@@ -79,6 +79,11 @@ wire [15:0] ioctl_index;
 wire        ioctl_wr;
 wire [26:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
+wire        mpeg2_stream_full;
+wire        mpeg2_stream_empty;
+wire [7:0]  mpeg2_stream_data;
+wire        mpeg2_stream_rd;
+wire        mpeg2_stream_wr;
 
 
 
@@ -102,7 +107,7 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
 
-	.ioctl_wait(1'b0)
+	.ioctl_wait(ioctl_download && mpeg2_stream_full)
 );
 
 ///////////////////////   CLOCKS   ///////////////////////////////
@@ -118,6 +123,32 @@ pll pll
 	.outclk_1(clk_video),
 	.outclk_2(clk_mpeg2)
 );
+
+assign mpeg2_stream_wr =
+	ioctl_download &&
+	ioctl_wr &&
+	(ioctl_index[5:0] == 6'd1) &&
+	!mpeg2_stream_full;
+
+assign mpeg2_stream_rd =
+	!mpeg2_stream_empty &&
+	!mpeg2_busy;
+
+mpeg2_stream_fifo mpeg2_stream_fifo
+(
+	.reset    (reset),
+
+	.wr_clk   (clk_sys),
+	.wr_data  (ioctl_dout),
+	.wr_en    (mpeg2_stream_wr),
+	.wr_full  (mpeg2_stream_full),
+
+	.rd_clk   (clk_sys),
+	.rd_en    (mpeg2_stream_rd),
+	.rd_data  (mpeg2_stream_data),
+	.rd_empty (mpeg2_stream_empty)
+);
+
 
 wire reset = RESET | status[0] | buttons[1];
 
@@ -233,10 +264,8 @@ mpeg2_decoder mpeg2_decoder
 	.dot_clk(clk_video),
 	.reset(reset),
 
-	.stream_data  (ioctl_dout),
-	.stream_valid (ioctl_download && ioctl_wr &&
-               (ioctl_index[5:0] == 6'd1) &&
-               !mpeg2_busy),
+	.stream_data  (mpeg2_stream_data),
+	.stream_valid (mpeg2_stream_rd),
 
 	.mem_res_wr_dta (mpeg2_mem_res_wr_dta),
 	.mem_res_wr_en  (mpeg2_mem_res_wr_en),
