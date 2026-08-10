@@ -99,7 +99,6 @@ mpeg2video decoder
 	.testpoint_dip    (4'h9),
 .testpoint_dip_en (1'b1),
 	.testpoint              (testpoint),
-	.testpoint              (testpoint),
 	.debug_mem_req_wr_en     (debug_mem_req_wr_en)
 );
 
