@@ -134,7 +134,7 @@ module framestore(rst, clk, mem_clk,
                   osd_rd_empty, osd_rd_almost_empty, osd_rd_en, osd_rd_valid, osd_rd_addr, osd_rd_dta, osd_wr_almost_full,
                   vbw_rd_empty, vbw_rd_almost_empty, vbw_rd_en, vbw_rd_valid, vbw_rd_dta, vbw_wr_almost_full,
                   vbr_wr_full, vbr_wr_almost_full, vbr_wr_dta, vbr_wr_en, vbr_wr_ack, vb_flush, vbr_rd_almost_empty,
-                  mem_req_rd_cmd, mem_req_rd_addr, mem_req_rd_dta, mem_req_rd_en, mem_req_rd_valid, 
+                  mem_req_rd_cmd, mem_req_rd_addr, mem_req_rd_dta, mem_req_rd_en, mem_req_rd_valid, mem_req_rd_empty,
                   mem_res_wr_dta, mem_res_wr_en, mem_res_wr_almost_full, mem_res_wr_full, mem_res_wr_overflow,
                   debug_mem_req_wr_en,
                   mem_req_wr_almost_full, mem_req_wr_full, mem_req_wr_overflow, 
@@ -226,6 +226,7 @@ module framestore(rst, clk, mem_clk,
   output       [63:0]mem_req_rd_dta;
   input              mem_req_rd_en;
   output             mem_req_rd_valid;
+  output             mem_req_rd_empty;
 
   wire          [2:0]tag_wr_dta;
   wire               tag_wr_en;
@@ -360,7 +361,7 @@ module framestore(rst, clk, mem_clk,
     .rd_clk(mem_clk), 
     .dout({mem_req_rd_cmd, mem_req_rd_addr, mem_req_rd_dta}), 
     .rd_en(mem_req_rd_en), 
-    .empty(), 
+    .empty(mem_req_rd_empty),
     .valid(mem_req_rd_valid), 
     .underflow(), 
     .prog_empty()

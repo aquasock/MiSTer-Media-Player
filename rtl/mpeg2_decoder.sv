@@ -26,6 +26,7 @@ module mpeg2_decoder
 	output wire [21:0] mem_req_rd_addr,
 	output wire [63:0] mem_req_rd_dta,
 	output wire        mem_req_rd_valid,
+	output wire        mem_req_rd_empty,
 
 	output wire        mem_res_wr_almost_full,
 
@@ -91,6 +92,7 @@ mpeg2video decoder
 	.mem_req_rd_dta         (mem_req_rd_dta),
 	.mem_req_rd_en          (mem_req_rd_en),
 	.mem_req_rd_valid       (mem_req_rd_valid),
+	.mem_req_rd_empty       (mem_req_rd_empty),
 
 	.mem_res_wr_dta         (mem_res_wr_dta),
 	.mem_res_wr_en          (mem_res_wr_en),

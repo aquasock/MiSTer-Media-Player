@@ -140,6 +140,7 @@ wire [1:0]  mpeg2_mem_req_rd_cmd;
 wire [21:0] mpeg2_mem_req_rd_addr;
 wire [63:0] mpeg2_mem_req_rd_dta;
 wire        mpeg2_mem_req_rd_valid;
+wire        mpeg2_mem_req_rd_empty;
 
 wire        mpeg2_mem_res_wr_almost_full;
 
@@ -210,6 +211,7 @@ mpeg2_decoder mpeg2_decoder
 	.mem_req_rd_addr        (mpeg2_mem_req_rd_addr),
 	.mem_req_rd_dta         (mpeg2_mem_req_rd_dta),
 	.mem_req_rd_valid       (mpeg2_mem_req_rd_valid),
+	.mem_req_rd_empty       (mpeg2_mem_req_rd_empty),
 
 	.mem_res_wr_almost_full (mpeg2_mem_res_wr_almost_full),
 
@@ -226,6 +228,7 @@ mpeg2_ddram_bridge mpeg2_ddram_bridge
 	.mem_req_addr        (mpeg2_mem_req_rd_addr),
 	.mem_req_dta         (mpeg2_mem_req_rd_dta),
 	.mem_req_valid       (mpeg2_mem_req_rd_valid),
+	.mem_req_empty       (mpeg2_mem_req_rd_empty),
 	.mem_req_en          (mpeg2_mem_req_rd_en),
 
 	.mem_res_dta         (mpeg2_mem_res_wr_dta),

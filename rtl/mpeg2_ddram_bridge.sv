@@ -8,6 +8,7 @@ module mpeg2_ddram_bridge
 	input  wire [21:0] mem_req_addr,
 	input  wire [63:0] mem_req_dta,
 	input  wire        mem_req_valid,
+	input  wire        mem_req_empty,
 	output reg         mem_req_en,
 
 	// MPEG2FPGA memory response FIFO
@@ -90,11 +91,11 @@ always @(posedge clk) begin
 // Request a FIFO read first, then capture the request when valid
 // is asserted on the following cycle.
 if (!pending) begin
-	if (!fetch_wait) begin
+	if (!fetch_wait && !mem_req_empty) begin
 		mem_req_en <= 1'b1;
 		fetch_wait <= 1'b1;
 	end
-	else if (mem_req_valid) begin
+	else if (fetch_wait && mem_req_valid) begin
 		debug_req_seen <= 1'b1;
 
 		pending      <= 1'b1;
@@ -102,11 +103,6 @@ if (!pending) begin
 		pending_addr <= mem_req_addr;
 		pending_dta  <= mem_req_dta;
 
-		fetch_wait <= 1'b0;
-	end
-	else begin
-		// FIFO was empty when we attempted the read.
-		// Try again on the next cycle.
 		fetch_wait <= 1'b0;
 	end
 end
