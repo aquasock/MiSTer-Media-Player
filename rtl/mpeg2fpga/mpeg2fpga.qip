@@ -6,7 +6,6 @@ set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/compat/generic_fifo_sc_b.
 set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/compat/generic_dpram.v
 
 set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/mpeg2video.v
-set_global_assignment -name VERILOG_MACRO "MODELINE_PAL_INTERL"
 set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/vbuf.v
 set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/getbits.v
 set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/vld.v
