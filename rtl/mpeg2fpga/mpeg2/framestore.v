@@ -136,6 +136,7 @@ module framestore(rst, clk, mem_clk,
                   vbr_wr_full, vbr_wr_almost_full, vbr_wr_dta, vbr_wr_en, vbr_wr_ack, vb_flush, vbr_rd_almost_empty,
                   mem_req_rd_cmd, mem_req_rd_addr, mem_req_rd_dta, mem_req_rd_en, mem_req_rd_valid, 
                   mem_res_wr_dta, mem_res_wr_en, mem_res_wr_almost_full, mem_res_wr_full, mem_res_wr_overflow,
+                  debug_mem_req_wr_en,
                   mem_req_wr_almost_full, mem_req_wr_full, mem_req_wr_overflow, 
 		  tag_wr_almost_full, tag_wr_full, tag_wr_overflow
                   );
@@ -214,6 +215,8 @@ module framestore(rst, clk, mem_clk,
   wire         [21:0]mem_req_wr_addr;
   wire         [63:0]mem_req_wr_dta;
   wire               mem_req_wr_en;
+  output             debug_mem_req_wr_en;
+  assign debug_mem_req_wr_en = mem_req_wr_en;
   output             mem_res_wr_full;
   output             mem_req_wr_full;
   output             mem_req_wr_overflow;
