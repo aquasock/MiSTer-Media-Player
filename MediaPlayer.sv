@@ -164,7 +164,7 @@ media_player media_player
 mpeg2_decoder mpeg2_decoder
 (
 	.clk                    (clk_sys),
-	.reset(1'b1),
+	.reset(reset),
 
 	.stream_data  (ioctl_dout),
 .stream_valid (ioctl_download && ioctl_wr &&
