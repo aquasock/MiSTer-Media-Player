@@ -56,6 +56,7 @@ module mpeg2video(clk, mem_clk, dot_clk,
              r, g, b, y, u, v, pixel_en, h_sync, v_sync, c_sync,                                                                  // clocked with dot_clk
              mem_req_rd_cmd, mem_req_rd_addr, mem_req_rd_dta, mem_req_rd_en, mem_req_rd_valid, mem_req_rd_empty,
              debug_mem_req_wr_en,
+             debug_vbr_wr_en,
              // clocked with mem_clk
              mem_res_wr_dta, mem_res_wr_en, mem_res_wr_almost_full,                                                               // clocked with mem_clk
              testpoint_dip, testpoint_dip_en, testpoint
@@ -102,6 +103,7 @@ module mpeg2video(clk, mem_clk, dot_clk,
   output           mem_req_rd_valid;
   output           mem_req_rd_empty;
   output              debug_mem_req_wr_en;
+  output              debug_vbr_wr_en;
   input      [63:0]mem_res_wr_dta;
   input            mem_res_wr_en;
   output           mem_res_wr_almost_full;
@@ -142,6 +144,7 @@ module mpeg2video(clk, mem_clk, dot_clk,
   /* framestore - vbr fifo interface */
   wire  [63:0]vbr_wr_dta;
   wire        vbr_wr_en;
+  assign debug_vbr_wr_en = vbr_wr_en;
   wire        vbr_wr_ack;
   wire        vbr_wr_full;
   wire        vbr_wr_almost_full;

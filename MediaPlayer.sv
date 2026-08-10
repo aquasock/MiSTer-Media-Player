@@ -151,12 +151,14 @@ wire        mpeg2_mem_res_wr_en;
 
 wire [33:0] mpeg2_debug_testpoint;
 wire mpeg2_debug_mem_req_wr_en;
+wire mpeg2_debug_vbr_wr_en;
 
 wire mpeg2_debug_req_seen;
 wire mpeg2_debug_read_seen;
 wire mpeg2_debug_write_seen;
 wire mpeg2_debug_response_seen;
 reg mpeg2_debug_mem_req_wr_seen = 1'b0;
+reg mpeg2_debug_vbr_wr_seen = 1'b0;
 
 always @(posedge clk_sys) begin
 	if (reset)
@@ -164,7 +166,12 @@ always @(posedge clk_sys) begin
 	else if (mpeg2_debug_mem_req_wr_en)
 		mpeg2_debug_mem_req_wr_seen <= 1'b1;
 end
-
+always @(posedge clk_sys) begin
+	if (reset)
+		mpeg2_debug_vbr_wr_seen <= 1'b0;
+	else if (mpeg2_debug_vbr_wr_en)
+		mpeg2_debug_vbr_wr_seen <= 1'b1;
+end
 
 
 media_player media_player
@@ -217,7 +224,8 @@ mpeg2_decoder mpeg2_decoder
 	.mem_res_wr_almost_full (mpeg2_mem_res_wr_almost_full),
 
 	.debug_testpoint        (mpeg2_debug_testpoint),
-	.debug_mem_req_wr_en    (mpeg2_debug_mem_req_wr_en)
+	.debug_mem_req_wr_en    (mpeg2_debug_mem_req_wr_en),
+	.debug_vbr_wr_en        (mpeg2_debug_vbr_wr_en)
 );
 
 mpeg2_ddram_bridge mpeg2_ddram_bridge
@@ -260,7 +268,7 @@ assign VGA_HS = HSync;
 assign VGA_VS = VSync;
 assign VGA_R = mpeg2_debug_mem_req_wr_seen ? 8'hFF : video;
 assign VGA_G = mpeg2_debug_req_seen ? 8'hFF : video;
-assign VGA_B = mpeg2_debug_response_seen ? 8'hFF : video;
+assign VGA_B = mpeg2_debug_vbr_wr_seen ? 8'hFF : video;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
