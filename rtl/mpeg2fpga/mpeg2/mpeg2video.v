@@ -56,6 +56,7 @@ module mpeg2video(clk, mem_clk, dot_clk,
              r, g, b, y, u, v, pixel_en, h_sync, v_sync, c_sync,                                                                  // clocked with dot_clk
              mem_req_rd_cmd, mem_req_rd_addr, mem_req_rd_dta, mem_req_rd_en, mem_req_rd_valid, mem_req_rd_empty,
              debug_mem_req_wr_en,
+             debug_getbits_valid,
              debug_vbr_wr_en,
              // clocked with mem_clk
              mem_res_wr_dta, mem_res_wr_en, mem_res_wr_almost_full,                                                               // clocked with mem_clk
@@ -104,6 +105,7 @@ module mpeg2video(clk, mem_clk, dot_clk,
   output           mem_req_rd_empty;
   output              debug_mem_req_wr_en;
   output              debug_vbr_wr_en;
+  output              debug_getbits_valid;
   input      [63:0]mem_res_wr_dta;
   input            mem_res_wr_en;
   output           mem_res_wr_almost_full;
@@ -161,7 +163,8 @@ module mpeg2video(clk, mem_clk, dot_clk,
   wire       align;                         // byte-align getbits and move forward one byte.
   wire [23:0]getbits;                       // elementary stream data. 
   wire       signbit;                       // sign bit, used when decoding dct variable length codes.
-  wire       getbits_valid;                 // getbits_valid is asserted when getbits is valid.
+  wire       getbits_valid;
+  assign debug_getbits_valid = getbits_valid;// getbits_valid is asserted when getbits is valid.
   wire       wait_state;                    // after vld requesting getbits to advance or align, vld should wait one cycle for getbits to process the request.
   wire       vld_en;                        // enable vld when getbits, rld, motcomp not busy, and not a wait state 
          
