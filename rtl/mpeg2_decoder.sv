@@ -33,7 +33,8 @@ module mpeg2_decoder
 	output wire [33:0] debug_testpoint,
 	output wire        debug_mem_req_wr_en,
 	output wire        debug_vbr_wr_en,
-	output wire        debug_getbits_valid
+	output wire        debug_getbits_valid,
+	output wire        debug_sequence_header_seen
 	);
 
 wire [7:0] y;
@@ -105,7 +106,8 @@ mpeg2video decoder
 	.testpoint              (testpoint),
 	.debug_mem_req_wr_en    (debug_mem_req_wr_en),
 	.debug_vbr_wr_en        (debug_vbr_wr_en),
-	.debug_getbits_valid    (debug_getbits_valid)
+	.debug_getbits_valid    (debug_getbits_valid),
+	.debug_sequence_header_seen (debug_sequence_header_seen)
 );
 
 endmodule

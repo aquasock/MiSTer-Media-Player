@@ -57,6 +57,7 @@ module mpeg2video(clk, mem_clk, dot_clk,
              mem_req_rd_cmd, mem_req_rd_addr, mem_req_rd_dta, mem_req_rd_en, mem_req_rd_valid, mem_req_rd_empty,
              debug_mem_req_wr_en,
              debug_getbits_valid,
+             debug_sequence_header_seen,
              debug_vbr_wr_en,
              // clocked with mem_clk
              mem_res_wr_dta, mem_res_wr_en, mem_res_wr_almost_full,                                                               // clocked with mem_clk
@@ -106,6 +107,7 @@ module mpeg2video(clk, mem_clk, dot_clk,
   output              debug_mem_req_wr_en;
   output              debug_vbr_wr_en;
   output              debug_getbits_valid;
+  output              debug_sequence_header_seen;
   input      [63:0]mem_res_wr_dta;
   input            mem_res_wr_en;
   output           mem_res_wr_almost_full;
@@ -278,7 +280,8 @@ module mpeg2video(clk, mem_clk, dot_clk,
   wire             motcomp_busy;            // asserted when motcomp input fifo's full
 
   /* vld - syncgen interface */
-  wire       [13:0]horizontal_size;         // horizontal size of frame
+  wire       [13:0]horizontal_size;
+  assign debug_sequence_header_seen = |horizontal_size;// horizontal size of frame
   wire       [13:0]vertical_size;           // vertical size of frame
   wire       [13:0]display_horizontal_size; // displayable part of frame. If non-zero, always less than horizontal_size.
   wire       [13:0]display_vertical_size;   // displayable part of frame. If non-zero, always less than vertical_size.
