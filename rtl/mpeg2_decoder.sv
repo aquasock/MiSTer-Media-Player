@@ -28,6 +28,7 @@ module mpeg2_decoder
 	output wire        mem_req_rd_valid,
 
 	output wire        mem_res_wr_almost_full
+	output wire [33:0] debug_testpoint,
 );
 
 wire [7:0] y;
@@ -40,6 +41,7 @@ wire watchdog_rst;
 
 wire [31:0] reg_dta_out;
 wire [33:0] testpoint;
+assign debug_testpoint = testpoint;
 
 
 // MPEG2FPGA uses an active-low reset.
@@ -92,8 +94,8 @@ mpeg2video decoder
 	.mem_res_wr_en          (mem_res_wr_en),
 	.mem_res_wr_almost_full (mem_res_wr_almost_full),
 
-	.testpoint_dip          (4'h0),
-	.testpoint_dip_en       (1'b0),
+	.testpoint_dip    (4'h9),
+.testpoint_dip_en (1'b1),
 	.testpoint              (testpoint)
 );
 

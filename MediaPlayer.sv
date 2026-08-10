@@ -80,6 +80,8 @@ wire        ioctl_wr;
 wire [26:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
 
+
+
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
 	.clk_sys(clk_sys),
@@ -146,6 +148,12 @@ wire        mpeg2_mem_req_rd_en;
 wire [63:0] mpeg2_mem_res_wr_dta;
 wire        mpeg2_mem_res_wr_en;
 
+wire [33:0] mpeg2_debug_testpoint;
+
+wire mpeg2_debug_req_seen;
+wire mpeg2_debug_read_seen;
+wire mpeg2_debug_response_seen;
+
 media_player media_player
 (
 	.clk     (clk_sys),
@@ -193,6 +201,7 @@ mpeg2_decoder mpeg2_decoder
 	.mem_req_rd_valid       (mpeg2_mem_req_rd_valid),
 
 	.mem_res_wr_almost_full (mpeg2_mem_res_wr_almost_full)
+	.debug_testpoint(mpeg2_debug_testpoint),
 );
 
 mpeg2_ddram_bridge mpeg2_ddram_bridge
@@ -219,6 +228,9 @@ mpeg2_ddram_bridge mpeg2_ddram_bridge
 	.ddram_din           (DDRAM_DIN),
 	.ddram_be            (DDRAM_BE),
 	.ddram_we            (DDRAM_WE)
+	.debug_req_seen      (mpeg2_debug_req_seen),
+.debug_read_seen     (mpeg2_debug_read_seen),
+.debug_response_seen (mpeg2_debug_response_seen),
 );
 
 assign CLK_VIDEO = clk_sys;
@@ -227,9 +239,9 @@ assign CE_PIXEL = ce_pix;
 assign VGA_DE = ~(HBlank | VBlank);
 assign VGA_HS = HSync;
 assign VGA_VS = VSync;
-assign VGA_R = video;
-assign VGA_G = video;
-assign VGA_B = video;
+assign VGA_R = mpeg2_debug_req_seen      ? 8'hFF : video;
+assign VGA_G = mpeg2_debug_read_seen     ? 8'hFF : video;
+assign VGA_B = mpeg2_debug_response_seen ? 8'hFF : video;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 

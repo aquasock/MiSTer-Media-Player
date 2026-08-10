@@ -25,6 +25,9 @@ module mpeg2_ddram_bridge
 	output reg  [63:0] ddram_din,
 	output wire [7:0]  ddram_be,
 	output reg         ddram_we
+	output reg debug_req_seen,
+output reg debug_read_seen,
+output reg debug_response_seen,
 );
 
 localparam [1:0]
@@ -58,6 +61,10 @@ always @(posedge clk) begin
 	ddram_we   <= 1'b0;
 
 	if (reset) begin
+	debug_req_seen      <= 1'b0;
+	debug_read_seen     <= 1'b0;
+	debug_response_seen <= 1'b0;
+
 		pending      <= 1'b0;
 		pending_cmd  <= CMD_NOOP;
 		pending_addr <= 22'd0;
@@ -71,6 +78,7 @@ always @(posedge clk) begin
 		// Capture the current MPEG2FPGA request, but do not remove it
 		// from its FIFO yet.
 		if (!pending && mem_req_valid) begin
+		debug_req_seen <= 1'b1;
 			pending      <= 1'b1;
 			pending_cmd  <= mem_req_cmd;
 			pending_addr <= mem_req_addr;
@@ -114,6 +122,8 @@ always @(posedge clk) begin
 						ddram_rd <= 1'b1;
 
 						if (!ddram_busy) begin
+						debug_read_seen <= 1'b1;
+
 							mem_req_en <= 1'b1;
 							pending    <= 1'b0;
 						end
@@ -137,6 +147,7 @@ always @(posedge clk) begin
 		mem_res_dta <= 64'd0;
 	end
 	else if (ddram_dout_ready) begin
+	debug_response_seen <= 1'b1;
 		mem_res_dta <= ddram_dout;
 		mem_res_en  <= 1'b1;
 	end
