@@ -158,6 +158,7 @@ wire mpeg2_debug_getbits_valid;
 wire mpeg2_debug_update_picture_buffers;
 wire mpeg2_debug_macroblock_seen;
 wire mpeg2_debug_sequence_header_seen;
+wire mpeg2_debug_pixel_underflow;
 
 wire mpeg2_debug_req_seen;
 wire mpeg2_debug_read_seen;
@@ -168,6 +169,7 @@ reg mpeg2_debug_vbr_wr_seen = 1'b0;
 reg mpeg2_debug_getbits_valid_seen = 1'b0;
 reg mpeg2_debug_update_picture_seen = 1'b0;
 reg mpeg2_debug_macroblock_seen_latched = 1'b0;
+reg mpeg2_debug_pixel_underflow_seen = 1'b0;
 
 always @(posedge clk_sys) begin
 	if (reset)
@@ -198,6 +200,12 @@ always @(posedge clk_sys) begin
 		mpeg2_debug_macroblock_seen_latched <= 1'b0;
 	else if (mpeg2_debug_macroblock_seen)
 		mpeg2_debug_macroblock_seen_latched <= 1'b1;
+end
+always @(posedge clk_video) begin
+	if (reset)
+		mpeg2_debug_pixel_underflow_seen <= 1'b0;
+	else if (mpeg2_debug_pixel_underflow)
+		mpeg2_debug_pixel_underflow_seen <= 1'b1;
 end
 
 
@@ -257,7 +265,8 @@ mpeg2_decoder mpeg2_decoder
 	.debug_getbits_valid    (mpeg2_debug_getbits_valid),
 	.debug_update_picture_buffers (mpeg2_debug_update_picture_buffers),
 	.debug_macroblock_seen        (mpeg2_debug_macroblock_seen),
-	.debug_sequence_header_seen (mpeg2_debug_sequence_header_seen)
+	.debug_sequence_header_seen (mpeg2_debug_sequence_header_seen),
+	.debug_pixel_underflow       (mpeg2_debug_pixel_underflow)
 );
 
 mpeg2_ddram_bridge mpeg2_ddram_bridge
@@ -304,6 +313,6 @@ assign VGA_B = mpeg2_b;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
-assign LED_USER = mpeg2_busy;
+assign LED_USER = mpeg2_busy | mpeg2_debug_pixel_underflow_seen;
 
 endmodule

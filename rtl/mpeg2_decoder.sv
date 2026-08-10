@@ -37,7 +37,8 @@ module mpeg2_decoder
 	output wire        debug_getbits_valid,
 	output wire        debug_update_picture_buffers,
 	output wire        debug_macroblock_seen,
-	output wire        debug_sequence_header_seen
+	output wire        debug_sequence_header_seen,
+	output wire        debug_pixel_underflow
 	);
 
 wire [7:0] y;
@@ -112,7 +113,8 @@ mpeg2video decoder
 	.debug_getbits_valid    (debug_getbits_valid),
 	.debug_update_picture_buffers (debug_update_picture_buffers),
 	.debug_macroblock_seen        (debug_macroblock_seen),
-	.debug_sequence_header_seen (debug_sequence_header_seen)
+	.debug_sequence_header_seen (debug_sequence_header_seen),
+	.debug_pixel_underflow       (debug_pixel_underflow)
 );
 
 endmodule

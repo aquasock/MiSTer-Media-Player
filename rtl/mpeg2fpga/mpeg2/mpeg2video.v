@@ -60,6 +60,7 @@ module mpeg2video(clk, mem_clk, dot_clk,
              debug_update_picture_buffers,
              debug_macroblock_seen,
              debug_sequence_header_seen,
+             debug_pixel_underflow,
              debug_vbr_wr_en,
              // clocked with mem_clk
              mem_res_wr_dta, mem_res_wr_en, mem_res_wr_almost_full,                                                               // clocked with mem_clk
@@ -112,6 +113,7 @@ module mpeg2video(clk, mem_clk, dot_clk,
   output              debug_update_picture_buffers;
   output              debug_macroblock_seen;
   output              debug_sequence_header_seen;
+  output              debug_pixel_underflow;
   input      [63:0]mem_res_wr_dta;
   input            mem_res_wr_en;
   output           mem_res_wr_almost_full;
@@ -323,6 +325,7 @@ module mpeg2video(clk, mem_clk, dot_clk,
   wire             pixel_rd_empty_pqueue;
   wire             pixel_rd_valid_pqueue;
   wire             pixel_rd_underflow_pqueue;
+  assign debug_pixel_underflow = pixel_rd_underflow_pqueue;
 
   /* mixer - osd interface */
   wire        [7:0]y_mixer;                 // luminance
