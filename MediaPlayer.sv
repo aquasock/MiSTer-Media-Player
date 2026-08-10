@@ -100,7 +100,7 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
 
-	.ioctl_wait(mpeg2_busy)
+	.ioctl_wait(1'b0)
 );
 
 ///////////////////////   CLOCKS   ///////////////////////////////
@@ -159,15 +159,15 @@ media_player media_player
 mpeg2_decoder mpeg2_decoder
 (
 	.clk                    (clk_sys),
-	.reset                  (reset),
+	.reset(1'b1),
 
 	.stream_data  (ioctl_dout),
 .stream_valid (ioctl_download && ioctl_wr &&
                (ioctl_index[5:0] == 6'd1)),
 
-	.mem_res_wr_dta         ({8{status[24:17]}}),
-	.mem_res_wr_en          (status[25]),
-	.mem_req_rd_en          (status[26]),
+	.mem_res_wr_dta (64'd0),
+	.mem_res_wr_en  (1'b0),
+	.mem_req_rd_en  (1'b0),
 
 	.busy                   (mpeg2_busy),
 	.error                  (mpeg2_error),
@@ -200,6 +200,6 @@ assign VGA_B = video;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
-assign LED_USER = ~(mpeg2_busy | mpeg2_error);
+assign LED_USER = 1'b0;
 
 endmodule
