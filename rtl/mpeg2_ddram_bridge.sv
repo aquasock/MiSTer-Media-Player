@@ -27,7 +27,7 @@ module mpeg2_ddram_bridge
 	output reg         ddram_we
 	output reg debug_req_seen,
 output reg debug_read_seen,
-output reg debug_response_seen,
+output reg debug_response_seen
 );
 
 localparam [1:0]

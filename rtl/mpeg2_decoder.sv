@@ -27,7 +27,7 @@ module mpeg2_decoder
 	output wire [63:0] mem_req_rd_dta,
 	output wire        mem_req_rd_valid,
 
-	output wire        mem_res_wr_almost_full
+	output wire        mem_res_wr_almost_full,
 	output wire [33:0] debug_testpoint,
 );
 
