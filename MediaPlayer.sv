@@ -59,31 +59,11 @@ localparam CONF_STR = {
 	"MediaPlayer;;",
 	"-;",
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
-	"O[2],TV Mode,NTSC,PAL;",
-	"O[4:3],Noise,White,Red,Green,Blue;",
-	"-;",
-	"P1,Test Page 1;",
-	"P1-;",
-	"P1-, -= Options in page 1 =-;",
-	"P1-;",
-	"P1O[5],Option 1-1,Off,On;",
-	"d0P1F1,BIN;",
-	"H0P1O[10],Option 1-2,Off,On;",
-	"-;",
-	"P2,Test Page 2;",
-	"P2-;",
-	"P2-, -= Options in page 2 =-;",
-	"P2-;",
-	"P2S0,DSK;",
-	"P2O[7:6],Option 2,1,2,3,4;",
-	"-;",
 	"-;",
 	"T[0],Reset;",
 	"R[0],Reset and close OSD;",
-	"v,0;", // [optional] config version 0-99. 
-	        // If CONF_STR options are changed in incompatible way, then change version number too,
-			  // so all options will get default values on first start.
-	"V,v",`BUILD_DATE 
+	"v,1;",
+	"V,v",`BUILD_DATE
 };
 
 wire forced_scandoubler;
