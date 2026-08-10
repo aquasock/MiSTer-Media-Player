@@ -2,6 +2,7 @@ module mpeg2_decoder
 (
 	input  wire        clk,
 	input  wire        mem_clk,
+	input  wire        dot_clk,
 	input  wire        reset,
 
 	input  wire [7:0]  stream_data,
@@ -61,7 +62,7 @@ mpeg2video decoder
 (
 	.clk     (clk),
 	.mem_clk (mem_clk),
-	.dot_clk (clk),
+	.dot_clk (dot_clk),
 
 	.rst                    (~reset),
 

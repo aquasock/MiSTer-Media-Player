@@ -99,7 +99,7 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.ioctl_download(ioctl_download),
 	.ioctl_index(ioctl_index),
 	.ioctl_wr(ioctl_wr),
-	.ioctl_addr(ioctl_addr),
+	.ioctl_addr(ioctl_addr),.mem_clk(clk_sys),
 	.ioctl_dout(ioctl_dout),
 
 	.ioctl_wait(1'b0)
@@ -108,11 +108,13 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 ///////////////////////   CLOCKS   ///////////////////////////////
 
 wire clk_sys;
+wire clk_video;
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
-	.outclk_0(clk_sys)
+	.outclk_0(clk_sys),
+	.outclk_1(clk_video)
 );
 
 wire reset = RESET | status[0] | buttons[1];
@@ -218,6 +220,7 @@ mpeg2_decoder mpeg2_decoder
 (
 	.clk                    (clk_sys),
 	.mem_clk(clk_sys),
+	.dot_clk(clk_video),
 	.reset(reset),
 
 	.stream_data  (ioctl_dout),
@@ -289,7 +292,7 @@ mpeg2_ddram_bridge mpeg2_ddram_bridge
 	.debug_response_seen (mpeg2_debug_response_seen)
 );
 
-assign CLK_VIDEO = clk_sys;
+assign CLK_VIDEO = clk_video;
 assign CE_PIXEL  = 1'b1;
 
 assign VGA_DE = mpeg2_pixel_en;
