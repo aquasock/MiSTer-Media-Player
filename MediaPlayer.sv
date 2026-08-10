@@ -149,7 +149,6 @@ wire        mpeg2_mem_res_wr_en;
 media_player media_player
 (
 	.clk     (clk_sys),
-	.mem_clk (CLK_50M),
 	.reset   (reset),
 
 	.ce_pix(ce_pix),
@@ -165,6 +164,7 @@ media_player media_player
 mpeg2_decoder mpeg2_decoder
 (
 	.clk                    (clk_sys),
+	.mem_clk (CLK_50M),
 	.reset(reset),
 
 	.stream_data  (ioctl_dout),
