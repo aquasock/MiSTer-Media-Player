@@ -100,11 +100,7 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
 
-	.ioctl_wait(
-    ioctl_download &&
-    (ioctl_index[5:0] == 6'd1) &&
-    mpeg2_busy
-)
+	.ioctl_wait(1'b0)
 );
 
 ///////////////////////   CLOCKS   ///////////////////////////////
@@ -236,6 +232,6 @@ assign VGA_B = video;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
-assign LED_USER = 1'b0;
+assign LED_USER = mpeg2_busy;
 
 endmodule
