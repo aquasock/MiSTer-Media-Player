@@ -254,7 +254,7 @@ assign VGA_DE = ~(HBlank | VBlank);
 assign VGA_HS = HSync;
 assign VGA_VS = VSync;
 assign VGA_R = mpeg2_debug_mem_req_wr_seen ? 8'hFF : video;
-assign VGA_G = mpeg2_debug_read_seen     ? 8'hFF : video;
+assign VGA_G = mpeg2_debug_req_seen ? 8'hFF : video;
 assign VGA_B = mpeg2_debug_response_seen ? 8'hFF : video;
 
 reg  [26:0] act_cnt;
