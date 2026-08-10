@@ -28,7 +28,7 @@ assign USER_OUT = '1;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
-assign DDRAM_CLK = clk_sys;
+assign DDRAM_CLK = clk_mpeg2_mem;
 
 assign VGA_SL = 0;
 assign VGA_F1 = 0;
@@ -115,13 +115,15 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 wire clk_sys;
 wire clk_video;
 wire clk_mpeg2;
+wire clk_mpeg2_mem;
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
 	.outclk_0(clk_sys),
 	.outclk_1(clk_video),
-	.outclk_2(clk_mpeg2)
+	.outclk_2(clk_mpeg2),
+	.outclk_3(clk_mpeg2_mem)
 );
 
 assign mpeg2_stream_wr =
@@ -260,7 +262,7 @@ media_player media_player
 mpeg2_decoder mpeg2_decoder
 (
 	.clk                    (clk_mpeg2),
-	.mem_clk(clk_sys),
+	.mem_clk                (clk_mpeg2_mem),
 	.dot_clk(clk_video),
 	.reset(reset),
 
@@ -302,7 +304,7 @@ mpeg2_decoder mpeg2_decoder
 
 mpeg2_ddram_bridge mpeg2_ddram_bridge
 (
-	.clk                    (clk_sys),
+	.clk                 (clk_mpeg2_mem),
 	.reset               (reset),
 
 	.mem_req_cmd         (mpeg2_mem_req_rd_cmd),
