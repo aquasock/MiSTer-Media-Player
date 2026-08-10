@@ -116,7 +116,7 @@ pll pll
 	.rst(0),
 	.outclk_0(clk_sys),
 	.outclk_1(clk_video),
-	.outclk_2(clk_mpeg2)
+	.clk(clk_sys)
 );
 
 wire reset = RESET | status[0] | buttons[1];
