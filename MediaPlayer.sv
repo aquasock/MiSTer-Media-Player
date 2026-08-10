@@ -110,7 +110,7 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 wire clk_sys;
 wire clk_video;
 wire clk_mpeg2;
-pll pll
+mediaplayer_pll mediaplayer_pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
