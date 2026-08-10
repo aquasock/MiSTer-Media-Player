@@ -99,7 +99,7 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.ioctl_download(ioctl_download),
 	.ioctl_index(ioctl_index),
 	.ioctl_wr(ioctl_wr),
-	.ioctl_addr(ioctl_addr),.mem_clk(clk_sys),
+	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
 
 	.ioctl_wait(1'b0)
