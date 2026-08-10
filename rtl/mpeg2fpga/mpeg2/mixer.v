@@ -38,6 +38,7 @@ module mixer(
   clk, rst, 
   pixel_repetition,
   y_in, u_in, v_in, osd_in, position_in, pixel_rd_en, pixel_rd_valid, pixel_rd_underflow,
+  debug_active_underflow,
   h_pos, v_pos, h_sync_in, v_sync_in, pixel_en_in,
   y_out, u_out, v_out, osd_out, h_sync_out, v_sync_out, pixel_en_out
   );
@@ -55,7 +56,8 @@ module mixer(
   input         [2:0]position_in;
   output reg         pixel_rd_en;
   input              pixel_rd_valid;
-  input              pixel_rd_underflow; // if pixel_rd_underflow we're outputting pixels faster than we're computing them
+  input              pixel_rd_underflow;
+  output            debug_active_underflow;// if pixel_rd_underflow we're outputting pixels faster than we're computing them
  
   /* from video sync generator */
   input        [11:0]h_pos;
@@ -214,7 +216,10 @@ module mixer(
 	            (state == STATE_REPEAT_PIXEL) || 
 	            (state == STATE_LAST_PIXEL) ||
 	            (state == STATE_REPEAT_LAST_PIXEL);
-
+assign debug_active_underflow =
+       pixel_rd_underflow &&
+       ((state == STATE_PIXEL) ||
+        (state == STATE_REPEAT_PIXEL));
   always @(posedge clk)
     if (~rst) y_out <= 8'b0;
     else if (pixel_en_2 && displaying) y_out <= y_0;

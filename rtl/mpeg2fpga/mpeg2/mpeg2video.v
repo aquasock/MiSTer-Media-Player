@@ -325,7 +325,8 @@ module mpeg2video(clk, mem_clk, dot_clk,
   wire             pixel_rd_empty_pqueue;
   wire             pixel_rd_valid_pqueue;
   wire             pixel_rd_underflow_pqueue;
-  assign debug_pixel_underflow = pixel_rd_underflow_pqueue;
+  wire             pixel_active_underflow;
+  assign debug_pixel_underflow = pixel_active_underflow;
 
   /* mixer - osd interface */
   wire        [7:0]y_mixer;                 // luminance
@@ -1108,7 +1109,8 @@ module mpeg2video(clk, mem_clk, dot_clk,
     .position_in(position_pqueue),                           // from pixel queue
     .pixel_rd_en(pixel_rd_en_pqueue),                        // to pixel queue
     .pixel_rd_valid(pixel_rd_valid_pqueue),                  // from pixel queue
-    .pixel_rd_underflow(pixel_rd_underflow_pqueue),          // from pixel queue
+    .pixel_rd_underflow(pixel_rd_underflow_pqueue),
+    .debug_active_underflow(pixel_active_underflow),// from pixel queue
     .h_pos(h_pos),                                           // from sync_gen
     .v_pos(v_pos),                                           // from sync_gen
     .h_sync_in(h_sync_gen),                                  // from sync_gen
