@@ -53,6 +53,7 @@ assign ddram_be       = 8'hFF;
 // -------------------------------------------------------------------------
 
 reg        pending;
+reg        fetch_wait;
 reg [1:0]  pending_cmd;
 reg [21:0] pending_addr;
 reg [63:0] pending_dta;
@@ -73,6 +74,7 @@ always @(posedge clk) begin
 	read_accepted   <= 1'b0;
 
 		pending      <= 1'b0;
+		fetch_wait   <= 1'b0;
 		pending_cmd  <= CMD_NOOP;
 		pending_addr <= 22'd0;
 		pending_dta  <= 64'd0;
@@ -84,27 +86,42 @@ always @(posedge clk) begin
 
 		// Capture the current MPEG2FPGA request, but do not remove it
 		// from its FIFO yet.
-		if (!pending && mem_req_valid) begin
+		// fifo_dc "valid" is a read acknowledge, not an empty/not-empty flag.
+// Request a FIFO read first, then capture the request when valid
+// is asserted on the following cycle.
+if (!pending) begin
+	if (!fetch_wait) begin
+		mem_req_en <= 1'b1;
+		fetch_wait <= 1'b1;
+	end
+	else if (mem_req_valid) begin
 		debug_req_seen <= 1'b1;
-			pending      <= 1'b1;
-			pending_cmd  <= mem_req_cmd;
-			pending_addr <= mem_req_addr;
-			pending_dta  <= mem_req_dta;
-		end
+
+		pending      <= 1'b1;
+		pending_cmd  <= mem_req_cmd;
+		pending_addr <= mem_req_addr;
+		pending_dta  <= mem_req_dta;
+
+		fetch_wait <= 1'b0;
+	end
+	else begin
+		// FIFO was empty when we attempted the read.
+		// Try again on the next cycle.
+		fetch_wait <= 1'b0;
+	end
+end
 
 		if (pending) begin
 			case (pending_cmd)
 
 				CMD_NOOP: begin
-					mem_req_en <= 1'b1;
-					pending    <= 1'b0;
-				end
+	pending <= 1'b0;
+end
 
 				CMD_REFRESH: begin
-					// MiSTer DDR3 handles refresh internally.
-					mem_req_en <= 1'b1;
-					pending    <= 1'b0;
-				end
+	// MiSTer DDR3 handles refresh internally.
+	pending <= 1'b0;
+end
 
 				CMD_WRITE: begin
 					ddram_addr <= DDR_BASE +
@@ -115,7 +132,6 @@ always @(posedge clk) begin
 					ddram_we <= 1'b1;
 
 					if (!ddram_busy) begin
-						mem_req_en <= 1'b1;
 						pending    <= 1'b0;
 					end
 				end
@@ -133,7 +149,6 @@ always @(posedge clk) begin
 
 						read_accepted   <= 1'b1;
 
-							mem_req_en <= 1'b1;
 							pending    <= 1'b0;
 						end
 					end
