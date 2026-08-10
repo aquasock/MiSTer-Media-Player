@@ -273,7 +273,7 @@ mpeg2_decoder mpeg2_decoder
 
 mpeg2_ddram_bridge mpeg2_ddram_bridge
 (
-	.clk(clk_mpeg2),
+	.clk                    (clk_sys),
 	.reset               (reset),
 
 	.mem_req_cmd         (mpeg2_mem_req_rd_cmd),
