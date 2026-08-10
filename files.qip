@@ -1,6 +1,6 @@
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_player.sv
+
+set_global_assignment -name QIP_FILE rtl/mpeg2fpga/mpeg2fpga.qip
+
 set_global_assignment -name SDC_FILE MediaPlayer.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE MediaPlayer.sv
-set_global_assignment -name SDC_FILE MediaPlayer.sdc
-set_global_assignment -name SYSTEMVERILOG_FILE MediaPlayer.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_player.sv

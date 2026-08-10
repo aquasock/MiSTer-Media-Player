@@ -1,0 +1,48 @@
+set_global_assignment -name SEARCH_PATH rtl/mpeg2fpga/mpeg2
+
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/compat/wrappers.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/compat/generic_fifo_dc.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/compat/generic_fifo_sc_b.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/compat/generic_dpram.v
+
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/mpeg2video.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/vbuf.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/getbits.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/vld.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/rld.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/iquant.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/idct.v
+
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/motcomp.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/motcomp_motvec.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/motcomp_addrgen.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/motcomp_picbuf.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/motcomp_dcttype.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/motcomp_recon.v
+
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/fwft.v
+
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/resample.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/resample_addrgen.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/resample_dta.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/resample_bilinear.v
+
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/pixel_queue.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/mixer.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/syncgen.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/syncgen_intf.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/yuv2rgb.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/osd.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/regfile.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/reset.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/watchdog.v
+
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/framestore.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/framestore_request.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/framestore_response.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/read_write.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/mem_addr.v
+
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/synchronizer.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/probe.v
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/xfifo_sc.v
