@@ -28,7 +28,7 @@ assign USER_OUT = '1;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
-assign DDRAM_CLK = clk_sys;
+assign DDRAM_CLK = CLK_50M;
 
 assign VGA_SL = 0;
 assign VGA_F1 = 0;
@@ -148,8 +148,9 @@ wire        mpeg2_mem_res_wr_en;
 
 media_player media_player
 (
-	.clk(clk_sys),
-	.reset(reset),
+	.clk     (clk_sys),
+	.mem_clk (CLK_50M),
+	.reset   (reset),
 
 	.ce_pix(ce_pix),
 
@@ -196,7 +197,7 @@ mpeg2_decoder mpeg2_decoder
 
 mpeg2_ddram_bridge mpeg2_ddram_bridge
 (
-	.clk                 (clk_sys),
+	.clk (CLK_50M),
 	.reset               (reset),
 
 	.mem_req_cmd         (mpeg2_mem_req_rd_cmd),
