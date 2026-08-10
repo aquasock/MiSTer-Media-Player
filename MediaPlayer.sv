@@ -109,12 +109,14 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 
 wire clk_sys;
 wire clk_video;
+wire clk_mpeg2;
 pll pll
 (
 	.refclk(CLK_50M),
 	.rst(0),
 	.outclk_0(clk_sys),
-	.outclk_1(clk_video)
+	.outclk_1(clk_video),
+	.outclk_2(clk_mpeg2)
 );
 
 wire reset = RESET | status[0] | buttons[1];
@@ -271,7 +273,7 @@ mpeg2_decoder mpeg2_decoder
 
 mpeg2_ddram_bridge mpeg2_ddram_bridge
 (
-	.clk(clk_sys),
+	.clk(clk_mpeg2),
 	.reset               (reset),
 
 	.mem_req_cmd         (mpeg2_mem_req_rd_cmd),
