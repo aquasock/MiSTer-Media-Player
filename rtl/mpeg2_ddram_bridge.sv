@@ -56,8 +56,12 @@ reg        pending;
 reg [1:0]  pending_cmd;
 reg [21:0] pending_addr;
 reg [63:0] pending_dta;
+reg       read_accepted;
+reg       read_returned;
+reg [7:0] outstanding_reads;
 
 always @(posedge clk) begin
+	read_accepted <= 1'b0;
 	mem_req_en <= 1'b0;
 	ddram_rd   <= 1'b0;
 	ddram_we   <= 1'b0;
@@ -65,6 +69,8 @@ always @(posedge clk) begin
 	if (reset) begin
 	debug_req_seen      <= 1'b0;
 	debug_read_seen     <= 1'b0;
+
+	read_accepted   <= 1'b0;
 
 		pending      <= 1'b0;
 		pending_cmd  <= CMD_NOOP;
@@ -125,6 +131,8 @@ always @(posedge clk) begin
 						if (!ddram_busy) begin
 						debug_read_seen <= 1'b1;
 
+						read_accepted   <= 1'b1;
+
 							mem_req_en <= 1'b1;
 							pending    <= 1'b0;
 						end
@@ -142,15 +150,40 @@ end
 // -------------------------------------------------------------------------
 
 always @(posedge clk) begin
-	mem_res_en <= 1'b0;
+	mem_res_en    <= 1'b0;
+	read_returned <= 1'b0;
 
 	if (reset) begin
-		mem_res_dta <= 64'd0;
+		mem_res_dta         <= 64'd0;
+		debug_response_seen <= 1'b0;
+		read_returned       <= 1'b0;
 	end
-	else if (ddram_dout_ready) begin
-	debug_response_seen <= 1'b1;
-		mem_res_dta <= ddram_dout;
-		mem_res_en  <= 1'b1;
+	else if (ddram_dout_ready && (outstanding_reads != 0)) begin
+		mem_res_dta         <= ddram_dout;
+		mem_res_en          <= 1'b1;
+		debug_response_seen <= 1'b1;
+		read_returned       <= 1'b1;
+	end
+end
+
+always @(posedge clk) begin
+	if (reset) begin
+		outstanding_reads <= 8'd0;
+	end
+	else begin
+		case ({read_accepted, read_returned})
+
+			2'b10:
+				outstanding_reads <= outstanding_reads + 8'd1;
+
+			2'b01:
+				if (outstanding_reads != 0)
+					outstanding_reads <= outstanding_reads - 8'd1;
+
+			default:
+				outstanding_reads <= outstanding_reads;
+
+		endcase
 	end
 end
 
