@@ -171,8 +171,9 @@ mpeg2_decoder mpeg2_decoder
 	.reset(reset),
 
 	.stream_data  (ioctl_dout),
-.stream_valid (ioctl_download && ioctl_wr &&
-               (ioctl_index[5:0] == 6'd1)),
+	.stream_valid (ioctl_download && ioctl_wr &&
+               (ioctl_index[5:0] == 6'd1) &&
+               !mpeg2_busy),
 
 	.mem_res_wr_dta (mpeg2_mem_res_wr_dta),
 	.mem_res_wr_en  (mpeg2_mem_res_wr_en),
