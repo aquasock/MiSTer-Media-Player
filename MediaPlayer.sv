@@ -107,6 +107,24 @@ wire VSync;
 wire ce_pix;
 wire [7:0] video;
 
+wire        mpeg2_busy;
+wire        mpeg2_error;
+
+wire [7:0]  mpeg2_r;
+wire [7:0]  mpeg2_g;
+wire [7:0]  mpeg2_b;
+
+wire        mpeg2_pixel_en;
+wire        mpeg2_h_sync;
+wire        mpeg2_v_sync;
+
+wire [1:0]  mpeg2_mem_req_rd_cmd;
+wire [21:0] mpeg2_mem_req_rd_addr;
+wire [63:0] mpeg2_mem_req_rd_dta;
+wire        mpeg2_mem_req_rd_valid;
+
+wire        mpeg2_mem_res_wr_almost_full;
+
 media_player media_player
 (
 	.clk(clk_sys),
@@ -122,6 +140,37 @@ media_player media_player
 	.video(video)
 );
 
+mpeg2_decoder mpeg2_decoder
+(
+	.clk                    (clk_sys),
+	.reset                  (reset),
+
+	.stream_data            (status[15:8]),
+	.stream_valid           (status[16]),
+
+	.mem_res_wr_dta         ({8{status[24:17]}}),
+	.mem_res_wr_en          (status[25]),
+	.mem_req_rd_en          (status[26]),
+
+	.busy                   (mpeg2_busy),
+	.error                  (mpeg2_error),
+
+	.r                      (mpeg2_r),
+	.g                      (mpeg2_g),
+	.b                      (mpeg2_b),
+
+	.pixel_en               (mpeg2_pixel_en),
+	.h_sync                 (mpeg2_h_sync),
+	.v_sync                 (mpeg2_v_sync),
+
+	.mem_req_rd_cmd         (mpeg2_mem_req_rd_cmd),
+	.mem_req_rd_addr        (mpeg2_mem_req_rd_addr),
+	.mem_req_rd_dta         (mpeg2_mem_req_rd_dta),
+	.mem_req_rd_valid       (mpeg2_mem_req_rd_valid),
+
+	.mem_res_wr_almost_full (mpeg2_mem_res_wr_almost_full)
+);
+
 assign CLK_VIDEO = clk_sys;
 assign CE_PIXEL = ce_pix;
 
@@ -134,6 +183,6 @@ assign VGA_B = video;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
-assign LED_USER    = act_cnt[26]  ? act_cnt[25:18]  > act_cnt[7:0]  : act_cnt[25:18]  <= act_cnt[7:0];
+assign LED_USER = ~(mpeg2_busy | mpeg2_error);
 
 endmodule
