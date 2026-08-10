@@ -289,8 +289,8 @@ mpeg2_ddram_bridge mpeg2_ddram_bridge
 	.debug_response_seen (mpeg2_debug_response_seen)
 );
 
-assign CE_PIXEL = 1'b1;
-assign CE_PIXEL = ce_pix;
+assign CLK_VIDEO = clk_sys;
+assign CE_PIXEL  = 1'b1;
 
 assign VGA_DE = mpeg2_pixel_en;
 assign VGA_HS = mpeg2_h_sync;
