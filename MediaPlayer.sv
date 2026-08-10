@@ -43,7 +43,7 @@ assign AUDIO_L = 0;
 assign AUDIO_R = 0;
 assign AUDIO_MIX = 0;
 
-assign LED_DISK = 0;
+assign LED_DISK = ioctl_download;
 assign LED_POWER = 0;
 assign BUTTONS = 0;
 
@@ -57,12 +57,14 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 `include "build_id.v" 
 localparam CONF_STR = {
 	"MediaPlayer;;",
+	"F1,M2V,Open MPEG-2 Video;",
+	"-;",
 	"-;",
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"-;",
 	"T[0],Reset;",
 	"R[0],Reset and close OSD;",
-	"v,1;",
+	"v,2;",
 	"V,v",`BUILD_DATE
 };
 
@@ -70,6 +72,13 @@ wire forced_scandoubler;
 wire   [1:0] buttons;
 wire [127:0] status;
 wire  [10:0] ps2_key;
+
+// ARM -> FPGA MPEG-2 elementary-stream transfer.
+wire        ioctl_download;
+wire [15:0] ioctl_index;
+wire        ioctl_wr;
+wire [26:0] ioctl_addr;
+wire  [7:0] ioctl_dout;
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
@@ -83,8 +92,15 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 	.buttons(buttons),
 	.status(status),
 	.status_menumask(0),
-	
-	.ps2_key(ps2_key)
+	.ps2_key(ps2_key),
+
+	.ioctl_download(ioctl_download),
+	.ioctl_index(ioctl_index),
+	.ioctl_wr(ioctl_wr),
+	.ioctl_addr(ioctl_addr),
+	.ioctl_dout(ioctl_dout),
+
+	.ioctl_wait(mpeg2_busy)
 );
 
 ///////////////////////   CLOCKS   ///////////////////////////////
@@ -145,8 +161,9 @@ mpeg2_decoder mpeg2_decoder
 	.clk                    (clk_sys),
 	.reset                  (reset),
 
-	.stream_data            (status[15:8]),
-	.stream_valid           (status[16]),
+	.stream_data  (ioctl_dout),
+.stream_valid (ioctl_download && ioctl_wr &&
+               (ioctl_index[5:0] == 6'd1)),
 
 	.mem_res_wr_dta         ({8{status[24:17]}}),
 	.mem_res_wr_en          (status[25]),
