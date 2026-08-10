@@ -102,7 +102,7 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	.status_menumask({status[5]}),
+	.status_menumask(0),
 	
 	.ps2_key(ps2_key)
 );
@@ -119,7 +119,6 @@ pll pll
 
 wire reset = RESET | status[0] | buttons[1];
 
-wire [1:0] col = status[4:3];
 
 wire HBlank;
 wire HSync;
@@ -128,13 +127,10 @@ wire VSync;
 wire ce_pix;
 wire [7:0] video;
 
-mycore mycore
+media_player media_player
 (
 	.clk(clk_sys),
 	.reset(reset),
-	
-	.pal(status[2]),
-	.scandouble(forced_scandoubler),
 
 	.ce_pix(ce_pix),
 
@@ -152,9 +148,9 @@ assign CE_PIXEL = ce_pix;
 assign VGA_DE = ~(HBlank | VBlank);
 assign VGA_HS = HSync;
 assign VGA_VS = VSync;
-assign VGA_G  = (!col || col == 2) ? video : 8'd0;
-assign VGA_R  = (!col || col == 1) ? video : 8'd0;
-assign VGA_B  = (!col || col == 3) ? video : 8'd0;
+assign VGA_R = video;
+assign VGA_G = video;
+assign VGA_B = video;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
