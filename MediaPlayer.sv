@@ -201,7 +201,8 @@ mpeg2_decoder mpeg2_decoder
 	.mem_req_rd_valid       (mpeg2_mem_req_rd_valid),
 
 	.mem_res_wr_almost_full (mpeg2_mem_res_wr_almost_full),
-	.debug_testpoint(mpeg2_debug_testpoint),
+
+	.debug_testpoint        (mpeg2_debug_testpoint)
 );
 
 mpeg2_ddram_bridge mpeg2_ddram_bridge
@@ -227,10 +228,11 @@ mpeg2_ddram_bridge mpeg2_ddram_bridge
 	.ddram_rd            (DDRAM_RD),
 	.ddram_din           (DDRAM_DIN),
 	.ddram_be            (DDRAM_BE),
-	.ddram_we            (DDRAM_WE)
+	.ddram_we            (DDRAM_WE),
+
 	.debug_req_seen      (mpeg2_debug_req_seen),
-.debug_read_seen     (mpeg2_debug_read_seen),
-.debug_response_seen (mpeg2_debug_response_seen)
+	.debug_read_seen     (mpeg2_debug_read_seen),
+	.debug_response_seen (mpeg2_debug_response_seen)
 );
 
 assign CLK_VIDEO = clk_sys;
