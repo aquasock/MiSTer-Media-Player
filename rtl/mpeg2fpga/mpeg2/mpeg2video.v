@@ -58,6 +58,7 @@ module mpeg2video(clk, mem_clk, dot_clk,
              debug_mem_req_wr_en,
              debug_getbits_valid,
              debug_update_picture_buffers,
+             debug_macroblock_seen,
              debug_sequence_header_seen,
              debug_vbr_wr_en,
              // clocked with mem_clk
@@ -109,6 +110,8 @@ module mpeg2video(clk, mem_clk, dot_clk,
   output              debug_vbr_wr_en;
   output              debug_getbits_valid;
   output              debug_update_picture_buffers;
+  output              debug_macroblock_seen;
+  output              debug_macroblock_seen;
   output              debug_sequence_header_seen;
   input      [63:0]mem_res_wr_dta;
   input            mem_res_wr_en;
@@ -250,6 +253,7 @@ module mpeg2video(clk, mem_clk, dot_clk,
   wire         [1:0]motion_type;
   wire              dct_type;
   wire        [12:0]macroblock_address;
+  assign debug_macroblock_seen = |macroblock_address;
   wire              macroblock_motion_forward;
   wire              macroblock_motion_backward;
   wire         [7:0]mb_width;

@@ -154,6 +154,7 @@ wire mpeg2_debug_mem_req_wr_en;
 wire mpeg2_debug_vbr_wr_en;
 wire mpeg2_debug_getbits_valid;
 wire mpeg2_debug_update_picture_buffers;
+wire mpeg2_debug_macroblock_seen;
 wire mpeg2_debug_sequence_header_seen;
 
 wire mpeg2_debug_req_seen;
@@ -164,6 +165,7 @@ reg mpeg2_debug_mem_req_wr_seen = 1'b0;
 reg mpeg2_debug_vbr_wr_seen = 1'b0;
 reg mpeg2_debug_getbits_valid_seen = 1'b0;
 reg mpeg2_debug_update_picture_seen = 1'b0;
+reg mpeg2_debug_macroblock_seen_latched = 1'b0;
 
 always @(posedge clk_sys) begin
 	if (reset)
@@ -188,6 +190,12 @@ always @(posedge clk_sys) begin
 		mpeg2_debug_update_picture_seen <= 1'b0;
 	else if (mpeg2_debug_update_picture_buffers)
 		mpeg2_debug_update_picture_seen <= 1'b1;
+end
+always @(posedge clk_sys) begin
+	if (reset)
+		mpeg2_debug_macroblock_seen_latched <= 1'b0;
+	else if (mpeg2_debug_macroblock_seen)
+		mpeg2_debug_macroblock_seen_latched <= 1'b1;
 end
 
 
@@ -245,6 +253,7 @@ mpeg2_decoder mpeg2_decoder
 	.debug_vbr_wr_en        (mpeg2_debug_vbr_wr_en),
 	.debug_getbits_valid    (mpeg2_debug_getbits_valid),
 	.debug_update_picture_buffers (mpeg2_debug_update_picture_buffers),
+	.debug_macroblock_seen        (mpeg2_debug_macroblock_seen),
 	.debug_sequence_header_seen (mpeg2_debug_sequence_header_seen)
 );
 
@@ -288,7 +297,7 @@ assign VGA_HS = HSync;
 assign VGA_VS = VSync;
 assign VGA_R = mpeg2_debug_mem_req_wr_seen ? 8'hFF : video;
 assign VGA_G = mpeg2_debug_req_seen ? 8'hFF : video;
-assign VGA_B = mpeg2_debug_update_picture_seen ? 8'hFF : video;
+assign VGA_B = mpeg2_debug_macroblock_seen_latched ? 8'hFF : video;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
