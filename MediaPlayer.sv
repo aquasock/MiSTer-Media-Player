@@ -289,15 +289,15 @@ mpeg2_ddram_bridge mpeg2_ddram_bridge
 	.debug_response_seen (mpeg2_debug_response_seen)
 );
 
-assign CLK_VIDEO = clk_sys;
+assign CE_PIXEL = 1'b1;
 assign CE_PIXEL = ce_pix;
 
-assign VGA_DE = ~(HBlank | VBlank);
-assign VGA_HS = HSync;
-assign VGA_VS = VSync;
-assign VGA_R = mpeg2_debug_mem_req_wr_seen ? 8'hFF : video;
-assign VGA_G = mpeg2_debug_req_seen ? 8'hFF : video;
-assign VGA_B = mpeg2_debug_macroblock_seen_latched ? 8'hFF : video;
+assign VGA_DE = mpeg2_pixel_en;
+assign VGA_HS = mpeg2_h_sync;
+assign VGA_VS = mpeg2_v_sync;
+assign VGA_R = mpeg2_r;
+assign VGA_G = mpeg2_g;
+assign VGA_B = mpeg2_b;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
