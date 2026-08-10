@@ -33,92 +33,84 @@ localparam [1:0]
 	CMD_READ    = 2'b10,
 	CMD_WRITE   = 2'b11;
 
-// MiSTer FPGA-accessible DDR region starts at byte address 0x20000000.
-// DDRAM_ADDR is a 64-bit-word address, therefore:
-//
-//     0x20000000 / 8 = 0x04000000
-//
 localparam [28:0] DDR_BASE = 29'h04000000;
 
 assign ddram_burstcnt = 8'd1;
 assign ddram_be       = 8'hFF;
 
-localparam STATE_IDLE      = 1'b0;
-localparam STATE_READ_WAIT = 1'b1;
 
-reg state;
+// -------------------------------------------------------------------------
+// MPEG2FPGA request -> MiSTer DDRAM
+//
+// MPEG2FPGA was designed for a pipelined memory controller. Do not wait for
+// a read response before accepting another request. DDRAM returns read data
+// later through DDRAM_DOUT_READY, in request order.
+// -------------------------------------------------------------------------
 
 always @(posedge clk) begin
 	mem_req_en <= 1'b0;
-	mem_res_en <= 1'b0;
 	ddram_rd   <= 1'b0;
 	ddram_we   <= 1'b0;
 
 	if (reset) begin
-		state       <= STATE_IDLE;
-		ddram_addr  <= 29'd0;
-		ddram_din   <= 64'd0;
-		mem_res_dta <= 64'd0;
+		ddram_addr <= 29'd0;
+		ddram_din  <= 64'd0;
 	end
-	else begin
-		case (state)
+	else if (mem_req_valid) begin
+		case (mem_req_cmd)
 
-			STATE_IDLE: begin
-				if (mem_req_valid) begin
-					case (mem_req_cmd)
+			CMD_NOOP: begin
+				mem_req_en <= 1'b1;
+			end
 
-						CMD_NOOP: begin
-							// Consume the MPEG2FPGA request.
-							mem_req_en <= 1'b1;
-						end
+			CMD_REFRESH: begin
+				// MiSTer DDR3 performs refresh internally.
+				mem_req_en <= 1'b1;
+			end
 
-						CMD_REFRESH: begin
-							// MiSTer's DDR3 controller performs its own refresh.
-							// Consume the legacy MPEG2FPGA refresh request.
-							mem_req_en <= 1'b1;
-						end
+			CMD_WRITE: begin
+				if (!ddram_busy) begin
+					ddram_addr <= DDR_BASE +
+					              {{7{1'b0}}, mem_req_addr};
 
-						CMD_WRITE: begin
-							if (!ddram_busy) begin
-								ddram_addr <= DDR_BASE +
-								              {{7{1'b0}}, mem_req_addr};
+					ddram_din <= mem_req_dta;
+					ddram_we  <= 1'b1;
 
-								ddram_din <= mem_req_dta;
-								ddram_we  <= 1'b1;
-
-								// Request has now been accepted.
-								mem_req_en <= 1'b1;
-							end
-						end
-
-						CMD_READ: begin
-							if (!ddram_busy && !mem_res_almost_full) begin
-								ddram_addr <= DDR_BASE +
-								              {{7{1'b0}}, mem_req_addr};
-
-								ddram_rd <= 1'b1;
-
-								// Remove this request from MPEG2FPGA's request FIFO.
-								mem_req_en <= 1'b1;
-
-								// Wait for MiSTer DDRAM read response.
-								state <= STATE_READ_WAIT;
-							end
-						end
-
-					endcase
+					mem_req_en <= 1'b1;
 				end
 			end
 
-			STATE_READ_WAIT: begin
-				if (ddram_dout_ready) begin
-					mem_res_dta <= ddram_dout;
-					mem_res_en  <= 1'b1;
-					state       <= STATE_IDLE;
+			CMD_READ: begin
+				if (!ddram_busy && !mem_res_almost_full) begin
+					ddram_addr <= DDR_BASE +
+					              {{7{1'b0}}, mem_req_addr};
+
+					ddram_rd <= 1'b1;
+
+					// The response will arrive later. MPEG2FPGA's internal
+					// tag FIFO preserves the destination of each read.
+					mem_req_en <= 1'b1;
 				end
 			end
 
 		endcase
+	end
+end
+
+
+// -------------------------------------------------------------------------
+// MiSTer DDRAM -> MPEG2FPGA response FIFO
+// -------------------------------------------------------------------------
+
+always @(posedge clk) begin
+	mem_res_en <= 1'b0;
+
+	if (reset) begin
+		mem_res_dta <= 64'd0;
+	end
+	else if (ddram_dout_ready) begin
+		mem_res_dta <= ddram_dout;
+		mem_res_en  <= 1'b1;
 	end
 end
 
