@@ -27,6 +27,7 @@ set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/resample_addrgen.v
 set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/resample_dta.v
 set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/resample_bilinear.v
 
+set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/osd.v
 set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/pixel_queue.v
 set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/mixer.v
 set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/syncgen.v

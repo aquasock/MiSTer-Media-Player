@@ -65,7 +65,7 @@
  * or static, on a black or a transparent background.
  */
 
-module osd (
+module mpeg2_osd (
   clk, clk_en, rst,
   y_in, u_in, v_in, h_sync_in, v_sync_in, pixel_en_in, osd_in,
   y_out, u_out, v_out, h_sync_out, v_sync_out, pixel_en_out,

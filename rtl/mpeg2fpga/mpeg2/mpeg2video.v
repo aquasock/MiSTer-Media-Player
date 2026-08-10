@@ -1103,7 +1103,7 @@ module mpeg2video(clk, mem_clk, dot_clk,
 
   /* On-Screen Display */
 
-  osd osd (
+  mpeg2_osd osd (
     .clk(dot_clk), 
     .clk_en(1'b1), 
     .rst(dot_rst), 
