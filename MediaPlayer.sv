@@ -143,7 +143,7 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 	.wr_en    (mpeg2_stream_wr),
 	.wr_full  (mpeg2_stream_full),
 
-	.rd_clk   (clk_sys),
+	.rd_clk   (clk_mpeg2),
 	.rd_en    (mpeg2_stream_rd),
 	.rd_data  (mpeg2_stream_data),
 	.rd_empty (mpeg2_stream_empty)
@@ -259,7 +259,7 @@ media_player media_player
 
 mpeg2_decoder mpeg2_decoder
 (
-	.clk                    (clk_sys),
+	.clk                    (clk_mpeg2),
 	.mem_clk(clk_sys),
 	.dot_clk(clk_video),
 	.reset(reset),
