@@ -111,7 +111,6 @@ module mpeg2video(clk, mem_clk, dot_clk,
   output              debug_getbits_valid;
   output              debug_update_picture_buffers;
   output              debug_macroblock_seen;
-  output              debug_macroblock_seen;
   output              debug_sequence_header_seen;
   input      [63:0]mem_res_wr_dta;
   input            mem_res_wr_en;
