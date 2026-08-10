@@ -65,7 +65,6 @@ always @(posedge clk) begin
 	if (reset) begin
 	debug_req_seen      <= 1'b0;
 	debug_read_seen     <= 1'b0;
-	debug_response_seen <= 1'b0;
 
 		pending      <= 1'b0;
 		pending_cmd  <= CMD_NOOP;
