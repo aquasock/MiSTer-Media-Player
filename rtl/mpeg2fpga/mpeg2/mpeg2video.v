@@ -57,6 +57,7 @@ module mpeg2video(clk, mem_clk, dot_clk,
              mem_req_rd_cmd, mem_req_rd_addr, mem_req_rd_dta, mem_req_rd_en, mem_req_rd_valid, mem_req_rd_empty,
              debug_mem_req_wr_en,
              debug_getbits_valid,
+             debug_update_picture_buffers,
              debug_sequence_header_seen,
              debug_vbr_wr_en,
              // clocked with mem_clk
@@ -107,6 +108,7 @@ module mpeg2video(clk, mem_clk, dot_clk,
   output              debug_mem_req_wr_en;
   output              debug_vbr_wr_en;
   output              debug_getbits_valid;
+  output              debug_update_picture_buffers;
   output              debug_sequence_header_seen;
   input      [63:0]mem_res_wr_dta;
   input            mem_res_wr_en;
@@ -258,6 +260,7 @@ module mpeg2video(clk, mem_clk, dot_clk,
   wire              motion_vert_field_select_1_1;
   wire              second_field;
   wire              update_picture_buffers;
+  assign debug_update_picture_buffers = update_picture_buffers;
   wire              last_frame;
   wire         [1:0]chroma_format;
   wire              motion_vector_valid;    // asserted when pmv_x_x_x, dmv_x_x valid
