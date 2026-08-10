@@ -28,7 +28,7 @@ assign USER_OUT = '1;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
-assign DDRAM_CLK = CLK_50M;
+assign DDRAM_CLK = clk_sys;
 
 assign VGA_SL = 0;
 assign VGA_F1 = 0;
@@ -150,9 +150,9 @@ wire        mpeg2_mem_res_wr_en;
 
 wire [33:0] mpeg2_debug_testpoint;
 
-wire mpeg2_debug_req_seen;
-wire mpeg2_debug_read_seen;
-wire mpeg2_debug_response_seen;
+assign VGA_R = mpeg2_debug_testpoint[22] ? 8'hFF : video;
+assign VGA_G = mpeg2_debug_testpoint[21] ? 8'hFF : video;
+assign VGA_B = mpeg2_debug_testpoint[20] ? 8'hFF : video;
 
 media_player media_player
 (
@@ -172,7 +172,7 @@ media_player media_player
 mpeg2_decoder mpeg2_decoder
 (
 	.clk                    (clk_sys),
-	.mem_clk (CLK_50M),
+	.mem_clk(clk_sys),
 	.reset(reset),
 
 	.stream_data  (ioctl_dout),
@@ -207,7 +207,7 @@ mpeg2_decoder mpeg2_decoder
 
 mpeg2_ddram_bridge mpeg2_ddram_bridge
 (
-	.clk (CLK_50M),
+	.clk(clk_sys),
 	.reset               (reset),
 
 	.mem_req_cmd         (mpeg2_mem_req_rd_cmd),
