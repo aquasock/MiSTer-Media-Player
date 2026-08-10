@@ -32,7 +32,6 @@ set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/mixer.v
 set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/syncgen.v
 set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/syncgen_intf.v
 set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/yuv2rgb.v
-set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/osd.v
 set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/regfile.v
 set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/reset.v
 set_global_assignment -name VERILOG_FILE rtl/mpeg2fpga/mpeg2/watchdog.v
