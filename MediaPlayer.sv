@@ -28,7 +28,7 @@ assign USER_OUT = '1;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
-assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = '0;  
+assign DDRAM_CLK = clk_sys;
 
 assign VGA_SL = 0;
 assign VGA_F1 = 0;
@@ -141,6 +141,11 @@ wire        mpeg2_mem_req_rd_valid;
 
 wire        mpeg2_mem_res_wr_almost_full;
 
+wire        mpeg2_mem_req_rd_en;
+
+wire [63:0] mpeg2_mem_res_wr_dta;
+wire        mpeg2_mem_res_wr_en;
+
 media_player media_player
 (
 	.clk(clk_sys),
@@ -165,9 +170,9 @@ mpeg2_decoder mpeg2_decoder
 .stream_valid (ioctl_download && ioctl_wr &&
                (ioctl_index[5:0] == 6'd1)),
 
-	.mem_res_wr_dta (64'd0),
-	.mem_res_wr_en  (1'b0),
-	.mem_req_rd_en  (1'b0),
+	.mem_res_wr_dta (mpeg2_mem_res_wr_dta),
+	.mem_res_wr_en  (mpeg2_mem_res_wr_en),
+	.mem_req_rd_en  (mpeg2_mem_req_rd_en),
 
 	.busy                   (mpeg2_busy),
 	.error                  (mpeg2_error),
@@ -186,6 +191,32 @@ mpeg2_decoder mpeg2_decoder
 	.mem_req_rd_valid       (mpeg2_mem_req_rd_valid),
 
 	.mem_res_wr_almost_full (mpeg2_mem_res_wr_almost_full)
+);
+
+mpeg2_ddram_bridge mpeg2_ddram_bridge
+(
+	.clk                 (clk_sys),
+	.reset               (reset),
+
+	.mem_req_cmd         (mpeg2_mem_req_rd_cmd),
+	.mem_req_addr        (mpeg2_mem_req_rd_addr),
+	.mem_req_dta         (mpeg2_mem_req_rd_dta),
+	.mem_req_valid       (mpeg2_mem_req_rd_valid),
+	.mem_req_en          (mpeg2_mem_req_rd_en),
+
+	.mem_res_dta         (mpeg2_mem_res_wr_dta),
+	.mem_res_en          (mpeg2_mem_res_wr_en),
+	.mem_res_almost_full (mpeg2_mem_res_wr_almost_full),
+
+	.ddram_busy          (DDRAM_BUSY),
+	.ddram_burstcnt      (DDRAM_BURSTCNT),
+	.ddram_addr          (DDRAM_ADDR),
+	.ddram_dout          (DDRAM_DOUT),
+	.ddram_dout_ready    (DDRAM_DOUT_READY),
+	.ddram_rd            (DDRAM_RD),
+	.ddram_din           (DDRAM_DIN),
+	.ddram_be            (DDRAM_BE),
+	.ddram_we            (DDRAM_WE)
 );
 
 assign CLK_VIDEO = clk_sys;
