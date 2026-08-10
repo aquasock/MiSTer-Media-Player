@@ -116,7 +116,7 @@ mediaplayer_pll mediaplayer_pll
 	.rst(0),
 	.outclk_0(clk_sys),
 	.outclk_1(clk_video),
-	.clk(clk_sys)
+	.outclk_2(clk_mpeg2)
 );
 
 wire reset = RESET | status[0] | buttons[1];
