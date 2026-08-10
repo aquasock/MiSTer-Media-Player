@@ -154,6 +154,7 @@ wire mpeg2_debug_mem_req_wr_en;
 
 wire mpeg2_debug_req_seen;
 wire mpeg2_debug_read_seen;
+wire mpeg2_debug_write_seen;
 wire mpeg2_debug_response_seen;
 reg mpeg2_debug_mem_req_wr_seen = 1'b0;
 
@@ -247,6 +248,7 @@ mpeg2_ddram_bridge mpeg2_ddram_bridge
 
 	.debug_req_seen      (mpeg2_debug_req_seen),
 	.debug_read_seen     (mpeg2_debug_read_seen),
+	.debug_write_seen    (mpeg2_debug_write_seen),
 	.debug_response_seen (mpeg2_debug_response_seen)
 );
 
@@ -258,7 +260,7 @@ assign VGA_HS = HSync;
 assign VGA_VS = VSync;
 assign VGA_R = mpeg2_debug_mem_req_wr_seen ? 8'hFF : video;
 assign VGA_G = mpeg2_debug_req_seen ? 8'hFF : video;
-assign VGA_B = mpeg2_debug_response_seen ? 8'hFF : video;
+assign VGA_B = mpeg2_debug_write_seen ? 8'hFF : video;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 

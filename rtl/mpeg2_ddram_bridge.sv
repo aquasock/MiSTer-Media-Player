@@ -30,6 +30,7 @@ module mpeg2_ddram_bridge
 	// Sticky diagnostic flags
 	output reg         debug_req_seen,
 	output reg         debug_read_seen,
+	output reg         debug_write_seen,
 	output reg         debug_response_seen
 );
 
@@ -71,6 +72,7 @@ always @(posedge clk) begin
 	if (reset) begin
 	debug_req_seen      <= 1'b0;
 	debug_read_seen     <= 1'b0;
+	debug_write_seen    <= 1'b0;
 
 	read_accepted   <= 1'b0;
 
@@ -128,6 +130,7 @@ end
 					ddram_we <= 1'b1;
 
 					if (!ddram_busy) begin
+					debug_write_seen <= 1'b1;
 						pending    <= 1'b0;
 					end
 				end
