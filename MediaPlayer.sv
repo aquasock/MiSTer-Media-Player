@@ -150,9 +150,11 @@ wire        mpeg2_mem_res_wr_en;
 
 wire [33:0] mpeg2_debug_testpoint;
 
-assign VGA_R = mpeg2_debug_testpoint[22] ? 8'hFF : video;
-assign VGA_G = mpeg2_debug_testpoint[21] ? 8'hFF : video;
-assign VGA_B = mpeg2_debug_testpoint[20] ? 8'hFF : video;
+wire mpeg2_debug_req_seen;
+wire mpeg2_debug_read_seen;
+wire mpeg2_debug_response_seen;
+
+
 
 media_player media_player
 (
