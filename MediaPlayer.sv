@@ -27,8 +27,9 @@ assign ADC_BUS  = 'Z;
 assign USER_OUT = '1;
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
-assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
-assign DDRAM_CLK = clk_mpeg2;
+assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE,
+        SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS,
+        SDRAM_nRAS, SDRAM_nCS} = 'Z;
 
 assign VGA_SL = 0;
 assign VGA_F1 = 0;
@@ -54,7 +55,7 @@ wire [1:0] ar = status[122:121];
 assign VIDEO_ARX = (!ar) ? 12'd4 : (ar - 1'd1);
 assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 
-`include "build_id.v" 
+`include "build_id.v"
 localparam CONF_STR = {
 	"MediaPlayer;;",
 	"F1,M2V,Open MPEG-2 Video;",
@@ -84,12 +85,6 @@ wire        mpeg2_stream_empty;
 wire [7:0]  mpeg2_stream_data;
 wire        mpeg2_stream_rd;
 wire        mpeg2_stream_wr;
-wire [2:0] mpeg2_debug_picture_coding_type;
-wire [1:0] mpeg2_debug_picture_structure;
-wire       mpeg2_debug_progressive_sequence;
-wire       mpeg2_debug_progressive_frame;
-wire mpeg2_debug_fwd_addr_error;
-
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
@@ -120,6 +115,7 @@ wire clk_sys;
 wire clk_video;
 wire clk_mpeg2;
 wire clk_mpeg2_mem;
+
 pll pll
 (
 	.refclk(CLK_50M),
@@ -130,6 +126,12 @@ pll pll
 	.outclk_3(clk_mpeg2_mem)
 );
 
+wire reset = RESET | status[0] | buttons[1];
+
+// kate - Phase 1H: MPEG2FPGA no longer exists in the active design.
+// The new H.262 front end owns the FIFO read side directly.  Both current
+// standards-driven parsers are byte-stream consumers and accept arbitrary
+// gaps, so data is consumed whenever the asynchronous FIFO is non-empty.
 assign mpeg2_stream_wr =
 	ioctl_download &&
 	ioctl_wr &&
@@ -137,8 +139,7 @@ assign mpeg2_stream_wr =
 	!mpeg2_stream_full;
 
 assign mpeg2_stream_rd =
-	!mpeg2_stream_empty &&
-	!mpeg2_busy;
+	!mpeg2_stream_empty;
 
 mpeg2_stream_fifo mpeg2_stream_fifo
 (
@@ -155,47 +156,48 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 	.rd_empty (mpeg2_stream_empty)
 );
 
+// kate - Phase 1H: the legacy MPEG2FPGA DDR frame-store path is gone.
+// The present first-block proof uses only the on-chip M10K luma framebuffer.
+// Keep the MiSTer DDR service interface completely idle until our own explicit
+// frame-store layer is introduced in a later decoder phase.
+assign DDRAM_CLK      = clk_mpeg2;
+assign DDRAM_BURSTCNT = 8'd0;
+assign DDRAM_ADDR     = 29'd0;
+assign DDRAM_RD       = 1'b0;
+assign DDRAM_DIN      = 64'd0;
+assign DDRAM_BE       = 8'd0;
+assign DDRAM_WE       = 1'b0;
 
-wire reset = RESET | status[0] | buttons[1];
+///////////////////////   VIDEO TIMING   /////////////////////////
 
-
-wire HBlank;
-wire HSync;
-wire VBlank;
-wire VSync;
-wire ce_pix;
-wire [7:0] video;
-
-wire        mpeg2_busy;
-wire        mpeg2_error;
-
-wire [7:0]  mpeg2_r;
-wire [7:0]  mpeg2_g;
-wire [7:0]  mpeg2_b;
-
-wire        mpeg2_pixel_en;
-wire [7:0]  mpeg2_resample_y;
-wire [2:0]  mpeg2_resample_position;
-wire [1:0]  mpeg2_resample_image;
-wire [11:0] mpeg2_resample_x;
-wire [11:0] mpeg2_resample_y_pos;
-wire        mpeg2_resample_wr_en;
-
-wire [11:0] mpeg2_video_h_pos;
-wire [11:0] mpeg2_video_v_pos;
-wire        mpeg2_video_pixel_en;
-wire        mpeg2_video_h_sync;
-wire        mpeg2_video_v_sync;
+wire [11:0] display_h_pos;
+wire [11:0] display_v_pos;
+wire        display_pixel_en;
+wire        display_h_sync;
+wire        display_v_sync;
 
 wire [7:0]  fb_video_y;
 wire        fb_video_de;
 wire        fb_video_hs;
 wire        fb_video_vs;
-wire        mpeg2_h_sync;
-wire        mpeg2_v_sync;
 
-// kate - New standards-driven H.262 decoder front end.  Phase 0 passively
-// observes the bytes accepted by MPEG2FPGA; it does not yet drive video.
+// kate - Fixed presentation timing is now instantiated directly by the core.
+// There is no MPEG2FPGA wrapper or legacy sync generator between this counter
+// and the MiSTer framebuffer/display path.
+mpeg2_video_svga_800x600 mpeg2_video_svga_800x600
+(
+	.clk      (clk_video),
+	.reset    (reset),
+
+	.h_pos    (display_h_pos),
+	.v_pos    (display_v_pos),
+	.pixel_en (display_pixel_en),
+	.h_sync   (display_h_sync),
+	.v_sync   (display_v_sync)
+);
+
+///////////////////////   NEW H.262 DECODER   ////////////////////
+
 wire        mpeg2_new_frontend_ready;
 wire        mpeg2_new_phase1_supported;
 wire        mpeg2_new_syntax_error;
@@ -225,9 +227,6 @@ wire        mpeg2_new_alternate_scan;
 wire        mpeg2_new_progressive_frame;
 wire        mpeg2_new_intra_quant_matrix_default;
 
-// kate - Phase 1E diagnostic: retain the proven first-block coefficient
-// parser and inverse quantiser, then feed the mismatch-corrected F[v][u]
-// block into our standards-driven 8x8 IDCT.
 wire        mpeg2_new_slice_header_seen;
 wire        mpeg2_new_macroblock_address_seen;
 wire        mpeg2_new_first_i_macroblock_seen;
@@ -251,6 +250,7 @@ wire        mpeg2_new_qfs_write_en;
 wire [5:0]  mpeg2_new_qfs_write_index;
 wire signed [12:0] mpeg2_new_qfs_write_value;
 wire        mpeg2_new_qfs_block_end;
+
 wire        mpeg2_new_inverse_quant_complete;
 wire        mpeg2_new_inverse_quant_error;
 wire        mpeg2_new_inverse_quant_unsupported_matrix;
@@ -261,6 +261,7 @@ wire        mpeg2_new_iq_coeff_valid;
 wire [5:0]  mpeg2_new_iq_coeff_index;
 wire signed [11:0] mpeg2_new_iq_coeff_value;
 wire        mpeg2_new_iq_coeff_block_end;
+
 wire        mpeg2_new_idct_complete;
 wire        mpeg2_new_idct_error;
 wire        mpeg2_new_idct_sample_valid;
@@ -269,7 +270,6 @@ wire signed [15:0] mpeg2_new_idct_sample_value;
 wire signed [15:0] mpeg2_new_first_luma_sample00;
 wire signed [15:0] mpeg2_new_first_luma_sample77;
 
-// kate - Phase 1F decoded-pel reconstruction and explicit picture coordinates.
 wire        mpeg2_new_recon_pixel_valid;
 wire [11:0] mpeg2_new_recon_pixel_x;
 wire [11:0] mpeg2_new_recon_pixel_y;
@@ -279,118 +279,14 @@ wire        mpeg2_new_recon_block_complete;
 wire        mpeg2_new_recon_error;
 wire [11:0] mpeg2_new_recon_block_origin_x;
 wire [11:0] mpeg2_new_recon_block_origin_y;
-wire [4:0]  mpeg2_new_effective_quantiser_scale_code =
-    mpeg2_new_macroblock_quant ?
-        mpeg2_new_macroblock_quantiser_scale_code :
-        mpeg2_new_slice_quantiser_scale_code;
 
-wire [1:0]  mpeg2_mem_req_rd_cmd;
-wire [21:0] mpeg2_mem_req_rd_addr;
-wire [63:0] mpeg2_mem_req_rd_dta;
-wire        mpeg2_mem_req_rd_valid;
-wire        mpeg2_mem_req_rd_empty;
+wire [4:0] mpeg2_new_effective_quantiser_scale_code =
+	mpeg2_new_macroblock_quant ?
+		mpeg2_new_macroblock_quantiser_scale_code :
+		mpeg2_new_slice_quantiser_scale_code;
 
-wire        mpeg2_mem_res_wr_almost_full;
-
-wire        mpeg2_mem_req_rd_en;
-
-wire [63:0] mpeg2_mem_res_wr_dta;
-wire        mpeg2_mem_res_wr_en;
-
-wire [33:0] mpeg2_debug_testpoint;
-wire mpeg2_debug_mem_req_wr_en;
-wire mpeg2_debug_vbr_wr_en;
-wire mpeg2_debug_getbits_valid;
-wire mpeg2_debug_update_picture_buffers;
-wire mpeg2_debug_macroblock_seen;
-wire mpeg2_debug_sequence_header_seen;
-wire mpeg2_debug_pixel_underflow;
-
-
-wire mpeg2_debug_req_seen;
-wire mpeg2_debug_read_seen;
-wire mpeg2_debug_write_seen;
-wire mpeg2_debug_response_seen;
-reg mpeg2_debug_mem_req_wr_seen = 1'b0;
-reg mpeg2_debug_fwd_addr_error_seen = 1'b0;
-reg mpeg2_debug_vbr_wr_seen = 1'b0;
-reg mpeg2_debug_getbits_valid_seen = 1'b0;
-reg mpeg2_debug_update_picture_seen = 1'b0;
-reg mpeg2_debug_macroblock_seen_latched = 1'b0;
-reg mpeg2_debug_pixel_underflow_seen = 1'b0;
-
-always @(posedge clk_sys) begin
-	if (reset)
-		mpeg2_debug_mem_req_wr_seen <= 1'b0;
-	else if (mpeg2_debug_mem_req_wr_en)
-		mpeg2_debug_mem_req_wr_seen <= 1'b1;
-end
-always @(posedge clk_sys) begin
-	if (reset)
-		mpeg2_debug_vbr_wr_seen <= 1'b0;
-	else if (mpeg2_debug_vbr_wr_en)
-		mpeg2_debug_vbr_wr_seen <= 1'b1;
-end
-always @(posedge clk_sys) begin
-	if (reset)
-		mpeg2_debug_getbits_valid_seen <= 1'b0;
-	else if (mpeg2_debug_getbits_valid)
-		mpeg2_debug_getbits_valid_seen <= 1'b1;
-end
-always @(posedge clk_sys) begin
-	if (reset)
-		mpeg2_debug_update_picture_seen <= 1'b0;
-	else if (mpeg2_debug_update_picture_buffers)
-		mpeg2_debug_update_picture_seen <= 1'b1;
-end
-always @(posedge clk_sys) begin
-	if (reset)
-		mpeg2_debug_macroblock_seen_latched <= 1'b0;
-	else if (mpeg2_debug_macroblock_seen)
-		mpeg2_debug_macroblock_seen_latched <= 1'b1;
-end
-always @(posedge clk_video) begin
-	if (reset)
-		mpeg2_debug_pixel_underflow_seen <= 1'b0;
-	else if (mpeg2_debug_pixel_underflow)
-		mpeg2_debug_pixel_underflow_seen <= 1'b1;
-end
-reg mpeg2_debug_bad_header_seen = 1'b0;
-
-always @(posedge clk_mpeg2) begin
-	if (reset)
-		mpeg2_debug_bad_header_seen <= 1'b0;
-	else if ((mpeg2_debug_picture_coding_type > 3) ||
-	         ((mpeg2_debug_picture_coding_type != 0) &&
-	          (mpeg2_debug_picture_structure != 2'b11)))
-		mpeg2_debug_bad_header_seen <= 1'b1;
-end
-
-always @(posedge clk_mpeg2) begin
-	if (reset)
-		mpeg2_debug_fwd_addr_error_seen <= 1'b0;
-	else if (mpeg2_debug_fwd_addr_error)
-		mpeg2_debug_fwd_addr_error_seen <= 1'b1;
-end
-
-media_player media_player
-(
-	.clk     (clk_sys),
-	.reset   (reset),
-
-	.ce_pix(ce_pix),
-
-	.HBlank(HBlank),
-	.HSync(HSync),
-	.VBlank(VBlank),
-	.VSync(VSync),
-
-	.video(video)
-);
-
-// kate - Phase 0 of the new decoder: standards-driven H.262 header parser.
-// It is intentionally passive so we can validate the new front end against the
-// same byte stream while retaining the current hardware video path.
+// kate - Standards-driven H.262 header parser.  Phase 1H is the first build in
+// which this parser is not sharing its compressed input with MPEG2FPGA.
 mpeg2_h262_frontend mpeg2_h262_frontend
 (
 	.clk                              (clk_mpeg2),
@@ -431,9 +327,7 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.intra_quant_matrix_default       (mpeg2_new_intra_quant_matrix_default)
 );
 
-// kate - Phase 1D remains passive beside MPEG2FPGA.  The coefficient probe
-// emits the exact non-zero QFS[] entries for the first luminance block while
-// retaining the already-proven H.262 VLC/EOB checks.
+// kate - First-slice/first-luma-block coefficient path.
 mpeg2_h262_slice_probe mpeg2_h262_slice_probe
 (
 	.clk                         (clk_mpeg2),
@@ -471,9 +365,8 @@ mpeg2_h262_slice_probe mpeg2_h262_slice_probe
 	.qfs_block_end               (mpeg2_new_qfs_block_end)
 );
 
-// kate - Phase 1D H.262 7.3/7.4 inverse scan and inverse quantisation proof.
-// The module currently supports the normative default intra matrix.  A custom
-// downloaded matrix is valid H.262 and is reported separately as unsupported.
+// kate - H.262 inverse scan, inverse quantisation, saturation and mismatch
+// control for the first luminance block.
 mpeg2_h262_inverse_quant mpeg2_h262_inverse_quant
 (
 	.clk                         (clk_mpeg2),
@@ -504,8 +397,7 @@ mpeg2_h262_inverse_quant mpeg2_h262_inverse_quant
 	.coeff_out_block_end         (mpeg2_new_iq_coeff_block_end)
 );
 
-// kate - Phase 1E H.262 7.5 / Annex A inverse DCT.  Phase 1F now consumes
-// this spatial sample stream for normative intra reconstruction and display.
+// kate - H.262 inverse DCT.
 mpeg2_h262_idct mpeg2_h262_idct
 (
 	.clk                         (clk_mpeg2),
@@ -526,92 +418,38 @@ mpeg2_h262_idct mpeg2_h262_idct
 	.first_luma_sample77         (mpeg2_new_first_luma_sample77)
 );
 
-// kate - Phase 1F H.262 7.6/7.6.8 intra reconstruction.
-// For an intra macroblock p[y][x] is zero; the IDCT result is saturated to
-// [0,255] and placed at the first block's normative macroblock coordinates.
+// kate - H.262 intra reconstruction and explicit picture coordinates.
 mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 (
-    .clk                                (clk_mpeg2),
-    .reset                              (reset),
+	.clk                                (clk_mpeg2),
+	.reset                              (reset),
 
-    .horizontal_size                    (mpeg2_new_horizontal_size),
-    .vertical_size                      (mpeg2_new_vertical_size),
-    .slice_vertical_position            (mpeg2_new_slice_vertical_position),
-    .slice_vertical_position_extension  (mpeg2_new_slice_vertical_position_extension),
-    .macroblock_address_increment       (mpeg2_new_macroblock_address_increment),
+	.horizontal_size                    (mpeg2_new_horizontal_size),
+	.vertical_size                      (mpeg2_new_vertical_size),
+	.slice_vertical_position            (mpeg2_new_slice_vertical_position),
+	.slice_vertical_position_extension  (mpeg2_new_slice_vertical_position_extension),
+	.macroblock_address_increment       (mpeg2_new_macroblock_address_increment),
 
-    .sample_valid                       (mpeg2_new_idct_sample_valid),
-    .sample_index                       (mpeg2_new_idct_sample_index),
-    .sample_value                       (mpeg2_new_idct_sample_value),
-    .idct_block_complete                (mpeg2_new_idct_complete),
+	.sample_valid                       (mpeg2_new_idct_sample_valid),
+	.sample_index                       (mpeg2_new_idct_sample_index),
+	.sample_value                       (mpeg2_new_idct_sample_value),
+	.idct_block_complete                (mpeg2_new_idct_complete),
 
-    .pixel_valid                        (mpeg2_new_recon_pixel_valid),
-    .pixel_x                            (mpeg2_new_recon_pixel_x),
-    .pixel_y                            (mpeg2_new_recon_pixel_y),
-    .pixel_luma                         (mpeg2_new_recon_pixel_luma),
-    .block_start                        (mpeg2_new_recon_block_start),
-    .block_complete                     (mpeg2_new_recon_block_complete),
-    .recon_error                        (mpeg2_new_recon_error),
-    .block_origin_x                     (mpeg2_new_recon_block_origin_x),
-    .block_origin_y                     (mpeg2_new_recon_block_origin_y)
+	.pixel_valid                        (mpeg2_new_recon_pixel_valid),
+	.pixel_x                            (mpeg2_new_recon_pixel_x),
+	.pixel_y                            (mpeg2_new_recon_pixel_y),
+	.pixel_luma                         (mpeg2_new_recon_pixel_luma),
+	.block_start                        (mpeg2_new_recon_block_start),
+	.block_complete                     (mpeg2_new_recon_block_complete),
+	.recon_error                        (mpeg2_new_recon_error),
+	.block_origin_x                     (mpeg2_new_recon_block_origin_x),
+	.block_origin_y                     (mpeg2_new_recon_block_origin_y)
 );
 
-mpeg2_decoder mpeg2_decoder
-(
-	.clk                    (clk_mpeg2),
-	.mem_clk                (clk_mpeg2),
-	.dot_clk(clk_video),
-	.reset(reset),
+///////////////////////   LUMA FRAMEBUFFER   //////////////////////
 
-	.stream_data  (mpeg2_stream_data),
-	.stream_valid (mpeg2_stream_rd),
-
-	.mem_res_wr_dta (mpeg2_mem_res_wr_dta),
-	.mem_res_wr_en  (mpeg2_mem_res_wr_en),
-	.mem_req_rd_en  (mpeg2_mem_req_rd_en),
-
-	.busy                   (mpeg2_busy),
-	.error                  (mpeg2_error),
-
-	.r                      (mpeg2_r),
-	.g                      (mpeg2_g),
-	.b                      (mpeg2_b),
-
-	.pixel_en               (mpeg2_pixel_en),
-	.h_sync                 (mpeg2_h_sync),
-	.v_sync                 (mpeg2_v_sync),
-
-	.mem_req_rd_cmd         (mpeg2_mem_req_rd_cmd),
-	.mem_req_rd_addr        (mpeg2_mem_req_rd_addr),
-	.mem_req_rd_dta         (mpeg2_mem_req_rd_dta),
-	.mem_req_rd_valid       (mpeg2_mem_req_rd_valid),
-	.mem_req_rd_empty       (mpeg2_mem_req_rd_empty),
-
-	.mem_res_wr_almost_full (mpeg2_mem_res_wr_almost_full),
-
-	.debug_testpoint        (mpeg2_debug_testpoint),
-	.debug_mem_req_wr_en    (mpeg2_debug_mem_req_wr_en),
-	.debug_vbr_wr_en        (mpeg2_debug_vbr_wr_en),
-	.debug_getbits_valid    (mpeg2_debug_getbits_valid),
-	.debug_update_picture_buffers (mpeg2_debug_update_picture_buffers),
-	.debug_macroblock_seen        (mpeg2_debug_macroblock_seen),
-	.debug_sequence_header_seen (mpeg2_debug_sequence_header_seen),
-	.debug_pixel_underflow       (mpeg2_debug_pixel_underflow),
-	.debug_fwd_addr_error(mpeg2_debug_fwd_addr_error),
-	.debug_resample_y        (mpeg2_resample_y),
-.debug_resample_position (mpeg2_resample_position),
-.debug_resample_image    (mpeg2_resample_image),
-.debug_resample_x        (mpeg2_resample_x),
-.debug_resample_y_pos    (mpeg2_resample_y_pos),
-.debug_resample_wr_en    (mpeg2_resample_wr_en),
-
-.debug_video_h_pos       (mpeg2_video_h_pos),
-.debug_video_v_pos       (mpeg2_video_v_pos),
-.debug_video_pixel_en    (mpeg2_video_pixel_en),
-.debug_video_h_sync      (mpeg2_video_h_sync),
-.debug_video_v_sync      (mpeg2_video_v_sync)
-);
-
+// kate - New-decoder pixels write at 54 MHz; the fixed 800x600 raster reads at
+// 40 MHz.  MPEG2FPGA is not present on either side of this memory.
 mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 (
 	.reset       (reset),
@@ -625,11 +463,11 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 	.wr_block_complete (mpeg2_new_recon_block_complete),
 
 	.rd_clk      (clk_video),
-	.h_pos       (mpeg2_video_h_pos),
-	.v_pos       (mpeg2_video_v_pos),
-	.pixel_en    (mpeg2_video_pixel_en),
-	.h_sync      (mpeg2_video_h_sync),
-	.v_sync      (mpeg2_video_v_sync),
+	.h_pos       (display_h_pos),
+	.v_pos       (display_v_pos),
+	.pixel_en    (display_pixel_en),
+	.h_sync      (display_h_sync),
+	.v_sync      (display_v_sync),
 
 	.video_y     (fb_video_y),
 	.video_de    (fb_video_de),
@@ -637,44 +475,9 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 	.video_vs    (fb_video_vs)
 );
 
-mpeg2_ddram_bridge mpeg2_ddram_bridge
-(
-	.clk                    (clk_mpeg2),
-	.reset               (reset),
-
-	.mem_req_cmd         (mpeg2_mem_req_rd_cmd),
-	.mem_req_addr        (mpeg2_mem_req_rd_addr),
-	.mem_req_dta         (mpeg2_mem_req_rd_dta),
-	.mem_req_valid       (mpeg2_mem_req_rd_valid),
-	.mem_req_empty       (mpeg2_mem_req_rd_empty),
-	.mem_req_en          (mpeg2_mem_req_rd_en),
-
-	.mem_res_dta         (mpeg2_mem_res_wr_dta),
-	.mem_res_en          (mpeg2_mem_res_wr_en),
-	.mem_res_almost_full (mpeg2_mem_res_wr_almost_full),
-
-	.ddram_busy          (DDRAM_BUSY),
-	.ddram_burstcnt      (DDRAM_BURSTCNT),
-	.ddram_addr          (DDRAM_ADDR),
-	.ddram_dout          (DDRAM_DOUT),
-	.ddram_dout_ready    (DDRAM_DOUT_READY),
-	.ddram_rd            (DDRAM_RD),
-	.ddram_din           (DDRAM_DIN),
-	.ddram_be            (DDRAM_BE),
-	.ddram_we            (DDRAM_WE),
-
-	.debug_req_seen      (mpeg2_debug_req_seen),
-	.debug_read_seen     (mpeg2_debug_read_seen),
-	.debug_write_seen    (mpeg2_debug_write_seen),
-	.debug_response_seen (mpeg2_debug_response_seen)
-);
-
 assign CLK_VIDEO = clk_video;
 assign CE_PIXEL  = 1'b1;
 
-// kate - Phase 1F presentation.  Pixel data in the visible 8x8 block now
-// comes from our H.262 decoder.  Legacy MPEG2FPGA remains only as the temporary
-// source of the already-proven 40 MHz SVGA timing used by this diagnostic.
 assign VGA_DE = fb_video_de;
 assign VGA_HS = fb_video_hs;
 assign VGA_VS = fb_video_vs;
@@ -683,13 +486,10 @@ assign VGA_R = fb_video_y;
 assign VGA_G = fb_video_y;
 assign VGA_B = fb_video_y;
 
-reg  [26:0] act_cnt;
-always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
-// kate - Phase 1F positive diagnostic.
-// OFF: the first decoded luma block has not completed reconstruction, or a
-// preceding syntax/coefficient/IQ/IDCT/reconstruction stage failed.
-// ON: 64 spatial samples have passed H.262 intra reconstruction/saturation and
-// have been handed to our framebuffer with explicit H.262 picture coordinates.
+// kate - Phase 1H positive diagnostic remains identical to Phase 1F/1G.
+// OFF: the first decoded luma block has not completed reconstruction, or an
+// earlier new-decoder stage reported an error.
+// ON: all 64 spatial samples reached our reconstruction/framebuffer path.
 assign LED_USER =
 	mpeg2_new_recon_block_complete &&
 	!mpeg2_new_syntax_error &&
