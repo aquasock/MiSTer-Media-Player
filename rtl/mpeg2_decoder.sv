@@ -42,7 +42,8 @@ module mpeg2_decoder
 	output wire        debug_progressive_sequence,
 	output wire        debug_progressive_frame,
 	output wire        debug_picture_coding_type,
-	output wire        debug_picture_structure
+	output wire        debug_picture_structure,
+	output wire debug_fwd_addr_error
 	);
 
 wire [7:0] y;
@@ -119,6 +120,7 @@ mpeg2video decoder
 	.debug_macroblock_seen        (debug_macroblock_seen),
 	.debug_sequence_header_seen (debug_sequence_header_seen),
 	.debug_pixel_underflow       (debug_pixel_underflow)
+	.debug_fwd_addr_error(debug_fwd_addr_error)
 );
 
 endmodule

@@ -65,6 +65,7 @@ module mpeg2video(clk, mem_clk, dot_clk,
 debug_picture_structure,
 debug_progressive_sequence,
 debug_progressive_frame,
+debug_fwd_addr_error,
              debug_vbr_wr_en,
              // clocked with mem_clk
              mem_res_wr_dta, mem_res_wr_en, mem_res_wr_almost_full,                                                               // clocked with mem_clk
@@ -122,6 +123,7 @@ debug_progressive_frame,
 output       [1:0]  debug_picture_structure;
 output              debug_progressive_sequence;
 output              debug_progressive_frame;
+output              debug_fwd_addr_error;
   input      [63:0]mem_res_wr_dta;
   input            mem_res_wr_en;
   output           mem_res_wr_almost_full;
@@ -432,6 +434,8 @@ assign debug_progressive_frame    = progressive_frame;
   wire       fwd_wr_addr_en;
   wire       fwd_wr_addr_ack;
   wire [21:0]fwd_wr_addr;
+  wire debug_fwd_addr_error =
+    fwd_wr_addr_en && (fwd_wr_addr == 22'h1effff);
   wire       fwd_rd_dta_clk_en;
   wire       fwd_rd_dta_almost_empty;
   wire       fwd_rd_dta_empty;
