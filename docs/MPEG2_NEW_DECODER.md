@@ -133,6 +133,47 @@ sanely check the RTL parser, the first slice independently parses as
 therefore `QFS[0] = 126` from the Table 7-2 reset predictor of 128.  These are
 reference-stream observations, not values assumed by the decoder.
 
+#### Phase 1C — complete first luminance block coefficient decode
+
+Still passive beside MPEG2FPGA.  Continue from the Phase 1B intra DC result and
+consume every remaining coefficient of luminance `block(0)` through End of Block.
+
+Normative behaviour implemented in this diagnostic:
+
+- H.262 7.2.2 and Table 7-3 select Annex B Table B.14 when
+  `intra_vlc_format = 0` and Table B.15 when `intra_vlc_format = 1` for an
+  intra block;
+- normal VLC entries produce `run` and positive `level`, followed by the
+  separate sign bit specified by 7.2.2;
+- End of Block terminates coefficient decoding and makes the remaining `QFS[n]`
+  values zero as described by 7.2.2.4;
+- Escape uses the Table B.14/B.15 escape VLC followed by the six-bit `run` and
+  twelve-bit two's-complement `signed_level` defined by 7.2.2.3 and Table B.16;
+- escape `signed_level = 0` is forbidden and `0x800` (-2048) is reserved;
+- coefficient run placement is checked so no coefficient is produced beyond
+  `QFS[63]`.
+
+The separate `mpeg2_h262_dct_vlc` module contains the complete Table B.14 and
+Table B.15 VLC mappings needed for intra AC decoding.  Table B.14's special
+first-coefficient `1 s` form is deliberately not used here: H.262 7.2.2.2
+states that an intra block codes its DC coefficient by 7.2.1, so the first
+Table B.14 coefficient in this path is a subsequent coefficient.
+
+The passive probe capture was expanded from 16 to 64 bytes to give ordinary
+test blocks more room.  That 64-byte bound is only a temporary diagnostic
+implementation detail and is **not** treated as an H.262 bitstream limit.  The
+production decoder will replace this capture/parser arrangement with a
+streaming bitreader.
+
+USER illuminates only after a legal End of Block has completed the first
+luminance block and neither the H.262 front end nor coefficient probe reports
+an error.
+
+For the local ffmpeg-generated flat-gray all-I reference stream, the first
+luminance block is DC-only after its DC differential: with
+`intra_vlc_format = 0`, the next two bits are the Table B.14 End-of-Block code
+`10`.  This is a reference-stream observation, not a value assumed by the RTL.
+
 ### Phase 2 — chroma
 
 Decode 4:2:0 Cb/Cr and add the independent presentation conversion path.

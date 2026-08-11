@@ -224,12 +224,13 @@ wire        mpeg2_new_intra_vlc_format;
 wire        mpeg2_new_alternate_scan;
 wire        mpeg2_new_progressive_frame;
 
-// kate - Phase 1A diagnostic: prove standards-aligned slice and first I-picture
-// macroblock parsing before coefficient decoding is added.
+// kate - Phase 1C diagnostic: prove one complete standards-aligned intra
+// luminance block, including AC VLCs and End of Block.
 wire        mpeg2_new_slice_header_seen;
 wire        mpeg2_new_macroblock_address_seen;
 wire        mpeg2_new_first_i_macroblock_seen;
 wire        mpeg2_new_first_luma_dc_seen;
+wire        mpeg2_new_first_luma_block_complete;
 wire        mpeg2_new_phase1_probe_error;
 wire [4:0]  mpeg2_new_slice_quantiser_scale_code;
 wire [11:0] mpeg2_new_macroblock_address_increment;
@@ -239,6 +240,9 @@ wire [7:0]  mpeg2_new_slice_vertical_position;
 wire [3:0]  mpeg2_new_first_luma_dc_size;
 wire signed [12:0] mpeg2_new_first_luma_dc_differential;
 wire [10:0] mpeg2_new_first_luma_dc_coefficient;
+wire [6:0]  mpeg2_new_first_luma_ac_nonzero_count;
+wire [5:0]  mpeg2_new_first_luma_last_coeff_index;
+wire signed [11:0] mpeg2_new_first_luma_last_ac_level;
 
 wire [1:0]  mpeg2_mem_req_rd_cmd;
 wire [21:0] mpeg2_mem_req_rd_addr;
@@ -386,9 +390,9 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.progressive_frame                (mpeg2_new_progressive_frame)
 );
 
-// kate - Phase 1B remains passive beside MPEG2FPGA.  In addition to the Phase
-// 1A slice/macroblock proof, it enters block(0), decodes the Table B.12
-// luminance DC size and differential, and reconstructs QFS[0] per H.262 7.2.1.
+// kate - Phase 1C remains passive beside MPEG2FPGA.  It continues through the
+// first luminance block's AC coefficients using H.262 Table 7-3 and Annex B
+// Tables B.14/B.15/B.16, and asserts completion only after a legal EOB.
 mpeg2_h262_slice_probe mpeg2_h262_slice_probe
 (
 	.clk                         (clk_mpeg2),
@@ -398,11 +402,13 @@ mpeg2_h262_slice_probe mpeg2_h262_slice_probe
 	.phase1_supported            (mpeg2_new_phase1_supported),
 	.vertical_size               (mpeg2_new_vertical_size),
 	.intra_dc_precision          (mpeg2_new_intra_dc_precision),
+	.intra_vlc_format            (mpeg2_new_intra_vlc_format),
 
 	.slice_header_seen           (mpeg2_new_slice_header_seen),
 	.macroblock_address_seen     (mpeg2_new_macroblock_address_seen),
 	.first_i_macroblock_seen     (mpeg2_new_first_i_macroblock_seen),
 	.first_luma_dc_seen          (mpeg2_new_first_luma_dc_seen),
+	.first_luma_block_complete   (mpeg2_new_first_luma_block_complete),
 	.probe_error                 (mpeg2_new_phase1_probe_error),
 	.quantiser_scale_code        (mpeg2_new_slice_quantiser_scale_code),
 	.macroblock_address_increment(mpeg2_new_macroblock_address_increment),
@@ -411,7 +417,10 @@ mpeg2_h262_slice_probe mpeg2_h262_slice_probe
 	.slice_vertical_position     (mpeg2_new_slice_vertical_position),
 	.first_luma_dc_size          (mpeg2_new_first_luma_dc_size),
 	.first_luma_dc_differential  (mpeg2_new_first_luma_dc_differential),
-	.first_luma_dc_coefficient   (mpeg2_new_first_luma_dc_coefficient)
+	.first_luma_dc_coefficient   (mpeg2_new_first_luma_dc_coefficient),
+	.first_luma_ac_nonzero_count (mpeg2_new_first_luma_ac_nonzero_count),
+	.first_luma_last_coeff_index (mpeg2_new_first_luma_last_coeff_index),
+	.first_luma_last_ac_level    (mpeg2_new_first_luma_last_ac_level)
 );
 
 mpeg2_decoder mpeg2_decoder
@@ -540,13 +549,13 @@ assign VGA_B = fb_video_y;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
-// kate - Phase 1B positive diagnostic.
-// OFF: the new decoder has not yet reconstructed the first luminance intra DC
-// coefficient, or either standards-driven parser detected an error.
-// ON: Phase 0 + Phase 1A passed and H.262 Table B.12 / 7.2.1 successfully
-// produced a legal first-block QFS[0].
+// kate - Phase 1C positive diagnostic.
+// OFF: the first luminance block has not yet reached a legal End of Block,
+// or either standards-driven parser detected an error.
+// ON: Phase 0/1A/1B passed and the new decoder consumed the complete first
+// intra luma block through H.262 Tables B.14/B.15/B.16 as applicable.
 assign LED_USER =
-	mpeg2_new_first_luma_dc_seen &&
+	mpeg2_new_first_luma_block_complete &&
 	!mpeg2_new_syntax_error &&
 	!mpeg2_new_phase1_probe_error;
 

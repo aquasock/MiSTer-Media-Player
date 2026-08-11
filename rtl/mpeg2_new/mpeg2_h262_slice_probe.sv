@@ -1,5 +1,5 @@
 //============================================================================
-// MiSTer Media Player - new H.262 decoder Phase 1B coefficient probe
+// MiSTer Media Player - new H.262 decoder Phase 1C coefficient probe
 //
 // This module is intentionally passive.  It observes the same elementary-
 // stream bytes as the legacy MPEG2FPGA path, captures the beginning of the
@@ -17,12 +17,16 @@
 //   - 6.2.6 block()
 //   - 7.2.1 DC coefficients in intra blocks / Table 7-2
 //   - Annex B, Table B.12 dct_dc_size_luminance
+//   - 7.2.2 other coefficients and Table 7-3 table selection
+//   - Annex B, Tables B.14/B.15 DCT coefficient VLCs
+//   - 7.2.2.3 / Table B.16 Escape coding
 //
 // Phase 1 capability boundary:
 //   - Non-scalable sequence syntax only.
 //   - Progressive 4:2:0 frame-picture I video is selected by the front end.
-//   - Phase 1B continues through the first luminance block's intra DC term.
-//   - AC coefficients remain Phase 1C and are not consumed by this probe.
+//   - Phase 1C decodes the complete first luminance block through End of Block.
+//   - The bounded capture buffer is a diagnostic implementation choice, not an
+//     H.262 syntax restriction; the production decoder will use a streaming bitreader.
 //
 // H.262 requires decoders to ignore extra_information_slice when encountered;
 // this probe therefore skips such bytes instead of assigning them meaning.
@@ -38,11 +42,13 @@ module mpeg2_h262_slice_probe
     input  wire        phase1_supported,
     input  wire [13:0] vertical_size,
     input  wire [1:0]  intra_dc_precision,
+    input  wire        intra_vlc_format,
 
     output reg         slice_header_seen,
     output reg         macroblock_address_seen,
     output reg         first_i_macroblock_seen,
     output reg         first_luma_dc_seen,
+    output reg         first_luma_block_complete,
     output reg         probe_error,
 
     output reg  [4:0]  quantiser_scale_code,
@@ -52,7 +58,10 @@ module mpeg2_h262_slice_probe
     output reg  [7:0]  slice_vertical_position,
     output reg  [3:0]  first_luma_dc_size,
     output reg signed [12:0] first_luma_dc_differential,
-    output reg  [10:0] first_luma_dc_coefficient
+    output reg  [10:0] first_luma_dc_coefficient,
+    output reg  [6:0]  first_luma_ac_nonzero_count,
+    output reg  [5:0]  first_luma_last_coeff_index,
+    output reg signed [11:0] first_luma_last_ac_level
 );
 
 // H.262 Table 6-1: slice_start_code values are 0x01 through 0xAF.
@@ -70,37 +79,40 @@ assign slice_start_now  = start_code_now &&
                           (start_code_value >= 8'h01) &&
                           (start_code_value <= 8'hAF);
 
-// A conforming non-scalable slice reaches its first macroblock header well
-// within this prefix.  The capture is deliberately larger than the normative
-// fixed/variable header fields we need, so the parser can run after capture
-// without competing with the incoming byte rate.
+// kate - Phase 1C expands the passive capture to 64 bytes so ordinary first
+// blocks can exercise the complete AC VLC path.  This remains only a probe;
+// H.262 does not impose this 64-byte block limit.
 reg         capture_active;
-reg [4:0]   capture_byte_count;
-reg [127:0] slice_prefix;
+reg [5:0]   capture_byte_count;
+reg [511:0] slice_prefix;
 
 reg         parse_active;
-reg [7:0]   bit_index;
+reg [9:0]   bit_index;
 
-wire current_bit = (bit_index < 8'd128) ?
-                   slice_prefix[7'd127 - bit_index[6:0]] : 1'b0;
+wire current_bit = (bit_index < 10'd512) ?
+                   slice_prefix[10'd511 - bit_index] : 1'b0;
 
-localparam [3:0]
-    ST_VPOS_EXT      = 4'd0,
-    ST_QSCALE        = 4'd1,
-    ST_AFTER_QSCALE  = 4'd2,
-    ST_INTRA_SLICE   = 4'd3,
-    ST_PIC_ID_ENABLE = 4'd4,
-    ST_PIC_ID        = 4'd5,
-    ST_EXTRA_FLAG    = 4'd6,
-    ST_EXTRA_INFO    = 4'd7,
-    ST_MBA           = 4'd8,
-    ST_MBTYPE_FIRST  = 4'd9,
-    ST_MBTYPE_SECOND = 4'd10,
-    ST_MB_QSCALE     = 4'd11,
-    ST_DC_LUMA       = 4'd12,
-    ST_DC_DIFF       = 4'd13;
+localparam [4:0]
+    ST_VPOS_EXT      = 5'd0,
+    ST_QSCALE        = 5'd1,
+    ST_AFTER_QSCALE  = 5'd2,
+    ST_INTRA_SLICE   = 5'd3,
+    ST_PIC_ID_ENABLE = 5'd4,
+    ST_PIC_ID        = 5'd5,
+    ST_EXTRA_FLAG    = 5'd6,
+    ST_EXTRA_INFO    = 5'd7,
+    ST_MBA           = 5'd8,
+    ST_MBTYPE_FIRST  = 5'd9,
+    ST_MBTYPE_SECOND = 5'd10,
+    ST_MB_QSCALE     = 5'd11,
+    ST_DC_LUMA       = 5'd12,
+    ST_DC_DIFF       = 5'd13,
+    ST_AC_VLC        = 5'd14,
+    ST_AC_SIGN       = 5'd15,
+    ST_ESCAPE_RUN    = 5'd16,
+    ST_ESCAPE_LEVEL  = 5'd17;
 
-reg [3:0] parse_state;
+reg [4:0] parse_state;
 reg [3:0] field_bit_count;
 reg [4:0] qscale_shift;
 reg [2:0] slice_vertical_position_extension;
@@ -144,6 +156,50 @@ wire [11:0] dc_coefficient_max =
     (12'd256 << intra_dc_precision) - 1'b1;
 wire signed [12:0] dc_coefficient_max_signed =
     $signed({1'b0, dc_coefficient_max});
+
+// H.262 7.2.2: after intra DC, n starts at one.  Every normal/escape
+// coefficient advances n by run zeroes plus one signed coefficient.  EOB
+// completes the block and implies zero for all remaining QFS entries.
+reg [15:0] ac_vlc_code;
+reg [4:0]  ac_vlc_len;
+wire [15:0] ac_vlc_code_next = {ac_vlc_code[14:0], current_bit};
+wire [4:0]  ac_vlc_len_next  = ac_vlc_len + 1'b1;
+
+wire       ac_vlc_match;
+wire       ac_vlc_eob;
+wire       ac_vlc_escape;
+wire [5:0] ac_vlc_run;
+wire [5:0] ac_vlc_level;
+
+mpeg2_h262_dct_vlc dct_vlc
+(
+    .table_one   (intra_vlc_format),
+    .vlc_code    (ac_vlc_code_next),
+    .vlc_len     (ac_vlc_len_next),
+    .match       (ac_vlc_match),
+    .end_of_block(ac_vlc_eob),
+    .escape      (ac_vlc_escape),
+    .run         (ac_vlc_run),
+    .level       (ac_vlc_level)
+);
+
+reg [6:0] qfs_index;
+reg [5:0] ac_run_pending;
+reg [5:0] ac_level_pending;
+
+reg [5:0] escape_run_shift;
+reg [2:0] escape_run_bit_count;
+wire [5:0] escape_run_next = {escape_run_shift[4:0], current_bit};
+
+reg [11:0] escape_level_shift;
+reg [3:0]  escape_level_bit_count;
+wire [11:0] escape_level_next = {escape_level_shift[10:0], current_bit};
+wire signed [11:0] escape_level_signed = $signed(escape_level_next);
+
+wire [7:0] normal_target_index =
+    {1'b0, qfs_index} + {2'b00, ac_run_pending};
+wire [7:0] escape_target_index =
+    {1'b0, qfs_index} + {2'b00, escape_run_shift};
 
 // Table B.1 VLC accumulator.  Codes are accumulated MSB-first and remain
 // right-aligned in vlc_code.  macroblock_escape contributes 33 and causes
@@ -318,10 +374,10 @@ always @(posedge clk) begin
     if (reset) begin
         byte_window                       <= 32'd0;
         capture_active                    <= 1'b0;
-        capture_byte_count                <= 5'd0;
-        slice_prefix                      <= 128'd0;
+        capture_byte_count                <= 6'd0;
+        slice_prefix                      <= 512'd0;
         parse_active                      <= 1'b0;
-        bit_index                         <= 8'd0;
+        bit_index                         <= 10'd0;
         parse_state                       <= ST_QSCALE;
         field_bit_count                   <= 4'd0;
         qscale_shift                      <= 5'd0;
@@ -334,6 +390,15 @@ always @(posedge clk) begin
         dc_size                           <= 4'd0;
         dc_diff_shift                     <= 11'd0;
         dc_diff_bit_count                 <= 4'd0;
+        ac_vlc_code                       <= 16'd0;
+        ac_vlc_len                        <= 5'd0;
+        qfs_index                         <= 7'd1;
+        ac_run_pending                    <= 6'd0;
+        ac_level_pending                  <= 6'd0;
+        escape_run_shift                  <= 6'd0;
+        escape_run_bit_count              <= 3'd0;
+        escape_level_shift                <= 12'd0;
+        escape_level_bit_count            <= 4'd0;
         vlc_code                          <= 11'd0;
         vlc_len                           <= 4'd0;
         mba_escape_base                   <= 12'd0;
@@ -342,6 +407,7 @@ always @(posedge clk) begin
         macroblock_address_seen           <= 1'b0;
         first_i_macroblock_seen           <= 1'b0;
         first_luma_dc_seen                <= 1'b0;
+        first_luma_block_complete         <= 1'b0;
         probe_error                       <= 1'b0;
         quantiser_scale_code              <= 5'd0;
         macroblock_address_increment      <= 12'd0;
@@ -351,6 +417,9 @@ always @(posedge clk) begin
         first_luma_dc_size                <= 4'd0;
         first_luma_dc_differential        <= 13'sd0;
         first_luma_dc_coefficient         <= 11'd0;
+        first_luma_ac_nonzero_count       <= 7'd0;
+        first_luma_last_coeff_index       <= 6'd0;
+        first_luma_last_ac_level          <= 12'sd0;
     end
     else begin
         // Byte-aligned capture begins immediately after a slice start code.
@@ -358,20 +427,20 @@ always @(posedge clk) begin
             byte_window <= byte_window_next;
 
             if (!capture_active && !parse_active && !probe_error &&
-                !first_luma_dc_seen && slice_start_now) begin
+                !first_luma_block_complete && slice_start_now) begin
                 capture_active          <= 1'b1;
-                capture_byte_count      <= 5'd0;
-                slice_prefix            <= 128'd0;
+                capture_byte_count      <= 6'd0;
+                slice_prefix            <= 512'd0;
                 slice_vertical_position <= start_code_value;
             end
             else if (capture_active) begin
-                slice_prefix <= {slice_prefix[119:0], stream_data};
+                slice_prefix <= {slice_prefix[503:0], stream_data};
 
-                if (capture_byte_count == 5'd15) begin
+                if (capture_byte_count == 6'd63) begin
                     capture_active   <= 1'b0;
-                    capture_byte_count <= 5'd0;
+                    capture_byte_count <= 6'd0;
                     parse_active     <= 1'b1;
-                    bit_index        <= 8'd0;
+                    bit_index        <= 10'd0;
                     field_bit_count  <= 4'd0;
                     qscale_shift     <= 5'd0;
                     slice_picture_id_enable <= 1'b0;
@@ -385,6 +454,18 @@ always @(posedge clk) begin
                     dc_size          <= 4'd0;
                     dc_diff_shift    <= 11'd0;
                     dc_diff_bit_count<= 4'd0;
+                    ac_vlc_code      <= 16'd0;
+                    ac_vlc_len       <= 5'd0;
+                    qfs_index        <= 7'd1;
+                    ac_run_pending   <= 6'd0;
+                    ac_level_pending <= 6'd0;
+                    escape_run_shift <= 6'd0;
+                    escape_run_bit_count <= 3'd0;
+                    escape_level_shift <= 12'd0;
+                    escape_level_bit_count <= 4'd0;
+                    first_luma_ac_nonzero_count <= 7'd0;
+                    first_luma_last_coeff_index <= 6'd0;
+                    first_luma_last_ac_level <= 12'sd0;
                     parse_state      <= (vertical_size > 14'd2800) ?
                                         ST_VPOS_EXT : ST_QSCALE;
                 end
@@ -401,7 +482,7 @@ always @(posedge clk) begin
             if (!phase1_supported) begin
                 parse_active <= 1'b0;
             end
-            else if (bit_index >= 8'd128) begin
+            else if (bit_index >= 10'd512) begin
                 probe_error  <= 1'b1;
                 parse_active <= 1'b0;
             end
@@ -645,7 +726,11 @@ always @(posedge clk) begin
                                 first_luma_dc_differential <= 13'sd0;
                                 first_luma_dc_coefficient  <= dc_predictor_reset;
                                 first_luma_dc_seen         <= 1'b1;
-                                parse_active               <= 1'b0;
+                                // H.262 7.2.2.4: n starts at one for intra blocks.
+                                qfs_index                   <= 7'd1;
+                                ac_vlc_code                 <= 16'd0;
+                                ac_vlc_len                  <= 5'd0;
+                                parse_state                 <= ST_AC_VLC;
                             end
                             else begin
                                 dc_diff_shift     <= 11'd0;
@@ -681,11 +766,121 @@ always @(posedge clk) begin
                                 first_luma_dc_differential <= dc_diff_decoded;
                                 first_luma_dc_coefficient  <= dc_coefficient_decoded[10:0];
                                 first_luma_dc_seen         <= 1'b1;
-                                parse_active               <= 1'b0;
+                                qfs_index                   <= 7'd1;
+                                ac_vlc_code                 <= 16'd0;
+                                ac_vlc_len                  <= 5'd0;
+                                parse_state                 <= ST_AC_VLC;
                             end
                         end
                         else begin
                             dc_diff_bit_count <= dc_diff_bit_count + 1'b1;
+                        end
+                    end
+
+                    ST_AC_VLC: begin
+                        bit_index <= bit_index + 1'b1;
+
+                        if (ac_vlc_match) begin
+                            ac_vlc_code <= 16'd0;
+                            ac_vlc_len  <= 5'd0;
+
+                            if (ac_vlc_eob) begin
+                                // H.262 7.2.2.4: EOB makes all remaining
+                                // QFS[n] values zero.  DC already exists, so
+                                // Table B.14 Note 2 is satisfied.
+                                first_luma_block_complete <= 1'b1;
+                                parse_active              <= 1'b0;
+                            end
+                            else if (ac_vlc_escape) begin
+                                escape_run_shift     <= 6'd0;
+                                escape_run_bit_count <= 3'd0;
+                                parse_state          <= ST_ESCAPE_RUN;
+                            end
+                            else begin
+                                ac_run_pending   <= ac_vlc_run;
+                                ac_level_pending <= ac_vlc_level;
+                                parse_state      <= ST_AC_SIGN;
+                            end
+                        end
+                        else if (ac_vlc_len_next >= 5'd16) begin
+                            // Tables B.14/B.15 have no VLC longer than 16 bits.
+                            probe_error  <= 1'b1;
+                            parse_active <= 1'b0;
+                        end
+                        else begin
+                            ac_vlc_code <= ac_vlc_code_next;
+                            ac_vlc_len  <= ac_vlc_len_next;
+                        end
+                    end
+
+                    ST_AC_SIGN: begin
+                        // H.262 7.2.2: the bit following a normal run/level VLC
+                        // is sign, zero for positive and one for negative.
+                        bit_index <= bit_index + 1'b1;
+
+                        if (normal_target_index > 8'd63) begin
+                            probe_error  <= 1'b1;
+                            parse_active <= 1'b0;
+                        end
+                        else begin
+                            first_luma_ac_nonzero_count <=
+                                first_luma_ac_nonzero_count + 1'b1;
+                            first_luma_last_coeff_index <= normal_target_index[5:0];
+                            first_luma_last_ac_level <= current_bit ?
+                                -$signed({6'd0, ac_level_pending}) :
+                                 $signed({6'd0, ac_level_pending});
+                            qfs_index <= normal_target_index + 1'b1;
+                            parse_state <= ST_AC_VLC;
+                        end
+                    end
+
+                    ST_ESCAPE_RUN: begin
+                        // H.262 7.2.2.3 / Table B.16: six fixed run bits.
+                        escape_run_shift <= escape_run_next;
+                        bit_index        <= bit_index + 1'b1;
+
+                        if (escape_run_bit_count == 3'd5) begin
+                            escape_run_bit_count   <= 3'd0;
+                            escape_level_shift     <= 12'd0;
+                            escape_level_bit_count <= 4'd0;
+                            parse_state            <= ST_ESCAPE_LEVEL;
+                        end
+                        else begin
+                            escape_run_bit_count <= escape_run_bit_count + 1'b1;
+                        end
+                    end
+
+                    ST_ESCAPE_LEVEL: begin
+                        // H.262 7.2.2.3 / Table B.16: twelve-bit two's-
+                        // complement signed_level.  Zero is forbidden and
+                        // 0x800 (-2048) is reserved; valid range is
+                        // -2047..-1 and +1..+2047.
+                        escape_level_shift <= escape_level_next;
+                        bit_index          <= bit_index + 1'b1;
+
+                        if (escape_level_bit_count == 4'd11) begin
+                            if ((escape_level_next == 12'h000) ||
+                                (escape_level_next == 12'h800) ||
+                                (escape_target_index > 8'd63)) begin
+                                probe_error  <= 1'b1;
+                                parse_active <= 1'b0;
+                            end
+                            else begin
+                                first_luma_ac_nonzero_count <=
+                                    first_luma_ac_nonzero_count + 1'b1;
+                                first_luma_last_coeff_index <=
+                                    escape_target_index[5:0];
+                                first_luma_last_ac_level <=
+                                    escape_level_signed;
+                                qfs_index <= escape_target_index + 1'b1;
+                                ac_vlc_code <= 16'd0;
+                                ac_vlc_len  <= 5'd0;
+                                parse_state <= ST_AC_VLC;
+                            end
+                        end
+                        else begin
+                            escape_level_bit_count <=
+                                escape_level_bit_count + 1'b1;
                         end
                     end
 
