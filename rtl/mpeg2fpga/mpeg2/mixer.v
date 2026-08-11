@@ -216,10 +216,12 @@ module mixer(
 	            (state == STATE_REPEAT_PIXEL) || 
 	            (state == STATE_LAST_PIXEL) ||
 	            (state == STATE_REPEAT_LAST_PIXEL);
+// kate - also flag visible raster periods where mixer has no pixel state.
 assign debug_active_underflow =
-       pixel_rd_underflow &&
-       ((state == STATE_PIXEL) ||
-        (state == STATE_REPEAT_PIXEL));
+       (pixel_rd_underflow &&
+        ((state == STATE_PIXEL) ||
+         (state == STATE_REPEAT_PIXEL))) ||
+       (pixel_en_2 && !displaying);
   always @(posedge clk)
     if (~rst) y_out <= 8'b0;
     else if (pixel_en_2 && displaying) y_out <= y_0;
