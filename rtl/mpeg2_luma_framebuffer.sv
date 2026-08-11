@@ -1,13 +1,13 @@
 // kate - Decoupled MPEG2 luma framebuffer.
 //
-// Phase 1F changes framebuffer ownership: the legacy MPEG2FPGA resampler no
-// longer writes this RAM.  The standards-driven H.262 decoder writes decoded
-// luminance samples with explicit picture X/Y coordinates at 54 MHz, while the
-// independent SVGA raster reads at 40 MHz.
+// Phase 1I stores all four luminance blocks of the first 4:2:0 intra
+// macroblock.  The decoder writes explicit picture X/Y coordinates at 54 MHz,
+// while the independent fixed SVGA raster reads at 40 MHz.
 //
-// The current decoder only reconstructs the first 8x8 luminance block.  To
-// make that proof unambiguous, the display returns a fixed diagnostic
-// background outside the completed block rather than showing uninitialised RAM.
+// To keep the proof unambiguous, RAM is exposed only after all four 8x8 Y
+// blocks have completed.  The rest of the 720x480 source window remains the
+// fixed diagnostic background so uninitialised RAM cannot look like decoded
+// picture data.
 //
 // Explicit altsyncram is retained because Quartus 17 otherwise implements this
 // mixed-clock framebuffer poorly or attempts to use registers.
@@ -22,6 +22,7 @@ module mpeg2_luma_framebuffer
     input  wire [11:0] wr_x_pos,
     input  wire [11:0] wr_y_pos,
     input  wire        wr_en,
+    input  wire        wr_macroblock_start,
     input  wire        wr_block_start,
     input  wire        wr_block_complete,
 
@@ -44,7 +45,7 @@ localparam integer SRC_HEIGHT = 480;
 localparam integer FB_SIZE    = SRC_WIDTH * SRC_HEIGHT;
 
 // -------------------------------------------------------------------------
-// Write-side address generation.
+// Write-side address generation and first-macroblock publication.
 // -------------------------------------------------------------------------
 
 reg [18:0] ram_wr_address;
@@ -54,40 +55,53 @@ reg        ram_wr_en;
 wire [18:0] wr_linear_address =
     (wr_y_pos * 19'd720) + wr_x_pos;
 
-// The first completed block's origin and publication flag are stable until a
-// later block starts or reset occurs.  This makes the multi-bit coordinates
-// safe to transfer with the synchronized publication flag on the read side.
-reg [11:0] block_origin_x_wr;
-reg [11:0] block_origin_y_wr;
-reg        block_present_wr;
-reg        wr_block_complete_d;
+// kate - Phase 1I publication descriptor.  macroblock_origin_* are captured
+// from block 0's first reconstructed sample.  The descriptor is not published
+// until the fourth block-complete pulse, so the read side never exposes a
+// partially reconstructed 16x16 macroblock.
+reg [11:0] macroblock_origin_x_wr;
+reg [11:0] macroblock_origin_y_wr;
+reg [2:0]  completed_luma_blocks_wr;
+reg        macroblock_present_wr;
+reg        macroblock_active_wr;
 
 always @(posedge wr_clk) begin
     if (reset) begin
-        ram_wr_address       <= 19'd0;
-        ram_wr_data          <= 8'd0;
-        ram_wr_en            <= 1'b0;
-        block_origin_x_wr    <= 12'd0;
-        block_origin_y_wr    <= 12'd0;
-        block_present_wr     <= 1'b0;
-        wr_block_complete_d  <= 1'b0;
+        ram_wr_address          <= 19'd0;
+        ram_wr_data             <= 8'd0;
+        ram_wr_en               <= 1'b0;
+        macroblock_origin_x_wr  <= 12'd0;
+        macroblock_origin_y_wr  <= 12'd0;
+        completed_luma_blocks_wr<= 3'd0;
+        macroblock_present_wr   <= 1'b0;
+        macroblock_active_wr    <= 1'b0;
     end
     else begin
-        ram_wr_en           <= 1'b0;
-        wr_block_complete_d <= wr_block_complete;
+        ram_wr_en <= 1'b0;
 
-        if (wr_block_start) begin
-            // kate - The reconstruction engine supplies the H.262 picture
-            // coordinate of sample [0][0] for this 8x8 block.
-            block_origin_x_wr <= wr_x_pos;
-            block_origin_y_wr <= wr_y_pos;
-            block_present_wr  <= 1'b0;
+        if (wr_macroblock_start) begin
+            completed_luma_blocks_wr <= 3'd0;
+            macroblock_present_wr    <= 1'b0;
+            macroblock_active_wr     <= 1'b1;
         end
-        else if (wr_block_complete && !wr_block_complete_d) begin
-            // Publish on the completion edge.  The two-clock read-domain
-            // synchronizer leaves more than one writer clock for the final
-            // registered Port-A write to commit before the block is exposed.
-            block_present_wr <= 1'b1;
+
+        if (wr_block_start && macroblock_active_wr &&
+            (completed_luma_blocks_wr == 3'd0)) begin
+            // Block 0 is the upper-left 8x8 block; its first pixel therefore
+            // carries the 16x16 macroblock's picture-space origin.
+            macroblock_origin_x_wr <= wr_x_pos;
+            macroblock_origin_y_wr <= wr_y_pos;
+        end
+
+        if (wr_block_complete && macroblock_active_wr) begin
+            if (completed_luma_blocks_wr == 3'd3) begin
+                completed_luma_blocks_wr <= 3'd4;
+                macroblock_present_wr    <= 1'b1;
+                macroblock_active_wr     <= 1'b0;
+            end
+            else begin
+                completed_luma_blocks_wr <= completed_luma_blocks_wr + 3'd1;
+            end
         end
 
         if (wr_en &&
@@ -101,44 +115,40 @@ always @(posedge wr_clk) begin
 end
 
 // -------------------------------------------------------------------------
-// Read-side synchronization of the completed-block descriptor.
-//
-// The coordinates are captured before block_present_wr can become one and do
-// not change while it remains one.  Two read-clock stages are therefore used
-// for both the descriptor and its publication flag.
+// Read-side synchronization of the completed-macroblock descriptor.
 // -------------------------------------------------------------------------
 
-reg        block_present_rd_1;
-reg        block_present_rd_2;
-reg [11:0] block_origin_x_rd_1;
-reg [11:0] block_origin_x_rd_2;
-reg [11:0] block_origin_y_rd_1;
-reg [11:0] block_origin_y_rd_2;
+reg        macroblock_present_rd_1;
+reg        macroblock_present_rd_2;
+reg [11:0] macroblock_origin_x_rd_1;
+reg [11:0] macroblock_origin_x_rd_2;
+reg [11:0] macroblock_origin_y_rd_1;
+reg [11:0] macroblock_origin_y_rd_2;
 
 always @(posedge rd_clk) begin
     if (reset) begin
-        block_present_rd_1 <= 1'b0;
-        block_present_rd_2 <= 1'b0;
-        block_origin_x_rd_1 <= 12'd0;
-        block_origin_x_rd_2 <= 12'd0;
-        block_origin_y_rd_1 <= 12'd0;
-        block_origin_y_rd_2 <= 12'd0;
+        macroblock_present_rd_1 <= 1'b0;
+        macroblock_present_rd_2 <= 1'b0;
+        macroblock_origin_x_rd_1 <= 12'd0;
+        macroblock_origin_x_rd_2 <= 12'd0;
+        macroblock_origin_y_rd_1 <= 12'd0;
+        macroblock_origin_y_rd_2 <= 12'd0;
     end
     else begin
-        block_present_rd_1 <= block_present_wr;
-        block_present_rd_2 <= block_present_rd_1;
-        block_origin_x_rd_1 <= block_origin_x_wr;
-        block_origin_x_rd_2 <= block_origin_x_rd_1;
-        block_origin_y_rd_1 <= block_origin_y_wr;
-        block_origin_y_rd_2 <= block_origin_y_rd_1;
+        macroblock_present_rd_1 <= macroblock_present_wr;
+        macroblock_present_rd_2 <= macroblock_present_rd_1;
+        macroblock_origin_x_rd_1 <= macroblock_origin_x_wr;
+        macroblock_origin_x_rd_2 <= macroblock_origin_x_rd_1;
+        macroblock_origin_y_rd_1 <= macroblock_origin_y_wr;
+        macroblock_origin_y_rd_2 <= macroblock_origin_y_rd_1;
     end
 end
 
 // -------------------------------------------------------------------------
 // Read-side address generation.
 //
-// Phase 1F keeps the existing 720x480 diagnostic presentation centered in
-// 800x600.  This is a presentation choice, not an H.262 decoding rule.
+// The 720x480 diagnostic presentation remains centered in 800x600.  This is a
+// presentation/debug choice, not an H.262 decoding rule.
 // -------------------------------------------------------------------------
 
 wire source_window =
@@ -149,13 +159,13 @@ wire source_window =
 wire [11:0] source_x = h_pos - 12'd40;
 wire [11:0] source_y = v_pos - 12'd60;
 
-wire decoded_block_window =
+wire decoded_macroblock_window =
     source_window &&
-    block_present_rd_2 &&
-    (source_x >= block_origin_x_rd_2) &&
-    (source_x <  block_origin_x_rd_2 + 12'd8) &&
-    (source_y >= block_origin_y_rd_2) &&
-    (source_y <  block_origin_y_rd_2 + 12'd8);
+    macroblock_present_rd_2 &&
+    (source_x >= macroblock_origin_x_rd_2) &&
+    (source_x <  macroblock_origin_x_rd_2 + 12'd16) &&
+    (source_y >= macroblock_origin_y_rd_2) &&
+    (source_y <  macroblock_origin_y_rd_2 + 12'd16);
 
 wire [18:0] ram_rd_address =
     ((v_pos - 12'd60) * 19'd720) +
@@ -215,31 +225,28 @@ altsyncram #(
 // -------------------------------------------------------------------------
 
 reg source_window_d;
-reg decoded_block_window_d;
+reg decoded_macroblock_window_d;
 
 always @(posedge rd_clk) begin
     if (reset) begin
-        source_window_d        <= 1'b0;
-        decoded_block_window_d <= 1'b0;
-        video_y                <= 8'd0;
-        video_de               <= 1'b0;
-        video_hs               <= 1'b0;
-        video_vs               <= 1'b0;
+        source_window_d             <= 1'b0;
+        decoded_macroblock_window_d <= 1'b0;
+        video_y                     <= 8'd0;
+        video_de                    <= 1'b0;
+        video_hs                    <= 1'b0;
+        video_vs                    <= 1'b0;
     end
     else begin
-        source_window_d        <= source_window;
-        decoded_block_window_d <= decoded_block_window;
+        source_window_d             <= source_window;
+        decoded_macroblock_window_d <= decoded_macroblock_window;
 
         video_de <= pixel_en;
         video_hs <= h_sync;
         video_vs <= v_sync;
 
-        if (decoded_block_window_d)
+        if (decoded_macroblock_window_d)
             video_y <= ram_rd_data;
         else if (source_window_d)
-            // kate - Diagnostic background only.  It makes the 8x8 decoded
-            // block visible while ensuring uninitialised RAM cannot masquerade
-            // as decoder output.
             video_y <= 8'd24;
         else
             video_y <= 8'd0;

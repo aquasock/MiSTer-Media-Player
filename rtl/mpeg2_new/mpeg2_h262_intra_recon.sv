@@ -12,16 +12,14 @@
 //     and macroblock_address_increment gives the difference to the first
 //     macroblock.  Therefore the first macroblock column in a slice is
 //     macroblock_address_increment - 1.
-//   - 6.1.3 / Figure 6-10: in 4:2:0, luminance block 0 is the upper-left 8x8
-//     block of the 16x16 macroblock.
+//   - 6.1.3 / Figure 6-10: in 4:2:0, luminance blocks 0..3 occupy the 16x16
+//     macroblock as 0/1 on the upper row and 2/3 on the lower row.
 //   - 7.6: intra-coded macroblocks form no prediction, so p[y][x] = 0.
 //   - 7.6.8: d[y][x] = f[y][x] + p[y][x], saturated to [0,255].
 //
-// Phase 1F capability boundary:
-//   The upstream Phase-1 parser currently supplies only luminance block 0 of
-//   the first macroblock in the first captured slice.  This module therefore
-//   reconstructs that one 8x8 block, with exact H.262 picture coordinates.
-//   It does not infer coordinates from display timing or legacy MPEG2FPGA tags.
+// Phase 1I capability boundary:
+//   The upstream probe supplies the four luminance blocks of the first 4:2:0
+//   intra macroblock in normative block order.  Chroma blocks are deferred.
 //============================================================================
 
 module mpeg2_h262_intra_recon
@@ -35,6 +33,10 @@ module mpeg2_h262_intra_recon
     input  wire [2:0]         slice_vertical_position_extension,
     input  wire [11:0]        macroblock_address_increment,
 
+    // kate - Phase 1I resets the local four-Y-block placement counter when the
+    // parser accepts the first intra macroblock header.
+    input  wire               macroblock_start,
+
     input  wire               sample_valid,
     input  wire [5:0]         sample_index,
     input  wire signed [15:0] sample_value,
@@ -45,7 +47,11 @@ module mpeg2_h262_intra_recon
     output reg [11:0]         pixel_y,
     output reg [7:0]          pixel_luma,
     output reg                block_start,
+    // kate - One-cycle completion pulse used as the upstream pipeline-ready
+    // handshake between successive luminance blocks.
     output reg                block_complete,
+    // Sticky success state after reconstructed block 3 completes.
+    output reg                macroblock_luma_complete,
     output reg                recon_error,
 
     output reg [11:0]         block_origin_x,
@@ -56,22 +62,18 @@ module mpeg2_h262_intra_recon
 wire [14:0] horizontal_size_rounded = {1'b0, horizontal_size} + 15'd15;
 wire [10:0] mb_width = horizontal_size_rounded[14:4];
 
-// H.262 6.3.16.  For ordinary SD pictures the extension is absent and the
-// first term is zero.  Keeping it here prevents a hidden SD-only coordinate
-// rule in this reconstruction block.
+// H.262 6.3.16.
 wire [10:0] mb_row =
     (vertical_size > 14'd2800) ?
         ({8'd0, slice_vertical_position_extension} << 7) +
          {3'd0, slice_vertical_position} - 11'd1 :
         {3'd0, slice_vertical_position} - 11'd1;
 
-// At slice start previous_macroblock_address is row_base-1, so for the first
-// macroblock in the slice its column is increment-1.  This is directly
-// equivalent to the normative macroblock-address equations in 6.3.17.
+// H.262 6.3.17 first macroblock in the slice.
 wire [11:0] mb_column = macroblock_address_increment - 12'd1;
 
-wire [15:0] origin_x_calc = {4'd0, mb_column} << 4;
-wire [15:0] origin_y_calc = {5'd0, mb_row} << 4;
+wire [15:0] macroblock_origin_x_calc = {4'd0, mb_column} << 4;
+wire [15:0] macroblock_origin_y_calc = {5'd0, mb_row} << 4;
 
 wire coordinate_state_valid =
     (horizontal_size != 14'd0) &&
@@ -80,14 +82,25 @@ wire coordinate_state_valid =
     (macroblock_address_increment != 12'd0) &&
     (mb_width != 11'd0) &&
     (mb_column < mb_width) &&
-    (origin_x_calc < 16'd4096) &&
-    (origin_y_calc < 16'd4096);
+    (macroblock_origin_x_calc < 16'd4096) &&
+    (macroblock_origin_y_calc < 16'd4096);
+
+// H.262 6.1.3 / Figure 6-10, 4:2:0 frame macroblock luminance layout:
+//       0 1
+//       2 3
+reg [1:0] luma_block_index;
+wire [3:0] luma_block_x_offset = luma_block_index[0] ? 4'd8 : 4'd0;
+wire [3:0] luma_block_y_offset = luma_block_index[1] ? 4'd8 : 4'd0;
+
+wire [15:0] block_origin_x_calc =
+    macroblock_origin_x_calc + {12'd0, luma_block_x_offset};
+wire [15:0] block_origin_y_calc =
+    macroblock_origin_y_calc + {12'd0, luma_block_y_offset};
 
 function automatic [7:0] saturate_pel;
     input signed [15:0] value;
     begin
-        // H.262 7.6/7.6.8: p[y][x] is zero for intra-coded macroblocks, so
-        // d[y][x] is the IDCT result saturated to the decoded-pel range.
+        // H.262 7.6/7.6.8: p[y][x] is zero for intra-coded macroblocks.
         if (value < 16'sd0)
             saturate_pel = 8'd0;
         else if (value > 16'sd255)
@@ -103,41 +116,50 @@ reg       idct_block_complete_d;
 
 always @(posedge clk) begin
     if (reset) begin
-        pixel_valid           <= 1'b0;
-        pixel_x               <= 12'd0;
-        pixel_y               <= 12'd0;
-        pixel_luma            <= 8'd0;
-        block_start           <= 1'b0;
-        block_complete        <= 1'b0;
-        recon_error           <= 1'b0;
-        block_origin_x        <= 12'd0;
-        block_origin_y        <= 12'd0;
-        capture_active        <= 1'b0;
-        expected_sample_index <= 6'd0;
-        idct_block_complete_d  <= 1'b0;
+        pixel_valid              <= 1'b0;
+        pixel_x                  <= 12'd0;
+        pixel_y                  <= 12'd0;
+        pixel_luma               <= 8'd0;
+        block_start              <= 1'b0;
+        block_complete           <= 1'b0;
+        macroblock_luma_complete <= 1'b0;
+        recon_error              <= 1'b0;
+        block_origin_x           <= 12'd0;
+        block_origin_y           <= 12'd0;
+        luma_block_index         <= 2'd0;
+        capture_active           <= 1'b0;
+        expected_sample_index    <= 6'd0;
+        idct_block_complete_d    <= 1'b0;
     end
     else begin
-        pixel_valid   <= 1'b0;
-        block_start   <= 1'b0;
+        pixel_valid    <= 1'b0;
+        block_start    <= 1'b0;
+        block_complete <= 1'b0;
         idct_block_complete_d <= idct_block_complete;
+
+        if (macroblock_start) begin
+            if (capture_active)
+                recon_error <= 1'b1;
+            luma_block_index         <= 2'd0;
+            macroblock_luma_complete <= 1'b0;
+        end
 
         if (sample_valid) begin
             if (!capture_active) begin
-                // The IDCT stream is defined to begin at row-major index 0.
-                if ((sample_index != 6'd0) || !coordinate_state_valid) begin
+                if ((sample_index != 6'd0) || !coordinate_state_valid ||
+                    macroblock_luma_complete) begin
                     recon_error <= 1'b1;
                 end
                 else begin
                     capture_active        <= 1'b1;
                     expected_sample_index <= 6'd1;
-                    block_complete        <= 1'b0;
-                    block_origin_x        <= origin_x_calc[11:0];
-                    block_origin_y        <= origin_y_calc[11:0];
+                    block_origin_x        <= block_origin_x_calc[11:0];
+                    block_origin_y        <= block_origin_y_calc[11:0];
 
                     pixel_valid <= 1'b1;
                     block_start <= 1'b1;
-                    pixel_x     <= origin_x_calc[11:0];
-                    pixel_y     <= origin_y_calc[11:0];
+                    pixel_x     <= block_origin_x_calc[11:0];
+                    pixel_y     <= block_origin_y_calc[11:0];
                     pixel_luma  <= saturate_pel(sample_value);
                 end
             end
@@ -155,17 +177,22 @@ always @(posedge clk) begin
                         capture_active        <= 1'b0;
                         expected_sample_index <= 6'd0;
                         block_complete        <= 1'b1;
+
+                        if (luma_block_index == 2'd3) begin
+                            macroblock_luma_complete <= 1'b1;
+                        end
+                        else begin
+                            luma_block_index <= luma_block_index + 2'd1;
+                        end
                     end
                     else begin
-                        expected_sample_index <= expected_sample_index + 1'b1;
+                        expected_sample_index <= expected_sample_index + 6'd1;
                     end
                 end
             end
         end
 
-        // block_complete from the IDCT and the row-major sample-63 event are
-        // expected together.  Treat a completion with no active final sample
-        // as an internal pipeline/protocol error, not an H.262 syntax error.
+        // Each IDCT completion must coincide with the final row-major sample.
         if (idct_block_complete && !idct_block_complete_d &&
             !(sample_valid && (sample_index == 6'd63))) begin
             recon_error <= 1'b1;

@@ -7,10 +7,10 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_dct_vlc.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_inverse_quant.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_idct.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_intra_recon.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_slice_probe.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_luma4_probe.sv
 
-# kate - Phase 1H: MPEG2FPGA and its DDR bridge are intentionally not part of
-# the active Quartus design.  rtl/mpeg2fpga remains in the repository only as a
+# kate - Phase 1I: MPEG2FPGA and its DDR bridge remain outside the active
+# Quartus design.  rtl/mpeg2fpga remains in the repository only as a
 # frozen reference implementation.
 set_global_assignment -name SDC_FILE MediaPlayer.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE MediaPlayer.sv

@@ -232,6 +232,8 @@ wire        mpeg2_new_macroblock_address_seen;
 wire        mpeg2_new_first_i_macroblock_seen;
 wire        mpeg2_new_first_luma_dc_seen;
 wire        mpeg2_new_first_luma_block_complete;
+wire        mpeg2_new_first_macroblock_luma_parsed;
+wire        mpeg2_new_luma_macroblock_start;
 wire        mpeg2_new_phase1_probe_error;
 wire [4:0]  mpeg2_new_slice_quantiser_scale_code;
 wire [11:0] mpeg2_new_macroblock_address_increment;
@@ -276,6 +278,7 @@ wire [11:0] mpeg2_new_recon_pixel_y;
 wire [7:0]  mpeg2_new_recon_pixel_luma;
 wire        mpeg2_new_recon_block_start;
 wire        mpeg2_new_recon_block_complete;
+wire        mpeg2_new_recon_macroblock_luma_complete;
 wire        mpeg2_new_recon_error;
 wire [11:0] mpeg2_new_recon_block_origin_x;
 wire [11:0] mpeg2_new_recon_block_origin_y;
@@ -327,8 +330,10 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.intra_quant_matrix_default       (mpeg2_new_intra_quant_matrix_default)
 );
 
-// kate - First-slice/first-luma-block coefficient path.
-mpeg2_h262_slice_probe mpeg2_h262_slice_probe
+// kate - Phase 1I first-macroblock luminance path.  The parser now decodes
+// H.262 blocks 0..3 and waits for the IQ/IDCT/reconstruction pipeline after
+// every EOB before submitting the next block.
+mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 (
 	.clk                         (clk_mpeg2),
 	.reset                       (reset),
@@ -338,12 +343,14 @@ mpeg2_h262_slice_probe mpeg2_h262_slice_probe
 	.vertical_size               (mpeg2_new_vertical_size),
 	.intra_dc_precision          (mpeg2_new_intra_dc_precision),
 	.intra_vlc_format            (mpeg2_new_intra_vlc_format),
+	.pipeline_block_done         (mpeg2_new_recon_block_complete),
 
 	.slice_header_seen           (mpeg2_new_slice_header_seen),
 	.macroblock_address_seen     (mpeg2_new_macroblock_address_seen),
 	.first_i_macroblock_seen     (mpeg2_new_first_i_macroblock_seen),
 	.first_luma_dc_seen          (mpeg2_new_first_luma_dc_seen),
 	.first_luma_block_complete   (mpeg2_new_first_luma_block_complete),
+	.first_macroblock_luma_parsed(mpeg2_new_first_macroblock_luma_parsed),
 	.probe_error                 (mpeg2_new_phase1_probe_error),
 	.quantiser_scale_code        (mpeg2_new_slice_quantiser_scale_code),
 	.macroblock_address_increment(mpeg2_new_macroblock_address_increment),
@@ -357,6 +364,7 @@ mpeg2_h262_slice_probe mpeg2_h262_slice_probe
 	.first_luma_ac_nonzero_count (mpeg2_new_first_luma_ac_nonzero_count),
 	.first_luma_last_coeff_index (mpeg2_new_first_luma_last_coeff_index),
 	.first_luma_last_ac_level    (mpeg2_new_first_luma_last_ac_level),
+	.luma_macroblock_start       (mpeg2_new_luma_macroblock_start),
 
 	.qfs_block_start             (mpeg2_new_qfs_block_start),
 	.qfs_write_en                (mpeg2_new_qfs_write_en),
@@ -429,6 +437,7 @@ mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 	.slice_vertical_position            (mpeg2_new_slice_vertical_position),
 	.slice_vertical_position_extension  (mpeg2_new_slice_vertical_position_extension),
 	.macroblock_address_increment       (mpeg2_new_macroblock_address_increment),
+	.macroblock_start                   (mpeg2_new_luma_macroblock_start),
 
 	.sample_valid                       (mpeg2_new_idct_sample_valid),
 	.sample_index                       (mpeg2_new_idct_sample_index),
@@ -441,6 +450,7 @@ mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 	.pixel_luma                         (mpeg2_new_recon_pixel_luma),
 	.block_start                        (mpeg2_new_recon_block_start),
 	.block_complete                     (mpeg2_new_recon_block_complete),
+	.macroblock_luma_complete           (mpeg2_new_recon_macroblock_luma_complete),
 	.recon_error                        (mpeg2_new_recon_error),
 	.block_origin_x                     (mpeg2_new_recon_block_origin_x),
 	.block_origin_y                     (mpeg2_new_recon_block_origin_y)
@@ -459,6 +469,7 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 	.wr_x_pos    (mpeg2_new_recon_pixel_x),
 	.wr_y_pos    (mpeg2_new_recon_pixel_y),
 	.wr_en       (mpeg2_new_recon_pixel_valid),
+	.wr_macroblock_start (mpeg2_new_luma_macroblock_start),
 	.wr_block_start    (mpeg2_new_recon_block_start),
 	.wr_block_complete (mpeg2_new_recon_block_complete),
 
@@ -486,12 +497,13 @@ assign VGA_R = fb_video_y;
 assign VGA_G = fb_video_y;
 assign VGA_B = fb_video_y;
 
-// kate - Phase 1H positive diagnostic remains identical to Phase 1F/1G.
-// OFF: the first decoded luma block has not completed reconstruction, or an
-// earlier new-decoder stage reported an error.
-// ON: all 64 spatial samples reached our reconstruction/framebuffer path.
+// kate - Phase 1I positive diagnostic.
+// OFF: all four luminance blocks of the first intra macroblock have not yet
+// completed reconstruction, or an earlier decoder stage reported an error.
+// ON: blocks 0..3 (256 reconstructed luma samples) reached our framebuffer.
 assign LED_USER =
-	mpeg2_new_recon_block_complete &&
+	mpeg2_new_first_macroblock_luma_parsed &&
+	mpeg2_new_recon_macroblock_luma_complete &&
 	!mpeg2_new_syntax_error &&
 	!mpeg2_new_phase1_probe_error &&
 	!mpeg2_new_inverse_quant_error &&
