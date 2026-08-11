@@ -336,7 +336,7 @@ mpeg2_decoder mpeg2_decoder
 	.debug_macroblock_seen        (mpeg2_debug_macroblock_seen),
 	.debug_sequence_header_seen (mpeg2_debug_sequence_header_seen),
 	.debug_pixel_underflow       (mpeg2_debug_pixel_underflow),
-	.debug_fwd_addr_error(mpeg2_debug_fwd_addr_error)
+	.debug_fwd_addr_error(mpeg2_debug_fwd_addr_error),
 	.debug_resample_y        (mpeg2_resample_y),
 .debug_resample_position (mpeg2_resample_position),
 .debug_resample_wr_en    (mpeg2_resample_wr_en),
