@@ -239,6 +239,7 @@ wire [11:0] mpeg2_new_macroblock_address_increment;
 wire        mpeg2_new_macroblock_quant;
 wire [4:0]  mpeg2_new_macroblock_quantiser_scale_code;
 wire [7:0]  mpeg2_new_slice_vertical_position;
+wire [2:0]  mpeg2_new_slice_vertical_position_extension;
 wire [3:0]  mpeg2_new_first_luma_dc_size;
 wire signed [12:0] mpeg2_new_first_luma_dc_differential;
 wire [10:0] mpeg2_new_first_luma_dc_coefficient;
@@ -267,6 +268,17 @@ wire [5:0]  mpeg2_new_idct_sample_index;
 wire signed [15:0] mpeg2_new_idct_sample_value;
 wire signed [15:0] mpeg2_new_first_luma_sample00;
 wire signed [15:0] mpeg2_new_first_luma_sample77;
+
+// kate - Phase 1F decoded-pel reconstruction and explicit picture coordinates.
+wire        mpeg2_new_recon_pixel_valid;
+wire [11:0] mpeg2_new_recon_pixel_x;
+wire [11:0] mpeg2_new_recon_pixel_y;
+wire [7:0]  mpeg2_new_recon_pixel_luma;
+wire        mpeg2_new_recon_block_start;
+wire        mpeg2_new_recon_block_complete;
+wire        mpeg2_new_recon_error;
+wire [11:0] mpeg2_new_recon_block_origin_x;
+wire [11:0] mpeg2_new_recon_block_origin_y;
 wire [4:0]  mpeg2_new_effective_quantiser_scale_code =
     mpeg2_new_macroblock_quant ?
         mpeg2_new_macroblock_quantiser_scale_code :
@@ -444,6 +456,7 @@ mpeg2_h262_slice_probe mpeg2_h262_slice_probe
 	.macroblock_quant            (mpeg2_new_macroblock_quant),
 	.macroblock_quantiser_scale_code(mpeg2_new_macroblock_quantiser_scale_code),
 	.slice_vertical_position     (mpeg2_new_slice_vertical_position),
+	.slice_vertical_position_extension(mpeg2_new_slice_vertical_position_extension),
 	.first_luma_dc_size          (mpeg2_new_first_luma_dc_size),
 	.first_luma_dc_differential  (mpeg2_new_first_luma_dc_differential),
 	.first_luma_dc_coefficient   (mpeg2_new_first_luma_dc_coefficient),
@@ -491,9 +504,8 @@ mpeg2_h262_inverse_quant mpeg2_h262_inverse_quant
 	.coeff_out_block_end         (mpeg2_new_iq_coeff_block_end)
 );
 
-// kate - Phase 1E H.262 7.5 / Annex A inverse-DCT proof.
-// This block remains passive; its sample stream is not yet connected to the
-// display framebuffer.  H.262 7.6.8 pel saturation is intentionally later.
+// kate - Phase 1E H.262 7.5 / Annex A inverse DCT.  Phase 1F now consumes
+// this spatial sample stream for normative intra reconstruction and display.
 mpeg2_h262_idct mpeg2_h262_idct
 (
 	.clk                         (clk_mpeg2),
@@ -512,6 +524,36 @@ mpeg2_h262_idct mpeg2_h262_idct
 	.sample_value                (mpeg2_new_idct_sample_value),
 	.first_luma_sample00         (mpeg2_new_first_luma_sample00),
 	.first_luma_sample77         (mpeg2_new_first_luma_sample77)
+);
+
+// kate - Phase 1F H.262 7.6/7.6.8 intra reconstruction.
+// For an intra macroblock p[y][x] is zero; the IDCT result is saturated to
+// [0,255] and placed at the first block's normative macroblock coordinates.
+mpeg2_h262_intra_recon mpeg2_h262_intra_recon
+(
+    .clk                                (clk_mpeg2),
+    .reset                              (reset),
+
+    .horizontal_size                    (mpeg2_new_horizontal_size),
+    .vertical_size                      (mpeg2_new_vertical_size),
+    .slice_vertical_position            (mpeg2_new_slice_vertical_position),
+    .slice_vertical_position_extension  (mpeg2_new_slice_vertical_position_extension),
+    .macroblock_address_increment       (mpeg2_new_macroblock_address_increment),
+
+    .sample_valid                       (mpeg2_new_idct_sample_valid),
+    .sample_index                       (mpeg2_new_idct_sample_index),
+    .sample_value                       (mpeg2_new_idct_sample_value),
+    .idct_block_complete                (mpeg2_new_idct_complete),
+
+    .pixel_valid                        (mpeg2_new_recon_pixel_valid),
+    .pixel_x                            (mpeg2_new_recon_pixel_x),
+    .pixel_y                            (mpeg2_new_recon_pixel_y),
+    .pixel_luma                         (mpeg2_new_recon_pixel_luma),
+    .block_start                        (mpeg2_new_recon_block_start),
+    .block_complete                     (mpeg2_new_recon_block_complete),
+    .recon_error                        (mpeg2_new_recon_error),
+    .block_origin_x                     (mpeg2_new_recon_block_origin_x),
+    .block_origin_y                     (mpeg2_new_recon_block_origin_y)
 );
 
 mpeg2_decoder mpeg2_decoder
@@ -575,10 +617,12 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 	.reset       (reset),
 
 	.wr_clk      (clk_mpeg2),
-	.wr_y        (mpeg2_resample_y),
-	.wr_x_pos    (mpeg2_resample_x),
-	.wr_y_pos    (mpeg2_resample_y_pos),
-	.wr_en       (mpeg2_resample_wr_en),
+	.wr_y        (mpeg2_new_recon_pixel_luma),
+	.wr_x_pos    (mpeg2_new_recon_pixel_x),
+	.wr_y_pos    (mpeg2_new_recon_pixel_y),
+	.wr_en       (mpeg2_new_recon_pixel_valid),
+	.wr_block_start    (mpeg2_new_recon_block_start),
+	.wr_block_complete (mpeg2_new_recon_block_complete),
 
 	.rd_clk      (clk_video),
 	.h_pos       (mpeg2_video_h_pos),
@@ -628,8 +672,9 @@ mpeg2_ddram_bridge mpeg2_ddram_bridge
 assign CLK_VIDEO = clk_video;
 assign CE_PIXEL  = 1'b1;
 
-// kate - Independent framebuffer presentation.
-// First proof is grayscale so the complete frame fits comfortably in M10K RAM.
+// kate - Phase 1F presentation.  Pixel data in the visible 8x8 block now
+// comes from our H.262 decoder.  Legacy MPEG2FPGA remains only as the temporary
+// source of the already-proven 40 MHz SVGA timing used by this diagnostic.
 assign VGA_DE = fb_video_de;
 assign VGA_HS = fb_video_hs;
 assign VGA_VS = fb_video_vs;
@@ -640,17 +685,18 @@ assign VGA_B = fb_video_y;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
-// kate - Phase 1E positive diagnostic.
-// OFF: IDCT has not completed, or a preceding syntax/coefficient/IQ/IDCT stage
-// failed, or a downloaded quantisation matrix is not yet implemented.
-// ON: one complete intra luma block has reached spatial-domain f[y][x] through
-// the new H.262 parser, coefficient decoder, inverse quantiser and IDCT.
+// kate - Phase 1F positive diagnostic.
+// OFF: the first decoded luma block has not completed reconstruction, or a
+// preceding syntax/coefficient/IQ/IDCT/reconstruction stage failed.
+// ON: 64 spatial samples have passed H.262 intra reconstruction/saturation and
+// have been handed to our framebuffer with explicit H.262 picture coordinates.
 assign LED_USER =
-	mpeg2_new_idct_complete &&
+	mpeg2_new_recon_block_complete &&
 	!mpeg2_new_syntax_error &&
 	!mpeg2_new_phase1_probe_error &&
 	!mpeg2_new_inverse_quant_error &&
 	!mpeg2_new_inverse_quant_unsupported_matrix &&
-	!mpeg2_new_idct_error;
+	!mpeg2_new_idct_error &&
+	!mpeg2_new_recon_error;
 
 endmodule

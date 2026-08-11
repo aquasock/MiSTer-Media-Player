@@ -57,6 +57,8 @@ module mpeg2_h262_slice_probe
     output reg         macroblock_quant,
     output reg  [4:0]  macroblock_quantiser_scale_code,
     output reg  [7:0]  slice_vertical_position,
+    // kate - H.262 6.3.16 extension used when vertical_size > 2800.
+    output reg  [2:0]  slice_vertical_position_extension,
     output reg  [3:0]  first_luma_dc_size,
     output reg signed [12:0] first_luma_dc_differential,
     output reg  [10:0] first_luma_dc_coefficient,
@@ -124,7 +126,6 @@ localparam [4:0]
 reg [4:0] parse_state;
 reg [3:0] field_bit_count;
 reg [4:0] qscale_shift;
-reg [2:0] slice_vertical_position_extension;
 reg       slice_picture_id_enable;
 reg [5:0] slice_picture_id_shift;
 
