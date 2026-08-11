@@ -174,6 +174,20 @@ wire [7:0]  mpeg2_g;
 wire [7:0]  mpeg2_b;
 
 wire        mpeg2_pixel_en;
+wire [7:0]  mpeg2_resample_y;
+wire [2:0]  mpeg2_resample_position;
+wire        mpeg2_resample_wr_en;
+
+wire [11:0] mpeg2_video_h_pos;
+wire [11:0] mpeg2_video_v_pos;
+wire        mpeg2_video_pixel_en;
+wire        mpeg2_video_h_sync;
+wire        mpeg2_video_v_sync;
+
+wire [7:0]  fb_video_y;
+wire        fb_video_de;
+wire        fb_video_hs;
+wire        fb_video_vs;
 wire        mpeg2_h_sync;
 wire        mpeg2_v_sync;
 
@@ -323,6 +337,37 @@ mpeg2_decoder mpeg2_decoder
 	.debug_sequence_header_seen (mpeg2_debug_sequence_header_seen),
 	.debug_pixel_underflow       (mpeg2_debug_pixel_underflow),
 	.debug_fwd_addr_error(mpeg2_debug_fwd_addr_error)
+	.debug_resample_y        (mpeg2_resample_y),
+.debug_resample_position (mpeg2_resample_position),
+.debug_resample_wr_en    (mpeg2_resample_wr_en),
+
+.debug_video_h_pos       (mpeg2_video_h_pos),
+.debug_video_v_pos       (mpeg2_video_v_pos),
+.debug_video_pixel_en    (mpeg2_video_pixel_en),
+.debug_video_h_sync      (mpeg2_video_h_sync),
+.debug_video_v_sync      (mpeg2_video_v_sync)
+);
+
+mpeg2_luma_framebuffer mpeg2_luma_framebuffer
+(
+	.reset       (reset),
+
+	.wr_clk      (clk_mpeg2),
+	.wr_y        (mpeg2_resample_y),
+	.wr_position (mpeg2_resample_position),
+	.wr_en       (mpeg2_resample_wr_en),
+
+	.rd_clk      (clk_video),
+	.h_pos       (mpeg2_video_h_pos),
+	.v_pos       (mpeg2_video_v_pos),
+	.pixel_en    (mpeg2_video_pixel_en),
+	.h_sync      (mpeg2_video_h_sync),
+	.v_sync      (mpeg2_video_v_sync),
+
+	.video_y     (fb_video_y),
+	.video_de    (fb_video_de),
+	.video_hs    (fb_video_hs),
+	.video_vs    (fb_video_vs)
 );
 
 mpeg2_ddram_bridge mpeg2_ddram_bridge
@@ -360,12 +405,15 @@ mpeg2_ddram_bridge mpeg2_ddram_bridge
 assign CLK_VIDEO = clk_video;
 assign CE_PIXEL  = 1'b1;
 
-assign VGA_DE = mpeg2_pixel_en;
-assign VGA_HS = mpeg2_h_sync;
-assign VGA_VS = mpeg2_v_sync;
-assign VGA_R = mpeg2_r;
-assign VGA_G = mpeg2_g;
-assign VGA_B = mpeg2_b;
+// kate - Independent framebuffer presentation.
+// First proof is grayscale so the complete frame fits comfortably in M10K RAM.
+assign VGA_DE = fb_video_de;
+assign VGA_HS = fb_video_hs;
+assign VGA_VS = fb_video_vs;
+
+assign VGA_R = fb_video_y;
+assign VGA_G = fb_video_y;
+assign VGA_B = fb_video_y;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 

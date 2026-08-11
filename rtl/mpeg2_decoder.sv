@@ -43,6 +43,15 @@ module mpeg2_decoder
 	output wire        debug_progressive_frame,
 	output wire        debug_picture_coding_type,
 	output wire        debug_picture_structure,
+	output wire [7:0]  debug_resample_y,
+output wire [2:0]  debug_resample_position,
+output wire        debug_resample_wr_en,
+
+output wire [11:0] debug_video_h_pos,
+output wire [11:0] debug_video_v_pos,
+output wire        debug_video_pixel_en,
+output wire        debug_video_h_sync,
+output wire        debug_video_v_sync,
 	output wire debug_fwd_addr_error
 	);
 
@@ -120,7 +129,16 @@ mpeg2video decoder
 	.debug_macroblock_seen        (debug_macroblock_seen),
 	.debug_sequence_header_seen (debug_sequence_header_seen),
 	.debug_pixel_underflow       (debug_pixel_underflow),
-	.debug_fwd_addr_error(debug_fwd_addr_error)
+	.debug_fwd_addr_error(debug_fwd_addr_error),
+	.debug_resample_y        (debug_resample_y),
+.debug_resample_position (debug_resample_position),
+.debug_resample_wr_en    (debug_resample_wr_en),
+
+.debug_video_h_pos       (debug_video_h_pos),
+.debug_video_v_pos       (debug_video_v_pos),
+.debug_video_pixel_en    (debug_video_pixel_en),
+.debug_video_h_sync      (debug_video_h_sync),
+.debug_video_v_sync      (debug_video_v_sync)
 );
 
 endmodule
