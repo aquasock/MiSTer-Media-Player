@@ -176,6 +176,7 @@ wire [7:0]  mpeg2_b;
 wire        mpeg2_pixel_en;
 wire [7:0]  mpeg2_resample_y;
 wire [2:0]  mpeg2_resample_position;
+wire [1:0]  mpeg2_resample_image;
 wire        mpeg2_resample_wr_en;
 
 wire [11:0] mpeg2_video_h_pos;
@@ -339,6 +340,7 @@ mpeg2_decoder mpeg2_decoder
 	.debug_fwd_addr_error(mpeg2_debug_fwd_addr_error),
 	.debug_resample_y        (mpeg2_resample_y),
 .debug_resample_position (mpeg2_resample_position),
+.debug_resample_image    (mpeg2_resample_image),
 .debug_resample_wr_en    (mpeg2_resample_wr_en),
 
 .debug_video_h_pos       (mpeg2_video_h_pos),
@@ -355,6 +357,7 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 	.wr_clk      (clk_mpeg2),
 	.wr_y        (mpeg2_resample_y),
 	.wr_position (mpeg2_resample_position),
+	.wr_image    (mpeg2_resample_image),
 	.wr_en       (mpeg2_resample_wr_en),
 
 	.rd_clk      (clk_video),

@@ -30,7 +30,7 @@ module resample_dta (
   fifo_read, fifo_valid,
   disp_rd_dta_empty, disp_rd_dta_en, disp_rd_dta_valid, disp_rd_dta,
   resample_rd_en, resample_rd_dta, resample_rd_valid,
-  fifo_osd, fifo_y, fifo_u_upper, fifo_u_lower, fifo_v_upper, fifo_v_lower, fifo_position
+  fifo_osd, fifo_y, fifo_u_upper, fifo_u_lower, fifo_v_upper, fifo_v_lower, fifo_position, fifo_image
   );
 
   input            clk;                      // clock
@@ -47,7 +47,7 @@ module resample_dta (
   input      [63:0]disp_rd_dta;
 
   output           resample_rd_en;
-  input       [2:0]resample_rd_dta;
+  input       [4:0]resample_rd_dta;
   input            resample_rd_valid;
 
   /* registers to read disp_rd_dta fifo in. 
@@ -61,6 +61,8 @@ module resample_dta (
   output reg  [63:0]fifo_v_upper;      /* chromi, upper row */
   output reg  [63:0]fifo_v_lower;      /* chromi, lower row */
   output reg   [2:0]fifo_position;     /* position of pixels, as in  resample_codes */
+  // kate - FRAME/TOP/BOTTOM belonging to this macroblock.
+  output reg   [1:0]fifo_image;
 
   /* first-word fall-through fifo readers */
 
@@ -69,7 +71,7 @@ module resample_dta (
   reg              disp_fwft_rd_en;
 
   wire             resample_fwft_valid; 
-  wire        [2:0]resample_fwft_dout; 
+  wire        [4:0]resample_fwft_dout; 
   reg              resample_fwft_rd_en;
 
   parameter [3:0]
@@ -166,10 +168,23 @@ module resample_dta (
 
   /* read data from resample fifo */
 
+  // kate - Keep image identity and position together through the return path.
   always @(posedge clk)
-    if (~rst) fifo_position <= 2'b0;
-    else if (clk_en && (state == STATE_RD_POS) && resample_fwft_valid) fifo_position <= resample_fwft_dout;
-    else fifo_position <= fifo_position;
+    if (~rst)
+      begin
+        fifo_image    <= 2'b0;
+        fifo_position <= 3'b0;
+      end
+    else if (clk_en && (state == STATE_RD_POS) && resample_fwft_valid)
+      begin
+        fifo_image    <= resample_fwft_dout[4:3];
+        fifo_position <= resample_fwft_dout[2:0];
+      end
+    else
+      begin
+        fifo_image    <= fifo_image;
+        fifo_position <= fifo_position;
+      end
 
   /* fifo readers */
 
@@ -188,7 +203,7 @@ module resample_dta (
     );
 
   fwft_reader 
-    #(.dta_width(9'd3))
+    #(.dta_width(9'd5))
   resample_fwft_reader (
     .rst(rst), 
     .clk(clk), 

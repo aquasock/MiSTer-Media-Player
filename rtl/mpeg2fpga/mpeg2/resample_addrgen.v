@@ -31,7 +31,7 @@ module resample_addrgen (
   progressive_sequence, progressive_frame, top_field_first, repeat_first_field, mb_width, mb_height, horizontal_size, vertical_size,
   interlaced, deinterlace, persistence, repeat_frame,
   disp_wr_addr_full, disp_wr_addr_en, disp_wr_addr_ack, disp_wr_addr,
-  resample_wr_dta, resample_wr_en,
+  resample_wr_dta, resample_wr_en, resample_wr_image,
   disp_wr_addr_almost_full, resample_wr_almost_full,
   busy
   );
@@ -66,6 +66,8 @@ module resample_addrgen (
 
   output reg    [2:0]resample_wr_dta;
   output reg         resample_wr_en;
+  // kate - Carry FRAME/TOP/BOTTOM identity with each resample request.
+  output reg    [1:0]resample_wr_image;
 
   input              disp_wr_addr_almost_full;
   input              resample_wr_almost_full;
@@ -590,6 +592,12 @@ module resample_addrgen (
     if (~rst) resample_wr_en <= 1'b0;
     else if (clk_en) resample_wr_en <= (state == STATE_WR_OSD_MSB);
     else resample_wr_en <= resample_wr_en;
+
+  // kate - Register image identity with the same request cadence as resample_wr_dta.
+  always @(posedge clk)
+    if (~rst) resample_wr_image <= NO_OUTPUT;
+    else if (clk_en && (state == STATE_WR_OSD_MSB)) resample_wr_image <= image;
+    else resample_wr_image <= resample_wr_image;
 
   /* display address generator */
   memory_address

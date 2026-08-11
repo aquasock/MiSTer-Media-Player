@@ -28,8 +28,8 @@
 module resample_bilinear (
   clk, clk_en, rst, 
   fifo_read, fifo_valid,
-  fifo_osd, fifo_y, fifo_u_upper, fifo_u_lower, fifo_v_upper, fifo_v_lower, fifo_position,
-  y, u, v, osd_out, position_out, pixel_wr_en, pixel_wr_almost_full
+  fifo_osd, fifo_y, fifo_u_upper, fifo_u_lower, fifo_v_upper, fifo_v_lower, fifo_position, fifo_image,
+  y, u, v, osd_out, position_out, image_out, pixel_wr_en, pixel_wr_almost_full
   );
 
   input              clk;                      // clock
@@ -45,6 +45,8 @@ module resample_bilinear (
   output reg    [7:0]v;
   output reg    [7:0]osd_out;
   output reg    [2:0]position_out;
+  // kate - FRAME/TOP/BOTTOM aligned to position_out/y.
+  output reg    [1:0]image_out;
   output reg         pixel_wr_en;
   input              pixel_wr_almost_full;
 
@@ -56,6 +58,7 @@ module resample_bilinear (
   input        [63:0]fifo_v_upper;    /* chromi, upper row */
   input        [63:0]fifo_v_lower;    /* chromi, lower row */
   input         [2:0]fifo_position;   /* position code */
+  input         [1:0]fifo_image;      /* FRAME/TOP/BOTTOM */
 
 `include "resample_codes.v"
 
@@ -141,6 +144,7 @@ module resample_bilinear (
   reg          [63:0]v_upper_0;    /* chromi, upper row */
   reg          [63:0]v_lower_0;    /* chromi, lower row */
   reg           [2:0]position_0;   /* position code */
+  reg           [1:0]image_0;      /* FRAME/TOP/BOTTOM */
 
   always @(posedge clk)
     if (~rst)
@@ -152,6 +156,7 @@ module resample_bilinear (
         v_upper_0     <= 12'sd0;
         v_lower_0     <= 12'sd0;
         position_0    <= 3'b0;
+        image_0       <= 2'b0;
       end
     else if (clk_en && (state == STATE_INIT) && fifo_valid)
       begin
@@ -162,6 +167,7 @@ module resample_bilinear (
         v_upper_0     <= fifo_v_upper;
         v_lower_0     <= fifo_v_lower;
         position_0    <= fifo_position;
+        image_0       <= fifo_image;
       end
     else
       begin
@@ -172,6 +178,7 @@ module resample_bilinear (
         v_upper_0     <= v_upper_0;
         v_lower_0     <= v_lower_0;
         position_0    <= position_0;
+        image_0       <= image_0;
       end
 
   /* stage 1 */
@@ -182,6 +189,7 @@ module resample_bilinear (
   reg         [135:0]v_upper_1;
   reg         [135:0]v_lower_1;
   reg           [2:0]position_1;
+  reg           [1:0]image_1;
   reg                pixel_wr_en_1;
   reg           [2:0]position_0_saved;
   
@@ -195,6 +203,7 @@ module resample_bilinear (
         v_upper_1        <= 135'b0;
         v_lower_1        <= 135'b0;
         position_1       <= 3'b0;
+        image_1          <= 2'b0;
         position_0_saved <= 3'b0;
         pixel_wr_en_1    <= 1'b0;
       end
@@ -207,6 +216,7 @@ module resample_bilinear (
         v_upper_1        <= v_upper_1;
         v_lower_1        <= v_lower_1;
         position_1       <= position_1;
+        image_1          <= image_1;
         position_0_saved <= position_0_saved;
         pixel_wr_en_1    <= 1'b0;
       end
@@ -219,6 +229,7 @@ module resample_bilinear (
         v_upper_1        <= {duplicate_pixel(v_upper_0), 8'b0};
         v_lower_1        <= {duplicate_pixel(v_lower_0), 8'b0};
         position_1       <= position_0;
+        image_1          <= image_0;
         position_0_saved <= ROW_X_COL_X;
         pixel_wr_en_1    <= 1'b1;
       end
@@ -231,6 +242,7 @@ module resample_bilinear (
         v_upper_1        <= {v_upper_1[127:120], duplicate_pixel(v_upper_0)};
         v_lower_1        <= {v_lower_1[127:120], duplicate_pixel(v_lower_0)};
         position_1       <= ROW_X_COL_X;
+        image_1          <= image_0;
         position_0_saved <= position_0;
         pixel_wr_en_1    <= 1'b1;
       end
@@ -243,6 +255,7 @@ module resample_bilinear (
         v_upper_1        <= v_upper_1;
         v_lower_1        <= v_lower_1;
         position_1       <= position_1;
+        image_1          <= image_1;
         position_0_saved <= position_0_saved;
         pixel_wr_en_1    <= 1'b0;
       end
@@ -255,6 +268,7 @@ module resample_bilinear (
         v_upper_1        <= {v_upper_1[127:0], v_upper_1[7:0]};
         v_lower_1        <= {v_lower_1[127:0], v_lower_1[7:0]};
         position_1       <= (loop[15] == 1'b0) ? position_0_saved : ROW_X_COL_X;
+        image_1          <= image_1;
         position_0_saved <= position_0_saved;
         pixel_wr_en_1    <= 1'b1;
       end
@@ -267,6 +281,7 @@ module resample_bilinear (
         v_upper_1        <= v_upper_1;
         v_lower_1        <= v_lower_1;
         position_1       <= position_1;
+        image_1          <= image_1;
         position_0_saved <= position_0_saved;
         pixel_wr_en_1    <= pixel_wr_en_1;
       end
@@ -300,6 +315,7 @@ module resample_bilinear (
   reg signed   [11:0]v_upper_sum_2;
   reg signed   [11:0]v_lower_sum_2;
   reg           [2:0]position_2;
+  reg           [1:0]image_2;
   reg                pixel_wr_en_2;
 
   always @(posedge clk)
@@ -312,6 +328,7 @@ module resample_bilinear (
         v_upper_sum_2 <= 12'sd0;
         v_lower_sum_2 <= 12'sd0;
         position_2    <= 3'b0;
+        image_2       <= 2'b0;
         pixel_wr_en_2 <= 1'b0;
       end
     else if (clk_en)
@@ -323,6 +340,7 @@ module resample_bilinear (
         v_upper_sum_2 <= v_upper_left_pixel_1 + v_upper_right_pixel_1;
         v_lower_sum_2 <= v_lower_left_pixel_1 + v_lower_right_pixel_1;
         position_2    <= position_1;
+        image_2       <= image_1;
         pixel_wr_en_2 <= pixel_wr_en_1;
       end
     else
@@ -334,6 +352,7 @@ module resample_bilinear (
         v_upper_sum_2 <= v_upper_sum_2;
         v_lower_sum_2 <= v_lower_sum_2;
         position_2    <= position_2;
+        image_2       <= image_2;
         pixel_wr_en_2 <= pixel_wr_en_2;
       end
 
@@ -345,6 +364,7 @@ module resample_bilinear (
   reg signed   [11:0]v_upper_sum_3;
   reg signed   [11:0]v_lower_sum_3;
   reg           [2:0]position_3;
+  reg           [1:0]image_3;
   reg                pixel_wr_en_3;
 
   wire signed  [11:0]double_u_upper_sum_2 = u_upper_sum_2 <<< 1;
@@ -360,6 +380,7 @@ module resample_bilinear (
         v_upper_sum_3 <= 12'sd0;
         v_lower_sum_3 <= 12'sd0;
         position_3    <= 3'b0;
+        image_3       <= 2'b0;
         pixel_wr_en_3 <= 1'b0;
       end
     else if (clk_en)
@@ -371,6 +392,7 @@ module resample_bilinear (
         v_upper_sum_3 <= v_upper_sum_2 + double_v_upper_sum_2; // multiply by 3
         v_lower_sum_3 <= v_lower_sum_2;
         position_3    <= position_2;
+        image_3       <= image_2;
         pixel_wr_en_3 <= pixel_wr_en_2;
       end
     else
@@ -382,6 +404,7 @@ module resample_bilinear (
         v_upper_sum_3 <= v_upper_sum_3;
         v_lower_sum_3 <= v_lower_sum_3;
         position_3    <= position_3;
+        image_3       <= image_3;
         pixel_wr_en_3 <= pixel_wr_en_3;
       end
 
@@ -391,6 +414,7 @@ module resample_bilinear (
   reg signed   [11:0]u_pixel_4;
   reg signed   [11:0]v_pixel_4;
   reg           [2:0]position_4;
+  reg           [1:0]image_4;
   reg                pixel_wr_en_4;
 
   always @(posedge clk)
@@ -401,6 +425,7 @@ module resample_bilinear (
         u_pixel_4     <= 12'sd0;
         v_pixel_4     <= 12'sd0;
         position_4    <= 3'b0;
+        image_4       <= 2'b0;
         pixel_wr_en_4 <= 1'b0;
       end
     else if (clk_en)
@@ -410,6 +435,7 @@ module resample_bilinear (
         u_pixel_4     <= (u_upper_sum_3 + u_lower_sum_3 + 12'sd7) >>> 3;
         v_pixel_4     <= (v_upper_sum_3 + v_lower_sum_3 + 12'sd7) >>> 3;
         position_4    <= position_3;
+        image_4       <= image_3;
         pixel_wr_en_4 <= pixel_wr_en_3;
       end
     else
@@ -419,6 +445,7 @@ module resample_bilinear (
         u_pixel_4     <= u_pixel_4;
         v_pixel_4     <= v_pixel_4;
         position_4    <= position_4;
+        image_4       <= image_4;
         pixel_wr_en_4 <= pixel_wr_en_4;
       end
 
@@ -428,6 +455,7 @@ module resample_bilinear (
   reg signed    [7:0]u_pixel_5;
   reg signed    [7:0]v_pixel_5;
   reg           [2:0]position_5;
+  reg           [1:0]image_5;
   reg                pixel_wr_en_5;
 
   always @(posedge clk)
@@ -438,6 +466,7 @@ module resample_bilinear (
         u_pixel_5     <= 8'sd0;
         v_pixel_5     <= 8'sd0;
         position_5    <= 3'b0;
+        image_5       <= 2'b0;
         pixel_wr_en_5 <= 1'b0;
       end
     else if (clk_en)
@@ -449,6 +478,7 @@ module resample_bilinear (
         if ((v_pixel_4[11:8] == 4'b0000) || (v_pixel_4[11:8] == 4'b1111)) v_pixel_5 <= v_pixel_4[7:0];
         else v_pixel_5 <= {v_pixel_4[11], {7{~v_pixel_4[11]}}};
         position_5    <= position_4;
+        image_5       <= image_4;
         pixel_wr_en_5 <= pixel_wr_en_4;
       end
     else
@@ -458,6 +488,7 @@ module resample_bilinear (
         u_pixel_5     <= u_pixel_5;
         v_pixel_5     <= v_pixel_5;
         position_5    <= position_5;
+        image_5       <= image_5;
         pixel_wr_en_5 <= pixel_wr_en_5;
       end
 
@@ -471,6 +502,7 @@ module resample_bilinear (
         u            <= 8'b0;
         v            <= 8'b0;
         position_out <= 3'b0;
+        image_out    <= 2'b0;
         pixel_wr_en  <= 1'b0;
       end
     else if (clk_en)
@@ -480,6 +512,7 @@ module resample_bilinear (
         u            <= u_pixel_5 + 8'd128;
         v            <= v_pixel_5 + 8'd128;
         position_out <= position_5;
+        image_out    <= image_5;
         pixel_wr_en  <= pixel_wr_en_5;
       end
     else
@@ -489,6 +522,7 @@ module resample_bilinear (
         u            <= u;
         v            <= v;
         position_out <= position_out;
+        image_out    <= image_out;
         pixel_wr_en  <= pixel_wr_en;
       end
 

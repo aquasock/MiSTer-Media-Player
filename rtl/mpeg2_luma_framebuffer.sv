@@ -14,8 +14,9 @@ module mpeg2_luma_framebuffer
 	input  wire        wr_clk,
 	input  wire [7:0]  wr_y,
 	input  wire [2:0]  wr_position,
+	// kate - MPEG2FPGA output image type: FRAME/TOP/BOTTOM.
+	input  wire [1:0]  wr_image,
 	input  wire        wr_en,
-
 	// Independent video side - 40 MHz.
 	input  wire        rd_clk,
 	input  wire [11:0] h_pos,
@@ -33,12 +34,16 @@ module mpeg2_luma_framebuffer
 localparam integer SRC_WIDTH  = 720;
 localparam integer SRC_HEIGHT = 480;
 localparam integer FB_SIZE    = SRC_WIDTH * SRC_HEIGHT;
-
 // MPEG2FPGA position codes.
 localparam [2:0]
 	ROW_0_COL_0    = 3'b000,
 	ROW_1_COL_0    = 3'b001,
 	ROW_X_COL_0    = 3'b010;
+
+localparam [1:0]
+	IMAGE_FRAME  = 2'd1,
+	IMAGE_TOP    = 2'd2,
+	IMAGE_BOTTOM = 2'd3;
 
 // -------------------------------------------------------------------------
 // Write-side address generation.
@@ -51,7 +56,6 @@ reg [8:0]  wr_line;
 reg [18:0] ram_wr_address;
 reg [7:0]  ram_wr_data;
 reg        ram_wr_en;
-
 always @(posedge wr_clk) begin
 	if (reset) begin
 		wr_address     <= 19'd0;
@@ -77,7 +81,6 @@ always @(posedge wr_clk) begin
 					wr_line_base   <= 19'd0;
 					wr_line        <= 9'd0;
 				end
-
 				ROW_1_COL_0: begin
 					ram_wr_address <= 19'd720;
 					ram_wr_data    <= wr_y;
@@ -89,14 +92,29 @@ always @(posedge wr_clk) begin
 				end
 
 				ROW_X_COL_0: begin
-					if (wr_line < SRC_HEIGHT-1) begin
-						ram_wr_address <= wr_line_base + 19'd720;
-						ram_wr_data    <= wr_y;
-						ram_wr_en      <= 1'b1;
+					// kate - MPEG2FPGA emits consecutive rows for FRAME, but every
+					// other source row for TOP/BOTTOM fields.
+					if (wr_image == IMAGE_FRAME) begin
+						if (wr_line < SRC_HEIGHT-1) begin
+							ram_wr_address <= wr_line_base + 19'd720;
+							ram_wr_data    <= wr_y;
+							ram_wr_en      <= 1'b1;
 
-						wr_line_base   <= wr_line_base + 19'd720;
-						wr_address     <= wr_line_base + 19'd721;
-						wr_line        <= wr_line + 1'b1;
+							wr_line_base   <= wr_line_base + 19'd720;
+							wr_address     <= wr_line_base + 19'd721;
+							wr_line        <= wr_line + 9'd1;
+						end
+					end
+					else begin
+						if (wr_line < SRC_HEIGHT-2) begin
+							ram_wr_address <= wr_line_base + 19'd1440;
+							ram_wr_data    <= wr_y;
+							ram_wr_en      <= 1'b1;
+
+							wr_line_base   <= wr_line_base + 19'd1440;
+							wr_address     <= wr_line_base + 19'd1441;
+							wr_line        <= wr_line + 9'd2;
+						end
 					end
 				end
 
@@ -116,7 +134,6 @@ always @(posedge wr_clk) begin
 		end
 	end
 end
-
 // -------------------------------------------------------------------------
 // Read-side address generation.
 //
@@ -135,7 +152,6 @@ wire [18:0] ram_rd_address =
 	 (h_pos - 12'd40);
 
 wire [7:0] ram_rd_data;
-
 // -------------------------------------------------------------------------
 // True dual-clock framebuffer.
 //
@@ -148,7 +164,6 @@ altsyncram #(
 	.width_a                        (8),
 	.widthad_a                      (19),
 	.numwords_a                     (FB_SIZE),
-
 	.width_b                        (8),
 	.widthad_b                      (19),
 	.numwords_b                     (FB_SIZE),
@@ -163,7 +178,6 @@ altsyncram #(
 ) framebuffer_ram (
 	.clock0         (wr_clk),
 	.clock1         (rd_clk),
-
 	.address_a      (ram_wr_address),
 	.data_a         (ram_wr_data),
 	.wren_a         (ram_wr_en),
@@ -186,14 +200,12 @@ altsyncram #(
 
 	.q_a            ()
 );
-
 // -------------------------------------------------------------------------
 // altsyncram read address is registered, so delay raster control one clock
 // to keep the returned pixel aligned.
 // -------------------------------------------------------------------------
 
 reg source_window_d;
-
 always @(posedge rd_clk) begin
 	if (reset) begin
 		source_window_d <= 1'b0;

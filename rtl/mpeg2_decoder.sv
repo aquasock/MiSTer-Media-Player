@@ -45,6 +45,7 @@ module mpeg2_decoder
 	output wire        debug_picture_structure,
 	output wire [7:0]  debug_resample_y,
 output wire [2:0]  debug_resample_position,
+output wire [1:0]  debug_resample_image,
 output wire        debug_resample_wr_en,
 
 output wire [11:0] debug_video_h_pos,
@@ -132,6 +133,7 @@ mpeg2video decoder
 	.debug_fwd_addr_error(debug_fwd_addr_error),
 	.debug_resample_y        (debug_resample_y),
 .debug_resample_position (debug_resample_position),
+.debug_resample_image    (debug_resample_image),
 .debug_resample_wr_en    (debug_resample_wr_en),
 
 .debug_video_h_pos       (debug_video_h_pos),
