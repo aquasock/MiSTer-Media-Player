@@ -1,11 +1,11 @@
 //============================================================================
-// MiSTer Media Player - new H.262 decoder Phase 1D inverse quantiser
+// MiSTer Media Player - new H.262 decoder inverse quantiser
 //
 // This diagnostic engine receives the complete QFS[] coefficient set for the
 // first intra luminance block, performs the H.262 inverse scan and inverse
 // quantisation, saturates the reconstructed coefficients, and applies MPEG-2
 // mismatch control.  It remains passive; the legacy MPEG2FPGA path still owns
-// displayed video during Phase 1D.
+// displayed video during the current bootstrap phases.
 //
 // Normative standards basis:
 //   ITU-T H.262 (02/2000) / ISO/IEC 13818-2:2000
@@ -42,7 +42,15 @@ module mpeg2_h262_inverse_quant
     output reg                iq_error,
     output reg                unsupported_matrix,
     output reg signed [11:0]  first_luma_f00,
-    output reg signed [11:0]  first_luma_f77
+    output reg signed [11:0]  first_luma_f77,
+
+    // kate - Phase 1E streams the final, mismatch-corrected F[v][u]
+    // coefficients in physical row-major order to the IDCT.
+    output reg                coeff_out_block_start,
+    output reg                coeff_out_valid,
+    output reg [5:0]          coeff_out_index,
+    output reg signed [11:0]  coeff_out_value,
+    output reg                coeff_out_block_end
 );
 
 // QFS[] is the one-dimensional coefficient array produced by H.262 7.2.
@@ -56,6 +64,8 @@ integer i;
 reg       busy;
 reg [5:0] physical_index;
 reg       parity_lsb;
+reg       emit_active;
+reg [5:0] emit_index;
 
 reg [1:0] latched_intra_dc_precision;
 reg [4:0] latched_quantiser_scale_code;
@@ -315,14 +325,26 @@ always @(posedge clk) begin
         unsupported_matrix           <= 1'b0;
         first_luma_f00               <= 12'sd0;
         first_luma_f77               <= 12'sd0;
+        emit_active                    <= 1'b0;
+        emit_index                     <= 6'd0;
+        coeff_out_block_start          <= 1'b0;
+        coeff_out_valid                <= 1'b0;
+        coeff_out_index                <= 6'd0;
+        coeff_out_value                <= 12'sd0;
+        coeff_out_block_end            <= 1'b0;
         for (i = 0; i < 64; i = i + 1) begin
             qfs[i]          <= 13'sd0;
             reconstructed[i] <= 12'sd0;
         end
     end
     else begin
+        // kate - coefficient handoff controls are one-cycle pulses.
+        coeff_out_block_start <= 1'b0;
+        coeff_out_valid       <= 1'b0;
+        coeff_out_block_end   <= 1'b0;
+
         if (block_start) begin
-            if (busy) begin
+            if (busy || emit_active) begin
                 iq_error <= 1'b1;
             end
             else begin
@@ -338,14 +360,14 @@ always @(posedge clk) begin
         end
 
         if (coeff_write_en) begin
-            if (busy)
+            if (busy || emit_active)
                 iq_error <= 1'b1;
             else
                 qfs[coeff_write_index] <= coeff_write_value;
         end
 
         if (block_end) begin
-            if (busy || (quantiser_scale_code == 5'd0)) begin
+            if (busy || emit_active || (quantiser_scale_code == 5'd0)) begin
                 iq_error <= 1'b1;
             end
             else if (!intra_quant_matrix_default) begin
@@ -372,6 +394,8 @@ always @(posedge clk) begin
                 first_luma_f77     <= mismatch_corrected_last;
                 busy               <= 1'b0;
                 block_complete     <= 1'b1;
+                emit_active        <= 1'b1;
+                emit_index         <= 6'd0;
             end
             else begin
                 reconstructed[physical_index] <= dequant_saturated;
@@ -379,6 +403,26 @@ always @(posedge clk) begin
                 if (physical_index == 6'd0)
                     first_luma_f00 <= dequant_saturated;
                 physical_index <= physical_index + 1'b1;
+            end
+        end
+
+        // kate - Emit the completed 8x8 transform-domain block only after
+        // mismatch control has finalized F[7][7].  The explicit stream keeps
+        // the IDCT independent of the inverse-quantiser's internal storage.
+        if (emit_active) begin
+            coeff_out_valid <= 1'b1;
+            coeff_out_index <= emit_index;
+            coeff_out_value <= reconstructed[emit_index];
+
+            if (emit_index == 6'd0)
+                coeff_out_block_start <= 1'b1;
+
+            if (emit_index == 6'd63) begin
+                coeff_out_block_end <= 1'b1;
+                emit_active         <= 1'b0;
+            end
+            else begin
+                emit_index <= emit_index + 1'b1;
             end
         end
     end

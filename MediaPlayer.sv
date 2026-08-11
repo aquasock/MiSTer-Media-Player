@@ -225,8 +225,9 @@ wire        mpeg2_new_alternate_scan;
 wire        mpeg2_new_progressive_frame;
 wire        mpeg2_new_intra_quant_matrix_default;
 
-// kate - Phase 1D diagnostic: retain the proven first-block coefficient
-// parser, then hand its QFS[] values to the standards-driven inverse quantiser.
+// kate - Phase 1E diagnostic: retain the proven first-block coefficient
+// parser and inverse quantiser, then feed the mismatch-corrected F[v][u]
+// block into our standards-driven 8x8 IDCT.
 wire        mpeg2_new_slice_header_seen;
 wire        mpeg2_new_macroblock_address_seen;
 wire        mpeg2_new_first_i_macroblock_seen;
@@ -254,6 +255,18 @@ wire        mpeg2_new_inverse_quant_error;
 wire        mpeg2_new_inverse_quant_unsupported_matrix;
 wire signed [11:0] mpeg2_new_first_luma_f00;
 wire signed [11:0] mpeg2_new_first_luma_f77;
+wire        mpeg2_new_iq_coeff_block_start;
+wire        mpeg2_new_iq_coeff_valid;
+wire [5:0]  mpeg2_new_iq_coeff_index;
+wire signed [11:0] mpeg2_new_iq_coeff_value;
+wire        mpeg2_new_iq_coeff_block_end;
+wire        mpeg2_new_idct_complete;
+wire        mpeg2_new_idct_error;
+wire        mpeg2_new_idct_sample_valid;
+wire [5:0]  mpeg2_new_idct_sample_index;
+wire signed [15:0] mpeg2_new_idct_sample_value;
+wire signed [15:0] mpeg2_new_first_luma_sample00;
+wire signed [15:0] mpeg2_new_first_luma_sample77;
 wire [4:0]  mpeg2_new_effective_quantiser_scale_code =
     mpeg2_new_macroblock_quant ?
         mpeg2_new_macroblock_quantiser_scale_code :
@@ -469,7 +482,36 @@ mpeg2_h262_inverse_quant mpeg2_h262_inverse_quant
 	.iq_error                    (mpeg2_new_inverse_quant_error),
 	.unsupported_matrix          (mpeg2_new_inverse_quant_unsupported_matrix),
 	.first_luma_f00              (mpeg2_new_first_luma_f00),
-	.first_luma_f77              (mpeg2_new_first_luma_f77)
+	.first_luma_f77              (mpeg2_new_first_luma_f77),
+
+	.coeff_out_block_start       (mpeg2_new_iq_coeff_block_start),
+	.coeff_out_valid             (mpeg2_new_iq_coeff_valid),
+	.coeff_out_index             (mpeg2_new_iq_coeff_index),
+	.coeff_out_value             (mpeg2_new_iq_coeff_value),
+	.coeff_out_block_end         (mpeg2_new_iq_coeff_block_end)
+);
+
+// kate - Phase 1E H.262 7.5 / Annex A inverse-DCT proof.
+// This block remains passive; its sample stream is not yet connected to the
+// display framebuffer.  H.262 7.6.8 pel saturation is intentionally later.
+mpeg2_h262_idct mpeg2_h262_idct
+(
+	.clk                         (clk_mpeg2),
+	.reset                       (reset),
+
+	.coeff_block_start           (mpeg2_new_iq_coeff_block_start),
+	.coeff_valid                 (mpeg2_new_iq_coeff_valid),
+	.coeff_index                 (mpeg2_new_iq_coeff_index),
+	.coeff_value                 (mpeg2_new_iq_coeff_value),
+	.coeff_block_end             (mpeg2_new_iq_coeff_block_end),
+
+	.block_complete              (mpeg2_new_idct_complete),
+	.idct_error                  (mpeg2_new_idct_error),
+	.sample_valid                (mpeg2_new_idct_sample_valid),
+	.sample_index                (mpeg2_new_idct_sample_index),
+	.sample_value                (mpeg2_new_idct_sample_value),
+	.first_luma_sample00         (mpeg2_new_first_luma_sample00),
+	.first_luma_sample77         (mpeg2_new_first_luma_sample77)
 );
 
 mpeg2_decoder mpeg2_decoder
@@ -598,16 +640,17 @@ assign VGA_B = fb_video_y;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
-// kate - Phase 1D positive diagnostic.
-// OFF: inverse quantisation has not completed, syntax/coefficient/IQ failed,
-// or the stream uses a downloaded quantisation matrix not yet implemented.
-// ON: one complete intra luma block has passed H.262 coefficient decoding,
-// inverse scan, inverse quantisation, saturation and mismatch control.
+// kate - Phase 1E positive diagnostic.
+// OFF: IDCT has not completed, or a preceding syntax/coefficient/IQ/IDCT stage
+// failed, or a downloaded quantisation matrix is not yet implemented.
+// ON: one complete intra luma block has reached spatial-domain f[y][x] through
+// the new H.262 parser, coefficient decoder, inverse quantiser and IDCT.
 assign LED_USER =
-	mpeg2_new_inverse_quant_complete &&
+	mpeg2_new_idct_complete &&
 	!mpeg2_new_syntax_error &&
 	!mpeg2_new_phase1_probe_error &&
 	!mpeg2_new_inverse_quant_error &&
-	!mpeg2_new_inverse_quant_unsupported_matrix;
+	!mpeg2_new_inverse_quant_unsupported_matrix &&
+	!mpeg2_new_idct_error;
 
 endmodule
