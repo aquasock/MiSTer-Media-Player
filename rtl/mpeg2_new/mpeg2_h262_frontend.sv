@@ -14,6 +14,7 @@
 //   - 6.2.2.3 sequence_extension()
 //   - 6.2.3 picture_header()
 //   - 6.2.3.1 picture_coding_extension()
+//   - 6.3.11 quantisation matrix reset/download semantics
 //   - Table 6-2 extension_start_code_identifier
 //   - Table 6-12 picture_coding_type
 //
@@ -58,7 +59,12 @@ module mpeg2_h262_frontend
     output reg         q_scale_type,
     output reg         intra_vlc_format,
     output reg         alternate_scan,
-    output reg         progressive_frame
+    output reg         progressive_frame,
+
+    // kate - Phase 1D currently implements the normative default intra
+    // quantisation matrix.  A downloaded matrix is valid H.262 but is kept
+    // as a separate capability boundary until matrix download support lands.
+    output reg         intra_quant_matrix_default
 );
 
 localparam [7:0]
@@ -168,6 +174,7 @@ always @(posedge clk) begin
         intra_vlc_format                    <= 1'b0;
         alternate_scan                      <= 1'b0;
         progressive_frame                   <= 1'b0;
+        intra_quant_matrix_default           <= 1'b1;
     end
     else if (stream_valid) begin
         byte_window <= byte_window_next;
@@ -194,7 +201,11 @@ always @(posedge clk) begin
 
             case (start_code_value)
                 SEQUENCE_HEADER_CODE: begin
-                    expect_sequence_extension <= 1'b1;
+                    expect_sequence_extension     <= 1'b1;
+                    // H.262 6.3.11: every sequence header resets all
+                    // quantisation matrices to their default values before
+                    // any optional matrix download in that header.
+                    intra_quant_matrix_default   <= 1'b1;
                 end
 
                 PICTURE_START_CODE: begin
@@ -244,6 +255,14 @@ always @(posedge clk) begin
                 // marker_bit follows bit_rate_value and shall be one.
                 if (!payload_next[13])
                     syntax_error <= 1'b1;
+
+                // H.262 6.2.2.1/6.3.11: after the fixed sequence-header
+                // fields, load_intra_quantiser_matrix is the 63rd payload
+                // bit.  The 64-bit window places it at payload_next[1].
+                // A value of one is fully valid H.262; Phase 1D simply does
+                // not yet implement the downloaded matrix values.
+                if (payload_next[1])
+                    intra_quant_matrix_default <= 1'b0;
             end
 
             // extension_start_code_identifier is the first four payload bits.
@@ -265,6 +284,13 @@ always @(posedge clk) begin
                 // accidentally interpreted with the non-scalable slice grammar.
                 if (stream_data[7:4] == EXT_SEQUENCE_SCALABLE)
                     sequence_scalable_extension_seen <= 1'b1;
+
+                // Conservatively treat any quant_matrix_extension as a
+                // Phase 1D matrix-download capability boundary.  The
+                // extension itself is valid H.262 and is not a syntax error.
+                // Later phases will parse its individual load flags/matrices.
+                if (stream_data[7:4] == EXT_QUANT_MATRIX)
+                    intra_quant_matrix_default <= 1'b0;
             end
 
             // sequence_extension(): 48 payload bits.

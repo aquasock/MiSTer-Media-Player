@@ -223,9 +223,10 @@ wire        mpeg2_new_q_scale_type;
 wire        mpeg2_new_intra_vlc_format;
 wire        mpeg2_new_alternate_scan;
 wire        mpeg2_new_progressive_frame;
+wire        mpeg2_new_intra_quant_matrix_default;
 
-// kate - Phase 1C diagnostic: prove one complete standards-aligned intra
-// luminance block, including AC VLCs and End of Block.
+// kate - Phase 1D diagnostic: retain the proven first-block coefficient
+// parser, then hand its QFS[] values to the standards-driven inverse quantiser.
 wire        mpeg2_new_slice_header_seen;
 wire        mpeg2_new_macroblock_address_seen;
 wire        mpeg2_new_first_i_macroblock_seen;
@@ -243,6 +244,20 @@ wire [10:0] mpeg2_new_first_luma_dc_coefficient;
 wire [6:0]  mpeg2_new_first_luma_ac_nonzero_count;
 wire [5:0]  mpeg2_new_first_luma_last_coeff_index;
 wire signed [11:0] mpeg2_new_first_luma_last_ac_level;
+wire        mpeg2_new_qfs_block_start;
+wire        mpeg2_new_qfs_write_en;
+wire [5:0]  mpeg2_new_qfs_write_index;
+wire signed [12:0] mpeg2_new_qfs_write_value;
+wire        mpeg2_new_qfs_block_end;
+wire        mpeg2_new_inverse_quant_complete;
+wire        mpeg2_new_inverse_quant_error;
+wire        mpeg2_new_inverse_quant_unsupported_matrix;
+wire signed [11:0] mpeg2_new_first_luma_f00;
+wire signed [11:0] mpeg2_new_first_luma_f77;
+wire [4:0]  mpeg2_new_effective_quantiser_scale_code =
+    mpeg2_new_macroblock_quant ?
+        mpeg2_new_macroblock_quantiser_scale_code :
+        mpeg2_new_slice_quantiser_scale_code;
 
 wire [1:0]  mpeg2_mem_req_rd_cmd;
 wire [21:0] mpeg2_mem_req_rd_addr;
@@ -387,12 +402,13 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.q_scale_type                     (mpeg2_new_q_scale_type),
 	.intra_vlc_format                 (mpeg2_new_intra_vlc_format),
 	.alternate_scan                   (mpeg2_new_alternate_scan),
-	.progressive_frame                (mpeg2_new_progressive_frame)
+	.progressive_frame                (mpeg2_new_progressive_frame),
+	.intra_quant_matrix_default       (mpeg2_new_intra_quant_matrix_default)
 );
 
-// kate - Phase 1C remains passive beside MPEG2FPGA.  It continues through the
-// first luminance block's AC coefficients using H.262 Table 7-3 and Annex B
-// Tables B.14/B.15/B.16, and asserts completion only after a legal EOB.
+// kate - Phase 1D remains passive beside MPEG2FPGA.  The coefficient probe
+// emits the exact non-zero QFS[] entries for the first luminance block while
+// retaining the already-proven H.262 VLC/EOB checks.
 mpeg2_h262_slice_probe mpeg2_h262_slice_probe
 (
 	.clk                         (clk_mpeg2),
@@ -420,7 +436,40 @@ mpeg2_h262_slice_probe mpeg2_h262_slice_probe
 	.first_luma_dc_coefficient   (mpeg2_new_first_luma_dc_coefficient),
 	.first_luma_ac_nonzero_count (mpeg2_new_first_luma_ac_nonzero_count),
 	.first_luma_last_coeff_index (mpeg2_new_first_luma_last_coeff_index),
-	.first_luma_last_ac_level    (mpeg2_new_first_luma_last_ac_level)
+	.first_luma_last_ac_level    (mpeg2_new_first_luma_last_ac_level),
+
+	.qfs_block_start             (mpeg2_new_qfs_block_start),
+	.qfs_write_en                (mpeg2_new_qfs_write_en),
+	.qfs_write_index             (mpeg2_new_qfs_write_index),
+	.qfs_write_value             (mpeg2_new_qfs_write_value),
+	.qfs_block_end               (mpeg2_new_qfs_block_end)
+);
+
+// kate - Phase 1D H.262 7.3/7.4 inverse scan and inverse quantisation proof.
+// The module currently supports the normative default intra matrix.  A custom
+// downloaded matrix is valid H.262 and is reported separately as unsupported.
+mpeg2_h262_inverse_quant mpeg2_h262_inverse_quant
+(
+	.clk                         (clk_mpeg2),
+	.reset                       (reset),
+
+	.block_start                 (mpeg2_new_qfs_block_start),
+	.coeff_write_en              (mpeg2_new_qfs_write_en),
+	.coeff_write_index           (mpeg2_new_qfs_write_index),
+	.coeff_write_value           (mpeg2_new_qfs_write_value),
+	.block_end                   (mpeg2_new_qfs_block_end),
+
+	.intra_quant_matrix_default  (mpeg2_new_intra_quant_matrix_default),
+	.intra_dc_precision          (mpeg2_new_intra_dc_precision),
+	.quantiser_scale_code        (mpeg2_new_effective_quantiser_scale_code),
+	.q_scale_type                (mpeg2_new_q_scale_type),
+	.alternate_scan              (mpeg2_new_alternate_scan),
+
+	.block_complete              (mpeg2_new_inverse_quant_complete),
+	.iq_error                    (mpeg2_new_inverse_quant_error),
+	.unsupported_matrix          (mpeg2_new_inverse_quant_unsupported_matrix),
+	.first_luma_f00              (mpeg2_new_first_luma_f00),
+	.first_luma_f77              (mpeg2_new_first_luma_f77)
 );
 
 mpeg2_decoder mpeg2_decoder
@@ -549,14 +598,16 @@ assign VGA_B = fb_video_y;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
-// kate - Phase 1C positive diagnostic.
-// OFF: the first luminance block has not yet reached a legal End of Block,
-// or either standards-driven parser detected an error.
-// ON: Phase 0/1A/1B passed and the new decoder consumed the complete first
-// intra luma block through H.262 Tables B.14/B.15/B.16 as applicable.
+// kate - Phase 1D positive diagnostic.
+// OFF: inverse quantisation has not completed, syntax/coefficient/IQ failed,
+// or the stream uses a downloaded quantisation matrix not yet implemented.
+// ON: one complete intra luma block has passed H.262 coefficient decoding,
+// inverse scan, inverse quantisation, saturation and mismatch control.
 assign LED_USER =
-	mpeg2_new_first_luma_block_complete &&
+	mpeg2_new_inverse_quant_complete &&
 	!mpeg2_new_syntax_error &&
-	!mpeg2_new_phase1_probe_error;
+	!mpeg2_new_phase1_probe_error &&
+	!mpeg2_new_inverse_quant_error &&
+	!mpeg2_new_inverse_quant_unsupported_matrix;
 
 endmodule

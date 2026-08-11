@@ -1,5 +1,5 @@
 //============================================================================
-// MiSTer Media Player - new H.262 decoder Phase 1C coefficient probe
+// MiSTer Media Player - new H.262 decoder Phase 1D coefficient probe
 //
 // This module is intentionally passive.  It observes the same elementary-
 // stream bytes as the legacy MPEG2FPGA path, captures the beginning of the
@@ -24,7 +24,8 @@
 // Phase 1 capability boundary:
 //   - Non-scalable sequence syntax only.
 //   - Progressive 4:2:0 frame-picture I video is selected by the front end.
-//   - Phase 1C decodes the complete first luminance block through End of Block.
+//   - Phase 1D retains the complete first-luma coefficient decode and exports
+//     each non-zero QFS[] entry plus block boundaries to the inverse quantiser.
 //   - The bounded capture buffer is a diagnostic implementation choice, not an
 //     H.262 syntax restriction; the production decoder will use a streaming bitreader.
 //
@@ -61,7 +62,15 @@ module mpeg2_h262_slice_probe
     output reg  [10:0] first_luma_dc_coefficient,
     output reg  [6:0]  first_luma_ac_nonzero_count,
     output reg  [5:0]  first_luma_last_coeff_index,
-    output reg signed [11:0] first_luma_last_ac_level
+    output reg signed [11:0] first_luma_last_ac_level,
+
+    // kate - Phase 1D coefficient handoff.  Run-created and EOB-created zero
+    // entries are implicit; qfs_block_start clears the destination array.
+    output reg         qfs_block_start,
+    output reg         qfs_write_en,
+    output reg  [5:0]  qfs_write_index,
+    output reg signed [12:0] qfs_write_value,
+    output reg         qfs_block_end
 );
 
 // H.262 Table 6-1: slice_start_code values are 0x01 through 0xAF.
@@ -420,8 +429,17 @@ always @(posedge clk) begin
         first_luma_ac_nonzero_count       <= 7'd0;
         first_luma_last_coeff_index       <= 6'd0;
         first_luma_last_ac_level          <= 12'sd0;
+        qfs_block_start                    <= 1'b0;
+        qfs_write_en                       <= 1'b0;
+        qfs_write_index                    <= 6'd0;
+        qfs_write_value                    <= 13'sd0;
+        qfs_block_end                      <= 1'b0;
     end
     else begin
+        // Phase 1D handoff signals are one-cycle pulses.
+        qfs_block_start <= 1'b0;
+        qfs_write_en    <= 1'b0;
+        qfs_block_end   <= 1'b0;
         // Byte-aligned capture begins immediately after a slice start code.
         if (stream_valid) begin
             byte_window <= byte_window_next;
@@ -656,6 +674,7 @@ always @(posedge clk) begin
                         if (current_bit) begin
                             macroblock_quant        <= 1'b0;
                             first_i_macroblock_seen <= 1'b1;
+                            qfs_block_start          <= 1'b1;
                             dc_vlc_code             <= 9'd0;
                             dc_vlc_len              <= 4'd0;
                             parse_state             <= ST_DC_LUMA;
@@ -671,6 +690,7 @@ always @(posedge clk) begin
                         if (current_bit) begin
                             macroblock_quant          <= 1'b1;
                             first_i_macroblock_seen   <= 1'b1;
+                            qfs_block_start            <= 1'b1;
                             macroblock_qscale_shift   <= 5'd0;
                             field_bit_count           <= 4'd0;
                             parse_state               <= ST_MB_QSCALE;
@@ -726,6 +746,9 @@ always @(posedge clk) begin
                                 first_luma_dc_differential <= 13'sd0;
                                 first_luma_dc_coefficient  <= dc_predictor_reset;
                                 first_luma_dc_seen         <= 1'b1;
+                                qfs_write_en               <= 1'b1;
+                                qfs_write_index            <= 6'd0;
+                                qfs_write_value            <= {2'b00, dc_predictor_reset};
                                 // H.262 7.2.2.4: n starts at one for intra blocks.
                                 qfs_index                   <= 7'd1;
                                 ac_vlc_code                 <= 16'd0;
@@ -766,6 +789,9 @@ always @(posedge clk) begin
                                 first_luma_dc_differential <= dc_diff_decoded;
                                 first_luma_dc_coefficient  <= dc_coefficient_decoded[10:0];
                                 first_luma_dc_seen         <= 1'b1;
+                                qfs_write_en               <= 1'b1;
+                                qfs_write_index            <= 6'd0;
+                                qfs_write_value            <= dc_coefficient_decoded;
                                 qfs_index                   <= 7'd1;
                                 ac_vlc_code                 <= 16'd0;
                                 ac_vlc_len                  <= 5'd0;
@@ -789,7 +815,8 @@ always @(posedge clk) begin
                                 // QFS[n] values zero.  DC already exists, so
                                 // Table B.14 Note 2 is satisfied.
                                 first_luma_block_complete <= 1'b1;
-                                parse_active              <= 1'b0;
+                                qfs_block_end              <= 1'b1;
+                                parse_active               <= 1'b0;
                             end
                             else if (ac_vlc_escape) begin
                                 escape_run_shift     <= 6'd0;
@@ -829,6 +856,11 @@ always @(posedge clk) begin
                             first_luma_last_ac_level <= current_bit ?
                                 -$signed({6'd0, ac_level_pending}) :
                                  $signed({6'd0, ac_level_pending});
+                            qfs_write_en    <= 1'b1;
+                            qfs_write_index <= normal_target_index[5:0];
+                            qfs_write_value <= current_bit ?
+                                -$signed({7'd0, ac_level_pending}) :
+                                 $signed({7'd0, ac_level_pending});
                             qfs_index <= normal_target_index + 1'b1;
                             parse_state <= ST_AC_VLC;
                         end
@@ -872,6 +904,10 @@ always @(posedge clk) begin
                                     escape_target_index[5:0];
                                 first_luma_last_ac_level <=
                                     escape_level_signed;
+                                qfs_write_en    <= 1'b1;
+                                qfs_write_index <= escape_target_index[5:0];
+                                qfs_write_value <=
+                                    {escape_level_signed[11], escape_level_signed};
                                 qfs_index <= escape_target_index + 1'b1;
                                 ac_vlc_code <= 16'd0;
                                 ac_vlc_len  <= 5'd0;
