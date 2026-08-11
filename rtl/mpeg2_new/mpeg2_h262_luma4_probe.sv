@@ -73,6 +73,13 @@ module mpeg2_h262_luma4_probe
     // Starts each of the first four macroblock reconstruction contexts.
     output reg         luma_macroblock_start,
 
+    // kate - Phase 1J diagnostic-3 sticky milestones.  These observe only the
+    // fourth macroblock's chroma syntax and do not alter parser decisions.
+    output reg         diag_mb3_cb_dc_seen,
+    output reg         diag_mb3_cb_eob_seen,
+    output reg         diag_mb3_cr_dc_seen,
+    output reg         diag_mb3_cr_eob_seen,
+
     // Coefficient handoff to inverse quantisation.
     output reg         qfs_block_start,
     output reg         qfs_write_en,
@@ -513,6 +520,10 @@ always @(posedge clk) begin
         first_luma_last_coeff_index       <= 6'd0;
         first_luma_last_ac_level          <= 12'sd0;
         luma_macroblock_start             <= 1'b0;
+        diag_mb3_cb_dc_seen               <= 1'b0;
+        diag_mb3_cb_eob_seen              <= 1'b0;
+        diag_mb3_cr_dc_seen               <= 1'b0;
+        diag_mb3_cr_eob_seen              <= 1'b0;
         qfs_block_start                   <= 1'b0;
         qfs_write_en                      <= 1'b0;
         qfs_write_index                   <= 6'd0;
@@ -768,6 +779,14 @@ always @(posedge clk) begin
                                 first_luma_dc_size <= dc_size_value;
 
                             if (dc_size_value == 4'd0) begin
+                                // kate - Diagnostic only: a zero-size DC VLC is
+                                // itself the complete DC decode for this block.
+                                if (macroblock_index == 2'd3) begin
+                                    if (block_index == 3'd4)
+                                        diag_mb3_cb_dc_seen <= 1'b1;
+                                    else if (block_index == 3'd5)
+                                        diag_mb3_cr_dc_seen <= 1'b1;
+                                end
                                 if (first_diagnostic_block) begin
                                     first_luma_dc_differential <= 13'sd0;
                                     first_luma_dc_coefficient  <= dc_predictor_y;
@@ -809,6 +828,16 @@ always @(posedge clk) begin
                                 parse_active <= 1'b0;
                             end
                             else begin
+                                // kate - Diagnostic only: all nonzero DC
+                                // differential bits for this chroma block have
+                                // now been accepted and reconstructed.
+                                if (macroblock_index == 2'd3) begin
+                                    if (block_index == 3'd4)
+                                        diag_mb3_cb_dc_seen <= 1'b1;
+                                    else if (block_index == 3'd5)
+                                        diag_mb3_cr_dc_seen <= 1'b1;
+                                end
+
                                 if (block_index < 3'd4)
                                     dc_predictor_y <= dc_coefficient_decoded[10:0];
                                 else if (block_index == 3'd4)
@@ -850,6 +879,10 @@ always @(posedge clk) begin
                                     parse_state <= ST_WAIT_PIPELINE;
                                 end
                                 else if (block_index == 3'd4) begin
+                                    // kate - Diagnostic only: Cb syntax reached
+                                    // a legal end_of_block before moving to Cr.
+                                    if (macroblock_index == 2'd3)
+                                        diag_mb3_cb_eob_seen <= 1'b1;
                                     block_index <= 3'd5;
                                     start_chroma_block();
                                 end
@@ -857,6 +890,10 @@ always @(posedge clk) begin
                                     // Cr completes the macroblock syntax.  Four
                                     // macroblocks are the Phase 1J target.
                                     if (macroblock_index == 2'd3) begin
+                                        // kate - Diagnostic only: a legal Cr EOB
+                                        // was accepted immediately before the
+                                        // normal Phase-1J completion flag.
+                                        diag_mb3_cr_eob_seen <= 1'b1;
                                         first_macroblock_luma_parsed <= 1'b1;
                                         parse_active <= 1'b0;
                                     end

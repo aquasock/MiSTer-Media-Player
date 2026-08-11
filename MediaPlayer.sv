@@ -234,6 +234,10 @@ wire        mpeg2_new_first_luma_dc_seen;
 wire        mpeg2_new_first_luma_block_complete;
 wire        mpeg2_new_first_macroblock_luma_parsed;
 wire        mpeg2_new_luma_macroblock_start;
+wire        mpeg2_new_diag_mb3_cb_dc_seen;
+wire        mpeg2_new_diag_mb3_cb_eob_seen;
+wire        mpeg2_new_diag_mb3_cr_dc_seen;
+wire        mpeg2_new_diag_mb3_cr_eob_seen;
 wire        mpeg2_new_phase1_probe_error;
 wire [4:0]  mpeg2_new_slice_quantiser_scale_code;
 wire [11:0] mpeg2_new_macroblock_address_increment;
@@ -365,6 +369,10 @@ mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 	.first_luma_last_coeff_index (mpeg2_new_first_luma_last_coeff_index),
 	.first_luma_last_ac_level    (mpeg2_new_first_luma_last_ac_level),
 	.luma_macroblock_start       (mpeg2_new_luma_macroblock_start),
+	.diag_mb3_cb_dc_seen         (mpeg2_new_diag_mb3_cb_dc_seen),
+	.diag_mb3_cb_eob_seen        (mpeg2_new_diag_mb3_cb_eob_seen),
+	.diag_mb3_cr_dc_seen         (mpeg2_new_diag_mb3_cr_dc_seen),
+	.diag_mb3_cr_eob_seen        (mpeg2_new_diag_mb3_cr_eob_seen),
 
 	.qfs_block_start             (mpeg2_new_qfs_block_start),
 	.qfs_write_en                (mpeg2_new_qfs_write_en),
@@ -472,6 +480,14 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 	.wr_macroblock_start (mpeg2_new_luma_macroblock_start),
 	.wr_block_start    (mpeg2_new_recon_block_start),
 	.wr_block_complete (mpeg2_new_recon_block_complete),
+
+	// kate - Phase 1J diagnostic-3 parser milestones.
+	.wr_diag_mb3_cb_dc_seen  (mpeg2_new_diag_mb3_cb_dc_seen),
+	.wr_diag_mb3_cb_eob_seen (mpeg2_new_diag_mb3_cb_eob_seen),
+	.wr_diag_mb3_cr_dc_seen  (mpeg2_new_diag_mb3_cr_dc_seen),
+	.wr_diag_mb3_cr_eob_seen (mpeg2_new_diag_mb3_cr_eob_seen),
+	.wr_diag_phase1j_complete (mpeg2_new_first_macroblock_luma_parsed),
+	.wr_diag_probe_error      (mpeg2_new_phase1_probe_error),
 
 	.rd_clk      (clk_video),
 	.h_pos       (display_h_pos),

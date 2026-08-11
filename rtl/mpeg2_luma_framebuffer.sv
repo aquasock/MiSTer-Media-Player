@@ -1,6 +1,6 @@
 // kate - Decoupled MPEG2 luma framebuffer.
 //
-// Phase 1J diagnostic 2 publication build.
+// Phase 1J diagnostic 3 publication build.
 //
 // The decoder still targets the first four 4:2:0 intra macroblocks' luminance:
 // sixteen 8x8 Y blocks forming one 64x16 horizontal strip.  The decoder writes
@@ -8,10 +8,9 @@
 // raster reads at 40 MHz.
 //
 // kate - This diagnostic version keeps the earlier progressive macroblock
-// publication and adds five on-screen state markers below the decoded strip.
-// The decoder/parser itself is unchanged.  Hardware can therefore tell us
-// whether MB3's header/type was accepted and how many of MB3's four Y blocks
-// completed reconstruction before the failure.
+// publication and first row of five MB3-luma markers.  A second row of six
+// markers reports MB3 Cb/Cr decode milestones, normal Phase-1J completion, and
+// probe_error.  The markers observe state only; decode decisions are unchanged.
 //
 // Explicit altsyncram is retained because Quartus 17 otherwise implements this
 // mixed-clock framebuffer poorly or attempts to use registers.
@@ -29,6 +28,15 @@ module mpeg2_luma_framebuffer
     input  wire        wr_macroblock_start,
     input  wire        wr_block_start,
     input  wire        wr_block_complete,
+
+    // kate - Phase 1J diagnostic-3 sticky parser milestones, all generated in
+    // the same 54 MHz domain as the framebuffer write port.
+    input  wire        wr_diag_mb3_cb_dc_seen,
+    input  wire        wr_diag_mb3_cb_eob_seen,
+    input  wire        wr_diag_mb3_cr_dc_seen,
+    input  wire        wr_diag_mb3_cr_eob_seen,
+    input  wire        wr_diag_phase1j_complete,
+    input  wire        wr_diag_probe_error,
 
     // Independent video side - 40 MHz.
     input  wire        rd_clk,
@@ -182,6 +190,8 @@ reg        mb3_started_rd_1;
 reg        mb3_started_rd_2;
 reg [3:0]  mb3_luma_blocks_done_rd_1;
 reg [3:0]  mb3_luma_blocks_done_rd_2;
+reg [5:0]  chroma_status_rd_1;
+reg [5:0]  chroma_status_rd_2;
 
 always @(posedge rd_clk) begin
     if (reset) begin
@@ -195,6 +205,8 @@ always @(posedge rd_clk) begin
         mb3_started_rd_2             <= 1'b0;
         mb3_luma_blocks_done_rd_1    <= 4'b0000;
         mb3_luma_blocks_done_rd_2    <= 4'b0000;
+        chroma_status_rd_1            <= 6'b000000;
+        chroma_status_rd_2            <= 6'b000000;
     end
     else begin
         published_macroblocks_rd_1 <= published_macroblocks_wr;
@@ -207,6 +219,15 @@ always @(posedge rd_clk) begin
         mb3_started_rd_2             <= mb3_started_rd_1;
         mb3_luma_blocks_done_rd_1    <= mb3_luma_blocks_done_wr;
         mb3_luma_blocks_done_rd_2    <= mb3_luma_blocks_done_rd_1;
+        chroma_status_rd_1 <= {
+            wr_diag_probe_error,
+            wr_diag_phase1j_complete,
+            wr_diag_mb3_cr_eob_seen,
+            wr_diag_mb3_cr_dc_seen,
+            wr_diag_mb3_cb_eob_seen,
+            wr_diag_mb3_cb_dc_seen
+        };
+        chroma_status_rd_2 <= chroma_status_rd_1;
     end
 end
 
@@ -263,6 +284,32 @@ wire diagnostic_status_on =
     (status_cell2 && mb3_luma_blocks_done_rd_2[1]) ||
     (status_cell3 && mb3_luma_blocks_done_rd_2[2]) ||
     (status_cell4 && mb3_luma_blocks_done_rd_2[3]);
+
+// kate - Phase 1J diagnostic-3 second row at picture y=36..43.
+//   cell 0: MB3 Cb DC decoded
+//   cell 1: MB3 Cb EOB decoded
+//   cell 2: MB3 Cr DC decoded
+//   cell 3: MB3 Cr EOB decoded
+//   cell 4: normal Phase-1J final completion flag
+//   cell 5: probe_error (bright means an error was actually raised)
+wire diagnostic_chroma_row =
+    source_window && (source_y >= 12'd36) && (source_y < 12'd44);
+
+wire chroma_cell0 = diagnostic_chroma_row && (source_x < 12'd8);
+wire chroma_cell1 = diagnostic_chroma_row && (source_x >= 12'd10) && (source_x < 12'd18);
+wire chroma_cell2 = diagnostic_chroma_row && (source_x >= 12'd20) && (source_x < 12'd28);
+wire chroma_cell3 = diagnostic_chroma_row && (source_x >= 12'd30) && (source_x < 12'd38);
+wire chroma_cell4 = diagnostic_chroma_row && (source_x >= 12'd40) && (source_x < 12'd48);
+wire chroma_cell5 = diagnostic_chroma_row && (source_x >= 12'd50) && (source_x < 12'd58);
+wire diagnostic_chroma_window = chroma_cell0 || chroma_cell1 || chroma_cell2 ||
+                                chroma_cell3 || chroma_cell4 || chroma_cell5;
+wire diagnostic_chroma_on =
+    (chroma_cell0 && chroma_status_rd_2[0]) ||
+    (chroma_cell1 && chroma_status_rd_2[1]) ||
+    (chroma_cell2 && chroma_status_rd_2[2]) ||
+    (chroma_cell3 && chroma_status_rd_2[3]) ||
+    (chroma_cell4 && chroma_status_rd_2[4]) ||
+    (chroma_cell5 && chroma_status_rd_2[5]);
 
 wire [18:0] ram_rd_address =
     ((v_pos - 12'd60) * 19'd720) +
@@ -325,6 +372,8 @@ reg source_window_d;
 reg decoded_strip_window_d;
 reg diagnostic_status_window_d;
 reg diagnostic_status_on_d;
+reg diagnostic_chroma_window_d;
+reg diagnostic_chroma_on_d;
 
 always @(posedge rd_clk) begin
     if (reset) begin
@@ -332,6 +381,8 @@ always @(posedge rd_clk) begin
         decoded_strip_window_d     <= 1'b0;
         diagnostic_status_window_d <= 1'b0;
         diagnostic_status_on_d     <= 1'b0;
+        diagnostic_chroma_window_d <= 1'b0;
+        diagnostic_chroma_on_d     <= 1'b0;
         video_y                     <= 8'd0;
         video_de               <= 1'b0;
         video_hs               <= 1'b0;
@@ -342,6 +393,8 @@ always @(posedge rd_clk) begin
         decoded_strip_window_d     <= decoded_strip_window;
         diagnostic_status_window_d <= diagnostic_status_window;
         diagnostic_status_on_d     <= diagnostic_status_on;
+        diagnostic_chroma_window_d <= diagnostic_chroma_window;
+        diagnostic_chroma_on_d     <= diagnostic_chroma_on;
 
         video_de <= pixel_en;
         video_hs <= h_sync;
@@ -351,6 +404,8 @@ always @(posedge rd_clk) begin
             video_y <= ram_rd_data;
         else if (diagnostic_status_window_d)
             video_y <= diagnostic_status_on_d ? 8'd220 : 8'd48;
+        else if (diagnostic_chroma_window_d)
+            video_y <= diagnostic_chroma_on_d ? 8'd220 : 8'd48;
         else if (source_window_d)
             video_y <= 8'd24;
         else
