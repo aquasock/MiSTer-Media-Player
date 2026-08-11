@@ -450,7 +450,7 @@ module regfile    (clk, clk_en, hard_rst, rst,
    */
 
   always @(posedge clk)
-    if (~hard_rst) deinterlace <= 1'b1;
+    if (~hard_rst) deinterlace <= 1'b0; // kate - don't force MPEG2 deinterlace on progressive MiSTer output
     else if (clk_en && reg_wr_en && (reg_addr == REG_WR_TRICK)) deinterlace <= reg_dta_in[10];
     else deinterlace <= deinterlace;
 
