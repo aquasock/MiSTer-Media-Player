@@ -201,6 +201,7 @@ wire        mpeg2_new_phase1_supported;
 wire        mpeg2_new_syntax_error;
 wire        mpeg2_new_sequence_seen;
 wire        mpeg2_new_sequence_extension_seen;
+wire        mpeg2_new_sequence_scalable_extension_seen;
 wire        mpeg2_new_picture_seen;
 wire        mpeg2_new_picture_coding_extension_seen;
 wire        mpeg2_new_slice_seen;
@@ -216,6 +217,17 @@ wire [9:0]  mpeg2_new_temporal_reference;
 wire [2:0]  mpeg2_new_picture_coding_type;
 wire [1:0]  mpeg2_new_picture_structure;
 wire        mpeg2_new_progressive_frame;
+
+// kate - Phase 1A diagnostic: prove standards-aligned slice and first I-picture
+// macroblock parsing before coefficient decoding is added.
+wire        mpeg2_new_slice_header_seen;
+wire        mpeg2_new_macroblock_address_seen;
+wire        mpeg2_new_first_i_macroblock_seen;
+wire        mpeg2_new_phase1a_error;
+wire [4:0]  mpeg2_new_slice_quantiser_scale_code;
+wire [11:0] mpeg2_new_macroblock_address_increment;
+wire        mpeg2_new_macroblock_quant;
+wire [7:0]  mpeg2_new_slice_vertical_position;
 
 wire [1:0]  mpeg2_mem_req_rd_cmd;
 wire [21:0] mpeg2_mem_req_rd_addr;
@@ -337,6 +349,7 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 
 	.sequence_seen                    (mpeg2_new_sequence_seen),
 	.sequence_extension_seen          (mpeg2_new_sequence_extension_seen),
+	.sequence_scalable_extension_seen (mpeg2_new_sequence_scalable_extension_seen),
 	.picture_seen                     (mpeg2_new_picture_seen),
 	.picture_coding_extension_seen    (mpeg2_new_picture_coding_extension_seen),
 	.slice_seen                       (mpeg2_new_slice_seen),
@@ -354,6 +367,28 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.picture_coding_type              (mpeg2_new_picture_coding_type),
 	.picture_structure                (mpeg2_new_picture_structure),
 	.progressive_frame                (mpeg2_new_progressive_frame)
+);
+
+// kate - Phase 1A remains passive beside MPEG2FPGA.  It captures the beginning
+// of the first slice, then decodes the H.262 slice header, Table B.1
+// macroblock_address_increment, and Table B.2 I-picture macroblock_type.
+mpeg2_h262_slice_probe mpeg2_h262_slice_probe
+(
+	.clk                         (clk_mpeg2),
+	.reset                       (reset),
+	.stream_data                 (mpeg2_stream_data),
+	.stream_valid                (mpeg2_stream_rd),
+	.phase1_supported            (mpeg2_new_phase1_supported),
+	.vertical_size               (mpeg2_new_vertical_size),
+
+	.slice_header_seen           (mpeg2_new_slice_header_seen),
+	.macroblock_address_seen     (mpeg2_new_macroblock_address_seen),
+	.first_i_macroblock_seen     (mpeg2_new_first_i_macroblock_seen),
+	.probe_error                 (mpeg2_new_phase1a_error),
+	.quantiser_scale_code        (mpeg2_new_slice_quantiser_scale_code),
+	.macroblock_address_increment(mpeg2_new_macroblock_address_increment),
+	.macroblock_quant            (mpeg2_new_macroblock_quant),
+	.slice_vertical_position     (mpeg2_new_slice_vertical_position)
 );
 
 mpeg2_decoder mpeg2_decoder
@@ -482,11 +517,14 @@ assign VGA_B = fb_video_y;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
-// kate - During new-decoder Phase 0 USER is a positive parser diagnostic.
-// OFF: required H.262 hierarchy has not yet been validated (or a syntax error
-// occurred). ON: valid sequence + MPEG-2 extensions + picture + slice have
-// been observed and the stream matches the progressive 4:2:0 I-frame Phase 1
-// bootstrap subset.
-assign LED_USER = mpeg2_new_phase1_supported && !mpeg2_new_syntax_error;
+// kate - Phase 1A positive diagnostic.
+// OFF: the new decoder has not yet decoded a valid first I-picture macroblock,
+// or the H.262 front end / slice probe detected an error.
+// ON: the Phase 0 hierarchy plus slice header, Table B.1 macroblock address
+// increment, and Table B.2 I-picture macroblock type have all been decoded.
+assign LED_USER =
+	mpeg2_new_first_i_macroblock_seen &&
+	!mpeg2_new_syntax_error &&
+	!mpeg2_new_phase1a_error;
 
 endmodule

@@ -35,6 +35,7 @@ module mpeg2_h262_frontend
 
     output reg         sequence_seen,
     output reg         sequence_extension_seen,
+    output reg         sequence_scalable_extension_seen,
     output reg         picture_seen,
     output reg         picture_coding_extension_seen,
     output reg         slice_seen,
@@ -107,6 +108,7 @@ assign frontend_ready =
 
 assign phase1_supported =
     frontend_ready &&
+    !sequence_scalable_extension_seen &&
     progressive_sequence &&
     (chroma_format == 2'b01) &&
     (picture_coding_type == 3'b001) &&
@@ -130,6 +132,7 @@ always @(posedge clk) begin
         syntax_error                        <= 1'b0;
         sequence_seen                       <= 1'b0;
         sequence_extension_seen             <= 1'b0;
+        sequence_scalable_extension_seen    <= 1'b0;
         picture_seen                        <= 1'b0;
         picture_coding_extension_seen       <= 1'b0;
         slice_seen                          <= 1'b0;
@@ -240,6 +243,12 @@ always @(posedge clk) begin
                 if (expect_picture_coding_extension &&
                     (stream_data[7:4] != EXT_PICTURE_CODING))
                     syntax_error <= 1'b1;
+
+                // kate - Phase 1 deliberately excludes H.262 scalable syntax.
+                // Track it explicitly so an unsupported scalable stream is not
+                // accidentally interpreted with the non-scalable slice grammar.
+                if (stream_data[7:4] == EXT_SEQUENCE_SCALABLE)
+                    sequence_scalable_extension_seen <= 1'b1;
             end
 
             // sequence_extension(): 48 payload bits.

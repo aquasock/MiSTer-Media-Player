@@ -4,6 +4,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_stream_fifo.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_luma_framebuffer.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_ddram_bridge.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_frontend.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_slice_probe.sv
 
 set_global_assignment -name QIP_FILE rtl/mpeg2fpga/mpeg2fpga.qip
 

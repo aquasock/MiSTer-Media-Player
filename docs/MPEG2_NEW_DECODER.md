@@ -84,6 +84,28 @@ No video path changes in this phase.
 Take ownership of the compressed stream and implement enough of clauses 6 and 7
 to decode the existing progressive all-I tests into an explicit luma frame.
 
+#### Phase 1A — slice and first macroblock probe
+
+Still passive beside MPEG2FPGA.  Capture a bounded prefix of the first slice and
+prove bit alignment against the normative H.262 syntax before coefficient
+decoding is introduced:
+
+- H.262 (02/2000) 6.2.4 `slice()`, including `quantiser_scale_code` and
+  the `slice_extension_flag` / `intra_slice` / `slice_picture_id_enable` /
+  `slice_picture_id` syntax introduced into the consolidated 2000 edition;
+- H.262 6.2.5 `macroblock()` entry;
+- Annex B Table B.1 `macroblock_address_increment`, including
+  `macroblock_escape`;
+- Annex B Table B.2 non-scalable I-picture `macroblock_type`.
+
+The bootstrap decoder explicitly rejects scalable-sequence syntax as unsupported
+rather than applying the non-scalable slice grammar to it.  This is an
+implementation capability boundary, not a claim that scalable H.262 is invalid.
+
+For this diagnostic build USER illuminates only after a valid first I-picture
+macroblock type has been decoded and neither the Phase 0 front end nor Phase 1A
+probe has reported an error.
+
 ### Phase 2 — chroma
 
 Decode 4:2:0 Cb/Cr and add the independent presentation conversion path.
