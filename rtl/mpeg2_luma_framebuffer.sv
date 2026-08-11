@@ -180,9 +180,6 @@ altsyncram #(
 	.byteena_a      (1'b1),
 	.byteena_b      (1'b1),
 
-	.clock_enable_input_a  (1'b1),
-	.clock_enable_input_b  (1'b1),
-	.clock_enable_output_b (1'b1),
 
 	.data_b         (8'd0),
 	.wren_b         (1'b0),
