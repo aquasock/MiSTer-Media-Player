@@ -31,7 +31,7 @@ module resample_addrgen (
   progressive_sequence, progressive_frame, top_field_first, repeat_first_field, mb_width, mb_height, horizontal_size, vertical_size,
   interlaced, deinterlace, persistence, repeat_frame,
   disp_wr_addr_full, disp_wr_addr_en, disp_wr_addr_ack, disp_wr_addr,
-  resample_wr_dta, resample_wr_en, resample_wr_image,
+  resample_wr_dta, resample_wr_en, resample_wr_image, resample_wr_x, resample_wr_y,
   disp_wr_addr_almost_full, resample_wr_almost_full,
   busy
   );
@@ -68,6 +68,9 @@ module resample_addrgen (
   output reg         resample_wr_en;
   // kate - Carry FRAME/TOP/BOTTOM identity with each resample request.
   output reg    [1:0]resample_wr_image;
+  // kate - Carry the actual destination macroblock origin with each request.
+  output reg   [11:0]resample_wr_x;
+  output reg   [11:0]resample_wr_y;
 
   input              disp_wr_addr_almost_full;
   input              resample_wr_almost_full;
@@ -598,6 +601,26 @@ module resample_addrgen (
     if (~rst) resample_wr_image <= NO_OUTPUT;
     else if (clk_en && (state == STATE_WR_OSD_MSB)) resample_wr_image <= image;
     else resample_wr_image <= resample_wr_image;
+
+  // kate - Register destination coordinates with the exact same request cadence.
+  // disp_x is the 16-pixel macroblock origin; disp_y is the actual output row
+  // (including even/odd field placement when fields are being emitted).
+  always @(posedge clk)
+    if (~rst)
+      begin
+        resample_wr_x <= 12'd0;
+        resample_wr_y <= 12'd0;
+      end
+    else if (clk_en && (state == STATE_WR_OSD_MSB))
+      begin
+        resample_wr_x <= disp_x;
+        resample_wr_y <= disp_y;
+      end
+    else
+      begin
+        resample_wr_x <= resample_wr_x;
+        resample_wr_y <= resample_wr_y;
+      end
 
   /* display address generator */
   memory_address

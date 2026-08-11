@@ -13,9 +13,9 @@ module mpeg2_luma_framebuffer
 	// MPEG2 resampler side - 54 MHz.
 	input  wire        wr_clk,
 	input  wire [7:0]  wr_y,
-	input  wire [2:0]  wr_position,
-	// kate - MPEG2FPGA output image type: FRAME/TOP/BOTTOM.
-	input  wire [1:0]  wr_image,
+	// kate - Exact MPEG2FPGA resampler destination coordinate.
+	input  wire [11:0] wr_x_pos,
+	input  wire [11:0] wr_y_pos,
 	input  wire        wr_en,
 	// Independent video side - 40 MHz.
 	input  wire        rd_clk,
@@ -34,34 +34,22 @@ module mpeg2_luma_framebuffer
 localparam integer SRC_WIDTH  = 720;
 localparam integer SRC_HEIGHT = 480;
 localparam integer FB_SIZE    = SRC_WIDTH * SRC_HEIGHT;
-// MPEG2FPGA position codes.
-localparam [2:0]
-	ROW_0_COL_0    = 3'b000,
-	ROW_1_COL_0    = 3'b001,
-	ROW_X_COL_0    = 3'b010;
-
-localparam [1:0]
-	IMAGE_FRAME  = 2'd1,
-	IMAGE_TOP    = 2'd2,
-	IMAGE_BOTTOM = 2'd3;
-
 // -------------------------------------------------------------------------
 // Write-side address generation.
+//
+// kate - Do not reconstruct raster position from ROW_* markers. The resampler
+// now supplies the exact destination X/Y aligned with each luminance pixel.
 // -------------------------------------------------------------------------
-
-reg [18:0] wr_address;
-reg [18:0] wr_line_base;
-reg [8:0]  wr_line;
 
 reg [18:0] ram_wr_address;
 reg [7:0]  ram_wr_data;
 reg        ram_wr_en;
+
+wire [18:0] wr_linear_address =
+	(wr_y_pos * 19'd720) + wr_x_pos;
+
 always @(posedge wr_clk) begin
 	if (reset) begin
-		wr_address     <= 19'd0;
-		wr_line_base   <= 19'd0;
-		wr_line        <= 9'd0;
-
 		ram_wr_address <= 19'd0;
 		ram_wr_data    <= 8'd0;
 		ram_wr_en      <= 1'b0;
@@ -69,71 +57,16 @@ always @(posedge wr_clk) begin
 	else begin
 		ram_wr_en <= 1'b0;
 
-		if (wr_en) begin
-			case (wr_position)
-
-				ROW_0_COL_0: begin
-					ram_wr_address <= 19'd0;
-					ram_wr_data    <= wr_y;
-					ram_wr_en      <= 1'b1;
-
-					wr_address     <= 19'd1;
-					wr_line_base   <= 19'd0;
-					wr_line        <= 9'd0;
-				end
-				ROW_1_COL_0: begin
-					ram_wr_address <= 19'd720;
-					ram_wr_data    <= wr_y;
-					ram_wr_en      <= 1'b1;
-
-					wr_address     <= 19'd721;
-					wr_line_base   <= 19'd720;
-					wr_line        <= 9'd1;
-				end
-
-				ROW_X_COL_0: begin
-					// kate - MPEG2FPGA emits consecutive rows for FRAME, but every
-					// other source row for TOP/BOTTOM fields.
-					if (wr_image == IMAGE_FRAME) begin
-						if (wr_line < SRC_HEIGHT-1) begin
-							ram_wr_address <= wr_line_base + 19'd720;
-							ram_wr_data    <= wr_y;
-							ram_wr_en      <= 1'b1;
-
-							wr_line_base   <= wr_line_base + 19'd720;
-							wr_address     <= wr_line_base + 19'd721;
-							wr_line        <= wr_line + 9'd1;
-						end
-					end
-					else begin
-						if (wr_line < SRC_HEIGHT-2) begin
-							ram_wr_address <= wr_line_base + 19'd1440;
-							ram_wr_data    <= wr_y;
-							ram_wr_en      <= 1'b1;
-
-							wr_line_base   <= wr_line_base + 19'd1440;
-							wr_address     <= wr_line_base + 19'd1441;
-							wr_line        <= wr_line + 9'd2;
-						end
-					end
-				end
-
-				default: begin
-					if ((wr_line < SRC_HEIGHT) &&
-					    (wr_address < FB_SIZE)) begin
-
-						ram_wr_address <= wr_address;
-						ram_wr_data    <= wr_y;
-						ram_wr_en      <= 1'b1;
-
-						wr_address <= wr_address + 1'b1;
-					end
-				end
-
-			endcase
+		if (wr_en &&
+		    (wr_x_pos < SRC_WIDTH) &&
+		    (wr_y_pos < SRC_HEIGHT)) begin
+		ram_wr_address <= wr_linear_address;
+		ram_wr_data    <= wr_y;
+		ram_wr_en      <= 1'b1;
 		end
 	end
 end
+
 // -------------------------------------------------------------------------
 // Read-side address generation.
 //

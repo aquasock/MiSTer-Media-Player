@@ -69,6 +69,8 @@ debug_fwd_addr_error,
 debug_resample_y,
 debug_resample_position,
 debug_resample_image,
+debug_resample_x,
+debug_resample_y_pos,
 debug_resample_wr_en,
 debug_video_h_pos,
 debug_video_v_pos,
@@ -136,6 +138,8 @@ output              debug_fwd_addr_error;
 output       [7:0]  debug_resample_y;
 output       [2:0]  debug_resample_position;
 output       [1:0]  debug_resample_image;
+output      [11:0]  debug_resample_x;
+output      [11:0]  debug_resample_y_pos;
 output              debug_resample_wr_en;
 
 output      [11:0]  debug_video_h_pos;
@@ -348,11 +352,16 @@ assign debug_video_v_sync   = v_sync_gen;
   wire        [7:0]osd_resample;            // osd pixel color 
   wire        [2:0]position_resample;       // position, as in resample_codes.v
   wire        [1:0]image_resample;          // FRAME/TOP/BOTTOM aligned to resampled pixels
+  wire       [11:0]coord_x_resample;        // exact output-pixel destination X
+  wire       [11:0]coord_y_resample;        // exact output-pixel destination Y
   wire             pixel_wr_en;
   assign debug_resample_y        = y_resample;
 assign debug_resample_position = position_resample;
 // kate - Expose field/frame identity aligned to resampled pixels.
 assign debug_resample_image    = image_resample;
+// kate - Coordinates are pipelined with y_resample, not inferred downstream.
+assign debug_resample_x        = coord_x_resample;
+assign debug_resample_y_pos    = coord_y_resample;
 assign debug_resample_wr_en    = pixel_wr_en;
   wire             pixel_wr_almost_full;
   wire             pixel_wr_full;
@@ -1080,6 +1089,8 @@ assign debug_progressive_frame    = progressive_frame;
     .osd_out(osd_resample),                                  // to pixel queue
     .position_out(position_resample),                        // to pixel queue
     .image_out(image_resample),                              // kate - FRAME/TOP/BOTTOM
+    .coord_x_out(coord_x_resample),                          // kate - exact destination X
+    .coord_y_out(coord_y_resample),                          // kate - exact destination Y
     .pixel_wr_en(pixel_wr_en),                               // to pixel queue
     .pixel_wr_almost_full(pixel_wr_almost_full)              // to pixel queue
     );

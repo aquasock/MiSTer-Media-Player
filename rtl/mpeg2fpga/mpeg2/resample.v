@@ -36,7 +36,7 @@ module resample(
   progressive_sequence, progressive_frame, top_field_first, repeat_first_field, mb_width, mb_height, horizontal_size, vertical_size, resample_wr_overflow,
   disp_wr_addr_full, disp_wr_addr_almost_full, disp_wr_addr_en, disp_wr_addr_ack, disp_wr_addr, disp_rd_dta_empty, disp_rd_dta_en, disp_rd_dta_valid, disp_rd_dta,
   pixel_wr_almost_full, interlaced, deinterlace, persistence, repeat_frame,
-  y, u, v, osd_out, position_out, image_out, pixel_wr_en
+  y, u, v, osd_out, position_out, image_out, coord_x_out, coord_y_out, pixel_wr_en
   );
 
   input              clk;                      // clock
@@ -81,15 +81,21 @@ module resample(
   output        [2:0]position_out;
   // kate - FRAME/TOP/BOTTOM aligned with output pixels.
   output        [1:0]image_out;
+  // kate - Exact destination coordinate aligned with each output pixel.
+  output       [11:0]coord_x_out;
+  output       [11:0]coord_y_out;
   output             pixel_wr_en;
 
   /* resample fifo */
   wire          [2:0]resample_wr_dta;
   wire          [1:0]resample_wr_image;
+  wire         [11:0]resample_wr_x;
+  wire         [11:0]resample_wr_y;
   wire               resample_wr_en;
   output             resample_wr_overflow;           // to probe
   wire               resample_wr_almost_full;
-  wire          [4:0]resample_rd_dta;
+  // kate - 3-bit position + 2-bit image + 12-bit X + 12-bit Y.
+  wire         [28:0]resample_rd_dta;
   wire               resample_rd_en;
   wire               resample_rd_valid;
 
@@ -129,6 +135,8 @@ module resample(
     .resample_wr_dta(resample_wr_dta),
     .resample_wr_en(resample_wr_en),
     .resample_wr_image(resample_wr_image),
+    .resample_wr_x(resample_wr_x),
+    .resample_wr_y(resample_wr_y),
     
     .disp_wr_addr_almost_full(disp_wr_addr_almost_full),
     .resample_wr_almost_full(resample_wr_almost_full),
@@ -145,6 +153,8 @@ module resample(
   wire  [63:0]fifo_v_lower;      /* chromi, lower row */
   wire   [2:0]fifo_position;     /* position of pixels, as in  resample_codes */
   wire   [1:0]fifo_image;        /* FRAME/TOP/BOTTOM for this pixel group */
+  wire  [11:0]fifo_x;            /* destination macroblock X origin */
+  wire  [11:0]fifo_y_pos;        /* destination output row */
 
   // Reads the pixels from memory fifo
   resample_dta resample_dta (
@@ -167,7 +177,9 @@ module resample(
     .fifo_v_upper(fifo_v_upper), 
     .fifo_v_lower(fifo_v_lower),
     .fifo_position(fifo_position),
-    .fifo_image(fifo_image)
+    .fifo_image(fifo_image),
+    .fifo_x(fifo_x),
+    .fifo_y_pos(fifo_y_pos)
     );
 
   // bilinear chroma upscaling, 4:2:0 to 4:4:4
@@ -185,12 +197,16 @@ module resample(
     .fifo_v_lower(fifo_v_lower),
     .fifo_position(fifo_position),
     .fifo_image(fifo_image),
+    .fifo_x(fifo_x),
+    .fifo_y_pos(fifo_y_pos),
     .y(y), 
     .u(u), 
     .v(v), 
     .osd_out(osd_out),
     .position_out(position_out),
     .image_out(image_out),
+    .coord_x_out(coord_x_out),
+    .coord_y_out(coord_y_out),
     .pixel_wr_en(pixel_wr_en),
     .pixel_wr_almost_full(pixel_wr_almost_full)
     );
@@ -198,12 +214,12 @@ module resample(
   // fifo between resample_addr and resample_dta
   fifo_sc 
     #(.addr_width(RESAMPLE_DEPTH),
-    .dta_width(9'd5), // kate - 3-bit position + 2-bit FRAME/TOP/BOTTOM
+    .dta_width(9'd29), // kate - position + image + destination X/Y
     .prog_thresh(RESAMPLE_THRESHOLD))
     resample_fifo (
     .rst(rst), 
     .clk(clk), 
-    .din({resample_wr_image, resample_wr_dta}), 
+    .din({resample_wr_y, resample_wr_x, resample_wr_image, resample_wr_dta}), 
     .wr_en(resample_wr_en), 
     .full(), 
     .wr_ack(), 
