@@ -124,16 +124,7 @@ end
 				CMD_WRITE: begin
 					ddram_addr <= DDR_BASE +
 					              {{7{1'b0}}, pending_addr};
-					ddram_din <= {
-    pending_dta[7:0],
-    pending_dta[15:8],
-    pending_dta[23:16],
-    pending_dta[31:24],
-    pending_dta[39:32],
-    pending_dta[47:40],
-    pending_dta[55:48],
-    pending_dta[63:56]
-}; // kate - test MPEG2FPGA/MiSTer DDR byte order
+					ddram_din  <= pending_dta;
 
 					// Keep presenting the write until MiSTer can accept it.
 					ddram_we <= 1'b1;
@@ -182,16 +173,7 @@ always @(posedge clk) begin
 		read_returned       <= 1'b0;
 	end
 	else if (ddram_dout_ready && (outstanding_reads != 0)) begin
-		mem_res_dta <= {
-    ddram_dout[7:0],
-    ddram_dout[15:8],
-    ddram_dout[23:16],
-    ddram_dout[31:24],
-    ddram_dout[39:32],
-    ddram_dout[47:40],
-    ddram_dout[55:48],
-    ddram_dout[63:56]
-}; // kate - restore MPEG2FPGA byte order on reads
+		mem_res_dta         <= ddram_dout;
 		mem_res_en          <= 1'b1;
 		debug_response_seen <= 1'b1;
 		read_returned       <= 1'b1;
