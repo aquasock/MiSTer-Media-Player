@@ -73,8 +73,9 @@ assign debug_testpoint = testpoint;
 
 // MPEG2FPGA uses an active-low reset.
 //
-// We deliberately run all three decoder clock domains from clk_sys for this
-// first MiSTer integration experiment. This is NOT the final clocking scheme.
+// We deliberately retain MPEG2FPGA as a reference decoder during Phase 1G,
+// but it no longer owns or influences the raster used by our framebuffer.
+// Its RGB/sync outputs below are legacy/reference outputs only.
 
 mpeg2video decoder
 (
@@ -140,11 +141,28 @@ mpeg2video decoder
 .debug_resample_y_pos    (debug_resample_y_pos),
 .debug_resample_wr_en    (debug_resample_wr_en),
 
-.debug_video_h_pos       (debug_video_h_pos),
-.debug_video_v_pos       (debug_video_v_pos),
-.debug_video_pixel_en    (debug_video_pixel_en),
-.debug_video_h_sync      (debug_video_h_sync),
-.debug_video_v_sync      (debug_video_v_sync)
+// kate - Phase 1G: legacy MPEG2FPGA timing is intentionally disconnected.
+// The wrapper's debug_video_* outputs are driven by our fixed SVGA generator.
+.debug_video_h_pos       (),
+.debug_video_v_pos       (),
+.debug_video_pixel_en    (),
+.debug_video_h_sync      (),
+.debug_video_v_sync      ()
+);
+
+// kate - Phase 1G standalone presentation timing.
+// Fixed VESA 800x600 @ 60 Hz-class raster from the existing 40 MHz dot clock.
+// No MPEG syntax or MPEG2FPGA register can move or resize this raster.
+mpeg2_video_svga_800x600 mpeg2_video_svga_800x600
+(
+	.clk      (dot_clk),
+	.reset    (reset),
+
+	.h_pos    (debug_video_h_pos),
+	.v_pos    (debug_video_v_pos),
+	.pixel_en (debug_video_pixel_en),
+	.h_sync   (debug_video_h_sync),
+	.v_sync   (debug_video_v_sync)
 );
 
 endmodule
