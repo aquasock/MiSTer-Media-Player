@@ -61,6 +61,10 @@ module mpeg2video(clk, mem_clk, dot_clk,
              debug_macroblock_seen,
              debug_sequence_header_seen,
              debug_pixel_underflow,
+             debug_picture_coding_type,
+debug_picture_structure,
+debug_progressive_sequence,
+debug_progressive_frame,
              debug_vbr_wr_en,
              // clocked with mem_clk
              mem_res_wr_dta, mem_res_wr_en, mem_res_wr_almost_full,                                                               // clocked with mem_clk
@@ -114,6 +118,10 @@ module mpeg2video(clk, mem_clk, dot_clk,
   output              debug_macroblock_seen;
   output              debug_sequence_header_seen;
   output              debug_pixel_underflow;
+  output       [2:0]  debug_picture_coding_type;
+output       [1:0]  debug_picture_structure;
+output              debug_progressive_sequence;
+output              debug_progressive_frame;
   input      [63:0]mem_res_wr_dta;
   input            mem_res_wr_en;
   output           mem_res_wr_almost_full;
@@ -250,6 +258,8 @@ module mpeg2video(clk, mem_clk, dot_clk,
 
   /* vld - motcomp interface */
   wire         [2:0]picture_coding_type;
+  assign debug_picture_coding_type = picture_coding_type;
+assign debug_picture_structure   = picture_structure;
   wire         [1:0]picture_structure;
   wire         [1:0]motion_type;
   wire              dct_type;
@@ -402,6 +412,8 @@ module mpeg2video(clk, mem_clk, dot_clk,
   /* vld - motcomp_picbuf interface */
   wire       progressive_sequence;
   wire       progressive_frame;
+  assign debug_progressive_sequence = progressive_sequence;
+assign debug_progressive_frame    = progressive_frame;
   wire       top_field_first;
   wire       repeat_first_field;
 

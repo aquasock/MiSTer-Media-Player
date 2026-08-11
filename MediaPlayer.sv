@@ -84,7 +84,10 @@ wire        mpeg2_stream_empty;
 wire [7:0]  mpeg2_stream_data;
 wire        mpeg2_stream_rd;
 wire        mpeg2_stream_wr;
-
+wire [2:0] mpeg2_debug_picture_coding_type;
+wire [1:0] mpeg2_debug_picture_structure;
+wire       mpeg2_debug_progressive_sequence;
+wire       mpeg2_debug_progressive_frame;
 
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
@@ -194,6 +197,10 @@ wire mpeg2_debug_update_picture_buffers;
 wire mpeg2_debug_macroblock_seen;
 wire mpeg2_debug_sequence_header_seen;
 wire mpeg2_debug_pixel_underflow;
+wire mpeg2_debug_picture_coding_type;
+wire mpeg2_debug_picture_structure;
+wire mpeg2_debug_progressive_sequence;
+wire mpeg2_debug_progressive_frame;
 
 wire mpeg2_debug_req_seen;
 wire mpeg2_debug_read_seen;
@@ -242,7 +249,16 @@ always @(posedge clk_video) begin
 	else if (mpeg2_debug_pixel_underflow)
 		mpeg2_debug_pixel_underflow_seen <= 1'b1;
 end
+reg mpeg2_debug_bad_header_seen = 1'b0;
 
+always @(posedge clk_mpeg2) begin
+	if (reset)
+		mpeg2_debug_bad_header_seen <= 1'b0;
+	else if ((mpeg2_debug_picture_coding_type > 3) ||
+	         ((mpeg2_debug_picture_coding_type != 0) &&
+	          (mpeg2_debug_picture_structure != 2'b11)))
+		mpeg2_debug_bad_header_seen <= 1'b1;
+end
 
 media_player media_player
 (
@@ -346,6 +362,8 @@ assign VGA_B = mpeg2_b;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
-assign LED_USER = mpeg2_busy | mpeg2_debug_pixel_underflow_seen;
+assign LED_USER =
+	mpeg2_debug_pixel_underflow_seen |
+	mpeg2_debug_bad_header_seen;
 
 endmodule

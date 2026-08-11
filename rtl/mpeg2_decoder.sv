@@ -38,7 +38,11 @@ module mpeg2_decoder
 	output wire        debug_update_picture_buffers,
 	output wire        debug_macroblock_seen,
 	output wire        debug_sequence_header_seen,
-	output wire        debug_pixel_underflow
+	output wire        debug_pixel_underflow,
+	output wire        debug_progressive_sequence,
+	output wire        debug_progressive_frame,
+	output wire        debug_picture_coding_type,
+	output wire        debug_picture_structure
 	);
 
 wire [7:0] y;
