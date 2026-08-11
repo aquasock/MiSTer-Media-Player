@@ -119,7 +119,7 @@ mpeg2video decoder
 	.debug_update_picture_buffers (debug_update_picture_buffers),
 	.debug_macroblock_seen        (debug_macroblock_seen),
 	.debug_sequence_header_seen (debug_sequence_header_seen),
-	.debug_pixel_underflow       (debug_pixel_underflow)
+	.debug_pixel_underflow       (debug_pixel_underflow),
 	.debug_fwd_addr_error(debug_fwd_addr_error)
 );
 
