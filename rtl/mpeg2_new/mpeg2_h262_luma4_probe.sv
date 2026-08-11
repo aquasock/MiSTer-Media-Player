@@ -1,5 +1,5 @@
 //============================================================================
-// MiSTer Media Player - H.262 Phase 1J first-slice macroblock probe
+// MiSTer Media Player - H.262 Phase 1K streaming first-slice macroblock probe
 //
 // Normative standards basis:
 //   ITU-T H.262 / ISO/IEC 13818-2
@@ -12,17 +12,17 @@
 //   - 7.2.2 intra AC coefficient decoding
 //   - Annex B Tables B.1, B.2, B.12, B.13, B.14 and B.15
 //
-// Phase 1J capability boundary:
+// Phase 1K capability boundary:
 //   - Non-scalable progressive 4:2:0 frame-picture I video only, selected by
 //     the standards-driven front end.
 //   - Decode and reconstruct luminance blocks 0..3 for the first four
-//     macroblocks in the first captured slice.
+//     macroblocks in the first slice.
 //   - Chroma blocks 4 and 5 are parsed completely (including their DC VLC and
 //     AC coefficient syntax) so the parser can advance to the next macroblock,
 //     but chroma samples are deliberately not submitted to IQ/IDCT yet.
-//   - The temporary 1024-byte slice-prefix capture is a diagnostic engineering
-//     bound, not an H.262 bitstream limit.  The production decoder will replace
-//     this probe with a streaming bitreader.
+//   - No whole-slice capture buffer.  Bits are consumed directly from the
+//     streaming byte reader; upstream FIFO backpressure preserves exact bit
+//     position while this parser or the reconstruction pipeline pauses.
 //
 // kate - Luma parsing pauses after every EOB until reconstruction reports the
 // previous block complete.  This preserves the existing one-block IQ/IDCT
@@ -35,6 +35,7 @@ module mpeg2_h262_luma4_probe
     input  wire        reset,
     input  wire [7:0]  stream_data,
     input  wire        stream_valid,
+    output wire        stream_ready,
 
     input  wire        phase1_supported,
     input  wire [13:0] vertical_size,
@@ -50,7 +51,7 @@ module mpeg2_h262_luma4_probe
     output reg         first_i_macroblock_seen,
     output reg         first_luma_dc_seen,
     output reg         first_luma_block_complete,
-    // Legacy signal name retained at the top-level boundary.  In Phase 1J it
+    // Legacy signal name retained at the top-level boundary.  In Phase 1K it
     // asserts only after the four-macroblock target has been parsed through Cr.
     output reg         first_macroblock_luma_parsed,
     output reg         probe_error,
@@ -73,27 +74,6 @@ module mpeg2_h262_luma4_probe
     // Starts each of the first four macroblock reconstruction contexts.
     output reg         luma_macroblock_start,
 
-    // kate - Phase 1J diagnostic-3 sticky milestones.  These observe only the
-    // fourth macroblock's chroma syntax and do not alter parser decisions.
-    output reg         diag_mb3_cb_dc_seen,
-    output reg         diag_mb3_cb_eob_seen,
-    output reg         diag_mb3_cr_dc_seen,
-    output reg         diag_mb3_cr_eob_seen,
-
-    // kate - Phase 1J diagnostic-4 sticky milestones for MB3 Y3 only.
-    // These signals observe parser progress/error classification and do not
-    // alter any decode decision or bitstream state transition.
-    output reg         diag_mb3_y3_started,
-    output reg         diag_mb3_y3_dc_size_seen,
-    output reg         diag_mb3_y3_dc_recon_seen,
-    output reg         diag_mb3_y3_ac_seen,
-    output reg         diag_mb3_y3_eob_seen,
-    output reg         diag_mb3_y3_bad_dc,
-    output reg         diag_mb3_y3_bad_ac_vlc,
-    output reg         diag_mb3_y3_coeff_overrun,
-    output reg         diag_mb3_y3_bad_escape,
-    output reg         diag_mb3_y3_capture_exhausted,
-
     // Coefficient handoff to inverse quantisation.
     output reg         qfs_block_start,
     output reg         qfs_write_en,
@@ -111,21 +91,13 @@ wire        slice_start_now  = start_code_now &&
                                (start_code_value >= 8'h01) &&
                                (start_code_value <= 8'hAF);
 
-// kate - Phase 1J bounded capture.  1024 bytes is deliberately generous for
-// the first four macroblocks of our SD test streams while remaining temporary
-// diagnostic storage rather than a production bitreader.
-reg          capture_active;
-reg [9:0]    capture_byte_count;
-reg [8191:0] slice_prefix;
-reg [13:0]   captured_bit_count;
-
-reg          parse_active;
-reg [13:0]   bit_index;
-wire [13:0] capture_read_index =
-    captured_bit_count - 14'd1 - bit_index;
-wire current_bit = ((captured_bit_count != 14'd0) &&
-                    (bit_index < captured_bit_count)) ?
-                   slice_prefix[capture_read_index[12:0]] : 1'b0;
+// kate - Phase 1K streaming bitreader state.  The bitreader retains only one
+// payload byte and backpressures the existing asynchronous input FIFO whenever
+// that byte has not yet been consumed.
+reg  parse_active;
+wire bit_valid;
+wire current_bit;
+wire bit_consume;
 
 localparam [4:0]
     ST_VPOS_EXT      = 5'd0,
@@ -149,6 +121,22 @@ localparam [4:0]
     ST_WAIT_PIPELINE = 5'd18;
 
 reg [4:0] parse_state;
+
+assign bit_consume = parse_active && bit_valid &&
+                     (parse_state != ST_WAIT_PIPELINE);
+
+mpeg2_h262_bitreader mpeg2_h262_bitreader
+(
+    .clk          (clk),
+    .reset        (reset),
+    .stream_data  (stream_data),
+    .stream_valid (stream_valid),
+    .stream_ready (stream_ready),
+    .enable       (parse_active),
+    .bit_consume  (bit_consume),
+    .bit_valid    (bit_valid),
+    .bit_value    (current_bit)
+);
 reg [3:0] field_bit_count;
 reg [4:0] qscale_shift;
 reg       slice_picture_id_enable;
@@ -157,7 +145,7 @@ reg [4:0] macroblock_qscale_shift;
 
 // H.262 6.1.3 / Figure 6-10 block order for 4:2:0 is Y0,Y1,Y2,Y3,Cb,Cr.
 // block_index therefore runs 0..5 for each macroblock.  macroblock_index runs
-// 0..3 for the Phase 1J horizontal strip target.
+// 0..3 for the Phase 1K horizontal strip target.
 reg [2:0] block_index;
 reg [1:0] macroblock_index;
 
@@ -173,8 +161,6 @@ wire [10:0] dc_predictor_current =
 wire        current_block_is_luma = (block_index < 3'd4);
 wire        first_diagnostic_block =
     (macroblock_index == 2'd0) && (block_index == 3'd0);
-wire        diagnostic_mb3_y3 =
-    (macroblock_index == 2'd3) && (block_index == 3'd3);
 
 // Annex B Tables B.12/B.13 DC-size accumulator.
 reg [9:0] dc_vlc_code;
@@ -481,12 +467,7 @@ endtask
 always @(posedge clk) begin
     if (reset) begin
         byte_window                       <= 32'd0;
-        capture_active                    <= 1'b0;
-        capture_byte_count                <= 10'd0;
-        slice_prefix                      <= 8192'd0;
-        captured_bit_count                <= 14'd0;
         parse_active                      <= 1'b0;
-        bit_index                         <= 14'd0;
         parse_state                       <= ST_QSCALE;
         field_bit_count                   <= 4'd0;
         qscale_shift                      <= 5'd0;
@@ -536,20 +517,6 @@ always @(posedge clk) begin
         first_luma_last_coeff_index       <= 6'd0;
         first_luma_last_ac_level          <= 12'sd0;
         luma_macroblock_start             <= 1'b0;
-        diag_mb3_cb_dc_seen               <= 1'b0;
-        diag_mb3_cb_eob_seen              <= 1'b0;
-        diag_mb3_cr_dc_seen               <= 1'b0;
-        diag_mb3_cr_eob_seen              <= 1'b0;
-        diag_mb3_y3_started               <= 1'b0;
-        diag_mb3_y3_dc_size_seen          <= 1'b0;
-        diag_mb3_y3_dc_recon_seen         <= 1'b0;
-        diag_mb3_y3_ac_seen               <= 1'b0;
-        diag_mb3_y3_eob_seen              <= 1'b0;
-        diag_mb3_y3_bad_dc                <= 1'b0;
-        diag_mb3_y3_bad_ac_vlc            <= 1'b0;
-        diag_mb3_y3_coeff_overrun         <= 1'b0;
-        diag_mb3_y3_bad_escape            <= 1'b0;
-        diag_mb3_y3_capture_exhausted     <= 1'b0;
         qfs_block_start                   <= 1'b0;
         qfs_write_en                      <= 1'b0;
         qfs_write_index                   <= 6'd0;
@@ -562,51 +529,35 @@ always @(posedge clk) begin
         qfs_block_end         <= 1'b0;
         luma_macroblock_start <= 1'b0;
 
-        // Capture the first slice prefix.  If the next start code arrives before
-        // the diagnostic maximum, start parsing immediately; otherwise parse at
-        // the 1024-byte bound.  Phase 1J stops after macroblock 3.
+        // kate - Search start codes at byte granularity.  The byte containing
+        // slice_start_code is consumed while parse_active is still low, so the
+        // bitreader begins with the following byte at the first slice-header bit.
         if (stream_valid) begin
             byte_window <= byte_window_next;
 
-            if (!capture_active && !parse_active && !probe_error &&
+            if (!parse_active && !probe_error &&
                 !first_macroblock_luma_parsed && slice_start_now) begin
-                capture_active          <= 1'b1;
-                capture_byte_count      <= 10'd0;
-                slice_prefix            <= 8192'd0;
-                captured_bit_count      <= 14'd0;
-                slice_vertical_position <= start_code_value;
-            end
-            else if (capture_active) begin
-                slice_prefix <= {slice_prefix[8183:0], stream_data};
-
-                if (((start_code_now) && (capture_byte_count >= 10'd4)) ||
-                    (capture_byte_count == 10'd1023)) begin
-                    capture_active     <= 1'b0;
-                    captured_bit_count <= ({4'd0, capture_byte_count} + 14'd1) << 3;
-                    parse_active       <= 1'b1;
-                    bit_index          <= 14'd0;
-                    field_bit_count    <= 4'd0;
-                    qscale_shift       <= 5'd0;
-                    slice_picture_id_enable <= 1'b0;
-                    slice_picture_id_shift  <= 6'd0;
-                    vlc_code           <= 11'd0;
-                    vlc_len            <= 4'd0;
-                    mba_escape_base     <= 12'd0;
-                    macroblock_qscale_shift <= 5'd0;
-                    block_index        <= 3'd0;
-                    macroblock_index     <= 2'd0;
-                    dc_predictor_y       <= dc_predictor_reset;
-                    dc_predictor_cb      <= dc_predictor_reset;
-                    dc_predictor_cr      <= dc_predictor_reset;
-                    first_luma_ac_nonzero_count <= 7'd0;
-                    first_luma_last_coeff_index <= 6'd0;
-                    first_luma_last_ac_level <= 12'sd0;
-                    parse_state <= (vertical_size > 14'd2800) ?
-                                   ST_VPOS_EXT : ST_QSCALE;
-                end
-                else begin
-                    capture_byte_count <= capture_byte_count + 10'd1;
-                end
+                parse_active                      <= 1'b1;
+                slice_vertical_position           <= start_code_value;
+                field_bit_count                   <= 4'd0;
+                qscale_shift                      <= 5'd0;
+                slice_vertical_position_extension <= 3'd0;
+                slice_picture_id_enable           <= 1'b0;
+                slice_picture_id_shift            <= 6'd0;
+                vlc_code                          <= 11'd0;
+                vlc_len                           <= 4'd0;
+                mba_escape_base                   <= 12'd0;
+                macroblock_qscale_shift           <= 5'd0;
+                block_index                       <= 3'd0;
+                macroblock_index                  <= 2'd0;
+                dc_predictor_y                    <= dc_predictor_reset;
+                dc_predictor_cb                   <= dc_predictor_reset;
+                dc_predictor_cr                   <= dc_predictor_reset;
+                first_luma_ac_nonzero_count       <= 7'd0;
+                first_luma_last_coeff_index       <= 6'd0;
+                first_luma_last_ac_level          <= 12'sd0;
+                parse_state <= (vertical_size > 14'd2800) ?
+                               ST_VPOS_EXT : ST_QSCALE;
             end
         end
 
@@ -614,20 +565,14 @@ always @(posedge clk) begin
             if (!phase1_supported) begin
                 parse_active <= 1'b0;
             end
-            else if (bit_index >= captured_bit_count) begin
-                // kate - Diagnostic only: distinguish temporary capture-bound
-                // exhaustion from a malformed VLC while MB3 Y3 is active.
-                if (diagnostic_mb3_y3)
-                    diag_mb3_y3_capture_exhausted <= 1'b1;
-                probe_error  <= 1'b1;
-                parse_active <= 1'b0;
+            else if ((parse_state != ST_WAIT_PIPELINE) && !bit_valid) begin
+                // Wait for the streaming bitreader to accept the next byte.
             end
             else begin
                 case (parse_state)
                     ST_VPOS_EXT: begin
                         slice_vertical_position_extension <=
                             {slice_vertical_position_extension[1:0], current_bit};
-                        bit_index <= bit_index + 14'd1;
                         if (field_bit_count == 4'd2) begin
                             field_bit_count <= 4'd0;
                             parse_state     <= ST_QSCALE;
@@ -637,7 +582,6 @@ always @(posedge clk) begin
 
                     ST_QSCALE: begin
                         qscale_shift <= {qscale_shift[3:0], current_bit};
-                        bit_index    <= bit_index + 14'd1;
                         if (field_bit_count == 4'd4) begin
                             quantiser_scale_code <= {qscale_shift[3:0], current_bit};
                             field_bit_count <= 4'd0;
@@ -651,7 +595,6 @@ always @(posedge clk) begin
                     end
 
                     ST_AFTER_QSCALE: begin
-                        bit_index <= bit_index + 14'd1;
                         if (current_bit)
                             parse_state <= ST_INTRA_SLICE;
                         else begin
@@ -664,7 +607,6 @@ always @(posedge clk) begin
                     end
 
                     ST_INTRA_SLICE: begin
-                        bit_index   <= bit_index + 14'd1;
                         parse_state <= ST_PIC_ID_ENABLE;
                     end
 
@@ -672,14 +614,12 @@ always @(posedge clk) begin
                         slice_picture_id_enable <= current_bit;
                         slice_picture_id_shift  <= 6'd0;
                         field_bit_count         <= 4'd0;
-                        bit_index               <= bit_index + 14'd1;
                         parse_state             <= ST_PIC_ID;
                     end
 
                     ST_PIC_ID: begin
                         slice_picture_id_shift <=
                             {slice_picture_id_shift[4:0], current_bit};
-                        bit_index <= bit_index + 14'd1;
                         if (field_bit_count == 4'd5) begin
                             field_bit_count <= 4'd0;
                             if (!slice_picture_id_enable &&
@@ -693,7 +633,6 @@ always @(posedge clk) begin
                     end
 
                     ST_EXTRA_FLAG: begin
-                        bit_index <= bit_index + 14'd1;
                         if (current_bit) begin
                             field_bit_count <= 4'd0;
                             parse_state     <= ST_EXTRA_INFO;
@@ -708,7 +647,6 @@ always @(posedge clk) begin
                     end
 
                     ST_EXTRA_INFO: begin
-                        bit_index <= bit_index + 14'd1;
                         if (field_bit_count == 4'd7) begin
                             field_bit_count <= 4'd0;
                             parse_state     <= ST_EXTRA_FLAG;
@@ -717,14 +655,13 @@ always @(posedge clk) begin
                     end
 
                     ST_MBA: begin
-                        bit_index <= bit_index + 14'd1;
                         if (mba_escape) begin
                             mba_escape_base <= mba_escape_base + 12'd33;
                             vlc_code <= 11'd0;
                             vlc_len  <= 4'd0;
                         end
                         else if (mba_match) begin
-                            // Phase 1J deliberately proves four consecutive
+                            // Phase 1K deliberately proves four consecutive
                             // macroblocks.  The first macroblock may begin at
                             // any legal slice column; the next three must have
                             // macroblock_address_increment == 1.
@@ -752,7 +689,6 @@ always @(posedge clk) begin
                     end
 
                     ST_MBTYPE_FIRST: begin
-                        bit_index <= bit_index + 14'd1;
                         if (current_bit) begin
                             macroblock_quant        <= 1'b0;
                             first_i_macroblock_seen <= 1'b1;
@@ -764,7 +700,6 @@ always @(posedge clk) begin
                     end
 
                     ST_MBTYPE_SECOND: begin
-                        bit_index <= bit_index + 14'd1;
                         if (current_bit) begin
                             macroblock_quant        <= 1'b1;
                             first_i_macroblock_seen <= 1'b1;
@@ -783,7 +718,6 @@ always @(posedge clk) begin
                     ST_MB_QSCALE: begin
                         macroblock_qscale_shift <=
                             {macroblock_qscale_shift[3:0], current_bit};
-                        bit_index <= bit_index + 14'd1;
                         if (field_bit_count == 4'd4) begin
                             macroblock_quantiser_scale_code <=
                                 {macroblock_qscale_shift[3:0], current_bit};
@@ -800,10 +734,7 @@ always @(posedge clk) begin
                     end
 
                     ST_DC_LUMA: begin
-                        bit_index <= bit_index + 14'd1;
                         if (dc_size_match) begin
-                            if (diagnostic_mb3_y3)
-                                diag_mb3_y3_dc_size_seen <= 1'b1;
                             dc_size     <= dc_size_value;
                             dc_vlc_code <= 10'd0;
                             dc_vlc_len  <= 4'd0;
@@ -811,16 +742,6 @@ always @(posedge clk) begin
                                 first_luma_dc_size <= dc_size_value;
 
                             if (dc_size_value == 4'd0) begin
-                                if (diagnostic_mb3_y3)
-                                    diag_mb3_y3_dc_recon_seen <= 1'b1;
-                                // kate - Diagnostic only: a zero-size DC VLC is
-                                // itself the complete DC decode for this block.
-                                if (macroblock_index == 2'd3) begin
-                                    if (block_index == 3'd4)
-                                        diag_mb3_cb_dc_seen <= 1'b1;
-                                    else if (block_index == 3'd5)
-                                        diag_mb3_cr_dc_seen <= 1'b1;
-                                end
                                 if (first_diagnostic_block) begin
                                     first_luma_dc_differential <= 13'sd0;
                                     first_luma_dc_coefficient  <= dc_predictor_y;
@@ -843,8 +764,6 @@ always @(posedge clk) begin
                             end
                         end
                         else if (dc_vlc_len_next >= (current_block_is_luma ? 4'd9 : 4'd10)) begin
-                            if (diagnostic_mb3_y3)
-                                diag_mb3_y3_bad_dc <= 1'b1;
                             probe_error  <= 1'b1;
                             parse_active <= 1'b0;
                         end
@@ -856,28 +775,13 @@ always @(posedge clk) begin
 
                     ST_DC_DIFF: begin
                         dc_diff_shift <= dc_diff_bits_next;
-                        bit_index     <= bit_index + 14'd1;
                         if (dc_diff_bit_count == (dc_size - 1'b1)) begin
                             if ((dc_coefficient_decoded < 13'sd0) ||
                                 (dc_coefficient_decoded > dc_coefficient_max_signed)) begin
-                                if (diagnostic_mb3_y3)
-                                    diag_mb3_y3_bad_dc <= 1'b1;
                                 probe_error  <= 1'b1;
                                 parse_active <= 1'b0;
                             end
                             else begin
-                                if (diagnostic_mb3_y3)
-                                    diag_mb3_y3_dc_recon_seen <= 1'b1;
-                                // kate - Diagnostic only: all nonzero DC
-                                // differential bits for this chroma block have
-                                // now been accepted and reconstructed.
-                                if (macroblock_index == 2'd3) begin
-                                    if (block_index == 3'd4)
-                                        diag_mb3_cb_dc_seen <= 1'b1;
-                                    else if (block_index == 3'd5)
-                                        diag_mb3_cr_dc_seen <= 1'b1;
-                                end
-
                                 if (block_index < 3'd4)
                                     dc_predictor_y <= dc_coefficient_decoded[10:0];
                                 else if (block_index == 3'd4)
@@ -905,13 +809,10 @@ always @(posedge clk) begin
                     end
 
                     ST_AC_VLC: begin
-                        bit_index <= bit_index + 14'd1;
                         if (ac_vlc_match) begin
                             ac_vlc_code <= 16'd0;
                             ac_vlc_len  <= 5'd0;
                             if (ac_vlc_eob) begin
-                                if (diagnostic_mb3_y3)
-                                    diag_mb3_y3_eob_seen <= 1'b1;
                                 if (current_block_is_luma) begin
                                     qfs_block_end <= 1'b1;
                                     if (first_diagnostic_block)
@@ -921,21 +822,13 @@ always @(posedge clk) begin
                                     parse_state <= ST_WAIT_PIPELINE;
                                 end
                                 else if (block_index == 3'd4) begin
-                                    // kate - Diagnostic only: Cb syntax reached
-                                    // a legal end_of_block before moving to Cr.
-                                    if (macroblock_index == 2'd3)
-                                        diag_mb3_cb_eob_seen <= 1'b1;
                                     block_index <= 3'd5;
                                     start_chroma_block();
                                 end
                                 else begin
                                     // Cr completes the macroblock syntax.  Four
-                                    // macroblocks are the Phase 1J target.
+                                    // macroblocks are the Phase 1K target.
                                     if (macroblock_index == 2'd3) begin
-                                        // kate - Diagnostic only: a legal Cr EOB
-                                        // was accepted immediately before the
-                                        // normal Phase-1J completion flag.
-                                        diag_mb3_cr_eob_seen <= 1'b1;
                                         first_macroblock_luma_parsed <= 1'b1;
                                         parse_active <= 1'b0;
                                     end
@@ -960,8 +853,6 @@ always @(posedge clk) begin
                             end
                         end
                         else if (ac_vlc_len_next >= 5'd16) begin
-                            if (diagnostic_mb3_y3)
-                                diag_mb3_y3_bad_ac_vlc <= 1'b1;
                             probe_error  <= 1'b1;
                             parse_active <= 1'b0;
                         end
@@ -972,16 +863,11 @@ always @(posedge clk) begin
                     end
 
                     ST_AC_SIGN: begin
-                        bit_index <= bit_index + 14'd1;
                         if (normal_target_index > 8'd63) begin
-                            if (diagnostic_mb3_y3)
-                                diag_mb3_y3_coeff_overrun <= 1'b1;
                             probe_error  <= 1'b1;
                             parse_active <= 1'b0;
                         end
                         else begin
-                            if (diagnostic_mb3_y3)
-                                diag_mb3_y3_ac_seen <= 1'b1;
                             if (first_diagnostic_block) begin
                                 first_luma_ac_nonzero_count <=
                                     first_luma_ac_nonzero_count + 7'd1;
@@ -1004,7 +890,6 @@ always @(posedge clk) begin
 
                     ST_ESCAPE_RUN: begin
                         escape_run_shift <= escape_run_next;
-                        bit_index        <= bit_index + 14'd1;
                         if (escape_run_bit_count == 3'd5) begin
                             escape_run_bit_count   <= 3'd0;
                             escape_level_shift     <= 12'd0;
@@ -1016,24 +901,14 @@ always @(posedge clk) begin
 
                     ST_ESCAPE_LEVEL: begin
                         escape_level_shift <= escape_level_next;
-                        bit_index          <= bit_index + 14'd1;
                         if (escape_level_bit_count == 4'd11) begin
                             if ((escape_level_next == 12'h000) ||
                                 (escape_level_next == 12'h800) ||
                                 (escape_target_index > 8'd63)) begin
-                                if (diagnostic_mb3_y3) begin
-                                    if ((escape_level_next == 12'h000) ||
-                                        (escape_level_next == 12'h800))
-                                        diag_mb3_y3_bad_escape <= 1'b1;
-                                    if (escape_target_index > 8'd63)
-                                        diag_mb3_y3_coeff_overrun <= 1'b1;
-                                end
                                 probe_error  <= 1'b1;
                                 parse_active <= 1'b0;
                             end
                             else begin
-                                if (diagnostic_mb3_y3)
-                                    diag_mb3_y3_ac_seen <= 1'b1;
                                 if (first_diagnostic_block) begin
                                     first_luma_ac_nonzero_count <=
                                         first_luma_ac_nonzero_count + 7'd1;
@@ -1058,13 +933,10 @@ always @(posedge clk) begin
                     ST_WAIT_PIPELINE: begin
                         // Do not consume another H.262 bit while the one-block
                         // IQ/IDCT/reconstruction storage is still occupied.
+                        // The bitreader holds position and backpressures the
+                        // outer async FIFO until pipeline_block_done arrives.
                         if (pipeline_block_done) begin
                             if (block_index < 3'd3) begin
-                                // kate - Diagnostic only: when MB3 Y2 completes,
-                                // the next submitted block is MB3 Y3.
-                                if ((macroblock_index == 2'd3) &&
-                                    (block_index == 3'd2))
-                                    diag_mb3_y3_started <= 1'b1;
                                 block_index <= block_index + 3'd1;
                                 start_luma_block();
                             end

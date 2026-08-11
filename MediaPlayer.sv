@@ -85,6 +85,7 @@ wire        mpeg2_stream_empty;
 wire [7:0]  mpeg2_stream_data;
 wire        mpeg2_stream_rd;
 wire        mpeg2_stream_wr;
+wire        mpeg2_new_stream_ready;
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
@@ -128,10 +129,10 @@ pll pll
 
 wire reset = RESET | status[0] | buttons[1];
 
-// kate - Phase 1H: MPEG2FPGA no longer exists in the active design.
-// The new H.262 front end owns the FIFO read side directly.  Both current
-// standards-driven parsers are byte-stream consumers and accept arbitrary
-// gaps, so data is consumed whenever the asynchronous FIFO is non-empty.
+// kate - Phase 1K: the streaming H.262 bitreader owns input backpressure.
+// Before a slice is selected, bytes flow continuously for start-code/header
+// parsing.  During slice parsing the bitreader stalls this FIFO whenever its
+// current payload byte has not been fully consumed, including IQ/IDCT waits.
 assign mpeg2_stream_wr =
 	ioctl_download &&
 	ioctl_wr &&
@@ -139,7 +140,8 @@ assign mpeg2_stream_wr =
 	!mpeg2_stream_full;
 
 assign mpeg2_stream_rd =
-	!mpeg2_stream_empty;
+	!mpeg2_stream_empty &&
+	mpeg2_new_stream_ready;
 
 mpeg2_stream_fifo mpeg2_stream_fifo
 (
@@ -157,7 +159,7 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 );
 
 // kate - Phase 1H: the legacy MPEG2FPGA DDR frame-store path is gone.
-// The present Phase-1J luma-strip proof uses only the on-chip M10K framebuffer.
+// The present Phase-1K luma-strip proof uses only the on-chip M10K framebuffer.
 // Keep the MiSTer DDR service interface completely idle until our own explicit
 // frame-store layer is introduced in a later decoder phase.
 assign DDRAM_CLK      = clk_mpeg2;
@@ -234,20 +236,6 @@ wire        mpeg2_new_first_luma_dc_seen;
 wire        mpeg2_new_first_luma_block_complete;
 wire        mpeg2_new_first_macroblock_luma_parsed;
 wire        mpeg2_new_luma_macroblock_start;
-wire        mpeg2_new_diag_mb3_cb_dc_seen;
-wire        mpeg2_new_diag_mb3_cb_eob_seen;
-wire        mpeg2_new_diag_mb3_cr_dc_seen;
-wire        mpeg2_new_diag_mb3_cr_eob_seen;
-wire        mpeg2_new_diag_mb3_y3_started;
-wire        mpeg2_new_diag_mb3_y3_dc_size_seen;
-wire        mpeg2_new_diag_mb3_y3_dc_recon_seen;
-wire        mpeg2_new_diag_mb3_y3_ac_seen;
-wire        mpeg2_new_diag_mb3_y3_eob_seen;
-wire        mpeg2_new_diag_mb3_y3_bad_dc;
-wire        mpeg2_new_diag_mb3_y3_bad_ac_vlc;
-wire        mpeg2_new_diag_mb3_y3_coeff_overrun;
-wire        mpeg2_new_diag_mb3_y3_bad_escape;
-wire        mpeg2_new_diag_mb3_y3_capture_exhausted;
 wire        mpeg2_new_phase1_probe_error;
 wire [4:0]  mpeg2_new_slice_quantiser_scale_code;
 wire [11:0] mpeg2_new_macroblock_address_increment;
@@ -344,15 +332,17 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.intra_quant_matrix_default       (mpeg2_new_intra_quant_matrix_default)
 );
 
-// kate - Phase 1J first-slice progression.  The probe reconstructs Y blocks
-// 0..3 for the first four macroblocks, consumes Cb/Cr block syntax to reach the
-// following macroblock, and waits for the one-block pipeline between Y blocks.
+// kate - Phase 1K first-slice streaming progression.  The probe reconstructs
+// Y blocks 0..3 for the first four macroblocks and consumes Cb/Cr syntax, but
+// no longer captures a bounded slice prefix.  Its ready output backpressures
+// the existing asynchronous byte FIFO while individual bits/pipeline stages run.
 mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 (
 	.clk                         (clk_mpeg2),
 	.reset                       (reset),
 	.stream_data                 (mpeg2_stream_data),
 	.stream_valid                (mpeg2_stream_rd),
+	.stream_ready                (mpeg2_new_stream_ready),
 	.phase1_supported            (mpeg2_new_phase1_supported),
 	.vertical_size               (mpeg2_new_vertical_size),
 	.intra_dc_precision          (mpeg2_new_intra_dc_precision),
@@ -379,20 +369,6 @@ mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 	.first_luma_last_coeff_index (mpeg2_new_first_luma_last_coeff_index),
 	.first_luma_last_ac_level    (mpeg2_new_first_luma_last_ac_level),
 	.luma_macroblock_start       (mpeg2_new_luma_macroblock_start),
-	.diag_mb3_cb_dc_seen         (mpeg2_new_diag_mb3_cb_dc_seen),
-	.diag_mb3_cb_eob_seen        (mpeg2_new_diag_mb3_cb_eob_seen),
-	.diag_mb3_cr_dc_seen         (mpeg2_new_diag_mb3_cr_dc_seen),
-	.diag_mb3_cr_eob_seen        (mpeg2_new_diag_mb3_cr_eob_seen),
-	.diag_mb3_y3_started         (mpeg2_new_diag_mb3_y3_started),
-	.diag_mb3_y3_dc_size_seen    (mpeg2_new_diag_mb3_y3_dc_size_seen),
-	.diag_mb3_y3_dc_recon_seen   (mpeg2_new_diag_mb3_y3_dc_recon_seen),
-	.diag_mb3_y3_ac_seen         (mpeg2_new_diag_mb3_y3_ac_seen),
-	.diag_mb3_y3_eob_seen        (mpeg2_new_diag_mb3_y3_eob_seen),
-	.diag_mb3_y3_bad_dc          (mpeg2_new_diag_mb3_y3_bad_dc),
-	.diag_mb3_y3_bad_ac_vlc      (mpeg2_new_diag_mb3_y3_bad_ac_vlc),
-	.diag_mb3_y3_coeff_overrun   (mpeg2_new_diag_mb3_y3_coeff_overrun),
-	.diag_mb3_y3_bad_escape      (mpeg2_new_diag_mb3_y3_bad_escape),
-	.diag_mb3_y3_capture_exhausted(mpeg2_new_diag_mb3_y3_capture_exhausted),
 
 	.qfs_block_start             (mpeg2_new_qfs_block_start),
 	.qfs_write_en                (mpeg2_new_qfs_write_en),
@@ -501,25 +477,6 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 	.wr_block_start    (mpeg2_new_recon_block_start),
 	.wr_block_complete (mpeg2_new_recon_block_complete),
 
-	// kate - Phase 1J diagnostic-3 parser milestones.
-	.wr_diag_mb3_cb_dc_seen  (mpeg2_new_diag_mb3_cb_dc_seen),
-	.wr_diag_mb3_cb_eob_seen (mpeg2_new_diag_mb3_cb_eob_seen),
-	.wr_diag_mb3_cr_dc_seen  (mpeg2_new_diag_mb3_cr_dc_seen),
-	.wr_diag_mb3_cr_eob_seen (mpeg2_new_diag_mb3_cr_eob_seen),
-	.wr_diag_phase1j_complete (mpeg2_new_first_macroblock_luma_parsed),
-	.wr_diag_probe_error      (mpeg2_new_phase1_probe_error),
-
-	// kate - Phase 1J diagnostic-4 MB3-Y3 milestones/error classes.
-	.wr_diag_mb3_y3_started          (mpeg2_new_diag_mb3_y3_started),
-	.wr_diag_mb3_y3_dc_size_seen     (mpeg2_new_diag_mb3_y3_dc_size_seen),
-	.wr_diag_mb3_y3_dc_recon_seen    (mpeg2_new_diag_mb3_y3_dc_recon_seen),
-	.wr_diag_mb3_y3_ac_seen          (mpeg2_new_diag_mb3_y3_ac_seen),
-	.wr_diag_mb3_y3_eob_seen         (mpeg2_new_diag_mb3_y3_eob_seen),
-	.wr_diag_mb3_y3_bad_dc           (mpeg2_new_diag_mb3_y3_bad_dc),
-	.wr_diag_mb3_y3_bad_ac_vlc       (mpeg2_new_diag_mb3_y3_bad_ac_vlc),
-	.wr_diag_mb3_y3_coeff_overrun    (mpeg2_new_diag_mb3_y3_coeff_overrun),
-	.wr_diag_mb3_y3_bad_escape       (mpeg2_new_diag_mb3_y3_bad_escape),
-	.wr_diag_mb3_y3_capture_exhausted(mpeg2_new_diag_mb3_y3_capture_exhausted),
 
 	.rd_clk      (clk_video),
 	.h_pos       (display_h_pos),
@@ -545,7 +502,7 @@ assign VGA_R = fb_video_y;
 assign VGA_G = fb_video_y;
 assign VGA_B = fb_video_y;
 
-// kate - Phase 1J positive diagnostic.
+// kate - Phase 1K positive diagnostic.
 // OFF: the first four intra macroblocks have not completed the luma path, or an
 // earlier decoder stage reported an error.
 // ON: sixteen Y blocks (1024 reconstructed luma samples) reached our framebuffer.

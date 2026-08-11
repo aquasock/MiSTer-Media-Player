@@ -1,16 +1,14 @@
 // kate - Decoupled MPEG2 luma framebuffer.
 //
-// Phase 1J diagnostic 4 publication build.
+// Phase 1K stores the first four 4:2:0 intra macroblocks' luminance: sixteen
+// 8x8 Y blocks forming one 64x16 horizontal strip.  The decoder writes explicit
+// picture X/Y coordinates at 54 MHz while the independent fixed SVGA raster
+// reads at 40 MHz.
 //
-// The decoder still targets the first four 4:2:0 intra macroblocks' luminance:
-// sixteen 8x8 Y blocks forming one 64x16 horizontal strip.  The decoder writes
-// explicit picture X/Y coordinates at 54 MHz while the independent fixed SVGA
-// raster reads at 40 MHz.
-//
-// kate - This diagnostic version keeps the earlier progressive macroblock
-// publication plus the earlier MB3-luma/chroma rows.  A third row of ten
-// markers isolates MB3 Y3 parser progress and failure class.  All markers
-// observe sticky state only; decode decisions are unchanged.
+// To keep the proof unambiguous, RAM is exposed only after all sixteen luma
+// blocks have completed.  The rest of the 720x480 source window remains the
+// fixed diagnostic background so uninitialised RAM cannot look like decoded
+// picture data.
 //
 // Explicit altsyncram is retained because Quartus 17 otherwise implements this
 // mixed-clock framebuffer poorly or attempts to use registers.
@@ -28,27 +26,6 @@ module mpeg2_luma_framebuffer
     input  wire        wr_macroblock_start,
     input  wire        wr_block_start,
     input  wire        wr_block_complete,
-
-    // kate - Phase 1J diagnostic-3 sticky parser milestones, all generated in
-    // the same 54 MHz domain as the framebuffer write port.
-    input  wire        wr_diag_mb3_cb_dc_seen,
-    input  wire        wr_diag_mb3_cb_eob_seen,
-    input  wire        wr_diag_mb3_cr_dc_seen,
-    input  wire        wr_diag_mb3_cr_eob_seen,
-    input  wire        wr_diag_phase1j_complete,
-    input  wire        wr_diag_probe_error,
-
-    // kate - Phase 1J diagnostic-4 MB3-Y3 parser milestones/error classes.
-    input  wire        wr_diag_mb3_y3_started,
-    input  wire        wr_diag_mb3_y3_dc_size_seen,
-    input  wire        wr_diag_mb3_y3_dc_recon_seen,
-    input  wire        wr_diag_mb3_y3_ac_seen,
-    input  wire        wr_diag_mb3_y3_eob_seen,
-    input  wire        wr_diag_mb3_y3_bad_dc,
-    input  wire        wr_diag_mb3_y3_bad_ac_vlc,
-    input  wire        wr_diag_mb3_y3_coeff_overrun,
-    input  wire        wr_diag_mb3_y3_bad_escape,
-    input  wire        wr_diag_mb3_y3_capture_exhausted,
 
     // Independent video side - 40 MHz.
     input  wire        rd_clk,
@@ -69,7 +46,7 @@ localparam integer SRC_HEIGHT = 480;
 localparam integer FB_SIZE    = SRC_WIDTH * SRC_HEIGHT;
 
 // -------------------------------------------------------------------------
-// Write-side address generation and diagnostic macroblock publication.
+// Write-side address generation and four-macroblock strip publication.
 // -------------------------------------------------------------------------
 
 reg [18:0] ram_wr_address;
@@ -79,52 +56,39 @@ reg        ram_wr_en;
 wire [18:0] wr_linear_address =
     (wr_y_pos * 19'd720) + wr_x_pos;
 
+// kate - The first block-start supplies the strip's upper-left picture-space
+// origin.  Publication waits for sixteen completed luma blocks (4 macroblocks
+// x 4 Y blocks), so the read side never exposes a partially decoded strip.
 reg [11:0] strip_origin_x_wr;
 reg [11:0] strip_origin_y_wr;
 reg [4:0]  completed_luma_blocks_wr;
 reg [2:0]  macroblocks_started_wr;
+reg        strip_present_wr;
 reg        strip_active_wr;
-
-// kate - Thermometer publication bits are monotonic.  Each bit crosses the
-// 54->40 MHz boundary independently through two flip-flops, avoiding a binary
-// count CDC where a multi-bit transition could momentarily decode incorrectly.
-// bit 0 = MB0 Y complete, bit 1 = MB1 Y complete, ... bit 3 = MB3 Y complete.
-reg [3:0] published_macroblocks_wr;
-
-// kate - Phase 1J diagnostic-2 progress state for the fourth macroblock.
-// mb3_started_wr goes high on the fourth luma_macroblock_start pulse, which is
-// emitted only after the parser has accepted MB3's macroblock type.
-// mb3_luma_blocks_done_wr is a thermometer for MB3 Y0..Y3 reconstruction.
-reg       mb3_started_wr;
-reg [3:0] mb3_luma_blocks_done_wr;
 
 always @(posedge wr_clk) begin
     if (reset) begin
-        ram_wr_address             <= 19'd0;
-        ram_wr_data                <= 8'd0;
-        ram_wr_en                  <= 1'b0;
-        strip_origin_x_wr          <= 12'd0;
-        strip_origin_y_wr          <= 12'd0;
-        completed_luma_blocks_wr   <= 5'd0;
-        macroblocks_started_wr     <= 3'd0;
-        strip_active_wr            <= 1'b0;
-        published_macroblocks_wr   <= 4'b0000;
-        mb3_started_wr              <= 1'b0;
-        mb3_luma_blocks_done_wr     <= 4'b0000;
+        ram_wr_address            <= 19'd0;
+        ram_wr_data               <= 8'd0;
+        ram_wr_en                 <= 1'b0;
+        strip_origin_x_wr         <= 12'd0;
+        strip_origin_y_wr         <= 12'd0;
+        completed_luma_blocks_wr  <= 5'd0;
+        macroblocks_started_wr    <= 3'd0;
+        strip_present_wr          <= 1'b0;
+        strip_active_wr           <= 1'b0;
     end
     else begin
         ram_wr_en <= 1'b0;
 
         if (wr_macroblock_start) begin
-            if (!strip_active_wr && (published_macroblocks_wr == 4'b0000)) begin
+            if (!strip_active_wr && !strip_present_wr) begin
                 completed_luma_blocks_wr <= 5'd0;
                 macroblocks_started_wr   <= 3'd1;
+                strip_present_wr         <= 1'b0;
                 strip_active_wr          <= 1'b1;
             end
             else if (strip_active_wr && (macroblocks_started_wr < 3'd4)) begin
-                // Before the fourth start pulse the counter is 3.
-                if (macroblocks_started_wr == 3'd3)
-                    mb3_started_wr <= 1'b1;
                 macroblocks_started_wr <= macroblocks_started_wr + 3'd1;
             end
         end
@@ -136,46 +100,15 @@ always @(posedge wr_clk) begin
         end
 
         if (wr_block_complete && strip_active_wr) begin
-            case (completed_luma_blocks_wr)
-                5'd3: begin
-                    // Four Y blocks = macroblock 0 complete.
-                    published_macroblocks_wr[0] <= 1'b1;
-                    completed_luma_blocks_wr    <= 5'd4;
-                end
-                5'd7: begin
-                    published_macroblocks_wr[1] <= 1'b1;
-                    completed_luma_blocks_wr    <= 5'd8;
-                end
-                5'd11: begin
-                    published_macroblocks_wr[2] <= 1'b1;
-                    completed_luma_blocks_wr    <= 5'd12;
-                end
-                5'd12: begin
-                    // MB3 Y block 0 completed.
-                    mb3_luma_blocks_done_wr[0] <= 1'b1;
-                    completed_luma_blocks_wr   <= 5'd13;
-                end
-                5'd13: begin
-                    // MB3 Y block 1 completed.
-                    mb3_luma_blocks_done_wr[1] <= 1'b1;
-                    completed_luma_blocks_wr   <= 5'd14;
-                end
-                5'd14: begin
-                    // MB3 Y block 2 completed.
-                    mb3_luma_blocks_done_wr[2] <= 1'b1;
-                    completed_luma_blocks_wr   <= 5'd15;
-                end
-                5'd15: begin
-                    // MB3 Y block 3 completed; the full fourth macroblock is visible.
-                    mb3_luma_blocks_done_wr[3] <= 1'b1;
-                    published_macroblocks_wr[3] <= 1'b1;
-                    completed_luma_blocks_wr    <= 5'd16;
-                    strip_active_wr             <= 1'b0;
-                end
-                default: begin
-                    completed_luma_blocks_wr <= completed_luma_blocks_wr + 5'd1;
-                end
-            endcase
+            if ((completed_luma_blocks_wr == 5'd15) &&
+                (macroblocks_started_wr == 3'd4)) begin
+                completed_luma_blocks_wr <= 5'd16;
+                strip_present_wr         <= 1'b1;
+                strip_active_wr          <= 1'b0;
+            end
+            else begin
+                completed_luma_blocks_wr <= completed_luma_blocks_wr + 5'd1;
+            end
         end
 
         if (wr_en &&
@@ -189,74 +122,32 @@ always @(posedge wr_clk) begin
 end
 
 // -------------------------------------------------------------------------
-// Read-side synchronization of the strip origin and publication thermometer.
+// Read-side synchronization of the completed-strip descriptor.
 // -------------------------------------------------------------------------
 
-reg [3:0]  published_macroblocks_rd_1;
-reg [3:0]  published_macroblocks_rd_2;
+reg        strip_present_rd_1;
+reg        strip_present_rd_2;
 reg [11:0] strip_origin_x_rd_1;
 reg [11:0] strip_origin_x_rd_2;
 reg [11:0] strip_origin_y_rd_1;
 reg [11:0] strip_origin_y_rd_2;
-reg        mb3_started_rd_1;
-reg        mb3_started_rd_2;
-reg [3:0]  mb3_luma_blocks_done_rd_1;
-reg [3:0]  mb3_luma_blocks_done_rd_2;
-reg [5:0]  chroma_status_rd_1;
-reg [5:0]  chroma_status_rd_2;
-reg [9:0]  y3_status_rd_1;
-reg [9:0]  y3_status_rd_2;
 
 always @(posedge rd_clk) begin
     if (reset) begin
-        published_macroblocks_rd_1 <= 4'b0000;
-        published_macroblocks_rd_2 <= 4'b0000;
-        strip_origin_x_rd_1        <= 12'd0;
-        strip_origin_x_rd_2        <= 12'd0;
-        strip_origin_y_rd_1        <= 12'd0;
-        strip_origin_y_rd_2        <= 12'd0;
-        mb3_started_rd_1             <= 1'b0;
-        mb3_started_rd_2             <= 1'b0;
-        mb3_luma_blocks_done_rd_1    <= 4'b0000;
-        mb3_luma_blocks_done_rd_2    <= 4'b0000;
-        chroma_status_rd_1            <= 6'b000000;
-        chroma_status_rd_2            <= 6'b000000;
-        y3_status_rd_1                <= 10'b0000000000;
-        y3_status_rd_2                <= 10'b0000000000;
+        strip_present_rd_1  <= 1'b0;
+        strip_present_rd_2  <= 1'b0;
+        strip_origin_x_rd_1 <= 12'd0;
+        strip_origin_x_rd_2 <= 12'd0;
+        strip_origin_y_rd_1 <= 12'd0;
+        strip_origin_y_rd_2 <= 12'd0;
     end
     else begin
-        published_macroblocks_rd_1 <= published_macroblocks_wr;
-        published_macroblocks_rd_2 <= published_macroblocks_rd_1;
-        strip_origin_x_rd_1        <= strip_origin_x_wr;
-        strip_origin_x_rd_2        <= strip_origin_x_rd_1;
-        strip_origin_y_rd_1        <= strip_origin_y_wr;
-        strip_origin_y_rd_2        <= strip_origin_y_rd_1;
-        mb3_started_rd_1             <= mb3_started_wr;
-        mb3_started_rd_2             <= mb3_started_rd_1;
-        mb3_luma_blocks_done_rd_1    <= mb3_luma_blocks_done_wr;
-        mb3_luma_blocks_done_rd_2    <= mb3_luma_blocks_done_rd_1;
-        chroma_status_rd_1 <= {
-            wr_diag_probe_error,
-            wr_diag_phase1j_complete,
-            wr_diag_mb3_cr_eob_seen,
-            wr_diag_mb3_cr_dc_seen,
-            wr_diag_mb3_cb_eob_seen,
-            wr_diag_mb3_cb_dc_seen
-        };
-        chroma_status_rd_2 <= chroma_status_rd_1;
-        y3_status_rd_1 <= {
-            wr_diag_mb3_y3_capture_exhausted,
-            wr_diag_mb3_y3_bad_escape,
-            wr_diag_mb3_y3_coeff_overrun,
-            wr_diag_mb3_y3_bad_ac_vlc,
-            wr_diag_mb3_y3_bad_dc,
-            wr_diag_mb3_y3_eob_seen,
-            wr_diag_mb3_y3_ac_seen,
-            wr_diag_mb3_y3_dc_recon_seen,
-            wr_diag_mb3_y3_dc_size_seen,
-            wr_diag_mb3_y3_started
-        };
-        y3_status_rd_2 <= y3_status_rd_1;
+        strip_present_rd_1  <= strip_present_wr;
+        strip_present_rd_2  <= strip_present_rd_1;
+        strip_origin_x_rd_1 <= strip_origin_x_wr;
+        strip_origin_x_rd_2 <= strip_origin_x_rd_1;
+        strip_origin_y_rd_1 <= strip_origin_y_wr;
+        strip_origin_y_rd_2 <= strip_origin_y_rd_1;
     end
 end
 
@@ -275,104 +166,13 @@ wire source_window =
 wire [11:0] source_x = h_pos - 12'd40;
 wire [11:0] source_y = v_pos - 12'd60;
 
-wire [11:0] published_width =
-    published_macroblocks_rd_2[3] ? 12'd64 :
-    published_macroblocks_rd_2[2] ? 12'd48 :
-    published_macroblocks_rd_2[1] ? 12'd32 :
-    published_macroblocks_rd_2[0] ? 12'd16 : 12'd0;
-
 wire decoded_strip_window =
     source_window &&
-    (published_width != 12'd0) &&
+    strip_present_rd_2 &&
     (source_x >= strip_origin_x_rd_2) &&
-    (source_x <  strip_origin_x_rd_2 + published_width) &&
+    (source_x <  strip_origin_x_rd_2 + 12'd64) &&
     (source_y >= strip_origin_y_rd_2) &&
     (source_y <  strip_origin_y_rd_2 + 12'd16);
-
-// kate - Five 8x8 status cells at picture coordinates y=24..31.
-//   cell 0: MB3 macroblock type accepted / reconstruction context started
-//   cell 1: MB3 Y0 reconstructed
-//   cell 2: MB3 Y1 reconstructed
-//   cell 3: MB3 Y2 reconstructed
-//   cell 4: MB3 Y3 reconstructed
-// Reached cells are bright (220); unreached cells are dim (48).  They are
-// intentionally outside the decoded 64x16 strip and are diagnostic UI only.
-wire diagnostic_status_row =
-    source_window && (source_y >= 12'd24) && (source_y < 12'd32);
-
-wire status_cell0 = diagnostic_status_row && (source_x < 12'd8);
-wire status_cell1 = diagnostic_status_row && (source_x >= 12'd10) && (source_x < 12'd18);
-wire status_cell2 = diagnostic_status_row && (source_x >= 12'd20) && (source_x < 12'd28);
-wire status_cell3 = diagnostic_status_row && (source_x >= 12'd30) && (source_x < 12'd38);
-wire status_cell4 = diagnostic_status_row && (source_x >= 12'd40) && (source_x < 12'd48);
-wire diagnostic_status_window = status_cell0 || status_cell1 || status_cell2 ||
-                                status_cell3 || status_cell4;
-wire diagnostic_status_on =
-    (status_cell0 && mb3_started_rd_2) ||
-    (status_cell1 && mb3_luma_blocks_done_rd_2[0]) ||
-    (status_cell2 && mb3_luma_blocks_done_rd_2[1]) ||
-    (status_cell3 && mb3_luma_blocks_done_rd_2[2]) ||
-    (status_cell4 && mb3_luma_blocks_done_rd_2[3]);
-
-// kate - Phase 1J diagnostic-3 second row at picture y=36..43.
-//   cell 0: MB3 Cb DC decoded
-//   cell 1: MB3 Cb EOB decoded
-//   cell 2: MB3 Cr DC decoded
-//   cell 3: MB3 Cr EOB decoded
-//   cell 4: normal Phase-1J final completion flag
-//   cell 5: probe_error (bright means an error was actually raised)
-wire diagnostic_chroma_row =
-    source_window && (source_y >= 12'd36) && (source_y < 12'd44);
-
-wire chroma_cell0 = diagnostic_chroma_row && (source_x < 12'd8);
-wire chroma_cell1 = diagnostic_chroma_row && (source_x >= 12'd10) && (source_x < 12'd18);
-wire chroma_cell2 = diagnostic_chroma_row && (source_x >= 12'd20) && (source_x < 12'd28);
-wire chroma_cell3 = diagnostic_chroma_row && (source_x >= 12'd30) && (source_x < 12'd38);
-wire chroma_cell4 = diagnostic_chroma_row && (source_x >= 12'd40) && (source_x < 12'd48);
-wire chroma_cell5 = diagnostic_chroma_row && (source_x >= 12'd50) && (source_x < 12'd58);
-wire diagnostic_chroma_window = chroma_cell0 || chroma_cell1 || chroma_cell2 ||
-                                chroma_cell3 || chroma_cell4 || chroma_cell5;
-wire diagnostic_chroma_on =
-    (chroma_cell0 && chroma_status_rd_2[0]) ||
-    (chroma_cell1 && chroma_status_rd_2[1]) ||
-    (chroma_cell2 && chroma_status_rd_2[2]) ||
-    (chroma_cell3 && chroma_status_rd_2[3]) ||
-    (chroma_cell4 && chroma_status_rd_2[4]) ||
-    (chroma_cell5 && chroma_status_rd_2[5]);
-
-// kate - Phase 1J diagnostic-4 third row at picture y=48..55.
-//   0 Y3 started            5 bad DC VLC/range
-//   1 DC-size decoded       6 bad AC VLC
-//   2 DC reconstructed      7 coefficient index > 63
-//   3 >=1 AC decoded        8 invalid Escape level
-//   4 legal Y3 EOB          9 capture exhausted during Y3
-wire diagnostic_y3_row =
-    source_window && (source_y >= 12'd48) && (source_y < 12'd56);
-
-wire y3_cell0 = diagnostic_y3_row && (source_x < 12'd8);
-wire y3_cell1 = diagnostic_y3_row && (source_x >= 12'd10) && (source_x < 12'd18);
-wire y3_cell2 = diagnostic_y3_row && (source_x >= 12'd20) && (source_x < 12'd28);
-wire y3_cell3 = diagnostic_y3_row && (source_x >= 12'd30) && (source_x < 12'd38);
-wire y3_cell4 = diagnostic_y3_row && (source_x >= 12'd40) && (source_x < 12'd48);
-wire y3_cell5 = diagnostic_y3_row && (source_x >= 12'd50) && (source_x < 12'd58);
-wire y3_cell6 = diagnostic_y3_row && (source_x >= 12'd60) && (source_x < 12'd68);
-wire y3_cell7 = diagnostic_y3_row && (source_x >= 12'd70) && (source_x < 12'd78);
-wire y3_cell8 = diagnostic_y3_row && (source_x >= 12'd80) && (source_x < 12'd88);
-wire y3_cell9 = diagnostic_y3_row && (source_x >= 12'd90) && (source_x < 12'd98);
-wire diagnostic_y3_window =
-    y3_cell0 || y3_cell1 || y3_cell2 || y3_cell3 || y3_cell4 ||
-    y3_cell5 || y3_cell6 || y3_cell7 || y3_cell8 || y3_cell9;
-wire diagnostic_y3_on =
-    (y3_cell0 && y3_status_rd_2[0]) ||
-    (y3_cell1 && y3_status_rd_2[1]) ||
-    (y3_cell2 && y3_status_rd_2[2]) ||
-    (y3_cell3 && y3_status_rd_2[3]) ||
-    (y3_cell4 && y3_status_rd_2[4]) ||
-    (y3_cell5 && y3_status_rd_2[5]) ||
-    (y3_cell6 && y3_status_rd_2[6]) ||
-    (y3_cell7 && y3_status_rd_2[7]) ||
-    (y3_cell8 && y3_status_rd_2[8]) ||
-    (y3_cell9 && y3_status_rd_2[9]);
 
 wire [18:0] ram_rd_address =
     ((v_pos - 12'd60) * 19'd720) +
@@ -433,37 +233,19 @@ altsyncram #(
 
 reg source_window_d;
 reg decoded_strip_window_d;
-reg diagnostic_status_window_d;
-reg diagnostic_status_on_d;
-reg diagnostic_chroma_window_d;
-reg diagnostic_chroma_on_d;
-reg diagnostic_y3_window_d;
-reg diagnostic_y3_on_d;
 
 always @(posedge rd_clk) begin
     if (reset) begin
         source_window_d        <= 1'b0;
-        decoded_strip_window_d     <= 1'b0;
-        diagnostic_status_window_d <= 1'b0;
-        diagnostic_status_on_d     <= 1'b0;
-        diagnostic_chroma_window_d <= 1'b0;
-        diagnostic_chroma_on_d     <= 1'b0;
-        diagnostic_y3_window_d     <= 1'b0;
-        diagnostic_y3_on_d         <= 1'b0;
-        video_y                     <= 8'd0;
+        decoded_strip_window_d <= 1'b0;
+        video_y                <= 8'd0;
         video_de               <= 1'b0;
         video_hs               <= 1'b0;
         video_vs               <= 1'b0;
     end
     else begin
-        source_window_d            <= source_window;
-        decoded_strip_window_d     <= decoded_strip_window;
-        diagnostic_status_window_d <= diagnostic_status_window;
-        diagnostic_status_on_d     <= diagnostic_status_on;
-        diagnostic_chroma_window_d <= diagnostic_chroma_window;
-        diagnostic_chroma_on_d     <= diagnostic_chroma_on;
-        diagnostic_y3_window_d     <= diagnostic_y3_window;
-        diagnostic_y3_on_d         <= diagnostic_y3_on;
+        source_window_d        <= source_window;
+        decoded_strip_window_d <= decoded_strip_window;
 
         video_de <= pixel_en;
         video_hs <= h_sync;
@@ -471,12 +253,6 @@ always @(posedge rd_clk) begin
 
         if (decoded_strip_window_d)
             video_y <= ram_rd_data;
-        else if (diagnostic_status_window_d)
-            video_y <= diagnostic_status_on_d ? 8'd220 : 8'd48;
-        else if (diagnostic_chroma_window_d)
-            video_y <= diagnostic_chroma_on_d ? 8'd220 : 8'd48;
-        else if (diagnostic_y3_window_d)
-            video_y <= diagnostic_y3_on_d ? 8'd220 : 8'd48;
         else if (source_window_d)
             video_y <= 8'd24;
         else
