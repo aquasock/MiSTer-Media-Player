@@ -987,6 +987,7 @@ module pixel_prediction (rst, clk, clk_en, dta_in,
   reg               hor_halfpixel_1;
   reg               ver_halfpixel_1;
   reg signed   [9:0]prev_left_pixel_in_1;
+  reg signed   [9:0]left_pixel_in_1; // kate - retain current-row pixel for integer prediction
   reg signed   [9:0]sum_prev_left_prev_right_1;
   reg signed   [9:0]sum_left_prev_left_1;
   reg signed   [9:0]sum_right_prev_right_1;
@@ -1017,6 +1018,11 @@ module pixel_prediction (rst, clk, clk_en, dta_in,
     else prev_left_pixel_in_1 <= prev_left_pixel_in_1;
 
   always @(posedge clk)
+    if (~rst) left_pixel_in_1 <= 10'sd0;
+    else if (clk_en) left_pixel_in_1 <= left_pixel_in_ext;
+    else left_pixel_in_1 <= left_pixel_in_1;
+
+  always @(posedge clk)
     if (~rst) sum_prev_left_prev_right_1 <= 10'sd0;
     else if (clk_en) sum_prev_left_prev_right_1 <= prev_left_pixel_in_ext + prev_rght_pixel_in_ext + 10'sd1;
     else sum_prev_left_prev_right_1 <= sum_prev_left_prev_right_1;
@@ -1042,7 +1048,7 @@ module pixel_prediction (rst, clk, clk_en, dta_in,
     if (~rst) pixel_out <= 10'sd0;
     else if (clk_en)
       case ({hor_halfpixel_1, ver_halfpixel_1})
-        2'b00:  pixel_out <= prev_left_pixel_in_1;
+        2'b00:  pixel_out <= left_pixel_in_1; // kate - integer prediction uses current row
 	2'b01:  pixel_out <= sum_left_prev_left_1 >>> 1;
 	2'b10:  pixel_out <= sum_prev_left_prev_right_1 >>> 1;
 	2'b11:  pixel_out <= (sum_left_prev_left_1 + sum_right_prev_right_1) >>> 2;
