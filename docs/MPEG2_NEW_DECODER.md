@@ -106,6 +106,33 @@ For this diagnostic build USER illuminates only after a valid first I-picture
 macroblock type has been decoded and neither the Phase 0 front end nor Phase 1A
 probe has reported an error.
 
+#### Phase 1B — first luminance intra DC coefficient
+
+Still passive beside MPEG2FPGA.  Continue from the proven first I macroblock into
+`block(0)` and implement the normative DC path only:
+
+- H.262 6.2.3.1 / 6.3.10 `intra_dc_precision`, `frame_pred_frame_dct`, and
+  `concealment_motion_vectors`;
+- H.262 6.2.5 optional macroblock-level `quantiser_scale_code`;
+- H.262 6.2.6 `block()` entry for luminance block 0;
+- H.262 Annex B Table B.12 `dct_dc_size_luminance`;
+- H.262 7.2.1 differential reconstruction and Table 7-2 DC predictor reset.
+
+The Phase 1 bootstrap currently marks intra concealment motion vectors as an
+unsupported capability (not a syntax error), so the first block follows the
+macroblock type and optional macroblock quantiser scale directly.
+
+The probe stops immediately after reconstructing the first luminance `QFS[0]`;
+AC run/level VLC decoding is intentionally deferred to Phase 1C.  USER now
+illuminates only after this first DC coefficient has been reconstructed within
+the H.262-required range and neither parser has reported an error.
+
+For the local ffmpeg-generated 720x480 flat-gray all-I reference stream used to
+sanely check the RTL parser, the first slice independently parses as
+`intra_dc_precision = 0`, luminance `dct_dc_size = 2`, differential `-2`, and
+therefore `QFS[0] = 126` from the Table 7-2 reset predictor of 128.  These are
+reference-stream observations, not values assumed by the decoder.
+
 ### Phase 2 — chroma
 
 Decode 4:2:0 Cb/Cr and add the independent presentation conversion path.

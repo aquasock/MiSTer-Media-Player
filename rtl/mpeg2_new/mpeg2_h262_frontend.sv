@@ -51,7 +51,13 @@ module mpeg2_h262_frontend
 
     output reg  [9:0]  temporal_reference,
     output reg  [2:0]  picture_coding_type,
+    output reg  [1:0]  intra_dc_precision,
     output reg  [1:0]  picture_structure,
+    output reg         frame_pred_frame_dct,
+    output reg         concealment_motion_vectors,
+    output reg         q_scale_type,
+    output reg         intra_vlc_format,
+    output reg         alternate_scan,
     output reg         progressive_frame
 );
 
@@ -97,7 +103,9 @@ wire [63:0] payload_next     = {payload_shift[55:0], stream_data};
 // Phase 0 proves that we can identify the required H.262 hierarchy without
 // disturbing legacy playback.  Phase 1 will initially decode progressive,
 // 4:2:0, frame-picture I video; these are capability limits, not H.262 syntax
-// validity rules.
+// validity rules.  concealment_motion_vectors is also excluded until the
+// intra-macroblock motion-vector syntax is implemented; a value of one remains
+// valid H.262 and is therefore a capability restriction, not syntax_error.
 assign frontend_ready =
     sequence_seen &&
     sequence_extension_seen &&
@@ -113,6 +121,8 @@ assign phase1_supported =
     (chroma_format == 2'b01) &&
     (picture_coding_type == 3'b001) &&
     (picture_structure == 2'b11) &&
+    frame_pred_frame_dct &&
+    !concealment_motion_vectors &&
     progressive_frame;
 
 always @(posedge clk) begin
@@ -150,7 +160,13 @@ always @(posedge clk) begin
 
         temporal_reference                  <= 10'd0;
         picture_coding_type                 <= 3'd0;
+        intra_dc_precision                  <= 2'd0;
         picture_structure                   <= 2'd0;
+        frame_pred_frame_dct                <= 1'b0;
+        concealment_motion_vectors          <= 1'b0;
+        q_scale_type                        <= 1'b0;
+        intra_vlc_format                    <= 1'b0;
+        alternate_scan                      <= 1'b0;
         progressive_frame                   <= 1'b0;
     end
     else if (stream_valid) begin
@@ -304,7 +320,16 @@ always @(posedge clk) begin
                 active_extension_id_valid &&
                 (active_extension_id == EXT_PICTURE_CODING) &&
                 (payload_byte_index == 4)) begin
+                // H.262 6.2.3.1 picture_coding_extension() bit layout.
+                // kate - Preserve fields that directly control block syntax and
+                // coefficient reconstruction instead of inferring defaults.
+                intra_dc_precision               <= payload_next[19:18];
                 picture_structure                 <= payload_next[17:16];
+                frame_pred_frame_dct              <= payload_next[14];
+                concealment_motion_vectors        <= payload_next[13];
+                q_scale_type                      <= payload_next[12];
+                intra_vlc_format                  <= payload_next[11];
+                alternate_scan                    <= payload_next[10];
                 progressive_frame                 <= payload_next[7];
                 picture_coding_extension_seen     <= 1'b1;
                 expect_picture_coding_extension   <= 1'b0;
@@ -318,9 +343,18 @@ always @(posedge clk) begin
                 if (progressive_sequence) begin
                     if (payload_next[17:16] != 2'b11)
                         syntax_error <= 1'b1;
+                    if (!payload_next[14])
+                        syntax_error <= 1'b1;
                     if (!payload_next[7])
                         syntax_error <= 1'b1;
                 end
+
+                // H.262 6.3.10: for 4:2:0 video chroma_420_type shall equal
+                // progressive_frame.  This is syntax/semantic validity, not a
+                // Phase 1 implementation restriction.
+                if ((chroma_format == 2'b01) &&
+                    (payload_next[8] != payload_next[7]))
+                    syntax_error <= 1'b1;
             end
         end
     end

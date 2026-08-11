@@ -215,7 +215,13 @@ wire        mpeg2_new_progressive_sequence;
 wire [1:0]  mpeg2_new_chroma_format;
 wire [9:0]  mpeg2_new_temporal_reference;
 wire [2:0]  mpeg2_new_picture_coding_type;
+wire [1:0]  mpeg2_new_intra_dc_precision;
 wire [1:0]  mpeg2_new_picture_structure;
+wire        mpeg2_new_frame_pred_frame_dct;
+wire        mpeg2_new_concealment_motion_vectors;
+wire        mpeg2_new_q_scale_type;
+wire        mpeg2_new_intra_vlc_format;
+wire        mpeg2_new_alternate_scan;
 wire        mpeg2_new_progressive_frame;
 
 // kate - Phase 1A diagnostic: prove standards-aligned slice and first I-picture
@@ -223,11 +229,16 @@ wire        mpeg2_new_progressive_frame;
 wire        mpeg2_new_slice_header_seen;
 wire        mpeg2_new_macroblock_address_seen;
 wire        mpeg2_new_first_i_macroblock_seen;
-wire        mpeg2_new_phase1a_error;
+wire        mpeg2_new_first_luma_dc_seen;
+wire        mpeg2_new_phase1_probe_error;
 wire [4:0]  mpeg2_new_slice_quantiser_scale_code;
 wire [11:0] mpeg2_new_macroblock_address_increment;
 wire        mpeg2_new_macroblock_quant;
+wire [4:0]  mpeg2_new_macroblock_quantiser_scale_code;
 wire [7:0]  mpeg2_new_slice_vertical_position;
+wire [3:0]  mpeg2_new_first_luma_dc_size;
+wire signed [12:0] mpeg2_new_first_luma_dc_differential;
+wire [10:0] mpeg2_new_first_luma_dc_coefficient;
 
 wire [1:0]  mpeg2_mem_req_rd_cmd;
 wire [21:0] mpeg2_mem_req_rd_addr;
@@ -365,13 +376,19 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 
 	.temporal_reference               (mpeg2_new_temporal_reference),
 	.picture_coding_type              (mpeg2_new_picture_coding_type),
+	.intra_dc_precision               (mpeg2_new_intra_dc_precision),
 	.picture_structure                (mpeg2_new_picture_structure),
+	.frame_pred_frame_dct             (mpeg2_new_frame_pred_frame_dct),
+	.concealment_motion_vectors       (mpeg2_new_concealment_motion_vectors),
+	.q_scale_type                     (mpeg2_new_q_scale_type),
+	.intra_vlc_format                 (mpeg2_new_intra_vlc_format),
+	.alternate_scan                   (mpeg2_new_alternate_scan),
 	.progressive_frame                (mpeg2_new_progressive_frame)
 );
 
-// kate - Phase 1A remains passive beside MPEG2FPGA.  It captures the beginning
-// of the first slice, then decodes the H.262 slice header, Table B.1
-// macroblock_address_increment, and Table B.2 I-picture macroblock_type.
+// kate - Phase 1B remains passive beside MPEG2FPGA.  In addition to the Phase
+// 1A slice/macroblock proof, it enters block(0), decodes the Table B.12
+// luminance DC size and differential, and reconstructs QFS[0] per H.262 7.2.1.
 mpeg2_h262_slice_probe mpeg2_h262_slice_probe
 (
 	.clk                         (clk_mpeg2),
@@ -380,15 +397,21 @@ mpeg2_h262_slice_probe mpeg2_h262_slice_probe
 	.stream_valid                (mpeg2_stream_rd),
 	.phase1_supported            (mpeg2_new_phase1_supported),
 	.vertical_size               (mpeg2_new_vertical_size),
+	.intra_dc_precision          (mpeg2_new_intra_dc_precision),
 
 	.slice_header_seen           (mpeg2_new_slice_header_seen),
 	.macroblock_address_seen     (mpeg2_new_macroblock_address_seen),
 	.first_i_macroblock_seen     (mpeg2_new_first_i_macroblock_seen),
-	.probe_error                 (mpeg2_new_phase1a_error),
+	.first_luma_dc_seen          (mpeg2_new_first_luma_dc_seen),
+	.probe_error                 (mpeg2_new_phase1_probe_error),
 	.quantiser_scale_code        (mpeg2_new_slice_quantiser_scale_code),
 	.macroblock_address_increment(mpeg2_new_macroblock_address_increment),
 	.macroblock_quant            (mpeg2_new_macroblock_quant),
-	.slice_vertical_position     (mpeg2_new_slice_vertical_position)
+	.macroblock_quantiser_scale_code(mpeg2_new_macroblock_quantiser_scale_code),
+	.slice_vertical_position     (mpeg2_new_slice_vertical_position),
+	.first_luma_dc_size          (mpeg2_new_first_luma_dc_size),
+	.first_luma_dc_differential  (mpeg2_new_first_luma_dc_differential),
+	.first_luma_dc_coefficient   (mpeg2_new_first_luma_dc_coefficient)
 );
 
 mpeg2_decoder mpeg2_decoder
@@ -517,14 +540,14 @@ assign VGA_B = fb_video_y;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
-// kate - Phase 1A positive diagnostic.
-// OFF: the new decoder has not yet decoded a valid first I-picture macroblock,
-// or the H.262 front end / slice probe detected an error.
-// ON: the Phase 0 hierarchy plus slice header, Table B.1 macroblock address
-// increment, and Table B.2 I-picture macroblock type have all been decoded.
+// kate - Phase 1B positive diagnostic.
+// OFF: the new decoder has not yet reconstructed the first luminance intra DC
+// coefficient, or either standards-driven parser detected an error.
+// ON: Phase 0 + Phase 1A passed and H.262 Table B.12 / 7.2.1 successfully
+// produced a legal first-block QFS[0].
 assign LED_USER =
-	mpeg2_new_first_i_macroblock_seen &&
+	mpeg2_new_first_luma_dc_seen &&
 	!mpeg2_new_syntax_error &&
-	!mpeg2_new_phase1a_error;
+	!mpeg2_new_phase1_probe_error;
 
 endmodule
