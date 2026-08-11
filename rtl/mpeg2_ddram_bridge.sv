@@ -139,7 +139,7 @@ end
 					ddram_addr <= DDR_BASE +
 					              {{7{1'b0}}, pending_addr};
 
-					if (!mem_res_almost_full && (outstanding_reads == 0)) begin
+					if (!mem_res_almost_full) begin
 						// Keep presenting the read until MiSTer accepts it.
 						ddram_rd <= 1'b1;
 

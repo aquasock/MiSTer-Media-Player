@@ -274,60 +274,74 @@ module fifo_dc (
   /* Writing when the fifo is full, or reading while the fifo is empty, does not destroy the contents of the fifo. */
   
   /* Implementation using opencores generic_fifo */
-  wire           fifo_full;
-  wire           fifo_empty;
-  wire           fifo_full_n;
-  wire           fifo_empty_n;
+  /*
+   * Quartus/Cyclone V implementation using Intel dual-clock FIFO.
+   * Preserve the original MPEG2FPGA fifo_dc status/acknowledge semantics.
+   */
+  wire [dta_width-1:0] fifo_dout;
+  wire                 fifo_full;
+  wire                 fifo_empty;
+  wire [addr_width-1:0] wr_usedw;
+  wire [addr_width-1:0] rd_usedw;
 
-  reg            fifo_valid;
-  reg            fifo_underflow;
-  reg            fifo_wr_ack;
-  reg            fifo_overflow;
+  reg                  fifo_valid;
+  reg                  fifo_underflow;
+  reg                  fifo_wr_ack;
+  reg                  fifo_overflow;
 
-  assign empty = fifo_empty;
-  assign full = fifo_full;
-  assign prog_empty = fifo_empty_n;
-  assign prog_full = fifo_full_n;
-  assign valid = fifo_valid;
+  assign dout      = fifo_dout;
+  assign empty     = fifo_empty;
+  assign full      = fifo_full;
+
+  assign prog_empty = (rd_usedw <= prog_thresh);
+  assign prog_full  = (wr_usedw >= ((1 << addr_width) - prog_thresh));
+
+  assign valid     = fifo_valid;
   assign underflow = fifo_underflow;
-  assign wr_ack = fifo_wr_ack;
-  assign overflow = fifo_overflow;
+  assign wr_ack    = fifo_wr_ack;
+  assign overflow  = fifo_overflow;
 
   always @(posedge rd_clk)
     if (~rst) fifo_valid <= 1'b0;
-    else fifo_valid <= rd_en && ~fifo_empty;
+    else      fifo_valid <= rd_en && ~fifo_empty;
 
   always @(posedge rd_clk)
     if (~rst) fifo_underflow <= 1'b0;
-    else fifo_underflow <= rd_en && fifo_empty;
+    else      fifo_underflow <= rd_en && fifo_empty;
 
   always @(posedge wr_clk)
     if (~rst) fifo_wr_ack <= 1'b0;
-    else fifo_wr_ack <= wr_en && ~fifo_full;
+    else      fifo_wr_ack <= wr_en && ~fifo_full;
 
   always @(posedge wr_clk)
     if (~rst) fifo_overflow <= 1'b0;
-    else fifo_overflow <= wr_en && fifo_full;
+    else      fifo_overflow <= wr_en && fifo_full;
 
-  generic_fifo_dc 
-    #(.aw(addr_width),
-    .dw(dta_width),
-    .n(prog_thresh))
-    gfifo_dc (
-    .rd_clk(rd_clk), 
-    .wr_clk(wr_clk), 
-    .rst(rst), 
-    .clr(1'b0), 
-    .din(din), 
-    .we(wr_en && ~fifo_full), 
-    .dout(dout), 
-    .re(rd_en && ~fifo_empty), 
-    .full(fifo_full), 
-    .empty(fifo_empty), 
-    .full_n(fifo_full_n), 
-    .empty_n(fifo_empty_n), 
-    .level()
-    );
+  dcfifo #(
+    .lpm_width            (dta_width),
+    .lpm_numwords         (1 << addr_width),
+    .lpm_widthu           (addr_width),
+    .lpm_showahead        ("OFF"),
+    .overflow_checking    ("ON"),
+    .underflow_checking   ("ON"),
+    .use_eab              ("ON"),
+    .rdsync_delaypipe     (4),
+    .wrsync_delaypipe     (4)
+  ) intel_fifo_dc (
+    .aclr    (~rst),
+
+    .data    (din),
+    .wrclk   (wr_clk),
+    .wrreq   (wr_en && ~fifo_full),
+    .wrfull  (fifo_full),
+    .wrusedw (wr_usedw),
+
+    .q       (fifo_dout),
+    .rdclk   (rd_clk),
+    .rdreq   (rd_en && ~fifo_empty),
+    .rdempty (fifo_empty),
+    .rdusedw (rd_usedw)
+  );
 
 `ifdef DEBUG
   always @(posedge rd_clk)
