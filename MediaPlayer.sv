@@ -194,6 +194,29 @@ wire        fb_video_vs;
 wire        mpeg2_h_sync;
 wire        mpeg2_v_sync;
 
+// kate - New standards-driven H.262 decoder front end.  Phase 0 passively
+// observes the bytes accepted by MPEG2FPGA; it does not yet drive video.
+wire        mpeg2_new_frontend_ready;
+wire        mpeg2_new_phase1_supported;
+wire        mpeg2_new_syntax_error;
+wire        mpeg2_new_sequence_seen;
+wire        mpeg2_new_sequence_extension_seen;
+wire        mpeg2_new_picture_seen;
+wire        mpeg2_new_picture_coding_extension_seen;
+wire        mpeg2_new_slice_seen;
+wire        mpeg2_new_sequence_end_seen;
+wire [13:0] mpeg2_new_horizontal_size;
+wire [13:0] mpeg2_new_vertical_size;
+wire [3:0]  mpeg2_new_aspect_ratio_information;
+wire [3:0]  mpeg2_new_frame_rate_code;
+wire [7:0]  mpeg2_new_profile_and_level_indication;
+wire        mpeg2_new_progressive_sequence;
+wire [1:0]  mpeg2_new_chroma_format;
+wire [9:0]  mpeg2_new_temporal_reference;
+wire [2:0]  mpeg2_new_picture_coding_type;
+wire [1:0]  mpeg2_new_picture_structure;
+wire        mpeg2_new_progressive_frame;
+
 wire [1:0]  mpeg2_mem_req_rd_cmd;
 wire [21:0] mpeg2_mem_req_rd_addr;
 wire [63:0] mpeg2_mem_req_rd_dta;
@@ -296,6 +319,41 @@ media_player media_player
 	.VSync(VSync),
 
 	.video(video)
+);
+
+// kate - Phase 0 of the new decoder: standards-driven H.262 header parser.
+// It is intentionally passive so we can validate the new front end against the
+// same byte stream while retaining the current hardware video path.
+mpeg2_h262_frontend mpeg2_h262_frontend
+(
+	.clk                              (clk_mpeg2),
+	.reset                            (reset),
+	.stream_data                      (mpeg2_stream_data),
+	.stream_valid                     (mpeg2_stream_rd),
+
+	.frontend_ready                   (mpeg2_new_frontend_ready),
+	.phase1_supported                 (mpeg2_new_phase1_supported),
+	.syntax_error                     (mpeg2_new_syntax_error),
+
+	.sequence_seen                    (mpeg2_new_sequence_seen),
+	.sequence_extension_seen          (mpeg2_new_sequence_extension_seen),
+	.picture_seen                     (mpeg2_new_picture_seen),
+	.picture_coding_extension_seen    (mpeg2_new_picture_coding_extension_seen),
+	.slice_seen                       (mpeg2_new_slice_seen),
+	.sequence_end_seen                (mpeg2_new_sequence_end_seen),
+
+	.horizontal_size                  (mpeg2_new_horizontal_size),
+	.vertical_size                    (mpeg2_new_vertical_size),
+	.aspect_ratio_information         (mpeg2_new_aspect_ratio_information),
+	.frame_rate_code                  (mpeg2_new_frame_rate_code),
+	.profile_and_level_indication     (mpeg2_new_profile_and_level_indication),
+	.progressive_sequence             (mpeg2_new_progressive_sequence),
+	.chroma_format                    (mpeg2_new_chroma_format),
+
+	.temporal_reference               (mpeg2_new_temporal_reference),
+	.picture_coding_type              (mpeg2_new_picture_coding_type),
+	.picture_structure                (mpeg2_new_picture_structure),
+	.progressive_frame                (mpeg2_new_progressive_frame)
 );
 
 mpeg2_decoder mpeg2_decoder
@@ -424,9 +482,11 @@ assign VGA_B = fb_video_y;
 
 reg  [26:0] act_cnt;
 always @(posedge clk_sys) act_cnt <= act_cnt + 1'd1; 
-assign LED_USER =
-	mpeg2_debug_pixel_underflow_seen |
-	mpeg2_debug_bad_header_seen |
-	mpeg2_debug_fwd_addr_error_seen;
+// kate - During new-decoder Phase 0 USER is a positive parser diagnostic.
+// OFF: required H.262 hierarchy has not yet been validated (or a syntax error
+// occurred). ON: valid sequence + MPEG-2 extensions + picture + slice have
+// been observed and the stream matches the progressive 4:2:0 I-frame Phase 1
+// bootstrap subset.
+assign LED_USER = mpeg2_new_phase1_supported && !mpeg2_new_syntax_error;
 
 endmodule
