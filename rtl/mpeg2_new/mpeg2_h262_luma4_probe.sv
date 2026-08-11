@@ -80,6 +80,20 @@ module mpeg2_h262_luma4_probe
     output reg         diag_mb3_cr_dc_seen,
     output reg         diag_mb3_cr_eob_seen,
 
+    // kate - Phase 1J diagnostic-4 sticky milestones for MB3 Y3 only.
+    // These signals observe parser progress/error classification and do not
+    // alter any decode decision or bitstream state transition.
+    output reg         diag_mb3_y3_started,
+    output reg         diag_mb3_y3_dc_size_seen,
+    output reg         diag_mb3_y3_dc_recon_seen,
+    output reg         diag_mb3_y3_ac_seen,
+    output reg         diag_mb3_y3_eob_seen,
+    output reg         diag_mb3_y3_bad_dc,
+    output reg         diag_mb3_y3_bad_ac_vlc,
+    output reg         diag_mb3_y3_coeff_overrun,
+    output reg         diag_mb3_y3_bad_escape,
+    output reg         diag_mb3_y3_capture_exhausted,
+
     // Coefficient handoff to inverse quantisation.
     output reg         qfs_block_start,
     output reg         qfs_write_en,
@@ -159,6 +173,8 @@ wire [10:0] dc_predictor_current =
 wire        current_block_is_luma = (block_index < 3'd4);
 wire        first_diagnostic_block =
     (macroblock_index == 2'd0) && (block_index == 3'd0);
+wire        diagnostic_mb3_y3 =
+    (macroblock_index == 2'd3) && (block_index == 3'd3);
 
 // Annex B Tables B.12/B.13 DC-size accumulator.
 reg [9:0] dc_vlc_code;
@@ -524,6 +540,16 @@ always @(posedge clk) begin
         diag_mb3_cb_eob_seen              <= 1'b0;
         diag_mb3_cr_dc_seen               <= 1'b0;
         diag_mb3_cr_eob_seen              <= 1'b0;
+        diag_mb3_y3_started               <= 1'b0;
+        diag_mb3_y3_dc_size_seen          <= 1'b0;
+        diag_mb3_y3_dc_recon_seen         <= 1'b0;
+        diag_mb3_y3_ac_seen               <= 1'b0;
+        diag_mb3_y3_eob_seen              <= 1'b0;
+        diag_mb3_y3_bad_dc                <= 1'b0;
+        diag_mb3_y3_bad_ac_vlc            <= 1'b0;
+        diag_mb3_y3_coeff_overrun         <= 1'b0;
+        diag_mb3_y3_bad_escape            <= 1'b0;
+        diag_mb3_y3_capture_exhausted     <= 1'b0;
         qfs_block_start                   <= 1'b0;
         qfs_write_en                      <= 1'b0;
         qfs_write_index                   <= 6'd0;
@@ -589,6 +615,10 @@ always @(posedge clk) begin
                 parse_active <= 1'b0;
             end
             else if (bit_index >= captured_bit_count) begin
+                // kate - Diagnostic only: distinguish temporary capture-bound
+                // exhaustion from a malformed VLC while MB3 Y3 is active.
+                if (diagnostic_mb3_y3)
+                    diag_mb3_y3_capture_exhausted <= 1'b1;
                 probe_error  <= 1'b1;
                 parse_active <= 1'b0;
             end
@@ -772,6 +802,8 @@ always @(posedge clk) begin
                     ST_DC_LUMA: begin
                         bit_index <= bit_index + 14'd1;
                         if (dc_size_match) begin
+                            if (diagnostic_mb3_y3)
+                                diag_mb3_y3_dc_size_seen <= 1'b1;
                             dc_size     <= dc_size_value;
                             dc_vlc_code <= 10'd0;
                             dc_vlc_len  <= 4'd0;
@@ -779,6 +811,8 @@ always @(posedge clk) begin
                                 first_luma_dc_size <= dc_size_value;
 
                             if (dc_size_value == 4'd0) begin
+                                if (diagnostic_mb3_y3)
+                                    diag_mb3_y3_dc_recon_seen <= 1'b1;
                                 // kate - Diagnostic only: a zero-size DC VLC is
                                 // itself the complete DC decode for this block.
                                 if (macroblock_index == 2'd3) begin
@@ -809,6 +843,8 @@ always @(posedge clk) begin
                             end
                         end
                         else if (dc_vlc_len_next >= (current_block_is_luma ? 4'd9 : 4'd10)) begin
+                            if (diagnostic_mb3_y3)
+                                diag_mb3_y3_bad_dc <= 1'b1;
                             probe_error  <= 1'b1;
                             parse_active <= 1'b0;
                         end
@@ -824,10 +860,14 @@ always @(posedge clk) begin
                         if (dc_diff_bit_count == (dc_size - 1'b1)) begin
                             if ((dc_coefficient_decoded < 13'sd0) ||
                                 (dc_coefficient_decoded > dc_coefficient_max_signed)) begin
+                                if (diagnostic_mb3_y3)
+                                    diag_mb3_y3_bad_dc <= 1'b1;
                                 probe_error  <= 1'b1;
                                 parse_active <= 1'b0;
                             end
                             else begin
+                                if (diagnostic_mb3_y3)
+                                    diag_mb3_y3_dc_recon_seen <= 1'b1;
                                 // kate - Diagnostic only: all nonzero DC
                                 // differential bits for this chroma block have
                                 // now been accepted and reconstructed.
@@ -870,6 +910,8 @@ always @(posedge clk) begin
                             ac_vlc_code <= 16'd0;
                             ac_vlc_len  <= 5'd0;
                             if (ac_vlc_eob) begin
+                                if (diagnostic_mb3_y3)
+                                    diag_mb3_y3_eob_seen <= 1'b1;
                                 if (current_block_is_luma) begin
                                     qfs_block_end <= 1'b1;
                                     if (first_diagnostic_block)
@@ -918,6 +960,8 @@ always @(posedge clk) begin
                             end
                         end
                         else if (ac_vlc_len_next >= 5'd16) begin
+                            if (diagnostic_mb3_y3)
+                                diag_mb3_y3_bad_ac_vlc <= 1'b1;
                             probe_error  <= 1'b1;
                             parse_active <= 1'b0;
                         end
@@ -930,10 +974,14 @@ always @(posedge clk) begin
                     ST_AC_SIGN: begin
                         bit_index <= bit_index + 14'd1;
                         if (normal_target_index > 8'd63) begin
+                            if (diagnostic_mb3_y3)
+                                diag_mb3_y3_coeff_overrun <= 1'b1;
                             probe_error  <= 1'b1;
                             parse_active <= 1'b0;
                         end
                         else begin
+                            if (diagnostic_mb3_y3)
+                                diag_mb3_y3_ac_seen <= 1'b1;
                             if (first_diagnostic_block) begin
                                 first_luma_ac_nonzero_count <=
                                     first_luma_ac_nonzero_count + 7'd1;
@@ -973,10 +1021,19 @@ always @(posedge clk) begin
                             if ((escape_level_next == 12'h000) ||
                                 (escape_level_next == 12'h800) ||
                                 (escape_target_index > 8'd63)) begin
+                                if (diagnostic_mb3_y3) begin
+                                    if ((escape_level_next == 12'h000) ||
+                                        (escape_level_next == 12'h800))
+                                        diag_mb3_y3_bad_escape <= 1'b1;
+                                    if (escape_target_index > 8'd63)
+                                        diag_mb3_y3_coeff_overrun <= 1'b1;
+                                end
                                 probe_error  <= 1'b1;
                                 parse_active <= 1'b0;
                             end
                             else begin
+                                if (diagnostic_mb3_y3)
+                                    diag_mb3_y3_ac_seen <= 1'b1;
                                 if (first_diagnostic_block) begin
                                     first_luma_ac_nonzero_count <=
                                         first_luma_ac_nonzero_count + 7'd1;
@@ -1003,6 +1060,11 @@ always @(posedge clk) begin
                         // IQ/IDCT/reconstruction storage is still occupied.
                         if (pipeline_block_done) begin
                             if (block_index < 3'd3) begin
+                                // kate - Diagnostic only: when MB3 Y2 completes,
+                                // the next submitted block is MB3 Y3.
+                                if ((macroblock_index == 2'd3) &&
+                                    (block_index == 3'd2))
+                                    diag_mb3_y3_started <= 1'b1;
                                 block_index <= block_index + 3'd1;
                                 start_luma_block();
                             end

@@ -238,6 +238,16 @@ wire        mpeg2_new_diag_mb3_cb_dc_seen;
 wire        mpeg2_new_diag_mb3_cb_eob_seen;
 wire        mpeg2_new_diag_mb3_cr_dc_seen;
 wire        mpeg2_new_diag_mb3_cr_eob_seen;
+wire        mpeg2_new_diag_mb3_y3_started;
+wire        mpeg2_new_diag_mb3_y3_dc_size_seen;
+wire        mpeg2_new_diag_mb3_y3_dc_recon_seen;
+wire        mpeg2_new_diag_mb3_y3_ac_seen;
+wire        mpeg2_new_diag_mb3_y3_eob_seen;
+wire        mpeg2_new_diag_mb3_y3_bad_dc;
+wire        mpeg2_new_diag_mb3_y3_bad_ac_vlc;
+wire        mpeg2_new_diag_mb3_y3_coeff_overrun;
+wire        mpeg2_new_diag_mb3_y3_bad_escape;
+wire        mpeg2_new_diag_mb3_y3_capture_exhausted;
 wire        mpeg2_new_phase1_probe_error;
 wire [4:0]  mpeg2_new_slice_quantiser_scale_code;
 wire [11:0] mpeg2_new_macroblock_address_increment;
@@ -373,6 +383,16 @@ mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 	.diag_mb3_cb_eob_seen        (mpeg2_new_diag_mb3_cb_eob_seen),
 	.diag_mb3_cr_dc_seen         (mpeg2_new_diag_mb3_cr_dc_seen),
 	.diag_mb3_cr_eob_seen        (mpeg2_new_diag_mb3_cr_eob_seen),
+	.diag_mb3_y3_started         (mpeg2_new_diag_mb3_y3_started),
+	.diag_mb3_y3_dc_size_seen    (mpeg2_new_diag_mb3_y3_dc_size_seen),
+	.diag_mb3_y3_dc_recon_seen   (mpeg2_new_diag_mb3_y3_dc_recon_seen),
+	.diag_mb3_y3_ac_seen         (mpeg2_new_diag_mb3_y3_ac_seen),
+	.diag_mb3_y3_eob_seen        (mpeg2_new_diag_mb3_y3_eob_seen),
+	.diag_mb3_y3_bad_dc          (mpeg2_new_diag_mb3_y3_bad_dc),
+	.diag_mb3_y3_bad_ac_vlc      (mpeg2_new_diag_mb3_y3_bad_ac_vlc),
+	.diag_mb3_y3_coeff_overrun   (mpeg2_new_diag_mb3_y3_coeff_overrun),
+	.diag_mb3_y3_bad_escape      (mpeg2_new_diag_mb3_y3_bad_escape),
+	.diag_mb3_y3_capture_exhausted(mpeg2_new_diag_mb3_y3_capture_exhausted),
 
 	.qfs_block_start             (mpeg2_new_qfs_block_start),
 	.qfs_write_en                (mpeg2_new_qfs_write_en),
@@ -488,6 +508,18 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 	.wr_diag_mb3_cr_eob_seen (mpeg2_new_diag_mb3_cr_eob_seen),
 	.wr_diag_phase1j_complete (mpeg2_new_first_macroblock_luma_parsed),
 	.wr_diag_probe_error      (mpeg2_new_phase1_probe_error),
+
+	// kate - Phase 1J diagnostic-4 MB3-Y3 milestones/error classes.
+	.wr_diag_mb3_y3_started          (mpeg2_new_diag_mb3_y3_started),
+	.wr_diag_mb3_y3_dc_size_seen     (mpeg2_new_diag_mb3_y3_dc_size_seen),
+	.wr_diag_mb3_y3_dc_recon_seen    (mpeg2_new_diag_mb3_y3_dc_recon_seen),
+	.wr_diag_mb3_y3_ac_seen          (mpeg2_new_diag_mb3_y3_ac_seen),
+	.wr_diag_mb3_y3_eob_seen         (mpeg2_new_diag_mb3_y3_eob_seen),
+	.wr_diag_mb3_y3_bad_dc           (mpeg2_new_diag_mb3_y3_bad_dc),
+	.wr_diag_mb3_y3_bad_ac_vlc       (mpeg2_new_diag_mb3_y3_bad_ac_vlc),
+	.wr_diag_mb3_y3_coeff_overrun    (mpeg2_new_diag_mb3_y3_coeff_overrun),
+	.wr_diag_mb3_y3_bad_escape       (mpeg2_new_diag_mb3_y3_bad_escape),
+	.wr_diag_mb3_y3_capture_exhausted(mpeg2_new_diag_mb3_y3_capture_exhausted),
 
 	.rd_clk      (clk_video),
 	.h_pos       (display_h_pos),

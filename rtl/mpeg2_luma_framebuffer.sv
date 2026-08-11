@@ -1,6 +1,6 @@
 // kate - Decoupled MPEG2 luma framebuffer.
 //
-// Phase 1J diagnostic 3 publication build.
+// Phase 1J diagnostic 4 publication build.
 //
 // The decoder still targets the first four 4:2:0 intra macroblocks' luminance:
 // sixteen 8x8 Y blocks forming one 64x16 horizontal strip.  The decoder writes
@@ -8,9 +8,9 @@
 // raster reads at 40 MHz.
 //
 // kate - This diagnostic version keeps the earlier progressive macroblock
-// publication and first row of five MB3-luma markers.  A second row of six
-// markers reports MB3 Cb/Cr decode milestones, normal Phase-1J completion, and
-// probe_error.  The markers observe state only; decode decisions are unchanged.
+// publication plus the earlier MB3-luma/chroma rows.  A third row of ten
+// markers isolates MB3 Y3 parser progress and failure class.  All markers
+// observe sticky state only; decode decisions are unchanged.
 //
 // Explicit altsyncram is retained because Quartus 17 otherwise implements this
 // mixed-clock framebuffer poorly or attempts to use registers.
@@ -37,6 +37,18 @@ module mpeg2_luma_framebuffer
     input  wire        wr_diag_mb3_cr_eob_seen,
     input  wire        wr_diag_phase1j_complete,
     input  wire        wr_diag_probe_error,
+
+    // kate - Phase 1J diagnostic-4 MB3-Y3 parser milestones/error classes.
+    input  wire        wr_diag_mb3_y3_started,
+    input  wire        wr_diag_mb3_y3_dc_size_seen,
+    input  wire        wr_diag_mb3_y3_dc_recon_seen,
+    input  wire        wr_diag_mb3_y3_ac_seen,
+    input  wire        wr_diag_mb3_y3_eob_seen,
+    input  wire        wr_diag_mb3_y3_bad_dc,
+    input  wire        wr_diag_mb3_y3_bad_ac_vlc,
+    input  wire        wr_diag_mb3_y3_coeff_overrun,
+    input  wire        wr_diag_mb3_y3_bad_escape,
+    input  wire        wr_diag_mb3_y3_capture_exhausted,
 
     // Independent video side - 40 MHz.
     input  wire        rd_clk,
@@ -192,6 +204,8 @@ reg [3:0]  mb3_luma_blocks_done_rd_1;
 reg [3:0]  mb3_luma_blocks_done_rd_2;
 reg [5:0]  chroma_status_rd_1;
 reg [5:0]  chroma_status_rd_2;
+reg [9:0]  y3_status_rd_1;
+reg [9:0]  y3_status_rd_2;
 
 always @(posedge rd_clk) begin
     if (reset) begin
@@ -207,6 +221,8 @@ always @(posedge rd_clk) begin
         mb3_luma_blocks_done_rd_2    <= 4'b0000;
         chroma_status_rd_1            <= 6'b000000;
         chroma_status_rd_2            <= 6'b000000;
+        y3_status_rd_1                <= 10'b0000000000;
+        y3_status_rd_2                <= 10'b0000000000;
     end
     else begin
         published_macroblocks_rd_1 <= published_macroblocks_wr;
@@ -228,6 +244,19 @@ always @(posedge rd_clk) begin
             wr_diag_mb3_cb_dc_seen
         };
         chroma_status_rd_2 <= chroma_status_rd_1;
+        y3_status_rd_1 <= {
+            wr_diag_mb3_y3_capture_exhausted,
+            wr_diag_mb3_y3_bad_escape,
+            wr_diag_mb3_y3_coeff_overrun,
+            wr_diag_mb3_y3_bad_ac_vlc,
+            wr_diag_mb3_y3_bad_dc,
+            wr_diag_mb3_y3_eob_seen,
+            wr_diag_mb3_y3_ac_seen,
+            wr_diag_mb3_y3_dc_recon_seen,
+            wr_diag_mb3_y3_dc_size_seen,
+            wr_diag_mb3_y3_started
+        };
+        y3_status_rd_2 <= y3_status_rd_1;
     end
 end
 
@@ -311,6 +340,40 @@ wire diagnostic_chroma_on =
     (chroma_cell4 && chroma_status_rd_2[4]) ||
     (chroma_cell5 && chroma_status_rd_2[5]);
 
+// kate - Phase 1J diagnostic-4 third row at picture y=48..55.
+//   0 Y3 started            5 bad DC VLC/range
+//   1 DC-size decoded       6 bad AC VLC
+//   2 DC reconstructed      7 coefficient index > 63
+//   3 >=1 AC decoded        8 invalid Escape level
+//   4 legal Y3 EOB          9 capture exhausted during Y3
+wire diagnostic_y3_row =
+    source_window && (source_y >= 12'd48) && (source_y < 12'd56);
+
+wire y3_cell0 = diagnostic_y3_row && (source_x < 12'd8);
+wire y3_cell1 = diagnostic_y3_row && (source_x >= 12'd10) && (source_x < 12'd18);
+wire y3_cell2 = diagnostic_y3_row && (source_x >= 12'd20) && (source_x < 12'd28);
+wire y3_cell3 = diagnostic_y3_row && (source_x >= 12'd30) && (source_x < 12'd38);
+wire y3_cell4 = diagnostic_y3_row && (source_x >= 12'd40) && (source_x < 12'd48);
+wire y3_cell5 = diagnostic_y3_row && (source_x >= 12'd50) && (source_x < 12'd58);
+wire y3_cell6 = diagnostic_y3_row && (source_x >= 12'd60) && (source_x < 12'd68);
+wire y3_cell7 = diagnostic_y3_row && (source_x >= 12'd70) && (source_x < 12'd78);
+wire y3_cell8 = diagnostic_y3_row && (source_x >= 12'd80) && (source_x < 12'd88);
+wire y3_cell9 = diagnostic_y3_row && (source_x >= 12'd90) && (source_x < 12'd98);
+wire diagnostic_y3_window =
+    y3_cell0 || y3_cell1 || y3_cell2 || y3_cell3 || y3_cell4 ||
+    y3_cell5 || y3_cell6 || y3_cell7 || y3_cell8 || y3_cell9;
+wire diagnostic_y3_on =
+    (y3_cell0 && y3_status_rd_2[0]) ||
+    (y3_cell1 && y3_status_rd_2[1]) ||
+    (y3_cell2 && y3_status_rd_2[2]) ||
+    (y3_cell3 && y3_status_rd_2[3]) ||
+    (y3_cell4 && y3_status_rd_2[4]) ||
+    (y3_cell5 && y3_status_rd_2[5]) ||
+    (y3_cell6 && y3_status_rd_2[6]) ||
+    (y3_cell7 && y3_status_rd_2[7]) ||
+    (y3_cell8 && y3_status_rd_2[8]) ||
+    (y3_cell9 && y3_status_rd_2[9]);
+
 wire [18:0] ram_rd_address =
     ((v_pos - 12'd60) * 19'd720) +
      (h_pos - 12'd40);
@@ -374,6 +437,8 @@ reg diagnostic_status_window_d;
 reg diagnostic_status_on_d;
 reg diagnostic_chroma_window_d;
 reg diagnostic_chroma_on_d;
+reg diagnostic_y3_window_d;
+reg diagnostic_y3_on_d;
 
 always @(posedge rd_clk) begin
     if (reset) begin
@@ -383,6 +448,8 @@ always @(posedge rd_clk) begin
         diagnostic_status_on_d     <= 1'b0;
         diagnostic_chroma_window_d <= 1'b0;
         diagnostic_chroma_on_d     <= 1'b0;
+        diagnostic_y3_window_d     <= 1'b0;
+        diagnostic_y3_on_d         <= 1'b0;
         video_y                     <= 8'd0;
         video_de               <= 1'b0;
         video_hs               <= 1'b0;
@@ -395,6 +462,8 @@ always @(posedge rd_clk) begin
         diagnostic_status_on_d     <= diagnostic_status_on;
         diagnostic_chroma_window_d <= diagnostic_chroma_window;
         diagnostic_chroma_on_d     <= diagnostic_chroma_on;
+        diagnostic_y3_window_d     <= diagnostic_y3_window;
+        diagnostic_y3_on_d         <= diagnostic_y3_on;
 
         video_de <= pixel_en;
         video_hs <= h_sync;
@@ -406,6 +475,8 @@ always @(posedge rd_clk) begin
             video_y <= diagnostic_status_on_d ? 8'd220 : 8'd48;
         else if (diagnostic_chroma_window_d)
             video_y <= diagnostic_chroma_on_d ? 8'd220 : 8'd48;
+        else if (diagnostic_y3_window_d)
+            video_y <= diagnostic_y3_on_d ? 8'd220 : 8'd48;
         else if (source_window_d)
             video_y <= 8'd24;
         else
