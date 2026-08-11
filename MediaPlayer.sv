@@ -157,7 +157,7 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 );
 
 // kate - Phase 1H: the legacy MPEG2FPGA DDR frame-store path is gone.
-// The present first-block proof uses only the on-chip M10K luma framebuffer.
+// The present Phase-1J luma-strip proof uses only the on-chip M10K framebuffer.
 // Keep the MiSTer DDR service interface completely idle until our own explicit
 // frame-store layer is introduced in a later decoder phase.
 assign DDRAM_CLK      = clk_mpeg2;
@@ -330,9 +330,9 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.intra_quant_matrix_default       (mpeg2_new_intra_quant_matrix_default)
 );
 
-// kate - Phase 1I first-macroblock luminance path.  The parser now decodes
-// H.262 blocks 0..3 and waits for the IQ/IDCT/reconstruction pipeline after
-// every EOB before submitting the next block.
+// kate - Phase 1J first-slice progression.  The probe reconstructs Y blocks
+// 0..3 for the first four macroblocks, consumes Cb/Cr block syntax to reach the
+// following macroblock, and waits for the one-block pipeline between Y blocks.
 mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 (
 	.clk                         (clk_mpeg2),
@@ -374,7 +374,7 @@ mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 );
 
 // kate - H.262 inverse scan, inverse quantisation, saturation and mismatch
-// control for the first luminance block.
+// control for each submitted luminance block.
 mpeg2_h262_inverse_quant mpeg2_h262_inverse_quant
 (
 	.clk                         (clk_mpeg2),
@@ -497,10 +497,10 @@ assign VGA_R = fb_video_y;
 assign VGA_G = fb_video_y;
 assign VGA_B = fb_video_y;
 
-// kate - Phase 1I positive diagnostic.
-// OFF: all four luminance blocks of the first intra macroblock have not yet
-// completed reconstruction, or an earlier decoder stage reported an error.
-// ON: blocks 0..3 (256 reconstructed luma samples) reached our framebuffer.
+// kate - Phase 1J positive diagnostic.
+// OFF: the first four intra macroblocks have not completed the luma path, or an
+// earlier decoder stage reported an error.
+// ON: sixteen Y blocks (1024 reconstructed luma samples) reached our framebuffer.
 assign LED_USER =
 	mpeg2_new_first_macroblock_luma_parsed &&
 	mpeg2_new_recon_macroblock_luma_complete &&

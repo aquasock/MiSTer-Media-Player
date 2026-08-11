@@ -1,10 +1,11 @@
 // kate - Decoupled MPEG2 luma framebuffer.
 //
-// Phase 1I stores all four luminance blocks of the first 4:2:0 intra
-// macroblock.  The decoder writes explicit picture X/Y coordinates at 54 MHz,
-// while the independent fixed SVGA raster reads at 40 MHz.
+// Phase 1J stores the first four 4:2:0 intra macroblocks' luminance: sixteen
+// 8x8 Y blocks forming one 64x16 horizontal strip.  The decoder writes explicit
+// picture X/Y coordinates at 54 MHz while the independent fixed SVGA raster
+// reads at 40 MHz.
 //
-// To keep the proof unambiguous, RAM is exposed only after all four 8x8 Y
+// To keep the proof unambiguous, RAM is exposed only after all sixteen luma
 // blocks have completed.  The rest of the 720x480 source window remains the
 // fixed diagnostic background so uninitialised RAM cannot look like decoded
 // picture data.
@@ -45,7 +46,7 @@ localparam integer SRC_HEIGHT = 480;
 localparam integer FB_SIZE    = SRC_WIDTH * SRC_HEIGHT;
 
 // -------------------------------------------------------------------------
-// Write-side address generation and first-macroblock publication.
+// Write-side address generation and four-macroblock strip publication.
 // -------------------------------------------------------------------------
 
 reg [18:0] ram_wr_address;
@@ -55,52 +56,58 @@ reg        ram_wr_en;
 wire [18:0] wr_linear_address =
     (wr_y_pos * 19'd720) + wr_x_pos;
 
-// kate - Phase 1I publication descriptor.  macroblock_origin_* are captured
-// from block 0's first reconstructed sample.  The descriptor is not published
-// until the fourth block-complete pulse, so the read side never exposes a
-// partially reconstructed 16x16 macroblock.
-reg [11:0] macroblock_origin_x_wr;
-reg [11:0] macroblock_origin_y_wr;
-reg [2:0]  completed_luma_blocks_wr;
-reg        macroblock_present_wr;
-reg        macroblock_active_wr;
+// kate - The first block-start supplies the strip's upper-left picture-space
+// origin.  Publication waits for sixteen completed luma blocks (4 macroblocks
+// x 4 Y blocks), so the read side never exposes a partially decoded strip.
+reg [11:0] strip_origin_x_wr;
+reg [11:0] strip_origin_y_wr;
+reg [4:0]  completed_luma_blocks_wr;
+reg [2:0]  macroblocks_started_wr;
+reg        strip_present_wr;
+reg        strip_active_wr;
 
 always @(posedge wr_clk) begin
     if (reset) begin
-        ram_wr_address          <= 19'd0;
-        ram_wr_data             <= 8'd0;
-        ram_wr_en               <= 1'b0;
-        macroblock_origin_x_wr  <= 12'd0;
-        macroblock_origin_y_wr  <= 12'd0;
-        completed_luma_blocks_wr<= 3'd0;
-        macroblock_present_wr   <= 1'b0;
-        macroblock_active_wr    <= 1'b0;
+        ram_wr_address            <= 19'd0;
+        ram_wr_data               <= 8'd0;
+        ram_wr_en                 <= 1'b0;
+        strip_origin_x_wr         <= 12'd0;
+        strip_origin_y_wr         <= 12'd0;
+        completed_luma_blocks_wr  <= 5'd0;
+        macroblocks_started_wr    <= 3'd0;
+        strip_present_wr          <= 1'b0;
+        strip_active_wr           <= 1'b0;
     end
     else begin
         ram_wr_en <= 1'b0;
 
         if (wr_macroblock_start) begin
-            completed_luma_blocks_wr <= 3'd0;
-            macroblock_present_wr    <= 1'b0;
-            macroblock_active_wr     <= 1'b1;
+            if (!strip_active_wr && !strip_present_wr) begin
+                completed_luma_blocks_wr <= 5'd0;
+                macroblocks_started_wr   <= 3'd1;
+                strip_present_wr         <= 1'b0;
+                strip_active_wr          <= 1'b1;
+            end
+            else if (strip_active_wr && (macroblocks_started_wr < 3'd4)) begin
+                macroblocks_started_wr <= macroblocks_started_wr + 3'd1;
+            end
         end
 
-        if (wr_block_start && macroblock_active_wr &&
-            (completed_luma_blocks_wr == 3'd0)) begin
-            // Block 0 is the upper-left 8x8 block; its first pixel therefore
-            // carries the 16x16 macroblock's picture-space origin.
-            macroblock_origin_x_wr <= wr_x_pos;
-            macroblock_origin_y_wr <= wr_y_pos;
+        if (wr_block_start && strip_active_wr &&
+            (completed_luma_blocks_wr == 5'd0)) begin
+            strip_origin_x_wr <= wr_x_pos;
+            strip_origin_y_wr <= wr_y_pos;
         end
 
-        if (wr_block_complete && macroblock_active_wr) begin
-            if (completed_luma_blocks_wr == 3'd3) begin
-                completed_luma_blocks_wr <= 3'd4;
-                macroblock_present_wr    <= 1'b1;
-                macroblock_active_wr     <= 1'b0;
+        if (wr_block_complete && strip_active_wr) begin
+            if ((completed_luma_blocks_wr == 5'd15) &&
+                (macroblocks_started_wr == 3'd4)) begin
+                completed_luma_blocks_wr <= 5'd16;
+                strip_present_wr         <= 1'b1;
+                strip_active_wr          <= 1'b0;
             end
             else begin
-                completed_luma_blocks_wr <= completed_luma_blocks_wr + 3'd1;
+                completed_luma_blocks_wr <= completed_luma_blocks_wr + 5'd1;
             end
         end
 
@@ -115,32 +122,32 @@ always @(posedge wr_clk) begin
 end
 
 // -------------------------------------------------------------------------
-// Read-side synchronization of the completed-macroblock descriptor.
+// Read-side synchronization of the completed-strip descriptor.
 // -------------------------------------------------------------------------
 
-reg        macroblock_present_rd_1;
-reg        macroblock_present_rd_2;
-reg [11:0] macroblock_origin_x_rd_1;
-reg [11:0] macroblock_origin_x_rd_2;
-reg [11:0] macroblock_origin_y_rd_1;
-reg [11:0] macroblock_origin_y_rd_2;
+reg        strip_present_rd_1;
+reg        strip_present_rd_2;
+reg [11:0] strip_origin_x_rd_1;
+reg [11:0] strip_origin_x_rd_2;
+reg [11:0] strip_origin_y_rd_1;
+reg [11:0] strip_origin_y_rd_2;
 
 always @(posedge rd_clk) begin
     if (reset) begin
-        macroblock_present_rd_1 <= 1'b0;
-        macroblock_present_rd_2 <= 1'b0;
-        macroblock_origin_x_rd_1 <= 12'd0;
-        macroblock_origin_x_rd_2 <= 12'd0;
-        macroblock_origin_y_rd_1 <= 12'd0;
-        macroblock_origin_y_rd_2 <= 12'd0;
+        strip_present_rd_1  <= 1'b0;
+        strip_present_rd_2  <= 1'b0;
+        strip_origin_x_rd_1 <= 12'd0;
+        strip_origin_x_rd_2 <= 12'd0;
+        strip_origin_y_rd_1 <= 12'd0;
+        strip_origin_y_rd_2 <= 12'd0;
     end
     else begin
-        macroblock_present_rd_1 <= macroblock_present_wr;
-        macroblock_present_rd_2 <= macroblock_present_rd_1;
-        macroblock_origin_x_rd_1 <= macroblock_origin_x_wr;
-        macroblock_origin_x_rd_2 <= macroblock_origin_x_rd_1;
-        macroblock_origin_y_rd_1 <= macroblock_origin_y_wr;
-        macroblock_origin_y_rd_2 <= macroblock_origin_y_rd_1;
+        strip_present_rd_1  <= strip_present_wr;
+        strip_present_rd_2  <= strip_present_rd_1;
+        strip_origin_x_rd_1 <= strip_origin_x_wr;
+        strip_origin_x_rd_2 <= strip_origin_x_rd_1;
+        strip_origin_y_rd_1 <= strip_origin_y_wr;
+        strip_origin_y_rd_2 <= strip_origin_y_rd_1;
     end
 end
 
@@ -159,13 +166,13 @@ wire source_window =
 wire [11:0] source_x = h_pos - 12'd40;
 wire [11:0] source_y = v_pos - 12'd60;
 
-wire decoded_macroblock_window =
+wire decoded_strip_window =
     source_window &&
-    macroblock_present_rd_2 &&
-    (source_x >= macroblock_origin_x_rd_2) &&
-    (source_x <  macroblock_origin_x_rd_2 + 12'd16) &&
-    (source_y >= macroblock_origin_y_rd_2) &&
-    (source_y <  macroblock_origin_y_rd_2 + 12'd16);
+    strip_present_rd_2 &&
+    (source_x >= strip_origin_x_rd_2) &&
+    (source_x <  strip_origin_x_rd_2 + 12'd64) &&
+    (source_y >= strip_origin_y_rd_2) &&
+    (source_y <  strip_origin_y_rd_2 + 12'd16);
 
 wire [18:0] ram_rd_address =
     ((v_pos - 12'd60) * 19'd720) +
@@ -225,26 +232,26 @@ altsyncram #(
 // -------------------------------------------------------------------------
 
 reg source_window_d;
-reg decoded_macroblock_window_d;
+reg decoded_strip_window_d;
 
 always @(posedge rd_clk) begin
     if (reset) begin
-        source_window_d             <= 1'b0;
-        decoded_macroblock_window_d <= 1'b0;
-        video_y                     <= 8'd0;
-        video_de                    <= 1'b0;
-        video_hs                    <= 1'b0;
-        video_vs                    <= 1'b0;
+        source_window_d        <= 1'b0;
+        decoded_strip_window_d <= 1'b0;
+        video_y                <= 8'd0;
+        video_de               <= 1'b0;
+        video_hs               <= 1'b0;
+        video_vs               <= 1'b0;
     end
     else begin
-        source_window_d             <= source_window;
-        decoded_macroblock_window_d <= decoded_macroblock_window;
+        source_window_d        <= source_window;
+        decoded_strip_window_d <= decoded_strip_window;
 
         video_de <= pixel_en;
         video_hs <= h_sync;
         video_vs <= v_sync;
 
-        if (decoded_macroblock_window_d)
+        if (decoded_strip_window_d)
             video_y <= ram_rd_data;
         else if (source_window_d)
             video_y <= 8'd24;
