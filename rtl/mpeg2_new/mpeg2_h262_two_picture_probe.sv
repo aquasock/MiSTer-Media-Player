@@ -1,17 +1,16 @@
 //============================================================================
-// MiSTer Media Player - Phase 1Q two-picture H.262 diagnostic wrapper
+// MiSTer Media Player - Phase 1R two-picture H.262 wrapper
 //
 // Normative standards basis:
 //   ITU-T H.262 / ISO/IEC 13818-2:2000, 6.2.2 video_sequence().
 //   A video sequence repeats picture_header(), picture_coding_extension() and
 //   picture_data() while additional pictures/groups are present.
 //
-// kate - Phase 1Q reuses the hardware-proven complete-picture parser for both
-// pictures.  After picture 1 completes, this wrapper latches its diagnostics,
-// gives the parser one local reset/re-arm cycle, then lets the same parser find
-// and decode picture 2.  Picture 1 still waits for DDR persistence block by
-// block.  Picture 2 waits only for reconstruction completion and remains a
-// diagnostic-only decode until ping-pong frame storage is added.
+// kate - Phase 1R keeps the Phase 1Q single-parser re-arm architecture.  Both
+// pictures now use the same proven DDR persistence handshake block by block.
+// Picture 1 is stored in bank 0; after parser re-arm, picture 2 is stored in
+// bank 1 by the downstream DDR writer.  second_picture_420_parsed therefore
+// means the complete second supported I picture has also reached DDR.
 //============================================================================
 
 module mpeg2_h262_two_picture_probe
@@ -99,9 +98,13 @@ wire signed [11:0] parser_first_luma_last_ac_level;
 // kate - parser_rearm is synchronous to clk.  The parser's ordinary reset path
 // clears all picture-local sticky state for exactly one clock between pictures.
 wire parser_reset = reset || parser_rearm;
-wire active_pipeline_block_done = first_picture_done ?
-                                  recon_block_complete :
-                                  pipeline_block_done;
+
+// kate - Phase 1R: both pictures must wait until the current reconstructed block
+// is physically accepted by the DDR writer.  Keep recon_block_complete in the
+// wrapper interface for compatibility with the Phase 1Q integration, but it is
+// no longer the completion handshake for picture 2.
+wire active_pipeline_block_done = pipeline_block_done;
+wire unused_recon_block_complete = recon_block_complete;
 
 assign stream_ready              = parser_stream_ready;
 assign first_picture_420_parsed  = first_picture_done;
@@ -138,8 +141,8 @@ assign first_luma_ac_nonzero_count = first_picture_done ?
                                      first_luma_ac_nonzero_count_latched :
                                      parser_first_luma_ac_nonzero_count;
 assign first_luma_last_coeff_index = first_picture_done ?
-                                    first_luma_last_coeff_index_latched :
-                                    parser_first_luma_last_coeff_index;
+                                     first_luma_last_coeff_index_latched :
+                                     parser_first_luma_last_coeff_index;
 assign first_luma_last_ac_level = first_picture_done ?
                                   first_luma_last_ac_level_latched :
                                   parser_first_luma_last_ac_level;
@@ -170,8 +173,7 @@ always @(posedge clk) begin
 
         if (!first_picture_done && parser_picture_420_parsed) begin
             // Picture 1 is complete only after every reconstructed block has
-            // reached DDR because active_pipeline_block_done still selects the
-            // DDR writer's block_stored pulse during this phase.
+            // reached DDR because pipeline_block_done is block_stored.
             first_picture_done                    <= 1'b1;
             parser_rearm                          <= 1'b1;
             first_probe_error_latched             <= parser_probe_error;
@@ -189,6 +191,8 @@ always @(posedge clk) begin
         end
         else if (first_picture_done && !parser_rearm &&
                  parser_picture_420_parsed) begin
+            // In Phase 1R this also proves the complete second frame has been
+            // persisted to alternate DDR bank 1.
             second_picture_done <= 1'b1;
         end
     end

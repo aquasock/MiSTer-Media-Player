@@ -6,11 +6,6 @@
 // reconstructed 8-bit Y/Cb/Cr samples are persisted to MiSTer's DDR3 service
 // port before the parser is allowed to submit the next 8x8 block.
 //
-// The existing Phase 1N on-chip presentation framebuffer remains active in
-// parallel for this proof.  Therefore a normal picture plus USER=ON demonstrates
-// that the already-proven decoder/display path still works while every block has
-// also traversed the new DDR write/backpressure path.
-//
 // Storage format (implementation choice, not an H.262 requirement):
 //   - Planar Y, Cb, Cr.
 //   - Fixed maximum strides: Y=720 pels, Cb/Cr=360 pels.
@@ -18,11 +13,15 @@
 //   - Each reconstructed 8x8 block is staged locally, then written as eight
 //     single-word DDR transactions separated by the component row stride.
 //
-// kate - Phase 1Ob address correction.  MiSTer's system video scaler
-// uses physical DDR byte address 0x20000000 as its RAM base, so the decoder
-// must not place its picture there.  Use the 0x30000000 core-owned region used
-// by established MiSTer DDR clients instead.  DDRAM_ADDR is a 64-bit-word
-// address, so 29'h06000000 corresponds to byte address 0x30000000.
+// kate - Phase 1Ob address correction.  MiSTer's system video scaler uses
+// physical DDR byte address 0x20000000 as its RAM base, so decoder frames begin
+// at physical byte 0x30000000 instead.
+//
+// kate - Phase 1R adds a second frame bank.  DDRAM_ADDR is a 64-bit-word
+// address.  Bank 0 begins at 29'h06000000 (physical 0x30000000), and bank 1 is
+// offset by 29'h00010000 words = 512 KiB (physical 0x30080000).  The maximum
+// 720x480 4:2:0 planar frame consumes 64800 words, so each frame fits entirely
+// inside its 65536-word bank.
 //============================================================================
 
 module mpeg2_h262_ddram_store
@@ -30,6 +29,7 @@ module mpeg2_h262_ddram_store
     input  wire        clk,
     input  wire        reset,
 
+    input  wire        frame_bank,
     input  wire [7:0]  pixel_value,
     // 0 = Y, 1 = Cb, 2 = Cr.
     input  wire [1:0]  pixel_component,
@@ -65,9 +65,10 @@ localparam [1:0] COMPONENT_Y  = 2'd0;
 localparam [1:0] COMPONENT_CB = 2'd1;
 localparam [1:0] COMPONENT_CR = 2'd2;
 
-localparam [28:0] DDR_Y_BASE  = 29'h06000000;
-localparam [28:0] DDR_CB_BASE = 29'h0600A8C0; // + 43200 Y words
-localparam [28:0] DDR_CR_BASE = 29'h0600D2F0; // + 10800 Cb words
+localparam [28:0] DDR_Y_BASE     = 29'h06000000;
+localparam [28:0] DDR_CB_BASE    = 29'h0600A8C0; // + 43200 Y words
+localparam [28:0] DDR_CR_BASE    = 29'h0600D2F0; // + 10800 Cb words
+localparam [28:0] DDR_BANK_WORDS = 29'h00010000;
 
 function automatic [28:0] row_times_90;
     input [11:0] row;
@@ -88,8 +89,7 @@ function automatic [28:0] row_times_45;
 endfunction
 
 // One 8x8 block = eight 64-bit row words.  These are explicit registers rather
-// than an inferred RAM so this proof does not consume additional M10K blocks
-// while the known-good Phase 1N display framebuffer is still present.
+// than an inferred RAM so the writer does not consume additional M10K blocks.
 reg [63:0] block_row0;
 reg [63:0] block_row1;
 reg [63:0] block_row2;
@@ -104,6 +104,7 @@ wire [63:0] row_shift_next = {pixel_value, row_shift[63:8]};
 reg        capture_active;
 reg        flush_pending;
 reg [1:0]  active_component;
+reg        active_frame_bank;
 reg [11:0] block_origin_x;
 reg [11:0] block_origin_y;
 
@@ -120,20 +121,23 @@ wire geometry_valid =
      (block_origin_x < CHROMA_WIDTH) &&
      (block_origin_y < CHROMA_HEIGHT));
 
+wire [28:0] active_bank_offset =
+    active_frame_bank ? DDR_BANK_WORDS : 29'd0;
+
 wire [28:0] first_word_address =
     (active_component == COMPONENT_Y) ?
-        (DDR_Y_BASE + row_times_90(block_origin_y) +
+        (DDR_Y_BASE + active_bank_offset + row_times_90(block_origin_y) +
          {20'd0, block_origin_x[11:3]}) :
     (active_component == COMPONENT_CB) ?
-        (DDR_CB_BASE + row_times_45(block_origin_y) +
+        (DDR_CB_BASE + active_bank_offset + row_times_45(block_origin_y) +
          {20'd0, block_origin_x[11:3]}) :
-        (DDR_CR_BASE + row_times_45(block_origin_y) +
+        (DDR_CR_BASE + active_bank_offset + row_times_45(block_origin_y) +
          {20'd0, block_origin_x[11:3]});
 
 wire [28:0] row_stride =
     (active_component == COMPONENT_Y) ? 29'd90 : 29'd45;
 
-// Keep a full write request stable for as long as DDRAM_BUSY is asserted.
+// Keep a full write request stable for as long as ddram_busy is asserted.
 assign ddram_burstcnt = write_active ? 8'd1 : 8'd0;
 assign ddram_addr     = write_active ? write_address : 29'd0;
 assign ddram_rd       = 1'b0;
@@ -153,6 +157,7 @@ always @(posedge clk) begin
         capture_active   <= 1'b0;
         flush_pending    <= 1'b0;
         active_component <= COMPONENT_Y;
+        active_frame_bank<= 1'b0;
         block_origin_x   <= 12'd0;
         block_origin_y   <= 12'd0;
         write_active     <= 1'b0;
@@ -170,10 +175,11 @@ always @(posedge clk) begin
             if (capture_active || flush_pending || write_active)
                 store_error <= 1'b1;
 
-            capture_active   <= 1'b1;
-            active_component <= pixel_component;
-            block_origin_x   <= {pixel_x[11:3], 3'b000};
-            block_origin_y   <= {pixel_y[11:3], 3'b000};
+            capture_active    <= 1'b1;
+            active_component  <= pixel_component;
+            active_frame_bank <= frame_bank;
+            block_origin_x    <= {pixel_x[11:3], 3'b000};
+            block_origin_y    <= {pixel_y[11:3], 3'b000};
         end
 
         if (pixel_valid) begin
@@ -181,9 +187,9 @@ always @(posedge clk) begin
                 store_error <= 1'b1;
             end
             else begin
-                // Reconstruction is already proven to emit sample_index 0..63
-                // in row-major order.  Shift one byte per pel; at X lane 7 the
-                // resulting word is {pel7,...,pel0}, so DDR byte 0 is pel0.
+                // Reconstruction emits sample_index 0..63 in row-major order.
+                // At X lane 7 the resulting word is {pel7,...,pel0}, so DDR
+                // byte 0 is pel0.
                 row_shift <= row_shift_next;
 
                 if (pixel_x[2:0] == 3'd7) begin
