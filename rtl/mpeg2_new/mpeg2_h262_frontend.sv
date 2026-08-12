@@ -14,9 +14,13 @@
 //   - 6.2.2.3 sequence_extension()
 //   - 6.2.3 picture_header()
 //   - 6.2.3.1 picture_coding_extension()
+//   - 6.3.3 frame_rate_code / Table 6-4
+//   - 6.3.9 temporal_reference
 //   - 6.3.11 quantisation matrix reset/download semantics
 //   - Table 6-2 extension_start_code_identifier
 //   - Table 6-12 picture_coding_type
+//   ITU-T H.222.0 / ISO/IEC 13818-1
+//   - PTS is 33 bits and uses the 90 kHz system-clock/300 timebase.
 //
 // kate - New decoder work starts here.  Keep syntax requirements separate
 // from implementation-support restrictions so valid H.262 is never labelled
@@ -46,6 +50,8 @@ module mpeg2_h262_frontend
     output reg  [13:0] vertical_size,
     output reg  [3:0]  aspect_ratio_information,
     output reg  [3:0]  frame_rate_code,
+    output reg  [1:0]  frame_rate_extension_n,
+    output reg  [4:0]  frame_rate_extension_d,
     output reg  [7:0]  profile_and_level_indication,
     output reg         progressive_sequence,
     output reg  [1:0]  chroma_format,
@@ -60,6 +66,19 @@ module mpeg2_h262_frontend
     output reg         intra_vlc_format,
     output reg         alternate_scan,
     output reg         progressive_frame,
+
+    // kate - Phase 1S timing foundation.  These are local elementary-stream
+    // schedule metadata, not PES PTS values: the current .m2v input has no
+    // H.222.0 PES layer from which a normative PTS could be read.  The local
+    // schedule deliberately uses the same 33-bit / 90 kHz representation so a
+    // later H.222.0 demux can replace the synthetic source without changing the
+    // downstream timestamp width or units.
+    output reg         timing_seen,
+    output reg         timing_advanced,
+    output reg         timing_unsupported,
+    output reg         timing_error,
+    output reg  [32:0] timing_picture_time_90k,
+    output reg  [9:0]  timing_picture_temporal_reference,
 
     // kate - Phase 1D currently implements the normative default intra
     // quantisation matrix.  A downloaded matrix is valid H.262 but is kept
@@ -101,6 +120,48 @@ reg        first_picture_after_gop;
 reg [11:0] horizontal_size_value;
 reg [11:0] vertical_size_value;
 
+// kate - Phase 1S synthetic elementary-stream presentation timeline.
+// H.222.0 timestamps use integer 90 kHz units.  Two direct H.262 rates have
+// fractional 90 kHz periods (24000/1001 and 60000/1001), so keep cumulative
+// time internally in quarter-ticks.  That represents every direct Table 6-4
+// frame period exactly and avoids long-term rounding drift.  The visible
+// 33-bit value is floor(cumulative quarter-ticks / 4), matching integer PTS
+// units when a real systems-layer source is added later.
+reg [34:0] timing_next_time_quarters;
+reg [32:0] timing_last_picture_time_90k;
+reg [7:0]  timing_picture_count;
+
+function automatic [15:0] direct_frame_duration_quarters;
+    input [3:0] code;
+    begin
+        case (code)
+            // 90 000 * frame_period * 4, from H.262 Table 6-4.
+            4'h1: direct_frame_duration_quarters = 16'd15015; // 24000/1001
+            4'h2: direct_frame_duration_quarters = 16'd15000; // 24
+            4'h3: direct_frame_duration_quarters = 16'd14400; // 25
+            4'h4: direct_frame_duration_quarters = 16'd12012; // 30000/1001
+            4'h5: direct_frame_duration_quarters = 16'd12000; // 30
+            4'h6: direct_frame_duration_quarters = 16'd7200;  // 50
+            4'h7: direct_frame_duration_quarters = 16'd6006;  // 60000/1001
+            4'h8: direct_frame_duration_quarters = 16'd6000;  // 60
+            default:
+                direct_frame_duration_quarters = 16'd0;
+        endcase
+    end
+endfunction
+
+wire [15:0] timing_frame_duration_quarters =
+    direct_frame_duration_quarters(frame_rate_code);
+
+// Implementation boundary only: this first scheduler handles the direct rates
+// in H.262 Table 6-4.  Non-zero frame_rate_extension_n/d are valid H.262, but
+// their rational scaling is deferred rather than silently assigning a wrong
+// presentation time.
+wire timing_direct_rate_supported =
+    (timing_frame_duration_quarters != 16'd0) &&
+    (frame_rate_extension_n == 2'd0) &&
+    (frame_rate_extension_d == 5'd0);
+
 wire [31:0] byte_window_next = {byte_window[23:0], stream_data};
 wire        start_code_now   = (byte_window_next[31:8] == 24'h000001);
 wire [7:0]  start_code_value = byte_window_next[7:0];
@@ -129,7 +190,9 @@ assign phase1_supported =
     (picture_structure == 2'b11) &&
     frame_pred_frame_dct &&
     !concealment_motion_vectors &&
-    progressive_frame;
+    progressive_frame &&
+    !timing_unsupported &&
+    !timing_error;
 
 always @(posedge clk) begin
     if (reset) begin
@@ -160,6 +223,8 @@ always @(posedge clk) begin
         vertical_size                       <= 14'd0;
         aspect_ratio_information            <= 4'd0;
         frame_rate_code                     <= 4'd0;
+        frame_rate_extension_n               <= 2'd0;
+        frame_rate_extension_d               <= 5'd0;
         profile_and_level_indication        <= 8'd0;
         progressive_sequence                <= 1'b0;
         chroma_format                       <= 2'd0;
@@ -174,6 +239,17 @@ always @(posedge clk) begin
         intra_vlc_format                    <= 1'b0;
         alternate_scan                      <= 1'b0;
         progressive_frame                   <= 1'b0;
+
+        timing_seen                         <= 1'b0;
+        timing_advanced                     <= 1'b0;
+        timing_unsupported                  <= 1'b0;
+        timing_error                        <= 1'b0;
+        timing_picture_time_90k             <= 33'd0;
+        timing_picture_temporal_reference   <= 10'd0;
+        timing_next_time_quarters           <= 35'd0;
+        timing_last_picture_time_90k        <= 33'd0;
+        timing_picture_count                <= 8'd0;
+
         intra_quant_matrix_default           <= 1'b1;
     end
     else if (stream_valid) begin
@@ -305,6 +381,8 @@ always @(posedge clk) begin
                 horizontal_size[11:0]        <= horizontal_size_value;
                 vertical_size[13:12]         <= payload_next[30:29];
                 vertical_size[11:0]          <= vertical_size_value;
+                frame_rate_extension_n       <= payload_next[6:5];
+                frame_rate_extension_d       <= payload_next[4:0];
                 sequence_extension_seen      <= 1'b1;
                 expect_sequence_extension    <= 1'b0;
 
@@ -324,6 +402,47 @@ always @(posedge clk) begin
                 temporal_reference  <= payload_next[31:22];
                 picture_coding_type <= payload_next[21:19];
                 picture_seen        <= 1'b1;
+
+                // kate - Phase 1S timing metadata is attached at the picture
+                // header, the same access-unit boundary to which a future PES
+                // PTS refers.  Current all-I coded order is also display order.
+                if (timing_picture_count != 8'hff)
+                    timing_picture_count <= timing_picture_count + 8'd1;
+
+                if (!timing_direct_rate_supported) begin
+                    // This remains a capability boundary, never syntax_error:
+                    // valid H.262 may use frame-rate extensions that this first
+                    // local scheduler does not yet rationally scale.
+                    timing_unsupported <= 1'b1;
+                end
+                else begin
+                    timing_picture_time_90k <= timing_next_time_quarters[34:2];
+                    timing_picture_temporal_reference <= payload_next[31:22];
+
+                    if (timing_seen) begin
+                        if (timing_next_time_quarters[34:2] >
+                            timing_last_picture_time_90k)
+                            timing_advanced <= 1'b1;
+                        else
+                            timing_error <= 1'b1;
+                    end
+
+                    timing_last_picture_time_90k <=
+                        timing_next_time_quarters[34:2];
+                    timing_next_time_quarters <=
+                        timing_next_time_quarters +
+                        {19'd0, timing_frame_duration_quarters};
+                    timing_seen <= 1'b1;
+
+                    // By the third picture header, the second timestamp must
+                    // already have proved forward progress.  Since the Phase 1S
+                    // USER diagnostic requires three persisted pictures, a
+                    // complete playback with USER on now also proves this timing
+                    // sideband progressed in hardware.
+                    if ((timing_picture_count >= 8'd2) &&
+                        !timing_advanced)
+                        timing_error <= 1'b1;
+                end
 
                 // H.262 Table 6-12 defines 001 I, 010 P, 011 B.  000 is
                 // forbidden; 100 shall not be used; 101-111 are reserved.
