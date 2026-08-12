@@ -129,7 +129,7 @@ pll pll
 
 wire reset = RESET | status[0] | buttons[1];
 
-// kate - Phase 1N: the streaming H.262 bitreader continues to own input
+// kate - Phase 1Oa: the streaming H.262 bitreader continues to own input
 // backpressure while picture_data() advances across every slice of the first
 // supported I-picture.  Slice boundaries remain inside the bitreader so no
 // alignment or payload bytes are discarded.
@@ -161,17 +161,9 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 	.rd_empty (mpeg2_stream_empty)
 );
 
-// kate - Phase 1H: the legacy MPEG2FPGA DDR frame-store path is gone.
-// The present Phase-1N first-colour-picture proof uses only on-chip M10K frame stores.
-// Keep the MiSTer DDR service interface completely idle until our own explicit
-// frame-store layer is introduced in a later decoder phase.
-assign DDRAM_CLK      = clk_mpeg2;
-assign DDRAM_BURSTCNT = 8'd0;
-assign DDRAM_ADDR     = 29'd0;
-assign DDRAM_RD       = 1'b0;
-assign DDRAM_DIN      = 64'd0;
-assign DDRAM_BE       = 8'd0;
-assign DDRAM_WE       = 1'b0;
+// kate - Phase 1Oa: the new H.262 DDR writer owns MiSTer's high-latency
+// DDR3 service port.  The legacy MPEG2FPGA DDR bridge remains absent.
+assign DDRAM_CLK = clk_mpeg2;
 
 ///////////////////////   VIDEO TIMING   /////////////////////////
 
@@ -293,6 +285,10 @@ wire        mpeg2_new_recon_error;
 wire [11:0] mpeg2_new_recon_block_origin_x;
 wire [11:0] mpeg2_new_recon_block_origin_y;
 
+wire        mpeg2_new_ddr_block_stored;
+wire        mpeg2_new_ddr_write_seen;
+wire        mpeg2_new_ddr_store_error;
+
 wire [4:0] mpeg2_new_effective_quantiser_scale_code =
 	mpeg2_new_macroblock_quant ?
 		mpeg2_new_macroblock_quantiser_scale_code :
@@ -349,10 +345,10 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.intra_quant_matrix_default       (mpeg2_new_intra_quant_matrix_default)
 );
 
-// kate - Phase 1N complete-first-picture 4:2:0 progression.  The parser now
-// submits Y0..Y3, Cb and Cr through the same serialized IQ/IDCT/reconstruction
-// path for every macroblock in every slice.  H.262 next_start_code() traversal
-// and the proven Phase 1K ready/backpressure path remain unchanged.
+// kate - Phase 1Oa keeps the proven complete-first-picture 4:2:0 parser, but
+// its serialized pipeline-ready handshake now waits until reconstruction has
+// also been persisted to DDR3.  Streaming bitreader backpressure therefore
+// covers DDR service latency without dropping compressed bits.
 mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 (
 	.clk                         (clk_mpeg2),
@@ -364,7 +360,7 @@ mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 	.vertical_size               (mpeg2_new_vertical_size),
 	.intra_dc_precision          (mpeg2_new_intra_dc_precision),
 	.intra_vlc_format            (mpeg2_new_intra_vlc_format),
-	.pipeline_block_done         (mpeg2_new_recon_block_complete),
+	.pipeline_block_done         (mpeg2_new_ddr_block_stored),
 
 	.slice_header_seen           (mpeg2_new_slice_header_seen),
 	.macroblock_address_seen     (mpeg2_new_macroblock_address_seen),
@@ -482,11 +478,44 @@ mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 	.block_origin_y                     (mpeg2_new_recon_block_origin_y)
 );
 
+///////////////////////   FULL-PRECISION DDR WRITER   ///////////
+
+// kate - Phase 1Oa hardware proof.  The existing on-chip colour framebuffer
+// below remains the known-good presentation path, while every reconstructed
+// block is also staged and written to full-precision planar Y/Cb/Cr DDR3.
+// The parser cannot advance until all eight rows of the current block have been
+// accepted by DDRAM.
+mpeg2_h262_ddram_store mpeg2_h262_ddram_store
+(
+	.clk             (clk_mpeg2),
+	.reset           (reset),
+
+	.pixel_value     (mpeg2_new_recon_pixel_value),
+	.pixel_component (mpeg2_new_recon_pixel_component),
+	.pixel_x         (mpeg2_new_recon_pixel_x),
+	.pixel_y         (mpeg2_new_recon_pixel_y),
+	.pixel_valid     (mpeg2_new_recon_pixel_valid),
+	.block_start     (mpeg2_new_recon_block_start),
+	.block_complete  (mpeg2_new_recon_block_complete),
+
+	.block_stored    (mpeg2_new_ddr_block_stored),
+	.write_seen      (mpeg2_new_ddr_write_seen),
+	.store_error     (mpeg2_new_ddr_store_error),
+
+	.ddram_busy      (DDRAM_BUSY),
+	.ddram_burstcnt  (DDRAM_BURSTCNT),
+	.ddram_addr      (DDRAM_ADDR),
+	.ddram_rd        (DDRAM_RD),
+	.ddram_din       (DDRAM_DIN),
+	.ddram_be        (DDRAM_BE),
+	.ddram_we        (DDRAM_WE)
+);
+
 ///////////////////////   4:2:0 FRAMEBUFFER   ///////////////////
 
-// kate - Reconstructed Y/Cb/Cr component pels write at 54 MHz.  The fixed
-// 800x600 raster reads all three planes at 40 MHz, expands 4:2:0 chroma, and
-// presents BT.601 RGB.  MPEG2FPGA is not present on either side.
+// kate - Phase 1Oa intentionally retains the hardware-proven Phase 1N
+// on-chip presentation framebuffer in parallel with the new DDR writer.  This
+// keeps the visual acceptance test unchanged while external storage is proven.
 mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 (
 	.reset       (reset),
@@ -528,12 +557,13 @@ assign VGA_R = fb_video_r;
 assign VGA_G = fb_video_g;
 assign VGA_B = fb_video_b;
 
-// kate - Phase 1N positive diagnostic.
+// kate - Phase 1Oa positive diagnostic.
 // OFF: picture_data() for the first supported I-picture has not completed, the
 // coded frame does not fit the current 720x480/360x240 on-chip stores, or an
 // earlier decoder stage reported an error.
 // ON: every Y/Cb/Cr intra block traversed parser -> IQ -> IDCT -> reconstruction
-// and the next non-slice start code completed picture_data().
+// -> accepted DDR3 writes, and the next non-slice start code completed
+// picture_data().
 assign LED_USER =
 	mpeg2_new_first_picture_420_parsed &&
 	mpeg2_new_recon_macroblock_420_complete &&
@@ -543,6 +573,8 @@ assign LED_USER =
 	!mpeg2_new_inverse_quant_error &&
 	!mpeg2_new_inverse_quant_unsupported_matrix &&
 	!mpeg2_new_idct_error &&
-	!mpeg2_new_recon_error;
+	!mpeg2_new_recon_error &&
+	mpeg2_new_ddr_write_seen &&
+	!mpeg2_new_ddr_store_error;
 
 endmodule
