@@ -18,9 +18,11 @@
 //   - Each reconstructed 8x8 block is staged locally, then written as eight
 //     single-word DDR transactions separated by the component row stride.
 //
-// DDR_BASE reuses the private region selected by this project's frozen
-// MPEG2FPGA DDR bridge. DDRAM_ADDR is a 64-bit-word address, so 29'h04000000
-// corresponds to byte address 0x20000000.
+// kate - Phase 1Ob address correction.  MiSTer's system video scaler
+// uses physical DDR byte address 0x20000000 as its RAM base, so the decoder
+// must not place its picture there.  Use the 0x30000000 core-owned region used
+// by established MiSTer DDR clients instead.  DDRAM_ADDR is a 64-bit-word
+// address, so 29'h06000000 corresponds to byte address 0x30000000.
 //============================================================================
 
 module mpeg2_h262_ddram_store
@@ -63,9 +65,9 @@ localparam [1:0] COMPONENT_Y  = 2'd0;
 localparam [1:0] COMPONENT_CB = 2'd1;
 localparam [1:0] COMPONENT_CR = 2'd2;
 
-localparam [28:0] DDR_Y_BASE  = 29'h04000000;
-localparam [28:0] DDR_CB_BASE = 29'h0400A8C0; // + 43200 Y words
-localparam [28:0] DDR_CR_BASE = 29'h0400D2F0; // + 10800 Cb words
+localparam [28:0] DDR_Y_BASE  = 29'h06000000;
+localparam [28:0] DDR_CB_BASE = 29'h0600A8C0; // + 43200 Y words
+localparam [28:0] DDR_CR_BASE = 29'h0600D2F0; // + 10800 Cb words
 
 function automatic [28:0] row_times_90;
     input [11:0] row;

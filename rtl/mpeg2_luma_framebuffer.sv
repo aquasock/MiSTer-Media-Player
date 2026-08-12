@@ -65,9 +65,12 @@ localparam integer SRC_HEIGHT     = 480;
 localparam integer CHROMA_WIDTH   = SRC_WIDTH / 2;
 localparam integer CHROMA_HEIGHT  = SRC_HEIGHT / 2;
 
-localparam [28:0] DDR_Y_BASE  = 29'h04000000;
-localparam [28:0] DDR_CB_BASE = 29'h0400A8C0;
-localparam [28:0] DDR_CR_BASE = 29'h0400D2F0;
+// kate - Phase 1Ob address correction.  Keep the decoder picture away
+// from MiSTer's system scaler RAM at physical byte 0x20000000.  These DDRAM
+// word addresses begin at physical byte 0x30000000.
+localparam [28:0] DDR_Y_BASE  = 29'h06000000;
+localparam [28:0] DDR_CB_BASE = 29'h0600A8C0;
+localparam [28:0] DDR_CR_BASE = 29'h0600D2F0;
 
 localparam [1:0] FETCH_Y  = 2'd0;
 localparam [1:0] FETCH_CB = 2'd1;
