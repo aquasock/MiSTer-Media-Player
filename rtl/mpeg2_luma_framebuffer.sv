@@ -1,14 +1,17 @@
 // kate - Decoupled MPEG2 luma framebuffer.
 //
-// Phase 1K stores the first four 4:2:0 intra macroblocks' luminance: sixteen
-// 8x8 Y blocks forming one 64x16 horizontal strip.  The decoder writes explicit
-// picture X/Y coordinates at 54 MHz while the independent fixed SVGA raster
-// reads at 40 MHz.
+// Phase 1L stores the complete first H.262 slice's reconstructed luminance.
+// The decoder writes explicit picture X/Y coordinates at 54 MHz while the
+// independent fixed SVGA raster reads at 40 MHz.
 //
-// To keep the proof unambiguous, RAM is exposed only after all sixteen luma
-// blocks have completed.  The rest of the 720x480 source window remains the
-// fixed diagnostic background so uninitialised RAM cannot look like decoded
-// picture data.
+// H.262 permits a slice to contain an arbitrary number of consecutive
+// macroblocks within one macroblock row.  Accordingly this framebuffer no
+// longer assumes a four-macroblock/64-pixel strip.  It records the actual
+// reconstructed X span and publishes that 16-line slice only after the parser
+// reports the normative slice terminator.
+//
+// The rest of the 720x480 source window remains the fixed diagnostic background
+// so uninitialised RAM cannot look like decoded picture data.
 //
 // Explicit altsyncram is retained because Quartus 17 otherwise implements this
 // mixed-clock framebuffer poorly or attempts to use registers.
@@ -26,6 +29,7 @@ module mpeg2_luma_framebuffer
     input  wire        wr_macroblock_start,
     input  wire        wr_block_start,
     input  wire        wr_block_complete,
+    input  wire        wr_slice_complete,
 
     // Independent video side - 40 MHz.
     input  wire        rd_clk,
@@ -46,7 +50,7 @@ localparam integer SRC_HEIGHT = 480;
 localparam integer FB_SIZE    = SRC_WIDTH * SRC_HEIGHT;
 
 // -------------------------------------------------------------------------
-// Write-side address generation and four-macroblock strip publication.
+// Write-side address generation and complete-first-slice publication.
 // -------------------------------------------------------------------------
 
 reg [18:0] ram_wr_address;
@@ -56,59 +60,54 @@ reg        ram_wr_en;
 wire [18:0] wr_linear_address =
     (wr_y_pos * 19'd720) + wr_x_pos;
 
-// kate - The first block-start supplies the strip's upper-left picture-space
-// origin.  Publication waits for sixteen completed luma blocks (4 macroblocks
-// x 4 Y blocks), so the read side never exposes a partially decoded strip.
+// kate - The first reconstructed block supplies the slice's upper-left
+// picture-space origin.  strip_end_x_wr is exclusive and grows from actual
+// reconstructed pixels, so a legal short slice is displayed at its real width.
+// These descriptor fields settle in the write clock domain before
+// strip_present_wr is asserted and remain stable thereafter.
 reg [11:0] strip_origin_x_wr;
 reg [11:0] strip_origin_y_wr;
-reg [4:0]  completed_luma_blocks_wr;
-reg [2:0]  macroblocks_started_wr;
+reg [11:0] strip_end_x_wr;
+reg        strip_origin_valid_wr;
 reg        strip_present_wr;
 reg        strip_active_wr;
 
+// wr_block_complete is intentionally retained at the interface because it is
+// the decoder's natural block-level publication event and will be useful when
+// this framebuffer grows beyond the first-slice proof.  Phase 1L publication
+// itself is governed by wr_slice_complete.
+
 always @(posedge wr_clk) begin
     if (reset) begin
-        ram_wr_address            <= 19'd0;
-        ram_wr_data               <= 8'd0;
-        ram_wr_en                 <= 1'b0;
-        strip_origin_x_wr         <= 12'd0;
-        strip_origin_y_wr         <= 12'd0;
-        completed_luma_blocks_wr  <= 5'd0;
-        macroblocks_started_wr    <= 3'd0;
-        strip_present_wr          <= 1'b0;
-        strip_active_wr           <= 1'b0;
+        ram_wr_address        <= 19'd0;
+        ram_wr_data           <= 8'd0;
+        ram_wr_en             <= 1'b0;
+        strip_origin_x_wr     <= 12'd0;
+        strip_origin_y_wr     <= 12'd0;
+        strip_end_x_wr        <= 12'd0;
+        strip_origin_valid_wr <= 1'b0;
+        strip_present_wr      <= 1'b0;
+        strip_active_wr       <= 1'b0;
     end
     else begin
         ram_wr_en <= 1'b0;
 
-        if (wr_macroblock_start) begin
-            if (!strip_active_wr && !strip_present_wr) begin
-                completed_luma_blocks_wr <= 5'd0;
-                macroblocks_started_wr   <= 3'd1;
-                strip_present_wr         <= 1'b0;
-                strip_active_wr          <= 1'b1;
-            end
-            else if (strip_active_wr && (macroblocks_started_wr < 3'd4)) begin
-                macroblocks_started_wr <= macroblocks_started_wr + 3'd1;
-            end
+        // The first accepted macroblock starts the one-slice capture.  Later
+        // macroblock_start pulses belong to the same slice and require no
+        // framebuffer-side bookkeeping because writes carry explicit X/Y.
+        if (wr_macroblock_start && !strip_active_wr && !strip_present_wr) begin
+            strip_origin_x_wr     <= 12'd0;
+            strip_origin_y_wr     <= 12'd0;
+            strip_end_x_wr        <= 12'd0;
+            strip_origin_valid_wr <= 1'b0;
+            strip_present_wr      <= 1'b0;
+            strip_active_wr       <= 1'b1;
         end
 
-        if (wr_block_start && strip_active_wr &&
-            (completed_luma_blocks_wr == 5'd0)) begin
-            strip_origin_x_wr <= wr_x_pos;
-            strip_origin_y_wr <= wr_y_pos;
-        end
-
-        if (wr_block_complete && strip_active_wr) begin
-            if ((completed_luma_blocks_wr == 5'd15) &&
-                (macroblocks_started_wr == 3'd4)) begin
-                completed_luma_blocks_wr <= 5'd16;
-                strip_present_wr         <= 1'b1;
-                strip_active_wr          <= 1'b0;
-            end
-            else begin
-                completed_luma_blocks_wr <= completed_luma_blocks_wr + 5'd1;
-            end
+        if (wr_block_start && strip_active_wr && !strip_origin_valid_wr) begin
+            strip_origin_x_wr     <= wr_x_pos;
+            strip_origin_y_wr     <= wr_y_pos;
+            strip_origin_valid_wr <= 1'b1;
         end
 
         if (wr_en &&
@@ -117,12 +116,27 @@ always @(posedge wr_clk) begin
             ram_wr_address <= wr_linear_address;
             ram_wr_data    <= wr_y;
             ram_wr_en      <= 1'b1;
+
+            if (strip_active_wr &&
+                ((wr_x_pos + 12'd1) > strip_end_x_wr))
+                strip_end_x_wr <= wr_x_pos + 12'd1;
+        end
+
+        // The parser can reach slice completion only after the final luma block
+        // has traversed IQ/IDCT/reconstruction and its Cb/Cr syntax has been
+        // consumed.  Publication therefore never exposes a partial slice.
+        if (wr_slice_complete && strip_active_wr) begin
+            if (strip_origin_valid_wr &&
+                (strip_end_x_wr > strip_origin_x_wr)) begin
+                strip_present_wr <= 1'b1;
+                strip_active_wr  <= 1'b0;
+            end
         end
     end
 end
 
 // -------------------------------------------------------------------------
-// Read-side synchronization of the completed-strip descriptor.
+// Read-side synchronization of the completed-slice descriptor.
 // -------------------------------------------------------------------------
 
 reg        strip_present_rd_1;
@@ -131,6 +145,8 @@ reg [11:0] strip_origin_x_rd_1;
 reg [11:0] strip_origin_x_rd_2;
 reg [11:0] strip_origin_y_rd_1;
 reg [11:0] strip_origin_y_rd_2;
+reg [11:0] strip_end_x_rd_1;
+reg [11:0] strip_end_x_rd_2;
 
 always @(posedge rd_clk) begin
     if (reset) begin
@@ -140,6 +156,8 @@ always @(posedge rd_clk) begin
         strip_origin_x_rd_2 <= 12'd0;
         strip_origin_y_rd_1 <= 12'd0;
         strip_origin_y_rd_2 <= 12'd0;
+        strip_end_x_rd_1    <= 12'd0;
+        strip_end_x_rd_2    <= 12'd0;
     end
     else begin
         strip_present_rd_1  <= strip_present_wr;
@@ -148,6 +166,8 @@ always @(posedge rd_clk) begin
         strip_origin_x_rd_2 <= strip_origin_x_rd_1;
         strip_origin_y_rd_1 <= strip_origin_y_wr;
         strip_origin_y_rd_2 <= strip_origin_y_rd_1;
+        strip_end_x_rd_1    <= strip_end_x_wr;
+        strip_end_x_rd_2    <= strip_end_x_rd_1;
     end
 end
 
@@ -166,11 +186,11 @@ wire source_window =
 wire [11:0] source_x = h_pos - 12'd40;
 wire [11:0] source_y = v_pos - 12'd60;
 
-wire decoded_strip_window =
+wire decoded_slice_window =
     source_window &&
     strip_present_rd_2 &&
     (source_x >= strip_origin_x_rd_2) &&
-    (source_x <  strip_origin_x_rd_2 + 12'd64) &&
+    (source_x <  strip_end_x_rd_2) &&
     (source_y >= strip_origin_y_rd_2) &&
     (source_y <  strip_origin_y_rd_2 + 12'd16);
 
@@ -232,12 +252,12 @@ altsyncram #(
 // -------------------------------------------------------------------------
 
 reg source_window_d;
-reg decoded_strip_window_d;
+reg decoded_slice_window_d;
 
 always @(posedge rd_clk) begin
     if (reset) begin
         source_window_d        <= 1'b0;
-        decoded_strip_window_d <= 1'b0;
+        decoded_slice_window_d <= 1'b0;
         video_y                <= 8'd0;
         video_de               <= 1'b0;
         video_hs               <= 1'b0;
@@ -245,13 +265,13 @@ always @(posedge rd_clk) begin
     end
     else begin
         source_window_d        <= source_window;
-        decoded_strip_window_d <= decoded_strip_window;
+        decoded_slice_window_d <= decoded_slice_window;
 
         video_de <= pixel_en;
         video_hs <= h_sync;
         video_vs <= v_sync;
 
-        if (decoded_strip_window_d)
+        if (decoded_slice_window_d)
             video_y <= ram_rd_data;
         else if (source_window_d)
             video_y <= 8'd24;

@@ -1,5 +1,5 @@
 //============================================================================
-// MiSTer Media Player - H.262 Phase 1K streaming first-slice macroblock probe
+// MiSTer Media Player - H.262 Phase 1L complete first-slice luma probe
 //
 // Normative standards basis:
 //   ITU-T H.262 / ISO/IEC 13818-2
@@ -12,21 +12,23 @@
 //   - 7.2.2 intra AC coefficient decoding
 //   - Annex B Tables B.1, B.2, B.12, B.13, B.14 and B.15
 //
-// Phase 1K capability boundary:
+// Phase 1L capability boundary:
 //   - Non-scalable progressive 4:2:0 frame-picture I video only, selected by
 //     the standards-driven front end.
-//   - Decode and reconstruct luminance blocks 0..3 for the first four
-//     macroblocks in the first slice.
+//   - Decode and reconstruct luminance blocks 0..3 for every macroblock in the
+//     first slice, not an arbitrary fixed macroblock count.
 //   - Chroma blocks 4 and 5 are parsed completely (including their DC VLC and
 //     AC coefficient syntax) so the parser can advance to the next macroblock,
 //     but chroma samples are deliberately not submitted to IQ/IDCT yet.
-//   - No whole-slice capture buffer.  Bits are consumed directly from the
-//     streaming byte reader; upstream FIFO backpressure preserves exact bit
-//     position while this parser or the reconstruction pipeline pauses.
+//   - H.262 6.2.4 terminates the macroblock loop when the next 23 bits are all
+//     zero.  The post-macroblock state below recognizes that condition directly.
+//   - No whole-slice capture buffer.  Bits remain streaming and upstream FIFO
+//     backpressure preserves exact bit position while this parser or the
+//     reconstruction pipeline pauses.
 //
 // kate - Luma parsing pauses after every EOB until reconstruction reports the
 // previous block complete.  This preserves the existing one-block IQ/IDCT
-// storage while we prove repeated macroblock progression.
+// storage while we extend the proven pipeline to an entire slice.
 //============================================================================
 
 module mpeg2_h262_luma4_probe
@@ -51,9 +53,9 @@ module mpeg2_h262_luma4_probe
     output reg         first_i_macroblock_seen,
     output reg         first_luma_dc_seen,
     output reg         first_luma_block_complete,
-    // Legacy signal name retained at the top-level boundary.  In Phase 1K it
-    // asserts only after the four-macroblock target has been parsed through Cr.
-    output reg         first_macroblock_luma_parsed,
+    // Sticky completion after the complete first slice has been parsed through
+    // the final Cr block and the H.262 23-zero slice terminator is recognized.
+    output reg         first_slice_luma_parsed,
     output reg         probe_error,
 
     output reg  [4:0]  quantiser_scale_code,
@@ -71,7 +73,7 @@ module mpeg2_h262_luma4_probe
     output reg  [5:0]  first_luma_last_coeff_index,
     output reg signed [11:0] first_luma_last_ac_level,
 
-    // Starts each of the first four macroblock reconstruction contexts.
+    // Starts each accepted intra macroblock reconstruction context.
     output reg         luma_macroblock_start,
 
     // Coefficient handoff to inverse quantisation.
@@ -91,7 +93,7 @@ wire        slice_start_now  = start_code_now &&
                                (start_code_value >= 8'h01) &&
                                (start_code_value <= 8'hAF);
 
-// kate - Phase 1K streaming bitreader state.  The bitreader retains only one
+// kate - Phase 1L streaming bitreader state.  The bitreader retains only one
 // payload byte and backpressures the existing asynchronous input FIFO whenever
 // that byte has not yet been consumed.
 reg  parse_active;
@@ -117,8 +119,9 @@ localparam [4:0]
     ST_AC_VLC        = 5'd14,
     ST_AC_SIGN       = 5'd15,
     ST_ESCAPE_RUN    = 5'd16,
-    ST_ESCAPE_LEVEL  = 5'd17,
-    ST_WAIT_PIPELINE = 5'd18;
+    ST_ESCAPE_LEVEL    = 5'd17,
+    ST_WAIT_PIPELINE   = 5'd18,
+    ST_SLICE_END_ZEROS = 5'd19;
 
 reg [4:0] parse_state;
 
@@ -144,10 +147,16 @@ reg [5:0] slice_picture_id_shift;
 reg [4:0] macroblock_qscale_shift;
 
 // H.262 6.1.3 / Figure 6-10 block order for 4:2:0 is Y0,Y1,Y2,Y3,Cb,Cr.
-// block_index therefore runs 0..5 for each macroblock.  macroblock_index runs
-// 0..3 for the Phase 1K horizontal strip target.
-reg [2:0] block_index;
-reg [1:0] macroblock_index;
+// block_index therefore runs 0..5 for each macroblock.  macroblock_index counts
+// completed macroblocks in this slice; 11 bits cover the H.262 maximum row width.
+reg [2:0]  block_index;
+reg [10:0] macroblock_index;
+
+// H.262 6.2.4 ends the slice macroblock loop when the next 23 bits are zero.
+// ST_MBA already accumulates up to 11 bits for Table B.1; if those 11 bits are
+// all zero, no legal MBA codeword has matched, so the remaining 12 zeros are
+// checked in ST_SLICE_END_ZEROS.
+reg [4:0] slice_zero_count;
 
 // H.262 7.2.1 / Table 7-2: all three intra DC predictors reset at slice start
 // and then persist across subsequent intra blocks/macroblocks in the slice.
@@ -160,7 +169,7 @@ wire [10:0] dc_predictor_current =
     (block_index == 3'd4) ? dc_predictor_cb : dc_predictor_cr;
 wire        current_block_is_luma = (block_index < 3'd4);
 wire        first_diagnostic_block =
-    (macroblock_index == 2'd0) && (block_index == 3'd0);
+    (macroblock_index == 11'd0) && (block_index == 3'd0);
 
 // Annex B Tables B.12/B.13 DC-size accumulator.
 reg [9:0] dc_vlc_code;
@@ -476,7 +485,8 @@ always @(posedge clk) begin
         slice_picture_id_shift            <= 6'd0;
         macroblock_qscale_shift           <= 5'd0;
         block_index                       <= 3'd0;
-        macroblock_index                  <= 2'd0;
+        macroblock_index                  <= 11'd0;
+        slice_zero_count                 <= 5'd0;
         dc_predictor_y                    <= 11'd128;
         dc_predictor_cb                   <= 11'd128;
         dc_predictor_cr                   <= 11'd128;
@@ -503,7 +513,7 @@ always @(posedge clk) begin
         first_i_macroblock_seen           <= 1'b0;
         first_luma_dc_seen                <= 1'b0;
         first_luma_block_complete         <= 1'b0;
-        first_macroblock_luma_parsed      <= 1'b0;
+        first_slice_luma_parsed           <= 1'b0;
         probe_error                       <= 1'b0;
         quantiser_scale_code              <= 5'd0;
         macroblock_address_increment      <= 12'd0;
@@ -536,7 +546,7 @@ always @(posedge clk) begin
             byte_window <= byte_window_next;
 
             if (!parse_active && !probe_error &&
-                !first_macroblock_luma_parsed && slice_start_now) begin
+                !first_slice_luma_parsed && slice_start_now) begin
                 parse_active                      <= 1'b1;
                 slice_vertical_position           <= start_code_value;
                 field_bit_count                   <= 4'd0;
@@ -549,7 +559,8 @@ always @(posedge clk) begin
                 mba_escape_base                   <= 12'd0;
                 macroblock_qscale_shift           <= 5'd0;
                 block_index                       <= 3'd0;
-                macroblock_index                  <= 2'd0;
+                macroblock_index                  <= 11'd0;
+                slice_zero_count                 <= 5'd0;
                 dc_predictor_y                    <= dc_predictor_reset;
                 dc_predictor_cb                   <= dc_predictor_reset;
                 dc_predictor_cr                   <= dc_predictor_reset;
@@ -661,11 +672,11 @@ always @(posedge clk) begin
                             vlc_len  <= 4'd0;
                         end
                         else if (mba_match) begin
-                            // Phase 1K deliberately proves four consecutive
-                            // macroblocks.  The first macroblock may begin at
-                            // any legal slice column; the next three must have
-                            // macroblock_address_increment == 1.
-                            if ((macroblock_index != 2'd0) &&
+                            // H.262 6.3.17: skipped macroblocks are prohibited
+                            // in the non-scalable I-picture subset supported by
+                            // this phase.  The first macroblock may start at any
+                            // legal slice column; every later MBA must be one.
+                            if ((macroblock_index != 11'd0) &&
                                 ((mba_escape_base + mba_value) != 12'd1)) begin
                                 probe_error  <= 1'b1;
                                 parse_active <= 1'b0;
@@ -675,16 +686,48 @@ always @(posedge clk) begin
                                 macroblock_address_seen <= 1'b1;
                                 vlc_code <= 11'd0;
                                 vlc_len  <= 4'd0;
+                                slice_zero_count <= 5'd0;
                                 parse_state <= ST_MBTYPE_FIRST;
                             end
                         end
                         else if (vlc_len_next >= 4'd11) begin
-                            probe_error  <= 1'b1;
-                            parse_active <= 1'b0;
+                            // H.262 6.2.4: after at least one macroblock, eleven
+                            // leading zero bits cannot be a Table B.1 MBA.  They
+                            // can, however, be the prefix of the 23-zero slice
+                            // terminator tested by the syntax's nextbits().
+                            if ((macroblock_index != 11'd0) &&
+                                (mba_escape_base == 12'd0) &&
+                                (vlc_code_next == 11'd0)) begin
+                                slice_zero_count <= 5'd11;
+                                parse_state      <= ST_SLICE_END_ZEROS;
+                            end
+                            else begin
+                                probe_error  <= 1'b1;
+                                parse_active <= 1'b0;
+                            end
                         end
                         else begin
                             vlc_code <= vlc_code_next;
                             vlc_len  <= vlc_len_next;
+                        end
+                    end
+
+                    ST_SLICE_END_ZEROS: begin
+                        // We arrive here after consuming eleven zero bits.  The
+                        // current bit is therefore zero number 12 through 23.
+                        // A one before zero 23 cannot be a valid MBA because the
+                        // first eleven bits have already ruled out every Table
+                        // B.1 codeword and macroblock_escape.
+                        if (current_bit) begin
+                            probe_error  <= 1'b1;
+                            parse_active <= 1'b0;
+                        end
+                        else if (slice_zero_count == 5'd22) begin
+                            first_slice_luma_parsed <= 1'b1;
+                            parse_active            <= 1'b0;
+                        end
+                        else begin
+                            slice_zero_count <= slice_zero_count + 5'd1;
                         end
                     end
 
@@ -826,17 +869,19 @@ always @(posedge clk) begin
                                     start_chroma_block();
                                 end
                                 else begin
-                                    // Cr completes the macroblock syntax.  Four
-                                    // macroblocks are the Phase 1K target.
-                                    if (macroblock_index == 2'd3) begin
-                                        first_macroblock_luma_parsed <= 1'b1;
+                                    // Cr completes one macroblock.  Phase 1L
+                                    // continues until H.262 6.2.4's actual
+                                    // first-slice terminator is encountered.
+                                    if (macroblock_index == 11'd2047) begin
+                                        probe_error  <= 1'b1;
                                         parse_active <= 1'b0;
                                     end
                                     else begin
-                                        macroblock_index <= macroblock_index + 2'd1;
+                                        macroblock_index <= macroblock_index + 11'd1;
                                         vlc_code        <= 11'd0;
                                         vlc_len         <= 4'd0;
                                         mba_escape_base <= 12'd0;
+                                        slice_zero_count <= 5'd0;
                                         parse_state     <= ST_MBA;
                                     end
                                 end

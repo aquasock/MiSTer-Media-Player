@@ -15,11 +15,12 @@
 //   - 7.6: intra-coded macroblocks form no prediction, so p[y][x] = 0.
 //   - 7.6.8: d[y][x] = f[y][x] + p[y][x], saturated to [0,255].
 //
-// Phase 1J capability boundary:
-//   The upstream probe supplies luminance blocks 0..3 for the first four
-//   macroblocks of one slice.  This module now accumulates the normative
-//   macroblock_address_increment sequence so each 16x16 macroblock is placed
-//   at its actual picture X coordinate.  Chroma remains deferred.
+// Phase 1L capability boundary:
+//   The upstream streaming probe supplies luminance blocks 0..3 for every
+//   macroblock in the first slice.  This module accumulates the normative
+//   macroblock_address_increment sequence until the row boundary; each 16x16
+//   macroblock is therefore placed at its actual picture X coordinate.
+//   Chroma remains deferred.
 //============================================================================
 
 module mpeg2_h262_intra_recon
@@ -33,7 +34,7 @@ module mpeg2_h262_intra_recon
     input  wire [2:0]         slice_vertical_position_extension,
     input  wire [11:0]        macroblock_address_increment,
 
-    // kate - Pulses once for each accepted Phase-1J intra macroblock header.
+    // kate - Pulses once for each accepted Phase-1L intra macroblock header.
     input  wire               macroblock_start,
 
     input  wire               sample_valid,
@@ -48,7 +49,8 @@ module mpeg2_h262_intra_recon
     output reg                block_start,
     // One-cycle completion pulse used as the upstream pipeline-ready handshake.
     output reg                block_complete,
-    // Sticky success state after the fourth macroblock's luma block 3 finishes.
+    // Sticky proof that at least one complete macroblock's four Y blocks have
+    // traversed reconstruction.  First-slice completion is owned by the parser.
     output reg                macroblock_luma_complete,
     output reg                recon_error,
 
@@ -67,12 +69,13 @@ wire [10:0] mb_row =
          {3'd0, slice_vertical_position} - 11'd1 :
         {3'd0, slice_vertical_position} - 11'd1;
 
-// kate - Phase 1J keeps the accumulated macroblock column explicitly.  For the
+// kate - Phase 1L keeps the accumulated macroblock column explicitly.  For the
 // first macroblock in a slice column = increment-1; after that each increment
 // is relative to the previously decoded macroblock address (H.262 6.3.17).
+// There is deliberately no fixed macroblock-count limit here; the parser owns
+// first-slice termination and this stage only enforces the encoded row width.
 reg        macroblock_sequence_started;
 reg [11:0] current_mb_column;
-reg [1:0]  macroblock_index;
 
 wire [12:0] first_mb_column_calc =
     {1'b0, macroblock_address_increment} - 13'd1;
@@ -136,7 +139,6 @@ always @(posedge clk) begin
         luma_block_index            <= 2'd0;
         macroblock_sequence_started <= 1'b0;
         current_mb_column           <= 12'd0;
-        macroblock_index            <= 2'd0;
         capture_active              <= 1'b0;
         expected_sample_index       <= 6'd0;
         idct_block_complete_d       <= 1'b0;
@@ -158,18 +160,18 @@ always @(posedge clk) begin
                 else begin
                     current_mb_column           <= first_mb_column_calc[11:0];
                     macroblock_sequence_started <= 1'b1;
-                    macroblock_index            <= 2'd0;
                     luma_block_index            <= 2'd0;
                 end
             end
             else begin
-                if ((macroblock_index == 2'd3) ||
-                    (next_mb_column_calc >= {2'd0, mb_width})) begin
+                // H.262 6.3.17 advances macroblock_address by the decoded
+                // increment.  Phase 1L permits every legal column in this row
+                // rather than imposing Phase 1J's four-macroblock test limit.
+                if (next_mb_column_calc >= {2'd0, mb_width}) begin
                     recon_error <= 1'b1;
                 end
                 else begin
                     current_mb_column <= next_mb_column_calc[11:0];
-                    macroblock_index  <= macroblock_index + 2'd1;
                     luma_block_index  <= 2'd0;
                 end
             end
@@ -177,8 +179,7 @@ always @(posedge clk) begin
 
         if (sample_valid) begin
             if (!capture_active) begin
-                if ((sample_index != 6'd0) || !coordinate_state_valid ||
-                    macroblock_luma_complete) begin
+                if ((sample_index != 6'd0) || !coordinate_state_valid) begin
                     recon_error <= 1'b1;
                 end
                 else begin
@@ -210,8 +211,7 @@ always @(posedge clk) begin
                         block_complete        <= 1'b1;
 
                         if (luma_block_index == 2'd3) begin
-                            if (macroblock_index == 2'd3)
-                                macroblock_luma_complete <= 1'b1;
+                            macroblock_luma_complete <= 1'b1;
                         end
                         else begin
                             luma_block_index <= luma_block_index + 2'd1;

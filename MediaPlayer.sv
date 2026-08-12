@@ -129,7 +129,9 @@ pll pll
 
 wire reset = RESET | status[0] | buttons[1];
 
-// kate - Phase 1K: the streaming H.262 bitreader owns input backpressure.
+// kate - Phase 1L: the streaming H.262 bitreader continues to own input
+// backpressure while the first slice expands from a fixed four-macroblock proof
+// to its normative H.262 termination.
 // Before a slice is selected, bytes flow continuously for start-code/header
 // parsing.  During slice parsing the bitreader stalls this FIFO whenever its
 // current payload byte has not been fully consumed, including IQ/IDCT waits.
@@ -159,7 +161,7 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 );
 
 // kate - Phase 1H: the legacy MPEG2FPGA DDR frame-store path is gone.
-// The present Phase-1K luma-strip proof uses only the on-chip M10K framebuffer.
+// The present Phase-1L first-slice proof uses only the on-chip M10K framebuffer.
 // Keep the MiSTer DDR service interface completely idle until our own explicit
 // frame-store layer is introduced in a later decoder phase.
 assign DDRAM_CLK      = clk_mpeg2;
@@ -234,7 +236,7 @@ wire        mpeg2_new_macroblock_address_seen;
 wire        mpeg2_new_first_i_macroblock_seen;
 wire        mpeg2_new_first_luma_dc_seen;
 wire        mpeg2_new_first_luma_block_complete;
-wire        mpeg2_new_first_macroblock_luma_parsed;
+wire        mpeg2_new_first_slice_luma_parsed;
 wire        mpeg2_new_luma_macroblock_start;
 wire        mpeg2_new_phase1_probe_error;
 wire [4:0]  mpeg2_new_slice_quantiser_scale_code;
@@ -332,10 +334,10 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.intra_quant_matrix_default       (mpeg2_new_intra_quant_matrix_default)
 );
 
-// kate - Phase 1K first-slice streaming progression.  The probe reconstructs
-// Y blocks 0..3 for the first four macroblocks and consumes Cb/Cr syntax, but
-// no longer captures a bounded slice prefix.  Its ready output backpressures
-// the existing asynchronous byte FIFO while individual bits/pipeline stages run.
+// kate - Phase 1L complete-first-slice streaming progression.  The probe
+// reconstructs Y blocks 0..3 for every macroblock in the first slice, consumes
+// Cb/Cr syntax, and terminates only when H.262 6.2.4's 23-zero nextbits()
+// condition is recognized.  The Phase 1K ready/backpressure path is unchanged.
 mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 (
 	.clk                         (clk_mpeg2),
@@ -354,7 +356,7 @@ mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 	.first_i_macroblock_seen     (mpeg2_new_first_i_macroblock_seen),
 	.first_luma_dc_seen          (mpeg2_new_first_luma_dc_seen),
 	.first_luma_block_complete   (mpeg2_new_first_luma_block_complete),
-	.first_macroblock_luma_parsed(mpeg2_new_first_macroblock_luma_parsed),
+	.first_slice_luma_parsed     (mpeg2_new_first_slice_luma_parsed),
 	.probe_error                 (mpeg2_new_phase1_probe_error),
 	.quantiser_scale_code        (mpeg2_new_slice_quantiser_scale_code),
 	.macroblock_address_increment(mpeg2_new_macroblock_address_increment),
@@ -476,6 +478,7 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 	.wr_macroblock_start (mpeg2_new_luma_macroblock_start),
 	.wr_block_start    (mpeg2_new_recon_block_start),
 	.wr_block_complete (mpeg2_new_recon_block_complete),
+	.wr_slice_complete (mpeg2_new_first_slice_luma_parsed),
 
 
 	.rd_clk      (clk_video),
@@ -502,12 +505,13 @@ assign VGA_R = fb_video_y;
 assign VGA_G = fb_video_y;
 assign VGA_B = fb_video_y;
 
-// kate - Phase 1K positive diagnostic.
-// OFF: the first four intra macroblocks have not completed the luma path, or an
+// kate - Phase 1L positive diagnostic.
+// OFF: the complete first slice has not reached its H.262 terminator, or an
 // earlier decoder stage reported an error.
-// ON: sixteen Y blocks (1024 reconstructed luma samples) reached our framebuffer.
+// ON: the complete first slice's luma blocks traversed the streaming parser,
+// IQ, IDCT and reconstruction path and the slice terminator was recognized.
 assign LED_USER =
-	mpeg2_new_first_macroblock_luma_parsed &&
+	mpeg2_new_first_slice_luma_parsed &&
 	mpeg2_new_recon_macroblock_luma_complete &&
 	!mpeg2_new_syntax_error &&
 	!mpeg2_new_phase1_probe_error &&
