@@ -70,6 +70,18 @@ set_false_path \
     -from [get_keepers {*|reset_mpeg2_sync[2]}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|rd_reset_sync[*]}]
 
+# kate - Phase 1R controlled frame-bank publication uses a four-cycle reset
+# request generated entirely in the 54 MHz memory/decoder domain to restart the
+# framebuffer memory-side prefill state after bank 1 has been completed.  That
+# request also intentionally asserts the framebuffer's existing 40 MHz
+# rd_reset_sync chain asynchronously; release is still synchronized by the
+# chain itself.  Treat only this new assertion boundary like the original
+# reset_mpeg2_sync boundary above.  Do not cut the stage-to-stage release paths
+# or any other 54 MHz -> 40 MHz logic.
+set_false_path \
+    -from [get_keepers {*|mpeg2_new_framebuffer_swap_reset_count[*]}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|rd_reset_sync[*]}]
+
 # Intel documents these first-stage DCFIFO ACLR exceptions when both
 # write_aclr_synch and read_aclr_synch are enabled.  The generated instance
 # names include version-dependent suffixes, so match only the documented
