@@ -572,11 +572,11 @@ mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 ///////////////////////   DDR-BACKED 4:2:0 DISPLAY   ////////////
 
 // kate - Phase 1S scheduled display-bank control.  A newly persisted frame is
-// held pending until the 40 MHz raster has passed the final 720x480 source line.
-// The bank switch and framebuffer re-arm then occur in the unused lower portion
-// of the 800x600 raster, giving the DDR line-cache prefill time to finish before
-// the next source window begins.  This avoids repeatedly blanking a picture in
-// the middle of its visible scan while preserving the Phase 1R controlled re-arm.
+// held pending until the fixed 800x600 raster reaches true vertical blanking.
+// The bank switch and framebuffer re-arm then occur after active row 599, giving
+// the DDR line-cache prefill the complete 28-line vertical blanking interval.
+// This keeps the visible 800x600 raster continuous while preserving the Phase 1R
+// controlled re-arm and blanking-aligned publication.
 reg       mpeg2_new_display_frame_bank;
 reg [2:0] mpeg2_new_framebuffer_swap_reset_count;
 reg       mpeg2_new_pending_frame_valid;
@@ -585,15 +585,15 @@ reg       mpeg2_new_swap_window_video;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] mpeg2_new_swap_window_sync;
 
-// The coded-picture source window occupies video rows 60..539.  Register a
-// single-bit safe-window level in the video domain; its rising edge is the first
-// line after the source window.  Keeping this as one registered control bit
-// avoids sampling the multi-bit raster counters in the decoder/DDRAM domain.
+// Register a single-bit vertical-blanking level in the 40 MHz video domain.
+// Its rising edge occurs at row 600, immediately after the last active raster
+// line.  Keeping this as one registered control bit avoids sampling the
+// multi-bit raster counters in the decoder/DDRAM domain.
 always @(posedge clk_video) begin
     if (reset_video)
         mpeg2_new_swap_window_video <= 1'b0;
     else
-        mpeg2_new_swap_window_video <= (display_v_pos >= 12'd540);
+        mpeg2_new_swap_window_video <= (display_v_pos >= 12'd600);
 end
 
 // Synchronize only the registered safe-window bit into the decoder/DDRAM domain.
