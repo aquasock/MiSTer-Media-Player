@@ -20,6 +20,12 @@
 // after full DDR persistence.  When P-picture decoding is enabled later, this
 // promotion point will be qualified for I/P pictures while B-pictures will not
 // replace the reference.
+//
+// kate - Phase 1T-d passively observes the first unsupported P-picture syntax
+// between supported I-pictures.  The existing front-end phase1_supported falling
+// edge independently arms the probe; USER can remain on for all-I streams, while
+// a controlled I/P/I/I diagnostic cannot reach USER unless a live P slice,
+// macroblock_address_increment and Table B.3 macroblock_type are verified.
 //============================================================================
 
 module mpeg2_h262_two_picture_probe
@@ -102,6 +108,17 @@ reg       reference_frame_bank_reg;
 reg [7:0] reference_promotion_count_reg;
 reg       reference_error_latched;
 
+// kate - Phase 1T-d uses the existing standards front end as an independent
+// expectation source.  Its supported-I level falls when a P picture header is
+// accepted; latch that fact across the unsupported picture until the passive
+// syntax observer verifies a live Table B.3 macroblock type.
+reg phase1_supported_d;
+reg p_picture_expected;
+wire p_macroblock_type_seen;
+wire p_syntax_probe_error;
+wire p_syntax_progress_error =
+    p_picture_expected && !p_macroblock_type_seen;
+
 reg        first_slice_header_seen_latched;
 reg        first_macroblock_address_seen_latched;
 reg        first_i_macroblock_seen_latched;
@@ -168,7 +185,9 @@ assign reference_promotion_count = reference_promotion_count_reg;
 assign probe_error               = probe_error_latched |
                                    parser_probe_error |
                                    reference_error_latched |
-                                   reference_progress_error;
+                                   reference_progress_error |
+                                   p_syntax_probe_error |
+                                   p_syntax_progress_error;
 
 // Preserve picture-1 diagnostics across all later parser re-arm cycles.  Before
 // picture 1 completes, expose the live parser values exactly as earlier phases.
@@ -220,6 +239,8 @@ always @(posedge clk) begin
         reference_frame_bank_reg              <= 1'b0;
         reference_promotion_count_reg         <= 8'd0;
         reference_error_latched               <= 1'b0;
+        phase1_supported_d                     <= 1'b0;
+        p_picture_expected                    <= 1'b0;
         first_slice_header_seen_latched       <= 1'b0;
         first_macroblock_address_seen_latched <= 1'b0;
         first_i_macroblock_seen_latched       <= 1'b0;
@@ -235,6 +256,13 @@ always @(posedge clk) begin
     else begin
         parser_rearm           <= 1'b0;
         picture_complete_pulse <= 1'b0;
+        phase1_supported_d     <= phase1_supported;
+
+        // Do not treat initial header acquisition as a P expectation: only a
+        // true high-to-low transition from the already-proven supported-I state
+        // arms the Phase 1T-d passive probe.
+        if (phase1_supported_d && !phase1_supported)
+            p_picture_expected <= 1'b1;
 
         if (parser_probe_error)
             probe_error_latched <= 1'b1;
@@ -287,6 +315,19 @@ always @(posedge clk) begin
         end
     end
 end
+
+// kate - Phase 1T-d passive observer.  This sees only bytes already accepted by
+// the main stream handshake and therefore cannot disturb decoder backpressure.
+mpeg2_h262_p_syntax_probe p_syntax_probe
+(
+    .clk                    (clk),
+    .reset                  (reset),
+    .stream_data            (stream_data),
+    .stream_valid           (stream_valid),
+    .p_picture_expected     (p_picture_expected),
+    .p_macroblock_type_seen (p_macroblock_type_seen),
+    .probe_error            (p_syntax_probe_error)
+);
 
 mpeg2_h262_luma4_probe picture_probe
 (
