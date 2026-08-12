@@ -126,14 +126,17 @@ reg [2:0] prefill_step;
 reg       prefill_done;
 
 // Video -> memory line-consumed handshake.
+// kate - Phase 1S CDC cleanup: only the single-bit event toggle crosses clock
+// domains.  Source lines are consumed strictly in order, so the memory side
+// maintains the associated line number locally instead of sampling an 11-bit
+// binary bus asynchronously.
 reg        line_done_toggle_rd;
-reg [10:0] line_done_number_rd;
-
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg        line_done_toggle_m1;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg        line_done_toggle_m2;
 reg        line_done_toggle_seen;
-reg [10:0] line_done_number_m1;
-reg [10:0] line_done_number_m2;
+reg [10:0] line_done_sequence_mem;
 
 reg        pending_event;
 reg [10:0] pending_event_line;
@@ -226,8 +229,7 @@ always @(posedge mem_clk) begin
         line_done_toggle_m1   <= 1'b0;
         line_done_toggle_m2   <= 1'b0;
         line_done_toggle_seen <= 1'b0;
-        line_done_number_m1   <= 11'd0;
-        line_done_number_m2   <= 11'd0;
+        line_done_sequence_mem <= 11'd0;
 
         pending_event         <= 1'b0;
         pending_event_line    <= 11'd0;
@@ -250,11 +252,11 @@ always @(posedge mem_clk) begin
         cb_cache_wr_en <= 1'b0;
         cr_cache_wr_en <= 1'b0;
 
-        // Synchronize the line-consumed event and its stable line number.
+        // Synchronize the one-bit line-consumed event.  The associated source
+        // line number is generated locally below, eliminating the old binary
+        // multi-bit CDC path.
         line_done_toggle_m1 <= line_done_toggle_rd;
         line_done_toggle_m2 <= line_done_toggle_m1;
-        line_done_number_m1 <= line_done_number_rd;
-        line_done_number_m2 <= line_done_number_m1;
 
         if (line_done_toggle_m2 != line_done_toggle_seen) begin
             line_done_toggle_seen <= line_done_toggle_m2;
@@ -268,8 +270,18 @@ always @(posedge mem_clk) begin
             end
             else begin
                 pending_event      <= 1'b1;
-                pending_event_line <= line_done_number_m2;
+                pending_event_line <= line_done_sequence_mem;
             end
+
+            // Each synchronized toggle represents exactly one consumed source
+            // line.  Wrap at the decoded picture height so repeated display
+            // frames remain aligned to source line 0 without crossing a bus.
+            if (picture_height_mem == 11'd0)
+                line_done_sequence_mem <= 11'd0;
+            else if (line_done_sequence_mem == (picture_height_mem - 11'd1))
+                line_done_sequence_mem <= 11'd0;
+            else
+                line_done_sequence_mem <= line_done_sequence_mem + 11'd1;
         end
 
         if (!picture_started && picture_complete) begin
@@ -283,12 +295,13 @@ always @(posedge mem_clk) begin
                 cache_error <= 1'b1;
             end
             else begin
-                picture_started    <= 1'b1;
-                picture_width_mem  <= horizontal_size[11:0];
-                picture_height_mem <= vertical_size[10:0];
-                chroma_height_mem  <= (vertical_size[10:0] + 11'd1) >> 1;
-                prefill_step       <= 3'd0;
-                prefill_done       <= 1'b0;
+                picture_started       <= 1'b1;
+                picture_width_mem     <= horizontal_size[11:0];
+                picture_height_mem    <= vertical_size[10:0];
+                chroma_height_mem     <= (vertical_size[10:0] + 11'd1) >> 1;
+                prefill_step          <= 3'd0;
+                prefill_done          <= 1'b0;
+                line_done_sequence_mem <= 11'd0;
             end
         end
 
@@ -596,7 +609,6 @@ always @(posedge rd_clk) begin
         picture_height_r2    <= 11'd0;
         picture_present_rd   <= 1'b0;
         line_done_toggle_rd  <= 1'b0;
-        line_done_number_rd  <= 11'd0;
     end
     else begin
         cache_ready_r1    <= cache_ready;
@@ -613,11 +625,12 @@ always @(posedge rd_clk) begin
             picture_present_rd <= 1'b1;
 
         // Mark a source line free one pixel after its final cache read request.
+        // Only the event toggle crosses to mem_clk; the memory-side sequence
+        // counter supplies the source-line identity.
         if (picture_present_rd && pixel_en &&
             (h_pos == 12'd760) &&
             (v_pos >= 12'd60) &&
             (v_pos < (12'd60 + {1'b0, picture_height_r2}))) begin
-            line_done_number_rd <= v_pos - 12'd60;
             line_done_toggle_rd <= ~line_done_toggle_rd;
         end
     end

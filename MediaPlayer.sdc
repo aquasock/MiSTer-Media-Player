@@ -28,14 +28,12 @@ set_false_path \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|cache_ready_r1}]
 
 # 40 MHz presentation -> 54 MHz memory/decoder line-consumed handshake.
-# line_done_number_rd is held stable while the toggle crosses the two-stage
-# synchronizer.  Cut only the first 54 MHz sampling stage.
+# kate - Phase 1S removed the old asynchronous 11-bit line-number bus.  Only the
+# event toggle now crosses domains; the 54 MHz side derives source-line identity
+# from a local sequential counter.  Cut only the first toggle synchronizer stage.
 set_false_path \
     -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|line_done_toggle_rd*}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|line_done_toggle_m1}]
-set_false_path \
-    -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|line_done_number_rd[*]}] \
-    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|line_done_number_m1[*]}]
 
 # kate - Phase 1S publication scheduling adds one single-bit video-domain
 # blanking-window level.  It is registered in the 40 MHz domain, then sampled by
