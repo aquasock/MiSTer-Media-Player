@@ -571,25 +571,78 @@ mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 
 ///////////////////////   DDR-BACKED 4:2:0 DISPLAY   ////////////
 
-// kate - Phase 1S repeated display-bank control.  Picture 1 is published from
-// bank 0 through the existing first-picture prefill.  Each later completed
-// picture reports its persisted bank; if that bank differs from the currently
-// displayed bank, switch the read-address translation and re-arm the framebuffer.
-// The framebuffer still republishes only after fresh cache prefill at h=0,v=0.
+// kate - Phase 1S scheduled display-bank control.  A newly persisted frame is
+// held pending until the 40 MHz raster has passed the final 720x480 source line.
+// The bank switch and framebuffer re-arm then occur in the unused lower portion
+// of the 800x600 raster, giving the DDR line-cache prefill time to finish before
+// the next source window begins.  This avoids repeatedly blanking a picture in
+// the middle of its visible scan while preserving the Phase 1R controlled re-arm.
 reg       mpeg2_new_display_frame_bank;
 reg [2:0] mpeg2_new_framebuffer_swap_reset_count;
+reg       mpeg2_new_pending_frame_valid;
+reg       mpeg2_new_pending_frame_bank;
+reg       mpeg2_new_swap_window_video;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] mpeg2_new_swap_window_sync;
+
+// The coded-picture source window occupies video rows 60..539.  Register a
+// single-bit safe-window level in the video domain; its rising edge is the first
+// line after the source window.  Keeping this as one registered control bit
+// avoids sampling the multi-bit raster counters in the decoder/DDRAM domain.
+always @(posedge clk_video) begin
+    if (reset_video)
+        mpeg2_new_swap_window_video <= 1'b0;
+    else
+        mpeg2_new_swap_window_video <= (display_v_pos >= 12'd540);
+end
+
+// Synchronize only the registered safe-window bit into the decoder/DDRAM domain.
+// sync[0] is the asynchronous first sampling stage; MediaPlayer.sdc cuts only
+// that boundary while leaving the later stages and scheduler fully timed.
+always @(posedge clk_mpeg2) begin
+    if (reset_mpeg2)
+        mpeg2_new_swap_window_sync <= 3'b000;
+    else
+        mpeg2_new_swap_window_sync <=
+            {mpeg2_new_swap_window_sync[1:0], mpeg2_new_swap_window_video};
+end
+
+wire mpeg2_new_swap_window_pulse =
+    mpeg2_new_swap_window_sync[1] && !mpeg2_new_swap_window_sync[2];
+
+wire mpeg2_new_frame_waiting =
+    mpeg2_new_picture_420_complete &&
+    mpeg2_new_first_picture_420_parsed &&
+    (mpeg2_new_completed_frame_bank != mpeg2_new_display_frame_bank);
+
+// If a picture happens to complete on the same decoder clock as the synchronized
+// safe-window pulse, publish it directly rather than waiting another raster.
+wire mpeg2_new_scheduled_frame_valid =
+    mpeg2_new_pending_frame_valid || mpeg2_new_frame_waiting;
+wire mpeg2_new_scheduled_frame_bank =
+    mpeg2_new_frame_waiting ?
+        mpeg2_new_completed_frame_bank :
+        mpeg2_new_pending_frame_bank;
 
 always @(posedge clk_mpeg2) begin
     if (reset_mpeg2) begin
         mpeg2_new_display_frame_bank            <= 1'b0;
         mpeg2_new_framebuffer_swap_reset_count  <= 3'd0;
+        mpeg2_new_pending_frame_valid           <= 1'b0;
+        mpeg2_new_pending_frame_bank            <= 1'b0;
     end
     else begin
-        if (mpeg2_new_picture_420_complete &&
-            mpeg2_new_first_picture_420_parsed &&
-            (mpeg2_new_completed_frame_bank != mpeg2_new_display_frame_bank)) begin
-            mpeg2_new_display_frame_bank           <= mpeg2_new_completed_frame_bank;
+        if (mpeg2_new_frame_waiting) begin
+            mpeg2_new_pending_frame_valid <= 1'b1;
+            mpeg2_new_pending_frame_bank  <= mpeg2_new_completed_frame_bank;
+        end
+
+        if (mpeg2_new_swap_window_pulse &&
+            mpeg2_new_scheduled_frame_valid &&
+            (mpeg2_new_scheduled_frame_bank != mpeg2_new_display_frame_bank)) begin
+            mpeg2_new_display_frame_bank           <= mpeg2_new_scheduled_frame_bank;
             mpeg2_new_framebuffer_swap_reset_count <= 3'd4;
+            mpeg2_new_pending_frame_valid          <= 1'b0;
         end
         else if (mpeg2_new_framebuffer_swap_reset_count != 3'd0) begin
             mpeg2_new_framebuffer_swap_reset_count <=

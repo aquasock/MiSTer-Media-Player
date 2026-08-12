@@ -37,6 +37,15 @@ set_false_path \
     -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|line_done_number_rd[*]}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|line_done_number_m1[*]}]
 
+# kate - Phase 1S publication scheduling adds one single-bit video-domain
+# blanking-window level.  It is registered in the 40 MHz domain, then sampled by
+# an explicit three-stage synchronizer in the 54 MHz decoder/DDRAM domain.  Cut
+# only the asynchronous source -> first synchronizer stage; later stages and the
+# scheduler remain fully timed.
+set_false_path \
+    -from [get_keepers {*|mpeg2_new_swap_window_video}] \
+    -to   [get_keepers {*|mpeg2_new_swap_window_sync[0]}]
+
 # Asynchronous reset request sources.
 # status[0] and cfg[1] are the HPS reset controls that reach reset_request;
 # RESET is the external reset input.  These are intentional asynchronous
