@@ -4,8 +4,14 @@
 // This diagnostic engine receives the complete QFS[] coefficient set for the
 // first intra luminance block, performs the H.262 inverse scan and inverse
 // quantisation, saturates the reconstructed coefficients, and applies MPEG-2
-// mismatch control.  It remains passive; the legacy MPEG2FPGA path still owns
-// displayed video during the current bootstrap phases.
+// mismatch control.
+//
+// kate - Phase 1P timing closure:
+//   TimeQuest after the balanced-IDCT fix found the new 54 MHz worst path in
+//   this module: physical_index -> inverse scan/QFS mux -> multiplier ->
+//   multiplier -> saturation -> reconstructed[].  The inverse-quant arithmetic
+//   is therefore pipelined below.  The normative H.262 arithmetic and mismatch
+//   control are unchanged; only the implementation scheduling is changed.
 //
 // Normative standards basis:
 //   ITU-T H.262 (02/2000) / ISO/IEC 13818-2:2000
@@ -62,15 +68,43 @@ reg signed [11:0] reconstructed [0:63];
 integer i;
 
 reg       busy;
+reg       issue_active;
 reg [5:0] physical_index;
 reg       parity_lsb;
 reg       emit_active;
 reg [5:0] emit_index;
 
-reg [1:0] latched_intra_dc_precision;
-reg [4:0] latched_quantiser_scale_code;
-reg       latched_q_scale_type;
+reg [7:0] latched_quantiser_scale_value;
+reg [3:0] latched_dc_multiplier;
 reg       latched_alternate_scan;
+
+// kate - Phase 1P three-register inverse-quant pipeline.
+//
+// Stage 1 breaks the physical-index / inverse-scan / QFS-selection path before
+// any multiply.  Stage 2 performs only QF*W (or the DC multiply), with the same
+// 32-bit signed arithmetic as before.  Stage 3 performs only the quantiser-scale
+// multiply.  Saturation/mismatch
+// writeback then starts from a registered product.
+//
+// One new physical coefficient is still issued every clk while issue_active is
+// set, so the pipeline adds latency but not steady-state coefficient throughput.
+reg               iq_s1_valid;
+reg [5:0]         iq_s1_index;
+reg signed [31:0] iq_s1_qfs_ext;
+reg signed [31:0] iq_s1_weight_ext;
+reg signed [31:0] iq_s1_qscale_ext;
+reg signed [31:0] iq_s1_dc_mult_ext;
+
+reg               iq_s2_valid;
+reg [5:0]         iq_s2_index;
+reg signed [31:0] iq_s2_product;
+reg signed [31:0] iq_s2_qscale_ext;
+reg               iq_s2_is_dc;
+
+reg               iq_s3_valid;
+reg [5:0]         iq_s3_index;
+reg signed [31:0] iq_s3_product;
+reg               iq_s3_is_dc;
 
 // H.262 7.3 Figures 7-2 and 7-3 define scan[alternate_scan][v][u].
 // physical_index is v*8+u; the function returns n such that
@@ -250,81 +284,80 @@ wire [5:0] qfs_read_index =
     scan_index(latched_alternate_scan, physical_index);
 wire signed [12:0] qfs_current = qfs[qfs_read_index];
 wire [7:0] weight_current = default_intra_weight(physical_index);
-wire [7:0] quantiser_scale_current =
-    quantiser_scale_value(latched_q_scale_type,
-                          latched_quantiser_scale_code);
 
-reg signed [31:0] qfs_ext;
-reg signed [31:0] weight_ext;
-reg signed [31:0] qscale_ext;
-reg signed [31:0] dc_mult_ext;
-reg signed [31:0] product_qw;
-reg signed [31:0] product_qws;
-reg signed [31:0] dequant_numerator;
-reg signed [31:0] dequant_unclipped;
-reg signed [11:0] dequant_saturated;
+// kate - Preserve the original H.262 arithmetic expression exactly, but start
+// it from a registered second-multiply result.  The *2 and /32 operations are
+// constant-scale logic; signed '/' retains the H.262 4.1 truncation toward zero.
+reg signed [31:0] iq_s3_numerator;
+reg signed [31:0] iq_s3_unclipped;
+reg signed [11:0] iq_s3_saturated;
 
 always @* begin
-    qfs_ext    = {{19{qfs_current[12]}}, qfs_current};
-    weight_ext = {24'd0, weight_current};
-    qscale_ext = {24'd0, quantiser_scale_current};
+    iq_s3_numerator = 32'sd0;
+    iq_s3_unclipped = 32'sd0;
 
-    case (latched_intra_dc_precision)
-        2'd0: dc_mult_ext = 32'sd8;
-        2'd1: dc_mult_ext = 32'sd4;
-        2'd2: dc_mult_ext = 32'sd2;
-        default: dc_mult_ext = 32'sd1;
-    endcase
-
-    product_qw       = 32'sd0;
-    product_qws      = 32'sd0;
-    dequant_numerator= 32'sd0;
-    dequant_unclipped= 32'sd0;
-
-    if (physical_index == 6'd0) begin
+    if (iq_s3_is_dc) begin
         // H.262 7.4.1: intra DC is independent of weighting matrix and qscale.
-        dequant_unclipped = qfs_ext * dc_mult_ext;
+        iq_s3_unclipped = iq_s3_product;
     end
     else begin
         // H.262 7.4.2.3 for an intra block:
         // F'' = (QF * W * quantiser_scale * 2) / 32.
-        // H.262 4.1 defines '/' as integer division truncated toward zero;
-        // SystemVerilog signed division has the same truncation direction.
-        product_qw        = qfs_ext * weight_ext;
-        product_qws       = product_qw * qscale_ext;
-        dequant_numerator = product_qws * 32'sd2;
-        dequant_unclipped = dequant_numerator / 32'sd32;
+        iq_s3_numerator = iq_s3_product * 32'sd2;
+        iq_s3_unclipped = iq_s3_numerator / 32'sd32;
     end
 
     // H.262 7.4.3 saturation range.
-    if (dequant_unclipped > 32'sd2047)
-        dequant_saturated = 12'sd2047;
-    else if (dequant_unclipped < -32'sd2048)
-        dequant_saturated = 12'sh800;
+    if (iq_s3_unclipped > 32'sd2047)
+        iq_s3_saturated = 12'sd2047;
+    else if (iq_s3_unclipped < -32'sd2048)
+        iq_s3_saturated = 12'sh800;
     else
-        dequant_saturated = dequant_unclipped[11:0];
+        iq_s3_saturated = iq_s3_unclipped[11:0];
 end
 
-wire total_parity_with_current = parity_lsb ^ dequant_saturated[0];
-wire signed [11:0] mismatch_corrected_last =
-    total_parity_with_current ?
-        dequant_saturated :
-        {dequant_saturated[11:1], ~dequant_saturated[0]};
+wire iq_total_parity_with_current =
+    parity_lsb ^ iq_s3_saturated[0];
+
+wire signed [11:0] iq_mismatch_corrected_last =
+    iq_total_parity_with_current ?
+        iq_s3_saturated :
+        {iq_s3_saturated[11:1], ~iq_s3_saturated[0]};
 
 always @(posedge clk) begin
     if (reset) begin
-        busy                         <= 1'b0;
-        physical_index               <= 6'd0;
-        parity_lsb                   <= 1'b0;
-        latched_intra_dc_precision   <= 2'd0;
-        latched_quantiser_scale_code <= 5'd0;
-        latched_q_scale_type         <= 1'b0;
-        latched_alternate_scan       <= 1'b0;
-        block_complete               <= 1'b0;
-        iq_error                     <= 1'b0;
-        unsupported_matrix           <= 1'b0;
-        first_luma_f00               <= 12'sd0;
-        first_luma_f77               <= 12'sd0;
+        busy                           <= 1'b0;
+        issue_active                   <= 1'b0;
+        physical_index                 <= 6'd0;
+        parity_lsb                     <= 1'b0;
+        latched_quantiser_scale_value  <= 8'd0;
+        latched_dc_multiplier          <= 4'd0;
+        latched_alternate_scan         <= 1'b0;
+
+        iq_s1_valid                    <= 1'b0;
+        iq_s1_index                    <= 6'd0;
+        iq_s1_qfs_ext                  <= 32'sd0;
+        iq_s1_weight_ext               <= 32'sd0;
+        iq_s1_qscale_ext               <= 32'sd0;
+        iq_s1_dc_mult_ext              <= 32'sd0;
+
+        iq_s2_valid                    <= 1'b0;
+        iq_s2_index                    <= 6'd0;
+        iq_s2_product                  <= 32'sd0;
+        iq_s2_qscale_ext               <= 32'sd0;
+        iq_s2_is_dc                    <= 1'b0;
+
+        iq_s3_valid                    <= 1'b0;
+        iq_s3_index                    <= 6'd0;
+        iq_s3_product                  <= 32'sd0;
+        iq_s3_is_dc                    <= 1'b0;
+
+        block_complete                 <= 1'b0;
+        iq_error                       <= 1'b0;
+        unsupported_matrix             <= 1'b0;
+        first_luma_f00                 <= 12'sd0;
+        first_luma_f77                 <= 12'sd0;
+
         emit_active                    <= 1'b0;
         emit_index                     <= 6'd0;
         coeff_out_block_start          <= 1'b0;
@@ -332,8 +365,9 @@ always @(posedge clk) begin
         coeff_out_index                <= 6'd0;
         coeff_out_value                <= 12'sd0;
         coeff_out_block_end            <= 1'b0;
+
         for (i = 0; i < 64; i = i + 1) begin
-            qfs[i]          <= 13'sd0;
+            qfs[i]           <= 13'sd0;
             reconstructed[i] <= 12'sd0;
         end
     end
@@ -342,6 +376,12 @@ always @(posedge clk) begin
         coeff_out_block_start <= 1'b0;
         coeff_out_valid       <= 1'b0;
         coeff_out_block_end   <= 1'b0;
+
+        // Pipeline valid flow.  Stage 1 is explicitly asserted only when a
+        // physical coefficient is issued below.
+        iq_s1_valid <= 1'b0;
+        iq_s2_valid <= iq_s1_valid;
+        iq_s3_valid <= iq_s2_valid;
 
         if (block_start) begin
             if (busy || emit_active) begin
@@ -352,6 +392,7 @@ always @(posedge clk) begin
                 unsupported_matrix <= 1'b0;
                 first_luma_f00     <= 12'sd0;
                 first_luma_f77     <= 12'sd0;
+
                 for (i = 0; i < 64; i = i + 1) begin
                     qfs[i]           <= 13'sd0;
                     reconstructed[i] <= 12'sd0;
@@ -375,34 +416,95 @@ always @(posedge clk) begin
                 unsupported_matrix <= 1'b1;
             end
             else begin
-                latched_intra_dc_precision   <= intra_dc_precision;
-                latched_quantiser_scale_code <= quantiser_scale_code;
-                latched_q_scale_type         <= q_scale_type;
-                latched_alternate_scan       <= alternate_scan;
-                physical_index               <= 6'd0;
-                parity_lsb                   <= 1'b0;
-                busy                         <= 1'b1;
+                latched_quantiser_scale_value <=
+                    quantiser_scale_value(q_scale_type, quantiser_scale_code);
+
+                case (intra_dc_precision)
+                    2'd0: latched_dc_multiplier <= 4'd8;
+                    2'd1: latched_dc_multiplier <= 4'd4;
+                    2'd2: latched_dc_multiplier <= 4'd2;
+                    default: latched_dc_multiplier <= 4'd1;
+                endcase
+
+                latched_alternate_scan <= alternate_scan;
+                physical_index         <= 6'd0;
+                parity_lsb             <= 1'b0;
+                busy                   <= 1'b1;
+                issue_active           <= 1'b1;
+
+                // A legal new block can only begin after the prior pipeline
+                // drained, but clear the valids explicitly at the boundary.
+                iq_s1_valid <= 1'b0;
+                iq_s2_valid <= 1'b0;
+                iq_s3_valid <= 1'b0;
             end
         end
 
-        if (busy) begin
+        // Stage 1: inverse scan/QFS selection and matrix lookup only.
+        if (issue_active) begin
+            iq_s1_valid       <= 1'b1;
+            iq_s1_index       <= physical_index;
+            iq_s1_qfs_ext     <= {{19{qfs_current[12]}}, qfs_current};
+            iq_s1_weight_ext  <= {24'd0, weight_current};
+            iq_s1_qscale_ext  <= {24'd0, latched_quantiser_scale_value};
+            iq_s1_dc_mult_ext <= {28'd0, latched_dc_multiplier};
+
             if (physical_index == 6'd63) begin
+                issue_active <= 1'b0;
+            end
+            else begin
+                physical_index <= physical_index + 1'b1;
+            end
+        end
+
+        // Stage 2: one multiply only, using the same 32-bit signed operands
+        // as the pre-pipeline implementation.
+        if (iq_s1_valid) begin
+            iq_s2_index      <= iq_s1_index;
+            iq_s2_qscale_ext <= iq_s1_qscale_ext;
+            iq_s2_is_dc      <= (iq_s1_index == 6'd0);
+
+            if (iq_s1_index == 6'd0) begin
+                // H.262 7.4.1 intra DC scaling.
+                iq_s2_product <= iq_s1_qfs_ext * iq_s1_dc_mult_ext;
+            end
+            else begin
+                // First half of H.262 7.4.2.3 intra AC scaling: QF * W.
+                iq_s2_product <= iq_s1_qfs_ext * iq_s1_weight_ext;
+            end
+        end
+
+        // Stage 3: one multiply only for AC.  DC simply carries the already
+        // completed 7.4.1 product through the same latency.
+        if (iq_s2_valid) begin
+            iq_s3_index <= iq_s2_index;
+            iq_s3_is_dc <= iq_s2_is_dc;
+
+            if (iq_s2_is_dc)
+                iq_s3_product <= iq_s2_product;
+            else
+                iq_s3_product <= iq_s2_product * iq_s2_qscale_ext;
+        end
+
+        // Registered-product saturation/writeback and mismatch control.
+        if (iq_s3_valid) begin
+            if (iq_s3_index == 6'd63) begin
                 // H.262 7.4.4: if the sum of saturated coefficients is even,
                 // toggle the LSB of F[7][7].  The standard notes that parity
                 // alone is sufficient to determine this condition.
-                reconstructed[63] <= mismatch_corrected_last;
-                first_luma_f77     <= mismatch_corrected_last;
+                reconstructed[63] <= iq_mismatch_corrected_last;
+                first_luma_f77     <= iq_mismatch_corrected_last;
                 busy               <= 1'b0;
                 block_complete     <= 1'b1;
                 emit_active        <= 1'b1;
                 emit_index         <= 6'd0;
             end
             else begin
-                reconstructed[physical_index] <= dequant_saturated;
-                parity_lsb <= parity_lsb ^ dequant_saturated[0];
-                if (physical_index == 6'd0)
-                    first_luma_f00 <= dequant_saturated;
-                physical_index <= physical_index + 1'b1;
+                reconstructed[iq_s3_index] <= iq_s3_saturated;
+                parity_lsb <= parity_lsb ^ iq_s3_saturated[0];
+
+                if (iq_s3_index == 6'd0)
+                    first_luma_f00 <= iq_s3_saturated;
             end
         end
 
