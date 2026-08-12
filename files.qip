@@ -12,7 +12,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_bitreade
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_ycbcr_to_rgb_bt601.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_luma4_probe.sv
 
-# kate - Phase 1Oa: MPEG2FPGA and its DDR bridge remain outside the active
+# kate - Phase 1Ob: MPEG2FPGA and its DDR bridge remain outside the active
 # Quartus design.  rtl/mpeg2fpga remains in the repository only as a
 # frozen reference implementation.
 set_global_assignment -name SDC_FILE MediaPlayer.sdc

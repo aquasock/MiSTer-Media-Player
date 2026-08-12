@@ -1,51 +1,50 @@
-// kate - Decoupled MPEG2 4:2:0 picture framebuffer.
+//============================================================================
+// MiSTer Media Player - Phase 1Ob DDR-backed H.262 4:2:0 presentation
 //
-// Phase 1N M10K fit diagnostic.
+// kate - The large on-chip Phase 1N picture planes are gone.  Full-precision
+// 8-bit Y/Cb/Cr samples are read back from the Phase 1Oa planar DDR3 layout
+// through small ping-pong line caches:
 //
-// IMPORTANT:
-// - The H.262 parser, inverse quantizer, IDCT and reconstruction path remain
-//   full precision.
-// - Luma is stored at the full reconstructed 8-bit precision.
-// - Cb and Cr are temporarily stored as their upper 4 bits only so the first
-//   complete colour-picture path can be tested without exhausting the DE10-Nano
-//   Cyclone V M10K block count.
-// - This chroma reduction is a diagnostic presentation/storage choice.  It is
-//   NOT an H.262 requirement and is not intended to be the final framebuffer.
-// - Once the colour path is proven, full-precision picture/reference storage
-//   will move to external DDR3.
+//   Y  : two cached 720-pel lines, 90 x 64-bit words per line
+//   Cb : two cached 360-pel lines, 45 x 64-bit words per line
+//   Cr : two cached 360-pel lines, 45 x 64-bit words per line
 //
-// The historical module/file name is retained to avoid unnecessary top-level
-// churn.  The picture planes represented here are:
-//   Y  : up to 720x480, 8 bits/pel
-//   Cb : up to 360x240, upper 4 bits/pel (diagnostic only)
-//   Cr : up to 360x240, upper 4 bits/pel (diagnostic only)
+// The memory side runs at the decoder/DDRAM clock.  The presentation side runs
+// at the independent fixed 40 MHz video clock.  Each cache RAM is dual-clock.
 //
-// The decoder writes explicit component-plane X/Y coordinates at 54 MHz while
-// the independent fixed SVGA raster reads at 40 MHz.  The complete picture is
-// published atomically only after parser/reconstruction completion.
+// The first two luma lines and first two chroma lines are prefetched before a
+// picture is published.  Once display begins, finishing source line N frees a
+// ping-pong bank:
+//   - refill Y line N+2;
+//   - after each odd luma line, refill Cb/Cr row (N>>1)+2.
 //
-// kate - Phase 1N presentation uses nearest-neighbour 4:2:0 chroma expansion:
-// each stored Cb/Cr pel supplies a 2x2 luma-pel area.  This is intentionally a
-// simple first-colour-picture presentation choice, not an H.262 sampling rule.
+// This is an implementation architecture, not an H.262 syntax requirement.
+// H.262 decoding/reconstruction remains upstream and full precision.
+//============================================================================
 
 module mpeg2_luma_framebuffer
 (
     input  wire        reset,
 
-    // H.262 reconstruction side - 54 MHz.
-    input  wire        wr_clk,
-    input  wire [7:0]  wr_value,
-    // 0 = Y, 1 = Cb, 2 = Cr.
-    input  wire [1:0]  wr_component,
-    input  wire [11:0] wr_x_pos,
-    input  wire [11:0] wr_y_pos,
-    input  wire        wr_en,
+    // DDR/read-control side - same clock as MiSTer DDRAM_CLK.
+    input  wire        mem_clk,
+    input  wire        picture_complete,
+    input  wire [13:0] horizontal_size,
+    input  wire [13:0] vertical_size,
 
-    input  wire        wr_picture_complete,
-    input  wire [13:0] wr_horizontal_size,
-    input  wire [13:0] wr_vertical_size,
+    input  wire        ddram_busy,
+    input  wire [63:0] ddram_dout,
+    input  wire        ddram_dout_ready,
+    output wire [7:0]  ddram_burstcnt,
+    output wire [28:0] ddram_addr,
+    output wire        ddram_rd,
 
-    // Independent video side - 40 MHz.
+    // Sticky/readiness diagnostics.
+    output reg         cache_ready,
+    output reg         read_seen,
+    output reg         cache_error,
+
+    // Independent fixed video side - 40 MHz.
     input  wire        rd_clk,
     input  wire [11:0] h_pos,
     input  wire [11:0] v_pos,
@@ -61,146 +60,553 @@ module mpeg2_luma_framebuffer
     output reg         video_vs
 );
 
-localparam integer SRC_WIDTH        = 720;
-localparam integer SRC_HEIGHT       = 480;
-localparam integer Y_FB_SIZE        = SRC_WIDTH * SRC_HEIGHT;
-localparam integer CHROMA_WIDTH     = SRC_WIDTH / 2;
-localparam integer CHROMA_HEIGHT    = SRC_HEIGHT / 2;
-localparam integer CHROMA_FB_SIZE   = CHROMA_WIDTH * CHROMA_HEIGHT;
+localparam integer SRC_WIDTH      = 720;
+localparam integer SRC_HEIGHT     = 480;
+localparam integer CHROMA_WIDTH   = SRC_WIDTH / 2;
+localparam integer CHROMA_HEIGHT  = SRC_HEIGHT / 2;
 
-localparam [1:0] COMPONENT_Y  = 2'd0;
-localparam [1:0] COMPONENT_CB = 2'd1;
-localparam [1:0] COMPONENT_CR = 2'd2;
+localparam [28:0] DDR_Y_BASE  = 29'h04000000;
+localparam [28:0] DDR_CB_BASE = 29'h0400A8C0;
+localparam [28:0] DDR_CR_BASE = 29'h0400D2F0;
+
+localparam [1:0] FETCH_Y  = 2'd0;
+localparam [1:0] FETCH_CB = 2'd1;
+localparam [1:0] FETCH_CR = 2'd2;
+
+localparam [1:0] MEM_IDLE  = 2'd0;
+localparam [1:0] MEM_ISSUE = 2'd1;
+localparam [1:0] MEM_RECV  = 2'd2;
+
+function automatic [28:0] row_times_90;
+    input [10:0] row;
+    reg [28:0] r;
+    begin
+        r = {18'd0, row};
+        row_times_90 = (r << 6) + (r << 4) + (r << 3) + (r << 1);
+    end
+endfunction
+
+function automatic [28:0] row_times_45;
+    input [10:0] row;
+    reg [28:0] r;
+    begin
+        r = {18'd0, row};
+        row_times_45 = (r << 5) + (r << 3) + (r << 2) + r;
+    end
+endfunction
 
 // -------------------------------------------------------------------------
-// Write-side three-plane picture store and publication descriptor.
+// Memory-side picture descriptor and line-fetch controller.
 // -------------------------------------------------------------------------
 
-reg [18:0] y_wr_address;
-reg [7:0]  y_wr_data;
-reg        y_wr_en;
+reg        picture_started;
+reg [10:0] picture_height_mem;
+reg [10:0] chroma_height_mem;
+reg [11:0] picture_width_mem;
 
-reg [16:0] cb_wr_address;
-reg [3:0]  cb_wr_data;
-reg        cb_wr_en;
+reg [1:0]  mem_state;
+reg [1:0]  fetch_kind;
+reg [10:0] fetch_line;
+reg [7:0]  fetch_line_words;
+reg [7:0]  fetch_word_offset;
+reg [7:0]  fetch_segment_words;
+reg [7:0]  recv_word_index;
+reg [28:0] fetch_address;
 
-reg [16:0] cr_wr_address;
-reg [3:0]  cr_wr_data;
-reg        cr_wr_en;
+assign ddram_burstcnt = (mem_state == MEM_ISSUE) ? fetch_segment_words : 8'd0;
+assign ddram_addr     = (mem_state == MEM_ISSUE) ? fetch_address : 29'd0;
+assign ddram_rd       = (mem_state == MEM_ISSUE);
 
-wire [18:0] y_wr_linear_address =
-    ({7'd0, wr_y_pos} * 19'd720) + {7'd0, wr_x_pos};
+// Initial prefetch sequence:
+//   0 Y0, 1 Y1, 2 Cb0, 3 Cr0, 4 Cb1, 5 Cr1.
+reg [2:0] prefill_step;
+reg       prefill_done;
 
-wire [16:0] c_wr_linear_address =
-    ({5'd0, wr_y_pos} * 17'd360) + {5'd0, wr_x_pos};
+// Video -> memory line-consumed handshake.
+reg        line_done_toggle_rd;
+reg [10:0] line_done_number_rd;
 
-reg        picture_present_wr;
-reg [11:0] picture_width_wr;
-reg [11:0] picture_height_wr;
+reg        line_done_toggle_m1;
+reg        line_done_toggle_m2;
+reg        line_done_toggle_seen;
+reg [10:0] line_done_number_m1;
+reg [10:0] line_done_number_m2;
 
-always @(posedge wr_clk) begin
+reg        pending_event;
+reg [10:0] pending_event_line;
+reg        refill_active;
+reg [1:0]  refill_phase;
+reg [10:0] refill_event_line;
+
+// Ping-pong line-cache write ports.
+reg [7:0]  y_cache_wr_addr;
+reg [63:0] y_cache_wr_data;
+reg        y_cache_wr_en;
+
+reg [6:0]  cb_cache_wr_addr;
+reg [63:0] cb_cache_wr_data;
+reg        cb_cache_wr_en;
+
+reg [6:0]  cr_cache_wr_addr;
+reg [63:0] cr_cache_wr_data;
+reg        cr_cache_wr_en;
+
+wire [7:0] y_fetch_cache_base =
+    fetch_line[0] ? 8'd90 : 8'd0;
+wire [6:0] c_fetch_cache_base =
+    fetch_line[0] ? 7'd45 : 7'd0;
+
+// A still picture is displayed repeatedly.  Refill targets therefore wrap at
+// the bottom of the decoded picture so the next video frame finds Y0/Y1 and
+// Cb/Cr0/1 back in their expected parity banks.
+wire [11:0] y_refill_raw =
+    {1'b0, refill_event_line} + 12'd2;
+wire [10:0] y_refill_line =
+    (y_refill_raw >= {1'b0, picture_height_mem}) ?
+        (y_refill_raw - {1'b0, picture_height_mem}) :
+        y_refill_raw[10:0];
+
+wire [11:0] c_refill_raw =
+    {2'b00, refill_event_line[10:1]} + 12'd2;
+wire [10:0] c_refill_line =
+    (c_refill_raw >= {1'b0, chroma_height_mem}) ?
+        (c_refill_raw - {1'b0, chroma_height_mem}) :
+        c_refill_raw[10:0];
+
+task automatic launch_fetch;
+    input [1:0]  kind;
+    input [10:0] line_number;
+    begin
+        fetch_kind         <= kind;
+        fetch_line         <= line_number;
+        fetch_line_words   <= (kind == FETCH_Y) ? 8'd90 : 8'd45;
+        fetch_word_offset  <= 8'd0;
+        // Keep an individual MiSTer DDR burst at 64 words or less.  A 720-pel
+        // luma line therefore uses 64+26 words; a chroma line uses one 45-word
+        // burst.  This is a service-interface implementation choice.
+        fetch_segment_words <= (kind == FETCH_Y) ? 8'd64 : 8'd45;
+        recv_word_index    <= 8'd0;
+
+        if (kind == FETCH_Y)
+            fetch_address <= DDR_Y_BASE + row_times_90(line_number);
+        else if (kind == FETCH_CB)
+            fetch_address <= DDR_CB_BASE + row_times_45(line_number);
+        else
+            fetch_address <= DDR_CR_BASE + row_times_45(line_number);
+
+        mem_state <= MEM_ISSUE;
+    end
+endtask
+
+always @(posedge mem_clk) begin
     if (reset) begin
-        y_wr_address       <= 19'd0;
-        y_wr_data          <= 8'd0;
-        y_wr_en            <= 1'b0;
-        cb_wr_address      <= 17'd0;
-        cb_wr_data         <= 4'd8;
-        cb_wr_en           <= 1'b0;
-        cr_wr_address      <= 17'd0;
-        cr_wr_data         <= 4'd8;
-        cr_wr_en           <= 1'b0;
-        picture_present_wr <= 1'b0;
-        picture_width_wr   <= 12'd0;
-        picture_height_wr  <= 12'd0;
+        picture_started       <= 1'b0;
+        picture_height_mem    <= 11'd0;
+        chroma_height_mem     <= 11'd0;
+        picture_width_mem     <= 12'd0;
+
+        mem_state             <= MEM_IDLE;
+        fetch_kind            <= FETCH_Y;
+        fetch_line            <= 11'd0;
+        fetch_line_words      <= 8'd0;
+        fetch_word_offset     <= 8'd0;
+        fetch_segment_words   <= 8'd0;
+        recv_word_index       <= 8'd0;
+        fetch_address         <= 29'd0;
+
+        prefill_step          <= 3'd0;
+        prefill_done          <= 1'b0;
+        cache_ready           <= 1'b0;
+        read_seen             <= 1'b0;
+        cache_error           <= 1'b0;
+
+        line_done_toggle_m1   <= 1'b0;
+        line_done_toggle_m2   <= 1'b0;
+        line_done_toggle_seen <= 1'b0;
+        line_done_number_m1   <= 11'd0;
+        line_done_number_m2   <= 11'd0;
+
+        pending_event         <= 1'b0;
+        pending_event_line    <= 11'd0;
+        refill_active         <= 1'b0;
+        refill_phase          <= 2'd0;
+        refill_event_line     <= 11'd0;
+
+        y_cache_wr_addr       <= 8'd0;
+        y_cache_wr_data       <= 64'd0;
+        y_cache_wr_en         <= 1'b0;
+        cb_cache_wr_addr      <= 7'd0;
+        cb_cache_wr_data      <= 64'd0;
+        cb_cache_wr_en        <= 1'b0;
+        cr_cache_wr_addr      <= 7'd0;
+        cr_cache_wr_data      <= 64'd0;
+        cr_cache_wr_en        <= 1'b0;
     end
     else begin
-        y_wr_en  <= 1'b0;
-        cb_wr_en <= 1'b0;
-        cr_wr_en <= 1'b0;
+        y_cache_wr_en  <= 1'b0;
+        cb_cache_wr_en <= 1'b0;
+        cr_cache_wr_en <= 1'b0;
 
-        if (wr_en) begin
-            case (wr_component)
-                COMPONENT_Y: begin
-                    if ((wr_x_pos < SRC_WIDTH) &&
-                        (wr_y_pos < SRC_HEIGHT)) begin
-                        y_wr_address <= y_wr_linear_address;
-                        y_wr_data    <= wr_value;
-                        y_wr_en      <= 1'b1;
-                    end
-                end
+        // Synchronize the line-consumed event and its stable line number.
+        line_done_toggle_m1 <= line_done_toggle_rd;
+        line_done_toggle_m2 <= line_done_toggle_m1;
+        line_done_number_m1 <= line_done_number_rd;
+        line_done_number_m2 <= line_done_number_m1;
 
-                COMPONENT_CB: begin
-                    if ((wr_x_pos < CHROMA_WIDTH) &&
-                        (wr_y_pos < CHROMA_HEIGHT)) begin
-                        cb_wr_address <= c_wr_linear_address;
-                        cb_wr_data    <= wr_value[7:4];
-                        cb_wr_en      <= 1'b1;
-                    end
-                end
+        if (line_done_toggle_m2 != line_done_toggle_seen) begin
+            line_done_toggle_seen <= line_done_toggle_m2;
 
-                COMPONENT_CR: begin
-                    if ((wr_x_pos < CHROMA_WIDTH) &&
-                        (wr_y_pos < CHROMA_HEIGHT)) begin
-                        cr_wr_address <= c_wr_linear_address;
-                        cr_wr_data    <= wr_value[7:4];
-                        cr_wr_en      <= 1'b1;
-                    end
-                end
-
-                default: begin end
-            endcase
-        end
-
-        // The parser asserts this only after the final macroblock's Cr block
-        // has completed the same IQ -> IDCT -> reconstruction path as Y/Cb.
-        if (wr_picture_complete && !picture_present_wr) begin
-            if ((wr_horizontal_size != 14'd0) &&
-                (wr_vertical_size   != 14'd0) &&
-                (wr_horizontal_size <= SRC_WIDTH) &&
-                (wr_vertical_size   <= SRC_HEIGHT)) begin
-                picture_width_wr   <= wr_horizontal_size[11:0];
-                picture_height_wr  <= wr_vertical_size[11:0];
-                picture_present_wr <= 1'b1;
+            if (!cache_ready) begin
+                cache_error <= 1'b1;
+            end
+            else if (pending_event) begin
+                // The DDR reader has fallen more than one displayed line behind.
+                cache_error <= 1'b1;
+            end
+            else begin
+                pending_event      <= 1'b1;
+                pending_event_line <= line_done_number_m2;
             end
         end
+
+        if (!picture_started && picture_complete) begin
+            if ((horizontal_size == 14'd0) ||
+                (vertical_size   == 14'd0) ||
+                (horizontal_size > SRC_WIDTH) ||
+                (vertical_size   > SRC_HEIGHT) ||
+                // Phase 1Ob ping-pong wrap assumes an even number of luma
+                // lines and an even number of 4:2:0 chroma lines.
+                (vertical_size[1:0] != 2'b00)) begin
+                cache_error <= 1'b1;
+            end
+            else begin
+                picture_started    <= 1'b1;
+                picture_width_mem  <= horizontal_size[11:0];
+                picture_height_mem <= vertical_size[10:0];
+                chroma_height_mem  <= (vertical_size[10:0] + 11'd1) >> 1;
+                prefill_step       <= 3'd0;
+                prefill_done       <= 1'b0;
+            end
+        end
+
+        case (mem_state)
+            MEM_ISSUE: begin
+                // Hold address/count/read stable until the MiSTer DDR service
+                // accepts the burst request.
+                if (!ddram_busy) begin
+                    recv_word_index <= 8'd0;
+                    mem_state       <= MEM_RECV;
+                end
+            end
+
+            MEM_RECV: begin
+                if (ddram_dout_ready) begin
+                    read_seen <= 1'b1;
+
+                    case (fetch_kind)
+                        FETCH_Y: begin
+                            y_cache_wr_addr <= y_fetch_cache_base +
+                                               fetch_word_offset +
+                                               recv_word_index[7:0];
+                            y_cache_wr_data <= ddram_dout;
+                            y_cache_wr_en   <= 1'b1;
+                        end
+
+                        FETCH_CB: begin
+                            cb_cache_wr_addr <= c_fetch_cache_base +
+                                                fetch_word_offset[6:0] +
+                                                recv_word_index[6:0];
+                            cb_cache_wr_data <= ddram_dout;
+                            cb_cache_wr_en   <= 1'b1;
+                        end
+
+                        default: begin
+                            cr_cache_wr_addr <= c_fetch_cache_base +
+                                                fetch_word_offset[6:0] +
+                                                recv_word_index[6:0];
+                            cr_cache_wr_data <= ddram_dout;
+                            cr_cache_wr_en   <= 1'b1;
+                        end
+                    endcase
+
+                    if (recv_word_index == (fetch_segment_words - 8'd1)) begin
+                        recv_word_index <= 8'd0;
+
+                        if ((fetch_word_offset + fetch_segment_words) <
+                            fetch_line_words) begin
+                            // Continue the same logical line fetch with the
+                            // remaining sequential words.
+                            fetch_word_offset <=
+                                fetch_word_offset + fetch_segment_words;
+                            fetch_address <=
+                                fetch_address + {21'd0, fetch_segment_words};
+
+                            if ((fetch_line_words -
+                                 (fetch_word_offset + fetch_segment_words)) >
+                                8'd64)
+                                fetch_segment_words <= 8'd64;
+                            else
+                                fetch_segment_words <=
+                                    fetch_line_words -
+                                    (fetch_word_offset + fetch_segment_words);
+
+                            mem_state <= MEM_ISSUE;
+                        end
+                        else begin
+                            // Complete logical line fetch.
+                            mem_state <= MEM_IDLE;
+
+                            if (!prefill_done) begin
+                                if (prefill_step == 3'd5) begin
+                                    prefill_done <= 1'b1;
+                                    cache_ready  <= 1'b1;
+                                end
+                                else begin
+                                    prefill_step <= prefill_step + 3'd1;
+                                end
+                            end
+                            else if (refill_active) begin
+                                if (refill_phase == 2'd0) begin
+                                    if (refill_event_line[0]) begin
+                                        refill_phase <= 2'd1;
+                                    end
+                                    else begin
+                                        refill_active <= 1'b0;
+                                    end
+                                end
+                                else if (refill_phase == 2'd1) begin
+                                    refill_phase <= 2'd2;
+                                end
+                                else begin
+                                    refill_active <= 1'b0;
+                                end
+                            end
+                        end
+                    end
+                    else begin
+                        recv_word_index <= recv_word_index + 8'd1;
+                    end
+                end
+            end
+
+            default: begin
+                // MEM_IDLE scheduling.
+                if (picture_started && !prefill_done) begin
+                    case (prefill_step)
+                        3'd0:
+                            launch_fetch(FETCH_Y, 11'd0);
+
+                        3'd1:
+                            if (picture_height_mem > 11'd1)
+                                launch_fetch(FETCH_Y, 11'd1);
+                            else
+                                prefill_step <= 3'd2;
+
+                        3'd2:
+                            launch_fetch(FETCH_CB, 11'd0);
+
+                        3'd3:
+                            launch_fetch(FETCH_CR, 11'd0);
+
+                        3'd4:
+                            if (chroma_height_mem > 11'd1)
+                                launch_fetch(FETCH_CB, 11'd1);
+                            else
+                                prefill_step <= 3'd5;
+
+                        3'd5:
+                            if (chroma_height_mem > 11'd1)
+                                launch_fetch(FETCH_CR, 11'd1);
+                            else begin
+                                prefill_done <= 1'b1;
+                                cache_ready  <= 1'b1;
+                            end
+
+                        default:
+                            cache_error <= 1'b1;
+                    endcase
+                end
+                else if (prefill_done) begin
+                    if (!refill_active && pending_event) begin
+                        pending_event     <= 1'b0;
+                        refill_active     <= 1'b1;
+                        refill_phase      <= 2'd0;
+                        refill_event_line <= pending_event_line;
+                    end
+                    else if (refill_active) begin
+                        if (refill_phase == 2'd0) begin
+                            launch_fetch(FETCH_Y, y_refill_line);
+                        end
+                        else if (refill_phase == 2'd1) begin
+                            launch_fetch(FETCH_CB, c_refill_line);
+                        end
+                        else begin
+                            launch_fetch(FETCH_CR, c_refill_line);
+                        end
+                    end
+                end
+            end
+        endcase
     end
 end
 
 // -------------------------------------------------------------------------
-// Read-side synchronization of the completed-picture descriptor.
+// Small dual-clock ping-pong line caches.
 // -------------------------------------------------------------------------
 
-reg        picture_present_rd_1;
-reg        picture_present_rd_2;
-reg [11:0] picture_width_rd_1;
-reg [11:0] picture_width_rd_2;
-reg [11:0] picture_height_rd_1;
-reg [11:0] picture_height_rd_2;
+wire [7:0]  y_cache_rd_addr;
+wire [6:0]  c_cache_rd_addr;
+wire [63:0] y_cache_rd_word;
+wire [63:0] cb_cache_rd_word;
+wire [63:0] cr_cache_rd_word;
+
+altsyncram #(
+    .operation_mode                 ("DUAL_PORT"),
+    .width_a                        (64),
+    .widthad_a                      (8),
+    .numwords_a                     (180),
+    .width_b                        (64),
+    .widthad_b                      (8),
+    .numwords_b                     (180),
+    .outdata_reg_b                  ("UNREGISTERED"),
+    .address_reg_b                  ("CLOCK1"),
+    .read_during_write_mode_mixed_ports ("DONT_CARE"),
+    .ram_block_type                 ("M10K"),
+    .intended_device_family         ("Cyclone V")
+) y_line_cache (
+    .clock0         (mem_clk),
+    .clock1         (rd_clk),
+    .address_a      (y_cache_wr_addr),
+    .data_a         (y_cache_wr_data),
+    .wren_a         (y_cache_wr_en),
+    .address_b      (y_cache_rd_addr),
+    .q_b            (y_cache_rd_word),
+    .aclr0          (1'b0),
+    .aclr1          (1'b0),
+    .addressstall_a (1'b0),
+    .addressstall_b (1'b0),
+    .byteena_a      (1'b1),
+    .byteena_b      (1'b1),
+    .data_b         (64'd0),
+    .wren_b         (1'b0),
+    .q_a            ()
+);
+
+altsyncram #(
+    .operation_mode                 ("DUAL_PORT"),
+    .width_a                        (64),
+    .widthad_a                      (7),
+    .numwords_a                     (90),
+    .width_b                        (64),
+    .widthad_b                      (7),
+    .numwords_b                     (90),
+    .outdata_reg_b                  ("UNREGISTERED"),
+    .address_reg_b                  ("CLOCK1"),
+    .read_during_write_mode_mixed_ports ("DONT_CARE"),
+    .ram_block_type                 ("M10K"),
+    .intended_device_family         ("Cyclone V")
+) cb_line_cache (
+    .clock0         (mem_clk),
+    .clock1         (rd_clk),
+    .address_a      (cb_cache_wr_addr),
+    .data_a         (cb_cache_wr_data),
+    .wren_a         (cb_cache_wr_en),
+    .address_b      (c_cache_rd_addr),
+    .q_b            (cb_cache_rd_word),
+    .aclr0          (1'b0),
+    .aclr1          (1'b0),
+    .addressstall_a (1'b0),
+    .addressstall_b (1'b0),
+    .byteena_a      (1'b1),
+    .byteena_b      (1'b1),
+    .data_b         (64'd0),
+    .wren_b         (1'b0),
+    .q_a            ()
+);
+
+altsyncram #(
+    .operation_mode                 ("DUAL_PORT"),
+    .width_a                        (64),
+    .widthad_a                      (7),
+    .numwords_a                     (90),
+    .width_b                        (64),
+    .widthad_b                      (7),
+    .numwords_b                     (90),
+    .outdata_reg_b                  ("UNREGISTERED"),
+    .address_reg_b                  ("CLOCK1"),
+    .read_during_write_mode_mixed_ports ("DONT_CARE"),
+    .ram_block_type                 ("M10K"),
+    .intended_device_family         ("Cyclone V")
+) cr_line_cache (
+    .clock0         (mem_clk),
+    .clock1         (rd_clk),
+    .address_a      (cr_cache_wr_addr),
+    .data_a         (cr_cache_wr_data),
+    .wren_a         (cr_cache_wr_en),
+    .address_b      (c_cache_rd_addr),
+    .q_b            (cr_cache_rd_word),
+    .aclr0          (1'b0),
+    .aclr1          (1'b0),
+    .addressstall_a (1'b0),
+    .addressstall_b (1'b0),
+    .byteena_a      (1'b1),
+    .byteena_b      (1'b1),
+    .data_b         (64'd0),
+    .wren_b         (1'b0),
+    .q_a            ()
+);
+
+// -------------------------------------------------------------------------
+// Video-side descriptor synchronization and line-consumed handshake.
+// -------------------------------------------------------------------------
+
+reg        cache_ready_r1;
+reg        cache_ready_r2;
+reg [11:0] picture_width_r1;
+reg [11:0] picture_width_r2;
+reg [10:0] picture_height_r1;
+reg [10:0] picture_height_r2;
+reg        picture_present_rd;
 
 always @(posedge rd_clk) begin
     if (reset) begin
-        picture_present_rd_1 <= 1'b0;
-        picture_present_rd_2 <= 1'b0;
-        picture_width_rd_1   <= 12'd0;
-        picture_width_rd_2   <= 12'd0;
-        picture_height_rd_1  <= 12'd0;
-        picture_height_rd_2  <= 12'd0;
+        cache_ready_r1       <= 1'b0;
+        cache_ready_r2       <= 1'b0;
+        picture_width_r1     <= 12'd0;
+        picture_width_r2     <= 12'd0;
+        picture_height_r1    <= 11'd0;
+        picture_height_r2    <= 11'd0;
+        picture_present_rd   <= 1'b0;
+        line_done_toggle_rd  <= 1'b0;
+        line_done_number_rd  <= 11'd0;
     end
     else begin
-        picture_present_rd_1 <= picture_present_wr;
-        picture_present_rd_2 <= picture_present_rd_1;
-        picture_width_rd_1   <= picture_width_wr;
-        picture_width_rd_2   <= picture_width_rd_1;
-        picture_height_rd_1  <= picture_height_wr;
-        picture_height_rd_2  <= picture_height_rd_1;
+        cache_ready_r1    <= cache_ready;
+        cache_ready_r2    <= cache_ready_r1;
+        picture_width_r1  <= picture_width_mem;
+        picture_width_r2  <= picture_width_r1;
+        picture_height_r1 <= picture_height_mem;
+        picture_height_r2 <= picture_height_r1;
+
+        // Publish only at a display-frame boundary after all initial line
+        // caches are filled, so source line 0 always starts from a known bank.
+        if (!picture_present_rd && cache_ready_r2 &&
+            (h_pos == 12'd0) && (v_pos == 12'd0))
+            picture_present_rd <= 1'b1;
+
+        // Mark a source line free one pixel after its final cache read request.
+        if (picture_present_rd && pixel_en &&
+            (h_pos == 12'd760) &&
+            (v_pos >= 12'd60) &&
+            (v_pos < (12'd60 + {1'b0, picture_height_r2}))) begin
+            line_done_number_rd <= v_pos - 12'd60;
+            line_done_toggle_rd <= ~line_done_toggle_rd;
+        end
     end
 end
 
 // -------------------------------------------------------------------------
-// Read-side address generation.
-//
-// The 720x480 diagnostic presentation remains centered in 800x600.  This is a
-// presentation/debug choice, not an H.262 decoding rule.
+// Video-side cache addressing and full-precision 4:2:0 expansion.
 // -------------------------------------------------------------------------
 
 wire source_window =
@@ -213,138 +619,78 @@ wire [11:0] source_y = v_pos - 12'd60;
 
 wire decoded_picture_window =
     source_window &&
-    picture_present_rd_2 &&
-    (source_x < picture_width_rd_2) &&
-    (source_y < picture_height_rd_2);
+    picture_present_rd &&
+    (source_x < picture_width_r2) &&
+    (source_y < {1'b0, picture_height_r2});
 
-wire [18:0] y_rd_address = source_window ?
-    (({7'd0, source_y} * 19'd720) + {7'd0, source_x}) : 19'd0;
+wire [6:0] y_word_index = source_x[11:3];
+wire [5:0] c_word_index = source_x[11:4];
 
-// kate - Phase 1N nearest-neighbour 4:2:0 expansion.  One chroma pel is read
-// for every 2x2 luma-pel group by dropping the low X/Y bits.
-wire [10:0] chroma_source_x = source_x[11:1];
-wire [10:0] chroma_source_y = source_y[11:1];
+assign y_cache_rd_addr =
+    (source_y[0] ? 8'd90 : 8'd0) + {1'b0, y_word_index};
 
-wire [16:0] c_rd_address = source_window ?
-    (({6'd0, chroma_source_y} * 17'd360) +
-     {6'd0, chroma_source_x}) : 17'd0;
+assign c_cache_rd_addr =
+    (source_y[1] ? 7'd45 : 7'd0) + {1'b0, c_word_index};
 
-wire [7:0] y_rd_data;
-wire [3:0] cb_rd_data_4;
-wire [3:0] cr_rd_data_4;
+wire [2:0] y_byte_lane = source_x[2:0];
+wire [2:0] c_byte_lane = source_x[3:1];
 
-// Expand the diagnostic 4-bit chroma back to 8 bits by restoring the stored
-// high nibble and clearing the discarded low nibble.  This deliberately keeps
-// neutral chroma exactly at 8'h80 rather than shifting it toward a colour cast.
-wire [7:0] cb_rd_data = {cb_rd_data_4, 4'b0000};
-wire [7:0] cr_rd_data = {cr_rd_data_4, 4'b0000};
+reg [2:0] y_byte_lane_d;
+reg [2:0] c_byte_lane_d;
+reg       source_window_d;
+reg       decoded_picture_window_d;
 
-// -------------------------------------------------------------------------
-// True dual-clock component framebuffers.
-//
-// DONT_CARE is used for mixed-port read-during-write because the picture is not
-// published to the read side until reconstruction has completed.
-// -------------------------------------------------------------------------
+reg [7:0] y_rd_data;
+reg [7:0] cb_rd_data;
+reg [7:0] cr_rd_data;
 
-altsyncram #(
-    .operation_mode                 ("DUAL_PORT"),
-    .width_a                        (8),
-    .widthad_a                      (19),
-    .numwords_a                     (Y_FB_SIZE),
-    .width_b                        (8),
-    .widthad_b                      (19),
-    .numwords_b                     (Y_FB_SIZE),
-    .outdata_reg_b                  ("UNREGISTERED"),
-    .address_reg_b                  ("CLOCK1"),
-    .read_during_write_mode_mixed_ports ("DONT_CARE"),
-    .ram_block_type                 ("M10K"),
-    .intended_device_family         ("Cyclone V")
-) y_framebuffer_ram (
-    .clock0         (wr_clk),
-    .clock1         (rd_clk),
-    .address_a      (y_wr_address),
-    .data_a         (y_wr_data),
-    .wren_a         (y_wr_en),
-    .address_b      (y_rd_address),
-    .q_b            (y_rd_data),
-    .aclr0          (1'b0),
-    .aclr1          (1'b0),
-    .addressstall_a (1'b0),
-    .addressstall_b (1'b0),
-    .byteena_a      (1'b1),
-    .byteena_b      (1'b1),
-    .data_b         (8'd0),
-    .wren_b         (1'b0),
-    .q_a            ()
-);
+always @* begin
+    case (y_byte_lane_d)
+        3'd0: y_rd_data = y_cache_rd_word[7:0];
+        3'd1: y_rd_data = y_cache_rd_word[15:8];
+        3'd2: y_rd_data = y_cache_rd_word[23:16];
+        3'd3: y_rd_data = y_cache_rd_word[31:24];
+        3'd4: y_rd_data = y_cache_rd_word[39:32];
+        3'd5: y_rd_data = y_cache_rd_word[47:40];
+        3'd6: y_rd_data = y_cache_rd_word[55:48];
+        default: y_rd_data = y_cache_rd_word[63:56];
+    endcase
 
-altsyncram #(
-    .operation_mode                 ("DUAL_PORT"),
-    .width_a                        (4),
-    .widthad_a                      (17),
-    .numwords_a                     (CHROMA_FB_SIZE),
-    .width_b                        (4),
-    .widthad_b                      (17),
-    .numwords_b                     (CHROMA_FB_SIZE),
-    .outdata_reg_b                  ("UNREGISTERED"),
-    .address_reg_b                  ("CLOCK1"),
-    .read_during_write_mode_mixed_ports ("DONT_CARE"),
-    .ram_block_type                 ("M10K"),
-    .intended_device_family         ("Cyclone V")
-) cb_framebuffer_ram (
-    .clock0         (wr_clk),
-    .clock1         (rd_clk),
-    .address_a      (cb_wr_address),
-    .data_a         (cb_wr_data),
-    .wren_a         (cb_wr_en),
-    .address_b      (c_rd_address),
-    .q_b            (cb_rd_data_4),
-    .aclr0          (1'b0),
-    .aclr1          (1'b0),
-    .addressstall_a (1'b0),
-    .addressstall_b (1'b0),
-    .byteena_a      (1'b1),
-    .byteena_b      (1'b1),
-    .data_b         (4'd0),
-    .wren_b         (1'b0),
-    .q_a            ()
-);
-
-altsyncram #(
-    .operation_mode                 ("DUAL_PORT"),
-    .width_a                        (4),
-    .widthad_a                      (17),
-    .numwords_a                     (CHROMA_FB_SIZE),
-    .width_b                        (4),
-    .widthad_b                      (17),
-    .numwords_b                     (CHROMA_FB_SIZE),
-    .outdata_reg_b                  ("UNREGISTERED"),
-    .address_reg_b                  ("CLOCK1"),
-    .read_during_write_mode_mixed_ports ("DONT_CARE"),
-    .ram_block_type                 ("M10K"),
-    .intended_device_family         ("Cyclone V")
-) cr_framebuffer_ram (
-    .clock0         (wr_clk),
-    .clock1         (rd_clk),
-    .address_a      (cr_wr_address),
-    .data_a         (cr_wr_data),
-    .wren_a         (cr_wr_en),
-    .address_b      (c_rd_address),
-    .q_b            (cr_rd_data_4),
-    .aclr0          (1'b0),
-    .aclr1          (1'b0),
-    .addressstall_a (1'b0),
-    .addressstall_b (1'b0),
-    .byteena_a      (1'b1),
-    .byteena_b      (1'b1),
-    .data_b         (4'd0),
-    .wren_b         (1'b0),
-    .q_a            ()
-);
-
-// -------------------------------------------------------------------------
-// Phase 1N colour presentation.
-// -------------------------------------------------------------------------
+    case (c_byte_lane_d)
+        3'd0: begin
+            cb_rd_data = cb_cache_rd_word[7:0];
+            cr_rd_data = cr_cache_rd_word[7:0];
+        end
+        3'd1: begin
+            cb_rd_data = cb_cache_rd_word[15:8];
+            cr_rd_data = cr_cache_rd_word[15:8];
+        end
+        3'd2: begin
+            cb_rd_data = cb_cache_rd_word[23:16];
+            cr_rd_data = cr_cache_rd_word[23:16];
+        end
+        3'd3: begin
+            cb_rd_data = cb_cache_rd_word[31:24];
+            cr_rd_data = cr_cache_rd_word[31:24];
+        end
+        3'd4: begin
+            cb_rd_data = cb_cache_rd_word[39:32];
+            cr_rd_data = cr_cache_rd_word[39:32];
+        end
+        3'd5: begin
+            cb_rd_data = cb_cache_rd_word[47:40];
+            cr_rd_data = cr_cache_rd_word[47:40];
+        end
+        3'd6: begin
+            cb_rd_data = cb_cache_rd_word[55:48];
+            cr_rd_data = cr_cache_rd_word[55:48];
+        end
+        default: begin
+            cb_rd_data = cb_cache_rd_word[63:56];
+            cr_rd_data = cr_cache_rd_word[63:56];
+        end
+    endcase
+end
 
 wire [7:0] rgb_r;
 wire [7:0] rgb_g;
@@ -360,23 +706,22 @@ mpeg2_ycbcr_to_rgb_bt601 mpeg2_ycbcr_to_rgb_bt601
     .b  (rgb_b)
 );
 
-// altsyncram read addresses are registered, so delay the region controls one
-// clock to keep them aligned with all three q_b outputs.
-reg source_window_d;
-reg decoded_picture_window_d;
-
 always @(posedge rd_clk) begin
     if (reset) begin
-        source_window_d          <= 1'b0;
-        decoded_picture_window_d <= 1'b0;
-        video_r                  <= 8'd0;
-        video_g                  <= 8'd0;
-        video_b                  <= 8'd0;
-        video_de                 <= 1'b0;
-        video_hs                 <= 1'b0;
-        video_vs                 <= 1'b0;
+        y_byte_lane_d             <= 3'd0;
+        c_byte_lane_d             <= 3'd0;
+        source_window_d           <= 1'b0;
+        decoded_picture_window_d  <= 1'b0;
+        video_r                   <= 8'd0;
+        video_g                   <= 8'd0;
+        video_b                   <= 8'd0;
+        video_de                  <= 1'b0;
+        video_hs                  <= 1'b0;
+        video_vs                  <= 1'b0;
     end
     else begin
+        y_byte_lane_d            <= y_byte_lane;
+        c_byte_lane_d            <= c_byte_lane;
         source_window_d          <= source_window;
         decoded_picture_window_d <= decoded_picture_window;
 

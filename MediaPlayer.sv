@@ -129,7 +129,7 @@ pll pll
 
 wire reset = RESET | status[0] | buttons[1];
 
-// kate - Phase 1Oa: the streaming H.262 bitreader continues to own input
+// kate - Phase 1Ob: the streaming H.262 bitreader continues to own input
 // backpressure while picture_data() advances across every slice of the first
 // supported I-picture.  Slice boundaries remain inside the bitreader so no
 // alignment or payload bytes are discarded.
@@ -161,8 +161,10 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 	.rd_empty (mpeg2_stream_empty)
 );
 
-// kate - Phase 1Oa: the new H.262 DDR writer owns MiSTer's high-latency
-// DDR3 service port.  The legacy MPEG2FPGA DDR bridge remains absent.
+// kate - Phase 1Ob: the H.262 writer owns DDRAM while picture_data() is
+// decoding.  After the complete first picture has been persisted, ownership
+// switches to the DDR-backed presentation reader.  Read and write phases never
+// overlap in this first-picture architecture.
 assign DDRAM_CLK = clk_mpeg2;
 
 ///////////////////////   VIDEO TIMING   /////////////////////////
@@ -288,6 +290,21 @@ wire [11:0] mpeg2_new_recon_block_origin_y;
 wire        mpeg2_new_ddr_block_stored;
 wire        mpeg2_new_ddr_write_seen;
 wire        mpeg2_new_ddr_store_error;
+
+wire [7:0]  mpeg2_new_ddr_wr_burstcnt;
+wire [28:0] mpeg2_new_ddr_wr_addr;
+wire        mpeg2_new_ddr_wr_rd;
+wire [63:0] mpeg2_new_ddr_wr_din;
+wire [7:0]  mpeg2_new_ddr_wr_be;
+wire        mpeg2_new_ddr_wr_we;
+
+wire [7:0]  mpeg2_new_ddr_rd_burstcnt;
+wire [28:0] mpeg2_new_ddr_rd_addr;
+wire        mpeg2_new_ddr_rd;
+
+wire        mpeg2_new_ddr_cache_ready;
+wire        mpeg2_new_ddr_read_seen;
+wire        mpeg2_new_ddr_cache_error;
 
 wire [4:0] mpeg2_new_effective_quantiser_scale_code =
 	mpeg2_new_macroblock_quant ?
@@ -480,11 +497,11 @@ mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 
 ///////////////////////   FULL-PRECISION DDR WRITER   ///////////
 
-// kate - Phase 1Oa hardware proof.  The existing on-chip colour framebuffer
-// below remains the known-good presentation path, while every reconstructed
-// block is also staged and written to full-precision planar Y/Cb/Cr DDR3.
-// The parser cannot advance until all eight rows of the current block have been
-// accepted by DDRAM.
+// kate - Phase 1Ob retains the hardware-proven Phase 1Oa full-precision
+// planar DDR writer.  The parser cannot advance until all eight rows of the
+// current reconstructed block have been accepted by DDRAM.  Presentation now
+// reads this same stored picture back from DDR rather than keeping a frame copy
+// in M10Ks.
 mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 (
 	.clk             (clk_mpeg2),
@@ -503,48 +520,77 @@ mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 	.store_error     (mpeg2_new_ddr_store_error),
 
 	.ddram_busy      (DDRAM_BUSY),
-	.ddram_burstcnt  (DDRAM_BURSTCNT),
-	.ddram_addr      (DDRAM_ADDR),
-	.ddram_rd        (DDRAM_RD),
-	.ddram_din       (DDRAM_DIN),
-	.ddram_be        (DDRAM_BE),
-	.ddram_we        (DDRAM_WE)
+	.ddram_burstcnt  (mpeg2_new_ddr_wr_burstcnt),
+	.ddram_addr      (mpeg2_new_ddr_wr_addr),
+	.ddram_rd        (mpeg2_new_ddr_wr_rd),
+	.ddram_din       (mpeg2_new_ddr_wr_din),
+	.ddram_be        (mpeg2_new_ddr_wr_be),
+	.ddram_we        (mpeg2_new_ddr_wr_we)
 );
 
-///////////////////////   4:2:0 FRAMEBUFFER   ///////////////////
+///////////////////////   DDR-BACKED 4:2:0 DISPLAY   ////////////
 
-// kate - Phase 1Oa intentionally retains the hardware-proven Phase 1N
-// on-chip presentation framebuffer in parallel with the new DDR writer.  This
-// keeps the visual acceptance test unchanged while external storage is proven.
+// kate - Phase 1Ob removes the full-picture M10K planes.  Once picture_data()
+// is complete, this module reads the full 8-bit planar Y/Cb/Cr picture back
+// from DDR3 into small ping-pong line caches and presents BT.601 RGB.
 mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 (
-	.reset       (reset),
+    .reset          (reset),
 
-	.wr_clk      (clk_mpeg2),
-	.wr_value    (mpeg2_new_recon_pixel_value),
-	.wr_component(mpeg2_new_recon_pixel_component),
-	.wr_x_pos    (mpeg2_new_recon_pixel_x),
-	.wr_y_pos    (mpeg2_new_recon_pixel_y),
-	.wr_en       (mpeg2_new_recon_pixel_valid),
+    .mem_clk        (clk_mpeg2),
+    .picture_complete(mpeg2_new_first_picture_420_parsed),
+    .horizontal_size(mpeg2_new_horizontal_size),
+    .vertical_size  (mpeg2_new_vertical_size),
 
-	.wr_picture_complete (mpeg2_new_first_picture_420_parsed),
-	.wr_horizontal_size  (mpeg2_new_horizontal_size),
-	.wr_vertical_size    (mpeg2_new_vertical_size),
+    .ddram_busy     (DDRAM_BUSY),
+    .ddram_dout     (DDRAM_DOUT),
+    .ddram_dout_ready(DDRAM_DOUT_READY),
+    .ddram_burstcnt (mpeg2_new_ddr_rd_burstcnt),
+    .ddram_addr     (mpeg2_new_ddr_rd_addr),
+    .ddram_rd       (mpeg2_new_ddr_rd),
 
-	.rd_clk      (clk_video),
-	.h_pos       (display_h_pos),
-	.v_pos       (display_v_pos),
-	.pixel_en    (display_pixel_en),
-	.h_sync      (display_h_sync),
-	.v_sync      (display_v_sync),
+    .cache_ready    (mpeg2_new_ddr_cache_ready),
+    .read_seen      (mpeg2_new_ddr_read_seen),
+    .cache_error    (mpeg2_new_ddr_cache_error),
 
-	.video_r     (fb_video_r),
-	.video_g     (fb_video_g),
-	.video_b     (fb_video_b),
-	.video_de    (fb_video_de),
-	.video_hs    (fb_video_hs),
-	.video_vs    (fb_video_vs)
+    .rd_clk         (clk_video),
+    .h_pos          (display_h_pos),
+    .v_pos          (display_v_pos),
+    .pixel_en       (display_pixel_en),
+    .h_sync         (display_h_sync),
+    .v_sync         (display_v_sync),
+
+    .video_r        (fb_video_r),
+    .video_g        (fb_video_g),
+    .video_b        (fb_video_b),
+    .video_de       (fb_video_de),
+    .video_hs       (fb_video_hs),
+    .video_vs       (fb_video_vs)
 );
+
+// Decoder/write phase and presentation/read phase are mutually exclusive.
+// The writer has proven ownership until picture_data() reaches its next
+// non-slice start code; the reader owns the port thereafter.
+wire mpeg2_new_ddr_read_phase = mpeg2_new_first_picture_420_parsed;
+
+assign DDRAM_BURSTCNT = mpeg2_new_ddr_read_phase ?
+                        mpeg2_new_ddr_rd_burstcnt :
+                        mpeg2_new_ddr_wr_burstcnt;
+assign DDRAM_ADDR     = mpeg2_new_ddr_read_phase ?
+                        mpeg2_new_ddr_rd_addr :
+                        mpeg2_new_ddr_wr_addr;
+assign DDRAM_RD       = mpeg2_new_ddr_read_phase ?
+                        mpeg2_new_ddr_rd :
+                        mpeg2_new_ddr_wr_rd;
+assign DDRAM_DIN      = mpeg2_new_ddr_read_phase ?
+                        64'd0 :
+                        mpeg2_new_ddr_wr_din;
+assign DDRAM_BE       = mpeg2_new_ddr_read_phase ?
+                        8'hFF :
+                        mpeg2_new_ddr_wr_be;
+assign DDRAM_WE       = mpeg2_new_ddr_read_phase ?
+                        1'b0 :
+                        mpeg2_new_ddr_wr_we;
 
 assign CLK_VIDEO = clk_video;
 assign CE_PIXEL  = 1'b1;
@@ -557,24 +603,24 @@ assign VGA_R = fb_video_r;
 assign VGA_G = fb_video_g;
 assign VGA_B = fb_video_b;
 
-// kate - Phase 1Oa positive diagnostic.
-// OFF: picture_data() for the first supported I-picture has not completed, the
-// coded frame does not fit the current 720x480/360x240 on-chip stores, or an
-// earlier decoder stage reported an error.
-// ON: every Y/Cb/Cr intra block traversed parser -> IQ -> IDCT -> reconstruction
-// -> accepted DDR3 writes, and the next non-slice start code completed
-// picture_data().
+// kate - Phase 1Ob positive diagnostic.
+// ON now requires the complete decode/write path plus successful DDR readback
+// and initial cache prefetch.  Therefore USER cannot light if presentation is
+// still coming from an on-chip full-picture copy: no such copy exists here.
 assign LED_USER =
-	mpeg2_new_first_picture_420_parsed &&
-	mpeg2_new_recon_macroblock_420_complete &&
-	mpeg2_new_phase1n_frame_geometry_supported &&
-	!mpeg2_new_syntax_error &&
-	!mpeg2_new_phase1_probe_error &&
-	!mpeg2_new_inverse_quant_error &&
-	!mpeg2_new_inverse_quant_unsupported_matrix &&
-	!mpeg2_new_idct_error &&
-	!mpeg2_new_recon_error &&
-	mpeg2_new_ddr_write_seen &&
-	!mpeg2_new_ddr_store_error;
+    mpeg2_new_first_picture_420_parsed &&
+    mpeg2_new_recon_macroblock_420_complete &&
+    mpeg2_new_phase1n_frame_geometry_supported &&
+    !mpeg2_new_syntax_error &&
+    !mpeg2_new_phase1_probe_error &&
+    !mpeg2_new_inverse_quant_error &&
+    !mpeg2_new_inverse_quant_unsupported_matrix &&
+    !mpeg2_new_idct_error &&
+    !mpeg2_new_recon_error &&
+    mpeg2_new_ddr_write_seen &&
+    !mpeg2_new_ddr_store_error &&
+    mpeg2_new_ddr_cache_ready &&
+    mpeg2_new_ddr_read_seen &&
+    !mpeg2_new_ddr_cache_error;
 
 endmodule
