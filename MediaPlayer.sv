@@ -144,17 +144,17 @@ reg [2:0] reset_mpeg2_sync;
 reg [2:0] reset_video_sync;
 
 always @(posedge clk_mpeg2 or posedge reset_request) begin
-\tif (reset_request)
-\t\treset_mpeg2_sync <= 3'b111;
-\telse
-\t\treset_mpeg2_sync <= {reset_mpeg2_sync[1:0], 1'b0};
+	if (reset_request)
+		reset_mpeg2_sync <= 3'b111;
+	else
+		reset_mpeg2_sync <= {reset_mpeg2_sync[1:0], 1'b0};
 end
 
 always @(posedge clk_video or posedge reset_request) begin
-\tif (reset_request)
-\t\treset_video_sync <= 3'b111;
-\telse
-\t\treset_video_sync <= {reset_video_sync[1:0], 1'b0};
+	if (reset_request)
+		reset_video_sync <= 3'b111;
+	else
+		reset_video_sync <= {reset_video_sync[1:0], 1'b0};
 end
 
 wire reset_mpeg2 = reset_mpeg2_sync[2];
