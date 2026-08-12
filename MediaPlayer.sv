@@ -266,6 +266,7 @@ wire        mpeg2_new_first_i_macroblock_seen;
 wire        mpeg2_new_first_luma_dc_seen;
 wire        mpeg2_new_first_luma_block_complete;
 wire        mpeg2_new_first_picture_420_parsed;
+wire        mpeg2_new_second_picture_420_parsed;
 wire        mpeg2_new_slice_start;
 wire        mpeg2_new_luma_macroblock_start;
 wire        mpeg2_new_phase1_probe_error;
@@ -394,11 +395,11 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.intra_quant_matrix_default       (mpeg2_new_intra_quant_matrix_default)
 );
 
-// kate - Phase 1Oa keeps the proven complete-first-picture 4:2:0 parser, but
-// its serialized pipeline-ready handshake now waits until reconstruction has
-// also been persisted to DDR3.  Streaming bitreader backpressure therefore
-// covers DDR service latency without dropping compressed bits.
-mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
+// kate - Phase 1Q keeps the proven complete-picture parser untouched and uses a
+// diagnostic wrapper to decode two consecutive supported I pictures.  Picture 1
+// keeps the proven DDR-backed completion handshake.  Picture 2 traverses the
+// same IQ/IDCT/reconstruction pipeline but is deliberately not stored yet.
+mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 (
 	.clk                         (clk_mpeg2),
 	.reset                       (reset_mpeg2),
@@ -410,6 +411,7 @@ mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 	.intra_dc_precision          (mpeg2_new_intra_dc_precision),
 	.intra_vlc_format            (mpeg2_new_intra_vlc_format),
 	.pipeline_block_done         (mpeg2_new_ddr_block_stored),
+	.recon_block_complete        (mpeg2_new_recon_block_complete),
 
 	.slice_header_seen           (mpeg2_new_slice_header_seen),
 	.macroblock_address_seen     (mpeg2_new_macroblock_address_seen),
@@ -417,6 +419,7 @@ mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 	.first_luma_dc_seen          (mpeg2_new_first_luma_dc_seen),
 	.first_luma_block_complete   (mpeg2_new_first_luma_block_complete),
 	.first_picture_420_parsed    (mpeg2_new_first_picture_420_parsed),
+	.second_picture_420_parsed   (mpeg2_new_second_picture_420_parsed),
 	.probe_error                 (mpeg2_new_phase1_probe_error),
 	.quantiser_scale_code        (mpeg2_new_slice_quantiser_scale_code),
 	.macroblock_address_increment(mpeg2_new_macroblock_address_increment),
@@ -529,11 +532,12 @@ mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 
 ///////////////////////   FULL-PRECISION DDR WRITER   ///////////
 
-// kate - Phase 1Ob retains the hardware-proven Phase 1Oa full-precision
-// planar DDR writer.  The parser cannot advance until all eight rows of the
-// current reconstructed block have been accepted by DDRAM.  Presentation now
-// reads this same stored picture back from DDR rather than keeping a frame copy
-// in M10Ks.
+// kate - Phase 1Q leaves picture 1's proven DDR frame untouched while picture 2
+// is decoded as a pipeline diagnostic.  Gate the writer after picture 1 so the
+// second reconstruction cannot overwrite the frame currently being displayed.
+wire mpeg2_new_ddr_first_picture_write_phase =
+    !mpeg2_new_first_picture_420_parsed;
+
 mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 (
 	.clk             (clk_mpeg2),
@@ -543,9 +547,12 @@ mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 	.pixel_component (mpeg2_new_recon_pixel_component),
 	.pixel_x         (mpeg2_new_recon_pixel_x),
 	.pixel_y         (mpeg2_new_recon_pixel_y),
-	.pixel_valid     (mpeg2_new_recon_pixel_valid),
-	.block_start     (mpeg2_new_recon_block_start),
-	.block_complete  (mpeg2_new_recon_block_complete),
+	.pixel_valid     (mpeg2_new_recon_pixel_valid &&
+	                  mpeg2_new_ddr_first_picture_write_phase),
+	.block_start     (mpeg2_new_recon_block_start &&
+	                  mpeg2_new_ddr_first_picture_write_phase),
+	.block_complete  (mpeg2_new_recon_block_complete &&
+	                  mpeg2_new_ddr_first_picture_write_phase),
 
 	.block_stored    (mpeg2_new_ddr_block_stored),
 	.write_seen      (mpeg2_new_ddr_write_seen),
@@ -635,12 +642,13 @@ assign VGA_R = fb_video_r;
 assign VGA_G = fb_video_g;
 assign VGA_B = fb_video_b;
 
-// kate - Phase 1Ob positive diagnostic.
-// ON now requires the complete decode/write path plus successful DDR readback
-// and initial cache prefetch.  Therefore USER cannot light if presentation is
-// still coming from an on-chip full-picture copy: no such copy exists here.
+// kate - Phase 1Q positive diagnostic.
+// The displayed frame is deliberately still picture 1.  USER now additionally
+// requires picture 2 to complete the full parser/IQ/IDCT/reconstruction path,
+// proving successive-picture decode before DDR ping-pong/frame swapping lands.
 assign LED_USER =
     mpeg2_new_first_picture_420_parsed &&
+    mpeg2_new_second_picture_420_parsed &&
     mpeg2_new_recon_macroblock_420_complete &&
     mpeg2_new_phase1n_frame_geometry_supported &&
     !mpeg2_new_syntax_error &&
