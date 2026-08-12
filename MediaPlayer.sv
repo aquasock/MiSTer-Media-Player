@@ -129,7 +129,7 @@ pll pll
 
 wire reset = RESET | status[0] | buttons[1];
 
-// kate - Phase 1M: the streaming H.262 bitreader continues to own input
+// kate - Phase 1N: the streaming H.262 bitreader continues to own input
 // backpressure while picture_data() advances across every slice of the first
 // supported I-picture.  Slice boundaries remain inside the bitreader so no
 // alignment or payload bytes are discarded.
@@ -162,7 +162,7 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 );
 
 // kate - Phase 1H: the legacy MPEG2FPGA DDR frame-store path is gone.
-// The present Phase-1M first-picture proof uses only the on-chip M10K framebuffer.
+// The present Phase-1N first-colour-picture proof uses only on-chip M10K frame stores.
 // Keep the MiSTer DDR service interface completely idle until our own explicit
 // frame-store layer is introduced in a later decoder phase.
 assign DDRAM_CLK      = clk_mpeg2;
@@ -181,7 +181,9 @@ wire        display_pixel_en;
 wire        display_h_sync;
 wire        display_v_sync;
 
-wire [7:0]  fb_video_y;
+wire [7:0]  fb_video_r;
+wire [7:0]  fb_video_g;
+wire [7:0]  fb_video_b;
 wire        fb_video_de;
 wire        fb_video_hs;
 wire        fb_video_vs;
@@ -237,7 +239,7 @@ wire        mpeg2_new_macroblock_address_seen;
 wire        mpeg2_new_first_i_macroblock_seen;
 wire        mpeg2_new_first_luma_dc_seen;
 wire        mpeg2_new_first_luma_block_complete;
-wire        mpeg2_new_first_picture_luma_parsed;
+wire        mpeg2_new_first_picture_420_parsed;
 wire        mpeg2_new_slice_start;
 wire        mpeg2_new_luma_macroblock_start;
 wire        mpeg2_new_phase1_probe_error;
@@ -253,6 +255,7 @@ wire [10:0] mpeg2_new_first_luma_dc_coefficient;
 wire [6:0]  mpeg2_new_first_luma_ac_nonzero_count;
 wire [5:0]  mpeg2_new_first_luma_last_coeff_index;
 wire signed [11:0] mpeg2_new_first_luma_last_ac_level;
+wire [2:0]  mpeg2_new_qfs_block_index;
 wire        mpeg2_new_qfs_block_start;
 wire        mpeg2_new_qfs_write_en;
 wire [5:0]  mpeg2_new_qfs_write_index;
@@ -279,12 +282,13 @@ wire signed [15:0] mpeg2_new_first_luma_sample00;
 wire signed [15:0] mpeg2_new_first_luma_sample77;
 
 wire        mpeg2_new_recon_pixel_valid;
+wire [1:0]  mpeg2_new_recon_pixel_component;
 wire [11:0] mpeg2_new_recon_pixel_x;
 wire [11:0] mpeg2_new_recon_pixel_y;
-wire [7:0]  mpeg2_new_recon_pixel_luma;
+wire [7:0]  mpeg2_new_recon_pixel_value;
 wire        mpeg2_new_recon_block_start;
 wire        mpeg2_new_recon_block_complete;
-wire        mpeg2_new_recon_macroblock_luma_complete;
+wire        mpeg2_new_recon_macroblock_420_complete;
 wire        mpeg2_new_recon_error;
 wire [11:0] mpeg2_new_recon_block_origin_x;
 wire [11:0] mpeg2_new_recon_block_origin_y;
@@ -294,10 +298,10 @@ wire [4:0] mpeg2_new_effective_quantiser_scale_code =
 		mpeg2_new_macroblock_quantiser_scale_code :
 		mpeg2_new_slice_quantiser_scale_code;
 
-// kate - Phase 1M's local on-chip presentation buffer is 720x480.  The parser
+// kate - Phase 1N's local on-chip presentation buffer is 720x480.  The parser
 // itself remains standards-driven, but USER only reports a complete displayable
 // first picture when the coded frame fits this current diagnostic store.
-wire mpeg2_new_phase1m_frame_geometry_supported =
+wire mpeg2_new_phase1n_frame_geometry_supported =
 	(mpeg2_new_horizontal_size != 14'd0) &&
 	(mpeg2_new_vertical_size   != 14'd0) &&
 	(mpeg2_new_horizontal_size <= 14'd720) &&
@@ -345,11 +349,10 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.intra_quant_matrix_default       (mpeg2_new_intra_quant_matrix_default)
 );
 
-// kate - Phase 1M complete-first-picture streaming progression.  The probe
-// reconstructs Y blocks 0..3 for every macroblock in every slice, consumes
-// Cb/Cr syntax, follows H.262 next_start_code() across slice boundaries, and
-// completes when picture_data() reaches the next non-slice start code.  The
-// proven Phase 1K ready/backpressure path remains unchanged.
+// kate - Phase 1N complete-first-picture 4:2:0 progression.  The parser now
+// submits Y0..Y3, Cb and Cr through the same serialized IQ/IDCT/reconstruction
+// path for every macroblock in every slice.  H.262 next_start_code() traversal
+// and the proven Phase 1K ready/backpressure path remain unchanged.
 mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 (
 	.clk                         (clk_mpeg2),
@@ -368,7 +371,7 @@ mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 	.first_i_macroblock_seen     (mpeg2_new_first_i_macroblock_seen),
 	.first_luma_dc_seen          (mpeg2_new_first_luma_dc_seen),
 	.first_luma_block_complete   (mpeg2_new_first_luma_block_complete),
-	.first_picture_luma_parsed   (mpeg2_new_first_picture_luma_parsed),
+	.first_picture_420_parsed    (mpeg2_new_first_picture_420_parsed),
 	.probe_error                 (mpeg2_new_phase1_probe_error),
 	.quantiser_scale_code        (mpeg2_new_slice_quantiser_scale_code),
 	.macroblock_address_increment(mpeg2_new_macroblock_address_increment),
@@ -385,6 +388,7 @@ mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 	.slice_start                 (mpeg2_new_slice_start),
 	.luma_macroblock_start       (mpeg2_new_luma_macroblock_start),
 
+	.qfs_block_index             (mpeg2_new_qfs_block_index),
 	.qfs_block_start             (mpeg2_new_qfs_block_start),
 	.qfs_write_en                (mpeg2_new_qfs_write_en),
 	.qfs_write_index             (mpeg2_new_qfs_write_index),
@@ -393,7 +397,7 @@ mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 );
 
 // kate - H.262 inverse scan, inverse quantisation, saturation and mismatch
-// control for each submitted luminance block.
+// control for every submitted Y/Cb/Cr intra block.
 mpeg2_h262_inverse_quant mpeg2_h262_inverse_quant
 (
 	.clk                         (clk_mpeg2),
@@ -445,7 +449,7 @@ mpeg2_h262_idct mpeg2_h262_idct
 	.first_luma_sample77         (mpeg2_new_first_luma_sample77)
 );
 
-// kate - H.262 intra reconstruction and explicit picture coordinates.
+// kate - H.262 intra 4:2:0 reconstruction and component-plane coordinates.
 mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 (
 	.clk                                (clk_mpeg2),
@@ -458,6 +462,7 @@ mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 	.macroblock_address_increment       (mpeg2_new_macroblock_address_increment),
 	.slice_start                        (mpeg2_new_slice_start),
 	.macroblock_start                   (mpeg2_new_luma_macroblock_start),
+	.block_index                        (mpeg2_new_qfs_block_index),
 
 	.sample_valid                       (mpeg2_new_idct_sample_valid),
 	.sample_index                       (mpeg2_new_idct_sample_index),
@@ -465,32 +470,35 @@ mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 	.idct_block_complete                (mpeg2_new_idct_complete),
 
 	.pixel_valid                        (mpeg2_new_recon_pixel_valid),
+	.pixel_component                    (mpeg2_new_recon_pixel_component),
 	.pixel_x                            (mpeg2_new_recon_pixel_x),
 	.pixel_y                            (mpeg2_new_recon_pixel_y),
-	.pixel_luma                         (mpeg2_new_recon_pixel_luma),
+	.pixel_value                        (mpeg2_new_recon_pixel_value),
 	.block_start                        (mpeg2_new_recon_block_start),
 	.block_complete                     (mpeg2_new_recon_block_complete),
-	.macroblock_luma_complete           (mpeg2_new_recon_macroblock_luma_complete),
+	.macroblock_420_complete            (mpeg2_new_recon_macroblock_420_complete),
 	.recon_error                        (mpeg2_new_recon_error),
 	.block_origin_x                     (mpeg2_new_recon_block_origin_x),
 	.block_origin_y                     (mpeg2_new_recon_block_origin_y)
 );
 
-///////////////////////   LUMA FRAMEBUFFER   //////////////////////
+///////////////////////   4:2:0 FRAMEBUFFER   ///////////////////
 
-// kate - New-decoder pixels write at 54 MHz; the fixed 800x600 raster reads at
-// 40 MHz.  MPEG2FPGA is not present on either side of this memory.
+// kate - Reconstructed Y/Cb/Cr component pels write at 54 MHz.  The fixed
+// 800x600 raster reads all three planes at 40 MHz, expands 4:2:0 chroma, and
+// presents BT.601 RGB.  MPEG2FPGA is not present on either side.
 mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 (
 	.reset       (reset),
 
 	.wr_clk      (clk_mpeg2),
-	.wr_y        (mpeg2_new_recon_pixel_luma),
+	.wr_value    (mpeg2_new_recon_pixel_value),
+	.wr_component(mpeg2_new_recon_pixel_component),
 	.wr_x_pos    (mpeg2_new_recon_pixel_x),
 	.wr_y_pos    (mpeg2_new_recon_pixel_y),
 	.wr_en       (mpeg2_new_recon_pixel_valid),
 
-	.wr_picture_complete (mpeg2_new_first_picture_luma_parsed),
+	.wr_picture_complete (mpeg2_new_first_picture_420_parsed),
 	.wr_horizontal_size  (mpeg2_new_horizontal_size),
 	.wr_vertical_size    (mpeg2_new_vertical_size),
 
@@ -501,7 +509,9 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 	.h_sync      (display_h_sync),
 	.v_sync      (display_v_sync),
 
-	.video_y     (fb_video_y),
+	.video_r     (fb_video_r),
+	.video_g     (fb_video_g),
+	.video_b     (fb_video_b),
 	.video_de    (fb_video_de),
 	.video_hs    (fb_video_hs),
 	.video_vs    (fb_video_vs)
@@ -514,20 +524,20 @@ assign VGA_DE = fb_video_de;
 assign VGA_HS = fb_video_hs;
 assign VGA_VS = fb_video_vs;
 
-assign VGA_R = fb_video_y;
-assign VGA_G = fb_video_y;
-assign VGA_B = fb_video_y;
+assign VGA_R = fb_video_r;
+assign VGA_G = fb_video_g;
+assign VGA_B = fb_video_b;
 
-// kate - Phase 1M positive diagnostic.
+// kate - Phase 1N positive diagnostic.
 // OFF: picture_data() for the first supported I-picture has not completed, the
-// coded frame does not fit the current 720x480 on-chip store, or an earlier
-// decoder stage reported an error.
-// ON: every decoded slice's luma blocks traversed parser -> IQ -> IDCT ->
-// reconstruction and the next non-slice start code completed picture_data().
+// coded frame does not fit the current 720x480/360x240 on-chip stores, or an
+// earlier decoder stage reported an error.
+// ON: every Y/Cb/Cr intra block traversed parser -> IQ -> IDCT -> reconstruction
+// and the next non-slice start code completed picture_data().
 assign LED_USER =
-	mpeg2_new_first_picture_luma_parsed &&
-	mpeg2_new_recon_macroblock_luma_complete &&
-	mpeg2_new_phase1m_frame_geometry_supported &&
+	mpeg2_new_first_picture_420_parsed &&
+	mpeg2_new_recon_macroblock_420_complete &&
+	mpeg2_new_phase1n_frame_geometry_supported &&
 	!mpeg2_new_syntax_error &&
 	!mpeg2_new_phase1_probe_error &&
 	!mpeg2_new_inverse_quant_error &&

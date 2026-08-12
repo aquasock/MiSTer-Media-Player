@@ -1,8 +1,8 @@
 //============================================================================
-// MiSTer Media Player - standards-driven H.262 intra reconstruction
+// MiSTer Media Player - standards-driven H.262 intra 4:2:0 reconstruction
 //
 // Normative standards basis:
-//   ITU-T H.262 consolidated text (02/2012):
+//   ITU-T H.262 / ISO/IEC 13818-2:
 //   - 6.3.3: mb_width = (horizontal_size + 15) / 16.
 //   - 6.3.16: slice_vertical_position identifies the macroblock row; for
 //     vertical_size > 2800 the 3-bit slice_vertical_position_extension extends
@@ -10,17 +10,17 @@
 //   - 6.3.17: at the start of a slice,
 //       previous_macroblock_address = (mb_row * mb_width) - 1,
 //     then each macroblock_address_increment advances macroblock_address.
-//   - 6.1.3 / Figure 6-10: in 4:2:0, luminance blocks 0..3 occupy the 16x16
-//     macroblock as 0/1 on the upper row and 2/3 on the lower row.
+//   - 6.1.3 / Figure 6-10: 4:2:0 macroblock block order is
+//       Y0, Y1, Y2, Y3, Cb, Cr.
 //   - 7.6: intra-coded macroblocks form no prediction, so p[y][x] = 0.
 //   - 7.6.8: d[y][x] = f[y][x] + p[y][x], saturated to [0,255].
 //
-// Phase 1M capability boundary:
-//   The upstream streaming probe supplies luminance blocks 0..3 for every
-//   macroblock in every slice of the first picture.  slice_start resets the
-//   slice-local previous-macroblock-address state, then each accepted
-//   macroblock_address_increment places the 16x16 macroblock at its normative
-//   picture coordinate.  Chroma remains deferred.
+// Phase 1N capability boundary:
+//   The upstream streaming parser now submits all six 4:2:0 intra blocks for
+//   every macroblock of the first picture.  Y samples are emitted in full-size
+//   picture coordinates; Cb and Cr samples are emitted in their 1/2-width,
+//   1/2-height component-plane coordinates.  Chroma upsampling and YCbCr->RGB
+//   presentation are deliberately downstream concerns.
 //============================================================================
 
 module mpeg2_h262_intra_recon
@@ -38,8 +38,12 @@ module mpeg2_h262_intra_recon
     // restarts previous_macroblock_address at each slice.
     input  wire               slice_start,
 
-    // Pulses once for each accepted Phase-1M intra macroblock header.
+    // Pulses once for each accepted Phase-1N intra macroblock header.
     input  wire               macroblock_start,
+
+    // Legacy parser module exposes the current H.262 4:2:0 block number.
+    // It remains stable from qfs_block_start through this block_complete.
+    input  wire [2:0]         block_index,
 
     input  wire               sample_valid,
     input  wire [5:0]         sample_index,
@@ -47,15 +51,17 @@ module mpeg2_h262_intra_recon
     input  wire               idct_block_complete,
 
     output reg                pixel_valid,
+    // 0 = Y, 1 = Cb, 2 = Cr.
+    output reg [1:0]          pixel_component,
     output reg [11:0]         pixel_x,
     output reg [11:0]         pixel_y,
-    output reg [7:0]          pixel_luma,
+    output reg [7:0]          pixel_value,
     output reg                block_start,
     // One-cycle completion pulse used as the upstream pipeline-ready handshake.
     output reg                block_complete,
-    // Sticky proof that at least one complete macroblock's four Y blocks have
-    // traversed reconstruction.  First-picture completion is owned by the parser.
-    output reg                macroblock_luma_complete,
+    // Sticky proof that at least one complete six-block 4:2:0 macroblock has
+    // traversed reconstruction.  First-picture completion is owned by parser.
+    output reg                macroblock_420_complete,
     output reg                recon_error,
 
     output reg [11:0]         block_origin_x,
@@ -73,11 +79,7 @@ wire [10:0] mb_row =
          {3'd0, slice_vertical_position} - 11'd1 :
         {3'd0, slice_vertical_position} - 11'd1;
 
-// kate - Phase 1M keeps the accumulated macroblock column explicitly.  For the
-// first macroblock in each slice column = increment-1; after that each increment
-// is relative to the previously decoded macroblock address (H.262 6.3.17).
-// There is deliberately no fixed macroblock-count limit here; the parser owns
-// slice/picture termination and this stage only enforces the encoded row width.
+// H.262 6.3.17 macroblock-address progression within one slice.
 reg        macroblock_sequence_started;
 reg [11:0] current_mb_column;
 
@@ -86,8 +88,10 @@ wire [12:0] first_mb_column_calc =
 wire [12:0] next_mb_column_calc =
     {1'b0, current_mb_column} + {1'b0, macroblock_address_increment};
 
-wire [15:0] macroblock_origin_x_calc = {4'd0, current_mb_column} << 4;
-wire [15:0] macroblock_origin_y_calc = {5'd0, mb_row} << 4;
+wire [15:0] luma_macroblock_origin_x = {4'd0, current_mb_column} << 4;
+wire [15:0] luma_macroblock_origin_y = {5'd0, mb_row} << 4;
+wire [15:0] chroma_macroblock_origin_x = {4'd0, current_mb_column} << 3;
+wire [15:0] chroma_macroblock_origin_y = {5'd0, mb_row} << 3;
 
 wire coordinate_state_valid =
     macroblock_sequence_started &&
@@ -96,25 +100,28 @@ wire coordinate_state_valid =
     (slice_vertical_position != 8'd0) &&
     (mb_width != 11'd0) &&
     (current_mb_column < mb_width) &&
-    (macroblock_origin_x_calc < 16'd4096) &&
-    (macroblock_origin_y_calc < 16'd4096);
+    (block_index <= 3'd5);
 
-// H.262 6.1.3 / Figure 6-10, 4:2:0 frame macroblock luminance layout:
-//       0 1
-//       2 3
-reg [1:0] luma_block_index;
-wire [3:0] luma_block_x_offset = luma_block_index[0] ? 4'd8 : 4'd0;
-wire [3:0] luma_block_y_offset = luma_block_index[1] ? 4'd8 : 4'd0;
+// H.262 4:2:0 block layout:
+//       Y0 Y1       Cb and Cr each contain one 8x8 block
+//       Y2 Y3       for the same 16x16 luma macroblock.
+wire [3:0] luma_block_x_offset = block_index[0] ? 4'd8 : 4'd0;
+wire [3:0] luma_block_y_offset = block_index[1] ? 4'd8 : 4'd0;
+wire       current_block_is_luma = (block_index < 3'd4);
+wire [1:0] current_component = current_block_is_luma ? 2'd0 :
+                               (block_index == 3'd4) ? 2'd1 : 2'd2;
 
-wire [15:0] block_origin_x_calc =
-    macroblock_origin_x_calc + {12'd0, luma_block_x_offset};
-wire [15:0] block_origin_y_calc =
-    macroblock_origin_y_calc + {12'd0, luma_block_y_offset};
+wire [15:0] block_origin_x_calc = current_block_is_luma ?
+    (luma_macroblock_origin_x + {12'd0, luma_block_x_offset}) :
+     chroma_macroblock_origin_x;
+wire [15:0] block_origin_y_calc = current_block_is_luma ?
+    (luma_macroblock_origin_y + {12'd0, luma_block_y_offset}) :
+     chroma_macroblock_origin_y;
 
 function automatic [7:0] saturate_pel;
     input signed [15:0] value;
     begin
-        // H.262 7.6/7.6.8: p[y][x] is zero for intra-coded macroblocks.
+        // H.262 7.6/7.6.8: p[y][x] is zero for an intra-coded macroblock.
         if (value < 16'sd0)
             saturate_pel = 8'd0;
         else if (value > 16'sd255)
@@ -127,25 +134,29 @@ endfunction
 reg       capture_active;
 reg [5:0] expected_sample_index;
 reg       idct_block_complete_d;
+reg [2:0] active_block_index;
+reg [1:0] active_component;
 
 always @(posedge clk) begin
     if (reset) begin
         pixel_valid                 <= 1'b0;
+        pixel_component             <= 2'd0;
         pixel_x                     <= 12'd0;
         pixel_y                     <= 12'd0;
-        pixel_luma                  <= 8'd0;
+        pixel_value                 <= 8'd0;
         block_start                 <= 1'b0;
         block_complete              <= 1'b0;
-        macroblock_luma_complete    <= 1'b0;
+        macroblock_420_complete     <= 1'b0;
         recon_error                 <= 1'b0;
         block_origin_x              <= 12'd0;
         block_origin_y              <= 12'd0;
-        luma_block_index            <= 2'd0;
         macroblock_sequence_started <= 1'b0;
         current_mb_column           <= 12'd0;
         capture_active              <= 1'b0;
         expected_sample_index       <= 6'd0;
         idct_block_complete_d       <= 1'b0;
+        active_block_index          <= 3'd0;
+        active_component            <= 2'd0;
     end
     else begin
         pixel_valid    <= 1'b0;
@@ -154,15 +165,14 @@ always @(posedge clk) begin
         idct_block_complete_d <= idct_block_complete;
 
         if (slice_start) begin
-            // The parser emits this only after the previous slice has completed,
-            // so downstream sample capture must already be idle.
+            // The parser emits this only after the previous slice's final Cr
+            // block has completed, so downstream sample capture must be idle.
             if (capture_active) begin
                 recon_error <= 1'b1;
             end
             else begin
                 macroblock_sequence_started <= 1'b0;
                 current_mb_column           <= 12'd0;
-                luma_block_index            <= 2'd0;
             end
         end
 
@@ -177,19 +187,14 @@ always @(posedge clk) begin
                 else begin
                     current_mb_column           <= first_mb_column_calc[11:0];
                     macroblock_sequence_started <= 1'b1;
-                    luma_block_index            <= 2'd0;
                 end
             end
             else begin
-                // H.262 6.3.17 advances macroblock_address by the decoded
-                // increment.  Phase 1M permits every legal column in this row
-                // rather than imposing Phase 1J's four-macroblock test limit.
                 if (next_mb_column_calc >= {2'd0, mb_width}) begin
                     recon_error <= 1'b1;
                 end
                 else begin
                     current_mb_column <= next_mb_column_calc[11:0];
-                    luma_block_index  <= 2'd0;
                 end
             end
         end
@@ -202,14 +207,17 @@ always @(posedge clk) begin
                 else begin
                     capture_active        <= 1'b1;
                     expected_sample_index <= 6'd1;
+                    active_block_index    <= block_index;
+                    active_component      <= current_component;
                     block_origin_x        <= block_origin_x_calc[11:0];
                     block_origin_y        <= block_origin_y_calc[11:0];
 
-                    pixel_valid <= 1'b1;
-                    block_start <= 1'b1;
-                    pixel_x     <= block_origin_x_calc[11:0];
-                    pixel_y     <= block_origin_y_calc[11:0];
-                    pixel_luma  <= saturate_pel(sample_value);
+                    pixel_valid     <= 1'b1;
+                    block_start     <= 1'b1;
+                    pixel_component <= current_component;
+                    pixel_x         <= block_origin_x_calc[11:0];
+                    pixel_y         <= block_origin_y_calc[11:0];
+                    pixel_value     <= saturate_pel(sample_value);
                 end
             end
             else begin
@@ -217,22 +225,19 @@ always @(posedge clk) begin
                     recon_error <= 1'b1;
                 end
                 else begin
-                    pixel_valid <= 1'b1;
-                    pixel_x     <= block_origin_x + {9'd0, sample_index[2:0]};
-                    pixel_y     <= block_origin_y + {9'd0, sample_index[5:3]};
-                    pixel_luma  <= saturate_pel(sample_value);
+                    pixel_valid     <= 1'b1;
+                    pixel_component <= active_component;
+                    pixel_x         <= block_origin_x + {9'd0, sample_index[2:0]};
+                    pixel_y         <= block_origin_y + {9'd0, sample_index[5:3]};
+                    pixel_value     <= saturate_pel(sample_value);
 
                     if (sample_index == 6'd63) begin
                         capture_active        <= 1'b0;
                         expected_sample_index <= 6'd0;
                         block_complete        <= 1'b1;
 
-                        if (luma_block_index == 2'd3) begin
-                            macroblock_luma_complete <= 1'b1;
-                        end
-                        else begin
-                            luma_block_index <= luma_block_index + 2'd1;
-                        end
+                        if (active_block_index == 3'd5)
+                            macroblock_420_complete <= 1'b1;
                     end
                     else begin
                         expected_sample_index <= expected_sample_index + 6'd1;

@@ -1,5 +1,5 @@
 //============================================================================
-// MiSTer Media Player - H.262 Phase 1M complete first-picture luma probe
+// MiSTer Media Player - H.262 Phase 1N complete first-picture 4:2:0 probe
 //
 // Normative standards basis:
 //   ITU-T H.262 / ISO/IEC 13818-2
@@ -12,25 +12,25 @@
 //   - 7.2.2 intra AC coefficient decoding
 //   - Annex B Tables B.1, B.2, B.12, B.13, B.14 and B.15
 //
-// Phase 1M capability boundary:
+// Phase 1N capability boundary:
 //   - Non-scalable progressive 4:2:0 frame-picture I video only, selected by
 //     the standards-driven front end.
-//   - Decode and reconstruct luminance blocks 0..3 for every macroblock in
-//     every slice of the first picture.
-//   - Chroma blocks 4 and 5 are parsed completely (including their DC VLC and
-//     AC coefficient syntax) so the parser can advance through picture_data(),
-//     but chroma samples are deliberately not submitted to IQ/IDCT yet.
+//   - Decode and reconstruct all six intra blocks (Y0..Y3,Cb,Cr) for every
+//     macroblock in every slice of the first picture.
+//   - The same serialized QFS -> inverse quantisation -> IDCT -> reconstruction
+//     pipeline is used for luma and chroma; the parser does not advance to the
+//     next block until reconstruction reports the current block complete.
 //   - H.262 6.2.4 terminates each slice when the next 23 bits are all zero.
-//     Phase 1M then performs the required next_start_code() traversal.  Another
+//     Phase 1N then performs the required next_start_code() traversal.  Another
 //     slice_start_code restarts slice parsing; any other start code completes
 //     the first picture_data() region.
 //   - No whole-slice capture buffer.  Bits remain streaming and upstream FIFO
 //     backpressure preserves exact bit position while this parser or the
 //     reconstruction pipeline pauses.
 //
-// kate - Luma parsing pauses after every EOB until reconstruction reports the
-// previous block complete.  DC predictors and macroblock-address state are
-// reset at every slice boundary as required by H.262.
+// kate - Every 4:2:0 block now pauses after EOB until reconstruction reports
+// completion.  DC predictors and macroblock-address state are reset at every
+// slice boundary as required by H.262.
 //============================================================================
 
 module mpeg2_h262_luma4_probe
@@ -57,7 +57,7 @@ module mpeg2_h262_luma4_probe
     output reg         first_luma_block_complete,
     // Sticky completion after every slice of the first picture has been parsed
     // and picture_data() reaches the next non-slice start code.
-    output reg         first_picture_luma_parsed,
+    output reg         first_picture_420_parsed,
     output reg         probe_error,
 
     output reg  [4:0]  quantiser_scale_code,
@@ -82,7 +82,9 @@ module mpeg2_h262_luma4_probe
     // Starts each accepted intra macroblock reconstruction context.
     output reg         luma_macroblock_start,
 
-    // Coefficient handoff to inverse quantisation.
+    // Coefficient handoff to inverse quantisation.  qfs_block_index remains
+    // stable for the complete serialized block pipeline: 0..3 Y, 4 Cb, 5 Cr.
+    output wire [2:0]  qfs_block_index,
     output reg         qfs_block_start,
     output reg         qfs_write_en,
     output reg  [5:0]  qfs_write_index,
@@ -99,7 +101,7 @@ wire        slice_start_now  = start_code_now &&
                                (start_code_value >= 8'h01) &&
                                (start_code_value <= 8'hAF);
 
-// kate - Phase 1M streaming bitreader state.  The bitreader retains only one
+// kate - Phase 1N streaming bitreader state.  The bitreader retains only one
 // payload byte and backpressures the existing asynchronous input FIFO whenever
 // that byte has not yet been consumed.
 reg  parse_active;
@@ -171,6 +173,7 @@ reg [4:0] macroblock_qscale_shift;
 // from the first block of later slices for retained diagnostics.
 reg [2:0]  block_index;
 reg [10:0] macroblock_index;
+assign qfs_block_index = block_index;
 
 // H.262 6.2.4 ends the slice macroblock loop when the next 23 bits are zero.
 // ST_MBA already accumulates up to 11 bits for Table B.1; if those 11 bits are
@@ -473,10 +476,10 @@ task automatic start_luma_block;
     end
 endtask
 
-// Chroma blocks must be consumed to reach the following macroblock, but Phase
-// 1M deliberately does not submit them to the luma IQ/IDCT pipeline.
+// kate - Phase 1N submits Cb/Cr through the same one-block IQ/IDCT pipeline.
 task automatic start_chroma_block;
     begin
+        qfs_block_start     <= 1'b1;
         dc_vlc_code         <= 10'd0;
         dc_vlc_len          <= 4'd0;
         dc_size             <= 4'd0;
@@ -539,7 +542,7 @@ always @(posedge clk) begin
         first_i_macroblock_seen           <= 1'b0;
         first_luma_dc_seen                <= 1'b0;
         first_luma_block_complete         <= 1'b0;
-        first_picture_luma_parsed         <= 1'b0;
+        first_picture_420_parsed         <= 1'b0;
         probe_error                       <= 1'b0;
         quantiser_scale_code              <= 5'd0;
         macroblock_address_increment      <= 12'd0;
@@ -579,7 +582,7 @@ always @(posedge clk) begin
             byte_window <= byte_window_next;
 
             if (!parse_active && !probe_error &&
-                !first_picture_luma_parsed && slice_start_now) begin
+                !first_picture_420_parsed && slice_start_now) begin
                 parse_active                      <= 1'b1;
                 slice_start                       <= 1'b1;
                 slice_vertical_position           <= start_code_value;
@@ -834,7 +837,7 @@ always @(posedge clk) begin
                                 // only while the next start code is a slice code.
                                 // Any other start code therefore completes the
                                 // first picture_data() region for this phase.
-                                first_picture_luma_parsed <= 1'b1;
+                                first_picture_420_parsed <= 1'b1;
                                 parse_active              <= 1'b0;
                             end
                         end
@@ -903,11 +906,9 @@ always @(posedge clk) begin
                                     first_luma_dc_coefficient  <= dc_predictor_y;
                                     first_luma_dc_seen         <= 1'b1;
                                 end
-                                if (current_block_is_luma) begin
-                                    qfs_write_en    <= 1'b1;
-                                    qfs_write_index <= 6'd0;
-                                    qfs_write_value <= {2'b00, dc_predictor_y};
-                                end
+                                qfs_write_en    <= 1'b1;
+                                qfs_write_index <= 6'd0;
+                                qfs_write_value <= {2'b00, dc_predictor_current};
                                 qfs_index   <= 7'd1;
                                 ac_vlc_code <= 16'd0;
                                 ac_vlc_len  <= 5'd0;
@@ -950,11 +951,9 @@ always @(posedge clk) begin
                                     first_luma_dc_coefficient  <= dc_coefficient_decoded[10:0];
                                     first_luma_dc_seen         <= 1'b1;
                                 end
-                                if (current_block_is_luma) begin
-                                    qfs_write_en    <= 1'b1;
-                                    qfs_write_index <= 6'd0;
-                                    qfs_write_value <= dc_coefficient_decoded;
-                                end
+                                qfs_write_en    <= 1'b1;
+                                qfs_write_index <= 6'd0;
+                                qfs_write_value <= dc_coefficient_decoded;
                                 qfs_index   <= 7'd1;
                                 ac_vlc_code <= 16'd0;
                                 ac_vlc_len  <= 5'd0;
@@ -969,35 +968,12 @@ always @(posedge clk) begin
                             ac_vlc_code <= 16'd0;
                             ac_vlc_len  <= 5'd0;
                             if (ac_vlc_eob) begin
-                                if (current_block_is_luma) begin
-                                    qfs_block_end <= 1'b1;
-                                    if (first_diagnostic_block)
-                                        first_luma_block_complete <= 1'b1;
-                                    // Wait for reconstruction of every Y block,
-                                    // including block 3, before parsing chroma.
-                                    parse_state <= ST_WAIT_PIPELINE;
-                                end
-                                else if (block_index == 3'd4) begin
-                                    block_index <= 3'd5;
-                                    start_chroma_block();
-                                end
-                                else begin
-                                    // Cr completes one macroblock.  Phase 1M
-                                    // continues until H.262 6.2.4's actual
-                                    // current-slice terminator is encountered.
-                                    if (macroblock_index == 11'd2047) begin
-                                        probe_error  <= 1'b1;
-                                        parse_active <= 1'b0;
-                                    end
-                                    else begin
-                                        macroblock_index <= macroblock_index + 11'd1;
-                                        vlc_code        <= 11'd0;
-                                        vlc_len         <= 4'd0;
-                                        mba_escape_base <= 12'd0;
-                                        slice_zero_count <= 5'd0;
-                                        parse_state     <= ST_MBA;
-                                    end
-                                end
+                                // kate - Phase 1N sends Y, Cb and Cr EOB through
+                                // the same serialized IQ/IDCT/reconstruction path.
+                                qfs_block_end <= 1'b1;
+                                if (first_diagnostic_block)
+                                    first_luma_block_complete <= 1'b1;
+                                parse_state <= ST_WAIT_PIPELINE;
                             end
                             else if (ac_vlc_escape) begin
                                 escape_run_shift     <= 6'd0;
@@ -1034,13 +1010,11 @@ always @(posedge clk) begin
                                     -$signed({6'd0, ac_level_pending}) :
                                      $signed({6'd0, ac_level_pending});
                             end
-                            if (current_block_is_luma) begin
-                                qfs_write_en    <= 1'b1;
-                                qfs_write_index <= normal_target_index[5:0];
-                                qfs_write_value <= current_bit ?
-                                    -$signed({7'd0, ac_level_pending}) :
-                                     $signed({7'd0, ac_level_pending});
-                            end
+                            qfs_write_en    <= 1'b1;
+                            qfs_write_index <= normal_target_index[5:0];
+                            qfs_write_value <= current_bit ?
+                                -$signed({7'd0, ac_level_pending}) :
+                                 $signed({7'd0, ac_level_pending});
                             qfs_index <= {1'b0, normal_target_index[5:0]} + 7'd1;
                             parse_state <= ST_AC_VLC;
                         end
@@ -1073,12 +1047,10 @@ always @(posedge clk) begin
                                     first_luma_last_coeff_index <= escape_target_index[5:0];
                                     first_luma_last_ac_level <= escape_level_signed;
                                 end
-                                if (current_block_is_luma) begin
-                                    qfs_write_en    <= 1'b1;
-                                    qfs_write_index <= escape_target_index[5:0];
-                                    qfs_write_value <=
-                                        {escape_level_signed[11], escape_level_signed};
-                                end
+                                qfs_write_en    <= 1'b1;
+                                qfs_write_index <= escape_target_index[5:0];
+                                qfs_write_value <=
+                                    {escape_level_signed[11], escape_level_signed};
                                 qfs_index <= {1'b0, escape_target_index[5:0]} + 7'd1;
                                 ac_vlc_code <= 16'd0;
                                 ac_vlc_len  <= 5'd0;
@@ -1101,6 +1073,27 @@ always @(posedge clk) begin
                             else if (block_index == 3'd3) begin
                                 block_index <= 3'd4;
                                 start_chroma_block();
+                            end
+                            else if (block_index == 3'd4) begin
+                                block_index <= 3'd5;
+                                start_chroma_block();
+                            end
+                            else if (block_index == 3'd5) begin
+                                // Cr reconstruction completes the six-block
+                                // 4:2:0 macroblock.  Only now may syntax advance
+                                // to the following macroblock/slice terminator.
+                                if (macroblock_index == 11'd2047) begin
+                                    probe_error  <= 1'b1;
+                                    parse_active <= 1'b0;
+                                end
+                                else begin
+                                    macroblock_index  <= macroblock_index + 11'd1;
+                                    vlc_code          <= 11'd0;
+                                    vlc_len           <= 4'd0;
+                                    mba_escape_base   <= 12'd0;
+                                    slice_zero_count  <= 5'd0;
+                                    parse_state       <= ST_MBA;
+                                end
                             end
                             else begin
                                 probe_error  <= 1'b1;

@@ -1,28 +1,34 @@
-// kate - Decoupled MPEG2 luma framebuffer.
+// kate - Decoupled MPEG2 4:2:0 picture framebuffer.
 //
-// Phase 1M stores reconstructed luminance for every slice of the first H.262
-// picture.  The decoder writes explicit picture X/Y coordinates at 54 MHz while
-// the independent fixed SVGA raster reads at 40 MHz.
+// The historical module/file name is retained to avoid gratuitous top-level
+// churn, but Phase 1N stores all three reconstructed component planes for the
+// first H.262 picture:
+//   Y  : up to 720x480
+//   Cb : up to 360x240
+//   Cr : up to 360x240
 //
-// kate - Unlike the Phase 1L first-slice proof, no partial slice is published.
-// RAM remains hidden until the parser reports that picture_data() has reached
-// the next non-slice start code.  At that point the complete decoded luma
-// picture becomes visible atomically from the presentation side.
+// The decoder writes explicit component-plane X/Y coordinates at 54 MHz while
+// the independent fixed SVGA raster reads at 40 MHz.  The complete picture is
+// published atomically only after parser/reconstruction completion.
 //
-// The current on-chip framebuffer is deliberately 720x480.  Smaller pictures
-// are shown at the upper-left of that diagnostic source window.  Pictures larger
-// than this local Phase 1M store are not published.
+// kate - Phase 1N presentation uses nearest-neighbour 4:2:0 chroma expansion:
+// each stored Cb/Cr pel supplies a 2x2 luma-pel area.  This is intentionally a
+// simple first-colour-picture presentation choice, not an H.262 sampling rule.
+// A later quality phase can add siting-aware interpolation without changing the
+// decoded component planes.
 //
-// Explicit altsyncram is retained because Quartus 17 otherwise implements this
-// mixed-clock framebuffer poorly or attempts to use registers.
+// Explicit altsyncram is retained because Quartus 17 otherwise implements these
+// mixed-clock frame stores poorly or attempts to use registers.
 
 module mpeg2_luma_framebuffer
 (
     input  wire        reset,
 
-    // New H.262 reconstruction side - 54 MHz.
+    // H.262 reconstruction side - 54 MHz.
     input  wire        wr_clk,
-    input  wire [7:0]  wr_y,
+    input  wire [7:0]  wr_value,
+    // 0 = Y, 1 = Cb, 2 = Cr.
+    input  wire [1:0]  wr_component,
     input  wire [11:0] wr_x_pos,
     input  wire [11:0] wr_y_pos,
     input  wire        wr_en,
@@ -39,26 +45,45 @@ module mpeg2_luma_framebuffer
     input  wire        h_sync,
     input  wire        v_sync,
 
-    output reg  [7:0]  video_y,
+    output reg  [7:0]  video_r,
+    output reg  [7:0]  video_g,
+    output reg  [7:0]  video_b,
     output reg         video_de,
     output reg         video_hs,
     output reg         video_vs
 );
 
-localparam integer SRC_WIDTH  = 720;
-localparam integer SRC_HEIGHT = 480;
-localparam integer FB_SIZE    = SRC_WIDTH * SRC_HEIGHT;
+localparam integer SRC_WIDTH        = 720;
+localparam integer SRC_HEIGHT       = 480;
+localparam integer Y_FB_SIZE        = SRC_WIDTH * SRC_HEIGHT;
+localparam integer CHROMA_WIDTH     = SRC_WIDTH / 2;
+localparam integer CHROMA_HEIGHT    = SRC_HEIGHT / 2;
+localparam integer CHROMA_FB_SIZE   = CHROMA_WIDTH * CHROMA_HEIGHT;
+
+localparam [1:0] COMPONENT_Y  = 2'd0;
+localparam [1:0] COMPONENT_CB = 2'd1;
+localparam [1:0] COMPONENT_CR = 2'd2;
 
 // -------------------------------------------------------------------------
-// Write-side picture store and publication descriptor.
+// Write-side three-plane picture store and publication descriptor.
 // -------------------------------------------------------------------------
 
-reg [18:0] ram_wr_address;
-reg [7:0]  ram_wr_data;
-reg        ram_wr_en;
+reg [18:0] y_wr_address;
+reg [7:0]  y_wr_data;
+reg        y_wr_en;
 
-wire [18:0] wr_linear_address =
+reg [16:0] cb_wr_address;
+reg [7:0]  cb_wr_data;
+reg        cb_wr_en;
+
+reg [16:0] cr_wr_address;
+reg [7:0]  cr_wr_data;
+reg        cr_wr_en;
+
+wire [18:0] y_wr_linear_address =
     (wr_y_pos * 19'd720) + wr_x_pos;
+wire [16:0] c_wr_linear_address =
+    ({5'd0, wr_y_pos} * 17'd360) + {8'd0, wr_x_pos[8:0]};
 
 reg        picture_present_wr;
 reg [11:0] picture_width_wr;
@@ -66,28 +91,59 @@ reg [11:0] picture_height_wr;
 
 always @(posedge wr_clk) begin
     if (reset) begin
-        ram_wr_address     <= 19'd0;
-        ram_wr_data        <= 8'd0;
-        ram_wr_en          <= 1'b0;
+        y_wr_address      <= 19'd0;
+        y_wr_data         <= 8'd0;
+        y_wr_en           <= 1'b0;
+        cb_wr_address     <= 17'd0;
+        cb_wr_data        <= 8'd128;
+        cb_wr_en          <= 1'b0;
+        cr_wr_address     <= 17'd0;
+        cr_wr_data        <= 8'd128;
+        cr_wr_en          <= 1'b0;
         picture_present_wr <= 1'b0;
         picture_width_wr   <= 12'd0;
         picture_height_wr  <= 12'd0;
     end
     else begin
-        ram_wr_en <= 1'b0;
+        y_wr_en  <= 1'b0;
+        cb_wr_en <= 1'b0;
+        cr_wr_en <= 1'b0;
 
-        if (wr_en &&
-            (wr_x_pos < SRC_WIDTH) &&
-            (wr_y_pos < SRC_HEIGHT)) begin
-            ram_wr_address <= wr_linear_address;
-            ram_wr_data    <= wr_y;
-            ram_wr_en      <= 1'b1;
+        if (wr_en) begin
+            case (wr_component)
+                COMPONENT_Y: begin
+                    if ((wr_x_pos < SRC_WIDTH) &&
+                        (wr_y_pos < SRC_HEIGHT)) begin
+                        y_wr_address <= y_wr_linear_address;
+                        y_wr_data    <= wr_value;
+                        y_wr_en      <= 1'b1;
+                    end
+                end
+
+                COMPONENT_CB: begin
+                    if ((wr_x_pos < CHROMA_WIDTH) &&
+                        (wr_y_pos < CHROMA_HEIGHT)) begin
+                        cb_wr_address <= c_wr_linear_address;
+                        cb_wr_data    <= wr_value;
+                        cb_wr_en      <= 1'b1;
+                    end
+                end
+
+                COMPONENT_CR: begin
+                    if ((wr_x_pos < CHROMA_WIDTH) &&
+                        (wr_y_pos < CHROMA_HEIGHT)) begin
+                        cr_wr_address <= c_wr_linear_address;
+                        cr_wr_data    <= wr_value;
+                        cr_wr_en      <= 1'b1;
+                    end
+                end
+
+                default: begin end
+            endcase
         end
 
-        // The parser reaches this point only after the final slice's final Y
-        // block has traversed reconstruction and the following non-slice start
-        // code has been recognized.  The descriptor therefore publishes a
-        // stable completed picture rather than an in-progress decode.
+        // The parser can assert this only after the final macroblock's Cr block
+        // has completed the same IQ -> IDCT -> reconstruction path as Y/Cb.
         if (wr_picture_complete && !picture_present_wr) begin
             if ((wr_horizontal_size != 14'd0) &&
                 (wr_vertical_size   != 14'd0) &&
@@ -152,63 +208,141 @@ wire decoded_picture_window =
     (source_x < picture_width_rd_2) &&
     (source_y < picture_height_rd_2);
 
-wire [18:0] ram_rd_address =
-    ((v_pos - 12'd60) * 19'd720) +
-     (h_pos - 12'd40);
+wire [18:0] y_rd_address = source_window ?
+    ((source_y * 19'd720) + source_x) : 19'd0;
 
-wire [7:0] ram_rd_data;
+// kate - Phase 1N nearest-neighbour 4:2:0 expansion.  One chroma pel is read
+// for every 2x2 luma-pel group by dropping the low X/Y bits.
+wire [10:0] chroma_source_x = source_x[11:1];
+wire [10:0] chroma_source_y = source_y[11:1];
+wire [16:0] c_rd_address = source_window ?
+    (({6'd0, chroma_source_y} * 17'd360) +
+     {8'd0, chroma_source_x[8:0]}) : 17'd0;
+
+wire [7:0] y_rd_data;
+wire [7:0] cb_rd_data;
+wire [7:0] cr_rd_data;
 
 // -------------------------------------------------------------------------
-// True dual-clock framebuffer.
+// True dual-clock component framebuffers.
 // -------------------------------------------------------------------------
 
 altsyncram #(
     .operation_mode                 ("DUAL_PORT"),
     .width_a                        (8),
     .widthad_a                      (19),
-    .numwords_a                     (FB_SIZE),
+    .numwords_a                     (Y_FB_SIZE),
     .width_b                        (8),
     .widthad_b                      (19),
-    .numwords_b                     (FB_SIZE),
-
+    .numwords_b                     (Y_FB_SIZE),
     .outdata_reg_b                  ("UNREGISTERED"),
     .address_reg_b                  ("CLOCK1"),
-
     .read_during_write_mode_mixed_ports ("OLD_DATA"),
-
     .ram_block_type                 ("M10K"),
     .intended_device_family         ("Cyclone V")
-) framebuffer_ram (
+) y_framebuffer_ram (
     .clock0         (wr_clk),
     .clock1         (rd_clk),
-
-    .address_a      (ram_wr_address),
-    .data_a         (ram_wr_data),
-    .wren_a         (ram_wr_en),
-
-    .address_b      (ram_rd_address),
-    .q_b            (ram_rd_data),
-
+    .address_a      (y_wr_address),
+    .data_a         (y_wr_data),
+    .wren_a         (y_wr_en),
+    .address_b      (y_rd_address),
+    .q_b            (y_rd_data),
     .aclr0          (1'b0),
     .aclr1          (1'b0),
-
     .addressstall_a (1'b0),
     .addressstall_b (1'b0),
-
     .byteena_a      (1'b1),
     .byteena_b      (1'b1),
-
     .data_b         (8'd0),
     .wren_b         (1'b0),
+    .q_a            ()
+);
 
+altsyncram #(
+    .operation_mode                 ("DUAL_PORT"),
+    .width_a                        (8),
+    .widthad_a                      (17),
+    .numwords_a                     (CHROMA_FB_SIZE),
+    .width_b                        (8),
+    .widthad_b                      (17),
+    .numwords_b                     (CHROMA_FB_SIZE),
+    .outdata_reg_b                  ("UNREGISTERED"),
+    .address_reg_b                  ("CLOCK1"),
+    .read_during_write_mode_mixed_ports ("OLD_DATA"),
+    .ram_block_type                 ("M10K"),
+    .intended_device_family         ("Cyclone V")
+) cb_framebuffer_ram (
+    .clock0         (wr_clk),
+    .clock1         (rd_clk),
+    .address_a      (cb_wr_address),
+    .data_a         (cb_wr_data),
+    .wren_a         (cb_wr_en),
+    .address_b      (c_rd_address),
+    .q_b            (cb_rd_data),
+    .aclr0          (1'b0),
+    .aclr1          (1'b0),
+    .addressstall_a (1'b0),
+    .addressstall_b (1'b0),
+    .byteena_a      (1'b1),
+    .byteena_b      (1'b1),
+    .data_b         (8'd0),
+    .wren_b         (1'b0),
+    .q_a            ()
+);
+
+altsyncram #(
+    .operation_mode                 ("DUAL_PORT"),
+    .width_a                        (8),
+    .widthad_a                      (17),
+    .numwords_a                     (CHROMA_FB_SIZE),
+    .width_b                        (8),
+    .widthad_b                      (17),
+    .numwords_b                     (CHROMA_FB_SIZE),
+    .outdata_reg_b                  ("UNREGISTERED"),
+    .address_reg_b                  ("CLOCK1"),
+    .read_during_write_mode_mixed_ports ("OLD_DATA"),
+    .ram_block_type                 ("M10K"),
+    .intended_device_family         ("Cyclone V")
+) cr_framebuffer_ram (
+    .clock0         (wr_clk),
+    .clock1         (rd_clk),
+    .address_a      (cr_wr_address),
+    .data_a         (cr_wr_data),
+    .wren_a         (cr_wr_en),
+    .address_b      (c_rd_address),
+    .q_b            (cr_rd_data),
+    .aclr0          (1'b0),
+    .aclr1          (1'b0),
+    .addressstall_a (1'b0),
+    .addressstall_b (1'b0),
+    .byteena_a      (1'b1),
+    .byteena_b      (1'b1),
+    .data_b         (8'd0),
+    .wren_b         (1'b0),
     .q_a            ()
 );
 
 // -------------------------------------------------------------------------
-// altsyncram read address is registered, so delay region controls one clock to
-// keep them aligned with q_b.
+// Phase 1N colour presentation.
 // -------------------------------------------------------------------------
 
+wire [7:0] rgb_r;
+wire [7:0] rgb_g;
+wire [7:0] rgb_b;
+
+mpeg2_ycbcr_to_rgb_bt601 mpeg2_ycbcr_to_rgb_bt601
+(
+    .y  (y_rd_data),
+    .cb (cb_rd_data),
+    .cr (cr_rd_data),
+    .r  (rgb_r),
+    .g  (rgb_g),
+    .b  (rgb_b)
+);
+
+// altsyncram read addresses are registered, so delay the region controls one
+// clock to keep them aligned with all three q_b outputs.
 reg source_window_d;
 reg decoded_picture_window_d;
 
@@ -216,7 +350,9 @@ always @(posedge rd_clk) begin
     if (reset) begin
         source_window_d          <= 1'b0;
         decoded_picture_window_d <= 1'b0;
-        video_y                  <= 8'd0;
+        video_r                  <= 8'd0;
+        video_g                  <= 8'd0;
+        video_b                  <= 8'd0;
         video_de                 <= 1'b0;
         video_hs                 <= 1'b0;
         video_vs                 <= 1'b0;
@@ -229,12 +365,21 @@ always @(posedge rd_clk) begin
         video_hs <= h_sync;
         video_vs <= v_sync;
 
-        if (decoded_picture_window_d)
-            video_y <= ram_rd_data;
-        else if (source_window_d)
-            video_y <= 8'd24;
-        else
-            video_y <= 8'd0;
+        if (decoded_picture_window_d) begin
+            video_r <= rgb_r;
+            video_g <= rgb_g;
+            video_b <= rgb_b;
+        end
+        else if (source_window_d) begin
+            video_r <= 8'd24;
+            video_g <= 8'd24;
+            video_b <= 8'd24;
+        end
+        else begin
+            video_r <= 8'd0;
+            video_g <= 8'd0;
+            video_b <= 8'd0;
+        end
     end
 end
 
