@@ -10,7 +10,7 @@
 //   - 6.3.17 macroblock semantics
 //   - 7.2.1 intra DC differential reconstruction / Table 7-2
 //   - 7.2.2 intra AC coefficient decoding
-//   - Annex B Tables B.1, B.2, B.12, B.13, B.14 and B.15
+//   - Annex B Tables B.1, B.2, B.3, B.12, B.13, B.14 and B.15
 //
 // Phase 1N capability boundary:
 //   - Non-scalable progressive 4:2:0 frame-picture I video only, selected by
@@ -31,6 +31,13 @@
 // kate - Every 4:2:0 block now pauses after EOB until reconstruction reports
 // completion.  DC predictors and macroblock-address state are reset at every
 // slice boundary as required by H.262.
+//
+// kate - Phase 1T-c adds the non-scalable P-picture macroblock_type VLC table
+// from H.262 Annex B Table B.3.  Live P-picture slice consumption remains
+// disabled in this substep; a reset-time sequential self-check walks all seven
+// legal Table B.3 codewords before the stream is allowed to advance.  This makes
+// the ordinary all-I hardware regression a positive proof that the future
+// P-picture macroblock-type primitive is synthesized and functioning.
 //============================================================================
 
 module mpeg2_h262_luma4_probe
@@ -135,6 +142,35 @@ localparam [4:0]
 
 reg [4:0] parse_state;
 
+// kate - Phase 1T-c Table B.3 P-picture macroblock_type primitive.  The decoder
+// accepts a right-aligned VLC plus its explicit length so prefix-sharing entries
+// such as 1, 01, 001 and 000001 remain unambiguous.  Flag order is
+// {quant, motion_forward, motion_backward, pattern, intra}.
+reg [2:0] p_mbtype_selftest_index;
+reg       p_mbtype_table_verified;
+reg       p_mbtype_selftest_error;
+reg [5:0] p_mbtype_decode_code;
+reg [2:0] p_mbtype_decode_len;
+reg [4:0] p_mbtype_expected_flags;
+reg       p_mbtype_match;
+reg       p_mbtype_quant;
+reg       p_mbtype_motion_forward;
+reg       p_mbtype_motion_backward;
+reg       p_mbtype_pattern;
+reg       p_mbtype_intra;
+wire [4:0] p_mbtype_decoded_flags = {
+    p_mbtype_quant,
+    p_mbtype_motion_forward,
+    p_mbtype_motion_backward,
+    p_mbtype_pattern,
+    p_mbtype_intra
+};
+
+wire bitreader_stream_ready;
+assign stream_ready = p_mbtype_table_verified &&
+                      !p_mbtype_selftest_error &&
+                      bitreader_stream_ready;
+
 // kate - bit_mod8 mirrors the bitreader's current position.  Slice syntax starts
 // on a byte boundary immediately after slice_start_code.  After the 23-zero
 // nextbits() condition is consumed, next_start_code() is recovered by consuming
@@ -154,7 +190,7 @@ mpeg2_h262_bitreader mpeg2_h262_bitreader
     .reset        (reset),
     .stream_data  (stream_data),
     .stream_valid (stream_valid),
-    .stream_ready (stream_ready),
+    .stream_ready (bitreader_stream_ready),
     .enable       (parse_active),
     .bit_consume  (bit_consume),
     .bit_valid    (bit_valid),
@@ -361,6 +397,142 @@ always @* begin
         end
         default: begin end
     endcase
+end
+
+// H.262 Annex B Table B.3: macroblock_type in non-scalable P-pictures.
+// The current substep uses this decoder for a sequential reset-time self-check;
+// the same live code/length interface will be connected to ST_MBTYPE in the next
+// Phase 1T substep when P-picture slice consumption is enabled.
+always @* begin
+    p_mbtype_match           = 1'b0;
+    p_mbtype_quant           = 1'b0;
+    p_mbtype_motion_forward  = 1'b0;
+    p_mbtype_motion_backward = 1'b0;
+    p_mbtype_pattern         = 1'b0;
+    p_mbtype_intra           = 1'b0;
+
+    case (p_mbtype_decode_len)
+        3'd1: begin
+            if (p_mbtype_decode_code[0] == 1'b1) begin
+                p_mbtype_match          = 1'b1;
+                p_mbtype_motion_forward = 1'b1;
+                p_mbtype_pattern        = 1'b1;
+            end
+        end
+
+        3'd2: begin
+            if (p_mbtype_decode_code[1:0] == 2'b01) begin
+                p_mbtype_match   = 1'b1;
+                p_mbtype_pattern = 1'b1;
+            end
+        end
+
+        3'd3: begin
+            if (p_mbtype_decode_code[2:0] == 3'b001) begin
+                p_mbtype_match          = 1'b1;
+                p_mbtype_motion_forward = 1'b1;
+            end
+        end
+
+        3'd5: begin
+            case (p_mbtype_decode_code[4:0])
+                5'b00011: begin
+                    p_mbtype_match = 1'b1;
+                    p_mbtype_intra = 1'b1;
+                end
+                5'b00010: begin
+                    p_mbtype_match          = 1'b1;
+                    p_mbtype_quant          = 1'b1;
+                    p_mbtype_motion_forward = 1'b1;
+                    p_mbtype_pattern        = 1'b1;
+                end
+                5'b00001: begin
+                    p_mbtype_match   = 1'b1;
+                    p_mbtype_quant   = 1'b1;
+                    p_mbtype_pattern = 1'b1;
+                end
+                default: begin end
+            endcase
+        end
+
+        3'd6: begin
+            if (p_mbtype_decode_code[5:0] == 6'b000001) begin
+                p_mbtype_match = 1'b1;
+                p_mbtype_quant = 1'b1;
+                p_mbtype_intra = 1'b1;
+            end
+        end
+
+        default: begin end
+    endcase
+end
+
+// Sequential Table B.3 test vectors.  Keeping code and expected properties in
+// a registered walk prevents this syntax primitive from becoming a dead source
+// artifact before live P-picture slice wiring is introduced.
+always @* begin
+    p_mbtype_decode_code    = 6'd0;
+    p_mbtype_decode_len     = 3'd0;
+    p_mbtype_expected_flags = 5'd0;
+
+    case (p_mbtype_selftest_index)
+        3'd0: begin
+            p_mbtype_decode_code    = 6'b000001; // 1
+            p_mbtype_decode_len     = 3'd1;
+            p_mbtype_expected_flags = 5'b01010;  // MC, Coded
+        end
+        3'd1: begin
+            p_mbtype_decode_code    = 6'b000001; // 01
+            p_mbtype_decode_len     = 3'd2;
+            p_mbtype_expected_flags = 5'b00010;  // No MC, Coded
+        end
+        3'd2: begin
+            p_mbtype_decode_code    = 6'b000001; // 001
+            p_mbtype_decode_len     = 3'd3;
+            p_mbtype_expected_flags = 5'b01000;  // MC, Not Coded
+        end
+        3'd3: begin
+            p_mbtype_decode_code    = 6'b000011; // 00011
+            p_mbtype_decode_len     = 3'd5;
+            p_mbtype_expected_flags = 5'b00001;  // Intra
+        end
+        3'd4: begin
+            p_mbtype_decode_code    = 6'b000010; // 00010
+            p_mbtype_decode_len     = 3'd5;
+            p_mbtype_expected_flags = 5'b11010;  // MC, Coded, Quant
+        end
+        3'd5: begin
+            p_mbtype_decode_code    = 6'b000001; // 00001
+            p_mbtype_decode_len     = 3'd5;
+            p_mbtype_expected_flags = 5'b10010;  // No MC, Coded, Quant
+        end
+        3'd6: begin
+            p_mbtype_decode_code    = 6'b000001; // 000001
+            p_mbtype_decode_len     = 3'd6;
+            p_mbtype_expected_flags = 5'b10001;  // Intra, Quant
+        end
+        default: begin end
+    endcase
+end
+
+always @(posedge clk) begin
+    if (reset) begin
+        p_mbtype_selftest_index <= 3'd0;
+        p_mbtype_table_verified <= 1'b0;
+        p_mbtype_selftest_error <= 1'b0;
+    end
+    else if (!p_mbtype_table_verified && !p_mbtype_selftest_error) begin
+        if (!p_mbtype_match ||
+            (p_mbtype_decoded_flags != p_mbtype_expected_flags)) begin
+            p_mbtype_selftest_error <= 1'b1;
+        end
+        else if (p_mbtype_selftest_index == 3'd6) begin
+            p_mbtype_table_verified <= 1'b1;
+        end
+        else begin
+            p_mbtype_selftest_index <= p_mbtype_selftest_index + 3'd1;
+        end
+    end
 end
 
 // H.262 Annex B Tables B.12 and B.13: dct_dc_size for luma/chroma.
@@ -570,6 +742,9 @@ always @(posedge clk) begin
         slice_start           <= 1'b0;
         luma_macroblock_start <= 1'b0;
 
+        if (p_mbtype_selftest_error)
+            probe_error <= 1'b1;
+
         if (bit_consume)
             bit_mod8 <= bit_mod8 + 3'd1;
 
@@ -582,6 +757,7 @@ always @(posedge clk) begin
             byte_window <= byte_window_next;
 
             if (!parse_active && !probe_error &&
+                p_mbtype_table_verified &&
                 !first_picture_420_parsed && slice_start_now) begin
                 parse_active                      <= 1'b1;
                 slice_start                       <= 1'b1;
