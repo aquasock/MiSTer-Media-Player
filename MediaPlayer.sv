@@ -193,7 +193,7 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 	.rd_empty (mpeg2_stream_empty)
 );
 
-// The DDR service and both Phase 1R clients run in the decoder clock domain.
+// The DDR service and both Phase 1S clients run in the decoder clock domain.
 assign DDRAM_CLK = clk_mpeg2;
 
 ///////////////////////   VIDEO TIMING   /////////////////////////
@@ -264,6 +264,10 @@ wire        mpeg2_new_first_luma_dc_seen;
 wire        mpeg2_new_first_luma_block_complete;
 wire        mpeg2_new_first_picture_420_parsed;
 wire        mpeg2_new_second_picture_420_parsed;
+wire        mpeg2_new_picture_420_complete;
+wire        mpeg2_new_active_frame_bank;
+wire        mpeg2_new_completed_frame_bank;
+wire [7:0]  mpeg2_new_picture_count;
 wire        mpeg2_new_slice_start;
 wire        mpeg2_new_luma_macroblock_start;
 wire        mpeg2_new_phase1_probe_error;
@@ -395,9 +399,9 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.intra_quant_matrix_default       (mpeg2_new_intra_quant_matrix_default)
 );
 
-// kate - Phase 1R retains Phase 1Q's single-parser re-arm architecture.  Both
-// supported pictures now wait for the same DDR block-stored handshake; the
-// downstream writer selects bank 0 for picture 1 and bank 1 for picture 2.
+// kate - Phase 1S keeps one parser and re-arms it after every persisted picture.
+// The wrapper reports the active write bank and the bank that just completed so
+// DDR storage and display publication can ping-pong repeatedly.
 mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 (
 	.clk                         (clk_mpeg2),
@@ -419,6 +423,10 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.first_luma_block_complete   (mpeg2_new_first_luma_block_complete),
 	.first_picture_420_parsed    (mpeg2_new_first_picture_420_parsed),
 	.second_picture_420_parsed   (mpeg2_new_second_picture_420_parsed),
+	.picture_420_complete        (mpeg2_new_picture_420_complete),
+	.active_frame_bank           (mpeg2_new_active_frame_bank),
+	.completed_frame_bank        (mpeg2_new_completed_frame_bank),
+	.picture_count               (mpeg2_new_picture_count),
 	.probe_error                 (mpeg2_new_phase1_probe_error),
 	.quantiser_scale_code        (mpeg2_new_slice_quantiser_scale_code),
 	.macroblock_address_increment(mpeg2_new_macroblock_address_increment),
@@ -531,15 +539,14 @@ mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 
 ///////////////////////   FULL-PRECISION DDR WRITER   ///////////
 
-// kate - Phase 1R stores both pictures.  first_picture_420_parsed remains low
-// through the final bank-0 block persistence handshake and becomes the bank
-// selector only after picture 1 is complete, so all picture-2 blocks land in
-// alternate bank 1 without disturbing the displayed bank 0 frame.
+// kate - Phase 1S alternates the writer bank after every complete persisted
+// picture.  active_frame_bank changes only after the final block_stored
+// handshake, so an entire picture remains in one stable DDR bank.
 mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 (
 	.clk             (clk_mpeg2),
 	.reset           (reset_mpeg2),
-	.frame_bank      (mpeg2_new_first_picture_420_parsed),
+	.frame_bank      (mpeg2_new_active_frame_bank),
 
 	.pixel_value     (mpeg2_new_recon_pixel_value),
 	.pixel_component (mpeg2_new_recon_pixel_component),
@@ -564,12 +571,11 @@ mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 
 ///////////////////////   DDR-BACKED 4:2:0 DISPLAY   ////////////
 
-// kate - Phase 1R display-bank control.  Picture 1 is published from bank 0.
-// Once picture 2 is fully persisted, switch the DDR read-address translation to
-// bank 1 and briefly re-arm the framebuffer.  Its existing prefill logic then
-// loads bank 1's first Y/Cb/Cr lines and republishes only at h=0,v=0.  This may
-// produce a short blank interval during the first swap, but it cannot mix old
-// and new cache lines within a displayed frame.
+// kate - Phase 1S repeated display-bank control.  Picture 1 is published from
+// bank 0 through the existing first-picture prefill.  Each later completed
+// picture reports its persisted bank; if that bank differs from the currently
+// displayed bank, switch the read-address translation and re-arm the framebuffer.
+// The framebuffer still republishes only after fresh cache prefill at h=0,v=0.
 reg       mpeg2_new_display_frame_bank;
 reg [2:0] mpeg2_new_framebuffer_swap_reset_count;
 
@@ -579,9 +585,10 @@ always @(posedge clk_mpeg2) begin
         mpeg2_new_framebuffer_swap_reset_count  <= 3'd0;
     end
     else begin
-        if (!mpeg2_new_display_frame_bank &&
-            mpeg2_new_second_picture_420_parsed) begin
-            mpeg2_new_display_frame_bank           <= 1'b1;
+        if (mpeg2_new_picture_420_complete &&
+            mpeg2_new_first_picture_420_parsed &&
+            (mpeg2_new_completed_frame_bank != mpeg2_new_display_frame_bank)) begin
+            mpeg2_new_display_frame_bank           <= mpeg2_new_completed_frame_bank;
             mpeg2_new_framebuffer_swap_reset_count <= 3'd4;
         end
         else if (mpeg2_new_framebuffer_swap_reset_count != 3'd0) begin
@@ -634,11 +641,11 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
     .video_vs       (fb_video_vs)
 );
 
-///////////////////////   PHASE 1R DDR ARBITRATION   ////////////
+///////////////////////   PHASE 1S DDR ARBITRATION   ////////////
 
-// kate - The presentation reader has priority.  The arbiter keeps the writer
-// backpressured for the full duration of each accepted read burst, then allows
-// bank-1 block writes in the gaps between line-cache transactions.
+// kate - The presentation reader keeps priority.  The arbiter holds writes
+// during each accepted read burst, allowing whichever non-display bank is being
+// reconstructed to receive its single-word block-store writes between reads.
 mpeg2_h262_ddram_arbiter mpeg2_h262_ddram_arbiter
 (
     .clk             (clk_mpeg2),
@@ -678,14 +685,15 @@ assign VGA_R = fb_video_r;
 assign VGA_G = fb_video_g;
 assign VGA_B = fb_video_b;
 
-// kate - Phase 1R positive diagnostic.
-// USER requires the complete second frame to have been stored, display bank 1
-// to have been selected, and the framebuffer to have completed a fresh bank-1
-// prefill/read after its controlled re-arm.
+// kate - Phase 1S positive diagnostic.
+// USER now requires at least three fully persisted pictures and a fresh cache
+// refill from the most recently completed bank.  This proves a second controlled
+// publication (0 -> 1 -> 0) rather than merely re-proving the v0.1.0 swap.
 assign LED_USER =
     mpeg2_new_first_picture_420_parsed &&
     mpeg2_new_second_picture_420_parsed &&
-    mpeg2_new_display_frame_bank &&
+    (mpeg2_new_picture_count >= 8'd3) &&
+    (mpeg2_new_completed_frame_bank == mpeg2_new_display_frame_bank) &&
     mpeg2_new_recon_macroblock_420_complete &&
     mpeg2_new_phase1n_frame_geometry_supported &&
     !mpeg2_new_syntax_error &&

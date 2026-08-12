@@ -1,16 +1,16 @@
 //============================================================================
-// MiSTer Media Player - Phase 1R two-picture H.262 wrapper
+// MiSTer Media Player - Phase 1S continuous all-I H.262 wrapper
 //
 // Normative standards basis:
 //   ITU-T H.262 / ISO/IEC 13818-2:2000, 6.2.2 video_sequence().
 //   A video sequence repeats picture_header(), picture_coding_extension() and
 //   picture_data() while additional pictures/groups are present.
 //
-// kate - Phase 1R keeps the Phase 1Q single-parser re-arm architecture.  Both
-// pictures now use the same proven DDR persistence handshake block by block.
-// Picture 1 is stored in bank 0; after parser re-arm, picture 2 is stored in
-// bank 1 by the downstream DDR writer.  second_picture_420_parsed therefore
-// means the complete second supported I picture has also reached DDR.
+// kate - Phase 1S extends the proven Phase 1Q/1R single-parser re-arm path to
+// every supported picture.  Every picture still waits for the DDR persistence
+// handshake block by block.  The active write bank alternates 0/1 after each
+// complete picture, and a one-cycle completion pulse reports which bank just
+// became complete so the top level can republish it safely.
 //============================================================================
 
 module mpeg2_h262_two_picture_probe
@@ -36,6 +36,10 @@ module mpeg2_h262_two_picture_probe
     output wire        first_luma_block_complete,
     output wire        first_picture_420_parsed,
     output wire        second_picture_420_parsed,
+    output wire        picture_420_complete,
+    output wire        active_frame_bank,
+    output wire        completed_frame_bank,
+    output wire [7:0]  picture_count,
     output wire        probe_error,
 
     output wire [4:0]  quantiser_scale_code,
@@ -66,7 +70,11 @@ module mpeg2_h262_two_picture_probe
 reg first_picture_done;
 reg second_picture_done;
 reg parser_rearm;
-reg first_probe_error_latched;
+reg probe_error_latched;
+reg picture_complete_pulse;
+reg active_frame_bank_reg;
+reg completed_frame_bank_reg;
+reg [7:0] picture_count_reg;
 
 reg        first_slice_header_seen_latched;
 reg        first_macroblock_address_seen_latched;
@@ -99,19 +107,22 @@ wire signed [11:0] parser_first_luma_last_ac_level;
 // clears all picture-local sticky state for exactly one clock between pictures.
 wire parser_reset = reset || parser_rearm;
 
-// kate - Phase 1R: both pictures must wait until the current reconstructed block
-// is physically accepted by the DDR writer.  Keep recon_block_complete in the
-// wrapper interface for compatibility with the Phase 1Q integration, but it is
-// no longer the completion handshake for picture 2.
+// kate - Every picture must wait until the current reconstructed block is
+// physically accepted by the DDR writer.  recon_block_complete remains in the
+// interface for compatibility but is not the persistence handshake.
 wire active_pipeline_block_done = pipeline_block_done;
 wire unused_recon_block_complete = recon_block_complete;
 
 assign stream_ready              = parser_stream_ready;
 assign first_picture_420_parsed  = first_picture_done;
 assign second_picture_420_parsed = second_picture_done;
-assign probe_error               = first_probe_error_latched | parser_probe_error;
+assign picture_420_complete      = picture_complete_pulse;
+assign active_frame_bank         = active_frame_bank_reg;
+assign completed_frame_bank      = completed_frame_bank_reg;
+assign picture_count             = picture_count_reg;
+assign probe_error               = probe_error_latched | parser_probe_error;
 
-// Preserve picture-1 diagnostics across the parser's re-arm cycle.  Before
+// Preserve picture-1 diagnostics across all later parser re-arm cycles.  Before
 // picture 1 completes, expose the live parser values exactly as earlier phases.
 assign slice_header_seen = first_picture_done ?
                            first_slice_header_seen_latched :
@@ -152,7 +163,11 @@ always @(posedge clk) begin
         first_picture_done                    <= 1'b0;
         second_picture_done                   <= 1'b0;
         parser_rearm                          <= 1'b0;
-        first_probe_error_latched             <= 1'b0;
+        probe_error_latched                   <= 1'b0;
+        picture_complete_pulse                <= 1'b0;
+        active_frame_bank_reg                 <= 1'b0;
+        completed_frame_bank_reg              <= 1'b0;
+        picture_count_reg                     <= 8'd0;
         first_slice_header_seen_latched       <= 1'b0;
         first_macroblock_address_seen_latched <= 1'b0;
         first_i_macroblock_seen_latched       <= 1'b0;
@@ -166,34 +181,42 @@ always @(posedge clk) begin
         first_luma_last_ac_level_latched      <= 12'sd0;
     end
     else begin
-        parser_rearm <= 1'b0;
+        parser_rearm           <= 1'b0;
+        picture_complete_pulse <= 1'b0;
 
-        if (!first_picture_done && parser_probe_error)
-            first_probe_error_latched <= 1'b1;
+        if (parser_probe_error)
+            probe_error_latched <= 1'b1;
 
-        if (!first_picture_done && parser_picture_420_parsed) begin
-            // Picture 1 is complete only after every reconstructed block has
-            // reached DDR because pipeline_block_done is block_stored.
-            first_picture_done                    <= 1'b1;
-            parser_rearm                          <= 1'b1;
-            first_probe_error_latched             <= parser_probe_error;
-            first_slice_header_seen_latched       <= parser_slice_header_seen;
-            first_macroblock_address_seen_latched <= parser_macroblock_address_seen;
-            first_i_macroblock_seen_latched       <= parser_first_i_macroblock_seen;
-            first_luma_dc_seen_latched            <= parser_first_luma_dc_seen;
-            first_luma_block_complete_latched     <= parser_first_luma_block_complete;
-            first_luma_dc_size_latched            <= parser_first_luma_dc_size;
-            first_luma_dc_differential_latched    <= parser_first_luma_dc_differential;
-            first_luma_dc_coefficient_latched     <= parser_first_luma_dc_coefficient;
-            first_luma_ac_nonzero_count_latched   <= parser_first_luma_ac_nonzero_count;
-            first_luma_last_coeff_index_latched   <= parser_first_luma_last_coeff_index;
-            first_luma_last_ac_level_latched      <= parser_first_luma_last_ac_level;
-        end
-        else if (first_picture_done && !parser_rearm &&
-                 parser_picture_420_parsed) begin
-            // In Phase 1R this also proves the complete second frame has been
-            // persisted to alternate DDR bank 1.
-            second_picture_done <= 1'b1;
+        if (!parser_rearm && parser_picture_420_parsed) begin
+            // The completion pulse is delayed one registered cycle relative to
+            // the parser's sticky picture-complete indication.  At this point
+            // every block is already stored because pipeline_block_done is the
+            // DDR block_stored handshake.
+            picture_complete_pulse   <= 1'b1;
+            completed_frame_bank_reg <= active_frame_bank_reg;
+            active_frame_bank_reg    <= ~active_frame_bank_reg;
+            parser_rearm             <= 1'b1;
+
+            if (picture_count_reg != 8'hff)
+                picture_count_reg <= picture_count_reg + 8'd1;
+
+            if (!first_picture_done) begin
+                first_picture_done                    <= 1'b1;
+                first_slice_header_seen_latched       <= parser_slice_header_seen;
+                first_macroblock_address_seen_latched <= parser_macroblock_address_seen;
+                first_i_macroblock_seen_latched       <= parser_first_i_macroblock_seen;
+                first_luma_dc_seen_latched            <= parser_first_luma_dc_seen;
+                first_luma_block_complete_latched     <= parser_first_luma_block_complete;
+                first_luma_dc_size_latched            <= parser_first_luma_dc_size;
+                first_luma_dc_differential_latched    <= parser_first_luma_dc_differential;
+                first_luma_dc_coefficient_latched     <= parser_first_luma_dc_coefficient;
+                first_luma_ac_nonzero_count_latched   <= parser_first_luma_ac_nonzero_count;
+                first_luma_last_coeff_index_latched   <= parser_first_luma_last_coeff_index;
+                first_luma_last_ac_level_latched      <= parser_first_luma_last_ac_level;
+            end
+            else if (!second_picture_done) begin
+                second_picture_done <= 1'b1;
+            end
         end
     end
 end
