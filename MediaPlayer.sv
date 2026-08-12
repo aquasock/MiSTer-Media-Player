@@ -127,7 +127,38 @@ pll pll
 	.outclk_3(clk_mpeg2_mem)
 );
 
-wire reset = RESET | status[0] | buttons[1];
+// kate - Phase 1P CDC/reset closure.
+//
+// RESET, status[0], and buttons[1] originate outside the MPEG/video clock
+// domains.  Treat their OR as an asynchronous reset request, then synchronize
+// reset RELEASE independently into each destination domain.  Assertion is
+// asynchronous into these small synchronizer chains, so even a short request
+// is stretched until the destination clock has observed it.
+//
+// This is an implementation/timing-safety change, not an H.262 requirement.
+wire reset_request = RESET | status[0] | buttons[1];
+
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] reset_mpeg2_sync;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] reset_video_sync;
+
+always @(posedge clk_mpeg2 or posedge reset_request) begin
+\tif (reset_request)
+\t\treset_mpeg2_sync <= 3'b111;
+\telse
+\t\treset_mpeg2_sync <= {reset_mpeg2_sync[1:0], 1'b0};
+end
+
+always @(posedge clk_video or posedge reset_request) begin
+\tif (reset_request)
+\t\treset_video_sync <= 3'b111;
+\telse
+\t\treset_video_sync <= {reset_video_sync[1:0], 1'b0};
+end
+
+wire reset_mpeg2 = reset_mpeg2_sync[2];
+wire reset_video = reset_video_sync[2];
 
 // kate - Phase 1Ob: the streaming H.262 bitreader continues to own input
 // backpressure while picture_data() advances across every slice of the first
@@ -148,7 +179,8 @@ assign mpeg2_stream_rd =
 
 mpeg2_stream_fifo mpeg2_stream_fifo
 (
-	.reset    (reset),
+	// kate - DCFIFO owns reset-release synchronization for wr_clk and rd_clk.
+	.reset    (reset_request),
 
 	.wr_clk   (clk_sys),
 	.wr_data  (ioctl_dout),
@@ -188,7 +220,7 @@ wire        fb_video_vs;
 mpeg2_video_svga_800x600 mpeg2_video_svga_800x600
 (
 	.clk      (clk_video),
-	.reset    (reset),
+	.reset    (reset_video),
 
 	.h_pos    (display_h_pos),
 	.v_pos    (display_v_pos),
@@ -325,7 +357,7 @@ wire mpeg2_new_phase1n_frame_geometry_supported =
 mpeg2_h262_frontend mpeg2_h262_frontend
 (
 	.clk                              (clk_mpeg2),
-	.reset                            (reset),
+	.reset                            (reset_mpeg2),
 	.stream_data                      (mpeg2_stream_data),
 	.stream_valid                     (mpeg2_stream_rd),
 
@@ -369,7 +401,7 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 (
 	.clk                         (clk_mpeg2),
-	.reset                       (reset),
+	.reset                       (reset_mpeg2),
 	.stream_data                 (mpeg2_stream_data),
 	.stream_valid                (mpeg2_stream_rd),
 	.stream_ready                (mpeg2_new_stream_ready),
@@ -414,7 +446,7 @@ mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 mpeg2_h262_inverse_quant mpeg2_h262_inverse_quant
 (
 	.clk                         (clk_mpeg2),
-	.reset                       (reset),
+	.reset                       (reset_mpeg2),
 
 	.block_start                 (mpeg2_new_qfs_block_start),
 	.coeff_write_en              (mpeg2_new_qfs_write_en),
@@ -445,7 +477,7 @@ mpeg2_h262_inverse_quant mpeg2_h262_inverse_quant
 mpeg2_h262_idct mpeg2_h262_idct
 (
 	.clk                         (clk_mpeg2),
-	.reset                       (reset),
+	.reset                       (reset_mpeg2),
 
 	.coeff_block_start           (mpeg2_new_iq_coeff_block_start),
 	.coeff_valid                 (mpeg2_new_iq_coeff_valid),
@@ -466,7 +498,7 @@ mpeg2_h262_idct mpeg2_h262_idct
 mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 (
 	.clk                                (clk_mpeg2),
-	.reset                              (reset),
+	.reset                              (reset_mpeg2),
 
 	.horizontal_size                    (mpeg2_new_horizontal_size),
 	.vertical_size                      (mpeg2_new_vertical_size),
@@ -505,7 +537,7 @@ mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 (
 	.clk             (clk_mpeg2),
-	.reset           (reset),
+	.reset           (reset_mpeg2),
 
 	.pixel_value     (mpeg2_new_recon_pixel_value),
 	.pixel_component (mpeg2_new_recon_pixel_component),
@@ -535,7 +567,7 @@ mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 // from DDR3 into small ping-pong line caches and presents BT.601 RGB.
 mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 (
-    .reset          (reset),
+    .reset          (reset_mpeg2),
 
     .mem_clk        (clk_mpeg2),
     .picture_complete(mpeg2_new_first_picture_420_parsed),

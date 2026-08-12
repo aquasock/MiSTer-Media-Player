@@ -25,7 +25,12 @@ dcfifo #(
 	.underflow_checking   ("ON"),
 	.use_eab              ("ON"),
 	.rdsync_delaypipe     (4),
-	.wrsync_delaypipe     (4)
+	.wrsync_delaypipe     (4),
+
+	// kate - Phase 1P: synchronize asynchronous-clear RELEASE independently
+	// to both FIFO clocks.  Intel recommends both circuits for DCFIFO ACLR.
+	.write_aclr_synch     ("ON"),
+	.read_aclr_synch      ("ON")
 ) stream_fifo
 (
 	.aclr    (reset),

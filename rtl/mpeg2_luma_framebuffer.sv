@@ -571,8 +571,23 @@ reg [10:0] picture_height_r1;
 reg [10:0] picture_height_r2;
 reg        picture_present_rd;
 
+// kate - Phase 1P: the module reset input is synchronized to mem_clk by the
+// top level.  It still crosses into the independent 40 MHz rd_clk domain, so
+// synchronize only its RELEASE again here.  Assertion remains asynchronous.
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] rd_reset_sync;
+
+always @(posedge rd_clk or posedge reset) begin
+    if (reset)
+        rd_reset_sync <= 3'b111;
+    else
+        rd_reset_sync <= {rd_reset_sync[1:0], 1'b0};
+end
+
+wire rd_reset = rd_reset_sync[2];
+
 always @(posedge rd_clk) begin
-    if (reset) begin
+    if (rd_reset) begin
         cache_ready_r1       <= 1'b0;
         cache_ready_r2       <= 1'b0;
         picture_width_r1     <= 12'd0;
@@ -710,7 +725,7 @@ mpeg2_ycbcr_to_rgb_bt601 mpeg2_ycbcr_to_rgb_bt601
 );
 
 always @(posedge rd_clk) begin
-    if (reset) begin
+    if (rd_reset) begin
         y_byte_lane_d             <= 3'd0;
         c_byte_lane_d             <= 3'd0;
         source_window_d           <= 1'b0;
