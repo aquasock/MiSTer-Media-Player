@@ -2,7 +2,7 @@
 
 An experimental media-player core for [MiSTer FPGA](https://github.com/MiSTer-devel/Main_MiSTer), with a standards-driven MPEG-2 Video / ITU-T H.262 decoder implemented primarily in FPGA logic.
 
-> **Development status:** active, pre-release, developer-oriented. The current hardware-proven baseline decodes two consecutive supported I pictures; only the first picture is stored and displayed today. Continuous playback, P/B pictures, audio, program-stream demux, and DVD support are future work.
+> **Development status:** active, pre-release, developer-oriented. Version **v0.1.0** is the first hardware-proven milestone release: two consecutive supported I pictures are decoded, stored in alternate DDR frame banks, and presented with a controlled frame transition. Continuous playback, P/B pictures, audio, program-stream demux, and DVD support are future work.
 
 ## Current status
 
@@ -15,7 +15,10 @@ The active decoder is a clean H.262 implementation under `rtl/mpeg2_new/`. It cu
 - intra reconstruction;
 - full 8-bit Y, Cb, and Cr reconstruction;
 - planar frame storage in MiSTer DDR3;
+- two DDR frame banks for the proven two-picture path;
+- explicit DDR arbitration between frame writes and display reads;
 - DDR3 readback through small ping-pong line caches;
+- controlled publication of the second completed frame;
 - 4:2:0 chroma expansion and limited-range BT.601 YCbCr-to-RGB presentation;
 - a fixed 800x600 / 40 MHz diagnostic raster;
 - two consecutive supported I-picture decodes using one re-armed parser.
@@ -30,11 +33,19 @@ The current implementation subset is intentionally narrow while the decoder arch
 | Chroma format | 4:2:0 |
 | Proven diagnostic geometry | Up to 720x480 |
 | Reconstruction precision | 8-bit Y/Cb/Cr |
-| Frame storage | MiSTer DDR3 |
-| Display | First decoded frame; second frame decode proven but not yet published |
+| Frame storage | Two planar MiSTer DDR3 frame banks for the proven path |
+| Display | Controlled picture 1 -> picture 2 publication after picture 2 is fully stored |
 | Video output | Fixed 800x600 diagnostic timing |
 
 The frozen `rtl/mpeg2fpga/` tree remains in the repository only as a historical/reference implementation. It is not part of the active Quartus build.
+
+## Releases
+
+Milestone releases use semantic version tags on GitHub. MiSTer RBF assets retain the normal date-coded core naming convention.
+
+Current milestone release:
+
+- **v0.1.0** — Phase 1R alternate DDR frame bank and controlled frame swap; binary asset `MediaPlayer_20260812.rbf`.
 
 ## Architecture
 
@@ -53,10 +64,10 @@ H.262 parser / bitreader / VLC decode
 inverse quantization -> IDCT -> intra reconstruction
         |
         v
-planar Y / Cb / Cr DDR3 frame store
+planar Y / Cb / Cr DDR3 frame banks
         |
         v
-DDR3 line caches -> 4:2:0 expansion -> BT.601 RGB
+DDR arbitration -> line caches -> 4:2:0 expansion -> BT.601 RGB
         |
         v
 MiSTer video output
@@ -108,8 +119,8 @@ The USER LED is used as a positive completion diagnostic during development. Its
 
 Near-term work is deliberately staged into small hardware-testable steps:
 
-1. alternate DDR frame storage and a controlled frame swap;
-2. continuous all-I playback and display scheduling;
+1. continuous all-I playback and repeated controlled frame-bank publication;
+2. display scheduling and timestamp infrastructure;
 3. reference-picture management;
 4. P- and B-picture prediction / motion compensation;
 5. broader H.262 picture structures and chroma formats;
