@@ -24,6 +24,22 @@
 //   rate of 720x576 at 30 frames/s.  Future block double-buffering can overlap
 //   coefficient preparation with this transform.
 //
+// kate - Phase 1P timing closure:
+//   The original behavioral accumulator loops caused Quartus 17 to map each
+//   8-term dot product as a long serial DSP/MAC chain.  TimeQuest measured the
+//   worst pass-1 transform_index -> temp path at 35.453 ns.
+//
+//   The arithmetic is now explicitly associated as a balanced tree:
+//
+//       p0 + p1   p2 + p3   p4 + p5   p6 + p7
+//          \       /           \       /
+//           sum01               sum23
+//                \             /
+//                    result
+//
+//   Both passes still evaluate the exact same integer sum before the unchanged
+//   rounding operation.  Only the hardware association is different.
+//
 // Verification performed when this implementation was generated:
 //   - fixed-point model compared against the Annex-A mathematical IDCT;
 //   - all 4096 legacy H.262 Annex-A DC/mismatch vectors had peak error <= 1;
@@ -60,7 +76,6 @@ reg signed [11:0] coeff [0:63];
 // First-pass values carry ten fractional bits (Q10).
 reg signed [23:0] temp [0:63];
 integer i;
-integer k;
 
 reg       capture_active;
 reg       pass1_active;
@@ -153,26 +168,147 @@ function automatic signed [31:0] round_q24_to_integer;
     end
 endfunction
 
+// -------------------------------------------------------------------------
+// Phase 1P balanced pass-1 dot product.
+//
+// 12-bit coefficient x 15-bit Q14 basis = exact signed 27-bit product.
+// Sign-extend to the existing 32-bit accumulator width before adding.  The
+// legal coefficient/basis range cannot overflow 32 bits, so re-association is
+// bit-exact with the former serial accumulator.
+// -------------------------------------------------------------------------
+
+reg signed [26:0] pass1_product0;
+reg signed [26:0] pass1_product1;
+reg signed [26:0] pass1_product2;
+reg signed [26:0] pass1_product3;
+reg signed [26:0] pass1_product4;
+reg signed [26:0] pass1_product5;
+reg signed [26:0] pass1_product6;
+reg signed [26:0] pass1_product7;
+
+reg signed [31:0] pass1_pair0;
+reg signed [31:0] pass1_pair1;
+reg signed [31:0] pass1_pair2;
+reg signed [31:0] pass1_pair3;
+reg signed [31:0] pass1_quad0;
+reg signed [31:0] pass1_quad1;
 reg signed [31:0] pass1_sum;
+
+wire [5:0] pass1_row_base = {transform_index[5:3], 3'b000};
+
+always @* begin
+    pass1_product0 =
+        $signed(coeff[pass1_row_base + 6'd0]) *
+        $signed(basis_q14(transform_index[2:0], 3'd0));
+    pass1_product1 =
+        $signed(coeff[pass1_row_base + 6'd1]) *
+        $signed(basis_q14(transform_index[2:0], 3'd1));
+    pass1_product2 =
+        $signed(coeff[pass1_row_base + 6'd2]) *
+        $signed(basis_q14(transform_index[2:0], 3'd2));
+    pass1_product3 =
+        $signed(coeff[pass1_row_base + 6'd3]) *
+        $signed(basis_q14(transform_index[2:0], 3'd3));
+    pass1_product4 =
+        $signed(coeff[pass1_row_base + 6'd4]) *
+        $signed(basis_q14(transform_index[2:0], 3'd4));
+    pass1_product5 =
+        $signed(coeff[pass1_row_base + 6'd5]) *
+        $signed(basis_q14(transform_index[2:0], 3'd5));
+    pass1_product6 =
+        $signed(coeff[pass1_row_base + 6'd6]) *
+        $signed(basis_q14(transform_index[2:0], 3'd6));
+    pass1_product7 =
+        $signed(coeff[pass1_row_base + 6'd7]) *
+        $signed(basis_q14(transform_index[2:0], 3'd7));
+
+    pass1_pair0 =
+        {{5{pass1_product0[26]}}, pass1_product0} +
+        {{5{pass1_product1[26]}}, pass1_product1};
+    pass1_pair1 =
+        {{5{pass1_product2[26]}}, pass1_product2} +
+        {{5{pass1_product3[26]}}, pass1_product3};
+    pass1_pair2 =
+        {{5{pass1_product4[26]}}, pass1_product4} +
+        {{5{pass1_product5[26]}}, pass1_product5};
+    pass1_pair3 =
+        {{5{pass1_product6[26]}}, pass1_product6} +
+        {{5{pass1_product7[26]}}, pass1_product7};
+
+    pass1_quad0 = pass1_pair0 + pass1_pair1;
+    pass1_quad1 = pass1_pair2 + pass1_pair3;
+    pass1_sum   = pass1_quad0 + pass1_quad1;
+end
+
+// -------------------------------------------------------------------------
+// Phase 1P balanced pass-2 dot product.
+//
+// 24-bit Q10 intermediate x 15-bit Q14 basis = exact signed 39-bit product.
+// Sign-extend to the existing 48-bit accumulator width and use the same
+// balanced three-level addition tree.
+// -------------------------------------------------------------------------
+
+reg signed [38:0] pass2_product0;
+reg signed [38:0] pass2_product1;
+reg signed [38:0] pass2_product2;
+reg signed [38:0] pass2_product3;
+reg signed [38:0] pass2_product4;
+reg signed [38:0] pass2_product5;
+reg signed [38:0] pass2_product6;
+reg signed [38:0] pass2_product7;
+
+reg signed [47:0] pass2_pair0;
+reg signed [47:0] pass2_pair1;
+reg signed [47:0] pass2_pair2;
+reg signed [47:0] pass2_pair3;
+reg signed [47:0] pass2_quad0;
+reg signed [47:0] pass2_quad1;
 reg signed [47:0] pass2_sum;
 reg signed [31:0] pass2_integer;
 
 always @* begin
-    pass1_sum = 32'sd0;
-    for (k = 0; k < 8; k = k + 1) begin
-        pass1_sum = pass1_sum +
-            ($signed(coeff[(transform_index[5:3] * 8) + k]) *
-             $signed(basis_q14(transform_index[2:0], k[2:0])));
-    end
-end
+    pass2_product0 =
+        $signed(temp[{3'd0, transform_index[2:0]}]) *
+        $signed(basis_q14(transform_index[5:3], 3'd0));
+    pass2_product1 =
+        $signed(temp[{3'd1, transform_index[2:0]}]) *
+        $signed(basis_q14(transform_index[5:3], 3'd1));
+    pass2_product2 =
+        $signed(temp[{3'd2, transform_index[2:0]}]) *
+        $signed(basis_q14(transform_index[5:3], 3'd2));
+    pass2_product3 =
+        $signed(temp[{3'd3, transform_index[2:0]}]) *
+        $signed(basis_q14(transform_index[5:3], 3'd3));
+    pass2_product4 =
+        $signed(temp[{3'd4, transform_index[2:0]}]) *
+        $signed(basis_q14(transform_index[5:3], 3'd4));
+    pass2_product5 =
+        $signed(temp[{3'd5, transform_index[2:0]}]) *
+        $signed(basis_q14(transform_index[5:3], 3'd5));
+    pass2_product6 =
+        $signed(temp[{3'd6, transform_index[2:0]}]) *
+        $signed(basis_q14(transform_index[5:3], 3'd6));
+    pass2_product7 =
+        $signed(temp[{3'd7, transform_index[2:0]}]) *
+        $signed(basis_q14(transform_index[5:3], 3'd7));
 
-always @* begin
-    pass2_sum = 48'sd0;
-    for (k = 0; k < 8; k = k + 1) begin
-        pass2_sum = pass2_sum +
-            ($signed(temp[(k * 8) + transform_index[2:0]]) *
-             $signed(basis_q14(transform_index[5:3], k[2:0])));
-    end
+    pass2_pair0 =
+        {{9{pass2_product0[38]}}, pass2_product0} +
+        {{9{pass2_product1[38]}}, pass2_product1};
+    pass2_pair1 =
+        {{9{pass2_product2[38]}}, pass2_product2} +
+        {{9{pass2_product3[38]}}, pass2_product3};
+    pass2_pair2 =
+        {{9{pass2_product4[38]}}, pass2_product4} +
+        {{9{pass2_product5[38]}}, pass2_product5};
+    pass2_pair3 =
+        {{9{pass2_product6[38]}}, pass2_product6} +
+        {{9{pass2_product7[38]}}, pass2_product7};
+
+    pass2_quad0 = pass2_pair0 + pass2_pair1;
+    pass2_quad1 = pass2_pair2 + pass2_pair3;
+    pass2_sum   = pass2_quad0 + pass2_quad1;
+
     pass2_integer = round_q24_to_integer(pass2_sum);
 end
 
