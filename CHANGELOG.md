@@ -4,17 +4,34 @@ All notable project milestones are documented here.
 
 This project is still in active pre-release development. Published milestone releases use semantic version numbers, while unreleased work remains organized by development phase.
 
-## Unreleased — Phase 1S
+## Unreleased — Phase 1T
 
-Target milestone: **v0.2.0**
+Target milestone: **v0.3.0**
 
 Planned next milestone:
 
-- extend the proven two-picture path into continuous all-I picture playback;
-- reuse the two DDR frame banks as a repeated ping-pong store rather than a one-time bank 0 -> bank 1 transition;
-- add display scheduling so completed pictures are published repeatedly at controlled boundaries;
-- begin timestamp/scheduling infrastructure needed for later H.222.0 integration;
-- preserve the single-parser architecture and Phase 1P timing/CDC discipline.
+- establish reference-picture management needed for predictive pictures;
+- preserve the hardware-proven continuous all-I decode and presentation path as the regression baseline;
+- begin P-picture decode/prediction work in small hardware-testable steps;
+- keep timestamp/scheduling metadata compatible with later H.222.0 PES-derived timestamps;
+- preserve the Phase 1P timing/CDC discipline.
+
+## [0.2.0] - 2026-08-12 — Phase 1S
+
+Continuous all-I playback and presentation-timing foundation.
+
+- Extended the single re-armed H.262 parser from two pictures to continuous supported all-I picture decode.
+- Reused the two planar DDR frame banks as a repeated bank 0 / bank 1 ping-pong store.
+- Protected the displayed DDR bank from reconstruction writes while it remained owned by the display reader.
+- Moved repeated frame publication and framebuffer re-arm into true vertical blanking so active video remains continuous.
+- Removed the old asynchronous multi-bit line-number CDC bus; the line-cache handoff now crosses only a synchronized one-bit event and derives source-line identity locally in the DDR clock domain.
+- Eliminated all observed playback artifacts from the continuous-all-I diagnostic stream, including mixed-frame distortion, black flicker, the bottom-edge white bar, and faint horizontal line artifacts.
+- Added the first presentation-timing metadata foundation using H.262 frame-rate information and `temporal_reference` with a 33-bit 90 kHz representation compatible with later H.222.0 PTS handling.
+- Kept the current elementary-stream timing explicitly synthetic: `.m2v` input has no PES layer, so the generated schedule is not represented as a normative PES PTS.
+- Hardware acceptance: `test_all_i.m2v` plays to completion with USER completion correct and no observed flicker, tearing, corruption, bars, or other image artifacts.
+- Final proven Phase 1S RTL commit before release documentation: `37d6268080d6d14f2e2e2d91345bc4a0132747ee`.
+- Final proven Phase 1S Quartus fit at that commit: 11,349 / 41,910 ALMs (27%), 18,231 registers, 63 / 553 RAM blocks (11%), and 55 / 112 DSP blocks (49%).
+- Final focused timing at that commit: decoder setup +4.838 ns, video setup +7.945 ns, decoder recovery +15.683 ns, video recovery +21.572 ns, all with TNS 0; hold and removal checks are positive.
 
 ## [0.1.0] - 2026-08-12 — Phase 1R
 
