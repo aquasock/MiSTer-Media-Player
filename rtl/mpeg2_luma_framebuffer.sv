@@ -1,11 +1,20 @@
 // kate - Decoupled MPEG2 4:2:0 picture framebuffer.
 //
+// Phase 1N M10K packing fix.
+//
 // The historical module/file name is retained to avoid gratuitous top-level
-// churn, but Phase 1N stores all three reconstructed component planes for the
-// first H.262 picture:
+// churn.  The decoder stores all three reconstructed component planes for the
+// first supported H.262 picture:
 //   Y  : up to 720x480
 //   Cb : up to 360x240
 //   Cr : up to 360x240
+//
+// The original Phase 1N proof stored one 8-bit pel per RAM word.  Cyclone V
+// M10K blocks are substantially more efficient in their 256x40 configuration,
+// so this revision packs five 8-bit pels into each 40-bit word and uses the
+// M10K byte-enable lanes for single-pel writes.  This reduces the three picture
+// planes from about 508 M10Ks to about 406 M10Ks without changing decoded
+// precision or picture dimensions.
 //
 // The decoder writes explicit component-plane X/Y coordinates at 54 MHz while
 // the independent fixed SVGA raster reads at 40 MHz.  The complete picture is
@@ -16,9 +25,6 @@
 // simple first-colour-picture presentation choice, not an H.262 sampling rule.
 // A later quality phase can add siting-aware interpolation without changing the
 // decoded component planes.
-//
-// Explicit altsyncram is retained because Quartus 17 otherwise implements these
-// mixed-clock frame stores poorly or attempts to use registers.
 
 module mpeg2_luma_framebuffer
 (
@@ -53,37 +59,65 @@ module mpeg2_luma_framebuffer
     output reg         video_vs
 );
 
-localparam integer SRC_WIDTH        = 720;
-localparam integer SRC_HEIGHT       = 480;
-localparam integer Y_FB_SIZE        = SRC_WIDTH * SRC_HEIGHT;
-localparam integer CHROMA_WIDTH     = SRC_WIDTH / 2;
-localparam integer CHROMA_HEIGHT    = SRC_HEIGHT / 2;
-localparam integer CHROMA_FB_SIZE   = CHROMA_WIDTH * CHROMA_HEIGHT;
+localparam integer SRC_WIDTH          = 720;
+localparam integer SRC_HEIGHT         = 480;
+localparam integer CHROMA_WIDTH       = SRC_WIDTH / 2;
+localparam integer CHROMA_HEIGHT      = SRC_HEIGHT / 2;
+localparam integer PELS_PER_RAM_WORD  = 5;
+localparam integer Y_WORDS_PER_ROW    = SRC_WIDTH / PELS_PER_RAM_WORD;       // 144
+localparam integer C_WORDS_PER_ROW    = CHROMA_WIDTH / PELS_PER_RAM_WORD;    // 72
+localparam integer Y_FB_WORDS         = Y_WORDS_PER_ROW * SRC_HEIGHT;         // 69120
+localparam integer C_FB_WORDS         = C_WORDS_PER_ROW * CHROMA_HEIGHT;      // 17280
 
 localparam [1:0] COMPONENT_Y  = 2'd0;
 localparam [1:0] COMPONENT_CB = 2'd1;
 localparam [1:0] COMPONENT_CR = 2'd2;
 
 // -------------------------------------------------------------------------
+// Small constant /5 helpers.
+//
+// Coordinates are bounded to 0..719 (Y) or 0..359 (Cb/Cr), and these constant
+// operations synthesize to small combinational networks.  Keeping division to
+// X only also preserves the row-aligned packed RAM organization.
+// -------------------------------------------------------------------------
+
+wire [11:0] wr_x_group = wr_x_pos / 12'd5;
+wire [2:0]  wr_x_lane  = wr_x_pos % 12'd5;
+
+wire [4:0] wr_lane_enable =
+    (wr_x_lane == 3'd0) ? 5'b00001 :
+    (wr_x_lane == 3'd1) ? 5'b00010 :
+    (wr_x_lane == 3'd2) ? 5'b00100 :
+    (wr_x_lane == 3'd3) ? 5'b01000 :
+                           5'b10000;
+
+// Replicate the pel across every byte lane.  byteena_a selects the one lane
+// that is actually changed, so no read/modify/write cycle is required.
+wire [39:0] wr_data_40 = {5{wr_value}};
+
+// -------------------------------------------------------------------------
 // Write-side three-plane picture store and publication descriptor.
 // -------------------------------------------------------------------------
 
-reg [18:0] y_wr_address;
-reg [7:0]  y_wr_data;
+reg [16:0] y_wr_address;
+reg [39:0] y_wr_data;
+reg [4:0]  y_wr_byteena;
 reg        y_wr_en;
 
-reg [16:0] cb_wr_address;
-reg [7:0]  cb_wr_data;
+reg [14:0] cb_wr_address;
+reg [39:0] cb_wr_data;
+reg [4:0]  cb_wr_byteena;
 reg        cb_wr_en;
 
-reg [16:0] cr_wr_address;
-reg [7:0]  cr_wr_data;
+reg [14:0] cr_wr_address;
+reg [39:0] cr_wr_data;
+reg [4:0]  cr_wr_byteena;
 reg        cr_wr_en;
 
-wire [18:0] y_wr_linear_address =
-    (wr_y_pos * 19'd720) + wr_x_pos;
-wire [16:0] c_wr_linear_address =
-    ({5'd0, wr_y_pos} * 17'd360) + {8'd0, wr_x_pos[8:0]};
+wire [16:0] y_wr_word_address =
+    ({5'd0, wr_y_pos} * 17'd144) + {9'd0, wr_x_group[7:0]};
+wire [14:0] c_wr_word_address =
+    ({3'd0, wr_y_pos} * 15'd72) + {8'd0, wr_x_group[6:0]};
 
 reg        picture_present_wr;
 reg [11:0] picture_width_wr;
@@ -91,40 +125,48 @@ reg [11:0] picture_height_wr;
 
 always @(posedge wr_clk) begin
     if (reset) begin
-        y_wr_address      <= 19'd0;
-        y_wr_data         <= 8'd0;
-        y_wr_en           <= 1'b0;
-        cb_wr_address     <= 17'd0;
-        cb_wr_data        <= 8'd128;
-        cb_wr_en          <= 1'b0;
-        cr_wr_address     <= 17'd0;
-        cr_wr_data        <= 8'd128;
-        cr_wr_en          <= 1'b0;
+        y_wr_address       <= 17'd0;
+        y_wr_data          <= 40'd0;
+        y_wr_byteena       <= 5'b00000;
+        y_wr_en            <= 1'b0;
+        cb_wr_address      <= 15'd0;
+        cb_wr_data         <= {5{8'd128}};
+        cb_wr_byteena      <= 5'b00000;
+        cb_wr_en           <= 1'b0;
+        cr_wr_address      <= 15'd0;
+        cr_wr_data         <= {5{8'd128}};
+        cr_wr_byteena      <= 5'b00000;
+        cr_wr_en           <= 1'b0;
         picture_present_wr <= 1'b0;
         picture_width_wr   <= 12'd0;
         picture_height_wr  <= 12'd0;
     end
     else begin
-        y_wr_en  <= 1'b0;
-        cb_wr_en <= 1'b0;
-        cr_wr_en <= 1'b0;
+        y_wr_en       <= 1'b0;
+        cb_wr_en      <= 1'b0;
+        cr_wr_en      <= 1'b0;
+        y_wr_byteena  <= 5'b00000;
+        cb_wr_byteena <= 5'b00000;
+        cr_wr_byteena <= 5'b00000;
 
         if (wr_en) begin
             case (wr_component)
                 COMPONENT_Y: begin
                     if ((wr_x_pos < SRC_WIDTH) &&
                         (wr_y_pos < SRC_HEIGHT)) begin
-                        y_wr_address <= y_wr_linear_address;
-                        y_wr_data    <= wr_value;
-                        y_wr_en      <= 1'b1;
+                        y_wr_address  <= y_wr_word_address;
+                        y_wr_data     <= wr_data_40;
+                        y_wr_byteena  <= wr_lane_enable;
+                        y_wr_en       <= 1'b1;
                     end
                 end
 
                 COMPONENT_CB: begin
                     if ((wr_x_pos < CHROMA_WIDTH) &&
                         (wr_y_pos < CHROMA_HEIGHT)) begin
-                        cb_wr_address <= c_wr_linear_address;
-                        cb_wr_data    <= wr_value;
+                        cb_wr_address <= c_wr_word_address;
+                        cb_wr_data    <= wr_data_40;
+                        cb_wr_byteena <= wr_lane_enable;
                         cb_wr_en      <= 1'b1;
                     end
                 end
@@ -132,8 +174,9 @@ always @(posedge wr_clk) begin
                 COMPONENT_CR: begin
                     if ((wr_x_pos < CHROMA_WIDTH) &&
                         (wr_y_pos < CHROMA_HEIGHT)) begin
-                        cr_wr_address <= c_wr_linear_address;
-                        cr_wr_data    <= wr_value;
+                        cr_wr_address <= c_wr_word_address;
+                        cr_wr_data    <= wr_data_40;
+                        cr_wr_byteena <= wr_lane_enable;
                         cr_wr_en      <= 1'b1;
                     end
                 end
@@ -208,36 +251,101 @@ wire decoded_picture_window =
     (source_x < picture_width_rd_2) &&
     (source_y < picture_height_rd_2);
 
-wire [18:0] y_rd_address = source_window ?
-    ((source_y * 19'd720) + source_x) : 19'd0;
+wire [11:0] y_rd_group = source_x / 12'd5;
+wire [2:0]  y_rd_lane  = source_x % 12'd5;
+wire [16:0] y_rd_address = source_window ?
+    (({5'd0, source_y} * 17'd144) + {9'd0, y_rd_group[7:0]}) : 17'd0;
 
 // kate - Phase 1N nearest-neighbour 4:2:0 expansion.  One chroma pel is read
-// for every 2x2 luma-pel group by dropping the low X/Y bits.
+// for every 2x2 luma-pel group by dropping the low X/Y bits before RAM packing.
 wire [10:0] chroma_source_x = source_x[11:1];
 wire [10:0] chroma_source_y = source_y[11:1];
-wire [16:0] c_rd_address = source_window ?
-    (({6'd0, chroma_source_y} * 17'd360) +
-     {8'd0, chroma_source_x[8:0]}) : 17'd0;
+wire [10:0] c_rd_group = chroma_source_x / 11'd5;
+wire [2:0]  c_rd_lane  = chroma_source_x % 11'd5;
+wire [14:0] c_rd_address = source_window ?
+    (({4'd0, chroma_source_y} * 15'd72) + {8'd0, c_rd_group[6:0]}) : 15'd0;
 
-wire [7:0] y_rd_data;
-wire [7:0] cb_rd_data;
-wire [7:0] cr_rd_data;
+wire [39:0] y_rd_word;
+wire [39:0] cb_rd_word;
+wire [39:0] cr_rd_word;
+
+// altsyncram registers the read address.  Carry the byte-lane selector through
+// the same one-cycle latency so the selected pel stays aligned with q_b.
+reg [2:0] y_rd_lane_d;
+reg [2:0] c_rd_lane_d;
+
+always @(posedge rd_clk) begin
+    if (reset) begin
+        y_rd_lane_d <= 3'd0;
+        c_rd_lane_d <= 3'd0;
+    end
+    else begin
+        y_rd_lane_d <= y_rd_lane;
+        c_rd_lane_d <= c_rd_lane;
+    end
+end
+
+reg [7:0] y_rd_data;
+reg [7:0] cb_rd_data;
+reg [7:0] cr_rd_data;
+
+always @* begin
+    case (y_rd_lane_d)
+        3'd0: y_rd_data = y_rd_word[7:0];
+        3'd1: y_rd_data = y_rd_word[15:8];
+        3'd2: y_rd_data = y_rd_word[23:16];
+        3'd3: y_rd_data = y_rd_word[31:24];
+        default: y_rd_data = y_rd_word[39:32];
+    endcase
+
+    case (c_rd_lane_d)
+        3'd0: begin
+            cb_rd_data = cb_rd_word[7:0];
+            cr_rd_data = cr_rd_word[7:0];
+        end
+        3'd1: begin
+            cb_rd_data = cb_rd_word[15:8];
+            cr_rd_data = cr_rd_word[15:8];
+        end
+        3'd2: begin
+            cb_rd_data = cb_rd_word[23:16];
+            cr_rd_data = cr_rd_word[23:16];
+        end
+        3'd3: begin
+            cb_rd_data = cb_rd_word[31:24];
+            cr_rd_data = cr_rd_word[31:24];
+        end
+        default: begin
+            cb_rd_data = cb_rd_word[39:32];
+            cr_rd_data = cr_rd_word[39:32];
+        end
+    endcase
+end
 
 // -------------------------------------------------------------------------
 // True dual-clock component framebuffers.
+//
+// Cyclone V M10K dual-port mode supports 256x40 organization.  Five byte
+// enables select the individual 8-bit pel lanes.  DONT_CARE is used for
+// mixed-port read-during-write because the design never publishes a picture
+// until all decoder writes are complete; no presentation pixel depends on the
+// collision value.
 // -------------------------------------------------------------------------
 
 altsyncram #(
     .operation_mode                 ("DUAL_PORT"),
-    .width_a                        (8),
-    .widthad_a                      (19),
-    .numwords_a                     (Y_FB_SIZE),
-    .width_b                        (8),
-    .widthad_b                      (19),
-    .numwords_b                     (Y_FB_SIZE),
+    .width_a                        (40),
+    .widthad_a                      (17),
+    .numwords_a                     (Y_FB_WORDS),
+    .width_b                        (40),
+    .widthad_b                      (17),
+    .numwords_b                     (Y_FB_WORDS),
+    .byte_size                      (8),
+    .width_byteena_a                (5),
+    .width_byteena_b                (5),
     .outdata_reg_b                  ("UNREGISTERED"),
     .address_reg_b                  ("CLOCK1"),
-    .read_during_write_mode_mixed_ports ("OLD_DATA"),
+    .read_during_write_mode_mixed_ports ("DONT_CARE"),
     .ram_block_type                 ("M10K"),
     .intended_device_family         ("Cyclone V")
 ) y_framebuffer_ram (
@@ -247,29 +355,32 @@ altsyncram #(
     .data_a         (y_wr_data),
     .wren_a         (y_wr_en),
     .address_b      (y_rd_address),
-    .q_b            (y_rd_data),
+    .q_b            (y_rd_word),
     .aclr0          (1'b0),
     .aclr1          (1'b0),
     .addressstall_a (1'b0),
     .addressstall_b (1'b0),
-    .byteena_a      (1'b1),
-    .byteena_b      (1'b1),
-    .data_b         (8'd0),
+    .byteena_a      (y_wr_byteena),
+    .byteena_b      (5'b11111),
+    .data_b         (40'd0),
     .wren_b         (1'b0),
     .q_a            ()
 );
 
 altsyncram #(
     .operation_mode                 ("DUAL_PORT"),
-    .width_a                        (8),
-    .widthad_a                      (17),
-    .numwords_a                     (CHROMA_FB_SIZE),
-    .width_b                        (8),
-    .widthad_b                      (17),
-    .numwords_b                     (CHROMA_FB_SIZE),
+    .width_a                        (40),
+    .widthad_a                      (15),
+    .numwords_a                     (C_FB_WORDS),
+    .width_b                        (40),
+    .widthad_b                      (15),
+    .numwords_b                     (C_FB_WORDS),
+    .byte_size                      (8),
+    .width_byteena_a                (5),
+    .width_byteena_b                (5),
     .outdata_reg_b                  ("UNREGISTERED"),
     .address_reg_b                  ("CLOCK1"),
-    .read_during_write_mode_mixed_ports ("OLD_DATA"),
+    .read_during_write_mode_mixed_ports ("DONT_CARE"),
     .ram_block_type                 ("M10K"),
     .intended_device_family         ("Cyclone V")
 ) cb_framebuffer_ram (
@@ -279,29 +390,32 @@ altsyncram #(
     .data_a         (cb_wr_data),
     .wren_a         (cb_wr_en),
     .address_b      (c_rd_address),
-    .q_b            (cb_rd_data),
+    .q_b            (cb_rd_word),
     .aclr0          (1'b0),
     .aclr1          (1'b0),
     .addressstall_a (1'b0),
     .addressstall_b (1'b0),
-    .byteena_a      (1'b1),
-    .byteena_b      (1'b1),
-    .data_b         (8'd0),
+    .byteena_a      (cb_wr_byteena),
+    .byteena_b      (5'b11111),
+    .data_b         (40'd0),
     .wren_b         (1'b0),
     .q_a            ()
 );
 
 altsyncram #(
     .operation_mode                 ("DUAL_PORT"),
-    .width_a                        (8),
-    .widthad_a                      (17),
-    .numwords_a                     (CHROMA_FB_SIZE),
-    .width_b                        (8),
-    .widthad_b                      (17),
-    .numwords_b                     (CHROMA_FB_SIZE),
+    .width_a                        (40),
+    .widthad_a                      (15),
+    .numwords_a                     (C_FB_WORDS),
+    .width_b                        (40),
+    .widthad_b                      (15),
+    .numwords_b                     (C_FB_WORDS),
+    .byte_size                      (8),
+    .width_byteena_a                (5),
+    .width_byteena_b                (5),
     .outdata_reg_b                  ("UNREGISTERED"),
     .address_reg_b                  ("CLOCK1"),
-    .read_during_write_mode_mixed_ports ("OLD_DATA"),
+    .read_during_write_mode_mixed_ports ("DONT_CARE"),
     .ram_block_type                 ("M10K"),
     .intended_device_family         ("Cyclone V")
 ) cr_framebuffer_ram (
@@ -311,14 +425,14 @@ altsyncram #(
     .data_a         (cr_wr_data),
     .wren_a         (cr_wr_en),
     .address_b      (c_rd_address),
-    .q_b            (cr_rd_data),
+    .q_b            (cr_rd_word),
     .aclr0          (1'b0),
     .aclr1          (1'b0),
     .addressstall_a (1'b0),
     .addressstall_b (1'b0),
-    .byteena_a      (1'b1),
-    .byteena_b      (1'b1),
-    .data_b         (8'd0),
+    .byteena_a      (cr_wr_byteena),
+    .byteena_b      (5'b11111),
+    .data_b         (40'd0),
     .wren_b         (1'b0),
     .q_a            ()
 );
