@@ -129,10 +129,11 @@ pll pll
 
 wire reset = RESET | status[0] | buttons[1];
 
-// kate - Phase 1L: the streaming H.262 bitreader continues to own input
-// backpressure while the first slice expands from a fixed four-macroblock proof
-// to its normative H.262 termination.
-// Before a slice is selected, bytes flow continuously for start-code/header
+// kate - Phase 1M: the streaming H.262 bitreader continues to own input
+// backpressure while picture_data() advances across every slice of the first
+// supported I-picture.  Slice boundaries remain inside the bitreader so no
+// alignment or payload bytes are discarded.
+// Before the first slice is selected, bytes flow continuously for start-code/header
 // parsing.  During slice parsing the bitreader stalls this FIFO whenever its
 // current payload byte has not been fully consumed, including IQ/IDCT waits.
 assign mpeg2_stream_wr =
@@ -161,7 +162,7 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 );
 
 // kate - Phase 1H: the legacy MPEG2FPGA DDR frame-store path is gone.
-// The present Phase-1L first-slice proof uses only the on-chip M10K framebuffer.
+// The present Phase-1M first-picture proof uses only the on-chip M10K framebuffer.
 // Keep the MiSTer DDR service interface completely idle until our own explicit
 // frame-store layer is introduced in a later decoder phase.
 assign DDRAM_CLK      = clk_mpeg2;
@@ -236,7 +237,8 @@ wire        mpeg2_new_macroblock_address_seen;
 wire        mpeg2_new_first_i_macroblock_seen;
 wire        mpeg2_new_first_luma_dc_seen;
 wire        mpeg2_new_first_luma_block_complete;
-wire        mpeg2_new_first_slice_luma_parsed;
+wire        mpeg2_new_first_picture_luma_parsed;
+wire        mpeg2_new_slice_start;
 wire        mpeg2_new_luma_macroblock_start;
 wire        mpeg2_new_phase1_probe_error;
 wire [4:0]  mpeg2_new_slice_quantiser_scale_code;
@@ -292,6 +294,15 @@ wire [4:0] mpeg2_new_effective_quantiser_scale_code =
 		mpeg2_new_macroblock_quantiser_scale_code :
 		mpeg2_new_slice_quantiser_scale_code;
 
+// kate - Phase 1M's local on-chip presentation buffer is 720x480.  The parser
+// itself remains standards-driven, but USER only reports a complete displayable
+// first picture when the coded frame fits this current diagnostic store.
+wire mpeg2_new_phase1m_frame_geometry_supported =
+	(mpeg2_new_horizontal_size != 14'd0) &&
+	(mpeg2_new_vertical_size   != 14'd0) &&
+	(mpeg2_new_horizontal_size <= 14'd720) &&
+	(mpeg2_new_vertical_size   <= 14'd480);
+
 // kate - Standards-driven H.262 header parser.  Phase 1H is the first build in
 // which this parser is not sharing its compressed input with MPEG2FPGA.
 mpeg2_h262_frontend mpeg2_h262_frontend
@@ -334,10 +345,11 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.intra_quant_matrix_default       (mpeg2_new_intra_quant_matrix_default)
 );
 
-// kate - Phase 1L complete-first-slice streaming progression.  The probe
-// reconstructs Y blocks 0..3 for every macroblock in the first slice, consumes
-// Cb/Cr syntax, and terminates only when H.262 6.2.4's 23-zero nextbits()
-// condition is recognized.  The Phase 1K ready/backpressure path is unchanged.
+// kate - Phase 1M complete-first-picture streaming progression.  The probe
+// reconstructs Y blocks 0..3 for every macroblock in every slice, consumes
+// Cb/Cr syntax, follows H.262 next_start_code() across slice boundaries, and
+// completes when picture_data() reaches the next non-slice start code.  The
+// proven Phase 1K ready/backpressure path remains unchanged.
 mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 (
 	.clk                         (clk_mpeg2),
@@ -356,7 +368,7 @@ mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 	.first_i_macroblock_seen     (mpeg2_new_first_i_macroblock_seen),
 	.first_luma_dc_seen          (mpeg2_new_first_luma_dc_seen),
 	.first_luma_block_complete   (mpeg2_new_first_luma_block_complete),
-	.first_slice_luma_parsed     (mpeg2_new_first_slice_luma_parsed),
+	.first_picture_luma_parsed   (mpeg2_new_first_picture_luma_parsed),
 	.probe_error                 (mpeg2_new_phase1_probe_error),
 	.quantiser_scale_code        (mpeg2_new_slice_quantiser_scale_code),
 	.macroblock_address_increment(mpeg2_new_macroblock_address_increment),
@@ -370,6 +382,7 @@ mpeg2_h262_luma4_probe mpeg2_h262_luma4_probe
 	.first_luma_ac_nonzero_count (mpeg2_new_first_luma_ac_nonzero_count),
 	.first_luma_last_coeff_index (mpeg2_new_first_luma_last_coeff_index),
 	.first_luma_last_ac_level    (mpeg2_new_first_luma_last_ac_level),
+	.slice_start                 (mpeg2_new_slice_start),
 	.luma_macroblock_start       (mpeg2_new_luma_macroblock_start),
 
 	.qfs_block_start             (mpeg2_new_qfs_block_start),
@@ -443,6 +456,7 @@ mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 	.slice_vertical_position            (mpeg2_new_slice_vertical_position),
 	.slice_vertical_position_extension  (mpeg2_new_slice_vertical_position_extension),
 	.macroblock_address_increment       (mpeg2_new_macroblock_address_increment),
+	.slice_start                        (mpeg2_new_slice_start),
 	.macroblock_start                   (mpeg2_new_luma_macroblock_start),
 
 	.sample_valid                       (mpeg2_new_idct_sample_valid),
@@ -475,11 +489,10 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 	.wr_x_pos    (mpeg2_new_recon_pixel_x),
 	.wr_y_pos    (mpeg2_new_recon_pixel_y),
 	.wr_en       (mpeg2_new_recon_pixel_valid),
-	.wr_macroblock_start (mpeg2_new_luma_macroblock_start),
-	.wr_block_start    (mpeg2_new_recon_block_start),
-	.wr_block_complete (mpeg2_new_recon_block_complete),
-	.wr_slice_complete (mpeg2_new_first_slice_luma_parsed),
 
+	.wr_picture_complete (mpeg2_new_first_picture_luma_parsed),
+	.wr_horizontal_size  (mpeg2_new_horizontal_size),
+	.wr_vertical_size    (mpeg2_new_vertical_size),
 
 	.rd_clk      (clk_video),
 	.h_pos       (display_h_pos),
@@ -505,14 +518,16 @@ assign VGA_R = fb_video_y;
 assign VGA_G = fb_video_y;
 assign VGA_B = fb_video_y;
 
-// kate - Phase 1L positive diagnostic.
-// OFF: the complete first slice has not reached its H.262 terminator, or an
-// earlier decoder stage reported an error.
-// ON: the complete first slice's luma blocks traversed the streaming parser,
-// IQ, IDCT and reconstruction path and the slice terminator was recognized.
+// kate - Phase 1M positive diagnostic.
+// OFF: picture_data() for the first supported I-picture has not completed, the
+// coded frame does not fit the current 720x480 on-chip store, or an earlier
+// decoder stage reported an error.
+// ON: every decoded slice's luma blocks traversed parser -> IQ -> IDCT ->
+// reconstruction and the next non-slice start code completed picture_data().
 assign LED_USER =
-	mpeg2_new_first_slice_luma_parsed &&
+	mpeg2_new_first_picture_luma_parsed &&
 	mpeg2_new_recon_macroblock_luma_complete &&
+	mpeg2_new_phase1m_frame_geometry_supported &&
 	!mpeg2_new_syntax_error &&
 	!mpeg2_new_phase1_probe_error &&
 	!mpeg2_new_inverse_quant_error &&

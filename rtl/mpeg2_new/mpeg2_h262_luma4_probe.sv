@@ -1,5 +1,5 @@
 //============================================================================
-// MiSTer Media Player - H.262 Phase 1L complete first-slice luma probe
+// MiSTer Media Player - H.262 Phase 1M complete first-picture luma probe
 //
 // Normative standards basis:
 //   ITU-T H.262 / ISO/IEC 13818-2
@@ -12,23 +12,25 @@
 //   - 7.2.2 intra AC coefficient decoding
 //   - Annex B Tables B.1, B.2, B.12, B.13, B.14 and B.15
 //
-// Phase 1L capability boundary:
+// Phase 1M capability boundary:
 //   - Non-scalable progressive 4:2:0 frame-picture I video only, selected by
 //     the standards-driven front end.
-//   - Decode and reconstruct luminance blocks 0..3 for every macroblock in the
-//     first slice, not an arbitrary fixed macroblock count.
+//   - Decode and reconstruct luminance blocks 0..3 for every macroblock in
+//     every slice of the first picture.
 //   - Chroma blocks 4 and 5 are parsed completely (including their DC VLC and
-//     AC coefficient syntax) so the parser can advance to the next macroblock,
+//     AC coefficient syntax) so the parser can advance through picture_data(),
 //     but chroma samples are deliberately not submitted to IQ/IDCT yet.
-//   - H.262 6.2.4 terminates the macroblock loop when the next 23 bits are all
-//     zero.  The post-macroblock state below recognizes that condition directly.
+//   - H.262 6.2.4 terminates each slice when the next 23 bits are all zero.
+//     Phase 1M then performs the required next_start_code() traversal.  Another
+//     slice_start_code restarts slice parsing; any other start code completes
+//     the first picture_data() region.
 //   - No whole-slice capture buffer.  Bits remain streaming and upstream FIFO
 //     backpressure preserves exact bit position while this parser or the
 //     reconstruction pipeline pauses.
 //
 // kate - Luma parsing pauses after every EOB until reconstruction reports the
-// previous block complete.  This preserves the existing one-block IQ/IDCT
-// storage while we extend the proven pipeline to an entire slice.
+// previous block complete.  DC predictors and macroblock-address state are
+// reset at every slice boundary as required by H.262.
 //============================================================================
 
 module mpeg2_h262_luma4_probe
@@ -53,9 +55,9 @@ module mpeg2_h262_luma4_probe
     output reg         first_i_macroblock_seen,
     output reg         first_luma_dc_seen,
     output reg         first_luma_block_complete,
-    // Sticky completion after the complete first slice has been parsed through
-    // the final Cr block and the H.262 23-zero slice terminator is recognized.
-    output reg         first_slice_luma_parsed,
+    // Sticky completion after every slice of the first picture has been parsed
+    // and picture_data() reaches the next non-slice start code.
+    output reg         first_picture_luma_parsed,
     output reg         probe_error,
 
     output reg  [4:0]  quantiser_scale_code,
@@ -72,6 +74,10 @@ module mpeg2_h262_luma4_probe
     output reg  [6:0]  first_luma_ac_nonzero_count,
     output reg  [5:0]  first_luma_last_coeff_index,
     output reg signed [11:0] first_luma_last_ac_level,
+
+    // One-cycle pulse for every accepted slice_start_code.  Reconstruction
+    // uses this to reset slice-local macroblock-address state.
+    output reg         slice_start,
 
     // Starts each accepted intra macroblock reconstruction context.
     output reg         luma_macroblock_start,
@@ -93,7 +99,7 @@ wire        slice_start_now  = start_code_now &&
                                (start_code_value >= 8'h01) &&
                                (start_code_value <= 8'hAF);
 
-// kate - Phase 1L streaming bitreader state.  The bitreader retains only one
+// kate - Phase 1M streaming bitreader state.  The bitreader retains only one
 // payload byte and backpressures the existing asynchronous input FIFO whenever
 // that byte has not yet been consumed.
 reg  parse_active;
@@ -119,11 +125,23 @@ localparam [4:0]
     ST_AC_VLC        = 5'd14,
     ST_AC_SIGN       = 5'd15,
     ST_ESCAPE_RUN    = 5'd16,
-    ST_ESCAPE_LEVEL    = 5'd17,
-    ST_WAIT_PIPELINE   = 5'd18,
-    ST_SLICE_END_ZEROS = 5'd19;
+    ST_ESCAPE_LEVEL     = 5'd17,
+    ST_WAIT_PIPELINE    = 5'd18,
+    ST_SLICE_END_ZEROS  = 5'd19,
+    ST_START_CODE_PREFIX = 5'd20,
+    ST_START_CODE_VALUE  = 5'd21;
 
 reg [4:0] parse_state;
+
+// kate - bit_mod8 mirrors the bitreader's current position.  Slice syntax starts
+// on a byte boundary immediately after slice_start_code.  After the 23-zero
+// nextbits() condition is consumed, next_start_code() is recovered by consuming
+// zero stuffing until the terminating '1' of the byte-aligned 0x000001 prefix.
+// The following eight bits are the next start_code_value.
+reg [2:0] bit_mod8;
+reg [7:0] next_start_code_shift;
+reg [2:0] next_start_code_bit_count;
+reg [10:0] picture_slice_index;
 
 assign bit_consume = parse_active && bit_valid &&
                      (parse_state != ST_WAIT_PIPELINE);
@@ -148,7 +166,9 @@ reg [4:0] macroblock_qscale_shift;
 
 // H.262 6.1.3 / Figure 6-10 block order for 4:2:0 is Y0,Y1,Y2,Y3,Cb,Cr.
 // block_index therefore runs 0..5 for each macroblock.  macroblock_index counts
-// completed macroblocks in this slice; 11 bits cover the H.262 maximum row width.
+// completed macroblocks in the current slice; 11 bits cover the H.262 maximum
+// row width.  picture_slice_index distinguishes the first block of the picture
+// from the first block of later slices for retained diagnostics.
 reg [2:0]  block_index;
 reg [10:0] macroblock_index;
 
@@ -169,7 +189,9 @@ wire [10:0] dc_predictor_current =
     (block_index == 3'd4) ? dc_predictor_cb : dc_predictor_cr;
 wire        current_block_is_luma = (block_index < 3'd4);
 wire        first_diagnostic_block =
-    (macroblock_index == 11'd0) && (block_index == 3'd0);
+    (picture_slice_index == 11'd0) &&
+    (macroblock_index == 11'd0) &&
+    (block_index == 3'd0);
 
 // Annex B Tables B.12/B.13 DC-size accumulator.
 reg [9:0] dc_vlc_code;
@@ -452,7 +474,7 @@ task automatic start_luma_block;
 endtask
 
 // Chroma blocks must be consumed to reach the following macroblock, but Phase
-// 1J deliberately does not submit them to the luma IQ/IDCT pipeline.
+// 1M deliberately does not submit them to the luma IQ/IDCT pipeline.
 task automatic start_chroma_block;
     begin
         dc_vlc_code         <= 10'd0;
@@ -478,6 +500,10 @@ always @(posedge clk) begin
         byte_window                       <= 32'd0;
         parse_active                      <= 1'b0;
         parse_state                       <= ST_QSCALE;
+        bit_mod8                          <= 3'd0;
+        next_start_code_shift             <= 8'd0;
+        next_start_code_bit_count         <= 3'd0;
+        picture_slice_index               <= 11'd0;
         field_bit_count                   <= 4'd0;
         qscale_shift                      <= 5'd0;
         slice_vertical_position_extension <= 3'd0;
@@ -513,7 +539,7 @@ always @(posedge clk) begin
         first_i_macroblock_seen           <= 1'b0;
         first_luma_dc_seen                <= 1'b0;
         first_luma_block_complete         <= 1'b0;
-        first_slice_luma_parsed           <= 1'b0;
+        first_picture_luma_parsed         <= 1'b0;
         probe_error                       <= 1'b0;
         quantiser_scale_code              <= 5'd0;
         macroblock_address_increment      <= 12'd0;
@@ -526,6 +552,7 @@ always @(posedge clk) begin
         first_luma_ac_nonzero_count       <= 7'd0;
         first_luma_last_coeff_index       <= 6'd0;
         first_luma_last_ac_level          <= 12'sd0;
+        slice_start                       <= 1'b0;
         luma_macroblock_start             <= 1'b0;
         qfs_block_start                   <= 1'b0;
         qfs_write_en                      <= 1'b0;
@@ -537,18 +564,29 @@ always @(posedge clk) begin
         qfs_block_start       <= 1'b0;
         qfs_write_en          <= 1'b0;
         qfs_block_end         <= 1'b0;
+        slice_start           <= 1'b0;
         luma_macroblock_start <= 1'b0;
 
-        // kate - Search start codes at byte granularity.  The byte containing
+        if (bit_consume)
+            bit_mod8 <= bit_mod8 + 3'd1;
+
+        // kate - Search the first slice start code at byte granularity.  Once
+        // picture_data() parsing begins, later start codes remain in the same
+        // streaming bitreader so slice boundaries do not discard partial bytes.
         // slice_start_code is consumed while parse_active is still low, so the
         // bitreader begins with the following byte at the first slice-header bit.
         if (stream_valid) begin
             byte_window <= byte_window_next;
 
             if (!parse_active && !probe_error &&
-                !first_slice_luma_parsed && slice_start_now) begin
+                !first_picture_luma_parsed && slice_start_now) begin
                 parse_active                      <= 1'b1;
+                slice_start                       <= 1'b1;
                 slice_vertical_position           <= start_code_value;
+                bit_mod8                          <= 3'd0;
+                next_start_code_shift             <= 8'd0;
+                next_start_code_bit_count         <= 3'd0;
+                picture_slice_index               <= 11'd0;
                 field_bit_count                   <= 4'd0;
                 qscale_shift                      <= 5'd0;
                 slice_vertical_position_extension <= 3'd0;
@@ -723,11 +761,86 @@ always @(posedge clk) begin
                             parse_active <= 1'b0;
                         end
                         else if (slice_zero_count == 5'd22) begin
-                            first_slice_luma_parsed <= 1'b1;
-                            parse_active            <= 1'b0;
+                            // The 23-zero nextbits() condition has been consumed.
+                            // Continue with H.262 next_start_code() rather than
+                            // releasing the bitreader and losing alignment.
+                            parse_state <= ST_START_CODE_PREFIX;
                         end
                         else begin
                             slice_zero_count <= slice_zero_count + 5'd1;
+                        end
+                    end
+
+                    ST_START_CODE_PREFIX: begin
+                        // H.262 5.2.3: next_start_code() consumes zero stuffing
+                        // until the byte-aligned 0x000001 prefix.  Because the
+                        // slice-end test already consumed 23 zeros, simply keep
+                        // consuming zeros until the prefix's terminating '1'.
+                        // That '1' must be bit 7 of its byte.
+                        if (!current_bit) begin
+                            // Continue through zero_bit / zero_byte stuffing.
+                        end
+                        else if (bit_mod8 != 3'd7) begin
+                            probe_error  <= 1'b1;
+                            parse_active <= 1'b0;
+                        end
+                        else begin
+                            next_start_code_shift     <= 8'd0;
+                            next_start_code_bit_count <= 3'd0;
+                            parse_state               <= ST_START_CODE_VALUE;
+                        end
+                    end
+
+                    ST_START_CODE_VALUE: begin
+                        next_start_code_shift <=
+                            {next_start_code_shift[6:0], current_bit};
+
+                        if (next_start_code_bit_count == 3'd7) begin
+                            next_start_code_bit_count <= 3'd0;
+
+                            if (({next_start_code_shift[6:0], current_bit} >= 8'h01) &&
+                                ({next_start_code_shift[6:0], current_bit} <= 8'hAF)) begin
+                                // picture_data() continues with another slice().
+                                if (picture_slice_index == 11'd2047) begin
+                                    probe_error  <= 1'b1;
+                                    parse_active <= 1'b0;
+                                end
+                                else begin
+                                    picture_slice_index               <= picture_slice_index + 11'd1;
+                                    slice_start                       <= 1'b1;
+                                    slice_vertical_position           <=
+                                        {next_start_code_shift[6:0], current_bit};
+                                    slice_vertical_position_extension <= 3'd0;
+                                    field_bit_count                   <= 4'd0;
+                                    qscale_shift                      <= 5'd0;
+                                    slice_picture_id_enable           <= 1'b0;
+                                    slice_picture_id_shift            <= 6'd0;
+                                    macroblock_qscale_shift           <= 5'd0;
+                                    block_index                       <= 3'd0;
+                                    macroblock_index                  <= 11'd0;
+                                    slice_zero_count                  <= 5'd0;
+                                    vlc_code                          <= 11'd0;
+                                    vlc_len                           <= 4'd0;
+                                    mba_escape_base                   <= 12'd0;
+                                    dc_predictor_y                    <= dc_predictor_reset;
+                                    dc_predictor_cb                   <= dc_predictor_reset;
+                                    dc_predictor_cr                   <= dc_predictor_reset;
+                                    parse_state <= (vertical_size > 14'd2800) ?
+                                                   ST_VPOS_EXT : ST_QSCALE;
+                                end
+                            end
+                            else begin
+                                // H.262 6.2.3.7: picture_data() repeats slice()
+                                // only while the next start code is a slice code.
+                                // Any other start code therefore completes the
+                                // first picture_data() region for this phase.
+                                first_picture_luma_parsed <= 1'b1;
+                                parse_active              <= 1'b0;
+                            end
+                        end
+                        else begin
+                            next_start_code_bit_count <=
+                                next_start_code_bit_count + 3'd1;
                         end
                     end
 
@@ -869,9 +982,9 @@ always @(posedge clk) begin
                                     start_chroma_block();
                                 end
                                 else begin
-                                    // Cr completes one macroblock.  Phase 1L
+                                    // Cr completes one macroblock.  Phase 1M
                                     // continues until H.262 6.2.4's actual
-                                    // first-slice terminator is encountered.
+                                    // current-slice terminator is encountered.
                                     if (macroblock_index == 11'd2047) begin
                                         probe_error  <= 1'b1;
                                         parse_active <= 1'b0;

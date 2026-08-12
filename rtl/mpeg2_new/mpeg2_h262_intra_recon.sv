@@ -15,12 +15,12 @@
 //   - 7.6: intra-coded macroblocks form no prediction, so p[y][x] = 0.
 //   - 7.6.8: d[y][x] = f[y][x] + p[y][x], saturated to [0,255].
 //
-// Phase 1L capability boundary:
+// Phase 1M capability boundary:
 //   The upstream streaming probe supplies luminance blocks 0..3 for every
-//   macroblock in the first slice.  This module accumulates the normative
-//   macroblock_address_increment sequence until the row boundary; each 16x16
-//   macroblock is therefore placed at its actual picture X coordinate.
-//   Chroma remains deferred.
+//   macroblock in every slice of the first picture.  slice_start resets the
+//   slice-local previous-macroblock-address state, then each accepted
+//   macroblock_address_increment places the 16x16 macroblock at its normative
+//   picture coordinate.  Chroma remains deferred.
 //============================================================================
 
 module mpeg2_h262_intra_recon
@@ -34,7 +34,11 @@ module mpeg2_h262_intra_recon
     input  wire [2:0]         slice_vertical_position_extension,
     input  wire [11:0]        macroblock_address_increment,
 
-    // kate - Pulses once for each accepted Phase-1L intra macroblock header.
+    // kate - Pulses once for every accepted slice_start_code.  H.262 6.3.17
+    // restarts previous_macroblock_address at each slice.
+    input  wire               slice_start,
+
+    // Pulses once for each accepted Phase-1M intra macroblock header.
     input  wire               macroblock_start,
 
     input  wire               sample_valid,
@@ -50,7 +54,7 @@ module mpeg2_h262_intra_recon
     // One-cycle completion pulse used as the upstream pipeline-ready handshake.
     output reg                block_complete,
     // Sticky proof that at least one complete macroblock's four Y blocks have
-    // traversed reconstruction.  First-slice completion is owned by the parser.
+    // traversed reconstruction.  First-picture completion is owned by the parser.
     output reg                macroblock_luma_complete,
     output reg                recon_error,
 
@@ -69,11 +73,11 @@ wire [10:0] mb_row =
          {3'd0, slice_vertical_position} - 11'd1 :
         {3'd0, slice_vertical_position} - 11'd1;
 
-// kate - Phase 1L keeps the accumulated macroblock column explicitly.  For the
-// first macroblock in a slice column = increment-1; after that each increment
+// kate - Phase 1M keeps the accumulated macroblock column explicitly.  For the
+// first macroblock in each slice column = increment-1; after that each increment
 // is relative to the previously decoded macroblock address (H.262 6.3.17).
 // There is deliberately no fixed macroblock-count limit here; the parser owns
-// first-slice termination and this stage only enforces the encoded row width.
+// slice/picture termination and this stage only enforces the encoded row width.
 reg        macroblock_sequence_started;
 reg [11:0] current_mb_column;
 
@@ -149,6 +153,19 @@ always @(posedge clk) begin
         block_complete <= 1'b0;
         idct_block_complete_d <= idct_block_complete;
 
+        if (slice_start) begin
+            // The parser emits this only after the previous slice has completed,
+            // so downstream sample capture must already be idle.
+            if (capture_active) begin
+                recon_error <= 1'b1;
+            end
+            else begin
+                macroblock_sequence_started <= 1'b0;
+                current_mb_column           <= 12'd0;
+                luma_block_index            <= 2'd0;
+            end
+        end
+
         if (macroblock_start) begin
             if (capture_active || (macroblock_address_increment == 12'd0)) begin
                 recon_error <= 1'b1;
@@ -165,7 +182,7 @@ always @(posedge clk) begin
             end
             else begin
                 // H.262 6.3.17 advances macroblock_address by the decoded
-                // increment.  Phase 1L permits every legal column in this row
+                // increment.  Phase 1M permits every legal column in this row
                 // rather than imposing Phase 1J's four-macroblock test limit.
                 if (next_mb_column_calc >= {2'd0, mb_width}) begin
                     recon_error <= 1'b1;
