@@ -2,17 +2,35 @@
 
 All notable project milestones are documented here.
 
-This project is still in active pre-release development, so entries are organized by development phase rather than semantic version number.
+This project is still in active pre-release development. Published milestone releases use semantic version numbers, while unreleased work remains organized by development phase.
 
-## Unreleased — Phase 1R
+## Unreleased — Phase 1S
+
+Target milestone: **v0.2.0**
 
 Planned next milestone:
 
-- add an alternate DDR frame bank for the second decoded picture;
-- preserve the currently displayed frame until the next frame is fully stored;
-- publish/swap the display frame only at a controlled boundary;
-- retain the single-parser successive-picture architecture;
-- preserve the timing/CDC discipline established in Phase 1P.
+- extend the proven two-picture path into continuous all-I picture playback;
+- reuse the two DDR frame banks as a repeated ping-pong store rather than a one-time bank 0 -> bank 1 transition;
+- add display scheduling so completed pictures are published repeatedly at controlled boundaries;
+- begin timestamp/scheduling infrastructure needed for later H.222.0 integration;
+- preserve the single-parser architecture and Phase 1P timing/CDC discipline.
+
+## [0.1.0] - 2026-08-12 — Phase 1R
+
+First hardware-proven milestone release.
+
+- Added an alternate DDR frame bank for the second decoded picture.
+- Added explicit DDR arbitration so display reads and reconstructed-frame writes can safely share the MiSTer DDRAM interface.
+- Preserved picture 1 on screen while picture 2 is decoded and stored in the alternate bank.
+- Made the parser wait for DDR persistence on both pictures so second-picture completion means the full frame has been stored.
+- Added controlled framebuffer re-arm and frame-bank publication after picture 2 completes.
+- Proved a visible picture 1 -> picture 2 transition on MiSTer hardware.
+- Hardware acceptance: USER completion correct, stable color output, no tearing observed, and no flicker observed.
+- Final Quartus fit: 11,342 / 41,910 ALMs (27%), 18,142 registers, 63 / 553 RAM blocks (11%), and 55 / 112 DSP blocks (49%).
+- Final focused timing: decoder setup +5.265 ns, video setup +7.619 ns, decoder recovery +16.147 ns, video recovery +21.712 ns, with TNS 0; hold and removal checks are positive.
+- Published GitHub pre-release tag: `v0.1.0`.
+- MiSTer binary asset: `MediaPlayer_20260812.rbf`.
 
 ## Phase 1Q — Successive I-picture decode
 
