@@ -1,16 +1,25 @@
 //============================================================================
-// MiSTer Media Player - Phase 1S continuous all-I H.262 wrapper
+// MiSTer Media Player - Phase 1T continuous H.262 picture wrapper
 //
 // Normative standards basis:
 //   ITU-T H.262 / ISO/IEC 13818-2:2000, 6.2.2 video_sequence().
-//   A video sequence repeats picture_header(), picture_coding_extension() and
-//   picture_data() while additional pictures/groups are present.
+//   ITU-T H.262 / ISO/IEC 13818-2:2000, 3.111 and 7.6.2.2.
+//   A reference frame is a reconstructed I- or P-frame.  Frame prediction in
+//   a P-picture uses the most recently reconstructed reference frame.
 //
-// kate - Phase 1S extends the proven Phase 1Q/1R single-parser re-arm path to
+// kate - Phase 1S extended the proven Phase 1Q/1R single-parser re-arm path to
 // every supported picture.  Every picture still waits for the DDR persistence
 // handshake block by block.  The active write bank alternates 0/1 after each
 // complete picture, and a one-cycle completion pulse reports which bank just
 // became complete so the top level can republish it safely.
+//
+// kate - Phase 1T-a adds explicit reference-frame ownership bookkeeping without
+// changing the proven all-I decode path.  phase1_supported currently admits only
+// I-pictures, so every accepted persisted picture is a reference picture.  The
+// most recently completed bank is promoted to current reference ownership only
+// after full DDR persistence.  When P-picture decoding is enabled later, this
+// promotion point will be qualified for I/P pictures while B-pictures will not
+// replace the reference.
 //============================================================================
 
 module mpeg2_h262_two_picture_probe
@@ -40,6 +49,14 @@ module mpeg2_h262_two_picture_probe
     output wire        active_frame_bank,
     output wire        completed_frame_bank,
     output wire [7:0]  picture_count,
+
+    // kate - Phase 1T-a reference-picture state.  These outputs are sideband
+    // metadata for later prediction work; the current top level does not need
+    // them to preserve the hardware-proven Phase 1S presentation path.
+    output wire        reference_frame_valid,
+    output wire        reference_frame_bank,
+    output wire [7:0]  reference_promotion_count,
+
     output wire        probe_error,
 
     output wire [4:0]  quantiser_scale_code,
@@ -75,6 +92,15 @@ reg picture_complete_pulse;
 reg active_frame_bank_reg;
 reg completed_frame_bank_reg;
 reg [7:0] picture_count_reg;
+
+// kate - Phase 1T-a current-reference bookkeeping.  Because the current
+// supported decoder subset accepts only I-pictures, each fully persisted picture
+// is a reference frame.  Promotion occurs on the same completion edge that
+// commits completed_frame_bank_reg, never before the final block_stored handshake.
+reg       reference_frame_valid_reg;
+reg       reference_frame_bank_reg;
+reg [7:0] reference_promotion_count_reg;
+reg       reference_error_latched;
 
 reg        first_slice_header_seen_latched;
 reg        first_macroblock_address_seen_latched;
@@ -113,6 +139,22 @@ wire parser_reset = reset || parser_rearm;
 wire active_pipeline_block_done = pipeline_block_done;
 wire unused_recon_block_complete = recon_block_complete;
 
+// One completion event per fully persisted picture.  The parser completion is
+// sticky until parser_rearm, so suppress the re-arm cycle itself.
+wire picture_persisted_now = !parser_rearm && parser_picture_420_parsed;
+
+// After three persisted pictures the existing USER diagnostic already expects
+// a 0 -> 1 -> 0 bank sequence.  Tie the new reference bookkeeping into that
+// proof without changing the top-level LED equation: probe_error must remain
+// clear only if reference ownership has also advanced three times and the newest
+// reference is the completed bank rather than the next write bank.
+wire reference_progress_error =
+    (picture_count_reg >= 8'd3) &&
+    (!reference_frame_valid_reg ||
+     (reference_promotion_count_reg < 8'd3) ||
+     (reference_frame_bank_reg != completed_frame_bank_reg) ||
+     (reference_frame_bank_reg == active_frame_bank_reg));
+
 assign stream_ready              = parser_stream_ready;
 assign first_picture_420_parsed  = first_picture_done;
 assign second_picture_420_parsed = second_picture_done;
@@ -120,7 +162,13 @@ assign picture_420_complete      = picture_complete_pulse;
 assign active_frame_bank         = active_frame_bank_reg;
 assign completed_frame_bank      = completed_frame_bank_reg;
 assign picture_count             = picture_count_reg;
-assign probe_error               = probe_error_latched | parser_probe_error;
+assign reference_frame_valid     = reference_frame_valid_reg;
+assign reference_frame_bank      = reference_frame_bank_reg;
+assign reference_promotion_count = reference_promotion_count_reg;
+assign probe_error               = probe_error_latched |
+                                   parser_probe_error |
+                                   reference_error_latched |
+                                   reference_progress_error;
 
 // Preserve picture-1 diagnostics across all later parser re-arm cycles.  Before
 // picture 1 completes, expose the live parser values exactly as earlier phases.
@@ -168,6 +216,10 @@ always @(posedge clk) begin
         active_frame_bank_reg                 <= 1'b0;
         completed_frame_bank_reg              <= 1'b0;
         picture_count_reg                     <= 8'd0;
+        reference_frame_valid_reg             <= 1'b0;
+        reference_frame_bank_reg              <= 1'b0;
+        reference_promotion_count_reg         <= 8'd0;
+        reference_error_latched               <= 1'b0;
         first_slice_header_seen_latched       <= 1'b0;
         first_macroblock_address_seen_latched <= 1'b0;
         first_i_macroblock_seen_latched       <= 1'b0;
@@ -187,7 +239,7 @@ always @(posedge clk) begin
         if (parser_probe_error)
             probe_error_latched <= 1'b1;
 
-        if (!parser_rearm && parser_picture_420_parsed) begin
+        if (picture_persisted_now) begin
             // The completion pulse is delayed one registered cycle relative to
             // the parser's sticky picture-complete indication.  At this point
             // every block is already stored because pipeline_block_done is the
@@ -199,6 +251,21 @@ always @(posedge clk) begin
 
             if (picture_count_reg != 8'hff)
                 picture_count_reg <= picture_count_reg + 8'd1;
+
+            // kate - Phase 1T-a promotion point.  The bank being completed may
+            // not already be the current reference: that would mean the writer
+            // overwrote the reference before a replacement was fully persisted.
+            // With the current all-I ping-pong path this invariant must hold on
+            // every picture after the first.
+            if (reference_frame_valid_reg &&
+                (active_frame_bank_reg == reference_frame_bank_reg))
+                reference_error_latched <= 1'b1;
+
+            reference_frame_valid_reg <= 1'b1;
+            reference_frame_bank_reg  <= active_frame_bank_reg;
+            if (reference_promotion_count_reg != 8'hff)
+                reference_promotion_count_reg <=
+                    reference_promotion_count_reg + 8'd1;
 
             if (!first_picture_done) begin
                 first_picture_done                    <= 1'b1;
