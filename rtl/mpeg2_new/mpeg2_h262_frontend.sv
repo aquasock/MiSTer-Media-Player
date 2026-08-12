@@ -16,7 +16,9 @@
 //   - 6.2.3.1 picture_coding_extension()
 //   - 6.3.3 frame_rate_code / Table 6-4
 //   - 6.3.9 temporal_reference
+//   - 6.3.10 picture coding extension semantics / f_code
 //   - 6.3.11 quantisation matrix reset/download semantics
+//   - 7.6.3.1 motion-vector decoding
 //   - Table 6-2 extension_start_code_identifier
 //   - Table 6-12 picture_coding_type
 //   ITU-T H.222.0 / ISO/IEC 13818-1
@@ -66,6 +68,16 @@ module mpeg2_h262_frontend
     output reg         intra_vlc_format,
     output reg         alternate_scan,
     output reg         progressive_frame,
+
+    // kate - Phase 1T-b exposes the four H.262 f_code controls needed by the
+    // future motion-vector decoder.  Index mapping follows H.262 Table 7-7:
+    // [0][0] forward horizontal, [0][1] forward vertical,
+    // [1][0] backward horizontal, [1][1] backward vertical.
+    output reg  [3:0]  forward_f_code_horizontal,
+    output reg  [3:0]  forward_f_code_vertical,
+    output reg  [3:0]  backward_f_code_horizontal,
+    output reg  [3:0]  backward_f_code_vertical,
+    output reg         motion_f_code_seen,
 
     // kate - Phase 1S timing foundation.  These are local elementary-stream
     // schedule metadata, not PES PTS values: the current .m2v input has no
@@ -167,6 +179,18 @@ wire        start_code_now   = (byte_window_next[31:8] == 24'h000001);
 wire [7:0]  start_code_value = byte_window_next[7:0];
 wire [63:0] payload_next     = {payload_shift[55:0], stream_data};
 
+// kate - Phase 1T-b keeps the registered motion-vector control fields in the
+// active I-picture support gate so the existing hardware regression proves that
+// these new sideband outputs are real captured state, not dead/debug-only RTL.
+// H.262 6.3.10 requires all four f_code values to be 15 in the current supported
+// I-picture subset because concealment_motion_vectors is also required to be 0.
+wire phase1_i_f_code_state_valid =
+    motion_f_code_seen &&
+    (forward_f_code_horizontal  == 4'hF) &&
+    (forward_f_code_vertical    == 4'hF) &&
+    (backward_f_code_horizontal == 4'hF) &&
+    (backward_f_code_vertical   == 4'hF);
+
 // Phase 0 proves that we can identify the required H.262 hierarchy without
 // disturbing legacy playback.  Phase 1 will initially decode progressive,
 // 4:2:0, frame-picture I video; these are capability limits, not H.262 syntax
@@ -191,6 +215,7 @@ assign phase1_supported =
     frame_pred_frame_dct &&
     !concealment_motion_vectors &&
     progressive_frame &&
+    phase1_i_f_code_state_valid &&
     !timing_unsupported &&
     !timing_error;
 
@@ -239,6 +264,11 @@ always @(posedge clk) begin
         intra_vlc_format                    <= 1'b0;
         alternate_scan                      <= 1'b0;
         progressive_frame                   <= 1'b0;
+        forward_f_code_horizontal           <= 4'd0;
+        forward_f_code_vertical             <= 4'd0;
+        backward_f_code_horizontal          <= 4'd0;
+        backward_f_code_vertical            <= 4'd0;
+        motion_f_code_seen                  <= 1'b0;
 
         timing_seen                         <= 1'b0;
         timing_advanced                     <= 1'b0;
@@ -466,8 +496,14 @@ always @(posedge clk) begin
                 (active_extension_id == EXT_PICTURE_CODING) &&
                 (payload_byte_index == 4)) begin
                 // H.262 6.2.3.1 picture_coding_extension() bit layout.
-                // kate - Preserve fields that directly control block syntax and
-                // coefficient reconstruction instead of inferring defaults.
+                // kate - Preserve fields that directly control block syntax,
+                // coefficient reconstruction and future motion-vector decoding
+                // instead of inferring defaults.
+                forward_f_code_horizontal         <= payload_next[35:32];
+                forward_f_code_vertical           <= payload_next[31:28];
+                backward_f_code_horizontal        <= payload_next[27:24];
+                backward_f_code_vertical          <= payload_next[23:20];
+                motion_f_code_seen                <= 1'b1;
                 intra_dc_precision               <= payload_next[19:18];
                 picture_structure                 <= payload_next[17:16];
                 frame_pred_frame_dct              <= payload_next[14];
@@ -478,6 +514,39 @@ always @(posedge clk) begin
                 progressive_frame                 <= payload_next[7];
                 picture_coding_extension_seen     <= 1'b1;
                 expect_picture_coding_extension   <= 1'b0;
+
+                // H.262 6.3.10: every f_code is a 4-bit unsigned value in
+                // 1..9 or 15.  Zero is forbidden and 10..14 are reserved.
+                if (!(((payload_next[35:32] >= 4'd1) &&
+                       (payload_next[35:32] <= 4'd9)) ||
+                      (payload_next[35:32] == 4'hF)))
+                    syntax_error <= 1'b1;
+                if (!(((payload_next[31:28] >= 4'd1) &&
+                       (payload_next[31:28] <= 4'd9)) ||
+                      (payload_next[31:28] == 4'hF)))
+                    syntax_error <= 1'b1;
+                if (!(((payload_next[27:24] >= 4'd1) &&
+                       (payload_next[27:24] <= 4'd9)) ||
+                      (payload_next[27:24] == 4'hF)))
+                    syntax_error <= 1'b1;
+                if (!(((payload_next[23:20] >= 4'd1) &&
+                       (payload_next[23:20] <= 4'd9)) ||
+                      (payload_next[23:20] == 4'hF)))
+                    syntax_error <= 1'b1;
+
+                // H.262 6.3.10: with no concealment motion vectors an I-picture
+                // uses no motion vectors, so all four f_code values shall be 15.
+                if ((picture_coding_type == 3'b001) &&
+                    !payload_next[13] &&
+                    (payload_next[35:20] != 16'hFFFF))
+                    syntax_error <= 1'b1;
+
+                // Backward motion vectors are unused in both I- and P-pictures;
+                // the corresponding two f_code values shall therefore be 15.
+                if (((picture_coding_type == 3'b001) ||
+                     (picture_coding_type == 3'b010)) &&
+                    (payload_next[27:20] != 8'hFF))
+                    syntax_error <= 1'b1;
 
                 // picture_structure == 00 is reserved.
                 if (payload_next[17:16] == 2'b00)
