@@ -10,6 +10,9 @@ Reference encoder used to establish the checked-in baseline:
 from pathlib import Path
 import subprocess, hashlib, json
 
+# This file is intentionally deterministic at the source-frame level. The
+# checked-in binaries are the baseline; reruns with another FFmpeg version may
+# produce different encoded bytes and therefore require an explicit re-baseline.
 ROOT = Path(__file__).resolve().parent
 TMP = ROOT / ".regen_tmp"
 TMP.mkdir(exist_ok=True)
