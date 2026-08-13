@@ -18,7 +18,7 @@ function automatic [28:0] addr;input [28:0] off;input [2:0] b;input [2:0] r;begi
 function automatic [7:0] bat;input [63:0] w;input [2:0] n;begin case(n)
 0:bat=w[7:0];1:bat=w[15:8];2:bat=w[23:16];3:bat=w[31:24];4:bat=w[39:32];5:bat=w[47:40];6:bat=w[55:48];default:bat=w[63:56];endcase end endfunction
 function automatic [7:0] clipadd;input [7:0] p;input signed [15:0] f;reg signed [16:0] s;begin s=$signed({9'd0,p})+{f[15],f};if(s<0)clipadd=0;else if(s>255)clipadd=255;else clipadd=s[7:0];end endfunction
-(* ramstyle="M10K" *) reg signed [15:0] rm[0:511];reg [8:0] rc;
+reg signed [15:0] rm[0:511];reg [8:0] rc;
 reg [63:0] rr[0:7],dr[0:7];integer i;
 reg started,rb,db,rkind,req,waitresp;reg [2:0] blk,row;reg [19:0] timeout;
 wire [28:0] roff=rb?BANK:0,doff=db?BANK:0;assign ddram_burstcnt=req?1:0;assign ddram_addr=req?addr(rkind?doff:roff,blk,row):0;assign ddram_rd=req;
