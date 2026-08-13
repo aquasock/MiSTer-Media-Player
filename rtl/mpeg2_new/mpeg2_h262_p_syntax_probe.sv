@@ -27,20 +27,30 @@
 // setup requirement.  This implementation intentionally consumes the captured
 // first-macroblock prefix over multiple clocks.  No timing exception is used.
 //
-// Phase 1T-e controlled diagnostic boundary:
+// kate - Phase 1T-f is the final address-generation proof before an actual
+// reference DDR transaction is added.  H.262 frame motion vectors are in
+// half-sample units.  For the controlled first luma sample at current x=7,
+// vector x=0 addresses luma sample 7 (DDR word 0) and vector x=4 addresses
+// luma sample 9 (DDR word 1).  USER success is therefore withheld until the
+// vector-to-integer-sample conversion crosses the expected 8-pixel DDR word
+// boundary.  The 8-pixel packing is an implementation choice of this core.
+//
+// Phase 1T-f controlled diagnostic boundary:
 //   - non-scalable progressive frame P picture;
 //   - frame_pred_frame_dct == 1, therefore frame-based prediction is implied;
 //   - first macroblock_address_increment == 1;
 //   - all seven Table B.3 macroblock_type VLCs remain recognized;
 //   - a non-intra P macroblock without macroblock_motion_forward derives the
-//     normative implicit zero prediction vector;
+//     normative implicit zero prediction vector and reference word 0;
 //   - a macroblock with macroblock_motion_forward decodes both forward motion
 //     components using Table B.10, f_code-1 residuals and 7.6.3.1 reconstruction;
-//   - the controlled coded-motion vector is vector'[0][0] == (4, 0).
+//   - the controlled coded-motion vector is vector'[0][0] == (4, 0) and derives
+//     reference luma word index 1 for current sample x=7.
 //
-// The final (4,0) check is a hardware-test restriction, not an H.262 validity
-// rule.  It deliberately keeps the reconstructed vector in the USER proof until
-// the next phase consumes that vector in the reference-pixel read path.
+// The final (4,0) and word-index checks are hardware-test restrictions, not
+// H.262 validity rules.  They deliberately keep the reconstructed vector and
+// storage-address boundary in the USER proof until the next phase performs the
+// corresponding reference DDR read.
 //============================================================================
 
 module mpeg2_h262_p_syntax_probe
@@ -51,9 +61,9 @@ module mpeg2_h262_p_syntax_probe
     input  wire       stream_valid,
     input  wire       p_picture_expected,
 
-    // Historical name retained at the wrapper boundary.  From Phase 1T-e this
-    // positive result means the first P macroblock type AND its required first
-    // prediction-vector semantics have been verified.
+    // Historical name retained at the wrapper boundary.  From Phase 1T-f this
+    // positive result means the first P macroblock type, required prediction
+    // vector semantics and controlled reference-word derivation are verified.
     output reg        p_macroblock_type_seen,
     output reg        probe_error
 );
@@ -301,6 +311,13 @@ function automatic reconstructed_component_in_range;
     end
 endfunction
 
+// kate - Phase 1T-f controlled luma reference-word derivation.  The selected
+// current sample is x=7 so vector x=4 half-samples moves the integer prediction
+// location to x=9 and across the 8-pixel DDR packing boundary into word 1.
+wire signed [12:0] controlled_integer_dx = forward_vector_x >>> 1;
+wire signed [13:0] controlled_reference_x = 14'sd7 + controlled_integer_dx;
+wire [10:0] controlled_reference_word = controlled_reference_x[13:3];
+
 always @(posedge clk) begin
     if (reset) begin
         byte_window                    <= 32'd0;
@@ -474,15 +491,19 @@ always @(posedge clk) begin
                 D_IMPLICIT_ZERO: begin
                     // H.262 7.6.3.5: in a P frame, a non-intra macroblock with
                     // macroblock_motion_forward==0 forms prediction with (0,0).
+                    // Phase 1T-f also proves current x=7 remains in DDR word 0.
                     if (!p_picture_controls_seen ||
                         (p_picture_structure != 2'b11) ||
                         !p_frame_pred_frame_dct) begin
                         probe_error <= 1'b1;
                     end
                     else begin
-                        forward_vector_x       <= 13'sd0;
-                        forward_vector_y       <= 13'sd0;
-                        p_macroblock_type_seen <= 1'b1;
+                        forward_vector_x <= 13'sd0;
+                        forward_vector_y <= 13'sd0;
+                        if (((14'sd7 + (13'sd0 >>> 1)) >>> 3) == 14'sd0)
+                            p_macroblock_type_seen <= 1'b1;
+                        else
+                            probe_error <= 1'b1;
                     end
                     decode_active <= 1'b0;
                     decode_state  <= D_IDLE;
@@ -585,10 +606,16 @@ always @(posedge clk) begin
                     else begin
                         forward_vector_y <= reconstructed_component;
 
-                        // Controlled test_ip_motion.m2v proof: first forward
-                        // luminance vector must reconstruct to exactly (4,0).
+                        // Controlled test_ip_motion_end.m2v proof: the first
+                        // forward luminance vector must reconstruct to (4,0).
+                        // Phase 1T-f additionally proves that +4 half-samples is
+                        // +2 integer luma samples, moving current x=7 to x=9 and
+                        // therefore selecting packed DDR luma word index 1.
                         if ((forward_vector_x == 13'sd4) &&
-                            (reconstructed_component == 13'sd0)) begin
+                            (reconstructed_component == 13'sd0) &&
+                            (controlled_integer_dx == 13'sd2) &&
+                            (controlled_reference_x == 14'sd9) &&
+                            (controlled_reference_word == 11'd1)) begin
                             p_macroblock_type_seen <= 1'b1;
                         end
                         else begin
