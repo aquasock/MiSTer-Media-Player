@@ -29,12 +29,24 @@
 // its pattern-only first P macroblock has the normative implicit (0,0) vector.
 // Destination luma (0,0) therefore predicts from stored reference luma (0,0).
 // The real first residual sample exported by the Phase 1T-k transform diagnostic
-// is added to that real DDR prediction and clipped under 7.6.8. The registered
-// reconstructed value is checked on the following clock before success asserts.
-// No P-picture DDR writeback, publication or reference promotion occurs here.
+// is added to that real DDR prediction and clipped under 7.6.8.
 //
-// All coordinates and exact-value checks below are implementation regression
-// restrictions, not H.262 validity rules.
+// kate - Phase 1T-m proves DDR persistence of that real reconstructed P pel.
+// Each 512 KiB frame bank has 65536 64-bit words while the maximum 720x480 4:2:0
+// planar payload consumes 64800 words. The final word (offset 65535) is therefore
+// reserved as a per-bank diagnostic persistence slot. The target bank is latched
+// as the bank opposite the current reference when the controlled implicit-P proof
+// starts. The slot is read before the byte write and read again afterward.
+// Success requires byte 0 to equal the live reconstructed pel and bytes 1..7 to
+// remain unchanged. reconstructed_seen is deliberately withheld until this DDR
+// round trip passes, so the existing top-level USER proof automatically requires
+// persistence. This is not yet real frame-pel placement, P-frame publication, or
+// P reference promotion.
+//
+// The prediction client uses one explicitly documented Phase 1T-m command:
+// burstcnt=1 with rd=0 requests a byte-0 diagnostic write. addr[16] carries the
+// target frame bank and addr[7:0] carries the byte value. The DDR arbiter maps
+// that command to the reserved diagnostic word and an 8'h01 byte enable.
 //============================================================================
 
 module mpeg2_h262_reference_read_probe
@@ -49,7 +61,6 @@ module mpeg2_h262_reference_read_probe
     input  wire [3:0]  forward_f_code_horizontal,
     input  wire [3:0]  forward_f_code_vertical,
 
-    // kate - Phase 1T-l controlled pattern-only implicit-zero reconstruction.
     input  wire        p_implicit_reconstruct_request,
     input  wire signed [15:0] p_residual_sample,
 
@@ -69,25 +80,38 @@ module mpeg2_h262_reference_read_probe
     output reg         half_sample_seen,
     output reg         reconstructed_seen,
     output reg  [7:0]  reconstructed_value,
+    output reg         persisted_seen,
+    output reg  [7:0]  persisted_value,
     output reg         probe_error
 );
 
-localparam [28:0] DDR_Y_BASE     = 29'h06000000;
-localparam [28:0] DDR_BANK_WORDS = 29'h00010000;
+localparam [28:0] DDR_Y_BASE           = 29'h06000000;
+localparam [28:0] DDR_BANK_WORDS       = 29'h00010000;
+localparam [28:0] DDR_DIAG_WORD_OFFSET = 29'h0000FFFF;
 localparam [7:0]  DIAG_EXPECTED_INTEGER_SAMPLE = 8'd162;
+
+localparam [1:0] READ_INITIAL   = 2'd0;
+localparam [1:0] READ_DEST_PRE  = 2'd1;
+localparam [1:0] READ_DEST_POST = 2'd2;
 
 reg        trigger_seen;
 reg        request_active;
 reg        response_waiting;
+reg [1:0]  request_kind;
+reg        request_write_command;
 reg [28:0] request_address;
 reg [2:0]  request_lane;
 reg        request_half_sample;
 reg        request_implicit_reconstruct;
 reg signed [15:0] request_residual_sample;
+reg [7:0]  request_write_value;
 reg [15:0] proof_timeout;
 
 reg        reconstruct_verify_pending;
 reg [7:0]  reconstruct_prediction_sample;
+reg        persist_frame_bank_latched;
+reg [63:0] persistence_pre_word;
+reg [15:0] persist_timeout;
 
 function automatic [28:0] row_times_90;
     input [11:0] row;
@@ -127,10 +151,7 @@ wire controlled_halfpel_mode =
 wire controlled_explicit_mode =
     controlled_integer_mode || controlled_halfpel_mode;
 wire controlled_implicit_mode = p_implicit_reconstruct_request;
-wire controlled_mode = controlled_explicit_mode || controlled_implicit_mode;
 
-// H.262 7.6.4 vector decomposition for the explicit modes. The implicit mode
-// has vector (0,0) by construction and therefore uses integer displacement 0.
 wire signed [12:0] explicit_int_vec_x = p_forward_vector_x >>> 1;
 wire signed [12:0] explicit_int_vec_y = p_forward_vector_y >>> 1;
 wire signed [12:0] int_vec_x =
@@ -179,6 +200,14 @@ wire [28:0] calculated_address =
     row_times_90(reference_y) +
     {20'd0, reference_x[11:3]};
 
+wire [28:0] persist_bank_offset =
+    persist_frame_bank_latched ? DDR_BANK_WORDS : 29'd0;
+wire [28:0] persist_address =
+    DDR_Y_BASE + persist_bank_offset + DDR_DIAG_WORD_OFFSET;
+
+wire [28:0] write_command_address =
+    {12'd0, persist_frame_bank_latched, 8'd0, request_write_value};
+
 wire [7:0] returned_sample =
     (request_lane == 3'd0) ? ddram_dout[7:0]   :
     (request_lane == 3'd1) ? ddram_dout[15:8]  :
@@ -219,8 +248,6 @@ wire halfpel_nontrivial =
     (halfpel_filtered_sample > halfpel_min) &&
     (halfpel_filtered_sample < halfpel_max);
 
-// H.262 7.6.8 controlled reconstructed-pel arithmetic. Explicit sign extension
-// makes the addition width independent of expression sizing rules.
 wire signed [16:0] returned_sample_signed =
     $signed({9'd0, returned_sample});
 wire signed [16:0] request_residual_extended =
@@ -238,34 +265,40 @@ wire [7:0] verify_reconstruction_clipped =
     clip_decoded_pel(verify_reconstruction_sum);
 
 assign ddram_burstcnt = request_active ? 8'd1 : 8'd0;
-assign ddram_addr     = request_active ? request_address : 29'd0;
-assign ddram_rd       = request_active;
+assign ddram_addr = request_active ?
+    (request_write_command ? write_command_address : request_address) : 29'd0;
+assign ddram_rd = request_active && !request_write_command;
 
 always @(posedge clk) begin
     if (reset) begin
-        trigger_seen                 <= 1'b0;
-        request_active               <= 1'b0;
-        response_waiting             <= 1'b0;
-        request_address              <= 29'd0;
-        request_lane                 <= 3'd0;
-        request_half_sample          <= 1'b0;
-        request_implicit_reconstruct <= 1'b0;
-        request_residual_sample      <= 16'sd0;
-        proof_timeout                <= 16'd0;
-        reconstruct_verify_pending   <= 1'b0;
-        reconstruct_prediction_sample<= 8'd0;
-        read_seen                    <= 1'b0;
-        sample_value                 <= 8'd0;
-        sample_nonzero               <= 1'b0;
-        half_sample_seen             <= 1'b0;
-        reconstructed_seen           <= 1'b0;
-        reconstructed_value          <= 8'd0;
-        probe_error                  <= 1'b0;
+        trigger_seen                  <= 1'b0;
+        request_active                <= 1'b0;
+        response_waiting              <= 1'b0;
+        request_kind                  <= READ_INITIAL;
+        request_write_command         <= 1'b0;
+        request_address               <= 29'd0;
+        request_lane                  <= 3'd0;
+        request_half_sample           <= 1'b0;
+        request_implicit_reconstruct  <= 1'b0;
+        request_residual_sample       <= 16'sd0;
+        request_write_value           <= 8'd0;
+        proof_timeout                 <= 16'd0;
+        reconstruct_verify_pending    <= 1'b0;
+        reconstruct_prediction_sample <= 8'd0;
+        persist_frame_bank_latched    <= 1'b0;
+        persistence_pre_word          <= 64'd0;
+        persist_timeout               <= 16'd0;
+        read_seen                     <= 1'b0;
+        sample_value                  <= 8'd0;
+        sample_nonzero                <= 1'b0;
+        half_sample_seen              <= 1'b0;
+        reconstructed_seen            <= 1'b0;
+        reconstructed_value           <= 8'd0;
+        persisted_seen                <= 1'b0;
+        persisted_value               <= 8'd0;
+        probe_error                   <= 1'b0;
     end
     else begin
-        // Explicit modes trigger from the established syntax/vector proof.
-        // The implicit mode is requested only after the controlled pattern-only
-        // residual observer has a real spatial sample available.
         if ((((p_vector_proof_seen && controlled_explicit_mode) ||
               controlled_implicit_mode)) && !trigger_seen) begin
             trigger_seen  <= 1'b1;
@@ -276,12 +309,17 @@ always @(posedge clk) begin
                 probe_error <= 1'b1;
             end
             else begin
+                request_kind                 <= READ_INITIAL;
+                request_write_command        <= 1'b0;
                 request_address              <= calculated_address;
                 request_lane                 <= reference_x[2:0];
                 request_half_sample          <= controlled_halfpel_mode;
                 request_implicit_reconstruct <= controlled_implicit_mode;
                 request_residual_sample      <= p_residual_sample;
                 request_active               <= 1'b1;
+
+                if (controlled_implicit_mode)
+                    persist_frame_bank_latched <= ~reference_frame_bank;
             end
         end
 
@@ -291,9 +329,24 @@ always @(posedge clk) begin
                 probe_error <= 1'b1;
         end
 
+        if ((persist_timeout != 16'd0) && !persisted_seen) begin
+            persist_timeout <= persist_timeout - 16'd1;
+            if (persist_timeout == 16'd1)
+                probe_error <= 1'b1;
+        end
+
         if (request_active && !ddram_busy) begin
-            request_active   <= 1'b0;
-            response_waiting <= 1'b1;
+            if (request_write_command) begin
+                request_write_command <= 1'b0;
+                request_kind          <= READ_DEST_POST;
+                request_address       <= persist_address;
+                request_lane          <= 3'd0;
+                request_active        <= 1'b1;
+            end
+            else begin
+                request_active   <= 1'b0;
+                response_waiting <= 1'b1;
+            end
         end
 
         if (ddram_dout_ready) begin
@@ -302,39 +355,58 @@ always @(posedge clk) begin
             end
             else begin
                 response_waiting <= 1'b0;
-                proof_timeout    <= 16'd0;
-                read_seen        <= 1'b1;
 
-                if (request_implicit_reconstruct) begin
-                    sample_value                  <= returned_sample;
-                    sample_nonzero                <= (returned_sample != 8'd0);
-                    reconstruct_prediction_sample <= returned_sample;
-                    reconstructed_value           <= response_reconstruction_clipped;
-                    reconstruct_verify_pending    <= 1'b1;
+                if (request_kind == READ_DEST_PRE) begin
+                    persistence_pre_word  <= ddram_dout;
+                    request_write_value   <= reconstructed_value;
+                    request_write_command <= 1'b1;
+                    request_active        <= 1'b1;
                 end
-                else if (request_half_sample) begin
-                    sample_value     <= halfpel_filtered_sample;
-                    sample_nonzero   <= (halfpel_filtered_sample != 8'd0);
-                    half_sample_seen <= 1'b1;
+                else if (request_kind == READ_DEST_POST) begin
+                    persisted_value <= ddram_dout[7:0];
+                    persist_timeout <= 16'd0;
 
-                    if (!halfpel_relation_ok ||
-                        !halfpel_nontrivial ||
-                        (halfpel_filtered_sample == 8'd0))
+                    if ((ddram_dout[7:0] != reconstructed_value) ||
+                        (ddram_dout[63:8] != persistence_pre_word[63:8])) begin
                         probe_error <= 1'b1;
+                    end
+                    else begin
+                        persisted_seen     <= 1'b1;
+                        reconstructed_seen <= 1'b1;
+                    end
                 end
                 else begin
-                    sample_value   <= returned_sample;
-                    sample_nonzero <= (returned_sample != 8'd0);
+                    proof_timeout <= 16'd0;
+                    read_seen     <= 1'b1;
 
-                    if (returned_sample != DIAG_EXPECTED_INTEGER_SAMPLE)
-                        probe_error <= 1'b1;
+                    if (request_implicit_reconstruct) begin
+                        sample_value                  <= returned_sample;
+                        sample_nonzero                <= (returned_sample != 8'd0);
+                        reconstruct_prediction_sample <= returned_sample;
+                        reconstructed_value           <= response_reconstruction_clipped;
+                        reconstruct_verify_pending    <= 1'b1;
+                    end
+                    else if (request_half_sample) begin
+                        sample_value     <= halfpel_filtered_sample;
+                        sample_nonzero   <= (halfpel_filtered_sample != 8'd0);
+                        half_sample_seen <= 1'b1;
+
+                        if (!halfpel_relation_ok ||
+                            !halfpel_nontrivial ||
+                            (halfpel_filtered_sample == 8'd0))
+                            probe_error <= 1'b1;
+                    end
+                    else begin
+                        sample_value   <= returned_sample;
+                        sample_nonzero <= (returned_sample != 8'd0);
+
+                        if (returned_sample != DIAG_EXPECTED_INTEGER_SAMPLE)
+                            probe_error <= 1'b1;
+                    end
                 end
             end
         end
 
-        // Verify the registered decoded pel against the same latched real
-        // prediction/residual operands on the following clock. USER is allowed
-        // to consume reconstructed_seen only after this check passes.
         if (reconstruct_verify_pending) begin
             reconstruct_verify_pending <= 1'b0;
             if (!request_implicit_reconstruct ||
@@ -342,7 +414,12 @@ always @(posedge clk) begin
                 probe_error <= 1'b1;
             end
             else begin
-                reconstructed_seen <= 1'b1;
+                request_kind          <= READ_DEST_PRE;
+                request_write_command <= 1'b0;
+                request_address       <= persist_address;
+                request_lane          <= 3'd0;
+                request_active        <= 1'b1;
+                persist_timeout       <= 16'hFFFF;
             end
         end
     end
