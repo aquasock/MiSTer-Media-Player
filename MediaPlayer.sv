@@ -280,6 +280,9 @@ wire        mpeg2_new_p_residual_required;
 wire        mpeg2_new_p_residual_success;
 wire        mpeg2_new_p_first_residual_sample_valid;
 wire signed [15:0] mpeg2_new_p_first_residual_sample_value;
+wire        mpeg2_new_p_residual_sample_valid;
+wire [5:0]  mpeg2_new_p_residual_sample_index;
+wire signed [15:0] mpeg2_new_p_residual_sample_value;
 wire        mpeg2_new_slice_start;
 wire        mpeg2_new_luma_macroblock_start;
 wire        mpeg2_new_phase1_probe_error;
@@ -365,6 +368,14 @@ wire        mpeg2_new_pred_reconstructed_seen;
 wire [7:0]  mpeg2_new_pred_reconstructed_value;
 wire        mpeg2_new_pred_persisted_seen;
 wire        mpeg2_new_pred_error;
+
+wire        mpeg2_new_p_store_select;
+wire [7:0]  mpeg2_new_p_store_pixel_value;
+wire [11:0] mpeg2_new_p_store_pixel_x;
+wire [11:0] mpeg2_new_p_store_pixel_y;
+wire        mpeg2_new_p_store_pixel_valid;
+wire        mpeg2_new_p_store_block_start;
+wire        mpeg2_new_p_store_block_complete;
 
 wire        mpeg2_new_ddr_cache_ready;
 wire        mpeg2_new_ddr_read_seen;
@@ -458,6 +469,9 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.p_residual_success          (mpeg2_new_p_residual_success),
 	.p_first_residual_sample_valid(mpeg2_new_p_first_residual_sample_valid),
 	.p_first_residual_sample_value(mpeg2_new_p_first_residual_sample_value),
+	.p_residual_sample_valid     (mpeg2_new_p_residual_sample_valid),
+	.p_residual_sample_index     (mpeg2_new_p_residual_sample_index),
+	.p_residual_sample_value     (mpeg2_new_p_residual_sample_value),
 	.probe_error                 (mpeg2_new_phase1_probe_error),
 	.quantiser_scale_code        (mpeg2_new_slice_quantiser_scale_code),
 	.macroblock_address_increment(mpeg2_new_macroblock_address_increment),
@@ -559,13 +573,27 @@ mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 	.clk             (clk_mpeg2),
 	.reset           (reset_mpeg2),
 	.frame_bank      (mpeg2_new_active_frame_bank),
-	.pixel_value     (mpeg2_new_recon_pixel_value),
-	.pixel_component (mpeg2_new_recon_pixel_component),
-	.pixel_x         (mpeg2_new_recon_pixel_x),
-	.pixel_y         (mpeg2_new_recon_pixel_y),
-	.pixel_valid     (mpeg2_new_recon_pixel_valid),
-	.block_start     (mpeg2_new_recon_block_start),
-	.block_complete  (mpeg2_new_recon_block_complete),
+	.pixel_value     (mpeg2_new_p_store_select ?
+	                  mpeg2_new_p_store_pixel_value :
+	                  mpeg2_new_recon_pixel_value),
+	.pixel_component (mpeg2_new_p_store_select ?
+	                  2'd0 :
+	                  mpeg2_new_recon_pixel_component),
+	.pixel_x         (mpeg2_new_p_store_select ?
+	                  mpeg2_new_p_store_pixel_x :
+	                  mpeg2_new_recon_pixel_x),
+	.pixel_y         (mpeg2_new_p_store_select ?
+	                  mpeg2_new_p_store_pixel_y :
+	                  mpeg2_new_recon_pixel_y),
+	.pixel_valid     (mpeg2_new_p_store_select ?
+	                  mpeg2_new_p_store_pixel_valid :
+	                  mpeg2_new_recon_pixel_valid),
+	.block_start     (mpeg2_new_p_store_select ?
+	                  mpeg2_new_p_store_block_start :
+	                  mpeg2_new_recon_block_start),
+	.block_complete  (mpeg2_new_p_store_select ?
+	                  mpeg2_new_p_store_block_complete :
+	                  mpeg2_new_recon_block_complete),
 	.block_stored    (mpeg2_new_ddr_block_stored),
 	.write_seen      (mpeg2_new_ddr_write_seen),
 	.store_error     (mpeg2_new_ddr_store_error),
@@ -578,10 +606,11 @@ mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 	.ddram_we        (mpeg2_new_ddr_wr_we)
 );
 
-// kate - Phase 1T-l: the controlled pattern-only P macroblock has no explicit
-// forward vector. Once its complete first-Y0 transform has produced a real
-// spatial sample, request the normative implicit (0,0) prediction and decoded
-// pel proof from the existing prediction DDR client.
+// kate - Phase 1T-o: the controlled pattern-only P macroblock has no explicit
+// forward vector. Once its complete first-Y0 transform is available, the
+// prediction client reconstructs the full 8x8 luma block from real reference
+// rows plus the 64 live residual samples, emits it through the ordinary DDR
+// block writer, and verifies all eight destination row words by readback.
 wire mpeg2_new_phase1t_implicit_reconstruct_required =
     mpeg2_new_p_residual_required &&
     mpeg2_new_p_residual_success &&
@@ -599,15 +628,26 @@ mpeg2_h262_reference_read_probe mpeg2_h262_reference_read_probe
     .forward_f_code_horizontal (mpeg2_new_forward_f_code_horizontal),
     .forward_f_code_vertical   (mpeg2_new_forward_f_code_vertical),
     .p_implicit_reconstruct_request(mpeg2_new_phase1t_implicit_reconstruct_required),
-    .p_residual_sample         (mpeg2_new_p_first_residual_sample_value),
+    .p_residual_sample_valid   (mpeg2_new_p_residual_sample_valid),
+    .p_residual_sample_index   (mpeg2_new_p_residual_sample_index),
+    .p_residual_sample_value   (mpeg2_new_p_residual_sample_value),
     .reference_frame_valid     (mpeg2_new_reference_frame_valid),
     .reference_frame_bank      (mpeg2_new_reference_frame_bank),
+    .destination_frame_bank    (mpeg2_new_active_frame_bank),
+    .p_store_block_stored      (mpeg2_new_ddr_block_stored),
     .ddram_busy                (mpeg2_new_pred_busy),
     .ddram_dout                (DDRAM_DOUT),
     .ddram_dout_ready          (mpeg2_new_pred_dout_ready),
     .ddram_burstcnt            (mpeg2_new_pred_burstcnt),
     .ddram_addr                (mpeg2_new_pred_addr),
     .ddram_rd                  (mpeg2_new_pred_rd),
+    .p_store_select            (mpeg2_new_p_store_select),
+    .p_store_pixel_value       (mpeg2_new_p_store_pixel_value),
+    .p_store_pixel_x           (mpeg2_new_p_store_pixel_x),
+    .p_store_pixel_y           (mpeg2_new_p_store_pixel_y),
+    .p_store_pixel_valid       (mpeg2_new_p_store_pixel_valid),
+    .p_store_block_start       (mpeg2_new_p_store_block_start),
+    .p_store_block_complete    (mpeg2_new_p_store_block_complete),
     .read_seen                 (mpeg2_new_pred_read_seen),
     .sample_value              (mpeg2_new_pred_sample_value),
     .sample_nonzero            (mpeg2_new_pred_sample_nonzero),
