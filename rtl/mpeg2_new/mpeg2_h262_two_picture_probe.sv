@@ -38,6 +38,10 @@
 // requires complete first-Y0 coefficient decoding, non-intra inverse
 // quantisation and a full IDCT result. Explicit-motion regressions retain the
 // already-proven Phase 1T-i completion boundary.
+//
+// kate - Phase 1T-l exports the controlled residual requirement, completion and
+// first spatial residual sample. These are diagnostic sidebands only; the P
+// picture still does not enter the normal I reconstruction or DDR write path.
 //============================================================================
 
 module mpeg2_h262_two_picture_probe
@@ -68,21 +72,20 @@ module mpeg2_h262_two_picture_probe
     output wire        completed_frame_bank,
     output wire [7:0]  picture_count,
 
-    // kate - Phase 1T-a reference-picture state. These outputs are sideband
-    // metadata for later prediction work; the current top level does not need
-    // them to preserve the hardware-proven Phase 1S presentation path.
     output wire        reference_frame_valid,
     output wire        reference_frame_bank,
     output wire [7:0]  reference_promotion_count,
 
-    // kate - Phase 1T-d positive live-P syntax result. This is deliberately
-    // separate from picture_count, which continues to count persisted I frames.
     output wire        p_macroblock_type_seen,
-
-    // kate - Phase 1T-i verified explicit forward-vector sideband.
     output wire        p_forward_vector_valid,
     output wire signed [12:0] p_forward_vector_x,
     output wire signed [12:0] p_forward_vector_y,
+
+    // kate - Phase 1T-l controlled residual reconstruction sideband.
+    output wire        p_residual_required,
+    output wire        p_residual_success,
+    output wire        p_first_residual_sample_valid,
+    output wire signed [15:0] p_first_residual_sample_value,
 
     output wire        probe_error,
 
@@ -120,38 +123,33 @@ reg active_frame_bank_reg;
 reg completed_frame_bank_reg;
 reg [7:0] picture_count_reg;
 
-// kate - Phase 1T-a current-reference bookkeeping. Because the current
-// supported decoder subset accepts only I-pictures, each fully persisted picture
-// is a reference frame. Promotion occurs on the same completion edge that
-// commits completed_frame_bank_reg, never before the final block_stored handshake.
 reg       reference_frame_valid_reg;
 reg       reference_frame_bank_reg;
 reg [7:0] reference_promotion_count_reg;
 reg       reference_error_latched;
 
-// kate - Phase 1T-d uses the existing standards front end as an independent
-// expectation source. Its supported-I level falls when a P picture header is
-// accepted; latch that fact across the unsupported picture until the passive
-// syntax observer verifies a live Table B.3 macroblock type.
 reg phase1_supported_d;
 reg p_picture_expected;
 wire p_syntax_probe_error;
 wire p_macroblock_type_seen_raw;
 
-// kate - Phase 1T-k residual-transform decision/proof sideband. The residual
-// observer independently classifies the first P macroblock. Until that decision
-// is known, the external positive P result is held low. Pattern-only code 01
-// additionally requires the complete residual transform proof.
 wire p_residual_decision_complete;
-wire p_residual_required;
-wire p_residual_success;
+wire p_residual_required_raw;
+wire p_residual_success_raw;
+wire p_first_residual_sample_valid_raw;
+wire signed [15:0] p_first_residual_sample_value_raw;
 wire p_residual_probe_error;
+
+assign p_residual_required            = p_residual_required_raw;
+assign p_residual_success             = p_residual_success_raw;
+assign p_first_residual_sample_valid  = p_first_residual_sample_valid_raw;
+assign p_first_residual_sample_value  = p_first_residual_sample_value_raw;
 
 assign p_macroblock_type_seen =
     p_macroblock_type_seen_raw &&
     (!p_picture_expected ||
      (p_residual_decision_complete &&
-      (!p_residual_required || p_residual_success)));
+      (!p_residual_required_raw || p_residual_success_raw)));
 
 wire p_syntax_progress_error =
     p_picture_expected && !p_macroblock_type_seen;
@@ -183,25 +181,11 @@ wire [6:0] parser_first_luma_ac_nonzero_count;
 wire [5:0] parser_first_luma_last_coeff_index;
 wire signed [11:0] parser_first_luma_last_ac_level;
 
-// kate - parser_rearm is synchronous to clk. The parser's ordinary reset path
-// clears all picture-local sticky state for exactly one clock between pictures.
 wire parser_reset = reset || parser_rearm;
-
-// kate - Every picture must wait until the current reconstructed block is
-// physically accepted by the DDR writer. recon_block_complete remains in the
-// interface for compatibility but is not the persistence handshake.
 wire active_pipeline_block_done = pipeline_block_done;
 wire unused_recon_block_complete = recon_block_complete;
-
-// One completion event per fully persisted picture. The parser completion is
-// sticky until parser_rearm, so suppress the re-arm cycle itself.
 wire picture_persisted_now = !parser_rearm && parser_picture_420_parsed;
 
-// After three persisted pictures the existing USER diagnostic already expects
-// a 0 -> 1 -> 0 bank sequence. Tie the new reference bookkeeping into that
-// proof without changing the top-level LED equation: probe_error must remain
-// clear only if reference ownership has also advanced three times and the newest
-// reference is the completed bank rather than the next write bank.
 wire reference_progress_error =
     (picture_count_reg >= 8'd3) &&
     (!reference_frame_valid_reg ||
@@ -227,8 +211,6 @@ assign probe_error               = probe_error_latched |
                                    p_residual_probe_error |
                                    p_syntax_progress_error;
 
-// Preserve picture-1 diagnostics across all later parser re-arm cycles. Before
-// picture 1 completes, expose the live parser values exactly as earlier phases.
 assign slice_header_seen = first_picture_done ?
                            first_slice_header_seen_latched :
                            parser_slice_header_seen;
@@ -296,9 +278,6 @@ always @(posedge clk) begin
         picture_complete_pulse <= 1'b0;
         phase1_supported_d     <= phase1_supported;
 
-        // Do not treat initial header acquisition as a P expectation: only a
-        // true high-to-low transition from the already-proven supported-I state
-        // arms the Phase 1T-d passive probes.
         if (phase1_supported_d && !phase1_supported)
             p_picture_expected <= 1'b1;
 
@@ -306,10 +285,6 @@ always @(posedge clk) begin
             probe_error_latched <= 1'b1;
 
         if (picture_persisted_now) begin
-            // The completion pulse is delayed one registered cycle relative to
-            // the parser's sticky picture-complete indication. At this point
-            // every block is already stored because pipeline_block_done is the
-            // DDR block_stored handshake.
             picture_complete_pulse   <= 1'b1;
             completed_frame_bank_reg <= active_frame_bank_reg;
             active_frame_bank_reg    <= ~active_frame_bank_reg;
@@ -318,11 +293,6 @@ always @(posedge clk) begin
             if (picture_count_reg != 8'hff)
                 picture_count_reg <= picture_count_reg + 8'd1;
 
-            // kate - Phase 1T-a promotion point. The bank being completed may
-            // not already be the current reference: that would mean the writer
-            // overwrote the reference before a replacement was fully persisted.
-            // With the current all-I ping-pong path this invariant must hold on
-            // every picture after the first.
             if (reference_frame_valid_reg &&
                 (active_frame_bank_reg == reference_frame_bank_reg))
                 reference_error_latched <= 1'b1;
@@ -354,9 +324,6 @@ always @(posedge clk) begin
     end
 end
 
-// kate - Phase 1T-d passive syntax observer. This sees only bytes already
-// accepted by the main stream handshake and therefore cannot disturb decoder
-// backpressure.
 mpeg2_h262_p_syntax_probe p_syntax_probe
 (
     .clk                    (clk),
@@ -371,19 +338,19 @@ mpeg2_h262_p_syntax_probe p_syntax_probe
     .probe_error            (p_syntax_probe_error)
 );
 
-// kate - Phase 1T-k complete first-Y0 residual transform observer. It is also
-// passive and independently verifies the stronger pattern-only residual boundary.
 mpeg2_h262_p_residual_probe p_residual_probe
 (
-    .clk                  (clk),
-    .reset                (reset),
-    .stream_data          (stream_data),
-    .stream_valid         (stream_valid),
-    .p_picture_expected   (p_picture_expected),
-    .decision_complete    (p_residual_decision_complete),
-    .residual_required    (p_residual_required),
-    .residual_success     (p_residual_success),
-    .probe_error          (p_residual_probe_error)
+    .clk                (clk),
+    .reset              (reset),
+    .stream_data        (stream_data),
+    .stream_valid       (stream_valid),
+    .p_picture_expected (p_picture_expected),
+    .decision_complete  (p_residual_decision_complete),
+    .residual_required  (p_residual_required_raw),
+    .residual_success   (p_residual_success_raw),
+    .first_sample_valid (p_first_residual_sample_valid_raw),
+    .first_sample_value (p_first_residual_sample_value_raw),
+    .probe_error        (p_residual_probe_error)
 );
 
 mpeg2_h262_luma4_probe picture_probe
