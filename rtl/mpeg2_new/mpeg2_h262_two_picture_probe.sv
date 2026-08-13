@@ -50,6 +50,10 @@
 // its real destination DDR write/readback. This prevents the following I picture
 // from racing the P destination bank. P publication/reference promotion remain
 // outside this phase.
+//
+// kate - Phase 1T-o exports the complete 64-sample first-Y0 residual stream so
+// the DDR reconstruction client can prove an entire 8x8 P luma block while the
+// same stream hold protects the destination bank.
 //============================================================================
 
 module mpeg2_h262_two_picture_probe
@@ -95,6 +99,9 @@ module mpeg2_h262_two_picture_probe
     output wire        p_residual_success,
     output wire        p_first_residual_sample_valid,
     output wire signed [15:0] p_first_residual_sample_value,
+    output wire        p_residual_sample_valid,
+    output wire [5:0]  p_residual_sample_index,
+    output wire signed [15:0] p_residual_sample_value,
 
     output wire        probe_error,
 
@@ -147,6 +154,9 @@ wire p_residual_required_raw;
 wire p_residual_success_raw;
 wire p_first_residual_sample_valid_raw;
 wire signed [15:0] p_first_residual_sample_value_raw;
+wire p_residual_sample_valid_raw;
+wire [5:0] p_residual_sample_index_raw;
+wire signed [15:0] p_residual_sample_value_raw;
 wire p_residual_probe_error;
 wire p_stream_hold;
 wire p_stream_hold_seen;
@@ -156,6 +166,9 @@ assign p_residual_required            = p_residual_required_raw;
 assign p_residual_success             = p_residual_success_raw;
 assign p_first_residual_sample_valid  = p_first_residual_sample_valid_raw;
 assign p_first_residual_sample_value  = p_first_residual_sample_value_raw;
+assign p_residual_sample_valid        = p_residual_sample_valid_raw;
+assign p_residual_sample_index        = p_residual_sample_index_raw;
+assign p_residual_sample_value        = p_residual_sample_value_raw;
 
 wire p_macroblock_type_seen_decoded =
     p_macroblock_type_seen_raw &&
@@ -365,9 +378,12 @@ mpeg2_h262_p_residual_probe p_residual_probe
     .decision_complete  (p_residual_decision_complete),
     .residual_required  (p_residual_required_raw),
     .residual_success   (p_residual_success_raw),
-    .first_sample_valid (p_first_residual_sample_valid_raw),
-    .first_sample_value (p_first_residual_sample_value_raw),
-    .probe_error        (p_residual_probe_error)
+    .first_sample_valid     (p_first_residual_sample_valid_raw),
+    .first_sample_value     (p_first_residual_sample_value_raw),
+    .residual_sample_valid  (p_residual_sample_valid_raw),
+    .residual_sample_index  (p_residual_sample_index_raw),
+    .residual_sample_value  (p_residual_sample_value_raw),
+    .probe_error            (p_residual_probe_error)
 );
 
 mpeg2_h262_p_stream_hold p_stream_hold_probe
