@@ -6,34 +6,44 @@
 //   - 6.2.3.1 picture_coding_extension()
 //   - 6.2.4 slice()
 //   - 6.2.5 macroblock()
-//   - 6.2.5.2 motion_vectors()
-//   - 6.2.5.2.1 motion_vector()
+//   - 6.2.6 block()
+//   - 7.2.2 non-intra DCT coefficient decoding
 //   - 7.6.3.1 motion-vector reconstruction
 //   - 7.6.3.4 motion-vector predictor reset at each slice
 //   - 7.6.3.5 implicit zero-vector prediction in P frame pictures
 //   - 7.6.4 forming predictions / half-sample flag derivation
 //   - Annex B Table B.1 macroblock_address_increment
 //   - Annex B Table B.3 P-picture macroblock_type
+//   - Annex B Table B.9 coded_block_pattern
 //   - Annex B Table B.10 motion_code
+//   - Annex B Table B.14 DCT coefficients, table zero
 //
 // kate - Phase 1T-d established a passive live-stream proof through the first
-// P-picture macroblock_type.  Phase 1T-e extends that bounded diagnostic through
+// P-picture macroblock_type. Phase 1T-e extended that bounded diagnostic through
 // the first P prediction-vector semantics, before any reference pixels are read.
 // The proven decoder still reconstructs only I-pictures; this observer never
 // backpressures the stream and never emits pixels, DDR requests or publications.
 //
 // kate - The first Phase 1T-e candidate attempted the whole Table B.10 decode,
-// residual decode and 7.6.3.1 reconstruction in one combinational path.  Real
+// residual decode and 7.6.3.1 reconstruction in one combinational path. Real
 // TimeQuest evidence showed that implementation violated the 54 MHz decoder
-// setup requirement.  This implementation intentionally consumes the captured
-// first-macroblock prefix over multiple clocks.  No timing exception is used.
+// setup requirement. This implementation intentionally consumes the captured
+// first-macroblock prefix over multiple clocks. No timing exception is used.
 //
 // kate - Phase 1T-f added controlled luma reference-word derivation. H.262 frame
-// motion vectors are in half-sample units.  For the original current x=7 proof,
-// vector x=4 addresses luma sample 9 (DDR word 1). Phase 1T-i broadens that
-// controlled explicit-vector boundary to also accept x=3. H.262 7.6.4 derives
-// int_vec=1 and half_flag=1 for x=3, so an actual odd vector can now be exported
-// to the reference reader rather than inferred from f_code or a test tag.
+// motion vectors are in half-sample units. For the original current x=7 proof,
+// vector x=4 addresses luma sample 9 (DDR word 1). Phase 1T-i broadened that
+// controlled explicit-vector boundary to also accept x=3 and prove horizontal
+// half-sample prediction from the reconstructed vector itself.
+//
+// kate - Phase 1T-j begins the transform-residual path without disturbing the
+// accepted motion diagnostics. The known pattern-only first macroblock in
+// test_ipii.m2v is followed past its normative implicit (0,0) vector through
+// Table B.9 coded_block_pattern and the first non-intra Table B.14 coefficient.
+// The recorded controlled prefix decodes as CBP=63 and first Y0 coefficient
+// run=0, level=+7. These exact values are diagnostic-stream restrictions, not
+// H.262 validity rules. Other already-proven P macroblock modes retain their
+// Phase 1T-i completion boundary.
 //
 // Controlled explicit-motion diagnostic boundary:
 //   - non-scalable progressive frame P picture;
@@ -45,12 +55,10 @@
 //   - a macroblock with macroblock_motion_forward decodes both forward motion
 //     components using Table B.10, f_code-1 residuals and 7.6.3.1 reconstruction;
 //   - the controlled coded-motion vectors are (4,0) for the existing integer
-//     regressions and (3,0) for the Phase 1T-i horizontal half-sample regression.
+//     regressions and (3,0) for the horizontal half-sample regression.
 //
-// The final vector restrictions are hardware-test restrictions, not H.262
-// validity rules. The actual accepted explicit vector is exported to the next
-// diagnostic stage so address and half-sample selection are driven by the
-// standards-derived vector value itself.
+// The final vector, CBP and first-coefficient restrictions are hardware-test
+// restrictions, not H.262 validity rules.
 //============================================================================
 
 module mpeg2_h262_p_syntax_probe
@@ -61,13 +69,13 @@ module mpeg2_h262_p_syntax_probe
     input  wire       stream_valid,
     input  wire       p_picture_expected,
 
-    // Historical name retained at the wrapper boundary.  This positive result
-    // means the first controlled P macroblock and required prediction-vector
-    // semantics have been verified.
+    // Historical name retained at the wrapper boundary. For the controlled
+    // pattern-only implicit-zero vector this is now withheld until CBP=63 and
+    // the first non-intra Y0 coefficient run=0, level=+7 are verified.
     output reg        p_macroblock_type_seen,
 
-    // kate - Phase 1T-i exports only a verified explicit forward vector. These
-    // remain zero/invalid for implicit-zero and intra P macroblocks.
+    // Phase 1T-i exports only a verified explicit forward vector. These remain
+    // zero/invalid for implicit-zero and intra P macroblocks.
     output reg        p_forward_vector_valid,
     output reg signed [12:0] p_forward_vector_x,
     output reg signed [12:0] p_forward_vector_y,
@@ -99,8 +107,8 @@ reg [3:0]  p_forward_f_code_vertical;
 reg [1:0]  p_picture_structure;
 reg        p_frame_pred_frame_dct;
 
-// Ten bytes are retained only as a bounded diagnostic prefix.  The decoder FSM
-// below then consumes those bits over multiple clocks so no long dynamic VLC /
+// Ten bytes are retained only as a bounded diagnostic prefix. The decoder FSM
+// below consumes those bits over multiple clocks so no long dynamic VLC /
 // arithmetic path is placed between registers.
 reg        slice_capture_active;
 reg [3:0]  slice_payload_count;
@@ -122,10 +130,14 @@ localparam [4:0]
     D_MOTION_PREP   = 5'd9,
     D_MCODE_BIT     = 5'd10,
     D_RESIDUAL_BIT  = 5'd11,
-    D_RECONSTRUCT   = 5'd12;
+    D_RECONSTRUCT   = 5'd12,
+    D_CBP           = 5'd13,
+    D_FIRST_COEFF   = 5'd14,
+    D_FIRST_SIGN    = 5'd15;
 
 reg [4:0] decode_state;
 reg       mb_motion_forward;
+reg       mb_pattern;
 reg       mb_intra;
 
 reg        motion_component_vertical;
@@ -145,14 +157,14 @@ wire [3:0] current_forward_f_code =
 function automatic f_code_supported_for_probe;
     input [3:0] code;
     begin
-        // H.262 permits 1..9 or 15.  A used motion-vector component uses 1..9.
+        // H.262 permits 1..9 or 15. A used motion-vector component uses 1..9.
         f_code_supported_for_probe =
             (code >= 4'd1) && (code <= 4'd9);
     end
 endfunction
 
-// Match one complete Table B.10 codeword.  bits contains the accumulated VLC in
-// its least-significant len bits.  Return {valid, signed motion_code[5:0]}.
+// Match one complete Table B.10 codeword. bits contains the accumulated VLC in
+// its least-significant len bits. Return {valid, signed motion_code[5:0]}.
 function automatic [6:0] match_motion_code;
     input [10:0] bits;
     input [3:0]  len;
@@ -245,9 +257,9 @@ wire [3:0]  vlc_length_next = vlc_length + 4'd1;
 wire [6:0]  motion_match = match_motion_code(vlc_accum_next, vlc_length_next);
 wire signed [5:0] motion_match_value = $signed(motion_match[5:0]);
 
-// H.262 7.6.3.1 with PMV == 0 at the beginning of a slice.  The fixed shifts
-// keep this arithmetic small and bounded; Table B.10 VLC traversal is already
-// complete before this function is evaluated for the registered component.
+// H.262 7.6.3.1 with PMV == 0 at the beginning of a slice. The fixed shifts
+// keep this arithmetic small and bounded; Table B.10 traversal is complete
+// before this function is evaluated for the registered component.
 function automatic signed [12:0] reconstruct_zero_pmv_delta;
     input signed [5:0] code;
     input [3:0]        f_code;
@@ -318,7 +330,7 @@ function automatic reconstructed_component_in_range;
     end
 endfunction
 
-// Controlled x=7 address proof retained from Phase 1T-f.  Both x-vector 4 and
+// Controlled x=7 address proof retained from Phase 1T-f. Both x-vector 4 and
 // x-vector 3 land in packed luma word 1: +4 uses integer sample 9, while +3 has
 // int_vec=1 and therefore base integer sample 8 plus a horizontal half-sample.
 wire signed [12:0] controlled_integer_dx = forward_vector_x >>> 1;
@@ -344,6 +356,7 @@ always @(posedge clk) begin
         decode_shift                   <= 80'd0;
         decode_state                   <= D_IDLE;
         mb_motion_forward              <= 1'b0;
+        mb_pattern                     <= 1'b0;
         mb_intra                       <= 1'b0;
         motion_component_vertical      <= 1'b0;
         vlc_accum                      <= 11'd0;
@@ -361,13 +374,14 @@ always @(posedge clk) begin
     end
     else begin
         // Start the multi-cycle decode only after all ten captured bytes have
-        // reached slice_payload_shift.  Stream reception continues passively.
+        // reached slice_payload_shift. Stream reception continues passively.
         if (decode_pending) begin
             decode_pending            <= 1'b0;
             decode_active             <= 1'b1;
             decode_shift              <= slice_payload_shift;
             decode_state              <= D_QSCALE;
             mb_motion_forward         <= 1'b0;
+            mb_pattern                <= 1'b0;
             mb_intra                  <= 1'b0;
             motion_component_vertical <= 1'b0;
             vlc_accum                 <= 11'd0;
@@ -434,6 +448,7 @@ always @(posedge clk) begin
                     if (decode_shift[79] == 1'b1) begin
                         // 1: motion_forward + pattern
                         mb_motion_forward <= 1'b1;
+                        mb_pattern        <= 1'b1;
                         mb_intra          <= 1'b0;
                         decode_shift      <= decode_shift << 1;
                         decode_state      <= D_MOTION_PREP;
@@ -441,6 +456,7 @@ always @(posedge clk) begin
                     else if (decode_shift[79:78] == 2'b01) begin
                         // 01: pattern; P frame uses implicit (0,0) prediction.
                         mb_motion_forward <= 1'b0;
+                        mb_pattern        <= 1'b1;
                         mb_intra          <= 1'b0;
                         decode_shift      <= decode_shift << 2;
                         decode_state      <= D_IMPLICIT_ZERO;
@@ -448,6 +464,7 @@ always @(posedge clk) begin
                     else if (decode_shift[79:77] == 3'b001) begin
                         // 001: motion_forward
                         mb_motion_forward <= 1'b1;
+                        mb_pattern        <= 1'b0;
                         mb_intra          <= 1'b0;
                         decode_shift      <= decode_shift << 3;
                         decode_state      <= D_MOTION_PREP;
@@ -455,6 +472,7 @@ always @(posedge clk) begin
                     else if (decode_shift[79:75] == 5'b00011) begin
                         // 00011: intra
                         mb_motion_forward <= 1'b0;
+                        mb_pattern        <= 1'b0;
                         mb_intra          <= 1'b1;
                         decode_shift      <= decode_shift << 5;
                         decode_state      <= D_INTRA_DONE;
@@ -462,6 +480,7 @@ always @(posedge clk) begin
                     else if (decode_shift[79:75] == 5'b00010) begin
                         // 00010: quant + motion_forward + pattern
                         mb_motion_forward <= 1'b1;
+                        mb_pattern        <= 1'b1;
                         mb_intra          <= 1'b0;
                         decode_shift      <= decode_shift << 5;
                         decode_state      <= D_MB_QUANT;
@@ -469,6 +488,7 @@ always @(posedge clk) begin
                     else if (decode_shift[79:75] == 5'b00001) begin
                         // 00001: quant + pattern
                         mb_motion_forward <= 1'b0;
+                        mb_pattern        <= 1'b1;
                         mb_intra          <= 1'b0;
                         decode_shift      <= decode_shift << 5;
                         decode_state      <= D_MB_QUANT;
@@ -476,6 +496,7 @@ always @(posedge clk) begin
                     else if (decode_shift[79:74] == 6'b000001) begin
                         // 000001: quant + intra
                         mb_motion_forward <= 1'b0;
+                        mb_pattern        <= 1'b0;
                         mb_intra          <= 1'b1;
                         decode_shift      <= decode_shift << 6;
                         decode_state      <= D_MB_QUANT;
@@ -504,15 +525,73 @@ always @(posedge clk) begin
                     if (!p_picture_controls_seen ||
                         (p_picture_structure != 2'b11) ||
                         !p_frame_pred_frame_dct) begin
-                        probe_error <= 1'b1;
+                        probe_error   <= 1'b1;
+                        decode_active <= 1'b0;
+                        decode_state  <= D_IDLE;
                     end
                     else begin
                         forward_vector_x <= 13'sd0;
                         forward_vector_y <= 13'sd0;
-                        if (((14'sd7 + (13'sd0 >>> 1)) >>> 3) == 14'sd0)
+
+                        if (((14'sd7 + (13'sd0 >>> 1)) >>> 3) != 14'sd0) begin
+                            probe_error   <= 1'b1;
+                            decode_active <= 1'b0;
+                            decode_state  <= D_IDLE;
+                        end
+                        else if (mb_pattern) begin
+                            // Phase 1T-j: the controlled test_ipii first P
+                            // macroblock is pattern-only. Continue into its real
+                            // residual syntax instead of ending at vector proof.
+                            decode_state <= D_CBP;
+                        end
+                        else begin
                             p_macroblock_type_seen <= 1'b1;
-                        else
-                            probe_error <= 1'b1;
+                            decode_active          <= 1'b0;
+                            decode_state           <= D_IDLE;
+                        end
+                    end
+                end
+
+                D_CBP: begin
+                    // H.262 Annex B Table B.9. Controlled test_ipii.m2v has
+                    // coded_block_pattern 63, VLC 001100, so all six 4:2:0
+                    // blocks are coded. This exact CBP is a regression-vector
+                    // restriction, not a general H.262 restriction.
+                    if (decode_shift[79:74] != 6'b001100) begin
+                        probe_error   <= 1'b1;
+                        decode_active <= 1'b0;
+                        decode_state  <= D_IDLE;
+                    end
+                    else begin
+                        decode_shift <= decode_shift << 6;
+                        decode_state <= D_FIRST_COEFF;
+                    end
+                end
+
+                D_FIRST_COEFF: begin
+                    // H.262 7.2.2 / Table B.14 modified first-coefficient table
+                    // for a non-intra block. The controlled Y0 coefficient is
+                    // run=0, |level|=7 with VLC 0000001010.
+                    if (decode_shift[79:70] != 10'b0000001010) begin
+                        probe_error   <= 1'b1;
+                        decode_active <= 1'b0;
+                        decode_state  <= D_IDLE;
+                    end
+                    else begin
+                        decode_shift <= decode_shift << 10;
+                        decode_state <= D_FIRST_SIGN;
+                    end
+                end
+
+                D_FIRST_SIGN: begin
+                    // Sign 0 means +7. USER success for the pattern-only
+                    // regression is not published until this real coefficient
+                    // bit has been consumed and verified.
+                    if (decode_shift[79] != 1'b0) begin
+                        probe_error <= 1'b1;
+                    end
+                    else begin
+                        p_macroblock_type_seen <= 1'b1;
                     end
                     decode_active <= 1'b0;
                     decode_state  <= D_IDLE;
@@ -547,7 +626,7 @@ always @(posedge clk) begin
                 end
 
                 D_MCODE_BIT: begin
-                    // One Table B.10 bit per clock.  This is deliberately not a
+                    // One Table B.10 bit per clock. This is deliberately not a
                     // variable-position combinational walk.
                     decode_shift <= decode_shift << 1;
                     vlc_accum    <= vlc_accum_next;
@@ -710,7 +789,7 @@ always @(posedge clk) begin
                 else if (start_code_now &&
                          (start_code_value == PICTURE_START_CODE)) begin
                     // The expected P picture reached another picture header
-                    // before its controlled first prediction vector was verified.
+                    // before its controlled first P syntax proof was verified.
                     probe_error <= 1'b1;
                 end
             end
