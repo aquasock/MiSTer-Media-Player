@@ -1,17 +1,22 @@
 //============================================================================
-// MiSTer Media Player - Phase 1T-f/1T-g H.262 reference-picture DDR read probe
+// MiSTer Media Player - Phase 1T-f/1T-g/1T-h H.262 reference-picture probe
 //
 // Normative standards basis:
 //   ITU-T H.262 / ISO/IEC 13818-2:2000, 7.6.4.
 //   Prediction samples are read from the reference frame offset by the motion
-//   vector. Motion vectors are in half-sample units; an even component therefore
-//   maps directly to an integer-sample displacement via DIV 2.
+//   vector. Motion vectors are in half-sample units. For horizontal half-sample
+//   prediction with no vertical half-sample component, H.262 forms:
+//
+//       pel_pred = (pel_ref[x] + pel_ref[x+1]) // 2
+//
+//   where // is integer division rounded to the nearest integer (H.262 4.1).
+//   Reference samples are unsigned, so this implementation is equivalently
+//   (a + b + 1) >> 1.
 //
 // kate - Phase 1T-f consumes only the already-proven controlled forward vector
 // (4,0). It performs one real luma DDR read from the current reference bank and
-// selects one returned prediction sample. No half-sample interpolation, residual
-// addition, P-picture reconstruction, frame persistence or reference promotion is
-// performed here.
+// selects one returned prediction sample. No P-picture reconstruction, frame
+// persistence or reference promotion is performed here.
 //
 // kate - Phase 1T-g tightens that read from merely non-zero to the exact expected
 // regression-vector sample value. In test_ip_motion_nores_end.m2v the reference
@@ -19,7 +24,20 @@
 // makes the USER proof sensitive to the selected DDR word and byte lane. 162 is
 // a controlled test-vector value, not an H.262 validity requirement.
 //
-// Diagnostic coordinate:
+// kate - Phase 1T-h deliberately proves the half-sample FILTER ARITHMETIC before
+// changing the accepted motion-vector diagnostic to an odd vector. The existing
+// (4,0) proof still selects packed DDR word 1. That returned word also contains
+// adjacent reference samples (8,0) and (9,0) in byte lanes 0 and 1. Phase 1T-h
+// applies the normative horizontal half-sample filter to those two real DDR
+// samples, exports the filtered result as sample_value, and makes sample_nonzero
+// depend on the filtered result. The existing exact (9,0)==162 check remains.
+// This is an implementation diagnostic staging step: the current P motion vector
+// is still even and therefore does not normatively request half-sample prediction.
+// Odd-vector selection of this proven filter is intentionally left to the next
+// phase so syntax/vector selection and interpolation arithmetic are not changed
+// in the same hardware-test boundary.
+//
+// Diagnostic coordinate used by the existing integer-vector proof:
 //   destination luma sample = (7,0)
 //   vector (4,0) => integer displacement (+2,0)
 //   reference sample = (9,0)
@@ -102,6 +120,22 @@ wire [7:0] returned_sample =
     (request_lane == 3'd6) ? ddram_dout[55:48] :
                              ddram_dout[63:56];
 
+// kate - Phase 1T-h horizontal half-sample arithmetic proof. Word 1 contains
+// luma x=8 in lane 0 and x=9 in lane 1. H.262 7.6.4 uses nearest-integer //2;
+// because both inputs are non-negative this is exactly (a+b+1)>>1.
+wire [7:0] halfpel_left_sample  = ddram_dout[7:0];
+wire [7:0] halfpel_right_sample = ddram_dout[15:8];
+wire [8:0] halfpel_sum =
+    {1'b0, halfpel_left_sample} + {1'b0, halfpel_right_sample};
+wire [8:0] halfpel_rounded_sum = halfpel_sum + 9'd1;
+wire [7:0] halfpel_filtered_sample = halfpel_rounded_sum[8:1];
+wire [8:0] halfpel_filtered_twice =
+    {halfpel_filtered_sample, 1'b0};
+wire       halfpel_relation_ok =
+    halfpel_sum[0] ?
+        (halfpel_filtered_twice == (halfpel_sum + 9'd1)) :
+        (halfpel_filtered_twice == halfpel_sum);
+
 assign ddram_burstcnt = request_active ? 8'd1 : 8'd0;
 assign ddram_addr     = request_active ? request_address : 29'd0;
 assign ddram_rd       = request_active;
@@ -121,7 +155,7 @@ always @(posedge clk) begin
     end
     else begin
         // p_vector_proof_seen is the hardware-proven Phase 1T-e positive result.
-        // Restrict this first DDR proof to the f_code=1,1 controlled vector so
+        // Restrict this DDR/filter proof to the f_code=1,1 controlled vector so
         // the implied (4,0) value is unambiguous without yet broadening the
         // wrapper interface to a reusable motion-vector bus.
         if (p_vector_proof_seen && controlled_f_code && !trigger_seen) begin
@@ -138,10 +172,10 @@ always @(posedge clk) begin
             end
         end
 
-        // A controlled Phase 1T-f/1T-g proof must produce its one-word response
-        // in a bounded interval. At 54 MHz this is about 1.2 ms, far longer than
-        // the normal single DDR read latency but short enough to fail before the
-        // following I picture can make the legacy P-syntax USER gates true.
+        // A controlled Phase 1T-f/1T-g/1T-h proof must produce its one-word
+        // response in a bounded interval. At 54 MHz this is about 1.2 ms, far
+        // longer than normal single-read latency but short enough to fail before
+        // the following I picture can make the legacy P-syntax USER gates true.
         if (trigger_seen && !read_seen && (proof_timeout != 16'd0)) begin
             proof_timeout <= proof_timeout - 16'd1;
             if (proof_timeout == 16'd1)
@@ -160,14 +194,19 @@ always @(posedge clk) begin
             else begin
                 response_waiting <= 1'b0;
                 proof_timeout    <= 16'd0;
-                sample_value     <= returned_sample;
-                sample_nonzero   <= (returned_sample != 8'd0);
                 read_seen        <= 1'b1;
 
-                // Phase 1T-g exact-value proof. The older non-zero check remains
-                // exported for the existing top-level gate, while any value other
-                // than the controlled reference sample is now a sticky failure.
-                if (returned_sample != DIAG_EXPECTED_SAMPLE)
+                // Phase 1T-g still proves the exact x=9 byte lane. Phase 1T-h
+                // additionally consumes x=8/x=9 through the normative horizontal
+                // half-sample filter. Make the existing top-level non-zero gate
+                // depend on the FILTERED result, not the old integer sample.
+                sample_value   <= halfpel_filtered_sample;
+                sample_nonzero <= (halfpel_filtered_sample != 8'd0);
+
+                if ((returned_sample != DIAG_EXPECTED_SAMPLE) ||
+                    (halfpel_left_sample == halfpel_right_sample) ||
+                    !halfpel_relation_ok ||
+                    (halfpel_filtered_sample == 8'd0))
                     probe_error <= 1'b1;
             end
         end
