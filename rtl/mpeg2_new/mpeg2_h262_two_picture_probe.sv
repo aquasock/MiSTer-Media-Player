@@ -42,6 +42,14 @@
 // kate - Phase 1T-l exports the controlled residual requirement, completion and
 // first spatial residual sample. These are diagnostic sidebands only; the P
 // picture still does not enter the normal I reconstruction or DDR write path.
+//
+// kate - Phase 1T-n adds a controlled stream hold at the same first-P-slice
+// capture boundary used by the residual probe. Once that buffered boundary is
+// reached, following compressed bytes are held until either an explicit/no-
+// residual P proof completes or the controlled reconstructed pel has completed
+// its real destination DDR write/readback. This prevents the following I picture
+// from racing the P destination bank. P publication/reference promotion remain
+// outside this phase.
 //============================================================================
 
 module mpeg2_h262_two_picture_probe
@@ -59,6 +67,7 @@ module mpeg2_h262_two_picture_probe
 
     input  wire        pipeline_block_done,
     input  wire        recon_block_complete,
+    input  wire        p_persistence_complete,
 
     output wire        slice_header_seen,
     output wire        macroblock_address_seen,
@@ -139,17 +148,24 @@ wire p_residual_success_raw;
 wire p_first_residual_sample_valid_raw;
 wire signed [15:0] p_first_residual_sample_value_raw;
 wire p_residual_probe_error;
+wire p_stream_hold;
+wire p_stream_hold_seen;
+wire p_stream_hold_error;
 
 assign p_residual_required            = p_residual_required_raw;
 assign p_residual_success             = p_residual_success_raw;
 assign p_first_residual_sample_valid  = p_first_residual_sample_valid_raw;
 assign p_first_residual_sample_value  = p_first_residual_sample_value_raw;
 
-assign p_macroblock_type_seen =
+wire p_macroblock_type_seen_decoded =
     p_macroblock_type_seen_raw &&
     (!p_picture_expected ||
      (p_residual_decision_complete &&
       (!p_residual_required_raw || p_residual_success_raw)));
+
+assign p_macroblock_type_seen =
+    p_macroblock_type_seen_decoded &&
+    (!p_picture_expected || p_stream_hold_seen);
 
 wire p_syntax_progress_error =
     p_picture_expected && !p_macroblock_type_seen;
@@ -193,7 +209,7 @@ wire reference_progress_error =
      (reference_frame_bank_reg != completed_frame_bank_reg) ||
      (reference_frame_bank_reg == active_frame_bank_reg));
 
-assign stream_ready              = parser_stream_ready;
+assign stream_ready              = parser_stream_ready && !p_stream_hold;
 assign first_picture_420_parsed  = first_picture_done;
 assign second_picture_420_parsed = second_picture_done;
 assign picture_420_complete      = picture_complete_pulse;
@@ -209,6 +225,7 @@ assign probe_error               = probe_error_latched |
                                    reference_progress_error |
                                    p_syntax_probe_error |
                                    p_residual_probe_error |
+                                   p_stream_hold_error |
                                    p_syntax_progress_error;
 
 assign slice_header_seen = first_picture_done ?
@@ -351,6 +368,21 @@ mpeg2_h262_p_residual_probe p_residual_probe
     .first_sample_valid (p_first_residual_sample_valid_raw),
     .first_sample_value (p_first_residual_sample_value_raw),
     .probe_error        (p_residual_probe_error)
+);
+
+mpeg2_h262_p_stream_hold p_stream_hold_probe
+(
+    .clk                    (clk),
+    .reset                  (reset),
+    .stream_data            (stream_data),
+    .stream_valid           (stream_valid),
+    .p_picture_active       (p_picture_expected),
+    .p_macroblock_type_seen (p_macroblock_type_seen_decoded),
+    .p_residual_required    (p_residual_required_raw),
+    .p_persistence_complete (p_persistence_complete),
+    .stream_hold            (p_stream_hold),
+    .hold_seen              (p_stream_hold_seen),
+    .hold_error             (p_stream_hold_error)
 );
 
 mpeg2_h262_luma4_probe picture_probe

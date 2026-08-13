@@ -31,22 +31,21 @@
 // The real first residual sample exported by the Phase 1T-k transform diagnostic
 // is added to that real DDR prediction and clipped under 7.6.8.
 //
-// kate - Phase 1T-m proves DDR persistence of that real reconstructed P pel.
-// Each 512 KiB frame bank has 65536 64-bit words while the maximum 720x480 4:2:0
-// planar payload consumes 64800 words. The final word (offset 65535) is therefore
-// reserved as a per-bank diagnostic persistence slot. The target bank is latched
-// as the bank opposite the current reference when the controlled implicit-P proof
-// starts. The slot is read before the byte write and read again afterward.
+// kate - Phase 1T-m proved a real DDR write/readback using a reserved per-bank
+// diagnostic word. Phase 1T-n moves that exact proof to the real destination:
+// luma (0,0), byte lane 0 of word 0 in the bank opposite the current reference.
+// The target bank is latched when the controlled implicit-P proof begins. The
+// destination word is read before the byte write and read again afterward.
 // Success requires byte 0 to equal the live reconstructed pel and bytes 1..7 to
 // remain unchanged. reconstructed_seen is deliberately withheld until this DDR
-// round trip passes, so the existing top-level USER proof automatically requires
-// persistence. This is not yet real frame-pel placement, P-frame publication, or
-// P reference promotion.
+// round trip passes. The compressed stream is held independently while this
+// proof runs so the following I picture cannot race the destination bank.
+// P-frame publication and P reference promotion remain outside this phase.
 //
-// The prediction client uses one explicitly documented Phase 1T-m command:
-// burstcnt=1 with rd=0 requests a byte-0 diagnostic write. addr[16] carries the
-// target frame bank and addr[7:0] carries the byte value. The DDR arbiter maps
-// that command to the reserved diagnostic word and an 8'h01 byte enable.
+// The prediction client uses one explicitly documented Phase 1T-n command:
+// burstcnt=1 with rd=0 requests a byte-0 write. addr[16] carries the target
+// frame bank and addr[7:0] carries the byte value. The DDR arbiter maps that
+// command to luma word 0 with an 8'h01 byte enable.
 //============================================================================
 
 module mpeg2_h262_reference_read_probe
@@ -85,9 +84,8 @@ module mpeg2_h262_reference_read_probe
     output reg         probe_error
 );
 
-localparam [28:0] DDR_Y_BASE           = 29'h06000000;
-localparam [28:0] DDR_BANK_WORDS       = 29'h00010000;
-localparam [28:0] DDR_DIAG_WORD_OFFSET = 29'h0000FFFF;
+localparam [28:0] DDR_Y_BASE     = 29'h06000000;
+localparam [28:0] DDR_BANK_WORDS = 29'h00010000;
 localparam [7:0]  DIAG_EXPECTED_INTEGER_SAMPLE = 8'd162;
 
 localparam [1:0] READ_INITIAL   = 2'd0;
@@ -203,7 +201,7 @@ wire [28:0] calculated_address =
 wire [28:0] persist_bank_offset =
     persist_frame_bank_latched ? DDR_BANK_WORDS : 29'd0;
 wire [28:0] persist_address =
-    DDR_Y_BASE + persist_bank_offset + DDR_DIAG_WORD_OFFSET;
+    DDR_Y_BASE + persist_bank_offset;
 
 wire [28:0] write_command_address =
     {12'd0, persist_frame_bank_latched, 8'd0, request_write_value};
