@@ -29,17 +29,19 @@
 // its pattern-only first P macroblock has the normative implicit (0,0) vector.
 // Destination luma (0,0) therefore predicts from stored reference luma (0,0).
 // The real first residual sample exported by the Phase 1T-k transform diagnostic
-// is added to that real DDR prediction and clipped under 7.6.8. The registered
-// reconstructed value is checked on the following clock before success asserts.
+// is added to that real DDR prediction and clipped under 7.6.8.
 //
 // kate - Phase 1T-m proves DDR persistence of that real reconstructed P pel.
 // Each 512 KiB frame bank has 65536 64-bit words while the maximum 720x480 4:2:0
 // planar payload consumes 64800 words. The final word (offset 65535) is therefore
-// reserved as a per-bank diagnostic persistence slot. The slot in the bank
-// opposite the current reference is read before the byte write and read again
-// afterward. Success requires byte 0 to equal the live reconstructed pel and
-// bytes 1..7 to remain unchanged. This is deliberately not yet a real frame-pel
-// placement, P-frame publication, or P reference promotion.
+// reserved as a per-bank diagnostic persistence slot. The target bank is latched
+// as the bank opposite the current reference when the controlled implicit-P proof
+// starts. The slot is read before the byte write and read again afterward.
+// Success requires byte 0 to equal the live reconstructed pel and bytes 1..7 to
+// remain unchanged. reconstructed_seen is deliberately withheld until this DDR
+// round trip passes, so the existing top-level USER proof automatically requires
+// persistence. This is not yet real frame-pel placement, P-frame publication, or
+// P reference promotion.
 //
 // The prediction client uses one explicitly documented Phase 1T-m command:
 // burstcnt=1 with rd=0 requests a byte-0 diagnostic write. addr[16] carries the
@@ -83,9 +85,9 @@ module mpeg2_h262_reference_read_probe
     output reg         probe_error
 );
 
-localparam [28:0] DDR_Y_BASE          = 29'h06000000;
-localparam [28:0] DDR_BANK_WORDS      = 29'h00010000;
-localparam [28:0] DDR_DIAG_WORD_OFFSET= 29'h0000FFFF;
+localparam [28:0] DDR_Y_BASE           = 29'h06000000;
+localparam [28:0] DDR_BANK_WORDS       = 29'h00010000;
+localparam [28:0] DDR_DIAG_WORD_OFFSET = 29'h0000FFFF;
 localparam [7:0]  DIAG_EXPECTED_INTEGER_SAMPLE = 8'd162;
 
 localparam [1:0] READ_INITIAL   = 2'd0;
@@ -107,6 +109,7 @@ reg [15:0] proof_timeout;
 
 reg        reconstruct_verify_pending;
 reg [7:0]  reconstruct_prediction_sample;
+reg        persist_frame_bank_latched;
 reg [63:0] persistence_pre_word;
 reg [15:0] persist_timeout;
 
@@ -197,14 +200,13 @@ wire [28:0] calculated_address =
     row_times_90(reference_y) +
     {20'd0, reference_x[11:3]};
 
-wire persist_frame_bank = ~reference_frame_bank;
 wire [28:0] persist_bank_offset =
-    persist_frame_bank ? DDR_BANK_WORDS : 29'd0;
+    persist_frame_bank_latched ? DDR_BANK_WORDS : 29'd0;
 wire [28:0] persist_address =
     DDR_Y_BASE + persist_bank_offset + DDR_DIAG_WORD_OFFSET;
 
 wire [28:0] write_command_address =
-    {12'd0, persist_frame_bank, 8'd0, request_write_value};
+    {12'd0, persist_frame_bank_latched, 8'd0, request_write_value};
 
 wire [7:0] returned_sample =
     (request_lane == 3'd0) ? ddram_dout[7:0]   :
@@ -283,6 +285,7 @@ always @(posedge clk) begin
         proof_timeout                 <= 16'd0;
         reconstruct_verify_pending    <= 1'b0;
         reconstruct_prediction_sample <= 8'd0;
+        persist_frame_bank_latched    <= 1'b0;
         persistence_pre_word          <= 64'd0;
         persist_timeout               <= 16'd0;
         read_seen                     <= 1'b0;
@@ -314,6 +317,9 @@ always @(posedge clk) begin
                 request_implicit_reconstruct <= controlled_implicit_mode;
                 request_residual_sample      <= p_residual_sample;
                 request_active               <= 1'b1;
+
+                if (controlled_implicit_mode)
+                    persist_frame_bank_latched <= ~reference_frame_bank;
             end
         end
 
@@ -331,8 +337,6 @@ always @(posedge clk) begin
 
         if (request_active && !ddram_busy) begin
             if (request_write_command) begin
-                // The arbiter has accepted the diagnostic byte write. Reuse the
-                // same prediction client for an ordinary post-write readback.
                 request_write_command <= 1'b0;
                 request_kind          <= READ_DEST_POST;
                 request_address       <= persist_address;
@@ -367,7 +371,8 @@ always @(posedge clk) begin
                         probe_error <= 1'b1;
                     end
                     else begin
-                        persisted_seen <= 1'b1;
+                        persisted_seen     <= 1'b1;
+                        reconstructed_seen <= 1'b1;
                     end
                 end
                 else begin
@@ -409,13 +414,12 @@ always @(posedge clk) begin
                 probe_error <= 1'b1;
             end
             else begin
-                reconstructed_seen     <= 1'b1;
-                request_kind           <= READ_DEST_PRE;
-                request_write_command  <= 1'b0;
-                request_address        <= persist_address;
-                request_lane           <= 3'd0;
-                request_active         <= 1'b1;
-                persist_timeout        <= 16'hFFFF;
+                request_kind          <= READ_DEST_PRE;
+                request_write_command <= 1'b0;
+                request_address       <= persist_address;
+                request_lane          <= 3'd0;
+                request_active        <= 1'b1;
+                persist_timeout       <= 16'hFFFF;
             end
         end
     end
