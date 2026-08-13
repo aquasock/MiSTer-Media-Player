@@ -1,5 +1,5 @@
 //============================================================================
-// MiSTer Media Player - Phase 1T-f H.262 reference-picture DDR read probe
+// MiSTer Media Player - Phase 1T-f/1T-g H.262 reference-picture DDR read probe
 //
 // Normative standards basis:
 //   ITU-T H.262 / ISO/IEC 13818-2:2000, 7.6.4.
@@ -12,6 +12,12 @@
 // selects one returned prediction sample. No half-sample interpolation, residual
 // addition, P-picture reconstruction, frame persistence or reference promotion is
 // performed here.
+//
+// kate - Phase 1T-g tightens that read from merely non-zero to the exact expected
+// regression-vector sample value. In test_ip_motion_nores_end.m2v the reference
+// I-picture reconstructs luma sample (9,0) as 8'd162. Requiring that exact byte
+// makes the USER proof sensitive to the selected DDR word and byte lane. 162 is
+// a controlled test-vector value, not an H.262 validity requirement.
 //
 // Diagnostic coordinate:
 //   destination luma sample = (7,0)
@@ -54,6 +60,11 @@ localparam [28:0] DDR_BANK_WORDS = 29'h00010000;
 // integer luma samples. Destination x=7 therefore reads reference x=9.
 localparam [11:0] DIAG_REFERENCE_X = 12'd9;
 localparam [11:0] DIAG_REFERENCE_Y = 12'd0;
+
+// kate - Phase 1T-g exact readback value for test_ip_motion_nores_end.m2v.
+// This is deliberately an implementation regression constant rather than a
+// normative video-syntax restriction.
+localparam [7:0] DIAG_EXPECTED_SAMPLE = 8'd162;
 
 reg        trigger_seen;
 reg        request_active;
@@ -127,9 +138,9 @@ always @(posedge clk) begin
             end
         end
 
-        // A controlled Phase 1T-f proof must produce its one-word response in a
-        // bounded interval. At 54 MHz this is about 1.2 ms, far longer than the
-        // normal single DDR read latency but short enough to fail before the
+        // A controlled Phase 1T-f/1T-g proof must produce its one-word response
+        // in a bounded interval. At 54 MHz this is about 1.2 ms, far longer than
+        // the normal single DDR read latency but short enough to fail before the
         // following I picture can make the legacy P-syntax USER gates true.
         if (trigger_seen && !read_seen && (proof_timeout != 16'd0)) begin
             proof_timeout <= proof_timeout - 16'd1;
@@ -153,10 +164,10 @@ always @(posedge clk) begin
                 sample_nonzero   <= (returned_sample != 8'd0);
                 read_seen        <= 1'b1;
 
-                // Zero is legal video data generally, but the Phase 1T-f
-                // controlled regression vectors deliberately use a non-zero
-                // reference sample. Treat zero as diagnostic failure only here.
-                if (returned_sample == 8'd0)
+                // Phase 1T-g exact-value proof. The older non-zero check remains
+                // exported for the existing top-level gate, while any value other
+                // than the controlled reference sample is now a sticky failure.
+                if (returned_sample != DIAG_EXPECTED_SAMPLE)
                     probe_error <= 1'b1;
             end
         end
