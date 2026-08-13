@@ -1,47 +1,5 @@
 //============================================================================
 // MiSTer Media Player - Phase 1T continuous H.262 picture wrapper
-//
-// Normative standards basis:
-//   ITU-T H.262 / ISO/IEC 13818-2:2000, 6.2.2 video_sequence().
-//   ITU-T H.262 / ISO/IEC 13818-2:2000, 3.111 and 7.6.2.2.
-//   A reference frame is a reconstructed I- or P-frame. Frame prediction in
-//   a P-picture uses the most recently reconstructed reference frame.
-//
-// kate - Phase 1S extended the proven Phase 1Q/1R single-parser re-arm path to
-// every supported picture. Every picture still waits for the DDR persistence
-// handshake block by block. The active write bank alternates 0/1 after each
-// complete picture, and a one-cycle completion pulse reports which bank just
-// became complete so the top level can republish it safely.
-//
-// kate - Phase 1T-a adds explicit reference-frame ownership bookkeeping without
-// changing the proven all-I decode path. phase1_supported currently admits only
-// I-pictures, so every accepted persisted picture is a reference picture. The
-// most recently completed bank is promoted to current reference ownership only
-// after full DDR persistence. When P-picture decoding is enabled later, this
-// promotion point will be qualified for I/P pictures while B-pictures will not
-// replace the reference.
-//
-// kate - Phase 1T-d passively observes the first unsupported P-picture syntax
-// between supported I-pictures. The existing front-end phase1_supported falling
-// edge independently arms the probe; USER can remain on for all-I streams, while
-// a controlled I/P/I diagnostic cannot report P-syntax success unless a live P
-// slice, macroblock_address_increment and Table B.3 macroblock_type are verified.
-//
-// kate - Phase 1T-i exports the verified explicit forward vector from that
-// passive observer. Implicit-zero and intra P macroblocks still report syntax
-// success but do not assert p_forward_vector_valid.
-//
-// kate - Phase 1T-k adds an independent passive residual-transform proof for
-// the controlled pattern-only first P macroblock in test_ipii.m2v. The ordinary
-// p_syntax result is now gated until that observer has classified the first P
-// macroblock. If it is the controlled pattern-only case, success additionally
-// requires complete first-Y0 coefficient decoding, non-intra inverse
-// quantisation and a full IDCT result. Explicit-motion regressions retain the
-// already-proven Phase 1T-i completion boundary.
-//
-// kate - Phase 1T-l exports the controlled residual requirement, completion and
-// first spatial residual sample. These are diagnostic sidebands only; the P
-// picture still does not enter the normal I reconstruction or DDR write path.
 //============================================================================
 
 module mpeg2_h262_two_picture_probe
@@ -59,6 +17,7 @@ module mpeg2_h262_two_picture_probe
 
     input  wire        pipeline_block_done,
     input  wire        recon_block_complete,
+    input  wire        p_persistence_complete,
 
     output wire        slice_header_seen,
     output wire        macroblock_address_seen,
@@ -81,7 +40,6 @@ module mpeg2_h262_two_picture_probe
     output wire signed [12:0] p_forward_vector_x,
     output wire signed [12:0] p_forward_vector_y,
 
-    // kate - Phase 1T-l controlled residual reconstruction sideband.
     output wire        p_residual_required,
     output wire        p_residual_success,
     output wire        p_first_residual_sample_valid,
@@ -139,17 +97,24 @@ wire p_residual_success_raw;
 wire p_first_residual_sample_valid_raw;
 wire signed [15:0] p_first_residual_sample_value_raw;
 wire p_residual_probe_error;
+wire p_stream_hold;
+wire p_stream_hold_seen;
+wire p_stream_hold_error;
 
 assign p_residual_required            = p_residual_required_raw;
 assign p_residual_success             = p_residual_success_raw;
 assign p_first_residual_sample_valid  = p_first_residual_sample_valid_raw;
 assign p_first_residual_sample_value  = p_first_residual_sample_value_raw;
 
-assign p_macroblock_type_seen =
+wire p_macroblock_type_seen_decoded =
     p_macroblock_type_seen_raw &&
     (!p_picture_expected ||
      (p_residual_decision_complete &&
       (!p_residual_required_raw || p_residual_success_raw)));
+
+assign p_macroblock_type_seen =
+    p_macroblock_type_seen_decoded &&
+    (!p_picture_expected || p_stream_hold_seen);
 
 wire p_syntax_progress_error =
     p_picture_expected && !p_macroblock_type_seen;
@@ -193,7 +158,7 @@ wire reference_progress_error =
      (reference_frame_bank_reg != completed_frame_bank_reg) ||
      (reference_frame_bank_reg == active_frame_bank_reg));
 
-assign stream_ready              = parser_stream_ready;
+assign stream_ready              = parser_stream_ready && !p_stream_hold;
 assign first_picture_420_parsed  = first_picture_done;
 assign second_picture_420_parsed = second_picture_done;
 assign picture_420_complete      = picture_complete_pulse;
@@ -209,6 +174,7 @@ assign probe_error               = probe_error_latched |
                                    reference_progress_error |
                                    p_syntax_probe_error |
                                    p_residual_probe_error |
+                                   p_stream_hold_error |
                                    p_syntax_progress_error;
 
 assign slice_header_seen = first_picture_done ?
@@ -351,6 +317,21 @@ mpeg2_h262_p_residual_probe p_residual_probe
     .first_sample_valid (p_first_residual_sample_valid_raw),
     .first_sample_value (p_first_residual_sample_value_raw),
     .probe_error        (p_residual_probe_error)
+);
+
+mpeg2_h262_p_stream_hold p_stream_hold_probe
+(
+    .clk                    (clk),
+    .reset                  (reset),
+    .stream_data            (stream_data),
+    .stream_valid           (stream_valid),
+    .p_picture_active       (p_picture_expected),
+    .p_macroblock_type_seen (p_macroblock_type_seen_decoded),
+    .p_residual_required    (p_residual_required_raw),
+    .p_persistence_complete (p_persistence_complete),
+    .stream_hold            (p_stream_hold),
+    .hold_seen              (p_stream_hold_seen),
+    .hold_error             (p_stream_hold_error)
 );
 
 mpeg2_h262_luma4_probe picture_probe
