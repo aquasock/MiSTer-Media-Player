@@ -16,14 +16,14 @@
 // Response-ready is demultiplexed by the recorded read owner so the framebuffer
 // cannot consume a prediction response and vice versa.
 //
-// kate - Phase 1T-m temporarily extends the prediction client with one explicit
-// diagnostic write command so a hardware-reconstructed P pel can be persisted
-// without adding a permanent fourth DDR client. burstcnt=1 with prediction_rd=0
-// is decoded as a byte-0 write to the final unused 64-bit word of the selected
-// 512 KiB frame bank. prediction_addr[16] selects the bank and [7:0] carries the
-// byte value. Ordinary prediction reads remain prediction_rd=1. This diagnostic
-// command is an implementation proof mechanism, not part of H.262 or the final
-// P-picture writer architecture.
+// kate - Phase 1T-n reuses the Phase 1T-m diagnostic write command for the first
+// real P-picture destination pel. burstcnt=1 with prediction_rd=0 is decoded as
+// a byte-0 write to luma word 0 of the selected 512 KiB frame bank.
+// prediction_addr[16] selects the bank and [7:0] carries the byte value. The
+// controlled P stream is held before a following picture can write that bank,
+// so this one-byte transaction now proves actual frame-pel placement. Ordinary
+// prediction reads remain prediction_rd=1. This command is still a temporary
+// implementation proof mechanism, not the final P-picture writer architecture.
 //============================================================================
 
 module mpeg2_h262_ddram_arbiter
@@ -61,9 +61,8 @@ module mpeg2_h262_ddram_arbiter
     output wire        ddram_we
 );
 
-localparam [28:0] DDR_Y_BASE           = 29'h06000000;
-localparam [28:0] DDR_BANK_WORDS       = 29'h00010000;
-localparam [28:0] DDR_DIAG_WORD_OFFSET = 29'h0000FFFF;
+localparam [28:0] DDR_Y_BASE     = 29'h06000000;
+localparam [28:0] DDR_BANK_WORDS = 29'h00010000;
 
 reg       read_outstanding;
 reg       read_owner_prediction;
@@ -83,8 +82,7 @@ wire prediction_write_targets_reader_bank =
     (prediction_write_bank == reader_frame_bank);
 wire [28:0] prediction_write_address =
     DDR_Y_BASE +
-    (prediction_write_bank ? DDR_BANK_WORDS : 29'd0) +
-    DDR_DIAG_WORD_OFFSET;
+    (prediction_write_bank ? DDR_BANK_WORDS : 29'd0);
 wire [63:0] prediction_write_data = {56'd0, prediction_addr[7:0]};
 
 wire grant_reader = !read_outstanding && reader_rd;
