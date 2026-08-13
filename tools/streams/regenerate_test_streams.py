@@ -4,8 +4,8 @@
 Regression-vector reset: 2026-08-13. These files are a new controlled baseline;
 they are not claimed to be byte-identical to the earlier ad-hoc test artifacts.
 
-Reference encoder used to establish the checked-in baseline:
-  ffmpeg 7.1.5-0+deb13u1, mpeg2video encoder
+Encoder used to establish the checked-in GitHub baseline:
+  ffmpeg 6.1.1-3ubuntu5, native mpeg2video encoder
 """
 from pathlib import Path
 import subprocess, hashlib, json
