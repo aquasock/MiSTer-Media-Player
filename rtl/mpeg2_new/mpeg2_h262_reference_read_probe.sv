@@ -60,6 +60,7 @@ reg        request_active;
 reg        response_waiting;
 reg [28:0] request_address;
 reg [2:0]  request_lane;
+reg [15:0] proof_timeout;
 
 function automatic [28:0] row_times_90;
     input [11:0] row;
@@ -101,6 +102,7 @@ always @(posedge clk) begin
         response_waiting <= 1'b0;
         request_address  <= 29'd0;
         request_lane     <= 3'd0;
+        proof_timeout    <= 16'd0;
         read_seen        <= 1'b0;
         sample_value     <= 8'd0;
         sample_nonzero   <= 1'b0;
@@ -112,7 +114,8 @@ always @(posedge clk) begin
         // the implied (4,0) value is unambiguous without yet broadening the
         // wrapper interface to a reusable motion-vector bus.
         if (p_vector_proof_seen && controlled_f_code && !trigger_seen) begin
-            trigger_seen <= 1'b1;
+            trigger_seen  <= 1'b1;
+            proof_timeout <= 16'hFFFF;
 
             if (!reference_frame_valid) begin
                 probe_error <= 1'b1;
@@ -122,6 +125,16 @@ always @(posedge clk) begin
                 request_lane    <= DIAG_REFERENCE_X[2:0];
                 request_active  <= 1'b1;
             end
+        end
+
+        // A controlled Phase 1T-f proof must produce its one-word response in a
+        // bounded interval. At 54 MHz this is about 1.2 ms, far longer than the
+        // normal single DDR read latency but short enough to fail before the
+        // following I picture can make the legacy P-syntax USER gates true.
+        if (trigger_seen && !read_seen && (proof_timeout != 16'd0)) begin
+            proof_timeout <= proof_timeout - 16'd1;
+            if (proof_timeout == 16'd1)
+                probe_error <= 1'b1;
         end
 
         if (request_active && !ddram_busy) begin
@@ -135,9 +148,16 @@ always @(posedge clk) begin
             end
             else begin
                 response_waiting <= 1'b0;
+                proof_timeout    <= 16'd0;
                 sample_value     <= returned_sample;
                 sample_nonzero   <= (returned_sample != 8'd0);
                 read_seen        <= 1'b1;
+
+                // Zero is legal video data generally, but the Phase 1T-f
+                // controlled regression vectors deliberately use a non-zero
+                // reference sample. Treat zero as diagnostic failure only here.
+                if (returned_sample == 8'd0)
+                    probe_error <= 1'b1;
             end
         end
     end
