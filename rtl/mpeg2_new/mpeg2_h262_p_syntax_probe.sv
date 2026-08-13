@@ -16,10 +16,16 @@
 //   - Annex B Table B.10 motion_code
 //
 // kate - Phase 1T-d established a passive live-stream proof through the first
-// P-picture macroblock_type.  Phase 1T-e extends that same bounded diagnostic to
-// the prediction-vector semantics needed before any reference pixels are read.
+// P-picture macroblock_type.  Phase 1T-e extends that bounded diagnostic through
+// the first P prediction-vector semantics, before any reference pixels are read.
 // The proven decoder still reconstructs only I-pictures; this observer never
 // backpressures the stream and never emits pixels, DDR requests or publications.
+//
+// kate - The first Phase 1T-e candidate attempted the whole Table B.10 decode,
+// residual decode and 7.6.3.1 reconstruction in one combinational path.  Real
+// TimeQuest evidence showed that implementation violated the 54 MHz decoder
+// setup requirement.  This implementation intentionally consumes the captured
+// first-macroblock prefix over multiple clocks.  No timing exception is used.
 //
 // Phase 1T-e controlled diagnostic boundary:
 //   - non-scalable progressive frame P picture;
@@ -76,314 +82,224 @@ reg [3:0]  p_forward_f_code_vertical;
 reg [1:0]  p_picture_structure;
 reg        p_frame_pred_frame_dct;
 
-// Ten bytes cover the bounded first-macroblock prefix even for the longest
-// Table B.10 codes plus the maximum residual length used by f_code 1..9.
+// Ten bytes are retained only as a bounded diagnostic prefix.  The decoder FSM
+// below then consumes those bits over multiple clocks so no long dynamic VLC /
+// arithmetic path is placed between registers.
 reg        slice_capture_active;
 reg [3:0]  slice_payload_count;
 reg [79:0] slice_payload_shift;
 reg        decode_pending;
+reg        decode_active;
+reg [79:0] decode_shift;
+
+localparam [4:0]
+    D_IDLE          = 5'd0,
+    D_QSCALE        = 5'd1,
+    D_SLICE_EXT     = 5'd2,
+    D_EXTRA_BIT     = 5'd3,
+    D_MBA           = 5'd4,
+    D_MBTYPE        = 5'd5,
+    D_MB_QUANT      = 5'd6,
+    D_IMPLICIT_ZERO = 5'd7,
+    D_INTRA_DONE    = 5'd8,
+    D_MOTION_PREP   = 5'd9,
+    D_MCODE_BIT     = 5'd10,
+    D_RESIDUAL_BIT  = 5'd11,
+    D_RECONSTRUCT   = 5'd12;
+
+reg [4:0] decode_state;
+reg       mb_motion_forward;
+reg       mb_intra;
+
+reg        motion_component_vertical;
+reg [10:0] vlc_accum;
+reg [3:0]  vlc_length;
+reg signed [5:0] motion_code_reg;
+reg [7:0]  motion_residual_reg;
+reg [3:0]  residual_bits_remaining;
+reg signed [12:0] forward_vector_x;
+reg signed [12:0] forward_vector_y;
+
+wire [3:0] current_forward_f_code =
+    motion_component_vertical ?
+        p_forward_f_code_vertical :
+        p_forward_f_code_horizontal;
 
 function automatic f_code_supported_for_probe;
     input [3:0] code;
     begin
-        // H.262 permits 1..9 or 15.  This coded-motion diagnostic needs at most
-        // eight residual bits, so values 1..9 are the implemented boundary.
+        // H.262 permits 1..9 or 15.  A used motion-vector component uses 1..9.
         f_code_supported_for_probe =
             (code >= 4'd1) && (code <= 4'd9);
     end
 endfunction
 
-// Return {valid, length[3:0], signed motion_code[5:0]} for Table B.10.
-function automatic [10:0] decode_motion_code;
-    input [79:0] payload;
-    input integer pos;
+// Match one complete Table B.10 codeword.  bits contains the accumulated VLC in
+// its least-significant len bits.  Return {valid, signed motion_code[5:0]}.
+function automatic [6:0] match_motion_code;
+    input [10:0] bits;
+    input [3:0]  len;
     reg          valid;
-    reg [3:0]    len;
     reg signed [5:0] value;
     begin
-        valid = 1'b1;
-        len   = 4'd0;
+        valid = 1'b0;
         value = 6'sd0;
 
-        if (payload[79-pos] == 1'b1) begin len=4'd1; value= 6'sd0; end
-        else if (payload[79-pos -: 3]  == 3'b010)          begin len=4'd3;  value= 6'sd1;  end
-        else if (payload[79-pos -: 3]  == 3'b011)          begin len=4'd3;  value=-6'sd1;  end
-        else if (payload[79-pos -: 4]  == 4'b0010)         begin len=4'd4;  value= 6'sd2;  end
-        else if (payload[79-pos -: 4]  == 4'b0011)         begin len=4'd4;  value=-6'sd2;  end
-        else if (payload[79-pos -: 5]  == 5'b00010)        begin len=4'd5;  value= 6'sd3;  end
-        else if (payload[79-pos -: 5]  == 5'b00011)        begin len=4'd5;  value=-6'sd3;  end
-        else if (payload[79-pos -: 7]  == 7'b0000110)      begin len=4'd7;  value= 6'sd4;  end
-        else if (payload[79-pos -: 7]  == 7'b0000111)      begin len=4'd7;  value=-6'sd4;  end
-        else if (payload[79-pos -: 8]  == 8'b00001010)     begin len=4'd8;  value= 6'sd5;  end
-        else if (payload[79-pos -: 8]  == 8'b00001011)     begin len=4'd8;  value=-6'sd5;  end
-        else if (payload[79-pos -: 8]  == 8'b00001000)     begin len=4'd8;  value= 6'sd6;  end
-        else if (payload[79-pos -: 8]  == 8'b00001001)     begin len=4'd8;  value=-6'sd6;  end
-        else if (payload[79-pos -: 8]  == 8'b00000110)     begin len=4'd8;  value= 6'sd7;  end
-        else if (payload[79-pos -: 8]  == 8'b00000111)     begin len=4'd8;  value=-6'sd7;  end
-        else if (payload[79-pos -: 10] == 10'b0000010110)  begin len=4'd10; value= 6'sd8;  end
-        else if (payload[79-pos -: 10] == 10'b0000010111)  begin len=4'd10; value=-6'sd8;  end
-        else if (payload[79-pos -: 10] == 10'b0000010100)  begin len=4'd10; value= 6'sd9;  end
-        else if (payload[79-pos -: 10] == 10'b0000010101)  begin len=4'd10; value=-6'sd9;  end
-        else if (payload[79-pos -: 10] == 10'b0000010010)  begin len=4'd10; value= 6'sd10; end
-        else if (payload[79-pos -: 10] == 10'b0000010011)  begin len=4'd10; value=-6'sd10; end
-        else if (payload[79-pos -: 11] == 11'b00000100010) begin len=4'd11; value= 6'sd11; end
-        else if (payload[79-pos -: 11] == 11'b00000100011) begin len=4'd11; value=-6'sd11; end
-        else if (payload[79-pos -: 11] == 11'b00000100000) begin len=4'd11; value= 6'sd12; end
-        else if (payload[79-pos -: 11] == 11'b00000100001) begin len=4'd11; value=-6'sd12; end
-        else if (payload[79-pos -: 11] == 11'b00000011110) begin len=4'd11; value= 6'sd13; end
-        else if (payload[79-pos -: 11] == 11'b00000011111) begin len=4'd11; value=-6'sd13; end
-        else if (payload[79-pos -: 11] == 11'b00000011100) begin len=4'd11; value= 6'sd14; end
-        else if (payload[79-pos -: 11] == 11'b00000011101) begin len=4'd11; value=-6'sd14; end
-        else if (payload[79-pos -: 11] == 11'b00000011010) begin len=4'd11; value= 6'sd15; end
-        else if (payload[79-pos -: 11] == 11'b00000011011) begin len=4'd11; value=-6'sd15; end
-        else if (payload[79-pos -: 11] == 11'b00000011000) begin len=4'd11; value= 6'sd16; end
-        else if (payload[79-pos -: 11] == 11'b00000011001) begin len=4'd11; value=-6'sd16; end
-        else begin
-            valid = 1'b0;
-            len   = 4'd0;
-            value = 6'sd0;
-        end
+        case (len)
+            4'd1: begin
+                if (bits[0] == 1'b1) begin valid=1'b1; value= 6'sd0; end
+            end
+            4'd3: begin
+                case (bits[2:0])
+                    3'b010: begin valid=1'b1; value= 6'sd1; end
+                    3'b011: begin valid=1'b1; value=-6'sd1; end
+                    default: ;
+                endcase
+            end
+            4'd4: begin
+                case (bits[3:0])
+                    4'b0010: begin valid=1'b1; value= 6'sd2; end
+                    4'b0011: begin valid=1'b1; value=-6'sd2; end
+                    default: ;
+                endcase
+            end
+            4'd5: begin
+                case (bits[4:0])
+                    5'b00010: begin valid=1'b1; value= 6'sd3; end
+                    5'b00011: begin valid=1'b1; value=-6'sd3; end
+                    default: ;
+                endcase
+            end
+            4'd7: begin
+                case (bits[6:0])
+                    7'b0000110: begin valid=1'b1; value= 6'sd4; end
+                    7'b0000111: begin valid=1'b1; value=-6'sd4; end
+                    default: ;
+                endcase
+            end
+            4'd8: begin
+                case (bits[7:0])
+                    8'b00001010: begin valid=1'b1; value= 6'sd5; end
+                    8'b00001011: begin valid=1'b1; value=-6'sd5; end
+                    8'b00001000: begin valid=1'b1; value= 6'sd6; end
+                    8'b00001001: begin valid=1'b1; value=-6'sd6; end
+                    8'b00000110: begin valid=1'b1; value= 6'sd7; end
+                    8'b00000111: begin valid=1'b1; value=-6'sd7; end
+                    default: ;
+                endcase
+            end
+            4'd10: begin
+                case (bits[9:0])
+                    10'b0000010110: begin valid=1'b1; value= 6'sd8; end
+                    10'b0000010111: begin valid=1'b1; value=-6'sd8; end
+                    10'b0000010100: begin valid=1'b1; value= 6'sd9; end
+                    10'b0000010101: begin valid=1'b1; value=-6'sd9; end
+                    10'b0000010010: begin valid=1'b1; value= 6'sd10; end
+                    10'b0000010011: begin valid=1'b1; value=-6'sd10; end
+                    default: ;
+                endcase
+            end
+            4'd11: begin
+                case (bits[10:0])
+                    11'b00000100010: begin valid=1'b1; value= 6'sd11; end
+                    11'b00000100011: begin valid=1'b1; value=-6'sd11; end
+                    11'b00000100000: begin valid=1'b1; value= 6'sd12; end
+                    11'b00000100001: begin valid=1'b1; value=-6'sd12; end
+                    11'b00000011110: begin valid=1'b1; value= 6'sd13; end
+                    11'b00000011111: begin valid=1'b1; value=-6'sd13; end
+                    11'b00000011100: begin valid=1'b1; value= 6'sd14; end
+                    11'b00000011101: begin valid=1'b1; value=-6'sd14; end
+                    11'b00000011010: begin valid=1'b1; value= 6'sd15; end
+                    11'b00000011011: begin valid=1'b1; value=-6'sd15; end
+                    11'b00000011000: begin valid=1'b1; value= 6'sd16; end
+                    11'b00000011001: begin valid=1'b1; value=-6'sd16; end
+                    default: ;
+                endcase
+            end
+            default: ;
+        endcase
 
-        decode_motion_code = {valid, len, value[5:0]};
+        match_motion_code = {valid, value[5:0]};
     end
 endfunction
 
-reg p_prefix_decode_ok;
-reg p_prefix_controlled_prediction_ok;
-reg p_prefix_motion_forward;
-reg p_prefix_intra;
-reg signed [12:0] p_prefix_vector_x;
-reg signed [12:0] p_prefix_vector_y;
+wire [10:0] vlc_accum_next = {vlc_accum[9:0], decode_shift[79]};
+wire [3:0]  vlc_length_next = vlc_length + 4'd1;
+wire [6:0]  motion_match = match_motion_code(vlc_accum_next, vlc_length_next);
+wire signed [5:0] motion_match_value = $signed(motion_match[5:0]);
 
-integer pos;
-integer i;
-integer r_size;
-integer f;
-integer low;
-integer high;
-integer range;
-integer residual;
-integer motion_code_i;
-integer abs_motion_code;
-integer delta;
-integer vector_value;
-reg [10:0] motion_decode;
-reg [3:0]  motion_len;
-reg signed [5:0] motion_value;
-reg mb_quant;
-reg mb_pattern;
-reg mb_valid;
+// H.262 7.6.3.1 with PMV == 0 at the beginning of a slice.  The fixed shifts
+// keep this arithmetic small and bounded; Table B.10 VLC traversal is already
+// complete before this function is evaluated for the registered component.
+function automatic signed [12:0] reconstruct_zero_pmv_delta;
+    input signed [5:0] code;
+    input [3:0]        f_code;
+    input [7:0]        residual;
+    reg [5:0]          abs_code;
+    reg [12:0]         abs_minus_one;
+    reg [12:0]         magnitude;
+    begin
+        abs_code = code[5] ? -code : code;
+        abs_minus_one = {7'd0, abs_code} - 13'd1;
+        magnitude = 13'd0;
 
-// Decode the bounded first P macroblock and derive its first frame-prediction
-// vector.  The predictor is zero because H.262 7.6.3.4 resets PMV at every slice.
-always @* begin
-    p_prefix_decode_ok                = 1'b1;
-    p_prefix_controlled_prediction_ok = 1'b0;
-    p_prefix_motion_forward           = 1'b0;
-    p_prefix_intra                    = 1'b0;
-    p_prefix_vector_x                 = 13'sd0;
-    p_prefix_vector_y                 = 13'sd0;
-    mb_quant                          = 1'b0;
-    mb_pattern                        = 1'b0;
-    mb_valid                          = 1'b1;
-    motion_decode                     = 11'd0;
-    motion_len                        = 4'd0;
-    motion_value                      = 6'sd0;
-    pos                               = 5;
-    i                                 = 0;
-    r_size                            = 0;
-    f                                 = 0;
-    low                               = 0;
-    high                              = 0;
-    range                             = 0;
-    residual                          = 0;
-    motion_code_i                     = 0;
-    abs_motion_code                   = 0;
-    delta                             = 0;
-    vector_value                      = 0;
-
-    if (slice_payload_shift[79:75] == 5'd0)
-        p_prefix_decode_ok = 1'b0;
-
-    // Optional slice extension: flag plus eight following syntax bits.
-    if (slice_payload_shift[79-pos])
-        pos = pos + 9;
-
-    // Reserved extra_bit_slice == 1 is not accepted by this controlled stream.
-    if (slice_payload_shift[79-pos] != 1'b0)
-        p_prefix_decode_ok = 1'b0;
-    pos = pos + 1;
-
-    // Controlled first macroblock starts at the first slice column.
-    if (slice_payload_shift[79-pos] != 1'b1)
-        p_prefix_decode_ok = 1'b0;
-    pos = pos + 1;
-
-    // H.262 Annex B Table B.3.
-    if (slice_payload_shift[79-pos] == 1'b1) begin
-        p_prefix_motion_forward = 1'b1;
-        mb_pattern = 1'b1;
-        pos = pos + 1;
-    end
-    else if (slice_payload_shift[79-pos -: 2] == 2'b01) begin
-        mb_pattern = 1'b1;
-        pos = pos + 2;
-    end
-    else if (slice_payload_shift[79-pos -: 3] == 3'b001) begin
-        p_prefix_motion_forward = 1'b1;
-        pos = pos + 3;
-    end
-    else if (slice_payload_shift[79-pos -: 5] == 5'b00011) begin
-        p_prefix_intra = 1'b1;
-        pos = pos + 5;
-    end
-    else if (slice_payload_shift[79-pos -: 5] == 5'b00010) begin
-        mb_quant = 1'b1;
-        p_prefix_motion_forward = 1'b1;
-        mb_pattern = 1'b1;
-        pos = pos + 5;
-    end
-    else if (slice_payload_shift[79-pos -: 5] == 5'b00001) begin
-        mb_quant = 1'b1;
-        mb_pattern = 1'b1;
-        pos = pos + 5;
-    end
-    else if (slice_payload_shift[79-pos -: 6] == 6'b000001) begin
-        mb_quant = 1'b1;
-        p_prefix_intra = 1'b1;
-        pos = pos + 6;
-    end
-    else begin
-        mb_valid = 1'b0;
-        p_prefix_decode_ok = 1'b0;
-    end
-
-    if (mb_valid && mb_quant)
-        pos = pos + 5; // macroblock_quantiser_scale_code
-
-    if (mb_valid && !p_prefix_intra && !p_prefix_motion_forward) begin
-        // H.262 7.6.3.5: P frame prediction is formed with vector (0,0).
-        if (!p_picture_controls_seen ||
-            (p_picture_structure != 2'b11) ||
-            !p_frame_pred_frame_dct) begin
-            p_prefix_decode_ok = 1'b0;
+        if ((f_code == 4'd1) || (code == 6'sd0)) begin
+            reconstruct_zero_pmv_delta = {{7{code[5]}}, code};
         end
         else begin
-            p_prefix_vector_x = 13'sd0;
-            p_prefix_vector_y = 13'sd0;
-            p_prefix_controlled_prediction_ok = 1'b1;
+            case (f_code)
+                4'd2: magnitude = (abs_minus_one << 1) + residual + 13'd1;
+                4'd3: magnitude = (abs_minus_one << 2) + residual + 13'd1;
+                4'd4: magnitude = (abs_minus_one << 3) + residual + 13'd1;
+                4'd5: magnitude = (abs_minus_one << 4) + residual + 13'd1;
+                4'd6: magnitude = (abs_minus_one << 5) + residual + 13'd1;
+                4'd7: magnitude = (abs_minus_one << 6) + residual + 13'd1;
+                4'd8: magnitude = (abs_minus_one << 7) + residual + 13'd1;
+                4'd9: magnitude = (abs_minus_one << 8) + residual + 13'd1;
+                default: magnitude = 13'd0;
+            endcase
+
+            if (code[5])
+                reconstruct_zero_pmv_delta = -$signed(magnitude);
+            else
+                reconstruct_zero_pmv_delta = $signed(magnitude);
         end
     end
-    else if (mb_valid && p_prefix_motion_forward) begin
-        // Phase 1T-e handles the frame-based one-vector case.  With
-        // frame_pred_frame_dct==1 H.262 omits frame_motion_type from the stream.
-        if (!p_picture_controls_seen ||
-            (p_picture_structure != 2'b11) ||
-            !p_frame_pred_frame_dct ||
-            !f_code_supported_for_probe(p_forward_f_code_horizontal) ||
-            !f_code_supported_for_probe(p_forward_f_code_vertical)) begin
-            p_prefix_decode_ok = 1'b0;
-        end
-        else begin
-            // Horizontal component.
-            motion_decode = decode_motion_code(slice_payload_shift, pos);
-            motion_len    = motion_decode[9:6];
-            motion_value  = $signed(motion_decode[5:0]);
-            if (!motion_decode[10]) begin
-                p_prefix_decode_ok = 1'b0;
-            end
-            else begin
-                pos = pos + motion_len;
-                motion_code_i = motion_value;
-                r_size = p_forward_f_code_horizontal - 1;
-                residual = 0;
-                if ((motion_code_i != 0) && (r_size != 0)) begin
-                    for (i = 0; i < 8; i = i + 1)
-                        if (i < r_size)
-                            residual = (residual << 1) |
-                                       slice_payload_shift[79-pos-i];
-                    pos = pos + r_size;
-                end
-                f     = 1 << r_size;
-                low   = -16 * f;
-                high  = (16 * f) - 1;
-                range = 32 * f;
-                if ((f == 1) || (motion_code_i == 0))
-                    delta = motion_code_i;
-                else begin
-                    abs_motion_code = (motion_code_i < 0) ?
-                                      -motion_code_i : motion_code_i;
-                    delta = ((abs_motion_code - 1) * f) + residual + 1;
-                    if (motion_code_i < 0)
-                        delta = -delta;
-                end
-                if ((delta < low) || (delta > high))
-                    p_prefix_decode_ok = 1'b0;
-                vector_value = delta; // PMV == 0 at slice start.
-                if (vector_value < low)
-                    vector_value = vector_value + range;
-                if (vector_value > high)
-                    vector_value = vector_value - range;
-                p_prefix_vector_x = vector_value;
-            end
+endfunction
 
-            // Vertical component follows immediately after horizontal residual.
-            motion_decode = decode_motion_code(slice_payload_shift, pos);
-            motion_len    = motion_decode[9:6];
-            motion_value  = $signed(motion_decode[5:0]);
-            if (!motion_decode[10]) begin
-                p_prefix_decode_ok = 1'b0;
-            end
-            else begin
-                pos = pos + motion_len;
-                motion_code_i = motion_value;
-                r_size = p_forward_f_code_vertical - 1;
-                residual = 0;
-                if ((motion_code_i != 0) && (r_size != 0)) begin
-                    for (i = 0; i < 8; i = i + 1)
-                        if (i < r_size)
-                            residual = (residual << 1) |
-                                       slice_payload_shift[79-pos-i];
-                    pos = pos + r_size;
-                end
-                f     = 1 << r_size;
-                low   = -16 * f;
-                high  = (16 * f) - 1;
-                range = 32 * f;
-                if ((f == 1) || (motion_code_i == 0))
-                    delta = motion_code_i;
-                else begin
-                    abs_motion_code = (motion_code_i < 0) ?
-                                      -motion_code_i : motion_code_i;
-                    delta = ((abs_motion_code - 1) * f) + residual + 1;
-                    if (motion_code_i < 0)
-                        delta = -delta;
-                end
-                if ((delta < low) || (delta > high))
-                    p_prefix_decode_ok = 1'b0;
-                vector_value = delta; // PMV == 0 at slice start.
-                if (vector_value < low)
-                    vector_value = vector_value + range;
-                if (vector_value > high)
-                    vector_value = vector_value - range;
-                p_prefix_vector_y = vector_value;
-            end
+wire signed [12:0] reconstructed_component =
+    reconstruct_zero_pmv_delta(
+        motion_code_reg,
+        current_forward_f_code,
+        motion_residual_reg);
 
-            // Controlled hardware vector generated by test_ip_motion.m2v.
-            if (p_prefix_decode_ok &&
-                (p_prefix_vector_x == 13'sd4) &&
-                (p_prefix_vector_y == 13'sd0))
-                p_prefix_controlled_prediction_ok = 1'b1;
-        end
+function automatic reconstructed_component_in_range;
+    input signed [12:0] value;
+    input [3:0]         f_code;
+    begin
+        case (f_code)
+            4'd1: reconstructed_component_in_range =
+                (value >= -13'sd16) && (value <= 13'sd15);
+            4'd2: reconstructed_component_in_range =
+                (value >= -13'sd32) && (value <= 13'sd31);
+            4'd3: reconstructed_component_in_range =
+                (value >= -13'sd64) && (value <= 13'sd63);
+            4'd4: reconstructed_component_in_range =
+                (value >= -13'sd128) && (value <= 13'sd127);
+            4'd5: reconstructed_component_in_range =
+                (value >= -13'sd256) && (value <= 13'sd255);
+            4'd6: reconstructed_component_in_range =
+                (value >= -13'sd512) && (value <= 13'sd511);
+            4'd7: reconstructed_component_in_range =
+                (value >= -13'sd1024) && (value <= 13'sd1023);
+            4'd8: reconstructed_component_in_range =
+                (value >= -13'sd2048) && (value <= 13'sd2047);
+            4'd9: reconstructed_component_in_range =
+                (value >= -13'sd4096) && (value <= 13'sd4095);
+            default: reconstructed_component_in_range = 1'b0;
+        endcase
     end
-    else if (mb_valid && p_prefix_intra) begin
-        // No prediction vector belongs to an ordinary intra macroblock.
-        p_prefix_controlled_prediction_ok = 1'b1;
-    end
-
-    if (!p_prefix_controlled_prediction_ok)
-        p_prefix_decode_ok = 1'b0;
-end
+endfunction
 
 always @(posedge clk) begin
     if (reset) begin
@@ -400,16 +316,296 @@ always @(posedge clk) begin
         slice_payload_count            <= 4'd0;
         slice_payload_shift            <= 80'd0;
         decode_pending                 <= 1'b0;
+        decode_active                  <= 1'b0;
+        decode_shift                   <= 80'd0;
+        decode_state                   <= D_IDLE;
+        mb_motion_forward              <= 1'b0;
+        mb_intra                       <= 1'b0;
+        motion_component_vertical      <= 1'b0;
+        vlc_accum                      <= 11'd0;
+        vlc_length                     <= 4'd0;
+        motion_code_reg                <= 6'sd0;
+        motion_residual_reg            <= 8'd0;
+        residual_bits_remaining        <= 4'd0;
+        forward_vector_x               <= 13'sd0;
+        forward_vector_y               <= 13'sd0;
         p_macroblock_type_seen         <= 1'b0;
         probe_error                    <= 1'b0;
     end
     else begin
+        // Start the multi-cycle decode only after all ten captured bytes have
+        // reached slice_payload_shift.  Stream reception continues passively.
         if (decode_pending) begin
-            decode_pending <= 1'b0;
-            if (p_prefix_decode_ok)
-                p_macroblock_type_seen <= 1'b1;
-            else
-                probe_error <= 1'b1;
+            decode_pending            <= 1'b0;
+            decode_active             <= 1'b1;
+            decode_shift              <= slice_payload_shift;
+            decode_state              <= D_QSCALE;
+            mb_motion_forward         <= 1'b0;
+            mb_intra                  <= 1'b0;
+            motion_component_vertical <= 1'b0;
+            vlc_accum                 <= 11'd0;
+            vlc_length                <= 4'd0;
+            motion_code_reg           <= 6'sd0;
+            motion_residual_reg       <= 8'd0;
+            residual_bits_remaining   <= 4'd0;
+            forward_vector_x          <= 13'sd0;
+            forward_vector_y          <= 13'sd0;
+        end
+
+        if (decode_active) begin
+            case (decode_state)
+                D_QSCALE: begin
+                    if (decode_shift[79:75] == 5'd0) begin
+                        probe_error   <= 1'b1;
+                        decode_active <= 1'b0;
+                        decode_state  <= D_IDLE;
+                    end
+                    else begin
+                        decode_shift <= decode_shift << 5;
+                        decode_state <= D_SLICE_EXT;
+                    end
+                end
+
+                D_SLICE_EXT: begin
+                    // H.262 slice_extension_flag is consumed only when the
+                    // next bit is one; otherwise that same zero is the following
+                    // extra_bit_slice terminator.
+                    if (decode_shift[79]) begin
+                        decode_shift <= decode_shift << 9;
+                    end
+                    decode_state <= D_EXTRA_BIT;
+                end
+
+                D_EXTRA_BIT: begin
+                    if (decode_shift[79] != 1'b0) begin
+                        probe_error   <= 1'b1;
+                        decode_active <= 1'b0;
+                        decode_state  <= D_IDLE;
+                    end
+                    else begin
+                        decode_shift <= decode_shift << 1;
+                        decode_state <= D_MBA;
+                    end
+                end
+
+                D_MBA: begin
+                    // Controlled stream restriction: first MBA increment is the
+                    // one-bit Table B.1 code for value 1.
+                    if (decode_shift[79] != 1'b1) begin
+                        probe_error   <= 1'b1;
+                        decode_active <= 1'b0;
+                        decode_state  <= D_IDLE;
+                    end
+                    else begin
+                        decode_shift <= decode_shift << 1;
+                        decode_state <= D_MBTYPE;
+                    end
+                end
+
+                D_MBTYPE: begin
+                    // H.262 Annex B Table B.3, non-scalable P picture.
+                    if (decode_shift[79] == 1'b1) begin
+                        // 1: motion_forward + pattern
+                        mb_motion_forward <= 1'b1;
+                        mb_intra          <= 1'b0;
+                        decode_shift      <= decode_shift << 1;
+                        decode_state      <= D_MOTION_PREP;
+                    end
+                    else if (decode_shift[79:78] == 2'b01) begin
+                        // 01: pattern; P frame uses implicit (0,0) prediction.
+                        mb_motion_forward <= 1'b0;
+                        mb_intra          <= 1'b0;
+                        decode_shift      <= decode_shift << 2;
+                        decode_state      <= D_IMPLICIT_ZERO;
+                    end
+                    else if (decode_shift[79:77] == 3'b001) begin
+                        // 001: motion_forward
+                        mb_motion_forward <= 1'b1;
+                        mb_intra          <= 1'b0;
+                        decode_shift      <= decode_shift << 3;
+                        decode_state      <= D_MOTION_PREP;
+                    end
+                    else if (decode_shift[79:75] == 5'b00011) begin
+                        // 00011: intra
+                        mb_motion_forward <= 1'b0;
+                        mb_intra          <= 1'b1;
+                        decode_shift      <= decode_shift << 5;
+                        decode_state      <= D_INTRA_DONE;
+                    end
+                    else if (decode_shift[79:75] == 5'b00010) begin
+                        // 00010: quant + motion_forward + pattern
+                        mb_motion_forward <= 1'b1;
+                        mb_intra          <= 1'b0;
+                        decode_shift      <= decode_shift << 5;
+                        decode_state      <= D_MB_QUANT;
+                    end
+                    else if (decode_shift[79:75] == 5'b00001) begin
+                        // 00001: quant + pattern
+                        mb_motion_forward <= 1'b0;
+                        mb_intra          <= 1'b0;
+                        decode_shift      <= decode_shift << 5;
+                        decode_state      <= D_MB_QUANT;
+                    end
+                    else if (decode_shift[79:74] == 6'b000001) begin
+                        // 000001: quant + intra
+                        mb_motion_forward <= 1'b0;
+                        mb_intra          <= 1'b1;
+                        decode_shift      <= decode_shift << 6;
+                        decode_state      <= D_MB_QUANT;
+                    end
+                    else begin
+                        probe_error   <= 1'b1;
+                        decode_active <= 1'b0;
+                        decode_state  <= D_IDLE;
+                    end
+                end
+
+                D_MB_QUANT: begin
+                    // macroblock_quantiser_scale_code is a five-bit syntax field.
+                    decode_shift <= decode_shift << 5;
+                    if (mb_intra)
+                        decode_state <= D_INTRA_DONE;
+                    else if (mb_motion_forward)
+                        decode_state <= D_MOTION_PREP;
+                    else
+                        decode_state <= D_IMPLICIT_ZERO;
+                end
+
+                D_IMPLICIT_ZERO: begin
+                    // H.262 7.6.3.5: in a P frame, a non-intra macroblock with
+                    // macroblock_motion_forward==0 forms prediction with (0,0).
+                    if (!p_picture_controls_seen ||
+                        (p_picture_structure != 2'b11) ||
+                        !p_frame_pred_frame_dct) begin
+                        probe_error <= 1'b1;
+                    end
+                    else begin
+                        forward_vector_x       <= 13'sd0;
+                        forward_vector_y       <= 13'sd0;
+                        p_macroblock_type_seen <= 1'b1;
+                    end
+                    decode_active <= 1'b0;
+                    decode_state  <= D_IDLE;
+                end
+
+                D_INTRA_DONE: begin
+                    // An ordinary intra P macroblock carries no prediction vector.
+                    p_macroblock_type_seen <= 1'b1;
+                    decode_active          <= 1'b0;
+                    decode_state           <= D_IDLE;
+                end
+
+                D_MOTION_PREP: begin
+                    if (!p_picture_controls_seen ||
+                        (p_picture_structure != 2'b11) ||
+                        !p_frame_pred_frame_dct ||
+                        !f_code_supported_for_probe(p_forward_f_code_horizontal) ||
+                        !f_code_supported_for_probe(p_forward_f_code_vertical)) begin
+                        probe_error   <= 1'b1;
+                        decode_active <= 1'b0;
+                        decode_state  <= D_IDLE;
+                    end
+                    else begin
+                        motion_component_vertical <= 1'b0;
+                        vlc_accum                 <= 11'd0;
+                        vlc_length                <= 4'd0;
+                        motion_code_reg           <= 6'sd0;
+                        motion_residual_reg       <= 8'd0;
+                        residual_bits_remaining   <= 4'd0;
+                        decode_state               <= D_MCODE_BIT;
+                    end
+                end
+
+                D_MCODE_BIT: begin
+                    // One Table B.10 bit per clock.  This is deliberately not a
+                    // variable-position combinational walk.
+                    decode_shift <= decode_shift << 1;
+                    vlc_accum    <= vlc_accum_next;
+                    vlc_length   <= vlc_length_next;
+
+                    if (motion_match[6]) begin
+                        motion_code_reg         <= motion_match_value;
+                        motion_residual_reg     <= 8'd0;
+                        vlc_accum               <= 11'd0;
+                        vlc_length              <= 4'd0;
+
+                        if ((motion_match_value == 6'sd0) ||
+                            (current_forward_f_code == 4'd1)) begin
+                            residual_bits_remaining <= 4'd0;
+                            decode_state             <= D_RECONSTRUCT;
+                        end
+                        else begin
+                            residual_bits_remaining <=
+                                current_forward_f_code - 4'd1;
+                            decode_state <= D_RESIDUAL_BIT;
+                        end
+                    end
+                    else if (vlc_length_next == 4'd11) begin
+                        probe_error   <= 1'b1;
+                        decode_active <= 1'b0;
+                        decode_state  <= D_IDLE;
+                    end
+                end
+
+                D_RESIDUAL_BIT: begin
+                    decode_shift <= decode_shift << 1;
+                    motion_residual_reg <=
+                        {motion_residual_reg[6:0], decode_shift[79]};
+
+                    if (residual_bits_remaining == 4'd1) begin
+                        residual_bits_remaining <= 4'd0;
+                        decode_state             <= D_RECONSTRUCT;
+                    end
+                    else begin
+                        residual_bits_remaining <=
+                            residual_bits_remaining - 4'd1;
+                    end
+                end
+
+                D_RECONSTRUCT: begin
+                    // H.262 7.6.3.4 resets PMV at slice start, so the controlled
+                    // first vector equals the reconstructed differential here.
+                    if (!reconstructed_component_in_range(
+                            reconstructed_component,
+                            current_forward_f_code)) begin
+                        probe_error   <= 1'b1;
+                        decode_active <= 1'b0;
+                        decode_state  <= D_IDLE;
+                    end
+                    else if (!motion_component_vertical) begin
+                        forward_vector_x          <= reconstructed_component;
+                        motion_component_vertical <= 1'b1;
+                        vlc_accum                 <= 11'd0;
+                        vlc_length                <= 4'd0;
+                        motion_code_reg           <= 6'sd0;
+                        motion_residual_reg       <= 8'd0;
+                        residual_bits_remaining   <= 4'd0;
+                        decode_state               <= D_MCODE_BIT;
+                    end
+                    else begin
+                        forward_vector_y <= reconstructed_component;
+
+                        // Controlled test_ip_motion.m2v proof: first forward
+                        // luminance vector must reconstruct to exactly (4,0).
+                        if ((forward_vector_x == 13'sd4) &&
+                            (reconstructed_component == 13'sd0)) begin
+                            p_macroblock_type_seen <= 1'b1;
+                        end
+                        else begin
+                            probe_error <= 1'b1;
+                        end
+
+                        decode_active <= 1'b0;
+                        decode_state  <= D_IDLE;
+                    end
+                end
+
+                default: begin
+                    probe_error   <= 1'b1;
+                    decode_active <= 1'b0;
+                    decode_state  <= D_IDLE;
+                end
+            endcase
         end
 
         if (stream_valid) begin
@@ -425,15 +621,11 @@ always @(posedge clk) begin
                         probe_error <= 1'b1;
                     end
                     else begin
-                        p_forward_f_code_horizontal <=
-                            pce_payload_next[35:32];
-                        p_forward_f_code_vertical <=
-                            pce_payload_next[31:28];
-                        p_picture_structure <=
-                            pce_payload_next[17:16];
-                        p_frame_pred_frame_dct <=
-                            pce_payload_next[14];
-                        p_picture_controls_seen <= 1'b1;
+                        p_forward_f_code_horizontal <= pce_payload_next[35:32];
+                        p_forward_f_code_vertical   <= pce_payload_next[31:28];
+                        p_picture_structure         <= pce_payload_next[17:16];
+                        p_frame_pred_frame_dct      <= pce_payload_next[14];
+                        p_picture_controls_seen     <= 1'b1;
                     end
                 end
                 else begin
@@ -460,7 +652,7 @@ always @(posedge clk) begin
                 end
             end
             else if (p_picture_expected && !p_macroblock_type_seen &&
-                     !decode_pending && !probe_error) begin
+                     !decode_pending && !decode_active && !probe_error) begin
                 if (start_code_now &&
                     (start_code_value == EXTENSION_START_CODE)) begin
                     pce_capture_active <= 1'b1;
