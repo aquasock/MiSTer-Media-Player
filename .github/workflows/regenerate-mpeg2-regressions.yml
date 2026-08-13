@@ -1,0 +1,51 @@
+name: Regenerate MPEG2 regression streams
+
+on:
+  push:
+    branches:
+      - stream-baseline-reset
+    paths:
+      - tools/streams/regenerate_test_streams.py
+      - .github/workflows/regenerate-mpeg2-regressions.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: stream-baseline-reset
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -n 3
+
+      - name: Generate controlled streams
+        run: |
+          cd tools/streams
+          python3 regenerate_test_streams.py > baseline-manifest.json
+          cat baseline-manifest.json
+
+      - name: Commit generated binaries
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/streams/test_all_i.m2v \
+                  tools/streams/test_ipii.m2v \
+                  tools/streams/test_ip_motion_end.m2v \
+                  tools/streams/test_ip_motion_nores_end.m2v \
+                  tools/streams/test_ip_halfpel_end.m2v \
+                  tools/streams/test_ip_two_mb_static.m2v \
+                  tools/streams/baseline-manifest.json
+          if git diff --cached --quiet; then
+            echo "Generated streams already match the branch."
+          else
+            git commit -m "Regenerate MPEG2 regression streams"
+            git push origin HEAD:stream-baseline-reset
+          fi
