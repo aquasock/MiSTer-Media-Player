@@ -16,14 +16,10 @@
 // Response-ready is demultiplexed by the recorded read owner so the framebuffer
 // cannot consume a prediction response and vice versa.
 //
-// kate - Phase 1T-n reuses the Phase 1T-m diagnostic write command for the first
-// real P-picture destination pel. burstcnt=1 with prediction_rd=0 is decoded as
-// a byte-0 write to luma word 0 of the selected 512 KiB frame bank.
-// prediction_addr[16] selects the bank and [7:0] carries the byte value. The
-// controlled P stream is held before a following picture can write that bank,
-// so this one-byte transaction now proves actual frame-pel placement. Ordinary
-// prediction reads remain prediction_rd=1. This command is still a temporary
-// implementation proof mechanism, not the final P-picture writer architecture.
+// kate - Phase 1T-o removes the temporary Phase 1T-m/n prediction-write command.
+// The first reconstructed P block now uses the ordinary block writer, so this
+// arbiter returns to three explicit clients: presentation read, prediction read,
+// and reconstruction write. No prediction-side write encoding remains.
 //============================================================================
 
 module mpeg2_h262_ddram_arbiter
@@ -61,9 +57,6 @@ module mpeg2_h262_ddram_arbiter
     output wire        ddram_we
 );
 
-localparam [28:0] DDR_Y_BASE     = 29'h06000000;
-localparam [28:0] DDR_BANK_WORDS = 29'h00010000;
-
 reg       read_outstanding;
 reg       read_owner_prediction;
 reg [7:0] read_words_remaining;
@@ -73,52 +66,51 @@ reg       reader_frame_bank;
 wire writer_targets_reader_bank =
     reader_bank_valid && (writer_addr[16] == reader_frame_bank);
 
-wire prediction_read_cmd = prediction_rd;
-wire prediction_write_cmd =
-    (prediction_burstcnt == 8'd1) && !prediction_rd;
-wire prediction_write_bank = prediction_addr[16];
-wire prediction_write_targets_reader_bank =
-    reader_bank_valid &&
-    (prediction_write_bank == reader_frame_bank);
-wire [28:0] prediction_write_address =
-    DDR_Y_BASE +
-    (prediction_write_bank ? DDR_BANK_WORDS : 29'd0);
-wire [63:0] prediction_write_data = {56'd0, prediction_addr[7:0]};
+wire grant_reader =
+    !read_outstanding && reader_rd;
 
-wire grant_reader = !read_outstanding && reader_rd;
-wire grant_prediction_read =
-    !read_outstanding && !reader_rd && prediction_read_cmd;
-wire grant_prediction_write =
-    !read_outstanding && !reader_rd && !prediction_read_cmd &&
-    prediction_write_cmd && !prediction_write_targets_reader_bank;
+wire grant_prediction =
+    !read_outstanding && !reader_rd && prediction_rd;
+
 wire grant_writer =
-    !read_outstanding && !reader_rd && !prediction_read_cmd &&
-    !prediction_write_cmd && writer_we && !writer_targets_reader_bank;
+    !read_outstanding && !reader_rd && !prediction_rd &&
+    writer_we && !writer_targets_reader_bank;
 
-assign reader_busy = grant_reader ? ddram_busy : 1'b1;
+assign reader_busy =
+    grant_reader ? ddram_busy : 1'b1;
+
 assign prediction_busy =
-    (grant_prediction_read || grant_prediction_write) ? ddram_busy : 1'b1;
-assign writer_busy = grant_writer ? ddram_busy : 1'b1;
+    grant_prediction ? ddram_busy : 1'b1;
 
-assign ddram_burstcnt = grant_reader ? reader_burstcnt :
-                        grant_prediction_read ? prediction_burstcnt :
-                        grant_prediction_write ? 8'd1 :
-                        grant_writer ? writer_burstcnt : 8'd0;
-assign ddram_addr     = grant_reader ? reader_addr :
-                        grant_prediction_read ? prediction_addr :
-                        grant_prediction_write ? prediction_write_address :
-                        grant_writer ? writer_addr : 29'd0;
-assign ddram_rd       = grant_reader ? reader_rd :
-                        grant_prediction_read ? 1'b1 : 1'b0;
-assign ddram_din      = grant_prediction_write ? prediction_write_data :
-                        grant_writer ? writer_din : 64'd0;
-assign ddram_be       = grant_prediction_write ? 8'h01 :
-                        grant_writer ? writer_be : 8'hFF;
-assign ddram_we       = grant_prediction_write ? 1'b1 :
-                        grant_writer ? writer_we : 1'b0;
+assign writer_busy =
+    grant_writer ? ddram_busy : 1'b1;
+
+assign ddram_burstcnt =
+    grant_reader ? reader_burstcnt :
+    grant_prediction ? prediction_burstcnt :
+    grant_writer ? writer_burstcnt : 8'd0;
+
+assign ddram_addr =
+    grant_reader ? reader_addr :
+    grant_prediction ? prediction_addr :
+    grant_writer ? writer_addr : 29'd0;
+
+assign ddram_rd =
+    grant_reader ? 1'b1 :
+    grant_prediction ? 1'b1 : 1'b0;
+
+assign ddram_din =
+    grant_writer ? writer_din : 64'd0;
+
+assign ddram_be =
+    grant_writer ? writer_be : 8'hFF;
+
+assign ddram_we =
+    grant_writer ? writer_we : 1'b0;
 
 assign reader_dout_ready =
     read_outstanding && !read_owner_prediction && ddram_dout_ready;
+
 assign prediction_dout_ready =
     read_outstanding && read_owner_prediction && ddram_dout_ready;
 
@@ -139,7 +131,7 @@ always @(posedge clk) begin
                 reader_bank_valid     <= 1'b1;
                 reader_frame_bank     <= reader_addr[16];
             end
-            else if (grant_prediction_read && !ddram_busy) begin
+            else if (grant_prediction && !ddram_busy) begin
                 read_outstanding      <= 1'b1;
                 read_owner_prediction <= 1'b1;
                 read_words_remaining  <= prediction_burstcnt;

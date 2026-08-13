@@ -28,6 +28,12 @@
 // The IQ precondition also sign-extends QFS before its left shift so the complete
 // diagnostic block does not depend on narrow signed-shift behavior.
 //
+// kate - Phase 1T-o exports the complete row-major 8x8 spatial residual stream
+// from the already-proven IDCT. This does not change coefficient decoding,
+// inverse quantisation or IDCT arithmetic; it only exposes all 64 live f[y][x]
+// samples so the block-level prediction/reconstruction proof can apply H.262
+// 7.6.8 to every pel rather than only sample (0,0).
+//
 // The 256-byte first-slice capture is an implementation regression boundary,
 // not an H.262 limit. Downloaded non-intra quantiser matrices remain a valid
 // H.262 feature but are outside this diagnostic and therefore fail this proof
@@ -51,6 +57,12 @@ module mpeg2_h262_p_residual_probe
     output reg        residual_success,
     output reg        first_sample_valid,
     output reg signed [15:0] first_sample_value,
+
+    // kate - Phase 1T-o complete first-Y0 spatial residual stream.
+    output wire       residual_sample_valid,
+    output wire [5:0] residual_sample_index,
+    output wire signed [15:0] residual_sample_value,
+
     output reg        probe_error
 );
 
@@ -409,6 +421,10 @@ mpeg2_h262_idct p_residual_idct
 reg [6:0] idct_sample_count;
 wire unused_idct_values =
     &{1'b0, idct_first_sample00[0], idct_first_sample77[0]};
+
+assign residual_sample_valid = idct_sample_valid;
+assign residual_sample_index = idct_sample_index;
+assign residual_sample_value = idct_sample_value;
 
 always @(posedge clk) begin
     if (reset) begin
@@ -897,7 +913,6 @@ always @(posedge clk) begin
                 emit_index <= emit_index + 6'd1;
             end
         end
-
         if (idct_sample_valid) begin
             if (idct_sample_index != idct_sample_count[5:0]) begin
                 probe_error <= 1'b1;
