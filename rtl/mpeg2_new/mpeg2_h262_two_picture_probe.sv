@@ -24,8 +24,8 @@
 // kate - Phase 1T-d passively observes the first unsupported P-picture syntax
 // between supported I-pictures.  The existing front-end phase1_supported falling
 // edge independently arms the probe; USER can remain on for all-I streams, while
-// a controlled I/P/I/I diagnostic cannot reach USER unless a live P slice,
-// macroblock_address_increment and Table B.3 macroblock_type are verified.
+// a controlled I/P/I diagnostic cannot report P-syntax success unless a live P
+// slice, macroblock_address_increment and Table B.3 macroblock_type are verified.
 //============================================================================
 
 module mpeg2_h262_two_picture_probe
@@ -62,6 +62,10 @@ module mpeg2_h262_two_picture_probe
     output wire        reference_frame_valid,
     output wire        reference_frame_bank,
     output wire [7:0]  reference_promotion_count,
+
+    // kate - Phase 1T-d positive live-P syntax result.  This is deliberately
+    // separate from picture_count, which continues to count persisted I frames.
+    output wire        p_macroblock_type_seen,
 
     output wire        probe_error,
 
@@ -114,7 +118,6 @@ reg       reference_error_latched;
 // syntax observer verifies a live Table B.3 macroblock type.
 reg phase1_supported_d;
 reg p_picture_expected;
-wire p_macroblock_type_seen;
 wire p_syntax_probe_error;
 wire p_syntax_progress_error =
     p_picture_expected && !p_macroblock_type_seen;

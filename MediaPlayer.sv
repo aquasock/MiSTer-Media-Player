@@ -268,6 +268,7 @@ wire        mpeg2_new_picture_420_complete;
 wire        mpeg2_new_active_frame_bank;
 wire        mpeg2_new_completed_frame_bank;
 wire [7:0]  mpeg2_new_picture_count;
+wire        mpeg2_new_p_macroblock_type_seen;
 wire        mpeg2_new_slice_start;
 wire        mpeg2_new_luma_macroblock_start;
 wire        mpeg2_new_phase1_probe_error;
@@ -427,6 +428,7 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.active_frame_bank           (mpeg2_new_active_frame_bank),
 	.completed_frame_bank        (mpeg2_new_completed_frame_bank),
 	.picture_count               (mpeg2_new_picture_count),
+	.p_macroblock_type_seen      (mpeg2_new_p_macroblock_type_seen),
 	.probe_error                 (mpeg2_new_phase1_probe_error),
 	.quantiser_scale_code        (mpeg2_new_slice_quantiser_scale_code),
 	.macroblock_address_increment(mpeg2_new_macroblock_address_increment),
@@ -738,15 +740,27 @@ assign VGA_R = fb_video_r;
 assign VGA_G = fb_video_g;
 assign VGA_B = fb_video_b;
 
-// kate - Phase 1S positive diagnostic.
-// USER now requires at least three fully persisted pictures and a fresh cache
-// refill from the most recently completed bank.  This proves a second controlled
-// publication (0 -> 1 -> 0) rather than merely re-proving the v0.1.0 swap.
-assign LED_USER =
+// kate - Phase 1T-d keeps the hardware-proven Phase 1S all-I USER criterion
+// intact, while giving the live P-syntax probe an independent positive result.
+// P pictures are not reconstructed yet, so the P path requires the verified P
+// macroblock type plus two fully persisted I pictures (I/P/I) rather than an
+// unrelated third I publication.
+wire mpeg2_new_phase1s_all_i_user_success =
     mpeg2_new_first_picture_420_parsed &&
     mpeg2_new_second_picture_420_parsed &&
     (mpeg2_new_picture_count >= 8'd3) &&
-    (mpeg2_new_completed_frame_bank == mpeg2_new_display_frame_bank) &&
+    (mpeg2_new_completed_frame_bank == mpeg2_new_display_frame_bank);
+
+wire mpeg2_new_phase1t_p_syntax_user_success =
+    mpeg2_new_p_macroblock_type_seen &&
+    mpeg2_new_first_picture_420_parsed &&
+    mpeg2_new_second_picture_420_parsed &&
+    (mpeg2_new_picture_count >= 8'd2) &&
+    (mpeg2_new_completed_frame_bank == mpeg2_new_display_frame_bank);
+
+assign LED_USER =
+    (mpeg2_new_phase1s_all_i_user_success ||
+     mpeg2_new_phase1t_p_syntax_user_success) &&
     mpeg2_new_recon_macroblock_420_complete &&
     mpeg2_new_phase1n_frame_geometry_supported &&
     !mpeg2_new_syntax_error &&
