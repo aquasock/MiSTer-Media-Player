@@ -1,0 +1,59 @@
+{
+  "test_all_i.m2v": {
+    "bytes": 121295,
+    "sha256": "bb1e4cad532a8affb21cf5b278a06d7fd37b6c26065a2742636600007d505a23",
+    "picture_types": [
+      "I",
+      "I",
+      "I",
+      "I"
+    ]
+  },
+  "test_ipii.m2v": {
+    "bytes": 94553,
+    "sha256": "f25231e8bbb4a0bca64e17e6e68b35e7cf2d8c04a766ce061708bc56f4dd7a9f",
+    "picture_types": [
+      "I",
+      "P",
+      "I",
+      "I"
+    ]
+  },
+  "test_ip_motion_end.m2v": {
+    "bytes": 65103,
+    "sha256": "74c68051688e790bafad65144847cf0aca206ad6813e24eaedba16f718b241b0",
+    "picture_types": [
+      "I",
+      "P",
+      "I"
+    ]
+  },
+  "test_ip_motion_nores_end.m2v": {
+    "bytes": 64699,
+    "sha256": "3d6279c71c78be694383dd8106e33d1378c293ce452d51541c2ff0370eeb2841",
+    "picture_types": [
+      "I",
+      "P",
+      "I"
+    ]
+  },
+  "test_ip_halfpel_end.m2v": {
+    "bytes": 69790,
+    "sha256": "668a2c896f357402d12d2f1f343aa5ff68a6878ca90793c30f4c3d2387770b16",
+    "picture_types": [
+      "I",
+      "P",
+      "I"
+    ]
+  },
+  "test_ip_two_mb_static.m2v": {
+    "bytes": 159,
+    "sha256": "9c10076b495d4aeee1b38f2024a199b68b9e3831f5e5faef0f2f67265647d625",
+    "picture_types": [
+      "I",
+      "P",
+      "I"
+    ],
+    "first_p_slice_prefix": "12 79 c0"
+  }
+}
