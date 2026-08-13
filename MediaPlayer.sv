@@ -183,7 +183,7 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 	.reset    (reset_request),
 
 	.wr_clk   (clk_sys),
-	.wr_data  (ioctl_dout),
+	.wr_data  (mpeg2_stream_wr ? ioctl_dout : 8'd0),
 	.wr_en    (mpeg2_stream_wr),
 	.wr_full  (mpeg2_stream_full),
 
@@ -211,14 +211,10 @@ wire        fb_video_de;
 wire        fb_video_hs;
 wire        fb_video_vs;
 
-// kate - Fixed presentation timing is now instantiated directly by the core.
-// There is no MPEG2FPGA wrapper or legacy sync generator between this counter
-// and the MiSTer framebuffer/display path.
 mpeg2_video_svga_800x600 mpeg2_video_svga_800x600
 (
 	.clk      (clk_video),
 	.reset    (reset_video),
-
 	.h_pos    (display_h_pos),
 	.v_pos    (display_v_pos),
 	.pixel_en (display_pixel_en),
@@ -280,6 +276,10 @@ wire        mpeg2_new_p_macroblock_type_seen;
 wire        mpeg2_new_p_forward_vector_valid;
 wire signed [12:0] mpeg2_new_p_forward_vector_x;
 wire signed [12:0] mpeg2_new_p_forward_vector_y;
+wire        mpeg2_new_p_residual_required;
+wire        mpeg2_new_p_residual_success;
+wire        mpeg2_new_p_first_residual_sample_valid;
+wire signed [15:0] mpeg2_new_p_first_residual_sample_value;
 wire        mpeg2_new_slice_start;
 wire        mpeg2_new_luma_macroblock_start;
 wire        mpeg2_new_phase1_probe_error;
@@ -361,6 +361,8 @@ wire        mpeg2_new_pred_read_seen;
 wire [7:0]  mpeg2_new_pred_sample_value;
 wire        mpeg2_new_pred_sample_nonzero;
 wire        mpeg2_new_pred_half_sample_seen;
+wire        mpeg2_new_pred_reconstructed_seen;
+wire [7:0]  mpeg2_new_pred_reconstructed_value;
 wire        mpeg2_new_pred_error;
 
 wire        mpeg2_new_ddr_cache_ready;
@@ -372,28 +374,21 @@ wire [4:0] mpeg2_new_effective_quantiser_scale_code =
 		mpeg2_new_macroblock_quantiser_scale_code :
 		mpeg2_new_slice_quantiser_scale_code;
 
-// kate - Phase 1N's local on-chip presentation buffer is 720x480.  The parser
-// itself remains standards-driven, but USER only reports a complete displayable
-// first picture when the coded frame fits this current diagnostic store.
 wire mpeg2_new_phase1n_frame_geometry_supported =
 	(mpeg2_new_horizontal_size != 14'd0) &&
 	(mpeg2_new_vertical_size   != 14'd0) &&
 	(mpeg2_new_horizontal_size <= 14'd720) &&
 	(mpeg2_new_vertical_size   <= 14'd480);
 
-// kate - Standards-driven H.262 header parser.  Phase 1H is the first build in
-// which this parser is not sharing its compressed input with MPEG2FPGA.
 mpeg2_h262_frontend mpeg2_h262_frontend
 (
 	.clk                              (clk_mpeg2),
 	.reset                            (reset_mpeg2),
 	.stream_data                      (mpeg2_stream_data),
 	.stream_valid                     (mpeg2_stream_rd),
-
 	.frontend_ready                   (mpeg2_new_frontend_ready),
 	.phase1_supported                 (mpeg2_new_phase1_supported),
 	.syntax_error                     (mpeg2_new_syntax_error),
-
 	.sequence_seen                    (mpeg2_new_sequence_seen),
 	.sequence_extension_seen          (mpeg2_new_sequence_extension_seen),
 	.sequence_scalable_extension_seen (mpeg2_new_sequence_scalable_extension_seen),
@@ -401,7 +396,6 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.picture_coding_extension_seen    (mpeg2_new_picture_coding_extension_seen),
 	.slice_seen                       (mpeg2_new_slice_seen),
 	.sequence_end_seen                (mpeg2_new_sequence_end_seen),
-
 	.horizontal_size                  (mpeg2_new_horizontal_size),
 	.vertical_size                    (mpeg2_new_vertical_size),
 	.aspect_ratio_information         (mpeg2_new_aspect_ratio_information),
@@ -409,7 +403,6 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.profile_and_level_indication     (mpeg2_new_profile_and_level_indication),
 	.progressive_sequence             (mpeg2_new_progressive_sequence),
 	.chroma_format                    (mpeg2_new_chroma_format),
-
 	.temporal_reference               (mpeg2_new_temporal_reference),
 	.picture_coding_type              (mpeg2_new_picture_coding_type),
 	.intra_dc_precision               (mpeg2_new_intra_dc_precision),
@@ -428,9 +421,6 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.intra_quant_matrix_default       (mpeg2_new_intra_quant_matrix_default)
 );
 
-// kate - Phase 1S keeps one parser and re-arms it after every persisted picture.
-// The wrapper reports the active write bank and the bank that just completed so
-// DDR storage and display publication can ping-pong repeatedly.
 mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 (
 	.clk                         (clk_mpeg2),
@@ -444,7 +434,6 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.intra_vlc_format            (mpeg2_new_intra_vlc_format),
 	.pipeline_block_done         (mpeg2_new_ddr_block_stored),
 	.recon_block_complete        (mpeg2_new_recon_block_complete),
-
 	.slice_header_seen           (mpeg2_new_slice_header_seen),
 	.macroblock_address_seen     (mpeg2_new_macroblock_address_seen),
 	.first_i_macroblock_seen     (mpeg2_new_first_i_macroblock_seen),
@@ -463,6 +452,10 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.p_forward_vector_valid      (mpeg2_new_p_forward_vector_valid),
 	.p_forward_vector_x          (mpeg2_new_p_forward_vector_x),
 	.p_forward_vector_y          (mpeg2_new_p_forward_vector_y),
+	.p_residual_required         (mpeg2_new_p_residual_required),
+	.p_residual_success          (mpeg2_new_p_residual_success),
+	.p_first_residual_sample_valid(mpeg2_new_p_first_residual_sample_valid),
+	.p_first_residual_sample_value(mpeg2_new_p_first_residual_sample_value),
 	.probe_error                 (mpeg2_new_phase1_probe_error),
 	.quantiser_scale_code        (mpeg2_new_slice_quantiser_scale_code),
 	.macroblock_address_increment(mpeg2_new_macroblock_address_increment),
@@ -478,7 +471,6 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.first_luma_last_ac_level    (mpeg2_new_first_luma_last_ac_level),
 	.slice_start                 (mpeg2_new_slice_start),
 	.luma_macroblock_start       (mpeg2_new_luma_macroblock_start),
-
 	.qfs_block_index             (mpeg2_new_qfs_block_index),
 	.qfs_block_start             (mpeg2_new_qfs_block_start),
 	.qfs_write_en                (mpeg2_new_qfs_write_en),
@@ -487,31 +479,25 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.qfs_block_end               (mpeg2_new_qfs_block_end)
 );
 
-// kate - H.262 inverse scan, inverse quantisation, saturation and mismatch
-// control for every submitted Y/Cb/Cr intra block.
 mpeg2_h262_inverse_quant mpeg2_h262_inverse_quant
 (
 	.clk                         (clk_mpeg2),
 	.reset                       (reset_mpeg2),
-
 	.block_start                 (mpeg2_new_qfs_block_start),
 	.coeff_write_en              (mpeg2_new_qfs_write_en),
 	.coeff_write_index           (mpeg2_new_qfs_write_index),
 	.coeff_write_value           (mpeg2_new_qfs_write_value),
 	.block_end                   (mpeg2_new_qfs_block_end),
-
 	.intra_quant_matrix_default  (mpeg2_new_intra_quant_matrix_default),
 	.intra_dc_precision          (mpeg2_new_intra_dc_precision),
 	.quantiser_scale_code        (mpeg2_new_effective_quantiser_scale_code),
 	.q_scale_type                (mpeg2_new_q_scale_type),
 	.alternate_scan              (mpeg2_new_alternate_scan),
-
 	.block_complete              (mpeg2_new_inverse_quant_complete),
 	.iq_error                    (mpeg2_new_inverse_quant_error),
 	.unsupported_matrix          (mpeg2_new_inverse_quant_unsupported_matrix),
 	.first_luma_f00              (mpeg2_new_first_luma_f00),
 	.first_luma_f77              (mpeg2_new_first_luma_f77),
-
 	.coeff_out_block_start       (mpeg2_new_iq_coeff_block_start),
 	.coeff_out_valid             (mpeg2_new_iq_coeff_valid),
 	.coeff_out_index             (mpeg2_new_iq_coeff_index),
@@ -519,18 +505,15 @@ mpeg2_h262_inverse_quant mpeg2_h262_inverse_quant
 	.coeff_out_block_end         (mpeg2_new_iq_coeff_block_end)
 );
 
-// kate - H.262 inverse DCT.
 mpeg2_h262_idct mpeg2_h262_idct
 (
 	.clk                         (clk_mpeg2),
 	.reset                       (reset_mpeg2),
-
 	.coeff_block_start           (mpeg2_new_iq_coeff_block_start),
 	.coeff_valid                 (mpeg2_new_iq_coeff_valid),
 	.coeff_index                 (mpeg2_new_iq_coeff_index),
 	.coeff_value                 (mpeg2_new_iq_coeff_value),
 	.coeff_block_end             (mpeg2_new_iq_coeff_block_end),
-
 	.block_complete              (mpeg2_new_idct_complete),
 	.idct_error                  (mpeg2_new_idct_error),
 	.sample_valid                (mpeg2_new_idct_sample_valid),
@@ -540,12 +523,10 @@ mpeg2_h262_idct mpeg2_h262_idct
 	.first_luma_sample77         (mpeg2_new_first_luma_sample77)
 );
 
-// kate - H.262 intra 4:2:0 reconstruction and component-plane coordinates.
 mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 (
 	.clk                                (clk_mpeg2),
 	.reset                              (reset_mpeg2),
-
 	.horizontal_size                    (mpeg2_new_horizontal_size),
 	.vertical_size                      (mpeg2_new_vertical_size),
 	.slice_vertical_position            (mpeg2_new_slice_vertical_position),
@@ -554,12 +535,10 @@ mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 	.slice_start                        (mpeg2_new_slice_start),
 	.macroblock_start                   (mpeg2_new_luma_macroblock_start),
 	.block_index                        (mpeg2_new_qfs_block_index),
-
 	.sample_valid                       (mpeg2_new_idct_sample_valid),
 	.sample_index                       (mpeg2_new_idct_sample_index),
 	.sample_value                       (mpeg2_new_idct_sample_value),
 	.idct_block_complete                (mpeg2_new_idct_complete),
-
 	.pixel_valid                        (mpeg2_new_recon_pixel_valid),
 	.pixel_component                    (mpeg2_new_recon_pixel_component),
 	.pixel_x                            (mpeg2_new_recon_pixel_x),
@@ -573,17 +552,11 @@ mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 	.block_origin_y                     (mpeg2_new_recon_block_origin_y)
 );
 
-///////////////////////   FULL-PRECISION DDR WRITER   ///////////
-
-// kate - Phase 1S alternates the writer bank after every complete persisted
-// picture.  active_frame_bank changes only after the final block_stored
-// handshake, so an entire picture remains in one stable DDR bank.
 mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 (
 	.clk             (clk_mpeg2),
 	.reset           (reset_mpeg2),
 	.frame_bank      (mpeg2_new_active_frame_bank),
-
 	.pixel_value     (mpeg2_new_recon_pixel_value),
 	.pixel_component (mpeg2_new_recon_pixel_component),
 	.pixel_x         (mpeg2_new_recon_pixel_x),
@@ -591,11 +564,9 @@ mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 	.pixel_valid     (mpeg2_new_recon_pixel_valid),
 	.block_start     (mpeg2_new_recon_block_start),
 	.block_complete  (mpeg2_new_recon_block_complete),
-
 	.block_stored    (mpeg2_new_ddr_block_stored),
 	.write_seen      (mpeg2_new_ddr_write_seen),
 	.store_error     (mpeg2_new_ddr_store_error),
-
 	.ddram_busy      (mpeg2_new_ddr_writer_busy),
 	.ddram_burstcnt  (mpeg2_new_ddr_wr_burstcnt),
 	.ddram_addr      (mpeg2_new_ddr_wr_addr),
@@ -605,12 +576,16 @@ mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 	.ddram_we        (mpeg2_new_ddr_wr_we)
 );
 
-///////////////////////   PHASE 1T REFERENCE PREDICTION PROBE   ///////////
+// kate - Phase 1T-l: the controlled pattern-only P macroblock has no explicit
+// forward vector. Once its complete first-Y0 transform has produced a real
+// spatial sample, request the normative implicit (0,0) prediction and decoded
+// pel proof from the existing prediction DDR client.
+wire mpeg2_new_phase1t_implicit_reconstruct_required =
+    mpeg2_new_p_residual_required &&
+    mpeg2_new_p_residual_success &&
+    mpeg2_new_p_first_residual_sample_valid &&
+    !mpeg2_new_p_forward_vector_valid;
 
-// kate - Phase 1T-i consumes the verified explicit forward vector itself.
-// Existing (4,0), f_code=1/1 keeps the exact integer sample proof; the new
-// (3,0), f_code=2/2 case derives an actual horizontal half-sample flag and
-// selects the proven two-sample interpolation path.
 mpeg2_h262_reference_read_probe mpeg2_h262_reference_read_probe
 (
     .clk                       (clk_mpeg2),
@@ -621,6 +596,8 @@ mpeg2_h262_reference_read_probe mpeg2_h262_reference_read_probe
     .p_forward_vector_y        (mpeg2_new_p_forward_vector_y),
     .forward_f_code_horizontal (mpeg2_new_forward_f_code_horizontal),
     .forward_f_code_vertical   (mpeg2_new_forward_f_code_vertical),
+    .p_implicit_reconstruct_request(mpeg2_new_phase1t_implicit_reconstruct_required),
+    .p_residual_sample         (mpeg2_new_p_first_residual_sample_value),
     .reference_frame_valid     (mpeg2_new_reference_frame_valid),
     .reference_frame_bank      (mpeg2_new_reference_frame_bank),
     .ddram_busy                (mpeg2_new_pred_busy),
@@ -633,17 +610,11 @@ mpeg2_h262_reference_read_probe mpeg2_h262_reference_read_probe
     .sample_value              (mpeg2_new_pred_sample_value),
     .sample_nonzero            (mpeg2_new_pred_sample_nonzero),
     .half_sample_seen          (mpeg2_new_pred_half_sample_seen),
+    .reconstructed_seen        (mpeg2_new_pred_reconstructed_seen),
+    .reconstructed_value       (mpeg2_new_pred_reconstructed_value),
     .probe_error               (mpeg2_new_pred_error)
 );
 
-///////////////////////   DDR-BACKED 4:2:0 DISPLAY   ////////////
-
-// kate - Phase 1S scheduled display-bank control.  A newly persisted frame is
-// held pending until the fixed 800x600 raster reaches true vertical blanking.
-// The bank switch and framebuffer re-arm then occur after active row 599, giving
-// the DDR line-cache prefill the complete 28-line vertical blanking interval.
-// This keeps the visible 800x600 raster continuous while preserving the Phase 1R
-// controlled re-arm and blanking-aligned publication.
 reg       mpeg2_new_display_frame_bank;
 reg [2:0] mpeg2_new_framebuffer_swap_reset_count;
 reg       mpeg2_new_pending_frame_valid;
@@ -652,10 +623,6 @@ reg       mpeg2_new_swap_window_video;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] mpeg2_new_swap_window_sync;
 
-// Register a single-bit vertical-blanking level in the 40 MHz video domain.
-// Its rising edge occurs at row 600, immediately after the last active raster
-// line.  Keeping this as one registered control bit avoids sampling the
-// multi-bit raster counters in the decoder/DDRAM domain.
 always @(posedge clk_video) begin
     if (reset_video)
         mpeg2_new_swap_window_video <= 1'b0;
@@ -663,9 +630,6 @@ always @(posedge clk_video) begin
         mpeg2_new_swap_window_video <= (display_v_pos >= 12'd600);
 end
 
-// Synchronize only the registered safe-window bit into the decoder/DDRAM domain.
-// sync[0] is the asynchronous first sampling stage; MediaPlayer.sdc cuts only
-// that boundary while leaving the later stages and scheduler fully timed.
 always @(posedge clk_mpeg2) begin
     if (reset_mpeg2)
         mpeg2_new_swap_window_sync <= 3'b000;
@@ -682,8 +646,6 @@ wire mpeg2_new_frame_waiting =
     mpeg2_new_first_picture_420_parsed &&
     (mpeg2_new_completed_frame_bank != mpeg2_new_display_frame_bank);
 
-// If a picture happens to complete on the same decoder clock as the synchronized
-// safe-window pulse, publish it directly rather than waiting another raster.
 wire mpeg2_new_scheduled_frame_valid =
     mpeg2_new_pending_frame_valid || mpeg2_new_frame_waiting;
 wire mpeg2_new_scheduled_frame_bank =
@@ -729,30 +691,25 @@ assign mpeg2_new_ddr_rd_banked_addr =
 mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 (
     .reset          (mpeg2_new_framebuffer_reset),
-
     .mem_clk        (clk_mpeg2),
     .picture_complete(mpeg2_new_first_picture_420_parsed),
     .horizontal_size(mpeg2_new_horizontal_size),
     .vertical_size  (mpeg2_new_vertical_size),
-
     .ddram_busy     (mpeg2_new_ddr_reader_busy),
     .ddram_dout     (DDRAM_DOUT),
     .ddram_dout_ready(mpeg2_new_ddr_reader_dout_ready),
     .ddram_burstcnt (mpeg2_new_ddr_rd_burstcnt),
     .ddram_addr     (mpeg2_new_ddr_rd_addr),
     .ddram_rd       (mpeg2_new_ddr_rd),
-
     .cache_ready    (mpeg2_new_ddr_cache_ready),
     .read_seen      (mpeg2_new_ddr_read_seen),
     .cache_error    (mpeg2_new_ddr_cache_error),
-
     .rd_clk         (clk_video),
     .h_pos          (display_h_pos),
     .v_pos          (display_v_pos),
     .pixel_en       (display_pixel_en),
     .h_sync         (display_h_sync),
     .v_sync         (display_v_sync),
-
     .video_r        (fb_video_r),
     .video_g        (fb_video_g),
     .video_b        (fb_video_b),
@@ -761,16 +718,10 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
     .video_vs       (fb_video_vs)
 );
 
-///////////////////////   PHASE 1S/1T DDR ARBITRATION   /////////
-
-// kate - Display reads retain highest priority. Phase 1T-f adds a one-word
-// prediction reader below display priority and above writes. The arbiter also
-// demultiplexes DDR response-ready so each reader consumes only its own data.
 mpeg2_h262_ddram_arbiter mpeg2_h262_ddram_arbiter
 (
     .clk             (clk_mpeg2),
     .reset           (reset_mpeg2),
-
     .writer_burstcnt (mpeg2_new_ddr_wr_burstcnt),
     .writer_addr     (mpeg2_new_ddr_wr_addr),
     .writer_rd       (mpeg2_new_ddr_wr_rd),
@@ -778,19 +729,16 @@ mpeg2_h262_ddram_arbiter mpeg2_h262_ddram_arbiter
     .writer_be       (mpeg2_new_ddr_wr_be),
     .writer_we       (mpeg2_new_ddr_wr_we),
     .writer_busy     (mpeg2_new_ddr_writer_busy),
-
     .reader_burstcnt (mpeg2_new_ddr_rd_burstcnt),
     .reader_addr     (mpeg2_new_ddr_rd_banked_addr),
     .reader_rd       (mpeg2_new_ddr_rd),
     .reader_busy     (mpeg2_new_ddr_reader_busy),
     .reader_dout_ready(mpeg2_new_ddr_reader_dout_ready),
-
     .prediction_burstcnt (mpeg2_new_pred_burstcnt),
     .prediction_addr     (mpeg2_new_pred_addr),
     .prediction_rd       (mpeg2_new_pred_rd),
     .prediction_busy     (mpeg2_new_pred_busy),
     .prediction_dout_ready(mpeg2_new_pred_dout_ready),
-
     .ddram_busy      (DDRAM_BUSY),
     .ddram_dout_ready(DDRAM_DOUT_READY),
     .ddram_burstcnt  (DDRAM_BURSTCNT),
@@ -803,20 +751,13 @@ mpeg2_h262_ddram_arbiter mpeg2_h262_ddram_arbiter
 
 assign CLK_VIDEO = clk_video;
 assign CE_PIXEL  = 1'b1;
-
 assign VGA_DE = fb_video_de;
 assign VGA_HS = fb_video_hs;
 assign VGA_VS = fb_video_vs;
-
 assign VGA_R = fb_video_r;
 assign VGA_G = fb_video_g;
 assign VGA_B = fb_video_b;
 
-// kate - Phase 1T-d keeps the hardware-proven Phase 1S all-I USER criterion
-// intact, while giving the live P-syntax probe an independent positive result.
-// Phase 1T-i requires a DDR prediction proof only for the two controlled modes:
-// the Phase 1T-g integer-vector regression and the new odd-vector half-sample
-// regression. Other P syntax vectors keep their previous syntax-only acceptance.
 wire mpeg2_new_phase1s_all_i_user_success =
     mpeg2_new_first_picture_420_parsed &&
     mpeg2_new_second_picture_420_parsed &&
@@ -848,13 +789,23 @@ wire mpeg2_new_phase1t_reference_read_ok =
      (!mpeg2_new_phase1t_halfpel_read_required ||
       mpeg2_new_pred_half_sample_seen));
 
+// kate - Phase 1T-l requires the implicit pattern-only path to complete the
+// real prediction + residual + clipping proof. No fixed expected pel value is
+// invented; the prediction and residual are both live data from this stream.
+wire mpeg2_new_phase1t_implicit_reconstruct_ok =
+    !mpeg2_new_phase1t_implicit_reconstruct_required ||
+    mpeg2_new_pred_reconstructed_seen;
+
 wire mpeg2_new_phase1t_p_syntax_user_success =
     mpeg2_new_p_macroblock_type_seen &&
     mpeg2_new_first_picture_420_parsed &&
     mpeg2_new_second_picture_420_parsed &&
     (mpeg2_new_picture_count >= 8'd2) &&
     (mpeg2_new_completed_frame_bank == mpeg2_new_display_frame_bank) &&
-    mpeg2_new_phase1t_reference_read_ok;
+    mpeg2_new_phase1t_reference_read_ok &&
+    mpeg2_new_phase1t_implicit_reconstruct_ok;
+
+wire unused_phase1t_reconstructed_value = &{1'b0, mpeg2_new_pred_reconstructed_value};
 
 assign LED_USER =
     (mpeg2_new_phase1s_all_i_user_success ||
