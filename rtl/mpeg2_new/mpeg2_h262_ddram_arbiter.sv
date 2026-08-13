@@ -15,6 +15,15 @@
 // highest priority, prediction reads are next, and writes remain lowest priority.
 // Response-ready is demultiplexed by the recorded read owner so the framebuffer
 // cannot consume a prediction response and vice versa.
+//
+// kate - Phase 1T-m temporarily extends the prediction client with one explicit
+// diagnostic write command so a hardware-reconstructed P pel can be persisted
+// without adding a permanent fourth DDR client. burstcnt=1 with prediction_rd=0
+// is decoded as a byte-0 write to the final unused 64-bit word of the selected
+// 512 KiB frame bank. prediction_addr[16] selects the bank and [7:0] carries the
+// byte value. Ordinary prediction reads remain prediction_rd=1. This diagnostic
+// command is an implementation proof mechanism, not part of H.262 or the final
+// P-picture writer architecture.
 //============================================================================
 
 module mpeg2_h262_ddram_arbiter
@@ -22,7 +31,6 @@ module mpeg2_h262_ddram_arbiter
     input  wire        clk,
     input  wire        reset,
 
-    // Writer client. Current H.262 store issues one-word write transactions.
     input  wire [7:0]  writer_burstcnt,
     input  wire [28:0] writer_addr,
     input  wire        writer_rd,
@@ -31,21 +39,18 @@ module mpeg2_h262_ddram_arbiter
     input  wire        writer_we,
     output wire        writer_busy,
 
-    // Presentation reader. The framebuffer issues read bursts up to 64 words.
     input  wire [7:0]  reader_burstcnt,
     input  wire [28:0] reader_addr,
     input  wire        reader_rd,
     output wire        reader_busy,
     output wire        reader_dout_ready,
 
-    // Phase 1T-f prediction reader. It currently issues one-word reads.
     input  wire [7:0]  prediction_burstcnt,
     input  wire [28:0] prediction_addr,
     input  wire        prediction_rd,
     output wire        prediction_busy,
     output wire        prediction_dout_ready,
 
-    // MiSTer DDR service.
     input  wire        ddram_busy,
     input  wire        ddram_dout_ready,
     output wire [7:0]  ddram_burstcnt,
@@ -56,42 +61,63 @@ module mpeg2_h262_ddram_arbiter
     output wire        ddram_we
 );
 
+localparam [28:0] DDR_Y_BASE           = 29'h06000000;
+localparam [28:0] DDR_BANK_WORDS       = 29'h00010000;
+localparam [28:0] DDR_DIAG_WORD_OFFSET = 29'h0000FFFF;
+
 reg       read_outstanding;
 reg       read_owner_prediction;
 reg [7:0] read_words_remaining;
 reg       reader_bank_valid;
 reg       reader_frame_bank;
 
-// The two Phase 1R/1S frame banks are separated by 0x10000 64-bit words.
-// Plane offsets stay below that boundary, so address bit 16 identifies the
-// selected frame bank for both reader and writer transactions.
 wire writer_targets_reader_bank =
     reader_bank_valid && (writer_addr[16] == reader_frame_bank);
 
-wire grant_reader = !read_outstanding && reader_rd;
-wire grant_prediction =
-    !read_outstanding && !reader_rd && prediction_rd;
-wire grant_writer =
-    !read_outstanding && !reader_rd && !prediction_rd && writer_we &&
-    !writer_targets_reader_bank;
+wire prediction_read_cmd = prediction_rd;
+wire prediction_write_cmd =
+    (prediction_burstcnt == 8'd1) && !prediction_rd;
+wire prediction_write_bank = prediction_addr[16];
+wire prediction_write_targets_reader_bank =
+    reader_bank_valid &&
+    (prediction_write_bank == reader_frame_bank);
+wire [28:0] prediction_write_address =
+    DDR_Y_BASE +
+    (prediction_write_bank ? DDR_BANK_WORDS : 29'd0) +
+    DDR_DIAG_WORD_OFFSET;
+wire [63:0] prediction_write_data = {56'd0, prediction_addr[7:0]};
 
-// A client which is not selected must continue holding its request. All clients
-// use the corresponding busy output as request backpressure.
+wire grant_reader = !read_outstanding && reader_rd;
+wire grant_prediction_read =
+    !read_outstanding && !reader_rd && prediction_read_cmd;
+wire grant_prediction_write =
+    !read_outstanding && !reader_rd && !prediction_read_cmd &&
+    prediction_write_cmd && !prediction_write_targets_reader_bank;
+wire grant_writer =
+    !read_outstanding && !reader_rd && !prediction_read_cmd &&
+    !prediction_write_cmd && writer_we && !writer_targets_reader_bank;
+
 assign reader_busy = grant_reader ? ddram_busy : 1'b1;
-assign prediction_busy = grant_prediction ? ddram_busy : 1'b1;
+assign prediction_busy =
+    (grant_prediction_read || grant_prediction_write) ? ddram_busy : 1'b1;
 assign writer_busy = grant_writer ? ddram_busy : 1'b1;
 
 assign ddram_burstcnt = grant_reader ? reader_burstcnt :
-                        grant_prediction ? prediction_burstcnt :
+                        grant_prediction_read ? prediction_burstcnt :
+                        grant_prediction_write ? 8'd1 :
                         grant_writer ? writer_burstcnt : 8'd0;
 assign ddram_addr     = grant_reader ? reader_addr :
-                        grant_prediction ? prediction_addr :
+                        grant_prediction_read ? prediction_addr :
+                        grant_prediction_write ? prediction_write_address :
                         grant_writer ? writer_addr : 29'd0;
 assign ddram_rd       = grant_reader ? reader_rd :
-                        grant_prediction ? prediction_rd : 1'b0;
-assign ddram_din      = grant_writer ? writer_din : 64'd0;
-assign ddram_be       = grant_writer ? writer_be : 8'hFF;
-assign ddram_we       = grant_writer ? writer_we : 1'b0;
+                        grant_prediction_read ? 1'b1 : 1'b0;
+assign ddram_din      = grant_prediction_write ? prediction_write_data :
+                        grant_writer ? writer_din : 64'd0;
+assign ddram_be       = grant_prediction_write ? 8'h01 :
+                        grant_writer ? writer_be : 8'hFF;
+assign ddram_we       = grant_prediction_write ? 1'b1 :
+                        grant_writer ? writer_we : 1'b0;
 
 assign reader_dout_ready =
     read_outstanding && !read_owner_prediction && ddram_dout_ready;
@@ -115,7 +141,7 @@ always @(posedge clk) begin
                 reader_bank_valid     <= 1'b1;
                 reader_frame_bank     <= reader_addr[16];
             end
-            else if (grant_prediction && !ddram_busy) begin
+            else if (grant_prediction_read && !ddram_busy) begin
                 read_outstanding      <= 1'b1;
                 read_owner_prediction <= 1'b1;
                 read_words_remaining  <= prediction_burstcnt;
@@ -133,5 +159,7 @@ always @(posedge clk) begin
         end
     end
 end
+
+wire unused_writer_rd = writer_rd;
 
 endmodule
