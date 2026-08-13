@@ -32,15 +32,19 @@
 // is added to that real DDR prediction and clipped under 7.6.8. The registered
 // reconstructed value is checked on the following clock before success asserts.
 //
-// kate - Phase 1T-m persists that hardware-proven decoded pel into byte lane 0
-// of luma word (0,0) in the current non-reference write bank. The destination
-// word is read before the byte write and read again afterward. Positive proof
-// requires byte 0 to equal the live reconstructed pel and bytes 1..7 to remain
-// unchanged. This proves one real P-pel DDR persistence boundary only: there is
-// still no P-frame publication or P reference promotion.
+// kate - Phase 1T-m proves DDR persistence of that real reconstructed P pel.
+// Each 512 KiB frame bank has 65536 64-bit words while the maximum 720x480 4:2:0
+// planar payload consumes 64800 words. The final word (offset 65535) is therefore
+// reserved as a per-bank diagnostic persistence slot. The slot in the bank
+// opposite the current reference is read before the byte write and read again
+// afterward. Success requires byte 0 to equal the live reconstructed pel and
+// bytes 1..7 to remain unchanged. This is deliberately not yet a real frame-pel
+// placement, P-frame publication, or P reference promotion.
 //
-// All coordinates and exact-value checks below are implementation regression
-// restrictions, not H.262 validity rules.
+// The prediction client uses one explicitly documented Phase 1T-m command:
+// burstcnt=1 with rd=0 requests a byte-0 diagnostic write. addr[16] carries the
+// target frame bank and addr[7:0] carries the byte value. The DDR arbiter maps
+// that command to the reserved diagnostic word and an 8'h01 byte enable.
 //============================================================================
 
 module mpeg2_h262_reference_read_probe
@@ -60,24 +64,13 @@ module mpeg2_h262_reference_read_probe
 
     input  wire        reference_frame_valid,
     input  wire        reference_frame_bank,
-    input  wire        persist_frame_bank,
 
-    // Prediction/read client.
     input  wire        ddram_busy,
     input  wire [63:0] ddram_dout,
     input  wire        ddram_dout_ready,
     output wire [7:0]  ddram_burstcnt,
     output wire [28:0] ddram_addr,
     output wire        ddram_rd,
-
-    // kate - Phase 1T-m one-byte persistence writer client. The top level
-    // arbitrates this against the existing block writer before the DDR arbiter.
-    input  wire        persist_writer_busy,
-    output wire [7:0]  persist_writer_burstcnt,
-    output wire [28:0] persist_writer_addr,
-    output wire [63:0] persist_writer_din,
-    output wire [7:0]  persist_writer_be,
-    output wire        persist_writer_we,
 
     output reg         read_seen,
     output reg  [7:0]  sample_value,
@@ -90,30 +83,31 @@ module mpeg2_h262_reference_read_probe
     output reg         probe_error
 );
 
-localparam [28:0] DDR_Y_BASE     = 29'h06000000;
-localparam [28:0] DDR_BANK_WORDS = 29'h00010000;
+localparam [28:0] DDR_Y_BASE          = 29'h06000000;
+localparam [28:0] DDR_BANK_WORDS      = 29'h00010000;
+localparam [28:0] DDR_DIAG_WORD_OFFSET= 29'h0000FFFF;
 localparam [7:0]  DIAG_EXPECTED_INTEGER_SAMPLE = 8'd162;
 
-localparam [1:0] READ_INITIAL  = 2'd0;
-localparam [1:0] READ_DEST_PRE = 2'd1;
-localparam [1:0] READ_DEST_POST= 2'd2;
+localparam [1:0] READ_INITIAL   = 2'd0;
+localparam [1:0] READ_DEST_PRE  = 2'd1;
+localparam [1:0] READ_DEST_POST = 2'd2;
 
 reg        trigger_seen;
 reg        request_active;
 reg        response_waiting;
 reg [1:0]  request_kind;
+reg        request_write_command;
 reg [28:0] request_address;
 reg [2:0]  request_lane;
 reg        request_half_sample;
 reg        request_implicit_reconstruct;
 reg signed [15:0] request_residual_sample;
+reg [7:0]  request_write_value;
 reg [15:0] proof_timeout;
 
 reg        reconstruct_verify_pending;
 reg [7:0]  reconstruct_prediction_sample;
-
 reg [63:0] persistence_pre_word;
-reg        persist_write_active;
 reg [15:0] persist_timeout;
 
 function automatic [28:0] row_times_90;
@@ -203,10 +197,14 @@ wire [28:0] calculated_address =
     row_times_90(reference_y) +
     {20'd0, reference_x[11:3]};
 
-// Controlled P destination is luma (0,0) in the current write bank.
+wire persist_frame_bank = ~reference_frame_bank;
 wire [28:0] persist_bank_offset =
     persist_frame_bank ? DDR_BANK_WORDS : 29'd0;
-wire [28:0] persist_address = DDR_Y_BASE + persist_bank_offset;
+wire [28:0] persist_address =
+    DDR_Y_BASE + persist_bank_offset + DDR_DIAG_WORD_OFFSET;
+
+wire [28:0] write_command_address =
+    {12'd0, persist_frame_bank, 8'd0, request_write_value};
 
 wire [7:0] returned_sample =
     (request_lane == 3'd0) ? ddram_dout[7:0]   :
@@ -265,14 +263,9 @@ wire [7:0] verify_reconstruction_clipped =
     clip_decoded_pel(verify_reconstruction_sum);
 
 assign ddram_burstcnt = request_active ? 8'd1 : 8'd0;
-assign ddram_addr     = request_active ? request_address : 29'd0;
-assign ddram_rd       = request_active;
-
-assign persist_writer_burstcnt = persist_write_active ? 8'd1 : 8'd0;
-assign persist_writer_addr     = persist_write_active ? persist_address : 29'd0;
-assign persist_writer_din      = {56'd0, reconstructed_value};
-assign persist_writer_be       = persist_write_active ? 8'h01 : 8'hFF;
-assign persist_writer_we       = persist_write_active;
+assign ddram_addr = request_active ?
+    (request_write_command ? write_command_address : request_address) : 29'd0;
+assign ddram_rd = request_active && !request_write_command;
 
 always @(posedge clk) begin
     if (reset) begin
@@ -280,16 +273,17 @@ always @(posedge clk) begin
         request_active                <= 1'b0;
         response_waiting              <= 1'b0;
         request_kind                  <= READ_INITIAL;
+        request_write_command         <= 1'b0;
         request_address               <= 29'd0;
         request_lane                  <= 3'd0;
         request_half_sample           <= 1'b0;
         request_implicit_reconstruct  <= 1'b0;
         request_residual_sample       <= 16'sd0;
+        request_write_value           <= 8'd0;
         proof_timeout                 <= 16'd0;
         reconstruct_verify_pending    <= 1'b0;
         reconstruct_prediction_sample <= 8'd0;
         persistence_pre_word          <= 64'd0;
-        persist_write_active          <= 1'b0;
         persist_timeout               <= 16'd0;
         read_seen                     <= 1'b0;
         sample_value                  <= 8'd0;
@@ -313,6 +307,7 @@ always @(posedge clk) begin
             end
             else begin
                 request_kind                 <= READ_INITIAL;
+                request_write_command        <= 1'b0;
                 request_address              <= calculated_address;
                 request_lane                 <= reference_x[2:0];
                 request_half_sample          <= controlled_halfpel_mode;
@@ -335,16 +330,19 @@ always @(posedge clk) begin
         end
 
         if (request_active && !ddram_busy) begin
-            request_active   <= 1'b0;
-            response_waiting <= 1'b1;
-        end
-
-        if (persist_write_active && !persist_writer_busy) begin
-            persist_write_active <= 1'b0;
-            request_kind          <= READ_DEST_POST;
-            request_address       <= persist_address;
-            request_lane          <= 3'd0;
-            request_active        <= 1'b1;
+            if (request_write_command) begin
+                // The arbiter has accepted the diagnostic byte write. Reuse the
+                // same prediction client for an ordinary post-write readback.
+                request_write_command <= 1'b0;
+                request_kind          <= READ_DEST_POST;
+                request_address       <= persist_address;
+                request_lane          <= 3'd0;
+                request_active        <= 1'b1;
+            end
+            else begin
+                request_active   <= 1'b0;
+                response_waiting <= 1'b1;
+            end
         end
 
         if (ddram_dout_ready) begin
@@ -355,8 +353,10 @@ always @(posedge clk) begin
                 response_waiting <= 1'b0;
 
                 if (request_kind == READ_DEST_PRE) begin
-                    persistence_pre_word <= ddram_dout;
-                    persist_write_active <= 1'b1;
+                    persistence_pre_word  <= ddram_dout;
+                    request_write_value   <= reconstructed_value;
+                    request_write_command <= 1'b1;
+                    request_active        <= 1'b1;
                 end
                 else if (request_kind == READ_DEST_POST) begin
                     persisted_value <= ddram_dout[7:0];
@@ -405,17 +405,17 @@ always @(posedge clk) begin
         if (reconstruct_verify_pending) begin
             reconstruct_verify_pending <= 1'b0;
             if (!request_implicit_reconstruct ||
-                (reconstructed_value != verify_reconstruction_clipped) ||
-                (persist_frame_bank == reference_frame_bank)) begin
+                (reconstructed_value != verify_reconstruction_clipped)) begin
                 probe_error <= 1'b1;
             end
             else begin
-                reconstructed_seen <= 1'b1;
-                request_kind       <= READ_DEST_PRE;
-                request_address    <= persist_address;
-                request_lane       <= 3'd0;
-                request_active     <= 1'b1;
-                persist_timeout    <= 16'hFFFF;
+                reconstructed_seen     <= 1'b1;
+                request_kind           <= READ_DEST_PRE;
+                request_write_command  <= 1'b0;
+                request_address        <= persist_address;
+                request_lane           <= 3'd0;
+                request_active         <= 1'b1;
+                persist_timeout        <= 16'hFFFF;
             end
         end
     end
