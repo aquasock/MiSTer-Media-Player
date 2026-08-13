@@ -193,7 +193,7 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 	.rd_empty (mpeg2_stream_empty)
 );
 
-// The DDR service and both Phase 1S clients run in the decoder clock domain.
+// The DDR service and Phase 1S/1T clients run in the decoder clock domain.
 assign DDRAM_CLK = clk_mpeg2;
 
 ///////////////////////   VIDEO TIMING   /////////////////////////
@@ -255,6 +255,11 @@ wire        mpeg2_new_q_scale_type;
 wire        mpeg2_new_intra_vlc_format;
 wire        mpeg2_new_alternate_scan;
 wire        mpeg2_new_progressive_frame;
+wire [3:0]  mpeg2_new_forward_f_code_horizontal;
+wire [3:0]  mpeg2_new_forward_f_code_vertical;
+wire [3:0]  mpeg2_new_backward_f_code_horizontal;
+wire [3:0]  mpeg2_new_backward_f_code_vertical;
+wire        mpeg2_new_motion_f_code_seen;
 wire        mpeg2_new_intra_quant_matrix_default;
 
 wire        mpeg2_new_slice_header_seen;
@@ -268,6 +273,9 @@ wire        mpeg2_new_picture_420_complete;
 wire        mpeg2_new_active_frame_bank;
 wire        mpeg2_new_completed_frame_bank;
 wire [7:0]  mpeg2_new_picture_count;
+wire        mpeg2_new_reference_frame_valid;
+wire        mpeg2_new_reference_frame_bank;
+wire [7:0]  mpeg2_new_reference_promotion_count;
 wire        mpeg2_new_p_macroblock_type_seen;
 wire        mpeg2_new_slice_start;
 wire        mpeg2_new_luma_macroblock_start;
@@ -339,6 +347,17 @@ wire [28:0] mpeg2_new_ddr_rd_addr;
 wire [28:0] mpeg2_new_ddr_rd_banked_addr;
 wire        mpeg2_new_ddr_rd;
 wire        mpeg2_new_ddr_reader_busy;
+wire        mpeg2_new_ddr_reader_dout_ready;
+
+wire [7:0]  mpeg2_new_pred_burstcnt;
+wire [28:0] mpeg2_new_pred_addr;
+wire        mpeg2_new_pred_rd;
+wire        mpeg2_new_pred_busy;
+wire        mpeg2_new_pred_dout_ready;
+wire        mpeg2_new_pred_read_seen;
+wire [7:0]  mpeg2_new_pred_sample_value;
+wire        mpeg2_new_pred_sample_nonzero;
+wire        mpeg2_new_pred_error;
 
 wire        mpeg2_new_ddr_cache_ready;
 wire        mpeg2_new_ddr_read_seen;
@@ -397,6 +416,11 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.intra_vlc_format                 (mpeg2_new_intra_vlc_format),
 	.alternate_scan                   (mpeg2_new_alternate_scan),
 	.progressive_frame                (mpeg2_new_progressive_frame),
+	.forward_f_code_horizontal        (mpeg2_new_forward_f_code_horizontal),
+	.forward_f_code_vertical          (mpeg2_new_forward_f_code_vertical),
+	.backward_f_code_horizontal       (mpeg2_new_backward_f_code_horizontal),
+	.backward_f_code_vertical         (mpeg2_new_backward_f_code_vertical),
+	.motion_f_code_seen               (mpeg2_new_motion_f_code_seen),
 	.intra_quant_matrix_default       (mpeg2_new_intra_quant_matrix_default)
 );
 
@@ -428,6 +452,9 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.active_frame_bank           (mpeg2_new_active_frame_bank),
 	.completed_frame_bank        (mpeg2_new_completed_frame_bank),
 	.picture_count               (mpeg2_new_picture_count),
+	.reference_frame_valid       (mpeg2_new_reference_frame_valid),
+	.reference_frame_bank        (mpeg2_new_reference_frame_bank),
+	.reference_promotion_count   (mpeg2_new_reference_promotion_count),
 	.p_macroblock_type_seen      (mpeg2_new_p_macroblock_type_seen),
 	.probe_error                 (mpeg2_new_phase1_probe_error),
 	.quantiser_scale_code        (mpeg2_new_slice_quantiser_scale_code),
@@ -571,6 +598,33 @@ mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 	.ddram_we        (mpeg2_new_ddr_wr_we)
 );
 
+///////////////////////   PHASE 1T-f REFERENCE READ   ///////////
+
+// kate - Consume the hardware-proven Phase 1T-e controlled vector only far
+// enough to prove one real reference-picture luma read. The f_code=1,1 test
+// stream's accepted explicit vector is fixed at (4,0), which H.262 7.6.4 maps
+// to a +2-sample horizontal reference displacement.
+mpeg2_h262_reference_read_probe mpeg2_h262_reference_read_probe
+(
+    .clk                       (clk_mpeg2),
+    .reset                     (reset_mpeg2),
+    .p_vector_proof_seen       (mpeg2_new_p_macroblock_type_seen),
+    .forward_f_code_horizontal (mpeg2_new_forward_f_code_horizontal),
+    .forward_f_code_vertical   (mpeg2_new_forward_f_code_vertical),
+    .reference_frame_valid     (mpeg2_new_reference_frame_valid),
+    .reference_frame_bank      (mpeg2_new_reference_frame_bank),
+    .ddram_busy                (mpeg2_new_pred_busy),
+    .ddram_dout                (DDRAM_DOUT),
+    .ddram_dout_ready          (mpeg2_new_pred_dout_ready),
+    .ddram_burstcnt            (mpeg2_new_pred_burstcnt),
+    .ddram_addr                (mpeg2_new_pred_addr),
+    .ddram_rd                  (mpeg2_new_pred_rd),
+    .read_seen                 (mpeg2_new_pred_read_seen),
+    .sample_value              (mpeg2_new_pred_sample_value),
+    .sample_nonzero            (mpeg2_new_pred_sample_nonzero),
+    .probe_error               (mpeg2_new_pred_error)
+);
+
 ///////////////////////   DDR-BACKED 4:2:0 DISPLAY   ////////////
 
 // kate - Phase 1S scheduled display-bank control.  A newly persisted frame is
@@ -672,7 +726,7 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 
     .ddram_busy     (mpeg2_new_ddr_reader_busy),
     .ddram_dout     (DDRAM_DOUT),
-    .ddram_dout_ready(DDRAM_DOUT_READY),
+    .ddram_dout_ready(mpeg2_new_ddr_reader_dout_ready),
     .ddram_burstcnt (mpeg2_new_ddr_rd_burstcnt),
     .ddram_addr     (mpeg2_new_ddr_rd_addr),
     .ddram_rd       (mpeg2_new_ddr_rd),
@@ -696,11 +750,11 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
     .video_vs       (fb_video_vs)
 );
 
-///////////////////////   PHASE 1S DDR ARBITRATION   ////////////
+///////////////////////   PHASE 1S/1T DDR ARBITRATION   /////////
 
-// kate - The presentation reader keeps priority.  The arbiter holds writes
-// during each accepted read burst, allowing whichever non-display bank is being
-// reconstructed to receive its single-word block-store writes between reads.
+// kate - Display reads retain highest priority. Phase 1T-f adds a one-word
+// prediction reader below display priority and above writes. The arbiter also
+// demultiplexes DDR response-ready so each reader consumes only its own data.
 mpeg2_h262_ddram_arbiter mpeg2_h262_ddram_arbiter
 (
     .clk             (clk_mpeg2),
@@ -718,6 +772,13 @@ mpeg2_h262_ddram_arbiter mpeg2_h262_ddram_arbiter
     .reader_addr     (mpeg2_new_ddr_rd_banked_addr),
     .reader_rd       (mpeg2_new_ddr_rd),
     .reader_busy     (mpeg2_new_ddr_reader_busy),
+    .reader_dout_ready(mpeg2_new_ddr_reader_dout_ready),
+
+    .prediction_burstcnt (mpeg2_new_pred_burstcnt),
+    .prediction_addr     (mpeg2_new_pred_addr),
+    .prediction_rd       (mpeg2_new_pred_rd),
+    .prediction_busy     (mpeg2_new_pred_busy),
+    .prediction_dout_ready(mpeg2_new_pred_dout_ready),
 
     .ddram_busy      (DDRAM_BUSY),
     .ddram_dout_ready(DDRAM_DOUT_READY),
@@ -742,21 +803,30 @@ assign VGA_B = fb_video_b;
 
 // kate - Phase 1T-d keeps the hardware-proven Phase 1S all-I USER criterion
 // intact, while giving the live P-syntax probe an independent positive result.
-// P pictures are not reconstructed yet, so the P path requires the verified P
-// macroblock type plus two fully persisted I pictures (I/P/I) rather than an
-// unrelated third I publication.
+// Phase 1T-f tightens only the controlled f_code=1,1 P diagnostic: that path must
+// now complete a real reference-bank DDR read and return a non-zero selected
+// luma sample. Other Phase 1T-e regression vectors retain their previous proof.
 wire mpeg2_new_phase1s_all_i_user_success =
     mpeg2_new_first_picture_420_parsed &&
     mpeg2_new_second_picture_420_parsed &&
     (mpeg2_new_picture_count >= 8'd3) &&
     (mpeg2_new_completed_frame_bank == mpeg2_new_display_frame_bank);
 
+wire mpeg2_new_phase1t_reference_read_required =
+    (mpeg2_new_forward_f_code_horizontal == 4'd1) &&
+    (mpeg2_new_forward_f_code_vertical   == 4'd1);
+
+wire mpeg2_new_phase1t_reference_read_ok =
+    !mpeg2_new_phase1t_reference_read_required ||
+    (mpeg2_new_pred_read_seen && mpeg2_new_pred_sample_nonzero);
+
 wire mpeg2_new_phase1t_p_syntax_user_success =
     mpeg2_new_p_macroblock_type_seen &&
     mpeg2_new_first_picture_420_parsed &&
     mpeg2_new_second_picture_420_parsed &&
     (mpeg2_new_picture_count >= 8'd2) &&
-    (mpeg2_new_completed_frame_bank == mpeg2_new_display_frame_bank);
+    (mpeg2_new_completed_frame_bank == mpeg2_new_display_frame_bank) &&
+    mpeg2_new_phase1t_reference_read_ok;
 
 assign LED_USER =
     (mpeg2_new_phase1s_all_i_user_success ||
@@ -765,6 +835,7 @@ assign LED_USER =
     mpeg2_new_phase1n_frame_geometry_supported &&
     !mpeg2_new_syntax_error &&
     !mpeg2_new_phase1_probe_error &&
+    !mpeg2_new_pred_error &&
     !mpeg2_new_inverse_quant_error &&
     !mpeg2_new_inverse_quant_unsupported_matrix &&
     !mpeg2_new_idct_error &&
