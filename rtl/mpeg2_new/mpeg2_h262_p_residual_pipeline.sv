@@ -3,8 +3,12 @@
 //
 // kate - Phase 1T-p serializes Y0..Y3 residual parsing, non-intra IQ, and IDCT
 // through one transform engine. Cb/Cr remain outside this diagnostic boundary.
+// The module retains the Phase 1T-o public probe interface. Four 0..63 residual
+// sample sequences are emitted strictly in Y0,Y1,Y2,Y3 order; downstream logic
+// can therefore derive the 0..255 macroblock sample number without another
+// top-level sideband.
 //============================================================================
-module mpeg2_h262_p_residual_pipeline
+module mpeg2_h262_p_residual_probe
 (
     input  wire       clk,
     input  wire       reset,
@@ -17,7 +21,6 @@ module mpeg2_h262_p_residual_pipeline
     output wire       first_sample_valid,
     output wire signed [15:0] first_sample_value,
     output wire       residual_sample_valid,
-    output wire [1:0] residual_sample_block_index,
     output wire [5:0] residual_sample_index,
     output wire signed [15:0] residual_sample_value,
     output wire       probe_error
@@ -35,6 +38,7 @@ wire q_scale_type;
 wire alternate_scan;
 wire parser_error;
 wire transform_error;
+wire [1:0] residual_sample_block_index_unused;
 
 mpeg2_h262_p_residual_parser parser
 (
@@ -73,7 +77,7 @@ mpeg2_h262_p_non_intra_transform transform
     .first_sample_valid(first_sample_valid),
     .first_sample_value(first_sample_value),
     .residual_sample_valid(residual_sample_valid),
-    .residual_sample_block_index(residual_sample_block_index),
+    .residual_sample_block_index(residual_sample_block_index_unused),
     .residual_sample_index(residual_sample_index),
     .residual_sample_value(residual_sample_value),
     .probe_error(transform_error)
