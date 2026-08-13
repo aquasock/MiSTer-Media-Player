@@ -26,6 +26,10 @@
 // edge independently arms the probe; USER can remain on for all-I streams, while
 // a controlled I/P/I diagnostic cannot report P-syntax success unless a live P
 // slice, macroblock_address_increment and Table B.3 macroblock_type are verified.
+//
+// kate - Phase 1T-i exports the verified explicit forward vector from that
+// passive observer. Implicit-zero and intra P macroblocks still report syntax
+// success but do not assert p_forward_vector_valid.
 //============================================================================
 
 module mpeg2_h262_two_picture_probe
@@ -66,6 +70,11 @@ module mpeg2_h262_two_picture_probe
     // kate - Phase 1T-d positive live-P syntax result.  This is deliberately
     // separate from picture_count, which continues to count persisted I frames.
     output wire        p_macroblock_type_seen,
+
+    // kate - Phase 1T-i verified explicit forward-vector sideband.
+    output wire        p_forward_vector_valid,
+    output wire signed [12:0] p_forward_vector_x,
+    output wire signed [12:0] p_forward_vector_y,
 
     output wire        probe_error,
 
@@ -329,6 +338,9 @@ mpeg2_h262_p_syntax_probe p_syntax_probe
     .stream_valid           (stream_valid),
     .p_picture_expected     (p_picture_expected),
     .p_macroblock_type_seen (p_macroblock_type_seen),
+    .p_forward_vector_valid (p_forward_vector_valid),
+    .p_forward_vector_x     (p_forward_vector_x),
+    .p_forward_vector_y     (p_forward_vector_y),
     .probe_error            (p_syntax_probe_error)
 );
 

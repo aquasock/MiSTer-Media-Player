@@ -277,6 +277,9 @@ wire        mpeg2_new_reference_frame_valid;
 wire        mpeg2_new_reference_frame_bank;
 wire [7:0]  mpeg2_new_reference_promotion_count;
 wire        mpeg2_new_p_macroblock_type_seen;
+wire        mpeg2_new_p_forward_vector_valid;
+wire signed [12:0] mpeg2_new_p_forward_vector_x;
+wire signed [12:0] mpeg2_new_p_forward_vector_y;
 wire        mpeg2_new_slice_start;
 wire        mpeg2_new_luma_macroblock_start;
 wire        mpeg2_new_phase1_probe_error;
@@ -357,6 +360,7 @@ wire        mpeg2_new_pred_dout_ready;
 wire        mpeg2_new_pred_read_seen;
 wire [7:0]  mpeg2_new_pred_sample_value;
 wire        mpeg2_new_pred_sample_nonzero;
+wire        mpeg2_new_pred_half_sample_seen;
 wire        mpeg2_new_pred_error;
 
 wire        mpeg2_new_ddr_cache_ready;
@@ -456,6 +460,9 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.reference_frame_bank        (mpeg2_new_reference_frame_bank),
 	.reference_promotion_count   (mpeg2_new_reference_promotion_count),
 	.p_macroblock_type_seen      (mpeg2_new_p_macroblock_type_seen),
+	.p_forward_vector_valid      (mpeg2_new_p_forward_vector_valid),
+	.p_forward_vector_x          (mpeg2_new_p_forward_vector_x),
+	.p_forward_vector_y          (mpeg2_new_p_forward_vector_y),
 	.probe_error                 (mpeg2_new_phase1_probe_error),
 	.quantiser_scale_code        (mpeg2_new_slice_quantiser_scale_code),
 	.macroblock_address_increment(mpeg2_new_macroblock_address_increment),
@@ -598,17 +605,20 @@ mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 	.ddram_we        (mpeg2_new_ddr_wr_we)
 );
 
-///////////////////////   PHASE 1T-f REFERENCE READ   ///////////
+///////////////////////   PHASE 1T REFERENCE PREDICTION PROBE   ///////////
 
-// kate - Consume the hardware-proven Phase 1T-e controlled vector only far
-// enough to prove one real reference-picture luma read. The f_code=1,1 test
-// stream's accepted explicit vector is fixed at (4,0), which H.262 7.6.4 maps
-// to a +2-sample horizontal reference displacement.
+// kate - Phase 1T-i consumes the verified explicit forward vector itself.
+// Existing (4,0), f_code=1/1 keeps the exact integer sample proof; the new
+// (3,0), f_code=2/2 case derives an actual horizontal half-sample flag and
+// selects the proven two-sample interpolation path.
 mpeg2_h262_reference_read_probe mpeg2_h262_reference_read_probe
 (
     .clk                       (clk_mpeg2),
     .reset                     (reset_mpeg2),
     .p_vector_proof_seen       (mpeg2_new_p_macroblock_type_seen),
+    .p_forward_vector_valid    (mpeg2_new_p_forward_vector_valid),
+    .p_forward_vector_x        (mpeg2_new_p_forward_vector_x),
+    .p_forward_vector_y        (mpeg2_new_p_forward_vector_y),
     .forward_f_code_horizontal (mpeg2_new_forward_f_code_horizontal),
     .forward_f_code_vertical   (mpeg2_new_forward_f_code_vertical),
     .reference_frame_valid     (mpeg2_new_reference_frame_valid),
@@ -622,6 +632,7 @@ mpeg2_h262_reference_read_probe mpeg2_h262_reference_read_probe
     .read_seen                 (mpeg2_new_pred_read_seen),
     .sample_value              (mpeg2_new_pred_sample_value),
     .sample_nonzero            (mpeg2_new_pred_sample_nonzero),
+    .half_sample_seen          (mpeg2_new_pred_half_sample_seen),
     .probe_error               (mpeg2_new_pred_error)
 );
 
@@ -803,22 +814,39 @@ assign VGA_B = fb_video_b;
 
 // kate - Phase 1T-d keeps the hardware-proven Phase 1S all-I USER criterion
 // intact, while giving the live P-syntax probe an independent positive result.
-// Phase 1T-f tightens only the controlled f_code=1,1 P diagnostic: that path must
-// now complete a real reference-bank DDR read and return a non-zero selected
-// luma sample. Other Phase 1T-e regression vectors retain their previous proof.
+// Phase 1T-i requires a DDR prediction proof only for the two controlled modes:
+// the Phase 1T-g integer-vector regression and the new odd-vector half-sample
+// regression. Other P syntax vectors keep their previous syntax-only acceptance.
 wire mpeg2_new_phase1s_all_i_user_success =
     mpeg2_new_first_picture_420_parsed &&
     mpeg2_new_second_picture_420_parsed &&
     (mpeg2_new_picture_count >= 8'd3) &&
     (mpeg2_new_completed_frame_bank == mpeg2_new_display_frame_bank);
 
-wire mpeg2_new_phase1t_reference_read_required =
+wire mpeg2_new_phase1t_integer_read_required =
+    mpeg2_new_p_forward_vector_valid &&
+    (mpeg2_new_p_forward_vector_x == 13'sd4) &&
+    (mpeg2_new_p_forward_vector_y == 13'sd0) &&
     (mpeg2_new_forward_f_code_horizontal == 4'd1) &&
     (mpeg2_new_forward_f_code_vertical   == 4'd1);
 
+wire mpeg2_new_phase1t_halfpel_read_required =
+    mpeg2_new_p_forward_vector_valid &&
+    (mpeg2_new_p_forward_vector_x == 13'sd3) &&
+    (mpeg2_new_p_forward_vector_y == 13'sd0) &&
+    (mpeg2_new_forward_f_code_horizontal == 4'd2) &&
+    (mpeg2_new_forward_f_code_vertical   == 4'd2);
+
+wire mpeg2_new_phase1t_reference_read_required =
+    mpeg2_new_phase1t_integer_read_required ||
+    mpeg2_new_phase1t_halfpel_read_required;
+
 wire mpeg2_new_phase1t_reference_read_ok =
     !mpeg2_new_phase1t_reference_read_required ||
-    (mpeg2_new_pred_read_seen && mpeg2_new_pred_sample_nonzero);
+    (mpeg2_new_pred_read_seen &&
+     mpeg2_new_pred_sample_nonzero &&
+     (!mpeg2_new_phase1t_halfpel_read_required ||
+      mpeg2_new_pred_half_sample_seen));
 
 wire mpeg2_new_phase1t_p_syntax_user_success =
     mpeg2_new_p_macroblock_type_seen &&
