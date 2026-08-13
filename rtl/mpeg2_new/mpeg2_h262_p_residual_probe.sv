@@ -23,6 +23,11 @@
 // matrix (all weights 16), applies saturation/mismatch control, and sends the
 // resulting 8x8 coefficient block through the existing H.262 IDCT module.
 //
+// kate - Phase 1T-l exports the real first spatial residual sample so the next
+// diagnostic can add it to the stored-reference prediction under H.262 7.6.8.
+// The IQ precondition also sign-extends QFS before its left shift so the complete
+// diagnostic block does not depend on narrow signed-shift behavior.
+//
 // The 256-byte first-slice capture is an implementation regression boundary,
 // not an H.262 limit. Downloaded non-intra quantiser matrices remain a valid
 // H.262 feature but are outside this diagnostic and therefore fail this proof
@@ -44,6 +49,8 @@ module mpeg2_h262_p_residual_probe
     output reg        decision_complete,
     output reg        residual_required,
     output reg        residual_success,
+    output reg        first_sample_valid,
+    output reg signed [15:0] first_sample_value,
     output reg        probe_error
 );
 
@@ -69,13 +76,6 @@ wire        slice_start_now  = start_code_now &&
 
 // -------------------------------------------------------------------------
 // Sequence-level non-intra matrix capability tracking.
-//
-// For the ordinary fixed 64-bit sequence-header prefix, load_intra... is bit
-// 63 and is payload_next[1]. If it is zero, load_non_intra... immediately
-// follows at payload_next[0]. If a downloaded intra matrix is present, this
-// small observer does not walk the following 64 bytes to find the later
-// non-intra flag, so it conservatively marks the non-intra default unavailable.
-// Any quant_matrix_extension is likewise outside this first diagnostic.
 // -------------------------------------------------------------------------
 reg        sequence_capture_active;
 reg [3:0]  sequence_payload_count;
@@ -109,8 +109,6 @@ reg [7:0]  slice_payload [0:255];
 reg        decode_pending;
 reg [8:0]  captured_byte_count;
 
-// The capture is decoded later one bit per clock. A registered byte reader
-// avoids a 2048-bit barrel shift and keeps the parser path sequential.
 reg [7:0] decode_byte;
 reg [7:0] decode_byte_index;
 reg [2:0] decode_bit_offset;
@@ -194,9 +192,6 @@ wire signed [11:0] escape_level_signed = $signed(escape_level_next);
 wire [7:0] escape_target_index =
     {1'b0, qfs_index} + {2'b00, escape_run_shift};
 
-// -------------------------------------------------------------------------
-// H.262 scan and quantiser-scale helpers.
-// -------------------------------------------------------------------------
 function automatic [5:0] scan_index;
     input       alternate;
     input [5:0] linear;
@@ -328,8 +323,6 @@ endfunction
 // Non-intra inverse quantisation. For the default non-intra matrix W=16,
 // H.262 7.4.2.3 reduces algebraically to
 //   F'' = ((2*QF + Sign(QF)) * quantiser_scale) / 2.
-// Signed division preserves the required truncation toward zero. Saturation
-// and mismatch control are then applied exactly as separate H.262 stages.
 // -------------------------------------------------------------------------
 reg        iq_active;
 reg [5:0]  iq_index;
@@ -339,6 +332,7 @@ reg        f00_proven;
 
 wire [5:0] iq_qfs_index = scan_index(p_alternate_scan, iq_index);
 wire signed [12:0] iq_qf = qfs[iq_qfs_index];
+wire signed [14:0] iq_qf_extended = {{2{iq_qf[12]}}, iq_qf};
 wire [7:0] iq_qscale =
     quantiser_scale_value(p_q_scale_type, p_quantiser_scale_code);
 
@@ -351,9 +345,9 @@ reg               iq_parity_with_current;
 
 always @* begin
     if (iq_qf > 13'sd0)
-        iq_precondition = ($signed(iq_qf) <<< 1) + 15'sd1;
+        iq_precondition = (iq_qf_extended <<< 1) + 15'sd1;
     else if (iq_qf < 13'sd0)
-        iq_precondition = ($signed(iq_qf) <<< 1) - 15'sd1;
+        iq_precondition = (iq_qf_extended <<< 1) - 15'sd1;
     else
         iq_precondition = 15'sd0;
 
@@ -376,8 +370,6 @@ end
 
 // -------------------------------------------------------------------------
 // Feed the completely reconstructed coefficient block to the existing IDCT.
-// This is a second diagnostic instance; the normal I-picture transform path is
-// untouched by Phase 1T-k.
 // -------------------------------------------------------------------------
 reg        emit_pending;
 reg        emit_active;
@@ -416,11 +408,8 @@ mpeg2_h262_idct p_residual_idct
 
 reg [6:0] idct_sample_count;
 wire unused_idct_values =
-    &{1'b0, idct_sample_value[0], idct_first_sample00[0], idct_first_sample77[0]};
+    &{1'b0, idct_first_sample00[0], idct_first_sample77[0]};
 
-// -------------------------------------------------------------------------
-// Sequential control.
-// -------------------------------------------------------------------------
 always @(posedge clk) begin
     if (reset) begin
         byte_window                     <= 32'd0;
@@ -478,6 +467,8 @@ always @(posedge clk) begin
         decision_complete               <= 1'b0;
         residual_required               <= 1'b0;
         residual_success                <= 1'b0;
+        first_sample_valid              <= 1'b0;
+        first_sample_value              <= 16'sd0;
         probe_error                     <= 1'b0;
 
         for (i = 0; i < 64; i = i + 1) begin
@@ -493,9 +484,6 @@ always @(posedge clk) begin
         if (idct_error)
             probe_error <= 1'b1;
 
-        // -------------------------------------------------------------
-        // Byte observers / capture.
-        // -------------------------------------------------------------
         if (stream_valid) begin
             byte_window <= byte_window_next;
 
@@ -507,8 +495,6 @@ always @(posedge clk) begin
                     sequence_seen           <= 1'b1;
 
                     if (sequence_payload_next[1]) begin
-                        // A downloaded intra matrix moves the later non-intra
-                        // load flag beyond this bounded sequence observer.
                         non_intra_quant_matrix_default <= 1'b0;
                     end
                     else begin
@@ -528,7 +514,6 @@ always @(posedge clk) begin
                 non_intra_quant_matrix_default <= 1'b1;
             end
 
-            // Read the extension_start_code_identifier on the next payload byte.
             if (extension_id_pending) begin
                 extension_id_pending <= 1'b0;
                 if (stream_data[7:4] == EXT_QUANT_MATRIX)
@@ -569,10 +554,6 @@ always @(posedge clk) begin
 
             if (slice_capture_active) begin
                 if (start_code_now) begin
-                    // A short slice is still usable: decode the bytes captured
-                    // before the following start_code_value. The trailing
-                    // 00 00 01 prefix bytes may be present, but a valid first
-                    // block must reach EOB before them.
                     slice_capture_active <= 1'b0;
                     captured_byte_count  <= {1'b0, slice_capture_count};
                     decode_pending       <= (slice_capture_count != 8'd0);
@@ -606,10 +587,6 @@ always @(posedge clk) begin
             end
         end
 
-        // -------------------------------------------------------------
-        // Begin the sequential first-macroblock decode after all captured
-        // bytes are stable.
-        // -------------------------------------------------------------
         if (decode_pending) begin
             decode_pending    <= 1'b0;
             decode_byte       <= slice_payload[0];
@@ -632,7 +609,6 @@ always @(posedge clk) begin
         if (parse_active) begin
             case (parse_state)
                 R_LOAD: begin
-                    // One cycle allows the registered byte read to settle.
                     parse_state <= R_QSCALE;
                 end
 
@@ -656,8 +632,6 @@ always @(posedge clk) begin
                 end
 
                 R_EXTRA_ZERO: begin
-                    // Controlled non-scalable stream: the next bit is the zero
-                    // extra_bit_slice terminator, as already proven in 1T-d.
                     if (decode_bit) begin
                         probe_error  <= 1'b1;
                         parse_active <= 1'b0;
@@ -668,7 +642,6 @@ always @(posedge clk) begin
                 end
 
                 R_MBA: begin
-                    // Controlled first macroblock_address_increment == 1.
                     if (!decode_bit) begin
                         probe_error  <= 1'b1;
                         parse_active <= 1'b0;
@@ -680,8 +653,6 @@ always @(posedge clk) begin
 
                 R_MBTYPE_FIRST: begin
                     if (decode_bit) begin
-                        // Table B.3 code 1: motion_forward + pattern. The
-                        // existing Phase 1T motion path remains authoritative.
                         decision_complete <= 1'b1;
                         residual_required <= 1'b0;
                         parse_active      <= 1'b0;
@@ -693,8 +664,6 @@ always @(posedge clk) begin
 
                 R_MBTYPE_SECOND: begin
                     if (decode_bit) begin
-                        // Table B.3 code 01: pattern-only, implicit (0,0)
-                        // prediction. This is the controlled residual target.
                         decision_complete <= 1'b1;
                         residual_required <= 1'b1;
 
@@ -713,8 +682,6 @@ always @(posedge clk) begin
                         end
                     end
                     else begin
-                        // Any longer Table B.3 code is outside this residual
-                        // diagnostic. It remains handled by p_syntax_probe.
                         decision_complete <= 1'b1;
                         residual_required <= 1'b0;
                         parse_active      <= 1'b0;
@@ -725,7 +692,6 @@ always @(posedge clk) begin
                     cbp_shift <= cbp_next;
                     if (field_bit_count == 3'd5) begin
                         field_bit_count <= 3'd0;
-                        // Controlled Table B.9 CBP 63 VLC = 001100.
                         if (cbp_next != 6'b001100) begin
                             probe_error  <= 1'b1;
                             parse_active <= 1'b0;
@@ -759,7 +725,6 @@ always @(posedge clk) begin
                 end
 
                 R_FIRST_SIGN: begin
-                    // Sign zero gives the already-proven first QFS value +7.
                     if (decode_bit) begin
                         probe_error  <= 1'b1;
                         parse_active <= 1'b0;
@@ -864,14 +829,11 @@ always @(posedge clk) begin
                 end
             endcase
 
-            // Advance one captured bit after every bit-consuming decode state.
             if (parse_consumes_bit) begin
                 if (decode_bit_offset == 3'd7) begin
                     decode_bit_offset <= 3'd0;
                     if (({1'b0, decode_byte_index} + 9'd1) >=
                         captured_byte_count) begin
-                        // EOB was not found inside the captured first-slice
-                        // diagnostic prefix.
                         probe_error  <= 1'b1;
                         parse_active <= 1'b0;
                     end
@@ -886,16 +848,11 @@ always @(posedge clk) begin
             end
         end
 
-        // -------------------------------------------------------------
-        // One coefficient per clock non-intra inverse quantisation.
-        // -------------------------------------------------------------
         if (iq_active) begin
             iq_coeff[iq_index] <= iq_final_value;
             iq_parity <= iq_parity_with_current;
 
             if (iq_index == 6'd0) begin
-                // Controlled test_ipii has qscale code 2 and linear scale,
-                // therefore QFS[0]=+7 must reconstruct exactly to F[0][0]=30.
                 if ((p_quantiser_scale_code == 5'd2) &&
                     !p_q_scale_type &&
                     (iq_qf == 13'sd7) &&
@@ -917,9 +874,6 @@ always @(posedge clk) begin
             end
         end
 
-        // -------------------------------------------------------------
-        // Serialize reconstructed coefficients into the IDCT.
-        // -------------------------------------------------------------
         if (emit_pending) begin
             emit_pending           <= 1'b0;
             emit_active            <= 1'b1;
@@ -944,19 +898,23 @@ always @(posedge clk) begin
             end
         end
 
-        // Positive transform proof: all 64 row-major IDCT outputs must arrive
-        // in sequence, and the independently constrained F[0][0]=30 proof must
-        // already have passed.
         if (idct_sample_valid) begin
             if (idct_sample_index != idct_sample_count[5:0]) begin
                 probe_error <= 1'b1;
             end
-            else if (idct_sample_index == 6'd63) begin
-                if ((idct_sample_count == 7'd63) &&
-                    f00_proven && idct_block_complete && !idct_error)
-                    residual_success <= 1'b1;
-                else
-                    probe_error <= 1'b1;
+            else begin
+                if (idct_sample_index == 6'd0) begin
+                    first_sample_valid <= 1'b1;
+                    first_sample_value <= idct_sample_value;
+                end
+
+                if (idct_sample_index == 6'd63) begin
+                    if ((idct_sample_count == 7'd63) &&
+                        f00_proven && idct_block_complete && !idct_error)
+                        residual_success <= 1'b1;
+                    else
+                        probe_error <= 1'b1;
+                end
             end
 
             if (idct_sample_count < 7'd64)

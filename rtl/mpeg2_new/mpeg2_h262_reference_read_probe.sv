@@ -1,8 +1,8 @@
 //============================================================================
-// MiSTer Media Player - Phase 1T-f/1T-g/1T-h/1T-i H.262 reference-picture probe
+// MiSTer Media Player - Phase 1T H.262 reference-picture / reconstruction probe
 //
 // Normative standards basis:
-//   ITU-T H.262 / ISO/IEC 13818-2:2000, 7.6.4.
+//   ITU-T H.262 / ISO/IEC 13818-2:2000, 7.6.4 and 7.6.8.
 //   Prediction samples are read from the reference frame offset by the motion
 //   vector. Motion vectors are in half-sample units. The integer-vector part and
 //   half-sample flags are derived from the reconstructed vector itself:
@@ -17,25 +17,24 @@
 //   where // is integer division rounded to the nearest integer. For unsigned
 //   reference samples this implementation is equivalently (a + b + 1) >> 1.
 //
+//   H.262 7.6.8 forms a decoded inter pel by adding the spatial-domain residual
+//   f[y][x] to prediction p[y][x], then saturating the result to 0..255.
+//
 // kate - Phase 1T-f performs one real luma DDR read from the current reference
-// bank. Phase 1T-g requires the exact controlled integer sample x=9 == 162 for
-// test_ip_motion_nores_end.m2v. Phase 1T-h proved the horizontal two-sample
-// interpolation arithmetic on a real returned DDR word before an odd vector was
-// allowed to select it.
+// bank. Phase 1T-g requires exact controlled integer sample x=9 == 162.
+// Phase 1T-h proved horizontal interpolation arithmetic, and Phase 1T-i let an
+// actual verified odd motion vector select that interpolation.
 //
-// kate - Phase 1T-i consumes the actual verified explicit forward vector exported
-// by the syntax probe. Two deliberately narrow diagnostic modes are supported:
+// kate - Phase 1T-l adds a third deliberately narrow mode for test_ipii.m2v:
+// its pattern-only first P macroblock has the normative implicit (0,0) vector.
+// Destination luma (0,0) therefore predicts from stored reference luma (0,0).
+// The real first residual sample exported by the Phase 1T-k transform diagnostic
+// is added to that real DDR prediction and clipped under 7.6.8. The registered
+// reconstructed value is checked on the following clock before success asserts.
+// No P-picture DDR writeback, publication or reference promotion occurs here.
 //
-//   integer mode: vector (4,0), f_code 1/1, destination (7,0)
-//     -> int_vec=(2,0), no half flags, reference (9,0), exact sample 162.
-//
-//   horizontal-half mode: vector (3,0), f_code 2/2, destination (0,0)
-//     -> int_vec=(1,0), half_flag=(1,0), base reference (1,0), interpolate
-//        reference samples (1,0) and (2,0) from the same packed DDR word.
-//
-// These coordinates and exact integer-mode value are implementation regression
-// restrictions, not H.262 validity rules. No residual addition, P-picture pixel
-// reconstruction, frame persistence or reference promotion occurs here.
+// All coordinates and exact-value checks below are implementation regression
+// restrictions, not H.262 validity rules.
 //============================================================================
 
 module mpeg2_h262_reference_read_probe
@@ -49,6 +48,10 @@ module mpeg2_h262_reference_read_probe
     input  wire signed [12:0] p_forward_vector_y,
     input  wire [3:0]  forward_f_code_horizontal,
     input  wire [3:0]  forward_f_code_vertical,
+
+    // kate - Phase 1T-l controlled pattern-only implicit-zero reconstruction.
+    input  wire        p_implicit_reconstruct_request,
+    input  wire signed [15:0] p_residual_sample,
 
     input  wire        reference_frame_valid,
     input  wire        reference_frame_bank,
@@ -64,6 +67,8 @@ module mpeg2_h262_reference_read_probe
     output reg  [7:0]  sample_value,
     output reg         sample_nonzero,
     output reg         half_sample_seen,
+    output reg         reconstructed_seen,
+    output reg  [7:0]  reconstructed_value,
     output reg         probe_error
 );
 
@@ -77,7 +82,12 @@ reg        response_waiting;
 reg [28:0] request_address;
 reg [2:0]  request_lane;
 reg        request_half_sample;
+reg        request_implicit_reconstruct;
+reg signed [15:0] request_residual_sample;
 reg [15:0] proof_timeout;
+
+reg        reconstruct_verify_pending;
+reg [7:0]  reconstruct_prediction_sample;
 
 function automatic [28:0] row_times_90;
     input [11:0] row;
@@ -85,6 +95,18 @@ function automatic [28:0] row_times_90;
     begin
         r = {17'd0, row};
         row_times_90 = (r << 6) + (r << 4) + (r << 3) + (r << 1);
+    end
+endfunction
+
+function automatic [7:0] clip_decoded_pel;
+    input signed [16:0] value;
+    begin
+        if (value < 17'sd0)
+            clip_decoded_pel = 8'd0;
+        else if (value > 17'sd255)
+            clip_decoded_pel = 8'd255;
+        else
+            clip_decoded_pel = value[7:0];
     end
 endfunction
 
@@ -102,19 +124,28 @@ wire controlled_halfpel_mode =
     (forward_f_code_horizontal == 4'd2) &&
     (forward_f_code_vertical   == 4'd2);
 
-wire controlled_mode = controlled_integer_mode || controlled_halfpel_mode;
+wire controlled_explicit_mode =
+    controlled_integer_mode || controlled_halfpel_mode;
+wire controlled_implicit_mode = p_implicit_reconstruct_request;
+wire controlled_mode = controlled_explicit_mode || controlled_implicit_mode;
 
-// H.262 7.6.4 vector decomposition. Arithmetic shift implements DIV 2 with
-// floor behavior for two's-complement values; the subtraction then derives the
-// half-sample flag directly from the reconstructed vector.
-wire signed [12:0] int_vec_x = p_forward_vector_x >>> 1;
-wire signed [12:0] int_vec_y = p_forward_vector_y >>> 1;
+// H.262 7.6.4 vector decomposition for the explicit modes. The implicit mode
+// has vector (0,0) by construction and therefore uses integer displacement 0.
+wire signed [12:0] explicit_int_vec_x = p_forward_vector_x >>> 1;
+wire signed [12:0] explicit_int_vec_y = p_forward_vector_y >>> 1;
+wire signed [12:0] int_vec_x =
+    controlled_implicit_mode ? 13'sd0 : explicit_int_vec_x;
+wire signed [12:0] int_vec_y =
+    controlled_implicit_mode ? 13'sd0 : explicit_int_vec_y;
 wire signed [12:0] twice_int_vec_x = int_vec_x + int_vec_x;
 wire signed [12:0] twice_int_vec_y = int_vec_y + int_vec_y;
-wire half_flag_x = (p_forward_vector_x - twice_int_vec_x) != 13'sd0;
-wire half_flag_y = (p_forward_vector_y - twice_int_vec_y) != 13'sd0;
+wire half_flag_x = controlled_implicit_mode ? 1'b0 :
+    ((p_forward_vector_x - twice_int_vec_x) != 13'sd0);
+wire half_flag_y = controlled_implicit_mode ? 1'b0 :
+    ((p_forward_vector_y - twice_int_vec_y) != 13'sd0);
 
-wire [11:0] diag_destination_x = controlled_halfpel_mode ? 12'd0 : 12'd7;
+wire [11:0] diag_destination_x =
+    controlled_integer_mode ? 12'd7 : 12'd0;
 wire [11:0] diag_destination_y = 12'd0;
 wire signed [13:0] reference_x_signed =
     $signed({1'b0, diag_destination_x}) + int_vec_x;
@@ -133,6 +164,11 @@ wire vector_decomposition_ok =
         ((int_vec_x == 13'sd1) && (int_vec_y == 13'sd0) &&
          half_flag_x && !half_flag_y &&
          (reference_x_signed == 14'sd1) &&
+         (reference_y_signed == 14'sd0)) :
+    controlled_implicit_mode ?
+        ((int_vec_x == 13'sd0) && (int_vec_y == 13'sd0) &&
+         !half_flag_x && !half_flag_y &&
+         (reference_x_signed == 14'sd0) &&
          (reference_y_signed == 14'sd0)) :
         1'b0;
 
@@ -183,29 +219,55 @@ wire halfpel_nontrivial =
     (halfpel_filtered_sample > halfpel_min) &&
     (halfpel_filtered_sample < halfpel_max);
 
+// H.262 7.6.8 controlled reconstructed-pel arithmetic. Explicit sign extension
+// makes the addition width independent of expression sizing rules.
+wire signed [16:0] returned_sample_signed =
+    $signed({9'd0, returned_sample});
+wire signed [16:0] request_residual_extended =
+    {{1{request_residual_sample[15]}}, request_residual_sample};
+wire signed [16:0] response_reconstruction_sum =
+    returned_sample_signed + request_residual_extended;
+wire [7:0] response_reconstruction_clipped =
+    clip_decoded_pel(response_reconstruction_sum);
+
+wire signed [16:0] latched_prediction_signed =
+    $signed({9'd0, reconstruct_prediction_sample});
+wire signed [16:0] verify_reconstruction_sum =
+    latched_prediction_signed + request_residual_extended;
+wire [7:0] verify_reconstruction_clipped =
+    clip_decoded_pel(verify_reconstruction_sum);
+
 assign ddram_burstcnt = request_active ? 8'd1 : 8'd0;
 assign ddram_addr     = request_active ? request_address : 29'd0;
 assign ddram_rd       = request_active;
 
 always @(posedge clk) begin
     if (reset) begin
-        trigger_seen       <= 1'b0;
-        request_active     <= 1'b0;
-        response_waiting   <= 1'b0;
-        request_address    <= 29'd0;
-        request_lane       <= 3'd0;
-        request_half_sample<= 1'b0;
-        proof_timeout      <= 16'd0;
-        read_seen          <= 1'b0;
-        sample_value       <= 8'd0;
-        sample_nonzero     <= 1'b0;
-        half_sample_seen   <= 1'b0;
-        probe_error        <= 1'b0;
+        trigger_seen                 <= 1'b0;
+        request_active               <= 1'b0;
+        response_waiting             <= 1'b0;
+        request_address              <= 29'd0;
+        request_lane                 <= 3'd0;
+        request_half_sample          <= 1'b0;
+        request_implicit_reconstruct <= 1'b0;
+        request_residual_sample      <= 16'sd0;
+        proof_timeout                <= 16'd0;
+        reconstruct_verify_pending   <= 1'b0;
+        reconstruct_prediction_sample<= 8'd0;
+        read_seen                    <= 1'b0;
+        sample_value                 <= 8'd0;
+        sample_nonzero               <= 1'b0;
+        half_sample_seen             <= 1'b0;
+        reconstructed_seen           <= 1'b0;
+        reconstructed_value          <= 8'd0;
+        probe_error                  <= 1'b0;
     end
     else begin
-        // Only the two controlled explicit-vector modes consume the diagnostic
-        // DDR reader. Other P syntax regressions remain syntax-only.
-        if (p_vector_proof_seen && controlled_mode && !trigger_seen) begin
+        // Explicit modes trigger from the established syntax/vector proof.
+        // The implicit mode is requested only after the controlled pattern-only
+        // residual observer has a real spatial sample available.
+        if ((((p_vector_proof_seen && controlled_explicit_mode) ||
+              controlled_implicit_mode)) && !trigger_seen) begin
             trigger_seen  <= 1'b1;
             proof_timeout <= 16'hFFFF;
 
@@ -214,15 +276,15 @@ always @(posedge clk) begin
                 probe_error <= 1'b1;
             end
             else begin
-                request_address     <= calculated_address;
-                request_lane        <= reference_x[2:0];
-                request_half_sample <= controlled_halfpel_mode;
-                request_active      <= 1'b1;
+                request_address              <= calculated_address;
+                request_lane                 <= reference_x[2:0];
+                request_half_sample          <= controlled_halfpel_mode;
+                request_implicit_reconstruct <= controlled_implicit_mode;
+                request_residual_sample      <= p_residual_sample;
+                request_active               <= 1'b1;
             end
         end
 
-        // A controlled prediction proof must produce its one-word response in a
-        // bounded interval. At 54 MHz this is about 1.2 ms.
         if (trigger_seen && !read_seen && (proof_timeout != 16'd0)) begin
             proof_timeout <= proof_timeout - 16'd1;
             if (proof_timeout == 16'd1)
@@ -243,8 +305,14 @@ always @(posedge clk) begin
                 proof_timeout    <= 16'd0;
                 read_seen        <= 1'b1;
 
-                if (request_half_sample) begin
-                    // Phase 1T-i: the odd vector itself selected this branch.
+                if (request_implicit_reconstruct) begin
+                    sample_value                  <= returned_sample;
+                    sample_nonzero                <= (returned_sample != 8'd0);
+                    reconstruct_prediction_sample <= returned_sample;
+                    reconstructed_value           <= response_reconstruction_clipped;
+                    reconstruct_verify_pending    <= 1'b1;
+                end
+                else if (request_half_sample) begin
                     sample_value     <= halfpel_filtered_sample;
                     sample_nonzero   <= (halfpel_filtered_sample != 8'd0);
                     half_sample_seen <= 1'b1;
@@ -255,13 +323,26 @@ always @(posedge clk) begin
                         probe_error <= 1'b1;
                 end
                 else begin
-                    // Preserve the Phase 1T-g exact integer-reference proof.
                     sample_value   <= returned_sample;
                     sample_nonzero <= (returned_sample != 8'd0);
 
                     if (returned_sample != DIAG_EXPECTED_INTEGER_SAMPLE)
                         probe_error <= 1'b1;
                 end
+            end
+        end
+
+        // Verify the registered decoded pel against the same latched real
+        // prediction/residual operands on the following clock. USER is allowed
+        // to consume reconstructed_seen only after this check passes.
+        if (reconstruct_verify_pending) begin
+            reconstruct_verify_pending <= 1'b0;
+            if (!request_implicit_reconstruct ||
+                (reconstructed_value != verify_reconstruction_clipped)) begin
+                probe_error <= 1'b1;
+            end
+            else begin
+                reconstructed_seen <= 1'b1;
             end
         end
     end
