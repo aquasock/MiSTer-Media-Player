@@ -150,7 +150,9 @@ reg [8:0]  mb_col;
 reg [8:0]  mb_row;
 reg [2:0]  block_index;
 reg [2:0]  row_index;
-reg [19:0] timeout;
+// kate - Phase 1U-e: this is an implementation watchdog, not an H.262 limit.
+// Widen it now that the live coded raster count can exceed the four-MB proof.
+reg [23:0] timeout;
 
 reg        emit_active;
 reg        waiting_for_store;
@@ -217,7 +219,7 @@ always @(posedge clk) begin
         mb_row                   <= 9'd0;
         block_index              <= 3'd0;
         row_index                <= 3'd0;
-        timeout                  <= 20'd0;
+        timeout                  <= 24'd0;
         emit_active              <= 1'b0;
         waiting_for_store        <= 1'b0;
         emit_index               <= 6'd0;
@@ -246,7 +248,7 @@ always @(posedge clk) begin
             mb_row                   <= 9'd0;
             block_index              <= 3'd0;
             row_index                <= 3'd0;
-            timeout                  <= 20'hFFFFF;
+            timeout                  <= 24'hFFFFFF;
 
             if (!reference_valid ||
                 (destination_bank == reference_bank) ||
@@ -259,9 +261,9 @@ always @(posedge clk) begin
             end
         end
 
-        if (started && !persisted_seen && (timeout != 20'd0)) begin
-            timeout <= timeout - 20'd1;
-            if (timeout == 20'd1)
+        if (started && !persisted_seen && (timeout != 24'd0)) begin
+            timeout <= timeout - 24'd1;
+            if (timeout == 24'd1)
                 error <= 1'b1;
         end
 
@@ -315,7 +317,7 @@ always @(posedge clk) begin
                                 if (ddram_dout == reference_rows[7]) begin
                                     persisted_seen     <= 1'b1;
                                     reconstructed_seen <= 1'b1;
-                                    timeout            <= 20'd0;
+                                    timeout            <= 24'd0;
                                 end
                             end
                             else begin
