@@ -1,10 +1,12 @@
 //============================================================================
 // MiSTer Media Player - P diagnostic controller
 //
-// Phase 1U-k preserves the accepted zero/skipped raster paths and adds a
-// controlled aligned non-zero motion observer. The aligned observer verifies a
-// complete 128x96 P picture before publishing representative vector (+32,0);
-// the existing raster persistence hold then protects the destination DDR bank.
+// Phase 1U-l preserves the accepted zero/skipped and aligned raster paths and
+// carries the aligned observer's 48-position motion plan through the already
+// established residual-sample sideband.  The aligned representative vector is
+// withheld until all 48 plan bits have been serialized, so the reference
+// pipeline can capture a complete per-macroblock execution plan before DDR work
+// begins.  This is a controlled transport reuse, not residual syntax.
 //============================================================================
 
 module mpeg2_h262_p_diagnostic_controller
@@ -49,6 +51,7 @@ wire four_mb_error;
 wire aligned_candidate;
 wire aligned_seen;
 wire aligned_complete_now;
+wire [47:0] aligned_shift_right_map;
 wire aligned_error;
 
 wire residual_decision;
@@ -68,12 +71,41 @@ wire raster_candidate = four_mb_candidate || aligned_candidate;
 wire raster_seen      = four_mb_seen || aligned_seen;
 wire raster_complete_now = four_mb_complete_now || aligned_complete_now;
 
-// The semantic raster observers publish a representative mode vector only
-// after their complete controlled picture syntax has been proven. For the
-// aligned-motion mode (+32,0) is a mode key for the raster engine: it denotes
-// first-column prediction from the adjacent reference macroblock to the right.
+// Phase 1U-l serializes one shift-right plan bit per cycle through the existing
+// residual-sample sideband.  The actual residual classifier still reports that
+// this controlled aligned stream has no residual coefficients.
+reg       aligned_plan_sending;
+reg       aligned_plan_done;
+reg [5:0] aligned_plan_index;
+
+always @(posedge clk) begin
+    if (reset) begin
+        aligned_plan_sending <= 1'b0;
+        aligned_plan_done    <= 1'b0;
+        aligned_plan_index   <= 6'd0;
+    end
+    else begin
+        if (aligned_seen && !aligned_plan_sending && !aligned_plan_done) begin
+            aligned_plan_sending <= 1'b1;
+            aligned_plan_index   <= 6'd0;
+        end
+        else if (aligned_plan_sending) begin
+            if (aligned_plan_index == 6'd47) begin
+                aligned_plan_sending <= 1'b0;
+                aligned_plan_done    <= 1'b1;
+            end
+            else begin
+                aligned_plan_index <= aligned_plan_index + 6'd1;
+            end
+        end
+    end
+end
+
+// Semantic raster observers publish their representative vector only after the
+// complete controlled picture has been verified.  For aligned motion, Phase
+// 1U-l additionally waits until the 48-bit execution plan has been delivered.
 assign p_forward_vector_valid =
-    aligned_seen ? 1'b1 :
+    aligned_seen ? aligned_plan_done :
     four_mb_seen ? 1'b1 :
     two_mb_seen  ? 1'b1 :
     raster_candidate ? 1'b0 : vector_valid_raw;
@@ -87,9 +119,14 @@ assign p_residual_required           = residual_required_raw;
 assign p_residual_success            = residual_success_raw;
 assign p_first_residual_sample_valid = first_valid_raw;
 assign p_first_residual_sample_value = first_value_raw;
-assign p_residual_sample_valid       = residual_valid_raw;
-assign p_residual_sample_index       = residual_index_raw;
-assign p_residual_sample_value       = residual_value_raw;
+assign p_residual_sample_valid =
+    aligned_plan_sending ? 1'b1 : residual_valid_raw;
+assign p_residual_sample_index =
+    aligned_plan_sending ? aligned_plan_index : residual_index_raw;
+assign p_residual_sample_value =
+    aligned_plan_sending ?
+        $signed({15'd0, aligned_shift_right_map[aligned_plan_index]}) :
+        residual_value_raw;
 
 wire mb_seen_combined =
     raster_candidate ? raster_seen :
@@ -205,14 +242,15 @@ mpeg2_h262_p_four_mb_two_row_syntax_probe four_mb_probe
 
 mpeg2_h262_p_aligned_motion_syntax_probe aligned_motion_probe
 (
-    .clk                 (clk),
-    .reset               (reset),
-    .stream_data         (stream_data),
-    .stream_valid        (stream_valid),
-    .aligned_candidate   (aligned_candidate),
-    .aligned_seen        (aligned_seen),
-    .aligned_complete_now(aligned_complete_now),
-    .probe_error         (aligned_error)
+    .clk                    (clk),
+    .reset                  (reset),
+    .stream_data            (stream_data),
+    .stream_valid           (stream_valid),
+    .aligned_candidate      (aligned_candidate),
+    .aligned_seen           (aligned_seen),
+    .aligned_complete_now   (aligned_complete_now),
+    .aligned_shift_right_map(aligned_shift_right_map),
+    .probe_error            (aligned_error)
 );
 
 mpeg2_h262_p_residual_probe residual_probe

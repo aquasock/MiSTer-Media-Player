@@ -11,14 +11,14 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_intra_re
 # temporary internal P chroma component tag carried in pixel_x[11:10].
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
-# kate - Phase 1U-k preserves the accepted reference clients and adds a
-# controlled full-raster aligned non-zero motion path.
+# kate - Phase 1U-l preserves the accepted reference clients while replacing
+# the fixed aligned client with a serialized per-macroblock motion-plan client.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_explicit_reference_probe.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_macroblock_420_engine.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_two_mb_copy_engine.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_four_mb_two_row_copy_engine.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_raster_engine.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_aligned.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_motion_plan_raster_engine.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_plan.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_bitreader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_ycbcr_to_rgb_bt601.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_luma4_probe.sv
@@ -32,7 +32,7 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_residu
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_stream_hold.sv
-# kate - Phase 1U-k extends the factored P orchestration while preserving the
+# kate - Phase 1U-l extends the factored P orchestration while preserving the
 # accepted I-picture bookkeeping and wrapper interfaces.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_picture_bookkeeper.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller.sv

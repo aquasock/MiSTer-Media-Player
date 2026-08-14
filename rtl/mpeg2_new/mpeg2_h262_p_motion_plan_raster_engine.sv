@@ -1,0 +1,343 @@
+//============================================================================
+// MiSTer Media Player - controlled per-macroblock aligned P motion engine
+//
+// Standards authority: core-standards.md.
+// H262-003 selects prediction samples by reconstructed motion vector.
+// H262-006 defines 4:2:0 block order Y0,Y1,Y2,Y3,Cb,Cr.
+// H262-016 proves the controlled luma vector (+32,0) half-sample units.
+// H262-017 scales that vector to (+16,0) chroma half-sample units.
+//
+// Phase 1U-l consumes a 48-bit execution plan for the controlled 128x96 / 8x6
+// raster.  A set bit means the destination macroblock predicts from the adjacent
+// reference macroblock to its right; a clear bit means colocated zero-vector
+// prediction.  The syntax observer/controller owns the standards semantics that
+// produced the plan.  This engine only executes the already-proven aligned
+// prediction choices and persists/readbacks all six 4:2:0 blocks.
+//============================================================================
+
+module mpeg2_h262_p_motion_plan_raster_engine
+(
+    input  wire        clk,
+    input  wire        reset,
+    input  wire        request,
+    input  wire [47:0] shift_right_map,
+    input  wire        reference_valid,
+    input  wire        reference_bank,
+    input  wire        destination_bank,
+    input  wire        store_block_stored,
+    input  wire        ddram_busy,
+    input  wire [63:0] ddram_dout,
+    input  wire        ddram_dout_ready,
+    output wire [7:0]  ddram_burstcnt,
+    output wire [28:0] ddram_addr,
+    output wire        ddram_rd,
+    output wire        store_select,
+    output wire [7:0]  store_pixel_value,
+    output wire [11:0] store_pixel_x,
+    output wire [11:0] store_pixel_y,
+    output wire        store_pixel_valid,
+    output wire        store_block_start,
+    output wire        store_block_complete,
+    output reg         read_seen,
+    output reg  [7:0]  sample_value,
+    output reg         sample_nonzero,
+    output reg         reconstructed_seen,
+    output reg  [7:0]  reconstructed_value,
+    output reg         persisted_seen,
+    output reg  [7:0]  persisted_value,
+    output reg         error
+);
+
+localparam [28:0]
+    DDR_Y_BASE     = 29'h06000000,
+    DDR_CB_BASE    = 29'h0600A8C0,
+    DDR_CR_BASE    = 29'h0600D2F0,
+    DDR_BANK_WORDS = 29'h00010000;
+localparam [15:0] MACROBLOCK_COUNT = 16'd48;
+localparam [8:0]  MACROBLOCK_WIDTH = 9'd8;
+localparam [47:0] LAST_COLUMN_MASK = 48'h808080808080;
+localparam READ_REFERENCE = 1'b0,
+           READ_VERIFY    = 1'b1;
+
+function automatic [28:0] row_times_90;
+    input [11:0] row;
+    reg [28:0] r;
+    begin
+        r = {17'd0, row};
+        row_times_90 = (r << 6) + (r << 4) + (r << 3) + (r << 1);
+    end
+endfunction
+
+function automatic [28:0] row_times_45;
+    input [11:0] row;
+    reg [28:0] r;
+    begin
+        r = {17'd0, row};
+        row_times_45 = (r << 5) + (r << 3) + (r << 2) + r;
+    end
+endfunction
+
+function automatic [28:0] block_row_address;
+    input [28:0] bank_offset;
+    input [8:0]  macroblock_col;
+    input [8:0]  macroblock_row;
+    input [2:0]  block_index_value;
+    input [2:0]  row_index_value;
+    reg [11:0] luma_row;
+    reg [11:0] luma_word;
+    reg [11:0] chroma_row;
+    begin
+        if (block_index_value < 3'd4) begin
+            luma_row  = ({3'd0, macroblock_row} << 4) +
+                        {8'd0, block_index_value[1], row_index_value};
+            luma_word = ({3'd0, macroblock_col} << 1) +
+                        {11'd0, block_index_value[0]};
+            block_row_address = DDR_Y_BASE + bank_offset +
+                                row_times_90(luma_row) +
+                                {17'd0, luma_word};
+        end
+        else begin
+            chroma_row = ({3'd0, macroblock_row} << 3) +
+                         {9'd0, row_index_value};
+            if (block_index_value == 3'd4)
+                block_row_address = DDR_CB_BASE + bank_offset +
+                                    row_times_45(chroma_row) +
+                                    {20'd0, macroblock_col};
+            else
+                block_row_address = DDR_CR_BASE + bank_offset +
+                                    row_times_45(chroma_row) +
+                                    {20'd0, macroblock_col};
+        end
+    end
+endfunction
+
+function automatic [7:0] byte_at;
+    input [63:0] word_value;
+    input [2:0] lane;
+    begin
+        case (lane)
+            3'd0: byte_at = word_value[7:0];
+            3'd1: byte_at = word_value[15:8];
+            3'd2: byte_at = word_value[23:16];
+            3'd3: byte_at = word_value[31:24];
+            3'd4: byte_at = word_value[39:32];
+            3'd5: byte_at = word_value[47:40];
+            3'd6: byte_at = word_value[55:48];
+            default: byte_at = word_value[63:56];
+        endcase
+    end
+endfunction
+
+reg [63:0] reference_rows [0:7];
+integer i;
+reg        started;
+reg        latched_reference_bank;
+reg        latched_destination_bank;
+reg [47:0] latched_shift_right_map;
+reg        read_kind;
+reg        request_active;
+reg        response_waiting;
+reg [15:0] macroblock_index;
+reg [8:0]  mb_col;
+reg [8:0]  mb_row;
+reg [2:0]  block_index;
+reg [2:0]  row_index;
+reg [23:0] timeout;
+reg        emit_active;
+reg        waiting_for_store;
+reg [5:0]  emit_index;
+
+wire [28:0] reference_bank_offset =
+    latched_reference_bank ? DDR_BANK_WORDS : 29'd0;
+wire [28:0] destination_bank_offset =
+    latched_destination_bank ? DDR_BANK_WORDS : 29'd0;
+wire shift_right_current = latched_shift_right_map[macroblock_index[5:0]];
+wire [8:0] reference_mb_col =
+    shift_right_current ? (mb_col + 9'd1) : mb_col;
+wire [8:0] address_mb_col =
+    (read_kind == READ_REFERENCE) ? reference_mb_col : mb_col;
+
+assign ddram_burstcnt = request_active ? 8'd1 : 8'd0;
+assign ddram_addr = request_active ?
+    block_row_address(
+        (read_kind == READ_REFERENCE) ? reference_bank_offset : destination_bank_offset,
+        address_mb_col, mb_row, block_index, row_index
+    ) : 29'd0;
+assign ddram_rd = request_active;
+
+wire [2:0] emit_row  = emit_index[5:3];
+wire [2:0] emit_lane = emit_index[2:0];
+wire [11:0] luma_x =
+    ({3'd0, mb_col} << 4) + {8'd0, block_index[0], emit_lane};
+wire [11:0] luma_y =
+    ({3'd0, mb_row} << 4) + {8'd0, block_index[1], emit_row};
+wire [11:0] chroma_x =
+    ({3'd0, mb_col} << 3) + {9'd0, emit_lane};
+wire [11:0] chroma_y =
+    ({3'd0, mb_row} << 3) + {9'd0, emit_row};
+
+assign store_select         = emit_active;
+assign store_pixel_value    = byte_at(reference_rows[emit_row], emit_lane);
+assign store_pixel_valid    = emit_active;
+assign store_block_start    = emit_active && (emit_index == 6'd0);
+assign store_block_complete = emit_active && (emit_index == 6'd63);
+assign store_pixel_x =
+    (block_index < 3'd4) ? luma_x :
+    (block_index == 3'd4) ? {2'b01, chroma_x[9:0]} :
+                            {2'b10, chroma_x[9:0]};
+assign store_pixel_y = (block_index < 3'd4) ? luma_y : chroma_y;
+
+always @(posedge clk) begin
+    if (reset) begin
+        started                  <= 1'b0;
+        latched_reference_bank   <= 1'b0;
+        latched_destination_bank <= 1'b0;
+        latched_shift_right_map  <= 48'd0;
+        read_kind                <= READ_REFERENCE;
+        request_active           <= 1'b0;
+        response_waiting         <= 1'b0;
+        macroblock_index         <= 16'd0;
+        mb_col                   <= 9'd0;
+        mb_row                   <= 9'd0;
+        block_index              <= 3'd0;
+        row_index                <= 3'd0;
+        timeout                  <= 24'd0;
+        emit_active              <= 1'b0;
+        waiting_for_store        <= 1'b0;
+        emit_index               <= 6'd0;
+        read_seen                <= 1'b0;
+        sample_value             <= 8'd0;
+        sample_nonzero           <= 1'b0;
+        reconstructed_seen       <= 1'b0;
+        reconstructed_value      <= 8'd0;
+        persisted_seen           <= 1'b0;
+        persisted_value          <= 8'd0;
+        error                    <= 1'b0;
+        for (i = 0; i < 8; i = i + 1)
+            reference_rows[i] <= 64'd0;
+    end
+    else begin
+        if (request && !started) begin
+            started                  <= 1'b1;
+            latched_reference_bank   <= reference_bank;
+            latched_destination_bank <= destination_bank;
+            latched_shift_right_map  <= shift_right_map;
+            read_kind                <= READ_REFERENCE;
+            macroblock_index         <= 16'd0;
+            mb_col                   <= 9'd0;
+            mb_row                   <= 9'd0;
+            block_index              <= 3'd0;
+            row_index                <= 3'd0;
+            timeout                  <= 24'hFFFFFF;
+            if (!reference_valid ||
+                (destination_bank == reference_bank) ||
+                (shift_right_map == 48'd0) ||
+                ((shift_right_map & LAST_COLUMN_MASK) != 48'd0))
+                error <= 1'b1;
+            else
+                request_active <= 1'b1;
+        end
+
+        if (started && !persisted_seen && (timeout != 24'd0)) begin
+            timeout <= timeout - 24'd1;
+            if (timeout == 24'd1)
+                error <= 1'b1;
+        end
+
+        if (request_active && !ddram_busy) begin
+            request_active   <= 1'b0;
+            response_waiting <= 1'b1;
+        end
+
+        if (ddram_dout_ready) begin
+            if (!response_waiting) begin
+                error <= 1'b1;
+            end
+            else begin
+                response_waiting <= 1'b0;
+                if (read_kind == READ_REFERENCE) begin
+                    reference_rows[row_index] <= ddram_dout;
+                    if ((macroblock_index == 16'd0) &&
+                        (block_index == 3'd0) && (row_index == 3'd0)) begin
+                        read_seen      <= 1'b1;
+                        sample_value   <= ddram_dout[7:0];
+                        sample_nonzero <= (ddram_dout[7:0] != 8'd0);
+                    end
+                    if (row_index == 3'd7) begin
+                        emit_index  <= 6'd0;
+                        emit_active <= 1'b1;
+                    end
+                    else begin
+                        row_index      <= row_index + 3'd1;
+                        request_active <= 1'b1;
+                    end
+                end
+                else begin
+                    if (ddram_dout != reference_rows[row_index])
+                        error <= 1'b1;
+                    if ((macroblock_index == 16'd0) &&
+                        (block_index == 3'd0) && (row_index == 3'd0) &&
+                        (ddram_dout == reference_rows[0]))
+                        persisted_value <= ddram_dout[7:0];
+                    if (row_index == 3'd7) begin
+                        if (block_index == 3'd5) begin
+                            if ((macroblock_index + 16'd1) >= MACROBLOCK_COUNT) begin
+                                if (ddram_dout == reference_rows[7]) begin
+                                    persisted_seen     <= 1'b1;
+                                    reconstructed_seen <= 1'b1;
+                                    timeout            <= 24'd0;
+                                end
+                            end
+                            else begin
+                                macroblock_index <= macroblock_index + 16'd1;
+                                if ((mb_col + 9'd1) >= MACROBLOCK_WIDTH) begin
+                                    mb_col <= 9'd0;
+                                    mb_row <= mb_row + 9'd1;
+                                end
+                                else begin
+                                    mb_col <= mb_col + 9'd1;
+                                end
+                                block_index    <= 3'd0;
+                                row_index      <= 3'd0;
+                                read_kind      <= READ_REFERENCE;
+                                request_active <= 1'b1;
+                            end
+                        end
+                        else begin
+                            block_index    <= block_index + 3'd1;
+                            row_index      <= 3'd0;
+                            read_kind      <= READ_REFERENCE;
+                            request_active <= 1'b1;
+                        end
+                    end
+                    else begin
+                        row_index      <= row_index + 3'd1;
+                        request_active <= 1'b1;
+                    end
+                end
+            end
+        end
+
+        if (emit_active) begin
+            if ((macroblock_index == 16'd0) &&
+                (block_index == 3'd0) && (emit_index == 6'd0))
+                reconstructed_value <= store_pixel_value;
+            if (emit_index == 6'd63) begin
+                emit_active       <= 1'b0;
+                waiting_for_store <= 1'b1;
+            end
+            else begin
+                emit_index <= emit_index + 6'd1;
+            end
+        end
+
+        if (waiting_for_store && store_block_stored) begin
+            waiting_for_store <= 1'b0;
+            read_kind         <= READ_VERIFY;
+            row_index         <= 3'd0;
+            request_active    <= 1'b1;
+        end
+    end
+end
+
+endmodule
