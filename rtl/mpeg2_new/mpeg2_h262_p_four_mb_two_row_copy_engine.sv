@@ -8,13 +8,11 @@
 //   H262-008 slice vertical position selects the macroblock row.
 //   H262-009 macroblock addressing advances within each slice row.
 //
-// kate - Phase 1T-v preserves the hardware-accepted four-macroblock limit but
-// removes the special interpretation of macroblock_index[1:0] as row/column.
-// Placement now advances explicit mb_col/mb_row raster counters and wraps the
-// column according to a width value.  The Phase 1T-u syntax proof still gates
-// this engine to a two-macroblock-wide picture, so CONTROLLED_MB_WIDTH remains
-// 2 here; the next interface step can replace that value with live geometry
-// without changing the DDR address or pixel-placement machinery again.
+// kate - Phase 1T-w preserves the hardware-accepted four-macroblock limit and
+// accepts raster width through an explicit interface.  Width is latched with
+// the request so later picture-header activity cannot move an active raster.
+// The current reference pipeline still supplies the proven width value 2; a
+// later geometry step can replace that source without changing this engine.
 //============================================================================
 
 module mpeg2_h262_p_four_mb_two_row_copy_engine
@@ -22,6 +20,7 @@ module mpeg2_h262_p_four_mb_two_row_copy_engine
     input  wire        clk,
     input  wire        reset,
     input  wire        request,
+    input  wire [8:0]  macroblock_width,
 
     input  wire        reference_valid,
     input  wire        reference_bank,
@@ -59,8 +58,6 @@ localparam [28:0]
     DDR_CB_BASE    = 29'h0600A8C0,
     DDR_CR_BASE    = 29'h0600D2F0,
     DDR_BANK_WORDS = 29'h00010000;
-
-localparam [8:0] CONTROLLED_MB_WIDTH = 9'd2;
 
 localparam READ_REFERENCE = 1'b0,
            READ_VERIFY    = 1'b1;
@@ -146,6 +143,7 @@ reg        read_kind;
 reg        request_active;
 reg        response_waiting;
 reg [2:0]  macroblock_count;
+reg [8:0]  latched_macroblock_width;
 reg [8:0]  mb_col;
 reg [8:0]  mb_row;
 reg [2:0]  block_index;
@@ -211,6 +209,7 @@ always @(posedge clk) begin
         request_active           <= 1'b0;
         response_waiting         <= 1'b0;
         macroblock_count         <= 3'd0;
+        latched_macroblock_width <= 9'd0;
         mb_col                   <= 9'd0;
         mb_row                   <= 9'd0;
         block_index              <= 3'd0;
@@ -238,6 +237,7 @@ always @(posedge clk) begin
             latched_destination_bank <= destination_bank;
             read_kind                <= READ_REFERENCE;
             macroblock_count         <= 3'd0;
+            latched_macroblock_width <= macroblock_width;
             mb_col                   <= 9'd0;
             mb_row                   <= 9'd0;
             block_index              <= 3'd0;
@@ -246,7 +246,7 @@ always @(posedge clk) begin
 
             if (!reference_valid ||
                 (destination_bank == reference_bank) ||
-                (CONTROLLED_MB_WIDTH == 9'd0)) begin
+                (macroblock_width == 9'd0)) begin
                 error <= 1'b1;
             end
             else begin
@@ -314,7 +314,7 @@ always @(posedge clk) begin
                             end
                             else begin
                                 macroblock_count <= macroblock_count + 3'd1;
-                                if ((mb_col + 9'd1) >= CONTROLLED_MB_WIDTH) begin
+                                if ((mb_col + 9'd1) >= latched_macroblock_width) begin
                                     mb_col <= 9'd0;
                                     mb_row <= mb_row + 9'd1;
                                 end

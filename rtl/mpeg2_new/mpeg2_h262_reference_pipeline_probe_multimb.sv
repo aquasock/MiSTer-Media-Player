@@ -49,6 +49,13 @@ module mpeg2_h262_reference_read_probe
     output wire        probe_error
 );
 
+// kate - Phase 1T-w: move raster width ownership out of the four-MB engine.
+// The current syntax proof still admits only the accepted two-Macroblock-wide
+// controlled picture, so this interface value remains 2 for this increment.
+// The next geometry step can replace this source with live coded width without
+// changing the engine's address or raster machinery again.
+wire [8:0] four_macroblock_width = 9'd2;
+
 wire four_request =
     p_forward_vector_valid &&
     (p_forward_vector_x == 13'sd0) &&
@@ -254,6 +261,7 @@ mpeg2_h262_p_four_mb_two_row_copy_engine four_probe
     .clk                  (clk),
     .reset                (reset),
     .request              (four_sel),
+    .macroblock_width     (four_macroblock_width),
     .reference_valid      (reference_frame_valid),
     .reference_bank       (reference_frame_bank),
     .destination_bank     (destination_frame_bank),
