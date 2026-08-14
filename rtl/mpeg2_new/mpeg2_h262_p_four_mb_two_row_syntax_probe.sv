@@ -10,23 +10,19 @@
 //   H262-012 motion_code 0 code 1
 //   H262-013 macroblock_address_increment 1 code 1
 //
-// kate - Phase 1U-h doubles the accepted controlled raster again. The observer
-// accepts two through six macroblocks per row and two through four progressive-
-// frame macroblock rows, derived from coded sequence geometry. Every controlled
-// macroblock remains adjacent, motion-forward-only,
-// macroblock_address_increment=1, motion_code=(0,0), and forward f_code=(2,2).
-// Supported row payloads are:
-//   2 MB: 12 79 c0
-//   3 MB: 12 79 e7
-//   4 MB: 12 79 e7 9c
-//   5 MB: 12 79 e7 9e 70
-//   6 MB: 12 79 e7 9e 79 c0
-// The new 96x64 diagnostic uses four slices and 6x4=24 macroblocks.
+// kate - Phase 1U-i removes the controlled observer's literal row-payload
+// table.  For the current progressive-frame diagnostic subset it recognizes
+// the established repeated syntax directly as a byte stream:
+//   slice header bits: 000100
+//   each adjacent zero-vector P macroblock: 100111
+//   zero stuffing to the next byte boundary
+// The coded geometry may therefore range across the current implementation
+// boundary of 2..45 macroblocks per row and 2..30 rows without increasing
+// payload storage.  The new 128x96 regression uses 8x6=48 macroblocks.
 //
 // Compatibility note: public signal/module names retain "four_mb" and
-// "two_row" so the hardware-accepted controller interface does not change in
-// this increment. This is a controlled diagnostic recognizer, not a general
-// P-picture parser.
+// "two_row" so the hardware-accepted controller interface does not change.
+// This is still a controlled diagnostic recognizer, not a general P parser.
 //============================================================================
 
 module mpeg2_h262_p_four_mb_two_row_syntax_probe
@@ -78,8 +74,8 @@ wire [12:0] sequence_vertical_rounded =
 wire [8:0] sequence_macroblock_width  = sequence_horizontal_rounded[12:4];
 wire [8:0] sequence_macroblock_height = sequence_vertical_rounded[12:4];
 reg        geometry_supported_raster;
-reg [2:0]  controlled_mb_per_row;
-reg [2:0]  controlled_row_count;
+reg [5:0]  controlled_mb_per_row;
+reg [5:0]  controlled_row_count;
 
 // picture_header() first 16 payload bits contain temporal_reference[9:0],
 // picture_coding_type[2:0], then the first three vbv_delay bits.
@@ -95,36 +91,67 @@ reg [2:0]  pce_count;
 reg [39:0] pce_shift;
 wire [39:0] pce_next = {pce_shift[31:0], stream_data};
 
-// Controlled row payloads grow from three bytes at widths 2/3 to six bytes at
-// width 6. slice_count also sees the 00 00 01 prefix of the following start
-// code, so the accepted boundary count is payload bytes + 3.
-wire [2:0] expected_payload_bytes =
-    ((controlled_mb_per_row == 3'd2) ||
-     (controlled_mb_per_row == 3'd3)) ? 3'd3 :
-    (controlled_mb_per_row == 3'd4) ? 3'd4 :
-    (controlled_mb_per_row == 3'd5) ? 3'd5 :
-    (controlled_mb_per_row == 3'd6) ? 3'd6 : 3'd0;
-wire [3:0] expected_slice_count =
-    {1'b0, expected_payload_bytes} + 4'd3;
+// The controlled row is six header bits followed by six bits per macroblock.
+// Convert that exact bit count to a byte count; the final partial byte is
+// required to contain zero stuffing in its unused low bits.
+wire [6:0] controlled_mb_plus_one =
+    {1'b0, controlled_mb_per_row} + 7'd1;
+wire [9:0] controlled_row_bits =
+    ({3'd0, controlled_mb_plus_one} << 2) +
+    ({3'd0, controlled_mb_plus_one} << 1);
+wire [9:0] expected_payload_bytes_full =
+    (controlled_row_bits + 10'd7) >> 3;
+wire [5:0] expected_payload_bytes = expected_payload_bytes_full[5:0];
+wire [5:0] expected_slice_count = expected_payload_bytes + 6'd3;
+wire [2:0] final_valid_bits = controlled_row_bits[2:0];
 
 reg        slice_capture;
-reg [2:0]  slice_row_number;
-reg [3:0]  slice_count;
-reg [47:0] payload_shift;
-reg        payload_complete;
+reg [5:0]  slice_row_number;
+reg [5:0]  slice_count;
+reg [1:0]  payload_cycle_phase;
+reg        row_payload_ok;
 reg        proof_done;
 
-wire controlled_payload_ok =
-    ((controlled_mb_per_row == 3'd2) &&
-     (payload_shift[23:0] == 24'h1279c0)) ||
-    ((controlled_mb_per_row == 3'd3) &&
-     (payload_shift[23:0] == 24'h1279e7)) ||
-    ((controlled_mb_per_row == 3'd4) &&
-     (payload_shift[31:0] == 32'h1279e79c)) ||
-    ((controlled_mb_per_row == 3'd5) &&
-     (payload_shift[39:0] == 40'h1279e79e70)) ||
-    ((controlled_mb_per_row == 3'd6) &&
-     (payload_shift == 48'h1279e79e79c0));
+// After the initial bytes 12 79, the unstuffed controlled bit pattern repeats
+// as bytes e7 9e 79. payload_cycle_phase tracks that three-byte cycle without
+// a division/modulo datapath.
+reg [7:0] expected_payload_byte_base;
+always @* begin
+    if (slice_count == 6'd0)
+        expected_payload_byte_base = 8'h12;
+    else if (slice_count == 6'd1)
+        expected_payload_byte_base = 8'h79;
+    else begin
+        case (payload_cycle_phase)
+            2'd0: expected_payload_byte_base = 8'hE7;
+            2'd1: expected_payload_byte_base = 8'h9E;
+            default: expected_payload_byte_base = 8'h79;
+        endcase
+    end
+end
+
+reg [7:0] final_byte_mask;
+always @* begin
+    case (final_valid_bits)
+        3'd1: final_byte_mask = 8'h80;
+        3'd2: final_byte_mask = 8'hC0;
+        3'd3: final_byte_mask = 8'hE0;
+        3'd4: final_byte_mask = 8'hF0;
+        3'd5: final_byte_mask = 8'hF8;
+        3'd6: final_byte_mask = 8'hFC;
+        3'd7: final_byte_mask = 8'hFE;
+        default: final_byte_mask = 8'hFF;
+    endcase
+end
+
+wire current_payload_byte_is_last =
+    (expected_payload_bytes != 6'd0) &&
+    ((slice_count + 6'd1) == expected_payload_bytes);
+
+wire [7:0] expected_payload_byte =
+    (current_payload_byte_is_last && (final_valid_bits != 3'd0)) ?
+        (expected_payload_byte_base & final_byte_mask) :
+        expected_payload_byte_base;
 
 // Assert on the exact accepted boundary after the last controlled slice. The
 // controller uses this combinational pulse to stop compressed input before the
@@ -136,8 +163,7 @@ assign four_mb_complete_now =
     post_p_boundary_now &&
     (slice_row_number == controlled_row_count) &&
     (slice_count == expected_slice_count) &&
-    payload_complete &&
-    controlled_payload_ok;
+    row_payload_ok;
 
 always @(posedge clk) begin
     if (reset) begin
@@ -146,8 +172,8 @@ always @(posedge clk) begin
         sequence_count            <= 2'd0;
         sequence_shift            <= 24'd0;
         geometry_supported_raster <= 1'b0;
-        controlled_mb_per_row     <= 3'd0;
-        controlled_row_count      <= 3'd0;
+        controlled_mb_per_row     <= 6'd0;
+        controlled_row_count      <= 6'd0;
         picture_capture           <= 1'b0;
         picture_count             <= 1'b0;
         picture_shift             <= 16'd0;
@@ -157,10 +183,10 @@ always @(posedge clk) begin
         pce_shift                 <= 40'd0;
         four_mb_candidate         <= 1'b0;
         slice_capture             <= 1'b0;
-        slice_row_number          <= 3'd0;
-        slice_count               <= 4'd0;
-        payload_shift             <= 48'd0;
-        payload_complete          <= 1'b0;
+        slice_row_number          <= 6'd0;
+        slice_count               <= 6'd0;
+        payload_cycle_phase       <= 2'd0;
+        row_payload_ok            <= 1'b0;
         proof_done                <= 1'b0;
         four_mb_seen              <= 1'b0;
         probe_error               <= 1'b0;
@@ -178,21 +204,21 @@ always @(posedge clk) begin
                     (sequence_horizontal_size != 12'd0) &&
                     (sequence_vertical_size   != 12'd0) &&
                     (sequence_macroblock_width  >= 9'd2) &&
-                    (sequence_macroblock_width  <= 9'd6) &&
+                    (sequence_macroblock_width  <= 9'd45) &&
                     (sequence_macroblock_height >= 9'd2) &&
-                    (sequence_macroblock_height <= 9'd4);
+                    (sequence_macroblock_height <= 9'd30);
 
                 if ((sequence_macroblock_width >= 9'd2) &&
-                    (sequence_macroblock_width <= 9'd6))
-                    controlled_mb_per_row <= sequence_macroblock_width[2:0];
+                    (sequence_macroblock_width <= 9'd45))
+                    controlled_mb_per_row <= sequence_macroblock_width[5:0];
                 else
-                    controlled_mb_per_row <= 3'd0;
+                    controlled_mb_per_row <= 6'd0;
 
                 if ((sequence_macroblock_height >= 9'd2) &&
-                    (sequence_macroblock_height <= 9'd4))
-                    controlled_row_count <= sequence_macroblock_height[2:0];
+                    (sequence_macroblock_height <= 9'd30))
+                    controlled_row_count <= sequence_macroblock_height[5:0];
                 else
-                    controlled_row_count <= 3'd0;
+                    controlled_row_count <= 6'd0;
             end
             else begin
                 sequence_count <= sequence_count + 2'd1;
@@ -259,8 +285,7 @@ always @(posedge clk) begin
         if (!proof_done && slice_capture) begin
             if (start_code_now) begin
                 if ((slice_count != expected_slice_count) ||
-                    !payload_complete ||
-                    !controlled_payload_ok) begin
+                    !row_payload_ok) begin
                     slice_capture <= 1'b0;
                     proof_done    <= 1'b1;
                     probe_error   <= 1'b1;
@@ -269,12 +294,12 @@ always @(posedge clk) begin
                     // H262-008: each next slice start code selects the following
                     // macroblock row. H262-009 restarts the MBA basis for it.
                     if (start_code_value ==
-                        {5'd0, slice_row_number} + 8'd1) begin
-                        slice_capture    <= 1'b1;
-                        slice_row_number <= slice_row_number + 3'd1;
-                        slice_count      <= 4'd0;
-                        payload_shift    <= 48'd0;
-                        payload_complete <= 1'b0;
+                        {2'd0, slice_row_number} + 8'd1) begin
+                        slice_capture       <= 1'b1;
+                        slice_row_number    <= slice_row_number + 6'd1;
+                        slice_count         <= 6'd0;
+                        payload_cycle_phase <= 2'd0;
+                        row_payload_ok      <= 1'b1;
                     end
                     else begin
                         slice_capture <= 1'b0;
@@ -293,24 +318,29 @@ always @(posedge clk) begin
                 end
             end
             else begin
-                if (slice_count < {1'b0, expected_payload_bytes}) begin
-                    payload_shift <= {payload_shift[39:0], stream_data};
-                    if ((slice_count + 4'd1) ==
-                        {1'b0, expected_payload_bytes})
-                        payload_complete <= 1'b1;
+                if (slice_count < expected_payload_bytes) begin
+                    if (stream_data != expected_payload_byte)
+                        row_payload_ok <= 1'b0;
+
+                    if (slice_count >= 6'd2) begin
+                        if (payload_cycle_phase == 2'd2)
+                            payload_cycle_phase <= 2'd0;
+                        else
+                            payload_cycle_phase <= payload_cycle_phase + 2'd1;
+                    end
                 end
 
-                if (slice_count != 4'hF)
-                    slice_count <= slice_count + 4'd1;
+                if (slice_count != 6'h3F)
+                    slice_count <= slice_count + 6'd1;
             end
         end
         else if (!proof_done && four_mb_candidate && slice_start_now) begin
             if (start_code_value == 8'h01) begin
-                slice_capture    <= 1'b1;
-                slice_row_number <= 3'd1;
-                slice_count      <= 4'd0;
-                payload_shift    <= 48'd0;
-                payload_complete <= 1'b0;
+                slice_capture       <= 1'b1;
+                slice_row_number    <= 6'd1;
+                slice_count         <= 6'd0;
+                payload_cycle_phase <= 2'd0;
+                row_payload_ok      <= 1'b1;
             end
             else begin
                 proof_done  <= 1'b1;
