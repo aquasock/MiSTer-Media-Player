@@ -11,6 +11,10 @@ module mpeg2_h262_reference_read_probe
 (
     input  wire        clk,
     input  wire        reset,
+    // kate - Phase 1T-x: expose coded horizontal geometry at this boundary.
+    // It is intentionally not consumed until the top-level connection is
+    // hardware-validated in the next increment.
+    input  wire [13:0] horizontal_size,
     input  wire        p_vector_proof_seen,
     input  wire        p_forward_vector_valid,
     input  wire signed [12:0] p_forward_vector_x,
