@@ -1,17 +1,20 @@
 //============================================================================
-// MiSTer Media Player - controlled 2x2-macroblock H.262 P copy/readback engine
+// MiSTer Media Player - controlled raster H.262 P copy/readback engine
 //
 // Standards authority: core-standards.md, source_id H262.
 //   H262-003 prediction samples come from the applicable reference picture.
 //   H262-006 4:2:0 block order is Y0,Y1,Y2,Y3,Cb,Cr.
+//   H262-007 coded macroblock width is derived from horizontal_size.
 //   H262-008 slice vertical position selects the macroblock row.
 //   H262-009 macroblock addressing advances within each slice row.
 //
-// kate - Phase 1T-s proves four motion-forward-only P macroblocks arranged as
-// two columns by two slice rows.  All decoded vectors are (0,0) and there is no
-// residual, so each reconstructed pel equals the colocated reference pel.  All
-// twenty-four 8x8 blocks are copied through the ordinary DDR block writer and
-// then read back from the destination bank for exact comparison.
+// kate - Phase 1T-v preserves the hardware-accepted four-macroblock limit but
+// removes the special interpretation of macroblock_index[1:0] as row/column.
+// Placement now advances explicit mb_col/mb_row raster counters and wraps the
+// column according to a width value.  The Phase 1T-u syntax proof still gates
+// this engine to a two-macroblock-wide picture, so CONTROLLED_MB_WIDTH remains
+// 2 here; the next interface step can replace that value with live geometry
+// without changing the DDR address or pixel-placement machinery again.
 //============================================================================
 
 module mpeg2_h262_p_four_mb_two_row_copy_engine
@@ -57,59 +60,61 @@ localparam [28:0]
     DDR_CR_BASE    = 29'h0600D2F0,
     DDR_BANK_WORDS = 29'h00010000;
 
+localparam [8:0] CONTROLLED_MB_WIDTH = 9'd2;
+
 localparam READ_REFERENCE = 1'b0,
            READ_VERIFY    = 1'b1;
 
 function automatic [28:0] row_times_90;
-    input [4:0] row;
+    input [11:0] row;
     reg [28:0] r;
     begin
-        r = {24'd0, row};
+        r = {17'd0, row};
         row_times_90 = (r << 6) + (r << 4) + (r << 3) + (r << 1);
     end
 endfunction
 
 function automatic [28:0] row_times_45;
-    input [3:0] row;
+    input [11:0] row;
     reg [28:0] r;
     begin
-        r = {25'd0, row};
+        r = {17'd0, row};
         row_times_45 = (r << 5) + (r << 3) + (r << 2) + r;
     end
 endfunction
 
 function automatic [28:0] block_row_address;
     input [28:0] bank_offset;
-    input [1:0]  macroblock_index;
-    input [2:0]  block_index;
-    input [2:0]  row_index;
-    reg [4:0] luma_row;
-    reg [1:0] luma_word;
-    reg [3:0] chroma_row;
+    input [8:0]  macroblock_col;
+    input [8:0]  macroblock_row;
+    input [2:0]  block_index_value;
+    input [2:0]  row_index_value;
+    reg [11:0] luma_row;
+    reg [11:0] luma_word;
+    reg [11:0] chroma_row;
     begin
-        if (block_index < 3'd4) begin
-            // macroblock_index[1] is the slice row and [0] is the column.
+        if (block_index_value < 3'd4) begin
             // Y0/Y1 occupy rows +0..7; Y2/Y3 occupy rows +8..15.
-            luma_row  = {macroblock_index[1], 4'b0000} +
-                        {1'b0, block_index[1], row_index};
-            luma_word = {macroblock_index[0], 1'b0} + block_index[0];
+            luma_row  = ({3'd0, macroblock_row} << 4) +
+                        {8'd0, block_index_value[1], row_index_value};
+            luma_word = ({3'd0, macroblock_col} << 1) +
+                        {11'd0, block_index_value[0]};
             block_row_address = DDR_Y_BASE + bank_offset +
                                 row_times_90(luma_row) +
-                                {27'd0, luma_word};
+                                {17'd0, luma_word};
         end
         else begin
             // 4:2:0 chroma has one 8x8 Cb and Cr block per macroblock.
-            // The second macroblock row begins eight chroma rows lower.
-            chroma_row = {macroblock_index[1], 3'b000} +
-                         {1'b0, row_index};
-            if (block_index == 3'd4)
+            chroma_row = ({3'd0, macroblock_row} << 3) +
+                         {9'd0, row_index_value};
+            if (block_index_value == 3'd4)
                 block_row_address = DDR_CB_BASE + bank_offset +
                                     row_times_45(chroma_row) +
-                                    {28'd0, macroblock_index[0]};
+                                    {20'd0, macroblock_col};
             else
                 block_row_address = DDR_CR_BASE + bank_offset +
                                     row_times_45(chroma_row) +
-                                    {28'd0, macroblock_index[0]};
+                                    {20'd0, macroblock_col};
         end
     end
 endfunction
@@ -140,7 +145,9 @@ reg        latched_destination_bank;
 reg        read_kind;
 reg        request_active;
 reg        response_waiting;
-reg [1:0]  macroblock_index;
+reg [2:0]  macroblock_count;
+reg [8:0]  mb_col;
+reg [8:0]  mb_row;
 reg [2:0]  block_index;
 reg [2:0]  row_index;
 reg [19:0] timeout;
@@ -159,7 +166,8 @@ assign ddram_addr = request_active ?
     block_row_address(
         (read_kind == READ_REFERENCE) ?
             reference_bank_offset : destination_bank_offset,
-        macroblock_index,
+        mb_col,
+        mb_row,
         block_index,
         row_index
     ) : 29'd0;
@@ -167,16 +175,16 @@ assign ddram_rd = request_active;
 
 wire [2:0] emit_row  = emit_index[5:3];
 wire [2:0] emit_lane = emit_index[2:0];
-wire [4:0] luma_x =
-    {macroblock_index[0], 4'b0000} +
-    {1'b0, block_index[0], emit_lane};
-wire [4:0] luma_y =
-    {macroblock_index[1], 4'b0000} +
-    {1'b0, block_index[1], emit_row};
-wire [3:0] chroma_x =
-    {macroblock_index[0], 3'b000} + {1'b0, emit_lane};
-wire [3:0] chroma_y =
-    {macroblock_index[1], 3'b000} + {1'b0, emit_row};
+wire [11:0] luma_x =
+    ({3'd0, mb_col} << 4) +
+    {8'd0, block_index[0], emit_lane};
+wire [11:0] luma_y =
+    ({3'd0, mb_row} << 4) +
+    {8'd0, block_index[1], emit_row};
+wire [11:0] chroma_x =
+    ({3'd0, mb_col} << 3) + {9'd0, emit_lane};
+wire [11:0] chroma_y =
+    ({3'd0, mb_row} << 3) + {9'd0, emit_row};
 
 assign store_select         = emit_active;
 assign store_pixel_value    = byte_at(reference_rows[emit_row], emit_lane);
@@ -188,11 +196,11 @@ assign store_block_complete = emit_active && (emit_index == 6'd63);
 // pixel_x[11:10] while its public component input remains Y:
 //   01 = Cb, 10 = Cr.
 assign store_pixel_x =
-    (block_index < 3'd4) ? {7'd0, luma_x} :
-    (block_index == 3'd4) ? {2'b01, 6'd0, chroma_x} :
-                            {2'b10, 6'd0, chroma_x};
+    (block_index < 3'd4) ? luma_x :
+    (block_index == 3'd4) ? {2'b01, chroma_x[9:0]} :
+                            {2'b10, chroma_x[9:0]};
 assign store_pixel_y =
-    (block_index < 3'd4) ? {7'd0, luma_y} : {8'd0, chroma_y};
+    (block_index < 3'd4) ? luma_y : chroma_y;
 
 always @(posedge clk) begin
     if (reset) begin
@@ -202,7 +210,9 @@ always @(posedge clk) begin
         read_kind                <= READ_REFERENCE;
         request_active           <= 1'b0;
         response_waiting         <= 1'b0;
-        macroblock_index         <= 2'd0;
+        macroblock_count         <= 3'd0;
+        mb_col                   <= 9'd0;
+        mb_row                   <= 9'd0;
         block_index              <= 3'd0;
         row_index                <= 3'd0;
         timeout                  <= 20'd0;
@@ -227,13 +237,16 @@ always @(posedge clk) begin
             latched_reference_bank   <= reference_bank;
             latched_destination_bank <= destination_bank;
             read_kind                <= READ_REFERENCE;
-            macroblock_index         <= 2'd0;
+            macroblock_count         <= 3'd0;
+            mb_col                   <= 9'd0;
+            mb_row                   <= 9'd0;
             block_index              <= 3'd0;
             row_index                <= 3'd0;
             timeout                  <= 20'hFFFFF;
 
             if (!reference_valid ||
-                (destination_bank == reference_bank)) begin
+                (destination_bank == reference_bank) ||
+                (CONTROLLED_MB_WIDTH == 9'd0)) begin
                 error <= 1'b1;
             end
             else begin
@@ -262,7 +275,7 @@ always @(posedge clk) begin
                 if (read_kind == READ_REFERENCE) begin
                     reference_rows[row_index] <= ddram_dout;
 
-                    if ((macroblock_index == 2'd0) &&
+                    if ((macroblock_count == 3'd0) &&
                         (block_index == 3'd0) &&
                         (row_index == 3'd0)) begin
                         read_seen      <= 1'b1;
@@ -283,7 +296,7 @@ always @(posedge clk) begin
                     if (ddram_dout != reference_rows[row_index])
                         error <= 1'b1;
 
-                    if ((macroblock_index == 2'd0) &&
+                    if ((macroblock_count == 3'd0) &&
                         (block_index == 3'd0) &&
                         (row_index == 3'd0) &&
                         (ddram_dout == reference_rows[0])) begin
@@ -292,7 +305,7 @@ always @(posedge clk) begin
 
                     if (row_index == 3'd7) begin
                         if (block_index == 3'd5) begin
-                            if (macroblock_index == 2'd3) begin
+                            if (macroblock_count == 3'd3) begin
                                 if (ddram_dout == reference_rows[7]) begin
                                     persisted_seen     <= 1'b1;
                                     reconstructed_seen <= 1'b1;
@@ -300,11 +313,18 @@ always @(posedge clk) begin
                                 end
                             end
                             else begin
-                                macroblock_index <= macroblock_index + 2'd1;
-                                block_index      <= 3'd0;
-                                row_index        <= 3'd0;
-                                read_kind        <= READ_REFERENCE;
-                                request_active   <= 1'b1;
+                                macroblock_count <= macroblock_count + 3'd1;
+                                if ((mb_col + 9'd1) >= CONTROLLED_MB_WIDTH) begin
+                                    mb_col <= 9'd0;
+                                    mb_row <= mb_row + 9'd1;
+                                end
+                                else begin
+                                    mb_col <= mb_col + 9'd1;
+                                end
+                                block_index    <= 3'd0;
+                                row_index      <= 3'd0;
+                                read_kind      <= READ_REFERENCE;
+                                request_active <= 1'b1;
                             end
                         end
                         else begin
@@ -323,7 +343,7 @@ always @(posedge clk) begin
         end
 
         if (emit_active) begin
-            if ((macroblock_index == 2'd0) &&
+            if ((macroblock_count == 3'd0) &&
                 (block_index == 3'd0) &&
                 (emit_index == 6'd0)) begin
                 reconstructed_value <= store_pixel_value;
