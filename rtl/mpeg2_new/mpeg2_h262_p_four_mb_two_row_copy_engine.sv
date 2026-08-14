@@ -8,11 +8,11 @@
 //   H262-008 slice vertical position selects the macroblock row.
 //   H262-009 macroblock addressing advances within each slice row.
 //
-// kate - Phase 1T-w preserves the hardware-accepted four-macroblock limit and
-// accepts raster width through an explicit interface.  Width is latched with
-// the request so later picture-header activity cannot move an active raster.
-// The current reference pipeline still supplies the proven width value 2; a
-// later geometry step can replace that source without changing this engine.
+// kate - Phase 1U-a removes the internal four-macroblock completion constant.
+// The requested macroblock count is latched with the raster width and frame-bank
+// ownership so later control activity cannot move the active reconstruction.
+// The current reference pipeline deliberately supplies count=4, preserving the
+// hardware-accepted Phase 1T behavior while exposing the next geometry boundary.
 //============================================================================
 
 module mpeg2_h262_p_four_mb_two_row_copy_engine
@@ -21,6 +21,7 @@ module mpeg2_h262_p_four_mb_two_row_copy_engine
     input  wire        reset,
     input  wire        request,
     input  wire [8:0]  macroblock_width,
+    input  wire [15:0] macroblock_count,
 
     input  wire        reference_valid,
     input  wire        reference_bank,
@@ -142,7 +143,8 @@ reg        latched_destination_bank;
 reg        read_kind;
 reg        request_active;
 reg        response_waiting;
-reg [2:0]  macroblock_count;
+reg [15:0] macroblock_index;
+reg [15:0] latched_macroblock_count;
 reg [8:0]  latched_macroblock_width;
 reg [8:0]  mb_col;
 reg [8:0]  mb_row;
@@ -208,7 +210,8 @@ always @(posedge clk) begin
         read_kind                <= READ_REFERENCE;
         request_active           <= 1'b0;
         response_waiting         <= 1'b0;
-        macroblock_count         <= 3'd0;
+        macroblock_index         <= 16'd0;
+        latched_macroblock_count <= 16'd0;
         latched_macroblock_width <= 9'd0;
         mb_col                   <= 9'd0;
         mb_row                   <= 9'd0;
@@ -236,7 +239,8 @@ always @(posedge clk) begin
             latched_reference_bank   <= reference_bank;
             latched_destination_bank <= destination_bank;
             read_kind                <= READ_REFERENCE;
-            macroblock_count         <= 3'd0;
+            macroblock_index         <= 16'd0;
+            latched_macroblock_count <= macroblock_count;
             latched_macroblock_width <= macroblock_width;
             mb_col                   <= 9'd0;
             mb_row                   <= 9'd0;
@@ -246,7 +250,8 @@ always @(posedge clk) begin
 
             if (!reference_valid ||
                 (destination_bank == reference_bank) ||
-                (macroblock_width == 9'd0)) begin
+                (macroblock_width == 9'd0) ||
+                (macroblock_count == 16'd0)) begin
                 error <= 1'b1;
             end
             else begin
@@ -275,7 +280,7 @@ always @(posedge clk) begin
                 if (read_kind == READ_REFERENCE) begin
                     reference_rows[row_index] <= ddram_dout;
 
-                    if ((macroblock_count == 3'd0) &&
+                    if ((macroblock_index == 16'd0) &&
                         (block_index == 3'd0) &&
                         (row_index == 3'd0)) begin
                         read_seen      <= 1'b1;
@@ -296,7 +301,7 @@ always @(posedge clk) begin
                     if (ddram_dout != reference_rows[row_index])
                         error <= 1'b1;
 
-                    if ((macroblock_count == 3'd0) &&
+                    if ((macroblock_index == 16'd0) &&
                         (block_index == 3'd0) &&
                         (row_index == 3'd0) &&
                         (ddram_dout == reference_rows[0])) begin
@@ -305,7 +310,8 @@ always @(posedge clk) begin
 
                     if (row_index == 3'd7) begin
                         if (block_index == 3'd5) begin
-                            if (macroblock_count == 3'd3) begin
+                            if ((macroblock_index + 16'd1) >=
+                                latched_macroblock_count) begin
                                 if (ddram_dout == reference_rows[7]) begin
                                     persisted_seen     <= 1'b1;
                                     reconstructed_seen <= 1'b1;
@@ -313,7 +319,7 @@ always @(posedge clk) begin
                                 end
                             end
                             else begin
-                                macroblock_count <= macroblock_count + 3'd1;
+                                macroblock_index <= macroblock_index + 16'd1;
                                 if ((mb_col + 9'd1) >= latched_macroblock_width) begin
                                     mb_col <= 9'd0;
                                     mb_row <= mb_row + 9'd1;
@@ -343,7 +349,7 @@ always @(posedge clk) begin
         end
 
         if (emit_active) begin
-            if ((macroblock_count == 3'd0) &&
+            if ((macroblock_index == 16'd0) &&
                 (block_index == 3'd0) &&
                 (emit_index == 6'd0)) begin
                 reconstructed_value <= store_pixel_value;

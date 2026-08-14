@@ -66,6 +66,12 @@ wire [8:0] four_macroblock_width =
     ((horizontal_size != 14'd0) && (horizontal_size <= 14'd720)) ?
         four_macroblock_width_full[8:0] : 9'd0;
 
+// kate - Phase 1U-a: keep the hardware-proven 32x32 diagnostic at exactly four
+// macroblocks while the copy engine's completion boundary becomes explicit.
+// A later isolated geometry increment can replace this constant with a live
+// coded picture macroblock count without changing the engine again.
+wire [15:0] four_macroblock_count = 16'd4;
+
 wire four_request =
     p_forward_vector_valid &&
     (p_forward_vector_x == 13'sd0) &&
@@ -272,6 +278,7 @@ mpeg2_h262_p_four_mb_two_row_copy_engine four_probe
     .reset                (reset),
     .request              (four_sel),
     .macroblock_width     (four_macroblock_width),
+    .macroblock_count     (four_macroblock_count),
     .reference_valid      (reference_frame_valid),
     .reference_bank       (reference_frame_bank),
     .destination_bank     (destination_frame_bank),
