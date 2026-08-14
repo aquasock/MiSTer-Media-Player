@@ -1,10 +1,10 @@
 //============================================================================
 // MiSTer Media Player - P diagnostic controller
 //
-// Phase 1U-o preserves all accepted P clients and adds one controlled
-// motion+residual raster.  Its six-block residual is buffered and replayed only
-// after the exact picture syntax has been verified, so the legacy aligned-plan
-// transport remains unchanged for already-accepted streams.
+// Phase 1U-q replaces the fixed aligned-motion payload observer with a buffered
+// syntax-derived plan parser.  The public aligned plan transport remains the
+// accepted 48-bit serialized sideband; only parser hold ownership is added.
+// Mixed motion+residual behavior from Phase 1U-o is preserved unchanged.
 //============================================================================
 module mpeg2_h262_p_diagnostic_controller
 (
@@ -20,7 +20,7 @@ module mpeg2_h262_p_diagnostic_controller
 wire syntax_error_raw,mb_seen_raw,vector_valid_raw;wire signed[12:0] vector_x_raw,vector_y_raw;
 wire two_mb_seen,two_mb_error;
 wire four_mb_candidate,four_mb_seen,four_mb_complete_now,four_mb_parse_hold,four_mb_error;
-wire aligned_candidate,aligned_seen,aligned_complete_now;wire[47:0] aligned_shift_right_map;wire aligned_error;
+wire aligned_candidate,aligned_seen,aligned_complete_now,aligned_parse_hold;wire[47:0] aligned_shift_right_map;wire aligned_error;
 wire mixed_candidate,mixed_seen,mixed_complete_now,mixed_first_slice_complete;wire[47:0] mixed_shift_right_map;wire mixed_error;
 wire residual_decision,residual_required_raw,residual_success_raw,first_valid_raw,residual_valid_raw,residual_error_raw,mixed_replay_active;
 wire signed[15:0] first_value_raw,residual_value_raw;wire[5:0] residual_index_raw;
@@ -30,7 +30,6 @@ wire raster_candidate=four_mb_candidate||aligned_candidate||mixed_candidate;
 wire raster_seen=four_mb_seen||aligned_seen||mixed_seen;
 wire raster_complete_now=four_mb_complete_now||aligned_complete_now||mixed_complete_now;
 
-// Accepted Phase 1U-l aligned-plan serialization remains intact for old streams.
 reg aligned_plan_sending,aligned_plan_done;reg[5:0] aligned_plan_index;
 always @(posedge clk)begin
  if(reset)begin aligned_plan_sending<=0;aligned_plan_done<=0;aligned_plan_index<=0;end
@@ -66,7 +65,7 @@ always @(posedge clk)begin
 end
 wire hold_seen_combined=raster_seen?raster_hold_seen:hold_seen;
 assign p_macroblock_type_seen=mb_seen_decoded&&(!p_picture_expected||(hold_seen_combined&&!two_mb_wait&&!raster_wait));
-assign stream_hold=four_mb_parse_hold||raster_hold_active||(!raster_candidate&&old_stream_hold);
+assign stream_hold=four_mb_parse_hold||aligned_parse_hold||raster_hold_active||(!raster_candidate&&old_stream_hold);
 wire syntax_error=syntax_error_raw&&!two_mb_seen&&!four_mb_seen&&!aligned_candidate&&!aligned_seen&&!mixed_candidate&&!mixed_seen;
 wire progress_error=p_picture_expected&&!p_macroblock_type_seen;
 assign probe_error=syntax_error|two_mb_error|four_mb_error|((aligned_error)&&!use_mixed)|mixed_error|residual_error_raw|hold_error|raster_hold_error|progress_error;
@@ -74,7 +73,7 @@ assign probe_error=syntax_error|two_mb_error|four_mb_error|((aligned_error)&&!us
 mpeg2_h262_p_syntax_probe syntax_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.p_picture_expected(p_picture_expected),.p_macroblock_type_seen(mb_seen_raw),.p_forward_vector_valid(vector_valid_raw),.p_forward_vector_x(vector_x_raw),.p_forward_vector_y(vector_y_raw),.probe_error(syntax_error_raw));
 mpeg2_h262_p_two_mb_syntax_probe two_mb_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.two_mb_seen(two_mb_seen),.probe_error(two_mb_error));
 mpeg2_h262_p_four_mb_two_row_syntax_probe four_mb_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.four_mb_candidate(four_mb_candidate),.four_mb_seen(four_mb_seen),.four_mb_complete_now(four_mb_complete_now),.parse_hold(four_mb_parse_hold),.probe_error(four_mb_error));
-mpeg2_h262_p_aligned_motion_syntax_probe aligned_motion_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.aligned_candidate(aligned_candidate),.aligned_seen(aligned_seen),.aligned_complete_now(aligned_complete_now),.aligned_shift_right_map(aligned_shift_right_map),.probe_error(aligned_error));
+mpeg2_h262_p_aligned_motion_syntax_probe aligned_motion_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.aligned_candidate(aligned_candidate),.aligned_seen(aligned_seen),.aligned_complete_now(aligned_complete_now),.aligned_shift_right_map(aligned_shift_right_map),.parse_hold(aligned_parse_hold),.probe_error(aligned_error));
 mpeg2_h262_p_motion_residual_syntax_probe mixed_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.mixed_candidate(mixed_candidate),.mixed_seen(mixed_seen),.mixed_complete_now(mixed_complete_now),.first_slice_complete(mixed_first_slice_complete),.shift_right_map(mixed_shift_right_map),.probe_error(mixed_error));
 mpeg2_h262_p_residual_probe residual_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.p_picture_expected(p_picture_expected),.mixed_mode(use_mixed),.mixed_first_slice_complete(mixed_first_slice_complete),.mixed_release(mixed_seen),.decision_complete(residual_decision),.residual_required(residual_required_raw),.residual_success(residual_success_raw),.mixed_replay_active(mixed_replay_active),.first_sample_valid(first_valid_raw),.first_sample_value(first_value_raw),.residual_sample_valid(residual_valid_raw),.residual_sample_index(residual_index_raw),.residual_sample_value(residual_value_raw),.probe_error(residual_error_raw));
 mpeg2_h262_p_stream_hold hold_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.p_picture_active(p_picture_expected&&!raster_candidate),.p_macroblock_type_seen(mb_seen_for_hold),.p_residual_required(residual_required_raw),.p_persistence_complete(p_persistence_complete),.stream_hold(old_stream_hold),.hold_seen(hold_seen),.hold_error(hold_error));
