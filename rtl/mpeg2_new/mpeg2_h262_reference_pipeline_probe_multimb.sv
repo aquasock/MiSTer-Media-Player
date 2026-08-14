@@ -1,11 +1,10 @@
 //============================================================================
-// MiSTer Media Player - Phase 1T-r reference pipeline
+// MiSTer Media Player - Phase 1T-s reference pipeline
 //
-// kate - Keep the public reference-probe interface unchanged.  Existing
-// explicit x=4/x=3 diagnostics retain their proven client; the accepted
-// implicit residual path retains the complete first-420-macroblock engine; and
-// the semantic two-MB observer alone exports explicit (0,0), selecting the new
-// serialized two-macroblock copy/readback client.
+// kate - Keep the public reference-probe interface unchanged.  The accepted
+// f_code=(1,1) two-MB client remains untouched.  A distinct f_code=(2,2),
+// zero-vector semantic proof selects a new 2x2-macroblock/two-row copy client.
+// Existing explicit-motion and implicit-residual clients retain their behavior.
 //============================================================================
 
 module mpeg2_h262_reference_read_probe
@@ -50,6 +49,14 @@ module mpeg2_h262_reference_read_probe
     output wire        probe_error
 );
 
+wire four_request =
+    p_forward_vector_valid &&
+    (p_forward_vector_x == 13'sd0) &&
+    (p_forward_vector_y == 13'sd0) &&
+    (forward_f_code_horizontal == 4'd2) &&
+    (forward_f_code_vertical   == 4'd2) &&
+    !p_implicit_reconstruct_request;
+
 wire copy_request =
     p_forward_vector_valid &&
     (p_forward_vector_x == 13'sd0) &&
@@ -63,16 +70,24 @@ wire copy_request =
 // but the completed P persistence sideband must remain visible to the P
 // controller and USER success predicate.
 reg copy_selected;
+reg four_selected;
 always @(posedge clk) begin
-    if (reset)
+    if (reset) begin
         copy_selected <= 1'b0;
-    else if (copy_request)
-        copy_selected <= 1'b1;
+        four_selected <= 1'b0;
+    end
+    else begin
+        if (copy_request)
+            copy_selected <= 1'b1;
+        if (four_request)
+            four_selected <= 1'b1;
+    end
 end
 
-wire copy_sel = copy_selected || copy_request;
-wire implicit_sel = p_implicit_reconstruct_request && !copy_sel;
-wire explicit_sel = !copy_sel && !implicit_sel;
+wire four_sel = four_selected || four_request;
+wire copy_sel = !four_sel && (copy_selected || copy_request);
+wire implicit_sel = p_implicit_reconstruct_request && !four_sel && !copy_sel;
+wire explicit_sel = !four_sel && !copy_sel && !implicit_sel;
 
 wire [7:0]  explicit_burstcnt;
 wire [28:0] explicit_addr;
@@ -121,6 +136,25 @@ wire [11:0] copy_store_y;
 wire        copy_store_valid;
 wire        copy_store_start;
 wire        copy_store_complete;
+
+wire [7:0]  four_burstcnt;
+wire [28:0] four_addr;
+wire        four_rd;
+wire        four_read_seen;
+wire [7:0]  four_sample;
+wire        four_nonzero;
+wire        four_reconstructed_seen;
+wire [7:0]  four_reconstructed_value;
+wire        four_persisted_seen;
+wire [7:0]  four_persisted_value;
+wire        four_error;
+wire        four_store_select;
+wire [7:0]  four_store_value;
+wire [11:0] four_store_x;
+wire [11:0] four_store_y;
+wire        four_store_valid;
+wire        four_store_start;
+wire        four_store_complete;
 
 mpeg2_h262_p_explicit_reference_probe explicit_probe
 (
@@ -215,35 +249,84 @@ mpeg2_h262_p_two_mb_copy_engine copy_probe
     .error                (copy_error)
 );
 
-assign ddram_burstcnt = copy_sel ? copy_burstcnt :
+mpeg2_h262_p_four_mb_two_row_copy_engine four_probe
+(
+    .clk                  (clk),
+    .reset                (reset),
+    .request              (four_sel),
+    .reference_valid      (reference_frame_valid),
+    .reference_bank       (reference_frame_bank),
+    .destination_bank     (destination_frame_bank),
+    .store_block_stored   (p_store_block_stored),
+    .ddram_busy           (ddram_busy),
+    .ddram_dout           (ddram_dout),
+    .ddram_dout_ready     (ddram_dout_ready && four_sel),
+    .ddram_burstcnt       (four_burstcnt),
+    .ddram_addr           (four_addr),
+    .ddram_rd             (four_rd),
+    .store_select         (four_store_select),
+    .store_pixel_value    (four_store_value),
+    .store_pixel_x        (four_store_x),
+    .store_pixel_y        (four_store_y),
+    .store_pixel_valid    (four_store_valid),
+    .store_block_start    (four_store_start),
+    .store_block_complete (four_store_complete),
+    .read_seen            (four_read_seen),
+    .sample_value         (four_sample),
+    .sample_nonzero       (four_nonzero),
+    .reconstructed_seen   (four_reconstructed_seen),
+    .reconstructed_value  (four_reconstructed_value),
+    .persisted_seen       (four_persisted_seen),
+    .persisted_value      (four_persisted_value),
+    .error                (four_error)
+);
+
+assign ddram_burstcnt = four_sel ? four_burstcnt :
+                        copy_sel ? copy_burstcnt :
                         implicit_sel ? implicit_burstcnt : explicit_burstcnt;
-assign ddram_addr = copy_sel ? copy_addr :
+assign ddram_addr = four_sel ? four_addr :
+                    copy_sel ? copy_addr :
                     implicit_sel ? implicit_addr : explicit_addr;
-assign ddram_rd = copy_sel ? copy_rd :
+assign ddram_rd = four_sel ? four_rd :
+                  copy_sel ? copy_rd :
                   implicit_sel ? implicit_rd : explicit_rd;
 
-assign p_store_select = copy_sel ? copy_store_select : implicit_store_select;
-assign p_store_pixel_value = copy_sel ? copy_store_value : implicit_store_value;
-assign p_store_pixel_x = copy_sel ? copy_store_x : implicit_store_x;
-assign p_store_pixel_y = copy_sel ? copy_store_y : implicit_store_y;
-assign p_store_pixel_valid = copy_sel ? copy_store_valid : implicit_store_valid;
-assign p_store_block_start = copy_sel ? copy_store_start : implicit_store_start;
-assign p_store_block_complete = copy_sel ? copy_store_complete : implicit_store_complete;
+assign p_store_select = four_sel ? four_store_select :
+                        copy_sel ? copy_store_select : implicit_store_select;
+assign p_store_pixel_value = four_sel ? four_store_value :
+                             copy_sel ? copy_store_value : implicit_store_value;
+assign p_store_pixel_x = four_sel ? four_store_x :
+                         copy_sel ? copy_store_x : implicit_store_x;
+assign p_store_pixel_y = four_sel ? four_store_y :
+                         copy_sel ? copy_store_y : implicit_store_y;
+assign p_store_pixel_valid = four_sel ? four_store_valid :
+                             copy_sel ? copy_store_valid : implicit_store_valid;
+assign p_store_block_start = four_sel ? four_store_start :
+                             copy_sel ? copy_store_start : implicit_store_start;
+assign p_store_block_complete = four_sel ? four_store_complete :
+                                copy_sel ? copy_store_complete : implicit_store_complete;
 
-assign read_seen = copy_sel ? copy_read_seen :
+assign read_seen = four_sel ? four_read_seen :
+                   copy_sel ? copy_read_seen :
                    implicit_sel ? implicit_read_seen : explicit_read_seen;
-assign sample_value = copy_sel ? copy_sample :
+assign sample_value = four_sel ? four_sample :
+                      copy_sel ? copy_sample :
                       implicit_sel ? implicit_sample : explicit_sample;
-assign sample_nonzero = copy_sel ? copy_nonzero :
+assign sample_nonzero = four_sel ? four_nonzero :
+                        copy_sel ? copy_nonzero :
                         implicit_sel ? implicit_nonzero : explicit_nonzero;
 assign half_sample_seen = explicit_sel ? explicit_half : 1'b0;
-assign reconstructed_seen = copy_sel ? copy_reconstructed_seen :
+assign reconstructed_seen = four_sel ? four_reconstructed_seen :
+                            copy_sel ? copy_reconstructed_seen :
                             implicit_reconstructed_seen;
-assign reconstructed_value = copy_sel ? copy_reconstructed_value :
+assign reconstructed_value = four_sel ? four_reconstructed_value :
+                             copy_sel ? copy_reconstructed_value :
                              implicit_reconstructed_value;
-assign persisted_seen = copy_sel ? copy_persisted_seen : implicit_persisted_seen;
-assign persisted_value = copy_sel ? copy_persisted_value : implicit_persisted_value;
-assign probe_error = explicit_error || implicit_error || copy_error;
+assign persisted_seen = four_sel ? four_persisted_seen :
+                        copy_sel ? copy_persisted_seen : implicit_persisted_seen;
+assign persisted_value = four_sel ? four_persisted_value :
+                         copy_sel ? copy_persisted_value : implicit_persisted_value;
+assign probe_error = explicit_error || implicit_error || copy_error || four_error;
 
 wire unused_explicit_active = explicit_active;
 

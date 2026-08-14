@@ -1,9 +1,10 @@
 //============================================================================
-// MiSTer Media Player - Phase 1T-r P diagnostic controller
+// MiSTer Media Player - Phase 1T-s P diagnostic controller
 //
-// kate - Preserve the accepted c5b6 syntax/residual/hold paths.  Add the
-// independently parsed 32x16 two-macroblock zero-vector diagnostic, and withhold
-// public P success and hold release until its complete DDR persistence proof.
+// kate - Preserve the hardware-accepted Phase 1T-r paths.  Add an independent
+// 32x32/two-slice observer.  Its f_code=(2,2) zero-vector proof is held only
+// after the second slice boundary, so the existing first-slice hold remains
+// byte-for-byte behaviorally isolated for all previously accepted diagnostics.
 //============================================================================
 
 module mpeg2_h262_p_diagnostic_controller
@@ -39,6 +40,11 @@ wire signed [12:0] vector_y_raw;
 wire two_mb_seen;
 wire two_mb_error;
 
+wire four_mb_candidate;
+wire four_mb_seen;
+wire four_mb_complete_now;
+wire four_mb_error;
+
 wire residual_decision;
 wire residual_required_raw;
 wire residual_success_raw;
@@ -50,10 +56,20 @@ wire signed [15:0] residual_value_raw;
 wire residual_error;
 wire hold_seen;
 wire hold_error;
+wire old_stream_hold;
 
-assign p_forward_vector_valid = two_mb_seen ? 1'b1 : vector_valid_raw;
-assign p_forward_vector_x     = two_mb_seen ? 13'sd0 : vector_x_raw;
-assign p_forward_vector_y     = two_mb_seen ? 13'sd0 : vector_y_raw;
+// Once either semantic multi-MB observer completes, publish the exact zero
+// vector it proved.  While the four-MB candidate is still being observed,
+// suppress the older first-macroblock vector so the new engine cannot start
+// before both slice rows are semantically verified.
+assign p_forward_vector_valid =
+    four_mb_seen ? 1'b1 :
+    two_mb_seen  ? 1'b1 :
+    four_mb_candidate ? 1'b0 : vector_valid_raw;
+assign p_forward_vector_x =
+    (four_mb_seen || two_mb_seen) ? 13'sd0 : vector_x_raw;
+assign p_forward_vector_y =
+    (four_mb_seen || two_mb_seen) ? 13'sd0 : vector_y_raw;
 
 assign p_residual_required           = residual_required_raw;
 assign p_residual_success            = residual_success_raw;
@@ -63,35 +79,84 @@ assign p_residual_sample_valid       = residual_valid_raw;
 assign p_residual_sample_index       = residual_index_raw;
 assign p_residual_sample_value       = residual_value_raw;
 
-wire mb_seen_combined = mb_seen_raw || two_mb_seen;
+wire mb_seen_combined =
+    four_mb_candidate ? four_mb_seen :
+    (mb_seen_raw || two_mb_seen || four_mb_seen);
 wire mb_seen_decoded =
     mb_seen_combined &&
     (!p_picture_expected ||
      (residual_decision &&
       (!residual_required_raw || residual_success_raw)));
 
-// For the new no-residual two-MB case, do not let the existing stream-hold
-// controller see syntax completion until the copy engine has verified all
-// twelve blocks.  Existing no-residual and residual diagnostics are unchanged.
-wire two_mb_wait = two_mb_seen && !p_persistence_complete;
-wire mb_seen_for_hold = mb_seen_decoded && !two_mb_wait;
+// Existing two-MB persistence gating is unchanged.  The four-MB path uses a
+// separate boundary hold below so the first slice can flow into the observer.
+wire two_mb_wait  = two_mb_seen  && !p_persistence_complete;
+wire four_mb_wait = four_mb_seen && !p_persistence_complete;
+wire mb_seen_for_hold = mb_seen_decoded && !two_mb_wait && !four_mb_wait;
+
+reg        four_hold_active;
+reg        four_hold_seen;
+reg        four_hold_error;
+reg [19:0] four_hold_timeout;
+
+always @(posedge clk) begin
+    if (reset) begin
+        four_hold_active  <= 1'b0;
+        four_hold_seen    <= 1'b0;
+        four_hold_error   <= 1'b0;
+        four_hold_timeout <= 20'd0;
+    end
+    else begin
+        // four_mb_complete_now is asserted on the same accepted byte that
+        // completes the next start code after slice 2.  Holding here prevents
+        // any following picture payload byte from entering while DDR copy and
+        // readback are in flight.
+        if (four_mb_complete_now && !four_hold_seen) begin
+            four_hold_active  <= 1'b1;
+            four_hold_seen    <= 1'b1;
+            four_hold_timeout <= 20'hFFFFF;
+        end
+
+        if (four_hold_active) begin
+            if (p_persistence_complete) begin
+                four_hold_active  <= 1'b0;
+                four_hold_timeout <= 20'd0;
+            end
+            else if (four_hold_timeout == 20'd1) begin
+                four_hold_active  <= 1'b0;
+                four_hold_timeout <= 20'd0;
+                four_hold_error   <= 1'b1;
+            end
+            else if (four_hold_timeout != 20'd0) begin
+                four_hold_timeout <= four_hold_timeout - 20'd1;
+            end
+        end
+    end
+end
+
+wire hold_seen_combined = four_mb_seen ? four_hold_seen : hold_seen;
 
 assign p_macroblock_type_seen =
     mb_seen_decoded &&
-    (!p_picture_expected || (hold_seen && !two_mb_wait));
+    (!p_picture_expected ||
+     (hold_seen_combined && !two_mb_wait && !four_mb_wait));
+
+assign stream_hold =
+    four_hold_active || (!four_mb_candidate && old_stream_hold);
 
 // The older first-macroblock passive syntax probe intentionally expects a
-// longer capture and flags the new three-byte controlled slice.  Suppress only
-// that raw syntax error after the independent semantic two-MB observer proves
-// the complete slice.  All other existing errors remain live.
-wire syntax_error = syntax_error_raw && !two_mb_seen;
+// different bounded capture.  Suppress its raw error only after an independent
+// semantic multi-MB observer proves the complete controlled syntax.
+wire syntax_error = syntax_error_raw && !two_mb_seen && !four_mb_seen;
 wire progress_error = p_picture_expected && !p_macroblock_type_seen;
 
 assign probe_error =
     syntax_error |
     two_mb_error |
+    four_mb_error |
     residual_error |
     hold_error |
+    four_hold_error |
     progress_error;
 
 mpeg2_h262_p_syntax_probe syntax_probe
@@ -118,6 +183,18 @@ mpeg2_h262_p_two_mb_syntax_probe two_mb_probe
     .probe_error  (two_mb_error)
 );
 
+mpeg2_h262_p_four_mb_two_row_syntax_probe four_mb_probe
+(
+    .clk                 (clk),
+    .reset               (reset),
+    .stream_data         (stream_data),
+    .stream_valid        (stream_valid),
+    .four_mb_candidate   (four_mb_candidate),
+    .four_mb_seen        (four_mb_seen),
+    .four_mb_complete_now(four_mb_complete_now),
+    .probe_error         (four_mb_error)
+);
+
 mpeg2_h262_p_residual_probe residual_probe
 (
     .clk                (clk),
@@ -142,11 +219,11 @@ mpeg2_h262_p_stream_hold hold_probe
     .reset                  (reset),
     .stream_data            (stream_data),
     .stream_valid           (stream_valid),
-    .p_picture_active       (p_picture_expected),
+    .p_picture_active       (p_picture_expected && !four_mb_candidate),
     .p_macroblock_type_seen (mb_seen_for_hold),
     .p_residual_required    (residual_required_raw),
     .p_persistence_complete (p_persistence_complete),
-    .stream_hold            (stream_hold),
+    .stream_hold            (old_stream_hold),
     .hold_seen              (hold_seen),
     .hold_error             (hold_error)
 );
