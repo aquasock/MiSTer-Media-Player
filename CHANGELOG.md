@@ -4,17 +4,25 @@ All notable project milestones are documented here.
 
 This project is still in active pre-release development. Published milestone releases use semantic version numbers, while unreleased work remains organized by development phase.
 
-## Unreleased — Phase 1T
+## Unreleased
 
-Target milestone: **v0.3.0**
+No unreleased milestone changes yet.
 
-Planned next milestone:
+## [0.3.0] - 2026-08-14 — Phase 1T
 
-- establish reference-picture management needed for predictive pictures;
-- preserve the hardware-proven continuous all-I decode and presentation path as the regression baseline;
-- begin P-picture decode/prediction work in small hardware-testable steps;
-- keep timestamp/scheduling metadata compatible with later H.222.0 PES-derived timestamps;
-- preserve the Phase 1P timing/CDC discipline.
+Reference-picture management and the first hardware-proven predictive-picture reconstruction paths.
+
+- Preserved the hardware-proven continuous progressive 4:2:0 all-I decode, DDR ping-pong storage, blanking-aligned publication, and synthetic 90 kHz elementary-stream timing baseline from v0.2.0.
+- Added reference-picture bookkeeping and controlled reference/destination DDR-bank ownership for predictive-picture work.
+- Added P-picture diagnostic syntax, motion-vector, stream-hold, and reference-read paths developed against ITU-T H.262 semantics.
+- Added controlled forward-prediction reconstruction paths, including zero-vector reference copying, explicit reference sampling, and the established half-sample interpolation behavior used by the hardware diagnostics.
+- Added non-intra P residual parsing, inverse quantization / transform handling, prediction-plus-residual reconstruction, and ordinary DDR persistence for the controlled supported path.
+- Extended the controlled P reconstruction proof from one complete 4:2:0 macroblock to two adjacent macroblocks and then to four macroblocks over two raster rows.
+- Replaced fixed macroblock-index placement in the four-macroblock path with explicit raster row/column tracking and then fed that path from live coded horizontal geometry using the H.262 `(horizontal_size + 15) / 16` macroblock-width rule.
+- Preserved the existing all-I hardware regressions while adding dedicated P-picture regression streams for reference reads, residual reconstruction, two-macroblock placement, and four-macroblock/two-row placement.
+- Preserved the Phase 1P timing/CDC discipline throughout the predictive-picture increments.
+- Current limitation: P-picture support remains a deliberately controlled hardware-proven diagnostic subset, not general arbitrary MPEG-2 P-picture playback. B pictures are not supported.
+- Current input remains raw MPEG-2 Video elementary stream data; H.222.0/MPEG program-stream demux, PES timestamps, audio, and DVD/VOB playback remain future work.
 
 ## [0.2.0] - 2026-08-12 — Phase 1S
 
