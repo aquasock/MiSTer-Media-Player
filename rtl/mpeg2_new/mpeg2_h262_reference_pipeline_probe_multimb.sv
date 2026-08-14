@@ -15,6 +15,10 @@ module mpeg2_h262_reference_read_probe
     // It is intentionally not consumed until the top-level connection is
     // hardware-validated in the next increment.
     input  wire [13:0] horizontal_size,
+    // kate - Phase 1U-b: expose coded vertical geometry beside horizontal_size.
+    // It is deliberately not consumed yet; the next isolated step can connect
+    // and validate the live top-level signal before any count behavior changes.
+    input  wire [13:0] vertical_size,
     input  wire        p_vector_proof_seen,
     input  wire        p_forward_vector_valid,
     input  wire signed [12:0] p_forward_vector_x,
@@ -254,7 +258,7 @@ mpeg2_h262_p_two_mb_copy_engine copy_probe
     .ddram_dout_ready     (ddram_dout_ready && copy_sel),
     .ddram_burstcnt       (copy_burstcnt),
     .ddram_addr           (copy_addr),
-    .ddram_rd             (copy_rd),
+    .ddram_rd              (copy_rd),
     .store_select         (copy_store_select),
     .store_pixel_value    (copy_store_value),
     .store_pixel_x        (copy_store_x),
