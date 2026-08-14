@@ -11,22 +11,28 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_intra_re
 # temporary internal P chroma component tag carried in pixel_x[11:10].
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
-# kate - Phase 1T-q preserves explicit prediction reads and extends the
-# controlled implicit-zero path to the complete first 4:2:0 P macroblock.
+# kate - Phase 1T-r preserves the accepted explicit and complete first-420-MB
+# clients while adding a controlled two-macroblock zero-vector copy/readback.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_explicit_reference_probe.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_macroblock_420_engine.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_two_mb_copy_engine.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_multimb.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_bitreader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_ycbcr_to_rgb_bt601.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_luma4_probe.sv
-# kate - Phase 1T-d passive P-picture slice/macroblock syntax observer.
+# kate - Existing P syntax proof plus an independent semantic two-MB observer.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_syntax_probe.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_two_mb_syntax_probe.sv
 # kate - Phase 1T-q serialized first-P Y0,Y1,Y2,Y3,Cb,Cr residual pipeline.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_residual_parser_420.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_stream_hold.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_two_picture_probe.sv
+# kate - Phase 1T-r factors orchestration only; parser and P datapaths above
+# retain their public interfaces and accepted behavior.
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_picture_bookkeeper.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_two_picture_probe_multimb.sv
 
 # kate - Phase 1R: MPEG2FPGA and its DDR bridge remain outside the active
 # Quartus design.  rtl/mpeg2fpga remains in the repository only as a
