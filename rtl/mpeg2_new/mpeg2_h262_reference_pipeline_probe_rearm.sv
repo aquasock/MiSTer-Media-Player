@@ -1,15 +1,15 @@
 //============================================================================
 // MiSTer Media Player - re-arm wrapper for accepted P reference pipeline
 //
-// Phase 1U-n reuses the exact accepted Phase 1U-l reference pipeline source.
-// The source is preprocessor-renamed to an internal base module, then wrapped
-// with a one-cycle local reset when a persisted plan has completed and the
-// controller withdraws its representative vector at the following P header.
+// Phase 1U-n reuses the exact accepted Phase 1U-l reference pipeline logic.
+// The included source declares an internal base module explicitly, then this
+// public wrapper applies a one-cycle local reset when a persisted plan has
+// completed and the controller withdraws its representative vector at the
+// following P header.  The explicit base name is Quartus-17-safe and avoids
+// relying on preprocessor identifier renaming.
 //============================================================================
 
-`define mpeg2_h262_reference_read_probe mpeg2_h262_reference_read_probe_base
 `include "rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_plan.sv"
-`undef mpeg2_h262_reference_read_probe
 
 module mpeg2_h262_reference_read_probe
 (

@@ -9,7 +9,7 @@
 // (+32,0), so no public top-level interface changes are required in this phase.
 //============================================================================
 
-module mpeg2_h262_reference_read_probe
+module mpeg2_h262_reference_read_probe_base
 (
     input  wire        clk,
     input  wire        reset,
