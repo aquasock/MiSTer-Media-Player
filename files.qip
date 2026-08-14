@@ -32,11 +32,11 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_residu
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_stream_hold.sv
-# kate - Phase 1U-l extends the factored P orchestration while preserving the
-# accepted I-picture bookkeeping and wrapper interfaces.
+# kate - Phase 1U-m publishes persisted P pictures into normal frame/reference
+# ownership while retaining the accepted I bookkeeper and P controller.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_picture_bookkeeper.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_two_picture_probe_multimb.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_publish.sv
 
 # kate - Phase 1R: MPEG2FPGA and its DDR bridge remain outside the active
 # Quartus design.  rtl/mpeg2fpga remains in the repository only as a
