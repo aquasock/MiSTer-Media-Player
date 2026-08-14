@@ -53,12 +53,18 @@ module mpeg2_h262_reference_read_probe
     output wire        probe_error
 );
 
-// kate - Phase 1T-w: move raster width ownership out of the four-MB engine.
-// The current syntax proof still admits only the accepted two-Macroblock-wide
-// controlled picture, so this interface value remains 2 for this increment.
-// The next geometry step can replace this source with live coded width without
-// changing the engine's address or raster machinery again.
-wire [8:0] four_macroblock_width = 9'd2;
+// kate - Phase 1T-z: activate live H.262 coded raster width at the already
+// hardware-validated geometry boundary.  H262-007 gives macroblock width as
+// (horizontal_size + 15) / 16.  The widened add avoids overflow, and the
+// existing implementation limit of horizontal_size <= 720 keeps the 9-bit
+// raster interface comfortably in range.  A zero size remains invalid.
+wire [14:0] four_horizontal_size_rounded =
+    {1'b0, horizontal_size} + 15'd15;
+wire [10:0] four_macroblock_width_full =
+    four_horizontal_size_rounded[14:4];
+wire [8:0] four_macroblock_width =
+    ((horizontal_size != 14'd0) && (horizontal_size <= 14'd720)) ?
+        four_macroblock_width_full[8:0] : 9'd0;
 
 wire four_request =
     p_forward_vector_valid &&
