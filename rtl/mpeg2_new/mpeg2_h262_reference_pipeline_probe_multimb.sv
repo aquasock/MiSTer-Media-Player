@@ -74,8 +74,7 @@ wire [8:0] four_macroblock_width =
 // current supported subset only: progressive sequence, 4:2:0, frame picture,
 // progressive frame.  The controlled H.262 4:2:0 record defines a 16x16 luma
 // macroblock, so this subset uses ceil(vertical_size / 16) macroblock rows.
-// This is deliberately not a claim about field-picture geometry.  Keep the
-// derived row count behavior-neutral until the next isolated activation step.
+// This is deliberately not a claim about field-picture geometry.
 wire [14:0] four_vertical_size_rounded =
     {1'b0, vertical_size} + 15'd15;
 wire [10:0] four_macroblock_height_full =
@@ -84,11 +83,17 @@ wire [8:0] four_macroblock_height =
     ((vertical_size != 14'd0) && (vertical_size <= 14'd480)) ?
         four_macroblock_height_full[8:0] : 9'd0;
 
-// kate - Phase 1U-a: keep the hardware-proven 32x32 diagnostic at exactly four
-// macroblocks while the copy engine's completion boundary becomes explicit.
-// A later isolated geometry increment can replace this constant with a live
-// coded picture macroblock count without changing the engine again.
-wire [15:0] four_macroblock_count = 16'd4;
+// kate - Phase 1U-e accelerated geometry step: activate the coded-picture
+// completion boundary for the currently supported progressive frame subset.
+// The implementation limits above bound the product to 45 * 30 = 1350, well
+// inside the copy engine's 16-bit macroblock_count input.  Invalid geometry
+// propagates as count zero and is rejected by the engine at request start.
+wire [17:0] four_macroblock_count_full =
+    four_macroblock_width * four_macroblock_height;
+wire [15:0] four_macroblock_count =
+    ((four_macroblock_width != 9'd0) &&
+     (four_macroblock_height != 9'd0)) ?
+        four_macroblock_count_full[15:0] : 16'd0;
 
 wire four_request =
     p_forward_vector_valid &&
@@ -372,6 +377,5 @@ assign persisted_value = four_sel ? four_persisted_value :
 assign probe_error = explicit_error || implicit_error || copy_error || four_error;
 
 wire unused_explicit_active = explicit_active;
-wire unused_four_macroblock_height = &{1'b0, four_macroblock_height};
 
 endmodule
