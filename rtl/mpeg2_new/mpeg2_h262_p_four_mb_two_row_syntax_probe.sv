@@ -3,16 +3,18 @@
 //
 // Standards authority: core-standards.md, source_id H262.
 // Relevant established records:
-//   H262-007 macroblock width
+//   H262-007 macroblock width = (horizontal_size + 15) / 16
 //   H262-008 slice vertical position identifies the macroblock row
 //   H262-009 macroblock address progression restarts from the slice basis
 //   H262-011 P-picture motion-forward-only macroblock_type code 001
 //   H262-012 motion_code 0 code 1
 //   H262-013 macroblock_address_increment 1 code 1
 //
-// kate - Phase 1T-s recognizes one deliberately narrow 32x32 progressive P
-// diagnostic.  It requires two P slices, vertical positions 1 and 2.  Each
-// slice contains exactly two adjacent motion-forward-only macroblocks with
+// kate - Phase 1T-u keeps the accepted two-row controlled P proof but derives
+// its two-macroblock slice width from sequence_header() horizontal_size rather
+// than matching one literal 32x32 header.  The controlled vertical boundary
+// remains 32 pels, with slices at vertical positions 1 and 2.  Each slice
+// contains exactly two adjacent motion-forward-only macroblocks with
 // macroblock_address_increment=1, motion_code=(0,0), and forward f_code=(2,2).
 // Each controlled slice therefore has the semantic payload 0x12 0x79 0xC0.
 //
@@ -51,12 +53,18 @@ wire        post_p_boundary_now =
     (start_code_value == SEQUENCE_HEADER_CODE);
 
 // sequence_header() first 24 payload bits are horizontal_size_value followed
-// by vertical_size_value.
+// by vertical_size_value.  H262-007 defines coded macroblock width from
+// horizontal_size; use that geometry instead of recognizing a literal header.
 reg        sequence_capture;
 reg [1:0]  sequence_count;
 reg [23:0] sequence_shift;
 wire [23:0] sequence_next = {sequence_shift[15:0], stream_data};
-reg        geometry_32x32;
+wire [11:0] sequence_horizontal_size = sequence_next[23:12];
+wire [11:0] sequence_vertical_size   = sequence_next[11:0];
+wire [12:0] sequence_horizontal_rounded =
+    {1'b0, sequence_horizontal_size} + 13'd15;
+wire [8:0] sequence_macroblock_width = sequence_horizontal_rounded[12:4];
+reg        geometry_two_mb_wide_32_high;
 
 // picture_header() first 16 payload bits contain temporal_reference[9:0],
 // picture_coding_type[2:0], then the first three vbv_delay bits.
@@ -116,27 +124,27 @@ assign four_mb_complete_now =
 
 always @(posedge clk) begin
     if (reset) begin
-        byte_window          <= 32'd0;
-        sequence_capture     <= 1'b0;
-        sequence_count       <= 2'd0;
-        sequence_shift       <= 24'd0;
-        geometry_32x32       <= 1'b0;
-        picture_capture      <= 1'b0;
-        picture_count        <= 1'b0;
-        picture_shift        <= 16'd0;
-        current_picture_is_p <= 1'b0;
-        pce_capture          <= 1'b0;
-        pce_count            <= 3'd0;
-        pce_shift            <= 40'd0;
-        four_mb_candidate    <= 1'b0;
-        slice_capture        <= 1'b0;
-        second_slice         <= 1'b0;
-        slice_count          <= 4'd0;
-        first_three_bytes    <= 24'd0;
-        first_three_complete <= 1'b0;
-        proof_done           <= 1'b0;
-        four_mb_seen         <= 1'b0;
-        probe_error          <= 1'b0;
+        byte_window                  <= 32'd0;
+        sequence_capture             <= 1'b0;
+        sequence_count               <= 2'd0;
+        sequence_shift               <= 24'd0;
+        geometry_two_mb_wide_32_high <= 1'b0;
+        picture_capture              <= 1'b0;
+        picture_count                <= 1'b0;
+        picture_shift                <= 16'd0;
+        current_picture_is_p         <= 1'b0;
+        pce_capture                  <= 1'b0;
+        pce_count                    <= 3'd0;
+        pce_shift                    <= 40'd0;
+        four_mb_candidate            <= 1'b0;
+        slice_capture                <= 1'b0;
+        second_slice                 <= 1'b0;
+        slice_count                  <= 4'd0;
+        first_three_bytes            <= 24'd0;
+        first_three_complete         <= 1'b0;
+        proof_done                   <= 1'b0;
+        four_mb_seen                 <= 1'b0;
+        probe_error                  <= 1'b0;
     end
     else if (stream_valid) begin
         byte_window <= byte_window_next;
@@ -146,7 +154,10 @@ always @(posedge clk) begin
             if (sequence_count == 2'd2) begin
                 sequence_capture <= 1'b0;
                 sequence_count   <= 2'd0;
-                geometry_32x32   <= (sequence_next == 24'h020020);
+                geometry_two_mb_wide_32_high <=
+                    (sequence_horizontal_size != 12'd0) &&
+                    (sequence_macroblock_width == 9'd2) &&
+                    (sequence_vertical_size == 12'd32);
             end
             else begin
                 sequence_count <= sequence_count + 2'd1;
@@ -188,7 +199,7 @@ always @(posedge clk) begin
                 // and vertical f_code are both 2.  motion_code=0 still yields
                 // an exact zero vector with no residual motion bits.
                 four_mb_candidate <=
-                    geometry_32x32 &&
+                    geometry_two_mb_wide_32_high &&
                     current_picture_is_p &&
                     (pce_next[39:36] == 4'h8) &&
                     (pce_next[35:32] == 4'd2) &&
@@ -221,7 +232,7 @@ always @(posedge clk) begin
                 end
                 else if (!second_slice) begin
                     // H262-008: the second slice start code selects row 1 of
-                    // this 32x32 picture.  H262-009 then restarts the MBA basis.
+                    // this controlled picture. H262-009 then restarts the MBA basis.
                     if (start_code_value == 8'h02) begin
                         slice_capture        <= 1'b1;
                         second_slice         <= 1'b1;
