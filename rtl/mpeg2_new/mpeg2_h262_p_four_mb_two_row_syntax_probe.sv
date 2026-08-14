@@ -44,6 +44,11 @@ wire [7:0]  start_code_value = byte_window_next[7:0];
 wire        slice_start_now  = start_code_now &&
                                (start_code_value >= 8'h01) &&
                                (start_code_value <= 8'hAF);
+// kate - Phase 1T-t: a following I picture may be preceded by a new sequence
+// header.  Both start codes are valid boundaries for the completed P picture.
+wire        post_p_boundary_now =
+    (start_code_value == PICTURE_START_CODE) ||
+    (start_code_value == SEQUENCE_HEADER_CODE);
 
 // sequence_header() first 24 payload bits are horizontal_size_value followed
 // by vertical_size_value.
@@ -96,14 +101,15 @@ wire controlled_payload_ok =
     (first_three_bytes[5:0]   == 6'b000000);
 
 // Assert on the exact accepted boundary after the second controlled slice.
-// This combinational pulse lets the controller stop the compressed stream on
-// the same boundary cycle, before bytes of the following picture are consumed.
+// The controlled stream may begin the next I picture directly or may emit a
+// sequence header first.  This combinational pulse lets the controller stop the
+// compressed stream on that boundary cycle, before its payload is consumed.
 assign four_mb_complete_now =
     stream_valid &&
     slice_capture &&
     second_slice &&
     start_code_now &&
-    (start_code_value == PICTURE_START_CODE) &&
+    post_p_boundary_now &&
     (slice_count == 4'd6) &&
     first_three_complete &&
     controlled_payload_ok;
@@ -233,7 +239,7 @@ always @(posedge clk) begin
                     slice_capture <= 1'b0;
                     proof_done    <= 1'b1;
 
-                    if (start_code_value == PICTURE_START_CODE)
+                    if (post_p_boundary_now)
                         four_mb_seen <= 1'b1;
                     else
                         probe_error <= 1'b1;
