@@ -5,6 +5,12 @@
 // syntax-derived plan parser.  The public aligned plan transport remains the
 // accepted 48-bit serialized sideband; only parser hold ownership is added.
 // Mixed motion+residual behavior from Phase 1U-o is preserved unchanged.
+//
+// Phase 1U-r latches completion of the mixed raster client because its
+// reference wrapper presents p_persistence_complete as a completion pulse when
+// ownership returns to the accepted base client.  The diagnostic proof must
+// remember that successful persistence after the pulse has passed; otherwise
+// mixed_seen remains asserted while raster_wait incorrectly re-asserts.
 //============================================================================
 module mpeg2_h262_p_diagnostic_controller
 (
@@ -51,9 +57,20 @@ assign p_residual_sample_valid=use_mixed?residual_valid_raw:(aligned_plan_sendin
 assign p_residual_sample_index=use_mixed?residual_index_raw:(aligned_plan_sending?aligned_plan_index:residual_index_raw);
 assign p_residual_sample_value=use_mixed?residual_value_raw:(aligned_plan_sending?$signed({15'd0,aligned_shift_right_map[aligned_plan_index]}):residual_value_raw);
 
+// The accepted base clients keep persisted_seen asserted until their local
+// re-arm, but the mixed wrapper drops back to the base client immediately after
+// mixed persistence.  Preserve the mixed completion as diagnostic state so the
+// final USER proof does not regress after that one-cycle completion handoff.
+reg mixed_persistence_seen;
+always @(posedge clk)begin
+ if(reset)mixed_persistence_seen<=0;
+ else if(mixed_seen&&p_persistence_complete)mixed_persistence_seen<=1;
+end
+wire raster_persistence_complete=use_mixed?(p_persistence_complete||mixed_persistence_seen):p_persistence_complete;
+
 wire mb_seen_combined=raster_candidate?raster_seen:(mb_seen_raw||two_mb_seen||raster_seen);
 wire mb_seen_decoded=mb_seen_combined&&(!p_picture_expected||(residual_decision&&(!residual_required_raw||residual_success_raw)));
-wire two_mb_wait=two_mb_seen&&!p_persistence_complete;wire raster_wait=raster_seen&&!p_persistence_complete;
+wire two_mb_wait=two_mb_seen&&!p_persistence_complete;wire raster_wait=raster_seen&&!raster_persistence_complete;
 wire mb_seen_for_hold=mb_seen_decoded&&!two_mb_wait&&!raster_wait;
 reg raster_hold_active,raster_hold_seen,raster_hold_ready,raster_hold_error;reg[19:0] raster_hold_timeout;
 always @(posedge clk)begin
@@ -78,4 +95,5 @@ mpeg2_h262_p_motion_residual_syntax_probe mixed_probe(.clk(clk),.reset(reset),.s
 mpeg2_h262_p_residual_probe residual_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.p_picture_expected(p_picture_expected),.mixed_mode(use_mixed),.mixed_first_slice_complete(mixed_first_slice_complete),.mixed_release(mixed_seen),.decision_complete(residual_decision),.residual_required(residual_required_raw),.residual_success(residual_success_raw),.mixed_replay_active(mixed_replay_active),.first_sample_valid(first_valid_raw),.first_sample_value(first_value_raw),.residual_sample_valid(residual_valid_raw),.residual_sample_index(residual_index_raw),.residual_sample_value(residual_value_raw),.probe_error(residual_error_raw));
 mpeg2_h262_p_stream_hold hold_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.p_picture_active(p_picture_expected&&!raster_candidate),.p_macroblock_type_seen(mb_seen_for_hold),.p_residual_required(residual_required_raw),.p_persistence_complete(p_persistence_complete),.stream_hold(old_stream_hold),.hold_seen(hold_seen),.hold_error(hold_error));
 wire unused_mixed_map=&{1'b0,mixed_shift_right_map};
+wire unused_mixed_replay=&{1'b0,mixed_replay_active};
 endmodule
