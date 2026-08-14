@@ -1,5 +1,5 @@
 //============================================================================
-// MiSTer Media Player - controlled four-macroblock/two-row H.262 P observer
+// MiSTer Media Player - controlled multi-macroblock/two-row H.262 P observer
 //
 // Standards authority: core-standards.md, source_id H262.
 // Relevant established records:
@@ -10,14 +10,16 @@
 //   H262-012 motion_code 0 code 1
 //   H262-013 macroblock_address_increment 1 code 1
 //
-// kate - Phase 1T-u keeps the accepted two-row controlled P proof but derives
-// its two-macroblock slice width from sequence_header() horizontal_size rather
-// than matching one literal 32x32 header.  The controlled vertical boundary
-// remains 32 pels, with slices at vertical positions 1 and 2.  Each slice
-// contains exactly two adjacent motion-forward-only macroblocks with
-// macroblock_address_increment=1, motion_code=(0,0), and forward f_code=(2,2).
-// Each controlled slice therefore has the semantic payload 0x12 0x79 0xC0.
+// kate - Phase 1U-f extends the accepted two-row controlled P proof from two
+// macroblocks per row to either two or three, derived from sequence_header()
+// horizontal_size.  The controlled vertical boundary remains 32 pels, with
+// slices at vertical positions 1 and 2.  Each macroblock is motion-forward-only
+// with macroblock_address_increment=1, motion_code=(0,0), and forward
+// f_code=(2,2).  The accepted two-MB row payload remains 0x12 0x79 0xC0;
+// the new three-MB row payload is 0x12 0x79 0xE7.
 //
+// Compatibility note: public signal/module names retain "four_mb" so the
+// hardware-accepted controller interface does not change in this increment.
 // This is a controlled diagnostic recognizer, not a general P-picture parser.
 //============================================================================
 
@@ -47,14 +49,14 @@ wire        slice_start_now  = start_code_now &&
                                (start_code_value >= 8'h01) &&
                                (start_code_value <= 8'hAF);
 // kate - Phase 1T-t: a following I picture may be preceded by a new sequence
-// header.  Both start codes are valid boundaries for the completed P picture.
+// header. Both start codes are valid boundaries for the completed P picture.
 wire        post_p_boundary_now =
     (start_code_value == PICTURE_START_CODE) ||
     (start_code_value == SEQUENCE_HEADER_CODE);
 
 // sequence_header() first 24 payload bits are horizontal_size_value followed
-// by vertical_size_value.  H262-007 defines coded macroblock width from
-// horizontal_size; use that geometry instead of recognizing a literal header.
+// by vertical_size_value. H262-007 defines coded macroblock width from
+// horizontal_size; use that geometry instead of recognizing one literal header.
 reg        sequence_capture;
 reg [1:0]  sequence_count;
 reg [23:0] sequence_shift;
@@ -64,7 +66,8 @@ wire [11:0] sequence_vertical_size   = sequence_next[11:0];
 wire [12:0] sequence_horizontal_rounded =
     {1'b0, sequence_horizontal_size} + 13'd15;
 wire [8:0] sequence_macroblock_width = sequence_horizontal_rounded[12:4];
-reg        geometry_two_mb_wide_32_high;
+reg        geometry_supported_two_row;
+reg [1:0]  controlled_mb_per_row;
 
 // picture_header() first 16 payload bits contain temporal_reference[9:0],
 // picture_coding_type[2:0], then the first three vbv_delay bits.
@@ -80,9 +83,9 @@ reg [2:0]  pce_count;
 reg [39:0] pce_shift;
 wire [39:0] pce_next = {pce_shift[31:0], stream_data};
 
-// Capture two controlled P slices.  As with the accepted Phase 1T-r observer,
-// slice_count==6 at the following start-code byte means exactly three payload
-// bytes preceded the 00 00 01 prefix of that next start code.
+// Capture two controlled P slices. slice_count==6 at the following start-code
+// byte means exactly three payload bytes preceded the 00 00 01 prefix of that
+// next start code. Both accepted row encodings are exactly three payload bytes.
 reg        slice_capture;
 reg        second_slice;
 reg [3:0]  slice_count;
@@ -90,7 +93,7 @@ reg [23:0] first_three_bytes;
 reg        first_three_complete;
 reg        proof_done;
 
-wire controlled_payload_ok =
+wire first_two_macroblocks_ok =
     // quantiser_scale_code = 2
     (first_three_bytes[23:19] == 5'd2) &&
     // extra_bit_slice terminator = 0
@@ -104,13 +107,24 @@ wire controlled_payload_ok =
     (first_three_bytes[11]    == 1'b1) &&
     (first_three_bytes[10:8]  == 3'b001) &&
     (first_three_bytes[7]     == 1'b1) &&
-    (first_three_bytes[6]     == 1'b1) &&
-    // stuffing to the byte boundary
-    (first_three_bytes[5:0]   == 6'b000000);
+    (first_three_bytes[6]     == 1'b1);
+
+wire third_macroblock_ok =
+    // macroblock 2: same adjacent zero-vector syntax, ending on byte boundary
+    (first_three_bytes[5]   == 1'b1) &&
+    (first_three_bytes[4:2] == 3'b001) &&
+    (first_three_bytes[1]   == 1'b1) &&
+    (first_three_bytes[0]   == 1'b1);
+
+wire controlled_payload_ok =
+    first_two_macroblocks_ok &&
+    (((controlled_mb_per_row == 2'd2) &&
+      (first_three_bytes[5:0] == 6'b000000)) ||
+     ((controlled_mb_per_row == 2'd3) && third_macroblock_ok));
 
 // Assert on the exact accepted boundary after the second controlled slice.
 // The controlled stream may begin the next I picture directly or may emit a
-// sequence header first.  This combinational pulse lets the controller stop the
+// sequence header first. This combinational pulse lets the controller stop the
 // compressed stream on that boundary cycle, before its payload is consumed.
 assign four_mb_complete_now =
     stream_valid &&
@@ -128,7 +142,8 @@ always @(posedge clk) begin
         sequence_capture             <= 1'b0;
         sequence_count               <= 2'd0;
         sequence_shift               <= 24'd0;
-        geometry_two_mb_wide_32_high <= 1'b0;
+        geometry_supported_two_row   <= 1'b0;
+        controlled_mb_per_row        <= 2'd0;
         picture_capture              <= 1'b0;
         picture_count                <= 1'b0;
         picture_shift                <= 16'd0;
@@ -154,10 +169,20 @@ always @(posedge clk) begin
             if (sequence_count == 2'd2) begin
                 sequence_capture <= 1'b0;
                 sequence_count   <= 2'd0;
-                geometry_two_mb_wide_32_high <=
+                geometry_supported_two_row <=
                     (sequence_horizontal_size != 12'd0) &&
-                    (sequence_macroblock_width == 9'd2) &&
+                    ((sequence_macroblock_width == 9'd2) ||
+                     (sequence_macroblock_width == 9'd3)) &&
                     (sequence_vertical_size == 12'd32);
+
+                if ((sequence_vertical_size == 12'd32) &&
+                    (sequence_macroblock_width == 9'd2))
+                    controlled_mb_per_row <= 2'd2;
+                else if ((sequence_vertical_size == 12'd32) &&
+                         (sequence_macroblock_width == 9'd3))
+                    controlled_mb_per_row <= 2'd3;
+                else
+                    controlled_mb_per_row <= 2'd0;
             end
             else begin
                 sequence_count <= sequence_count + 2'd1;
@@ -195,11 +220,11 @@ always @(posedge clk) begin
                 pce_capture <= 1'b0;
                 pce_count   <= 3'd0;
 
-                // Controlled progressive frame-P boundary.  Forward horizontal
-                // and vertical f_code are both 2.  motion_code=0 still yields
+                // Controlled progressive frame-P boundary. Forward horizontal
+                // and vertical f_code are both 2. motion_code=0 still yields
                 // an exact zero vector with no residual motion bits.
                 four_mb_candidate <=
-                    geometry_two_mb_wide_32_high &&
+                    geometry_supported_two_row &&
                     current_picture_is_p &&
                     (pce_next[39:36] == 4'h8) &&
                     (pce_next[35:32] == 4'd2) &&
