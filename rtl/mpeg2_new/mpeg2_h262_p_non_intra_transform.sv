@@ -8,6 +8,11 @@
 // Y0, Y1, Y2 and Y3. QFS is accepted in scan order; inverse quantisation reads
 // it back in natural coefficient order using the selected H.262 scan. Mismatch
 // control is applied per block before the existing IDCT is driven.
+//
+// kate - Phase 1U-p pipelines the scan-address lookup at the QFS/IQ boundary.
+// The block controls are latched when QFS capture closes, and the 64-way scan
+// mapping now terminates at iq_qfs_index_reg instead of feeding the QFS mux,
+// inverse-quant arithmetic and diagnostic checks in the same 54 MHz cycle.
 //============================================================================
 
 module mpeg2_h262_p_non_intra_transform
@@ -172,13 +177,17 @@ endfunction
 
 reg        iq_active;
 reg [5:0]  iq_index;
+reg [5:0]  iq_qfs_index_reg;
 reg        iq_parity;
 reg        y0_f00_proven;
-wire [5:0] iq_qfs_index = scan_index(alternate_scan, iq_index);
-wire signed [12:0] iq_qf = qfs[iq_qfs_index];
+reg [4:0]  iq_quantiser_scale_code;
+reg        iq_q_scale_type;
+reg        iq_alternate_scan;
+
+wire signed [12:0] iq_qf = qfs[iq_qfs_index_reg];
 wire signed [14:0] iq_qf_extended = {{2{iq_qf[12]}}, iq_qf};
 wire [7:0] iq_qscale =
-    quantiser_scale_value(q_scale_type, quantiser_scale_code);
+    quantiser_scale_value(iq_q_scale_type, iq_quantiser_scale_code);
 
 reg signed [14:0] iq_precondition;
 reg signed [23:0] iq_product;
@@ -263,8 +272,12 @@ always @(posedge clk) begin
         active_block_index     <= 2'd0;
         iq_active              <= 1'b0;
         iq_index               <= 6'd0;
+        iq_qfs_index_reg       <= 6'd0;
         iq_parity              <= 1'b0;
         y0_f00_proven          <= 1'b0;
+        iq_quantiser_scale_code<= 5'd0;
+        iq_q_scale_type        <= 1'b0;
+        iq_alternate_scan      <= 1'b0;
         emit_pending           <= 1'b0;
         emit_active            <= 1'b0;
         emit_index             <= 6'd0;
@@ -318,10 +331,14 @@ always @(posedge clk) begin
                 probe_error <= 1'b1;
             end
             else begin
-                capture_active <= 1'b0;
-                iq_active      <= 1'b1;
-                iq_index       <= 6'd0;
-                iq_parity      <= 1'b0;
+                capture_active          <= 1'b0;
+                iq_active               <= 1'b1;
+                iq_index                <= 6'd0;
+                iq_qfs_index_reg        <= scan_index(alternate_scan, 6'd0);
+                iq_parity               <= 1'b0;
+                iq_quantiser_scale_code <= quantiser_scale_code;
+                iq_q_scale_type         <= q_scale_type;
+                iq_alternate_scan       <= alternate_scan;
             end
         end
 
@@ -330,8 +347,8 @@ always @(posedge clk) begin
             iq_parity <= iq_parity_with_current;
 
             if ((active_block_index == 2'd0) && (iq_index == 6'd0)) begin
-                if ((quantiser_scale_code == 5'd2) &&
-                    !q_scale_type &&
+                if ((iq_quantiser_scale_code == 5'd2) &&
+                    !iq_q_scale_type &&
                     (iq_qf == 13'sd7) &&
                     (iq_final_value == 12'sd30))
                     y0_f00_proven <= 1'b1;
@@ -345,7 +362,9 @@ always @(posedge clk) begin
                 emit_index   <= 6'd0;
             end
             else begin
-                iq_index <= iq_index + 6'd1;
+                iq_index         <= iq_index + 6'd1;
+                iq_qfs_index_reg <= scan_index(iq_alternate_scan,
+                                               iq_index + 6'd1);
             end
         end
 
