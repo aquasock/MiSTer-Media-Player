@@ -70,6 +70,20 @@ wire [8:0] four_macroblock_width =
     ((horizontal_size != 14'd0) && (horizontal_size <= 14'd720)) ?
         four_macroblock_width_full[8:0] : 9'd0;
 
+// kate - Phase 1U-d: derive vertical macroblock geometry for the decoder's
+// current supported subset only: progressive sequence, 4:2:0, frame picture,
+// progressive frame.  The controlled H.262 4:2:0 record defines a 16x16 luma
+// macroblock, so this subset uses ceil(vertical_size / 16) macroblock rows.
+// This is deliberately not a claim about field-picture geometry.  Keep the
+// derived row count behavior-neutral until the next isolated activation step.
+wire [14:0] four_vertical_size_rounded =
+    {1'b0, vertical_size} + 15'd15;
+wire [10:0] four_macroblock_height_full =
+    four_vertical_size_rounded[14:4];
+wire [8:0] four_macroblock_height =
+    ((vertical_size != 14'd0) && (vertical_size <= 14'd480)) ?
+        four_macroblock_height_full[8:0] : 9'd0;
+
 // kate - Phase 1U-a: keep the hardware-proven 32x32 diagnostic at exactly four
 // macroblocks while the copy engine's completion boundary becomes explicit.
 // A later isolated geometry increment can replace this constant with a live
@@ -226,7 +240,7 @@ mpeg2_h262_p_luma_macroblock_engine implicit_probe
     .ddram_dout_ready     (ddram_dout_ready && implicit_sel),
     .ddram_burstcnt       (implicit_burstcnt),
     .ddram_addr           (implicit_addr),
-    .ddram_rd             (implicit_rd),
+    .ddram_rd              (implicit_rd),
     .store_select         (implicit_store_select),
     .store_pixel_value    (implicit_store_value),
     .store_pixel_x        (implicit_store_x),
@@ -292,7 +306,7 @@ mpeg2_h262_p_four_mb_two_row_copy_engine four_probe
     .ddram_dout_ready     (ddram_dout_ready && four_sel),
     .ddram_burstcnt       (four_burstcnt),
     .ddram_addr           (four_addr),
-    .ddram_rd             (four_rd),
+    .ddram_rd              (four_rd),
     .store_select         (four_store_select),
     .store_pixel_value    (four_store_value),
     .store_pixel_x        (four_store_x),
@@ -358,5 +372,6 @@ assign persisted_value = four_sel ? four_persisted_value :
 assign probe_error = explicit_error || implicit_error || copy_error || four_error;
 
 wire unused_explicit_active = explicit_active;
+wire unused_four_macroblock_height = &{1'b0, four_macroblock_height};
 
 endmodule
