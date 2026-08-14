@@ -621,6 +621,8 @@ mpeg2_h262_reference_read_probe mpeg2_h262_reference_read_probe
 (
     .clk                       (clk_mpeg2),
     .reset                     (reset_mpeg2),
+    // kate - Phase 1T-y: connect live coded horizontal geometry at top level.
+    .horizontal_size           (mpeg2_new_horizontal_size),
     .p_vector_proof_seen       (mpeg2_new_p_macroblock_type_seen),
     .p_forward_vector_valid    (mpeg2_new_p_forward_vector_valid),
     .p_forward_vector_x        (mpeg2_new_p_forward_vector_x),
