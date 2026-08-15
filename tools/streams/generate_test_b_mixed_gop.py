@@ -57,8 +57,8 @@ def enc_comp(target:int,pred:int)->str:
  return MCODE[mc]+format(res,'02b')
 
 def fvec(v,r,c):
- xs=((1,2,-1,3,-2,1,2,-1),(-1,1,2,-2,3,-1,1,2))[v]
- ys=((1,2,1,0,-1,-2),(-1,1,2,-2,0,1))[v]
+ xs=((1,2,-1,3,-2,1,2,-1),(1,1,2,-2,3,-1,1,-2))[v]
+ ys=((1,2,1,0,-1,-2),(1,1,2,-2,0,-1))[v]
  return xs[c],ys[r]
 
 def bvec(v,r,c):
