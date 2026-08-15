@@ -7,6 +7,12 @@
 // out-of-range sentinel vector plus B direction metadata.  P and B share the
 // registered DDR request adapter; B reads both retained reference banks and
 // writes only to the scratch frame through the ordinary store interface.
+//
+// Commit 129 gates the registered DDR response pulse by the client that owns
+// the shared request path.  Without this ownership gate, the idle B engine saw
+// the preceding P engine's DDR responses and latched its sticky unexpected-
+// response error before B decoding began; the reciprocal gate also protects a
+// later P picture from responses belonging to an intervening B picture.
 //============================================================================
 `include "rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_plan.sv"
 module mpeg2_h262_reference_read_probe
@@ -143,6 +149,11 @@ wire shared_rd_raw=b_select?b_rd_raw:mix_rd_raw;
 reg shared_req_active,shared_response_pending;reg[7:0] shared_bc_reg;reg[28:0] shared_addr_reg;
 reg[63:0] shared_dout_reg;reg shared_dout_ready_reg;
 wire shared_engine_busy=!(shared_req_active&&!ddram_busy);
+// Only the selected client may observe a response.  The request adapter is
+// physically shared, so an ungated ready pulse is otherwise indistinguishable
+// from an unsolicited response to the idle client and trips its sticky error.
+wire mix_dout_ready_owned=shared_dout_ready_reg&&mixed_select&&!b_select;
+wire b_dout_ready_owned=shared_dout_ready_reg&&b_select;
 
 always @(posedge clk)begin
  if(reset)begin
@@ -164,7 +175,7 @@ mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
  .clk(clk),.reset(reset),.capture_enable(mixed_select),.request(mixed_select),.shift_right_map(48'd0),
  .residual_valid(mix_residual_valid),.residual_index(mix_residual_index),.residual_value(mix_residual_value),
  .reference_valid(reference_frame_valid),.reference_bank(reference_frame_bank),.destination_bank(destination_frame_bank),.store_block_stored(p_store_block_stored),
- .ddram_busy(shared_engine_busy),.ddram_dout(shared_dout_reg),.ddram_dout_ready(shared_dout_ready_reg),.ddram_burstcnt(mix_bc_raw),.ddram_addr(mix_addr_raw),.ddram_rd(mix_rd_raw),
+ .ddram_busy(shared_engine_busy),.ddram_dout(shared_dout_reg),.ddram_dout_ready(mix_dout_ready_owned),.ddram_burstcnt(mix_bc_raw),.ddram_addr(mix_addr_raw),.ddram_rd(mix_rd_raw),
  .store_select(mix_store_sel),.store_pixel_value(mix_store_val),.store_pixel_x(mix_store_x),.store_pixel_y(mix_store_y),.store_pixel_valid(mix_store_valid),
  .store_block_start(mix_store_start),.store_block_complete(mix_store_complete),.active(mixed_active),.read_seen(mix_read),.sample_value(mix_sample),.sample_nonzero(mix_nonzero),
  .half_sample_seen(mixed_half),.reconstructed_seen(mix_recon),.reconstructed_value(mix_recon_val),.persisted_seen(mixed_persisted_seen),.persisted_value(mix_persist_val),.error(mixed_error));
@@ -173,7 +184,7 @@ mpeg2_h262_b_bidirectional_raster_engine b_probe(
  .clk(clk),.reset(reset),.capture_enable(b_select),.request(b_select),
  .sideband_valid(p_residual_sample_valid&&b_select),.sideband_index(p_residual_sample_index),.sideband_value(p_residual_sample_value),
  .reference_valid(reference_frame_valid),.future_reference_bank(reference_frame_bank),.store_block_stored(p_store_block_stored),
- .ddram_busy(shared_engine_busy),.ddram_dout(shared_dout_reg),.ddram_dout_ready(shared_dout_ready_reg),
+ .ddram_busy(shared_engine_busy),.ddram_dout(shared_dout_reg),.ddram_dout_ready(b_dout_ready_owned),
  .ddram_burstcnt(b_bc_raw),.ddram_addr(b_addr_raw),.ddram_rd(b_rd_raw),
  .store_select(b_store_sel),.store_pixel_value(b_store_val),.store_pixel_x(b_store_x),.store_pixel_y(b_store_y),
  .store_pixel_valid(b_store_valid),.store_block_start(b_store_start),.store_block_complete(b_store_complete),
