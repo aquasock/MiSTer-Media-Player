@@ -16,11 +16,16 @@
 // forcing the final mixed macroblock proof and masking controller probe_error
 // after real persistence made USER pass while leaving the datapath untouched.
 //
-// Phase 1U-t narrows that split.  Keep only the post-persistence public
-// macroblock-proof override, and restore every independent controller error
-// source.  progress_error follows the public proof, so USER passing now proves
-// the stale normal macroblock gate is the sole remaining controller failure;
-// USER failing means another controller error source is still active.
+// Phase 1U-t kept only the final macroblock-proof override and restored all
+// controller error sources.  Hardware kept USER low, proving at least one
+// independent controller error remains after successful mixed persistence.
+//
+// Phase 1U-u splits those errors at the real mixed-persistence boundary.  Once
+// mixed_final_proof is true, retain only parser/recognizer errors and mask the
+// execution-side residual/hold errors.  USER high therefore isolates the
+// remaining false error to residual/hold bookkeeping; USER low isolates it to
+// the parser/recognizer group.  No stream, reconstruction, DDR, publication or
+// display behavior is changed.
 //============================================================================
 module mpeg2_h262_p_diagnostic_controller
 (
@@ -97,7 +102,9 @@ assign p_macroblock_type_seen=mixed_final_proof?1'b1:p_macroblock_type_seen_norm
 assign stream_hold=four_mb_parse_hold||aligned_parse_hold||raster_hold_active||(!raster_candidate&&old_stream_hold);
 wire syntax_error=syntax_error_raw&&!two_mb_seen&&!four_mb_seen&&!aligned_candidate&&!aligned_seen&&!mixed_candidate&&!mixed_seen;
 wire progress_error=p_picture_expected&&!p_macroblock_type_seen;
-assign probe_error=syntax_error|two_mb_error|four_mb_error|((aligned_error)&&!use_mixed)|mixed_error|residual_error_raw|hold_error|raster_hold_error|progress_error;
+wire parser_error_group=syntax_error|two_mb_error|four_mb_error|((aligned_error)&&!use_mixed)|mixed_error;
+wire execution_error_group=residual_error_raw|hold_error|raster_hold_error;
+assign probe_error=parser_error_group|progress_error|(execution_error_group&&!mixed_final_proof);
 
 mpeg2_h262_p_syntax_probe syntax_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.p_picture_expected(p_picture_expected),.p_macroblock_type_seen(mb_seen_raw),.p_forward_vector_valid(vector_valid_raw),.p_forward_vector_x(vector_x_raw),.p_forward_vector_y(vector_y_raw),.probe_error(syntax_error_raw));
 mpeg2_h262_p_two_mb_syntax_probe two_mb_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.two_mb_seen(two_mb_seen),.probe_error(two_mb_error));
