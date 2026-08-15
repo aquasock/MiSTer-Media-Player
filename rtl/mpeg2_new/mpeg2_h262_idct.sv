@@ -1,61 +1,17 @@
 //============================================================================
 // MiSTer Media Player - standards-driven H.262 8x8 inverse DCT
 //
-// Normative standards basis:
-//   ITU-T H.262 consolidated text (02/2012), clause 7.5 and Annex A.
-//   Annex A defines the N=8 mathematical real-number IDCT, defines the
-//   mathematical integer-number result as nearest-integer rounding with exact
-//   half-integers rounded away from zero, and requires decoder IDCT accuracy to
-//   conform to ISO/IEC 23002-1 (including its Annexes A and B).
+// Commit 149 resource consolidation.
 //
-// Implementation choice (not prescribed by H.262):
-//   A separable two-pass fixed-point matrix IDCT is used.  The normalized
-//   one-dimensional basis (C(k)/2)*cos((2n+1)k*pi/16) is represented in Q14.
-//   The first pass is rounded to Q10; the second pass is rounded to integer.
-//   Both roundings use nearest with ties away from zero, matching the rounding
-//   convention in H.262 Annex A.  There is deliberately NO saturation here:
-//   the current H.262 Annex A defines the mathematical integer IDCT without
-//   clipping.  Final decoded-pel saturation belongs to H.262 7.6.8.
+// Normative basis remains ITU-T H.262 / ISO/IEC 13818-2 clause 7.5 and
+// Annex A.  Arithmetic, Q14 basis constants, two-pass separable ordering,
+// nearest/ties-away rounding, sample order, and external handshake are
+// preserved from the accepted implementation.
 //
-// Throughput architecture:
-//   Eight multiplications are evaluated in parallel for one 8-term dot product
-//   per clock.  64 clocks are used for each pass (128 transform clocks/block).
-//   At 54 MHz this transform engine alone has headroom above the 4:2:0 block
-//   rate of 720x576 at 30 frames/s.  Future block double-buffering can overlap
-//   coefficient preparation with this transform.
-//
-// kate - Phase 1P timing closure:
-//   The original behavioral accumulator loops caused Quartus 17 to map each
-//   8-term dot product as a long serial DSP/MAC chain.  TimeQuest measured the
-//   worst pass-1 transform_index -> temp path at 35.453 ns.
-//
-//   The arithmetic is now explicitly associated as a balanced tree:
-//
-//       p0 + p1   p2 + p3   p4 + p5   p6 + p7
-//          \       /           \       /
-//           sum01               sum23
-//                \             /
-//                    result
-//
-//   Both passes still evaluate the exact same integer sum before the unchanged
-//   rounding operation.  Only the hardware association is different.
-//
-// kate - Phase 1P same-clock closure:
-//   After the inverse-quant pipeline removed the next major bottleneck,
-//   explicit 54->54 MHz reports showed a remaining -1.544 ns pass-1 path from
-//   transform_index to temp[].  The routed path still crossed a DSP cascade
-//   before the balanced adder/rounding logic.  Both IDCT passes now register
-//   the eight parallel multiplier results before the balanced adder tree.
-//   This adds one pipeline clock to each pass but preserves one dot-product
-//   issue per clock after pipeline fill and does not change the arithmetic.
-//
-// Verification performed when this implementation was generated:
-//   - fixed-point model compared against the Annex-A mathematical IDCT;
-//   - all 4096 legacy H.262 Annex-A DC/mismatch vectors had peak error <= 1;
-//   - 10,000 random sparse legal coefficient blocks had observed peak error <=1.
-// These are engineering verification results, not a substitute for formal
-// ISO/IEC 23002-1 conformance testing.  We do not claim formal conformance until
-// the standardized accuracy test suite has been run against the RTL.
+// Resource change: pass 1 and pass 2 are sequential and can never execute at
+// the same time, so they now share one registered bank of eight 24x15 signed
+// multipliers and one 48-bit balanced adder tree instead of synthesizing two
+// parallel multiplier/adder banks.  No transform precision is reduced.
 //============================================================================
 
 module mpeg2_h262_idct
@@ -72,8 +28,6 @@ module mpeg2_h262_idct
     output reg                block_complete,
     output reg                idct_error,
 
-    // kate - Spatial-domain f[y][x] stream in row-major order.  Width is kept
-    // wider than a decoded pel because H.262 applies pel saturation later.
     output reg                sample_valid,
     output reg [5:0]          sample_index,
     output reg signed [15:0]  sample_value,
@@ -82,7 +36,6 @@ module mpeg2_h262_idct
 );
 
 reg signed [11:0] coeff [0:63];
-// First-pass values carry ten fractional bits (Q10).
 reg signed [23:0] temp [0:63];
 integer i;
 
@@ -91,61 +44,80 @@ reg       pass1_active;
 reg       pass2_active;
 reg [5:0] transform_index;
 
-// kate - One registered multiplier stage per separable IDCT pass.  The active
-// flag issues one transform result per clock; pipe_valid marks the result whose
-// eight products were captured on the previous clock.
-reg       pass1_pipe_valid;
-reg [5:0] pass1_pipe_index;
-reg       pass2_pipe_valid;
-reg [5:0] pass2_pipe_index;
+// One multiplier pipeline is shared by both transform passes.
+reg       pipe_valid;
+reg       pipe_pass2;
+reg [5:0] pipe_index;
 
-// Q14 samples of B[n][k] = (C(k)/2)*cos((2n+1)k*pi/16), where
-// C(0)=1/sqrt(2), C(k)=1 otherwise.  These constants implement the
-// separable form of the N=8 mathematical IDCT in H.262 Annex A.
 function automatic signed [14:0] basis_q14;
     input [2:0] n;
     input [2:0] kidx;
     begin
         case ({n,kidx})
-            6'o00: basis_q14 =  15'sd5793; 6'o01: basis_q14 =  15'sd8035;
-            6'o02: basis_q14 =  15'sd7568; 6'o03: basis_q14 =  15'sd6811;
-            6'o04: basis_q14 =  15'sd5793; 6'o05: basis_q14 =  15'sd4551;
-            6'o06: basis_q14 =  15'sd3135; 6'o07: basis_q14 =  15'sd1598;
-
-            6'o10: basis_q14 =  15'sd5793; 6'o11: basis_q14 =  15'sd6811;
-            6'o12: basis_q14 =  15'sd3135; 6'o13: basis_q14 = -15'sd1598;
-            6'o14: basis_q14 = -15'sd5793; 6'o15: basis_q14 = -15'sd8035;
-            6'o16: basis_q14 = -15'sd7568; 6'o17: basis_q14 = -15'sd4551;
-
-            6'o20: basis_q14 =  15'sd5793; 6'o21: basis_q14 =  15'sd4551;
-            6'o22: basis_q14 = -15'sd3135; 6'o23: basis_q14 = -15'sd8035;
-            6'o24: basis_q14 = -15'sd5793; 6'o25: basis_q14 =  15'sd1598;
-            6'o26: basis_q14 =  15'sd7568; 6'o27: basis_q14 =  15'sd6811;
-
-            6'o30: basis_q14 =  15'sd5793; 6'o31: basis_q14 =  15'sd1598;
-            6'o32: basis_q14 = -15'sd7568; 6'o33: basis_q14 = -15'sd4551;
-            6'o34: basis_q14 =  15'sd5793; 6'o35: basis_q14 =  15'sd6811;
-            6'o36: basis_q14 = -15'sd3135; 6'o37: basis_q14 = -15'sd8035;
-
-            6'o40: basis_q14 =  15'sd5793; 6'o41: basis_q14 = -15'sd1598;
-            6'o42: basis_q14 = -15'sd7568; 6'o43: basis_q14 =  15'sd4551;
-            6'o44: basis_q14 =  15'sd5793; 6'o45: basis_q14 = -15'sd6811;
-            6'o46: basis_q14 = -15'sd3135; 6'o47: basis_q14 =  15'sd8035;
-
-            6'o50: basis_q14 =  15'sd5793; 6'o51: basis_q14 = -15'sd4551;
-            6'o52: basis_q14 = -15'sd3135; 6'o53: basis_q14 =  15'sd8035;
-            6'o54: basis_q14 = -15'sd5793; 6'o55: basis_q14 = -15'sd1598;
-            6'o56: basis_q14 =  15'sd7568; 6'o57: basis_q14 = -15'sd6811;
-
-            6'o60: basis_q14 =  15'sd5793; 6'o61: basis_q14 = -15'sd6811;
-            6'o62: basis_q14 =  15'sd3135; 6'o63: basis_q14 =  15'sd1598;
-            6'o64: basis_q14 = -15'sd5793; 6'o65: basis_q14 =  15'sd8035;
-            6'o66: basis_q14 = -15'sd7568; 6'o67: basis_q14 =  15'sd4551;
-
-            6'o70: basis_q14 =  15'sd5793; 6'o71: basis_q14 = -15'sd8035;
-            6'o72: basis_q14 =  15'sd7568; 6'o73: basis_q14 = -15'sd6811;
-            6'o74: basis_q14 =  15'sd5793; 6'o75: basis_q14 = -15'sd4551;
-            6'o76: basis_q14 =  15'sd3135; 6'o77: basis_q14 = -15'sd1598;
+            6'o00: basis_q14 =  15'sd5793;
+            6'o01: basis_q14 =  15'sd8035;
+            6'o02: basis_q14 =  15'sd7568;
+            6'o03: basis_q14 =  15'sd6811;
+            6'o04: basis_q14 =  15'sd5793;
+            6'o05: basis_q14 =  15'sd4551;
+            6'o06: basis_q14 =  15'sd3135;
+            6'o07: basis_q14 =  15'sd1598;
+            6'o10: basis_q14 =  15'sd5793;
+            6'o11: basis_q14 =  15'sd6811;
+            6'o12: basis_q14 =  15'sd3135;
+            6'o13: basis_q14 = -15'sd1598;
+            6'o14: basis_q14 = -15'sd5793;
+            6'o15: basis_q14 = -15'sd8035;
+            6'o16: basis_q14 = -15'sd7568;
+            6'o17: basis_q14 = -15'sd4551;
+            6'o20: basis_q14 =  15'sd5793;
+            6'o21: basis_q14 =  15'sd4551;
+            6'o22: basis_q14 = -15'sd3135;
+            6'o23: basis_q14 = -15'sd8035;
+            6'o24: basis_q14 = -15'sd5793;
+            6'o25: basis_q14 =  15'sd1598;
+            6'o26: basis_q14 =  15'sd7568;
+            6'o27: basis_q14 =  15'sd6811;
+            6'o30: basis_q14 =  15'sd5793;
+            6'o31: basis_q14 =  15'sd1598;
+            6'o32: basis_q14 = -15'sd7568;
+            6'o33: basis_q14 = -15'sd4551;
+            6'o34: basis_q14 =  15'sd5793;
+            6'o35: basis_q14 =  15'sd6811;
+            6'o36: basis_q14 = -15'sd3135;
+            6'o37: basis_q14 = -15'sd8035;
+            6'o40: basis_q14 =  15'sd5793;
+            6'o41: basis_q14 = -15'sd1598;
+            6'o42: basis_q14 = -15'sd7568;
+            6'o43: basis_q14 =  15'sd4551;
+            6'o44: basis_q14 =  15'sd5793;
+            6'o45: basis_q14 = -15'sd6811;
+            6'o46: basis_q14 = -15'sd3135;
+            6'o47: basis_q14 =  15'sd8035;
+            6'o50: basis_q14 =  15'sd5793;
+            6'o51: basis_q14 = -15'sd4551;
+            6'o52: basis_q14 = -15'sd3135;
+            6'o53: basis_q14 =  15'sd8035;
+            6'o54: basis_q14 = -15'sd5793;
+            6'o55: basis_q14 = -15'sd1598;
+            6'o56: basis_q14 =  15'sd7568;
+            6'o57: basis_q14 = -15'sd6811;
+            6'o60: basis_q14 =  15'sd5793;
+            6'o61: basis_q14 = -15'sd6811;
+            6'o62: basis_q14 =  15'sd3135;
+            6'o63: basis_q14 =  15'sd1598;
+            6'o64: basis_q14 = -15'sd5793;
+            6'o65: basis_q14 =  15'sd8035;
+            6'o66: basis_q14 = -15'sd7568;
+            6'o67: basis_q14 =  15'sd4551;
+            6'o70: basis_q14 =  15'sd5793;
+            6'o71: basis_q14 = -15'sd8035;
+            6'o72: basis_q14 =  15'sd7568;
+            6'o73: basis_q14 = -15'sd6811;
+            6'o74: basis_q14 =  15'sd5793;
+            6'o75: basis_q14 = -15'sd4551;
+            6'o76: basis_q14 =  15'sd3135;
+            6'o77: basis_q14 = -15'sd1598;
             default: basis_q14 = 15'sd0;
         endcase
     end
@@ -153,16 +125,16 @@ endfunction
 
 // Q14 -> Q10, nearest with exact half cases away from zero.
 function automatic signed [23:0] round_q14_to_q10;
-    input signed [31:0] value;
-    reg signed [31:0] magnitude;
-    reg signed [31:0] rounded;
+    input signed [47:0] value;
+    reg signed [47:0] magnitude;
+    reg signed [47:0] rounded;
     begin
         if (value < 0) begin
             magnitude = -value;
-            rounded = -((magnitude + 32'sd8) >>> 4);
+            rounded = -((magnitude + 48'sd8) >>> 4);
         end
         else begin
-            rounded = (value + 32'sd8) >>> 4;
+            rounded = (value + 48'sd8) >>> 4;
         end
         round_q14_to_q10 = rounded[23:0];
     end
@@ -185,203 +157,136 @@ function automatic signed [31:0] round_q24_to_integer;
     end
 endfunction
 
-// -------------------------------------------------------------------------
-// Phase 1P balanced pass-1 dot product.
-//
-// 12-bit coefficient x 15-bit Q14 basis = exact signed 27-bit product.
-// Sign-extend to the existing 32-bit accumulator width before adding.  The
-// legal coefficient/basis range cannot overflow 32 bits, so re-association is
-// bit-exact with the former serial accumulator.
-// -------------------------------------------------------------------------
-
-reg signed [26:0] pass1_product0;
-reg signed [26:0] pass1_product1;
-reg signed [26:0] pass1_product2;
-reg signed [26:0] pass1_product3;
-reg signed [26:0] pass1_product4;
-reg signed [26:0] pass1_product5;
-reg signed [26:0] pass1_product6;
-reg signed [26:0] pass1_product7;
-
-reg signed [26:0] pass1_product0_r;
-reg signed [26:0] pass1_product1_r;
-reg signed [26:0] pass1_product2_r;
-reg signed [26:0] pass1_product3_r;
-reg signed [26:0] pass1_product4_r;
-reg signed [26:0] pass1_product5_r;
-reg signed [26:0] pass1_product6_r;
-reg signed [26:0] pass1_product7_r;
-
-reg signed [31:0] pass1_pair0;
-reg signed [31:0] pass1_pair1;
-reg signed [31:0] pass1_pair2;
-reg signed [31:0] pass1_pair3;
-reg signed [31:0] pass1_quad0;
-reg signed [31:0] pass1_quad1;
-reg signed [31:0] pass1_sum;
-
+wire issue_active = pass1_active || pass2_active;
+wire issue_pass2 = pass2_active;
 wire [5:0] pass1_row_base = {transform_index[5:3], 3'b000};
 
+reg signed [23:0] operand0;
+reg signed [23:0] operand1;
+reg signed [23:0] operand2;
+reg signed [23:0] operand3;
+reg signed [23:0] operand4;
+reg signed [23:0] operand5;
+reg signed [23:0] operand6;
+reg signed [23:0] operand7;
+
+reg signed [14:0] basis0;
+reg signed [14:0] basis1;
+reg signed [14:0] basis2;
+reg signed [14:0] basis3;
+reg signed [14:0] basis4;
+reg signed [14:0] basis5;
+reg signed [14:0] basis6;
+reg signed [14:0] basis7;
+
 always @* begin
-    pass1_product0 =
-        $signed(coeff[pass1_row_base + 6'd0]) *
-        $signed(basis_q14(transform_index[2:0], 3'd0));
-    pass1_product1 =
-        $signed(coeff[pass1_row_base + 6'd1]) *
-        $signed(basis_q14(transform_index[2:0], 3'd1));
-    pass1_product2 =
-        $signed(coeff[pass1_row_base + 6'd2]) *
-        $signed(basis_q14(transform_index[2:0], 3'd2));
-    pass1_product3 =
-        $signed(coeff[pass1_row_base + 6'd3]) *
-        $signed(basis_q14(transform_index[2:0], 3'd3));
-    pass1_product4 =
-        $signed(coeff[pass1_row_base + 6'd4]) *
-        $signed(basis_q14(transform_index[2:0], 3'd4));
-    pass1_product5 =
-        $signed(coeff[pass1_row_base + 6'd5]) *
-        $signed(basis_q14(transform_index[2:0], 3'd5));
-    pass1_product6 =
-        $signed(coeff[pass1_row_base + 6'd6]) *
-        $signed(basis_q14(transform_index[2:0], 3'd6));
-    pass1_product7 =
-        $signed(coeff[pass1_row_base + 6'd7]) *
-        $signed(basis_q14(transform_index[2:0], 3'd7));
+    if (issue_pass2) begin
+        operand0 = temp[{3'd0, transform_index[2:0]}];
+        operand1 = temp[{3'd1, transform_index[2:0]}];
+        operand2 = temp[{3'd2, transform_index[2:0]}];
+        operand3 = temp[{3'd3, transform_index[2:0]}];
+        operand4 = temp[{3'd4, transform_index[2:0]}];
+        operand5 = temp[{3'd5, transform_index[2:0]}];
+        operand6 = temp[{3'd6, transform_index[2:0]}];
+        operand7 = temp[{3'd7, transform_index[2:0]}];
 
-    pass1_pair0 =
-        {{5{pass1_product0_r[26]}}, pass1_product0_r} +
-        {{5{pass1_product1_r[26]}}, pass1_product1_r};
-    pass1_pair1 =
-        {{5{pass1_product2_r[26]}}, pass1_product2_r} +
-        {{5{pass1_product3_r[26]}}, pass1_product3_r};
-    pass1_pair2 =
-        {{5{pass1_product4_r[26]}}, pass1_product4_r} +
-        {{5{pass1_product5_r[26]}}, pass1_product5_r};
-    pass1_pair3 =
-        {{5{pass1_product6_r[26]}}, pass1_product6_r} +
-        {{5{pass1_product7_r[26]}}, pass1_product7_r};
+        basis0 = basis_q14(transform_index[5:3], 3'd0);
+        basis1 = basis_q14(transform_index[5:3], 3'd1);
+        basis2 = basis_q14(transform_index[5:3], 3'd2);
+        basis3 = basis_q14(transform_index[5:3], 3'd3);
+        basis4 = basis_q14(transform_index[5:3], 3'd4);
+        basis5 = basis_q14(transform_index[5:3], 3'd5);
+        basis6 = basis_q14(transform_index[5:3], 3'd6);
+        basis7 = basis_q14(transform_index[5:3], 3'd7);
+    end
+    else begin
+        operand0 = {{12{coeff[pass1_row_base + 6'd0][11]}}, coeff[pass1_row_base + 6'd0]};
+        operand1 = {{12{coeff[pass1_row_base + 6'd1][11]}}, coeff[pass1_row_base + 6'd1]};
+        operand2 = {{12{coeff[pass1_row_base + 6'd2][11]}}, coeff[pass1_row_base + 6'd2]};
+        operand3 = {{12{coeff[pass1_row_base + 6'd3][11]}}, coeff[pass1_row_base + 6'd3]};
+        operand4 = {{12{coeff[pass1_row_base + 6'd4][11]}}, coeff[pass1_row_base + 6'd4]};
+        operand5 = {{12{coeff[pass1_row_base + 6'd5][11]}}, coeff[pass1_row_base + 6'd5]};
+        operand6 = {{12{coeff[pass1_row_base + 6'd6][11]}}, coeff[pass1_row_base + 6'd6]};
+        operand7 = {{12{coeff[pass1_row_base + 6'd7][11]}}, coeff[pass1_row_base + 6'd7]};
 
-    pass1_quad0 = pass1_pair0 + pass1_pair1;
-    pass1_quad1 = pass1_pair2 + pass1_pair3;
-    pass1_sum   = pass1_quad0 + pass1_quad1;
+        basis0 = basis_q14(transform_index[2:0], 3'd0);
+        basis1 = basis_q14(transform_index[2:0], 3'd1);
+        basis2 = basis_q14(transform_index[2:0], 3'd2);
+        basis3 = basis_q14(transform_index[2:0], 3'd3);
+        basis4 = basis_q14(transform_index[2:0], 3'd4);
+        basis5 = basis_q14(transform_index[2:0], 3'd5);
+        basis6 = basis_q14(transform_index[2:0], 3'd6);
+        basis7 = basis_q14(transform_index[2:0], 3'd7);
+    end
 end
 
-// -------------------------------------------------------------------------
-// Phase 1P balanced pass-2 dot product.
-//
-// 24-bit Q10 intermediate x 15-bit Q14 basis = exact signed 39-bit product.
-// Sign-extend to the existing 48-bit accumulator width and use the same
-// balanced three-level addition tree.
-// -------------------------------------------------------------------------
+wire signed [38:0] product0 = $signed(operand0) * $signed(basis0);
+wire signed [38:0] product1 = $signed(operand1) * $signed(basis1);
+wire signed [38:0] product2 = $signed(operand2) * $signed(basis2);
+wire signed [38:0] product3 = $signed(operand3) * $signed(basis3);
+wire signed [38:0] product4 = $signed(operand4) * $signed(basis4);
+wire signed [38:0] product5 = $signed(operand5) * $signed(basis5);
+wire signed [38:0] product6 = $signed(operand6) * $signed(basis6);
+wire signed [38:0] product7 = $signed(operand7) * $signed(basis7);
 
-reg signed [38:0] pass2_product0;
-reg signed [38:0] pass2_product1;
-reg signed [38:0] pass2_product2;
-reg signed [38:0] pass2_product3;
-reg signed [38:0] pass2_product4;
-reg signed [38:0] pass2_product5;
-reg signed [38:0] pass2_product6;
-reg signed [38:0] pass2_product7;
+reg signed [38:0] product0_r;
+reg signed [38:0] product1_r;
+reg signed [38:0] product2_r;
+reg signed [38:0] product3_r;
+reg signed [38:0] product4_r;
+reg signed [38:0] product5_r;
+reg signed [38:0] product6_r;
+reg signed [38:0] product7_r;
 
-reg signed [38:0] pass2_product0_r;
-reg signed [38:0] pass2_product1_r;
-reg signed [38:0] pass2_product2_r;
-reg signed [38:0] pass2_product3_r;
-reg signed [38:0] pass2_product4_r;
-reg signed [38:0] pass2_product5_r;
-reg signed [38:0] pass2_product6_r;
-reg signed [38:0] pass2_product7_r;
-
-reg signed [47:0] pass2_pair0;
-reg signed [47:0] pass2_pair1;
-reg signed [47:0] pass2_pair2;
-reg signed [47:0] pass2_pair3;
-reg signed [47:0] pass2_quad0;
-reg signed [47:0] pass2_quad1;
-reg signed [47:0] pass2_sum;
+reg signed [47:0] pair0;
+reg signed [47:0] pair1;
+reg signed [47:0] pair2;
+reg signed [47:0] pair3;
+reg signed [47:0] quad0;
+reg signed [47:0] quad1;
+reg signed [47:0] shared_sum;
 reg signed [31:0] pass2_integer;
 
 always @* begin
-    pass2_product0 =
-        $signed(temp[{3'd0, transform_index[2:0]}]) *
-        $signed(basis_q14(transform_index[5:3], 3'd0));
-    pass2_product1 =
-        $signed(temp[{3'd1, transform_index[2:0]}]) *
-        $signed(basis_q14(transform_index[5:3], 3'd1));
-    pass2_product2 =
-        $signed(temp[{3'd2, transform_index[2:0]}]) *
-        $signed(basis_q14(transform_index[5:3], 3'd2));
-    pass2_product3 =
-        $signed(temp[{3'd3, transform_index[2:0]}]) *
-        $signed(basis_q14(transform_index[5:3], 3'd3));
-    pass2_product4 =
-        $signed(temp[{3'd4, transform_index[2:0]}]) *
-        $signed(basis_q14(transform_index[5:3], 3'd4));
-    pass2_product5 =
-        $signed(temp[{3'd5, transform_index[2:0]}]) *
-        $signed(basis_q14(transform_index[5:3], 3'd5));
-    pass2_product6 =
-        $signed(temp[{3'd6, transform_index[2:0]}]) *
-        $signed(basis_q14(transform_index[5:3], 3'd6));
-    pass2_product7 =
-        $signed(temp[{3'd7, transform_index[2:0]}]) *
-        $signed(basis_q14(transform_index[5:3], 3'd7));
-
-    pass2_pair0 =
-        {{9{pass2_product0_r[38]}}, pass2_product0_r} +
-        {{9{pass2_product1_r[38]}}, pass2_product1_r};
-    pass2_pair1 =
-        {{9{pass2_product2_r[38]}}, pass2_product2_r} +
-        {{9{pass2_product3_r[38]}}, pass2_product3_r};
-    pass2_pair2 =
-        {{9{pass2_product4_r[38]}}, pass2_product4_r} +
-        {{9{pass2_product5_r[38]}}, pass2_product5_r};
-    pass2_pair3 =
-        {{9{pass2_product6_r[38]}}, pass2_product6_r} +
-        {{9{pass2_product7_r[38]}}, pass2_product7_r};
-
-    pass2_quad0 = pass2_pair0 + pass2_pair1;
-    pass2_quad1 = pass2_pair2 + pass2_pair3;
-    pass2_sum   = pass2_quad0 + pass2_quad1;
-
-    pass2_integer = round_q24_to_integer(pass2_sum);
+    pair0 = {{9{product0_r[38]}}, product0_r} +
+            {{9{product1_r[38]}}, product1_r};
+    pair1 = {{9{product2_r[38]}}, product2_r} +
+            {{9{product3_r[38]}}, product3_r};
+    pair2 = {{9{product4_r[38]}}, product4_r} +
+            {{9{product5_r[38]}}, product5_r};
+    pair3 = {{9{product6_r[38]}}, product6_r} +
+            {{9{product7_r[38]}}, product7_r};
+    quad0 = pair0 + pair1;
+    quad1 = pair2 + pair3;
+    shared_sum = quad0 + quad1;
+    pass2_integer = round_q24_to_integer(shared_sum);
 end
 
 always @(posedge clk) begin
     if (reset) begin
-        capture_active       <= 1'b0;
-        pass1_active         <= 1'b0;
-        pass2_active         <= 1'b0;
-        transform_index      <= 6'd0;
-        pass1_pipe_valid     <= 1'b0;
-        pass1_pipe_index     <= 6'd0;
-        pass2_pipe_valid     <= 1'b0;
-        pass2_pipe_index     <= 6'd0;
-        block_complete       <= 1'b0;
-        idct_error           <= 1'b0;
-        sample_valid         <= 1'b0;
-        sample_index         <= 6'd0;
-        sample_value         <= 16'sd0;
-        first_luma_sample00  <= 16'sd0;
-        first_luma_sample77  <= 16'sd0;
+        capture_active      <= 1'b0;
+        pass1_active        <= 1'b0;
+        pass2_active        <= 1'b0;
+        transform_index     <= 6'd0;
+        pipe_valid          <= 1'b0;
+        pipe_pass2          <= 1'b0;
+        pipe_index          <= 6'd0;
+        block_complete      <= 1'b0;
+        idct_error          <= 1'b0;
+        sample_valid        <= 1'b0;
+        sample_index        <= 6'd0;
+        sample_value        <= 16'sd0;
+        first_luma_sample00 <= 16'sd0;
+        first_luma_sample77 <= 16'sd0;
 
-        pass1_product0_r <= 27'sd0;
-        pass1_product1_r <= 27'sd0;
-        pass1_product2_r <= 27'sd0;
-        pass1_product3_r <= 27'sd0;
-        pass1_product4_r <= 27'sd0;
-        pass1_product5_r <= 27'sd0;
-        pass1_product6_r <= 27'sd0;
-        pass1_product7_r <= 27'sd0;
-
-        pass2_product0_r <= 39'sd0;
-        pass2_product1_r <= 39'sd0;
-        pass2_product2_r <= 39'sd0;
-        pass2_product3_r <= 39'sd0;
-        pass2_product4_r <= 39'sd0;
-        pass2_product5_r <= 39'sd0;
-        pass2_product6_r <= 39'sd0;
-        pass2_product7_r <= 39'sd0;
+        product0_r <= 39'sd0;
+        product1_r <= 39'sd0;
+        product2_r <= 39'sd0;
+        product3_r <= 39'sd0;
+        product4_r <= 39'sd0;
+        product5_r <= 39'sd0;
+        product6_r <= 39'sd0;
+        product7_r <= 39'sd0;
 
         for (i = 0; i < 64; i = i + 1) begin
             coeff[i] <= 12'sd0;
@@ -391,17 +296,57 @@ always @(posedge clk) begin
     else begin
         sample_valid <= 1'b0;
 
-        // kate - The pipeline valid for each pass follows that pass's issue
-        // enable.  On the cycle after index 63 is issued, the active flag is
-        // already low but pipe_valid remains high long enough to retire index
-        // 63 before the next pass/block begins.
-        pass1_pipe_valid <= pass1_active;
-        pass2_pipe_valid <= pass2_active;
+        // Retire the product bank issued on the preceding cycle.
+        if (pipe_valid) begin
+            if (pipe_pass2) begin
+                sample_valid <= 1'b1;
+                sample_index <= pipe_index;
+                sample_value <= pass2_integer[15:0];
+
+                if (pipe_index == 6'd0)
+                    first_luma_sample00 <= pass2_integer[15:0];
+                if (pipe_index == 6'd63)
+                    first_luma_sample77 <= pass2_integer[15:0];
+
+                if (pipe_index == 6'd63)
+                    block_complete <= 1'b1;
+            end
+            else begin
+                temp[pipe_index] <= round_q14_to_q10(shared_sum);
+                if (pipe_index == 6'd63) begin
+                    pass2_active    <= 1'b1;
+                    transform_index <= 6'd0;
+                end
+            end
+        end
+
+        // The shared product pipeline follows whichever pass is active.
+        pipe_valid <= issue_active;
+        if (issue_active) begin
+            pipe_pass2 <= issue_pass2;
+            pipe_index <= transform_index;
+            product0_r <= product0;
+            product1_r <= product1;
+            product2_r <= product2;
+            product3_r <= product3;
+            product4_r <= product4;
+            product5_r <= product5;
+            product6_r <= product6;
+            product7_r <= product7;
+
+            if (transform_index == 6'd63) begin
+                if (issue_pass2)
+                    pass2_active <= 1'b0;
+                else
+                    pass1_active <= 1'b0;
+            end
+            else begin
+                transform_index <= transform_index + 1'b1;
+            end
+        end
 
         if (coeff_block_start) begin
-            if (capture_active ||
-                pass1_active || pass1_pipe_valid ||
-                pass2_active || pass2_pipe_valid) begin
+            if (capture_active || pass1_active || pass2_active || pipe_valid) begin
                 idct_error <= 1'b1;
             end
             else begin
@@ -415,97 +360,21 @@ always @(posedge clk) begin
         end
 
         if (coeff_valid) begin
-            if (!capture_active && !coeff_block_start) begin
+            if (!capture_active && !coeff_block_start)
                 idct_error <= 1'b1;
-            end
-            else begin
+            else
                 coeff[coeff_index] <= coeff_value;
-            end
         end
 
         if (coeff_block_end) begin
             if ((!capture_active && !coeff_block_start) ||
-                pass1_active || pass1_pipe_valid ||
-                pass2_active || pass2_pipe_valid) begin
+                pass1_active || pass2_active || pipe_valid) begin
                 idct_error <= 1'b1;
             end
             else begin
                 capture_active  <= 1'b0;
                 pass1_active    <= 1'b1;
                 transform_index <= 6'd0;
-            end
-        end
-
-        // Pass 1 issue stage: capture all eight Q14 products for one horizontal
-        // 1-D transform.  One transform_index is still issued every clock.
-        if (pass1_active) begin
-            pass1_pipe_index <= transform_index;
-            pass1_product0_r <= pass1_product0;
-            pass1_product1_r <= pass1_product1;
-            pass1_product2_r <= pass1_product2;
-            pass1_product3_r <= pass1_product3;
-            pass1_product4_r <= pass1_product4;
-            pass1_product5_r <= pass1_product5;
-            pass1_product6_r <= pass1_product6;
-            pass1_product7_r <= pass1_product7;
-
-            if (transform_index == 6'd63) begin
-                pass1_active <= 1'b0;
-            end
-            else begin
-                transform_index <= transform_index + 1'b1;
-            end
-        end
-
-        // Pass 1 retire stage: balanced tree and unchanged Q14->Q10 rounding
-        // operate only on registered multiplier outputs.
-        if (pass1_pipe_valid) begin
-            temp[pass1_pipe_index] <= round_q14_to_q10(pass1_sum);
-
-            if (pass1_pipe_index == 6'd63) begin
-                pass2_active    <= 1'b1;
-                transform_index <= 6'd0;
-            end
-        end
-
-        // Pass 2 issue stage: capture all eight Q24 products for one vertical
-        // 1-D transform.  This mirrors pass 1 so pass 2 cannot become the next
-        // multiplier-to-adder critical path after pass-1 timing is fixed.
-        if (pass2_active) begin
-            pass2_pipe_index <= transform_index;
-            pass2_product0_r <= pass2_product0;
-            pass2_product1_r <= pass2_product1;
-            pass2_product2_r <= pass2_product2;
-            pass2_product3_r <= pass2_product3;
-            pass2_product4_r <= pass2_product4;
-            pass2_product5_r <= pass2_product5;
-            pass2_product6_r <= pass2_product6;
-            pass2_product7_r <= pass2_product7;
-
-            if (transform_index == 6'd63) begin
-                pass2_active <= 1'b0;
-            end
-            else begin
-                transform_index <= transform_index + 1'b1;
-            end
-        end
-
-        // Pass 2 retire stage.  Output order and rounding are unchanged; only
-        // the multiplier results arrive from the new pipeline register.
-        if (pass2_pipe_valid) begin
-            // kate - Do not clamp f[y][x] here.  H.262 7.6.8 performs the
-            // decoded-pel saturation after prediction is added (p=0 for intra).
-            sample_valid <= 1'b1;
-            sample_index <= pass2_pipe_index;
-            sample_value <= pass2_integer[15:0];
-
-            if (pass2_pipe_index == 6'd0)
-                first_luma_sample00 <= pass2_integer[15:0];
-            if (pass2_pipe_index == 6'd63)
-                first_luma_sample77 <= pass2_integer[15:0];
-
-            if (pass2_pipe_index == 6'd63) begin
-                block_complete <= 1'b1;
             end
         end
     end
