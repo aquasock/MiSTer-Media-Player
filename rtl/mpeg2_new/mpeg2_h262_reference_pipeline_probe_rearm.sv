@@ -1,11 +1,11 @@
 //============================================================================
 // MiSTer Media Player - re-arm wrapper for accepted P reference pipeline
 //
-// Phase 1U-o keeps the accepted Phase 1U-l/1U-n base intact and adds one
-// controlled motion+residual raster client around it.  Mixed mode is identified
-// only when the verified (+32,0), f_code=(3,3) vector and replayed residual
-// stream coincide.  The base is held in local reset for that client, preventing
-// the historical plan-sideband path from consuming real residual samples.
+// The accepted motion-plan base remains intact.  Residual-bearing generalized
+// raster pictures are identified when the verified (+32,0), f_code=(3,3)
+// representative vector coincides with residual-sideband replay.  That replay
+// now carries the decoded 48-bit motion map plus sparse residual block metadata,
+// so the mixed raster no longer uses a picture-wide hard-coded execution map.
 //============================================================================
 `include "rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_plan.sv"
 module mpeg2_h262_reference_read_probe
@@ -42,7 +42,7 @@ mpeg2_h262_reference_read_probe_base base_probe(
 wire[7:0] mix_bc;wire[28:0] mix_addr;wire mix_rd,mix_store_sel;wire[7:0] mix_store_val;wire[11:0] mix_store_x,mix_store_y;wire mix_store_valid,mix_store_start,mix_store_complete;
 wire mix_read;wire[7:0] mix_sample;wire mix_nonzero,mix_recon;wire[7:0] mix_recon_val,mix_persist_val;
 mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
- .clk(clk),.reset(reset),.capture_enable(mixed_select),.request(mixed_select),.shift_right_map(48'h201008040201),
+ .clk(clk),.reset(reset),.capture_enable(mixed_select),.request(mixed_select),.shift_right_map(48'd0),
  .residual_valid(p_residual_sample_valid&&mixed_select),.residual_index(p_residual_sample_index),.residual_value(p_residual_sample_value),
  .reference_valid(reference_frame_valid),.reference_bank(reference_frame_bank),.destination_bank(destination_frame_bank),.store_block_stored(p_store_block_stored),
  .ddram_busy(ddram_busy),.ddram_dout(ddram_dout),.ddram_dout_ready(ddram_dout_ready&&mixed_select),.ddram_burstcnt(mix_bc),.ddram_addr(mix_addr),.ddram_rd(mix_rd),
