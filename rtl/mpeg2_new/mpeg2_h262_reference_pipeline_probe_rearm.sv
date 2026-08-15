@@ -1,16 +1,12 @@
 //============================================================================
-// MiSTer Media Player - consolidated re-arm wrapper for P reference pipeline
+// MiSTer Media Player - consolidated re-arm wrapper for P/B reference pipeline
 //
 // Generalized P raster replay is identified by ordered motion metadata at
-// sideband index 0x3e.  The historical 128x96 +32/0 motion-plan transport is
-// captured here and translated into the same generalized metadata protocol,
-// eliminating its duplicate raster execution engine.
-//
-// The generalized raster DDR request remains registered at this wrapper
-// boundary.  The raster engine sees a synthetic busy handshake that completes
-// only when the registered external request is accepted; read data is delayed
-// one cycle so a zero-latency response cannot race the engine wait-response
-// transition.
+// sideband index 0x3e.  Historical P motion-plan transport is translated into
+// that protocol.  Commit 128 adds a B sideband client selected by an internal
+// out-of-range sentinel vector plus B direction metadata.  P and B share the
+// registered DDR request adapter; B reads both retained reference banks and
+// writes only to the scratch frame through the ordinary store interface.
 //============================================================================
 `include "rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_plan.sv"
 module mpeg2_h262_reference_read_probe
@@ -28,9 +24,6 @@ module mpeg2_h262_reference_read_probe
  output wire reconstructed_seen,output wire[7:0] reconstructed_value,output wire persisted_seen,output wire[7:0] persisted_value,output wire probe_error
 );
 
-// ---------------------------------------------------------------------------
-// Generalized sideband selection.
-// ---------------------------------------------------------------------------
 wire general_detect_now=p_residual_sample_valid&&(p_residual_sample_index==6'h3e)&&
  (forward_f_code_horizontal==4'd3)&&(forward_f_code_vertical==4'd3)&&
  (horizontal_size==14'd128)&&(vertical_size==14'd96)&&!p_implicit_reconstruct_request;
@@ -42,19 +35,25 @@ always @(posedge clk)begin
  else if(mixed_persisted_seen)general_mixed_mode<=0;
 end
 
-// ---------------------------------------------------------------------------
-// Historical motion-plan compatibility adapter.
-//
-// The old transport supplied 48 ordered sideband bits at indexes 0..47, then
-// published representative vector (+32,0).  Convert those bits to 48 ordinary
-// generalized motion metadata words: bit 0 -> (0,0), bit 1 -> (+32,0), followed
-// by the normal A2FF metadata terminator.  The generalized raster engine then
-// performs the exact same 8x6 prediction/store work used by the v0.4.0 path.
-// ---------------------------------------------------------------------------
+wire b_direction_word=(p_residual_sample_index==6'h38)||(p_residual_sample_index==6'h39)||(p_residual_sample_index==6'h3a);
+wire b_detect_now=p_residual_sample_valid&&b_direction_word&&p_forward_vector_valid&&
+ (p_forward_vector_x==13'sd2047)&&(p_forward_vector_y==-13'sd2048)&&
+ (forward_f_code_horizontal==4'd3)&&(forward_f_code_vertical==4'd3)&&
+ (horizontal_size==14'd128)&&(vertical_size==14'd96)&&!p_implicit_reconstruct_request;
+reg b_mode;
+wire b_active,b_persisted_seen,b_error,b_half,b_recon,b_read,b_nonzero;
+wire [7:0] b_sample,b_recon_value,b_persist_value;
+always @(posedge clk)begin
+ if(reset)b_mode<=0;
+ else if(b_detect_now)b_mode<=1;
+ else if(b_persisted_seen&&!b_active)b_mode<=0;
+end
+wire b_select=b_mode||b_detect_now||b_active;
+
 wire plan_capture_window=
  !p_forward_vector_valid&&!p_implicit_reconstruct_request&&
  (forward_f_code_horizontal==4'd3)&&(forward_f_code_vertical==4'd3)&&
- (horizontal_size==14'd128)&&(vertical_size==14'd96)&&!general_mixed_mode;
+ (horizontal_size==14'd128)&&(vertical_size==14'd96)&&!general_mixed_mode&&!b_select;
 wire plan_first_now=plan_capture_window&&p_residual_sample_valid&&
  (p_residual_sample_index==6'd0)&&(p_residual_sample_value[15:1]==15'd0);
 
@@ -65,7 +64,7 @@ reg plan_capture_active,plan_ready,plan_started,plan_replay_active,plan_replay_s
 wire plan_request_now=plan_ready&&p_forward_vector_valid&&
  (p_forward_vector_x==13'sd32)&&(p_forward_vector_y==13'sd0)&&
  (forward_f_code_horizontal==4'd3)&&(forward_f_code_vertical==4'd3)&&
- (horizontal_size==14'd128)&&(vertical_size==14'd96)&&!p_implicit_reconstruct_request;
+ (horizontal_size==14'd128)&&(vertical_size==14'd96)&&!p_implicit_reconstruct_request&&!b_select;
 
 always @(posedge clk)begin
  if(reset)begin
@@ -85,18 +84,12 @@ always @(posedge clk)begin
    end
   end
 
-  if(plan_request_now&&!plan_started)begin
-   plan_started<=1;plan_replay_active<=1;plan_emit_count<=0;
-  end else if(plan_replay_active)begin
+  if(plan_request_now&&!plan_started)begin plan_started<=1;plan_replay_active<=1;plan_emit_count<=0;end
+  else if(plan_replay_active)begin
    if(plan_emit_count==6'd0)plan_replay_seen<=1;
-   if(plan_emit_count==6'd48)plan_replay_active<=0;
-   else plan_emit_count<=plan_emit_count+1'b1;
+   if(plan_emit_count==6'd48)plan_replay_active<=0;else plan_emit_count<=plan_emit_count+1'b1;
   end
 
-  // Retire adapter state only after the translated raster has actually
-  // persisted.  plan_replay_active protects against a stale persisted_seen
-  // from the preceding generalized P picture until the first synthesized
-  // metadata word re-arms the raster engine.
   if(plan_started&&plan_replay_seen&&!plan_replay_active&&!mixed_active&&mixed_persisted_seen)begin
    plan_capture_count<=0;plan_emit_count<=0;plan_capture_active<=0;
    plan_ready<=0;plan_started<=0;plan_replay_seen<=0;plan_shift_right_map<=0;
@@ -108,31 +101,26 @@ wire[5:0] plan_map_index=(plan_emit_count<6'd48)?plan_emit_count:6'd0;
 wire signed[7:0] plan_emit_mvx=plan_shift_right_map[plan_map_index]?8'sd32:8'sd0;
 wire plan_adapter_valid=plan_replay_active;
 wire[5:0] plan_adapter_index=(plan_emit_count<6'd48)?6'h3e:6'h3f;
-wire signed[15:0] plan_adapter_value=(plan_emit_count<6'd48)?
- {plan_emit_mvx,8'sd0}:16'shA2FF;
+wire signed[15:0] plan_adapter_value=(plan_emit_count<6'd48)?{plan_emit_mvx,8'sd0}:16'shA2FF;
 
 wire plan_select=plan_first_now||plan_capture_active||plan_ready||plan_started||plan_replay_active;
-wire general_input_select=general_mixed_mode||general_detect_now;
+wire general_input_select=(general_mixed_mode||general_detect_now)&&!b_select;
 wire mixed_select=general_input_select||plan_select||mixed_active;
 wire mix_residual_valid=plan_adapter_valid?1'b1:(p_residual_sample_valid&&general_input_select);
 wire[5:0] mix_residual_index=plan_adapter_valid?plan_adapter_index:p_residual_sample_index;
 wire signed[15:0] mix_residual_value=plan_adapter_valid?plan_adapter_value:p_residual_sample_value;
 
-// ---------------------------------------------------------------------------
-// Legacy client shell.  It now contains only explicit-reference,
-// implicit-residual and one shared zero-motion raster-copy engine.
-// ---------------------------------------------------------------------------
 wire base_persisted_seen,base_probe_error;reg p_forward_vector_valid_d;
 wire base_rearm_now=base_persisted_seen&&p_forward_vector_valid_d&&!p_forward_vector_valid;
-wire base_reset=reset||base_rearm_now||mixed_select;
+wire base_reset=reset||base_rearm_now||mixed_select||b_select;
 always @(posedge clk)begin
  if(reset)p_forward_vector_valid_d<=0;
- else p_forward_vector_valid_d<=p_forward_vector_valid&&!mixed_select;
+ else p_forward_vector_valid_d<=p_forward_vector_valid&&!mixed_select&&!b_select;
 end
 wire[7:0] base_bc;wire[28:0] base_addr;wire base_rd,base_store_sel;wire[7:0] base_store_val;wire[11:0] base_store_x,base_store_y;wire base_store_valid,base_store_start,base_store_complete;
 wire base_read;wire[7:0] base_sample;wire base_nonzero,base_half,base_recon;wire[7:0] base_recon_val,base_persist_val;
-wire base_vector_valid=p_forward_vector_valid&&!mixed_select;
-wire base_residual_valid=p_residual_sample_valid&&!mixed_select;
+wire base_vector_valid=p_forward_vector_valid&&!mixed_select&&!b_select;
+wire base_residual_valid=p_residual_sample_valid&&!mixed_select&&!b_select;
 
 mpeg2_h262_reference_read_probe_base base_probe(
  .reset(base_reset),.p_forward_vector_valid(base_vector_valid),.p_residual_sample_valid(base_residual_valid),
@@ -141,63 +129,77 @@ mpeg2_h262_reference_read_probe_base base_probe(
  .read_seen(base_read),.sample_value(base_sample),.sample_nonzero(base_nonzero),.half_sample_seen(base_half),.reconstructed_seen(base_recon),
  .reconstructed_value(base_recon_val),.persisted_seen(base_persisted_seen),.persisted_value(base_persist_val),.probe_error(base_probe_error),.*);
 
-// ---------------------------------------------------------------------------
-// Registered generalized-raster DDR request adapter.
-// ---------------------------------------------------------------------------
 wire[7:0] mix_bc_raw;wire[28:0] mix_addr_raw;wire mix_rd_raw;
-reg mix_req_active,mix_response_pending;reg[7:0] mix_bc_reg;reg[28:0] mix_addr_reg;
-reg[63:0] mix_dout_reg;reg mix_dout_ready_reg;
-wire mix_engine_busy=!(mix_req_active&&!ddram_busy);
+wire mix_store_sel;wire[7:0] mix_store_val;wire[11:0] mix_store_x,mix_store_y;wire mix_store_valid,mix_store_start,mix_store_complete;
+wire mix_read;wire[7:0] mix_sample;wire mix_nonzero,mix_recon;wire[7:0] mix_recon_val,mix_persist_val;
+
+wire[7:0] b_bc_raw;wire[28:0] b_addr_raw;wire b_rd_raw;
+wire b_store_sel;wire[7:0] b_store_val;wire[11:0] b_store_x,b_store_y;wire b_store_valid,b_store_start,b_store_complete;
+
+wire shared_select=mixed_select||b_select;
+wire[7:0] shared_bc_raw=b_select?b_bc_raw:mix_bc_raw;
+wire[28:0] shared_addr_raw=b_select?b_addr_raw:mix_addr_raw;
+wire shared_rd_raw=b_select?b_rd_raw:mix_rd_raw;
+reg shared_req_active,shared_response_pending;reg[7:0] shared_bc_reg;reg[28:0] shared_addr_reg;
+reg[63:0] shared_dout_reg;reg shared_dout_ready_reg;
+wire shared_engine_busy=!(shared_req_active&&!ddram_busy);
 
 always @(posedge clk)begin
  if(reset)begin
-  mix_req_active<=0;mix_response_pending<=0;mix_bc_reg<=0;mix_addr_reg<=0;mix_dout_reg<=0;mix_dout_ready_reg<=0;
+  shared_req_active<=0;shared_response_pending<=0;shared_bc_reg<=0;shared_addr_reg<=0;shared_dout_reg<=0;shared_dout_ready_reg<=0;
  end else begin
-  mix_dout_ready_reg<=0;
-  if(!mixed_select)begin
-   mix_req_active<=0;mix_response_pending<=0;
-  end else begin
-   if(!mix_req_active&&mix_rd_raw)begin
-    mix_req_active<=1;mix_bc_reg<=mix_bc_raw;mix_addr_reg<=mix_addr_raw;
-   end else if(mix_req_active&&!ddram_busy)begin
-    mix_req_active<=0;mix_response_pending<=1;
-   end
-   if(ddram_dout_ready&&(mix_response_pending||(mix_req_active&&!ddram_busy)))begin
-    mix_dout_reg<=ddram_dout;mix_dout_ready_reg<=1;mix_response_pending<=0;
+  shared_dout_ready_reg<=0;
+  if(!shared_select)begin shared_req_active<=0;shared_response_pending<=0;end
+  else begin
+   if(!shared_req_active&&shared_rd_raw)begin shared_req_active<=1;shared_bc_reg<=shared_bc_raw;shared_addr_reg<=shared_addr_raw;end
+   else if(shared_req_active&&!ddram_busy)begin shared_req_active<=0;shared_response_pending<=1;end
+   if(ddram_dout_ready&&(shared_response_pending||(shared_req_active&&!ddram_busy)))begin
+    shared_dout_reg<=ddram_dout;shared_dout_ready_reg<=1;shared_response_pending<=0;
    end
   end
  end
 end
 
-wire mix_store_sel;wire[7:0] mix_store_val;wire[11:0] mix_store_x,mix_store_y;wire mix_store_valid,mix_store_start,mix_store_complete;
-wire mix_read;wire[7:0] mix_sample;wire mix_nonzero,mix_recon;wire[7:0] mix_recon_val,mix_persist_val;
 mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
  .clk(clk),.reset(reset),.capture_enable(mixed_select),.request(mixed_select),.shift_right_map(48'd0),
  .residual_valid(mix_residual_valid),.residual_index(mix_residual_index),.residual_value(mix_residual_value),
  .reference_valid(reference_frame_valid),.reference_bank(reference_frame_bank),.destination_bank(destination_frame_bank),.store_block_stored(p_store_block_stored),
- .ddram_busy(mix_engine_busy),.ddram_dout(mix_dout_reg),.ddram_dout_ready(mix_dout_ready_reg),.ddram_burstcnt(mix_bc_raw),.ddram_addr(mix_addr_raw),.ddram_rd(mix_rd_raw),
+ .ddram_busy(shared_engine_busy),.ddram_dout(shared_dout_reg),.ddram_dout_ready(shared_dout_ready_reg),.ddram_burstcnt(mix_bc_raw),.ddram_addr(mix_addr_raw),.ddram_rd(mix_rd_raw),
  .store_select(mix_store_sel),.store_pixel_value(mix_store_val),.store_pixel_x(mix_store_x),.store_pixel_y(mix_store_y),.store_pixel_valid(mix_store_valid),
  .store_block_start(mix_store_start),.store_block_complete(mix_store_complete),.active(mixed_active),.read_seen(mix_read),.sample_value(mix_sample),.sample_nonzero(mix_nonzero),
  .half_sample_seen(mixed_half),.reconstructed_seen(mix_recon),.reconstructed_value(mix_recon_val),.persisted_seen(mixed_persisted_seen),.persisted_value(mix_persist_val),.error(mixed_error));
 
-assign ddram_burstcnt=mixed_select?(mix_req_active?mix_bc_reg:8'd0):base_bc;
-assign ddram_addr=mixed_select?(mix_req_active?mix_addr_reg:29'd0):base_addr;
-assign ddram_rd=mixed_select?mix_req_active:base_rd;
-assign p_store_select=mixed_select?mix_store_sel:base_store_sel;
-assign p_store_pixel_value=mixed_select?mix_store_val:base_store_val;
-assign p_store_pixel_x=mixed_select?mix_store_x:base_store_x;
-assign p_store_pixel_y=mixed_select?mix_store_y:base_store_y;
-assign p_store_pixel_valid=mixed_select?mix_store_valid:base_store_valid;
-assign p_store_block_start=mixed_select?mix_store_start:base_store_start;
-assign p_store_block_complete=mixed_select?mix_store_complete:base_store_complete;
+mpeg2_h262_b_bidirectional_raster_engine b_probe(
+ .clk(clk),.reset(reset),.capture_enable(b_select),.request(b_select),
+ .sideband_valid(p_residual_sample_valid&&b_select),.sideband_index(p_residual_sample_index),.sideband_value(p_residual_sample_value),
+ .reference_valid(reference_frame_valid),.future_reference_bank(reference_frame_bank),.store_block_stored(p_store_block_stored),
+ .ddram_busy(shared_engine_busy),.ddram_dout(shared_dout_reg),.ddram_dout_ready(shared_dout_ready_reg),
+ .ddram_burstcnt(b_bc_raw),.ddram_addr(b_addr_raw),.ddram_rd(b_rd_raw),
+ .store_select(b_store_sel),.store_pixel_value(b_store_val),.store_pixel_x(b_store_x),.store_pixel_y(b_store_y),
+ .store_pixel_valid(b_store_valid),.store_block_start(b_store_start),.store_block_complete(b_store_complete),
+ .active(b_active),.read_seen(b_read),.sample_nonzero(b_nonzero),.half_sample_seen(b_half),
+ .reconstructed_seen(b_recon),.persisted_seen(b_persisted_seen),.error(b_error));
+assign b_sample=8'd0;assign b_recon_value=8'd0;assign b_persist_value=8'd0;
+
+assign ddram_burstcnt=shared_select?(shared_req_active?shared_bc_reg:8'd0):base_bc;
+assign ddram_addr=shared_select?(shared_req_active?shared_addr_reg:29'd0):base_addr;
+assign ddram_rd=shared_select?shared_req_active:base_rd;
+assign p_store_select=b_select?b_store_sel:mixed_select?mix_store_sel:base_store_sel;
+assign p_store_pixel_value=b_select?b_store_val:mixed_select?mix_store_val:base_store_val;
+assign p_store_pixel_x=b_select?b_store_x:mixed_select?mix_store_x:base_store_x;
+assign p_store_pixel_y=b_select?b_store_y:mixed_select?mix_store_y:base_store_y;
+assign p_store_pixel_valid=b_select?b_store_valid:mixed_select?mix_store_valid:base_store_valid;
+assign p_store_block_start=b_select?b_store_start:mixed_select?mix_store_start:base_store_start;
+assign p_store_block_complete=b_select?b_store_complete:mixed_select?mix_store_complete:base_store_complete;
 wire mixed_seen_enable=!plan_select||plan_replay_seen;
-assign read_seen=mixed_select?(mixed_seen_enable&&mix_read):base_read;
-assign sample_value=mixed_select?mix_sample:base_sample;
-assign sample_nonzero=mixed_select?(mixed_seen_enable&&mix_nonzero):base_nonzero;
-assign half_sample_seen=mixed_select?(mixed_seen_enable&&mixed_half):base_half;
-assign reconstructed_seen=mixed_select?(mixed_seen_enable&&mix_recon):base_recon;
-assign reconstructed_value=mixed_select?mix_recon_val:base_recon_val;
-assign persisted_seen=mixed_select?(mixed_seen_enable&&mixed_persisted_seen):base_persisted_seen;
-assign persisted_value=mixed_select?mix_persist_val:base_persist_val;
-assign probe_error=plan_error||mixed_error||(!mixed_select&&base_probe_error);
+assign read_seen=b_select?b_read:mixed_select?(mixed_seen_enable&&mix_read):base_read;
+assign sample_value=b_select?b_sample:mixed_select?mix_sample:base_sample;
+assign sample_nonzero=b_select?b_nonzero:mixed_select?(mixed_seen_enable&&mix_nonzero):base_nonzero;
+assign half_sample_seen=b_select?b_half:mixed_select?(mixed_seen_enable&&mixed_half):base_half;
+assign reconstructed_seen=b_select?b_recon:mixed_select?(mixed_seen_enable&&mix_recon):base_recon;
+assign reconstructed_value=b_select?b_recon_value:mixed_select?mix_recon_val:base_recon_val;
+assign persisted_seen=b_select?b_persisted_seen:mixed_select?(mixed_seen_enable&&mixed_persisted_seen):base_persisted_seen;
+assign persisted_value=b_select?b_persist_value:mixed_select?mix_persist_val:base_persist_val;
+assign probe_error=plan_error||(b_select?b_error:(mixed_select?mixed_error:base_probe_error));
+wire unused_b=&{1'b0,b_sample,b_recon_value,b_persist_value};
 endmodule
