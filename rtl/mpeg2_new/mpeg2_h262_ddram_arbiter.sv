@@ -20,6 +20,10 @@
 // The first reconstructed P block now uses the ordinary block writer, so this
 // arbiter returns to three explicit clients: presentation read, prediction read,
 // and reconstruction write. No prediction-side write encoding remains.
+//
+// Commit 142 extends display ownership to the B scratch frame.  The two retained
+// reference banks occupy regions 00/01 while B scratch occupies region 10, so
+// writer exclusion must compare address bits [17:16] rather than bit 16 alone.
 //============================================================================
 
 module mpeg2_h262_ddram_arbiter
@@ -61,10 +65,10 @@ reg       read_outstanding;
 reg       read_owner_prediction;
 reg [7:0] read_words_remaining;
 reg       reader_bank_valid;
-reg       reader_frame_bank;
+reg [1:0] reader_frame_region;
 
-wire writer_targets_reader_bank =
-    reader_bank_valid && (writer_addr[16] == reader_frame_bank);
+wire writer_targets_reader_region =
+    reader_bank_valid && (writer_addr[17:16] == reader_frame_region);
 
 wire grant_reader =
     !read_outstanding && reader_rd;
@@ -74,7 +78,7 @@ wire grant_prediction =
 
 wire grant_writer =
     !read_outstanding && !reader_rd && !prediction_rd &&
-    writer_we && !writer_targets_reader_bank;
+    writer_we && !writer_targets_reader_region;
 
 assign reader_busy =
     grant_reader ? ddram_busy : 1'b1;
@@ -120,7 +124,7 @@ always @(posedge clk) begin
         read_owner_prediction <= 1'b0;
         read_words_remaining  <= 8'd0;
         reader_bank_valid     <= 1'b0;
-        reader_frame_bank     <= 1'b0;
+        reader_frame_region   <= 2'b00;
     end
     else begin
         if (!read_outstanding) begin
@@ -129,7 +133,7 @@ always @(posedge clk) begin
                 read_owner_prediction <= 1'b0;
                 read_words_remaining  <= reader_burstcnt;
                 reader_bank_valid     <= 1'b1;
-                reader_frame_bank     <= reader_addr[16];
+                reader_frame_region   <= reader_addr[17:16];
             end
             else if (grant_prediction && !ddram_busy) begin
                 read_outstanding      <= 1'b1;
