@@ -5,126 +5,38 @@ on:
 permissions:
   contents: write
 jobs:
-  stage:
+  patch:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: c137-staging
-      - name: Patch Commit 137 diagnostic
+      - name: Apply exact Commit 137 diagnostic patch
         shell: bash
         run: |
-          python3 - <<'PY'
+          python - <<'PYCODE'
           from pathlib import Path
-          p = Path('MediaPlayer.sv')
-          s = p.read_text()
-          start = s.index('// Commit 136 keeps the slow direct USER override')
-          end = s.index('wire mpeg2_new_normal_user_led =', start)
-          new = r'''// Commit 137 keeps the proven slow direct USER override, but after B raster
-// stage 15 it reports exactly which ordinary top-level acceptance prerequisite
-// is still false for the controlled I/P/B stream.  Counts 1..14 are failure
-// categories; 15 means every listed prerequisite is clean.  Decode, DDR,
-// publication, and normal I/P USER behavior are unchanged.
-reg        mpeg2_new_b_diag_active;
-reg        mpeg2_new_b_diag_completion_mode;
-reg [3:0]  mpeg2_new_b_diag_stage;
-reg [29:0] mpeg2_new_b_diag_counter;
+          p=Path('MediaPlayer.sv')
+          t=p.read_text()
 
-wire mpeg2_new_b_core_diag_valid =
-    (mpeg2_new_p_first_residual_sample_value[15:8] == 8'hBD);
-wire [3:0] mpeg2_new_b_core_diag_stage = mpeg2_new_b_core_diag_valid ?
-    mpeg2_new_p_first_residual_sample_value[3:0] : 4'd0;
-wire mpeg2_new_b_raster_diag_valid =
-    (mpeg2_new_b_core_diag_stage >= 4'd10) &&
-    (mpeg2_new_pred_sample_value[7:4] == 4'hD);
-wire [2:0] mpeg2_new_b_raster_diag_stage = mpeg2_new_b_raster_diag_valid ?
-    mpeg2_new_pred_sample_value[2:0] : 3'd0;
-wire [3:0] mpeg2_new_b_raster_diag_mapped =
-    (mpeg2_new_b_raster_diag_stage >= 3'd7) ? 4'd15 :
-    (mpeg2_new_b_raster_diag_stage >= 3'd6) ? 4'd14 :
-    (mpeg2_new_b_raster_diag_stage >= 3'd5) ? 4'd13 :
-    (mpeg2_new_b_raster_diag_stage >= 3'd4) ? 4'd12 : 4'd0;
-wire [3:0] mpeg2_new_b_exec_diag_target =
-    (mpeg2_new_b_raster_diag_mapped > mpeg2_new_b_core_diag_stage) ?
-        mpeg2_new_b_raster_diag_mapped : mpeg2_new_b_core_diag_stage;
-wire mpeg2_new_b_completion_reached =
-    (mpeg2_new_b_raster_diag_mapped >= 4'd15);
+          a=t.index('// Commit 136 keeps the slow direct USER override')
+          b=t.index('reg        mpeg2_new_b_diag_active;',a)
+          comment='// Commit 137 keeps the proven slow direct USER override, but after B raster\n// stage 15 it reports exactly which ordinary top-level acceptance prerequisite\n// is still false for the controlled I/P/B stream. Counts 1..14 are failure\n// categories; 15 means every listed prerequisite is clean. Decode, DDR,\n// publication, and normal I/P USER behavior are unchanged.\n'
+          t=t[:a]+comment+t[b:]
 
-// The controlled B stream is coded I / future-P / B, so the ordinary P-success
-// branch is the relevant pre-B acceptance path.  Each number identifies the
-// first remaining false prerequisite; 15 is the all-clean sentinel.
-wire [3:0] mpeg2_new_b_top_level_diag_target =
-    !mpeg2_new_p_macroblock_type_seen                         ? 4'd1 :
-    !mpeg2_new_first_picture_420_parsed                       ? 4'd2 :
-    !mpeg2_new_second_picture_420_parsed                      ? 4'd3 :
-    (mpeg2_new_picture_count < 8'd2)                          ? 4'd4 :
-    (mpeg2_new_completed_frame_bank != mpeg2_new_display_frame_bank) ? 4'd5 :
-    !mpeg2_new_phase1t_reference_read_ok                      ? 4'd6 :
-    !mpeg2_new_phase1t_implicit_reconstruct_ok                ? 4'd7 :
-    !mpeg2_new_recon_macroblock_420_complete                  ? 4'd8 :
-    !mpeg2_new_phase1n_frame_geometry_supported               ? 4'd9 :
-    mpeg2_new_syntax_error                                    ? 4'd10 :
-    (mpeg2_new_inverse_quant_error ||
-     mpeg2_new_inverse_quant_unsupported_matrix)              ? 4'd11 :
-    (mpeg2_new_idct_error || mpeg2_new_recon_error)           ? 4'd12 :
-    !mpeg2_new_ddr_write_seen                                 ? 4'd13 :
-    (!mpeg2_new_ddr_cache_ready ||
-     !mpeg2_new_ddr_read_seen ||
-      mpeg2_new_ddr_cache_error)                              ? 4'd14 :
-                                                                  4'd15;
-
-always @(posedge clk_mpeg2) begin
-    if (reset_mpeg2) begin
-        mpeg2_new_b_diag_active          <= 1'b0;
-        mpeg2_new_b_diag_completion_mode <= 1'b0;
-        mpeg2_new_b_diag_stage           <= 4'd0;
-        mpeg2_new_b_diag_counter         <= 30'd0;
-    end
-    else if (!mpeg2_new_b_diag_active &&
-             mpeg2_new_picture_seen &&
-             (mpeg2_new_picture_coding_type == 3'b011)) begin
-        mpeg2_new_b_diag_active          <= 1'b1;
-        mpeg2_new_b_diag_completion_mode <= 1'b0;
-        mpeg2_new_b_diag_stage           <= 4'd0;
-        mpeg2_new_b_diag_counter         <= 30'd0;
-    end
-    else if (mpeg2_new_b_diag_active) begin
-        if (mpeg2_new_b_diag_completion_mode) begin
-            if (mpeg2_new_b_top_level_diag_target != mpeg2_new_b_diag_stage) begin
-                mpeg2_new_b_diag_stage   <= mpeg2_new_b_top_level_diag_target;
-                mpeg2_new_b_diag_counter <= 30'd0;
-            end
-            else
-                mpeg2_new_b_diag_counter <= mpeg2_new_b_diag_counter + 1'b1;
-        end
-        else if (mpeg2_new_b_completion_reached) begin
-            mpeg2_new_b_diag_completion_mode <= 1'b1;
-            mpeg2_new_b_diag_stage           <= mpeg2_new_b_top_level_diag_target;
-            mpeg2_new_b_diag_counter         <= 30'd0;
-        end
-        else if (mpeg2_new_b_exec_diag_target > mpeg2_new_b_diag_stage) begin
-            mpeg2_new_b_diag_stage   <= mpeg2_new_b_exec_diag_target;
-            mpeg2_new_b_diag_counter <= 30'd0;
-        end
-        else
-            mpeg2_new_b_diag_counter <= mpeg2_new_b_diag_counter + 1'b1;
-    end
-end
-
-// At the current decoder clock, one slot is roughly 0.30 s. Each numbered
-// stage/status produces that many distinct on-slots separated by equal off-slots,
-// followed by a long dark gap before the group repeats.
-wire [5:0] mpeg2_new_b_diag_phase = mpeg2_new_b_diag_counter[29:24];
-wire [5:0] mpeg2_new_b_diag_limit = {1'b0, mpeg2_new_b_diag_stage, 1'b0};
-wire mpeg2_new_b_diag_led =
-    (mpeg2_new_b_diag_phase < mpeg2_new_b_diag_limit) &&
-    !mpeg2_new_b_diag_phase[0];
-
-'''
-          p.write_text(s[:start] + new + s[end:])
-          PY
-          git config user.name "c137-stage"
-          git config user.email "c137-stage@users.noreply.github.com"
+          a=t.index('wire mpeg2_new_b_core_error =')
+          b=t.index('always @(posedge clk_mpeg2) begin',a)
+          block='// The controlled B stream is coded I / future-P / B, so the ordinary P-success\n// branch is the relevant pre-B acceptance path. Each number identifies the\n// first remaining false prerequisite; 15 is the all-clean sentinel.\nwire [3:0] mpeg2_new_b_completion_diag_target =\n    !mpeg2_new_p_macroblock_type_seen                         ? 4\'d1 :\n    !mpeg2_new_first_picture_420_parsed                       ? 4\'d2 :\n    !mpeg2_new_second_picture_420_parsed                      ? 4\'d3 :\n    (mpeg2_new_picture_count < 8\'d2)                          ? 4\'d4 :\n    (mpeg2_new_completed_frame_bank != mpeg2_new_display_frame_bank) ? 4\'d5 :\n    !mpeg2_new_phase1t_reference_read_ok                      ? 4\'d6 :\n    !mpeg2_new_phase1t_implicit_reconstruct_ok                ? 4\'d7 :\n    !mpeg2_new_recon_macroblock_420_complete                  ? 4\'d8 :\n    !mpeg2_new_phase1n_frame_geometry_supported               ? 4\'d9 :\n    mpeg2_new_syntax_error                                    ? 4\'d10 :\n    (mpeg2_new_inverse_quant_error ||\n     mpeg2_new_inverse_quant_unsupported_matrix)              ? 4\'d11 :\n    (mpeg2_new_idct_error || mpeg2_new_recon_error)           ? 4\'d12 :\n    !mpeg2_new_ddr_write_seen                                 ? 4\'d13 :\n    (!mpeg2_new_ddr_cache_ready ||\n     !mpeg2_new_ddr_read_seen ||\n      mpeg2_new_ddr_cache_error)                              ? 4\'d14 :\n                                                                  4\'d15;\n\n'
+          t=t[:a]+block+t[b:]
+          p.write_text(t)
+          PYCODE
+      - name: Commit staged RTL
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add MediaPlayer.sv
-          git commit -m "stage Commit 137 RTL"
+          git diff --cached --quiet && exit 0
+          git commit -m 'stage Commit 137 RTL'
           git push origin HEAD:c137-staging
