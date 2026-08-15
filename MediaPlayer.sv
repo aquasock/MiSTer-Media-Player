@@ -854,15 +854,11 @@ wire mpeg2_new_phase1t_p_syntax_user_success =
 
 wire unused_phase1t_reconstructed_value = &{1'b0, mpeg2_new_pred_reconstructed_value};
 
-// Commit 136 keeps the slow direct USER override and the proven 1..15
-// execution trace, then switches to a stable completion-status trace after
-// raster stage 15. The publication shell carrier is now 0xBDss: status is in
-// bits 7:4 and the original B-core execution stage remains in bits 3:0.
-// Completion pulses: 1 B-core error; 2 B-raster/reference-wrapper error;
-// 3 DDR scratch-store error; 4 publication/reference error; 5 P/bookkeeper
-// contamination; 6 other top-level prerequisite/error; 7 everything clean.
-// The old phase1/pred probe-error blink instrumentation is deliberately not
-// used for categories 4..6, so that instrumentation cannot diagnose itself.
+// Commit 137 keeps the proven slow direct USER override, but after B raster
+// stage 15 it reports exactly which ordinary top-level acceptance prerequisite
+// is still false for the controlled I/P/B stream. Counts 1..14 are failure
+// categories; 15 means every listed prerequisite is clean. Decode, DDR,
+// publication, and normal I/P USER behavior are unchanged.
 reg        mpeg2_new_b_diag_active;
 reg        mpeg2_new_b_diag_completion_mode;
 reg        mpeg2_new_b_diag_pred_error_seen;
@@ -891,41 +887,28 @@ wire [3:0] mpeg2_new_b_exec_diag_target =
 wire mpeg2_new_b_completion_reached =
     (mpeg2_new_b_raster_diag_mapped >= 4'd15);
 
-wire mpeg2_new_b_core_error =
-    mpeg2_new_b_core_diag_status[3];
-wire mpeg2_new_b_publication_reference_error =
-    mpeg2_new_b_core_diag_status[2] ||
-    !mpeg2_new_b_core_diag_status[0];
-wire mpeg2_new_b_p_bookkeeper_error =
-    mpeg2_new_b_core_diag_status[1];
-
-// These are the ordinary USER prerequisites except phase1_probe_error,
-// pred_error, and ddr_store_error. Those three are classified separately above
-// or by the raw Commit 136 carrier. This prevents the older diagnostic pulse
-// gates from creating a false "other" failure after a clean stage-15 decode.
-wire mpeg2_new_b_other_top_level_failure =
-    !(mpeg2_new_phase1s_all_i_user_success ||
-      mpeg2_new_phase1t_p_syntax_user_success) ||
-    !mpeg2_new_recon_macroblock_420_complete ||
-    !mpeg2_new_phase1n_frame_geometry_supported ||
-    mpeg2_new_syntax_error ||
-    mpeg2_new_inverse_quant_error ||
-    mpeg2_new_inverse_quant_unsupported_matrix ||
-    mpeg2_new_idct_error ||
-    mpeg2_new_recon_error ||
-    !mpeg2_new_ddr_write_seen ||
-    !mpeg2_new_ddr_cache_ready ||
-    !mpeg2_new_ddr_read_seen ||
-    mpeg2_new_ddr_cache_error;
-
+// The controlled B stream is coded I / future-P / B, so the ordinary P-success
+// branch is the relevant pre-B acceptance path. Each number identifies the
+// first remaining false prerequisite; 15 is the all-clean sentinel.
 wire [3:0] mpeg2_new_b_completion_diag_target =
-    mpeg2_new_b_core_error                                      ? 4'd1 :
-    (mpeg2_new_b_diag_pred_error_seen || mpeg2_new_pred_error) ? 4'd2 :
-    mpeg2_new_ddr_store_error                                  ? 4'd3 :
-    mpeg2_new_b_publication_reference_error                    ? 4'd4 :
-    mpeg2_new_b_p_bookkeeper_error                             ? 4'd5 :
-    mpeg2_new_b_other_top_level_failure                        ? 4'd6 :
-                                                                  4'd7;
+    !mpeg2_new_p_macroblock_type_seen                         ? 4'd1 :
+    !mpeg2_new_first_picture_420_parsed                       ? 4'd2 :
+    !mpeg2_new_second_picture_420_parsed                      ? 4'd3 :
+    (mpeg2_new_picture_count < 8'd2)                          ? 4'd4 :
+    (mpeg2_new_completed_frame_bank != mpeg2_new_display_frame_bank) ? 4'd5 :
+    !mpeg2_new_phase1t_reference_read_ok                      ? 4'd6 :
+    !mpeg2_new_phase1t_implicit_reconstruct_ok                ? 4'd7 :
+    !mpeg2_new_recon_macroblock_420_complete                  ? 4'd8 :
+    !mpeg2_new_phase1n_frame_geometry_supported               ? 4'd9 :
+    mpeg2_new_syntax_error                                    ? 4'd10 :
+    (mpeg2_new_inverse_quant_error ||
+     mpeg2_new_inverse_quant_unsupported_matrix)              ? 4'd11 :
+    (mpeg2_new_idct_error || mpeg2_new_recon_error)           ? 4'd12 :
+    !mpeg2_new_ddr_write_seen                                 ? 4'd13 :
+    (!mpeg2_new_ddr_cache_ready ||
+     !mpeg2_new_ddr_read_seen ||
+      mpeg2_new_ddr_cache_error)                              ? 4'd14 :
+                                                                  4'd15;
 
 always @(posedge clk_mpeg2) begin
     if (reset_mpeg2) begin
