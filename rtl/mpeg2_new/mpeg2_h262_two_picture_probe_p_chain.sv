@@ -5,8 +5,11 @@
 // progressive B-picture core proof. B reconstruction completion is consumed as
 // a non-reference event: neither retained I/P bank is promoted or overwritten.
 //
-// Commit 130 adds B-only USER pulse diagnostics.  It does not alter compressed
-// syntax parsing, sideband values, reference publication, or frame ownership.
+// Commit 130 adds B-only USER pulse diagnostics.  Commit 131 refines the
+// pre-replay trace to distinguish B header/PCE qualification, first-slice
+// acquisition, each completed slice row, and replay start without changing
+// compressed syntax parsing, sideband values, reference publication, or frame
+// ownership.
 //============================================================================
 module mpeg2_h262_two_picture_probe
 (
@@ -139,29 +142,48 @@ mpeg2_h262_b_core_probe b_controller(
  .sideband_index(b_sideband_index),.sideband_value(b_sideband_value),.first_sample_valid(b_first_valid),
  .first_sample_value(b_first_value),.probe_error(b_error));
 
-// Commit 130 parser-side diagnostic stages:
-// 1 = B picture header observed; 2 = full six-slice parse reached replay;
-// 3 = sideband metadata/residual replay reached its A3FF terminator.
-reg[2:0] b_diag_stage;
+// Commit 131 parser qualification trace.  The parse_hold rising edges are
+// observer-only proof points: edge 1 begins row 1 after slice 2 is found; each
+// later edge can occur only after the previous row returned through S_SUCCESS.
+// 1 header, 2 PCE candidate, 3 first slice accepted/row1 parse starts,
+// 4 row1 parsed, 5 row2 parsed, 6 row3 parsed, 7 row4 parsed,
+// 8 row5 parsed/row6 parse starts, 9 row6 parsed and replay begins.
+reg[3:0] b_diag_stage;
+reg[2:0] b_parse_start_count;
+reg b_parse_hold_d;
 reg[26:0] b_diag_blink_counter;
+wire b_parse_start=b_parse_hold&&!b_parse_hold_d;
 always @(posedge clk)begin
- if(reset)begin b_diag_stage<=0;b_diag_blink_counter<=0;end
+ if(reset)begin b_diag_stage<=0;b_parse_start_count<=0;b_parse_hold_d<=0;b_diag_blink_counter<=0;end
  else begin
   b_diag_blink_counter<=b_diag_blink_counter+1'b1;
-  if(b_picture_observed&&(b_diag_stage<3'd1))b_diag_stage<=3'd1;
-  if(b_replay_active&&(b_diag_stage<3'd2))b_diag_stage<=3'd2;
-  if(b_seen)b_diag_stage<=3'd3;
+  b_parse_hold_d<=b_parse_hold;
+  if(b_picture_observed&&(b_diag_stage<4'd1))b_diag_stage<=4'd1;
+  if(b_candidate&&(b_diag_stage<4'd2))b_diag_stage<=4'd2;
+  if(b_picture_observed&&b_parse_start&&!b_error)begin
+   case(b_parse_start_count)
+    3'd0:if(b_diag_stage<4'd3)b_diag_stage<=4'd3;
+    3'd1:if(b_diag_stage<4'd4)b_diag_stage<=4'd4;
+    3'd2:if(b_diag_stage<4'd5)b_diag_stage<=4'd5;
+    3'd3:if(b_diag_stage<4'd6)b_diag_stage<=4'd6;
+    3'd4:if(b_diag_stage<4'd7)b_diag_stage<=4'd7;
+    default:if(b_diag_stage<4'd8)b_diag_stage<=4'd8;
+   endcase
+   if(b_parse_start_count<3'd6)b_parse_start_count<=b_parse_start_count+1'b1;
+  end
+  if(b_replay_active)b_diag_stage<=4'd9;
  end
 end
-wire[3:0] b_diag_blink_phase=b_diag_blink_counter[26:23];
-wire[3:0] b_diag_blink_limit={b_diag_stage,1'b0};
+wire[4:0] b_diag_blink_phase=b_diag_blink_counter[26:22];
+wire[4:0] b_diag_blink_limit={b_diag_stage,1'b0};
 wire b_diag_blink_high=(b_diag_blink_phase<b_diag_blink_limit)&&!b_diag_blink_phase[0];
-wire b_diag_parser_blink=b_picture_observed&&(b_diag_stage<3);
+wire b_diag_parser_blink=b_picture_observed&&(b_diag_stage!=0);
 
 wire b_final_success=b_seen&&b_persistence_verified;
 wire b_transport=b_replay_active||b_sideband_valid;
-// During the diagnostic build, a recognized B picture opens the existing USER
-// success gate; the two B-only probe_error outputs then encode the deepest stage.
+// During the diagnostic build, a recognized B picture opens the ordinary USER
+// success gate.  probe_error below then encodes the deepest parser stage as a
+// stable 1..9 pulse group; normal I/P streams never enter this diagnostic mode.
 assign p_macroblock_type_seen=b_picture_observed?1'b1:(b_final_success?1'b1:p_macroblock_type_seen_raw);
 assign p_forward_vector_valid=b_transport?1'b1:p_forward_vector_valid_raw;
 assign p_forward_vector_x=b_transport?13'sd2047:p_forward_vector_x_raw;
