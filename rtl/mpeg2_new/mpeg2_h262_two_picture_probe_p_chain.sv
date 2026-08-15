@@ -141,6 +141,39 @@ mpeg2_h262_b_core_probe b_controller(
  .sideband_index(b_sideband_index),.sideband_value(b_sideband_value),.first_sample_valid(b_first_valid),
  .first_sample_value(b_first_value),.probe_error(b_error));
 
+// Commit 135 observes the actual B-core outputs rather than mirroring stream
+// syntax.  The sticky stage is exported through the otherwise-unused B-side
+// first-residual diagnostic value using signature 0xBD1x.  No ready/hold,
+// sideband, parser, transform, or reconstruction control depends on it.
+//  1 candidate; 2 slice-1 accepted/row-1 parse starts; 3..7 rows 1..5 parsed;
+//  8 row 6 parsed; 9 replay active; 10 first sideband; 11 replay terminator.
+reg[3:0] b_core_exec_stage;
+reg[2:0] b_core_rows_completed;
+reg b_candidate_d,b_parse_hold_d,b_replay_active_d;
+always @(posedge clk)begin
+ if(reset)begin
+  b_core_exec_stage<=0;b_core_rows_completed<=0;b_candidate_d<=0;b_parse_hold_d<=0;b_replay_active_d<=0;
+ end else begin
+  b_candidate_d<=b_candidate;b_parse_hold_d<=b_parse_hold;b_replay_active_d<=b_replay_active;
+  if(b_candidate&&!b_candidate_d)begin b_core_exec_stage<=4'd1;b_core_rows_completed<=0;end
+  if(b_candidate&&!b_parse_hold_d&&b_parse_hold&&(b_core_exec_stage<4'd2))b_core_exec_stage<=4'd2;
+  if(b_candidate&&b_parse_hold_d&&!b_parse_hold&&!b_replay_active&&(b_core_rows_completed<3'd5))begin
+   b_core_rows_completed<=b_core_rows_completed+1'b1;
+   case(b_core_rows_completed)
+    3'd0:if(b_core_exec_stage<4'd3)b_core_exec_stage<=4'd3;
+    3'd1:if(b_core_exec_stage<4'd4)b_core_exec_stage<=4'd4;
+    3'd2:if(b_core_exec_stage<4'd5)b_core_exec_stage<=4'd5;
+    3'd3:if(b_core_exec_stage<4'd6)b_core_exec_stage<=4'd6;
+    default:if(b_core_exec_stage<4'd7)b_core_exec_stage<=4'd7;
+   endcase
+  end
+  if(b_replay_active&&!b_replay_active_d&&(b_core_exec_stage<4'd8))b_core_exec_stage<=4'd8;
+  if(b_replay_active&&b_replay_active_d&&(b_core_exec_stage<4'd9))b_core_exec_stage<=4'd9;
+  if(b_sideband_valid&&(b_core_exec_stage<4'd10))b_core_exec_stage<=4'd10;
+  if(b_seen&&(b_core_exec_stage<4'd11))b_core_exec_stage<=4'd11;
+ end
+end
+
 // Commit 132 B-PCE qualification observer. This mirrors only the capture and
 // qualification expressions from mpeg2_h262_b_core_probe and never drives it.
 // Pulse count meanings:
@@ -243,7 +276,7 @@ assign p_forward_vector_y=b_transport?-13'sd2048:p_forward_vector_y_raw;
 assign p_residual_required=b_transport?b_first_valid:p_residual_required_raw;
 assign p_residual_success=b_transport?1'b1:p_residual_success_raw;
 assign p_first_residual_sample_valid=b_transport?b_first_valid:p_first_residual_sample_valid_raw;
-assign p_first_residual_sample_value=b_transport?b_first_value:p_first_residual_sample_value_raw;
+assign p_first_residual_sample_value=b_picture_observed?$signed({12'hBD1,b_core_exec_stage}):p_first_residual_sample_value_raw;
 assign p_residual_sample_valid=b_transport?b_sideband_valid:p_residual_sample_valid_raw;
 assign p_residual_sample_index=b_transport?b_sideband_index:p_residual_sample_index_raw;
 assign p_residual_sample_value=b_transport?b_sideband_value:p_residual_sample_value_raw;
@@ -254,5 +287,5 @@ wire normal_probe_error=bookkeeper_error|p_error_raw|b_error|publication_error|r
 assign probe_error=b_diag_blink?!b_diag_blink_high:normal_probe_error;
 
 wire unused_base_state=&{1'b0,base_active_frame_bank,base_completed_frame_bank,base_picture_count,
- base_reference_frame_valid,base_reference_frame_bank,base_reference_promotion_count,b_complete_now,b_header_now,b_final_success};
+ base_reference_frame_valid,base_reference_frame_bank,base_reference_promotion_count,b_complete_now,b_header_now,b_final_success,b_first_value};
 endmodule
