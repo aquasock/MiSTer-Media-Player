@@ -12,15 +12,15 @@
 // remember that successful persistence after the pulse has passed; otherwise
 // mixed_seen remains asserted while raster_wait incorrectly re-asserts.
 //
-// Phase 1U-s is a diagnostic-only isolation boundary.  Once the mixed client
-// has both recognized its complete raster and observed the real persistence
-// completion pulse, the decoder/persistence datapath has already completed.
-// From that point only, force the controller's public macroblock proof true and
-// suppress this controller's own probe_error.  USER remaining low therefore
-// isolates the failure outside this controller (notably the reference/raster
-// probe_error path); USER turning on isolates it inside controller/residual
-// proof bookkeeping.  No stream, reconstruction, DDR, or publication behavior
-// is changed by this diagnostic gate.
+// Phase 1U-s proved that the remaining mixed failure is inside this controller:
+// forcing the final mixed macroblock proof and masking controller probe_error
+// after real persistence made USER pass while leaving the datapath untouched.
+//
+// Phase 1U-t narrows that split.  Keep only the post-persistence public
+// macroblock-proof override, and restore every independent controller error
+// source.  progress_error follows the public proof, so USER passing now proves
+// the stale normal macroblock gate is the sole remaining controller failure;
+// USER failing means another controller error source is still active.
 //============================================================================
 module mpeg2_h262_p_diagnostic_controller
 (
@@ -96,9 +96,8 @@ wire p_macroblock_type_seen_normal=mb_seen_decoded&&(!p_picture_expected||(hold_
 assign p_macroblock_type_seen=mixed_final_proof?1'b1:p_macroblock_type_seen_normal;
 assign stream_hold=four_mb_parse_hold||aligned_parse_hold||raster_hold_active||(!raster_candidate&&old_stream_hold);
 wire syntax_error=syntax_error_raw&&!two_mb_seen&&!four_mb_seen&&!aligned_candidate&&!aligned_seen&&!mixed_candidate&&!mixed_seen;
-wire progress_error=p_picture_expected&&!p_macroblock_type_seen_normal;
-wire probe_error_normal=syntax_error|two_mb_error|four_mb_error|((aligned_error)&&!use_mixed)|mixed_error|residual_error_raw|hold_error|raster_hold_error|progress_error;
-assign probe_error=mixed_final_proof?1'b0:probe_error_normal;
+wire progress_error=p_picture_expected&&!p_macroblock_type_seen;
+assign probe_error=syntax_error|two_mb_error|four_mb_error|((aligned_error)&&!use_mixed)|mixed_error|residual_error_raw|hold_error|raster_hold_error|progress_error;
 
 mpeg2_h262_p_syntax_probe syntax_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.p_picture_expected(p_picture_expected),.p_macroblock_type_seen(mb_seen_raw),.p_forward_vector_valid(vector_valid_raw),.p_forward_vector_x(vector_x_raw),.p_forward_vector_y(vector_y_raw),.probe_error(syntax_error_raw));
 mpeg2_h262_p_two_mb_syntax_probe two_mb_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.two_mb_seen(two_mb_seen),.probe_error(two_mb_error));
