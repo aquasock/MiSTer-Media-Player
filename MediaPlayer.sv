@@ -854,31 +854,33 @@ wire mpeg2_new_phase1t_p_syntax_user_success =
 
 wire unused_phase1t_reconstructed_value = &{1'b0, mpeg2_new_pred_reconstructed_value};
 
-// Commit 133 diagnostic-only USER override. Once the registered frontend has
-// reported a B picture, USER is driven directly from this slow pulse encoder
-// instead of passing through the normal I/P success and sticky-error gates.
-// The target is the deepest B header/PCE qualification term visible at the
-// already-accepted frontend interface; decoder execution is not modified.
+// Commit 135 keeps the slow direct USER override from Commit 133/134, but its
+// pulse count now comes from the actual B-core execution observer and the
+// B-raster engine's existing sticky stage rather than frontend qualification.
+// Core carrier: 0xBD1x on p_first_residual_sample_value, stages 1..11.
+// Raster carrier: 0xD? on prediction sample_value, raster stages 4..7 map to
+// USER stages 12..15.  Normal I/P USER behavior remains unchanged.
 reg        mpeg2_new_b_diag_active;
 reg [3:0]  mpeg2_new_b_diag_stage;
 reg [29:0] mpeg2_new_b_diag_counter;
 
+wire mpeg2_new_b_core_diag_valid =
+    (mpeg2_new_p_first_residual_sample_value[15:4] == 12'hBD1);
+wire [3:0] mpeg2_new_b_core_diag_stage = mpeg2_new_b_core_diag_valid ?
+    mpeg2_new_p_first_residual_sample_value[3:0] : 4'd0;
+wire mpeg2_new_b_raster_diag_valid =
+    (mpeg2_new_b_core_diag_stage >= 4'd10) &&
+    (mpeg2_new_pred_sample_value[7:4] == 4'hD);
+wire [2:0] mpeg2_new_b_raster_diag_stage = mpeg2_new_b_raster_diag_valid ?
+    mpeg2_new_pred_sample_value[2:0] : 3'd0;
+wire [3:0] mpeg2_new_b_raster_diag_mapped =
+    (mpeg2_new_b_raster_diag_stage >= 3'd7) ? 4'd15 :
+    (mpeg2_new_b_raster_diag_stage >= 3'd6) ? 4'd14 :
+    (mpeg2_new_b_raster_diag_stage >= 3'd5) ? 4'd13 :
+    (mpeg2_new_b_raster_diag_stage >= 3'd4) ? 4'd12 : 4'd0;
 wire [3:0] mpeg2_new_b_diag_target =
-    !mpeg2_new_b_diag_active                              ? 4'd0  :
-    (mpeg2_new_backward_f_code_horizontal != 4'd3)       ? 4'd1  :
-    (mpeg2_new_backward_f_code_vertical != 4'd3)         ? 4'd2  :
-    (mpeg2_new_forward_f_code_horizontal != 4'd3)        ? 4'd3  :
-    (mpeg2_new_forward_f_code_vertical != 4'd3)          ? 4'd4  :
-    (mpeg2_new_picture_structure != 2'b11)               ? 4'd5  :
-    !mpeg2_new_frame_pred_frame_dct                      ? 4'd6  :
-    mpeg2_new_concealment_motion_vectors                 ? 4'd7  :
-    !mpeg2_new_progressive_frame                         ? 4'd8  :
-    (mpeg2_new_horizontal_size != 14'd128)               ? 4'd9  :
-    (mpeg2_new_vertical_size != 14'd96)                  ? 4'd10 :
-    !mpeg2_new_progressive_sequence                      ? 4'd11 :
-    (mpeg2_new_chroma_format != 2'b01)                   ? 4'd12 :
-    mpeg2_new_syntax_error                               ? 4'd13 :
-                                                             4'd14;
+    (mpeg2_new_b_raster_diag_mapped > mpeg2_new_b_core_diag_stage) ?
+        mpeg2_new_b_raster_diag_mapped : mpeg2_new_b_core_diag_stage;
 
 always @(posedge clk_mpeg2) begin
     if (reset_mpeg2) begin
@@ -890,7 +892,7 @@ always @(posedge clk_mpeg2) begin
              mpeg2_new_picture_seen &&
              (mpeg2_new_picture_coding_type == 3'b011)) begin
         mpeg2_new_b_diag_active  <= 1'b1;
-        mpeg2_new_b_diag_stage   <= 4'd1;
+        mpeg2_new_b_diag_stage   <= 4'd0;
         mpeg2_new_b_diag_counter <= 30'd0;
     end
     else if (mpeg2_new_b_diag_active) begin

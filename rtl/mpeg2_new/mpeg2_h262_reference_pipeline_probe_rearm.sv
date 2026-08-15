@@ -194,7 +194,10 @@ mpeg2_h262_b_bidirectional_raster_engine b_probe(
  .store_pixel_valid(b_store_valid),.store_block_start(b_store_start),.store_block_complete(b_store_complete),
  .active(b_active),.read_seen(b_read),.sample_nonzero(b_nonzero),.half_sample_seen(b_half),
  .reconstructed_seen(b_recon),.persisted_seen(b_persisted_seen),.diag_stage(b_diag_stage),.error(b_error));
-assign b_sample=8'd0;assign b_recon_value=8'd0;assign b_persist_value=8'd0;
+// Commit 135 exports the existing B-raster diagnostic stage through sample_value
+// only while the B client owns this wrapper.  0xD? is a diagnostic signature;
+// no B prediction or store logic consumes sample_value.
+assign b_sample={4'hD,1'b0,b_diag_stage};assign b_recon_value=8'd0;assign b_persist_value=8'd0;
 
 assign ddram_burstcnt=shared_select?(shared_req_active?shared_bc_reg:8'd0):base_bc;
 assign ddram_addr=shared_select?(shared_req_active?shared_addr_reg:29'd0):base_addr;
@@ -232,5 +235,5 @@ wire b_diag_pre_raster=(b_diag_stage!=0)&&(b_diag_stage<3);
 wire b_diag_blink_active=(b_diag_stage>=3)&&((b_diag_stage<7)||b_error);
 wire normal_probe_error=plan_error||(b_select?b_error:(mixed_select?mixed_error:base_probe_error));
 assign probe_error=b_diag_pre_raster?1'b0:(b_diag_blink_active?!b_diag_blink_high:normal_probe_error);
-wire unused_b=&{1'b0,b_sample,b_recon_value,b_persist_value,b_diag_stage};
+wire unused_b=&{1'b0,b_recon_value,b_persist_value,b_diag_stage};
 endmodule
