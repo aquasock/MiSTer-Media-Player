@@ -28,10 +28,15 @@
 // mixed_final_proof.  Hardware made USER pass, clearing residual_error_raw and
 // isolating the false error to hold_error or raster_hold_error.
 //
-// Phase 1U-w keeps the legacy hold_error fully live and masks only
-// raster_hold_error after mixed_final_proof.  USER low therefore identifies the
-// legacy stream-hold diagnostic; USER high identifies raster_hold_error.  No
-// stream, reconstruction, DDR, publication or display behavior is changed.
+// Phase 1U-w kept legacy hold_error fully live while masking only
+// raster_hold_error after mixed_final_proof.  Hardware kept USER low, proving
+// the remaining false error is the legacy stream-hold diagnostic.
+//
+// Phase 1U-x retires legacy stream-hold ownership once a raster client has been
+// accepted and gives any already-active legacy hold the controller's remembered
+// raster persistence completion instead of only the one-cycle raw handoff pulse.
+// This prevents a stale legacy hold from timing out after a successfully
+// persisted mixed P picture.  All controller error sources are live again.
 //============================================================================
 module mpeg2_h262_p_diagnostic_controller
 (
@@ -89,6 +94,7 @@ always @(posedge clk)begin
 end
 wire raster_persistence_complete=use_mixed?(p_persistence_complete||mixed_persistence_seen):p_persistence_complete;
 wire mixed_final_proof=mixed_seen&&mixed_persistence_seen;
+wire legacy_hold_owner=p_picture_expected&&!raster_candidate&&!raster_seen;
 
 wire mb_seen_combined=raster_candidate?raster_seen:(mb_seen_raw||two_mb_seen||raster_seen);
 wire mb_seen_decoded=mb_seen_combined&&(!p_picture_expected||(residual_decision&&(!residual_required_raw||residual_success_raw)));
@@ -105,11 +111,11 @@ end
 wire hold_seen_combined=raster_seen?raster_hold_seen:hold_seen;
 wire p_macroblock_type_seen_normal=mb_seen_decoded&&(!p_picture_expected||(hold_seen_combined&&!two_mb_wait&&!raster_wait));
 assign p_macroblock_type_seen=mixed_final_proof?1'b1:p_macroblock_type_seen_normal;
-assign stream_hold=four_mb_parse_hold||aligned_parse_hold||raster_hold_active||(!raster_candidate&&old_stream_hold);
+assign stream_hold=four_mb_parse_hold||aligned_parse_hold||raster_hold_active||(!raster_candidate&&!raster_seen&&old_stream_hold);
 wire syntax_error=syntax_error_raw&&!two_mb_seen&&!four_mb_seen&&!aligned_candidate&&!aligned_seen&&!mixed_candidate&&!mixed_seen;
 wire progress_error=p_picture_expected&&!p_macroblock_type_seen;
 wire parser_error_group=syntax_error|two_mb_error|four_mb_error|((aligned_error)&&!use_mixed)|mixed_error;
-assign probe_error=parser_error_group|progress_error|residual_error_raw|hold_error|(raster_hold_error&&!mixed_final_proof);
+assign probe_error=parser_error_group|progress_error|residual_error_raw|hold_error|raster_hold_error;
 
 mpeg2_h262_p_syntax_probe syntax_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.p_picture_expected(p_picture_expected),.p_macroblock_type_seen(mb_seen_raw),.p_forward_vector_valid(vector_valid_raw),.p_forward_vector_x(vector_x_raw),.p_forward_vector_y(vector_y_raw),.probe_error(syntax_error_raw));
 mpeg2_h262_p_two_mb_syntax_probe two_mb_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.two_mb_seen(two_mb_seen),.probe_error(two_mb_error));
@@ -117,7 +123,7 @@ mpeg2_h262_p_four_mb_two_row_syntax_probe four_mb_probe(.clk(clk),.reset(reset),
 mpeg2_h262_p_aligned_motion_syntax_probe aligned_motion_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.aligned_candidate(aligned_candidate),.aligned_seen(aligned_seen),.aligned_complete_now(aligned_complete_now),.aligned_shift_right_map(aligned_shift_right_map),.parse_hold(aligned_parse_hold),.probe_error(aligned_error));
 mpeg2_h262_p_motion_residual_syntax_probe mixed_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.mixed_candidate(mixed_candidate),.mixed_seen(mixed_seen),.mixed_complete_now(mixed_complete_now),.first_slice_complete(mixed_first_slice_complete),.shift_right_map(mixed_shift_right_map),.probe_error(mixed_error));
 mpeg2_h262_p_residual_probe residual_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.p_picture_expected(p_picture_expected),.mixed_mode(use_mixed),.mixed_first_slice_complete(mixed_first_slice_complete),.mixed_release(mixed_seen),.decision_complete(residual_decision),.residual_required(residual_required_raw),.residual_success(residual_success_raw),.mixed_replay_active(mixed_replay_active),.first_sample_valid(first_valid_raw),.first_sample_value(first_value_raw),.residual_sample_valid(residual_valid_raw),.residual_sample_index(residual_index_raw),.residual_sample_value(residual_value_raw),.probe_error(residual_error_raw));
-mpeg2_h262_p_stream_hold hold_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.p_picture_active(p_picture_expected&&!raster_candidate),.p_macroblock_type_seen(mb_seen_for_hold),.p_residual_required(residual_required_raw),.p_persistence_complete(p_persistence_complete),.stream_hold(old_stream_hold),.hold_seen(hold_seen),.hold_error(hold_error));
+mpeg2_h262_p_stream_hold hold_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.p_picture_active(legacy_hold_owner),.p_macroblock_type_seen(mb_seen_for_hold),.p_residual_required(residual_required_raw),.p_persistence_complete(raster_persistence_complete),.stream_hold(old_stream_hold),.hold_seen(hold_seen),.hold_error(hold_error));
 wire unused_mixed_map=&{1'b0,mixed_shift_right_map};
 wire unused_mixed_replay=&{1'b0,mixed_replay_active};
 endmodule
