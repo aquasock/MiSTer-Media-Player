@@ -1,0 +1,91 @@
+name: c138-stage
+on:
+  push:
+    branches: [c138-staging]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: c138-staging
+          fetch-depth: 1
+      - name: Apply Commit 138 RTL
+        shell: bash
+        run: |
+          git fetch --depth=1 origin 2856f46447d8772f3f7ff6528622bdbd1c14033b
+          git checkout 2856f46447d8772f3f7ff6528622bdbd1c14033b -- \
+            rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv \
+            rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine.sv
+          python3 - <<'PYCODE'
+          from pathlib import Path
+
+          p=Path('MediaPlayer.sv')
+          t=p.read_text()
+          old='wire        mpeg2_new_phase1_probe_error;\n'
+          new=old+'wire        mpeg2_new_b_user_success;\n'
+          assert t.count(old)==1 and 'mpeg2_new_b_user_success' not in t
+          t=t.replace(old,new,1)
+
+          old='\t.probe_error                 (mpeg2_new_phase1_probe_error),\n\t.quantiser_scale_code'
+          new='\t.probe_error                 (mpeg2_new_phase1_probe_error),\n\t.b_user_success              (mpeg2_new_b_user_success),\n\t.quantiser_scale_code'
+          assert t.count(old)==1
+          t=t.replace(old,new,1)
+
+          a=t.index('// Commit 137 keeps the proven slow direct USER override')
+          b=t.index('wire mpeg2_new_normal_user_led =',a)
+          t=t[:a]+'''// Commit 138 retires the temporary B pulse diagnostics.  B acceptance is\n// now a first-class success result exported by the publication shell after the\n// real B core has completed and the non-reference scratch frame has persisted.\n// The accepted all-I and P success branches remain unchanged.\n'''+t[b:]
+
+          old='''wire mpeg2_new_normal_user_led =\n    (mpeg2_new_phase1s_all_i_user_success ||\n     mpeg2_new_phase1t_p_syntax_user_success) &&\n'''
+          new='''wire mpeg2_new_normal_user_led =\n    (mpeg2_new_phase1s_all_i_user_success ||\n     mpeg2_new_phase1t_p_syntax_user_success ||\n     mpeg2_new_b_user_success) &&\n'''
+          assert t.count(old)==1
+          t=t.replace(old,new,1)
+
+          old='''assign LED_USER = mpeg2_new_b_diag_active ?\n    mpeg2_new_b_diag_led : mpeg2_new_normal_user_led;\n'''
+          new='''assign LED_USER = mpeg2_new_normal_user_led;\n'''
+          assert t.count(old)==1
+          t=t.replace(old,new,1)
+          p.write_text(t)
+
+          p=Path('rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv')
+          t=p.read_text()
+          old='output wire probe_error,output wire[4:0] quantiser_scale_code'
+          new='output wire probe_error,output wire b_user_success,output wire[4:0] quantiser_scale_code'
+          assert t.count(old)==1
+          t=t.replace(old,new,1)
+
+          old='''// Commit 130 adds B-only USER pulse diagnostics. Commit 131 refined the\n// pre-replay parser trace. Commit 132 replaces that coarse pre-replay trace with\n// an observer-only mirror of the B core's sequence/picture/PCE qualification so\n// each gating term can be isolated without perturbing B parser or DDR behavior.\n'''
+          new='''// Commit 138 retires the temporary Commit 130-137 USER pulse diagnostics.\n// The proven B completion is exported directly as a clean acceptance result;\n// B remains non-reference and the accepted I/P publication path is unchanged.\n'''
+          assert t.count(old)==1
+          t=t.replace(old,new,1)
+
+          a=t.index('// Commit 135 observes the actual B-core outputs')
+          b=t.index('wire unused_base_state=',a)
+          block='''wire b_final_success=b_seen&&b_persistence_verified;\nwire b_transport=b_replay_active||b_sideband_valid;\nassign p_macroblock_type_seen=b_final_success?1'b1:p_macroblock_type_seen_raw;\nassign p_forward_vector_valid=b_transport?1'b1:p_forward_vector_valid_raw;\nassign p_forward_vector_x=b_transport?13'sd2047:p_forward_vector_x_raw;\nassign p_forward_vector_y=b_transport?-13'sd2048:p_forward_vector_y_raw;\nassign p_residual_required=b_transport?b_first_valid:p_residual_required_raw;\nassign p_residual_success=b_transport?1'b1:p_residual_success_raw;\nassign p_first_residual_sample_valid=b_transport?b_first_valid:p_first_residual_sample_valid_raw;\nassign p_first_residual_sample_value=b_transport?b_first_value:p_first_residual_sample_value_raw;\nassign p_residual_sample_valid=b_transport?b_sideband_valid:p_residual_sample_valid_raw;\nassign p_residual_sample_index=b_transport?b_sideband_index:p_residual_sample_index_raw;\nassign p_residual_sample_value=b_transport?b_sideband_value:p_residual_sample_value_raw;\n\nwire p_hold_effective=p_hold_raw&&!b_picture_inflight&&!b_candidate&&!b_transport;\nassign stream_ready=(b_picture_inflight?1'b1:parser_ready)&&!p_hold_effective&&!b_parse_hold;\nwire b_accept_error=b_error||publication_error||reference_progress_error;\nassign b_user_success=b_final_success&&!b_accept_error;\nassign probe_error=(b_picture_observed?1'b0:bookkeeper_error)||\n                   (b_picture_observed?1'b0:p_error_raw)||\n                   b_error||publication_error||reference_progress_error;\n\n'''
+          t=t[:a]+block+t[b:]
+          p.write_text(t)
+          PYCODE
+
+          git diff --check
+          grep -q 'output wire b_user_success' rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+          grep -q 'assign b_user_success=b_final_success&&!b_accept_error;' rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+          grep -q 'mpeg2_new_b_user_success' MediaPlayer.sv
+          ! grep -q 'mpeg2_new_b_diag_active' MediaPlayer.sv
+          ! grep -q 'b_diag_blink' rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+          ! grep -q 'diag_stage' rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+          ! grep -q 'diag_stage' rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine.sv
+      - name: Commit staged RTL
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add MediaPlayer.sv \
+            rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv \
+            rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv \
+            rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine.sv
+          git diff --cached --quiet && exit 1
+          git commit -m 'stage Commit 138 RTL'
+          git push origin HEAD:c138-staging
