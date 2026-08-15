@@ -276,7 +276,9 @@ assign p_forward_vector_y=b_transport?-13'sd2048:p_forward_vector_y_raw;
 assign p_residual_required=b_transport?b_first_valid:p_residual_required_raw;
 assign p_residual_success=b_transport?1'b1:p_residual_success_raw;
 assign p_first_residual_sample_valid=b_transport?b_first_valid:p_first_residual_sample_valid_raw;
-assign p_first_residual_sample_value=b_picture_observed?$signed({12'hBD1,b_core_exec_stage}):p_first_residual_sample_value_raw;
+wire[3:0] b_completion_status={b_error,(publication_error|reference_progress_error),(bookkeeper_error|p_error_raw),b_persistence_verified};
+assign p_first_residual_sample_value=b_picture_observed?$signed({8'hBD,b_completion_status,b_core_exec_stage}):p_first_residual_sample_value_raw;
+
 assign p_residual_sample_valid=b_transport?b_sideband_valid:p_residual_sample_valid_raw;
 assign p_residual_sample_index=b_transport?b_sideband_index:p_residual_sample_index_raw;
 assign p_residual_sample_value=b_transport?b_sideband_value:p_residual_sample_value_raw;
