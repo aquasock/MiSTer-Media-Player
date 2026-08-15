@@ -13,6 +13,9 @@
 // the preceding P engine's DDR responses and latched its sticky unexpected-
 // response error before B decoding began; the reciprocal gate also protects a
 // later P picture from responses belonging to an intervening B picture.
+//
+// Commit 130 leaves that datapath untouched and turns the B engine's sticky
+// progress stage into a USER-LED pulse gate after metadata replay completes.
 //============================================================================
 `include "rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_plan.sv"
 module mpeg2_h262_reference_read_probe
@@ -49,6 +52,7 @@ wire b_detect_now=p_residual_sample_valid&&b_direction_word&&p_forward_vector_va
 reg b_mode;
 wire b_active,b_persisted_seen,b_error,b_half,b_recon,b_read,b_nonzero;
 wire [7:0] b_sample,b_recon_value,b_persist_value;
+wire [2:0] b_diag_stage;
 always @(posedge clk)begin
  if(reset)b_mode<=0;
  else if(b_detect_now)b_mode<=1;
@@ -189,8 +193,11 @@ mpeg2_h262_b_bidirectional_raster_engine b_probe(
  .store_select(b_store_sel),.store_pixel_value(b_store_val),.store_pixel_x(b_store_x),.store_pixel_y(b_store_y),
  .store_pixel_valid(b_store_valid),.store_block_start(b_store_start),.store_block_complete(b_store_complete),
  .active(b_active),.read_seen(b_read),.sample_nonzero(b_nonzero),.half_sample_seen(b_half),
- .reconstructed_seen(b_recon),.persisted_seen(b_persisted_seen),.error(b_error));
-assign b_sample=8'd0;assign b_recon_value=8'd0;assign b_persist_value=8'd0;
+ .reconstructed_seen(b_recon),.persisted_seen(b_persisted_seen),.diag_stage(b_diag_stage),.error(b_error));
+// Commit 135 exports the existing B-raster diagnostic stage through sample_value
+// only while the B client owns this wrapper.  0xD? is a diagnostic signature;
+// no B prediction or store logic consumes sample_value.
+assign b_sample={4'hD,1'b0,b_diag_stage};assign b_recon_value=8'd0;assign b_persist_value=8'd0;
 
 assign ddram_burstcnt=shared_select?(shared_req_active?shared_bc_reg:8'd0):base_bc;
 assign ddram_addr=shared_select?(shared_req_active?shared_addr_reg:29'd0):base_addr;
@@ -211,6 +218,22 @@ assign reconstructed_seen=b_select?b_recon:mixed_select?(mixed_seen_enable&&mix_
 assign reconstructed_value=b_select?b_recon_value:mixed_select?mix_recon_val:base_recon_val;
 assign persisted_seen=b_select?b_persisted_seen:mixed_select?(mixed_seen_enable&&mixed_persisted_seen):base_persisted_seen;
 assign persisted_value=b_select?b_persist_value:mixed_select?mix_persist_val:base_persist_val;
-assign probe_error=plan_error||(b_select?b_error:(mixed_select?mixed_error:base_probe_error));
-wire unused_b=&{1'b0,b_sample,b_recon_value,b_persist_value};
+
+// Commit 130 diagnostics use the existing USER success/error gate rather than
+// widening MediaPlayer.sv.  A stage N failure produces N synchronized pulses
+// per group.  Stages 0-2 are left transparent so the parser shell can report
+// header/parse progress; a clean stage 7 returns to normal solid-success logic.
+reg[26:0] b_diag_blink_counter;
+always @(posedge clk)begin
+ if(reset)b_diag_blink_counter<=0;
+ else b_diag_blink_counter<=b_diag_blink_counter+1'b1;
+end
+wire[3:0] b_diag_blink_phase=b_diag_blink_counter[26:23];
+wire[3:0] b_diag_blink_limit={b_diag_stage,1'b0};
+wire b_diag_blink_high=(b_diag_blink_phase<b_diag_blink_limit)&&!b_diag_blink_phase[0];
+wire b_diag_pre_raster=(b_diag_stage!=0)&&(b_diag_stage<3);
+wire b_diag_blink_active=(b_diag_stage>=3)&&((b_diag_stage<7)||b_error);
+wire normal_probe_error=plan_error||(b_select?b_error:(mixed_select?mixed_error:base_probe_error));
+assign probe_error=b_diag_pre_raster?1'b0:(b_diag_blink_active?!b_diag_blink_high:normal_probe_error);
+wire unused_b=&{1'b0,b_recon_value,b_persist_value,b_diag_stage};
 endmodule

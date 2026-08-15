@@ -5,9 +5,10 @@
 // progressive B-picture core proof. B reconstruction completion is consumed as
 // a non-reference event: neither retained I/P bank is promoted or overwritten.
 //
-// Commit 138 retires the temporary Commit 130-137 USER pulse diagnostics.
-// The proven B completion is exported directly as a clean acceptance result;
-// B remains non-reference and the accepted I/P publication path is unchanged.
+// Commit 130 adds B-only USER pulse diagnostics. Commit 131 refined the
+// pre-replay parser trace. Commit 132 replaces that coarse pre-replay trace with
+// an observer-only mirror of the B core's sequence/picture/PCE qualification so
+// each gating term can be isolated without perturbing B parser or DDR behavior.
 //============================================================================
 module mpeg2_h262_two_picture_probe
 (
@@ -23,7 +24,7 @@ module mpeg2_h262_two_picture_probe
     output wire signed[12:0] p_forward_vector_y,output wire p_residual_required,output wire p_residual_success,
     output wire p_first_residual_sample_valid,output wire signed[15:0] p_first_residual_sample_value,
     output wire p_residual_sample_valid,output wire[5:0] p_residual_sample_index,output wire signed[15:0] p_residual_sample_value,
-    output wire probe_error,output wire b_user_success,output wire[4:0] quantiser_scale_code,output wire[11:0] macroblock_address_increment,
+    output wire probe_error,output wire[4:0] quantiser_scale_code,output wire[11:0] macroblock_address_increment,
     output wire macroblock_quant,output wire[4:0] macroblock_quantiser_scale_code,output wire[7:0] slice_vertical_position,
     output wire[2:0] slice_vertical_position_extension,output wire[3:0] first_luma_dc_size,
     output wire signed[12:0] first_luma_dc_differential,output wire[10:0] first_luma_dc_coefficient,
@@ -140,27 +141,152 @@ mpeg2_h262_b_core_probe b_controller(
  .sideband_index(b_sideband_index),.sideband_value(b_sideband_value),.first_sample_valid(b_first_valid),
  .first_sample_value(b_first_value),.probe_error(b_error));
 
+// Commit 135 observes the actual B-core outputs rather than mirroring stream
+// syntax.  The sticky stage is exported through the otherwise-unused B-side
+// first-residual diagnostic value using signature 0xBD1x.  No ready/hold,
+// sideband, parser, transform, or reconstruction control depends on it.
+//  1 candidate; 2 slice-1 accepted/row-1 parse starts; 3..7 rows 1..5 parsed;
+//  8 row 6 parsed; 9 replay active; 10 first sideband; 11 replay terminator.
+reg[3:0] b_core_exec_stage;
+reg[2:0] b_core_rows_completed;
+reg b_candidate_d,b_parse_hold_d,b_replay_active_d;
+always @(posedge clk)begin
+ if(reset)begin
+  b_core_exec_stage<=0;b_core_rows_completed<=0;b_candidate_d<=0;b_parse_hold_d<=0;b_replay_active_d<=0;
+ end else begin
+  b_candidate_d<=b_candidate;b_parse_hold_d<=b_parse_hold;b_replay_active_d<=b_replay_active;
+  if(b_candidate&&!b_candidate_d)begin b_core_exec_stage<=4'd1;b_core_rows_completed<=0;end
+  if(b_candidate&&!b_parse_hold_d&&b_parse_hold&&(b_core_exec_stage<4'd2))b_core_exec_stage<=4'd2;
+  if(b_candidate&&b_parse_hold_d&&!b_parse_hold&&!b_replay_active&&(b_core_rows_completed<3'd5))begin
+   b_core_rows_completed<=b_core_rows_completed+1'b1;
+   case(b_core_rows_completed)
+    3'd0:if(b_core_exec_stage<4'd3)b_core_exec_stage<=4'd3;
+    3'd1:if(b_core_exec_stage<4'd4)b_core_exec_stage<=4'd4;
+    3'd2:if(b_core_exec_stage<4'd5)b_core_exec_stage<=4'd5;
+    3'd3:if(b_core_exec_stage<4'd6)b_core_exec_stage<=4'd6;
+    default:if(b_core_exec_stage<4'd7)b_core_exec_stage<=4'd7;
+   endcase
+  end
+  if(b_replay_active&&!b_replay_active_d&&(b_core_exec_stage<4'd8))b_core_exec_stage<=4'd8;
+  if(b_replay_active&&b_replay_active_d&&(b_core_exec_stage<4'd9))b_core_exec_stage<=4'd9;
+  if(b_sideband_valid&&(b_core_exec_stage<4'd10))b_core_exec_stage<=4'd10;
+  if(b_seen&&(b_core_exec_stage<4'd11))b_core_exec_stage<=4'd11;
+ end
+end
+
+// Commit 132 B-PCE qualification observer. This mirrors only the capture and
+// qualification expressions from mpeg2_h262_b_core_probe and never drives it.
+// Pulse count meanings:
+//  1 shell B header; 2 mirrored B picture type; 3 PCE start; 4 PCE bytes done;
+//  5 geometry; 6 extension id; 7/8 forward f_code H/V; 9/10 backward H/V;
+//  11 frame picture; 12 frame_pred_frame_dct; 13 concealment clear;
+//  14 actual b_candidate asserted by the real B core.
+reg[3:0] b_diag_stage;
+reg[26:0] b_diag_blink_counter;
+wire diag_start_code_now=(picture_window_next[31:8]==24'h000001);
+wire[7:0] diag_start_code_value=picture_window_next[7:0];
+reg diag_sequence_capture;reg[1:0] diag_sequence_count;reg[23:0] diag_sequence_shift;
+wire[23:0] diag_sequence_next={diag_sequence_shift[15:0],stream_data};
+reg diag_geometry_128x96;
+reg diag_picture_capture,diag_picture_count;reg[15:0] diag_picture_shift;
+wire[15:0] diag_picture_next={diag_picture_shift[7:0],stream_data};
+reg diag_current_picture_is_b;
+reg diag_pce_capture;reg[2:0] diag_pce_count;reg[39:0] diag_pce_shift;
+wire[39:0] diag_pce_next={diag_pce_shift[31:0],stream_data};
+
+always @(posedge clk)begin
+ if(reset)begin
+  b_diag_stage<=0;b_diag_blink_counter<=0;
+  diag_sequence_capture<=0;diag_sequence_count<=0;diag_sequence_shift<=0;diag_geometry_128x96<=0;
+  diag_picture_capture<=0;diag_picture_count<=0;diag_picture_shift<=0;diag_current_picture_is_b<=0;
+  diag_pce_capture<=0;diag_pce_count<=0;diag_pce_shift<=0;
+ end else begin
+  b_diag_blink_counter<=b_diag_blink_counter+1'b1;
+  if(b_picture_observed&&(b_diag_stage<4'd1))b_diag_stage<=4'd1;
+  if(b_candidate&&(b_diag_stage<4'd14))b_diag_stage<=4'd14;
+  if(stream_valid)begin
+   if(diag_sequence_capture)begin
+    diag_sequence_shift<=diag_sequence_next;
+    if(diag_sequence_count==2)begin
+     diag_sequence_capture<=0;diag_sequence_count<=0;
+     diag_geometry_128x96<=(diag_sequence_next[23:12]==128)&&(diag_sequence_next[11:0]==96);
+    end else diag_sequence_count<=diag_sequence_count+1'b1;
+   end else if(diag_start_code_now&&(diag_start_code_value==8'hB3))begin
+    diag_sequence_capture<=1;diag_sequence_count<=0;diag_sequence_shift<=0;
+   end
+
+   if(diag_picture_capture)begin
+    diag_picture_shift<=diag_picture_next;
+    if(diag_picture_count)begin
+     diag_picture_capture<=0;diag_picture_count<=0;diag_current_picture_is_b<=(diag_picture_next[5:3]==3'd3);
+     if((diag_picture_next[5:3]==3'd3)&&(b_diag_stage<4'd2))b_diag_stage<=4'd2;
+    end else diag_picture_count<=1;
+   end else if(diag_start_code_now&&(diag_start_code_value==8'h00))begin
+    diag_picture_capture<=1;diag_picture_count<=0;diag_picture_shift<=0;diag_current_picture_is_b<=0;
+   end
+
+   if(diag_pce_capture)begin
+    diag_pce_shift<=diag_pce_next;
+    if(diag_pce_count==4)begin
+     diag_pce_capture<=0;diag_pce_count<=0;b_diag_stage<=4'd4;
+     if(diag_geometry_128x96)begin
+      b_diag_stage<=4'd5;
+      if(diag_pce_next[39:36]==4'h8)begin
+       b_diag_stage<=4'd6;
+       if(diag_pce_next[35:32]==4'd3)begin
+        b_diag_stage<=4'd7;
+        if(diag_pce_next[31:28]==4'd3)begin
+         b_diag_stage<=4'd8;
+         if(diag_pce_next[27:24]==4'd3)begin
+          b_diag_stage<=4'd9;
+          if(diag_pce_next[23:20]==4'd3)begin
+           b_diag_stage<=4'd10;
+           if(diag_pce_next[17:16]==2'b11)begin
+            b_diag_stage<=4'd11;
+            if(diag_pce_next[14])begin
+             b_diag_stage<=4'd12;
+             if(!diag_pce_next[13])b_diag_stage<=4'd13;
+            end
+           end
+          end
+         end
+        end
+       end
+      end
+     end
+    end else diag_pce_count<=diag_pce_count+1'b1;
+   end else if(diag_current_picture_is_b&&diag_start_code_now&&(diag_start_code_value==8'hB5))begin
+    diag_pce_capture<=1;diag_pce_count<=0;diag_pce_shift<=0;
+    if(b_diag_stage<4'd3)b_diag_stage<=4'd3;
+   end
+  end
+ end
+end
+wire[4:0] b_diag_blink_phase=b_diag_blink_counter[26:22];
+wire[4:0] b_diag_blink_limit={b_diag_stage,1'b0};
+wire b_diag_blink_high=(b_diag_blink_phase<b_diag_blink_limit)&&!b_diag_blink_phase[0];
+wire b_diag_blink=b_picture_observed&&(b_diag_stage!=0);
+
 wire b_final_success=b_seen&&b_persistence_verified;
 wire b_transport=b_replay_active||b_sideband_valid;
-assign p_macroblock_type_seen=b_final_success?1'b1:p_macroblock_type_seen_raw;
+assign p_macroblock_type_seen=b_picture_observed?1'b1:(b_final_success?1'b1:p_macroblock_type_seen_raw);
 assign p_forward_vector_valid=b_transport?1'b1:p_forward_vector_valid_raw;
 assign p_forward_vector_x=b_transport?13'sd2047:p_forward_vector_x_raw;
 assign p_forward_vector_y=b_transport?-13'sd2048:p_forward_vector_y_raw;
 assign p_residual_required=b_transport?b_first_valid:p_residual_required_raw;
 assign p_residual_success=b_transport?1'b1:p_residual_success_raw;
 assign p_first_residual_sample_valid=b_transport?b_first_valid:p_first_residual_sample_valid_raw;
-assign p_first_residual_sample_value=b_transport?b_first_value:p_first_residual_sample_value_raw;
+wire[3:0] b_completion_status={b_error,(publication_error|reference_progress_error),(bookkeeper_error|p_error_raw),b_persistence_verified};
+assign p_first_residual_sample_value=b_picture_observed?$signed({8'hBD,b_completion_status,b_core_exec_stage}):p_first_residual_sample_value_raw;
+
 assign p_residual_sample_valid=b_transport?b_sideband_valid:p_residual_sample_valid_raw;
 assign p_residual_sample_index=b_transport?b_sideband_index:p_residual_sample_index_raw;
 assign p_residual_sample_value=b_transport?b_sideband_value:p_residual_sample_value_raw;
 
 wire p_hold_effective=p_hold_raw&&!b_picture_inflight&&!b_candidate&&!b_transport;
 assign stream_ready=(b_picture_inflight?1'b1:parser_ready)&&!p_hold_effective&&!b_parse_hold;
-wire b_accept_error=b_error||publication_error||reference_progress_error;
-assign b_user_success=b_final_success&&!b_accept_error;
-assign probe_error=(b_picture_observed?1'b0:bookkeeper_error)||
-                   (b_picture_observed?1'b0:p_error_raw)||
-                   b_error||publication_error||reference_progress_error;
+wire normal_probe_error=bookkeeper_error|p_error_raw|b_error|publication_error|reference_progress_error;
+assign probe_error=b_diag_blink?!b_diag_blink_high:normal_probe_error;
 
 wire unused_base_state=&{1'b0,base_active_frame_bank,base_completed_frame_bank,base_picture_count,
  base_reference_frame_valid,base_reference_frame_bank,base_reference_promotion_count,b_complete_now,b_header_now,b_final_success,b_first_value};
