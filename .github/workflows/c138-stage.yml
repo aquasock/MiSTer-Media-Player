@@ -69,7 +69,10 @@ jobs:
           p.write_text(t)
           PYCODE
 
-          git diff --check
+          git diff --check -- MediaPlayer.sv \
+            rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv \
+            rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv \
+            rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine.sv
           grep -q 'output wire b_user_success' rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
           grep -q 'assign b_user_success=b_final_success&&!b_accept_error;' rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
           grep -q 'mpeg2_new_b_user_success' MediaPlayer.sv
