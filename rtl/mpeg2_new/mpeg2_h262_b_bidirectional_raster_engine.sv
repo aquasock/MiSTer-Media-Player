@@ -7,9 +7,6 @@
 // result in the non-reference B scratch frame.  The scratch frame is verified
 // by DDR readback before persisted_seen is asserted.
 //
-// Commit 130 adds a sticky seven-stage diagnostic marker only.  It does not
-// alter prediction, residual, store, or persistence behavior.
-//
 // Sideband protocol:
 //   index 0x38/0x39/0x3a: forward vector for Fwd/Bwd/Interp MB respectively
 //   index 0x3b:           backward vector for the same MB
@@ -47,7 +44,6 @@ module mpeg2_h262_b_bidirectional_raster_engine
     output reg  half_sample_seen,
     output reg  reconstructed_seen,
     output reg  persisted_seen,
-    output reg  [2:0] diag_stage,
     output reg  error
 );
 
@@ -237,13 +233,12 @@ always @(posedge clk) begin
         pending<=0;started<=0;active<=0;future_bank_latched<=0;req<=0;waitresp<=0;req_kind<=0;
         mbi<=0;col<=0;mrow<=0;blk<=0;timeout<=0;emit<=0;wait_store<=0;pixel_setup<=0;ei<=0;verify_row<=0;
         pred_direction<=0;tap_index<=0;pred_sum<=0;forward_prediction<=0;out_reg<=0;
-        read_seen<=0;sample_nonzero<=0;half_sample_seen<=0;reconstructed_seen<=0;persisted_seen<=0;diag_stage<=0;error<=0;
+        read_seen<=0;sample_nonzero<=0;half_sample_seen<=0;reconstructed_seen<=0;persisted_seen<=0;error<=0;
         for(i=0;i<48;i=i+1)begin direction[i]<=0;fmvx[i]<=0;fmvy[i]<=0;bmvx[i]<=0;bmvy[i]<=0;end
         for(i=0;i<4;i=i+1)begin desc_mb[i]<=0;desc_block[i]<=0;end
         for(i=0;i<8;i=i+1)resrows[i]<=0;
     end else begin
         if(capture_enable&&sideband_valid) begin
-            if(diag_stage<3'd2)diag_stage<=3'd2;
             if(desc_active) begin
                 if(sideband_index!=sample_expected)error<=1;
                 else begin
@@ -271,14 +266,13 @@ always @(posedge clk) begin
                     desc_count<=desc_count+1'b1;desc_active<=1;sample_expected<=0;
                 end
             end else if((sideband_index==6'h3f)&&(sideband_value==16'shA3FF)) begin
-                if((motion_count!=48)||motion_first_pending||metadata_done)error<=1;
-                else begin metadata_done<=1;diag_stage<=3'd3;end
+                if((motion_count!=48)||motion_first_pending||metadata_done)error<=1;else metadata_done<=1;
             end else error<=1;
         end
 
         if(request&&!started)pending<=1;
         if(pending&&!started&&metadata_done) begin
-            pending<=0;started<=1;active<=1;future_bank_latched<=future_reference_bank;timeout<=24'hffffff;diag_stage<=3'd4;
+            pending<=0;started<=1;active<=1;future_bank_latched<=future_reference_bank;timeout<=24'hffffff;
             mbi<=0;col<=0;mrow<=0;blk<=0;ei<=0;exec_desc_slot<=0;pred_direction<=0;pixel_setup<=1;persisted_seen<=0;
             if(!reference_valid||(motion_count!=48)||(direction[0]==0))begin error<=1;active<=0;persisted_seen<=1;timeout<=0;pixel_setup<=0;end
         end
@@ -306,18 +300,17 @@ always @(posedge clk) begin
                             forward_prediction<=selected_prediction;pred_direction<=1;pred_sum<=0;tap_index<=0;pixel_setup<=1;
                         end else begin
                             out_reg<=reconstructed_current;emit<=1;
-                            if((mbi==0)&&(blk==0)&&(ei==0))begin read_seen<=1;sample_nonzero<=|final_prediction;diag_stage<=3'd5;end
+                            if((mbi==0)&&(blk==0)&&(ei==0))begin read_seen<=1;sample_nonzero<=|final_prediction;end
                         end
                     end else begin pred_sum<=pred_sum_with_current;tap_index<=tap_index+1'b1;req<=1;end
                 end else begin
                     if(ddram_dout!=resrows[verify_row])error<=1;
                     if(verify_row==7) begin
-                        if((mbi==0)&&(blk==0))diag_stage<=3'd6;
                         if(residual_hit)exec_desc_slot<=exec_desc_slot+1'b1;
                         if(blk==5) begin
                             if(mbi+1>=MB_COUNT) begin
                                 if((exec_desc_slot+(residual_hit?1'b1:1'b0))!=desc_count)error<=1;
-                                persisted_seen<=1;reconstructed_seen<=1;active<=0;timeout<=0;diag_stage<=3'd7;
+                                persisted_seen<=1;reconstructed_seen<=1;active<=0;timeout<=0;
                             end else begin
                                 mbi<=mbi+1'b1;if(col+1>=MB_WIDTH)begin col<=0;mrow<=mrow+1'b1;end else col<=col+1'b1;
                                 blk<=0;ei<=0;pred_direction<=0;pixel_setup<=1;
