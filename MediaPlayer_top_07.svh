@@ -200,8 +200,8 @@ wire mpeg2_new_normal_user_led =
     mpeg2_new_ddr_read_seen &&
     !mpeg2_new_ddr_cache_error;
 
-// Commit 140 presentation diagnostic remains present as an observer only; the
-// direct LED output is intentionally returned to the Commit-136 B trace here.
+// Commit 143 returns USER to the existing Commit-140 presentation trace while
+// leaving the Commit-141 execution/completion trace active only as an observer.
 wire [5:0] mpeg2_new_b_presentation_diag_phase =
     mpeg2_new_b_presentation_diag_counter[29:24];
 wire [5:0] mpeg2_new_b_presentation_diag_limit =
@@ -211,7 +211,7 @@ wire mpeg2_new_b_presentation_diag_led =
      mpeg2_new_b_presentation_diag_limit) &&
     !mpeg2_new_b_presentation_diag_phase[0];
 
-assign LED_USER = mpeg2_new_b_diag_active ?
-    mpeg2_new_b_diag_led : mpeg2_new_normal_user_led;
+assign LED_USER = mpeg2_new_b_presentation_diag_active ?
+    mpeg2_new_b_presentation_diag_led : mpeg2_new_normal_user_led;
 
 endmodule
