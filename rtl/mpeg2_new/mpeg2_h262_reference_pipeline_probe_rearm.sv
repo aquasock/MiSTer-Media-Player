@@ -4,6 +4,13 @@
 // Generalized P raster replay is identified by the first ordered motion metadata
 // word (sideband index 0x3e), not by any particular representative vector value.
 // Legacy accepted clients continue through the existing base implementation.
+//
+// Phase 1U-aa registers the generalized raster DDR request at this wrapper
+// boundary.  The raster engine sees a synthetic busy handshake that completes
+// only when the registered external request is actually accepted.  Read data is
+// delayed one cycle so a zero-latency response cannot race the engine's waitresp
+// transition.  Decoder semantics are unchanged; this only cuts the long
+// motion/address combinational path before the HPS f2sdram interface.
 //============================================================================
 `include "rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_plan.sv"
 module mpeg2_h262_reference_read_probe
@@ -52,20 +59,48 @@ mpeg2_h262_reference_read_probe_base base_probe(
  .read_seen(base_read),.sample_value(base_sample),.sample_nonzero(base_nonzero),.half_sample_seen(base_half),.reconstructed_seen(base_recon),
  .reconstructed_value(base_recon_val),.persisted_seen(base_persisted_seen),.persisted_value(base_persist_val),.probe_error(base_probe_error),.*);
 
-wire[7:0] mix_bc;wire[28:0] mix_addr;wire mix_rd,mix_store_sel;wire[7:0] mix_store_val;wire[11:0] mix_store_x,mix_store_y;wire mix_store_valid,mix_store_start,mix_store_complete;
+// Registered generalized-raster DDR request adapter.  mix_req_active is the
+// external request; the raster engine is held busy until that request is
+// accepted by the real DDR interface.
+wire[7:0] mix_bc_raw;wire[28:0] mix_addr_raw;wire mix_rd_raw;
+reg mix_req_active,mix_response_pending;reg[7:0] mix_bc_reg;reg[28:0] mix_addr_reg;
+reg[63:0] mix_dout_reg;reg mix_dout_ready_reg;
+wire mix_engine_busy=!(mix_req_active&&!ddram_busy);
+
+always @(posedge clk)begin
+ if(reset)begin
+  mix_req_active<=0;mix_response_pending<=0;mix_bc_reg<=0;mix_addr_reg<=0;mix_dout_reg<=0;mix_dout_ready_reg<=0;
+ end else begin
+  mix_dout_ready_reg<=0;
+  if(!mixed_select)begin
+   mix_req_active<=0;mix_response_pending<=0;
+  end else begin
+   if(!mix_req_active&&mix_rd_raw)begin
+    mix_req_active<=1;mix_bc_reg<=mix_bc_raw;mix_addr_reg<=mix_addr_raw;
+   end else if(mix_req_active&&!ddram_busy)begin
+    mix_req_active<=0;mix_response_pending<=1;
+   end
+   if(ddram_dout_ready&&(mix_response_pending||(mix_req_active&&!ddram_busy)))begin
+    mix_dout_reg<=ddram_dout;mix_dout_ready_reg<=1;mix_response_pending<=0;
+   end
+  end
+ end
+end
+
+wire mix_store_sel;wire[7:0] mix_store_val;wire[11:0] mix_store_x,mix_store_y;wire mix_store_valid,mix_store_start,mix_store_complete;
 wire mix_read;wire[7:0] mix_sample;wire mix_nonzero,mix_recon;wire[7:0] mix_recon_val,mix_persist_val;
 mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
  .clk(clk),.reset(reset),.capture_enable(mixed_select),.request(mixed_select),.shift_right_map(48'd0),
  .residual_valid(p_residual_sample_valid&&mixed_select),.residual_index(p_residual_sample_index),.residual_value(p_residual_sample_value),
  .reference_valid(reference_frame_valid),.reference_bank(reference_frame_bank),.destination_bank(destination_frame_bank),.store_block_stored(p_store_block_stored),
- .ddram_busy(ddram_busy),.ddram_dout(ddram_dout),.ddram_dout_ready(ddram_dout_ready&&mixed_select),.ddram_burstcnt(mix_bc),.ddram_addr(mix_addr),.ddram_rd(mix_rd),
+ .ddram_busy(mix_engine_busy),.ddram_dout(mix_dout_reg),.ddram_dout_ready(mix_dout_ready_reg),.ddram_burstcnt(mix_bc_raw),.ddram_addr(mix_addr_raw),.ddram_rd(mix_rd_raw),
  .store_select(mix_store_sel),.store_pixel_value(mix_store_val),.store_pixel_x(mix_store_x),.store_pixel_y(mix_store_y),.store_pixel_valid(mix_store_valid),
  .store_block_start(mix_store_start),.store_block_complete(mix_store_complete),.active(mixed_active),.read_seen(mix_read),.sample_value(mix_sample),.sample_nonzero(mix_nonzero),
  .half_sample_seen(mixed_half),.reconstructed_seen(mix_recon),.reconstructed_value(mix_recon_val),.persisted_seen(mixed_persisted_seen),.persisted_value(mix_persist_val),.error(mixed_error));
 
-assign ddram_burstcnt=mixed_select?mix_bc:base_bc;
-assign ddram_addr=mixed_select?mix_addr:base_addr;
-assign ddram_rd=mixed_select?mix_rd:base_rd;
+assign ddram_burstcnt=mixed_select?(mix_req_active?mix_bc_reg:8'd0):base_bc;
+assign ddram_addr=mixed_select?(mix_req_active?mix_addr_reg:29'd0):base_addr;
+assign ddram_rd=mixed_select?mix_req_active:base_rd;
 assign p_store_select=mixed_select?mix_store_sel:base_store_sel;
 assign p_store_pixel_value=mixed_select?mix_store_val:base_store_val;
 assign p_store_pixel_x=mixed_select?mix_store_x:base_store_x;
