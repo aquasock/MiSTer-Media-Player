@@ -4,6 +4,9 @@
 // The accepted I/P publication path remains unchanged. Commit 128 adds one
 // progressive B-picture core proof. B reconstruction completion is consumed as
 // a non-reference event: neither retained I/P bank is promoted or overwritten.
+//
+// Commit 130 adds B-only USER pulse diagnostics.  It does not alter compressed
+// syntax parsing, sideband values, reference publication, or frame ownership.
 //============================================================================
 module mpeg2_h262_two_picture_probe
 (
@@ -136,9 +139,30 @@ mpeg2_h262_b_core_probe b_controller(
  .sideband_index(b_sideband_index),.sideband_value(b_sideband_value),.first_sample_valid(b_first_valid),
  .first_sample_value(b_first_value),.probe_error(b_error));
 
+// Commit 130 parser-side diagnostic stages:
+// 1 = B picture header observed; 2 = full six-slice parse reached replay;
+// 3 = sideband metadata/residual replay reached its A3FF terminator.
+reg[2:0] b_diag_stage;
+reg[26:0] b_diag_blink_counter;
+always @(posedge clk)begin
+ if(reset)begin b_diag_stage<=0;b_diag_blink_counter<=0;end
+ else begin
+  b_diag_blink_counter<=b_diag_blink_counter+1'b1;
+  if(b_picture_observed&&(b_diag_stage<3'd1))b_diag_stage<=3'd1;
+  if(b_replay_active&&(b_diag_stage<3'd2))b_diag_stage<=3'd2;
+  if(b_seen)b_diag_stage<=3'd3;
+ end
+end
+wire[3:0] b_diag_blink_phase=b_diag_blink_counter[26:23];
+wire[3:0] b_diag_blink_limit={b_diag_stage,1'b0};
+wire b_diag_blink_high=(b_diag_blink_phase<b_diag_blink_limit)&&!b_diag_blink_phase[0];
+wire b_diag_parser_blink=b_picture_observed&&(b_diag_stage<3);
+
 wire b_final_success=b_seen&&b_persistence_verified;
 wire b_transport=b_replay_active||b_sideband_valid;
-assign p_macroblock_type_seen=b_final_success?1'b1:p_macroblock_type_seen_raw;
+// During the diagnostic build, a recognized B picture opens the existing USER
+// success gate; the two B-only probe_error outputs then encode the deepest stage.
+assign p_macroblock_type_seen=b_picture_observed?1'b1:(b_final_success?1'b1:p_macroblock_type_seen_raw);
 assign p_forward_vector_valid=b_transport?1'b1:p_forward_vector_valid_raw;
 assign p_forward_vector_x=b_transport?13'sd2047:p_forward_vector_x_raw;
 assign p_forward_vector_y=b_transport?-13'sd2048:p_forward_vector_y_raw;
@@ -152,8 +176,9 @@ assign p_residual_sample_value=b_transport?b_sideband_value:p_residual_sample_va
 
 wire p_hold_effective=p_hold_raw&&!b_picture_inflight&&!b_candidate&&!b_transport;
 assign stream_ready=(b_picture_inflight?1'b1:parser_ready)&&!p_hold_effective&&!b_parse_hold;
-assign probe_error=(b_picture_observed?1'b0:bookkeeper_error)||(b_picture_observed?1'b0:p_error_raw)||b_error||publication_error||reference_progress_error;
+wire normal_probe_error=bookkeeper_error|p_error_raw|b_error|publication_error|reference_progress_error;
+assign probe_error=b_picture_observed?(b_diag_parser_blink?!b_diag_blink_high:1'b0):normal_probe_error;
 
 wire unused_base_state=&{1'b0,base_active_frame_bank,base_completed_frame_bank,base_picture_count,
- base_reference_frame_valid,base_reference_frame_bank,base_reference_promotion_count,b_complete_now,b_candidate,b_header_now};
+ base_reference_frame_valid,base_reference_frame_bank,base_reference_promotion_count,b_complete_now,b_candidate,b_header_now,b_final_success};
 endmodule
