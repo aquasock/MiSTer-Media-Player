@@ -11,36 +11,33 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_intra_re
 # temporary internal P chroma component tag carried in pixel_x[11:10].
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
-# kate - Phase 1U-y preserves the accepted reference clients while deriving
-# both aligned motion and sparse residual block placement from buffered P syntax.
+# Post-v0.4 consolidation shares one generic zero-motion raster client and the
+# generalized motion/residual engine across formerly duplicated P proof paths.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_explicit_reference_probe.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_macroblock_420_engine.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_two_mb_copy_engine.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_four_mb_two_row_copy_engine.sv
-set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_motion_plan_raster_engine.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_bitreader.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_ycbcr_to_rgb_bt601.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_luma4_probe.sv
-# kate - Existing P syntax proofs plus the generalized sequential raster observer.
+# Existing P syntax proofs plus the generalized sequential raster observer.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_syntax_probe.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_two_mb_syntax_probe.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_four_mb_two_row_syntax_probe.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe.sv
-# kate - Phase 1U-y reuses one accepted non-intra transform for syntax-selected
+# Phase 1U-y reuses one accepted non-intra transform for syntax-selected
 # residual blocks and replays sparse block metadata over the existing sideband.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_residual_parser_420.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_stream_hold.sv
-# kate - Phase 1U-y keeps the consecutive-P publication shell and the accepted
-# raster/legacy-hold ownership lifecycle from Phase 1U-x.
+# Preserve the consecutive-P publication shell and accepted controller lifecycle.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_picture_bookkeeper.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
 
-# kate - Phase 1R: MPEG2FPGA and its DDR bridge remain outside the active
+# Phase 1R: MPEG2FPGA and its DDR bridge remain outside the active
 # Quartus design.  rtl/mpeg2fpga remains in the repository only as a
 # frozen reference implementation.
 set_global_assignment -name SDC_FILE MediaPlayer.sdc
