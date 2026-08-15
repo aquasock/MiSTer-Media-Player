@@ -69,7 +69,7 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.intra_quant_matrix_default       (mpeg2_new_intra_quant_matrix_default)
 );
 
-mpeg2_h262_two_picture_probe_diag_accept mpeg2_h262_two_picture_probe
+mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 (
 	.clk                         (clk_mpeg2),
 	.reset                       (reset_mpeg2),
