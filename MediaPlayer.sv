@@ -854,7 +854,65 @@ wire mpeg2_new_phase1t_p_syntax_user_success =
 
 wire unused_phase1t_reconstructed_value = &{1'b0, mpeg2_new_pred_reconstructed_value};
 
-assign LED_USER =
+// Commit 133 diagnostic-only USER override. Once the registered frontend has
+// reported a B picture, USER is driven directly from this slow pulse encoder
+// instead of passing through the normal I/P success and sticky-error gates.
+// The target is the deepest B header/PCE qualification term visible at the
+// already-accepted frontend interface; decoder execution is not modified.
+reg        mpeg2_new_b_diag_active;
+reg [3:0]  mpeg2_new_b_diag_stage;
+reg [28:0] mpeg2_new_b_diag_counter;
+
+wire [3:0] mpeg2_new_b_diag_target =
+    !mpeg2_new_b_diag_active                              ? 4'd0  :
+    (mpeg2_new_backward_f_code_horizontal != 4'd3)       ? 4'd1  :
+    (mpeg2_new_backward_f_code_vertical != 4'd3)         ? 4'd2  :
+    (mpeg2_new_forward_f_code_horizontal != 4'd3)        ? 4'd3  :
+    (mpeg2_new_forward_f_code_vertical != 4'd3)          ? 4'd4  :
+    (mpeg2_new_picture_structure != 2'b11)               ? 4'd5  :
+    !mpeg2_new_frame_pred_frame_dct                      ? 4'd6  :
+    mpeg2_new_concealment_motion_vectors                 ? 4'd7  :
+    !mpeg2_new_progressive_frame                         ? 4'd8  :
+    (mpeg2_new_horizontal_size != 14'd128)               ? 4'd9  :
+    (mpeg2_new_vertical_size != 14'd96)                  ? 4'd10 :
+    !mpeg2_new_progressive_sequence                      ? 4'd11 :
+    (mpeg2_new_chroma_format != 2'b01)                   ? 4'd12 :
+    mpeg2_new_syntax_error                               ? 4'd13 :
+                                                             4'd14;
+
+always @(posedge clk_mpeg2) begin
+    if (reset_mpeg2) begin
+        mpeg2_new_b_diag_active  <= 1'b0;
+        mpeg2_new_b_diag_stage   <= 4'd0;
+        mpeg2_new_b_diag_counter <= 29'd0;
+    end
+    else if (!mpeg2_new_b_diag_active &&
+             mpeg2_new_picture_seen &&
+             (mpeg2_new_picture_coding_type == 3'b011)) begin
+        mpeg2_new_b_diag_active  <= 1'b1;
+        mpeg2_new_b_diag_stage   <= 4'd1;
+        mpeg2_new_b_diag_counter <= 29'd0;
+    end
+    else if (mpeg2_new_b_diag_active) begin
+        if (mpeg2_new_b_diag_target > mpeg2_new_b_diag_stage) begin
+            mpeg2_new_b_diag_stage   <= mpeg2_new_b_diag_target;
+            mpeg2_new_b_diag_counter <= 29'd0;
+        end
+        else
+            mpeg2_new_b_diag_counter <= mpeg2_new_b_diag_counter + 1'b1;
+    end
+end
+
+// At the current decoder clock, one slot is roughly 0.15 s. Each numbered
+// stage produces that many distinct on-slots separated by equal off-slots,
+// followed by a long dark gap before the group repeats.
+wire [5:0] mpeg2_new_b_diag_phase = mpeg2_new_b_diag_counter[28:23];
+wire [5:0] mpeg2_new_b_diag_limit = {1'b0, mpeg2_new_b_diag_stage, 1'b0};
+wire mpeg2_new_b_diag_led =
+    (mpeg2_new_b_diag_phase < mpeg2_new_b_diag_limit) &&
+    !mpeg2_new_b_diag_phase[0];
+
+wire mpeg2_new_normal_user_led =
     (mpeg2_new_phase1s_all_i_user_success ||
      mpeg2_new_phase1t_p_syntax_user_success) &&
     mpeg2_new_recon_macroblock_420_complete &&
@@ -871,5 +929,8 @@ assign LED_USER =
     mpeg2_new_ddr_cache_ready &&
     mpeg2_new_ddr_read_seen &&
     !mpeg2_new_ddr_cache_error;
+
+assign LED_USER = mpeg2_new_b_diag_active ?
+    mpeg2_new_b_diag_led : mpeg2_new_normal_user_led;
 
 endmodule
