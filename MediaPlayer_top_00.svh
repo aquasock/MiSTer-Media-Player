@@ -86,6 +86,8 @@ wire [7:0]  mpeg2_stream_data;
 wire        mpeg2_stream_rd;
 wire        mpeg2_stream_wr;
 wire        mpeg2_new_stream_ready;
+wire        mpeg2_new_decoder_stream_ready;
+wire        mpeg2_new_b_presentation_hold;
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
@@ -172,6 +174,14 @@ assign mpeg2_stream_wr =
 	ioctl_wr &&
 	(ioctl_index[5:0] == 6'd1) &&
 	!mpeg2_stream_full;
+
+// Phase 1V: the decoder owns syntax/persistence backpressure, while the top
+// level additionally pauses between a persisted B and completion of its proven
+// scratch->future-reference presentation transaction. This prevents a later
+// P/B pair from overtaking the two-vblank display-order operation.
+assign mpeg2_new_stream_ready =
+	mpeg2_new_decoder_stream_ready &&
+	!mpeg2_new_b_presentation_hold;
 
 assign mpeg2_stream_rd =
 	!mpeg2_stream_empty &&

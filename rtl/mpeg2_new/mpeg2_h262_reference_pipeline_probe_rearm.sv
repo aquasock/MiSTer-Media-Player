@@ -2,17 +2,11 @@
 // MiSTer Media Player - consolidated re-arm wrapper for P/B reference pipeline
 //
 // Generalized P raster replay is identified by ordered motion metadata at
-// sideband index 0x3e.  Historical P motion-plan transport is translated into
-// that protocol.  Commit 128 adds a B sideband client selected by an internal
-// out-of-range sentinel vector plus B direction metadata.  P and B share the
-// registered DDR request adapter; B reads both retained reference banks and
-// writes only to the scratch frame through the ordinary store interface.
-//
-// Commit 129 gates the registered DDR response pulse by the client that owns
-// the shared request path.  Without this ownership gate, the idle B engine saw
-// the preceding P engine's DDR responses and latched its sticky unexpected-
-// response error before B decoding began; the reciprocal gate also protects a
-// later P picture from responses belonging to an intervening B picture.
+// sideband index 0x3e. Historical P motion-plan transport is translated into
+// that protocol. B uses an internal sentinel vector plus B direction metadata.
+// P and B share the registered DDR request adapter and response-owner gating.
+// Phase 1V mixed-GOP work adds a one-cycle B-engine re-arm after each fully
+// persisted B picture so a later B transaction can reuse the same raster engine.
 //============================================================================
 `include "rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_plan.sv"
 module mpeg2_h262_reference_read_probe
@@ -49,10 +43,16 @@ wire b_detect_now=p_residual_sample_valid&&b_direction_word&&p_forward_vector_va
 reg b_mode;
 wire b_active,b_persisted_seen,b_error,b_half,b_recon,b_read,b_nonzero;
 wire [7:0] b_sample,b_recon_value,b_persist_value;
+reg b_history_error;
+wire b_rearm_now=b_mode&&b_persisted_seen&&!b_active;
+wire b_reset=reset||b_rearm_now;
 always @(posedge clk)begin
- if(reset)b_mode<=0;
- else if(b_detect_now)b_mode<=1;
- else if(b_persisted_seen&&!b_active)b_mode<=0;
+ if(reset)begin b_mode<=0;b_history_error<=0;end
+ else begin
+  if(b_error)b_history_error<=1;
+  if(b_detect_now)b_mode<=1;
+  else if(b_persisted_seen&&!b_active)b_mode<=0;
+ end
 end
 wire b_select=b_mode||b_detect_now||b_active;
 
@@ -149,9 +149,6 @@ wire shared_rd_raw=b_select?b_rd_raw:mix_rd_raw;
 reg shared_req_active,shared_response_pending;reg[7:0] shared_bc_reg;reg[28:0] shared_addr_reg;
 reg[63:0] shared_dout_reg;reg shared_dout_ready_reg;
 wire shared_engine_busy=!(shared_req_active&&!ddram_busy);
-// Only the selected client may observe a response.  The request adapter is
-// physically shared, so an ungated ready pulse is otherwise indistinguishable
-// from an unsolicited response to the idle client and trips its sticky error.
 wire mix_dout_ready_owned=shared_dout_ready_reg&&mixed_select&&!b_select;
 wire b_dout_ready_owned=shared_dout_ready_reg&&b_select;
 
@@ -181,7 +178,7 @@ mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
  .half_sample_seen(mixed_half),.reconstructed_seen(mix_recon),.reconstructed_value(mix_recon_val),.persisted_seen(mixed_persisted_seen),.persisted_value(mix_persist_val),.error(mixed_error));
 
 mpeg2_h262_b_bidirectional_raster_engine b_probe(
- .clk(clk),.reset(reset),.capture_enable(b_select),.request(b_select),
+ .clk(clk),.reset(b_reset),.capture_enable(b_select),.request(b_select),
  .sideband_valid(p_residual_sample_valid&&b_select),.sideband_index(p_residual_sample_index),.sideband_value(p_residual_sample_value),
  .reference_valid(reference_frame_valid),.future_reference_bank(reference_frame_bank),.store_block_stored(p_store_block_stored),
  .ddram_busy(shared_engine_busy),.ddram_dout(shared_dout_reg),.ddram_dout_ready(b_dout_ready_owned),
@@ -211,6 +208,6 @@ assign reconstructed_seen=b_select?b_recon:mixed_select?(mixed_seen_enable&&mix_
 assign reconstructed_value=b_select?b_recon_value:mixed_select?mix_recon_val:base_recon_val;
 assign persisted_seen=b_select?b_persisted_seen:mixed_select?(mixed_seen_enable&&mixed_persisted_seen):base_persisted_seen;
 assign persisted_value=b_select?b_persist_value:mixed_select?mix_persist_val:base_persist_val;
-assign probe_error=plan_error||(b_select?b_error:(mixed_select?mixed_error:base_probe_error));
+assign probe_error=plan_error||b_history_error||(b_select?b_error:(mixed_select?mixed_error:base_probe_error));
 wire unused_b=&{1'b0,b_sample,b_recon_value,b_persist_value};
 endmodule

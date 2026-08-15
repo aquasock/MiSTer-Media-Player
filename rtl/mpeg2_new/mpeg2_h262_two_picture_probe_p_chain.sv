@@ -1,13 +1,11 @@
 //============================================================================
-// MiSTer Media Player - reference publication shell with controlled B support
+// MiSTer Media Player - reference publication shell with mixed I/P/B support
 //
-// The accepted I/P publication path remains unchanged. Commit 128 adds one
-// progressive B-picture core proof. B reconstruction completion is consumed as
-// a non-reference event: neither retained I/P bank is promoted or overwritten.
-//
-// Commit 138 retires the temporary Commit 130-137 USER pulse diagnostics.
-// The proven B completion is exported directly as a clean acceptance result;
-// B remains non-reference and the accepted I/P publication path is unchanged.
+// The accepted I/P publication path remains unchanged. B reconstruction is a
+// non-reference event: neither retained I/P bank is promoted or overwritten.
+// Phase 1V mixed-GOP work re-arms repeated B transactions and holds the byte
+// stream after B sideband completion until scratch persistence is complete, so
+// a following reference picture cannot outrun the shared P/B execution client.
 //============================================================================
 module mpeg2_h262_two_picture_probe
 (
@@ -61,6 +59,7 @@ reg active_frame_bank_reg,completed_frame_bank_reg;reg[7:0] picture_count_reg;re
 reg[31:0] picture_window;wire[31:0] picture_window_next={picture_window[23:0],stream_data};
 wire picture_start_now=(picture_window_next==32'h00000100);reg picture_header_capture,picture_header_second_byte;
 reg[1:0] p_header_count;reg consecutive_candidate_seen;reg b_picture_observed,b_picture_inflight,b_persistence_verified;
+reg[2:0] b_header_count,b_persist_count;
 wire b_header_now=stream_valid&&picture_header_capture&&picture_header_second_byte&&(stream_data[5:3]==3'b011);
 wire persistence_edge=p_persistence_complete&&!p_persistence_d;
 wire p_persisted_now=persistence_edge&&!b_picture_inflight;
@@ -78,7 +77,7 @@ always @(posedge clk)begin
   p_persistence_d<=0;p_publication_count<=0;publication_error<=0;picture_complete_pulse<=0;active_frame_bank_reg<=0;completed_frame_bank_reg<=0;
   picture_count_reg<=0;reference_frame_valid_reg<=0;reference_frame_bank_reg<=0;reference_promotion_count_reg<=0;
   picture_window<=0;picture_header_capture<=0;picture_header_second_byte<=0;p_header_count<=0;consecutive_candidate_seen<=0;
-  b_picture_observed<=0;b_picture_inflight<=0;b_persistence_verified<=0;
+  b_picture_observed<=0;b_picture_inflight<=0;b_persistence_verified<=0;b_header_count<=0;b_persist_count<=0;
  end else begin
   p_persistence_d<=p_persistence_complete;picture_complete_pulse<=0;
 
@@ -94,6 +93,10 @@ always @(posedge clk)begin
       if(p_header_count>=1)consecutive_candidate_seen<=1;
      end else if(stream_data[5:3]==3'b011)begin
       b_picture_observed<=1;b_picture_inflight<=1;b_persistence_verified<=0;
+      if(b_header_count!=3'd7)b_header_count<=b_header_count+1'b1;
+      // In coded order the future reference P precedes each B.  Do not accept
+      // a B transaction if an observed P header has not actually persisted.
+      if(p_publication_count<p_header_count)publication_error<=1;
      end else if((stream_data[5:3]==3'b001)&&consecutive_candidate_seen&&(p_publication_count<2))publication_error<=1;
     end
    end
@@ -116,6 +119,7 @@ always @(posedge clk)begin
    end
   end else if(b_persisted_now)begin
    b_persistence_verified<=1;b_picture_inflight<=0;
+   if(b_persist_count!=3'd7)b_persist_count<=b_persist_count+1'b1;
   end
  end
 end
@@ -140,7 +144,8 @@ mpeg2_h262_b_core_probe b_controller(
  .sideband_index(b_sideband_index),.sideband_value(b_sideband_value),.first_sample_valid(b_first_valid),
  .first_sample_value(b_first_value),.probe_error(b_error));
 
-wire b_final_success=b_seen&&b_persistence_verified;
+wire b_all_observed_persisted=(b_header_count!=0)&&(b_persist_count==b_header_count);
+wire b_final_success=b_seen&&b_persistence_verified&&b_all_observed_persisted;
 wire b_transport=b_replay_active||b_sideband_valid;
 assign p_macroblock_type_seen=b_final_success?1'b1:p_macroblock_type_seen_raw;
 assign p_forward_vector_valid=b_transport?1'b1:p_forward_vector_valid_raw;
@@ -155,7 +160,12 @@ assign p_residual_sample_index=b_transport?b_sideband_index:p_residual_sample_in
 assign p_residual_sample_value=b_transport?b_sideband_value:p_residual_sample_value_raw;
 
 wire p_hold_effective=p_hold_raw&&!b_picture_inflight&&!b_candidate&&!b_transport;
-assign stream_ready=(b_picture_inflight?1'b1:parser_ready)&&!p_hold_effective&&!b_parse_hold;
+// The final B slice is delimited by the following start code, so that start
+// code may already be consumed when replay completes.  Hold immediately after
+// b_seen until scratch persistence finishes; the following picture header body
+// then resumes with the shared P/B execution client free.
+wire b_persistence_wait=b_picture_inflight&&b_seen&&!b_persistence_verified;
+assign stream_ready=(b_picture_inflight?1'b1:parser_ready)&&!p_hold_effective&&!b_parse_hold&&!b_persistence_wait;
 wire b_accept_error=b_error||publication_error||reference_progress_error;
 assign b_user_success=b_final_success&&!b_accept_error;
 assign probe_error=(b_picture_observed?1'b0:bookkeeper_error)||

@@ -75,7 +75,7 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.reset                       (reset_mpeg2),
 	.stream_data                 (mpeg2_stream_data),
 	.stream_valid                (mpeg2_stream_rd),
-	.stream_ready                (mpeg2_new_stream_ready),
+	.stream_ready                (mpeg2_new_decoder_stream_ready),
 	.phase1_supported            (mpeg2_new_phase1_supported),
 	.vertical_size               (mpeg2_new_vertical_size),
 	.intra_dc_precision          (mpeg2_new_intra_dc_precision),

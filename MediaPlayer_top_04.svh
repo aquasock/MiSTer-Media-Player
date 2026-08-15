@@ -94,6 +94,16 @@ reg       mpeg2_new_b_presentation_error;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] mpeg2_new_swap_window_sync;
 
+// Once a B has persisted, keep the compressed stream parked until the existing
+// two-vblank scratch->future-reference transaction has completed. B parsing
+// itself is not held because b_user_success rises only after persistence.
+assign mpeg2_new_b_presentation_hold =
+    mpeg2_new_b_reorder_active &&
+    ((mpeg2_new_b_user_success && !mpeg2_new_b_user_success_d) ||
+     mpeg2_new_b_scratch_pending ||
+     mpeg2_new_b_scratch_presented) &&
+    !mpeg2_new_b_presentation_complete;
+
 always @(posedge clk_video) begin
     if (reset_video)
         mpeg2_new_swap_window_video <= 1'b0;

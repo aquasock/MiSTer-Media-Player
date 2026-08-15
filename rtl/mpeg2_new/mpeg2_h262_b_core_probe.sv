@@ -1,16 +1,15 @@
 //============================================================================
-// MiSTer Media Player - controlled progressive 4:2:0 B-picture core probe
+// MiSTer Media Player - progressive 4:2:0 B-picture core probe
 //
-// Commit 128 / Phase 1V-a.  This is the first B-picture hardware boundary.
-// It decodes a complete 128x96 progressive non-scalable B picture containing
-// the six non-quantised non-intra Table-B.4 macroblock types used for forward,
-// backward and bidirectional frame prediction.  Forward/backward f_code=(3,3)
-// motion vectors are reconstructed independently.  Up to four coded Y0 blocks
-// use the existing serialized non-intra IQ/IDCT engine.
+// Phase 1V mixed-GOP boundary.  Extends the controlled 128x96 B path with
+// repeatable B-picture re-arm and bounded macroblock_address_increment skips.
+// Forward/backward f_code=(3,3) frame vectors remain independently decoded and
+// the existing serialized non-intra IQ/IDCT engine remains shared.  Residual
+// syntax in this boundary remains the established Y0-only controlled subset.
 //
-// Diagnostic implementation limits (not H.262 limits): no skipped B MBs yet,
-// MBA increment must be 1, coded B MBs use CBP=32 (Y0 only), and each coded
-// block carries the controlled first coefficient +/-1 followed by EOB.
+// Current implementation limits (not H.262 limits): 128x96 progressive 4:2:0,
+// MBA increment 1..8 within an 8-MB row, no leading/trailing skipped B MB in
+// the regression, CBP=32 for coded residual MBs, and controlled +/-1 then EOB.
 //============================================================================
 module mpeg2_h262_b_core_probe
 (
@@ -51,8 +50,8 @@ reg signed [12:0] residual_level [0:3];
 reg [2:0] residual_count;
 reg q_scale_type, alternate_scan;
 
-reg parser_error, replay_error;
-assign probe_error = parser_error | replay_error;
+reg parser_error, replay_error, prior_error;
+assign probe_error = prior_error | parser_error | replay_error;
 
 reg [31:0] byte_window;
 wire [31:0] byte_window_next={byte_window[23:0],stream_data};
@@ -89,7 +88,8 @@ reg [5:0] state;
 
 reg [2:0] field_bit_count; reg [4:0] qscale_shift,current_qscale; reg [3:0] extra_info_count;
 reg [5:0] current_col; reg row_has_coded_mb;
-reg [3:0] mbtype_bits; reg [2:0] mbtype_len; reg [1:0] current_direction; reg current_pattern;
+reg [6:0] mba_bits; reg [2:0] mba_len;
+reg [3:0] mbtype_bits; reg [2:0] mbtype_len; reg [1:0] current_direction,last_direction; reg current_pattern;
 reg signed [7:0] fpx,fpy,bpx,bpy,cur_fx,cur_fy,cur_bx,cur_by;
 reg signed [5:0] motion_code_pending; reg [10:0] motion_bits; reg [3:0] motion_len;
 reg [1:0] motion_residual_shift; reg motion_residual_count;
@@ -97,6 +97,8 @@ reg [3:0] cbp_bits; reg [2:0] cbp_len;
 reg [3:0] coeff_bits; reg [2:0] coeff_len;
 
 wire [4:0] qscale_next={qscale_shift[3:0],parser_current_bit};
+wire [6:0] mba_bits_next={mba_bits[5:0],parser_current_bit};
+wire [2:0] mba_len_next=mba_len+1'b1;
 wire [10:0] motion_bits_next={motion_bits[9:0],parser_current_bit};
 wire [3:0] motion_len_next=motion_len+1'b1;
 wire [1:0] motion_residual_next={motion_residual_shift[0],parser_current_bit};
@@ -107,6 +109,34 @@ wire [2:0] cbp_len_next=cbp_len+1'b1;
 wire [3:0] coeff_bits_next={coeff_bits[2:0],parser_current_bit};
 wire [2:0] coeff_len_next=coeff_len+1'b1;
 wire [5:0] current_map_index=((slice_row_number-1'b1)<<3)+current_col;
+
+function automatic [4:0] match_mba_increment;
+    input [6:0] bits; input [2:0] len;
+    begin
+        match_mba_increment=5'd0;
+        case(len)
+        3'd1: if(bits[0]) match_mba_increment={1'b1,4'd1};
+        3'd3: case(bits[2:0])
+            3'b011:match_mba_increment={1'b1,4'd2};
+            3'b010:match_mba_increment={1'b1,4'd3};
+            default:;
+        endcase
+        3'd4: case(bits[3:0])
+            4'b0011:match_mba_increment={1'b1,4'd4};
+            4'b0010:match_mba_increment={1'b1,4'd5};
+            default:;
+        endcase
+        3'd5: case(bits[4:0])
+            5'b00011:match_mba_increment={1'b1,4'd6};
+            5'b00010:match_mba_increment={1'b1,4'd7};
+            default:;
+        endcase
+        3'd7: if(bits[6:0]==7'b0000111) match_mba_increment={1'b1,4'd8};
+        default:;
+        endcase
+    end
+endfunction
+wire [4:0] mba_match=match_mba_increment(mba_bits_next,mba_len_next);
 
 function automatic [3:0] match_b_mbtype;
     input [3:0] bits; input [2:0] len;
@@ -216,10 +246,10 @@ always @(posedge clk) begin
         byte_window<=0;sequence_capture<=0;sequence_count<=0;sequence_shift<=0;geometry_128x96<=0;
         picture_capture<=0;picture_count<=0;picture_shift<=0;current_picture_is_b<=0;
         pce_capture<=0;pce_count<=0;pce_shift<=0;b_candidate<=0;b_seen<=0;b_complete_now<=0;
-        parse_hold<=0;parser_error<=0;replay_error<=0;slice_capture<=0;slice_row_number<=0;row_byte_count<=0;
+        parse_hold<=0;parser_error<=0;replay_error<=0;prior_error<=0;slice_capture<=0;slice_row_number<=0;row_byte_count<=0;
         parse_active<=0;proof_done<=0;boundary_final<=0;parse_byte_limit<=0;parse_byte_index<=0;parse_bit_index<=7;
         state<=S_QSCALE;field_bit_count<=0;qscale_shift<=0;current_qscale<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;
-        mbtype_bits<=0;mbtype_len<=0;current_direction<=0;current_pattern<=0;
+        mba_bits<=0;mba_len<=0;mbtype_bits<=0;mbtype_len<=0;current_direction<=0;last_direction<=0;current_pattern<=0;
         fpx<=0;fpy<=0;bpx<=0;bpy<=0;cur_fx<=0;cur_fy<=0;cur_bx<=0;cur_by<=0;
         motion_code_pending<=0;motion_bits<=0;motion_len<=0;motion_residual_shift<=0;motion_residual_count<=0;
         cbp_bits<=0;cbp_len<=0;coeff_bits<=0;coeff_len<=0;direction_plan<=0;forward_x_plan<=0;forward_y_plan<=0;backward_x_plan<=0;backward_y_plan<=0;
@@ -243,14 +273,37 @@ always @(posedge clk) begin
                 else begin qscale_shift<=qscale_next;if(field_bit_count==4)begin field_bit_count<=0;if(qscale_next==0)state<=S_ERROR;else begin current_qscale<=qscale_next;state<=S_EXTRA_FLAG;end end else field_bit_count<=field_bit_count+1'b1;end
             end
             S_EXTRA_FLAG: begin
-                if(parser_at_end)state<=S_ERROR;else if(parser_current_bit)begin extra_info_count<=0;state<=S_EXTRA_INFO;end else state<=S_MBA;
+                if(parser_at_end)state<=S_ERROR;
+                else if(parser_current_bit)begin extra_info_count<=0;state<=S_EXTRA_INFO;end
+                else begin mba_bits<=0;mba_len<=0;state<=S_MBA;end
             end
             S_EXTRA_INFO: begin
                 if(parser_at_end)state<=S_ERROR;else if(extra_info_count==7)begin extra_info_count<=0;state<=S_EXTRA_FLAG;end else extra_info_count<=extra_info_count+1'b1;
             end
             S_MBA: begin
-                if(parser_at_end||!parser_current_bit)state<=S_ERROR;
-                else begin mbtype_bits<=0;mbtype_len<=0;state<=S_MBTYPE;end
+                if(parser_at_end)state<=S_ERROR;
+                else if(mba_match[4]) begin
+                    if((mba_match[3:0]==0)||
+                       ((mba_match[3:0]>1)&&!row_has_coded_mb)||
+                       ((current_col+mba_match[3:0]-1'b1)>=MB_WIDTH)) begin
+                        state<=S_ERROR;
+                    end else begin
+                        // For this bounded B regression, skipped MBs inherit the
+                        // previous coded B direction and current vector predictors.
+                        for(i=0;i<7;i=i+1) begin
+                            if(i<(mba_match[3:0]-1'b1)) begin
+                                direction_plan[(((slice_row_number-1'b1)<<3)+current_col+i)*2 +: 2] <= last_direction;
+                                forward_x_plan[(((slice_row_number-1'b1)<<3)+current_col+i)*8 +: 8] <= fpx;
+                                forward_y_plan[(((slice_row_number-1'b1)<<3)+current_col+i)*8 +: 8] <= fpy;
+                                backward_x_plan[(((slice_row_number-1'b1)<<3)+current_col+i)*8 +: 8] <= bpx;
+                                backward_y_plan[(((slice_row_number-1'b1)<<3)+current_col+i)*8 +: 8] <= bpy;
+                            end
+                        end
+                        current_col<=current_col+mba_match[3:0]-1'b1;
+                        mba_bits<=0;mba_len<=0;mbtype_bits<=0;mbtype_len<=0;state<=S_MBTYPE;
+                    end
+                end else if(mba_len_next>=7) state<=S_ERROR;
+                else begin mba_bits<=mba_bits_next;mba_len<=mba_len_next;end
             end
             S_MBTYPE: begin
                 if(parser_at_end)state<=S_ERROR;
@@ -301,8 +354,9 @@ always @(posedge clk) begin
                 backward_x_plan[(current_map_index*8)+:8]<=cur_bx;backward_y_plan[(current_map_index*8)+:8]<=cur_by;
                 if(current_direction[0])begin fpx<=cur_fx;fpy<=cur_fy;end
                 if(current_direction[1])begin bpx<=cur_bx;bpy<=cur_by;end
-                row_has_coded_mb<=1;
-                if(current_col==MB_WIDTH-1'b1)state<=S_STUFF;else begin current_col<=current_col+1'b1;state<=S_MBA;end
+                last_direction<=current_direction;row_has_coded_mb<=1;
+                if(current_col==MB_WIDTH-1'b1)state<=S_STUFF;
+                else begin current_col<=current_col+1'b1;mba_bits<=0;mba_len<=0;state<=S_MBA;end
             end
             S_STUFF: begin if(parser_at_end)state<=S_SUCCESS;else if(parser_current_bit)state<=S_ERROR;end
             S_SUCCESS: begin
@@ -352,7 +406,23 @@ always @(posedge clk) begin
             if(sequence_capture)begin sequence_shift<=sequence_next;if(sequence_count==2)begin sequence_capture<=0;sequence_count<=0;geometry_128x96<=(sequence_next[23:12]==128)&&(sequence_next[11:0]==96);end else sequence_count<=sequence_count+1'b1;end
             else if(start_code_now&&(start_code_value==SEQUENCE_HEADER_CODE))begin sequence_capture<=1;sequence_count<=0;sequence_shift<=0;end
 
-            if(picture_capture)begin picture_shift<=picture_next;if(picture_count)begin picture_capture<=0;picture_count<=0;current_picture_is_b<=(picture_next[5:3]==3'd3);end else picture_count<=1;end
+            if(picture_capture)begin
+                picture_shift<=picture_next;
+                if(picture_count)begin
+                    picture_capture<=0;picture_count<=0;current_picture_is_b<=(picture_next[5:3]==3'd3);
+                    // A later B picture starts a fresh proof transaction.  The
+                    // preceding B remains sticky through persistence and is only
+                    // retired when the next B header is actually observed.
+                    if((picture_next[5:3]==3'd3)&&!parse_active&&!replay_active)begin
+                        prior_error<=prior_error|parser_error|replay_error;
+                        proof_done<=0;b_seen<=0;b_candidate<=0;parse_hold<=0;parser_error<=0;replay_error<=0;
+                        slice_capture<=0;slice_row_number<=0;row_byte_count<=0;boundary_final<=0;
+                        state<=S_QSCALE;field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;
+                        mba_bits<=0;mba_len<=0;mbtype_bits<=0;mbtype_len<=0;last_direction<=0;
+                        residual_count<=0;rstate<=R_IDLE;replay_mb<=0;replay_slot<=0;replay_sample<=0;
+                    end
+                end else picture_count<=1;
+            end
             else if(start_code_now&&(start_code_value==PICTURE_START_CODE))begin picture_capture<=1;picture_count<=0;picture_shift<=0;current_picture_is_b<=0;b_candidate<=0;end
 
             if(pce_capture)begin
@@ -371,17 +441,17 @@ always @(posedge clk) begin
                     else if(slice_row_number<MB_HEIGHT)begin
                         if(start_code_value==({2'd0,slice_row_number}+1'b1))begin
                             slice_capture<=0;parse_active<=1;parse_hold<=1;boundary_final<=0;parse_byte_limit<=row_byte_count-3;parse_byte_index<=0;parse_bit_index<=7;state<=S_QSCALE;
-                            field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;
+                            field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;
                         end else begin slice_capture<=0;proof_done<=1;parser_error<=1;end
                     end else if(post_b_boundary_now)begin
                         slice_capture<=0;parse_active<=1;parse_hold<=1;boundary_final<=1;parse_byte_limit<=row_byte_count-3;parse_byte_index<=0;parse_bit_index<=7;state<=S_QSCALE;
-                        field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;
+                        field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;
                     end else begin slice_capture<=0;proof_done<=1;parser_error<=1;end
                 end else if(row_byte_count<ROW_BUFFER_BYTES)begin row_bytes[row_byte_count]<=stream_data;row_byte_count<=row_byte_count+1'b1;end
                 else begin slice_capture<=0;proof_done<=1;parser_error<=1;end
             end else if(!parse_active&&!proof_done&&b_candidate&&slice_start_now)begin
                 if(start_code_value==8'h01)begin
-                    slice_capture<=1;slice_row_number<=1;row_byte_count<=0;direction_plan<=0;forward_x_plan<=0;forward_y_plan<=0;backward_x_plan<=0;backward_y_plan<=0;residual_count<=0;parser_error<=0;replay_error<=0;
+                    slice_capture<=1;slice_row_number<=1;row_byte_count<=0;direction_plan<=0;forward_x_plan<=0;forward_y_plan<=0;backward_x_plan<=0;backward_y_plan<=0;residual_count<=0;parser_error<=0;replay_error<=0;last_direction<=0;mba_bits<=0;mba_len<=0;
                 end else begin proof_done<=1;parser_error<=1;end
             end
         end
