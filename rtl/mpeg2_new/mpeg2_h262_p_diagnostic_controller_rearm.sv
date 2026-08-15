@@ -20,12 +20,14 @@
 // controller error sources.  Hardware kept USER low, proving at least one
 // independent controller error remains after successful mixed persistence.
 //
-// Phase 1U-u splits those errors at the real mixed-persistence boundary.  Once
-// mixed_final_proof is true, retain only parser/recognizer errors and mask the
-// execution-side residual/hold errors.  USER high therefore isolates the
-// remaining false error to residual/hold bookkeeping; USER low isolates it to
-// the parser/recognizer group.  No stream, reconstruction, DDR, publication or
-// display behavior is changed.
+// Phase 1U-u masked the execution-side residual/hold group after real mixed
+// persistence.  Hardware made USER pass, proving the remaining false error is
+// inside that execution-side group.
+//
+// Phase 1U-v keeps residual_error_raw fully live while masking only the two
+// hold-related errors after mixed_final_proof.  USER low therefore proves the
+// residual diagnostic itself is asserting; USER high isolates the false error
+// to hold_error/raster_hold_error.  No datapath behavior is changed.
 //============================================================================
 module mpeg2_h262_p_diagnostic_controller
 (
@@ -103,8 +105,8 @@ assign stream_hold=four_mb_parse_hold||aligned_parse_hold||raster_hold_active||(
 wire syntax_error=syntax_error_raw&&!two_mb_seen&&!four_mb_seen&&!aligned_candidate&&!aligned_seen&&!mixed_candidate&&!mixed_seen;
 wire progress_error=p_picture_expected&&!p_macroblock_type_seen;
 wire parser_error_group=syntax_error|two_mb_error|four_mb_error|((aligned_error)&&!use_mixed)|mixed_error;
-wire execution_error_group=residual_error_raw|hold_error|raster_hold_error;
-assign probe_error=parser_error_group|progress_error|(execution_error_group&&!mixed_final_proof);
+wire hold_error_group=hold_error|raster_hold_error;
+assign probe_error=parser_error_group|progress_error|residual_error_raw|(hold_error_group&&!mixed_final_proof);
 
 mpeg2_h262_p_syntax_probe syntax_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.p_picture_expected(p_picture_expected),.p_macroblock_type_seen(mb_seen_raw),.p_forward_vector_valid(vector_valid_raw),.p_forward_vector_x(vector_x_raw),.p_forward_vector_y(vector_y_raw),.probe_error(syntax_error_raw));
 mpeg2_h262_p_two_mb_syntax_probe two_mb_probe(.clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.two_mb_seen(two_mb_seen),.probe_error(two_mb_error));
