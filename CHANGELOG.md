@@ -8,6 +8,26 @@ This project is still in active pre-release development. Published milestone rel
 
 No unreleased milestone changes yet.
 
+## [0.4.0] - 2026-08-14 — Phase 1U
+
+Generalized progressive 4:2:0 P-picture decoding within the current implementation envelope.
+
+- Preserved the hardware-proven continuous progressive 4:2:0 all-I decode, DDR ping-pong/reference storage, blanking-aligned publication, and synthetic 90 kHz elementary-stream timing baseline from v0.3.0.
+- Promoted reconstructed P pictures into the normal publication/reference ownership path and proved consecutive P-to-P reference consumption.
+- Replaced picture-wide and fixed-position P prediction controls with syntax-derived per-macroblock execution plans across the full 128x96 / 8x6-macroblock generalized regression geometry.
+- Added signed horizontal and vertical forward motion-vector reconstruction, predictor reuse/reset, H.262 wrap behavior, and the supported f_code=(3,3) residual-bit path.
+- Added integer, horizontal half-sample, vertical half-sample, and bilinear prediction with 4:2:0 chroma-vector scaling.
+- Generalized 4:2:0 coded-block-pattern handling across all six macroblock blocks and added sparse syntax-derived residual block placement.
+- Generalized non-intra residual coefficients beyond the earlier fixed run=0/level=+7 proof, including ordinary run/level VLCs, non-zero runs, signs, EOB, Escape syntax, modified-first handling, q_scale_type, alternate_scan, and slice/macroblock quantiser-scale changes.
+- Unified generalized motion-only and motion-plus-residual P pictures behind one serialized prediction/residual raster path while preserving the established legacy regressions.
+- Registered the generalized DDR request/response boundary after the first generalized candidate exposed a severe f2sdram setup path; the corrected path restored zero setup TNS and eliminated the observed MiSTer crash.
+- Removed an obsolete legacy transform diagnostic assertion from generalized mode while retaining the original controlled proof unchanged.
+- Hardware acceptance of the feature-complete baseline `8cbcf25f46b993fccdb6d77d2d4f2504546d0aa1` covered generalized transform controls, combined generalized P decoding, consecutive P references, generalized residual placement, and the continuous all-I regression, all with USER completion on.
+- Feature-complete baseline fit: 26,884 / 41,910 ALMs (64%), 37,328 registers, 452,129 block-memory bits in 70 RAM blocks, 75 / 112 DSP blocks, and 3 / 6 PLLs.
+- Feature-complete baseline timing: global setup +0.649 ns, decoder setup +2.864 ns with 0/100 violations, video setup +8.316 ns with 0/80 violations, and setup TNS 0.
+- Current generalized-P implementation limits include 128x96 / 8x6-macroblock regression geometry, forward f_code=(3,3), at most 16 coded residual blocks and 64 non-zero coefficient events per picture. These are implementation limits, not H.262 limits.
+- B pictures, broader/interlaced H.262 picture structures, non-4:2:0 chroma, H.222.0 Program Stream/PES demux and real PTS, audio, and DVD/VOB navigation remain future work.
+
 ## [0.3.0] - 2026-08-14 — Phase 1T
 
 Reference-picture management and the first hardware-proven predictive-picture reconstruction paths.
