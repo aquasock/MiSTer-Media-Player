@@ -39,6 +39,13 @@ assign HDMI_FREEZE = 0;
 assign HDMI_BLACKOUT = 0;
 assign HDMI_BOB_DEINT = 0;
 
+// AUDIO_FORK_POINT[PCM_OUT]: advisory v0.5.0 handoff, not a permanent ABI.
+// Replace these zeroes only at the top-level PCM/output boundary.  Keep codec
+// decode behind a codec-independent PCM valid/ready contract so MP2/MP3/AC-3
+// (and standalone-audio codecs) remain separate from MiSTer output formatting.
+// Prefer serialized/time-multiplexed arithmetic: the integrated core values DSP
+// headroom more than parallel per-codec datapaths.  AUDIO_S/MIX policy belongs
+// here or in a sibling output adapter, not inside the H.262 video decoder.
 assign AUDIO_S = 0;
 assign AUDIO_L = 0;
 assign AUDIO_R = 0;
@@ -74,6 +81,13 @@ wire   [1:0] buttons;
 wire [127:0] status;
 wire  [10:0] ps2_key;
 
+// AUDIO_FORK_POINT[STREAM_SPLIT]: advisory v0.5.0 handoff, not a permanent ABI.
+// ioctl_* currently carries one raw .m2v elementary video stream.  A future
+// HPS/container/DVD demux should split compressed audio and video ABOVE this
+// decoder boundary: keep mpeg2_stream_* video-only and add a sibling audio FIFO
+// with its own data/valid/ready backpressure.  Do not route audio bytes through
+// mpeg2_h262_frontend or mpeg2_h262_two_picture_probe in MediaPlayer_top_02.svh;
+// those modules and their parser/reference state are deliberately video-private.
 // ARM -> FPGA MPEG-2 elementary-stream transfer.
 wire        ioctl_download;
 wire [15:0] ioctl_index;
@@ -114,6 +128,12 @@ hps_io #(.CONF_STR(CONF_STR)) hps_io
 
 ///////////////////////   CLOCKS   ///////////////////////////////
 
+// AUDIO_FORK_POINT[CLOCK_RESET]: advisory v0.5.0 handoff, not a permanent ABI.
+// Add audio as a sibling clock/reset consumer.  Reusing clk_mpeg2 is acceptable
+// only if its throughput and timing remain suitable; otherwise add an explicit
+// audio clock domain and synchronize reset release/CDC using the same discipline
+// below.  Audio FIFO readiness must not be ANDed into mpeg2_new_stream_ready:
+// routine A/V synchronization belongs above the two independent decoder pipes.
 wire clk_sys;
 wire clk_video;
 wire clk_mpeg2;
@@ -203,11 +223,26 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 	.rd_empty (mpeg2_stream_empty)
 );
 
+// AUDIO_FORK_POINT[DDR_CLIENT]: advisory v0.5.0 handoff, not a permanent ABI.
+// If audio eventually needs external buffering, integrate it as an explicit
+// additional DDR client at mpeg2_h262_ddram_arbiter in MediaPlayer_top_06.svh
+// (or a successor system arbiter).  Allocate a separate address region and
+// preserve the video writer/reader/prediction response ownership and the
+// [17:16] frame-region protection.  Never reuse P/B prediction request signals
+// as an implicit audio transport.  Prefer on-chip FIFO/RAM when practical.
 // The DDR service and Phase 1S/1T clients run in the decoder clock domain.
 assign DDRAM_CLK = clk_mpeg2;
 
 ///////////////////////   VIDEO TIMING   /////////////////////////
 
+// AUDIO_FORK_POINT[AV_SYNC]: advisory v0.5.0 handoff, not a permanent ABI.
+// Future A/V synchronization should observe the presentation side, not H.262
+// syntax state.  Useful starting signals are display_v_pos here plus
+// mpeg2_new_swap_window_pulse / mpeg2_new_b_presentation_complete in
+// MediaPlayer_top_04.svh and the actual framebuffer swap in _06.svh.  Export a
+// clean video-present/timebase event to a higher-level A/V controller; let that
+// controller use timestamps/buffer occupancy/drop-repeat policy rather than
+// directly stalling either codec's internal parser for normal synchronization.
 wire [11:0] display_h_pos;
 wire [11:0] display_v_pos;
 wire        display_pixel_en;
