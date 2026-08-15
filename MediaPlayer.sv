@@ -861,7 +861,7 @@ wire unused_phase1t_reconstructed_value = &{1'b0, mpeg2_new_pred_reconstructed_v
 // already-accepted frontend interface; decoder execution is not modified.
 reg        mpeg2_new_b_diag_active;
 reg [3:0]  mpeg2_new_b_diag_stage;
-reg [28:0] mpeg2_new_b_diag_counter;
+reg [29:0] mpeg2_new_b_diag_counter;
 
 wire [3:0] mpeg2_new_b_diag_target =
     !mpeg2_new_b_diag_active                              ? 4'd0  :
@@ -884,29 +884,29 @@ always @(posedge clk_mpeg2) begin
     if (reset_mpeg2) begin
         mpeg2_new_b_diag_active  <= 1'b0;
         mpeg2_new_b_diag_stage   <= 4'd0;
-        mpeg2_new_b_diag_counter <= 29'd0;
+        mpeg2_new_b_diag_counter <= 30'd0;
     end
     else if (!mpeg2_new_b_diag_active &&
              mpeg2_new_picture_seen &&
              (mpeg2_new_picture_coding_type == 3'b011)) begin
         mpeg2_new_b_diag_active  <= 1'b1;
         mpeg2_new_b_diag_stage   <= 4'd1;
-        mpeg2_new_b_diag_counter <= 29'd0;
+        mpeg2_new_b_diag_counter <= 30'd0;
     end
     else if (mpeg2_new_b_diag_active) begin
         if (mpeg2_new_b_diag_target > mpeg2_new_b_diag_stage) begin
             mpeg2_new_b_diag_stage   <= mpeg2_new_b_diag_target;
-            mpeg2_new_b_diag_counter <= 29'd0;
+            mpeg2_new_b_diag_counter <= 30'd0;
         end
         else
             mpeg2_new_b_diag_counter <= mpeg2_new_b_diag_counter + 1'b1;
     end
 end
 
-// At the current decoder clock, one slot is roughly 0.15 s. Each numbered
+// At the current decoder clock, one slot is roughly 0.30 s. Each numbered
 // stage produces that many distinct on-slots separated by equal off-slots,
 // followed by a long dark gap before the group repeats.
-wire [5:0] mpeg2_new_b_diag_phase = mpeg2_new_b_diag_counter[28:23];
+wire [5:0] mpeg2_new_b_diag_phase = mpeg2_new_b_diag_counter[29:24];
 wire [5:0] mpeg2_new_b_diag_limit = {1'b0, mpeg2_new_b_diag_stage, 1'b0};
 wire mpeg2_new_b_diag_led =
     (mpeg2_new_b_diag_phase < mpeg2_new_b_diag_limit) &&
