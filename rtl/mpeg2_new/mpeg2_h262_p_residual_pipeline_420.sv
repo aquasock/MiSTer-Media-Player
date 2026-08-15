@@ -120,7 +120,9 @@ wire signed [12:0] qwval = general_mode ? gwval : old_wval;
 wire [4:0] qscale = general_mode ? current_qscale : old_qscale;
 wire qtype = general_mode ? g_qtype : old_qtype;
 wire alt   = general_mode ? g_alt : old_alt;
-wire [1:0] tblock=(qblock==0)?2'd0:2'd1;
+// The transform's block-index 0 is reserved for the legacy Phase-1T controlled
+// Y0/+7/qscale=2 proof. Generalized syntax must not inherit that diagnostic key.
+wire [1:0] tblock=general_mode?2'd1:((qblock==0)?2'd0:2'd1);
 wire tfvalid, tvalid, terr;
 wire signed [15:0] tfvalue, tvalue;
 wire [1:0] unused_block;
