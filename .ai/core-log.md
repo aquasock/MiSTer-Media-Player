@@ -1,35 +1,3 @@
-## 149 COMMIT v0.5.0-cycle 0cbafd8 2026-08-15T16:46:05-07:00
-
-#### Coming From:
-
-v0.5.0-cycle 4e9058a
-
-#### Purpose:
-
-Recover FPGA resources without changing accepted MPEG-2 behavior by sharing the H.262 IDCT multiplier/adder bank between its mutually exclusive transform passes.
-
-#### Outcome:
-
-Exact GitHub master commit `0cbafd8d1ad5a9e832fe72a3ec15ca3c344c1fa1` modifies only `rtl/mpeg2_new/mpeg2_h262_idct.sv` (+253/-384). The two sequential IDCT passes now share one arithmetic bank without changing constants, rounding, sample order, or interfaces.
-
-Clean build validation: 31,678 / 41,910 ALMs (76%), 43,752 registers, 461,345 block-memory bits in 73 RAM blocks, 68 / 112 DSPs, 3 / 6 PLLs. Relative to Commit 148 this recovers 477 ALMs, 636 registers, and 24 DSPs. Global setup is +0.470 ns with zero setup TNS.
-
-All five accepted hardware streams pass. The 68-DSP shared-IDCT consolidation is accepted.
-
-#### Next Steps:
-
-Preserve this executable baseline and add advisory Audio-fork handoff comments.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_idct.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed — all five accepted regressions pass
-
----
 ## 150 COMMIT v0.5.0-cycle 4469220 2026-08-15T16:57:25-07:00
 
 #### Coming From:
@@ -637,21 +605,53 @@ Restore exact 128x96 consecutive-P compatibility without giving back the parser-
 - [ ] Passed — consecutive-P regression; no crash
 
 ---
-## 168 PROPOSAL Unreleased pending 2026-08-16T07:05:20-07:00
+## 168 COMMIT Unreleased 0ea9ac5 2026-08-16T07:45:00-07:00
 
 #### Coming From:
 
-Unreleased b1a0b0f
+Unreleased b11590c
 
 #### Purpose:
 
-Restore exact 128x96 consecutive-reference P acceptance while preserving the single streamed generalized-P parser and Commit-167 resource headroom.
+Restore consecutive-reference P acceptance after the generalized-P parser consolidation without giving back the recovered FPGA headroom.
 
 #### Outcome:
 
-Scope the next functional boundary only to the exact-128x96 streamed-parser/controller compatibility path. Five of six regressions already pass, including 720x480 generalized P and both B guards, so DDR ownership, presentation pacing, B ordering, IDCT, residual/raster geometry, QIP, and SDC remain out of scope.
+Exact functional commit `0ea9ac55723d10812bbf0f4ac0b01ecf2a3df0b0` modifies only `rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv` (+8/-0), retaining an already-observed streamed-motion transaction across wide-picture completion so motion-only P can accept its persistence completion.
 
-Validation will require a clean Quartus build near the Commit-167 resource shape, repeated `test_p_consecutive_reference.m2v`, and the same five passing guard streams.
+Quartus 17.0.2 validation is clean: 30,751 / 41,910 ALMs (73%), 41,338 registers, 486,017 block-memory bits in 77 RAM blocks, 69 DSPs, 3 PLLs; zero setup TNS and global setup +0.644 ns. All six requested hardware regressions pass, including repeated `test_p_consecutive_reference.m2v` and the 720x480 generalized-P stream. Audio compatibility is clean; the only cumulative overlapping post-fork path is `files.qip`, where main and Audio add independent source entries.
+
+#### Next Steps:
+
+Use the restored 73% baseline to widen the remaining fixed-geometry B path.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+
+#### Status:
+
+- [x] Built
+- [x] Passed — all six requested P/B/I regressions pass
+
+---
+## 169 PROPOSAL Unreleased pending 2026-08-16T07:45:00-07:00
+
+#### Coming From:
+
+Unreleased 0ea9ac5
+
+#### Purpose:
+
+Widen progressive 4:2:0 B-picture decoding from the current fixed 128x96 / 8x6 implementation to the established <=720x480 frame envelope while preserving accepted two-reference prediction, non-reference scratch-frame semantics, and all qualified P/I behavior.
+
+#### Outcome:
+
+Current B implementation limits are explicit: the B syntax/core uses fixed 8x6 geometry, 48-entry direction/vector plans, row-local MBA increments through 8, and a bounded four-block Y0-only residual subset; the bidirectional raster engine likewise fixes 48 macroblocks and 128x96 / 64x48 luma/chroma bounds. The accepted Commit-168 baseline is 30,751 ALMs (73%), restoring sufficient headroom to attempt the capability expansion.
+
+Scope the next hardware boundary to generalized B geometry and addressing through 45x30 macroblocks while retaining the existing bounded residual subset, two retained reference banks, B scratch-frame non-publication behavior, DDR ownership protections, P pacing, IDCT arithmetic, and timing constraints. Add a deterministic 720x480 mixed-GOP B regression that exercises forward, backward, and bidirectional prediction plus internal skipped macroblocks. Existing 128x96 B behavior remains a required guard.
+
+Validation will require a clean Quartus/STA build, the new 720x480 B regression, and the complete accepted six-stream P/B/I matrix. If required integration work would materially change DDR arbitration, reference publication, P behavior, IDCT, or SDC, stop and revise the proposal before implementation.
 
 #### Next Steps:
 
@@ -659,7 +659,7 @@ Await user approval before implementation.
 
 #### Files Modified:
 
-- TBD — exact 128x96 generalized-P parser/controller compatibility path only
+- TBD — B syntax/core geometry, B bidirectional raster geometry, minimal integration, and deterministic 720x480 B regression generator only
 
 #### Status:
 
