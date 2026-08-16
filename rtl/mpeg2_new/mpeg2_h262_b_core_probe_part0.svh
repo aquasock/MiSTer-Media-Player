@@ -8,9 +8,13 @@
 // kate - Commit 170: generalize coded_block_pattern and non-intra residual
 // syntax across all six 4:2:0 blocks. Sparse residual metadata remains bounded
 // to 16 blocks / 64 coefficient events (implementation limits, not H.262).
+// kate - Commit 171: accept the full Table-B.1 macroblock_address_increment
+// VLC set plus macroblock_escape accumulation needed inside a 45-MB row.
+// Leading/trailing skipped-B semantics remain outside this boundary.
 //
-// Standards authority: .ai/core-standards.md H262-006, H262-010, H262-021,
-// H262-024 plus the established motion/address records used by Commit 169.
+// Standards authority: .ai/core-standards.md H262-006, H262-010, H262-014,
+// H262-021, H262-024 plus the established motion/address records used by
+// Commit 169.
 //============================================================================
 module mpeg2_h262_b_core_probe
 (
@@ -100,8 +104,87 @@ localparam [5:0]
 reg [5:0] state;
 
 reg [2:0] field_bit_count; reg [4:0] qscale_shift,current_qscale; reg [3:0] extra_info_count;
-reg [5:0] current_col; reg row_has_coded_mb; reg [3:0] skip_remaining; reg geometry_sent;
+reg [5:0] current_col; reg row_has_coded_mb; reg [5:0] skip_remaining; reg geometry_sent;
+// Historical 1..8 decoder state remains below for source compatibility; Commit
+// 171 drives S_MBA from the wider Table-B.1 state and Quartus prunes the old path.
 reg [6:0] mba_bits; reg [2:0] mba_len;
+reg [10:0] mba_wide_bits; reg [3:0] mba_wide_len; reg [6:0] mba_escape_accum;
+wire [10:0] mba_wide_bits_next={mba_wide_bits[9:0],parser_current_bit};
+wire [3:0] mba_wide_len_next=mba_wide_len+1'b1;
+
+function automatic [7:0] match_mba_symbol;
+    input [10:0] bits; input [3:0] len;
+    reg valid,escape; reg [5:0] value;
+    begin
+        valid=0;escape=0;value=0;
+        case(len)
+        4'd1: if(bits[0])begin valid=1;value=1;end
+        4'd3: case(bits[2:0])
+            3'b011:begin valid=1;value=2;end
+            3'b010:begin valid=1;value=3;end
+            default:;
+        endcase
+        4'd4: case(bits[3:0])
+            4'b0011:begin valid=1;value=4;end
+            4'b0010:begin valid=1;value=5;end
+            default:;
+        endcase
+        4'd5: case(bits[4:0])
+            5'b00011:begin valid=1;value=6;end
+            5'b00010:begin valid=1;value=7;end
+            default:;
+        endcase
+        4'd7: case(bits[6:0])
+            7'b0000111:begin valid=1;value=8;end
+            7'b0000110:begin valid=1;value=9;end
+            default:;
+        endcase
+        4'd8: case(bits[7:0])
+            8'b00001011:begin valid=1;value=10;end
+            8'b00001010:begin valid=1;value=11;end
+            8'b00001001:begin valid=1;value=12;end
+            8'b00001000:begin valid=1;value=13;end
+            8'b00000111:begin valid=1;value=14;end
+            8'b00000110:begin valid=1;value=15;end
+            default:;
+        endcase
+        4'd10: case(bits[9:0])
+            10'b0000010111:begin valid=1;value=16;end
+            10'b0000010110:begin valid=1;value=17;end
+            10'b0000010101:begin valid=1;value=18;end
+            10'b0000010100:begin valid=1;value=19;end
+            10'b0000010011:begin valid=1;value=20;end
+            10'b0000010010:begin valid=1;value=21;end
+            default:;
+        endcase
+        4'd11: case(bits[10:0])
+            11'b00000100011:begin valid=1;value=22;end
+            11'b00000100010:begin valid=1;value=23;end
+            11'b00000100001:begin valid=1;value=24;end
+            11'b00000100000:begin valid=1;value=25;end
+            11'b00000011111:begin valid=1;value=26;end
+            11'b00000011110:begin valid=1;value=27;end
+            11'b00000011101:begin valid=1;value=28;end
+            11'b00000011100:begin valid=1;value=29;end
+            11'b00000011011:begin valid=1;value=30;end
+            11'b00000011010:begin valid=1;value=31;end
+            11'b00000011001:begin valid=1;value=32;end
+            11'b00000011000:begin valid=1;value=33;end
+            11'b00000001000:begin valid=1;escape=1;value=0;end
+            default:;
+        endcase
+        default:;
+        endcase
+        match_mba_symbol={valid,escape,value};
+    end
+endfunction
+
+wire [7:0] mba_symbol=match_mba_symbol(mba_wide_bits_next,mba_wide_len_next);
+wire [7:0] mba_increment_total={1'b0,mba_escape_accum}+{2'b00,mba_symbol[5:0]};
+wire [7:0] mba_target_col_wide={2'b00,current_col}+mba_increment_total-8'd1;
+wire [7:0] mba_escape_accum_next={1'b0,mba_escape_accum}+8'd33;
+wire [7:0] mba_escape_min_target={2'b00,current_col}+mba_escape_accum_next;
+
 reg [3:0] mbtype_bits; reg [2:0] mbtype_len; reg [1:0] current_direction,last_direction; reg current_pattern;
 reg signed [7:0] fpx,fpy,bpx,bpy,cur_fx,cur_fy,cur_bx,cur_by;
 reg signed [5:0] motion_code_pending; reg [10:0] motion_bits; reg [3:0] motion_len;

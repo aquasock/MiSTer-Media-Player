@@ -59,6 +59,7 @@
                         proof_done<=0;b_seen<=0;b_candidate<=0;parse_hold<=0;parser_error<=0;replay_error<=0;
                         slice_capture<=0;slice_row_number<=0;row_byte_count<=0;row_base_index<=0;residual_count<=0;residual_coeff_count<=0;geometry_sent<=0;
                         current_col<=0;row_has_coded_mb<=0;skip_remaining<=0;last_direction<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;
+                        mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;
                     end
                 end else picture_count<=1;
             end else if(start_code_now&&(start_code_value==PICTURE_START_CODE))begin picture_capture<=1;picture_count<=0;picture_shift<=0;end
@@ -79,12 +80,12 @@
                     else if(slice_row_number<picture_mb_height)begin
                         if(start_code_value==({2'd0,slice_row_number}+1'b1))begin
                             slice_capture<=0;parse_active<=1;parse_hold<=1;boundary_final<=0;parse_byte_limit<=row_byte_count-3;parse_byte_index<=0;parse_bit_index<=7;state<=S_QSCALE;
-                            field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;
+                            field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;
                             cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
                         end else begin slice_capture<=0;proof_done<=1;parser_error<=1;end
                     end else if(post_b_boundary_now)begin
                         slice_capture<=0;parse_active<=1;parse_hold<=1;boundary_final<=1;parse_byte_limit<=row_byte_count-3;parse_byte_index<=0;parse_bit_index<=7;state<=S_QSCALE;
-                        field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;
+                        field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;
                         cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
                     end else begin slice_capture<=0;proof_done<=1;parser_error<=1;end
                 end else if(row_byte_count<ROW_BUFFER_BYTES)begin row_bytes[row_byte_count]<=stream_data;row_byte_count<=row_byte_count+1'b1;end
@@ -92,7 +93,7 @@
             end else if(!parse_active&&!proof_done&&b_candidate&&slice_start_now)begin
                 if(start_code_value==8'h01)begin
                     slice_capture<=1;slice_row_number<=1;row_byte_count<=0;row_base_index<=0;residual_count<=0;residual_coeff_count<=0;parser_error<=0;replay_error<=0;
-                    geometry_sent<=0;last_direction<=0;mba_bits<=0;mba_len<=0;
+                    geometry_sent<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;
                 end else begin proof_done<=1;parser_error<=1;end
             end
         end

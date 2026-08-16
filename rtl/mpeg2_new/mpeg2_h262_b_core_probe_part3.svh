@@ -40,7 +40,7 @@ always @(posedge clk) begin
         parse_hold<=0;parser_error<=0;replay_error<=0;prior_error<=0;slice_capture<=0;slice_row_number<=0;row_byte_count<=0;row_base_index<=0;
         parse_active<=0;proof_done<=0;boundary_final<=0;parse_byte_limit<=0;parse_byte_index<=0;parse_bit_index<=7;
         state<=S_QSCALE;field_bit_count<=0;qscale_shift<=0;current_qscale<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;skip_remaining<=0;geometry_sent<=0;
-        mba_bits<=0;mba_len<=0;mbtype_bits<=0;mbtype_len<=0;current_direction<=0;last_direction<=0;current_pattern<=0;
+        mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;mbtype_bits<=0;mbtype_len<=0;current_direction<=0;last_direction<=0;current_pattern<=0;
         fpx<=0;fpy<=0;bpx<=0;bpy<=0;cur_fx<=0;cur_fy<=0;cur_bx<=0;cur_by<=0;
         motion_code_pending<=0;motion_bits<=0;motion_len<=0;motion_residual_shift<=0;motion_residual_count<=0;
         cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
@@ -69,22 +69,29 @@ always @(posedge clk) begin
             S_EXTRA_FLAG: begin
                 if(parser_at_end)state<=S_ERROR;
                 else if(parser_current_bit)begin extra_info_count<=0;state<=S_EXTRA_INFO;end
-                else begin mba_bits<=0;mba_len<=0;state<=S_MBA;end
+                else begin mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;state<=S_MBA;end
             end
             S_EXTRA_INFO: begin
                 if(parser_at_end)state<=S_ERROR;else if(extra_info_count==7)begin extra_info_count<=0;state<=S_EXTRA_FLAG;end else extra_info_count<=extra_info_count+1'b1;
             end
             S_MBA: begin
                 if(parser_at_end)state<=S_ERROR;
-                else if(mba_match[4]) begin
-                    if((mba_match[3:0]==0)||((mba_match[3:0]>1)&&!row_has_coded_mb)||(mba_target_col>=picture_mb_width)) state<=S_ERROR;
-                    else begin
-                        mba_bits<=0;mba_len<=0;mbtype_bits<=0;mbtype_len<=0;
-                        if(mba_match[3:0]>1)begin skip_remaining<=mba_match[3:0]-1'b1;state<=S_SKIP_A;end
+                else if(mba_symbol[7]) begin
+                    mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;
+                    if(mba_symbol[6]) begin
+                        if(mba_escape_min_target>={2'b00,picture_mb_width})state<=S_ERROR;
+                        else begin mba_escape_accum<=mba_escape_accum_next[6:0];state<=S_MBA;end
+                    end else if((mba_increment_total==0)||
+                                (!row_has_coded_mb&&(mba_increment_total!=8'd1))||
+                                (mba_target_col_wide>={2'b00,picture_mb_width})) begin
+                        state<=S_ERROR;
+                    end else begin
+                        mba_escape_accum<=0;mbtype_bits<=0;mbtype_len<=0;
+                        if(mba_increment_total>8'd1)begin skip_remaining<=mba_increment_total[5:0]-1'b1;state<=S_SKIP_A;end
                         else state<=S_MBTYPE;
                     end
-                end else if(mba_len_next>=7) state<=S_ERROR;
-                else begin mba_bits<=mba_bits_next;mba_len<=mba_len_next;end
+                end else if(mba_wide_len_next>=4'd11) state<=S_ERROR;
+                else begin mba_wide_bits<=mba_wide_bits_next;mba_wide_len<=mba_wide_len_next;end
             end
             S_SKIP_A: begin
                 if(last_direction==0)state<=S_ERROR;
