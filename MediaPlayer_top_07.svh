@@ -131,6 +131,14 @@ wire mpeg2_new_normal_user_led =
 // but displays codes 31..38 as two short USER groups instead of 31..38 flashes.
 // Group 1: 1=capture, 2=flush, 3=write/not-busy, 4=write/busy.
 // Group 2: 1=prediction already present, 2=prediction first coincident.
+//
+// kate - Commit 159 resurfaces the existing Commit-154 generalized-P first-error
+// carrier (paired E?/D? values).  No predictor control consumes this observer.
+// When prediction is proven earlier than the DDR overlap, USER reports A-B-C:
+//   A-B = first prediction cause, C = later writer-overlap state.
+// Prediction causes: 1 metadata/order, 2 start prerequisites, 3 source bounds,
+// 4 unsolicited DDR response, 5 persistence verify mismatch, 6 timeout,
+// 7 residual-descriptor consumption mismatch, 8 other/unclassified predictor.
 reg [31:0] mpeg2_new_pp_diag_picture_window;
 reg        mpeg2_new_pp_diag_header_capture;
 reg        mpeg2_new_pp_diag_header_second_byte;
@@ -145,6 +153,9 @@ reg        mpeg2_new_pp_diag_p2_store_seen;
 reg        mpeg2_new_pp_diag_p2_persisted;
 reg        mpeg2_new_pp_diag_pred_persisted_d;
 reg        mpeg2_new_pp_diag_pred_before_ddr;
+reg [3:0]  mpeg2_new_pp_diag_pred_cause;
+reg [2:0]  mpeg2_new_pp_diag_pred_cause_wait;
+reg [3:0]  mpeg2_new_pp_diag_pred_cause_d;
 reg        mpeg2_new_pp_diag_ddr_fault_latched;
 reg [5:0]  mpeg2_new_pp_diag_ddr_fault_code;
 reg [4:0]  mpeg2_new_pp_diag_stage;
@@ -197,6 +208,18 @@ wire mpeg2_new_pp_diag_pred_at_or_before_ddr =
     mpeg2_new_pp_diag_pred_before_ddr || mpeg2_new_pred_error;
 wire mpeg2_new_pp_diag_pred_coincident_ddr =
     !mpeg2_new_pp_diag_pred_before_ddr && mpeg2_new_pred_error;
+
+// Commit-154 generalized-P error carrier.  The paired high nibbles and matching
+// low-nibble cause make accidental interpretation of ordinary pixel data unlikely.
+wire mpeg2_new_pp_diag_pred_carrier_valid =
+    mpeg2_new_pred_error &&
+    (mpeg2_new_pred_sample_value[7:4] == 4'hE) &&
+    (mpeg2_new_pred_reconstructed_value[7:4] == 4'hD) &&
+    (mpeg2_new_pred_sample_value[3:0] == mpeg2_new_pred_reconstructed_value[3:0]) &&
+    (mpeg2_new_pred_sample_value[3:0] >= 4'd1) &&
+    (mpeg2_new_pred_sample_value[3:0] <= 4'd7);
+wire [3:0] mpeg2_new_pp_diag_pred_carrier_cause =
+    mpeg2_new_pred_sample_value[3:0];
 
 wire [5:0] mpeg2_new_pp_diag_overlap_pred_code =
     (mpeg2_new_ddr_store_diag_cause == 3'd1) ?
@@ -258,6 +281,9 @@ always @(posedge clk_mpeg2) begin
         mpeg2_new_pp_diag_p2_persisted      <= 1'b0;
         mpeg2_new_pp_diag_pred_persisted_d  <= 1'b0;
         mpeg2_new_pp_diag_pred_before_ddr   <= 1'b0;
+        mpeg2_new_pp_diag_pred_cause        <= 4'd0;
+        mpeg2_new_pp_diag_pred_cause_wait   <= 3'd0;
+        mpeg2_new_pp_diag_pred_cause_d      <= 4'd0;
         mpeg2_new_pp_diag_ddr_fault_latched <= 1'b0;
         mpeg2_new_pp_diag_ddr_fault_code    <= 6'd0;
         mpeg2_new_pp_diag_stage             <= 5'd0;
@@ -363,6 +389,26 @@ always @(posedge clk_mpeg2) begin
             mpeg2_new_pred_error)
             mpeg2_new_pp_diag_pred_before_ddr <= 1'b1;
 
+        // Wait a few clocks for the existing generalized-P E?/D? carrier to
+        // become visible after probe_error first rises.  If it never appears,
+        // retain a small generic class rather than inventing a specific cause.
+        if (mpeg2_new_pp_diag_active &&
+            mpeg2_new_pred_error &&
+            (mpeg2_new_pp_diag_pred_cause == 4'd0)) begin
+            if (mpeg2_new_pp_diag_pred_carrier_valid) begin
+                mpeg2_new_pp_diag_pred_cause <=
+                    mpeg2_new_pp_diag_pred_carrier_cause;
+                mpeg2_new_pp_diag_pred_cause_wait <= 3'd0;
+            end
+            else if (mpeg2_new_pp_diag_pred_cause_wait < 3'd3) begin
+                mpeg2_new_pp_diag_pred_cause_wait <=
+                    mpeg2_new_pp_diag_pred_cause_wait + 1'b1;
+            end
+            else begin
+                mpeg2_new_pp_diag_pred_cause <= 4'd8;
+            end
+        end
+
         if (mpeg2_new_pp_diag_active &&
             !mpeg2_new_pp_diag_ddr_fault_latched &&
             mpeg2_new_pp_diag_ddr_error_present) begin
@@ -379,9 +425,11 @@ always @(posedge clk_mpeg2) begin
             mpeg2_new_pp_diag_stage <= 5'd10;
 
         if (mpeg2_new_pp_diag_active) begin
-            if (mpeg2_new_pp_diag_code != mpeg2_new_pp_diag_code_d) begin
-                mpeg2_new_pp_diag_code_d  <= mpeg2_new_pp_diag_code;
-                mpeg2_new_pp_diag_counter <= 31'd0;
+            if ((mpeg2_new_pp_diag_code != mpeg2_new_pp_diag_code_d) ||
+                (mpeg2_new_pp_diag_pred_cause != mpeg2_new_pp_diag_pred_cause_d)) begin
+                mpeg2_new_pp_diag_code_d       <= mpeg2_new_pp_diag_code;
+                mpeg2_new_pp_diag_pred_cause_d <= mpeg2_new_pp_diag_pred_cause;
+                mpeg2_new_pp_diag_counter      <= 31'd0;
             end
             else begin
                 mpeg2_new_pp_diag_counter <=
@@ -392,9 +440,10 @@ always @(posedge clk_mpeg2) begin
 end
 
 // The historical single-count display is preserved for progress and all other
-// terminal codes.  Commit 158 makes only refined overlap codes 31..38 easier to
-// read: group 1 is 1..4 flashes, a clear pause follows, then group 2 is 1..2
-// flashes, followed by the long repeat gap.  The ON/OFF slot still uses bit 24.
+// terminal codes.  Commit 158 makes refined overlap codes 31..38 easier to read
+// as writer-state then prediction-order groups.  Commit 159 gives prediction-
+// before cases with a classified first cause a three-group A-B-C presentation.
+// The ON/OFF slot remains based on bit 24.
 wire [6:0] mpeg2_new_pp_diag_phase = mpeg2_new_pp_diag_counter[30:24];
 wire [6:0] mpeg2_new_pp_diag_limit = {mpeg2_new_pp_diag_code_d, 1'b0};
 wire mpeg2_new_pp_diag_single_led =
@@ -427,8 +476,65 @@ wire mpeg2_new_pp_diag_split_led =
      (mpeg2_new_pp_diag_split_phase < mpeg2_new_pp_diag_split_second_end) &&
      !mpeg2_new_pp_diag_split_second_phase[0]);
 
-wire mpeg2_new_pp_diag_led = mpeg2_new_pp_diag_split_display ?
-    mpeg2_new_pp_diag_split_led : mpeg2_new_pp_diag_single_led;
+// Commit 159 A-B-C mapping.  Cause 1..4 => A=1, cause 5..8 => A=2;
+// B is the 1..4 position inside that group.  C repeats the later writer state.
+// This mode is used only for odd internal codes 31/33/35/37, so A-B-C itself
+// also proves prediction was already present before the DDR overlap.
+wire mpeg2_new_pp_diag_pred_detail_display =
+    (mpeg2_new_pp_diag_pred_cause_d != 4'd0) &&
+    ((mpeg2_new_pp_diag_code_d == 6'd31) ||
+     (mpeg2_new_pp_diag_code_d == 6'd33) ||
+     (mpeg2_new_pp_diag_code_d == 6'd35) ||
+     (mpeg2_new_pp_diag_code_d == 6'd37));
+wire [2:0] mpeg2_new_pp_diag_pred_detail_group =
+    (mpeg2_new_pp_diag_pred_cause_d <= 4'd4) ? 3'd1 : 3'd2;
+wire [2:0] mpeg2_new_pp_diag_pred_detail_item =
+    (mpeg2_new_pp_diag_pred_cause_d == 4'd1 || mpeg2_new_pp_diag_pred_cause_d == 4'd5) ? 3'd1 :
+    (mpeg2_new_pp_diag_pred_cause_d == 4'd2 || mpeg2_new_pp_diag_pred_cause_d == 4'd6) ? 3'd2 :
+    (mpeg2_new_pp_diag_pred_cause_d == 4'd3 || mpeg2_new_pp_diag_pred_cause_d == 4'd7) ? 3'd3 : 3'd4;
+wire [2:0] mpeg2_new_pp_diag_pred_detail_writer =
+    (mpeg2_new_pp_diag_code_d == 6'd31) ? 3'd1 :
+    (mpeg2_new_pp_diag_code_d == 6'd33) ? 3'd2 :
+    (mpeg2_new_pp_diag_code_d == 6'd35) ? 3'd3 : 3'd4;
+wire [4:0] mpeg2_new_pp_diag_pred_detail_phase =
+    mpeg2_new_pp_diag_counter[28:24];
+wire [4:0] mpeg2_new_pp_diag_pred_detail_first_end =
+    {1'b0, mpeg2_new_pp_diag_pred_detail_group, 1'b0};
+wire [4:0] mpeg2_new_pp_diag_pred_detail_second_start =
+    mpeg2_new_pp_diag_pred_detail_first_end + 5'd3;
+wire [4:0] mpeg2_new_pp_diag_pred_detail_second_end =
+    mpeg2_new_pp_diag_pred_detail_second_start +
+    {1'b0, mpeg2_new_pp_diag_pred_detail_item, 1'b0};
+wire [4:0] mpeg2_new_pp_diag_pred_detail_third_start =
+    mpeg2_new_pp_diag_pred_detail_second_end + 5'd3;
+wire [4:0] mpeg2_new_pp_diag_pred_detail_third_end =
+    mpeg2_new_pp_diag_pred_detail_third_start +
+    {1'b0, mpeg2_new_pp_diag_pred_detail_writer, 1'b0};
+wire [4:0] mpeg2_new_pp_diag_pred_detail_second_phase =
+    mpeg2_new_pp_diag_pred_detail_phase -
+    mpeg2_new_pp_diag_pred_detail_second_start;
+wire [4:0] mpeg2_new_pp_diag_pred_detail_third_phase =
+    mpeg2_new_pp_diag_pred_detail_phase -
+    mpeg2_new_pp_diag_pred_detail_third_start;
+wire mpeg2_new_pp_diag_pred_detail_led =
+    ((mpeg2_new_pp_diag_pred_detail_phase <
+      mpeg2_new_pp_diag_pred_detail_first_end) &&
+     !mpeg2_new_pp_diag_pred_detail_phase[0]) ||
+    ((mpeg2_new_pp_diag_pred_detail_phase >=
+      mpeg2_new_pp_diag_pred_detail_second_start) &&
+     (mpeg2_new_pp_diag_pred_detail_phase <
+      mpeg2_new_pp_diag_pred_detail_second_end) &&
+     !mpeg2_new_pp_diag_pred_detail_second_phase[0]) ||
+    ((mpeg2_new_pp_diag_pred_detail_phase >=
+      mpeg2_new_pp_diag_pred_detail_third_start) &&
+     (mpeg2_new_pp_diag_pred_detail_phase <
+      mpeg2_new_pp_diag_pred_detail_third_end) &&
+     !mpeg2_new_pp_diag_pred_detail_third_phase[0]);
+
+wire mpeg2_new_pp_diag_led = mpeg2_new_pp_diag_pred_detail_display ?
+    mpeg2_new_pp_diag_pred_detail_led :
+    mpeg2_new_pp_diag_split_display ?
+        mpeg2_new_pp_diag_split_led : mpeg2_new_pp_diag_single_led;
 
 assign LED_USER = mpeg2_new_pp_diag_active ?
     mpeg2_new_pp_diag_led : mpeg2_new_normal_user_led;
