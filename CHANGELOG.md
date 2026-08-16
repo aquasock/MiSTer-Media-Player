@@ -8,25 +8,26 @@ This project is still in active pre-release development. Published milestone rel
 
 No unreleased milestone changes yet.
 
-## [0.4.0] - 2026-08-14 — Phase 1U
+## [0.4.0] - 2026-08-16 — Progressive 4:2:0 I/P/B milestone
 
-Generalized progressive 4:2:0 P-picture decoding within the current implementation envelope.
+Hardware-qualified progressive 4:2:0 I/P/B decoding and presentation within the current bounded implementation envelope.
 
-- Preserved the hardware-proven continuous progressive 4:2:0 all-I decode, DDR ping-pong/reference storage, blanking-aligned publication, and synthetic 90 kHz elementary-stream timing baseline from v0.3.0.
-- Promoted reconstructed P pictures into the normal publication/reference ownership path and proved consecutive P-to-P reference consumption.
-- Replaced picture-wide and fixed-position P prediction controls with syntax-derived per-macroblock execution plans across the full 128x96 / 8x6-macroblock generalized regression geometry.
-- Added signed horizontal and vertical forward motion-vector reconstruction, predictor reuse/reset, H.262 wrap behavior, and the supported f_code=(3,3) residual-bit path.
-- Added integer, horizontal half-sample, vertical half-sample, and bilinear prediction with 4:2:0 chroma-vector scaling.
-- Generalized 4:2:0 coded-block-pattern handling across all six macroblock blocks and added sparse syntax-derived residual block placement.
-- Generalized non-intra residual coefficients beyond the earlier fixed run=0/level=+7 proof, including ordinary run/level VLCs, non-zero runs, signs, EOB, Escape syntax, modified-first handling, q_scale_type, alternate_scan, and slice/macroblock quantiser-scale changes.
-- Unified generalized motion-only and motion-plus-residual P pictures behind one serialized prediction/residual raster path while preserving the established legacy regressions.
-- Registered the generalized DDR request/response boundary after the first generalized candidate exposed a severe f2sdram setup path; the corrected path restored zero setup TNS and eliminated the observed MiSTer crash.
-- Removed an obsolete legacy transform diagnostic assertion from generalized mode while retaining the original controlled proof unchanged.
-- Hardware acceptance of the feature-complete baseline `8cbcf25f46b993fccdb6d77d2d4f2504546d0aa1` covered generalized transform controls, combined generalized P decoding, consecutive P references, generalized residual placement, and the continuous all-I regression, all with USER completion on.
-- Feature-complete baseline fit: 26,884 / 41,910 ALMs (64%), 37,328 registers, 452,129 block-memory bits in 70 RAM blocks, 75 / 112 DSP blocks, and 3 / 6 PLLs.
-- Feature-complete baseline timing: global setup +0.649 ns, decoder setup +2.864 ns with 0/100 violations, video setup +8.316 ns with 0/80 violations, and setup TNS 0.
-- Current generalized-P implementation limits include 128x96 / 8x6-macroblock regression geometry, forward f_code=(3,3), at most 16 coded residual blocks and 64 non-zero coefficient events per picture. These are implementation limits, not H.262 limits.
-- B pictures, broader/interlaced H.262 picture structures, non-4:2:0 chroma, H.222.0 Program Stream/PES demux and real PTS, audio, and DVD/VOB navigation remain future work.
+- Preserved the hardware-proven continuous progressive 4:2:0 all-I decode, DDR-backed presentation, blanking-aligned publication, and synthetic 90 kHz elementary-stream timing baseline from v0.3.0.
+- Generalized P-picture reconstruction around syntax-derived per-macroblock motion and residual execution, including signed horizontal/vertical forward vectors, predictor reuse/reset, H.262 wrap behavior, integer and half-sample interpolation, 4:2:0 chroma-vector scaling, coded-block-pattern handling, sparse residual placement, run/level and Escape coefficient syntax, q_scale_type, alternate_scan, and quantiser-scale changes within the proven regression envelope.
+- Preserved consecutive reconstructed-P reference promotion and corrected the publication-versus-presentation destination-ownership race by pacing a following P until its destination retained bank is no longer display-owned.
+- Added the first hardware-proven B-picture core path with forward, backward, and bidirectional prediction, internal macroblock-address skips, bounded residual reconstruction, and 128x96 mixed I/P/B deterministic regressions.
+- Added a dedicated B scratch DDR region and corrected frame-region identity to use the full two-bit region selector so retained bank 0, retained bank 1, and B scratch remain distinct under display-write protection.
+- Added blanking-aligned B presentation/reorder handling that preserves the future P reference while the intervening B picture reconstructs and presents from scratch, then presents the retained future reference in display order.
+- Split the large top-level integration into `MediaPlayer_top_00.svh` through `MediaPlayer_top_07.svh` without changing the MiSTer-facing top entity.
+- Consolidated the active IDCT arithmetic around a shared multiplier bank, reducing DSP use from the earlier 92-DSP development point to 68 DSP blocks while preserving the accepted regression behavior.
+- Added comments-only Audio-fork integration anchors without establishing a permanent ABI or altering synthesized behavior.
+- Localized and corrected an intermittent consecutive-P failure to a display/reference destination-ownership race; the temporary first-fault, timeout-phase, writer, cache, and arbiter diagnostic layer was completely retired after the functional fix was accepted.
+- Restored normal USER completion behavior after the diagnostic investigation.
+- Hardware-qualified RTL baseline: `1370c28e3d34b1fd603c17130986bc336da29a32`.
+- Release qualification used a fresh clone of GitHub `master`, Quartus Prime 17.0.2 Lite, the standard Phase 1P timing reports, and the full required MiSTer matrix: 20 consecutive passes of `test_p_consecutive_reference.m2v`, plus passes of `test_b_mixed_gop.m2v`, `test_b_core_decode.m2v`, `test_p_general_decode.m2v`, and `test_all_i.m2v`.
+- Qualified fit: 31,782 / 41,910 ALMs (76%), 43,812 registers, 461,345 block-memory bits in 73 RAM blocks, 68 / 112 DSP blocks, and 3 / 6 PLLs.
+- Qualified timing: global setup +0.167 ns, hold +0.248 ns, recovery +4.117 ns, removal +0.704 ns, decoder setup +1.311 ns with 0/100 violations, video setup +6.987 ns with 0/80 violations, and setup endpoint TNS 0.
+- Current implementation limits remain deliberate engineering bounds: established I-picture coverage reaches 720x480, while the generalized P/B hardware regressions use 128x96 / 8x6 macroblocks. General arbitrary H.262 P/B playback, interlaced/broader picture structures, non-4:2:0 chroma, H.222.0 Program Stream/PES demux and real PTS, audio, and DVD/VOB navigation remain future work.
 
 ## [0.3.0] - 2026-08-14 — Phase 1T
 
@@ -81,7 +82,7 @@ First hardware-proven milestone release.
 
 - Proved two consecutive supported I-picture decodes in hardware.
 - Reused a single proven H.262 parser by locally re-arming it between pictures.
-- Kept picture 1 stored/displayed while picture 2 traversed parser, inverse quantization, IDCT, and reconstruction.
+- Kept picture 1 stored/displayed while picture 2 traverses parser, inverse quantization, IDCT, and reconstruction.
 - Removed an earlier duplicated-parser diagnostic that introduced slight color-image flicker.
 - Hardware acceptance: both diagnostic streams pass, image is stable, USER completion behavior is correct.
 
