@@ -731,7 +731,7 @@ v0.4.0 release closure is complete. Preserve tag `v0.4.0`, final documentation c
 - [x] Passed — v0.4.0 tag and GitHub pre-release publication verified; expected binary asset present
 
 ---
-## 166 COMMIT Unreleased pending 2026-08-16T02:52:00-07:00
+## 166 COMMIT Unreleased 74535ad 2026-08-16T04:19:33-07:00
 
 #### Coming From:
 
@@ -743,21 +743,33 @@ Widen the generalized progressive 4:2:0 P-picture hardware path from the fixed 1
 
 #### Outcome:
 
-Approved implementation boundary recorded before source modification. The planned architecture removes the 48-entry packed whole-picture motion-plan transport: the syntax parser will emit one ordered motion event for every P macroblock as it is parsed, including zero-vector events for skipped macroblocks, and the active P raster engine will retain that stream in one M10K-oriented motion RAM sized for at most 45x30 = 1350 macroblocks. This avoids replicating a 1350-entry packed vector plan across parser, residual pipeline, and raster engine.
+Exact GitHub master source commit `74535adb3574ef71a00e39e806816929ec3facdd` (`Widen generalized P geometry`) is one functional commit ahead of the Commit-166 proposal metadata commit `6018b0095ee7b596dd3ff300ee048e6ff7bc8d23`. Pre-publication comparison reports exactly seven intended paths and no top-level, B-engine, SDC, `.ai`, DDR-protection, publication, or presentation-scheduler changes.
 
-The generalized parser and raster executor will derive supported geometry from live sequence dimensions for progressive 4:2:0 frame pictures up to 720x480, preserving the fixed 720/360 DDR row strides already used by the established I-frame store. A new deterministic 720x480 P regression will exercise non-zero signed/half-sample motion, internal skips, and sparse residual activity. The existing sparse residual implementation caps of 16 coded blocks and 64 non-zero coefficient events remain in this commit and remain explicitly implementation limits, not H.262 limits.
+Commit 166 preserves the hardware-qualified 128x96 generalized-P parser as a compatibility path and adds `mpeg2_h262_p_wide_motion_syntax_probe.sv` for progressive 4:2:0 P frame pictures above that legacy envelope through 720x480. The wide parser derives macroblock geometry from the sequence dimensions, buffers one slice row at a time, follows H.262 macroblock-address progression, emits one ordered motion event for every macroblock, and explicitly emits zero-vector events for skipped P macroblocks. This replaces the proposed 1350-entry packed whole-picture interface with a streamed syntax-to-execution handoff.
 
-No B-picture geometry, H.222.0/PES, audio, interlaced picture structure, non-4:2:0 chroma, QIP, SDC, DDR display-write protection, or release metadata is in scope.
+The shared P residual pipeline is extended rather than duplicated. Wide sparse residual descriptors carry an 11-bit macroblock index through a two-word sideband while the established non-intra IQ/IDCT datapath and 16-block spatial residual buffer are reused. The existing implementation limits of at most 16 coded residual blocks and 64 non-zero coefficient events per picture remain unchanged and are not H.262 limits.
+
+The generalized P raster engine now derives execution geometry through 45x30 macroblocks and retains ordered motion words in an M10K-oriented 1350x16 motion store with no reset loop. Reference and destination addressing preserve the established fixed 720-luma/360-chroma DDR row layout. The reference wrapper broadens only generalized-P sideband detection to the supported frame envelope; B detection and the historical aligned-plan adapter remain restricted to their proven 128x96 paths. `files.qip` changes only to register the new SystemVerilog source.
+
+A deterministic generator `tools/streams/generate_test_p_720x480_general_decode.py` was added. Agent-side FFmpeg/FFprobe validation succeeds on the generated 720x480 I/P/I elementary stream: 45x30 = 1350 macroblocks, forward f_code=(3,3), two internal skipped P macroblocks, safe interior signed half-sample motion, and one sparse Y residual block. The generated `.m2v` remains local-only and is not committed. This software-side generator check is not FPGA build or MiSTer hardware acceptance.
+
+No B-picture geometry, H.222.0/PES, audio, interlaced picture structure, non-4:2:0 chroma, DDR display-write protection, reference-publication semantics, consecutive-P destination pacing, SDC constraints, or release metadata is changed by this boundary. MiSTer-Media-Player-Audio compatibility remains unavailable because `core.md` has no configured Audio repository.
 
 #### Next Steps:
 
-Implement the approved generalized-P geometry/streaming-motion boundary on `master` as one development commit. Then update this entry with the exact source commit and request a clean Quartus build plus the new 720x480 P regression, repeated consecutive-P regression, existing generalized-P regression, both B guards, and all-I guard.
+Pull current `master`. Run `python3 tools/streams/generate_test_p_720x480_general_decode.py`, then perform a clean/from-scratch Quartus Prime 17.0.2 build. Place the build logs in `.ai/current_results` as `74535ad_build_logs.tar.gz`. On hardware run `test_p_720x480_general_decode.m2v`, repeated `test_p_consecutive_reference.m2v`, `test_p_general_decode.m2v`, `test_b_mixed_gop.m2v`, `test_b_core_decode.m2v`, and `test_all_i.m2v`. Report USER behavior and any load/stall/crash or visible reconstruction anomaly before further source work.
 
 #### Files Modified:
 
-- Planned: generalized P syntax/controller/residual/raster integration and one deterministic 720x480 stream generator
+- files.qip
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- tools/streams/generate_test_p_720x480_general_decode.py
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [ ] Built — exact Commit 166 source not yet Quartus-validated
+- [ ] Passed — exact Commit 166 source not yet hardware-validated
