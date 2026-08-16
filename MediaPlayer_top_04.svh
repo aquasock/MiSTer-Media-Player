@@ -11,6 +11,7 @@
 	.block_stored    (mpeg2_new_ddr_block_stored),
 	.write_seen      (mpeg2_new_ddr_write_seen),
 	.store_error     (mpeg2_new_ddr_store_error),
+	.diag_error_cause(mpeg2_new_ddr_store_diag_cause),
 	.ddram_busy      (mpeg2_new_ddr_writer_busy),
 	.ddram_burstcnt  (mpeg2_new_ddr_wr_burstcnt),
 	.ddram_addr      (mpeg2_new_ddr_wr_addr),

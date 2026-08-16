@@ -43,6 +43,10 @@ module mpeg2_luma_framebuffer
     output reg         cache_ready,
     output reg         read_seen,
     output reg         cache_error,
+    // kate - Commit 155 observer-only first-error classification.  This output
+    // never feeds cache control: 1=line event before ready, 2=reader backlog,
+    // 3=invalid picture geometry, 4=invalid prefill state.
+    output reg  [2:0]  diag_error_cause,
 
     // Independent fixed video side - 40 MHz.
     input  wire        rd_clk,
@@ -179,6 +183,27 @@ wire [10:0] c_refill_line =
         (c_refill_raw - {1'b0, chroma_height_mem}) :
         c_refill_raw[10:0];
 
+wire cache_geometry_error_now =
+    !picture_started && picture_complete &&
+    ((horizontal_size == 14'd0) ||
+     (vertical_size   == 14'd0) ||
+     (horizontal_size > SRC_WIDTH) ||
+     (vertical_size   > SRC_HEIGHT) ||
+     (vertical_size[1:0] != 2'b00));
+wire cache_line_event_now =
+    (line_done_toggle_m2 != line_done_toggle_seen);
+wire cache_prefill_error_now =
+    (mem_state == MEM_IDLE) && picture_started && !prefill_done &&
+    (prefill_step > 3'd5);
+// kate - Commit 155 mirrors only the predicates that already assert
+// cache_error.  Priority is diagnostic-only and cannot alter fetch scheduling.
+wire [2:0] diag_error_cause_now =
+    (cache_line_event_now && !cache_ready)              ? 3'd1 :
+    (cache_line_event_now && cache_ready && pending_event) ? 3'd2 :
+    cache_geometry_error_now                            ? 3'd3 :
+    cache_prefill_error_now                             ? 3'd4 :
+                                                           3'd0;
+
 task automatic launch_fetch;
     input [1:0]  kind;
     input [10:0] line_number;
@@ -225,6 +250,7 @@ always @(posedge mem_clk) begin
         cache_ready           <= 1'b0;
         read_seen             <= 1'b0;
         cache_error           <= 1'b0;
+        diag_error_cause      <= 3'd0;
 
         line_done_toggle_m1   <= 1'b0;
         line_done_toggle_m2   <= 1'b0;
@@ -251,6 +277,9 @@ always @(posedge mem_clk) begin
         y_cache_wr_en  <= 1'b0;
         cb_cache_wr_en <= 1'b0;
         cr_cache_wr_en <= 1'b0;
+
+        if ((diag_error_cause == 3'd0) && (diag_error_cause_now != 3'd0))
+            diag_error_cause <= diag_error_cause_now;
 
         // Synchronize the one-bit line-consumed event.  The associated source
         // line number is generated locally below, eliminating the old binary

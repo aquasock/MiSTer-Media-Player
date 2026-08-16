@@ -46,6 +46,10 @@ module mpeg2_h262_ddram_store
     // Sticky diagnostics.
     output reg         write_seen,
     output reg         store_error,
+    // kate - Commit 155 observer-only first-error classification.  This output
+    // never feeds writer control: 1=overlap at block_start, 2=orphan pixel,
+    // 3=invalid block_complete state, 4=invalid block geometry.
+    output reg  [2:0]  diag_error_cause,
 
     input  wire        ddram_busy,
     output wire [7:0]  ddram_burstcnt,
@@ -137,6 +141,16 @@ wire [28:0] first_word_address =
 wire [28:0] row_stride =
     (active_component == COMPONENT_Y) ? 29'd90 : 29'd45;
 
+// kate - Commit 155 mirrors only the predicates that already assert
+// store_error.  The priority here is diagnostic-only and cannot alter the
+// writer state machine or its DDR requests.
+wire [2:0] diag_error_cause_now =
+    (block_start && (capture_active || flush_pending || write_active)) ? 3'd1 :
+    (pixel_valid && !(capture_active || block_start))                  ? 3'd2 :
+    (block_complete && (!capture_active || flush_pending || write_active)) ? 3'd3 :
+    (!write_active && flush_pending && !geometry_valid)                ? 3'd4 :
+                                                                         3'd0;
+
 // Keep a full write request stable for as long as ddram_busy is asserted.
 assign ddram_burstcnt = write_active ? 8'd1 : 8'd0;
 assign ddram_addr     = write_active ? write_address : 29'd0;
@@ -167,9 +181,13 @@ always @(posedge clk) begin
         block_stored     <= 1'b0;
         write_seen       <= 1'b0;
         store_error      <= 1'b0;
+        diag_error_cause <= 3'd0;
     end
     else begin
         block_stored <= 1'b0;
+
+        if ((diag_error_cause == 3'd0) && (diag_error_cause_now != 3'd0))
+            diag_error_cause <= diag_error_cause_now;
 
         if (block_start) begin
             if (capture_active || flush_pending || write_active)
