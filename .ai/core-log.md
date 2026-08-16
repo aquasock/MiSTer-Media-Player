@@ -1,37 +1,3 @@
-## 147 COMMIT v0.5.0-cycle f8afbe4 2026-08-15T15:56:39-07:00
-
-#### Coming From:
-
-v0.5.0-cycle 94aaf9b
-
-#### Purpose:
-
-Correct the mixed-GOP regression generator so every B-picture prediction footprint stays inside the coded reference picture while preserving the approved repeated I/P/B test scope.
-
-#### Outcome:
-
-Exact GitHub master commit `f8afbe453a1c8caec17f14992520c0a816d7c269` modifies only `tools/streams/generate_test_b_mixed_gop.py` (+2/-2). No RTL, QIP, SDC, DDR, parser, prediction, pacing, presentation, or observer source changes.
-
-The corrected stream retains I/P/B/P/B coded order, I/B/P/B/P display order, two B pictures, forward/backward/bidirectional prediction, real internal MBA skips, and residual/no-residual cases, but removes the second-B edge-crossing motion vectors.
-
-Because RTL is unchanged from Commit 146, fitted resources remain 32,238 ALMs, 44,532 registers, 461,345 block-memory bits, 92 DSPs, and 3 PLLs with clean timing.
-
-Hardware corrected `test_b_mixed_gop.m2v` reaches stable **12-flash** diagnostic success. This proves both B parses/skips, both B prediction/reconstruction and scratch persistence transactions, the intervening second P/reference publication, both scratch presentations, both retained future-P presentations, and final normal acceptance. The four standing regressions also pass with normal solid USER: `test_b_core_decode.m2v`, `test_p_general_decode.m2v`, `test_p_consecutive_reference.m2v`, and `test_all_i.m2v`.
-
-#### Next Steps:
-
-Retire the temporary Commit-146 mixed-GOP USER trace and restore normal USER behavior, then rerun all five accepted streams.
-
-#### Files Modified:
-
-- tools/streams/generate_test_b_mixed_gop.py
-
-#### Status:
-
-- [x] Built
-- [x] Passed — mixed GOP reaches stage 12; all four standing regressions pass
-
----
 ## 148 COMMIT v0.5.0-cycle 4e9058a 2026-08-15T16:09:00-07:00
 
 #### Coming From:
@@ -785,3 +751,44 @@ Preserve Commit 166 as the accepted 720x480 generalized-P functional baseline. T
 
 - [x] Built — clean Quartus 17.0.2 flow/fitter/STA accepted; timing closes at 88% ALM utilization
 - [x] Passed — new 720x480 P regression and all five standing P/B/I guards pass
+
+---
+## 167 COMMIT Unreleased b11590c 2026-08-16T05:31:18-07:00
+
+#### Coming From:
+
+Unreleased 74535ad
+
+#### Purpose:
+
+Recover FPGA resource headroom after the accepted 720x480 generalized-P expansion by consolidating the duplicate generalized-P syntax implementations onto the Commit-166 streamed parser, while preserving the exact accepted P/B/I behavior and making no B-picture geometry expansion in this boundary.
+
+#### Outcome:
+
+Exact GitHub master functional commit `b11590cf77febb7364a13e628a64e107fc2a8620` (`Consolidate generalized P parser`) is one commit ahead of the accepted Commit-166 archival tip `ad0343989b8525998060e4f8ccc8d5426a545c57`. Pre-publication comparison reports exactly six parser-source paths and no controller, residual-pipeline, raster-engine, B-engine, DDR, top-level, QIP, or SDC changes.
+
+Commit 166 synthesized two complete generalized-P syntax parsers: the historical 128x96 packed-plan parser and the new streamed <=720x480 parser. Commit 167 makes the streamed parser own the exact 128x96 regression geometry as well as the already-accepted wider envelope. Its geometry gate is changed only to admit exact 128x96 in addition to the Commit-166 wider condition; the H.262 macroblock/VLC/motion/residual parsing datapath is otherwise retained.
+
+The historical `mpeg2_h262_p_aligned_motion_syntax_probe` module interface is preserved as a constant-zero compatibility shell in `mpeg2_h262_p_motion_plan_syntax_probe.sv`. This keeps the existing controller wiring source-stable while making the legacy packed-plan candidate permanently inactive so Quartus can prune the duplicate parser and legacy-only downstream logic. The historical part files remain in the repository but are no longer included by the active wrapper.
+
+The streamed parser source is split across four `.svh` include parts, with the active `.sv` wrapper using the same project-root-relative include convention already established by the legacy parser. This split is source organization only. Post-publication boundary checks confirm the four include joins are continuous and the final part closes the same module normally.
+
+No accepted DDR ownership/protection, reference publication, P destination pacing, IDCT, generalized-P raster execution, residual transform, B reconstruction/presentation, generator, H.222/PES, audio, interlaced, non-4:2:0, or release behavior is intentionally changed. Build/resource and MiSTer hardware validation remain pending.
+
+#### Next Steps:
+
+Perform a clean Quartus 17.0.2 build and compare directly against Commit 166's 36,957 ALMs / 45,721 registers / 487,041 block-memory bits / 78 RAM blocks / 70 DSPs. Verify the retired legacy parser is absent from fitted resource hierarchy and measure recovered ALM/DSP headroom. Then rerun the complete six-stream hardware matrix: `test_p_720x480_general_decode.m2v`, repeated `test_p_consecutive_reference.m2v`, `test_p_general_decode.m2v`, `test_b_mixed_gop.m2v`, `test_b_core_decode.m2v`, and `test_all_i.m2v`.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
