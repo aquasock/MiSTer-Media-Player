@@ -11,6 +11,9 @@
 // kate - Commit 171: accept the full Table-B.1 macroblock_address_increment
 // VLC set plus macroblock_escape accumulation needed inside a 45-MB row.
 // Leading/trailing skipped-B semantics remain outside this boundary.
+// kate - Commit 172: register each decoded B macroblock-address symbol before
+// row-bound/skip arithmetic so the Commit-171 syntax does not sit on one long
+// 54 MHz combinational path. Address semantics and consumed bits are unchanged.
 //
 // Standards authority: .ai/core-standards.md H262-006, H262-010, H262-014,
 // H262-021, H262-024 plus the established motion/address records used by
@@ -100,7 +103,7 @@ localparam [5:0]
     S_CBP=13,S_BLOCK=14,S_FIRST_COEFF=15,S_COEFF_VLC=16,
     S_COEFF_SIGN=17,S_ESCAPE_RUN=18,S_ESCAPE_LEVEL=19,
     S_MB_DONE=20,S_STUFF=21,S_SUCCESS=22,S_ERROR=23,
-    S_SKIP_A=24,S_SKIP_B=25,S_GEOMETRY=26,S_MB_B=27;
+    S_SKIP_A=24,S_SKIP_B=25,S_GEOMETRY=26,S_MB_B=27,S_MBA_APPLY=28;
 reg [5:0] state;
 
 reg [2:0] field_bit_count; reg [4:0] qscale_shift,current_qscale; reg [3:0] extra_info_count;
@@ -109,6 +112,7 @@ reg [5:0] current_col; reg row_has_coded_mb; reg [5:0] skip_remaining; reg geome
 // 171 drives S_MBA from the wider Table-B.1 state and Quartus prunes the old path.
 reg [6:0] mba_bits; reg [2:0] mba_len;
 reg [10:0] mba_wide_bits; reg [3:0] mba_wide_len; reg [6:0] mba_escape_accum;
+reg mba_symbol_escape_q; reg [5:0] mba_symbol_value_q;
 wire [10:0] mba_wide_bits_next={mba_wide_bits[9:0],parser_current_bit};
 wire [3:0] mba_wide_len_next=mba_wide_len+1'b1;
 
@@ -180,10 +184,10 @@ function automatic [7:0] match_mba_symbol;
 endfunction
 
 wire [7:0] mba_symbol=match_mba_symbol(mba_wide_bits_next,mba_wide_len_next);
-wire [7:0] mba_increment_total={1'b0,mba_escape_accum}+{2'b00,mba_symbol[5:0]};
-wire [7:0] mba_target_col_wide={2'b00,current_col}+mba_increment_total-8'd1;
-wire [7:0] mba_escape_accum_next={1'b0,mba_escape_accum}+8'd33;
-wire [7:0] mba_escape_min_target={2'b00,current_col}+mba_escape_accum_next;
+wire [7:0] mba_increment_total_q={1'b0,mba_escape_accum}+{2'b00,mba_symbol_value_q};
+wire [7:0] mba_target_col_q={2'b00,current_col}+mba_increment_total_q-8'd1;
+wire [7:0] mba_escape_accum_next_q={1'b0,mba_escape_accum}+8'd33;
+wire [7:0] mba_escape_min_target_q={2'b00,current_col}+mba_escape_accum_next_q;
 
 reg [3:0] mbtype_bits; reg [2:0] mbtype_len; reg [1:0] current_direction,last_direction; reg current_pattern;
 reg signed [7:0] fpx,fpy,bpx,bpy,cur_fx,cur_fy,cur_bx,cur_by;
