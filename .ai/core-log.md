@@ -1,35 +1,3 @@
-## 148 COMMIT v0.5.0-cycle 4e9058a 2026-08-15T16:09:00-07:00
-
-#### Coming From:
-
-v0.5.0-cycle f8afbe4
-
-#### Purpose:
-
-Retire the temporary mixed-GOP USER diagnostic after corrected repeated I/P/B playback was hardware accepted, restoring normal USER indication without changing decode behavior.
-
-#### Outcome:
-
-Exact GitHub master commit `4e9058a59e9d99b2d36dab8bc65a11faa7159dc2` modifies only `MediaPlayer_top_07.svh`, removing the Commit-146 observer and restoring normal `LED_USER` acceptance. Repeated mixed-GOP/re-arm behavior, Commit-142 DDR protection, Commit-139 presentation ordering, and the corrected generator remain unchanged.
-
-Clean build validation: 32,155 / 41,910 ALMs (77%), 44,388 registers, 461,345 block-memory bits in 73 RAM blocks, 92 / 112 DSPs, 3 / 6 PLLs; zero setup TNS, global setup +0.324 ns, decoder +1.543 ns, video +8.313 ns.
-
-All five required regressions pass: `test_b_mixed_gop.m2v`, `test_b_core_decode.m2v`, `test_p_general_decode.m2v`, `test_p_consecutive_reference.m2v`, and `test_all_i.m2v`. Commit 148 is the accepted cleaned repeated-mixed-I/P/B baseline.
-
-#### Next Steps:
-
-Recover FPGA resources conservatively while preserving all accepted behavior.
-
-#### Files Modified:
-
-- MediaPlayer_top_07.svh
-
-#### Status:
-
-- [x] Built
-- [x] Passed — all five normal-USER regressions pass
-
----
 ## 149 COMMIT v0.5.0-cycle 0cbafd8 2026-08-15T16:46:05-07:00
 
 #### Coming From:
@@ -644,15 +612,15 @@ Recover FPGA headroom by consolidating the duplicate generalized-P syntax implem
 
 #### Outcome:
 
-Exact GitHub master functional commit `b11590cf77febb7364a13e628a64e107fc2a8620` modifies six parser-source paths. The streamed parser now accepts exact 128x96 geometry as well as the wider <=720x480 envelope, so one parser handles both accepted generalized-P cases.
+Exact functional commit `b11590cf77febb7364a13e628a64e107fc2a8620` consolidates exact 128x96 and wider <=720x480 P syntax onto the streamed parser and leaves the historical packed-plan parser as a constant-zero compatibility shell.
 
-The historical `mpeg2_h262_p_aligned_motion_syntax_probe` interface remains as a constant-zero compatibility shell, allowing Quartus to prune the duplicate packed-plan parser and legacy-only logic without changing controller wiring. The wide parser is split across four `.svh` include parts for source organization only; the split boundaries were verified continuous.
+Quartus 17.0.2 build validation is clean: 30,771 / 41,910 ALMs (73%), 41,381 registers, 486,017 block-memory bits in 77 RAM blocks, 69 DSPs, 3 PLLs; zero setup TNS and global setup +0.579 ns. Relative to Commit 166 this recovers 6,186 ALMs, 4,340 registers, one RAM block, and one DSP.
 
-No controller, residual/raster engine, B engine, DDR, top-level, QIP, SDC, IDCT, publication, pacing, or presentation behavior is intentionally changed. Build/resource and MiSTer hardware validation are pending.
+Hardware passes `test_p_720x480_general_decode.m2v`, `test_p_general_decode.m2v`, `test_b_mixed_gop.m2v`, `test_b_core_decode.m2v`, and `test_all_i.m2v`. `test_p_consecutive_reference.m2v` fails with normal USER indication absent but without the historical crash. Because Commit 166 and the v0.4.0 baseline passed repeated consecutive-P, Commit 167 is not accepted as functionally complete. Build evidence was archived under transitional build hash `b1a0b0f`.
 
 #### Next Steps:
 
-Perform a clean Quartus 17.0.2 build, compare resources against Commit 166, verify the retired parser is absent from fitted hierarchy, then rerun the same six-stream hardware matrix.
+Restore exact 128x96 consecutive-P compatibility without giving back the parser-consolidation resource recovery.
 
 #### Files Modified:
 
@@ -662,6 +630,36 @@ Perform a clean Quartus 17.0.2 build, compare resources against Commit 166, veri
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+
+#### Status:
+
+- [x] Built — resource-recovery objective met
+- [ ] Passed — consecutive-P regression; no crash
+
+---
+## 168 PROPOSAL Unreleased pending 2026-08-16T07:05:20-07:00
+
+#### Coming From:
+
+Unreleased b1a0b0f
+
+#### Purpose:
+
+Restore exact 128x96 consecutive-reference P acceptance while preserving the single streamed generalized-P parser and Commit-167 resource headroom.
+
+#### Outcome:
+
+Scope the next functional boundary only to the exact-128x96 streamed-parser/controller compatibility path. Five of six regressions already pass, including 720x480 generalized P and both B guards, so DDR ownership, presentation pacing, B ordering, IDCT, residual/raster geometry, QIP, and SDC remain out of scope.
+
+Validation will require a clean Quartus build near the Commit-167 resource shape, repeated `test_p_consecutive_reference.m2v`, and the same five passing guard streams.
+
+#### Next Steps:
+
+Await user approval before implementation.
+
+#### Files Modified:
+
+- TBD — exact 128x96 generalized-P parser/controller compatibility path only
 
 #### Status:
 
