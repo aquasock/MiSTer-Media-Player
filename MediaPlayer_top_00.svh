@@ -102,6 +102,7 @@ wire        mpeg2_stream_wr;
 wire        mpeg2_new_stream_ready;
 wire        mpeg2_new_decoder_stream_ready;
 wire        mpeg2_new_b_presentation_hold;
+wire        mpeg2_new_p_destination_ownership_hold;
 
 hps_io #(.CONF_STR(CONF_STR)) hps_io
 (
@@ -199,9 +200,13 @@ assign mpeg2_stream_wr =
 // level additionally pauses between a persisted B and completion of its proven
 // scratch->future-reference presentation transaction. This prevents a later
 // P/B pair from overtaking the two-vblank display-order operation.
+// kate - Commit 162 adds a second, P-only ownership pause after the following
+// picture header has been consumed and classified.  It never blocks the header
+// needed to distinguish a consecutive P from a following B.
 assign mpeg2_new_stream_ready =
 	mpeg2_new_decoder_stream_ready &&
-	!mpeg2_new_b_presentation_hold;
+	!mpeg2_new_b_presentation_hold &&
+	!mpeg2_new_p_destination_ownership_hold;
 
 assign mpeg2_stream_rd =
 	!mpeg2_stream_empty &&
