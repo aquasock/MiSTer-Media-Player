@@ -117,7 +117,7 @@ wire mpeg2_new_normal_user_led =
 // 22 cache invalid prefill state
 // 23 reserved generic overlap+prediction fallback
 // 24..30 retain causes 16..22 respectively with prediction already/coincident
-// Refined overlap+prediction terminal pulses:
+// Refined overlap+prediction internal terminal codes:
 // 31 capture-active only; prediction was already present before overlap
 // 32 capture-active only; prediction first appears coincident with overlap
 // 33 flush-pending only; prediction was already present before overlap
@@ -126,6 +126,11 @@ wire mpeg2_new_normal_user_led =
 // 36 write-active+flush, DDR not busy; prediction first appears with overlap
 // 37 write-active+flush, DDR busy; prediction already present before overlap
 // 38 write-active+flush, DDR busy; prediction first appears with overlap
+//
+// kate - Commit 158 leaves those internal codes and all observer latches intact,
+// but displays codes 31..38 as two short USER groups instead of 31..38 flashes.
+// Group 1: 1=capture, 2=flush, 3=write/not-busy, 4=write/busy.
+// Group 2: 1=prediction already present, 2=prediction first coincident.
 reg [31:0] mpeg2_new_pp_diag_picture_window;
 reg        mpeg2_new_pp_diag_header_capture;
 reg        mpeg2_new_pp_diag_header_second_byte;
@@ -386,14 +391,44 @@ always @(posedge clk_mpeg2) begin
     end
 end
 
-// Same slow cadence used by prior hardware traces: counter[30:24], roughly
-// 0.30 s per ON/OFF slot, followed by a long dark repeat gap.  Commit 157 adds
-// one observer counter/code bit only so terminal counts 31..38 fit cleanly.
+// The historical single-count display is preserved for progress and all other
+// terminal codes.  Commit 158 makes only refined overlap codes 31..38 easier to
+// read: group 1 is 1..4 flashes, a clear pause follows, then group 2 is 1..2
+// flashes, followed by the long repeat gap.  The ON/OFF slot still uses bit 24.
 wire [6:0] mpeg2_new_pp_diag_phase = mpeg2_new_pp_diag_counter[30:24];
 wire [6:0] mpeg2_new_pp_diag_limit = {mpeg2_new_pp_diag_code_d, 1'b0};
-wire mpeg2_new_pp_diag_led =
+wire mpeg2_new_pp_diag_single_led =
     (mpeg2_new_pp_diag_phase < mpeg2_new_pp_diag_limit) &&
     !mpeg2_new_pp_diag_phase[0];
+
+wire mpeg2_new_pp_diag_split_display =
+    (mpeg2_new_pp_diag_code_d >= 6'd31) &&
+    (mpeg2_new_pp_diag_code_d <= 6'd38);
+wire [2:0] mpeg2_new_pp_diag_split_state_count =
+    (mpeg2_new_pp_diag_code_d <= 6'd32) ? 3'd1 :
+    (mpeg2_new_pp_diag_code_d <= 6'd34) ? 3'd2 :
+    (mpeg2_new_pp_diag_code_d <= 6'd36) ? 3'd3 : 3'd4;
+wire [1:0] mpeg2_new_pp_diag_split_pred_count =
+    mpeg2_new_pp_diag_code_d[0] ? 2'd1 : 2'd2;
+wire [4:0] mpeg2_new_pp_diag_split_phase = mpeg2_new_pp_diag_counter[28:24];
+wire [4:0] mpeg2_new_pp_diag_split_first_end =
+    {1'b0, mpeg2_new_pp_diag_split_state_count, 1'b0};
+wire [4:0] mpeg2_new_pp_diag_split_second_start =
+    mpeg2_new_pp_diag_split_first_end + 5'd3;
+wire [4:0] mpeg2_new_pp_diag_split_second_end =
+    mpeg2_new_pp_diag_split_second_start +
+    {2'b00, mpeg2_new_pp_diag_split_pred_count, 1'b0};
+wire [4:0] mpeg2_new_pp_diag_split_second_phase =
+    mpeg2_new_pp_diag_split_phase - mpeg2_new_pp_diag_split_second_start;
+wire mpeg2_new_pp_diag_split_led =
+    ((mpeg2_new_pp_diag_split_phase < mpeg2_new_pp_diag_split_first_end) &&
+     !mpeg2_new_pp_diag_split_phase[0]) ||
+    ((mpeg2_new_pp_diag_split_phase >= mpeg2_new_pp_diag_split_second_start) &&
+     (mpeg2_new_pp_diag_split_phase < mpeg2_new_pp_diag_split_second_end) &&
+     !mpeg2_new_pp_diag_split_second_phase[0]);
+
+wire mpeg2_new_pp_diag_led = mpeg2_new_pp_diag_split_display ?
+    mpeg2_new_pp_diag_split_led : mpeg2_new_pp_diag_single_led;
 
 assign LED_USER = mpeg2_new_pp_diag_active ?
     mpeg2_new_pp_diag_led : mpeg2_new_normal_user_led;
