@@ -1,33 +1,3 @@
-## 150 COMMIT v0.5.0-cycle 4469220 2026-08-15T16:57:25-07:00
-
-#### Coming From:
-
-v0.5.0-cycle 0cbafd8
-
-#### Purpose:
-
-Add comments-only Audio-fork jumping-off points without changing FPGA behavior or establishing a permanent integration ABI.
-
-#### Outcome:
-
-Exact GitHub master commit `44692208170113ed5fc35877e4ec2c16d2b04e08` modifies only `MediaPlayer_top_00.svh` with 35 comment lines. Five `AUDIO_FORK_POINT[...]` anchors identify PCM output, stream split/demux, clock/reset, DDR-client integration, and system-level integration guidance while preserving the video-private H.262 path.
-
-Executable RTL is identical to hardware-accepted Commit 149. Commit 150 was not separately rebuilt.
-
-#### Next Steps:
-
-Preserve the Audio comments in subsequent source baselines.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh (comments only)
-
-#### Status:
-
-- [ ] Built — comments-only; executable state equals built Commit 149
-- [ ] Passed
-
----
 ## 151 COMMIT v0.5.0-cycle f05d07d 2026-08-15T17:22:51-07:00
 
 #### Coming From:
@@ -40,11 +10,9 @@ Attempt one final ALM-focused IDCT cleanup without changing arithmetic, DDR owne
 
 #### Outcome:
 
-Exact GitHub master commit `f05d07d326f4f0bc224695ed979d77570cf3c7d5` modifies only `rtl/mpeg2_new/mpeg2_h262_idct.sv` (+6/-21), removing reset/block-start writes believed unreachable under the complete-64-coefficient caller contract.
+Exact commit `f05d07d326f4f0bc224695ed979d77570cf3c7d5` modifies only `rtl/mpeg2_new/mpeg2_h262_idct.sv`. Build is clean at 31,828 ALMs, 42,873 registers, 461,345 block-memory bits, 68 DSPs, and 3 PLLs, but ALMs increase by 150 versus the prior executable baseline.
 
-Build validation is clean but misses the resource objective: 31,828 ALMs, 42,873 registers, 461,345 block-memory bits, 68 DSPs, 3 PLLs. ALMs increase by 150 versus the prior executable baseline.
-
-Repeated `test_p_consecutive_reference.m2v` is intermittent at approximately 50/50 and can crash the MiSTer. Commit 151 is rejected regardless of the clean build.
+Repeated `test_p_consecutive_reference.m2v` is intermittent and can crash the MiSTer. Commit 151 is rejected.
 
 #### Next Steps:
 
@@ -72,11 +40,7 @@ Restore the stable Commit-150/149 IDCT storage/reset behavior while preserving t
 
 #### Outcome:
 
-Exact GitHub master commit `c49a9e5cf0becea550984050b9e44d9bb0cfa17a` exactly reverses Commit 151 and restores the Commit-150 source tree.
-
-The clean build returns to the expected resource/timing shape, but repeated `test_p_consecutive_reference.m2v` still intermittently stalls/crashes while the other four standing streams pass. This proves Commit 151 did not create the underlying instability and invalidates the assumption that the earlier baseline was reliably stable under repeated consecutive-P stress.
-
-Build evidence and the crash photograph were archived.
+Exact commit `c49a9e5cf0becea550984050b9e44d9bb0cfa17a` exactly reverses Commit 151 and restores the Commit-150 source tree. Repeated `test_p_consecutive_reference.m2v` still intermittently stalls/crashes while the other standing streams pass, proving Commit 151 did not create the underlying instability.
 
 #### Next Steps:
 
@@ -84,7 +48,7 @@ Stop resource optimization and instrument the consecutive-P failure before attem
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_idct.sv (exact Commit-151 revert)
+- rtl/mpeg2_new/mpeg2_h262_idct.sv
 
 #### Status:
 
@@ -104,11 +68,7 @@ Instrument the intermittent consecutive-P stall with an observer-only USER-LED p
 
 #### Outcome:
 
-Exact GitHub master commit `99c7519ed99021eb39b692d8451757044a15d147` modifies only `MediaPlayer_top_07.svh` (+211/-2). The observer distinguishes generalized replay, DDR reconstruction/persistence, publication, and stream release while remaining functionally passive.
-
-Trace codes are 1..10 progress, 11 publication error, 12 prediction/reference-pipeline error, 13 DDR store/cache error, and 14 frontend/IQ/IDCT/reconstruction error.
-
-Repeated hardware testing cleanly separates **10** on pass from **12** on failure. Code 12 proves the failure reaches the prediction/reference pipeline but is still too broad for correction.
+Exact commit `99c7519ed99021eb39b692d8451757044a15d147` modifies only `MediaPlayer_top_07.svh`. Repeated hardware testing separates pass code **10** from failure code **12**, localizing the failure to the prediction/reference pipeline while remaining functionally passive.
 
 #### Next Steps:
 
@@ -132,21 +92,17 @@ v0.5.0-cycle 99c7519
 
 #### Purpose:
 
-Refine the intermittent consecutive-reference P diagnostic so the Commit-153 prediction/reference-pipeline error bucket identifies the first generalized-P engine failure class without changing decode behavior.
+Refine the intermittent consecutive-reference P diagnostic so the prediction/reference bucket identifies the first generalized-P engine failure class.
 
 #### Outcome:
 
-Exact GitHub master commit `ad071ba3380f918b9f4a3734a97cee1f00bf80c5` modifies `MediaPlayer_top_07.svh` (+28/-7) and `rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv` (+64/-13). The generalized-P engine gains an observer-only sticky first-error cause published through paired `0xE?` / `0xD?` proof-output signatures. Functional engine control does not consume the cause.
+Exact commit `ad071ba3380f918b9f4a3734a97cee1f00bf80c5` adds observer-only generalized-P first-error cause visibility. Build is clean at 31,855 ALMs, 43,890 registers, 461,345 block-memory bits, 68 DSPs, and 3 PLLs with global setup +0.384 ns.
 
-Cause mapping: 1 metadata/re-arm accounting; 2 invalid reference/destination launch prerequisites; 3 source bounds; 4 unsolicited DDR response; 5 persistence readback mismatch; 6 engine timeout; 7 residual-descriptor accounting. Top-level terminal mapping 15..21 corresponds to those classes, with 22 wrapper/other. Pass remains code 10.
-
-Exact build validation is clean: 31,855 / 41,910 ALMs (76%), 43,890 registers, 461,345 block-memory bits in 73 RAM blocks, 68 / 112 DSPs, 3 / 6 PLLs; zero setup TNS, global setup +0.384 ns, decoder +1.518 ns, video +7.627 ns, hold +0.248 ns, recovery +3.761 ns, removal +0.692 ns, minimum pulse-width +0.462 ns.
-
-Repeated hardware runs show **10** on pass and **13** on failure. Code 13 has higher priority and means DDR store/cache error is present; it masks whether a lower-priority prediction cause is also present or first. The build archive was inspected and archived.
+Repeated hardware runs show **10** on pass and **13** on failure. Code 13 indicates DDR store/cache error is present and masks whether a lower-priority prediction cause is also present or first.
 
 #### Next Steps:
 
-Refine code 13 observer-only into specific DDR store/cache first-fault classes and record whether prediction error was already present or coincident. Do not apply a functional fix until ordering is known.
+Refine code 13 into specific DDR store/cache first-fault classes and preserve prediction-error ordering.
 
 #### Files Modified:
 
@@ -171,9 +127,7 @@ Refine code 13 into DDR store/cache first-fault classes and preserve prediction-
 
 #### Outcome:
 
-Exact GitHub master commit `dbd0993e78d187a5aee57a3edcb567bd0c558c28` adds observer-only cause visibility to the DDR writer, framebuffer cache, and top-level trace. Codes 15..22 are store/cache causes without prior prediction error; 23..30 are the same causes with prediction already present or coincident.
-
-Analysis & Synthesis fails because `MediaPlayer_top_04.svh` connects the new port to `mpeg2_h262_ddram_store`, while Quartus compiles that entity from `rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv`; the observer was added to an unused sibling. No hardware diagnostic exists for this commit. Failed build resources were archived.
+Exact commit `dbd0993e78d187a5aee57a3edcb567bd0c558c28` adds observer-only writer/cache cause visibility, but Analysis & Synthesis fails because the new port is connected to an unused writer sibling rather than active `rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv`.
 
 #### Next Steps:
 
@@ -206,11 +160,7 @@ Attach the Commit-155 writer diagnostic to the active Quartus writer implementat
 
 #### Outcome:
 
-Exact GitHub master commit `ebd3ead1316691d3032a33ada7654bf1a98c53bf` moves the observer to active `rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv`; functional writer state and DDR behavior are unchanged.
-
-Build validation is clean: 31,910 ALMs, 43,934 registers, 461,345 block-memory bits in 73 RAM blocks, 68 DSPs, 3 PLLs; zero setup TNS and global setup +0.558 ns.
-
-Repeated consecutive-P runs produce **10** on pass and **23** on crash. Code 23 means writer cause 1 (`block_start` overlap with active capture/flush/write) with prediction error already present or coincident. All four standing guard streams pass. The build package was inspected and archived.
+Exact commit `ebd3ead1316691d3032a33ada7654bf1a98c53bf` moves the observer to active `rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv`. Build is clean at 31,910 ALMs, 43,934 registers, 461,345 block-memory bits, 68 DSPs, and 3 PLLs. Failing consecutive-P runs report **23**, meaning writer cause 1 with prediction error already present or coincident.
 
 #### Next Steps:
 
@@ -239,9 +189,7 @@ Refine code 23 into exact writer state, DDR-busy state, and prediction-before/co
 
 #### Outcome:
 
-Exact GitHub master commit `177a4800820560d13610d03f4f14c6e55d71163b` modifies `MediaPlayer_top_07.svh` (+82/-47) and active `rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv` (+9/-4). The observer distinguishes capture, flush, write+flush with DDR busy low/high, and several invalid writer conditions; it also records whether prediction error preceded or coincided with the overlap.
-
-Internal result codes 31..38 preserve the required evidence, but the commit was intentionally superseded before build because counting that many USER flashes was not practical.
+Exact commit `177a4800820560d13610d03f4f14c6e55d71163b` preserves observer-only behavior and records writer state plus prediction ordering. The internal result codes were intentionally superseded before build because the USER presentation was impractical.
 
 #### Next Steps:
 
@@ -270,11 +218,7 @@ Make the Commit-157 diagnostic human-readable on the USER LED without changing i
 
 #### Outcome:
 
-Exact GitHub master commit `5740587427e3dda356eaa316ced0fbfab7b258d6` modifies only `MediaPlayer_top_07.svh` (+40/-5). Internal codes 31..38 are unchanged; USER now presents writer state and prediction ordering as two short groups.
-
-Build validation is clean: 31,944 ALMs, 43,942 registers, 461,345 block-memory bits in 73 RAM blocks, 68 DSPs, 3 PLLs; zero setup TNS and global setup +0.220 ns.
-
-Hardware failure reports **4-1**: writer overlap occurs in write-active+flush while writer-visible DDR busy is high, and prediction error was already present earlier. Therefore prediction/reference failure precedes the writer overlap. The build archive was inspected and archived.
+Exact commit `5740587427e3dda356eaa316ced0fbfab7b258d6` changes only USER presentation. Build is clean at 31,944 ALMs, 43,942 registers, 461,345 block-memory bits, 68 DSPs, and 3 PLLs. Hardware failure reports **4-1**: writer overlap occurs in write-active+flush while DDR busy is high, and prediction error was already present earlier.
 
 #### Next Steps:
 
@@ -302,11 +246,7 @@ Identify the first generalized-P prediction/reference failure class already pres
 
 #### Outcome:
 
-Exact GitHub master commit `a5b518d045bb035748cb668f797ba4187a84bcba` modifies only `MediaPlayer_top_07.svh` (+114/-8). The top-level observer decodes the existing generalized-P first-error carrier: 1 metadata/order, 2 start prerequisites, 3 source bounds, 4 unsolicited DDR response, 5 persistence mismatch, 6 timeout, 7 residual accounting, 8 other.
-
-Failing `test_p_consecutive_reference.m2v` runs report **2-2-4**: generalized-P cause 6 (prediction transaction timeout) occurs before the later writer state-4 overlap. Passing runs report **10**, and all four standing guard streams pass.
-
-Build validation is clean: 32,011 ALMs, 44,079 registers, 461,345 block-memory bits in 73 RAM blocks, 68 DSPs, 3 PLLs; zero setup TNS and global setup +0.120 ns. The build package was inspected and archived.
+Exact commit `a5b518d045bb035748cb668f797ba4187a84bcba` decodes the generalized-P first-error carrier at top level. Failing `test_p_consecutive_reference.m2v` runs report **2-2-4**, identifying generalized-P prediction transaction timeout before the later writer overlap. Build is clean at 32,011 ALMs, 44,079 registers, 461,345 block-memory bits, 68 DSPs, and 3 PLLs.
 
 #### Next Steps:
 
@@ -334,11 +274,7 @@ Refine generalized-P timeout cause 6 so the failing transaction identifies which
 
 #### Outcome:
 
-Exact GitHub master commit `1efbb4b328a933a31a350213f7ffdadd669c82cd` modifies only `rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv` (+50/-16). Observer-only state records timeout phase: 1 request issue/accept, 2 DDR response wait, 3 reconstructed output/store completion, 4 persistence readback. Functional control is unchanged.
-
-Build validation is clean: 32,031 ALMs, 43,911 registers, 461,345 block-memory bits in 73 RAM blocks, 68 DSPs, 3 PLLs; zero setup TNS and global setup +0.141 ns.
-
-Failing hardware reports **1-3-4**. Phase 3 proves the generalized-P engine has completed reconstruction/output and is waiting for ordinary DDR store completion; the later writer state remains 4. This narrows the stall to the reconstructed-block -> DDR-store completion handshake, but not yet to a specific arbiter denial reason.
+Exact commit `1efbb4b328a933a31a350213f7ffdadd669c82cd` adds observer-only timeout-phase state. Build is clean at 32,031 ALMs, 43,911 registers, 461,345 block-memory bits, 68 DSPs, and 3 PLLs. Failing hardware reports **1-3-4**, proving the generalized-P engine is waiting for ordinary DDR store completion after reconstruction/output.
 
 #### Next Steps:
 
@@ -366,15 +302,11 @@ Classify the DDR-arbiter condition holding the ordinary reconstruction writer du
 
 #### Outcome:
 
-Exact GitHub master commit `5d8c8ba7073ea1273ff0aa7df1a074b86ca83a64` modifies only `MediaPlayer_top_07.svh` (+110/-1). A passive arbiter mirror distinguishes: 1 display-region ownership exclusion, 2 display read priority, 3 prediction read priority, 4 writer granted but physical DDR busy. Functional arbitration is unchanged.
-
-Build validation is clean: 32,034 ALMs, 44,006 registers, 461,345 block-memory bits in 73 RAM blocks, 68 DSPs, 3 PLLs; zero setup TNS and global setup +0.589 ns.
-
-Failing hardware reports **2-1-4**: the first stall reason is display-region ownership exclusion. Source review shows the next P destination bank can still be the displayed bank because reference publication precedes display-bank handoff. Commit-142 protection is therefore working correctly and must not be weakened.
+Exact commit `5d8c8ba7073ea1273ff0aa7df1a074b86ca83a64` adds a passive arbiter mirror. Build is clean at 32,034 ALMs, 44,006 registers, 461,345 block-memory bits, 68 DSPs, and 3 PLLs. Failing hardware reports **2-1-4**: display-region ownership exclusion is the first stall reason, proving the existing display-write protection is correctly blocking an unsafe destination bank.
 
 #### Next Steps:
 
-Pace a following P picture until its selected destination bank is no longer display-owned, preserving existing B behavior and DDR protection.
+Pace a following P picture until its selected destination bank is no longer display-owned.
 
 #### Files Modified:
 
@@ -398,13 +330,7 @@ Correct the consecutive-P publication-versus-presentation ownership race by paci
 
 #### Outcome:
 
-Exact GitHub master commit `42d330fffe8555cbaea01d5d002680fb4ab20acf` modifies `MediaPlayer_top_00.svh` (+6/-1) and `MediaPlayer_top_05.svh` (+72/-0). A registered `mpeg2_new_p_destination_ownership_hold` is added to stream readiness and is armed from accepted picture-header classification only for a following P picture. B and I pictures continue without this hold.
-
-Commit-142 display-write exclusion, the DDR arbiter/writer, reference publication, B scratch/reorder behavior, QIP, SDC, and generators are unchanged.
-
-Build validation is clean: 31,922 ALMs, 43,946 registers, 461,345 block-memory bits in 73 RAM blocks, 68 DSPs, 3 PLLs; zero setup TNS and global setup +0.332 ns.
-
-Hardware validation passes completely: repeated `test_p_consecutive_reference.m2v` no longer stalls/crashes and all four standing guard streams pass. Commit 162 is the accepted functional fix.
+Exact commit `42d330fffe8555cbaea01d5d002680fb4ab20acf` adds a registered P-only destination-ownership hold. Commit-142 display-write exclusion, DDR arbitration/writer, reference publication, B behavior, QIP, and SDC remain unchanged. Build is clean at 31,922 ALMs, 43,946 registers, 461,345 block-memory bits, 68 DSPs, and 3 PLLs; repeated consecutive-P and all standing guard streams pass.
 
 #### Next Steps:
 
@@ -433,13 +359,7 @@ Retire the temporary consecutive-P diagnostics while preserving the accepted Com
 
 #### Outcome:
 
-Exact GitHub master commit `1370c28e3d34b1fd603c17130986bc336da29a32` restores the seven diagnostic files changed by Commits 153-161 to their pre-investigation contents, removing 716 lines of observer code. A direct comparison from Commit 152 to Commit 163 shows only the two Commit-162 pacing files remain changed.
-
-Normal USER acceptance is restored. Commit-142 DDR protection, B ordering, shared-IDCT consolidation, reference publication, parser/prediction arithmetic, and Audio comments remain preserved.
-
-Build validation is clean: 31,782 ALMs, 43,812 registers, 461,345 block-memory bits in 73 RAM blocks, 68 DSPs, 3 PLLs; zero setup TNS and global setup +0.167 ns.
-
-Repeated consecutive-P stress and all four standing guard streams pass. Commit 163 is the accepted cleaned post-investigation functional baseline. Build evidence was archived.
+Exact commit `1370c28e3d34b1fd603c17130986bc336da29a32` restores the seven diagnostic files to their pre-investigation contents while preserving the two Commit-162 pacing changes. Build is clean at 31,782 ALMs, 43,812 registers, 461,345 block-memory bits, 68 DSPs, and 3 PLLs; repeated consecutive-P and all four standing guards pass.
 
 #### Next Steps:
 
@@ -473,13 +393,7 @@ Record the accepted v0.4.0 clean-build and hardware qualification in the public 
 
 #### Outcome:
 
-Exact GitHub master commit `cf9ec63a47ffa4fea8b6525190a0cfa39e7ba0b6` modifies only `docs/RELEASE_NOTES_v0.4.0.md`. The notes describe the qualified progressive 4:2:0 I/P/B milestone, including B scratch/reorder behavior, DDR region protection, P destination pacing, shared-IDCT consolidation, and diagnostic retirement.
-
-Release qualification used a fresh clone of exact `1370c28` on Quartus Prime 17.0.2 Lite. Results: 31,782 ALMs, 43,812 registers, 461,345 block-memory bits in 73 RAM blocks, 68 DSPs, 3 PLLs; zero setup TNS, global setup +0.167 ns, decoder +1.311 ns, video +6.987 ns.
-
-Hardware qualification passes: `test_p_consecutive_reference.m2v` passes 20 consecutive runs and `test_b_mixed_gop.m2v`, `test_b_core_decode.m2v`, `test_p_general_decode.m2v`, and `test_all_i.m2v` each pass. The qualification package was inspected and archived.
-
-Per user instruction, documentation-only release commits were not rebuilt.
+Exact commit `cf9ec63a47ffa4fea8b6525190a0cfa39e7ba0b6` modifies only `docs/RELEASE_NOTES_v0.4.0.md`. Release qualification used a fresh clone of exact `1370c28`: 31,782 ALMs, 43,812 registers, 461,345 block-memory bits, 68 DSPs, 3 PLLs, zero setup TNS, global setup +0.167 ns. Consecutive-P passes 20 runs and the mixed-GOP B, B-core, generalized-P, and all-I guards pass.
 
 #### Next Steps:
 
@@ -507,11 +421,7 @@ Complete v0.4.0 documentation and release publication while leaving the qualifie
 
 #### Outcome:
 
-Exact GitHub master commit `b4385fe4ec62587df701c160333a81ea367c5659` modifies only `README.md` and `CHANGELOG.md`, updating them to the qualified I/P/B milestone and preserving a fresh `Unreleased` section.
-
-The annotated `v0.4.0` tag resolves to `b4385fe`, and the GitHub v0.4.0 pre-release is published with the expected `MediaPlayer_20260816.rbf` asset. No RTL, QIP, SDC, generator, DDR, or decoder source changed after qualified Commit 163.
-
-Per user instruction, no second build was performed after the documentation-only release commits.
+Exact commit `b4385fe4ec62587df701c160333a81ea367c5659` modifies only `README.md` and `CHANGELOG.md`. The annotated `v0.4.0` tag resolves to `b4385fe`, and the GitHub v0.4.0 pre-release is published with the expected `MediaPlayer_20260816.rbf` asset. No synthesized source changed after qualified Commit 163.
 
 #### Next Steps:
 
@@ -536,21 +446,17 @@ Unreleased bc37008
 
 #### Purpose:
 
-Widen generalized progressive 4:2:0 P-picture decoding from the fixed 128x96 regression geometry to the established 720x480 frame envelope while preserving accepted DDR ownership, publication, B ordering, IDCT, and pacing behavior.
+Widen generalized progressive 4:2:0 P-picture decoding from fixed 128x96 to the established 720x480 frame envelope while preserving accepted DDR ownership, publication, B ordering, IDCT, and pacing behavior.
 
 #### Outcome:
 
-Exact GitHub master functional commit `74535adb3574ef71a00e39e806816929ec3facdd` modifies seven intended paths. It adds a streamed wide-P syntax parser, expands macroblock geometry through 45x30, stores ordered motion in a 1350x16 M10K-oriented memory, and extends sparse residual metadata to 11-bit macroblock indices while retaining the existing 16-block / 64-coefficient-event implementation limits.
+Exact functional commit `74535adb3574ef71a00e39e806816929ec3facdd` adds streamed wide-P syntax, 45x30 macroblock geometry, a 1350x16 M10K-oriented motion store, and 11-bit sparse-residual macroblock indices while retaining 16-block / 64-coefficient-event implementation ceilings. Build is clean at 36,957 ALMs (88%), 45,721 registers, 487,041 block-memory bits, 78 RAM blocks, 70 DSPs, and 3 PLLs.
 
-A deterministic `test_p_720x480_general_decode` generator was added. The generated stream contains 45x30 macroblocks, signed half-sample motion, internal skipped P macroblocks, and sparse residual data. B geometry and accepted DDR/presentation behavior are unchanged.
-
-Clean Quartus validation: 36,957 / 41,910 ALMs (88%), 45,721 registers, 487,041 block-memory bits in 78 RAM blocks, 70 DSPs, 3 PLLs; zero setup TNS, global setup +0.270 ns, decoder +0.674 ns, video +6.977 ns. The 1350x16 motion store maps to four M10Ks. The new wide parser itself uses about 4,696 ALMs and two DSPs.
-
-All six required hardware regressions pass: the new 720x480 P stream, repeated consecutive-P, legacy generalized P, mixed-GOP B, B core, and all-I. Audio-repo comparison finds no conflicting independent edits in overlapping Commit-166 paths.
+The deterministic 720x480 P regression plus repeated consecutive-P, generalized P, mixed-GOP B, B core, and all-I all pass.
 
 #### Next Steps:
 
-Recover generalized-P parser resources before widening B geometry; 88% ALM utilization is too close to capacity.
+Recover generalized-P parser resources before widening B geometry.
 
 #### Files Modified:
 
@@ -576,19 +482,17 @@ Unreleased 74535ad
 
 #### Purpose:
 
-Recover FPGA headroom by consolidating the duplicate generalized-P syntax implementations onto the Commit-166 streamed parser without expanding B-picture capability.
+Recover FPGA headroom by consolidating duplicate generalized-P syntax implementations onto the Commit-166 streamed parser without expanding B capability.
 
 #### Outcome:
 
-Exact functional commit `b11590cf77febb7364a13e628a64e107fc2a8620` consolidates exact 128x96 and wider <=720x480 P syntax onto the streamed parser and leaves the historical packed-plan parser as a constant-zero compatibility shell.
+Exact functional commit `b11590cf77febb7364a13e628a64e107fc2a8620` consolidates exact 128x96 and wider <=720x480 P syntax onto the streamed parser. Quartus is clean at 30,771 ALMs (73%), 41,381 registers, 486,017 block-memory bits, 77 RAM blocks, 69 DSPs, and 3 PLLs, recovering 6,186 ALMs versus Commit 166.
 
-Quartus 17.0.2 build validation is clean: 30,771 / 41,910 ALMs (73%), 41,381 registers, 486,017 block-memory bits in 77 RAM blocks, 69 DSPs, 3 PLLs; zero setup TNS and global setup +0.579 ns. Relative to Commit 166 this recovers 6,186 ALMs, 4,340 registers, one RAM block, and one DSP.
-
-Hardware passes `test_p_720x480_general_decode.m2v`, `test_p_general_decode.m2v`, `test_b_mixed_gop.m2v`, `test_b_core_decode.m2v`, and `test_all_i.m2v`. `test_p_consecutive_reference.m2v` fails with normal USER indication absent but without the historical crash. Because Commit 166 and the v0.4.0 baseline passed repeated consecutive-P, Commit 167 is not accepted as functionally complete. Build evidence was archived under transitional build hash `b1a0b0f`.
+Five hardware streams pass, but `test_p_consecutive_reference.m2v` loses normal USER acceptance without crashing. Commit 167 is not functionally accepted.
 
 #### Next Steps:
 
-Restore exact 128x96 consecutive-P compatibility without giving back the parser-consolidation resource recovery.
+Restore exact 128x96 consecutive-P compatibility without giving back parser-consolidation resource recovery.
 
 #### Files Modified:
 
@@ -613,13 +517,13 @@ Unreleased b11590c
 
 #### Purpose:
 
-Restore consecutive-reference P acceptance after the generalized-P parser consolidation without giving back the recovered FPGA headroom.
+Restore consecutive-reference P acceptance after generalized-P parser consolidation without giving back the recovered FPGA headroom.
 
 #### Outcome:
 
-Exact functional commit `0ea9ac55723d10812bbf0f4ac0b01ecf2a3df0b0` modifies only `rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv` (+8/-0), retaining an already-observed streamed-motion transaction across wide-picture completion so motion-only P can accept its persistence completion.
+Exact functional commit `0ea9ac55723d10812bbf0f4ac0b01ecf2a3df0b0` modifies only `rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv`, retaining an already-observed streamed-motion transaction across wide-picture completion so motion-only P can accept persistence completion. Build is clean at 30,751 ALMs (73%), 41,338 registers, 486,017 block-memory bits, 77 RAM blocks, 69 DSPs, and 3 PLLs with global setup +0.644 ns.
 
-Quartus 17.0.2 validation is clean: 30,751 / 41,910 ALMs (73%), 41,338 registers, 486,017 block-memory bits in 77 RAM blocks, 69 DSPs, 3 PLLs; zero setup TNS and global setup +0.644 ns. All six requested hardware regressions pass, including repeated `test_p_consecutive_reference.m2v` and the 720x480 generalized-P stream. Audio compatibility is clean; the only cumulative overlapping post-fork path is `files.qip`, where main and Audio add independent source entries.
+All six requested hardware regressions pass, including repeated consecutive-P and 720x480 generalized P.
 
 #### Next Steps:
 
@@ -643,19 +547,19 @@ Unreleased 0ea9ac5
 
 #### Purpose:
 
-Widen progressive 4:2:0 B-picture decoding from the fixed 128x96 / 8x6 implementation to the established <=720x480 frame envelope while preserving accepted two-reference prediction, non-reference scratch-frame semantics, and qualified P/I behavior.
+Widen progressive 4:2:0 B-picture decoding from fixed 128x96 / 8x6 to the established <=720x480 frame envelope while preserving two-reference prediction, non-reference scratch semantics, and qualified P/I behavior.
 
 #### Outcome:
 
-Exact functional commit `ac1ddaf393a09c7b2733657a84940f227cd1a63a` (`Widen generalized B geometry`) modifies exactly four B-path RTL files plus one deterministic regression generator. B syntax now derives geometry through 45x30 macroblocks and streams ordered direction/vector metadata during slice parsing rather than scaling the historical whole-picture register plan. The B raster retains the metadata in a 1350x34 M10K-oriented motion store, uses live padded luma/chroma bounds, and keeps the existing four-block Y0 residual ceiling.
+Exact functional commit `ac1ddaf393a09c7b2733657a84940f227cd1a63a` widens B syntax/raster geometry through 45x30 macroblocks, streams ordered B motion metadata, retains it in a 1350x34 M10K-oriented store, and widens the internal B scratch-coordinate tag while preserving the existing scratch region and four-block Y0 residual ceiling.
 
-The DDR writer adds a wide internal B-scratch coordinate tag while retaining the legacy 128x96 tag; both forms still target only the existing non-reference scratch region. The reference wrapper admits B sideband detection throughout the same <=720x480 geometry envelope. DDR arbitration, reference publication, P behavior, IDCT, QIP, SDC, and top-level presentation control are unchanged.
+Quartus 17.0.2 validation is clean: 28,106 / 41,910 ALMs (67%), 38,220 registers, 534,989 block-memory bits in 84 RAM blocks, 69 DSPs, and 3 PLLs. Relative to Commit 168 this recovers 2,645 ALMs and 3,118 registers while using 48,972 additional memory bits and seven additional RAM blocks. Setup TNS is zero; worst setup +0.367 ns, hold +0.251 ns, recovery +3.395 ns, removal +0.734 ns, minimum pulse-width +0.462 ns. No flow Error or Critical Warning records are present.
 
-Agent-side generator validation passes with FFmpeg/ffprobe: `test_b_720x480_mixed_gop.m2v` is 187,087 bytes, SHA-256 `7c9ab2a9444789b16ef64bbf8a483bda743a7a29caf4de5d8e7e97e8862e5530`, coded order I/P/B/P/B, display order I/B/P/B/P, 45x30 macroblocks, safe signed half-sample B motion, internal skips, and bounded residuals. Quartus and MiSTer hardware validation are pending.
+Hardware validation passes completely: `test_b_720x480_mixed_gop.m2v`, `test_p_720x480_general_decode.m2v`, repeated `test_p_consecutive_reference.m2v`, `test_p_general_decode.m2v`, `test_b_mixed_gop.m2v`, `test_b_core_decode.m2v`, and `test_all_i.m2v` all pass. Latest Audio tip `81219ce` has no independent edits to any Commit-169 RTL path, so compatibility remains clean.
 
 #### Next Steps:
 
-Pull exact `ac1ddaf`, run a clean Quartus/STA build, then run `test_b_720x480_mixed_gop.m2v` first followed by the complete accepted six-stream P/B/I matrix. Report the build and hardware results before any further source change.
+Generalize the remaining B residual syntax/coverage while preserving the accepted 67% geometry/motion baseline.
 
 #### Files Modified:
 
@@ -664,6 +568,38 @@ Pull exact `ac1ddaf`, run a clean Quartus/STA build, then run `test_b_720x480_mi
 - rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
 - rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
 - tools/streams/generate_test_b_720x480_mixed_gop.py
+
+#### Status:
+
+- [x] Built
+- [x] Passed — new 720x480 B stream plus complete prior six-stream matrix pass
+
+---
+## 170 PROPOSAL Unreleased pending 2026-08-16T14:15:00-07:00
+
+#### Coming From:
+
+Unreleased ac1ddaf
+
+#### Purpose:
+
+Generalize progressive 4:2:0 B-picture residual syntax across all six macroblock blocks while preserving the accepted <=720x480 B geometry, two-reference motion path, scratch-frame semantics, and all qualified P/I behavior.
+
+#### Outcome:
+
+The accepted Commit-169 B path still has explicit implementation limits: coded residual macroblocks are restricted to CBP=32 / Y0 only, at most four residual blocks are retained, and coefficient parsing is limited to the controlled +/-1 then EOB subset. These are implementation limits, not H.262 limits. The existing standards library already records the required 4:2:0 block order, coded-block-pattern selection, non-intra coefficient VLC rules, and Escape syntax under H262-006, H262-010, H262-021, and H262-024.
+
+Scope the next hardware boundary to full 4:2:0 six-bit coded-block-pattern selection, residual block indices 0..5, and generalized non-intra coefficient parsing using the established project VLC/transform path. Align B residual storage with the existing bounded generalized-P envelope of up to 16 residual blocks / 64 coefficient events where practical; those remain implementation ceilings. Preserve B motion/geometry, DDR arbitration, reference publication, scratch presentation ordering, P pacing, IDCT arithmetic, QIP, and SDC.
+
+Add a deterministic 720x480 B residual regression that exercises multiple luma and chroma residual blocks, more than one coded block in a macroblock, ordinary non-intra VLC coefficients, EOB, and Escape syntax while retaining safe forward/backward/bidirectional motion. Validation requires a clean Quartus/STA build, the new residual regression first, then the complete seven-stream Commit-169 matrix. If implementation requires changes outside B residual syntax/sideband/raster capacity, stop and revise the proposal before proceeding.
+
+#### Next Steps:
+
+Await user approval before implementation.
+
+#### Files Modified:
+
+- TBD — B residual syntax/core, B raster residual-capacity path, and deterministic 720x480 B residual regression generator only
 
 #### Status:
 
