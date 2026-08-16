@@ -635,7 +635,7 @@ Use the restored 73% baseline to widen the remaining fixed-geometry B path.
 - [x] Passed — all six requested P/B/I regressions pass
 
 ---
-## 169 PROPOSAL Unreleased pending 2026-08-16T07:45:00-07:00
+## 169 COMMIT Unreleased ac1ddaf 2026-08-16T07:52:00-07:00
 
 #### Coming From:
 
@@ -643,23 +643,27 @@ Unreleased 0ea9ac5
 
 #### Purpose:
 
-Widen progressive 4:2:0 B-picture decoding from the current fixed 128x96 / 8x6 implementation to the established <=720x480 frame envelope while preserving accepted two-reference prediction, non-reference scratch-frame semantics, and all qualified P/I behavior.
+Widen progressive 4:2:0 B-picture decoding from the fixed 128x96 / 8x6 implementation to the established <=720x480 frame envelope while preserving accepted two-reference prediction, non-reference scratch-frame semantics, and qualified P/I behavior.
 
 #### Outcome:
 
-Current B implementation limits are explicit: the B syntax/core uses fixed 8x6 geometry, 48-entry direction/vector plans, row-local MBA increments through 8, and a bounded four-block Y0-only residual subset; the bidirectional raster engine likewise fixes 48 macroblocks and 128x96 / 64x48 luma/chroma bounds. The accepted Commit-168 baseline is 30,751 ALMs (73%), restoring sufficient headroom to attempt the capability expansion.
+Exact functional commit `ac1ddaf393a09c7b2733657a84940f227cd1a63a` (`Widen generalized B geometry`) modifies exactly four B-path RTL files plus one deterministic regression generator. B syntax now derives geometry through 45x30 macroblocks and streams ordered direction/vector metadata during slice parsing rather than scaling the historical whole-picture register plan. The B raster retains the metadata in a 1350x34 M10K-oriented motion store, uses live padded luma/chroma bounds, and keeps the existing four-block Y0 residual ceiling.
 
-Scope the next hardware boundary to generalized B geometry and addressing through 45x30 macroblocks while retaining the existing bounded residual subset, two retained reference banks, B scratch-frame non-publication behavior, DDR ownership protections, P pacing, IDCT arithmetic, and timing constraints. Add a deterministic 720x480 mixed-GOP B regression that exercises forward, backward, and bidirectional prediction plus internal skipped macroblocks. Existing 128x96 B behavior remains a required guard.
+The DDR writer adds a wide internal B-scratch coordinate tag while retaining the legacy 128x96 tag; both forms still target only the existing non-reference scratch region. The reference wrapper admits B sideband detection throughout the same <=720x480 geometry envelope. DDR arbitration, reference publication, P behavior, IDCT, QIP, SDC, and top-level presentation control are unchanged.
 
-Validation will require a clean Quartus/STA build, the new 720x480 B regression, and the complete accepted six-stream P/B/I matrix. If required integration work would materially change DDR arbitration, reference publication, P behavior, IDCT, or SDC, stop and revise the proposal before implementation.
+Agent-side generator validation passes with FFmpeg/ffprobe: `test_b_720x480_mixed_gop.m2v` is 187,087 bytes, SHA-256 `7c9ab2a9444789b16ef64bbf8a483bda743a7a29caf4de5d8e7e97e8862e5530`, coded order I/P/B/P/B, display order I/B/P/B/P, 45x30 macroblocks, safe signed half-sample B motion, internal skips, and bounded residuals. Quartus and MiSTer hardware validation are pending.
 
 #### Next Steps:
 
-Await user approval before implementation.
+Pull exact `ac1ddaf`, run a clean Quartus/STA build, then run `test_b_720x480_mixed_gop.m2v` first followed by the complete accepted six-stream P/B/I matrix. Report the build and hardware results before any further source change.
 
 #### Files Modified:
 
-- TBD — B syntax/core geometry, B bidirectional raster geometry, minimal integration, and deterministic 720x480 B regression generator only
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- tools/streams/generate_test_b_720x480_mixed_gop.py
 
 #### Status:
 
