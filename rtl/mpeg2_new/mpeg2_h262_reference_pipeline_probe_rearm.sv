@@ -24,9 +24,15 @@ module mpeg2_h262_reference_read_probe
  output wire reconstructed_seen,output wire[7:0] reconstructed_value,output wire persisted_seen,output wire[7:0] persisted_value,output wire probe_error
 );
 
+// kate - Commit 166: the generalized P sideband is now valid throughout the
+// established progressive 4:2:0 frame envelope. B remains on its proven 128x96
+// path and the historical aligned-plan adapter remains 128x96-only.
+wire general_geometry_supported=
+ (horizontal_size!=14'd0)&&(vertical_size!=14'd0)&&
+ (horizontal_size<=14'd720)&&(vertical_size<=14'd480);
 wire general_detect_now=p_residual_sample_valid&&(p_residual_sample_index==6'h3e)&&
  (forward_f_code_horizontal==4'd3)&&(forward_f_code_vertical==4'd3)&&
- (horizontal_size==14'd128)&&(vertical_size==14'd96)&&!p_implicit_reconstruct_request;
+ general_geometry_supported&&!p_implicit_reconstruct_request;
 reg general_mixed_mode;
 wire mixed_active,mixed_persisted_seen,mixed_error,mixed_half;
 always @(posedge clk)begin
@@ -169,7 +175,9 @@ always @(posedge clk)begin
 end
 
 mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
- .clk(clk),.reset(reset),.capture_enable(mixed_select),.request(mixed_select),.shift_right_map(48'd0),
+ .clk(clk),.reset(reset),.capture_enable(mixed_select),.request(mixed_select),
+ .horizontal_size(horizontal_size),.vertical_size(vertical_size),
+ .shift_right_map(48'd0),
  .residual_valid(mix_residual_valid),.residual_index(mix_residual_index),.residual_value(mix_residual_value),
  .reference_valid(reference_frame_valid),.reference_bank(reference_frame_bank),.destination_bank(destination_frame_bank),.store_block_stored(p_store_block_stored),
  .ddram_busy(shared_engine_busy),.ddram_dout(shared_dout_reg),.ddram_dout_ready(mix_dout_ready_owned),.ddram_burstcnt(mix_bc_raw),.ddram_addr(mix_addr_raw),.ddram_rd(mix_rd_raw),

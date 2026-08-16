@@ -25,6 +25,8 @@ set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_syntax
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_two_mb_syntax_probe.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_four_mb_two_row_syntax_probe.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe.sv
+# kate - Commit 166: streamed wide-geometry P syntax, leaving 128x96 parser intact.
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe.sv
 # Shared non-intra transform; Commit 128 reuses it for controlled B residuals.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_residual_parser_420.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
