@@ -1,0 +1,15 @@
++------------------------------------------------------------------------------------------------------------+
+; Timing Summary (Setup)                                                                                     ;
++-----------------------------------------------------------------------------------+--------+---------------+
+; Clock                                                                             ; Slack  ; End Point TNS ;
++-----------------------------------------------------------------------------------+--------+---------------+
+; emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk           ; -0.036 ; -0.206        ;
+; pll_hdmi|pll_hdmi_inst|altera_pll_i|cyclonev_pll|counter[0].output_counter|divclk ; 0.326  ; 0.000         ;
+; sysmem|fpga_interfaces|clocks_resets|h2f_user0_clk                                ; 2.326  ; 0.000         ;
+; spi_sck                                                                           ; 5.881  ; 0.000         ;
+; emu|pll|pll_inst|altera_pll_i|general[1].gpll~PLL_OUTPUT_COUNTER|divclk           ; 7.621  ; 0.000         ;
+; FPGA_CLK1_50                                                                      ; 8.492  ; 0.000         ;
+; FPGA_CLK2_50                                                                      ; 11.432 ; 0.000         ;
+; emu|pll|pll_inst|altera_pll_i|general[0].gpll~PLL_OUTPUT_COUNTER|divclk           ; 16.972 ; 0.000         ;
+; pll_audio|pll_audio_inst|altera_pll_i|general[0].gpll~PLL_OUTPUT_COUNTER|divclk   ; 24.483 ; 0.000         ;
++-----------------------------------------------------------------------------------+--------+---------------+
