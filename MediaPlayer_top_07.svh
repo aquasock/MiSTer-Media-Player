@@ -83,12 +83,13 @@ wire mpeg2_new_normal_user_led =
     mpeg2_new_ddr_read_seen &&
     !mpeg2_new_ddr_cache_error;
 
-// Commit 153 is observer-only.  It targets the intermittent I/P1/P2/I
-// consecutive-reference hang without changing parser, replay, prediction, DDR,
-// publication, or stream-ready behavior.  The raw picture-header observer is
-// intentionally local to the LED diagnostic so no decoder state depends on it.
+// Commit 154 refines the observer-only Commit-153 consecutive-P trace.  The
+// generalized P raster now publishes a paired E?/D? signature over its existing
+// proof outputs after its first sticky error.  These proof values never control
+// prediction, DDR, stream pacing, or reference ownership, and normal USER
+// acceptance already rejects mpeg2_new_pred_error.
 //
-// Progress pulses (last reached stage repeats after a stall):
+// Progress pulses (unchanged from Commit 153):
 //  1 first P header consumed
 //  2 P1 reference publication complete
 //  3 immediately consecutive second P header consumed; diagnostic becomes active
@@ -101,9 +102,16 @@ wire mpeg2_new_normal_user_led =
 // 10 following I published and normal USER acceptance is clean
 // Error pulses:
 // 11 second P reached before P1 reference/publication state was ready
-// 12 prediction/reference-pipeline error
 // 13 DDR store/cache error
 // 14 frontend/IQ/IDCT/reconstruction error
+// 15 generalized-P metadata/re-arm accounting failure
+// 16 invalid reference/destination launch state
+// 17 source-bounds failure
+// 18 DDR response arrived without an engine-owned pending request
+// 19 persistence readback mismatch
+// 20 generalized-P engine timeout
+// 21 final residual-descriptor accounting mismatch
+// 22 wrapper/selection/other prediction error without an engine signature
 reg [31:0] mpeg2_new_pp_diag_picture_window;
 reg        mpeg2_new_pp_diag_header_capture;
 reg        mpeg2_new_pp_diag_header_second_byte;
@@ -137,6 +145,19 @@ wire mpeg2_new_pp_diag_p2_metadata_done =
 wire mpeg2_new_pp_diag_persisted_edge =
     mpeg2_new_pred_persisted_seen && !mpeg2_new_pp_diag_pred_persisted_d;
 
+wire mpeg2_new_pp_diag_engine_signature =
+    (mpeg2_new_pred_sample_value[7:4] == 4'hE) &&
+    (mpeg2_new_pred_reconstructed_value[7:4] == 4'hD) &&
+    (mpeg2_new_pred_sample_value[3:0] ==
+     mpeg2_new_pred_reconstructed_value[3:0]) &&
+    (mpeg2_new_pred_sample_value[3:0] >= 4'd1) &&
+    (mpeg2_new_pred_sample_value[3:0] <= 4'd7);
+wire [3:0] mpeg2_new_pp_diag_engine_cause =
+    mpeg2_new_pred_sample_value[3:0];
+wire [4:0] mpeg2_new_pp_diag_pred_error_code =
+    mpeg2_new_pp_diag_engine_signature ?
+        ({1'b0,mpeg2_new_pp_diag_engine_cause} + 5'd14) : 5'd22;
+
 wire [4:0] mpeg2_new_pp_diag_error_code =
     (mpeg2_new_syntax_error ||
      mpeg2_new_inverse_quant_error ||
@@ -144,7 +165,7 @@ wire [4:0] mpeg2_new_pp_diag_error_code =
      mpeg2_new_idct_error ||
      mpeg2_new_recon_error)                                  ? 5'd14 :
     (mpeg2_new_ddr_store_error || mpeg2_new_ddr_cache_error) ? 5'd13 :
-    mpeg2_new_pred_error                                     ? 5'd12 :
+    mpeg2_new_pred_error                                     ? mpeg2_new_pp_diag_pred_error_code :
     mpeg2_new_pp_diag_boundary_error                         ? 5'd11 :
                                                                5'd0;
 wire [4:0] mpeg2_new_pp_diag_code =

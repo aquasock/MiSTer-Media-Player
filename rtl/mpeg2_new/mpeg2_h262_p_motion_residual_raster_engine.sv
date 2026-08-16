@@ -138,6 +138,11 @@ reg [2:0] verify_row;
 reg [1:0] tap_index;
 reg [10:0] pred_sum;
 reg [7:0] out_reg;
+// kate - Commit 154 observer-only failure cause.  This register does not feed
+// any engine control.  While nonzero, the existing sample/reconstruction proof
+// outputs carry E?/D? signatures so the top-level USER diagnostic can classify
+// the first generalized-P error without adding another functional interface.
+reg [3:0] diag_error_cause;
 integer i;
 
 wire [28:0] roff=reference_bank_latched?BANK_OFF:0;
@@ -217,7 +222,7 @@ always @(posedge clk) begin
         req<=0; waitresp<=0; req_kind<=0; mbi<=0; col<=0; mrow<=0; blk<=0; timeout<=0;
         emit<=0; wait_store<=0; pixel_setup<=0; ei<=0; verify_row<=0; tap_index<=0; pred_sum<=0; out_reg<=0;
         read_seen<=0; sample_value<=0; sample_nonzero<=0; half_sample_seen<=0;
-        reconstructed_seen<=0; reconstructed_value<=0; persisted_seen<=0; persisted_value<=0; error<=0;
+        reconstructed_seen<=0; reconstructed_value<=0; persisted_seen<=0; persisted_value<=0; error<=0; diag_error_cause<=0;
         for(i=0;i<48;i=i+1) begin mvx[i]<=0; mvy[i]<=0; end
         for(i=0;i<16;i=i+1) begin desc_mb[i]<=0; desc_block[i]<=0; end
         for(i=0;i<8;i=i+1) resrows[i]<=0;
@@ -228,41 +233,69 @@ always @(posedge clk) begin
             persisted_seen<=0; metadata_done<=0; motion_count<=6'd1; mvx[0]<=residual_value[15:8]; mvy[0]<=residual_value[7:0];
             desc_count<=0; current_desc_slot<=0; desc_active<=0; sample_expected<=0; exec_desc_slot<=0;
             pending<=request; started<=0; req<=0; waitresp<=0; emit<=0; wait_store<=0; pixel_setup<=0;
-            mbi<=0; col<=0; mrow<=0; blk<=0; ei<=0; verify_row<=0; half_sample_seen<=0;
+            mbi<=0; col<=0; mrow<=0; blk<=0; ei<=0; verify_row<=0; half_sample_seen<=0; diag_error_cause<=0;
         end else if(capture_enable&&residual_valid) begin
             if(desc_active) begin
-                if(residual_index!=sample_expected) error<=1;
+                if(residual_index!=sample_expected) begin
+                    error<=1;
+                    if(diag_error_cause==0) diag_error_cause<=4'd1;
+                end
                 else begin
                     rm[{current_desc_slot,6'b000000}+residual_index]<=residual_value;
                     if(residual_index==6'd63) desc_active<=0;
                     else sample_expected<=sample_expected+1'b1;
                 end
             end else if(residual_index==6'h3e) begin
-                if(metadata_done||(desc_count!=0)||(motion_count>=6'd48)) error<=1;
+                if(metadata_done||(desc_count!=0)||(motion_count>=6'd48)) begin
+                    error<=1;
+                    if(diag_error_cause==0) diag_error_cause<=4'd1;
+                end
                 else begin mvx[motion_count]<=residual_value[15:8]; mvy[motion_count]<=residual_value[7:0]; motion_count<=motion_count+1'b1; end
             end else if((residual_index==6'h3f)&&(residual_value[15:12]==4'hB)) begin
-                if((motion_count!=6'd48)||metadata_done||(desc_count>=MAX_BLOCKS)||(residual_value[8:3]>=48)||(residual_value[2:0]>=6)||descriptor_order_error) error<=1;
+                if((motion_count!=6'd48)||metadata_done||(desc_count>=MAX_BLOCKS)||(residual_value[8:3]>=48)||(residual_value[2:0]>=6)||descriptor_order_error) begin
+                    error<=1;
+                    if(diag_error_cause==0) diag_error_cause<=4'd1;
+                end
                 else begin
                     current_desc_slot<=desc_count[3:0]; desc_mb[desc_count]<=residual_value[8:3]; desc_block[desc_count]<=residual_value[2:0];
                     desc_count<=desc_count+1'b1; desc_active<=1; sample_expected<=0;
                 end
             end else if((residual_index==6'h3f)&&(residual_value==16'shA2FF)) begin
-                if((motion_count!=6'd48)||metadata_done) error<=1; else metadata_done<=1;
-            end else error<=1;
+                if((motion_count!=6'd48)||metadata_done) begin
+                    error<=1;
+                    if(diag_error_cause==0) diag_error_cause<=4'd1;
+                end
+                else metadata_done<=1;
+            end else begin
+                error<=1;
+                if(diag_error_cause==0) diag_error_cause<=4'd1;
+            end
         end
 
         if(request&&!started) pending<=1;
         if(pending&&!started&&ready_res) begin
             pending<=0; started<=1; active<=1; reference_bank_latched<=reference_bank; destination_bank_latched<=destination_bank;
             timeout<=24'hffffff; mbi<=0; col<=0; mrow<=0; blk<=0; ei<=0; exec_desc_slot<=0; pixel_setup<=1;
-            if(!reference_valid||(reference_bank==destination_bank)||(motion_count!=6'd48)) begin error<=1; active<=0; persisted_seen<=1; timeout<=0; pixel_setup<=0; end
+            if(!reference_valid||(reference_bank==destination_bank)||(motion_count!=6'd48)) begin
+                error<=1; active<=0; persisted_seen<=1; timeout<=0; pixel_setup<=0;
+                if(diag_error_cause==0) diag_error_cause<=4'd2;
+            end
         end
 
-        if(started&&!persisted_seen&&timeout!=0) begin timeout<=timeout-1'b1; if(timeout==1) error<=1; end
+        if(started&&!persisted_seen&&timeout!=0) begin
+            timeout<=timeout-1'b1;
+            if(timeout==1) begin
+                error<=1;
+                if(diag_error_cause==0) diag_error_cause<=4'd6;
+            end
+        end
 
         if(pixel_setup) begin
             pixel_setup<=0; pred_sum<=0; tap_index<=0;
-            if(!source_bounds_ok) begin error<=1; active<=0; persisted_seen<=1; timeout<=0; end
+            if(!source_bounds_ok) begin
+                error<=1; active<=0; persisted_seen<=1; timeout<=0;
+                if(diag_error_cause==0) diag_error_cause<=4'd3;
+            end
             else begin
                 if(half_x||half_y) half_sample_seen<=1;
                 req_kind<=0; req<=1;
@@ -272,7 +305,10 @@ always @(posedge clk) begin
         if(req&&!ddram_busy) begin req<=0; waitresp<=1; end
 
         if(ddram_dout_ready) begin
-            if(!waitresp) error<=1;
+            if(!waitresp) begin
+                error<=1;
+                if(diag_error_cause==0) diag_error_cause<=4'd4;
+            end
             else begin
                 waitresp<=0;
                 if(!req_kind) begin
@@ -283,13 +319,19 @@ always @(posedge clk) begin
                         end
                     end else begin pred_sum<=pred_sum_with_current; tap_index<=tap_index+1'b1; req<=1; end
                 end else begin
-                    if(ddram_dout!=resrows[verify_row]) error<=1;
+                    if(ddram_dout!=resrows[verify_row]) begin
+                        error<=1;
+                        if(diag_error_cause==0) diag_error_cause<=4'd5;
+                    end
                     if((mbi==0)&&(blk==0)&&(verify_row==0)) persisted_value<=ddram_dout[7:0];
                     if(verify_row==3'd7) begin
                         if(residual_hit) exec_desc_slot<=exec_desc_slot+1'b1;
                         if(blk==3'd5) begin
                             if(mbi+1>=MB_COUNT) begin
-                                if((exec_desc_slot+(residual_hit?1'b1:1'b0))!=desc_count) error<=1;
+                                if((exec_desc_slot+(residual_hit?1'b1:1'b0))!=desc_count) begin
+                                    error<=1;
+                                    if(diag_error_cause==0) diag_error_cause<=4'd7;
+                                end
                                 persisted_seen<=1; reconstructed_seen<=1; active<=0; timeout<=0;
                             end else begin
                                 mbi<=mbi+1'b1;
@@ -312,6 +354,15 @@ always @(posedge clk) begin
 
         if(wait_store&&store_block_stored) begin
             wait_store<=0; req_kind<=1; verify_row<=0; req<=1;
+        end
+
+        // Diagnostic carrier only.  No functional control consumes these proof
+        // values when error is asserted; normal USER acceptance already rejects
+        // probe_error.  A paired signature avoids mistaking ordinary pixel data
+        // for a classified generalized-P error in the wrapper-level fallback.
+        if(diag_error_cause!=0) begin
+            sample_value<={4'hE,diag_error_cause};
+            reconstructed_value<={4'hD,diag_error_cause};
         end
     end
 end
