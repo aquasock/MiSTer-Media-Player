@@ -136,35 +136,35 @@ Idle Current: \~1.1A
 
 ## Standard Workflow:
 
-1. Review the available build and test logs, identify the observed failures or required work, and prepare a proposed plan of action for the next GitHub commits. Present that plan to the user and wait for explicit user approval.
+1. Review the available build and test logs, identify the observed failures or required work, and prepare a proposed plan of action for the next GitHub commits. 
 
-2. Update core-log.md with you proposed changes. You will make changes to the online github source code directly that is aligned with your proposed changes in core-log.md.
+2. Update core-log.md with your proposal and await user approval.
 
-3. You will then commit the change with a commit message that follows previous agents commit message conventions.
+3. If approved, you will make changes to the online github source code directly that is aligned with your proposed changes in core-log.md.
 
-4. You will record a new COMMIT entry in core-log.md. Follow all existing syntax and conventions of core-log.md. Verify the core-log.md entry limit and update if necessary.
+4. You will then commit the change with a commit message that follows previous agents commit message conventions. This will become the next builds official commit hash.
 
 5. I will then pull the updated source code into my build enviroment, build the binary, and run any diagnostic tests you requested.
 
-6. I will push the results of the diagnostic tests (if any) into the "current_results" folder in your core project folder. Updated log files for the recently compiled binary will also be located in  "current_results" folder.
+6. I will push the results of the diagnostic tests (if any) into the "current_results" folder in your core project folder. Updated log files for the recently compiled binary will also be located in "current_results" folder in (official commit hash)\_build\_logs.tar.gz.
 
-7. I will inform you of my results and you will inspect the contents of the "current_results" folder. build logs will be stored in (current\_short commit)\_build\_logs.tar.gz
+7. I will inform you of my results and you will inspect the contents of the "current_results" folder. 
 
-8. If my results convince you we should continue, update the core-log.md file with the new information.
+8. In one commit:
 
-9. In one commit:
+- Take (official commit hash)\_build\_logs.tar.gz and store it inside the "archived_results" folder. 
 
-- Take (current\_short commit)\_build\_logs.tar.gz and store it inside the "archived_results" folder. 
+- Delete the (official commit hash)\_build\_logs.tar.gz file in the "current_results" folder.
 
-- Delete the (current\_short commit)\_build\_logs.tar.gz file in the "current_results" folder.
+- Take anything else remaining inside "current_results" directory and .tar.gz it into the "archived_results" folder under the name (official commit hash)\_build\_resources.tar.gz.
 
-- Take anything else remaining inside "(project\_name)" directory and .tar.gz it into the "archived_results" folder under the name (current\_short commit)\_build\_resources.tar.gz.
+ update the core-log.md file with your analysis.
 
-- Label the commit message, ""(current\_short commit) archiving results" "
+- Label the commit message, "(official commit hash) archiving results"
 
-10. Check the MiSTer-Media-Player-Audio project's latest commit on github and verify that there are no conflicts with the MiSTer-Media-Player's functionality or later integration with MiSTer-Media-Player-Audio.
+9. Check the MiSTer-Media-Player-Audio project's latest commit on github and verify that there are no conflicts with the MiSTer-Media-Player's functionality or later integration with MiSTer-Media-Player-Audio.
 
-11. Repeat.
+10. Repeat.
 
 ---
 
