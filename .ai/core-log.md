@@ -751,13 +751,25 @@ The shared P residual pipeline is extended rather than duplicated. Wide sparse r
 
 The generalized P raster engine now derives execution geometry through 45x30 macroblocks and retains ordered motion words in an M10K-oriented 1350x16 motion store with no reset loop. Reference and destination addressing preserve the established fixed 720-luma/360-chroma DDR row layout. The reference wrapper broadens only generalized-P sideband detection to the supported frame envelope; B detection and the historical aligned-plan adapter remain restricted to their proven 128x96 paths. `files.qip` changes only to register the new SystemVerilog source.
 
-A deterministic generator `tools/streams/generate_test_p_720x480_general_decode.py` was added. Agent-side FFmpeg/FFprobe validation succeeds on the generated 720x480 I/P/I elementary stream: 45x30 = 1350 macroblocks, forward f_code=(3,3), two internal skipped P macroblocks, safe interior signed half-sample motion, and one sparse Y residual block. The generated `.m2v` remains local-only and is not committed. This software-side generator check is not FPGA build or MiSTer hardware acceptance.
+A deterministic generator `tools/streams/generate_test_p_720x480_general_decode.py` was added. Agent-side FFmpeg/FFprobe validation succeeds on the generated 720x480 I/P/I elementary stream: 45x30 = 1350 macroblocks, forward f_code=(3,3), two internal skipped P macroblocks, safe interior signed half-sample motion, and one sparse Y residual block. The generated `.m2v` remains local-only and is not committed.
 
-No B-picture geometry, H.222.0/PES, audio, interlaced picture structure, non-4:2:0 chroma, DDR display-write protection, reference-publication semantics, consecutive-P destination pacing, SDC constraints, or release metadata is changed by this boundary. MiSTer-Media-Player-Audio compatibility remains unavailable because `core.md` has no configured Audio repository.
+The exact user-uploaded build package is `7d820f9_build_logs.tar.gz`, Git blob `fafff62251e9e9e66632bb83d424027da11c52c8`, 1,194,353 bytes, SHA-256 `27d3e913ee2328ab14b0cc81a7cee052d2b96320a1280257c165e3c83254c17a`. Repository commit `4cb59a55e3c423b13e14ec5a8c831602f3afb872` adds only that build-log package on top of metadata-only `7d820f9`; the synthesized functional source remains exact Commit 166 `74535ad`.
+
+The supplied Quartus reports were extracted and inspected directly. Quartus Prime 17.0.2 Build 602 completed successfully for Cyclone V `5CSEBA6U23I7`. Fitter utilization is 36,957 / 41,910 ALMs (88%), 45,721 registers, 487,041 / 5,662,720 block-memory bits (9%) in 78 / 553 RAM blocks (14%), 70 / 112 DSPs (63%), and 3 / 6 PLLs (50%). Relative to the v0.4.0 qualified `1370c28` baseline this is +5,175 ALMs, +1,909 registers, +25,696 block-memory bits, +5 RAM blocks, +2 DSPs, and no PLL change.
+
+Timing closes with zero setup endpoint TNS. Global worst setup is +0.270 ns; decoder same-clock reports 0/100 violations with worst +0.674 ns; video same-clock reports 0/80 violations with worst +6.977 ns; hold +0.252 ns; recovery +3.598 ns; removal +0.694 ns; minimum pulse-width +0.462 ns. Structural timing remains `no_clock=3094`, `multiple_clock=86`, `virtual_clock=1`, `no_input_delay=14`, `no_output_delay=129`, `loops=0`, and `latches=0`. No `Error` or `Critical Warning` records were found in the supplied flow/fitter/STA reports.
+
+Fitter hierarchy confirms the intended storage mapping: `motion_mem_rtl_0` is a 1350x16 simple-dual-port logical memory using 21,600 bits in four M10Ks. The new wide syntax parser itself uses approximately 4,696 ALMs, 2,583 dedicated registers, one 4,096-bit row-buffer M10K, and two DSP blocks; this accounts for most of the Commit-166 resource increase and leaves ALM utilization at 88%.
+
+Hardware validation passes completely. The user reports all six requested tests pass: `test_p_720x480_general_decode.m2v`, repeated `test_p_consecutive_reference.m2v`, `test_p_general_decode.m2v`, `test_b_mixed_gop.m2v`, `test_b_core_decode.m2v`, and `test_all_i.m2v`. This accepts the 720x480 generalized progressive 4:2:0 P-picture boundary while preserving the existing P/B/I guards.
+
+The required Audio compatibility check is now available. MiSTer-Media-Player-Audio `main` is `1bfca132f48aaa4438c392bfabb21fc18fda192e`. Its `files.qip`, generalized-P controller, generalized-P raster engine, generalized-P residual pipeline, and reference wrapper have blob SHAs identical to the Audio D0 bootstrap `2e202fab2402788bf548654c75e27ca432289723`. Therefore Audio has no independent edits in the existing source paths overlapped by Commit 166, and no immediate reintegration conflict is identified.
+
+No B-picture geometry, H.222.0/PES, audio, interlaced picture structure, non-4:2:0 chroma, DDR display-write protection, reference-publication semantics, consecutive-P destination pacing, SDC constraints, or release metadata changed in this boundary.
 
 #### Next Steps:
 
-Pull current `master`. Run `python3 tools/streams/generate_test_p_720x480_general_decode.py`, then perform a clean/from-scratch Quartus Prime 17.0.2 build. Place the build logs in `.ai/current_results` as `74535ad_build_logs.tar.gz`. On hardware run `test_p_720x480_general_decode.m2v`, repeated `test_p_consecutive_reference.m2v`, `test_p_general_decode.m2v`, `test_b_mixed_gop.m2v`, `test_b_core_decode.m2v`, and `test_all_i.m2v`. Report USER behavior and any load/stall/crash or visible reconstruction anomaly before further source work.
+Preserve Commit 166 as the accepted 720x480 generalized-P functional baseline. The measured 88% ALM utilization is too close to device capacity to widen B geometry immediately. The next proposed engineering boundary is resource recovery/consolidation of the generalized-P syntax path while preserving the exact 720x480 behavior and all six accepted regressions. No further source changes are authorized until the user approves that boundary.
 
 #### Files Modified:
 
@@ -771,5 +783,5 @@ Pull current `master`. Run `python3 tools/streams/generate_test_p_720x480_genera
 
 #### Status:
 
-- [ ] Built — exact Commit 166 source not yet Quartus-validated
-- [ ] Passed — exact Commit 166 source not yet hardware-validated
+- [x] Built — clean Quartus 17.0.2 flow/fitter/STA accepted; timing closes at 88% ALM utilization
+- [x] Passed — new 720x480 P regression and all five standing P/B/I guards pass
