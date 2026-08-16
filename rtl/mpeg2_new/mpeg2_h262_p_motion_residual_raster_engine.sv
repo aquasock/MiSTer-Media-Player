@@ -143,6 +143,13 @@ reg [7:0] out_reg;
 // outputs carry E?/D? signatures so the top-level USER diagnostic can classify
 // the first generalized-P error without adding another functional interface.
 reg [3:0] diag_error_cause;
+// kate - Commit 160 observer-only timeout phase.  The live phase tracks the
+// four transaction regions that can consume the watchdog; the latched phase is
+// captured only when cause 6 first wins.  Neither register feeds engine control.
+// 1 prediction DDR request issue/accept, 2 prediction response wait,
+// 3 reconstructed block output/store completion, 4 persistence readback.
+reg [2:0] diag_timeout_phase;
+reg [2:0] diag_timeout_phase_latched;
 integer i;
 
 wire [28:0] roff=reference_bank_latched?BANK_OFF:0;
@@ -222,7 +229,8 @@ always @(posedge clk) begin
         req<=0; waitresp<=0; req_kind<=0; mbi<=0; col<=0; mrow<=0; blk<=0; timeout<=0;
         emit<=0; wait_store<=0; pixel_setup<=0; ei<=0; verify_row<=0; tap_index<=0; pred_sum<=0; out_reg<=0;
         read_seen<=0; sample_value<=0; sample_nonzero<=0; half_sample_seen<=0;
-        reconstructed_seen<=0; reconstructed_value<=0; persisted_seen<=0; persisted_value<=0; error<=0; diag_error_cause<=0;
+        reconstructed_seen<=0; reconstructed_value<=0; persisted_seen<=0; persisted_value<=0; error<=0;
+        diag_error_cause<=0; diag_timeout_phase<=0; diag_timeout_phase_latched<=0;
         for(i=0;i<48;i=i+1) begin mvx[i]<=0; mvy[i]<=0; end
         for(i=0;i<16;i=i+1) begin desc_mb[i]<=0; desc_block[i]<=0; end
         for(i=0;i<8;i=i+1) resrows[i]<=0;
@@ -233,7 +241,8 @@ always @(posedge clk) begin
             persisted_seen<=0; metadata_done<=0; motion_count<=6'd1; mvx[0]<=residual_value[15:8]; mvy[0]<=residual_value[7:0];
             desc_count<=0; current_desc_slot<=0; desc_active<=0; sample_expected<=0; exec_desc_slot<=0;
             pending<=request; started<=0; req<=0; waitresp<=0; emit<=0; wait_store<=0; pixel_setup<=0;
-            mbi<=0; col<=0; mrow<=0; blk<=0; ei<=0; verify_row<=0; half_sample_seen<=0; diag_error_cause<=0;
+            mbi<=0; col<=0; mrow<=0; blk<=0; ei<=0; verify_row<=0; half_sample_seen<=0;
+            diag_error_cause<=0; diag_timeout_phase<=0; diag_timeout_phase_latched<=0;
         end else if(capture_enable&&residual_valid) begin
             if(desc_active) begin
                 if(residual_index!=sample_expected) begin
@@ -276,6 +285,7 @@ always @(posedge clk) begin
         if(pending&&!started&&ready_res) begin
             pending<=0; started<=1; active<=1; reference_bank_latched<=reference_bank; destination_bank_latched<=destination_bank;
             timeout<=24'hffffff; mbi<=0; col<=0; mrow<=0; blk<=0; ei<=0; exec_desc_slot<=0; pixel_setup<=1;
+            diag_timeout_phase<=3'd1;
             if(!reference_valid||(reference_bank==destination_bank)||(motion_count!=6'd48)) begin
                 error<=1; active<=0; persisted_seen<=1; timeout<=0; pixel_setup<=0;
                 if(diag_error_cause==0) diag_error_cause<=4'd2;
@@ -286,7 +296,11 @@ always @(posedge clk) begin
             timeout<=timeout-1'b1;
             if(timeout==1) begin
                 error<=1;
-                if(diag_error_cause==0) diag_error_cause<=4'd6;
+                if(diag_error_cause==0) begin
+                    diag_error_cause<=4'd6;
+                    diag_timeout_phase_latched<=
+                        (diag_timeout_phase==3'd0) ? 3'd1 : diag_timeout_phase;
+                end
             end
         end
 
@@ -298,11 +312,14 @@ always @(posedge clk) begin
             end
             else begin
                 if(half_x||half_y) half_sample_seen<=1;
-                req_kind<=0; req<=1;
+                req_kind<=0; req<=1; diag_timeout_phase<=3'd1;
             end
         end
 
-        if(req&&!ddram_busy) begin req<=0; waitresp<=1; end
+        if(req&&!ddram_busy) begin
+            req<=0; waitresp<=1;
+            diag_timeout_phase<=req_kind ? 3'd4 : 3'd2;
+        end
 
         if(ddram_dout_ready) begin
             if(!waitresp) begin
@@ -313,12 +330,15 @@ always @(posedge clk) begin
                 waitresp<=0;
                 if(!req_kind) begin
                     if(tap_last) begin
-                        out_reg<=reconstructed_current; emit<=1;
+                        out_reg<=reconstructed_current; emit<=1; diag_timeout_phase<=3'd3;
                         if((mbi==0)&&(blk==0)&&(ei==0)) begin
                             read_seen<=1; sample_value<=predicted_current; sample_nonzero<=|predicted_current;
                         end
-                    end else begin pred_sum<=pred_sum_with_current; tap_index<=tap_index+1'b1; req<=1; end
+                    end else begin
+                        pred_sum<=pred_sum_with_current; tap_index<=tap_index+1'b1; req<=1; diag_timeout_phase<=3'd1;
+                    end
                 end else begin
+                    diag_timeout_phase<=3'd4;
                     if(ddram_dout!=resrows[verify_row]) begin
                         error<=1;
                         if(diag_error_cause==0) diag_error_cause<=4'd5;
@@ -336,9 +356,11 @@ always @(posedge clk) begin
                             end else begin
                                 mbi<=mbi+1'b1;
                                 if(col+1>=MB_WIDTH) begin col<=0; mrow<=mrow+1'b1; end else col<=col+1'b1;
-                                blk<=0; ei<=0; pixel_setup<=1;
+                                blk<=0; ei<=0; pixel_setup<=1; diag_timeout_phase<=3'd1;
                             end
-                        end else begin blk<=blk+1'b1; ei<=0; pixel_setup<=1; end
+                        end else begin
+                            blk<=blk+1'b1; ei<=0; pixel_setup<=1; diag_timeout_phase<=3'd1;
+                        end
                     end else begin verify_row<=verify_row+1'b1; req<=1; end
                 end
             end
@@ -348,21 +370,33 @@ always @(posedge clk) begin
             resrows[er][{el,3'b000}+:8]<=out_reg;
             if((mbi==0)&&(blk==0)&&(ei==0)) reconstructed_value<=out_reg;
             emit<=0;
-            if(ei==6'd63) wait_store<=1;
-            else begin ei<=ei+1'b1; pixel_setup<=1; end
+            if(ei==6'd63) begin
+                wait_store<=1; diag_timeout_phase<=3'd3;
+            end
+            else begin ei<=ei+1'b1; pixel_setup<=1; diag_timeout_phase<=3'd1; end
         end
 
         if(wait_store&&store_block_stored) begin
-            wait_store<=0; req_kind<=1; verify_row<=0; req<=1;
+            wait_store<=0; req_kind<=1; verify_row<=0; req<=1; diag_timeout_phase<=3'd4;
         end
 
         // Diagnostic carrier only.  No functional control consumes these proof
         // values when error is asserted; normal USER acceptance already rejects
-        // probe_error.  A paired signature avoids mistaking ordinary pixel data
-        // for a classified generalized-P error in the wrapper-level fallback.
+        // probe_error.  Commit 160 remaps timeout cause 6 only: E1/D1..E4/D4
+        // encode timeout phase 1..4 for the existing Commit-159 A-B-C display.
+        // Thus a timeout-before-writer failure is shown as 1-P-C, while all
+        // non-timeout generalized-P causes retain their historical E?/D? codes.
         if(diag_error_cause!=0) begin
-            sample_value<={4'hE,diag_error_cause};
-            reconstructed_value<={4'hD,diag_error_cause};
+            if((diag_error_cause==4'd6) &&
+               (diag_timeout_phase_latched>=3'd1) &&
+               (diag_timeout_phase_latched<=3'd4)) begin
+                sample_value<={4'hE,1'b0,diag_timeout_phase_latched};
+                reconstructed_value<={4'hD,1'b0,diag_timeout_phase_latched};
+            end
+            else begin
+                sample_value<={4'hE,diag_error_cause};
+                reconstructed_value<={4'hD,diag_error_cause};
+            end
         end
     end
 end
