@@ -1,7 +1,7 @@
 //============================================================================
 // MiSTer Media Player - standards-driven H.262 8x8 inverse DCT
 //
-// Commit 149 resource consolidation, with Commit 151 storage cleanup.
+// Commit 149 resource consolidation.
 //
 // Normative basis remains ITU-T H.262 / ISO/IEC 13818-2 clause 7.5 and
 // Annex A.  Arithmetic, Q14 basis constants, two-pass separable ordering,
@@ -9,11 +9,9 @@
 // preserved from the accepted implementation.
 //
 // Resource change: pass 1 and pass 2 are sequential and can never execute at
-// the same time, so they share one registered bank of eight 24x15 signed
-// multipliers and one 48-bit balanced adder tree.  Every live caller writes all
-// 64 coefficients before coeff_block_end, and pass 1 overwrites all 64 temp
-// entries before pass 2; redundant array clears and product-bank reset muxes
-// are therefore omitted without changing reachable transform behavior.
+// the same time, so they now share one registered bank of eight 24x15 signed
+// multipliers and one 48-bit balanced adder tree instead of synthesizing two
+// parallel multiplier/adder banks.  No transform precision is reduced.
 //============================================================================
 
 module mpeg2_h262_idct
@@ -39,6 +37,7 @@ module mpeg2_h262_idct
 
 reg signed [11:0] coeff [0:63];
 reg signed [23:0] temp [0:63];
+integer i;
 
 reg       capture_active;
 reg       pass1_active;
@@ -279,6 +278,20 @@ always @(posedge clk) begin
         sample_value        <= 16'sd0;
         first_luma_sample00 <= 16'sd0;
         first_luma_sample77 <= 16'sd0;
+
+        product0_r <= 39'sd0;
+        product1_r <= 39'sd0;
+        product2_r <= 39'sd0;
+        product3_r <= 39'sd0;
+        product4_r <= 39'sd0;
+        product5_r <= 39'sd0;
+        product6_r <= 39'sd0;
+        product7_r <= 39'sd0;
+
+        for (i = 0; i < 64; i = i + 1) begin
+            coeff[i] <= 12'sd0;
+            temp[i]  <= 24'sd0;
+        end
     end
     else begin
         sample_valid <= 1'b0;
@@ -341,6 +354,8 @@ always @(posedge clk) begin
                 block_complete      <= 1'b0;
                 first_luma_sample00 <= 16'sd0;
                 first_luma_sample77 <= 16'sd0;
+                for (i = 0; i < 64; i = i + 1)
+                    coeff[i] <= 12'sd0;
             end
         end
 
