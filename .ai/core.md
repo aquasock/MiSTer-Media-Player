@@ -146,19 +146,11 @@ Idle Current: \~1.1A
 
 5. I will then pull the updated source code into my build enviroment, build the binary, and run any diagnostic tests you requested.
 
-6. I will push the results of the diagnostic tests (if any) into the "current_results" folder in your core project folder. Updated log files for the recently compiled binary will also be located in the "output_files" and "phase1p_timing_reports" folders on the github root.
+6. I will push the results of the diagnostic tests (if any) into the "output_files" and "phase1p_timing_reports" folders on the github root. 
 
-7. I will inform you of my results and you will inspect the contents of the "current_results" folder. 
+7. I will inform you of my results and you will inspect the results.
 
-8. In one commit:
-
-- Take the contents of the phase1p_timing_reports and output_files, tar.gz them under the name (official commit hash)\_build\_logs.tar.gz, and store the archive inside the "archived_results" folder. 
-
-- Delete the contents of phase1p_timing_reports and output_files.
-
-- Take anything else remaining inside "current_results" directory and .tar.gz it into the "archived_results" folder under the name (official commit hash)\_build\_resources.tar.gz.
-
-- Label the commit message, "(official commit hash) archiving results"
+8. Delete the contents of phase1p_timing_reports and output_files.
 
 9. Check the MiSTer-Media-Player-Audio project's latest commit on github and verify that there are no conflicts with the MiSTer-Media-Player's functionality or later integration with MiSTer-Media-Player-Audio.
 
