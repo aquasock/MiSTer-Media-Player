@@ -10,10 +10,15 @@ wire [1:0] ec=bs?bsc:tcb?CB:tcr?CR:pixel_component;wire [11:0] ex=bs?{4'b0000,pi
 function automatic [28:0] r90;input [11:0] r;reg [28:0] x;begin x={17'd0,r};r90=(x<<6)+(x<<4)+(x<<3)+(x<<1);end endfunction
 function automatic [28:0] r45;input [11:0] r;reg [28:0] x;begin x={17'd0,r};r45=(x<<5)+(x<<3)+(x<<2)+x;end endfunction
 reg [63:0] b0,b1,b2,b3,b4,b5,b6,b7,sh;wire [63:0] shn={pixel_value,sh[63:8]};reg cap,flush,writing,ab,ascratch;reg [1:0] ac;reg [11:0] ox,oy;reg [2:0] wr;reg [28:0] wa;wire good=((ac==Y)&&(ox<720)&&(oy<480))||(((ac==CB)||(ac==CR))&&(ox<360)&&(oy<240));wire [28:0] off=ascratch?SCRATCH:(ab?BANK:0);wire [28:0] first=(ac==Y)?YB+off+r90(oy)+{20'd0,ox[11:3]}:(ac==CB)?CBB+off+r45(oy)+{20'd0,ox[11:3]}:CRB+off+r45(oy)+{20'd0,ox[11:3]};wire [28:0] stride=(ac==Y)?90:45;
-// kate - Commit 156 corrects the Commit-155 observer hookup onto the writer
-// that files.qip actually compiles.  Cause 4 groups both existing forms of
-// invalid block geometry/metadata; no writer control consumes this signal.
-wire [2:0] diag_error_cause_now=(block_start&&(cap||flush||writing))?3'd1:(pixel_valid&&!(cap||block_start))?3'd2:(block_complete&&(!cap||flush||writing))?3'd3:((block_start&&bs&&(bsc==2'b11))||(!writing&&flush&&!good))?3'd4:3'd0;
+// kate - Commit 157 refines only the observer encoding.  The first four values
+// split the previously proven overlapping block_start by the exact pre-edge
+// writer state and writer-visible DDR busy value.  Values 5..7 retain the
+// other three existing store-error classes.  No writer control consumes this.
+wire overlap_cap_only=block_start&&cap&&!flush&&!writing;
+wire overlap_flush_only=block_start&&!cap&&flush&&!writing;
+wire overlap_write_ready=block_start&&!cap&&flush&&writing&&!ddram_busy;
+wire overlap_write_busy=block_start&&!cap&&flush&&writing&&ddram_busy;
+wire [2:0] diag_error_cause_now=overlap_cap_only?3'd1:overlap_flush_only?3'd2:overlap_write_ready?3'd3:overlap_write_busy?3'd4:(pixel_valid&&!(cap||block_start))?3'd5:(block_complete&&(!cap||flush||writing))?3'd6:((block_start&&bs&&(bsc==2'b11))||(!writing&&flush&&!good))?3'd7:3'd0;
 assign ddram_burstcnt=writing?1:0;assign ddram_addr=writing?wa:0;assign ddram_rd=0;assign ddram_din=(wr==0)?b0:(wr==1)?b1:(wr==2)?b2:(wr==3)?b3:(wr==4)?b4:(wr==5)?b5:(wr==6)?b6:b7;assign ddram_be=8'hff;assign ddram_we=writing;
 always @(posedge clk)begin if(reset)begin cap<=0;flush<=0;writing<=0;ab<=0;ascratch<=0;ac<=0;ox<=0;oy<=0;wr<=0;wa<=0;sh<=0;block_stored<=0;write_seen<=0;store_error<=0;diag_error_cause<=0;end else begin block_stored<=0;
 if((diag_error_cause==0)&&(diag_error_cause_now!=0))diag_error_cause<=diag_error_cause_now;

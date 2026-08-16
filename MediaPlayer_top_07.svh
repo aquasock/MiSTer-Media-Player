@@ -83,12 +83,13 @@ wire mpeg2_new_normal_user_led =
     mpeg2_new_ddr_read_seen &&
     !mpeg2_new_ddr_cache_error;
 
-// Commit 155 refines Commit-154 code 13 without changing decode behavior.  The
-// DDR writer and framebuffer cache publish observer-only first-error causes.
-// This top-level observer also records whether prediction error was already
-// present, or appeared in the same observation interval, when the first DDR
-// store/cache failure became visible.  Once a DDR first-fault code is captured
-// it is sticky so a later prediction error cannot rewrite the ordering result.
+// Commit 157 refines only the proven Commit-156 overlap diagnostic.  The active
+// writer's three-bit observer now splits the prior store cause 1 into the exact
+// pre-edge writer state, including writer-visible DDR busy while writing.  The
+// top observer separately retains whether prediction error was already visible
+// on an earlier decoder clock or first becomes visible with the overlap.
+// Functional decode, writer sequencing, DDR service, and reference ownership are
+// unchanged.
 //
 // Progress pulses (unchanged):
 //  1 first P header consumed
@@ -101,22 +102,30 @@ wire mpeg2_new_normal_user_led =
 //  8 P2 reference publication complete
 //  9 following I header consumed, proving the compressed stream was released
 // 10 following I published and normal USER acceptance is clean
-// Error pulses:
+// Error pulses retained from Commit 156:
 // 11 second P reached before P1 reference/publication state was ready
 // 12 prediction/reference-pipeline error before a classified DDR first fault
 // 13 simultaneous/unclassified DDR store/cache error
 // 14 frontend/IQ/IDCT/reconstruction error
-// DDR first fault with NO prediction error already present/coincident:
-// 15 store block_start while prior capture/flush/write still active
+// 15 any store block_start overlap without prediction already/coincident
 // 16 store pixel_valid without an active block capture
 // 17 store block_complete in an invalid capture/flush/write state
-// 18 store rejected block geometry
+// 18 store rejected block geometry/metadata
 // 19 cache line-consumed event arrived before cache readiness
 // 20 cache reader fell more than one displayed line behind
 // 21 cache rejected picture geometry at startup
 // 22 cache invalid prefill state
-// Same eight DDR causes WITH prediction error already present/coincident:
-// 23..30 correspond respectively to causes 15..22 above.
+// 23 reserved generic overlap+prediction fallback
+// 24..30 retain causes 16..22 respectively with prediction already/coincident
+// Refined overlap+prediction terminal pulses:
+// 31 capture-active only; prediction was already present before overlap
+// 32 capture-active only; prediction first appears coincident with overlap
+// 33 flush-pending only; prediction was already present before overlap
+// 34 flush-pending only; prediction first appears coincident with overlap
+// 35 write-active+flush, DDR not busy; prediction already present before overlap
+// 36 write-active+flush, DDR not busy; prediction first appears with overlap
+// 37 write-active+flush, DDR busy; prediction already present before overlap
+// 38 write-active+flush, DDR busy; prediction first appears with overlap
 reg [31:0] mpeg2_new_pp_diag_picture_window;
 reg        mpeg2_new_pp_diag_header_capture;
 reg        mpeg2_new_pp_diag_header_second_byte;
@@ -132,10 +141,10 @@ reg        mpeg2_new_pp_diag_p2_persisted;
 reg        mpeg2_new_pp_diag_pred_persisted_d;
 reg        mpeg2_new_pp_diag_pred_before_ddr;
 reg        mpeg2_new_pp_diag_ddr_fault_latched;
-reg [4:0]  mpeg2_new_pp_diag_ddr_fault_code;
+reg [5:0]  mpeg2_new_pp_diag_ddr_fault_code;
 reg [4:0]  mpeg2_new_pp_diag_stage;
-reg [4:0]  mpeg2_new_pp_diag_code_d;
-reg [29:0] mpeg2_new_pp_diag_counter;
+reg [5:0]  mpeg2_new_pp_diag_code_d;
+reg [30:0] mpeg2_new_pp_diag_counter;
 
 wire [31:0] mpeg2_new_pp_diag_picture_window_next =
     {mpeg2_new_pp_diag_picture_window[23:0], mpeg2_stream_data};
@@ -156,52 +165,77 @@ wire mpeg2_new_pp_diag_persisted_edge =
 wire mpeg2_new_pp_diag_ddr_error_present =
     mpeg2_new_ddr_store_error || mpeg2_new_ddr_cache_error;
 
-wire [4:0] mpeg2_new_pp_diag_ddr_base_code =
+wire mpeg2_new_pp_diag_store_overlap_detail =
+    mpeg2_new_ddr_store_error && !mpeg2_new_ddr_cache_error &&
+    (mpeg2_new_ddr_store_diag_cause >= 3'd1) &&
+    (mpeg2_new_ddr_store_diag_cause <= 3'd4);
+
+wire [5:0] mpeg2_new_pp_diag_ddr_base_code =
+    mpeg2_new_pp_diag_store_overlap_detail                  ? 6'd15 :
     (mpeg2_new_ddr_store_error && !mpeg2_new_ddr_cache_error &&
-     (mpeg2_new_ddr_store_diag_cause == 3'd1)) ? 5'd15 :
+     (mpeg2_new_ddr_store_diag_cause == 3'd5)) ? 6'd16 :
     (mpeg2_new_ddr_store_error && !mpeg2_new_ddr_cache_error &&
-     (mpeg2_new_ddr_store_diag_cause == 3'd2)) ? 5'd16 :
+     (mpeg2_new_ddr_store_diag_cause == 3'd6)) ? 6'd17 :
     (mpeg2_new_ddr_store_error && !mpeg2_new_ddr_cache_error &&
-     (mpeg2_new_ddr_store_diag_cause == 3'd3)) ? 5'd17 :
-    (mpeg2_new_ddr_store_error && !mpeg2_new_ddr_cache_error &&
-     (mpeg2_new_ddr_store_diag_cause == 3'd4)) ? 5'd18 :
+     (mpeg2_new_ddr_store_diag_cause == 3'd7)) ? 6'd18 :
     (mpeg2_new_ddr_cache_error && !mpeg2_new_ddr_store_error &&
-     (mpeg2_new_ddr_cache_diag_cause == 3'd1)) ? 5'd19 :
+     (mpeg2_new_ddr_cache_diag_cause == 3'd1)) ? 6'd19 :
     (mpeg2_new_ddr_cache_error && !mpeg2_new_ddr_store_error &&
-     (mpeg2_new_ddr_cache_diag_cause == 3'd2)) ? 5'd20 :
+     (mpeg2_new_ddr_cache_diag_cause == 3'd2)) ? 6'd20 :
     (mpeg2_new_ddr_cache_error && !mpeg2_new_ddr_store_error &&
-     (mpeg2_new_ddr_cache_diag_cause == 3'd3)) ? 5'd21 :
+     (mpeg2_new_ddr_cache_diag_cause == 3'd3)) ? 6'd21 :
     (mpeg2_new_ddr_cache_error && !mpeg2_new_ddr_store_error &&
-     (mpeg2_new_ddr_cache_diag_cause == 3'd4)) ? 5'd22 :
-                                                               5'd13;
+     (mpeg2_new_ddr_cache_diag_cause == 3'd4)) ? 6'd22 :
+                                                               6'd13;
 
 wire mpeg2_new_pp_diag_pred_at_or_before_ddr =
     mpeg2_new_pp_diag_pred_before_ddr || mpeg2_new_pred_error;
-wire [4:0] mpeg2_new_pp_diag_ddr_code_now =
-    ((mpeg2_new_pp_diag_ddr_base_code >= 5'd15) &&
-     (mpeg2_new_pp_diag_ddr_base_code <= 5'd22) &&
+wire mpeg2_new_pp_diag_pred_coincident_ddr =
+    !mpeg2_new_pp_diag_pred_before_ddr && mpeg2_new_pred_error;
+
+wire [5:0] mpeg2_new_pp_diag_overlap_pred_code =
+    (mpeg2_new_ddr_store_diag_cause == 3'd1) ?
+        (mpeg2_new_pp_diag_pred_before_ddr ? 6'd31 :
+         mpeg2_new_pp_diag_pred_coincident_ddr ? 6'd32 : 6'd23) :
+    (mpeg2_new_ddr_store_diag_cause == 3'd2) ?
+        (mpeg2_new_pp_diag_pred_before_ddr ? 6'd33 :
+         mpeg2_new_pp_diag_pred_coincident_ddr ? 6'd34 : 6'd23) :
+    (mpeg2_new_ddr_store_diag_cause == 3'd3) ?
+        (mpeg2_new_pp_diag_pred_before_ddr ? 6'd35 :
+         mpeg2_new_pp_diag_pred_coincident_ddr ? 6'd36 : 6'd23) :
+    (mpeg2_new_ddr_store_diag_cause == 3'd4) ?
+        (mpeg2_new_pp_diag_pred_before_ddr ? 6'd37 :
+         mpeg2_new_pp_diag_pred_coincident_ddr ? 6'd38 : 6'd23) :
+                                                               6'd23;
+
+wire [5:0] mpeg2_new_pp_diag_ddr_code_now =
+    (mpeg2_new_pp_diag_store_overlap_detail &&
      mpeg2_new_pp_diag_pred_at_or_before_ddr) ?
-        (mpeg2_new_pp_diag_ddr_base_code + 5'd8) :
+        mpeg2_new_pp_diag_overlap_pred_code :
+    ((mpeg2_new_pp_diag_ddr_base_code >= 6'd16) &&
+     (mpeg2_new_pp_diag_ddr_base_code <= 6'd22) &&
+     mpeg2_new_pp_diag_pred_at_or_before_ddr) ?
+        (mpeg2_new_pp_diag_ddr_base_code + 6'd8) :
         mpeg2_new_pp_diag_ddr_base_code;
-wire [4:0] mpeg2_new_pp_diag_ddr_display_code =
+wire [5:0] mpeg2_new_pp_diag_ddr_display_code =
     mpeg2_new_pp_diag_ddr_fault_latched ?
         mpeg2_new_pp_diag_ddr_fault_code :
         mpeg2_new_pp_diag_ddr_code_now;
 
-wire [4:0] mpeg2_new_pp_diag_error_code =
+wire [5:0] mpeg2_new_pp_diag_error_code =
     (mpeg2_new_syntax_error ||
      mpeg2_new_inverse_quant_error ||
      mpeg2_new_inverse_quant_unsupported_matrix ||
      mpeg2_new_idct_error ||
-     mpeg2_new_recon_error)                                  ? 5'd14 :
+     mpeg2_new_recon_error)                                  ? 6'd14 :
     mpeg2_new_pp_diag_ddr_fault_latched                      ? mpeg2_new_pp_diag_ddr_fault_code :
     mpeg2_new_pp_diag_ddr_error_present                      ? mpeg2_new_pp_diag_ddr_display_code :
-    mpeg2_new_pred_error                                     ? 5'd12 :
-    mpeg2_new_pp_diag_boundary_error                         ? 5'd11 :
-                                                               5'd0;
-wire [4:0] mpeg2_new_pp_diag_code =
-    (mpeg2_new_pp_diag_error_code != 5'd0) ?
-        mpeg2_new_pp_diag_error_code : mpeg2_new_pp_diag_stage;
+    mpeg2_new_pred_error                                     ? 6'd12 :
+    mpeg2_new_pp_diag_boundary_error                         ? 6'd11 :
+                                                               6'd0;
+wire [5:0] mpeg2_new_pp_diag_code =
+    (mpeg2_new_pp_diag_error_code != 6'd0) ?
+        mpeg2_new_pp_diag_error_code : {1'b0, mpeg2_new_pp_diag_stage};
 
 always @(posedge clk_mpeg2) begin
     if (reset_mpeg2) begin
@@ -220,10 +254,10 @@ always @(posedge clk_mpeg2) begin
         mpeg2_new_pp_diag_pred_persisted_d  <= 1'b0;
         mpeg2_new_pp_diag_pred_before_ddr   <= 1'b0;
         mpeg2_new_pp_diag_ddr_fault_latched <= 1'b0;
-        mpeg2_new_pp_diag_ddr_fault_code    <= 5'd0;
+        mpeg2_new_pp_diag_ddr_fault_code    <= 6'd0;
         mpeg2_new_pp_diag_stage             <= 5'd0;
-        mpeg2_new_pp_diag_code_d            <= 5'd0;
-        mpeg2_new_pp_diag_counter           <= 30'd0;
+        mpeg2_new_pp_diag_code_d            <= 6'd0;
+        mpeg2_new_pp_diag_counter           <= 31'd0;
     end
     else begin
         mpeg2_new_pp_diag_pred_persisted_d <= mpeg2_new_pred_persisted_seen;
@@ -342,7 +376,7 @@ always @(posedge clk_mpeg2) begin
         if (mpeg2_new_pp_diag_active) begin
             if (mpeg2_new_pp_diag_code != mpeg2_new_pp_diag_code_d) begin
                 mpeg2_new_pp_diag_code_d  <= mpeg2_new_pp_diag_code;
-                mpeg2_new_pp_diag_counter <= 30'd0;
+                mpeg2_new_pp_diag_counter <= 31'd0;
             end
             else begin
                 mpeg2_new_pp_diag_counter <=
@@ -352,10 +386,11 @@ always @(posedge clk_mpeg2) begin
     end
 end
 
-// Same slow cadence used by prior hardware traces: counter[29:24], roughly
-// 0.30 s per ON/OFF slot, followed by a long dark repeat gap.
-wire [5:0] mpeg2_new_pp_diag_phase = mpeg2_new_pp_diag_counter[29:24];
-wire [5:0] mpeg2_new_pp_diag_limit = {mpeg2_new_pp_diag_code_d, 1'b0};
+// Same slow cadence used by prior hardware traces: counter[30:24], roughly
+// 0.30 s per ON/OFF slot, followed by a long dark repeat gap.  Commit 157 adds
+// one observer counter/code bit only so terminal counts 31..38 fit cleanly.
+wire [6:0] mpeg2_new_pp_diag_phase = mpeg2_new_pp_diag_counter[30:24];
+wire [6:0] mpeg2_new_pp_diag_limit = {mpeg2_new_pp_diag_code_d, 1'b0};
 wire mpeg2_new_pp_diag_led =
     (mpeg2_new_pp_diag_phase < mpeg2_new_pp_diag_limit) &&
     !mpeg2_new_pp_diag_phase[0];
