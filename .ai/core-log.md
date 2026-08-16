@@ -1,25 +1,3 @@
-## 152 COMMIT v0.5.0-cycle c49a9e5 2026-08-15T17:51:47-07:00
-
-#### Coming From:
-v0.5.0-cycle f05d07d
-
-#### Purpose:
-Restore the pre-151 IDCT behavior.
-
-#### Outcome:
-`c49a9e5cf0becea550984050b9e44d9bb0cfa17a` exactly reverses Commit 151. Consecutive-P still intermittently stalls/crashes, proving Commit 151 was not the root cause.
-
-#### Next Steps:
-Instrument the consecutive-P failure before functional correction.
-
-#### Files Modified:
-- rtl/mpeg2_new/mpeg2_h262_idct.sv
-
-#### Status:
-- [x] Built
-- [ ] Passed — REJECTED
-
----
 ## 153 COMMIT v0.5.0-cycle 99c7519 2026-08-15T18:24:58-07:00
 
 #### Coming From:
@@ -74,7 +52,7 @@ v0.5.0-cycle ad071ba
 Refine DDR store/cache first-fault classes.
 
 #### Outcome:
-`dbd0993e78d187a5aee57a3edcb567bd0c558c28` adds observer-only writer/cache causes, but Analysis & Synthesis fails because the port was attached to an unused writer sibling rather than active `_420p.sv`.
+`dbd0993e78d187a5aee57a3edcb567bd0c558c28` adds observer-only writer/cache causes, but Analysis & Synthesis fails because the observer was attached to an unused writer sibling rather than active `_420p.sv`.
 
 #### Next Steps:
 Move only the observer to active `_420p.sv`.
@@ -124,7 +102,7 @@ Unreleased ebd3ead
 Refine code 23 into writer state/busy/ordering evidence.
 
 #### Outcome:
-`177a4800820560d13610d03f4f14c6e55d71163b` records the required observer evidence, but its USER encoding was intentionally superseded before build.
+`177a4800820560d13610d03f4f14c6e55d71163b` records the required observer evidence, but its USER encoding was superseded before build.
 
 #### Next Steps:
 Replace only USER presentation with readable grouped output.
@@ -405,7 +383,7 @@ Unreleased 0ea9ac5
 Widen progressive 4:2:0 B decoding through <=720x480 while preserving two-reference/scratch semantics and qualified P/I behavior.
 
 #### Outcome:
-`ac1ddaf393a09c7b2733657a84940f227cd1a63a` widens B syntax/raster to 45x30, streams B motion metadata into a 1350x34 M10K-oriented store, and widens the internal scratch tag while retaining four-block Y0 residual capacity. Clean build: 28,106 ALMs (67%), 38,220 registers, 534,989 memory bits, 84 RAM, 69 DSPs, 3 PLLs; setup +0.367, hold +0.251, recovery +3.395, removal +0.734, min-pulse +0.462, setup TNS 0, no flow errors/critical warnings. New 720x480 B plus prior six-stream matrix passes; Audio `81219ce` compatibility clean.
+`ac1ddaf393a09c7b2733657a84940f227cd1a63a` widens B syntax/raster to 45x30, streams B motion metadata into a 1350x34 M10K-oriented store, and widens the internal scratch tag while retaining four-block Y0 residual capacity. Clean build: 28,106 ALMs (67%), 38,220 registers, 534,989 memory bits, 84 RAM, 69 DSPs, 3 PLLs; setup +0.367, hold +0.251, recovery +3.395, removal +0.734, min-pulse +0.462, setup TNS 0. New 720x480 B plus prior six-stream matrix passes; Audio compatibility clean.
 
 #### Next Steps:
 Generalize B residual syntax/coverage.
@@ -431,7 +409,7 @@ Unreleased ac1ddaf
 Generalize progressive 4:2:0 B residual syntax across all six macroblock blocks.
 
 #### Outcome:
-`3fae8964f7458119eb04cd773cb85128ae6bfc09` adds full 4:2:0 CBP selection, block indices 0..5, generalized non-intra VLC/EOB/Escape parsing, and 16-block/64-event bounded B residual storage. Clean build: 30,089 ALMs (72%), 40,746 registers, 559,565 memory bits, 86 RAM, 69 DSPs, 3 PLLs; setup +0.310, hold +0.209, recovery +3.745, removal +0.785, min-pulse +0.462, setup TNS 0, no flow errors/critical warnings. New residual stream plus prior seven-stream matrix passes. Cleanup `df3380c`; Audio `a5d7606` compatibility clean.
+`3fae8964f7458119eb04cd773cb85128ae6bfc09` adds full 4:2:0 CBP selection, block indices 0..5, generalized non-intra VLC/EOB/Escape parsing, and 16-block/64-event bounded B residual storage. Clean build: 30,089 ALMs (72%), 40,746 registers, 559,565 memory bits, 86 RAM, 69 DSPs, 3 PLLs; setup +0.310, hold +0.209, recovery +3.745, removal +0.785, min-pulse +0.462, setup TNS 0. New residual stream plus prior seven-stream matrix passes. Cleanup `df3380c`; Audio `a5d7606` compatibility clean.
 
 #### Next Steps:
 Generalize remaining B macroblock-address increment syntax.
@@ -454,21 +432,45 @@ Generalize remaining B macroblock-address increment syntax.
 Unreleased 3fae896
 
 #### Purpose:
-Generalize progressive 4:2:0 B-picture macroblock-address increment syntax across the full Table-B.1 range needed inside a 45-macroblock row while preserving the accepted B motion/residual/raster behavior.
+Generalize progressive 4:2:0 B-picture macroblock-address increment syntax across the full Table-B.1 range needed inside a 45-macroblock row while preserving accepted B motion/residual/raster behavior.
 
 #### Outcome:
-Exact functional commit `eb80c7b39a1d1abc4535aab3e87484d1b7bdf02f` (`Generalize B macroblock address increments`) extends the B syntax path from the prior 1..8 subset to all Table-B.1 values 1..33 plus `macroblock_escape` accumulation. The B internal-skip counter widens from 4 to 6 bits so long skip runs remain lossless inside the established 45-wide row envelope. The parser still requires the first coded macroblock to begin the row and the final coded macroblock to reach the row end; leading/trailing skipped-B semantics remain outside this boundary.
+`eb80c7b39a1d1abc4535aab3e87484d1b7bdf02f` extends the B syntax path from values 1..8 to all Table-B.1 values 1..33 plus `macroblock_escape` accumulation and widens the B skip counter from 4 to 6 bits. The parser still requires first/last coded macroblocks to cover the row endpoints; leading/trailing skipped-B semantics remain outside this boundary. Agent-side `test_b_720x480_address_increment.m2v` validates at 183,001 bytes, SHA-256 `dd28b53fa8311d9ee0ea102b294eb681211083dc269b0225275ca6796c2dba68`, exercising increments 1, 34 (escape+1), and 10.
 
-Agent-side deterministic regression `test_b_720x480_address_increment.m2v` validates with FFmpeg/ffprobe: 183,001 bytes, SHA-256 `dd28b53fa8311d9ee0ea102b294eb681211083dc269b0225275ca6796c2dba68`, coded I/P/B/P/B, display I/B/P/B/P. Every B row codes columns 0, 34, 44, exercising increments 1, 34 (`macroblock_escape` + 1), and 10; selected coded macroblocks retain ten residual blocks per B picture spanning Y0-Y3/Cb/Cr. B motion/geometry, residual syntax/capacity, raster/DDR behavior, reference publication, scratch presentation ordering, P pacing, IDCT, QIP, and SDC are unchanged.
+Clean Quartus build uses 30,215 ALMs (72%), 40,762 registers, 559,565 block-memory bits, 86 RAM blocks, 69 DSPs, and 3 PLLs. All nine requested MiSTer regressions pass, including the new long-address-increment stream. Timing does not close: the 54 MHz decoder clock has worst setup -0.036 ns with endpoint TNS -0.206 ns and TimeQuest reports `Critical Warning (332148): Timing requirements not met`; Fmax is 53.9 MHz. Hold +0.256 ns, recovery +3.002 ns, removal +0.719 ns, and minimum pulse width +0.462 ns remain positive. Commit 170 closed the same decoder clock at +0.310 ns / zero TNS, so Commit 171 is hardware-functional but not timing-qualified. Build-report cleanup is `7f5789a`; latest Audio tip `826b2df` is metadata-only over the previously reviewed `a5d7606` top-level Audio CDC change, so integration compatibility remains clean.
 
 #### Next Steps:
-Pull current `master` and treat `eb80c7b` as the executable build hash. Run `python3 tools/streams/generate_test_b_720x480_address_increment.py`, then a clean Quartus/STA build. Run `test_b_720x480_address_increment.m2v` first, followed by `test_b_720x480_residual_decode.m2v`, `test_b_720x480_mixed_gop.m2v`, `test_p_720x480_general_decode.m2v`, repeated `test_p_consecutive_reference.m2v`, `test_p_general_decode.m2v`, `test_b_mixed_gop.m2v`, `test_b_core_decode.m2v`, and `test_all_i.m2v`.
+Close the Commit-171 decoder setup regression without changing its accepted B address semantics, then repeat the full nine-stream matrix.
 
 #### Files Modified:
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
 - tools/streams/generate_test_b_720x480_address_increment.py
+
+#### Status:
+- [x] Built — hardware behavior passes; setup timing fails
+- [ ] Passed — -0.036 ns setup / -0.206 ns TNS at 54 MHz decoder clock
+
+---
+## 172 PROPOSAL Unreleased pending 2026-08-16T16:01:00-07:00
+
+#### Coming From:
+Unreleased eb80c7b
+
+#### Purpose:
+Restore timing closure for Commit 171 while preserving its hardware-passing full Table-B.1/`macroblock_escape` B address behavior.
+
+#### Outcome:
+Scope Commit 172 to the Commit-171 B syntax/address path responsible for the new 54 MHz decoder setup regression. Preserve exact accepted Table-B.1 values 1..33, escape accumulation, 45-wide internal-skip behavior, the existing first/last-coded-row endpoint requirement, and every Commit-170/171 B motion/residual/raster behavior. Do not change DDR arbitration, reference publication, scratch presentation ordering, P pacing, IDCT arithmetic, QIP, SDC, or timing constraints. No new video capability is part of this boundary.
+
+Validation requires a clean Quartus/STA build with non-negative 54 MHz setup slack, zero setup TNS, and no timing-requirements critical warning. Run `test_b_720x480_address_increment.m2v` first, then `test_b_720x480_residual_decode.m2v`, `test_b_720x480_mixed_gop.m2v`, `test_p_720x480_general_decode.m2v`, repeated `test_p_consecutive_reference.m2v`, `test_p_general_decode.m2v`, `test_b_mixed_gop.m2v`, `test_b_core_decode.m2v`, and `test_all_i.m2v`. If timing closure requires changes outside the B syntax/address boundary or changes semantics, stop and revise the proposal before implementation.
+
+#### Next Steps:
+Await user approval before implementation.
+
+#### Files Modified:
+- TBD — Commit-171 B syntax/address core only
 
 #### Status:
 - [ ] Built
