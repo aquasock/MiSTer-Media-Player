@@ -24,9 +24,9 @@ module mpeg2_h262_reference_read_probe
  output wire reconstructed_seen,output wire[7:0] reconstructed_value,output wire persisted_seen,output wire[7:0] persisted_value,output wire probe_error
 );
 
-// kate - Commit 166: the generalized P sideband is now valid throughout the
-// established progressive 4:2:0 frame envelope. B remains on its proven 128x96
-// path and the historical aligned-plan adapter remains 128x96-only.
+// kate - Commit 169: both generalized P and controlled B sidebands are valid
+// throughout the established progressive 4:2:0 frame envelope. The historical
+// aligned-plan P adapter remains exact-128x96-only.
 wire general_geometry_supported=
  (horizontal_size!=14'd0)&&(vertical_size!=14'd0)&&
  (horizontal_size<=14'd720)&&(vertical_size<=14'd480);
@@ -45,7 +45,7 @@ wire b_direction_word=(p_residual_sample_index==6'h38)||(p_residual_sample_index
 wire b_detect_now=p_residual_sample_valid&&b_direction_word&&p_forward_vector_valid&&
  (p_forward_vector_x==13'sd2047)&&(p_forward_vector_y==-13'sd2048)&&
  (forward_f_code_horizontal==4'd3)&&(forward_f_code_vertical==4'd3)&&
- (horizontal_size==14'd128)&&(vertical_size==14'd96)&&!p_implicit_reconstruct_request;
+ general_geometry_supported&&!p_implicit_reconstruct_request;
 reg b_mode;
 wire b_active,b_persisted_seen,b_error,b_half,b_recon,b_read,b_nonzero;
 wire [7:0] b_sample,b_recon_value,b_persist_value;
