@@ -48,10 +48,10 @@ Refine code 12 to a first generalized-P error class.
 v0.5.0-cycle 99c7519
 
 #### Purpose:
-Refine the prediction/reference diagnostic to first generalized-P failure class.
+Refine prediction/reference diagnostics to first generalized-P failure class.
 
 #### Outcome:
-`ad071ba3380f918b9f4a3734a97cee1f00bf80c5` adds observer-only generalized-P first-error cause visibility. Clean build: 31,855 ALMs, 43,890 registers, 461,345 memory bits, 68 DSPs, 3 PLLs, setup +0.384 ns. Failures report code 13, proving DDR store/cache error is present but masking ordering.
+`ad071ba3380f918b9f4a3734a97cee1f00bf80c5` adds observer-only first-error cause visibility. Clean build: 31,855 ALMs, 43,890 registers, 461,345 memory bits, 68 DSPs, 3 PLLs, setup +0.384 ns. Failures report code 13, proving DDR store/cache error is present but masking ordering.
 
 #### Next Steps:
 Refine code 13 and preserve prediction-error ordering.
@@ -124,7 +124,7 @@ Unreleased ebd3ead
 Refine code 23 into writer state/busy/ordering evidence.
 
 #### Outcome:
-`177a4800820560d13610d03f4f14c6e55d71163b` preserves observer-only behavior and records the required evidence, but its USER encoding was intentionally superseded before build.
+`177a4800820560d13610d03f4f14c6e55d71163b` records the required observer evidence, but its USER encoding was intentionally superseded before build.
 
 #### Next Steps:
 Replace only USER presentation with readable grouped output.
@@ -169,7 +169,7 @@ Unreleased 5740587
 Identify the first generalized-P prediction/reference failure class.
 
 #### Outcome:
-`a5b518d045bb035748cb668f797ba4187a84bcba` decodes the existing first-error carrier. Failures report 2-2-4: generalized-P prediction transaction timeout precedes writer overlap. Clean build: 32,011 ALMs, 44,079 registers, 461,345 memory bits, 68 DSPs, 3 PLLs.
+`a5b518d045bb035748cb668f797ba4187a84bcba` decodes the first-error carrier. Failures report 2-2-4: generalized-P prediction transaction timeout precedes writer overlap. Clean build: 32,011 ALMs, 44,079 registers, 461,345 memory bits, 68 DSPs, 3 PLLs.
 
 #### Next Steps:
 Record timeout transaction phase.
@@ -367,10 +367,7 @@ Restore exact 128x96 consecutive-P compatibility without giving back resource re
 #### Files Modified:
 - rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe.sv
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh ... part3.svh
 
 #### Status:
 - [x] Built
@@ -431,17 +428,13 @@ Generalize B residual syntax/coverage.
 Unreleased ac1ddaf
 
 #### Purpose:
-Generalize progressive 4:2:0 B residual syntax across all six macroblock blocks while preserving accepted <=720x480 B geometry, motion, scratch-frame semantics, and qualified P/I behavior.
+Generalize progressive 4:2:0 B residual syntax across all six macroblock blocks.
 
 #### Outcome:
-Exact functional commit `3fae8964f7458119eb04cd773cb85128ae6bfc09` (`Generalize B residual coverage`) replaces the controlled CBP=32/Y0-only residual parser with full 4:2:0 Table-B.9 coded-block-pattern selection, block indices 0..5, Table-B.14 first/subsequent non-intra VLC handling, EOB, and Escape syntax using the established project VLC/transform path. Sparse metadata remains bounded to 16 residual blocks / 64 coefficient events, and the B raster is widened to matching 16x64 spatial-sample storage.
-
-Quartus 17.0.2 validation is clean at 30,089 / 41,910 ALMs (72%), 40,746 registers, 559,565 block-memory bits in 86 RAM blocks, 69 DSPs, and 3 PLLs. Relative to Commit 169 this adds 1,983 ALMs, 2,526 registers, 24,576 memory bits, and two RAM blocks; DSP/PLL use is unchanged. Setup TNS is zero; worst setup +0.310 ns, hold +0.209 ns, recovery +3.745 ns, removal +0.785 ns, minimum pulse-width +0.462 ns. No flow Error or Critical Warning records are present.
-
-Hardware validation passes completely: `test_b_720x480_residual_decode.m2v`, `test_b_720x480_mixed_gop.m2v`, `test_p_720x480_general_decode.m2v`, repeated `test_p_consecutive_reference.m2v`, `test_p_general_decode.m2v`, `test_b_mixed_gop.m2v`, `test_b_core_decode.m2v`, and `test_all_i.m2v` all pass. Build-report cleanup is commit `df3380c`; latest Audio functional commit `a5d7606` changes only `MediaPlayer_top_00.svh`, so Commit-170 integration compatibility remains clean.
+`3fae8964f7458119eb04cd773cb85128ae6bfc09` adds full 4:2:0 CBP selection, block indices 0..5, generalized non-intra VLC/EOB/Escape parsing, and 16-block/64-event bounded B residual storage. Clean build: 30,089 ALMs (72%), 40,746 registers, 559,565 memory bits, 86 RAM, 69 DSPs, 3 PLLs; setup +0.310, hold +0.209, recovery +3.745, removal +0.785, min-pulse +0.462, setup TNS 0, no flow errors/critical warnings. New residual stream plus prior seven-stream matrix passes. Cleanup `df3380c`; Audio `a5d7606` compatibility clean.
 
 #### Next Steps:
-Generalize the remaining bounded B macroblock-address increment syntax while preserving the accepted 72% residual/motion baseline.
+Generalize remaining B macroblock-address increment syntax.
 
 #### Files Modified:
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe.sv
@@ -452,28 +445,30 @@ Generalize the remaining bounded B macroblock-address increment syntax while pre
 
 #### Status:
 - [x] Built
-- [x] Passed — new B residual regression plus complete prior seven-stream matrix pass
+- [x] Passed
+
 ---
-## 171 PROPOSAL Unreleased pending 2026-08-16T15:17:00-07:00
+## 171 COMMIT Unreleased eb80c7b 2026-08-16T15:39:00-07:00
 
 #### Coming From:
 Unreleased 3fae896
 
 #### Purpose:
-Generalize progressive 4:2:0 B-picture macroblock-address increment syntax across the full Table-B.1 value range needed inside a 45-macroblock row while preserving the accepted <=720x480 B motion/residual/raster behavior.
+Generalize progressive 4:2:0 B-picture macroblock-address increment syntax across the full Table-B.1 range needed inside a 45-macroblock row while preserving the accepted B motion/residual/raster behavior.
 
 #### Outcome:
-The accepted Commit-170 B parser still decodes only `macroblock_address_increment` values 1..8 with a seven-bit VLC accumulator. At 720-pixel width a row contains 45 macroblocks, so valid internal coded-macroblock gaps can require Table-B.1 values 9..33 and `macroblock_escape` accumulation for increments above 33. `.ai/core-standards.md` H262-014 already records the full Table-B.1 values 1..33 and escape accumulation as verified H.262 behavior.
+Exact functional commit `eb80c7b39a1d1abc4535aab3e87484d1b7bdf02f` (`Generalize B macroblock address increments`) extends the B syntax path from the prior 1..8 subset to all Table-B.1 values 1..33 plus `macroblock_escape` accumulation. The B internal-skip counter widens from 4 to 6 bits so long skip runs remain lossless inside the established 45-wide row envelope. The parser still requires the first coded macroblock to begin the row and the final coded macroblock to reach the row end; leading/trailing skipped-B semantics remain outside this boundary.
 
-Scope Commit 171 to B syntax/address progression only: accept the full Table-B.1 increment set and escape accumulation sufficient for the established 45-wide row envelope, and preserve the existing internal skipped-B reconstruction behavior. Keep the current requirement that the first coded macroblock begins the row and the final coded macroblock reaches the row end; leading/trailing skipped-B semantics are not part of this boundary. Preserve B macroblock-type coverage, motion-vector decoding, residual syntax/capacity, raster/DDR behavior, reference publication, scratch presentation ordering, P pacing, IDCT, QIP, and SDC.
-
-Add a deterministic 720x480 B regression with long internal skip runs that exercise increment values above 8 and at least one escape-accumulated increment above 33, while retaining safe forward/backward/bidirectional motion and existing residual coverage. Validation requires a clean Quartus/STA build, the new address-increment regression first, then the complete eight-stream Commit-170 matrix. If correct implementation requires leading/trailing B skips or changes outside B syntax/address progression, stop and revise the proposal before proceeding.
+Agent-side deterministic regression `test_b_720x480_address_increment.m2v` validates with FFmpeg/ffprobe: 183,001 bytes, SHA-256 `dd28b53fa8311d9ee0ea102b294eb681211083dc269b0225275ca6796c2dba68`, coded I/P/B/P/B, display I/B/P/B/P. Every B row codes columns 0, 34, 44, exercising increments 1, 34 (`macroblock_escape` + 1), and 10; selected coded macroblocks retain ten residual blocks per B picture spanning Y0-Y3/Cb/Cr. B motion/geometry, residual syntax/capacity, raster/DDR behavior, reference publication, scratch presentation ordering, P pacing, IDCT, QIP, and SDC are unchanged.
 
 #### Next Steps:
-Await user approval before implementation.
+Pull current `master` and treat `eb80c7b` as the executable build hash. Run `python3 tools/streams/generate_test_b_720x480_address_increment.py`, then a clean Quartus/STA build. Run `test_b_720x480_address_increment.m2v` first, followed by `test_b_720x480_residual_decode.m2v`, `test_b_720x480_mixed_gop.m2v`, `test_p_720x480_general_decode.m2v`, repeated `test_p_consecutive_reference.m2v`, `test_p_general_decode.m2v`, `test_b_mixed_gop.m2v`, `test_b_core_decode.m2v`, and `test_all_i.m2v`.
 
 #### Files Modified:
-- TBD — B syntax/core and deterministic 720x480 B address-increment regression generator only
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+- tools/streams/generate_test_b_720x480_address_increment.py
 
 #### Status:
 - [ ] Built
