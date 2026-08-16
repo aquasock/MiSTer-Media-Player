@@ -139,6 +139,102 @@ wire mpeg2_new_normal_user_led =
 // Prediction causes: 1 metadata/order, 2 start prerequisites, 3 source bounds,
 // 4 unsolicited DDR response, 5 persistence verify mismatch, 6 timeout,
 // 7 residual-descriptor consumption mismatch, 8 other/unclassified predictor.
+//
+// kate - Commit 161 passively mirrors the arbiter's read-owner bookkeeping so
+// Commit-160 timeout phase 3 can identify why the ordinary writer is held off.
+// This observer does not feed arbitration, writer sequencing, reference ownership,
+// prediction, or DDR commands.  Phase-3 timeout display becomes 2-R-C:
+//   R=1 display-region ownership exclusion
+//   R=2 display read outstanding/request priority
+//   R=3 prediction read outstanding/request priority
+//   R=4 writer granted, physical DDR busy
+// C remains the later Commit-157 writer-overlap state.
+reg        mpeg2_new_pp_diag_arb_read_outstanding;
+reg        mpeg2_new_pp_diag_arb_read_owner_prediction;
+reg [7:0]  mpeg2_new_pp_diag_arb_read_words_remaining;
+reg        mpeg2_new_pp_diag_arb_reader_bank_valid;
+reg [1:0]  mpeg2_new_pp_diag_arb_reader_frame_region;
+reg [2:0]  mpeg2_new_pp_diag_writer_stall_reason_d;
+
+wire mpeg2_new_pp_diag_arb_writer_targets_reader_region =
+    mpeg2_new_pp_diag_arb_reader_bank_valid &&
+    (mpeg2_new_ddr_wr_addr[17:16] ==
+     mpeg2_new_pp_diag_arb_reader_frame_region);
+wire mpeg2_new_pp_diag_arb_grant_reader =
+    !mpeg2_new_pp_diag_arb_read_outstanding && mpeg2_new_ddr_rd;
+wire mpeg2_new_pp_diag_arb_grant_prediction =
+    !mpeg2_new_pp_diag_arb_read_outstanding &&
+    !mpeg2_new_ddr_rd && mpeg2_new_pred_rd;
+wire mpeg2_new_pp_diag_arb_grant_writer =
+    !mpeg2_new_pp_diag_arb_read_outstanding &&
+    !mpeg2_new_ddr_rd && !mpeg2_new_pred_rd &&
+    mpeg2_new_ddr_wr_we &&
+    !mpeg2_new_pp_diag_arb_writer_targets_reader_region;
+wire mpeg2_new_pp_diag_arb_display_block =
+    (mpeg2_new_pp_diag_arb_read_outstanding &&
+     !mpeg2_new_pp_diag_arb_read_owner_prediction) ||
+    (!mpeg2_new_pp_diag_arb_read_outstanding && mpeg2_new_ddr_rd);
+wire mpeg2_new_pp_diag_arb_prediction_block =
+    (mpeg2_new_pp_diag_arb_read_outstanding &&
+     mpeg2_new_pp_diag_arb_read_owner_prediction) ||
+    (!mpeg2_new_pp_diag_arb_read_outstanding &&
+     !mpeg2_new_ddr_rd && mpeg2_new_pred_rd);
+wire [2:0] mpeg2_new_pp_diag_writer_stall_reason =
+    !mpeg2_new_ddr_wr_we ? 3'd0 :
+    mpeg2_new_pp_diag_arb_writer_targets_reader_region ? 3'd1 :
+    mpeg2_new_pp_diag_arb_display_block ? 3'd2 :
+    mpeg2_new_pp_diag_arb_prediction_block ? 3'd3 :
+    (mpeg2_new_pp_diag_arb_grant_writer && DDRAM_BUSY) ? 3'd4 : 3'd0;
+
+always @(posedge clk_mpeg2) begin
+    if (reset_mpeg2) begin
+        mpeg2_new_pp_diag_arb_read_outstanding      <= 1'b0;
+        mpeg2_new_pp_diag_arb_read_owner_prediction <= 1'b0;
+        mpeg2_new_pp_diag_arb_read_words_remaining <= 8'd0;
+        mpeg2_new_pp_diag_arb_reader_bank_valid     <= 1'b0;
+        mpeg2_new_pp_diag_arb_reader_frame_region   <= 2'b00;
+        mpeg2_new_pp_diag_writer_stall_reason_d     <= 3'd0;
+    end
+    else begin
+        // Capture the pre-edge writer denial reason.  Commit-160's E3/D3
+        // timeout carrier becomes visible one decoder clock after timeout wins.
+        if (!mpeg2_new_pp_diag_active)
+            mpeg2_new_pp_diag_writer_stall_reason_d <= 3'd0;
+        else if (mpeg2_new_ddr_wr_we)
+            mpeg2_new_pp_diag_writer_stall_reason_d <=
+                mpeg2_new_pp_diag_writer_stall_reason;
+
+        if (!mpeg2_new_pp_diag_arb_read_outstanding) begin
+            if (mpeg2_new_pp_diag_arb_grant_reader && !DDRAM_BUSY) begin
+                mpeg2_new_pp_diag_arb_read_outstanding      <= 1'b1;
+                mpeg2_new_pp_diag_arb_read_owner_prediction <= 1'b0;
+                mpeg2_new_pp_diag_arb_read_words_remaining  <=
+                    mpeg2_new_ddr_rd_burstcnt;
+                mpeg2_new_pp_diag_arb_reader_bank_valid     <= 1'b1;
+                mpeg2_new_pp_diag_arb_reader_frame_region   <=
+                    mpeg2_new_ddr_rd_banked_addr[17:16];
+            end
+            else if (mpeg2_new_pp_diag_arb_grant_prediction && !DDRAM_BUSY) begin
+                mpeg2_new_pp_diag_arb_read_outstanding      <= 1'b1;
+                mpeg2_new_pp_diag_arb_read_owner_prediction <= 1'b1;
+                mpeg2_new_pp_diag_arb_read_words_remaining  <=
+                    mpeg2_new_pred_burstcnt;
+            end
+        end
+        else if (DDRAM_DOUT_READY) begin
+            if (mpeg2_new_pp_diag_arb_read_words_remaining <= 8'd1) begin
+                mpeg2_new_pp_diag_arb_read_outstanding      <= 1'b0;
+                mpeg2_new_pp_diag_arb_read_owner_prediction <= 1'b0;
+                mpeg2_new_pp_diag_arb_read_words_remaining  <= 8'd0;
+            end
+            else begin
+                mpeg2_new_pp_diag_arb_read_words_remaining <=
+                    mpeg2_new_pp_diag_arb_read_words_remaining - 8'd1;
+            end
+        end
+    end
+end
+
 reg [31:0] mpeg2_new_pp_diag_picture_window;
 reg        mpeg2_new_pp_diag_header_capture;
 reg        mpeg2_new_pp_diag_header_second_byte;
@@ -218,8 +314,21 @@ wire mpeg2_new_pp_diag_pred_carrier_valid =
     (mpeg2_new_pred_sample_value[3:0] == mpeg2_new_pred_reconstructed_value[3:0]) &&
     (mpeg2_new_pred_sample_value[3:0] >= 4'd1) &&
     (mpeg2_new_pred_sample_value[3:0] <= 4'd7);
+// Commit 161 recognizes Commit-160 E3/D3 as timeout phase 3 only while
+// persistence is still incomplete.  Historical source-bounds cause 3 sets
+// persisted_seen and therefore retains its original cause-3 interpretation.
+wire mpeg2_new_pp_diag_phase3_timeout_carrier =
+    mpeg2_new_pp_diag_pred_carrier_valid &&
+    !mpeg2_new_pred_persisted_seen &&
+    (mpeg2_new_pred_sample_value[3:0] == 4'd3);
+wire mpeg2_new_pp_diag_writer_stall_reason_valid =
+    (mpeg2_new_pp_diag_writer_stall_reason_d >= 3'd1) &&
+    (mpeg2_new_pp_diag_writer_stall_reason_d <= 3'd4);
 wire [3:0] mpeg2_new_pp_diag_pred_carrier_cause =
-    mpeg2_new_pred_sample_value[3:0];
+    (mpeg2_new_pp_diag_phase3_timeout_carrier &&
+     mpeg2_new_pp_diag_writer_stall_reason_valid) ?
+        (4'd4 + {1'b0, mpeg2_new_pp_diag_writer_stall_reason_d}) :
+        mpeg2_new_pred_sample_value[3:0];
 
 wire [5:0] mpeg2_new_pp_diag_overlap_pred_code =
     (mpeg2_new_ddr_store_diag_cause == 3'd1) ?
