@@ -115,6 +115,10 @@ assign p_residual_sample_value =
 // A generalized transaction must begin before a persistence indication is
 // accepted. This prevents sticky persistence from the previous consecutive P
 // frame from retiring newly parsed metadata.
+// kate - Commit 168: streamed motion can finish before wide_complete_now. Keep
+// that observed transaction live across wide completion so motion-only P can
+// accept its own persistence pulse; clear it when generalized mode drops while
+// the following generalized P picture rearms.
 reg general_replay_seen,general_persistence_seen;
 always @(posedge clk)begin
  if(reset)begin
@@ -122,6 +126,10 @@ always @(posedge clk)begin
   general_persistence_seen<=0;
  end
  else if(raster_complete_now)begin
+  if(!wide_complete_now)general_replay_seen<=0;
+  general_persistence_seen<=0;
+ end
+ else if(!general_mode)begin
   general_replay_seen<=0;
   general_persistence_seen<=0;
  end
