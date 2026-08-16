@@ -127,8 +127,6 @@ wire [11:0] mpeg2_new_recon_block_origin_y;
 wire        mpeg2_new_ddr_block_stored;
 wire        mpeg2_new_ddr_write_seen;
 wire        mpeg2_new_ddr_store_error;
-wire [2:0]  mpeg2_new_ddr_store_diag_cause;
-wire [2:0]  mpeg2_new_ddr_cache_diag_cause;
 
 wire [7:0]  mpeg2_new_ddr_wr_burstcnt;
 wire [28:0] mpeg2_new_ddr_wr_addr;
