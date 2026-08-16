@@ -1,35 +1,3 @@
-## 146 COMMIT v0.5.0-cycle 94aaf9b 2026-08-15T15:31:21-07:00
-
-#### Coming From:
-
-v0.5.0-cycle 566ed6b
-
-#### Purpose:
-
-Add an observer-only slow USER trace to localize the Commit 145 mixed I/P/B hardware failure without changing parser, prediction, DDR, stream pacing, or presentation behavior.
-
-#### Outcome:
-
-Exact GitHub master commit `94aaf9b6d8fb3de1777cf590b7701eed2b8244ce` modifies only `MediaPlayer_top_07.svh` (+163/-1). The trace uses existing observable signals and the established slow cadence. Progress codes are 1 first B detected; 2 first B parse/skip-map replay starts; 3 first B persistence/clean B success; 4 first scratch presented; 5 first future-P presented/reorder complete; 6 second P/reference publication; 7 second B detected/re-arm; 8 second B parse/skip replay; 9 second B persisted/clean; 10 second scratch presented; 11 final future-P presented/reorder complete; 12 normal USER acceptance. Error codes are 13 parser/skip/publication-shell probe error; 14 prediction or DDR persistence error; 15 reference/publication not ready at a B boundary; 16 pacing/presentation error.
-
-The build is clean: 32,238 / 41,910 ALMs (77%), 44,532 registers, 461,345 block-memory bits in 73 RAM blocks, 92 / 112 DSPs, 3 / 6 PLLs; zero setup TNS, global setup +0.331 ns, decoder +0.966 ns, video +7.955 ns.
-
-Hardware `test_b_mixed_gop.m2v` reports code **14**. Agent-side bounds checking of the generated motion plans identifies deterministic out-of-bounds prediction footprints in the second B picture. This is a test-stream generator error, not evidence for an RTL correction.
-
-#### Next Steps:
-
-Correct only the mixed-GOP generator so all B prediction interpolation footprints remain within the coded reference picture while preserving coded/display order, both B pictures, direction modes, internal skips, and residual coverage. Leave RTL and the Commit-146 observer unchanged.
-
-#### Files Modified:
-
-- MediaPlayer_top_07.svh
-
-#### Status:
-
-- [x] Built
-- [ ] Passed — diagnostic code 14; root cause localized to out-of-bounds generated B motion vectors
-
----
 ## 147 COMMIT v0.5.0-cycle f8afbe4 2026-08-15T15:56:39-07:00
 
 #### Coming From:
@@ -651,7 +619,7 @@ A cross-baseline GitHub comparison provides the strongest scope check: comparing
 
 Commit-142 `[17:16]` DDR display-write exclusion, Commit-139/145 B scratch and presentation ordering, the 68-DSP shared-IDCT baseline, reference ownership/publication behavior, parser/prediction arithmetic, DDR arbiter behavior, generators, QIP/SDC, and Audio-fork comments remain preserved. The cleanup does not weaken the display-write protection that exposed the original ownership race.
 
-Exact `1370c28_build_logs.tar.gz` was inspected from the Google Drive project folder. Quartus Prime 17.0.2 Build 602 completed successfully for Cyclone V `5CSEBA6U23I7` at 2026-08-16 01:05 local. Fitter utilization is 31,782 / 41,910 ALMs (76%), 43,812 registers, 461,345 block-memory bits in 73 RAM blocks, 68 / 112 DSPs (61%), and 3 / 6 PLLs (50%). Setup endpoint TNS is zero. Global worst setup is +0.167 ns; decoder same-clock reports 0/100 violations with worst +1.311 ns; video same-clock reports 0/80 violations with worst +6.987 ns; hold +0.248 ns; recovery +4.117 ns; removal +0.704 ns; minimum pulse-width +0.462 ns. Structural timing remains `no_clock=3094`, `multiple_clock=86`, `virtual_clock=1`, `no_input_delay=14`, `no_output_delay=129`, `loops=0`, and `latches=0`.
+Exact `1370c28_build_logs.tar.gz` was inspected from the Google Drive project folder. Quartus Prime 17.0.2 Build 602 completed successfully for Cyclone V `5CSEBA6U23I7` at 2026-08-16 01:05 local. Fitter utilization is 31,782 / 41,910 ALMs (76%), 43,812 registers, 461,345 block-memory bits in 73 RAM blocks, 68 / 112 DSPs (61%), and 3 / 6 PLLs (50%). Setup endpoint TNS is zero. Global worst setup is +0.167 ns; decoder same-clock reports 0/100 violations with worst +1.311 ns; video same-clock reports 0/80 violations with worst +6.987 ns, hold +0.248 ns, recovery +4.117 ns, removal +0.704 ns, minimum pulse-width +0.462 ns. Structural timing remains `no_clock=3094`, `multiple_clock=86`, `virtual_clock=1`, `no_input_delay=14`, `no_output_delay=129`, `loops=0`, and `latches=0`.
 
 Hardware validation passes completely. The user reports **everything passes** after the requested Commit-163 matrix: repeated `test_p_consecutive_reference.m2v` stress remains clean with normal USER acceptance, and the four standing guards pass: `test_b_mixed_gop.m2v`, `test_b_core_decode.m2v`, `test_p_general_decode.m2v`, and `test_all_i.m2v`. This proves the accepted Commit-162 ownership-pacing correction remains effective after complete retirement of the Commits 153-161 diagnostic source layer. Commit 163 is the accepted cleaned post-investigation functional baseline.
 
@@ -761,3 +729,35 @@ v0.4.0 release closure is complete. Preserve tag `v0.4.0`, final documentation c
 
 - [x] Built — exact underlying `1370c28` RTL release qualification accepted; documentation-only commit intentionally not rebuilt
 - [x] Passed — v0.4.0 tag and GitHub pre-release publication verified; expected binary asset present
+
+---
+## 166 COMMIT Unreleased pending 2026-08-16T02:52:00-07:00
+
+#### Coming From:
+
+Unreleased bc37008
+
+#### Purpose:
+
+Widen the generalized progressive 4:2:0 P-picture hardware path from the fixed 128x96 / 8x6-macroblock regression geometry to the established 720x480 frame envelope without weakening the accepted v0.4.0 DDR ownership, publication, B-reorder, IDCT, or pacing behavior.
+
+#### Outcome:
+
+Approved implementation boundary recorded before source modification. The planned architecture removes the 48-entry packed whole-picture motion-plan transport: the syntax parser will emit one ordered motion event for every P macroblock as it is parsed, including zero-vector events for skipped macroblocks, and the active P raster engine will retain that stream in one M10K-oriented motion RAM sized for at most 45x30 = 1350 macroblocks. This avoids replicating a 1350-entry packed vector plan across parser, residual pipeline, and raster engine.
+
+The generalized parser and raster executor will derive supported geometry from live sequence dimensions for progressive 4:2:0 frame pictures up to 720x480, preserving the fixed 720/360 DDR row strides already used by the established I-frame store. A new deterministic 720x480 P regression will exercise non-zero signed/half-sample motion, internal skips, and sparse residual activity. The existing sparse residual implementation caps of 16 coded blocks and 64 non-zero coefficient events remain in this commit and remain explicitly implementation limits, not H.262 limits.
+
+No B-picture geometry, H.222.0/PES, audio, interlaced picture structure, non-4:2:0 chroma, QIP, SDC, DDR display-write protection, or release metadata is in scope.
+
+#### Next Steps:
+
+Implement the approved generalized-P geometry/streaming-motion boundary on `master` as one development commit. Then update this entry with the exact source commit and request a clean Quartus build plus the new 720x480 P regression, repeated consecutive-P regression, existing generalized-P regression, both B guards, and all-I guard.
+
+#### Files Modified:
+
+- Planned: generalized P syntax/controller/residual/raster integration and one deterministic 720x480 stream generator
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
