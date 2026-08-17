@@ -267,12 +267,15 @@ Restore a reproducible clean Quartus 17.0.2 build by correcting the inherited AS
 #### Validation:
 Start from a clean local database/output state and run the complete Quartus flow. Require successful Analysis & Synthesis, Fitter, Assembler and TimeQuest plus regenerated `MediaPlayer.fit.rpt`, `MediaPlayer.fit.summary`, `MediaPlayer.flow.rpt` and `MediaPlayer.sta.rpt`. Then run Phase-1P timing and the existing ten-stream hardware matrix; timing acceptance remains non-negative setup slack, zero setup TNS and no timing-requirements Critical Warning.
 
+#### Outcome (build/timing):
+Upload `807fb86` is clean: 30,111 ALMs (72%), 40,748 registers, 559,565 memory bits, 86 RAM blocks, 69 DSPs, 3 PLLs — identical to Commit-173, confirming the ASCAL fix is non-functional to the decoder. Flow Status is Successful with zero Critical Warnings/Errors across `MediaPlayer.flow.rpt`, `.fit.rpt`, and `.sta.rpt`. Global setup is +0.219 ns / zero TNS; the 54 MHz decoder clock (`general[2]` PLL output) is +0.626 ns / zero TNS, matching Commit-173 exactly. Hold +0.241 ns, recovery +4.415 ns, removal +0.725 ns, minimum pulse width +0.462 ns all positive with zero TNS. Phase-1P setup/recovery summaries match the same-clock STA results.
+
 #### Next Steps:
-Clean-build and hardware-qualify `4c65826`; after acceptance, resume picture-signaled P/B `f_code` as Commit 175.
+Awaiting the ten-stream hardware regression matrix result (LED-based, requires user report) to close hardware qualification; also awaiting the Audio-project repository URL (blank in core.md) to complete the Commit-174 compatibility check. After both are confirmed, resume picture-signaled P/B `f_code` as Commit 175.
 
 #### Files Modified:
 - sys/sys_top.v
 
 #### Status:
-- [ ] Built
-- [ ] Passed
+- [x] Built — clean flow, zero TNS, no critical warnings (`807fb86`)
+- [ ] Passed — hardware regression matrix result pending
