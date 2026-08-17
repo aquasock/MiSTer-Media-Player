@@ -40,4 +40,6 @@ c5_pin_model_dump.txt
 *.xml
 *_netlist
 *.cdf
-**/.DS_Storeresponse_timestamp.txt
+**/.DS_Store
+response_timestamp.txt
+
