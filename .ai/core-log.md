@@ -1,17 +1,4 @@
 ---
-## 165 COMMIT v0.4.0 b4385fe 2026-08-16T01:56:38-07:00
-
-#### Purpose:
-Complete v0.4.0 documentation and release publication.
-
-#### Outcome:
-`b4385fe` changes README/CHANGELOG only. Annotated `v0.4.0` and `MediaPlayer_20260816.rbf` are published; synthesized source remains qualified Commit 163.
-
-#### Status:
-- [x] Built — underlying `1370c28`
-- [x] Passed — release verified
-
----
 ## 166 COMMIT Unreleased 74535ad 2026-08-16T04:19:33-07:00
 
 #### Purpose:
@@ -691,6 +678,38 @@ Run all six Commit-175 streams and record acceptance, then run `test_p_visual_di
 #### Status:
 
 - [x] Built
+- [ ] Passed
+
+---
+## 185 COMMIT Unreleased ??? 2026-08-17T06:31:10-07:00
+
+#### Coming From:
+
+Unreleased 4f1c057
+
+#### Purpose:
+
+Localize the generalized P raster transaction stage that prevents parsed P pictures from reaching publication.
+
+#### Outcome:
+
+Commit 184 hardware clears the controlled-parser errors but every P-bearing stream remains unaccepted with prerequisite code 4, while the I-only control is accepted. The visual discriminator photograph shows the original uninterrupted diagonal I frame rather than the final P quadrant seams. Together these results prove that P syntax completes but `picture_count` never advances for the P picture; no decoder behavior has yet been changed.
+
+#### Next Steps:
+
+Add observability only for generalized-mode admission and the raster engine's capture, execution, DDR block-store wait, verification-readback, persistence-export, and publication-edge stages. Report the terminal stage on LED_DISK only when the existing USER-off and POWER-4 condition identifies missing P publication, verify the encoder and stage transitions in simulation, then perform a clean Quartus 17.0.2 build with non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning. Hardware validation will rerun one P stream and the visual discriminator; the returned stage code will define the following behavioral boundary.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- MediaPlayer_top_02.svh
+- MediaPlayer_top_04.svh
+- MediaPlayer_top_07.svh
+
+#### Status:
+
+- [ ] Built
 - [ ] Passed
 
 ---
