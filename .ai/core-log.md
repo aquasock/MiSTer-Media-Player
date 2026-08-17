@@ -793,7 +793,7 @@ Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_p_visual_di
 - [ ] Passed
 
 ---
-## 190 COMMIT Unreleased ??? 2026-08-17T15:03:19-07:00
+## 190 COMMIT Unreleased 2849c38 2026-08-17T15:03:19-07:00
 
 #### Coming From:
 
@@ -805,11 +805,11 @@ Slow the settled diagnostic blink cadence by half so each reported code can be c
 
 #### Outcome:
 
-Commit 189's non-overlapping settled USER, POWER, and DISK windows are clear and useful on hardware, but their 125 ms lit and dark slots make multi-blink codes difficult to count accurately.
+Commit `2849c38` doubles each settled diagnostic lit and dark slot from 125 ms to 250 ms while preserving the one-second post-sequence settlement delay, numeric codes, non-overlapping windows, and decoder behavior. The complete report is now 32 seconds. The clean Quartus 17.0.2 build closes with zero setup TNS, +0.180 ns global setup, +1.492 ns decoder setup, 30,974 ALMs, 41,821 registers, and no Critical Warning.
 
 #### Next Steps:
 
-Double only the diagnostic slot duration to 250 ms while retaining the same snapshot boundary, numeric codes, window slot allocation, and decoder behavior. The full report will become 32 seconds with six-second USER, ten-second POWER, and sixteen-second DISK windows. Perform a clean Quartus 17.0.2 build requiring non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning, then rerun the three generalized P streams and record each settled window.
+Rerun `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_p_visual_discriminator.m2v`. After the one-second settlement delay, observe one complete 32-second report: USER owns six seconds, POWER the next ten, and DISK the final sixteen. Record whether each window is solid, dark, or blinking and count any blinks; confirm the visual discriminator seams remain visible.
 
 #### Files Modified:
 
@@ -817,7 +817,7 @@ Double only the diagnostic slot duration to 250 ms while retaining the same snap
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
