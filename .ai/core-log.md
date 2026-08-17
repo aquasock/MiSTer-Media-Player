@@ -393,6 +393,58 @@ Hardware-run `28feb3f` and report the three LED states per stream. That result s
 - MediaPlayer_top_00.svh
 - MediaPlayer_top_07.svh
 
+#### Diagnostic Result:
+Hardware run of `28feb3f` on the standard target, read from the IO board cluster (POWER/DISK/USER):
+
+| Stream | POWER (presented) | DISK (error-free) | USER (accepted) |
+|---|---|---|---|
+| `test_p_motion_residual` | ON | **OFF** | OFF |
+| `test_p_mba_escape` | ON | **OFF** | OFF |
+| `test_consecutive_chain` | ON | **OFF** | OFF |
+| `test_i_baseline` (control) | ON | ON | ON |
+
+POWER ON with DISK OFF means presentation is clean and a decode/DDR error is latching. This is the opposite of the mechanism the Commit-176 static trace had favoured; had the originally proposed fix been written blind it would have modified the Commit-139/142/162 swap logic, which is not at fault. The reading also explains the Commit-175 photographic evidence: the error latches during P decode, the P never completes, `completed_frame_bank` still refers to the I frame, the banks therefore match, and the I frame stays on screen.
+
+DISK differentiating between streams also confirms the build under test was `28feb3f` and not the prior core: `4c65826` drove `LED_DISK` from `ioctl_download`, which sits dark at rest on every stream. An earlier agent claim that the diagnostic was absent from the compiled design was wrong — it was based on grepping `MediaPlayer.map.rpt`/`.fit.rpt` for the intermediate net names, which Quartus collapses into the output-pin logic.
+
+#### Status:
+- [x] Built
+- [x] Passed — diagnostic isolated the fault to the decode path
+
+---
+## 177 COMMIT Unreleased 92d14cf 2026-08-16T22:15:08-07:00
+
+#### Coming From:
+Unreleased 28feb3f
+
+#### Purpose:
+Identify which of the nine decode/DDR error flags latches on the P-final streams.
+
+#### Outcome:
+`92d14cf` changes only `MediaPlayer_top_00.svh` and `MediaPlayer_top_07.svh`. The Commit-176 single error bit proved an error latches but cannot say which, so the nine flags are priority-encoded and blinked out on `LED_USER`:
+
+| Code | Flag | Code | Flag |
+|---|---|---|---|
+| 1 | `syntax_error` | 6 | `idct_error` |
+| 2 | `phase1_probe_error` | 7 | `recon_error` |
+| 3 | `pred_error` | 8 | `ddr_store_error` |
+| 4 | `inverse_quant_error` | 9 | `ddr_cache_error` |
+| 5 | `inverse_quant_unsupported_matrix` | | |
+
+`LED_USER` is steady ON when no error latched and the stream is accepted, steady OFF when no error latched but not accepted, and blinks N times followed by a ~2 s gap otherwise. The steady-OFF state is new information: it separates an acceptance-prerequisite failure (`picture_count`, `second_picture_420_parsed`, `p_macroblock_type_seen`, `reference_read_ok`, `implicit_reconstruct_ok`) from a decode fault, which the Commit-176 encoding could not distinguish.
+
+`LED_DISK` returns to `ioctl_download`, restoring the file-load indicator that Commit 176 had displaced. `LED_POWER` keeps the presentation bit. Timing is 250 ms slots in a 26-slot frame off the 54 MHz decoder clock, giving nine countable blinks plus a 2 s separator. The encoder was verified in an iverilog testbench across all ten codes and both steady states before commit. No decode, presentation, ownership, or acceptance behavior changes.
+
+#### Validation:
+Clean Quartus 17.0.2 build from a wiped `db`/`incremental_db`/`output_files` state; acceptance remains non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning. Then run the three P-final streams and count the `LED_USER` blinks on each. `test_i_baseline` remains the control and must stay steady ON. `LED_DISK` must again follow stream loading, confirming the restored indicator.
+
+#### Next Steps:
+Report the blink count per stream. That names the failing flag and selects the Commit-178 fix boundary; Commit 179 then adds the dedicated regression. Adding a trailing I picture to the three P streams remains rejected — the streams are valid H.262 and verified pixel-exact against FFmpeg, and the retired suite's `I/P/I` shape is what masked this defect in the first place.
+
+#### Files Modified:
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_07.svh
+
 #### Status:
 - [x] Built — source committed; clean-build qualification pending
-- [ ] Passed — diagnostic result pending
+- [ ] Passed — blink result pending
