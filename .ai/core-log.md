@@ -821,7 +821,7 @@ Rerun `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_p_visual_
 - [ ] Passed
 
 ---
-## 191 COMMIT Unreleased ??? 2026-08-17T15:21:56-07:00
+## 191 COMMIT Unreleased 6281359 2026-08-17T15:21:56-07:00
 
 #### Coming From:
 
@@ -833,11 +833,11 @@ Make generalized P macroblock completion evidence durable and stop classifying i
 
 #### Outcome:
 
-Commit 190 hardware makes the settled report unambiguous and identical on all three generalized P streams: USER 2, POWER 6, DISK 1, while the visual discriminator retains its center seams. Source commit `85e8d4c` latches generalized completion and retires transient `progress_error`; exact controller replay passes all three target streams and preserves functional error codes 7 through 9. Its clean build has +0.184 ns global setup and +2.344 ns decoder setup but fails the gate on two legacy `hps_io.video_calc` hold paths from 40 MHz `vid_de_h` telemetry into the 20 MHz HPS status `dout`, with -0.510 ns worst hold and -1.013 ns hold TNS. RTL inspection proves this is an intentional slow-status clock-domain crossing, and a temporary endpoint-scoped false-path check removes only those crossings while leaving +0.135 ns worst hold and +0.184 ns worst setup; no RBF from the failed build is being packaged.
+Commit 190 hardware makes the settled report unambiguous and identical on all three generalized P streams: USER 2, POWER 6, DISK 1, while the visual discriminator retains its center seams. Commit `6281359` incorporates source commit `85e8d4c`, which latches generalized completion and retires transient `progress_error`, plus an endpoint-scoped false path for the legacy asynchronous `hps_io.video_calc` telemetry crossing that caused the first clean build's false hold failure. Exact controller replay passes all three target streams and preserves functional error codes 7 through 9. The final clean Quartus 17.0.2 build closes with zero setup and hold TNS, +0.346 ns global setup, +0.253 ns global hold, +2.107 ns decoder setup, 31,066 ALMs, 41,850 registers, and no Critical Warning. Qualified RBF `MediaPlayer_commit191_6281359.rbf` has SHA-256 `c96b98df825a23f065345185a6d914081fb59ad3a13af571970ed35344ea94af`; Audio project `fd90c77` remains integration-compatible.
 
 #### Next Steps:
 
-After revised-boundary approval, add one endpoint-scoped SDC false path from `hps_io.video_calc`'s `vid_*` telemetry registers to its `dout` status register, without cutting either clock domain globally or changing video logic. Commit that correction with the existing controller change as the final Commit 191 hash, then perform a fresh clean Quartus 17.0.2 build requiring non-negative setup and hold slack, zero setup and hold TNS, and no timing-requirements Critical Warning. Package only a passing RBF, then run the three target streams plus the I and B regression guards through the settled diagnostic.
+Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_p_visual_discriminator.m2v`, `test_i_baseline.m2v`, and `test_b_bidirectional.m2v` using the qualified RBF. For each stream, allow the one-second settlement and complete 32-second LED report, then record USER, POWER, and DISK behavior. The three P targets should report solid USER, solid POWER, and dark DISK; the visual discriminator must retain its four quadrants and center seams, while the I and B streams must retain their accepted display and diagnostic behavior.
 
 #### Files Modified:
 
@@ -846,7 +846,7 @@ After revised-boundary approval, add one endpoint-scoped SDC false path from `hp
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
