@@ -651,7 +651,7 @@ Hardware-run the standing stream matrix with particular attention to scaler outp
 - [ ] Passed
 
 ---
-## 183 COMMIT Unreleased ??? 2026-08-17T05:16:03-07:00
+## 183 COMMIT Unreleased f9b9be6 2026-08-17T05:16:03-07:00
 
 #### Coming From:
 
@@ -663,23 +663,19 @@ Make the P-final acceptance diagnostic report the first causal observer failure 
 
 #### Outcome:
 
-The exact pre-Commit-182 source was rebuilt cleanly and reproduces the same `1/1`, `1/1`, and `2/3` hardware signatures, clearing the ASCAL change as a cause. RTL replay of the three generated streams makes `syntax_error_raw` rise at the same first-P byte in every case; the four-MB observer never asserts candidate, seen, or error. The displayed chain code can change later because `probe_error_source` is a live combinational priority encoder over sticky error flags and mutable ownership claims, so it does not preserve the event that first failed acceptance.
+The exact pre-Commit-182 control reproduces the same hardware signatures, clearing ASCAL as a cause, while RTL replay makes `syntax_error_raw` rise at the same first-P byte in all three streams and never raises the four-MB observer. Commit `f9b9be6` snapshots the complete diagnostic hierarchy on the first visible parent error in `MediaPlayer_top_07.svh`, preventing later sticky flags or mutable ownership claims from relabeling it without changing decoder behavior. The clean Quartus 17.0.2 build closes with zero TNS, +0.625 ns global setup, +2.159 ns decoder setup, 30,153 ALMs, and 40,880 registers.
 
 #### Next Steps:
 
-With user approval, register the first failing `probe_error_source` and its parent diagnostic source when the error first rises, clear both only on reset, and drive the LED sub-code from those captured values without changing decode, stream hold, presentation, or acceptance logic. Verify all source codes and first-error retention in simulation, run a clean Quartus 17.0.2 build with zero TNS, then rerun the three P-final streams once; all three are expected to report the same first causal syntax-observer code, after which the obsolete controlled observer acceptance term can be retired in a separately approved behavioral commit.
+Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_consecutive_chain.m2v` once each and record USER, POWER, and DISK. The first-fault code must remain stable through the full consecutive chain; after hardware confirms the common observer artifact, scope a separate behavioral commit to retire obsolete controlled-observer errors from acceptance.
 
 #### Files Modified:
 
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_02.svh
 - MediaPlayer_top_07.svh
-- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
