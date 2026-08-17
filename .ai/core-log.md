@@ -480,7 +480,7 @@ This also removes the intermittency question: no evidence of run-to-run variatio
 - [x] Passed — diagnostic named the common fault source; see Commit-180 proposal
 
 ---
-## 180 PROPOSAL Unreleased 2026-08-17T00:25:03-07:00
+## 180 COMMIT Unreleased 7337195 2026-08-17T00:51:23-07:00
 
 #### Coming From:
 Unreleased 0225bef
@@ -524,6 +524,22 @@ Only the compiled `_p_chain` path is edited. The three unused same-named `mpeg2_
 
 #### Proposed Validation:
 Clean Quartus 17.0.2 build; acceptance remains non-negative setup slack, zero setup TNS, no timing-requirements Critical Warning. Then run each of the three P-final streams once and record USER, POWER and DISK. `test_i_baseline` remains the control on USER only — POWER reads 1 on the control by design and carries no information there. Repeat runs are not required; the fault is deterministic.
+
+#### Build Correction:
+`quartus_map` failed: `Error (12002): Port "probe_error_source" does not exist in macrofunction "p_controller" File: mpeg2_h262_two_picture_probe_p_chain.sv Line: 146` (and the same for `progress_detail`). The implementation had added both outputs to `mpeg2_h262_p_diagnostic_controller.sv`, the unused base file — the same class of mistake as `466f0b3` and `d5b97ce`, this time against a third module name. `files.qip` compiles `mpeg2_h262_p_diagnostic_controller_rearm.sv` for this module name.
+
+The base file's edit was reverted (never committed). The `_rearm` variant is not a drop-in equivalent: its `probe_error` is a **nine**-term OR (`syntax_error`, `two_mb_error`, `four_mb_error`, `legacy_error`, `wide_error`, `progress_error`, `residual_error_raw`, `hold_error`, `raster_hold_error`) rather than the base file's eight, `legacy_error`/`wide_error` replace `aligned_error`, and `p_macroblock_type_seen` carries an additional `general_final_proof` short-circuit not present in the base file. Porting the base file's encoding verbatim after only fixing the compile error would have mislabeled every code. Both diagnostics were re-derived directly from `_rearm.sv`'s own signals and re-verified in iverilog against the actual 9-term/short-circuit structure before commit (`7337195`).
+
+A full audit of `rtl/mpeg2_new/` found seven module names with this duplicate-definition pattern in total (`two_picture_probe`, `p_diagnostic_controller`, `p_aligned_motion_syntax_probe`, `p_residual_probe`, `reference_read_probe`, `ddram_store`, `p_luma_macroblock_engine`); only the `files.qip`-listed file compiles for each. Saved to agent memory with an audit command so this is checked before future edits rather than discovered by a failed build.
+
+#### Diagnostic Result:
+Corrected `7337195` build is clean: 0 errors across map/fit/asm/sta, 0 Critical Warnings, Flow Status Successful. 29,954 ALMs (71%), 40,849 registers, 559,565 memory bits, 86 RAM, 69 DSP, 3 PLL. Zero TNS on every timing check; worst-case setup +0.297 ns, 54 MHz decoder clock (`general[2]` PLL) setup +0.902 ns.
+
+Hardware regression against the three P-final streams (record USER, POWER, DISK; `test_i_baseline` as USER-only control) is outstanding.
+
+#### Status:
+- [x] Built — clean flow, zero TNS, no critical warnings (`7337195`)
+- [ ] Passed — hardware regression result pending
 
 #### Status:
 - [ ] Proposed — awaiting user approval
