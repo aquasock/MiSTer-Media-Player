@@ -30,7 +30,7 @@ Attach the observer to active `_420p.sv`.
 Refine writer state/busy/ordering evidence.
 
 #### Outcome:
-`177a480` records the observer evidence but its USER encoding was superseded before build.
+`177a480` records the required observer evidence but its USER encoding was superseded before build.
 
 #### Status:
 - [ ] Built — superseded
@@ -243,39 +243,36 @@ Generalize H.262 restricted slice partitioning across the accepted progressive P
 #### Outcome:
 `912a87494a30ae6f5d3dfb1320f8bf3b558430b4` implements `H262-025`: multiple same-row P/B slices are accepted, first-slice MBA positioning no longer creates synthetic leading skips, internal MBA gaps retain skipped-macroblock behavior, and row/picture transitions require contiguous non-overlapping restricted coverage. Agent stream `test_pb_720x480_restricted_slices.m2v` validates at 183,290 bytes / SHA256 `320f1f5aa5281b77284c9d354a1350a449fe91214ba6d381054c5114dec2c837`.
 
-Build upload `11dd441` is clean: 30,111 ALMs (72%), 40,748 registers, 559,565 memory bits, 86 RAM blocks, 69 DSPs, 3 PLLs. Global setup is +0.219 ns / zero TNS; the 54 MHz decoder clock is +0.626 ns / zero TNS; hold +0.241 ns, recovery +4.415 ns, removal +0.725 ns and minimum pulse width +0.462 ns are positive. All ten requested hardware regressions pass. Cleanup is `d500567`. Audio `fd90c77` compatibility is clean; intervening Audio work is FLAC/audio-only except an independent `MediaPlayer_top_00.svh` change setting the Audio control `dcfifo.use_eab` to `ON`.
+Build upload `11dd441` is clean: 30,111 ALMs (72%), 40,748 registers, 559,565 memory bits, 86 RAM blocks, 69 DSPs, 3 PLLs. Global setup is +0.219 ns / zero TNS; the 54 MHz decoder clock is +0.626 ns / zero TNS; hold +0.241 ns, recovery +4.415 ns, removal +0.725 ns and minimum pulse width +0.462 ns are positive. All ten requested hardware regressions pass. Cleanup is `d500567`. Audio `fd90c77` compatibility is clean.
 
 #### Next Steps:
-Generalize picture-signaled frame-motion `f_code` across the accepted progressive P/B paths under `H262-022`.
+Restore reproducible clean Quartus compilation before further decoder capability work; then resume picture-signaled P/B `f_code` under `H262-022`.
 
 #### Status:
 - [x] Built
 - [x] Passed
 
 ---
-## 174 PROPOSAL Unreleased pending 2026-08-16T18:22:00-07:00
+## 174 PROPOSAL Unreleased pending 2026-08-16T19:00:00-07:00
 
 #### Coming From:
 Unreleased 912a874
 
 #### Purpose:
-Generalize picture-signaled H.262 frame-motion `f_code` across the accepted progressive P/B <=720x480 paths for broader DVD/Main-Profile compatibility.
+Restore a reproducible clean Quartus 17.0.2 build by correcting the inherited ASCAL `mode` port-width mismatch exposed after deleting the cached compilation database.
 
 #### Outcome:
-`H262-022` defines component reconstruction from the signaled `f_code`: `r_size=f_code-1`, motion-residual width follows `r_size` when required, the differential scales by `f=2^r_size`, and the reconstructed component wraps in the corresponding `[-16*f,16*f-1]` range. The current generalized P path accepts only forward horizontal/vertical `f_code=3`; the B path accepts only all four forward/backward horizontal/vertical fields equal to 3. Both currently consume a fixed two-bit residual and use `reconstruct_mv_f3`.
+A fresh `quartus_sh --flow compile MediaPlayer` from the qualified Commit-173 source fails during Analysis & Synthesis before Fitter. `sys/ascal.vhd` declares `mode : IN unsigned(4 DOWNTO 0)` (5 bits), while `sys/sys_top.v` connects `{~lowlat,LFB_EN ? LFB_FLT : |scaler_flt,2'b00}` (4 bits). Quartus reports that the 4-element array cannot connect to the 5-element port. The current MiSTer upstream framework carries the same source pair, so this is an inherited framework mismatch rather than a Commit-173 decoder regression. ASCAL documents `MODE[4]` as TBD; therefore the conservative compatibility repair is to drive that unused high bit to zero while preserving the existing `MODE[3:0]` mapping exactly.
 
-Scope Commit 174 to the existing progressive frame-motion path: capture and apply picture-signaled forward P component `f_code` values and forward/backward B component `f_code` values, consume the component-specific motion-residual length, and perform the normative `H262-022` differential/predictor/wrap reconstruction. Preserve the accepted progressive 4:2:0 geometry, frame `motion_type` subset, P/B macroblock types, restricted-slice handling, B MBA/escape behavior, residual/CBP syntax, raster/DDR ownership, reference/scratch semantics, presentation ordering, P pacing, IDCT, QIP and SDC.
+Scope Commit 174 only to `sys/sys_top.v`: change the ASCAL connection to `{1'b0,~lowlat,LFB_EN ? LFB_FLT : |scaler_flt,2'b00}` and mark the intentional repair with `kate - Commit 174`. Do not alter `sys/ascal.vhd`, decoder RTL, P/B/I behavior, DDR/raster/reference/presentation logic, QIP, SDC, or timing constraints. The previously proposed picture-signaled P/B `f_code` work is deferred to Commit 175.
 
-Do not add field prediction, dual-prime, interlaced picture handling, new motion-vector transport widths, or timing-constraint changes in this boundary. If the applicable DVD/Main-Profile `f_code` range cannot be represented safely by the existing signed-8-bit P/B motion transport and raster address path, stop and revise the proposal before widening interfaces.
-
-Validation will add a deterministic 720x480 mixed I/P/B regression exercising multiple legal non-3 component `f_code` values, both zero-residual and non-zero-residual cases, positive/negative motion codes, predictor reuse and a controlled wrap case while remaining inside the existing transport envelope. Run it first, then the complete current ten-stream matrix. Acceptance requires clean Quartus/STA with non-negative setup slack, zero setup TNS and no timing-requirements critical warning.
+Validation must start from a clean local database/output state, run the complete Quartus flow, and require successful Analysis & Synthesis/Fitter/Assembler/TimeQuest plus regenerated `MediaPlayer.fit.rpt`, `MediaPlayer.fit.summary`, `MediaPlayer.flow.rpt`, and `MediaPlayer.sta.rpt`. Then run Phase-1P timing and the existing ten-stream hardware matrix; timing acceptance remains non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning.
 
 #### Next Steps:
-Await user approval before implementation.
+Await user approval before implementation. After qualification, resume P/B picture-signaled `f_code` as the next capability boundary.
 
 #### Files Modified:
-- TBD — generalized P/B picture-coding-extension and frame-motion reconstruction state only
-- tools/streams/generate_test_pb_720x480_fcode.py
+- sys/sys_top.v
 
 #### Status:
 - [ ] Built
