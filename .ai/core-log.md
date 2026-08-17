@@ -1,17 +1,4 @@
 ---
-## 166 COMMIT Unreleased 74535ad 2026-08-16T04:19:33-07:00
-
-#### Purpose:
-Widen generalized progressive 4:2:0 P decoding through 720x480.
-
-#### Outcome:
-`74535ad` adds 45x30 geometry, streamed wide-P syntax and M10K-oriented motion storage. Clean build: 36,957 ALMs (88%). New 720x480 P plus prior matrix passes.
-
-#### Status:
-- [x] Built
-- [x] Passed
-
----
 ## 167 COMMIT Unreleased b11590c 2026-08-16T05:31:18-07:00
 
 #### Purpose:
@@ -710,6 +697,34 @@ Run `test_p_motion_residual.m2v` and `test_p_visual_discriminator.m2v`, recordin
 #### Status:
 
 - [x] Built
+- [ ] Passed
+
+---
+## 186 COMMIT Unreleased ??? 2026-08-17T06:58:32-07:00
+
+#### Coming From:
+
+Unreleased d5e5f62
+
+#### Purpose:
+
+Complete generalized P parsing and raster publication when the final P picture is delimited by the MPEG sequence-end start code.
+
+#### Outcome:
+
+Commit 185 hardware reports raster stage 1 with prerequisite 4 on both the residual and visual-discriminator streams, and the discriminator still shows the retained I frame. Exact controller replay reproduces the stop: the wide parser emits 1,305 motion events, exactly 29 rows of 45 macroblocks, then rejects the final-row boundary because `post_p_boundary_now` recognizes picture and sequence headers but omits sequence-end code `0xB7`. Consequently `wide_complete_now` and the raster metadata terminator never assert; this is upstream of DDR, reconstruction, persistence, and publication.
+
+#### Next Steps:
+
+Add the MPEG sequence-end start code to the wide parser's accepted post-P boundary set without changing any slice or macroblock rule. Replay all seven deterministic streams through the compiled controller and require the P streams to reach wide completion and emit the metadata terminator, then run a clean Quartus 17.0.2 build with non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning. Hardware validation will rerun the residual and visual-discriminator streams; acceptance must clear and the discriminator must show the center quadrant seams.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+
+#### Status:
+
+- [ ] Built
 - [ ] Passed
 
 ---
