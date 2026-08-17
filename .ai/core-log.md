@@ -331,7 +331,7 @@ The 20 retired generators and their stale `.m2v` outputs are removed. Hardware q
 - [x] Passed — 3/6 qualify on hardware; the 3 P-final streams are blocked by the decoder finding recorded in Commit 176, not by a defect in the streams themselves
 
 ---
-## 176 PROPOSAL Unreleased pending 2026-08-16T21:16:07-07:00
+## 176 COMMIT Unreleased 28feb3f 2026-08-16T21:37:36-07:00
 
 #### Coming From:
 Unreleased c634a1e
@@ -362,24 +362,37 @@ The three P streams are valid H.262 and are verified pixel-exact against FFmpeg 
 
 Severity is low for sustained DVD playback, where a P is essentially never the last coded picture, but it is a real defect: the final frame of any title, chapter, or stream ending on a P will never be shown. It also currently blocks LED qualification of three of the six standing regressions.
 
-#### Proposed Commit Boundary:
-Split into two commits.
+#### Revised Commit Boundary:
+The originally proposed boundary was a direct final-P presentation fix. Static tracing of `mpeg2_h262_picture_bookkeeper.sv`, `mpeg2_new_frame_waiting`, `mpeg2_new_pending_frame_valid` and the swap block could not localize the fault: by that reading the acceptance LED should light for all three failing streams, so no fix could be written without guessing at the Commit-139/142/162 presentation race. Ruled out during that trace were stream-FIFO byte loss (`ioctl_wait` backpressure is wired in `MediaPlayer_top_00.svh`), a Commit-162 ownership hold on the final P (`sequence_end` is `00 00 01 B7` and never matches the `00 00 01 00` picture-start window, so the hold never arms), and picture termination generally (the parser completes a picture on any non-slice start code, and the final B of the two passing streams does complete).
 
-Commit 176 (decoder, this proposal): correct final-P presentation so a completed P picture reaches the display when no further picture follows, without weakening the Commit-142 DDR ownership protection or altering the Commit-139/162 B reorder and presentation paths. Scope limited to the presentation/swap logic in `MediaPlayer_top_04.svh`/`MediaPlayer_top_05.svh`/`MediaPlayer_top_06.svh`. No decoder RTL, QIP, SDC, or timing-constraint change.
+Two mechanisms remain and the single acceptance bit cannot separate them: the final P never completes (so `picture_count` / `second_picture_420_parsed` never advance), or it completes but never reaches the display (`completed_frame_bank` never equals `display_frame_bank`). One useful constraint: `mpeg2_new_phase1s_all_i_user_success` carries no picture-type condition, so for `test_consecutive_chain` (picture_count 7 >= 3) the LED can only be OFF through the bank equality or a latched error.
 
-Commit 177 (tests, follow-on): add a dedicated minimal final-P presentation regression to `tools/streams/` so the fixed behavior is guarded directly, rather than only implicitly through the three existing P streams.
+With user approval, Commit 176 was therefore rescoped from fix to diagnostic isolation, and the sequence became: 176 diagnostic, 177 fix, 178 dedicated final-P regression.
 
-Deliberately not proposed: adding a trailing I picture to the three P streams. That would restore LED qualification immediately but would re-mask the defect exactly as the retired suite did, and the streams are correct as written.
+#### Outcome:
+`28feb3f` changes only `MediaPlayer_top_00.svh` and `MediaPlayer_top_07.svh`. It drives the two core LED outputs that the `emu` interface already exports, so nothing outside the core changes and no framework file is touched:
+
+- board `LED[4]` (`LED_POWER`) — `completed_frame_bank == display_frame_bank`
+- board `LED[2]` (`LED_DISK`) — no decode/DDR error latched (`syntax`, `phase1_probe`, `pred`, `inverse_quant`, `inverse_quant_unsupported_matrix`, `idct`, `recon`, `ddr_store`, `ddr_cache`)
+
+`LED_USER` (board `LED[0]`) keeps its existing acceptance meaning. `LED_POWER`/`LED_DISK` are `[1:0]` `{enable, value}`; `sys/sys_top.v` derives `LED[4] = led_power[0]` and `LED[2] = led_disk[0]` when the enable bit is set, so both diagnostic bits are active-high. The previous `LED_DISK = ioctl_download` indicator is displaced for the duration of the diagnostic. No decode, presentation, ownership, or acceptance behavior is altered.
 
 #### Validation:
-Clean Quartus 17.0.2 build from a wiped `db`/`incremental_db`/`output_files` state; acceptance remains non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning. Then re-run all six Commit-175 streams: all six must light the USER LED, and `test_p_motion_residual` must additionally show visible macroblock-boundary discontinuity at MB (8,19), (8,26), (8,33), (8,40) and (15,38), confirming the P frame is genuinely on screen rather than the LED alone changing state.
+Clean Quartus 17.0.2 build from a wiped `db`/`incremental_db`/`output_files` state; acceptance remains non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning. Then run the three P-final streams (`test_p_motion_residual`, `test_p_mba_escape`, `test_consecutive_chain`) and record board `LED[0]`, `LED[4]` and `LED[2]` for each. Reading, for a stream with `LED[0]` OFF:
+
+- `LED[4]` OFF — the completed frame never reached the display; fault is in the swap/presentation path.
+- `LED[4]` ON, `LED[2]` OFF — a decode/DDR error latched; fault is in the decode path.
+- `LED[4]` ON, `LED[2]` ON — the P acceptance prerequisites failed (`picture_count`, `second_picture_420_parsed`, `p_macroblock_type_seen`, `reference_read_ok`, `implicit_reconstruct_ok`).
+
+Also record all three LEDs for `test_i_baseline` and `test_b_bidirectional` as controls; both should show `LED[0]`, `LED[4]` and `LED[2]` all ON.
 
 #### Next Steps:
-Awaiting user approval before implementation.
+Hardware-run `28feb3f` and report the three LED states per stream. That result selects the Commit-177 fix boundary. Commit 178 then adds the dedicated final-P presentation regression. Adding a trailing I picture to the three P streams remains rejected: it would restore LED qualification immediately but re-mask the defect exactly as the retired suite did, and the streams are correct as written.
 
 #### Files Modified:
-- .ai/core-log.md
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_07.svh
 
 #### Status:
-- [ ] Built
-- [ ] Passed
+- [x] Built — source committed; clean-build qualification pending
+- [ ] Passed — diagnostic result pending
