@@ -876,6 +876,6 @@ Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_p_visual_discri
 #### Status:
 
 - [x] Built
-- [ ] Passed
+- [x] Passed
 
 ---
