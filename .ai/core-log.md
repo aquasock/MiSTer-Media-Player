@@ -279,3 +279,32 @@ Awaiting the ten-stream hardware regression matrix result (LED-based, requires u
 #### Status:
 - [x] Built — clean flow, zero TNS, no critical warnings (`807fb86`)
 - [ ] Passed — hardware regression matrix result pending
+
+---
+## 175 PROPOSAL Unreleased pending 2026-08-16T20:17:18-07:00
+
+#### Coming From:
+Unreleased 4c65826
+
+#### Purpose:
+Retire the `tools/streams/generate_test_*.py` regression-stream generator set and design a replacement test-generation framework from scratch.
+
+#### Outcome:
+Agent-side analysis of all 20 existing generator scripts on 2026-08-16 found:
+
+1. **Confirmed broken generator.** `generate_test_p_motion_residual_boundary.py` raises `SystemExit` — its own internal consistency check finds an unexpected sequence-header-like `00 00 01 b3` byte pattern at offset 489 inside what should be a verbatim-copied I/P prefix (expected only the appended boundary preamble at offset 519). The script writes `test_p_motion_residual_boundary.m2v` to disk *before* running that check, so the file left on disk is self-flagged invalid, not a usable regression stream.
+2. **Root cause is systemic, not local.** None of the 20 hand-bit-packing generators implement H.262 start-code emulation avoidance. Any of them can silently embed an accidental byte-aligned `00 00 01` inside packed slice/macroblock data; Commit-175's analysis only surfaced the one case where a script happened to scan for that exact pattern for an unrelated reason.
+3. **Verification rigor is inconsistent across the set.** Most P-only generators (`test_p_general_decode`, `test_p_motion_dispatch`, `test_p_motion_residual_mix`, `test_p_general_residual_plan`, `test_p_general_motion_plan`, `test_p_aligned_motion_right`, `test_p_consecutive_reference`, the `six/twelve/twentyfour_mb` family, `test_p_controlled_raster`) build an explicit software H.262 reference model and pixel-diff FFmpeg's decode against it. The four 720x480 B-picture generators (`test_b_720x480_address_increment`, `..._mixed_gop`, `..._residual_decode`, `test_pb_720x480_restricted_slices`) plus `test_b_core_decode` and `test_b_mixed_gop` only check coded/display picture-type order, stream geometry, and that FFmpeg's own decoder completes without erroring — never confirming the intended MBA-escape, CBP/coefficient, or bidirectional-vector semantics actually decoded to the claimed values.
+4. **Heavy duplicated boilerplate.** VLC tables (`MBA`, `MCODE`, `BTYPE`, `CBP`) and bit-packing helpers (`start_codes`, `bits_to_bytes`, `enc_comp`/`encode_component`, `delta_for`, `escape`) are copy-pasted near-identically across most of the 20 files, so a representation bug fixed in one script has to be hand-propagated to the rest instead of fixed once.
+
+Per user instruction, the entire existing `tools/streams/generate_test_*.py` set and its stored `.m2v` outputs are retired as the authoritative regression source effective this entry. They remain on disk pending the replacement (no functioning generator set otherwise) but must not be used to qualify future commits.
+
+#### Next Steps:
+Design and build a replacement test-generation framework: a shared H.262 bitstream-authoring library (single source for VLC tables, bit-packing, and start-code scanning), mandatory start-code emulation-safe packing, and a software reference-model pixel verification requirement for every generated stream (no structural-only checks). Coverage should be re-derived from the currently accepted decoder capability boundary rather than ported as-is. Awaiting user confirmation on design scope before implementation begins.
+
+#### Files Modified:
+- .ai/core-log.md
+
+#### Status:
+- [ ] Built — design not yet implemented
+- [ ] Passed
