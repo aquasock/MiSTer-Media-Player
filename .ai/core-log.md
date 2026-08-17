@@ -833,14 +833,15 @@ Make generalized P macroblock completion evidence durable and stop classifying i
 
 #### Outcome:
 
-Commit 190 hardware makes the settled report unambiguous and identical on all three generalized P streams: USER 2, POWER 6, DISK 1, while the visual discriminator retains its center seams. This decodes as `phase1_probe_error`, `progress_error`, and `mb_seen_combined` false. Static tracing proves the cause is diagnostic state lifetime: `p_picture_expected` becomes sticky when P is encountered, `progress_error` is combinationally true during normal parsing before macroblock proof exists, and successful generalized persistence later clears `wide_seen` and the transient proof while leaving `p_picture_expected` set. The same reconstructed P reaching display proves this indication is post-success observer behavior rather than a decode failure.
+Commit 190 hardware makes the settled report unambiguous and identical on all three generalized P streams: USER 2, POWER 6, DISK 1, while the visual discriminator retains its center seams. Source commit `85e8d4c` latches generalized completion and retires transient `progress_error`; exact controller replay passes all three target streams and preserves functional error codes 7 through 9. Its clean build has +0.184 ns global setup and +2.344 ns decoder setup but fails the gate on two legacy `hps_io.video_calc` hold paths from 40 MHz `vid_de_h` telemetry into the 20 MHz HPS status `dout`, with -0.510 ns worst hold and -1.013 ns hold TNS. RTL inspection proves this is an intentional slow-status clock-domain crossing, and a temporary endpoint-scoped false-path check removes only those crossings while leaving +0.135 ns worst hold and +0.184 ns worst setup; no RBF from the failed build is being packaged.
 
 #### Next Steps:
 
-Latch successful generalized macroblock completion as durable seen evidence for the existing acceptance prerequisite, and remove the transient `progress_error` term from the sticky error output while preserving residual, stream-hold, raster-hold, publication, decoder, DDR, and presentation checks. Replay the generalized P regression streams through the compiled controller and verify that success remains visible after parser rearm while functional error terms still assert. Perform a clean Quartus 17.0.2 build requiring non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning, then run the three target streams plus the I and B regression guards through the settled diagnostic.
+After revised-boundary approval, add one endpoint-scoped SDC false path from `hps_io.video_calc`'s `vid_*` telemetry registers to its `dout` status register, without cutting either clock domain globally or changing video logic. Commit that correction with the existing controller change as the final Commit 191 hash, then perform a fresh clean Quartus 17.0.2 build requiring non-negative setup and hold slack, zero setup and hold TNS, and no timing-requirements Critical Warning. Package only a passing RBF, then run the three target streams plus the I and B regression guards through the settled diagnostic.
 
 #### Files Modified:
 
+- MediaPlayer.sdc
 - rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
 
 #### Status:
