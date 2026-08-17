@@ -850,7 +850,7 @@ Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_p_visual_discri
 - [ ] Passed
 
 ---
-## 192 COMMIT Unreleased ??? 2026-08-17T16:09:53-07:00
+## 192 COMMIT Unreleased 454336d 2026-08-17T16:09:53-07:00
 
 #### Coming From:
 
@@ -862,11 +862,11 @@ Align reference-picture completion and settled prerequisite reporting with the g
 
 #### Outcome:
 
-Commit 191 hardware clears USER and DISK errors on all three generalized P streams and preserves the visual discriminator's center seams, but POWER reports code 3, proving `second_picture_420_parsed` remains false after successful P presentation. Static tracing identifies the ownership mismatch: the outer publication shell increments its combined `picture_count` and promotes generalized P persistence, while its exported `second_picture_420_parsed` is still wired directly to the legacy I-only bookkeeper. The B regression remains accepted with USER solid but also reports POWER 3 because the settled prerequisite encoder evaluates P-only terms even after the independent B success path has passed; the I baseline remains accepted with USER solid and no DISK indication.
+Commit `454336d` exports second-reference completion from either the legacy I-only bookkeeper or the combined I/P publication count and suppresses P-only prerequisite sub-codes after the existing normal I/P/B acceptance result passes. Focused simulation proves generalized P persistence makes the second-reference result durable, preserves the legacy result, clears accepted I/P/B prerequisite reporting, and retains real-error priority. A clean Quartus 17.0.2 build completes with zero TNS, no Critical Warning, +0.466 ns global setup, +0.249 ns global hold, +1.959 ns decoder setup, 31,036 ALMs, 41,842 registers, 592,333 memory bits, 90 RAM blocks, 69 DSP blocks, and 3 PLLs. Qualified RBF `MediaPlayer_commit192_454336d.rbf` has SHA-256 `c2c45fa1fac3514362e8181c1513c4be1887329c5c9811c7f1ed072c06ec8404`; Audio project `fd90c77` remains integration-compatible.
 
 #### Next Steps:
 
-Publish second-reference completion from either the legacy bookkeeper result or the combined I/P reference-publication count without changing parser, reconstruction, DDR, bank, or presentation control, and suppress P-only prerequisite sub-codes whenever the normal I/P/B acceptance result is already true. Add focused simulations proving generalized P persistence makes the second-reference prerequisite durable while I and B acceptance remain mode-correct, then perform a clean Quartus 17.0.2 build with non-negative setup and hold slack, zero TNS, and no timing-requirements Critical Warning. Rerun the three P targets plus the I and B guards; accepted streams should match the I baseline's settled behavior, and the visual discriminator must retain its seams.
+Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_p_visual_discriminator.m2v`, `test_i_baseline.m2v`, and `test_b_bidirectional.m2v` using the qualified RBF. Each accepted stream must match the I baseline with USER solid and no POWER or DISK code; the visual discriminator must retain its four quadrants and center seams.
 
 #### Files Modified:
 
@@ -875,7 +875,7 @@ Publish second-reference completion from either the legacy bookkeeper result or 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
