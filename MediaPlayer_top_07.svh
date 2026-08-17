@@ -107,7 +107,7 @@ wire mpeg2_new_normal_user_led =
 //
 // No decode, presentation, ownership or acceptance behavior is altered; the
 // acceptance term itself still drives the steady-ON state unchanged.
-wire [3:0] mpeg2_new_diag_error_code =
+wire [3:0] mpeg2_new_diag_error_code_live =
     mpeg2_new_syntax_error                     ? 4'd1 :
     mpeg2_new_phase1_probe_error               ? 4'd2 :
     mpeg2_new_pred_error                       ? 4'd3 :
@@ -176,13 +176,46 @@ wire [3:0] mpeg2_new_diag_prereq_code =
 //   1 syntax_error      2 two_mb_error       3 four_mb_error
 //   4 legacy_error      5 wide_error         6 progress_error
 //   7 residual_error_raw 8 hold_error        9 raster_hold_error
+// kate - Commit 183.  The observer error flags and their ownership claims are
+// sticky/mutable state.  A live priority encoder can therefore relabel an old
+// failure later in a multi-picture stream.  Snapshot the complete hierarchy on
+// the first cycle that any parent error is visible, and retain it until reset.
+// This changes only the LED report; every decode and acceptance signal remains
+// connected exactly as before.
+reg       mpeg2_new_diag_first_error_valid;
+reg [3:0] mpeg2_new_diag_error_code_first;
+reg [3:0] mpeg2_new_diag_phase1_source_first;
+reg [3:0] mpeg2_new_diag_p_source_first;
+reg [3:0] mpeg2_new_diag_progress_detail_first;
+
+always @(posedge clk_mpeg2) begin
+    if (reset_mpeg2) begin
+        mpeg2_new_diag_first_error_valid     <= 1'b0;
+        mpeg2_new_diag_error_code_first      <= 4'd0;
+        mpeg2_new_diag_phase1_source_first   <= 4'd0;
+        mpeg2_new_diag_p_source_first        <= 4'd0;
+        mpeg2_new_diag_progress_detail_first <= 4'd0;
+    end
+    else if (!mpeg2_new_diag_first_error_valid &&
+             (mpeg2_new_diag_error_code_live != 4'd0)) begin
+        mpeg2_new_diag_first_error_valid     <= 1'b1;
+        mpeg2_new_diag_error_code_first      <= mpeg2_new_diag_error_code_live;
+        mpeg2_new_diag_phase1_source_first   <= mpeg2_new_phase1_probe_error_source;
+        mpeg2_new_diag_p_source_first        <= mpeg2_new_p_probe_error_source;
+        mpeg2_new_diag_progress_detail_first <= mpeg2_new_p_progress_detail;
+    end
+end
+
+wire [3:0] mpeg2_new_diag_error_code =
+    mpeg2_new_diag_first_error_valid ? mpeg2_new_diag_error_code_first : 4'd0;
+
 wire [3:0] mpeg2_new_diag_power_code =
-    (mpeg2_new_diag_error_code == 4'd2) ?
-        ((mpeg2_new_phase1_probe_error_source == 4'd2) ?
-             mpeg2_new_p_probe_error_source :
-             mpeg2_new_phase1_probe_error_source) :
-    (mpeg2_new_diag_error_code == 4'd0) ?
-        mpeg2_new_diag_prereq_code : 4'd0;
+    mpeg2_new_diag_first_error_valid ?
+        ((mpeg2_new_diag_error_code_first == 4'd2) ?
+            ((mpeg2_new_diag_phase1_source_first == 4'd2) ?
+                 mpeg2_new_diag_p_source_first :
+                 mpeg2_new_diag_phase1_source_first) : 4'd0) :
+        mpeg2_new_diag_prereq_code;
 
 // kate - Commit 180.  progress_error is a symptom, not a root cause: it is
 // p_picture_expected && !p_macroblock_type_seen, and that signal is a deep
@@ -194,10 +227,11 @@ wire [3:0] mpeg2_new_diag_power_code =
 // LED_DISK is steady off in every other case; its ioctl_download file-load
 // duty is displaced for the duration of this diagnostic.
 wire [3:0] mpeg2_new_diag_disk_code =
-    ((mpeg2_new_diag_error_code == 4'd2) &&
-     (mpeg2_new_phase1_probe_error_source == 4'd2) &&
-     (mpeg2_new_p_probe_error_source == 4'd6)) ?
-        mpeg2_new_p_progress_detail : 4'd0;
+    mpeg2_new_diag_first_error_valid &&
+    (mpeg2_new_diag_error_code_first == 4'd2) &&
+    (mpeg2_new_diag_phase1_source_first == 4'd2) &&
+    (mpeg2_new_diag_p_source_first == 4'd6) ?
+        mpeg2_new_diag_progress_detail_first : 4'd0;
 
 // 250 ms slot at the 54 MHz decoder clock.  Slots 0..2N-1 carry the N blinks
 // (even slot lit, odd slot dark); the remaining slots of the 32-slot frame are
