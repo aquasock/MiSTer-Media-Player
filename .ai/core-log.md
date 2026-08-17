@@ -614,6 +614,36 @@ Independently of the LEDs, capture the display for the three P streams and compa
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
 
+#### Hardware Result:
+User reports all six streams pass on `05422a5`, including the three P-final targets and all three regression guards. `test_b_bidirectional` passing is the one that matters most, since Commit 182 modified the B raster engine that Commits 139/162 hardware-qualified. The Commit-181 ownership fix is accepted; `test_p_mba_escape` and `test_p_motion_residual` also cleared, which is better than predicted — the `syntax_error` qualification was already correct, so those two were expected to possibly persist.
+
+#### Photographic Evidence — Negative Result:
+Three display photographs were captured to `.ai/current_results/` and analysed. All three show clean 720x480 rendering: correct geometry, no blocking, no tearing, no dropped slices, pattern consistent with the generator's synthetic diagonal source. That rules out gross decode corruption.
+
+**They do not establish that the final P was presented, and must not be recorded as if they do.** Decoding each stream with FFmpeg and diffing the I picture against the final P picture:
+
+| Stream | Macroblocks differing (of 1350) | Mean abs luma diff |
+|---|---|---|
+| `test_p_motion_residual` | 13 (1.0%) | 0.111 / 255 |
+| `test_p_mba_escape` | 14 (1.0%) | 0.082 / 255 |
+| `test_consecutive_chain` | **1** (0.1%) | 0.031 / 255 |
+
+99.0-99.9% of every frame is pixel-identical between the I and the final P. A display stuck on the I frame — precisely the Commit-175/176 failure mode — photographs indistinguishably from a perfect decode. `test_consecutive_chain` is the extreme case: after a six-generation P chain, exactly one macroblock out of 1350 differs from the I.
+
+A targeted check at the known differing coordinates does not rescue this. Those are 16x16 regions; resolving them in a handheld photograph requires registration to within a few pixels through perspective skew, JPEG artifacts, moire and glare, against a high-frequency diagonal gradient. Measurement noise would swamp a signal confined to 1% of the frame.
+
+The earlier claim in this log that "only the picture can" settle decode correctness was right that the acceptance LED cannot, and wrong that these pictures can. The I-versus-P separability should have been measured before requesting the photographs.
+
+#### Follow-on: `test_p_visual_discriminator` (`ea6b9ef`):
+`tools/streams/generate_test_p_visual_discriminator.py` adds a stream built for exactly this question and nothing else. One I, one P; the P displaces two diagonally opposite quadrants vertically by 24 px (48 half-pel, inside the f_code 3 range of [-64, 63]). Top quadrants displace down and bottom quadrants up so every prediction reads inside the reference frame — a single sign would read off the frame edge.
+
+675 of 1350 macroblocks change (50.0%), against 0.1-1.0% for the existing set. The source luma pattern repeats every 40 rows, so 24 px is 60% of a period and lands the shifted quadrants visibly out of phase. Pass/fail is absolute rather than comparative: a presented P shows two hard seams crossing at frame centre in a 2x2 pattern; a stuck I frame shows an unbroken diagonal gradient with no seams. No reference image, no registration, no measurement.
+
+Verified pixel-exact against FFmpeg. The generator additionally refuses to emit a stream whose macroblock change rate falls below 40%, so the discriminating property cannot silently regress. Binary `.m2v` is generated locally per the `tools/streams` convention; only the generator is committed.
+
+Not yet hardware-run. This stream proves nothing about residual, escape or reference chaining — the other five cover those — only that the final P reached the display, and it proves that from a photograph.
+
 #### Status:
 - [x] Built — clean flow, zero TNS, no critical warnings (`05422a5`)
-- [ ] Passed — hardware regression pending
+- [x] Passed — all six streams accepted on hardware; LED qualification complete
+- [ ] Open — P presentation not yet photographically confirmed; run `test_p_visual_discriminator`
