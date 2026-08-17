@@ -442,6 +442,19 @@ Report both counts per stream. The probe-source code decides whether the `luma4_
 - MediaPlayer_top_02.svh
 - MediaPlayer_top_07.svh
 
+#### Build Correction:
+`466f0b3` failed Analysis & Synthesis with `Error (12002): Port "probe_error_source" does not exist in macrofunction "mpeg2_h262_two_picture_probe"` at `MediaPlayer_top_03.svh:22`. The output had been added to `mpeg2_h262_picture_bookkeeper`, but that module is not on the active path: the port list beginning at `MediaPlayer_top_02.svh:73` belongs to `mpeg2_h262_two_picture_probe` and spans into `MediaPlayer_top_03.svh`, so the connection landed on the wrong module. The bookkeeper is reached only through the `_p_chain`, `_p_publish` and `_multimb` variants.
+
+`d5b97ce` reverts the bookkeeper to its pre-178 state and adds the output to `mpeg2_h262_two_picture_probe` instead. That module ORs eight sources rather than the bookkeeper's four, and the four additional ones are P-specific, so the Commit-178 sub-code table was incomplete as well as unbuildable. Corrected probe-source mapping: 1 `probe_error_latched`, 2 `parser_probe_error`, 3 `reference_error`, 4 `reference_progress_error`, 5 `p_syntax_probe_error`, 6 `p_residual_probe_error`, 7 `p_stream_hold_error`, 8 `p_syntax_progress_error`. The signal widens to `[3:0]` through `MediaPlayer_top_01.svh` and `MediaPlayer_top_07.svh`. `probe_error` itself remains unchanged.
+
+The four P-specific sources are the more probable candidates for the observed failures and were absent from the original encoding, so the corrected build is also a better diagnostic than the one that failed.
+
+#### Files Modified:
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe.sv
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_02.svh
+- MediaPlayer_top_07.svh
+
 #### Status:
-- [x] Built — source committed
+- [x] Built — corrected as `d5b97ce`; build hash for this cycle is `d5b97ce`
 - [ ] Passed — sub-code result pending
