@@ -78,7 +78,7 @@ Read this core.md file first. Treat it and all the directives in it as the sole 
 
 - Generated binary regression artifacts and diagnostic tools the user is intended to run such as ffmpeg generated files should normally be produced by deterministic scripts committed under tools/streams/ and generated locally by the user, rather than requiring the agent to commit the binary itself.
 
-- Treat core-log.md as a ring buffer. Only 20 of the most recent entries are ever allowed. Roll over to "001" when "999" is reached.
+- Treat core-log.md as a ring buffer. Only 40 of the most recent entries are ever allowed. Roll over to "001" when "999" is reached.
 
 - The folder labeled ".ai" on the github repositories root is your core project folder and contains your core directives, (core.md) running project memory, (core-log.md), standards library (core-standards.md), and core-log.md formatting guidelines (core-log-format.md).
 

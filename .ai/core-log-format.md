@@ -55,7 +55,7 @@ v0.5.0 1dd8382
 |---|---|
 | `<number>` | Sequential, no zero padding. Roll over to `001` after `999`. |
 | `<type>` | `COMMIT` or `VERSION`. These are the only two record types. See below. |
-| `<version>` | `Unreleased`, or the semantic version tag once released, e.g. `v0.5.0`. |
+| `<version>` | the semantic version tag, e.g. `v0.5.0`. |
 | `<short-hash>` | Abbreviated SHA of the commit this entry records, or `???` while the commit does not exist yet. Never a full SHA. |
 | `<timestamp>` | ISO-8601 with local UTC offset, America/Phoenix, e.g. `2026-08-15T01:17:18-07:00`. |
 
@@ -63,8 +63,7 @@ One space between fields. No punctuation, no parentheses, no trailing text.
 
 ### Record Types
 
-`COMMIT` — an ordinary development commit. `<version>` is `Unreleased` until the
-work is included in a release.
+`COMMIT` — an ordinary development commit.
 
 `VERSION` — a published version boundary: the tag, GitHub release, and packaged
 binary described in the Releasing section of `core.md`. `<version>` carries the
@@ -162,48 +161,6 @@ Close the entry with `---` on its own line.
 
 ---
 
-## Where Detail Goes
-
-`core-log.md` is a bounded ring buffer that a recovering agent reads in full. It
-is an index of project state, not an evidence archive. Long-form detail belongs
-in the **git commit message**, which is unbounded, permanent, and already tied to
-the exact hash the entry names.
-
-| Content | Destination |
-|---|---|
-| Timing figures, utilization, slack tables | Commit message |
-| Hardware result tables, LED codes, per-stream readings | Commit message |
-| Root-cause analysis, ruled-out hypotheses, traces | Commit message |
-| Photographs, captures, measurements | `.ai/current_results/` |
-| One-paragraph summary of the above | `core-log.md` Outcome |
-
-If an entry's Outcome runs past roughly one screen, the detail has leaked into
-the wrong file.
-
----
-
-## Numbering And The Ring Buffer
-
-Per `core.md`, `core-log.md` holds a bounded number of the most recent entries;
-when the limit is exceeded, remove entries from the top. Entry numbers keep
-increasing regardless, rolling `999` to `001`.
-
-Before pruning, prefer to roll an entry off only when both of its Status boxes
-are resolved. Dropping the opening entry of a still-open investigation removes
-the context that explains why current work is happening, which is the most
-expensive kind of loss for a recovering agent.
-
----
-
-## Commit Messages For The Log Itself
-
-Per `core.md`, use `(current_short_commit) core-log.md update`, where
-`current_short_commit` is the abbreviated SHA of the source commit this
-development cycle produced. Metadata-only `.ai/` commits do not advance that
-value, so several consecutive log updates may carry the same hash.
-
----
-
 ## Prohibited
 
 1. **Any section heading other than the six above.** This is the dominant
@@ -242,23 +199,10 @@ Before committing a log update, verify:
 - [ ] Files Modified lists source paths only
 - [ ] Status is exactly two lines with no suffixes
 - [ ] Entry ends with `---`
-- [ ] Entry count is within the ring-buffer limit
-- [ ] Commit message is `(current_short_commit) core-log.md update`
 
 ---
 
 ## Current Log Conformance
-
-As of 2026-08-17 the existing `core-log.md` does not conform. An audit found 26
-distinct section headings in use against the six permitted, and 22 of 41 Status
-lines carrying forbidden suffixes. Mandatory sections are frequently absent:
-`Coming From` appears in 9 of 20 entries, `Files Modified` in 8, `Next Steps` in
-5.
-
-Entries 176 through 183 are the worst offenders and were written by an agent
-that invented a new heading whenever the evidence did not fit the template,
-rather than compressing the evidence into Outcome and moving the detail into the
-commit message.
 
 Existing entries are historical record and should not be rewritten. This format
 applies to every entry written from now on.
