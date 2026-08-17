@@ -511,6 +511,7 @@ ARCHITECTURE rtl OF ascal IS
 	SIGNAL o_lex0,o_lex1,o_lex2,o_lex3       : std_logic;
 	SIGNAL o_wr : unsigned(3 DOWNTO 0);
 	SIGNAL o_hcpt,o_vcpt,o_vcpt_pre,o_vcpt_pre2,o_vcpt_pre3,o_vcpt2 : uint12;
+	SIGNAL o_vcpt_pre2_at_vmin : std_logic;
 	SIGNAL o_ihsize,o_ihsizem,o_ivsize : uint12;
 	SIGNAL o_ihsize_temp, o_ihsize_temp2 : natural RANGE 0 TO 32767;
 
@@ -2083,7 +2084,7 @@ BEGIN
 						vcarry_v:=true;
 					END IF;
 
-					IF o_vcpt_pre2=o_vmin THEN
+					IF o_vcpt_pre2_at_vmin='1' THEN
 						o_vacc     <=o_vacc_ini;
 						o_vacc_next<=o_vacc_ini + 2*o_ivsize;
 						o_vacpt <=x"001";
@@ -2757,6 +2758,7 @@ BEGIN
 	OSWEEP:PROCESS(o_clk) IS
 	BEGIN
 		IF rising_edge(o_clk) THEN
+			o_vcpt_pre2_at_vmin<=to_std_logic(o_vcpt_pre3=o_vmin);
 
 			IF o_ce='1' THEN
 				-- Output pixels count
