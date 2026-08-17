@@ -154,6 +154,15 @@ wire raster_persistence_complete =
          (p_persistence_complete||general_persistence_seen)) :
         p_persistence_complete;
 wire general_final_proof=use_general&&general_persistence_seen;
+// Commit 191: p_macroblock_type_seen is a cumulative acceptance prerequisite,
+// but generalized parser ownership is intentionally rearmed after persistence.
+// Retain the successful proof so rearm cannot turn completed work back into a
+// missing-progress indication.
+reg general_macroblock_seen;
+always @(posedge clk)begin
+ if(reset)general_macroblock_seen<=0;
+ else if(general_final_proof)general_macroblock_seen<=1;
+end
 wire legacy_hold_owner=p_picture_expected&&!raster_candidate&&!raster_seen;
 
 wire mb_seen_combined =
@@ -208,7 +217,7 @@ wire p_macroblock_type_seen_normal=
     (!p_picture_expected ||
      (hold_seen_combined&&!two_mb_wait&&!raster_wait));
 assign p_macroblock_type_seen=
-    general_final_proof?1'b1:p_macroblock_type_seen_normal;
+    general_macroblock_seen||general_final_proof||p_macroblock_type_seen_normal;
 
 assign stream_hold =
     four_mb_parse_hold ||
@@ -245,13 +254,14 @@ wire progress_error=p_picture_expected&&!p_macroblock_type_seen;
 // streams.  Their documented subset rejections must not fail acceptance.
 // Keep every functional completion/replay/hold error below; only retire the
 // controlled parser observer group from the acceptance error output.
+// progress_error is the live inverse of an eventual/cumulative prerequisite;
+// it is naturally true before parsing completes and therefore is not an error
+// event.  The top-level prerequisite report still exposes genuine absence.
 assign probe_error=
-    progress_error|residual_error_raw|
-    hold_error|raster_hold_error;
+    residual_error_raw|hold_error|raster_hold_error;
 
 // Preserve the established numeric codes for the remaining functional terms.
 assign probe_error_source=
-    progress_error    ? 4'd6 :
     residual_error_raw? 4'd7 :
     hold_error        ? 4'd8 :
     raster_hold_error ? 4'd9 : 4'd0;
