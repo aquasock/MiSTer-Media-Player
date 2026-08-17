@@ -1,17 +1,4 @@
 ---
-## 160 COMMIT Unreleased 1efbb4b 2026-08-15T23:31:10-07:00
-
-#### Purpose:
-Refine generalized-P timeout to active transaction phase.
-
-#### Outcome:
-`1efbb4b` reports 1-3-4: reconstructed output is waiting for ordinary DDR store completion.
-
-#### Status:
-- [x] Built
-- [ ] Passed — phase-3 stall localized
-
----
 ## 161 COMMIT Unreleased 5d8c8ba 2026-08-15T23:59:26-07:00
 
 #### Purpose:
@@ -469,6 +456,69 @@ Hardware regression against the Commit-178 diagnostic (report `LED_USER`/`LED_PO
 - rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
 - MediaPlayer_top_07.svh
 
+#### Diagnostic Result:
+Hardware run of `0225bef` on the standard target:
+
+| Stream | USER | POWER | Meaning |
+|---|---|---|---|
+| `test_p_mba_escape` | 2 blinks | 2 blinks | `phase1_probe_error`, source `p_error_raw` |
+| `test_consecutive_chain` | 2 blinks | 2 blinks | `phase1_probe_error`, source `p_error_raw` |
+| `test_p_motion_residual` | 2 blinks | 2 blinks | `phase1_probe_error`, source `p_error_raw` |
+| `test_i_baseline` (control) | steady ON | 1 blink | accepted; POWER 1 is expected, see below |
+
+The control reads exactly as predicted before the run: `LED_USER` steady ON, `LED_POWER` 1 blink. The Commit-178 note that the control "must read steady ON on both" was wrong. `mpeg2_new_diag_power_code` is gated only on `mpeg2_new_diag_error_code == 0`, which is true both when USER is steady OFF and when USER is steady ON, so an accepted stream still emits a prerequisite sub-code. For an all-I stream `p_macroblock_type_seen` is never asserted (`_p_chain.sv` forces it only via `b_final_success`), so the first false prerequisite is term 1. The same 1-blink pattern is the idle/boot baseline with no file loaded. This is an encoding wart in the diagnostic, not a decode defect; POWER is only meaningful on the control when read together with USER.
+
+All three P-final streams now report a single common source: `probe_error_source` 2 = `p_error_gated` = the `probe_error` output of `mpeg2_h262_p_diagnostic_controller` (`p_controller`). `b_picture_observed` is false on all three, as expected for streams with no B pictures, so the gate is transparent.
+
+#### Discrepancy Against Commit 177:
+`test_p_motion_residual` read steady OFF (no error latched) at `92d14cf` and now reads 2 blinks (error latched) at `0225bef`. The Commit-177 conclusion of two distinct faults does not reproduce; all three streams now fail identically.
+
+`0225bef` did not change `probe_error`. `git show 0225bef` confirms the `assign probe_error=...` statement in `_p_chain.sv` is byte-identical and the commit is purely additive (a new `probe_error_source` output plus two gated wires). No RTL semantic on the acceptance or error path was altered, so the change of state is not explained by the diff.
+
+Unexplained candidates, in rough order of likelihood: run-to-run intermittency in the underlying fault; sensitivity to the refit, which moved the 54 MHz decoder-clock setup slack from +0.626 ns at Commit 173/174 to +0.415 ns here (still positive, zero TNS) and grew the netlist from 30,111 to 30,161 ALMs and 40,748 to 40,877 registers; or a misread at Commit 177. Steady OFF and a 2-blink pattern are visually distinct, which argues against the last. An intermittent latch would be a materially different defect class from a deterministic one and must be resolved before a fix boundary is chosen.
+
 #### Status:
 - [x] Built — clean flow, zero TNS, no critical warnings (`0225bef`)
-- [ ] Passed — Commit-178 hardware sub-code result still pending
+- [x] Passed — diagnostic named the common fault source; see Commit-180 proposal
+
+---
+## 180 PROPOSAL Unreleased 2026-08-17T00:25:03-07:00
+
+#### Coming From:
+Unreleased 0225bef
+
+#### Purpose:
+Resolve the Commit-179 reproducibility question and name the specific term inside `mpeg2_h262_p_diagnostic_controller.probe_error`.
+
+#### Scoping:
+`p_error_raw` is an OR of eight terms at `mpeg2_h262_p_diagnostic_controller.sv:196` and does not localize further on its own:
+
+| Code | Term | Code | Term |
+|---|---|---|---|
+| 1 | `syntax_error` | 5 | `residual_error` |
+| 2 | `two_mb_error` | 6 | `hold_error` |
+| 3 | `four_mb_error` | 7 | `raster_hold_error` |
+| 4 | `aligned_error` | 8 | `progress_error` |
+
+Five of these are `probe_error` outputs of dedicated sub-probes (`mpeg2_h262_p_syntax_probe`, `_p_two_mb_syntax_probe`, `_p_four_mb_two_row_syntax_probe`, `_p_aligned_motion_syntax_probe`, `_p_residual_probe`); `syntax_error` is additionally qualified by `!two_mb_seen && !four_mb_seen && !aligned_seen`, and `progress_error` is the flat `p_picture_expected && !p_macroblock_type_seen`.
+
+The three failing streams have deliberately disjoint content — `test_consecutive_chain` carries no residual coefficients, no escapes, no quantiser changes and increment 1 on every macroblock; `test_p_mba_escape` is built from gaps and escapes; `test_p_motion_residual` is residual-heavy with mid-slice quantiser changes. Three structurally unrelated streams landing on one source points at a common early term rather than a content-specific probe, which makes `progress_error` and `syntax_error` the leading candidates over `residual_error` or the aligned/two-MB/four-MB probes. This is a hypothesis for the diagnostic to confirm or refute, not a conclusion.
+
+#### Proposed Commit Boundary:
+Observability only, no behavioral change, matching the Commit-177/178 pattern:
+
+1. Add a `probe_error_source` output to `mpeg2_h262_p_diagnostic_controller`, priority-encoded over the eight terms above in the same order as the existing OR. `probe_error` itself is untouched.
+2. Route it up through `_p_chain.sv` and `MediaPlayer_top_0x.svh`, and select it onto `LED_POWER` when `LED_USER` blinks 2 and the existing `probe_error_source` is 2, so the currently reported POWER 2 is replaced by the deeper eight-way code. The existing five-way source code is preserved for every other value.
+3. Verify the encoder in an iverilog testbench across all eight codes plus the clean case before commit, as was done for Commits 177 and 178.
+
+Only the compiled `_p_chain` variant is edited. The three unused same-named `mpeg2_h262_two_picture_probe` variants and the base file are deliberately left alone; this was the direct cause of the `466f0b3` and `d5b97ce` build failures.
+
+#### Proposed Validation:
+Clean Quartus 17.0.2 build; acceptance remains non-negative setup slack, zero setup TNS, no timing-requirements Critical Warning. Then:
+
+1. Run each of the three P-final streams and record USER and POWER.
+2. Run `test_p_motion_residual` at least three separate times, with a core reboot between runs, to settle whether the Commit-177 steady-OFF reading is reproducible or the fault is intermittent. If any run reports a different code than the others, the defect is intermittent and the fix boundary changes accordingly.
+3. `test_i_baseline` remains the control on USER only.
+
+#### Status:
+- [ ] Proposed — awaiting user approval
