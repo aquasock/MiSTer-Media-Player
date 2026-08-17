@@ -129,8 +129,10 @@ wire [3:0] mpeg2_new_diag_error_code =
 // sub-code for whichever case USER is reporting.
 //
 // LED_POWER when USER blinks 2 (probe_error) - probe_error source:
-//   1 probe_error_latched   2 parser_probe_error
-//   3 reference_error       4 reference_progress_error
+//   1 probe_error_latched      2 parser_probe_error
+//   3 reference_error          4 reference_progress_error
+//   5 p_syntax_probe_error     6 p_residual_probe_error
+//   7 p_stream_hold_error      8 p_syntax_progress_error
 //
 // LED_POWER when USER is steady OFF - first false acceptance term:
 //   1 p_macroblock_type_seen        2 first_picture_420_parsed
@@ -160,7 +162,7 @@ wire [3:0] mpeg2_new_diag_prereq_code =
 
 wire [3:0] mpeg2_new_diag_power_code =
     (mpeg2_new_diag_error_code == 4'd2) ?
-        {1'b0, mpeg2_new_phase1_probe_error_source} :
+        mpeg2_new_phase1_probe_error_source :
     (mpeg2_new_diag_error_code == 4'd0) ?
         mpeg2_new_diag_prereq_code : 4'd0;
 

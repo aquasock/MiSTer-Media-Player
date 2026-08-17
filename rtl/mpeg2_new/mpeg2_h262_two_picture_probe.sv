@@ -104,6 +104,9 @@ module mpeg2_h262_two_picture_probe
     output wire signed [15:0] p_residual_sample_value,
 
     output wire        probe_error,
+    // kate - Commit 178 observability only: names which probe_error source
+    // fired.  probe_error itself is unchanged.
+    output wire [3:0]  probe_error_source,
 
     output wire [4:0]  quantiser_scale_code,
     output wire [11:0] macroblock_address_increment,
@@ -240,6 +243,17 @@ assign probe_error               = probe_error_latched |
                                    p_residual_probe_error |
                                    p_stream_hold_error |
                                    p_syntax_progress_error;
+
+// kate - Commit 178 observability only.  Priority order matches the OR above.
+assign probe_error_source =
+    probe_error_latched      ? 4'd1 :
+    parser_probe_error       ? 4'd2 :
+    reference_error_latched  ? 4'd3 :
+    reference_progress_error ? 4'd4 :
+    p_syntax_probe_error     ? 4'd5 :
+    p_residual_probe_error   ? 4'd6 :
+    p_stream_hold_error      ? 4'd7 :
+    p_syntax_progress_error  ? 4'd8 : 4'd0;
 
 assign slice_header_seen = first_picture_done ?
                            first_slice_header_seen_latched :
