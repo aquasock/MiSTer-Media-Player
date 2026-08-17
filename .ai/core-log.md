@@ -659,19 +659,23 @@ Unreleased a2debaa
 
 #### Purpose:
 
-Determine whether Commit 182 exposed a functional ASCAL regression or placement-sensitive P-decoder behavior and restore the last hardware-passing boundary.
+Make the P-final acceptance diagnostic report the first causal observer failure instead of reclassifying sticky errors later in a multi-picture stream.
 
 #### Outcome:
 
-Commit 182 hardware accepts the I-final and B-final controls but rejects all three P-final streams: motion-residual and MBA-escape report USER/POWER `1/1`, while consecutive-chain reports `2/3`. The codes name `syntax_error` on the first two streams and the owned `four_mb_error` observer on the third, reproducing the pre-Commit-181 failure classes even though the compiled ownership qualification remains present.
+The exact pre-Commit-182 source was rebuilt cleanly and reproduces the same `1/1`, `1/1`, and `2/3` hardware signatures, clearing the ASCAL change as a cause. RTL replay of the three generated streams makes `syntax_error_raw` rise at the same first-P byte in every case; the four-MB observer never asserts candidate, seen, or error. The displayed chain code can change later because `probe_error_source` is a live combinational priority encoder over sticky error flags and mutable ownership claims, so it does not preserve the event that first failed acceptance.
 
 #### Next Steps:
 
-Build the exact pre-182 source as a clean control with the same Quartus 17.0.2 environment and have the user rerun the three P-final streams. If the control passes, revert the ASCAL predicate pipeline and requalify timing and hardware; if it fails, stop and revise the boundary around placement-sensitive decoder or CDC behavior before editing source.
+With user approval, register the first failing `probe_error_source` and its parent diagnostic source when the error first rises, clear both only on reset, and drive the LED sub-code from those captured values without changing decode, stream hold, presentation, or acceptance logic. Verify all source codes and first-error retention in simulation, run a clean Quartus 17.0.2 build with zero TNS, then rerun the three P-final streams once; all three are expected to report the same first causal syntax-observer code, after which the obsolete controlled observer acceptance term can be retired in a separately approved behavioral commit.
 
 #### Files Modified:
 
-- sys/ascal.vhd
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_02.svh
+- MediaPlayer_top_07.svh
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
 
 #### Status:
 
