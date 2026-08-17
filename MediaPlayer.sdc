@@ -3,6 +3,16 @@ derive_clock_uncertainty
 
 # core specific constraints
 
+# hps_io.video_calc publishes slowly changing video measurements to the HPS
+# through a clk_sys-selected status register.  The vid_* measurements are
+# produced in clk_vid/clk_100 domains and are intentionally sampled as
+# telemetry rather than synchronous control data.  Cut only those established
+# measurement-register -> status-register crossings; keep both clock domains
+# and every other crossing fully timed.
+set_false_path \
+    -from [get_keepers {*|hps_io:hps_io|video_calc:video_calc|vid_*}] \
+    -to   [get_keepers {*|hps_io:hps_io|video_calc:video_calc|dout[*]}]
+
 # kate - Phase 1P CDC/reset timing closure.
 #
 # The 40 MHz video and 54 MHz MPEG clocks are both PLL-derived, but the
