@@ -94,6 +94,22 @@ Read this core.md file first. Treat it and all the directives in it as the sole 
 
 ---
 
+## Agent Response Loop
+
+- When responding to the user, follow the following chain of events:
+
+1. Record the current time in a file on the local github root named "response_timestamp.txt". If the file already exsits, replace it.
+
+2. Continue normal agent "Thinking" process and respond to the user as normal.
+
+3. If the recorded time in "response_timestamp.txt" is greater than 1 minute from the current time, send the user an email notifying them that your response is ready.
+
+4. Await user input.
+
+5. Repeat.
+
+---
+
 ## Target Enviroment
 
 - Treat the user's current MiSTer hardware configuration as the standard development target unless the user says otherwise.
@@ -140,27 +156,17 @@ Idle Current: \~1.1A
 
 2. Update core-log.md with your proposal and await user approval.
 
-3. Record the current time in a file named "response_begin_timestamp.md" on the github project root.
+3. You will then make changes to the local github source code directly that is aligned with your proposed changes in core-log.md.
 
-4. If approved, you will make changes to the online github source code directly that is aligned with your proposed changes in core-log.md.
+4. You will then commit the changes to the online repository with a commit message that follows previous agents commit message conventions. This will become the next builds official commit hash.
 
-5. You will then commit the change with a commit message that follows previous agents commit message conventions. This will become the next builds official commit hash.
+5. I will then build the binary and run any diagnostic tests you requested.
 
-6. Notify the user that the changes have been made in the chat prompt.
+6. I will inform you of my test results and you will inspect the local build logs.
 
-7. Examine the file named "response_begin_timestamp.md" and compare the timestamp in it to the current time. If the current time is greater than 1 minute, send the user an email alerting them that your commits are complete.
+7. Check the MiSTer-Media-Player-Audio project's latest commit on github and verify that there are no conflicts with the MiSTer-Media-Player's functionality or later integration with MiSTer-Media-Player-Audio.
 
-8. I will then pull the updated source code into my build enviroment, build the binary, and run any diagnostic tests you requested.
-
-9. I will push the results of the diagnostic tests (if any) into the "output_files" and "phase1p_timing_reports" folders on the github root. 
-
-10. I will inform you of my results and you will inspect the results.
-
-11. Delete the contents of phase1p_timing_reports and output_files.
-
-12. Check the MiSTer-Media-Player-Audio project's latest commit on github and verify that there are no conflicts with the MiSTer-Media-Player's functionality or later integration with MiSTer-Media-Player-Audio.
-
-13. Repeat.
+8. Repeat.
 
 ---
 
