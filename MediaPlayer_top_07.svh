@@ -215,7 +215,10 @@ wire [3:0] mpeg2_new_diag_power_code_live =
             ((mpeg2_new_diag_phase1_source_first == 4'd2) ?
                  mpeg2_new_diag_p_source_first :
                  mpeg2_new_diag_phase1_source_first) : 4'd0) :
-        mpeg2_new_diag_prereq_code;
+        // Commit 192: prerequisites below describe the generalized P path.
+        // Once the existing normal I/P/B acceptance result is true, none of
+        // those P-only sub-codes is a failure and POWER must stay clear.
+        (mpeg2_new_normal_user_led ? 4'd0 : mpeg2_new_diag_prereq_code);
 
 // kate - Commit 180.  progress_error is a symptom, not a root cause: it is
 // p_picture_expected && !p_macroblock_type_seen, and that signal is a deep

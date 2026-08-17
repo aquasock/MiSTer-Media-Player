@@ -40,7 +40,7 @@ module mpeg2_h262_two_picture_probe
 );
 
 wire parser_ready,p_picture_expected,bookkeeper_error,p_hold_raw,p_error_raw;
-wire base_picture_420_complete,base_active_frame_bank,base_completed_frame_bank;
+wire base_second_picture_420_parsed,base_picture_420_complete,base_active_frame_bank,base_completed_frame_bank;
 wire[7:0] base_picture_count;wire base_reference_frame_valid,base_reference_frame_bank;wire[7:0] base_reference_promotion_count;
 
 mpeg2_h262_picture_bookkeeper bookkeeper(
@@ -49,7 +49,7 @@ mpeg2_h262_picture_bookkeeper bookkeeper(
  .pipeline_block_done(pipeline_block_done),.recon_block_complete(recon_block_complete),.p_picture_expected(p_picture_expected),
  .slice_header_seen(slice_header_seen),.macroblock_address_seen(macroblock_address_seen),.first_i_macroblock_seen(first_i_macroblock_seen),
  .first_luma_dc_seen(first_luma_dc_seen),.first_luma_block_complete(first_luma_block_complete),.first_picture_420_parsed(first_picture_420_parsed),
- .second_picture_420_parsed(second_picture_420_parsed),.picture_420_complete(base_picture_420_complete),.active_frame_bank(base_active_frame_bank),
+ .second_picture_420_parsed(base_second_picture_420_parsed),.picture_420_complete(base_picture_420_complete),.active_frame_bank(base_active_frame_bank),
  .completed_frame_bank(base_completed_frame_bank),.picture_count(base_picture_count),.reference_frame_valid(base_reference_frame_valid),
  .reference_frame_bank(base_reference_frame_bank),.reference_promotion_count(base_reference_promotion_count),.probe_error(bookkeeper_error),
  .quantiser_scale_code(quantiser_scale_code),.macroblock_address_increment(macroblock_address_increment),.macroblock_quant(macroblock_quant),
@@ -79,6 +79,11 @@ wire reference_progress_error=(picture_count_reg>=8'd2)&&(p_publication_count!=0
 assign picture_420_complete=picture_complete_pulse;assign active_frame_bank=active_frame_bank_reg;assign completed_frame_bank=completed_frame_bank_reg;
 assign picture_count=picture_count_reg;assign reference_frame_valid=reference_frame_valid_reg;assign reference_frame_bank=reference_frame_bank_reg;
 assign reference_promotion_count=reference_promotion_count_reg;
+// Commit 192: the legacy bookkeeper only counts I pictures.  A generalized P
+// persistence event also publishes a reference picture through this shell, so
+// the exported second-reference prerequisite must follow the combined I/P
+// publication count as well as the legacy result.
+assign second_picture_420_parsed=base_second_picture_420_parsed||(picture_count_reg>=8'd2);
 
 always @(posedge clk)begin
  if(reset)begin
