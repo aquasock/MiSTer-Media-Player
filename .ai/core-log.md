@@ -1,17 +1,4 @@
 ---
-## 164 COMMIT v0.4.0 cf9ec63 2026-08-16T01:55:28-07:00
-
-#### Purpose:
-Record v0.4.0 clean-build/hardware qualification.
-
-#### Outcome:
-Underlying `1370c28` passes fresh-clone qualification; consecutive-P passes 20 runs and all standing guards pass.
-
-#### Status:
-- [x] Built — underlying `1370c28`
-- [x] Passed
-
----
 ## 165 COMMIT v0.4.0 b4385fe 2026-08-16T01:56:38-07:00
 
 #### Purpose:
@@ -676,6 +663,34 @@ Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_consecutive
 #### Status:
 
 - [x] Built
+- [x] Passed
+
+---
+## 184 COMMIT Unreleased ??? 2026-08-17T06:04:32-07:00
+
+#### Coming From:
+
+Unreleased f9b9be6
+
+#### Purpose:
+
+Remove obsolete controlled-parser observer failures from generalized P-stream acceptance without weakening functional pipeline checks.
+
+#### Outcome:
+
+Commit 183 hardware makes all three P-final streams converge on the same USER/POWER `1/4` first-fault signature, including the six-picture consecutive chain, proving that the prior late `four_mb_error` classification was a mutable diagnostic artifact. RTL replay independently locates the common failure in the intentionally narrow controlled syntax observer, while the generalized wide parser is the functional owner of these f_code-3 streams.
+
+#### Next Steps:
+
+With user approval, remove only `parser_error_group` from `mpeg2_h262_p_diagnostic_controller.probe_error`; retain progress, residual, stream-hold, raster-hold, bookkeeper, publication, reference-progress, decoder, reconstruction, DDR, and presentation checks unchanged. Verify the remaining error OR and ownership behavior in simulation, run a clean Quartus 17.0.2 build requiring non-negative setup slack and zero TNS, then run all six Commit-175 streams and the P visual discriminator on hardware.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+
+#### Status:
+
+- [ ] Built
 - [ ] Passed
 
 ---
