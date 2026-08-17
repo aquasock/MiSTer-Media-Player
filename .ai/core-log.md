@@ -281,7 +281,7 @@ Awaiting the ten-stream hardware regression matrix result (LED-based, requires u
 - [ ] Passed — hardware regression matrix result pending
 
 ---
-## 175 PROPOSAL Unreleased pending 2026-08-16T20:17:18-07:00
+## 175 COMMIT Unreleased c634a1e 2026-08-16T20:45:00-07:00
 
 #### Coming From:
 Unreleased 4c65826
@@ -299,12 +299,33 @@ Agent-side analysis of all 20 existing generator scripts on 2026-08-16 found:
 
 Per user instruction, the entire existing `tools/streams/generate_test_*.py` set and its stored `.m2v` outputs are retired as the authoritative regression source effective this entry. They remain on disk pending the replacement (no functioning generator set otherwise) but must not be used to qualify future commits.
 
-#### Next Steps:
-Design and build a replacement test-generation framework: a shared H.262 bitstream-authoring library (single source for VLC tables, bit-packing, and start-code scanning), mandatory start-code emulation-safe packing, and a software reference-model pixel verification requirement for every generated stream (no structural-only checks). Coverage should be re-derived from the currently accepted decoder capability boundary rather than ported as-is. Awaiting user confirmation on design scope before implementation begins.
+#### Implementation:
+Per user direction, coverage was re-derived from scratch (old-set coverage explicitly not ported) and capped at 6 files, all 720x480/45x30 — the larger multi-geometry suite is deferred to future version-release cycles. `c634a1e` adds `tools/streams/h262common.py`, a shared library (VLC tables reused verbatim from the retired set, which were never the source of the problem; a real non-intra dequantization + 8x8 IDCT reference model; half-sample P/B motion-compensation sampling; per-slice-segment start-code emulation detection), and six generators:
+
+- `test_i_baseline` — all-intra sanity floor, no hand-patching.
+- `test_p_motion_residual` — half-sample motion (all 4 phases), full validated-CBP coverage (63/48/32/21/12/3) with DC/AC/Escape coefficients, mid-slice `quantiser_scale_code` changes.
+- `test_p_mba_escape` — ordinary skips, leading skip, mid-slice and leading `macroblock_escape`, last-column (44) addressing.
+- `test_b_bidirectional` — forward/backward/bidirectional prediction + residual, independent fp/bp tracking.
+- `test_pb_restricted_slices` — same-row P/B slice partitioning (H262-025) with per-segment predictor reset, ported forward with real verification.
+- `test_consecutive_chain` — 6-generation consecutive-P reference chain (previous deepest validated chain was 2).
+
+Every stream is verified pixel-exact against FFmpeg's own decode at generation time; residual-affected pixels get a documented +/-1 tolerance (ITU-T H.262 does not mandate a bit-exact IDCT — confirmed empirically when an exact-math reference landed within 0.002 of a rounding boundary and FFmpeg's practical IDCT resolved it to the other side). Motion-only pixels remain exact-match throughout.
+
+Two non-obvious behaviors were found empirically (via direct FFmpeg cross-checks, not memory) and are binding on future test authoring: a P-picture skip resets the motion-vector predictor to zero, but a B-picture skip does **not** — it repeats the previous macroblock's full prediction. `test_b_bidirectional` and `test_pb_restricted_slices` were scoped to avoid needing B-skip semantics rather than risk encoding that rule wrong under time pressure; it needs its own dedicated, separately-verified regression in the larger future suite.
+
+The 20 retired generators and their stale `.m2v` outputs are removed. Hardware qualification against `4c65826`/current decoder RTL is still outstanding — these streams have not yet been run through the 10-stream-matrix-style hardware pass.
 
 #### Files Modified:
-- .ai/core-log.md
+- tools/streams/h262common.py (new)
+- tools/streams/generate_test_i_baseline.py (new)
+- tools/streams/generate_test_p_motion_residual.py (new)
+- tools/streams/generate_test_p_mba_escape.py (new)
+- tools/streams/generate_test_b_bidirectional.py (new)
+- tools/streams/generate_test_pb_restricted_slices.py (new)
+- tools/streams/generate_test_consecutive_chain.py (new)
+- tools/streams/generate_test_*.py (20 retired scripts removed)
+- .gitignore (build_time.txt, __pycache__/, *.pyc)
 
 #### Status:
-- [ ] Built — design not yet implemented
-- [ ] Passed
+- [x] Built — all 6 generators run clean and pass their own software verification
+- [ ] Passed — hardware qualification against current decoder RTL not yet run
