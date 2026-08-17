@@ -51,8 +51,10 @@ assign AUDIO_L = 0;
 assign AUDIO_R = 0;
 assign AUDIO_MIX = 0;
 
-// kate - Commit 176 moves LED_DISK/LED_POWER to the presentation diagnostic in
-// MediaPlayer_top_07.svh so the failing final-P term is directly observable.
+// kate - Commit 177 restores the LED_DISK file-load indicator that Commit 176
+// had displaced; the diagnostic now rides LED_USER as a blink code instead.
+// LED_POWER stays on the presentation bit in MediaPlayer_top_07.svh.
+assign LED_DISK = ioctl_download;
 assign BUTTONS = 0;
 
 //////////////////////////////////////////////////////////////////

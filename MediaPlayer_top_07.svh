@@ -83,47 +83,81 @@ wire mpeg2_new_normal_user_led =
     mpeg2_new_ddr_read_seen &&
     !mpeg2_new_ddr_cache_error;
 
-assign LED_USER = mpeg2_new_normal_user_led;
-
-// kate - Commit 176 presentation diagnostic.
+// kate - Commit 177 error-identification diagnostic.
 //
-// Commit-175 hardware showed the USER LED (board LED[0]) is OFF in exactly the
-// three streams whose final coded picture is a P, and the captured display
-// carries none of the final P's residual content.  Static analysis narrowed the
-// cause to two mechanisms that the single acceptance bit cannot separate:
-// either the final P never completes (so picture_count/second_picture_420_parsed
-// never advance), or it completes but its frame never reaches the display
-// (completed_frame_bank never equals display_frame_bank).  These two wires make
-// that distinction directly observable instead of guessed at, without altering
-// any decode, presentation, ownership or acceptance behavior.
+// Commit-176 hardware read POWER ON / DISK OFF / USER OFF on all three P-final
+// streams and all three ON on test_i_baseline.  Presentation is therefore clean
+// and a decode/DDR error is latching instead, which is the opposite of the
+// mechanism the static trace had favoured.  One bit cannot say which of the
+// nine error flags fired, so the flags are priority-encoded and blinked out on
+// LED_USER.  LED_DISK returns to its ioctl_download file-load duty in
+// MediaPlayer_top_00.svh; LED_POWER keeps the presentation bit.
 //
-// Board LED[4] (LED_POWER): the completed frame is the frame being displayed.
-// Board LED[2] (LED_DISK) : no decode/DDR error has latched.
+// LED_USER encoding:
+//   steady ON        - no error latched and the stream is accepted
+//   steady OFF       - no error latched but not accepted (acceptance
+//                      prerequisites failed: picture_count,
+//                      second_picture_420_parsed, p_macroblock_type_seen,
+//                      reference_read_ok, implicit_reconstruct_ok)
+//   N blinks, pause  - error flag N latched, per the table below
 //
-// Reading a P-final stream with board LED[0] OFF:
-//   LED[4] OFF               -> completed frame never presented (swap path)
-//   LED[4] ON  and LED[2] OFF-> a decode/DDR error latched
-//   LED[4] ON  and LED[2] ON -> P acceptance prerequisites failed
-//                               (picture_count, second_picture_420_parsed,
-//                                p_macroblock_type_seen, reference_read_ok,
-//                                implicit_reconstruct_ok)
+//   1 syntax          4 inverse_quant                   7 recon
+//   2 phase1_probe    5 inverse_quant_unsupported_matrix 8 ddr_store
+//   3 pred            6 idct                            9 ddr_cache
+//
+// No decode, presentation, ownership or acceptance behavior is altered; the
+// acceptance term itself still drives the steady-ON state unchanged.
 wire mpeg2_new_diag_presentation_ok =
     (mpeg2_new_completed_frame_bank == mpeg2_new_display_frame_bank);
 
-wire mpeg2_new_diag_error_free =
-    !mpeg2_new_syntax_error &&
-    !mpeg2_new_phase1_probe_error &&
-    !mpeg2_new_pred_error &&
-    !mpeg2_new_inverse_quant_error &&
-    !mpeg2_new_inverse_quant_unsupported_matrix &&
-    !mpeg2_new_idct_error &&
-    !mpeg2_new_recon_error &&
-    !mpeg2_new_ddr_store_error &&
-    !mpeg2_new_ddr_cache_error;
+wire [3:0] mpeg2_new_diag_error_code =
+    mpeg2_new_syntax_error                     ? 4'd1 :
+    mpeg2_new_phase1_probe_error               ? 4'd2 :
+    mpeg2_new_pred_error                       ? 4'd3 :
+    mpeg2_new_inverse_quant_error              ? 4'd4 :
+    mpeg2_new_inverse_quant_unsupported_matrix ? 4'd5 :
+    mpeg2_new_idct_error                       ? 4'd6 :
+    mpeg2_new_recon_error                      ? 4'd7 :
+    mpeg2_new_ddr_store_error                  ? 4'd8 :
+    mpeg2_new_ddr_cache_error                  ? 4'd9 : 4'd0;
 
-// LED_POWER/LED_DISK are {enable, value}; sys_top drives board LED[4]/LED[2]
-// from the value bit when the enable bit is set.
+// 250 ms slot at the 54 MHz decoder clock.  Slots 0..2N-1 carry the N blinks
+// (even slot lit, odd slot dark); the remaining slots of the 26-slot frame are
+// the ~2 s separating gap, so nine blinks stay countable.
+localparam [23:0] MPEG2_NEW_DIAG_SLOT_CYCLES = 24'd13_500_000;
+localparam [4:0]  MPEG2_NEW_DIAG_SLOT_LAST   = 5'd25;
+
+reg [23:0] mpeg2_new_diag_slot_div;
+reg [4:0]  mpeg2_new_diag_slot;
+
+wire mpeg2_new_diag_slot_tick =
+    (mpeg2_new_diag_slot_div == MPEG2_NEW_DIAG_SLOT_CYCLES - 24'd1);
+
+always @(posedge clk_mpeg2) begin
+    if (reset_mpeg2) begin
+        mpeg2_new_diag_slot_div <= 24'd0;
+        mpeg2_new_diag_slot     <= 5'd0;
+    end
+    else if (mpeg2_new_diag_slot_tick) begin
+        mpeg2_new_diag_slot_div <= 24'd0;
+        mpeg2_new_diag_slot     <= (mpeg2_new_diag_slot == MPEG2_NEW_DIAG_SLOT_LAST) ?
+                                   5'd0 : mpeg2_new_diag_slot + 5'd1;
+    end
+    else begin
+        mpeg2_new_diag_slot_div <= mpeg2_new_diag_slot_div + 24'd1;
+    end
+end
+
+wire [4:0] mpeg2_new_diag_blink_slots = {mpeg2_new_diag_error_code, 1'b0};
+wire mpeg2_new_diag_blink =
+    (mpeg2_new_diag_slot < mpeg2_new_diag_blink_slots) &&
+    !mpeg2_new_diag_slot[0];
+
+assign LED_USER = (mpeg2_new_diag_error_code == 4'd0) ?
+                  mpeg2_new_normal_user_led : mpeg2_new_diag_blink;
+
+// LED_POWER is {enable, value}; sys_top drives the POWER LED from the value
+// bit when the enable bit is set.
 assign LED_POWER = {1'b1, mpeg2_new_diag_presentation_ok};
-assign LED_DISK  = {1'b1, mpeg2_new_diag_error_free};
 
 endmodule
