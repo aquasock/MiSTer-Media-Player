@@ -85,4 +85,45 @@ wire mpeg2_new_normal_user_led =
 
 assign LED_USER = mpeg2_new_normal_user_led;
 
+// kate - Commit 176 presentation diagnostic.
+//
+// Commit-175 hardware showed the USER LED (board LED[0]) is OFF in exactly the
+// three streams whose final coded picture is a P, and the captured display
+// carries none of the final P's residual content.  Static analysis narrowed the
+// cause to two mechanisms that the single acceptance bit cannot separate:
+// either the final P never completes (so picture_count/second_picture_420_parsed
+// never advance), or it completes but its frame never reaches the display
+// (completed_frame_bank never equals display_frame_bank).  These two wires make
+// that distinction directly observable instead of guessed at, without altering
+// any decode, presentation, ownership or acceptance behavior.
+//
+// Board LED[4] (LED_POWER): the completed frame is the frame being displayed.
+// Board LED[2] (LED_DISK) : no decode/DDR error has latched.
+//
+// Reading a P-final stream with board LED[0] OFF:
+//   LED[4] OFF               -> completed frame never presented (swap path)
+//   LED[4] ON  and LED[2] OFF-> a decode/DDR error latched
+//   LED[4] ON  and LED[2] ON -> P acceptance prerequisites failed
+//                               (picture_count, second_picture_420_parsed,
+//                                p_macroblock_type_seen, reference_read_ok,
+//                                implicit_reconstruct_ok)
+wire mpeg2_new_diag_presentation_ok =
+    (mpeg2_new_completed_frame_bank == mpeg2_new_display_frame_bank);
+
+wire mpeg2_new_diag_error_free =
+    !mpeg2_new_syntax_error &&
+    !mpeg2_new_phase1_probe_error &&
+    !mpeg2_new_pred_error &&
+    !mpeg2_new_inverse_quant_error &&
+    !mpeg2_new_inverse_quant_unsupported_matrix &&
+    !mpeg2_new_idct_error &&
+    !mpeg2_new_recon_error &&
+    !mpeg2_new_ddr_store_error &&
+    !mpeg2_new_ddr_cache_error;
+
+// LED_POWER/LED_DISK are {enable, value}; sys_top drives board LED[4]/LED[2]
+// from the value bit when the enable bit is set.
+assign LED_POWER = {1'b1, mpeg2_new_diag_presentation_ok};
+assign LED_DISK  = {1'b1, mpeg2_new_diag_error_free};
+
 endmodule

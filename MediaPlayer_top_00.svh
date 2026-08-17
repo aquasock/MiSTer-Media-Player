@@ -51,8 +51,8 @@ assign AUDIO_L = 0;
 assign AUDIO_R = 0;
 assign AUDIO_MIX = 0;
 
-assign LED_DISK = ioctl_download;
-assign LED_POWER = 0;
+// kate - Commit 176 moves LED_DISK/LED_POWER to the presentation diagnostic in
+// MediaPlayer_top_07.svh so the failing final-P term is directly observable.
 assign BUTTONS = 0;
 
 //////////////////////////////////////////////////////////////////
