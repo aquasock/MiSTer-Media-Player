@@ -734,7 +734,7 @@ Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_p_visual_di
 - [ ] Passed
 
 ---
-## 188 COMMIT Unreleased ??? 2026-08-17T07:44:50-07:00
+## 188 COMMIT Unreleased dbc3000 2026-08-17T07:44:50-07:00
 
 #### Coming From:
 
@@ -746,11 +746,11 @@ Identify the frontend syntax condition that remains latched after functionally s
 
 #### Outcome:
 
-Commit 187 hardware gives the same USER/POWER `1/4` indication with no DISK activity on the motion-residual, MBA-escape, and visual-discriminator streams, while the discriminator still displays all four quadrants with visible center seams. This passes Commit 187's parsing, reconstruction, publication, and presentation boundary and isolates the remaining shared indication to the frontend's sticky `syntax_error`; the existing DISK diagnostic is intentionally inactive for that error class and therefore provides no deeper source.
+Commit 187 hardware gives the same USER/POWER `1/4` indication with no DISK activity on all three generalized P streams while the discriminator retains its four visible quadrants, passing the parsing, reconstruction, publication, and presentation boundary. Commit `dbc3000` adds a sticky five-bit source covering all 21 frontend `syntax_error` assertion sites and reports it on DISK for that error class without changing decode control. Exact frontend replay leaves error and source clear on all three streams. The clean Quartus 17.0.2 build closes with zero setup TNS, +0.276 ns global setup, +1.948 ns decoder setup, 31,043 ALMs, 41,883 registers, and no Critical Warning.
 
 #### Next Steps:
 
-Add an observability-only first-fault code covering each frontend `syntax_error` assertion, route it alongside the existing frontend status without changing readiness or decoding, and display that code on LED_DISK only when USER reports top-level syntax error. Verify every assertion site has a distinct stable code in simulation, then perform a clean Quartus 17.0.2 build requiring non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning. Hardware validation will rerun the three P streams and use the shared DISK code to define the next functional correction boundary.
+Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_p_visual_discriminator.m2v`, recording USER, POWER, and DISK across one complete 16-second diagnostic frame. If USER truly reports syntax error, DISK will blink its assertion-site code from 1 through 21; DISK remaining off will prove the prior USER count was not top-level syntax error. Confirm the visual discriminator seams remain visible.
 
 #### Files Modified:
 
@@ -761,7 +761,7 @@ Add an observability-only first-fault code covering each frontend `syntax_error`
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
