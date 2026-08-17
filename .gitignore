@@ -26,6 +26,8 @@ PLLJ_PLLSPE_INFO.txt
 *.ddb
 build_id.v
 build_time.txt
+__pycache__/
+*.pyc
 c5_pin_model_dump.txt
 *.sopcinfo
 *.csv
