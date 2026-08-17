@@ -162,9 +162,9 @@ Idle Current: \~1.1A
 
 4. You will then commit the changes to the online repository with a commit message that follows previous agents commit message conventions. This will become the next builds official commit hash.
 
-5. I will then build the binary and run any diagnostic tests you requested.
+5. You will then build the project yourself and inform the user the files are ready for testing. 
 
-6. I will inform you of my test results and you will inspect the local build logs.
+6. I will inform you when my test results are ready on the local github repository.
 
 7. Check the MiSTer-Media-Player-Audio project's latest commit on github and verify that there are no conflicts with the MiSTer-Media-Player's functionality or later integration with MiSTer-Media-Player-Audio.
 
