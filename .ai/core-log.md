@@ -879,3 +879,36 @@ Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_p_visual_discri
 - [x] Passed
 
 ---
+## 193 COMMIT Unreleased ??? 2026-08-17T16:38:38-07:00
+
+#### Coming From:
+
+Unreleased 454336d
+
+#### Purpose:
+
+Generalize the progressive 4:2:0 P path from fixed `f_code=(3,3)` to independently picture-signaled horizontal and vertical `f_code` values from 1 through 4.
+
+#### Outcome:
+
+Commit 192 hardware accepts all five requested streams with solid USER and zero-code POWER, no DISK error, and the visual discriminator seams retained. Static tracing of the compiled generalized P path finds its remaining motion envelope fixed at `f_code=(3,3)`: picture admission requires both fields to equal 3, the motion parser consumes exactly two residual bits, and the shared reference adapter selects generalized P transactions only for that same pair. `H262-022` defines reconstruction from the picture-signaled component value, and values 1 through 4 form the next bounded expansion because their complete reconstructed range fits the existing signed eight-bit motion transport; B decoding remains outside this boundary.
+
+#### Next Steps:
+
+Parameterize generalized P motion reconstruction and admission for independent horizontal and vertical `f_code` values 1 through 4, preserving Table B.10 signed motion codes, predictor reuse/reset, component wraparound, current raster transport, and all fixed-3 behavior. Extend the shared deterministic stream tooling and add one pixel-verified 720x480 regression that covers every admitted value, unequal component pairs, non-zero residuals, signs, and wraparound. Run focused parser/reconstruction simulations, regenerate all standing streams, complete a clean Quartus 17.0.2 build with non-negative setup and hold slack and zero TNS, then hardware-run the new stream plus the five Commit-192 guards and `test_b_bidirectional.m2v` with the visual seams retained.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- tools/streams/h262common.py
+- tools/streams/generate_test_p_f_code_range.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
