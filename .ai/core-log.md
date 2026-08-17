@@ -636,7 +636,7 @@ Not yet hardware-run. This stream proves nothing about residual, escape or refer
 - [ ] Open — P presentation not yet photographically confirmed; run `test_p_visual_discriminator`
 
 ---
-## 182 COMMIT Unreleased ??? 2026-08-17T04:56:49-07:00
+## 182 COMMIT Unreleased a2debaa 2026-08-17T04:56:49-07:00
 
 #### Coming From:
 
@@ -648,11 +648,11 @@ Restore durable HDMI setup margin by removing the ASCAL vertical line-boundary c
 
 #### Outcome:
 
-The approved independent boundary registers the `o_vcpt_pre3 = o_vmin` predicate every HDMI clock and consumes that aligned predicate when the vertical accumulator advances, leaving decoder logic and ASCAL functionality otherwise unchanged.
+`a2debaa` registers the `o_vcpt_pre3 = o_vmin` predicate every HDMI clock and consumes that aligned predicate when the vertical accumulator advances. A clean Quartus 17.0.2 flow completed with zero setup TNS and no timing-requirements Critical Warning; the former vertical boundary path left the HDMI critical set and both HDMI and decoder setup slack are positive.
 
 #### Next Steps:
 
-Commit the built ASCAL change, retain zero setup TNS and no timing-requirements Critical Warning, then hardware-run the standing stream matrix with particular attention to scaler output stability and the P-presentation visual discriminator.
+Hardware-run the standing stream matrix with particular attention to scaler output stability, then run the P-presentation visual discriminator and report whether the final P frame shows the expected quadrant seams.
 
 #### Files Modified:
 
@@ -660,7 +660,7 @@ Commit the built ASCAL change, retain zero setup TNS and no timing-requirements 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
