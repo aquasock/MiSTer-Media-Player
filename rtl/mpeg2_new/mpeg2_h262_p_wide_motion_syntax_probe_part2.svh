@@ -85,16 +85,13 @@
             end
 
             R_APPLY: begin
-                // STANDARDS_CONFORMANCE:H262-025. The first MBA of a slice
-                // positions its first coded macroblock from the row origin; it
-                // does not imply skipped macroblocks. Restricted-slice coverage
-                // therefore requires that position to equal the next uncovered
-                // macroblock left by the preceding slice in this row.
+                // STANDARDS_CONFORMANCE:H262-025. The first MBA of a P slice
+                // positions its first coded macroblock from the row origin;
+                // preceding positions are skipped macroblocks.  Subsequent
+                // increments remain relative to previous_col.
                 if((mba_increment==0) ||
                    (next_col_calc<0) ||
-                   (next_col_calc>=$signed({5'd0,picture_mb_width})) ||
-                   ((previous_col<0) &&
-                    (next_col_calc!=$signed(picture_mb_count-row_base_index)))) begin
+                   (next_col_calc>=$signed({5'd0,picture_mb_width}))) begin
                     parser_state<=R_ERROR;
                 end else begin
                     current_col<=next_col_calc[5:0];
@@ -104,7 +101,7 @@
                     current_has_quant<=0;
                     mbtype_bits<=0;
                     mbtype_len<=0;
-                    if((previous_col>=0) && (mba_increment>1)) begin
+                    if(mba_increment>1) begin
                         predictor_x<=0;
                         predictor_y<=0;
                         skip_emit_col<=previous_col+1'b1;

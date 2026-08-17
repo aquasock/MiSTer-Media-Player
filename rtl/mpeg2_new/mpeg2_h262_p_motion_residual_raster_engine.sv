@@ -60,7 +60,7 @@ localparam [28:0]
     CR_BASE=29'h0600D2F0,
     BANK_OFF=29'h00010000;
 localparam integer MAX_MB=1350;
-localparam integer MAX_BLOCKS=16;
+localparam integer MAX_BLOCKS=32;
 
 wire [14:0] horizontal_rounded =
     {1'b0,horizontal_size}+15'd15;
@@ -192,17 +192,17 @@ reg [15:0] motion_word;
 wire signed [7:0] mb_mvx=$signed(motion_word[15:8]);
 wire signed [7:0] mb_mvy=$signed(motion_word[7:0]);
 
-reg signed [15:0] rm [0:1023];
-reg [10:0] desc_mb [0:15];
-reg [2:0] desc_block [0:15];
-reg [4:0] desc_count;
-reg [3:0] current_desc_slot;
+reg signed [15:0] rm [0:2047];
+reg [10:0] desc_mb [0:31];
+reg [2:0] desc_block [0:31];
+reg [5:0] desc_count;
+reg [4:0] current_desc_slot;
 reg desc_active;
 reg wide_desc_pending;
 reg [10:0] wide_desc_mb;
 reg [5:0] sample_expected;
 reg metadata_done;
-reg [4:0] exec_desc_slot;
+reg [5:0] exec_desc_slot;
 
 reg pending, started;
 reg reference_bank_latched, destination_bank_latched;
@@ -277,10 +277,10 @@ wire [11:0] src_y_tap=src_y_tap_signed[11:0];
 
 wire residual_hit=
     (exec_desc_slot<desc_count)&&
-    (desc_mb[exec_desc_slot[3:0]]==mbi)&&
-    (desc_block[exec_desc_slot[3:0]]==blk);
-wire [9:0] residual_mem_index=
-    {exec_desc_slot[3:0],6'b000000}+{4'd0,ei};
+    (desc_mb[exec_desc_slot[4:0]]==mbi)&&
+    (desc_block[exec_desc_slot[4:0]]==blk);
+wire [10:0] residual_mem_index=
+    {exec_desc_slot[4:0],6'b000000}+{5'd0,ei};
 wire signed [15:0] residual_pel=
     residual_hit?rm[residual_mem_index]:16'sd0;
 
@@ -314,8 +314,8 @@ wire ready_res=metadata_done;
 wire descriptor_order_error=
     (desc_count!=0)&&
     ({wide_desc_mb,residual_value[2:0]} <=
-     {desc_mb[(desc_count-1'b1)&5'h0f],
-      desc_block[(desc_count-1'b1)&5'h0f]});
+     {desc_mb[(desc_count-1'b1)&6'h1f],
+      desc_block[(desc_count-1'b1)&6'h1f]});
 
 wire new_picture_metadata=
     capture_enable&&residual_valid&&!desc_active&&
@@ -366,7 +366,7 @@ always @(posedge clk) begin
         persisted_value<=0;
         progress_stage<=0;
         error<=0;
-        for(i=0;i<16;i=i+1) begin
+        for(i=0;i<32;i=i+1) begin
             desc_mb[i]<=0;
             desc_block[i]<=0;
         end
@@ -446,7 +446,7 @@ always @(posedge clk) begin
                 end else if(descriptor_order_error) begin
                     error<=1;
                 end else begin
-                    current_desc_slot<=desc_count[3:0];
+                    current_desc_slot<=desc_count[4:0];
                     desc_mb[desc_count]<=wide_desc_mb;
                     desc_block[desc_count]<=residual_value[2:0];
                     desc_count<=desc_count+1'b1;
@@ -465,11 +465,11 @@ always @(posedge clk) begin
                    ((desc_count!=0)&&
                     ({5'd0,residual_value[8:3],
                       residual_value[2:0]} <=
-                     {desc_mb[(desc_count-1'b1)&5'h0f],
-                      desc_block[(desc_count-1'b1)&5'h0f]}))) begin
+                     {desc_mb[(desc_count-1'b1)&6'h1f],
+                      desc_block[(desc_count-1'b1)&6'h1f]}))) begin
                     error<=1;
                 end else begin
-                    current_desc_slot<=desc_count[3:0];
+                    current_desc_slot<=desc_count[4:0];
                     desc_mb[desc_count]<={5'd0,residual_value[8:3]};
                     desc_block[desc_count]<=residual_value[2:0];
                     desc_count<=desc_count+1'b1;

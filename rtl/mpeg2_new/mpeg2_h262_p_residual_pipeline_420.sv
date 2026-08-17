@@ -30,14 +30,14 @@ module mpeg2_h262_p_residual_probe
 
     input wire wide_mode,
     input wire wide_picture_complete,
-    input wire [175:0] wide_residual_mb_plan,
-    input wire [47:0] wide_residual_block_index_plan,
-    input wire [4:0] wide_residual_block_count,
+    input wire [351:0] wide_residual_mb_plan,
+    input wire [95:0] wide_residual_block_index_plan,
+    input wire [5:0] wide_residual_block_count,
     input wire [383:0] wide_coeff_index_plan,
     input wire [831:0] wide_coeff_value_plan,
     input wire [63:0] wide_coeff_last_plan,
     input wire [6:0] wide_coeff_count,
-    input wire [79:0] wide_qscale_plan,
+    input wire [159:0] wide_qscale_plan,
     input wire wide_q_scale_type,
     input wire wide_alternate_scan,
 
@@ -53,7 +53,7 @@ module mpeg2_h262_p_residual_probe
     output wire probe_error
 );
 
-localparam [4:0] MAX_BLOCKS=5'd16;
+localparam [5:0] MAX_BLOCKS=6'd32;
 localparam [6:0] MAX_COEFF_EVENTS=7'd64;
 wire any_general_mode = general_mode || wide_mode;
 
@@ -109,18 +109,18 @@ reg [287:0] gplan;
 reg [383:0] g_coeff_index;
 reg [831:0] g_coeff_value;
 reg [63:0] g_coeff_last;
-reg [79:0] g_qscale;
+reg [159:0] g_qscale;
 reg g_qtype, g_alt;
-reg [4:0] expected_blocks, slot_count;
+reg [5:0] expected_blocks, slot_count;
 reg [6:0] expected_coeffs, coeff_read_index;
 
 reg [8:0] scan_index;
 reg [5:0] scan_mb;
 reg [2:0] scan_block, current_block;
 reg [4:0] current_qscale;
-reg [10:0] desc_mb [0:15];
-reg [2:0] desc_block [0:15];
-reg signed [15:0] gmem [0:1023];
+reg [10:0] desc_mb [0:31];
+reg [2:0] desc_block [0:31];
+reg signed [15:0] gmem [0:2047];
 reg [6:0] sample_cap_count;
 
 reg gstart, gwe, gend;
@@ -128,15 +128,15 @@ reg [5:0] gwidx;
 reg signed [12:0] gwval;
 
 reg [5:0] replay_motion_mb;
-reg [4:0] replay_slot;
+reg [5:0] replay_slot;
 reg [5:0] replay_sample;
 reg replay_valid, first_valid_reg;
 reg [5:0] replay_index;
 reg signed [15:0] replay_value, first_value_reg;
 integer i;
 
-wire [9:0] replay_mem_index =
-    {replay_slot[3:0],6'b000000}+{4'd0,replay_sample};
+wire [10:0] replay_mem_index =
+    {replay_slot[4:0],6'b000000}+{5'd0,replay_sample};
 wire [5:0] coeff_idx_current =
     g_coeff_index[(coeff_read_index*6)+:6];
 wire signed [12:0] coeff_val_current =
@@ -231,7 +231,7 @@ always @(posedge clk) begin
         replay_index<=0;
         replay_value<=0;
         first_value_reg<=0;
-        for(i=0;i<16;i=i+1) begin
+        for(i=0;i<32;i=i+1) begin
             desc_mb[i]<=0;
             desc_block[i]<=0;
         end
@@ -262,7 +262,7 @@ always @(posedge clk) begin
             sample_cap_count<=0;
             replay_slot<=0;
             replay_sample<=0;
-            for(i=0;i<16;i=i+1) begin
+            for(i=0;i<32;i=i+1) begin
                 desc_mb[i]<=wide_residual_mb_plan[(i*11)+:11];
                 desc_block[i]<=
                     wide_residual_block_index_plan[(i*3)+:3];
