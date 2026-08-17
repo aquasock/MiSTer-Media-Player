@@ -715,7 +715,7 @@ Run `test_p_visual_discriminator.m2v` and record USER, POWER, and DISK after the
 - [ ] Passed
 
 ---
-## 187 COMMIT Unreleased ??? 2026-08-17T07:21:08-07:00
+## 187 COMMIT Unreleased 92546f5 2026-08-17T07:21:08-07:00
 
 #### Coming From:
 
@@ -727,11 +727,11 @@ Remove the two diagnosed wide-P parser limits blocking leading skipped macrobloc
 
 #### Outcome:
 
-Commit 186 hardware displays the visual discriminator's center seams, proving final-P completion, raster execution, and presentation now work. Exact compiled-controller replay localizes the remaining streams independently: MBA-escape enters `R_APPLY` on its leading-skip row and is rejected by a controlled restriction requiring the first coded macroblock at the next uncovered column, while motion-residual reaches `R_BLOCK` and fails when its 17th residual descriptor exceeds the implementation's 16-descriptor capacity. The stream requires 19 descriptors and does not exhaust coefficient storage; neither stop is an H.262 limit.
+Commit `92546f5` permits a P slice's first macroblock address increment to establish leading skipped macroblocks through the existing zero-motion skip path, and widens residual descriptor transport and raster storage from 16 to 32 entries. Exact compiled-controller replay completes the MBA-escape, motion-residual, and visual-discriminator streams without a wide-parser error; MBA-escape emits exactly 1,350 motion words, and the residual transaction carries all 19 descriptors. The dedicated raster-capacity simulation passes with 19 descriptors, 1,350 motion words, and an accepted terminator. The clean Quartus 17.0.2 build closes with zero setup TNS, +0.045 ns global setup, +2.133 ns decoder setup, 30,928 ALMs, 41,745 registers, and no Critical Warning.
 
 #### Next Steps:
 
-Allow a P slice's first macroblock address increment to establish a legal leading skipped region while retaining the existing zero, row-bound, and subsequent-coverage checks. Widen the generalized residual descriptor transport and raster storage from 16 to 32 entries without changing coefficient limits or decoded arithmetic. Replay the MBA-escape, motion-residual, and visual-discriminator streams through the compiled controller, verify a 19-descriptor raster transaction in simulation, then perform a clean Quartus 17.0.2 build requiring non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning. Hardware validation will run all three streams and require visible discriminator seams plus clean acceptance.
+Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_p_visual_discriminator.m2v` on hardware. Record USER, POWER, and DISK after the initial shared blink, and confirm that the visual discriminator still displays the center quadrant seams. Clean acceptance of both formerly blocked streams and preserved discriminator seams will pass this boundary.
 
 #### Files Modified:
 
@@ -743,7 +743,7 @@ Allow a P slice's first macroblock address increment to establish a legal leadin
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
