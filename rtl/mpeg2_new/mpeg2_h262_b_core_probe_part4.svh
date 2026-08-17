@@ -102,14 +102,27 @@
                 if(current_direction[0])begin fpx<=cur_fx;fpy<=cur_fy;end
                 if(current_direction[1])begin bpx<=cur_bx;bpy<=cur_by;end
                 last_direction<=current_direction;row_has_coded_mb<=1;
-                if(current_col==picture_mb_width-1'b1)state<=S_STUFF;
-                else begin current_col<=current_col+1'b1;mba_bits<=0;mba_len<=0;state<=S_MBA;end
+                // kate - Commit 173: current_col becomes the next uncovered
+                // column after every coded endpoint. S_MBA then either parses
+                // another in-slice MBA or recognizes the buffered zero tail.
+                current_col<=current_col+1'b1;
+                mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;state<=S_MBA;
             end
             S_STUFF: begin if(parser_at_end)state<=S_SUCCESS;else if(parser_current_bit)state<=S_ERROR;end
             S_SUCCESS: begin
                 parse_active<=0;
-                if(!row_has_coded_mb||(current_col!=picture_mb_width-1'b1))begin parser_error<=1;proof_done<=1;parse_hold<=0;end
+                if(!row_has_coded_mb||(current_col==0)||(current_col>{2'b00,picture_mb_width}))begin parser_error<=1;proof_done<=1;parse_hold<=0;end
                 else if(boundary_final)begin
-                    proof_done<=1;transform_slot<=0;t_coeff_read_index<=0;t_sample_count<=0;replay_slot<=0;replay_sample<=0;replay_active<=1;
-                    if(residual_count!=0)rstate<=R_TSTART;else begin if(residual_coeff_count!=0)replay_error<=1;rstate<=R_FINISH;end
+                    if(current_col!={2'b00,picture_mb_width})begin parser_error<=1;proof_done<=1;parse_hold<=0;end
+                    else begin
+                        proof_done<=1;transform_slot<=0;t_coeff_read_index<=0;t_sample_count<=0;replay_slot<=0;replay_sample<=0;replay_active<=1;
+                        if(residual_count!=0)rstate<=R_TSTART;else begin if(residual_coeff_count!=0)replay_error<=1;rstate<=R_FINISH;end
+                    end
+                end else if(slice_capture)begin
+                    // While parse_active, slice_capture is the classification of
+                    // the already-consumed next start code: 1 means same row.
+                    if(current_col>={2'b00,picture_mb_width})begin parser_error<=1;proof_done<=1;parse_hold<=0;end
+                    else begin row_covered_count<=current_col;row_byte_count<=0;slice_capture<=1;parse_hold<=0;end
                 end else begin
+                    if(current_col!={2'b00,picture_mb_width})begin parser_error<=1;proof_done<=1;parse_hold<=0;end
+                    else begin row_covered_count<=0;

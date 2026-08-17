@@ -130,20 +130,48 @@
 
             R_SUCCESS: begin
                 parse_active<=0;
-                if(!row_has_coded_mb ||
-                   (current_col!=(picture_mb_width-1'b1))) begin
+                if(!row_has_coded_mb) begin
                     probe_error<=1;
                     proof_done<=1;
                     parse_hold<=0;
-                end else begin
-                    picture_mb_count<=
-                        row_base_index+{5'd0,picture_mb_width};
-                    if(boundary_final) begin
+                end else if(boundary_final) begin
+                    if(current_col!=(picture_mb_width-1'b1)) begin
+                        probe_error<=1;
+                        proof_done<=1;
+                        parse_hold<=0;
+                    end else begin
+                        picture_mb_count<=
+                            row_base_index+{5'd0,current_col}+11'd1;
                         wide_seen<=1;
                         wide_complete_now<=1;
                         proof_done<=1;
                         final_release_pending<=1;
+                    end
+                end else if(slice_capture) begin
+                    // kate - Commit 173: while parse_active, slice_capture is
+                    // the already-consumed boundary classification: 1 means the
+                    // following slice has the same vertical position.
+                    if(current_col>=(picture_mb_width-1'b1)) begin
+                        probe_error<=1;
+                        proof_done<=1;
+                        parse_hold<=0;
                     end else begin
+                        picture_mb_count<=
+                            row_base_index+{5'd0,current_col}+11'd1;
+                        row_byte_count<=0;
+                        slice_capture<=1;
+                        parse_hold<=0;
+                    end
+                end else begin
+                    // A row transition is legal only after the restricted-slice
+                    // coverage for the current row reaches its right edge.
+                    if(current_col!=(picture_mb_width-1'b1)) begin
+                        probe_error<=1;
+                        proof_done<=1;
+                        parse_hold<=0;
+                    end else begin
+                        picture_mb_count<=
+                            row_base_index+{5'd0,picture_mb_width};
                         row_base_index<=
                             row_base_index+{5'd0,picture_mb_width};
                         slice_row_number<=slice_row_number+1'b1;
@@ -265,11 +293,16 @@
                         proof_done<=1;
                         probe_error<=1;
                     end else if(
-                        (slice_row_number<picture_mb_height) &&
-                        (start_code_value==
-                            ({2'd0,slice_row_number}+8'd1))
+                        (start_code_value=={2'd0,slice_row_number}) ||
+                        ((slice_row_number<picture_mb_height) &&
+                         (start_code_value==
+                            ({2'd0,slice_row_number}+8'd1)))
                     ) begin
-                        slice_capture<=0;
+                        // kate - Commit 173: preserve whether the already-seen
+                        // following slice stays on this row while the buffered
+                        // current slice is parsed under backpressure.
+                        slice_capture<=
+                            (start_code_value=={2'd0,slice_row_number});
                         parse_active<=1;
                         parse_hold<=1;
                         boundary_final<=0;

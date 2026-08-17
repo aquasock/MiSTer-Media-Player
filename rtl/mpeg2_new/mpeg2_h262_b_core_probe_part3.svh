@@ -31,13 +31,18 @@ wire [10:0] desc_mb=residual_mb[replay_slot[3:0]];
 wire [2:0] desc_block=residual_block[replay_slot[3:0]];
 wire [9:0] res_mem_addr={replay_slot[3:0],6'b000000}+{4'd0,replay_sample};
 
+// kate - Commit 173: next uncovered column in the current row across
+// same-vertical-position slices. It is reset only when restricted coverage
+// advances to the next row, not at each slice header.
+reg [5:0] row_covered_count;
+
 integer i;
 always @(posedge clk) begin
     if(reset) begin
         byte_window<=0;sequence_capture<=0;sequence_count<=0;sequence_shift<=0;geometry_supported<=0;picture_mb_width<=0;picture_mb_height<=0;
         picture_capture<=0;picture_count<=0;picture_shift<=0;current_picture_is_b<=0;
         pce_capture<=0;pce_count<=0;pce_shift<=0;b_candidate<=0;b_seen<=0;b_complete_now<=0;
-        parse_hold<=0;parser_error<=0;replay_error<=0;prior_error<=0;slice_capture<=0;slice_row_number<=0;row_byte_count<=0;row_base_index<=0;
+        parse_hold<=0;parser_error<=0;replay_error<=0;prior_error<=0;slice_capture<=0;slice_row_number<=0;row_byte_count<=0;row_base_index<=0;row_covered_count<=0;
         parse_active<=0;proof_done<=0;boundary_final<=0;parse_byte_limit<=0;parse_byte_index<=0;parse_bit_index<=7;
         state<=S_QSCALE;field_bit_count<=0;qscale_shift<=0;current_qscale<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;skip_remaining<=0;geometry_sent<=0;
         mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;mba_symbol_escape_q<=0;mba_symbol_value_q<=0;mbtype_bits<=0;mbtype_len<=0;current_direction<=0;last_direction<=0;current_pattern<=0;
@@ -75,8 +80,14 @@ always @(posedge clk) begin
                 if(parser_at_end)state<=S_ERROR;else if(extra_info_count==7)begin extra_info_count<=0;state<=S_EXTRA_FLAG;end else extra_info_count<=extra_info_count+1'b1;
             end
             S_MBA: begin
-                if(parser_at_end)state<=S_ERROR;
-                else if(mba_symbol[7]) begin
+                // kate - Commit 173: a coded slice endpoint may be followed by
+                // zero alignment bits and then the already-buffered start-code
+                // boundary. Only an all-zero unfinished MBA with no escape debt
+                // can terminate a non-empty slice.
+                if(parser_at_end) begin
+                    if(row_has_coded_mb&&(mba_wide_bits==0)&&(mba_escape_accum==0))state<=S_SUCCESS;
+                    else state<=S_ERROR;
+                end else if(mba_symbol[7]) begin
                     mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;
                     mba_symbol_escape_q<=mba_symbol[6];mba_symbol_value_q<=mba_symbol[5:0];
                     state<=S_MBA_APPLY;
@@ -88,12 +99,17 @@ always @(posedge clk) begin
                     if(mba_escape_min_target_q>={2'b00,picture_mb_width})state<=S_ERROR;
                     else begin mba_escape_accum<=mba_escape_accum_next_q[6:0];state<=S_MBA;end
                 end else if((mba_increment_total_q==0)||
-                            (!row_has_coded_mb&&(mba_increment_total_q!=8'd1))||
-                            (mba_target_col_q>={2'b00,picture_mb_width})) begin
+                            (mba_target_col_q>={2'b00,picture_mb_width})||
+                            (!row_has_coded_mb&&
+                             (mba_target_col_q!={2'b00,row_covered_count}))) begin
                     state<=S_ERROR;
                 end else begin
+                    // STANDARDS_CONFORMANCE:H262-025. The first MBA positions
+                    // the first coded macroblock and never emits synthetic
+                    // leading skips; later MBA gaps retain normal B skip logic.
                     mba_escape_accum<=0;mbtype_bits<=0;mbtype_len<=0;
-                    if(mba_increment_total_q>8'd1)begin skip_remaining<=mba_increment_total_q[5:0]-1'b1;state<=S_SKIP_A;end
+                    if(!row_has_coded_mb)begin current_col<=mba_target_col_q[5:0];state<=S_MBTYPE;end
+                    else if(mba_increment_total_q>8'd1)begin skip_remaining<=mba_increment_total_q[5:0]-1'b1;state<=S_SKIP_A;end
                     else state<=S_MBTYPE;
                 end
             end
