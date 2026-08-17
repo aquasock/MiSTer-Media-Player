@@ -765,7 +765,7 @@ Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_p_visual_di
 - [ ] Passed
 
 ---
-## 189 COMMIT Unreleased ??? 2026-08-17T08:04:37-07:00
+## 189 COMMIT Unreleased 06bce8f 2026-08-17T08:04:37-07:00
 
 #### Coming From:
 
@@ -777,11 +777,11 @@ Replace mutable overlapping playback-time LED indications with an unambiguous se
 
 #### Outcome:
 
-Commit 188 hardware again displays the generalized P discriminator's four quadrants and center seams on all three test paths, while DISK remains off throughout the reported USER/POWER `1/4` pattern. This matches exact frontend replay and proves no frontend syntax assertion occurred. Static inspection identifies the misleading readout mechanism: without a latched error, POWER encodes the live prerequisite chain from reset onward, so it passes legitimately through early codes while the stream is still loading, and all nonzero LED codes currently share the same blink epoch. The observed preamble therefore is not a settled failure code.
+Commit 188 hardware again displays the generalized P discriminator's four quadrants and center seams while DISK remains off throughout the reported USER/POWER `1/4` pattern, matching exact frontend replay and proving no frontend syntax assertion occurred. Commit `06bce8f` waits one second after sequence end, snapshots the settled hierarchy, resets the epoch, and reports USER, POWER, and DISK in non-overlapping windows without changing decoder behavior. A first clean build exposed the unrelated marginal HDMI path at -0.092 ns; reusing the blink divider instead of a separate wide settlement timer produced a clean Quartus 17.0.2 build with zero setup TNS, +0.432 ns global setup, +1.724 ns decoder setup, 30,923 ALMs, 41,806 registers, and no Critical Warning.
 
 #### Next Steps:
 
-Capture the complete diagnostic hierarchy only after sequence end and sufficient pipeline settlement, restart the diagnostic epoch from that snapshot, and give USER, POWER, and DISK non-overlapping reporting windows while preserving the existing numeric tables and all decoder behavior. Simulation will prove that codes changing during delivery cannot alter the final report and that each field occupies only its assigned window. A clean Quartus 17.0.2 build must retain non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning; hardware will rerun the three generalized P streams and report the stable post-stream result plus discriminator seams.
+Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_p_visual_discriminator.m2v`, watching one complete 16-second frame after the one-second settlement delay. USER owns the first three seconds, POWER the next five, and DISK the final eight; record whether each window is solid, dark, or blinking and count any blinks. The clean-success expectation is solid USER, then solid POWER, then dark DISK, with discriminator seams preserved.
 
 #### Files Modified:
 
@@ -789,7 +789,7 @@ Capture the complete diagnostic hierarchy only after sequence end and sufficient
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
