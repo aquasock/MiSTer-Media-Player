@@ -1,16 +1,3 @@
-## 154 COMMIT v0.5.0-cycle ad071ba 2026-08-15T18:55:00-07:00
-
-#### Purpose:
-Refine generalized-P prediction/reference diagnostics.
-
-#### Outcome:
-`ad071ba` adds first-error visibility. Clean build: 31,855 ALMs, setup +0.384 ns. Failure code 13 shows DDR store/cache error masking ordering.
-
-#### Status:
-- [x] Built
-- [x] Passed — diagnostic boundary
-
----
 ## 155 COMMIT v0.5.0-cycle dbd0993 2026-08-15T19:52:00-07:00
 
 #### Purpose:
@@ -240,9 +227,6 @@ Restore Commit-171 54 MHz timing without changing accepted B address semantics.
 #### Outcome:
 `338c2f8` registers each decoded B MBA symbol before escape/row-bound/skip arithmetic. Clean build: 29,901 ALMs (71%), 40,799 registers, 559,565 bits, 86 RAM, 69 DSP, 3 PLL; setup +0.823 ns / zero TNS, Fmax 56.51 MHz. All nine regressions pass. Cleanup `bbbdcf6`; Audio compatibility clean.
 
-#### Next Steps:
-Generalize profile-conformant restricted slice partitioning in progressive P/B; retain B `f_code` as the following capability boundary.
-
 #### Status:
 - [x] Built
 - [x] Passed
@@ -257,20 +241,41 @@ Unreleased 338c2f8
 Generalize H.262 restricted slice partitioning across the accepted progressive P/B <=720x480 paths.
 
 #### Outcome:
-`912a87494a30ae6f5d3dfb1320f8bf3b558430b4` implements `H262-025`: multiple same-row P/B slices are accepted, the first MBA of each slice positions its first coded macroblock without synthesizing leading skips, subsequent MBA gaps retain existing internal skipped-macroblock behavior, and row/picture transitions require contiguous non-overlapping restricted-slice coverage. Existing I behavior, P/B motion and fixed-`f_code` subset, residual syntax, raster/DDR, reference/scratch semantics, presentation, P pacing, IDCT, QIP and SDC are unchanged.
+`912a87494a30ae6f5d3dfb1320f8bf3b558430b4` implements `H262-025`: multiple same-row P/B slices are accepted, first-slice MBA positioning no longer creates synthetic leading skips, internal MBA gaps retain skipped-macroblock behavior, and row/picture transitions require contiguous non-overlapping restricted coverage. Agent stream `test_pb_720x480_restricted_slices.m2v` validates at 183,290 bytes / SHA256 `320f1f5aa5281b77284c9d354a1350a449fe91214ba6d381054c5114dec2c837`.
 
-Agent-side regression generation/FFmpeg/ffprobe validation passed for `test_pb_720x480_restricted_slices.m2v`: 183,290 bytes, SHA256 `320f1f5aa5281b77284c9d354a1350a449fe91214ba6d381054c5114dec2c837`, coded I/P/B/P/B, display I/B/P/B/P. Rows 4, 8, 18 and 22 are each split into three slices covering columns 0..11, 12..33 and 34..44; continuation-slice first MBA values are 13 and 35 (`macroblock_escape + 2`), and B split slices retain legal internal skips with coded endpoints.
-
-#### Files Modified:
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
-- tools/streams/generate_test_pb_720x480_restricted_slices.py
+Build upload `11dd441` is clean: 30,111 ALMs (72%), 40,748 registers, 559,565 memory bits, 86 RAM blocks, 69 DSPs, 3 PLLs. Global setup is +0.219 ns / zero TNS; the 54 MHz decoder clock is +0.626 ns / zero TNS; hold +0.241 ns, recovery +4.415 ns, removal +0.725 ns and minimum pulse width +0.462 ns are positive. All ten requested hardware regressions pass. Cleanup is `d500567`. Audio `fd90c77` compatibility is clean; intervening Audio work is FLAC/audio-only except an independent `MediaPlayer_top_00.svh` change setting the Audio control `dcfifo.use_eab` to `ON`.
 
 #### Next Steps:
-Clean Quartus/STA build, then run the new restricted-slice stream followed by the complete existing nine-stream matrix. Require non-negative 54 MHz setup slack, zero setup TNS and no timing-requirements critical warning.
+Generalize picture-signaled frame-motion `f_code` across the accepted progressive P/B paths under `H262-022`.
+
+#### Status:
+- [x] Built
+- [x] Passed
+
+---
+## 174 PROPOSAL Unreleased pending 2026-08-16T18:22:00-07:00
+
+#### Coming From:
+Unreleased 912a874
+
+#### Purpose:
+Generalize picture-signaled H.262 frame-motion `f_code` across the accepted progressive P/B <=720x480 paths for broader DVD/Main-Profile compatibility.
+
+#### Outcome:
+`H262-022` defines component reconstruction from the signaled `f_code`: `r_size=f_code-1`, motion-residual width follows `r_size` when required, the differential scales by `f=2^r_size`, and the reconstructed component wraps in the corresponding `[-16*f,16*f-1]` range. The current generalized P path accepts only forward horizontal/vertical `f_code=3`; the B path accepts only all four forward/backward horizontal/vertical fields equal to 3. Both currently consume a fixed two-bit residual and use `reconstruct_mv_f3`.
+
+Scope Commit 174 to the existing progressive frame-motion path: capture and apply picture-signaled forward P component `f_code` values and forward/backward B component `f_code` values, consume the component-specific motion-residual length, and perform the normative `H262-022` differential/predictor/wrap reconstruction. Preserve the accepted progressive 4:2:0 geometry, frame `motion_type` subset, P/B macroblock types, restricted-slice handling, B MBA/escape behavior, residual/CBP syntax, raster/DDR ownership, reference/scratch semantics, presentation ordering, P pacing, IDCT, QIP and SDC.
+
+Do not add field prediction, dual-prime, interlaced picture handling, new motion-vector transport widths, or timing-constraint changes in this boundary. If the applicable DVD/Main-Profile `f_code` range cannot be represented safely by the existing signed-8-bit P/B motion transport and raster address path, stop and revise the proposal before widening interfaces.
+
+Validation will add a deterministic 720x480 mixed I/P/B regression exercising multiple legal non-3 component `f_code` values, both zero-residual and non-zero-residual cases, positive/negative motion codes, predictor reuse and a controlled wrap case while remaining inside the existing transport envelope. Run it first, then the complete current ten-stream matrix. Acceptance requires clean Quartus/STA with non-negative setup slack, zero setup TNS and no timing-requirements critical warning.
+
+#### Next Steps:
+Await user approval before implementation.
+
+#### Files Modified:
+- TBD — generalized P/B picture-coding-extension and frame-motion reconstruction state only
+- tools/streams/generate_test_pb_720x480_fcode.py
 
 #### Status:
 - [ ] Built
