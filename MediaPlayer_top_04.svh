@@ -73,6 +73,7 @@ mpeg2_h262_reference_read_probe mpeg2_h262_reference_read_probe
     .reconstructed_seen        (mpeg2_new_pred_reconstructed_seen),
     .reconstructed_value       (mpeg2_new_pred_reconstructed_value),
     .persisted_seen            (mpeg2_new_pred_persisted_seen),
+    .p_progress_stage          (mpeg2_new_pred_progress_stage),
     .probe_error               (mpeg2_new_pred_error)
 );
 

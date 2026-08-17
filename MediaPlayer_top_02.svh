@@ -3,6 +3,7 @@ wire        mpeg2_new_pred_half_sample_seen;
 wire        mpeg2_new_pred_reconstructed_seen;
 wire [7:0]  mpeg2_new_pred_reconstructed_value;
 wire        mpeg2_new_pred_persisted_seen;
+wire [3:0]  mpeg2_new_pred_progress_stage;
 wire        mpeg2_new_pred_error;
 
 wire        mpeg2_new_p_store_select;

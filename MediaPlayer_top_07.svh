@@ -226,11 +226,22 @@ wire [3:0] mpeg2_new_diag_power_code =
 //   4 hold_seen_combined 5 two_mb_wait      6 raster_wait
 // LED_DISK is steady off in every other case; its ioctl_download file-load
 // duty is displaced for the duration of this diagnostic.
+// kate - Commit 185.  With no error latched and prerequisite 4 remaining,
+// POWER proves that both pictures parsed but the P publication count did not
+// advance.  DISK now reports the last generalized P raster stage reached:
+//   1 admission/capture       2 execution started   3 reference read
+//   4 reconstruction emitted 5 DDR store ack       6 verification readback
+//   7 persistence asserted
+// The prior Commit-180 progress-error detail remains available for its error
+// case.  This changes observability only.
 wire [3:0] mpeg2_new_diag_disk_code =
-    mpeg2_new_diag_first_error_valid &&
-    (mpeg2_new_diag_error_code_first == 4'd2) &&
-    (mpeg2_new_diag_phase1_source_first == 4'd2) &&
-    (mpeg2_new_diag_p_source_first == 4'd6) ?
+    (!mpeg2_new_diag_first_error_valid &&
+     (mpeg2_new_diag_prereq_code == 4'd4)) ?
+        mpeg2_new_pred_progress_stage :
+    (mpeg2_new_diag_first_error_valid &&
+     (mpeg2_new_diag_error_code_first == 4'd2) &&
+     (mpeg2_new_diag_phase1_source_first == 4'd2) &&
+     (mpeg2_new_diag_p_source_first == 4'd6)) ?
         mpeg2_new_diag_progress_detail_first : 4'd0;
 
 // 250 ms slot at the 54 MHz decoder clock.  Slots 0..2N-1 carry the N blinks

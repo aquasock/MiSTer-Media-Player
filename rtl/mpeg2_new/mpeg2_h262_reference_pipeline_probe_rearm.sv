@@ -21,7 +21,8 @@ module mpeg2_h262_reference_read_probe
  output wire p_store_select,output wire[7:0] p_store_pixel_value,output wire[11:0] p_store_pixel_x,output wire[11:0] p_store_pixel_y,
  output wire p_store_pixel_valid,output wire p_store_block_start,output wire p_store_block_complete,
  output wire read_seen,output wire[7:0] sample_value,output wire sample_nonzero,output wire half_sample_seen,
- output wire reconstructed_seen,output wire[7:0] reconstructed_value,output wire persisted_seen,output wire[7:0] persisted_value,output wire probe_error
+ output wire reconstructed_seen,output wire[7:0] reconstructed_value,output wire persisted_seen,output wire[7:0] persisted_value,
+ output wire[3:0] p_progress_stage,output wire probe_error
 );
 
 // kate - Commit 169: both generalized P and controlled B sidebands are valid
@@ -143,7 +144,7 @@ mpeg2_h262_reference_read_probe_base base_probe(
 
 wire[7:0] mix_bc_raw;wire[28:0] mix_addr_raw;wire mix_rd_raw;
 wire mix_store_sel;wire[7:0] mix_store_val;wire[11:0] mix_store_x,mix_store_y;wire mix_store_valid,mix_store_start,mix_store_complete;
-wire mix_read;wire[7:0] mix_sample;wire mix_nonzero,mix_recon;wire[7:0] mix_recon_val,mix_persist_val;
+wire mix_read;wire[7:0] mix_sample;wire mix_nonzero,mix_recon;wire[7:0] mix_recon_val,mix_persist_val;wire[3:0] mix_progress_stage;
 
 wire[7:0] b_bc_raw;wire[28:0] b_addr_raw;wire b_rd_raw;
 wire b_store_sel;wire[7:0] b_store_val;wire[11:0] b_store_x,b_store_y;wire b_store_valid,b_store_start,b_store_complete;
@@ -183,7 +184,8 @@ mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
  .ddram_busy(shared_engine_busy),.ddram_dout(shared_dout_reg),.ddram_dout_ready(mix_dout_ready_owned),.ddram_burstcnt(mix_bc_raw),.ddram_addr(mix_addr_raw),.ddram_rd(mix_rd_raw),
  .store_select(mix_store_sel),.store_pixel_value(mix_store_val),.store_pixel_x(mix_store_x),.store_pixel_y(mix_store_y),.store_pixel_valid(mix_store_valid),
  .store_block_start(mix_store_start),.store_block_complete(mix_store_complete),.active(mixed_active),.read_seen(mix_read),.sample_value(mix_sample),.sample_nonzero(mix_nonzero),
- .half_sample_seen(mixed_half),.reconstructed_seen(mix_recon),.reconstructed_value(mix_recon_val),.persisted_seen(mixed_persisted_seen),.persisted_value(mix_persist_val),.error(mixed_error));
+ .half_sample_seen(mixed_half),.reconstructed_seen(mix_recon),.reconstructed_value(mix_recon_val),.persisted_seen(mixed_persisted_seen),.persisted_value(mix_persist_val),
+ .progress_stage(mix_progress_stage),.error(mixed_error));
 
 mpeg2_h262_b_bidirectional_raster_engine b_probe(
  .clk(clk),.reset(b_reset),.capture_enable(b_select),.request(b_select),
@@ -216,6 +218,7 @@ assign reconstructed_seen=b_select?b_recon:mixed_select?(mixed_seen_enable&&mix_
 assign reconstructed_value=b_select?b_recon_value:mixed_select?mix_recon_val:base_recon_val;
 assign persisted_seen=b_select?b_persisted_seen:mixed_select?(mixed_seen_enable&&mixed_persisted_seen):base_persisted_seen;
 assign persisted_value=b_select?b_persist_value:mixed_select?mix_persist_val:base_persist_val;
+assign p_progress_stage=mix_progress_stage;
 assign probe_error=plan_error||b_history_error||(b_select?b_error:(mixed_select?mixed_error:base_probe_error));
 wire unused_b=&{1'b0,b_sample,b_recon_value,b_persist_value};
 endmodule

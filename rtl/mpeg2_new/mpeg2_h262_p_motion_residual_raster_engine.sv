@@ -50,6 +50,7 @@ module mpeg2_h262_p_motion_residual_raster_engine
     output reg [7:0] reconstructed_value,
     output reg persisted_seen,
     output reg [7:0] persisted_value,
+    output reg [3:0] progress_stage,
     output reg error
 );
 
@@ -363,6 +364,7 @@ always @(posedge clk) begin
         reconstructed_value<=0;
         persisted_seen<=0;
         persisted_value<=0;
+        progress_stage<=0;
         error<=0;
         for(i=0;i<16;i=i+1) begin
             desc_mb[i]<=0;
@@ -373,6 +375,7 @@ always @(posedge clk) begin
     end else begin
         if(new_picture_metadata) begin
             persisted_seen<=0;
+            progress_stage<=4'd1;
             metadata_done<=0;
             motion_count<=11'd1;
             motion_mem[0]<=residual_value;
@@ -398,6 +401,8 @@ always @(posedge clk) begin
             verify_row<=0;
             half_sample_seen<=0;
         end else if(capture_enable&&residual_valid) begin
+            if(progress_stage==4'd0)
+                progress_stage<=4'd1;
             if(desc_active) begin
                 if(residual_index!=sample_expected) begin
                     error<=1;
@@ -500,6 +505,7 @@ always @(posedge clk) begin
             ei<=0;
             exec_desc_slot<=0;
             motion_load<=1;
+            progress_stage<=4'd2;
             pixel_setup<=0;
             if(!geometry_ok ||
                !reference_valid ||
@@ -558,6 +564,8 @@ always @(posedge clk) begin
             end else begin
                 waitresp<=0;
                 if(!req_kind) begin
+                    if(progress_stage<4'd3)
+                        progress_stage<=4'd3;
                     if(tap_last) begin
                         out_reg<=reconstructed_current;
                         emit<=1;
@@ -572,6 +580,8 @@ always @(posedge clk) begin
                         req<=1;
                     end
                 end else begin
+                    if(progress_stage<4'd6)
+                        progress_stage<=4'd6;
                     if(ddram_dout!=resrows[verify_row]) error<=1;
                     if((mbi==0)&&(blk==0)&&(verify_row==0))
                         persisted_value<=ddram_dout[7:0];
@@ -587,6 +597,7 @@ always @(posedge clk) begin
                                 if(mbi+1'b1!=motion_count)
                                     error<=1;
                                 persisted_seen<=1;
+                                progress_stage<=4'd7;
                                 reconstructed_seen<=1;
                                 active<=0;
                                 timeout<=0;
@@ -614,6 +625,8 @@ always @(posedge clk) begin
         end
 
         if(emit) begin
+            if(progress_stage<4'd4)
+                progress_stage<=4'd4;
             resrows[er][{el,3'b000}+:8]<=out_reg;
             if((mbi==0)&&(blk==0)&&(ei==0))
                 reconstructed_value<=out_reg;
@@ -627,6 +640,8 @@ always @(posedge clk) begin
         end
 
         if(wait_store&&store_block_stored) begin
+            if(progress_stage<4'd5)
+                progress_stage<=4'd5;
             wait_store<=0;
             req_kind<=1;
             verify_row<=0;
