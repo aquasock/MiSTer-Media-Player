@@ -681,7 +681,7 @@ Run all six Commit-175 streams and record acceptance, then run `test_p_visual_di
 - [ ] Passed
 
 ---
-## 185 COMMIT Unreleased ??? 2026-08-17T06:31:10-07:00
+## 185 COMMIT Unreleased d5e5f62 2026-08-17T06:31:10-07:00
 
 #### Coming From:
 
@@ -693,11 +693,11 @@ Localize the generalized P raster transaction stage that prevents parsed P pictu
 
 #### Outcome:
 
-Commit 184 hardware clears the controlled-parser errors but every P-bearing stream remains unaccepted with prerequisite code 4, while the I-only control is accepted. The visual discriminator photograph shows the original uninterrupted diagonal I frame rather than the final P quadrant seams. Together these results prove that P syntax completes but `picture_count` never advances for the P picture; no decoder behavior has yet been changed.
+Commit `d5e5f62` adds a monotonic seven-stage trace to the compiled generalized P raster engine and reports its terminal stage on LED_DISK only when the existing diagnostic identifies missing P publication. Simulation verifies admission, execution, reference-read, reconstruction, DDR-store acknowledgement, verification-readback, and persistence codes in order. The clean Quartus 17.0.2 build closes with zero setup TNS, +0.533 ns global setup, +1.978 ns decoder setup, 30,071 ALMs, and 40,713 registers; decoder, storage, publication, and presentation behavior are unchanged.
 
 #### Next Steps:
 
-Add observability only for generalized-mode admission and the raster engine's capture, execution, DDR block-store wait, verification-readback, persistence-export, and publication-edge stages. Report the terminal stage on LED_DISK only when the existing USER-off and POWER-4 condition identifies missing P publication, verify the encoder and stage transitions in simulation, then perform a clean Quartus 17.0.2 build with non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning. Hardware validation will rerun one P stream and the visual discriminator; the returned stage code will define the following behavioral boundary.
+Run `test_p_motion_residual.m2v` and `test_p_visual_discriminator.m2v`, recording USER, POWER, and DISK for each. DISK codes 1 through 7 name the deepest completed raster stage; code 7 with POWER 4 isolates the loss after persistence export, while any lower code identifies the stalled engine boundary. Confirm separately whether the discriminator image still lacks the center quadrant seams.
 
 #### Files Modified:
 
@@ -709,7 +709,7 @@ Add observability only for generalized-mode admission and the raster engine's ca
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
