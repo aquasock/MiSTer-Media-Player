@@ -24,7 +24,9 @@ wire residual_hit=(exec_desc_slot<desc_count)&&
     (desc_block[exec_desc_slot[3:0]]==blk);
 wire [9:0] residual_mem_index={exec_desc_slot[3:0],6'b000000}+{4'd0,ei};
 wire signed [15:0] residual_pel=residual_hit?rm[residual_mem_index]:16'sd0;
-wire [7:0] current_tap_sample=bat(ddram_dout,src_x_tap[2:0]);
+// kate - Commit 182: byte select is the copy registered at request accept, not
+// the live combinational address.  Same value, captured a cycle earlier.
+wire [7:0] current_tap_sample=bat(ddram_dout,tap_byte_sel);
 wire [10:0] pred_sum_with_current=pred_sum+{3'd0,current_tap_sample};
 wire [7:0] selected_prediction=round_prediction(pred_sum_with_current,half_x,half_y);
 wire [8:0] bidir_sum={1'b0,forward_prediction}+{1'b0,selected_prediction}+9'd1;
@@ -60,7 +62,7 @@ always @(posedge clk) begin
         desc_count<=0;current_desc_slot<=0;desc_active<=0;sample_expected<=0;metadata_done<=0;exec_desc_slot<=0;
         pending<=0;started<=0;active<=0;future_bank_latched<=0;req<=0;waitresp<=0;req_kind<=0;
         mbi<=0;col<=0;mrow<=0;blk<=0;timeout<=0;emit<=0;wait_store<=0;pixel_setup<=0;ei<=0;verify_row<=0;
-        pred_direction<=0;tap_index<=0;pred_sum<=0;forward_prediction<=0;out_reg<=0;
+        pred_direction<=0;tap_index<=0;pred_sum<=0;forward_prediction<=0;out_reg<=0;tap_byte_sel<=0;
         read_seen<=0;sample_nonzero<=0;half_sample_seen<=0;reconstructed_seen<=0;persisted_seen<=0;error<=0;
         for(i=0;i<16;i=i+1)begin desc_mb[i]<=0;desc_block[i]<=0;end
         for(i=0;i<8;i=i+1)resrows[i]<=0;

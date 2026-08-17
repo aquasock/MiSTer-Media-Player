@@ -226,8 +226,28 @@ wire syntax_error=
     !wide_candidate &&
     !wide_seen;
 wire progress_error=p_picture_expected&&!p_macroblock_type_seen;
+// kate - Commit 181.  A controlled observer must not gate acceptance on a
+// stream it has disclaimed.  Each observer admits only its own documented
+// subset -- the four-MB raster observer claims picture_coding_extension
+// f_code 2, the Commit-166 wide parser claims f_code 3 -- so on any stream
+// outside that subset the observer never asserts its candidate/seen claim.
+// Its probe_error could still latch from an internal scope check and then
+// permanently fail acceptance for a stream it was never proving.  That is the
+// Commit-180 hardware result: the Commit-175 generators emit f_code 3, so
+// four_mb_candidate is false by construction on all six streams, yet
+// four_mb_error latched on test_consecutive_chain and read out as POWER 3.
+//
+// Qualify every observer error by that observer's own claim.  syntax_error
+// already carries the equivalent qualification and is unchanged.  probe_error
+// keeps all its terms; only unowned contributions are dropped.
+wire two_mb_error_owned  = two_mb_error  && two_mb_seen;
+wire four_mb_error_owned = four_mb_error && (four_mb_candidate || four_mb_seen);
+wire legacy_error_owned  = legacy_error  && legacy_mode;
+wire wide_error_owned    = wide_error    && wide_mode;
+
 wire parser_error_group=
-    syntax_error|two_mb_error|four_mb_error|legacy_error|wide_error;
+    syntax_error|two_mb_error_owned|four_mb_error_owned|
+    legacy_error_owned|wide_error_owned;
 assign probe_error=
     parser_error_group|progress_error|residual_error_raw|
     hold_error|raster_hold_error;
@@ -236,10 +256,10 @@ assign probe_error=
 // expanding parser_error_group into its five members first.
 assign probe_error_source=
     syntax_error      ? 4'd1 :
-    two_mb_error      ? 4'd2 :
-    four_mb_error     ? 4'd3 :
-    legacy_error      ? 4'd4 :
-    wide_error        ? 4'd5 :
+    two_mb_error_owned  ? 4'd2 :
+    four_mb_error_owned ? 4'd3 :
+    legacy_error_owned  ? 4'd4 :
+    wide_error_owned    ? 4'd5 :
     progress_error    ? 4'd6 :
     residual_error_raw? 4'd7 :
     hold_error        ? 4'd8 :

@@ -67,6 +67,14 @@ reg [5:0] ei;
 reg [2:0] verify_row;
 reg pred_direction;
 reg [1:0] tap_index;
+// kate - Commit 182 timing closure.  src_x_tap[2:0] selects the byte of the
+// returned 64-bit DDR word, but the data does not arrive until several cycles
+// after the request is accepted.  Computing that select combinationally put the
+// whole motion-vector address chain in series with the prediction/clip datapath
+// inside one 54 MHz cycle.  Capture it when the request is accepted instead;
+// every input to src_x_tap is held constant across the DDR wait, so the
+// registered copy is the same value the address itself was formed from.
+reg [2:0] tap_byte_sel;
 reg [10:0] pred_sum;
 reg [7:0] forward_prediction;
 reg [7:0] out_reg;
