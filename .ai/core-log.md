@@ -557,7 +557,7 @@ The acceptance LED is therefore currently reporting observer scope rather than d
 - [x] Passed — diagnostic named both faults; see Commit-181 proposal
 
 ---
-## 181 PROPOSAL Unreleased 2026-08-17T01:05:00-07:00
+## 181 COMMIT Unreleased 05422a5 2026-08-17T01:58:06-07:00
 
 #### Coming From:
 Unreleased 7337195
@@ -584,8 +584,36 @@ Clean Quartus 17.0.2 build; non-negative setup slack, zero setup TNS, no timing-
 
 Separately, and regardless of LED state, capture the display output for the three P-final streams and compare against the FFmpeg reference the generators already validate to, using the Commit-175 macroblock-boundary z-score method. The LED cannot answer whether these streams decode correctly; only the picture can. If the LED accepts but the picture is wrong, the real decode defect is still open and becomes the next boundary.
 
-#### Status:
-- [ ] Proposed — awaiting user approval
+#### Outcome:
+`05422a5` implements the approved boundary in `mpeg2_h262_p_diagnostic_controller_rearm.sv` only. Root cause named: each controlled observer admits only its own documented subset, keyed on the picture_coding_extension `f_code` — the four-MB raster observer claims `f_code` 2 (`..._p_four_mb_two_row_syntax_probe.sv:512`), the Commit-166 wide parser claims `f_code` 3 (`..._p_wide_motion_syntax_probe_part3.svh:273`). The Commit-175 generators emit `f_code` 3, so `four_mb_candidate` is **false by construction** on all six streams. That observer never claimed `test_consecutive_chain`, yet its `probe_error` still latched from an internal scope check and permanently failed acceptance for a stream it was not proving — the POWER 3 reading.
+
+Each observer error is now qualified by that observer's own claim (`two_mb_seen`, `four_mb_candidate||four_mb_seen`, `legacy_mode`, `wide_mode`). `syntax_error` already carried the equivalent qualification and is unchanged. `probe_error` keeps every term; only unowned contributions are dropped. `probe_error_source` was updated to the qualified terms so the diagnostic stays truthful.
+
+#### Timing Regression And Closure (Commit 182, same upload):
+The Commit-181 build failed STA: 54 MHz decoder clock setup **-0.081 ns / -0.629 ns TNS**, `Critical Warning (332148)`. A Fitter re-run on the same netlist reproduced it bit-for-bit, ruling out placement nondeterminism (`NUM_PARALLEL_PROCESSORS ALL` left unchanged by user direction — it affects compile time, not results).
+
+`report_timing` traced the path to `mpeg2_h262_b_bidirectional_raster_engine`: `motion_word[24]` → `out_reg`, twelve logic levels carrying the entire motion-vector address computation in series with the byte select, prediction accumulate, bidirectional average, residual add and clip — all in one cycle, 17.929 ns of an 18.518 ns budget (97%). **No Commit-181 signal appears anywhere on that path**; the near-free added gates only perturbed placement enough to tip an already-marginal path that had been reading +0.902 ns.
+
+Fix: `src_x_tap[2:0]` selects a byte of the returned 64-bit DDR word, but data does not arrive until several cycles after the request is accepted, and every input feeding `src_x_tap` (`motion_word`, `col`, `mrow`, `blk`, `ei`, `tap_index`, `pred_direction`) is held constant across that wait. The select is now registered at request accept and the registered copy drives the byte mux. No computed value changes — same number, captured from the same evaluation of `src_x_tap` that formed the address. Verified in an iverilog testbench across varying DDR latency (1-5 cycles), `ddram_busy` stalls, tap advances within a half-sample block, the bidirectional second pass where `pred_direction` flips the selected vector, and macroblock changes.
+
+Rejected alternative: rerolling the Fitter seed until it closes. That is luck, not closure, and the next commit re-rolls it; Commit 171→172 set the precedent of fixing by registering.
+
+#### Build:
+`05422a5` clean from wiped `db`/`incremental_db`/`output_files`: 0 errors across map/fit/asm/sta, 0 Critical Warnings, Flow Status Successful. 30,170 ALMs (72%), 40,854 registers, 559,565 memory bits, 86 RAM, 69 DSP, 3 PLL. Zero TNS on every timing check. 54 MHz decoder clock setup **-0.081 → +1.176 ns**; worst-case setup +0.313 ns. The critical path has moved off the B raster engine entirely (now `p_residual_probe|g_success` → `explicit_probe|error`, 15 levels, +1.176 ns), confirming a structural fix rather than a number nudged over the line.
+
+#### Validation:
+Run all six Commit-175 streams and record USER/POWER/DISK. `test_p_mba_escape`, `test_consecutive_chain`, `test_p_motion_residual` are the targets. `test_i_baseline`, `test_b_bidirectional` and `test_pb_restricted_slices` are regression guards and must keep their existing accepted state — `test_b_bidirectional` especially, since Commit 182 modifies the B raster engine that Commits 139/162 hardware-qualified.
+
+Expected: `test_consecutive_chain` should clear, since its `four_mb_error` was unowned by construction. `test_p_mba_escape` and `test_p_motion_residual` reported `syntax_error`, which was already correctly qualified, so they may still fail — if so the open question is why the wide parser does not claim streams matching its own `f_code` 3 admission criteria, and that becomes the next boundary.
+
+Independently of the LEDs, capture the display for the three P streams and compare against the FFmpeg reference using the Commit-175 macroblock-boundary z-score method. The acceptance LED cannot establish that these streams decode correctly; only the picture can.
+
+#### Files Modified:
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
 
 #### Status:
-- [ ] Proposed — awaiting user approval
+- [x] Built — clean flow, zero TNS, no critical warnings (`05422a5`)
+- [ ] Passed — hardware regression pending
