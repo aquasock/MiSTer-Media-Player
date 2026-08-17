@@ -1,17 +1,4 @@
 ---
-## 161 COMMIT Unreleased 5d8c8ba 2026-08-15T23:59:26-07:00
-
-#### Purpose:
-Classify DDR-arbiter condition during the phase-3 stall.
-
-#### Outcome:
-`5d8c8ba` reports 2-1-4: display-region ownership exclusion is first; protection is correct.
-
-#### Status:
-- [x] Built
-- [x] Passed — root cause localized
-
----
 ## 162 COMMIT Unreleased 42d330f 2026-08-16T00:25:40-07:00
 
 #### Purpose:
@@ -537,9 +524,68 @@ Corrected `7337195` build is clean: 0 errors across map/fit/asm/sta, 0 Critical 
 
 Hardware regression against the three P-final streams (record USER, POWER, DISK; `test_i_baseline` as USER-only control) is outstanding.
 
+#### Hardware Result:
+Run of `7337195`. `LED_USER` and `LED_POWER` share one slot counter, so both light together through the overlap and only the larger code keeps blinking; the user reported the observed composite pattern and it decodes as:
+
+| Stream | USER | POWER | DISK | Meaning |
+|---|---|---|---|---|
+| `test_p_mba_escape` | 2 | 1 | off | `phase1_probe_error` → `syntax_error` |
+| `test_consecutive_chain` | 2 | 3 | off | `phase1_probe_error` → `four_mb_error` |
+| `test_p_motion_residual` | 2 | 1 | off | `phase1_probe_error` → `syntax_error` |
+| `test_i_baseline` (control) | steady ON | — | — | accepted |
+
+USER 2 on all three matches Commit 179. DISK stayed off on every stream, so `progress_error` (code 6) is **not** the failing term. The Commit-179 hypothesis that `progress_error`/`syntax_error` were the leading candidates was half right: `syntax_error` is confirmed on two streams, `progress_error` is refuted outright. Building the `progress_detail` sub-code in the same commit cost nothing and eliminated it as a candidate in a single pass.
+
+There are two distinct faults, split by stream — the opposite of the Commit-179 conclusion, and this time named rather than inferred.
+
+#### Interpretation:
+The failing terms are controlled-pattern observers whose own documented scope excludes these streams, not general decode faults.
+
+`mpeg2_h262_p_four_mb_two_row_syntax_probe.sv:20-23` states its boundary explicitly: "The controlled semantic boundary remains intentionally narrower than a full P parser: every transmitted macroblock must be Table B.3 motion-forward-only (001), motion_code=(0,0), no residual." `test_consecutive_chain` is a six-generation P chain built from MC-not-coded macroblocks carrying **explicit non-zero motion vectors**, which that observer is documented not to accept. `four_mb_error` is therefore the observer correctly rejecting a stream outside its designed scope, not the decoder failing to decode legal H.262.
+
+The same applies to `syntax_error` on the other two streams: it is `syntax_error_raw` qualified by none of the specialized observers having claimed the stream, so it fires when the generalized `mpeg2_h262_p_syntax_probe` meets syntax outside its controlled subset. That probe has 18 separate `probe_error` assertion sites; splitting them would need a further diagnostic cycle and is not proposed, because the scope mismatch already explains the result.
+
+This is a direct consequence of Commit 175. The retired generator set produced streams shaped to match these observers; Commit 175 re-derived coverage from scratch with old-set coverage explicitly not ported, so the six replacement streams legitimately exceed the observer boundary. The observers were never widened to match.
+
+#### Critical Scope Finding:
+`mpeg2_new_phase1_probe_error` has exactly two consumers in the whole design (`MediaPlayer_top_07.svh:74` and `:112`): the acceptance LED term and the diagnostic error code. **It does not gate decode, reconstruction, DDR, or display.** The controlled observers do influence real byte-stream flow, but through the separate `stream_hold` path, not through `probe_error`.
+
+The acceptance LED is therefore currently reporting observer scope rather than decoder health, and cannot answer whether these three streams decode correctly. The only evidence bearing on actual decode remains the Commit-175 photographic analysis, which showed the final P's residual content absent from the display — and that was taken against the `4c65826` build, before Commits 176-180. Whether a genuine decode gap still exists is untested and must not be inferred from the LED either way.
+
 #### Status:
 - [x] Built — clean flow, zero TNS, no critical warnings (`7337195`)
-- [ ] Passed — hardware regression result pending
+- [x] Passed — diagnostic named both faults; see Commit-181 proposal
+
+---
+## 181 PROPOSAL Unreleased 2026-08-17T01:05:00-07:00
+
+#### Coming From:
+Unreleased 7337195
+
+#### Purpose:
+Stop the controlled-pattern observers from reporting acceptance failures on generalized streams they are documented not to cover, so the acceptance LED measures the decoder again.
+
+#### Scoping:
+Commits 176-180 spent five cycles narrowing a signal that turns out to be an observer-scope artifact. `probe_error` gates only the LED, and the failing terms are two Phase-1T/1U observers rejecting streams outside their own stated boundaries. Continuing to split `syntax_error`'s 18 sites would spend a sixth cycle refining the same artifact.
+
+`syntax_error` already implements the correct pattern: it is qualified by `!two_mb_seen && !four_mb_seen && !legacy_candidate && !legacy_seen && !wide_candidate && !wide_seen`, so it only counts when no specialized observer has claimed the stream. `four_mb_error` carries no equivalent qualification and latches even when the observer has effectively disqualified itself.
+
+#### Proposed Commit Boundary:
+Behavioral, narrow, one proof boundary:
+
+1. Qualify each controlled observer's error contribution so it counts only while that observer still claims the pattern it is designed to prove. An observer that meets syntax outside its documented subset should withdraw its claim rather than latch a permanent acceptance failure.
+2. Leave `stream_hold` semantics untouched. Flow control is a separate path with real timing consequences and is not implicated by this result.
+3. Leave `probe_error`'s remaining terms, all decode/DDR error flags, and the acceptance prerequisite chain unchanged.
+
+Risk: an observer that withdraws too readily could mask a real syntax fault. Mitigation is that the retired-suite patterns those observers were built for are gone, so their remaining value is narrow; and the eight other error flags plus the twelve acceptance prerequisites are unaffected and still gate the LED.
+
+#### Proposed Validation:
+Clean Quartus 17.0.2 build; non-negative setup slack, zero setup TNS, no timing-requirements Critical Warning. Then run all six Commit-175 streams and record USER/POWER/DISK. `test_i_baseline`, `test_b_bidirectional` and `test_pb_restricted_slices` must keep their existing accepted state — any regression there means an observer was disqualified too aggressively.
+
+Separately, and regardless of LED state, capture the display output for the three P-final streams and compare against the FFmpeg reference the generators already validate to, using the Commit-175 macroblock-boundary z-score method. The LED cannot answer whether these streams decode correctly; only the picture can. If the LED accepts but the picture is wrong, the real decode defect is still open and becomes the next boundary.
+
+#### Status:
+- [ ] Proposed — awaiting user approval
 
 #### Status:
 - [ ] Proposed — awaiting user approval
