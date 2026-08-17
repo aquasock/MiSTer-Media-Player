@@ -1,17 +1,4 @@
 ---
-## 163 COMMIT Unreleased 1370c28 2026-08-16T00:51:40-07:00
-
-#### Purpose:
-Retire temporary diagnostics while preserving Commit-162 pacing.
-
-#### Outcome:
-`1370c28` restores diagnostic files. Clean build: 31,782 ALMs, 43,812 registers. Repeated consecutive-P and all guards pass.
-
-#### Status:
-- [x] Built
-- [x] Passed — cleaned baseline accepted
-
----
 ## 164 COMMIT v0.4.0 cf9ec63 2026-08-16T01:55:28-07:00
 
 #### Purpose:
@@ -661,6 +648,34 @@ Hardware-run the standing stream matrix with particular attention to scaler outp
 #### Status:
 
 - [x] Built
+- [ ] Passed
+
+---
+## 183 COMMIT Unreleased ??? 2026-08-17T05:16:03-07:00
+
+#### Coming From:
+
+Unreleased a2debaa
+
+#### Purpose:
+
+Determine whether Commit 182 exposed a functional ASCAL regression or placement-sensitive P-decoder behavior and restore the last hardware-passing boundary.
+
+#### Outcome:
+
+Commit 182 hardware accepts the I-final and B-final controls but rejects all three P-final streams: motion-residual and MBA-escape report USER/POWER `1/1`, while consecutive-chain reports `2/3`. The codes name `syntax_error` on the first two streams and the owned `four_mb_error` observer on the third, reproducing the pre-Commit-181 failure classes even though the compiled ownership qualification remains present.
+
+#### Next Steps:
+
+Build the exact pre-182 source as a clean control with the same Quartus 17.0.2 environment and have the user rerun the three P-final streams. If the control passes, revert the ASCAL predicate pipeline and requalify timing and hardware; if it fails, stop and revise the boundary around placement-sensitive decoder or CDC behavior before editing source.
+
+#### Files Modified:
+
+- sys/ascal.vhd
+
+#### Status:
+
+- [ ] Built
 - [ ] Passed
 
 ---
