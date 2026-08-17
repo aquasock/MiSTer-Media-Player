@@ -253,7 +253,7 @@ Restore reproducible clean Quartus compilation before further decoder capability
 - [x] Passed
 
 ---
-## 174 PROPOSAL Unreleased pending 2026-08-16T19:00:00-07:00
+## 174 COMMIT Unreleased 4c65826 2026-08-16T19:21:12-07:00
 
 #### Coming From:
 Unreleased 912a874
@@ -262,14 +262,13 @@ Unreleased 912a874
 Restore a reproducible clean Quartus 17.0.2 build by correcting the inherited ASCAL `mode` port-width mismatch exposed after deleting the cached compilation database.
 
 #### Outcome:
-A fresh `quartus_sh --flow compile MediaPlayer` from the qualified Commit-173 source fails during Analysis & Synthesis before Fitter. `sys/ascal.vhd` declares `mode : IN unsigned(4 DOWNTO 0)` (5 bits), while `sys/sys_top.v` connects `{~lowlat,LFB_EN ? LFB_FLT : |scaler_flt,2'b00}` (4 bits). Quartus reports that the 4-element array cannot connect to the 5-element port. The current MiSTer upstream framework carries the same source pair, so this is an inherited framework mismatch rather than a Commit-173 decoder regression. ASCAL documents `MODE[4]` as TBD; therefore the conservative compatibility repair is to drive that unused high bit to zero while preserving the existing `MODE[3:0]` mapping exactly.
+`4c65826960541bbb98e55090e0fc2304593d8112` changes only `sys/sys_top.v`: ASCAL's documented TBD `MODE[4]` is explicitly driven low, preserving the existing `MODE[3:0]` mapping while satisfying the five-bit `mode` port. No MPEG-2 decoder RTL, scaler implementation, QIP, SDC, or timing constraint changed. Hardware clean-build qualification is pending.
 
-Scope Commit 174 only to `sys/sys_top.v`: change the ASCAL connection to `{1'b0,~lowlat,LFB_EN ? LFB_FLT : |scaler_flt,2'b00}` and mark the intentional repair with `kate - Commit 174`. Do not alter `sys/ascal.vhd`, decoder RTL, P/B/I behavior, DDR/raster/reference/presentation logic, QIP, SDC, or timing constraints. The previously proposed picture-signaled P/B `f_code` work is deferred to Commit 175.
-
-Validation must start from a clean local database/output state, run the complete Quartus flow, and require successful Analysis & Synthesis/Fitter/Assembler/TimeQuest plus regenerated `MediaPlayer.fit.rpt`, `MediaPlayer.fit.summary`, `MediaPlayer.flow.rpt`, and `MediaPlayer.sta.rpt`. Then run Phase-1P timing and the existing ten-stream hardware matrix; timing acceptance remains non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning.
+#### Validation:
+Start from a clean local database/output state and run the complete Quartus flow. Require successful Analysis & Synthesis, Fitter, Assembler and TimeQuest plus regenerated `MediaPlayer.fit.rpt`, `MediaPlayer.fit.summary`, `MediaPlayer.flow.rpt` and `MediaPlayer.sta.rpt`. Then run Phase-1P timing and the existing ten-stream hardware matrix; timing acceptance remains non-negative setup slack, zero setup TNS and no timing-requirements Critical Warning.
 
 #### Next Steps:
-Await user approval before implementation. After qualification, resume P/B picture-signaled `f_code` as the next capability boundary.
+Clean-build and hardware-qualify `4c65826`; after acceptance, resume picture-signaled P/B `f_code` as Commit 175.
 
 #### Files Modified:
 - sys/sys_top.v
