@@ -1,17 +1,4 @@
 ---
-## 168 COMMIT Unreleased 0ea9ac5 2026-08-16T07:45:00-07:00
-
-#### Purpose:
-Restore consecutive-reference P acceptance after parser consolidation.
-
-#### Outcome:
-`0ea9ac5` preserves streamed-motion transaction evidence across wide completion. Clean build: 30,751 ALMs (73%), setup +0.644 ns. All six regressions pass.
-
-#### Status:
-- [x] Built
-- [x] Passed
-
----
 ## 169 COMMIT Unreleased ac1ddaf 2026-08-16T07:52:00-07:00
 
 #### Purpose:
@@ -744,6 +731,37 @@ Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_p_visual_di
 #### Status:
 
 - [x] Built
+- [ ] Passed
+
+---
+## 188 COMMIT Unreleased ??? 2026-08-17T07:44:50-07:00
+
+#### Coming From:
+
+Unreleased 92546f5
+
+#### Purpose:
+
+Identify the frontend syntax condition that remains latched after functionally successful generalized P playback.
+
+#### Outcome:
+
+Commit 187 hardware gives the same USER/POWER `1/4` indication with no DISK activity on the motion-residual, MBA-escape, and visual-discriminator streams, while the discriminator still displays all four quadrants with visible center seams. This passes Commit 187's parsing, reconstruction, publication, and presentation boundary and isolates the remaining shared indication to the frontend's sticky `syntax_error`; the existing DISK diagnostic is intentionally inactive for that error class and therefore provides no deeper source.
+
+#### Next Steps:
+
+Add an observability-only first-fault code covering each frontend `syntax_error` assertion, route it alongside the existing frontend status without changing readiness or decoding, and display that code on LED_DISK only when USER reports top-level syntax error. Verify every assertion site has a distinct stable code in simulation, then perform a clean Quartus 17.0.2 build requiring non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning. Hardware validation will rerun the three P streams and use the shared DISK code to define the next functional correction boundary.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_frontend.sv
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_02.svh
+- MediaPlayer_top_07.svh
+
+#### Status:
+
+- [ ] Built
 - [ ] Passed
 
 ---
