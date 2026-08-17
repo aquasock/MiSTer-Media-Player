@@ -821,3 +821,31 @@ Rerun `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_p_visual_
 - [ ] Passed
 
 ---
+## 191 COMMIT Unreleased ??? 2026-08-17T15:21:56-07:00
+
+#### Coming From:
+
+Unreleased 2849c38
+
+#### Purpose:
+
+Make generalized P macroblock completion evidence durable and stop classifying its normal pre-completion absence as a sticky decoder error.
+
+#### Outcome:
+
+Commit 190 hardware makes the settled report unambiguous and identical on all three generalized P streams: USER 2, POWER 6, DISK 1, while the visual discriminator retains its center seams. This decodes as `phase1_probe_error`, `progress_error`, and `mb_seen_combined` false. Static tracing proves the cause is diagnostic state lifetime: `p_picture_expected` becomes sticky when P is encountered, `progress_error` is combinationally true during normal parsing before macroblock proof exists, and successful generalized persistence later clears `wide_seen` and the transient proof while leaving `p_picture_expected` set. The same reconstructed P reaching display proves this indication is post-success observer behavior rather than a decode failure.
+
+#### Next Steps:
+
+Latch successful generalized macroblock completion as durable seen evidence for the existing acceptance prerequisite, and remove the transient `progress_error` term from the sticky error output while preserving residual, stream-hold, raster-hold, publication, decoder, DDR, and presentation checks. Replay the generalized P regression streams through the compiled controller and verify that success remains visible after parser rearm while functional error terms still assert. Perform a clean Quartus 17.0.2 build requiring non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning, then run the three target streams plus the I and B regression guards through the settled diagnostic.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
