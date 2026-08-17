@@ -1,17 +1,4 @@
 ---
-## 162 COMMIT Unreleased 42d330f 2026-08-16T00:25:40-07:00
-
-#### Purpose:
-Correct the consecutive-P publication/presentation ownership race.
-
-#### Outcome:
-`42d330f` adds P-only destination ownership pacing. Repeated consecutive-P and all guards pass.
-
-#### Status:
-- [x] Built
-- [x] Passed — functional fix accepted
-
----
 ## 163 COMMIT Unreleased 1370c28 2026-08-16T00:51:40-07:00
 
 #### Purpose:
@@ -647,3 +634,33 @@ Not yet hardware-run. This stream proves nothing about residual, escape or refer
 - [x] Built — clean flow, zero TNS, no critical warnings (`05422a5`)
 - [x] Passed — all six streams accepted on hardware; LED qualification complete
 - [ ] Open — P presentation not yet photographically confirmed; run `test_p_visual_discriminator`
+
+---
+## 182 COMMIT Unreleased ??? 2026-08-17T04:56:49-07:00
+
+#### Coming From:
+
+Unreleased 05422a5
+
+#### Purpose:
+
+Restore durable HDMI setup margin by removing the ASCAL vertical line-boundary comparison from its cycle-critical accumulator decision.
+
+#### Outcome:
+
+The approved independent boundary registers the `o_vcpt_pre3 = o_vmin` predicate every HDMI clock and consumes that aligned predicate when the vertical accumulator advances, leaving decoder logic and ASCAL functionality otherwise unchanged.
+
+#### Next Steps:
+
+Commit the built ASCAL change, retain zero setup TNS and no timing-requirements Critical Warning, then hardware-run the standing stream matrix with particular attention to scaler output stability and the P-presentation visual discriminator.
+
+#### Files Modified:
+
+- sys/ascal.vhd
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
