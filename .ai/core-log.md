@@ -1,17 +1,4 @@
 ---
-## 159 COMMIT Unreleased a5b518d 2026-08-15T21:55:32-07:00
-
-#### Purpose:
-Identify the first generalized-P prediction/reference failure class.
-
-#### Outcome:
-`a5b518d` reports 2-2-4: generalized-P prediction timeout precedes writer overlap.
-
-#### Status:
-- [x] Built
-- [x] Passed — timeout identified first
-
----
 ## 160 COMMIT Unreleased 1efbb4b 2026-08-15T23:31:10-07:00
 
 #### Purpose:
@@ -458,3 +445,30 @@ The four P-specific sources are the more probable candidates for the observed fa
 #### Status:
 - [x] Built — corrected as `d5b97ce`; build hash for this cycle is `d5b97ce`
 - [ ] Passed — sub-code result pending
+
+---
+## 179 COMMIT Unreleased 0225bef 2026-08-16T23:58:00-07:00
+
+#### Coming From:
+Unreleased 466f0b3 (build hash `d5b97ce`)
+
+#### Purpose:
+Fix the `d5b97ce` build failure so the Commit-178 sub-code diagnostic can actually run.
+
+#### Outcome:
+The user's build of `d5b97ce` failed Analysis & Synthesis: `Error (12002): Port "probe_error_source" does not exist in macrofunction "mpeg2_h262_two_picture_probe" File: MediaPlayer_top_03.svh Line: 22`. Root cause: four separate `.sv` files under `rtl/mpeg2_new/` all declare `module mpeg2_h262_two_picture_probe` with the identical name (base, `_p_chain`, `_multimb`, `_p_publish`). `files.qip` compiles only `mpeg2_h262_two_picture_probe_p_chain.sv` for that module name. `d5b97ce` added `probe_error_source` to the uncompiled base file — the same class of wrong-file mistake its own "Build Correction" note had already flagged once (landing on the bookkeeper first, then this base file, neither of which is on the active `_p_chain` path).
+
+`0225bef` adds `probe_error_source` directly to `mpeg2_h262_two_picture_probe_p_chain.sv`, using a 5-term priority-encoded breakdown of that file's own `probe_error` OR (`bookkeeper_error` gated, `p_error_raw` gated, `b_error`, `publication_error`, `reference_progress_error`) rather than porting the base file's unrelated 8-term encoding. `probe_error` itself is unchanged. The `LED_POWER` sub-code comment table in `MediaPlayer_top_07.svh` is corrected to match. User approved the 5-source (vs. full 8-source bookkeeper-exposing) approach before implementation.
+
+#### Validation:
+Full clean Quartus 17.0.2 CLI flow from the existing `output_files/` state (`quartus_map` → `quartus_fit` → `quartus_asm` → `quartus_sta`), run directly by the agent this cycle. Analysis & Synthesis: 0 errors (was 1), 102 warnings. Fitter: Successful, 0 errors, 8 warnings. Assembler: Successful, 0 errors, 0 warnings. 30,161 ALMs (72%), 40,877 registers, 559,565 memory bits, 86 RAM blocks, 69 DSPs, 3 PLLs. TimeQuest: every setup/hold/recovery/removal/minimum-pulse-width slack positive, zero TNS on all; global (worst-case) setup +0.347 ns, the 54 MHz decoder clock (`general[2]` PLL) setup +0.415 ns / hold +0.250 ns / recovery +15.405 ns / removal +0.631 ns / minimum pulse width +7.818 ns. Flow Status Successful, zero Critical Warnings anywhere.
+
+Hardware regression against the Commit-178 diagnostic (report `LED_USER`/`LED_POWER` blink counts for `test_p_mba_escape`, `test_consecutive_chain`, `test_p_motion_residual`, plus `test_i_baseline` as steady-ON control) is still outstanding — this commit only restores a buildable bitstream carrying that diagnostic.
+
+#### Files Modified:
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+- MediaPlayer_top_07.svh
+
+#### Status:
+- [x] Built — clean flow, zero TNS, no critical warnings (`0225bef`)
+- [ ] Passed — Commit-178 hardware sub-code result still pending
