@@ -1,17 +1,4 @@
 ---
-## 167 COMMIT Unreleased b11590c 2026-08-16T05:31:18-07:00
-
-#### Purpose:
-Consolidate duplicate generalized-P syntax onto the streamed parser.
-
-#### Outcome:
-`b11590c` reduces utilization to 30,771 ALMs (73%) but regresses consecutive-P acceptance without crashing.
-
-#### Status:
-- [x] Built
-- [ ] Passed — consecutive-P regression
-
----
 ## 168 COMMIT Unreleased 0ea9ac5 2026-08-16T07:45:00-07:00
 
 #### Purpose:
@@ -725,6 +712,38 @@ Run `test_p_visual_discriminator.m2v` and record USER, POWER, and DISK after the
 #### Status:
 
 - [x] Built
+- [ ] Passed
+
+---
+## 187 COMMIT Unreleased ??? 2026-08-17T07:21:08-07:00
+
+#### Coming From:
+
+Unreleased 12b22cd
+
+#### Purpose:
+
+Remove the two diagnosed wide-P parser limits blocking leading skipped macroblocks and the validated 19-block residual transaction.
+
+#### Outcome:
+
+Commit 186 hardware displays the visual discriminator's center seams, proving final-P completion, raster execution, and presentation now work. Exact compiled-controller replay localizes the remaining streams independently: MBA-escape enters `R_APPLY` on its leading-skip row and is rejected by a controlled restriction requiring the first coded macroblock at the next uncovered column, while motion-residual reaches `R_BLOCK` and fails when its 17th residual descriptor exceeds the implementation's 16-descriptor capacity. The stream requires 19 descriptors and does not exhaust coefficient storage; neither stop is an H.262 limit.
+
+#### Next Steps:
+
+Allow a P slice's first macroblock address increment to establish a legal leading skipped region while retaining the existing zero, row-bound, and subsequent-coverage checks. Widen the generalized residual descriptor transport and raster storage from 16 to 32 entries without changing coefficient limits or decoded arithmetic. Replay the MBA-escape, motion-residual, and visual-discriminator streams through the compiled controller, verify a 19-descriptor raster transaction in simulation, then perform a clean Quartus 17.0.2 build requiring non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning. Hardware validation will run all three streams and require visible discriminator seams plus clean acceptance.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+
+#### Status:
+
+- [ ] Built
 - [ ] Passed
 
 ---
