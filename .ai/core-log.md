@@ -470,12 +470,10 @@ The control reads exactly as predicted before the run: `LED_USER` steady ON, `LE
 
 All three P-final streams now report a single common source: `probe_error_source` 2 = `p_error_gated` = the `probe_error` output of `mpeg2_h262_p_diagnostic_controller` (`p_controller`). `b_picture_observed` is false on all three, as expected for streams with no B pictures, so the gate is transparent.
 
-#### Discrepancy Against Commit 177:
-`test_p_motion_residual` read steady OFF (no error latched) at `92d14cf` and now reads 2 blinks (error latched) at `0225bef`. The Commit-177 conclusion of two distinct faults does not reproduce; all three streams now fail identically.
+#### Correction To Commit 177:
+`test_p_motion_residual` was recorded as steady OFF at `92d14cf` and reads 2 blinks here. The user has confirmed the Commit-177 reading was a misread and that the `0225bef` results are definitive. **The Commit-177 "two distinct faults" conclusion is withdrawn.** There is one deterministic fault affecting all three P-final streams, not two, and there is no separate acceptance-prerequisite failure to chase. The Commit-177 entry is left in place as the historical record but its interpretation is superseded by this entry.
 
-`0225bef` did not change `probe_error`. `git show 0225bef` confirms the `assign probe_error=...` statement in `_p_chain.sv` is byte-identical and the commit is purely additive (a new `probe_error_source` output plus two gated wires). No RTL semantic on the acceptance or error path was altered, so the change of state is not explained by the diff.
-
-Unexplained candidates, in rough order of likelihood: run-to-run intermittency in the underlying fault; sensitivity to the refit, which moved the 54 MHz decoder-clock setup slack from +0.626 ns at Commit 173/174 to +0.415 ns here (still positive, zero TNS) and grew the netlist from 30,111 to 30,161 ALMs and 40,748 to 40,877 registers; or a misread at Commit 177. Steady OFF and a 2-blink pattern are visually distinct, which argues against the last. An intermittent latch would be a materially different defect class from a deterministic one and must be resolved before a fix boundary is chosen.
+This also removes the intermittency question: no evidence of run-to-run variation remains, and `git show 0225bef` independently confirms the commit was purely additive (`assign probe_error=...` byte-identical), so nothing in the diff could have changed the observed state either.
 
 #### Status:
 - [x] Built — clean flow, zero TNS, no critical warnings (`0225bef`)
@@ -504,21 +502,28 @@ Five of these are `probe_error` outputs of dedicated sub-probes (`mpeg2_h262_p_s
 
 The three failing streams have deliberately disjoint content — `test_consecutive_chain` carries no residual coefficients, no escapes, no quantiser changes and increment 1 on every macroblock; `test_p_mba_escape` is built from gaps and escapes; `test_p_motion_residual` is residual-heavy with mid-slice quantiser changes. Three structurally unrelated streams landing on one source points at a common early term rather than a content-specific probe, which makes `progress_error` and `syntax_error` the leading candidates over `residual_error` or the aligned/two-MB/four-MB probes. This is a hypothesis for the diagnostic to confirm or refute, not a conclusion.
 
+#### Ruled Out By Static Analysis:
+Two candidates were eliminated this cycle without spending a build, and neither needs diagnostic coverage:
+
+1. **The `Warning (10259)` constant overflow at `mpeg2_h262_p_syntax_probe.sv:327` is benign.** The literal `13'sd4096` overflows a 13-bit signed type to `-4096`, and the unary minus overflows again back to `-4096`, so `value >= -13'sd4096` evaluates to the intended full-range 13-bit lower bound. The f_code-9 range check is correct despite the warning. Cosmetic only; it should be cleaned up eventually but it is not this defect.
+
+2. **The `D_MOTION_PREP` guard set at `mpeg2_h262_p_syntax_probe.sv:607-616` passes on all three streams.** That state raises `probe_error` unless `p_picture_controls_seen`, `picture_structure == 2'b11`, `frame_pred_frame_dct`, and both forward f_codes in 1..9. Reading the generator's picture_coding_extension patching at `tools/streams/h262common.py:330-336`: `f_code[0][0]` and `f_code[0][1]` are both forced to 3, `frame_pred_frame_dct` is explicitly set, `concealment_motion_vectors`/`q_scale_type`/`alternate_scan` are cleared, and `picture_structure` stays at FFmpeg's frame value 3. Every guard is satisfied, so this is not the failing term and picture-level f_code signalling (`H262-022`) is not implicated.
+
+#### Expectation On Diagnostic Depth:
+`progress_error` is `p_picture_expected && !p_macroblock_type_seen`, and `p_macroblock_type_seen` at `mpeg2_h262_p_diagnostic_controller.sv:182` is itself a deep conjunction of `mb_seen_decoded` (which folds in `mb_seen_combined`, `residual_decision`, `residual_required_raw`, `residual_success_raw`), `hold_seen_combined`, `two_mb_wait` and `raster_wait`. If `progress_error` is the winning term it is a symptom, not a root cause, and a bare eight-way split would end the cycle knowing little more than it started. The boundary below therefore covers both levels in one build rather than spending two.
+
 #### Proposed Commit Boundary:
 Observability only, no behavioral change, matching the Commit-177/178 pattern:
 
 1. Add a `probe_error_source` output to `mpeg2_h262_p_diagnostic_controller`, priority-encoded over the eight terms above in the same order as the existing OR. `probe_error` itself is untouched.
-2. Route it up through `_p_chain.sv` and `MediaPlayer_top_0x.svh`, and select it onto `LED_POWER` when `LED_USER` blinks 2 and the existing `probe_error_source` is 2, so the currently reported POWER 2 is replaced by the deeper eight-way code. The existing five-way source code is preserved for every other value.
-3. Verify the encoder in an iverilog testbench across all eight codes plus the clean case before commit, as was done for Commits 177 and 178.
+2. Add a second `progress_detail` output to the same module, priority-encoded over the false conjuncts of `p_macroblock_type_seen`: 1 `mb_seen_combined`, 2 `residual_decision`, 3 `residual_required_raw && !residual_success_raw`, 4 `hold_seen_combined`, 5 `two_mb_wait`, 6 `raster_wait`.
+3. Route both up through `_p_chain.sv` and `MediaPlayer_top_0x.svh`. `LED_POWER` carries the eight-way source when `LED_USER` blinks 2 and the existing five-way source is 2. `LED_DISK` is temporarily repurposed from `ioctl_download` to blink `progress_detail` when the eight-way source is 8 (`progress_error`), and is otherwise steady off. This is the same displacement Commit 176 used and Commit 177 reverted.
+4. Verify both encoders in an iverilog testbench across every code plus the clean case before commit, as was done for Commits 177 and 178.
 
-Only the compiled `_p_chain` variant is edited. The three unused same-named `mpeg2_h262_two_picture_probe` variants and the base file are deliberately left alone; this was the direct cause of the `466f0b3` and `d5b97ce` build failures.
+Only the compiled `_p_chain` path is edited. The three unused same-named `mpeg2_h262_two_picture_probe` variants and the base file are deliberately left alone; editing those was the direct cause of the `466f0b3` and `d5b97ce` build failures.
 
 #### Proposed Validation:
-Clean Quartus 17.0.2 build; acceptance remains non-negative setup slack, zero setup TNS, no timing-requirements Critical Warning. Then:
-
-1. Run each of the three P-final streams and record USER and POWER.
-2. Run `test_p_motion_residual` at least three separate times, with a core reboot between runs, to settle whether the Commit-177 steady-OFF reading is reproducible or the fault is intermittent. If any run reports a different code than the others, the defect is intermittent and the fix boundary changes accordingly.
-3. `test_i_baseline` remains the control on USER only.
+Clean Quartus 17.0.2 build; acceptance remains non-negative setup slack, zero setup TNS, no timing-requirements Critical Warning. Then run each of the three P-final streams once and record USER, POWER and DISK. `test_i_baseline` remains the control on USER only — POWER reads 1 on the control by design and carries no information there. Repeat runs are not required; the fault is deterministic.
 
 #### Status:
 - [ ] Proposed — awaiting user approval
