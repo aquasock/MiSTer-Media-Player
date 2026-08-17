@@ -51,7 +51,8 @@ module mpeg2_h262_p_wide_motion_syntax_probe
 localparam [7:0]
     PICTURE_START_CODE   = 8'h00,
     SEQUENCE_HEADER_CODE = 8'hB3,
-    EXTENSION_START_CODE = 8'hB5;
+    EXTENSION_START_CODE = 8'hB5,
+    SEQUENCE_END_CODE    = 8'hB7;
 localparam integer ROW_BUFFER_BYTES = 512;
 localparam [4:0] MAX_RESIDUAL_BLOCKS = 5'd16;
 localparam [6:0] MAX_COEFF_EVENTS = 7'd64;
@@ -65,7 +66,8 @@ wire slice_start_now = start_code_now &&
                        (start_code_value <= 8'hAF);
 wire post_p_boundary_now = start_code_now &&
                            ((start_code_value == PICTURE_START_CODE) ||
-                            (start_code_value == SEQUENCE_HEADER_CODE));
+                            (start_code_value == SEQUENCE_HEADER_CODE) ||
+                            (start_code_value == SEQUENCE_END_CODE));
 
 reg sequence_capture;
 reg [1:0] sequence_count;
