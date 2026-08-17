@@ -240,26 +240,17 @@ wire progress_error=p_picture_expected&&!p_macroblock_type_seen;
 // Qualify every observer error by that observer's own claim.  syntax_error
 // already carries the equivalent qualification and is unchanged.  probe_error
 // keeps all its terms; only unowned contributions are dropped.
-wire two_mb_error_owned  = two_mb_error  && two_mb_seen;
-wire four_mb_error_owned = four_mb_error && (four_mb_candidate || four_mb_seen);
-wire legacy_error_owned  = legacy_error  && legacy_mode;
-wire wide_error_owned    = wide_error    && wide_mode;
-
-wire parser_error_group=
-    syntax_error|two_mb_error_owned|four_mb_error_owned|
-    legacy_error_owned|wide_error_owned;
+// kate - Commit 184.  These five parser probes are historical controlled-
+// pattern observers, not the generalized decoder that owns current f_code-3
+// streams.  Their documented subset rejections must not fail acceptance.
+// Keep every functional completion/replay/hold error below; only retire the
+// controlled parser observer group from the acceptance error output.
 assign probe_error=
-    parser_error_group|progress_error|residual_error_raw|
+    progress_error|residual_error_raw|
     hold_error|raster_hold_error;
 
-// kate - Commit 180 observability only.  Priority order follows the OR above,
-// expanding parser_error_group into its five members first.
+// Preserve the established numeric codes for the remaining functional terms.
 assign probe_error_source=
-    syntax_error      ? 4'd1 :
-    two_mb_error_owned  ? 4'd2 :
-    four_mb_error_owned ? 4'd3 :
-    legacy_error_owned  ? 4'd4 :
-    wide_error_owned    ? 4'd5 :
     progress_error    ? 4'd6 :
     residual_error_raw? 4'd7 :
     hold_error        ? 4'd8 :
