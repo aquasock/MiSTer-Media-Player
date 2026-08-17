@@ -38,6 +38,7 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.frontend_ready                   (mpeg2_new_frontend_ready),
 	.phase1_supported                 (mpeg2_new_phase1_supported),
 	.syntax_error                     (mpeg2_new_syntax_error),
+	.syntax_error_source              (mpeg2_new_syntax_error_source),
 	.sequence_seen                    (mpeg2_new_sequence_seen),
 	.sequence_extension_seen          (mpeg2_new_sequence_extension_seen),
 	.sequence_scalable_extension_seen (mpeg2_new_sequence_scalable_extension_seen),

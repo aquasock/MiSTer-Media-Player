@@ -234,21 +234,24 @@ wire [3:0] mpeg2_new_diag_power_code =
 //   7 persistence asserted
 // The prior Commit-180 progress-error detail remains available for its error
 // case.  This changes observability only.
-wire [3:0] mpeg2_new_diag_disk_code =
+wire [4:0] mpeg2_new_diag_disk_code =
+    (mpeg2_new_diag_first_error_valid &&
+     (mpeg2_new_diag_error_code_first == 4'd1)) ?
+        mpeg2_new_syntax_error_source :
     (!mpeg2_new_diag_first_error_valid &&
      (mpeg2_new_diag_prereq_code == 4'd4)) ?
-        mpeg2_new_pred_progress_stage :
+        {1'b0, mpeg2_new_pred_progress_stage} :
     (mpeg2_new_diag_first_error_valid &&
      (mpeg2_new_diag_error_code_first == 4'd2) &&
      (mpeg2_new_diag_phase1_source_first == 4'd2) &&
      (mpeg2_new_diag_p_source_first == 4'd6)) ?
-        mpeg2_new_diag_progress_detail_first : 4'd0;
+        {1'b0, mpeg2_new_diag_progress_detail_first} : 5'd0;
 
 // 250 ms slot at the 54 MHz decoder clock.  Slots 0..2N-1 carry the N blinks
-// (even slot lit, odd slot dark); the remaining slots of the 32-slot frame are
-// the separating gap, so twelve blinks still leave ~2 s of gap.
+// (even slot lit, odd slot dark); Commit 188 widens the frame to 64 slots so
+// all 21 frontend assertion-site codes retain a separating gap.
 localparam [23:0] MPEG2_NEW_DIAG_SLOT_CYCLES = 24'd13_500_000;
-localparam [5:0]  MPEG2_NEW_DIAG_SLOT_LAST   = 6'd31;
+localparam [5:0]  MPEG2_NEW_DIAG_SLOT_LAST   = 6'd63;
 
 reg [23:0] mpeg2_new_diag_slot_div;
 reg [5:0]  mpeg2_new_diag_slot;
@@ -292,7 +295,7 @@ assign LED_POWER = {1'b1, (mpeg2_new_diag_power_code == 4'd0) ?
 // kate - Commit 180.  LED_DISK is {enable, value} on the same active-high
 // convention (sys_top.v:157 gives LED[2] = led_disk[0] when enabled).  Steady
 // OFF when there is no progress sub-code to report.
-wire [5:0] mpeg2_new_diag_disk_slots = {1'b0, mpeg2_new_diag_disk_code, 1'b0};
+wire [5:0] mpeg2_new_diag_disk_slots = {mpeg2_new_diag_disk_code, 1'b0};
 wire mpeg2_new_diag_disk_blink =
     (mpeg2_new_diag_slot < mpeg2_new_diag_disk_slots) &&
     !mpeg2_new_diag_slot[0];

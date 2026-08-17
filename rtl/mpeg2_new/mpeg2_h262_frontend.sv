@@ -39,6 +39,8 @@ module mpeg2_h262_frontend
     output wire        frontend_ready,
     output wire        phase1_supported,
     output reg         syntax_error,
+    // Commit 188 observability: stable first assertion site, 1..21.
+    output reg  [4:0]  syntax_error_source,
 
     output reg         sequence_seen,
     output reg         sequence_extension_seen,
@@ -234,6 +236,7 @@ always @(posedge clk) begin
         first_picture_after_gop             <= 1'b0;
 
         syntax_error                        <= 1'b0;
+        syntax_error_source                 <= 5'd0;
         sequence_seen                       <= 1'b0;
         sequence_extension_seen             <= 1'b0;
         sequence_scalable_extension_seen    <= 1'b0;
@@ -291,12 +294,16 @@ always @(posedge clk) begin
             // after each MPEG-2 picture_header.  The B5 byte identifies an
             // extension; its four-bit ID is checked on the following byte.
             if (expect_sequence_extension &&
-                (start_code_value != EXTENSION_START_CODE))
+                (start_code_value != EXTENSION_START_CODE)) begin
                 syntax_error <= 1'b1;
+                if (!syntax_error) syntax_error_source <= 5'd1;
+            end
 
             if (expect_picture_coding_extension &&
-                (start_code_value != EXTENSION_START_CODE))
+                (start_code_value != EXTENSION_START_CODE)) begin
                 syntax_error <= 1'b1;
+                if (!syntax_error) syntax_error_source <= 5'd2;
+            end
 
             active_start_code           <= start_code_value;
             active_start_code_valid     <= 1'b1;
@@ -326,6 +333,7 @@ always @(posedge clk) begin
                     // H.262 allocates this code for a media interface to mark
                     // an uncorrectable error location.
                     syntax_error <= 1'b1;
+                    if (!syntax_error) syntax_error_source <= 5'd3;
                 end
 
                 SEQUENCE_END_CODE: begin
@@ -359,8 +367,10 @@ always @(posedge clk) begin
                 sequence_seen            <= 1'b1;
 
                 // marker_bit follows bit_rate_value and shall be one.
-                if (!payload_next[13])
+                if (!payload_next[13]) begin
                     syntax_error <= 1'b1;
+                    if (!syntax_error) syntax_error_source <= 5'd4;
+                end
 
                 // H.262 6.2.2.1/6.3.11: after the fixed sequence-header
                 // fields, load_intra_quantiser_matrix is the 63rd payload
@@ -378,12 +388,16 @@ always @(posedge clk) begin
                 active_extension_id_valid <= 1'b1;
 
                 if (expect_sequence_extension &&
-                    (stream_data[7:4] != EXT_SEQUENCE))
+                    (stream_data[7:4] != EXT_SEQUENCE)) begin
                     syntax_error <= 1'b1;
+                    if (!syntax_error) syntax_error_source <= 5'd5;
+                end
 
                 if (expect_picture_coding_extension &&
-                    (stream_data[7:4] != EXT_PICTURE_CODING))
+                    (stream_data[7:4] != EXT_PICTURE_CODING)) begin
                     syntax_error <= 1'b1;
+                    if (!syntax_error) syntax_error_source <= 5'd6;
+                end
 
                 // kate - Phase 1 deliberately excludes H.262 scalable syntax.
                 // Track it explicitly so an unsupported scalable stream is not
@@ -417,12 +431,16 @@ always @(posedge clk) begin
                 expect_sequence_extension    <= 1'b0;
 
                 // marker_bit in sequence_extension() shall be one.
-                if (!payload_next[16])
+                if (!payload_next[16]) begin
                     syntax_error <= 1'b1;
+                    if (!syntax_error) syntax_error_source <= 5'd7;
+                end
 
                 // chroma_format == 00 is reserved by H.262.
-                if (payload_next[34:33] == 2'b00)
+                if (payload_next[34:33] == 2'b00) begin
                     syntax_error <= 1'b1;
+                    if (!syntax_error) syntax_error_source <= 5'd8;
+                end
             end
 
             // picture_header(): first 32 payload bits are sufficient for the
@@ -477,14 +495,18 @@ always @(posedge clk) begin
                 // H.262 Table 6-12 defines 001 I, 010 P, 011 B.  000 is
                 // forbidden; 100 shall not be used; 101-111 are reserved.
                 if ((payload_next[21:19] < 3'b001) ||
-                    (payload_next[21:19] > 3'b011))
+                    (payload_next[21:19] > 3'b011)) begin
                     syntax_error <= 1'b1;
+                    if (!syntax_error) syntax_error_source <= 5'd9;
+                end
 
                 // H.262 requires the first coded frame after a GOP header to
                 // be an I-frame.
                 if (first_picture_after_gop) begin
-                    if (payload_next[21:19] != 3'b001)
+                    if (payload_next[21:19] != 3'b001) begin
                         syntax_error <= 1'b1;
+                        if (!syntax_error) syntax_error_source <= 5'd10;
+                    end
                     first_picture_after_gop <= 1'b0;
                 end
             end
@@ -518,57 +540,79 @@ always @(posedge clk) begin
                 // H.262 6.3.10: every f_code is a 4-bit unsigned value in
                 // 1..9 or 15.  Zero is forbidden and 10..14 are reserved.
                 if (!(((payload_next[35:32] >= 4'd1) &&
-                       (payload_next[35:32] <= 4'd9)) ||
-                      (payload_next[35:32] == 4'hF)))
+                      (payload_next[35:32] <= 4'd9)) ||
+                      (payload_next[35:32] == 4'hF))) begin
                     syntax_error <= 1'b1;
+                    if (!syntax_error) syntax_error_source <= 5'd11;
+                end
                 if (!(((payload_next[31:28] >= 4'd1) &&
                        (payload_next[31:28] <= 4'd9)) ||
-                      (payload_next[31:28] == 4'hF)))
+                      (payload_next[31:28] == 4'hF))) begin
                     syntax_error <= 1'b1;
+                    if (!syntax_error) syntax_error_source <= 5'd12;
+                end
                 if (!(((payload_next[27:24] >= 4'd1) &&
                        (payload_next[27:24] <= 4'd9)) ||
-                      (payload_next[27:24] == 4'hF)))
+                      (payload_next[27:24] == 4'hF))) begin
                     syntax_error <= 1'b1;
+                    if (!syntax_error) syntax_error_source <= 5'd13;
+                end
                 if (!(((payload_next[23:20] >= 4'd1) &&
                        (payload_next[23:20] <= 4'd9)) ||
-                      (payload_next[23:20] == 4'hF)))
+                      (payload_next[23:20] == 4'hF))) begin
                     syntax_error <= 1'b1;
+                    if (!syntax_error) syntax_error_source <= 5'd14;
+                end
 
                 // H.262 6.3.10: with no concealment motion vectors an I-picture
                 // uses no motion vectors, so all four f_code values shall be 15.
                 if ((picture_coding_type == 3'b001) &&
                     !payload_next[13] &&
-                    (payload_next[35:20] != 16'hFFFF))
+                    (payload_next[35:20] != 16'hFFFF)) begin
                     syntax_error <= 1'b1;
+                    if (!syntax_error) syntax_error_source <= 5'd15;
+                end
 
                 // Backward motion vectors are unused in both I- and P-pictures;
                 // the corresponding two f_code values shall therefore be 15.
                 if (((picture_coding_type == 3'b001) ||
                      (picture_coding_type == 3'b010)) &&
-                    (payload_next[27:20] != 8'hFF))
+                    (payload_next[27:20] != 8'hFF)) begin
                     syntax_error <= 1'b1;
+                    if (!syntax_error) syntax_error_source <= 5'd16;
+                end
 
                 // picture_structure == 00 is reserved.
-                if (payload_next[17:16] == 2'b00)
+                if (payload_next[17:16] == 2'b00) begin
                     syntax_error <= 1'b1;
+                    if (!syntax_error) syntax_error_source <= 5'd17;
+                end
 
                 // A progressive sequence contains only progressive frame
                 // pictures; H.262 additionally requires frame structure.
                 if (progressive_sequence) begin
-                    if (payload_next[17:16] != 2'b11)
+                    if (payload_next[17:16] != 2'b11) begin
                         syntax_error <= 1'b1;
-                    if (!payload_next[14])
+                        if (!syntax_error) syntax_error_source <= 5'd18;
+                    end
+                    if (!payload_next[14]) begin
                         syntax_error <= 1'b1;
-                    if (!payload_next[7])
+                        if (!syntax_error) syntax_error_source <= 5'd19;
+                    end
+                    if (!payload_next[7]) begin
                         syntax_error <= 1'b1;
+                        if (!syntax_error) syntax_error_source <= 5'd20;
+                    end
                 end
 
                 // H.262 6.3.10: for 4:2:0 video chroma_420_type shall equal
                 // progressive_frame.  This is syntax/semantic validity, not a
                 // Phase 1 implementation restriction.
                 if ((chroma_format == 2'b01) &&
-                    (payload_next[8] != payload_next[7]))
+                    (payload_next[8] != payload_next[7])) begin
                     syntax_error <= 1'b1;
+                    if (!syntax_error) syntax_error_source <= 5'd21;
+                end
             end
         end
     end

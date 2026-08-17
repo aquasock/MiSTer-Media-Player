@@ -14,6 +14,7 @@ mpeg2_video_svga_800x600 mpeg2_video_svga_800x600
 wire        mpeg2_new_frontend_ready;
 wire        mpeg2_new_phase1_supported;
 wire        mpeg2_new_syntax_error;
+wire [4:0]  mpeg2_new_syntax_error_source;
 wire        mpeg2_new_sequence_seen;
 wire        mpeg2_new_sequence_extension_seen;
 wire        mpeg2_new_sequence_scalable_extension_seen;
