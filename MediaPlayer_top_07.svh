@@ -251,19 +251,19 @@ wire [4:0] mpeg2_new_diag_disk_code_live =
 // sticky; wait one decoder-clock second after it rises so parser, raster, DDR,
 // publication and display scheduling have all drained before sampling any live
 // prerequisite.  Reset the blink epoch at capture so every test begins at the
-// same visible boundary.  The existing slot divider supplies the delay: eight
-// 125 ms slots are one second, avoiding a second wide counter/comparator.
+// same visible boundary.  The existing slot divider supplies the delay: four
+// 250 ms slots are one second, avoiding a second wide counter/comparator.
 reg        mpeg2_new_diag_snapshot_valid;
 reg [3:0]  mpeg2_new_diag_error_code_snapshot;
 reg [3:0]  mpeg2_new_diag_power_code_snapshot;
 reg [4:0]  mpeg2_new_diag_disk_code_snapshot;
 reg        mpeg2_new_diag_success_snapshot;
 
-// 125 ms slots, divided into non-overlapping windows in a 16-second frame:
+// 250 ms slots, divided into non-overlapping windows in a 32-second frame:
 // USER 0..23, POWER 24..63, DISK 64..127.  Each numeric code uses alternating
 // lit/dark slots local to its window, so simultaneous slot-zero flashes can no
 // longer obscure the count.
-localparam [23:0] MPEG2_NEW_DIAG_SLOT_CYCLES = 24'd6_750_000;
+localparam [23:0] MPEG2_NEW_DIAG_SLOT_CYCLES = 24'd13_500_000;
 localparam [6:0]  MPEG2_NEW_DIAG_SLOT_LAST   = 7'd127;
 localparam [6:0]  MPEG2_NEW_DIAG_POWER_FIRST = 7'd24;
 localparam [6:0]  MPEG2_NEW_DIAG_DISK_FIRST  = 7'd64;
@@ -285,7 +285,7 @@ always @(posedge clk_mpeg2) begin
         mpeg2_new_diag_slot     <= 7'd0;
     end
     else if (!mpeg2_new_diag_snapshot_valid && mpeg2_new_sequence_end_seen) begin
-        if (mpeg2_new_diag_slot_tick && (mpeg2_new_diag_slot == 7'd7)) begin
+        if (mpeg2_new_diag_slot_tick && (mpeg2_new_diag_slot == 7'd3)) begin
             mpeg2_new_diag_snapshot_valid      <= 1'b1;
             mpeg2_new_diag_error_code_snapshot <= mpeg2_new_diag_error_code;
             mpeg2_new_diag_power_code_snapshot <= mpeg2_new_diag_power_code_live;
