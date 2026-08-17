@@ -850,3 +850,32 @@ Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_p_visual_discri
 - [ ] Passed
 
 ---
+## 192 COMMIT Unreleased ??? 2026-08-17T16:09:53-07:00
+
+#### Coming From:
+
+Unreleased 6281359
+
+#### Purpose:
+
+Align reference-picture completion and settled prerequisite reporting with the generalized P publication path and the already accepted I/B modes.
+
+#### Outcome:
+
+Commit 191 hardware clears USER and DISK errors on all three generalized P streams and preserves the visual discriminator's center seams, but POWER reports code 3, proving `second_picture_420_parsed` remains false after successful P presentation. Static tracing identifies the ownership mismatch: the outer publication shell increments its combined `picture_count` and promotes generalized P persistence, while its exported `second_picture_420_parsed` is still wired directly to the legacy I-only bookkeeper. The B regression remains accepted with USER solid but also reports POWER 3 because the settled prerequisite encoder evaluates P-only terms even after the independent B success path has passed; the I baseline remains accepted with USER solid and no DISK indication.
+
+#### Next Steps:
+
+Publish second-reference completion from either the legacy bookkeeper result or the combined I/P reference-publication count without changing parser, reconstruction, DDR, bank, or presentation control, and suppress P-only prerequisite sub-codes whenever the normal I/P/B acceptance result is already true. Add focused simulations proving generalized P persistence makes the second-reference prerequisite durable while I and B acceptance remain mode-correct, then perform a clean Quartus 17.0.2 build with non-negative setup and hold slack, zero TNS, and no timing-requirements Critical Warning. Rerun the three P targets plus the I and B guards; accepted streams should match the I baseline's settled behavior, and the visual discriminator must retain its seams.
+
+#### Files Modified:
+
+- MediaPlayer_top_07.svh
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
