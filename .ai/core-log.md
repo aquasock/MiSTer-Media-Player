@@ -247,7 +247,7 @@ Restore Commit-171 54 MHz setup closure without changing its hardware-passing B 
 `338c2f8bb868cd0e8a7d4bf01ac7961a06231d33` registers each decoded B macroblock-address symbol before escape/row-bound/skip arithmetic. Clean build: 29,901 ALMs (71%), 40,799 registers, 559,565 memory bits, 86 RAM blocks, 69 DSPs and 3 PLLs. Decoder setup closes at +0.823 ns / zero TNS (Fmax 56.51 MHz); hold/recovery/removal/min-pulse are positive, with no flow errors or critical warnings. All nine hardware regressions pass. Build-report cleanup is `bbbdcf6`. Latest Audio `33a5f91` only adds a timing-report `.gitkeep`; latest Audio functional `a50fb2e` changes only `tools/phase1p_timing.tcl`, so integration compatibility is clean.
 
 #### Next Steps:
-Generalize the remaining fixed-f_code B frame-motion reconstruction path.
+Generalize profile-conformant restricted slice partitioning in the progressive P/B paths; retain B `f_code` generalization as the following capability boundary.
 
 #### Files Modified:
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
@@ -258,25 +258,29 @@ Generalize the remaining fixed-f_code B frame-motion reconstruction path.
 - [x] Passed
 
 ---
-## 173 PROPOSAL Unreleased pending 2026-08-16T16:53:00-07:00
+## 173 PROPOSAL Unreleased pending 2026-08-16T17:06:00-07:00
 
 #### Coming From:
 Unreleased 338c2f8
 
 #### Purpose:
-Generalize progressive B-picture frame-motion reconstruction from the current fixed `f_code=3` subset to picture-signaled `f_code` behavior while preserving the accepted 720x480 B pipeline.
+Generalize profile-conformant restricted slice partitioning across the accepted progressive P/B 720x480 paths so a macroblock row may be carried by multiple same-row slices without misclassifying slice-boundary positioning as skipped macroblocks.
 
 #### Outcome:
-Current B qualification requires all four picture-coding-extension `f_code` fields to equal 3 and uses a fixed `reconstruct_mv_f3` path with two residual bits. H262-022 records the general frame-motion rule: `r_size = f_code - 1`, `f = 2^r_size`, with motion residual length and vector wrapping derived from that value. Scope Commit 173 only to B forward/backward horizontal/vertical `f_code` capture, residual-bit consumption, and frame-motion reconstruction within the already accepted frame-prediction motion modes. Preserve B geometry, Table-B.1 address/escape behavior, skipped-macroblock handling, residual/CBP syntax, scratch/reference semantics, DDR arbitration, presentation ordering, P pacing, IDCT, QIP, SDC, and Commit-172 timing closure. No new motion_type, field prediction, dual-prime, or interlaced capability is part of this boundary.
+Online verification against the official freely available ITU-T H.262 (02/2000) text clarifies the required model. A slice is an arbitrary run of consecutive macroblocks whose first and last macroblocks are coded, but slices may start and finish anywhere and multiple slices may therefore have the same `slice_vertical_position`. At slice start `previous_macroblock_address` is reset to the row origin minus one, and skipped-macroblock inference explicitly does not apply there. Table 8-5 requires restricted slice structure for all defined profiles, so every picture macroblock must nevertheless be enclosed in a non-overlapping slice.
 
-Validation will add a deterministic 720x480 mixed-GOP B stream exercising at least one non-3 `f_code` case with no motion-residual bits and one non-3 case requiring motion-residual bits, including signed motion and predictor reuse. Run that stream first, then the complete existing nine-stream matrix. Acceptance requires a clean Quartus/STA build with non-negative setup slack, zero setup TNS, and no timing-requirements critical warning.
+The current active I-picture parser already accepts an arbitrary legal first MBA within a slice and traverses successive slice start codes. The generalized P and B parsers impose a narrower implementation rule: each slice starts at column zero, reaches the right edge, and the next slice advances to the next macroblock row. Scope Commit 173 only to removing that P/B one-full-row-slice assumption: accept same-row continuation slices, interpret a non-1 first MBA as the first coded column of that slice rather than as skipped macroblocks, and maintain contiguous non-overlapping full-picture coverage required by restricted slice structure. Preserve the existing internal skipped-macroblock behavior; do not create or accept an illegal skipped first/last macroblock inside a slice.
+
+Preserve current I behavior, P/B geometry, B Table-B.1/escape support, motion and current `f_code` subset, residual/CBP syntax, reference/scratch semantics, DDR arbitration, presentation ordering, P pacing, IDCT, QIP, SDC, and Commit-172 timing closure. Defer B picture-signaled `f_code` generalization to the following capability boundary.
+
+Validation will add a deterministic 720x480 mixed I/P/B regression with selected rows partitioned into two or more slices sharing `slice_vertical_position`, later slices beginning at non-zero columns through their first macroblock address increment, every slice beginning and ending on coded macroblocks, complete row/picture coverage, and internal skipped macroblocks where legal. Run the new stream first, then the complete existing nine-stream matrix. Acceptance requires a clean Quartus/STA build with non-negative setup slack, zero setup TNS, and no timing-requirements critical warning.
 
 #### Next Steps:
 Await user approval before implementation.
 
 #### Files Modified:
-- TBD — generalized B `f_code`/frame-motion syntax path only
-- tools/streams/generate_test_b_720x480_fcode_motion.py
+- TBD — generalized P/B slice-position/coverage state only
+- tools/streams/generate_test_pb_720x480_restricted_slices.py
 
 #### Status:
 - [ ] Built
