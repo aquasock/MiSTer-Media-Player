@@ -793,3 +793,31 @@ Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_p_visual_di
 - [ ] Passed
 
 ---
+## 190 COMMIT Unreleased ??? 2026-08-17T15:03:19-07:00
+
+#### Coming From:
+
+Unreleased 06bce8f
+
+#### Purpose:
+
+Slow the settled diagnostic blink cadence by half so each reported code can be counted reliably on hardware.
+
+#### Outcome:
+
+Commit 189's non-overlapping settled USER, POWER, and DISK windows are clear and useful on hardware, but their 125 ms lit and dark slots make multi-blink codes difficult to count accurately.
+
+#### Next Steps:
+
+Double only the diagnostic slot duration to 250 ms while retaining the same snapshot boundary, numeric codes, window slot allocation, and decoder behavior. The full report will become 32 seconds with six-second USER, ten-second POWER, and sixteen-second DISK windows. Perform a clean Quartus 17.0.2 build requiring non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning, then rerun the three generalized P streams and record each settled window.
+
+#### Files Modified:
+
+- MediaPlayer_top_07.svh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
