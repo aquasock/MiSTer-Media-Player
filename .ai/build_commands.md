@@ -1,1 +1,0 @@
-We are resuming a project. Locate and open the authoritative project-control file /.ai/core.md from the GitHub repository: https://github.com/aquasock/MiSTer-Media-Player and follow the instructions under agent recovery.
