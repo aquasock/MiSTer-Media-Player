@@ -328,4 +328,58 @@ The 20 retired generators and their stale `.m2v` outputs are removed. Hardware q
 
 #### Status:
 - [x] Built — all 6 generators run clean and pass their own software verification
-- [ ] Passed — hardware qualification against current decoder RTL not yet run
+- [x] Passed — 3/6 qualify on hardware; the 3 P-final streams are blocked by the decoder finding recorded in Commit 176, not by a defect in the streams themselves
+
+---
+## 176 PROPOSAL Unreleased pending 2026-08-16T21:16:07-07:00
+
+#### Coming From:
+Unreleased c634a1e
+
+#### Purpose:
+Record the Commit-175 hardware result and scope the first presentation defect it exposed: a P picture that is the final coded picture of a stream is decoded but never presented.
+
+#### Evidence:
+All six Commit-175 streams were run on the standard DE10-Nano target against the `4c65826` build. No crashes, stalls, or visible corruption were observed on any stream. USER-LED acceptance results:
+
+| Stream | Coded pictures | Final picture | LED |
+|---|---|---|---|
+| `test_i_baseline` | I I I I | I | ON |
+| `test_b_bidirectional` | I P B P B | B | ON |
+| `test_pb_restricted_slices` | I P B P B | B | ON |
+| `test_p_motion_residual` | I P | **P** | OFF |
+| `test_p_mba_escape` | I P | **P** | OFF |
+| `test_consecutive_chain` | I P P P P P P | **P** | OFF |
+
+The LED is OFF in exactly the three cases where the final coded picture is a P, and ON in every case where it is an I or a B. Every retired 720x480 P generator produced `I / P / I` — a trailing I — so the retired suite never presented a P-final stream and this behavior was masked rather than absent.
+
+Photographic analysis confirms the mechanism independently of the LED. `test_p_motion_residual`'s P picture places residual macroblocks at MB (8,19), (8,26), (8,33), (8,40) and (15,38). Measuring macroblock-boundary luma discontinuity on the real FFmpeg-decoded P frame gives z-scores of +4.02, +5.24, +5.36, +3.44 and +5.38 against the same measurement on the I frame; the same measurement on the captured display photo gives -1.02 to +0.84 at those coordinates, indistinguishable from noise (largest outlier anywhere in the photo, z = 4.16, is at unrelated MB (26,20)). The residual content of the final P is therefore not on screen.
+
+`test_consecutive_chain` discriminates the cause: it contains no residual coefficients, no escapes, no quantiser changes and no coded-block patterns at all — only MC-not-coded macroblocks with explicit motion — and it still fails. A residual- or syntax-decode fault would not produce that result, whereas a presentation fault does. All three failing streams carry a correct trailing `sequence_end` (`00 00 01 B7`).
+
+#### Interpretation:
+The three P streams are valid H.262 and are verified pixel-exact against FFmpeg at generation time; the fault is on the decoder side, in presentation rather than in decode. `mpeg2_new_frame_waiting` (`MediaPlayer_top_04.svh`/`_05.svh`) publishes a completed frame only when `completed_frame_bank != display_frame_bank` and a swap window pulse follows; the B path reaches the display through the separate Commit-139/162 scratch-then-future-reference transaction, and an I-final stream is followed by nothing that needs pacing. The P-final case is the one path with no subsequent picture to carry it to the display. Root-cause localization inside that logic is not attempted here and is deferred to the approved cycle.
+
+Severity is low for sustained DVD playback, where a P is essentially never the last coded picture, but it is a real defect: the final frame of any title, chapter, or stream ending on a P will never be shown. It also currently blocks LED qualification of three of the six standing regressions.
+
+#### Proposed Commit Boundary:
+Split into two commits.
+
+Commit 176 (decoder, this proposal): correct final-P presentation so a completed P picture reaches the display when no further picture follows, without weakening the Commit-142 DDR ownership protection or altering the Commit-139/162 B reorder and presentation paths. Scope limited to the presentation/swap logic in `MediaPlayer_top_04.svh`/`MediaPlayer_top_05.svh`/`MediaPlayer_top_06.svh`. No decoder RTL, QIP, SDC, or timing-constraint change.
+
+Commit 177 (tests, follow-on): add a dedicated minimal final-P presentation regression to `tools/streams/` so the fixed behavior is guarded directly, rather than only implicitly through the three existing P streams.
+
+Deliberately not proposed: adding a trailing I picture to the three P streams. That would restore LED qualification immediately but would re-mask the defect exactly as the retired suite did, and the streams are correct as written.
+
+#### Validation:
+Clean Quartus 17.0.2 build from a wiped `db`/`incremental_db`/`output_files` state; acceptance remains non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning. Then re-run all six Commit-175 streams: all six must light the USER LED, and `test_p_motion_residual` must additionally show visible macroblock-boundary discontinuity at MB (8,19), (8,26), (8,33), (8,40) and (15,38), confirming the P frame is genuinely on screen rather than the LED alone changing state.
+
+#### Next Steps:
+Awaiting user approval before implementation.
+
+#### Files Modified:
+- .ai/core-log.md
+
+#### Status:
+- [ ] Built
+- [ ] Passed
