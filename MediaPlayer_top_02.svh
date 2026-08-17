@@ -109,3 +109,4 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.p_residual_sample_index     (mpeg2_new_p_residual_sample_index),
 	.p_residual_sample_value     (mpeg2_new_p_residual_sample_value),
 	.probe_error                 (mpeg2_new_phase1_probe_error),
+	.probe_error_source          (mpeg2_new_phase1_probe_error_source),

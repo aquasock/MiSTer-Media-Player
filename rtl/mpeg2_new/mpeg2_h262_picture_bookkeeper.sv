@@ -39,6 +39,9 @@ module mpeg2_h262_picture_bookkeeper
     output wire        reference_frame_bank,
     output wire [7:0]  reference_promotion_count,
     output wire        probe_error,
+    // kate - Commit 178 observability only: names which probe_error source
+    // fired.  probe_error itself is unchanged.
+    output wire [2:0]  probe_error_source,
 
     output wire [4:0]  quantiser_scale_code,
     output wire [11:0] macroblock_address_increment,
@@ -134,6 +137,13 @@ assign probe_error =
     parser_probe_error |
     reference_error_latched |
     reference_progress_error;
+
+// kate - Commit 178 observability only.  Priority order matches the OR above.
+assign probe_error_source =
+    probe_error_latched      ? 3'd1 :
+    parser_probe_error       ? 3'd2 :
+    reference_error_latched  ? 3'd3 :
+    reference_progress_error ? 3'd4 : 3'd0;
 
 assign slice_header_seen = first_picture_done ?
     first_slice_header_seen_latched : parser_slice_header_seen;

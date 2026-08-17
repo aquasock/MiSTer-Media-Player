@@ -107,9 +107,6 @@ wire mpeg2_new_normal_user_led =
 //
 // No decode, presentation, ownership or acceptance behavior is altered; the
 // acceptance term itself still drives the steady-ON state unchanged.
-wire mpeg2_new_diag_presentation_ok =
-    (mpeg2_new_completed_frame_bank == mpeg2_new_display_frame_bank);
-
 wire [3:0] mpeg2_new_diag_error_code =
     mpeg2_new_syntax_error                     ? 4'd1 :
     mpeg2_new_phase1_probe_error               ? 4'd2 :
@@ -121,14 +118,60 @@ wire [3:0] mpeg2_new_diag_error_code =
     mpeg2_new_ddr_store_error                  ? 4'd8 :
     mpeg2_new_ddr_cache_error                  ? 4'd9 : 4'd0;
 
+// kate - Commit 178 sub-code diagnostic.
+//
+// Commit-177 hardware read 2 blinks (phase1_probe_error) on test_p_mba_escape
+// and test_consecutive_chain, and steady OFF (no error latched, not accepted)
+// on test_p_motion_residual.  Two distinct faults, and neither is named yet:
+// probe_error ORs four sources, and the steady-OFF case does not say which
+// acceptance term is false.  LED_POWER carried presentation_ok, which read ON
+// on every stream and is therefore spent, so it is repurposed to blink the
+// sub-code for whichever case USER is reporting.
+//
+// LED_POWER when USER blinks 2 (probe_error) - probe_error source:
+//   1 probe_error_latched   2 parser_probe_error
+//   3 reference_error       4 reference_progress_error
+//
+// LED_POWER when USER is steady OFF - first false acceptance term:
+//   1 p_macroblock_type_seen        2 first_picture_420_parsed
+//   3 second_picture_420_parsed     4 picture_count < 2
+//   5 completed != display          6 reference_read_ok
+//   7 implicit_reconstruct_ok       8 recon_macroblock_420_complete
+//   9 phase1n_frame_geometry_supported
+//  10 ddr_write_seen               11 ddr_cache_ready
+//  12 ddr_read_seen
+//
+// Otherwise LED_POWER is steady ON.  Observability only: no decode,
+// presentation, ownership or acceptance behavior changes.
+wire [3:0] mpeg2_new_diag_prereq_code =
+    !mpeg2_new_p_macroblock_type_seen          ? 4'd1  :
+    !mpeg2_new_first_picture_420_parsed        ? 4'd2  :
+    !mpeg2_new_second_picture_420_parsed       ? 4'd3  :
+    (mpeg2_new_picture_count < 8'd2)           ? 4'd4  :
+    (mpeg2_new_completed_frame_bank !=
+     mpeg2_new_display_frame_bank)             ? 4'd5  :
+    !mpeg2_new_phase1t_reference_read_ok       ? 4'd6  :
+    !mpeg2_new_phase1t_implicit_reconstruct_ok ? 4'd7  :
+    !mpeg2_new_recon_macroblock_420_complete   ? 4'd8  :
+    !mpeg2_new_phase1n_frame_geometry_supported ? 4'd9 :
+    !mpeg2_new_ddr_write_seen                  ? 4'd10 :
+    !mpeg2_new_ddr_cache_ready                 ? 4'd11 :
+    !mpeg2_new_ddr_read_seen                   ? 4'd12 : 4'd0;
+
+wire [3:0] mpeg2_new_diag_power_code =
+    (mpeg2_new_diag_error_code == 4'd2) ?
+        {1'b0, mpeg2_new_phase1_probe_error_source} :
+    (mpeg2_new_diag_error_code == 4'd0) ?
+        mpeg2_new_diag_prereq_code : 4'd0;
+
 // 250 ms slot at the 54 MHz decoder clock.  Slots 0..2N-1 carry the N blinks
-// (even slot lit, odd slot dark); the remaining slots of the 26-slot frame are
-// the ~2 s separating gap, so nine blinks stay countable.
+// (even slot lit, odd slot dark); the remaining slots of the 32-slot frame are
+// the separating gap, so twelve blinks still leave ~2 s of gap.
 localparam [23:0] MPEG2_NEW_DIAG_SLOT_CYCLES = 24'd13_500_000;
-localparam [4:0]  MPEG2_NEW_DIAG_SLOT_LAST   = 5'd25;
+localparam [5:0]  MPEG2_NEW_DIAG_SLOT_LAST   = 6'd31;
 
 reg [23:0] mpeg2_new_diag_slot_div;
-reg [4:0]  mpeg2_new_diag_slot;
+reg [5:0]  mpeg2_new_diag_slot;
 
 wire mpeg2_new_diag_slot_tick =
     (mpeg2_new_diag_slot_div == MPEG2_NEW_DIAG_SLOT_CYCLES - 24'd1);
@@ -136,28 +179,34 @@ wire mpeg2_new_diag_slot_tick =
 always @(posedge clk_mpeg2) begin
     if (reset_mpeg2) begin
         mpeg2_new_diag_slot_div <= 24'd0;
-        mpeg2_new_diag_slot     <= 5'd0;
+        mpeg2_new_diag_slot     <= 6'd0;
     end
     else if (mpeg2_new_diag_slot_tick) begin
         mpeg2_new_diag_slot_div <= 24'd0;
         mpeg2_new_diag_slot     <= (mpeg2_new_diag_slot == MPEG2_NEW_DIAG_SLOT_LAST) ?
-                                   5'd0 : mpeg2_new_diag_slot + 5'd1;
+                                   6'd0 : mpeg2_new_diag_slot + 6'd1;
     end
     else begin
         mpeg2_new_diag_slot_div <= mpeg2_new_diag_slot_div + 24'd1;
     end
 end
 
-wire [4:0] mpeg2_new_diag_blink_slots = {mpeg2_new_diag_error_code, 1'b0};
+wire [5:0] mpeg2_new_diag_blink_slots = {1'b0, mpeg2_new_diag_error_code, 1'b0};
 wire mpeg2_new_diag_blink =
     (mpeg2_new_diag_slot < mpeg2_new_diag_blink_slots) &&
+    !mpeg2_new_diag_slot[0];
+
+wire [5:0] mpeg2_new_diag_power_slots = {1'b0, mpeg2_new_diag_power_code, 1'b0};
+wire mpeg2_new_diag_power_blink =
+    (mpeg2_new_diag_slot < mpeg2_new_diag_power_slots) &&
     !mpeg2_new_diag_slot[0];
 
 assign LED_USER = (mpeg2_new_diag_error_code == 4'd0) ?
                   mpeg2_new_normal_user_led : mpeg2_new_diag_blink;
 
 // LED_POWER is {enable, value}; sys_top drives the POWER LED from the value
-// bit when the enable bit is set.
-assign LED_POWER = {1'b1, mpeg2_new_diag_presentation_ok};
+// bit when the enable bit is set.  Steady ON when there is no sub-code.
+assign LED_POWER = {1'b1, (mpeg2_new_diag_power_code == 4'd0) ?
+                          1'b1 : mpeg2_new_diag_power_blink};
 
 endmodule
