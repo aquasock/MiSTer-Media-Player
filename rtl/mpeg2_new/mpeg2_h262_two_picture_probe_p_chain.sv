@@ -21,7 +21,11 @@ module mpeg2_h262_two_picture_probe
     output wire signed[12:0] p_forward_vector_y,output wire p_residual_required,output wire p_residual_success,
     output wire p_first_residual_sample_valid,output wire signed[15:0] p_first_residual_sample_value,
     output wire p_residual_sample_valid,output wire[5:0] p_residual_sample_index,output wire signed[15:0] p_residual_sample_value,
-    output wire probe_error,output wire b_user_success,output wire[4:0] quantiser_scale_code,output wire[11:0] macroblock_address_increment,
+    output wire probe_error,
+    // kate - Commit 179 observability only.  Names which of the five terms in
+    // the probe_error OR below fired.  probe_error itself is unchanged.
+    output wire[3:0] probe_error_source,
+    output wire b_user_success,output wire[4:0] quantiser_scale_code,output wire[11:0] macroblock_address_increment,
     output wire macroblock_quant,output wire[4:0] macroblock_quantiser_scale_code,output wire[7:0] slice_vertical_position,
     output wire[2:0] slice_vertical_position_extension,output wire[3:0] first_luma_dc_size,
     output wire signed[12:0] first_luma_dc_differential,output wire[10:0] first_luma_dc_coefficient,
@@ -171,6 +175,16 @@ assign b_user_success=b_final_success&&!b_accept_error;
 assign probe_error=(b_picture_observed?1'b0:bookkeeper_error)||
                    (b_picture_observed?1'b0:p_error_raw)||
                    b_error||publication_error||reference_progress_error;
+
+// kate - Commit 179 observability only.  Priority order matches the OR above.
+wire bookkeeper_error_gated=b_picture_observed?1'b0:bookkeeper_error;
+wire p_error_gated=b_picture_observed?1'b0:p_error_raw;
+assign probe_error_source=
+    bookkeeper_error_gated    ? 4'd1 :
+    p_error_gated             ? 4'd2 :
+    b_error                   ? 4'd3 :
+    publication_error         ? 4'd4 :
+    reference_progress_error  ? 4'd5 : 4'd0;
 
 wire unused_base_state=&{1'b0,base_active_frame_bank,base_completed_frame_bank,base_picture_count,
  base_reference_frame_valid,base_reference_frame_bank,base_reference_promotion_count,b_complete_now,b_header_now,b_final_success,b_first_value};

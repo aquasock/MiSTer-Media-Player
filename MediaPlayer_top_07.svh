@@ -128,11 +128,13 @@ wire [3:0] mpeg2_new_diag_error_code =
 // on every stream and is therefore spent, so it is repurposed to blink the
 // sub-code for whichever case USER is reporting.
 //
-// LED_POWER when USER blinks 2 (probe_error) - probe_error source:
-//   1 probe_error_latched      2 parser_probe_error
-//   3 reference_error          4 reference_progress_error
-//   5 p_syntax_probe_error     6 p_residual_probe_error
-//   7 p_stream_hold_error      8 p_syntax_progress_error
+// LED_POWER when USER blinks 2 (probe_error) - probe_error source.  Commit
+// 179: the instantiated macrofunction is mpeg2_h262_two_picture_probe_p_chain
+// (files.qip), whose probe_error is five terms, not the eight this table
+// originally assumed from the uncompiled base two_picture_probe.sv:
+//   1 bookkeeper_error (gated)  2 p_error_raw (gated)
+//   3 b_error                   4 publication_error
+//   5 reference_progress_error
 //
 // LED_POWER when USER is steady OFF - first false acceptance term:
 //   1 p_macroblock_type_seen        2 first_picture_420_parsed
