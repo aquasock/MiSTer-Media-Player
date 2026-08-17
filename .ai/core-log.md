@@ -43,7 +43,7 @@ Attach the observer to active `_420p.sv`.
 Refine writer state/busy/ordering evidence.
 
 #### Outcome:
-`177a480` records the required observer evidence but its USER encoding was superseded before build.
+`177a480` records the observer evidence but its USER encoding was superseded before build.
 
 #### Status:
 - [ ] Built — superseded
@@ -121,7 +121,7 @@ Correct the consecutive-P publication/presentation ownership race.
 Retire temporary diagnostics while preserving Commit-162 pacing.
 
 #### Outcome:
-`1370c28` restores the diagnostic files. Clean build: 31,782 ALMs, 43,812 registers. Repeated consecutive-P and all guards pass.
+`1370c28` restores diagnostic files. Clean build: 31,782 ALMs, 43,812 registers. Repeated consecutive-P and all guards pass.
 
 #### Status:
 - [x] Built
@@ -212,7 +212,7 @@ Widen progressive 4:2:0 B decoding through <=720x480.
 Generalize B residual syntax across all six 4:2:0 blocks.
 
 #### Outcome:
-`3fae896` adds full CBP selection, block 0..5 residuals, generalized non-intra VLC/EOB/Escape parsing and bounded 16-block/64-event storage. Clean build: 30,089 ALMs (72%), setup +0.310 ns, zero TNS. Eight-stream hardware matrix passes.
+`3fae896` adds full CBP selection, blocks 0..5, generalized non-intra VLC/EOB/Escape parsing and bounded 16-block/64-event storage. Clean build: 30,089 ALMs (72%), setup +0.310 ns, zero TNS. Eight-stream matrix passes.
 
 #### Status:
 - [x] Built
@@ -222,13 +222,10 @@ Generalize B residual syntax across all six 4:2:0 blocks.
 ## 171 COMMIT Unreleased eb80c7b 2026-08-16T15:39:00-07:00
 
 #### Purpose:
-Generalize B macroblock-address increments across full Table-B.1 plus `macroblock_escape` within a 45-MB row.
+Generalize B macroblock-address increments across Table-B.1 plus `macroblock_escape` within a 45-MB row.
 
 #### Outcome:
-`eb80c7b` accepts values 1..33 plus escape accumulation and widens the B skip counter to six bits. All nine requested MiSTer regressions pass. Clean build uses 30,215 ALMs (72%), 40,762 registers, 559,565 memory bits, 86 RAM blocks, 69 DSPs and 3 PLLs, but 54 MHz setup fails at -0.036 ns / -0.206 ns TNS (Fmax 53.9 MHz). Hold/recovery/removal/min-pulse remain positive. Cleanup `7f5789a`; Audio `826b2df` compatibility clean.
-
-#### Next Steps:
-Restore decoder setup closure without changing the accepted B address semantics.
+`eb80c7b` accepts 1..33 plus escape accumulation and a six-bit skip counter. All nine hardware regressions pass, but clean STA fails 54 MHz setup at -0.036 ns / -0.206 ns TNS (30,215 ALMs, 40,762 registers). Cleanup `7f5789a`; Audio `826b2df` compatibility clean.
 
 #### Status:
 - [x] Built — hardware behavior passes; setup timing fails
@@ -237,50 +234,43 @@ Restore decoder setup closure without changing the accepted B address semantics.
 ---
 ## 172 COMMIT Unreleased 338c2f8 2026-08-16T16:53:00-07:00
 
-#### Coming From:
-Unreleased eb80c7b
-
 #### Purpose:
-Restore Commit-171 54 MHz setup closure without changing its hardware-passing B address semantics.
+Restore Commit-171 54 MHz timing without changing accepted B address semantics.
 
 #### Outcome:
-`338c2f8bb868cd0e8a7d4bf01ac7961a06231d33` registers each decoded B macroblock-address symbol before escape/row-bound/skip arithmetic. Clean build: 29,901 ALMs (71%), 40,799 registers, 559,565 memory bits, 86 RAM blocks, 69 DSPs and 3 PLLs. Decoder setup closes at +0.823 ns / zero TNS (Fmax 56.51 MHz); hold/recovery/removal/min-pulse are positive, with no flow errors or critical warnings. All nine hardware regressions pass. Build-report cleanup is `bbbdcf6`. Latest Audio `33a5f91` only adds a timing-report `.gitkeep`; latest Audio functional `a50fb2e` changes only `tools/phase1p_timing.tcl`, so integration compatibility is clean.
+`338c2f8` registers each decoded B MBA symbol before escape/row-bound/skip arithmetic. Clean build: 29,901 ALMs (71%), 40,799 registers, 559,565 bits, 86 RAM, 69 DSP, 3 PLL; setup +0.823 ns / zero TNS, Fmax 56.51 MHz. All nine regressions pass. Cleanup `bbbdcf6`; Audio compatibility clean.
 
 #### Next Steps:
-Generalize profile-conformant restricted slice partitioning in the progressive P/B paths; retain B `f_code` generalization as the following capability boundary.
-
-#### Files Modified:
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+Generalize profile-conformant restricted slice partitioning in progressive P/B; retain B `f_code` as the following capability boundary.
 
 #### Status:
 - [x] Built
 - [x] Passed
 
 ---
-## 173 PROPOSAL Unreleased pending 2026-08-16T17:06:00-07:00
+## 173 COMMIT Unreleased 912a874 2026-08-16T17:42:56-07:00
 
 #### Coming From:
 Unreleased 338c2f8
 
 #### Purpose:
-Generalize profile-conformant restricted slice partitioning across the accepted progressive P/B 720x480 paths so a macroblock row may be carried by multiple same-row slices without misclassifying slice-boundary positioning as skipped macroblocks.
+Generalize H.262 restricted slice partitioning across the accepted progressive P/B <=720x480 paths.
 
 #### Outcome:
-Online verification against the official freely available ITU-T H.262 (02/2000) text clarifies the required model. A slice is an arbitrary run of consecutive macroblocks whose first and last macroblocks are coded, but slices may start and finish anywhere and multiple slices may therefore have the same `slice_vertical_position`. At slice start `previous_macroblock_address` is reset to the row origin minus one, and skipped-macroblock inference explicitly does not apply there. Table 8-5 requires restricted slice structure for all defined profiles, so every picture macroblock must nevertheless be enclosed in a non-overlapping slice.
+`912a87494a30ae6f5d3dfb1320f8bf3b558430b4` implements `H262-025`: multiple same-row P/B slices are accepted, the first MBA of each slice positions its first coded macroblock without synthesizing leading skips, subsequent MBA gaps retain existing internal skipped-macroblock behavior, and row/picture transitions require contiguous non-overlapping restricted-slice coverage. Existing I behavior, P/B motion and fixed-`f_code` subset, residual syntax, raster/DDR, reference/scratch semantics, presentation, P pacing, IDCT, QIP and SDC are unchanged.
 
-The current active I-picture parser already accepts an arbitrary legal first MBA within a slice and traverses successive slice start codes. The generalized P and B parsers impose a narrower implementation rule: each slice starts at column zero, reaches the right edge, and the next slice advances to the next macroblock row. Scope Commit 173 only to removing that P/B one-full-row-slice assumption: accept same-row continuation slices, interpret a non-1 first MBA as the first coded column of that slice rather than as skipped macroblocks, and maintain contiguous non-overlapping full-picture coverage required by restricted slice structure. Preserve the existing internal skipped-macroblock behavior; do not create or accept an illegal skipped first/last macroblock inside a slice.
-
-Preserve current I behavior, P/B geometry, B Table-B.1/escape support, motion and current `f_code` subset, residual/CBP syntax, reference/scratch semantics, DDR arbitration, presentation ordering, P pacing, IDCT, QIP, SDC, and Commit-172 timing closure. Defer B picture-signaled `f_code` generalization to the following capability boundary.
-
-Validation will add a deterministic 720x480 mixed I/P/B regression with selected rows partitioned into two or more slices sharing `slice_vertical_position`, later slices beginning at non-zero columns through their first macroblock address increment, every slice beginning and ending on coded macroblocks, complete row/picture coverage, and internal skipped macroblocks where legal. Run the new stream first, then the complete existing nine-stream matrix. Acceptance requires a clean Quartus/STA build with non-negative setup slack, zero setup TNS, and no timing-requirements critical warning.
-
-#### Next Steps:
-Await user approval before implementation.
+Agent-side regression generation/FFmpeg/ffprobe validation passed for `test_pb_720x480_restricted_slices.m2v`: 183,290 bytes, SHA256 `320f1f5aa5281b77284c9d354a1350a449fe91214ba6d381054c5114dec2c837`, coded I/P/B/P/B, display I/B/P/B/P. Rows 4, 8, 18 and 22 are each split into three slices covering columns 0..11, 12..33 and 34..44; continuation-slice first MBA values are 13 and 35 (`macroblock_escape + 2`), and B split slices retain legal internal skips with coded endpoints.
 
 #### Files Modified:
-- TBD — generalized P/B slice-position/coverage state only
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
 - tools/streams/generate_test_pb_720x480_restricted_slices.py
+
+#### Next Steps:
+Clean Quartus/STA build, then run the new restricted-slice stream followed by the complete existing nine-stream matrix. Require non-negative 54 MHz setup slack, zero setup TNS and no timing-requirements critical warning.
 
 #### Status:
 - [ ] Built
