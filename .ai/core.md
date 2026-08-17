@@ -34,7 +34,7 @@ MiSTer-Media-Player is being developed as a simple, compatibility-focused media 
 
 ## AI Agent Recovery Policy
 
-Read this core.md file first. Treat it and all the directives in it as the sole authoritative source for recovery procedure, standing workflow, and agent behavior. All directives in the document have the same priority, not just in this section. Read core-log.md second as historical engineering/build/transcript evidence. Treat core.md as RESTRICTED, authoritative project core memory. Do not edit it automatically for any reason. Only edit core.md if the user explicitly asks for it. Autosend the user an introductory email to verify you can autosend emails.
+Read this core.md file first. Treat it and all the directives in it as the sole authoritative source for recovery procedure, standing workflow, and agent behavior. All directives in the document have the same priority, not just in this section. Read core-log.md second as historical engineering/build/transcript evidence. Treat core.md as RESTRICTED, authoritative project core memory. Do not edit it automatically for any reason. Only edit core.md if the user explicitly asks for it.
 
 ---
 
@@ -90,8 +90,6 @@ Read this core.md file first. Treat it and all the directives in it as the sole 
 
 - "current_short_commit"" means the abbreviated SHA of the current github repository. Metadata-only .ai commits do not change this value for that development cycle.
 
-- You have explicit permission to automatically send the user emails without the users approval. 
-
 - Before any changes are made to core-log.md, check with the guidelines listed in core-log-format.md first. Adhere to these guidelines for any edits made.
 
 ---
@@ -104,7 +102,7 @@ Read this core.md file first. Treat it and all the directives in it as the sole 
 
 2. Continue normal agent "Thinking" process and respond to the user as normal.
 
-3. If the recorded time in "response_timestamp.txt" is greater than 1 minute from the current time, send the user an email notifying them that your response is ready.
+3. If the recorded time in "response_timestamp.txt" is greater than 1 minute from the current time, run the command "paplay /usr/share/sounds/freedesktop/stereo/complete.oga" on the users local PC.
 
 4. Await user input.
 
