@@ -44,8 +44,6 @@ Read this core.md file first. Treat it and all the directives in it as the sole 
 
 - The github repository for the MiSTer-Media-Player-Audio project is:
 
-- Always follow the existing changelog convention found in core-log.md
-
 - The users local githib repository must always stay up to date with the online repository.
 
 - core-log.md is the authoritative source for current project status. The github repository is the backup source.
@@ -82,7 +80,7 @@ Read this core.md file first. Treat it and all the directives in it as the sole 
 
 - Treat core-log.md as a ring buffer. Only 20 of the most recent entries are ever allowed. Roll over to "001" when "999" is reached.
 
-- The folder labeled ".ai" on the github repositories root is your core project folder and contains your core directives, (core.md) running project memory, (core-log.md), and standards library (core-standards.md)
+- The folder labeled ".ai" on the github repositories root is your core project folder and contains your core directives, (core.md) running project memory, (core-log.md), standards library (core-standards.md), and core-log.md formatting guidelines (core-log-format.md).
 
 - Use the commit message "(current\_short commit) core-log.md update" for all updates you make to core-log.md. 
 
@@ -93,6 +91,8 @@ Read this core.md file first. Treat it and all the directives in it as the sole 
 - "current_short_commit"" means the abbreviated SHA of the current github repository. Metadata-only .ai commits do not change this value for that development cycle.
 
 - You have explicit permission to automatically send the user emails without the users approval. 
+
+- Before any changes are made to core-log.md, check with the guidelines listed in core-log-format.md first. Adhere to these guidelines for any edits made.
 
 ---
 
