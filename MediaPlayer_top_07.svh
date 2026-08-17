@@ -209,7 +209,7 @@ end
 wire [3:0] mpeg2_new_diag_error_code =
     mpeg2_new_diag_first_error_valid ? mpeg2_new_diag_error_code_first : 4'd0;
 
-wire [3:0] mpeg2_new_diag_power_code =
+wire [3:0] mpeg2_new_diag_power_code_live =
     mpeg2_new_diag_first_error_valid ?
         ((mpeg2_new_diag_error_code_first == 4'd2) ?
             ((mpeg2_new_diag_phase1_source_first == 4'd2) ?
@@ -234,7 +234,7 @@ wire [3:0] mpeg2_new_diag_power_code =
 //   7 persistence asserted
 // The prior Commit-180 progress-error detail remains available for its error
 // case.  This changes observability only.
-wire [4:0] mpeg2_new_diag_disk_code =
+wire [4:0] mpeg2_new_diag_disk_code_live =
     (mpeg2_new_diag_first_error_valid &&
      (mpeg2_new_diag_error_code_first == 4'd1)) ?
         mpeg2_new_syntax_error_source :
@@ -247,58 +247,113 @@ wire [4:0] mpeg2_new_diag_disk_code =
      (mpeg2_new_diag_p_source_first == 4'd6)) ?
         {1'b0, mpeg2_new_diag_progress_detail_first} : 5'd0;
 
-// 250 ms slot at the 54 MHz decoder clock.  Slots 0..2N-1 carry the N blinks
-// (even slot lit, odd slot dark); Commit 188 widens the frame to 64 slots so
-// all 21 frontend assertion-site codes retain a separating gap.
+// Commit 189 snapshots only settled post-stream state.  sequence_end_seen is
+// sticky; wait one decoder-clock second after it rises so parser, raster, DDR,
+// publication and display scheduling have all drained before sampling any live
+// prerequisite.  Reset the blink epoch at capture so every test begins at the
+// same visible boundary.
+localparam [25:0] MPEG2_NEW_DIAG_SETTLE_CYCLES = 26'd54_000_000;
+reg [25:0] mpeg2_new_diag_settle_count;
+reg        mpeg2_new_diag_snapshot_valid;
+reg [3:0]  mpeg2_new_diag_error_code_snapshot;
+reg [3:0]  mpeg2_new_diag_power_code_snapshot;
+reg [4:0]  mpeg2_new_diag_disk_code_snapshot;
+reg        mpeg2_new_diag_success_snapshot;
+
+// 250 ms slots, divided into non-overlapping windows in a 32-second frame:
+// USER 0..23, POWER 24..63, DISK 64..127.  Each numeric code uses alternating
+// lit/dark slots local to its window, so simultaneous slot-zero flashes can no
+// longer obscure the count.
 localparam [23:0] MPEG2_NEW_DIAG_SLOT_CYCLES = 24'd13_500_000;
-localparam [5:0]  MPEG2_NEW_DIAG_SLOT_LAST   = 6'd63;
+localparam [6:0]  MPEG2_NEW_DIAG_SLOT_LAST   = 7'd127;
+localparam [6:0]  MPEG2_NEW_DIAG_POWER_FIRST = 7'd24;
+localparam [6:0]  MPEG2_NEW_DIAG_DISK_FIRST  = 7'd64;
 
 reg [23:0] mpeg2_new_diag_slot_div;
-reg [5:0]  mpeg2_new_diag_slot;
+reg [6:0]  mpeg2_new_diag_slot;
 
 wire mpeg2_new_diag_slot_tick =
     (mpeg2_new_diag_slot_div == MPEG2_NEW_DIAG_SLOT_CYCLES - 24'd1);
 
 always @(posedge clk_mpeg2) begin
     if (reset_mpeg2) begin
+        mpeg2_new_diag_settle_count        <= 26'd0;
+        mpeg2_new_diag_snapshot_valid      <= 1'b0;
+        mpeg2_new_diag_error_code_snapshot <= 4'd0;
+        mpeg2_new_diag_power_code_snapshot <= 4'd0;
+        mpeg2_new_diag_disk_code_snapshot  <= 5'd0;
+        mpeg2_new_diag_success_snapshot    <= 1'b0;
         mpeg2_new_diag_slot_div <= 24'd0;
-        mpeg2_new_diag_slot     <= 6'd0;
+        mpeg2_new_diag_slot     <= 7'd0;
     end
-    else if (mpeg2_new_diag_slot_tick) begin
+    else if (!mpeg2_new_diag_snapshot_valid && mpeg2_new_sequence_end_seen) begin
+        if (mpeg2_new_diag_settle_count == MPEG2_NEW_DIAG_SETTLE_CYCLES - 26'd1) begin
+            mpeg2_new_diag_snapshot_valid      <= 1'b1;
+            mpeg2_new_diag_error_code_snapshot <= mpeg2_new_diag_error_code;
+            mpeg2_new_diag_power_code_snapshot <= mpeg2_new_diag_power_code_live;
+            mpeg2_new_diag_disk_code_snapshot  <= mpeg2_new_diag_disk_code_live;
+            mpeg2_new_diag_success_snapshot    <= mpeg2_new_normal_user_led;
+            mpeg2_new_diag_slot_div            <= 24'd0;
+            mpeg2_new_diag_slot                <= 7'd0;
+        end
+        else begin
+            mpeg2_new_diag_settle_count <= mpeg2_new_diag_settle_count + 26'd1;
+        end
+    end
+    else if (mpeg2_new_diag_snapshot_valid && mpeg2_new_diag_slot_tick) begin
         mpeg2_new_diag_slot_div <= 24'd0;
         mpeg2_new_diag_slot     <= (mpeg2_new_diag_slot == MPEG2_NEW_DIAG_SLOT_LAST) ?
-                                   6'd0 : mpeg2_new_diag_slot + 6'd1;
+                                   7'd0 : mpeg2_new_diag_slot + 7'd1;
     end
-    else begin
+    else if (mpeg2_new_diag_snapshot_valid) begin
         mpeg2_new_diag_slot_div <= mpeg2_new_diag_slot_div + 24'd1;
     end
 end
 
-wire [5:0] mpeg2_new_diag_blink_slots = {1'b0, mpeg2_new_diag_error_code, 1'b0};
-wire mpeg2_new_diag_blink =
-    (mpeg2_new_diag_slot < mpeg2_new_diag_blink_slots) &&
+wire [4:0] mpeg2_new_diag_user_slots =
+    {mpeg2_new_diag_error_code_snapshot, 1'b0};
+wire mpeg2_new_diag_user_window = mpeg2_new_diag_slot < MPEG2_NEW_DIAG_POWER_FIRST;
+wire mpeg2_new_diag_user_blink =
+    mpeg2_new_diag_snapshot_valid && mpeg2_new_diag_user_window &&
+    (mpeg2_new_diag_slot < mpeg2_new_diag_user_slots) &&
     !mpeg2_new_diag_slot[0];
 
-wire [5:0] mpeg2_new_diag_power_slots = {1'b0, mpeg2_new_diag_power_code, 1'b0};
+wire [6:0] mpeg2_new_diag_power_slot =
+    mpeg2_new_diag_slot - MPEG2_NEW_DIAG_POWER_FIRST;
+wire [4:0] mpeg2_new_diag_power_slots =
+    {mpeg2_new_diag_power_code_snapshot, 1'b0};
+wire mpeg2_new_diag_power_window =
+    (mpeg2_new_diag_slot >= MPEG2_NEW_DIAG_POWER_FIRST) &&
+    (mpeg2_new_diag_slot < MPEG2_NEW_DIAG_DISK_FIRST);
 wire mpeg2_new_diag_power_blink =
-    (mpeg2_new_diag_slot < mpeg2_new_diag_power_slots) &&
-    !mpeg2_new_diag_slot[0];
+    mpeg2_new_diag_snapshot_valid && mpeg2_new_diag_power_window &&
+    (mpeg2_new_diag_power_slot < mpeg2_new_diag_power_slots) &&
+    !mpeg2_new_diag_power_slot[0];
 
-assign LED_USER = (mpeg2_new_diag_error_code == 4'd0) ?
-                  mpeg2_new_normal_user_led : mpeg2_new_diag_blink;
+assign LED_USER = !mpeg2_new_diag_snapshot_valid ? 1'b0 :
+                  (mpeg2_new_diag_error_code_snapshot == 4'd0) ?
+                    (mpeg2_new_diag_user_window && mpeg2_new_diag_success_snapshot) :
+                    mpeg2_new_diag_user_blink;
 
 // LED_POWER is {enable, value}; sys_top drives the POWER LED from the value
-// bit when the enable bit is set.  Steady ON when there is no sub-code.
-assign LED_POWER = {1'b1, (mpeg2_new_diag_power_code == 4'd0) ?
-                          1'b1 : mpeg2_new_diag_power_blink};
+// bit when enabled.  A zero sub-code lights the complete POWER window.
+assign LED_POWER = {1'b1, !mpeg2_new_diag_snapshot_valid ? 1'b0 :
+                          (mpeg2_new_diag_power_code_snapshot == 4'd0) ?
+                            mpeg2_new_diag_power_window :
+                            mpeg2_new_diag_power_blink};
 
 // kate - Commit 180.  LED_DISK is {enable, value} on the same active-high
 // convention (sys_top.v:157 gives LED[2] = led_disk[0] when enabled).  Steady
 // OFF when there is no progress sub-code to report.
-wire [5:0] mpeg2_new_diag_disk_slots = {mpeg2_new_diag_disk_code, 1'b0};
+wire [6:0] mpeg2_new_diag_disk_slot =
+    mpeg2_new_diag_slot - MPEG2_NEW_DIAG_DISK_FIRST;
+wire [5:0] mpeg2_new_diag_disk_slots =
+    {mpeg2_new_diag_disk_code_snapshot, 1'b0};
 wire mpeg2_new_diag_disk_blink =
-    (mpeg2_new_diag_slot < mpeg2_new_diag_disk_slots) &&
-    !mpeg2_new_diag_slot[0];
+    mpeg2_new_diag_snapshot_valid &&
+    (mpeg2_new_diag_slot >= MPEG2_NEW_DIAG_DISK_FIRST) &&
+    (mpeg2_new_diag_disk_slot < mpeg2_new_diag_disk_slots) &&
+    !mpeg2_new_diag_disk_slot[0];
 
 assign LED_DISK = {1'b1, mpeg2_new_diag_disk_blink};
 
