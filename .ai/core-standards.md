@@ -1086,6 +1086,11 @@ lookup:
   half_sample_interpolation_exact: H262-023
   non_intra_escape_coefficient: H262-024
   table_b14_escape: H262-024
+  slice_start_mba_positioning: H262-025
+  slice_start_mba_not_skipped: H262-025
+  slice_coded_endpoints: H262-025
+  multiple_slices_same_row: H262-025
+  restricted_slice_structure: H262-025
 ```
 
 ## 10.2 ESTABLISHED ATOMIC RECORDS
@@ -1550,7 +1555,6 @@ lookup:
         accelerated P-picture skipped-macroblock integration phase. The project source
         catalog still identifies the later H.262 (02/2012) edition as current.
 
-
 - record_id: H262-016
   title: "Controlled f_code 3 forward motion-vector reconstruction to +32"
   status: VERIFIED
@@ -1716,7 +1720,6 @@ lookup:
     - date: 2026-08-14
       change: "Added for the controlled mixed motion+residual raster vector."
 
-
 - record_id: H262-021
   title: "4:2:0 coded_block_pattern decoding and residual-block selection"
   status: VERIFIED
@@ -1851,6 +1854,55 @@ lookup:
   revision_history:
     - date: 2026-08-14
       change: "Added for generalized sparse non-intra coefficient parsing."
+
+- record_id: H262-025
+  title: "Slice endpoint coding, slice-start address positioning, and restricted slice coverage"
+  status: VERIFIED
+  verified_date: 2026-08-16
+  confidence: HIGH
+  source_id: H262
+  source_edition: "ITU-T H.262 (02/2000), official freely available consolidated edition"
+  source_reference: "6.1.2; 6.1.2.2; 6.3.16; 6.3.17; Table 8-5"
+  normative_force: SEMANTICS
+  controlled_conclusion: >
+    A slice is a non-empty series of an arbitrary number of consecutive macroblocks
+    confined to one macroblock row. Its first and last macroblocks shall not be
+    skipped, slices shall not overlap, and multiple slices may have the same
+    slice_vertical_position because slices may start and finish anywhere. At the
+    start of every slice, previous_macroblock_address is reset to
+    (mb_row * mb_width) - 1. Therefore the first macroblock_address_increment
+    positions the first coded macroblock in that row; unlike an address gap after
+    slice start, it does not imply skipped macroblocks before that first coded
+    macroblock. Under restricted slice structure every macroblock in the picture
+    shall be enclosed in a slice, and Table 8-5 specifies restricted slice structure
+    for the defined profiles, including Main Profile.
+  applicability: >
+    H.262 slice and macroblock addressing generally; complete picture coverage when
+    the applicable profile uses restricted slice structure.
+  exceptions:
+    - "The general slice structure in 6.1.2.1 may contain gaps where the applicable profile/level does not require restricted slice structure; H.262 does not define decoder output for those gap regions."
+    - "Internal skipped macroblocks remain governed by 6.3.17 and the picture-type-specific decoding rules; the first and last macroblock of the slice are coded endpoints."
+  conformance_effect: >
+    Slice-start address reconstruction must use the reset previous_macroblock_address
+    basis and must not synthesize leading skipped macroblocks from the first MBA.
+    A conforming restricted-slice bitstream may partition one macroblock row into
+    multiple non-overlapping slices with the same vertical position, provided coded
+    slice endpoints and complete macroblock coverage are maintained.
+  verification_method:
+    type: TEST
+    description: >
+      Decode a restricted-structure picture in which a macroblock row is divided
+      among multiple same-vertical-position slices, with a later slice beginning at
+      a non-zero column via its first MBA. Verify exact coded macroblock addresses,
+      no synthetic leading skips, coded slice endpoints, no overlap, and complete row coverage.
+  related_records: [H262-007, H262-008, H262-009, H262-014, H262-015]
+  supersedes: []
+  superseded_by: []
+  revision_history:
+    - date: 2026-08-16
+      change: >
+        Added after official H.262 review to distinguish slice-start MBA positioning
+        from true skipped-macroblock inference and to record restricted slice coverage.
 
 ```
 
