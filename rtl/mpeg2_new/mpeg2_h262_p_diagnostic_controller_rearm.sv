@@ -15,7 +15,13 @@ module mpeg2_h262_p_diagnostic_controller
  output wire p_residual_required,output wire p_residual_success,
  output wire p_first_residual_sample_valid,output wire signed [15:0] p_first_residual_sample_value,
  output wire p_residual_sample_valid,output wire [5:0] p_residual_sample_index,
- output wire signed [15:0] p_residual_sample_value,output wire probe_error
+ output wire signed [15:0] p_residual_sample_value,output wire probe_error,
+ // kate - Commit 180 observability only.  probe_error_source names which of the
+ // nine terms ORed into probe_error fired; progress_detail names which conjunct
+ // of p_macroblock_type_seen is false when progress_error is the winning term.
+ // Neither changes probe_error or any decode behavior.
+ output wire [3:0] probe_error_source,
+ output wire [3:0] progress_detail
 );
 
 wire syntax_error_raw,mb_seen_raw,vector_valid_raw;
@@ -225,6 +231,33 @@ wire parser_error_group=
 assign probe_error=
     parser_error_group|progress_error|residual_error_raw|
     hold_error|raster_hold_error;
+
+// kate - Commit 180 observability only.  Priority order follows the OR above,
+// expanding parser_error_group into its five members first.
+assign probe_error_source=
+    syntax_error      ? 4'd1 :
+    two_mb_error      ? 4'd2 :
+    four_mb_error     ? 4'd3 :
+    legacy_error      ? 4'd4 :
+    wide_error        ? 4'd5 :
+    progress_error    ? 4'd6 :
+    residual_error_raw? 4'd7 :
+    hold_error        ? 4'd8 :
+    raster_hold_error ? 4'd9 : 4'd0;
+
+// kate - Commit 180 observability only.  progress_error is a symptom: it is
+// p_picture_expected && !p_macroblock_type_seen, and p_macroblock_type_seen is
+// general_final_proof OR a deep conjunction.  Name the first false conjunct in
+// the order the expression evaluates.  Only meaningful while progress_error is
+// the winning source.
+assign progress_detail=
+    general_final_proof                             ? 4'd0 :
+    !mb_seen_combined                               ? 4'd1 :
+    !residual_decision                              ? 4'd2 :
+    (residual_required_raw&&!residual_success_raw)  ? 4'd3 :
+    !hold_seen_combined                             ? 4'd4 :
+    two_mb_wait                                     ? 4'd5 :
+    raster_wait                                     ? 4'd6 : 4'd0;
 
 mpeg2_h262_p_syntax_probe syntax_probe
 (

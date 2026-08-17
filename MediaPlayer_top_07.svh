@@ -162,11 +162,42 @@ wire [3:0] mpeg2_new_diag_prereq_code =
     !mpeg2_new_ddr_cache_ready                 ? 4'd11 :
     !mpeg2_new_ddr_read_seen                   ? 4'd12 : 4'd0;
 
+// kate - Commit 180 deepens the sub-code.  Commit-179 hardware read USER 2 /
+// POWER 2 on all three P-final streams, i.e. phase1_probe_error sourced from
+// p_error_raw, which is itself an eight-term OR in
+// mpeg2_h262_p_diagnostic_controller.  When the five-way source is 2, POWER
+// now carries that eight-way code instead; every other source value keeps the
+// Commit-179 meaning.
+//
+// The compiled controller is mpeg2_h262_p_diagnostic_controller_rearm.sv
+// (files.qip), whose probe_error is nine terms with legacy/wide replacing the
+// base file's aligned term.  LED_POWER when USER blinks 2 and the five-way
+// source is 2:
+//   1 syntax_error      2 two_mb_error       3 four_mb_error
+//   4 legacy_error      5 wide_error         6 progress_error
+//   7 residual_error_raw 8 hold_error        9 raster_hold_error
 wire [3:0] mpeg2_new_diag_power_code =
     (mpeg2_new_diag_error_code == 4'd2) ?
-        mpeg2_new_phase1_probe_error_source :
+        ((mpeg2_new_phase1_probe_error_source == 4'd2) ?
+             mpeg2_new_p_probe_error_source :
+             mpeg2_new_phase1_probe_error_source) :
     (mpeg2_new_diag_error_code == 4'd0) ?
         mpeg2_new_diag_prereq_code : 4'd0;
+
+// kate - Commit 180.  progress_error is a symptom, not a root cause: it is
+// p_picture_expected && !p_macroblock_type_seen, and that signal is a deep
+// conjunction.  When POWER reports 6, LED_DISK names the first false conjunct
+// so one build covers both levels:
+//   1 mb_seen_combined   2 residual_decision
+//   3 residual required but not successful
+//   4 hold_seen_combined 5 two_mb_wait      6 raster_wait
+// LED_DISK is steady off in every other case; its ioctl_download file-load
+// duty is displaced for the duration of this diagnostic.
+wire [3:0] mpeg2_new_diag_disk_code =
+    ((mpeg2_new_diag_error_code == 4'd2) &&
+     (mpeg2_new_phase1_probe_error_source == 4'd2) &&
+     (mpeg2_new_p_probe_error_source == 4'd6)) ?
+        mpeg2_new_p_progress_detail : 4'd0;
 
 // 250 ms slot at the 54 MHz decoder clock.  Slots 0..2N-1 carry the N blinks
 // (even slot lit, odd slot dark); the remaining slots of the 32-slot frame are
@@ -212,5 +243,15 @@ assign LED_USER = (mpeg2_new_diag_error_code == 4'd0) ?
 // bit when the enable bit is set.  Steady ON when there is no sub-code.
 assign LED_POWER = {1'b1, (mpeg2_new_diag_power_code == 4'd0) ?
                           1'b1 : mpeg2_new_diag_power_blink};
+
+// kate - Commit 180.  LED_DISK is {enable, value} on the same active-high
+// convention (sys_top.v:157 gives LED[2] = led_disk[0] when enabled).  Steady
+// OFF when there is no progress sub-code to report.
+wire [5:0] mpeg2_new_diag_disk_slots = {1'b0, mpeg2_new_diag_disk_code, 1'b0};
+wire mpeg2_new_diag_disk_blink =
+    (mpeg2_new_diag_slot < mpeg2_new_diag_disk_slots) &&
+    !mpeg2_new_diag_slot[0];
+
+assign LED_DISK = {1'b1, mpeg2_new_diag_disk_blink};
 
 endmodule

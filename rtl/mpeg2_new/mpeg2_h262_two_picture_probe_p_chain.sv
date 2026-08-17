@@ -25,6 +25,10 @@ module mpeg2_h262_two_picture_probe
     // kate - Commit 179 observability only.  Names which of the five terms in
     // the probe_error OR below fired.  probe_error itself is unchanged.
     output wire[3:0] probe_error_source,
+    // kate - Commit 180 observability only.  Deeper split of source 2
+    // (p_error_raw) plus the progress_error conjunct detail.
+    output wire[3:0] p_probe_error_source,
+    output wire[3:0] p_progress_detail,
     output wire b_user_success,output wire[4:0] quantiser_scale_code,output wire[11:0] macroblock_address_increment,
     output wire macroblock_quant,output wire[4:0] macroblock_quantiser_scale_code,output wire[7:0] slice_vertical_position,
     output wire[2:0] slice_vertical_position_extension,output wire[3:0] first_luma_dc_size,
@@ -138,7 +142,8 @@ mpeg2_h262_p_diagnostic_controller p_controller(
  .p_residual_required(p_residual_required_raw),.p_residual_success(p_residual_success_raw),
  .p_first_residual_sample_valid(p_first_residual_sample_valid_raw),.p_first_residual_sample_value(p_first_residual_sample_value_raw),
  .p_residual_sample_valid(p_residual_sample_valid_raw),.p_residual_sample_index(p_residual_sample_index_raw),
- .p_residual_sample_value(p_residual_sample_value_raw),.probe_error(p_error_raw));
+ .p_residual_sample_value(p_residual_sample_value_raw),.probe_error(p_error_raw),
+ .probe_error_source(p_probe_error_source),.progress_detail(p_progress_detail));
 
 wire b_candidate,b_seen,b_complete_now,b_parse_hold,b_replay_active,b_sideband_valid,b_first_valid,b_error;
 wire[5:0] b_sideband_index;wire signed[15:0] b_sideband_value,b_first_value;

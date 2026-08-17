@@ -51,10 +51,11 @@ assign AUDIO_L = 0;
 assign AUDIO_R = 0;
 assign AUDIO_MIX = 0;
 
-// kate - Commit 177 restores the LED_DISK file-load indicator that Commit 176
-// had displaced; the diagnostic now rides LED_USER as a blink code instead.
-// LED_POWER stays on the presentation bit in MediaPlayer_top_07.svh.
-assign LED_DISK = ioctl_download;
+// kate - Commit 180 displaces the LED_DISK file-load indicator again so it can
+// blink the progress_error conjunct sub-code, exactly as Commit 176 did and
+// Commit 177 reverted.  The assignment now lives with the rest of the blink
+// machinery in MediaPlayer_top_07.svh; restore this line when the diagnostic
+// is retired.
 assign BUTTONS = 0;
 
 //////////////////////////////////////////////////////////////////
