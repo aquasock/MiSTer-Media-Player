@@ -1,17 +1,4 @@
 ---
-## 158 COMMIT Unreleased 5740587 2026-08-15T21:24:27-07:00
-
-#### Purpose:
-Make Commit-157 evidence readable on USER LED.
-
-#### Outcome:
-`5740587` reports 4-1: writer write+flush overlap while DDR busy, with prediction error earlier.
-
-#### Status:
-- [x] Built
-- [ ] Passed — diagnostic captured 4-1
-
----
 ## 159 COMMIT Unreleased a5b518d 2026-08-15T21:55:32-07:00
 
 #### Purpose:
@@ -407,6 +394,54 @@ Report the blink count per stream. That names the failing flag and selects the C
 - MediaPlayer_top_00.svh
 - MediaPlayer_top_07.svh
 
+#### Diagnostic Result:
+Hardware run of `92d14cf`:
+
+| Stream | USER | Meaning |
+|---|---|---|
+| `test_p_mba_escape` | 2 blinks | `phase1_probe_error` |
+| `test_consecutive_chain` | 2 blinks | `phase1_probe_error` |
+| `test_p_motion_residual` | steady OFF | no error latched; an acceptance term is false |
+| `test_i_baseline` | steady ON | control good |
+
+Two distinct faults, not one. The steady-OFF reading is only distinguishable because Commit 177 moved the code onto `LED_USER` and added that third state; the Commit-176 encoding would have shown both as a bare OFF.
+
+`phase1_probe_error` is an OR of four sources and does not localize further on its own. A candidate site exists at `rtl/mpeg2_new/mpeg2_h262_luma4_probe.sv:896`, which raises `probe_error` for any `macroblock_address_increment` other than 1 after a slice's first macroblock, commented as the non-scalable I-picture subset prohibiting skipped macroblocks. That would explain `test_p_mba_escape`, which is built entirely from gaps and escapes, but it is not confirmed and two facts argue against it being the whole story: the retired `test_p_720x480_general_decode` carried skips at MB (5,5) and (20,30) and passed at Commit 166, and `test_consecutive_chain` uses increment 1 on every macroblock yet reports the same code. At least one of the two streams is failing through a different source inside the same flag.
+
 #### Status:
-- [x] Built — source committed; clean-build qualification pending
-- [ ] Passed — blink result pending
+- [x] Built
+- [x] Passed — diagnostic split the fault in two and named the error class
+
+---
+## 178 COMMIT Unreleased 466f0b3 2026-08-16T23:04:44-07:00
+
+#### Coming From:
+Unreleased 92d14cf
+
+#### Purpose:
+Name the specific `probe_error` source and the specific false acceptance term behind the two Commit-177 faults.
+
+#### Outcome:
+`466f0b3` adds a `probe_error_source` output to `mpeg2_h262_picture_bookkeeper.sv`, priority-encoded from the four terms already ORed into `probe_error`; `probe_error` itself is untouched. `LED_POWER` previously carried `presentation_ok`, which read ON on every Commit-176 stream and is therefore spent, so it now blinks a sub-code selected by what `LED_USER` is reporting:
+
+- `LED_USER` blinks 2 (`phase1_probe_error`) — `LED_POWER` blinks the probe source: 1 `probe_error_latched`, 2 `parser_probe_error`, 3 `reference_error`, 4 `reference_progress_error`.
+- `LED_USER` steady OFF — `LED_POWER` blinks the first false acceptance term: 1 `p_macroblock_type_seen`, 2 `first_picture_420_parsed`, 3 `second_picture_420_parsed`, 4 `picture_count < 2`, 5 `completed != display`, 6 `reference_read_ok`, 7 `implicit_reconstruct_ok`, 8 `recon_macroblock_420_complete`, 9 `phase1n_frame_geometry_supported`, 10 `ddr_write_seen`, 11 `ddr_cache_ready`, 12 `ddr_read_seen`.
+- Otherwise `LED_POWER` is steady ON.
+
+The blink frame grows from 26 to 32 slots so twelve blinks still leave a ~2 s separating gap. `LED_DISK` keeps its `ioctl_download` duty. The encoder was verified in an iverilog testbench across all four probe sources, all twelve prerequisite codes and the clean case before commit. Observability only: no decode, presentation, ownership, or acceptance behavior changes.
+
+#### Validation:
+Build and run the three P-final streams, recording both `LED_USER` and `LED_POWER` blink counts for each. `test_i_baseline` remains the control and must read steady ON on both. Expected: `test_p_mba_escape` and `test_consecutive_chain` show USER 2 plus a POWER probe-source code; `test_p_motion_residual` shows USER steady OFF plus a POWER prerequisite code.
+
+#### Next Steps:
+Report both counts per stream. The probe-source code decides whether the `luma4_probe:896` MBA restriction is genuinely responsible or whether reference bookkeeping is at fault, and the prerequisite code names what `test_p_motion_residual` is missing. Those two answers select the Commit-179 fix boundary.
+
+#### Files Modified:
+- rtl/mpeg2_new/mpeg2_h262_picture_bookkeeper.sv
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_02.svh
+- MediaPlayer_top_07.svh
+
+#### Status:
+- [x] Built — source committed
+- [ ] Passed — sub-code result pending
