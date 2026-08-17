@@ -700,7 +700,7 @@ Run `test_p_motion_residual.m2v` and `test_p_visual_discriminator.m2v`, recordin
 - [ ] Passed
 
 ---
-## 186 COMMIT Unreleased ??? 2026-08-17T06:58:32-07:00
+## 186 COMMIT Unreleased 12b22cd 2026-08-17T06:58:32-07:00
 
 #### Coming From:
 
@@ -712,11 +712,11 @@ Complete generalized P parsing and raster publication when the final P picture i
 
 #### Outcome:
 
-Commit 185 hardware reports raster stage 1 with prerequisite 4 on both the residual and visual-discriminator streams, and the discriminator still shows the retained I frame. Exact controller replay reproduces the visual stop: the wide parser emits 1,305 motion events, exactly 29 rows of 45 macroblocks, then rejects the final-row boundary because `post_p_boundary_now` recognizes picture and sequence headers but omits sequence-end code `0xB7`. The proposed predicate change makes that stream emit all 1,350 motion events, assert wide completion, and emit the raster terminator. Replay also proves the residual and MBA-escape streams stop earlier at separate content-specific parser states, so this boundary no longer claims to fix them.
+Commit `12b22cd` accepts MPEG sequence-end code `0xB7` as a legal boundary after the final wide-P slice. Exact controller replay changes the visual discriminator from 1,305 motion events with no completion or terminator to all 1,350 events, wide completion, and the raster terminator. The clean Quartus 17.0.2 build closes with zero setup TNS, +0.244 ns global setup, +2.139 ns decoder setup, 29,920 ALMs, and 40,850 registers. Residual and MBA-escape streams retain separate earlier parser stops outside this commit.
 
 #### Next Steps:
 
-Add the MPEG sequence-end start code to the wide parser's accepted post-P boundary set without changing any slice or macroblock rule. Retain the exact visual-discriminator replay as the proof that completion and the terminator now occur, then run a clean Quartus 17.0.2 build with non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning. Hardware validation will run the visual discriminator only: acceptance must clear, DISK must advance beyond capture, and the displayed P must show the center quadrant seams. The residual and MBA-escape parser stops remain explicitly outside this commit and become subsequent boundaries.
+Run `test_p_visual_discriminator.m2v` and record USER, POWER, and DISK after the initial shared blink. Acceptance must clear, DISK must advance beyond capture, and the displayed P must show the center quadrant seams. After hardware confirmation, isolate the earlier content-specific parser stops in the residual and MBA-escape streams as separate boundaries.
 
 #### Files Modified:
 
@@ -724,7 +724,7 @@ Add the MPEG sequence-end start code to the wide parser's accepted post-P bounda
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
