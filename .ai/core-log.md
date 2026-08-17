@@ -666,7 +666,7 @@ Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_consecutive
 - [x] Passed
 
 ---
-## 184 COMMIT Unreleased ??? 2026-08-17T06:04:32-07:00
+## 184 COMMIT Unreleased 4f1c057 2026-08-17T06:04:32-07:00
 
 #### Coming From:
 
@@ -678,11 +678,11 @@ Remove obsolete controlled-parser observer failures from generalized P-stream ac
 
 #### Outcome:
 
-Commit 183 hardware makes all three P-final streams converge on the same USER/POWER `1/4` first-fault signature, including the six-picture consecutive chain, proving that the prior late `four_mb_error` classification was a mutable diagnostic artifact. RTL replay independently locates the common failure in the intentionally narrow controlled syntax observer, while the generalized wide parser is the functional owner of these f_code-3 streams.
+Commit 183 hardware makes all three P-final streams converge on the same USER/POWER `1/4` first-fault signature, proving that the prior late `four_mb_error` classification was a mutable diagnostic artifact. Commit `4f1c057` removes only the five historical controlled parser observers from `probe_error`; progress, residual, stream-hold, raster-hold, bookkeeper, publication, reference-progress, decoder, reconstruction, DDR, and presentation checks remain. Simulation verifies retired observers cannot raise acceptance error and functional codes 6 through 9 remain intact. The clean Quartus 17.0.2 build closes with zero TNS, +0.470 ns global setup, +2.714 ns decoder setup, 30,069 ALMs, and 40,861 registers.
 
 #### Next Steps:
 
-With user approval, remove only `parser_error_group` from `mpeg2_h262_p_diagnostic_controller.probe_error`; retain progress, residual, stream-hold, raster-hold, bookkeeper, publication, reference-progress, decoder, reconstruction, DDR, and presentation checks unchanged. Verify the remaining error OR and ownership behavior in simulation, run a clean Quartus 17.0.2 build requiring non-negative setup slack and zero TNS, then run all six Commit-175 streams and the P visual discriminator on hardware.
+Run all six Commit-175 streams and record acceptance, then run `test_p_visual_discriminator.m2v` and confirm that the final displayed P frame shows two hard seams crossing at frame center in a 2x2 pattern rather than an unbroken diagonal gradient.
 
 #### Files Modified:
 
@@ -690,7 +690,7 @@ With user approval, remove only `parser_error_group` from `mpeg2_h262_p_diagnost
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
