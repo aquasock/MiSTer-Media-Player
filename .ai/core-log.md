@@ -765,3 +765,31 @@ Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_p_visual_di
 - [ ] Passed
 
 ---
+## 189 COMMIT Unreleased ??? 2026-08-17T08:04:37-07:00
+
+#### Coming From:
+
+Unreleased dbc3000
+
+#### Purpose:
+
+Replace mutable overlapping playback-time LED indications with an unambiguous settled post-stream diagnostic snapshot.
+
+#### Outcome:
+
+Commit 188 hardware again displays the generalized P discriminator's four quadrants and center seams on all three test paths, while DISK remains off throughout the reported USER/POWER `1/4` pattern. This matches exact frontend replay and proves no frontend syntax assertion occurred. Static inspection identifies the misleading readout mechanism: without a latched error, POWER encodes the live prerequisite chain from reset onward, so it passes legitimately through early codes while the stream is still loading, and all nonzero LED codes currently share the same blink epoch. The observed preamble therefore is not a settled failure code.
+
+#### Next Steps:
+
+Capture the complete diagnostic hierarchy only after sequence end and sufficient pipeline settlement, restart the diagnostic epoch from that snapshot, and give USER, POWER, and DISK non-overlapping reporting windows while preserving the existing numeric tables and all decoder behavior. Simulation will prove that codes changing during delivery cannot alter the final report and that each field occupies only its assigned window. A clean Quartus 17.0.2 build must retain non-negative setup slack, zero setup TNS, and no timing-requirements Critical Warning; hardware will rerun the three generalized P streams and report the stable post-stream result plus discriminator seams.
+
+#### Files Modified:
+
+- MediaPlayer_top_07.svh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
