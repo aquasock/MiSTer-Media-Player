@@ -268,12 +268,16 @@
                     pce_count<=0;
                     q_scale_type<=pce_next[12];
                     alternate_scan<=pce_next[10];
+                    p_forward_f_code_horizontal<=pce_next[35:32];
+                    p_forward_f_code_vertical<=pce_next[31:28];
                     wide_candidate<=
                         geometry_supported &&
                         current_picture_is_p &&
                         (pce_next[39:36]==4'h8) &&
-                        (pce_next[35:32]==4'd3) &&
-                        (pce_next[31:28]==4'd3) &&
+                        (pce_next[35:32]>=4'd1) &&
+                        (pce_next[35:32]<=4'd4) &&
+                        (pce_next[31:28]>=4'd1) &&
+                        (pce_next[31:28]<=4'd4) &&
                         (pce_next[17:16]==2'b11) &&
                         pce_next[14] &&
                         !pce_next[13];

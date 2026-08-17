@@ -10,7 +10,9 @@
 // Sparse residual metadata remains bounded
 // to 16 coded blocks / 64 coefficient events (implementation limits, not H.262).
 //
-// Standards authority: .ai/core-standards.md (H262-007..H262-018).
+// kate - Commit 193: picture-signalled horizontal/vertical f_code values 1..4
+// now drive residual length, differential reconstruction and component wrap.
+// Standards authority: .ai/core-standards.md (H262-007..H262-022).
 //============================================================================
 module mpeg2_h262_p_wide_motion_syntax_probe
 (
@@ -91,6 +93,8 @@ reg pce_capture;
 reg [2:0] pce_count;
 reg [39:0] pce_shift;
 wire [39:0] pce_next = {pce_shift[31:0], stream_data};
+reg [3:0] p_forward_f_code_horizontal;
+reg [3:0] p_forward_f_code_vertical;
 
 reg [7:0] row_bytes [0:ROW_BUFFER_BYTES-1];
 reg slice_capture;
@@ -150,8 +154,8 @@ reg signed [7:0] current_motion_x, current_motion_y;
 reg signed [5:0] motion_code_pending;
 reg [10:0] motion_vlc_bits;
 reg [3:0] motion_vlc_len;
-reg [1:0] motion_residual_shift;
-reg motion_residual_count;
+reg [2:0] motion_residual_shift;
+reg [1:0] motion_residual_count;
 
 reg [8:0] cbp_vlc_bits;
 reg [3:0] cbp_vlc_len;
@@ -234,8 +238,8 @@ wire [10:0] current_mb_index =
     row_base_index + {5'd0,current_col};
 wire [4:0] qscale_next =
     {qscale_shift[3:0], parser_current_bit};
-wire [1:0] motion_residual_next =
-    {motion_residual_shift[0], parser_current_bit};
+wire [2:0] motion_residual_next =
+    {motion_residual_shift[1:0], parser_current_bit};
 
 function automatic [6:0] match_mba_code;
     input [10:0] bits;

@@ -80,24 +80,31 @@ endfunction
 wire [6:0] motion_match =
     match_motion_code(motion_vlc_bits_next,motion_vlc_len_next);
 
-function automatic signed [7:0] reconstruct_mv_f3;
+function automatic signed [7:0] reconstruct_mv;
     input signed [7:0] pred;
     input signed [5:0] code;
-    input [1:0] residual;
+    input [2:0] residual;
+    input [3:0] f_code;
     reg [5:0] mag;
-    reg signed [9:0] delta, vec;
+    reg [2:0] r_size;
+    reg signed [10:0] delta, vec, low_limit, high_limit, vector_range;
     begin
+        r_size=f_code-1'b1;
         if(code==0) delta=0;
+        else if(f_code==4'd1) delta=code;
         else begin
             if(code<0) mag=-code; else mag=code;
-            delta=(($signed({1'b0,mag})-1) <<< 2) +
+            delta=(($signed({1'b0,mag})-1) <<< r_size) +
                   $signed({8'd0,residual}) + 1;
             if(code<0) delta=-delta;
         end
         vec=$signed(pred)+delta;
-        if(vec>10'sd63) vec=vec-10'sd128;
-        else if(vec< -10'sd64) vec=vec+10'sd128;
-        reconstruct_mv_f3=vec[7:0];
+        low_limit=-(11'sd16 <<< r_size);
+        high_limit=(11'sd16 <<< r_size)-1'b1;
+        vector_range=11'sd32 <<< r_size;
+        if(vec>high_limit) vec=vec-vector_range;
+        else if(vec<low_limit) vec=vec+vector_range;
+        reconstruct_mv=vec[7:0];
     end
 endfunction
 
@@ -247,6 +254,8 @@ always @(posedge clk) begin
         pce_capture<=0;
         pce_count<=0;
         pce_shift<=0;
+        p_forward_f_code_horizontal<=0;
+        p_forward_f_code_vertical<=0;
         wide_candidate<=0;
         wide_seen<=0;
         wide_complete_now<=0;

@@ -31,8 +31,11 @@ module mpeg2_h262_reference_read_probe
 wire general_geometry_supported=
  (horizontal_size!=14'd0)&&(vertical_size!=14'd0)&&
  (horizontal_size<=14'd720)&&(vertical_size<=14'd480);
+wire general_p_f_code_supported=
+ (forward_f_code_horizontal>=4'd1)&&(forward_f_code_horizontal<=4'd4)&&
+ (forward_f_code_vertical>=4'd1)&&(forward_f_code_vertical<=4'd4);
 wire general_detect_now=p_residual_sample_valid&&(p_residual_sample_index==6'h3e)&&
- (forward_f_code_horizontal==4'd3)&&(forward_f_code_vertical==4'd3)&&
+ general_p_f_code_supported&&
  general_geometry_supported&&!p_implicit_reconstruct_request;
 reg general_mixed_mode;
 wire mixed_active,mixed_persisted_seen,mixed_error,mixed_half;

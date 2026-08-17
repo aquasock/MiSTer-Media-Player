@@ -106,25 +106,33 @@ MCODE = {
 }
 
 
-def delta_for(target: int, pred: int) -> int:
+def delta_for(target: int, pred: int, f_code: int = 3) -> int:
+    if not (1 <= f_code <= 4):
+        raise ValueError(f_code)
+    f = 1 << (f_code - 1)
+    low, high, span = -16 * f, 16 * f - 1, 32 * f
+    if not (low <= target <= high and low <= pred <= high):
+        raise ValueError((target, pred, f_code))
     d = target - pred
-    while d > 63:
-        d -= 128
-    while d < -64:
-        d += 128
+    while d > high:
+        d -= span
+    while d < low:
+        d += span
     return d
 
 
-def enc_comp(target: int, pred: int) -> str:
-    d = delta_for(target, pred)
+def enc_comp(target: int, pred: int, f_code: int = 3) -> str:
+    d = delta_for(target, pred, f_code)
     if d == 0:
         return "1"
+    f = 1 << (f_code - 1)
     a = abs(d)
-    mc = (a - 1) // 4 + 1
-    res = (a - 1) % 4
+    mc = (a - 1) // f + 1
+    res = (a - 1) % f
     if d < 0:
         mc = -mc
-    return MCODE[mc] + format(res, "02b")
+    residual_bits = "" if f_code == 1 else format(res, f"0{f_code - 1}b")
+    return MCODE[mc] + residual_bits
 
 
 # --- Table B.3 P macroblock_type ---
@@ -313,7 +321,9 @@ def packed_row(code: int, payloads: tuple[bytes, ...]) -> bytes:
     return bytes(b)
 
 
-def patch_picture(data: bytes, pic_index: int, is_b: bool, row_groups: tuple[tuple[bytes, ...], ...]) -> bytes:
+def patch_picture(data: bytes, pic_index: int, is_b: bool,
+                  row_groups: tuple[tuple[bytes, ...], ...],
+                  forward_f_code: tuple[int, int] = (3, 3)) -> bytes:
     """row_groups[row] is a tuple of one or more same-row slice payloads (already packed bytes)."""
     b = bytearray(data)
     pics = pictures(b)
@@ -326,12 +336,15 @@ def patch_picture(data: bytes, pic_index: int, is_b: bool, row_groups: tuple[tup
             break
     if pce is None:
         raise SystemExit(f"picture {pic_index} type {ptype}: missing picture_coding_extension")
-    b[pce + 4] = (b[pce + 4] & 0xF0) | 3
+    f_code_h, f_code_v = (3, 3) if is_b else forward_f_code
+    if not (1 <= f_code_h <= 4 and 1 <= f_code_v <= 4):
+        raise ValueError(forward_f_code)
+    b[pce + 4] = (b[pce + 4] & 0xF0) | f_code_h
     if is_b:
         b[pce + 5] = 0x33
         b[pce + 6] = (b[pce + 6] & 0x0F) | 0x30
     else:
-        b[pce + 5] = 0x30 | (b[pce + 5] & 0x0F)
+        b[pce + 5] = (f_code_v << 4) | (b[pce + 5] & 0x0F)
     b[pce + 7] = (b[pce + 7] | 0x40) & ~(0x20 | 0x10 | 0x04)
 
     codes = start_codes(b)
@@ -350,14 +363,18 @@ def patch_picture(data: bytes, pic_index: int, is_b: bool, row_groups: tuple[tup
     return bytes(b)
 
 
-def patch_pictures(data: bytes, coded_types: list[int], specs: dict[int, tuple[bool, tuple[tuple[bytes, ...], ...]]]) -> bytes:
+def patch_pictures(data: bytes, coded_types: list[int],
+                   specs: dict[int, tuple[bool, tuple[tuple[bytes, ...], ...]]],
+                   forward_f_codes: dict[int, tuple[int, int]] | None = None) -> bytes:
     """specs: {pic_index: (is_b, row_groups)}. Applied in descending pic_index order (offset-safe)."""
     if [t for _, t in pictures(data)] != coded_types:
         raise SystemExit(f"expected coded types {coded_types}, found {[t for _, t in pictures(data)]}")
     b = data
+    forward_f_codes = forward_f_codes or {}
     for pic_index in sorted(specs, reverse=True):
         is_b, row_groups = specs[pic_index]
-        b = patch_picture(b, pic_index, is_b, row_groups)
+        b = patch_picture(b, pic_index, is_b, row_groups,
+                          forward_f_codes.get(pic_index, (3, 3)))
     return b
 
 

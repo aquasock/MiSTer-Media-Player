@@ -202,6 +202,11 @@
                     if($signed(motion_match[5:0])==0) begin
                         current_motion_x<=predictor_x;
                         parser_state<=R_MOTION_Y;
+                    end else if(p_forward_f_code_horizontal==4'd1) begin
+                        current_motion_x<=reconstruct_mv(
+                            predictor_x,motion_match[5:0],3'd0,
+                            p_forward_f_code_horizontal);
+                        parser_state<=R_MOTION_Y;
                     end else begin
                         motion_residual_shift<=0;
                         motion_residual_count<=0;
@@ -219,15 +224,18 @@
                 if(parser_at_end) parser_state<=R_ERROR;
                 else begin
                     motion_residual_shift<=motion_residual_next;
-                    if(motion_residual_count) begin
-                        current_motion_x<=reconstruct_mv_f3(
+                    if(motion_residual_count==
+                       (p_forward_f_code_horizontal-4'd2)) begin
+                        current_motion_x<=reconstruct_mv(
                             predictor_x,motion_code_pending,
-                            motion_residual_next);
+                            motion_residual_next,
+                            p_forward_f_code_horizontal);
                         motion_residual_count<=0;
                         motion_vlc_bits<=0;
                         motion_vlc_len<=0;
                         parser_state<=R_MOTION_Y;
-                    end else motion_residual_count<=1;
+                    end else motion_residual_count<=
+                        motion_residual_count+1'b1;
                 end
             end
 
@@ -239,6 +247,15 @@
                     motion_vlc_len<=0;
                     if($signed(motion_match[5:0])==0) begin
                         current_motion_y<=predictor_y;
+                        if(current_has_pattern) begin
+                            cbp_vlc_bits<=0;
+                            cbp_vlc_len<=0;
+                            parser_state<=R_CBP;
+                        end else parser_state<=R_MB_DONE;
+                    end else if(p_forward_f_code_vertical==4'd1) begin
+                        current_motion_y<=reconstruct_mv(
+                            predictor_y,motion_match[5:0],3'd0,
+                            p_forward_f_code_vertical);
                         if(current_has_pattern) begin
                             cbp_vlc_bits<=0;
                             cbp_vlc_len<=0;
@@ -261,17 +278,20 @@
                 if(parser_at_end) parser_state<=R_ERROR;
                 else begin
                     motion_residual_shift<=motion_residual_next;
-                    if(motion_residual_count) begin
-                        current_motion_y<=reconstruct_mv_f3(
+                    if(motion_residual_count==
+                       (p_forward_f_code_vertical-4'd2)) begin
+                        current_motion_y<=reconstruct_mv(
                             predictor_y,motion_code_pending,
-                            motion_residual_next);
+                            motion_residual_next,
+                            p_forward_f_code_vertical);
                         motion_residual_count<=0;
                         if(current_has_pattern) begin
                             cbp_vlc_bits<=0;
                             cbp_vlc_len<=0;
                             parser_state<=R_CBP;
                         end else parser_state<=R_MB_DONE;
-                    end else motion_residual_count<=1;
+                    end else motion_residual_count<=
+                        motion_residual_count+1'b1;
                 end
             end
 
