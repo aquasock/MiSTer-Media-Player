@@ -1,0 +1,129 @@
+`timescale 1ns/1ps
+
+module tb_h262_b_presentation_scheduler;
+    reg clk=0,reset=1,swap=0,frame_waiting=0,completed_bank=0,reference_bank=1;
+    reg b_start=0,non_b_start=0,sequence_end=0,b_success=0,b_error=0;
+    wire display_bank,display_scratch,display_scratch_bank,decode_scratch_bank;
+    wire [2:0] reset_count;
+    wire hold,complete,error;
+
+    always #5 clk=~clk;
+    mpeg2_h262_b_presentation_scheduler dut(
+        .clk(clk),.reset(reset),.swap_window_pulse(swap),
+        .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
+        .reference_frame_bank(reference_bank),.b_picture_start(b_start),
+        .non_b_picture_start(non_b_start),.sequence_end(sequence_end),
+        .b_user_success(b_success),.b_decode_error(b_error),
+        .display_frame_bank(display_bank),.display_scratch(display_scratch),
+        .display_scratch_bank(display_scratch_bank),
+        .decode_scratch_bank(decode_scratch_bank),
+        .framebuffer_swap_reset_count(reset_count),.presentation_hold(hold),
+        .presentation_complete(complete),.presentation_error(error));
+
+    task automatic pulse_start;
+        begin @(negedge clk);b_start<=1;@(negedge clk);b_start<=0;#1;end
+    endtask
+    task automatic pulse_success;
+        begin @(negedge clk);b_success<=1;@(negedge clk);b_success<=0;#1;end
+    endtask
+    task automatic pulse_close;
+        begin @(negedge clk);non_b_start<=1;@(negedge clk);non_b_start<=0;#1;end
+    endtask
+    task automatic pulse_swap;
+        begin @(negedge clk);swap<=1;@(negedge clk);swap<=0;#1;end
+    endtask
+
+    initial begin
+        repeat(4)@(posedge clk);@(negedge clk);reset<=0;
+
+        pulse_start();
+        if(decode_scratch_bank||hold||error)$fatal(1,"first B did not select scratch 0");
+        pulse_success();
+        pulse_start();
+        if(!decode_scratch_bank||hold||error)$fatal(1,"second B did not select scratch 1");
+        pulse_success();
+        pulse_close();
+        if(!hold)$fatal(1,"closed B run did not hold compressed input");
+
+        pulse_swap();
+        if(!display_scratch||display_scratch_bank)
+            $fatal(1,"first swap did not present scratch 0");
+        pulse_swap();
+        if(!display_scratch||!display_scratch_bank)
+            $fatal(1,"second swap did not present scratch 1");
+        pulse_swap();
+        if(display_scratch||!display_bank||!complete||error||hold)
+            $fatal(1,"future reference did not retire the B run");
+
+        // A failed later B must release ownership/backpressure and leave the
+        // ordinary reference presentation path usable.
+        reference_bank<=0;
+        pulse_start();
+        @(negedge clk);sequence_end<=1;@(negedge clk);sequence_end<=0;#1;
+        if(!hold)$fatal(1,"sequence-end close did not hold pending B run");
+        @(negedge clk);b_error<=1;@(negedge clk);b_error<=0;#1;
+        if(hold||!error)$fatal(1,"failed B transaction did not fail open");
+        completed_bank<=0;frame_waiting<=1;
+        pulse_swap();frame_waiting<=0;
+        if(display_scratch||display_bank)
+            $fatal(1,"ordinary frame presentation did not recover after abort");
+
+        $display("B_PRESENTATION_RESULT order=scratch0,scratch1,future fail_open=1");
+        $finish;
+    end
+
+    initial begin repeat(200)@(posedge clk);$fatal(1,"presentation test timed out");end
+endmodule
+
+module tb_h262_double_scratch_tags;
+    reg clk=0,reset=1;
+    reg [7:0] value=0;
+    reg [11:0] x=0,y=0;
+    reg [1:0] component=0;
+    reg valid=0,start=0,complete=0,bank=0;
+    wire stored,seen,store_error;
+    wire [7:0] burstcnt,be;
+    wire [28:0] addr;
+    wire rd;
+    wire [63:0] din;
+    wire we;
+
+    always #5 clk=~clk;
+    mpeg2_h262_ddram_store dut(
+        .clk(clk),.reset(reset),.pixel_value(value),.pixel_x(x),.pixel_y(y),
+        .pixel_component(component),.pixel_valid(valid),.block_start(start),
+        .block_complete(complete),.frame_bank(bank),.block_stored(stored),
+        .write_seen(seen),.store_error(store_error),.ddram_busy(1'b0),
+        .ddram_burstcnt(burstcnt),.ddram_addr(addr),.ddram_rd(rd),
+        .ddram_din(din),.ddram_be(be),.ddram_we(we));
+
+    task automatic check_tag;
+        input [11:0] tag_y;
+        input expected_bank;
+        input [1:0] expected_component;
+        input [28:0] expected_first;
+        begin
+            @(negedge clk);x<=12'hc00;y<=tag_y;component<=0;start<=1;
+            @(negedge clk);start<=0;#1;
+            if(!dut.ascratch||(dut.ascratch_bank!==expected_bank)||
+               (dut.ac!==expected_component)||(dut.first!==expected_first))
+                $fatal(1,"scratch tag %h decoded bank=%0d component=%0d first=%h",
+                       tag_y,dut.ascratch_bank,dut.ac,dut.first);
+            reset<=1;@(negedge clk);reset<=0;
+        end
+    endtask
+
+    initial begin
+        repeat(3)@(posedge clk);@(negedge clk);reset<=0;
+        check_tag(12'h800,0,0,29'h06020000);
+        check_tag(12'ha00,0,1,29'h0602a8c0);
+        check_tag(12'hc00,0,2,29'h0602d2f0);
+        check_tag(12'h200,1,0,29'h06030000);
+        check_tag(12'h400,1,1,29'h0603a8c0);
+        check_tag(12'h600,1,2,29'h0603d2f0);
+        if(store_error)$fatal(1,"valid double-scratch tags raised store error");
+        $display("DOUBLE_SCRATCH_TAG_RESULT banks=2 planes=6");
+        $finish;
+    end
+    initial begin repeat(100)@(posedge clk);$fatal(1,"scratch tag test timed out");end
+endmodule

@@ -73,17 +73,19 @@ module tb_h262_b_transport_abort;
     end
 endmodule
 
-// Full-corpus reproducer for the first failure which motivated Entry 205.
-// It is kept separate from the fast transport invariant because transforming
-// the first dense B picture is intentionally a long simulation.
-module tb_h262_dense_second_b_error;
+// Entry 206 full-corpus B parser/transform replay.  It is kept separate from
+// the fast transport invariant because all seven dense B pictures intentionally
+// make this a long simulation.
+module tb_h262_dense_full_b_sequence;
     localparam integer MAX_STREAM_BYTES=3145728;
     reg clk=0,reset=1,stream_valid=0;
     reg [7:0] stream_data=0;
     reg [7:0] stream_mem[0:MAX_STREAM_BYTES-1];
     reg [1023:0] hex_path;
-    integer stream_len,stream_index=0;
-    reg prior_error=0;
+    integer stream_len,stream_index=0,quiet_cycles=0;
+    integer b_pictures=0,rows=0,final_rows=0,motion_events=0;
+    integer residual_blocks=0,residual_coeffs=0,residual_samples=0;
+    reg [6:0] samples_remaining=0;
 
     wire candidate,seen,complete,hold,replay,sideband_valid,error;
     wire [5:0] sideband_index;
@@ -125,23 +127,58 @@ module tb_h262_dense_second_b_error;
     end
 
     always @(posedge clk) begin
-        if(error&&!prior_error)begin
-            $display("DENSE_SECOND_B_ERROR offset=%0d state=%0d row=%0d col=%0d byte=%0d/%0d bit=%0d",
-                     stream_index,parser.state,parser.slice_row_number,
-                     parser.current_col,parser.parse_byte_index,
-                     parser.parse_byte_limit,parser.parse_bit_index);
-            if((stream_index<818000)||(stream_index>819500)||
-               (parser.state!=6'd23)||(parser.slice_row_number!=6'd9))
-                $fatal(1,"unexpected dense failure boundary");
-            repeat(3)@(posedge clk);
-            if(hold)$fatal(1,"B parser error retained parse_hold");
+        if(error)
+            $fatal(1,"dense B error at offset=%0d state=%0d row=%0d col=%0d byte=%0d/%0d bit=%0d parser=%0d replay_error=%0d prior=%0d active=%0d boundary=%0d capture=%0d count=%0d",
+                   stream_index,parser.state,parser.slice_row_number,
+                   parser.current_col,parser.parse_byte_index,
+                   parser.parse_byte_limit,parser.parse_bit_index,
+                   parser.parser_error,parser.replay_error,parser.prior_error,
+                   parser.parse_active,parser.chunk_boundary_known,
+                   parser.slice_capture,parser.row_byte_count);
+
+        if(complete)b_pictures<=b_pictures+1;
+
+        if(sideband_valid)begin
+            if(samples_remaining!=0)begin
+                if(sideband_index!=(7'd64-samples_remaining))
+                    $fatal(1,"dense sample order error");
+                residual_samples<=residual_samples+1;
+                samples_remaining<=samples_remaining-1'b1;
+            end else if((sideband_index==6'h3f)&&
+                        (sideband_value[15:14]==2'b11))begin
+                residual_blocks<=residual_blocks+1;
+                samples_remaining<=7'd64;
+            end else if((sideband_index==6'h38)||
+                        (sideband_index==6'h39)||
+                        (sideband_index==6'h3a))begin
+                motion_events<=motion_events+1;
+            end
+
+            if(row_retired)begin
+                rows<=rows+1;
+                residual_coeffs<=residual_coeffs+parser.residual_coeff_count;
+                if(sideband_value==16'shA3FF)final_rows<=final_rows+1;
+            end
+        end
+
+        if((stream_index==stream_len)&&!hold&&!replay)quiet_cycles<=quiet_cycles+1;
+        else quiet_cycles<=0;
+
+        if(quiet_cycles==100)begin
+            $display("DENSE_B_SEQUENCE_RESULT pictures=%0d rows=%0d final=%0d motion=%0d blocks=%0d coeffs=%0d samples=%0d bytes=%0d",
+                     b_pictures,rows,final_rows,motion_events,residual_blocks,
+                     residual_coeffs,residual_samples,stream_index);
+            if(!seen||error||b_pictures!=7||rows!=210||final_rows!=7||
+               motion_events!=9450||residual_blocks!=52846||
+               residual_coeffs!=1539306||residual_samples!=3382144||
+               samples_remaining!=0||stream_index!=stream_len)
+                $fatal(1,"dense full-B sequence regression failed");
             $finish;
         end
-        prior_error<=error;
     end
 
     initial begin
-        repeat(120000000)@(posedge clk);
-        $fatal(1,"dense second-B reproducer timed out at %0d",stream_index);
+        repeat(150000000)@(posedge clk);
+        $fatal(1,"dense full-B sequence timed out at %0d",stream_index);
     end
 endmodule

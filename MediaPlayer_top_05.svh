@@ -19,6 +19,20 @@ wire [31:0] mpeg2_new_p_ownership_picture_window_next =
     {mpeg2_new_p_ownership_picture_window[23:0], mpeg2_stream_data};
 wire mpeg2_new_p_ownership_picture_start_now =
     (mpeg2_new_p_ownership_picture_window_next == 32'h00000100);
+wire mpeg2_new_picture_header_classified_now =
+    mpeg2_stream_rd &&
+    mpeg2_new_p_ownership_header_capture &&
+    mpeg2_new_p_ownership_header_second_byte;
+wire [2:0] mpeg2_new_picture_header_type_now = mpeg2_stream_data[5:3];
+wire mpeg2_new_b_picture_start_now =
+    mpeg2_new_picture_header_classified_now &&
+    (mpeg2_new_picture_header_type_now == 3'b011);
+wire mpeg2_new_non_b_picture_start_now =
+    mpeg2_new_picture_header_classified_now &&
+    (mpeg2_new_picture_header_type_now != 3'b011);
+wire mpeg2_new_sequence_end_now =
+    mpeg2_stream_rd &&
+    (mpeg2_new_p_ownership_picture_window_next == 32'h000001b7);
 wire mpeg2_new_p_destination_display_owned =
     !mpeg2_new_display_scratch &&
     (mpeg2_new_active_frame_bank == mpeg2_new_display_frame_bank);
@@ -73,39 +87,29 @@ always @(posedge clk_mpeg2) begin
     end
 end
 
-// Commit 139 adds one non-reference presentation slot.  The controlled stream
-// is coded I / future-P / B.  Bank 0 already displays the first I picture; the
-// completed future P remains pending while B reconstructs into fixed scratch
-// storage.  Once B persistence is proven, scratch gets the next swap and the
-// retained future-P bank gets the following swap.  B never becomes a reference.
-wire mpeg2_new_b_scratch_waiting =
-    mpeg2_new_b_scratch_pending || mpeg2_new_b_user_success_edge;
-wire mpeg2_new_scheduled_frame_valid =
-    mpeg2_new_b_scratch_waiting ||
-    mpeg2_new_b_future_waiting ||
-    (!mpeg2_new_b_reorder_active &&
-     !mpeg2_new_b_picture_start_edge &&
-     (mpeg2_new_frame_waiting || mpeg2_new_pending_frame_valid));
-wire mpeg2_new_scheduled_frame_scratch = mpeg2_new_b_scratch_waiting;
-wire mpeg2_new_scheduled_frame_bank =
-    mpeg2_new_b_future_waiting ?
-        mpeg2_new_b_future_frame_bank :
-    mpeg2_new_frame_waiting ?
-        mpeg2_new_completed_frame_bank :
-        mpeg2_new_pending_frame_bank;
-wire mpeg2_new_scheduled_frame_differs =
-    mpeg2_new_scheduled_frame_scratch ?
-        !mpeg2_new_display_scratch :
-        (mpeg2_new_display_scratch ||
-         (mpeg2_new_scheduled_frame_bank != mpeg2_new_display_frame_bank));
-
-always @(posedge clk_mpeg2) begin
-    if (reset_mpeg2) begin
-        mpeg2_new_display_frame_bank            <= 1'b0;
-        mpeg2_new_display_scratch               <= 1'b0;
-        mpeg2_new_framebuffer_swap_reset_count  <= 3'd0;
-        mpeg2_new_pending_frame_valid           <= 1'b0;
-        mpeg2_new_pending_frame_bank            <= 1'b0;
-        mpeg2_new_b_user_success_d              <= 1'b0;
-        mpeg2_new_b_picture_frontend_d          <= 1'b0;
-        mpeg2_new_b_reorder_active              <= 1'b0;
+// Entry 206: every accepted picture header produces an explicit event, so two
+// adjacent B headers cannot collapse into one coding-type level.  The scheduler
+// alternates two scratch frames and owns the complete B...B->future-reference
+// presentation transaction, including fail-open error retirement.
+mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
+(
+    .clk                         (clk_mpeg2),
+    .reset                       (reset_mpeg2),
+    .swap_window_pulse           (mpeg2_new_swap_window_pulse),
+    .frame_waiting               (mpeg2_new_frame_waiting),
+    .completed_frame_bank        (mpeg2_new_completed_frame_bank),
+    .reference_frame_bank        (mpeg2_new_reference_frame_bank),
+    .b_picture_start             (mpeg2_new_b_picture_start_now),
+    .non_b_picture_start         (mpeg2_new_non_b_picture_start_now),
+    .sequence_end                (mpeg2_new_sequence_end_now),
+    .b_user_success              (mpeg2_new_b_user_success),
+    .b_decode_error              (mpeg2_new_phase1_probe_error),
+    .display_frame_bank          (mpeg2_new_display_frame_bank),
+    .display_scratch             (mpeg2_new_display_scratch),
+    .display_scratch_bank        (mpeg2_new_display_scratch_bank),
+    .decode_scratch_bank         (mpeg2_new_b_decode_scratch_bank),
+    .framebuffer_swap_reset_count(mpeg2_new_framebuffer_swap_reset_count),
+    .presentation_hold           (mpeg2_new_b_presentation_hold),
+    .presentation_complete       (mpeg2_new_b_presentation_complete),
+    .presentation_error          (mpeg2_new_b_presentation_error)
+);

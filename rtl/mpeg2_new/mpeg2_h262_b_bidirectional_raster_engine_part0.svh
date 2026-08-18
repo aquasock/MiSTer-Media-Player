@@ -39,6 +39,7 @@ module mpeg2_h262_b_bidirectional_raster_engine
     input  wire signed [15:0] residual_store_read_data,
     input  wire reference_valid,
     input  wire future_reference_bank,
+    input  wire scratch_frame_bank,
     input  wire store_block_stored,
     input  wire ddram_busy,
     input  wire [63:0] ddram_dout,
@@ -69,9 +70,15 @@ localparam [28:0]
     CB_BASE     = 29'h0600A8C0,
     CR_BASE     = 29'h0600D2F0,
     BANK_OFF    = 29'h00010000,
-    SCRATCH_OFF = 29'h00020000;
+    SCRATCH0_OFF = 29'h00020000,
+    SCRATCH1_OFF = 29'h00030000;
 localparam integer MAX_MB=1350;
 localparam integer MAX_BLOCKS=2048;
+
+// Captured before any scratch address is issued.  Declare it ahead of the
+// address helpers so both simulation and Quartus resolve the selected bank
+// without relying on an implicit forward declaration.
+reg scratch_bank_latched;
 
 reg [5:0] mb_width,mb_height;
 reg geometry_seen;
@@ -96,8 +103,8 @@ function automatic [28:0] block_addr;
         if(b<4) begin
             lr=({6'd0,mr}<<4)+{8'd0,b[1],rr};
             lw=({6'd0,c}<<1)+{11'd0,b[0]};
-            block_addr=Y_BASE+SCRATCH_OFF+r90(lr)+{17'd0,lw};
+            block_addr=Y_BASE+(scratch_bank_latched?SCRATCH1_OFF:SCRATCH0_OFF)+r90(lr)+{17'd0,lw};
         end else begin
             cr=({6'd0,mr}<<3)+{9'd0,rr};
-            block_addr=(b==4?CB_BASE:CR_BASE)+SCRATCH_OFF+r45(cr)+{20'd0,c};
+            block_addr=(b==4?CB_BASE:CR_BASE)+(scratch_bank_latched?SCRATCH1_OFF:SCRATCH0_OFF)+r45(cr)+{20'd0,c};
         end

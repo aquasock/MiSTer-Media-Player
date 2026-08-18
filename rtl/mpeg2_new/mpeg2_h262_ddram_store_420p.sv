@@ -11,15 +11,17 @@ module mpeg2_h262_ddram_store(
  input wire ddram_busy,output wire [7:0] ddram_burstcnt,output wire [28:0] ddram_addr,
  output wire ddram_rd,output wire [63:0] ddram_din,output wire [7:0] ddram_be,output wire ddram_we);
 localparam [1:0] Y=0,CB=1,CR=2;
-localparam [28:0] YB=29'h06000000,CBB=29'h0600A8C0,CRB=29'h0600D2F0,BANK=29'h00010000,SCRATCH=29'h00020000;
+localparam [28:0] YB=29'h06000000,CBB=29'h0600A8C0,CRB=29'h0600D2F0,BANK=29'h00010000,SCRATCH0=29'h00020000,SCRATCH1=29'h00030000;
 wire scratch_tag=(pixel_component==Y)&&(pixel_x[11:10]==2'b11);
-wire wide_bs=scratch_tag&&pixel_y[11];
-wire legacy_bs=scratch_tag&&!pixel_y[11];
+wire wide_bs0=scratch_tag&&pixel_y[11]&&(pixel_y[10:9]!=2'b11);
+wire wide_bs1=scratch_tag&&!pixel_y[11]&&(pixel_y[10:9]!=2'b00);
+wire wide_bs=wide_bs0||wide_bs1;
+wire legacy_bs=scratch_tag&&!wide_bs;
 wire tcb=(pixel_component==Y)&&(pixel_x[11:10]==2'b01);
 wire tcr=(pixel_component==Y)&&(pixel_x[11:10]==2'b10);
 wire tag=tcb||tcr||scratch_tag;
 wire [1:0] legacy_bsc=(pixel_x[9:8]==2'b00)?Y:(pixel_x[9:8]==2'b01)?CB:(pixel_x[9:8]==2'b10)?CR:2'b11;
-wire [1:0] wide_bsc=(pixel_y[10:9]==2'b00)?Y:(pixel_y[10:9]==2'b01)?CB:(pixel_y[10:9]==2'b10)?CR:2'b11;
+wire [1:0] wide_bsc=wide_bs0?pixel_y[10:9]:(pixel_y[10:9]-2'b01);
 wire [1:0] bsc=wide_bs?wide_bsc:legacy_bsc;
 wire [1:0] ec=scratch_tag?bsc:tcb?CB:tcr?CR:pixel_component;
 wire [11:0] ex=wide_bs?{2'b00,pixel_x[9:0]}:legacy_bs?{4'b0000,pixel_x[7:0]}:(tag?{2'b00,pixel_x[9:0]}:pixel_x);
@@ -28,21 +30,21 @@ function automatic [28:0] r90;input [11:0] r;reg [28:0] x;begin x={17'd0,r};r90=
 function automatic [28:0] r45;input [11:0] r;reg [28:0] x;begin x={17'd0,r};r45=(x<<5)+(x<<3)+(x<<2)+x;end endfunction
 reg [63:0] b0,b1,b2,b3,b4,b5,b6,b7,sh;
 wire [63:0] shn={pixel_value,sh[63:8]};
-reg cap,flush,writing,ab,ascratch;reg [1:0] ac;reg [11:0] ox,oy;reg [2:0] wr;reg [28:0] wa;
+reg cap,flush,writing,ab,ascratch,ascratch_bank;reg [1:0] ac;reg [11:0] ox,oy;reg [2:0] wr;reg [28:0] wa;
 wire good=((ac==Y)&&(ox<720)&&(oy<480))||(((ac==CB)||(ac==CR))&&(ox<360)&&(oy<240));
-wire [28:0] off=ascratch?SCRATCH:(ab?BANK:0);
+wire [28:0] off=ascratch?(ascratch_bank?SCRATCH1:SCRATCH0):(ab?BANK:0);
 wire [28:0] first=(ac==Y)?YB+off+r90(oy)+{20'd0,ox[11:3]}:(ac==CB)?CBB+off+r45(oy)+{20'd0,ox[11:3]}:CRB+off+r45(oy)+{20'd0,ox[11:3]};
 wire [28:0] stride=(ac==Y)?90:45;
 assign ddram_burstcnt=writing?1:0;assign ddram_addr=writing?wa:0;assign ddram_rd=0;
 assign ddram_din=(wr==0)?b0:(wr==1)?b1:(wr==2)?b2:(wr==3)?b3:(wr==4)?b4:(wr==5)?b5:(wr==6)?b6:b7;
 assign ddram_be=8'hff;assign ddram_we=writing;
 always @(posedge clk)begin
- if(reset)begin cap<=0;flush<=0;writing<=0;ab<=0;ascratch<=0;ac<=0;ox<=0;oy<=0;wr<=0;wa<=0;sh<=0;block_stored<=0;write_seen<=0;store_error<=0;end
+ if(reset)begin cap<=0;flush<=0;writing<=0;ab<=0;ascratch<=0;ascratch_bank<=0;ac<=0;ox<=0;oy<=0;wr<=0;wa<=0;sh<=0;block_stored<=0;write_seen<=0;store_error<=0;end
  else begin
   block_stored<=0;
   if(block_start)begin
    if(cap||flush||writing)store_error<=1;
-   cap<=1;ac<=ec;ab<=frame_bank;ascratch<=scratch_tag;ox<={ex[11:3],3'b000};oy<={ey[11:3],3'b000};
+   cap<=1;ac<=ec;ab<=frame_bank;ascratch<=scratch_tag;ascratch_bank<=wide_bs1;ox<={ex[11:3],3'b000};oy<={ey[11:3],3'b000};
    if(scratch_tag&&(bsc==2'b11))store_error<=1;
   end
   if(pixel_valid)begin

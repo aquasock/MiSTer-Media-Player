@@ -51,7 +51,9 @@ assign store_block_complete=emit&&(ei==63);
 // Wide B scratch tag: X[11:10]=11 identifies scratch; Y[11:9]
 // identifies Y/Cb/Cr while preserving 10-bit X and 9-bit Y coordinates.
 assign store_pixel_x={2'b11,dest_x[9:0]};
-assign store_pixel_y=(blk<4)?{3'b100,luma_y[8:0]}:(blk==4)?{3'b101,chroma_y[8:0]}:{3'b110,chroma_y[8:0]};
+assign store_pixel_y=(blk<4)?(scratch_bank_latched?{3'b001,luma_y[8:0]}:{3'b100,luma_y[8:0]}):
+                     (blk==4)?(scratch_bank_latched?{3'b010,chroma_y[8:0]}:{3'b101,chroma_y[8:0]}):
+                              (scratch_bank_latched?{3'b011,chroma_y[8:0]}:{3'b110,chroma_y[8:0]});
 
 wire descriptor_order_error=(desc_count!=0)&&
     ({sideband_value[13:3],sideband_value[2:0]}<=
@@ -76,7 +78,7 @@ always @(posedge clk) begin
         mb_width<=0;mb_height<=0;geometry_seen<=0;motion_count<=0;motion_word<=0;motion_load<=0;
         motion_first_pending<=0;pending_direction<=0;pending_fmvx<=0;pending_fmvy<=0;
         desc_count<=0;last_desc_word<=0;current_desc_slot<=0;desc_active<=0;sample_expected<=0;metadata_done<=0;exec_desc_slot<=0;
-        pending<=0;started<=0;active<=0;future_bank_latched<=0;req<=0;waitresp<=0;req_kind<=0;
+        pending<=0;started<=0;active<=0;future_bank_latched<=0;scratch_bank_latched<=0;req<=0;waitresp<=0;req_kind<=0;
         mbi<=0;col<=0;mrow<=0;blk<=0;timeout<=0;emit<=0;wait_store<=0;pixel_setup<=0;residual_load<=0;residual_load_wait<=0;ei<=0;verify_row<=0;
         pred_direction<=0;tap_index<=0;pred_sum<=0;forward_prediction<=0;out_reg<=0;tap_byte_sel<=0;
         read_seen<=0;sample_nonzero<=0;half_sample_seen<=0;reconstructed_seen<=0;persisted_seen<=0;row_persisted<=0;error<=0;error_source<=0;

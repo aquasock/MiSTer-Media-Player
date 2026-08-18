@@ -52,6 +52,7 @@ mpeg2_h262_reference_read_probe mpeg2_h262_reference_read_probe
     .reference_frame_valid     (mpeg2_new_reference_frame_valid),
     .reference_frame_bank      (mpeg2_new_reference_frame_bank),
     .destination_frame_bank    (mpeg2_new_active_frame_bank),
+    .b_scratch_frame_bank      (mpeg2_new_b_decode_scratch_bank),
     .p_store_block_stored      (mpeg2_new_ddr_block_stored),
     .ddram_busy                (mpeg2_new_pred_busy),
     .ddram_dout                (DDRAM_DOUT),
@@ -80,33 +81,15 @@ mpeg2_h262_reference_read_probe mpeg2_h262_reference_read_probe
     .probe_error_detail        (mpeg2_new_pred_error_detail)
 );
 
-reg       mpeg2_new_display_frame_bank;
-reg       mpeg2_new_display_scratch;
-reg [2:0] mpeg2_new_framebuffer_swap_reset_count;
-reg       mpeg2_new_pending_frame_valid;
-reg       mpeg2_new_pending_frame_bank;
+wire      mpeg2_new_display_frame_bank;
+wire      mpeg2_new_display_scratch;
+wire      mpeg2_new_display_scratch_bank;
+wire [2:0] mpeg2_new_framebuffer_swap_reset_count;
 reg       mpeg2_new_swap_window_video;
-reg       mpeg2_new_b_user_success_d;
-reg       mpeg2_new_b_picture_frontend_d;
-reg       mpeg2_new_b_reorder_active;
-reg       mpeg2_new_b_scratch_pending;
-reg       mpeg2_new_b_future_frame_pending;
-reg       mpeg2_new_b_future_frame_bank;
-reg       mpeg2_new_b_scratch_presented;
-reg       mpeg2_new_b_presentation_complete;
-reg       mpeg2_new_b_presentation_error;
+wire      mpeg2_new_b_presentation_complete;
+wire      mpeg2_new_b_presentation_error;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] mpeg2_new_swap_window_sync;
-
-// Once a B has persisted, keep the compressed stream parked until the existing
-// two-vblank scratch->future-reference transaction has completed. B parsing
-// itself is not held because b_user_success rises only after persistence.
-assign mpeg2_new_b_presentation_hold =
-    mpeg2_new_b_reorder_active &&
-    ((mpeg2_new_b_user_success && !mpeg2_new_b_user_success_d) ||
-     mpeg2_new_b_scratch_pending ||
-     mpeg2_new_b_scratch_presented) &&
-    !mpeg2_new_b_presentation_complete;
 
 always @(posedge clk_video) begin
     if (reset_video)
@@ -125,15 +108,6 @@ end
 
 wire mpeg2_new_swap_window_pulse =
     mpeg2_new_swap_window_sync[1] && !mpeg2_new_swap_window_sync[2];
-
-wire mpeg2_new_b_user_success_edge =
-    mpeg2_new_b_user_success && !mpeg2_new_b_user_success_d;
-wire mpeg2_new_b_picture_frontend_active =
-    mpeg2_new_picture_seen && (mpeg2_new_picture_coding_type == 3'b011);
-wire mpeg2_new_b_picture_start_edge =
-    mpeg2_new_b_picture_frontend_active && !mpeg2_new_b_picture_frontend_d;
-wire mpeg2_new_b_future_waiting =
-    mpeg2_new_b_future_frame_pending && mpeg2_new_b_scratch_presented;
 
 wire mpeg2_new_frame_waiting =
     mpeg2_new_picture_420_complete &&

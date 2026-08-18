@@ -1,81 +1,13 @@
-        mpeg2_new_b_scratch_pending             <= 1'b0;
-        mpeg2_new_b_future_frame_pending        <= 1'b0;
-        mpeg2_new_b_future_frame_bank           <= 1'b0;
-        mpeg2_new_b_scratch_presented           <= 1'b0;
-        mpeg2_new_b_presentation_complete       <= 1'b0;
-        mpeg2_new_b_presentation_error          <= 1'b0;
-    end
-    else begin
-        mpeg2_new_b_user_success_d     <= mpeg2_new_b_user_success;
-        mpeg2_new_b_picture_frontend_d <= mpeg2_new_b_picture_frontend_active;
-
-        if (mpeg2_new_frame_waiting &&
-            !mpeg2_new_b_reorder_active &&
-            !mpeg2_new_b_picture_start_edge &&
-            !mpeg2_new_b_user_success_edge) begin
-            mpeg2_new_pending_frame_valid <= 1'b1;
-            mpeg2_new_pending_frame_bank  <= mpeg2_new_completed_frame_bank;
-        end
-
-        if (mpeg2_new_b_picture_start_edge) begin
-            mpeg2_new_b_reorder_active       <= 1'b1;
-            mpeg2_new_b_scratch_pending      <= 1'b0;
-            mpeg2_new_b_future_frame_pending <= 1'b1;
-            mpeg2_new_b_future_frame_bank    <= mpeg2_new_reference_frame_bank;
-            mpeg2_new_b_scratch_presented    <= 1'b0;
-            mpeg2_new_b_presentation_complete<= 1'b0;
-            mpeg2_new_pending_frame_valid    <= 1'b0;
-            if (mpeg2_new_display_scratch ||
-                (mpeg2_new_display_frame_bank == mpeg2_new_reference_frame_bank))
-                mpeg2_new_b_presentation_error <= 1'b1;
-        end
-
-        if (mpeg2_new_b_user_success_edge) begin
-            if (!mpeg2_new_b_reorder_active)
-                mpeg2_new_b_presentation_error <= 1'b1;
-            mpeg2_new_b_scratch_pending <= 1'b1;
-        end
-
-        if (mpeg2_new_swap_window_pulse &&
-            mpeg2_new_scheduled_frame_valid &&
-            mpeg2_new_scheduled_frame_differs) begin
-            mpeg2_new_display_scratch <= mpeg2_new_scheduled_frame_scratch;
-            if (!mpeg2_new_scheduled_frame_scratch)
-                mpeg2_new_display_frame_bank <= mpeg2_new_scheduled_frame_bank;
-            mpeg2_new_framebuffer_swap_reset_count <= 3'd4;
-
-            if (mpeg2_new_b_scratch_waiting) begin
-                mpeg2_new_b_scratch_pending   <= 1'b0;
-                mpeg2_new_b_scratch_presented <= 1'b1;
-            end
-            else if (mpeg2_new_b_future_waiting) begin
-                mpeg2_new_b_future_frame_pending <= 1'b0;
-                mpeg2_new_b_reorder_active       <= 1'b0;
-                mpeg2_new_pending_frame_valid    <= 1'b0;
-                if (mpeg2_new_b_scratch_presented &&
-                    !mpeg2_new_b_presentation_error)
-                    mpeg2_new_b_presentation_complete <= 1'b1;
-                else
-                    mpeg2_new_b_presentation_error <= 1'b1;
-            end
-            else begin
-                mpeg2_new_pending_frame_valid <= 1'b0;
-            end
-        end
-        else if (mpeg2_new_framebuffer_swap_reset_count != 3'd0) begin
-            mpeg2_new_framebuffer_swap_reset_count <=
-                mpeg2_new_framebuffer_swap_reset_count - 3'd1;
-        end
-    end
-end
-
 wire mpeg2_new_framebuffer_reset =
     reset_mpeg2 || (mpeg2_new_framebuffer_swap_reset_count != 3'd0);
 
-localparam [28:0] MPEG2_NEW_DDR_FRAME_BANK_WORDS    = 29'h00010000;
-localparam [28:0] MPEG2_NEW_DDR_FRAME_SCRATCH_WORDS = 29'h00020000;
+localparam [28:0] MPEG2_NEW_DDR_FRAME_BANK_WORDS     = 29'h00010000;
+localparam [28:0] MPEG2_NEW_DDR_FRAME_SCRATCH0_WORDS = 29'h00020000;
+localparam [28:0] MPEG2_NEW_DDR_FRAME_SCRATCH1_WORDS = 29'h00030000;
 wire [28:0] mpeg2_new_display_frame_offset =
-    mpeg2_new_display_scratch ? MPEG2_NEW_DDR_FRAME_SCRATCH_WORDS :
+    mpeg2_new_display_scratch ?
+        (mpeg2_new_display_scratch_bank ? MPEG2_NEW_DDR_FRAME_SCRATCH1_WORDS :
+                                           MPEG2_NEW_DDR_FRAME_SCRATCH0_WORDS) :
     mpeg2_new_display_frame_bank ? MPEG2_NEW_DDR_FRAME_BANK_WORDS : 29'd0;
 assign mpeg2_new_ddr_rd_banked_addr =
     mpeg2_new_ddr_rd_addr + mpeg2_new_display_frame_offset;
@@ -141,4 +73,3 @@ mpeg2_h262_ddram_arbiter mpeg2_h262_ddram_arbiter
     .ddram_be        (DDRAM_BE),
     .ddram_we        (DDRAM_WE)
 );
-

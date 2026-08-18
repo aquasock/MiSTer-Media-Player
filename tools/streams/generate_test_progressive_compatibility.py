@@ -68,6 +68,14 @@ def run(command: list[str]) -> None:
     subprocess.run(command, check=True)
 
 
+def ensure_sequence_end(stream: Path) -> None:
+    """Terminate raw encoder output so the streaming RTL can retire its last slice."""
+    sequence_end_code = b"\x00\x00\x01\xb7"
+    payload = stream.read_bytes()
+    if not payload.endswith(sequence_end_code):
+        stream.write_bytes(payload + sequence_end_code)
+
+
 def encoder_command(ffmpeg: str, case: Case, output: Path) -> list[str]:
     command = [
         ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
@@ -164,6 +172,7 @@ def main() -> None:
         output = output_dir / f"test_compat_{case.name}.m2v"
         command = encoder_command(ffmpeg, case, output)
         run(command)
+        ensure_sequence_end(output)
         picture_order = h.picture_types(ffprobe, output)
         analysis = analyzer.analyze_file(output)
         macroblock_counts = macroblock_debug_counts(ffmpeg, output)

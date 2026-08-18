@@ -64,7 +64,7 @@ module tb_h262_b_residual_streaming;
         .residual_store_write_data(residual_store_write_data),
         .residual_store_read_address(residual_store_read_address),
         .residual_store_read_data(residual_store_read_data),
-        .reference_valid(1'b1),.future_reference_bank(1'b1),
+        .reference_valid(1'b1),.future_reference_bank(1'b1),.scratch_frame_bank(1'b0),
         .store_block_stored(store_block_stored),.ddram_busy(1'b0),
         .ddram_dout(ddram_dout),.ddram_dout_ready(ddram_dout_ready),
         .ddram_burstcnt(burstcnt),

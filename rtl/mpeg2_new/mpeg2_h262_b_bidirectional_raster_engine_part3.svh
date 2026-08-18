@@ -16,7 +16,7 @@
 
         if(request&&!started)pending<=1;
         if(pending&&!started&&metadata_done) begin
-            pending<=0;started<=1;active<=1;future_bank_latched<=future_reference_bank;timeout<=26'h3ffffff;
+            pending<=0;started<=1;active<=1;future_bank_latched<=future_reference_bank;scratch_bank_latched<=scratch_frame_bank;timeout<=26'h3ffffff;
             mbi<=row_motion_base;col<=0;mrow<=exec_row;blk<=0;ei<=0;exec_desc_slot<=0;pred_direction<=0;motion_load<=1;pixel_setup<=0;residual_load<=0;residual_load_wait<=0;persisted_seen<=0;
             if(!reference_valid||!geometry_ok||(motion_count==0))begin error<=1;if(!error)error_source<=5'd8;active<=0;persisted_seen<=1;timeout<=0;motion_load<=0;end
         end

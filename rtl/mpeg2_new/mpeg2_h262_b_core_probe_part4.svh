@@ -155,7 +155,13 @@
                 // column after every coded endpoint. S_MBA then either parses
                 // another in-slice MBA or recognizes the buffered zero tail.
                 current_col<=current_col+1'b1;
-                mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;state<=S_MBA;
+                mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;
+                // Entry 206: once the rightmost macroblock is complete, only
+                // next_start_code() zero stuffing may remain.  Keep accepting
+                // that zero tail across any 510-byte refill boundary instead
+                // of attempting an impossible forty-sixth Table-B.1 symbol.
+                if(current_col==({2'b00,picture_mb_width}-1'b1))state<=S_STUFF;
+                else state<=S_MBA;
             end
             S_STUFF: begin if(parser_at_end)state<=S_SUCCESS;else if(parser_current_bit)state<=S_ERROR;end
             S_SUCCESS: begin
