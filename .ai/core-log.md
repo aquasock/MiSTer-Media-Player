@@ -889,7 +889,7 @@ None.
 - [ ] Passed
 
 ---
-## 210 COMMIT Unreleased ??? 2026-08-18T05:13:48-07:00
+## 210 COMMIT Unreleased 3fcf22f 2026-08-18T05:13:48-07:00
 
 #### Coming From:
 
@@ -901,17 +901,18 @@ Identify the hidden repeated-P parser failure that prevents the second dense P r
 
 #### Outcome:
 
-The full generated dense corpus reproduces POWER 4 at byte 1,192,302 with publication detail 1, two P headers but only one P publication, and three B headers after two B persistence events. Event tracing proves the second P emits zero rows and the generalized P parser has already latched `wide_error` with `proof_done` set before the third B header; the mixed-GOP shell gates that earlier P error after B ownership, so publication error is a downstream symptom. A speculative parked-B-header interlock deadlocked at the same byte and was removed. The remaining uncommitted changes are observational publication detail and the reproducer; no behavioral correction is retained.
+Commit `3fcf22f` proves the POWER-4 publication failure was downstream of stale B ownership: `b_candidate` remained asserted after B persistence, suppressed the following P parser's refill hold, and let thousands of compressed bytes overrun its active 512-byte window until coefficient state failed. The B parser now releases candidate ownership when the following non-B header is known, the P parser and publication shell retain sticky first-fault detail, and the complete dense regression passes 120 P rows, four P pictures, 210 B rows, seven B pictures, and five reference publications with no parser, transport, or publication error. Fail-open transport, parser-window, and restricted-slice regressions pass unchanged. The clean Quartus 17.0.2 build completes in 9 minutes 25 seconds with zero setup and hold TNS, no Critical Warning, +0.062 ns global setup, +0.249 ns global hold, +2.613 ns focused decoder setup, +14.318 ns focused decoder recovery, 29,163 ALMs, 41,923 registers, 4,025,331 memory bits, 503 RAM blocks, 65 DSP blocks, and 3 PLLs. RBF SHA-256 `6692722e11d44c10bbbd716e60d4b1761072c4b72452742d1df403c7342c1120` was uploaded to `10.10.0.30` and read back with the same hash.
 
 #### Next Steps:
 
-Stop pending approval to retarget this commit from publication ordering to repeated-P parser rearm. The revised work will preserve publication first-fault detail, add a first-fault code inside the wide P parser, correct the reproduced second-P failure, require all four dense P pictures and seven B pictures to parse, persist, and publish in order, then rerun the surrounding regressions before Quartus.
+Run `test_compat_dense_residual.m2v` on the deployed build and report load progression, final raster, and USER, POWER, and DISK indications; acceptance requires the full stream to complete without the former USER 2 / POWER 4 publication failure.
 
 #### Files Modified:
 
 - MediaPlayer_top_01.svh
 - MediaPlayer_top_02.svh
 - MediaPlayer_top_07.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
 - rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
@@ -921,7 +922,7 @@ Stop pending approval to retarget this commit from publication ordering to repea
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
