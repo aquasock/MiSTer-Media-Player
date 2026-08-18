@@ -1256,7 +1256,7 @@ None.
 - [ ] Passed
 
 ---
-## 223 COMMIT Unreleased ??? 2026-08-18T13:14:21-07:00
+## 223 COMMIT Unreleased bbe625e 2026-08-18T13:14:21-07:00
 
 #### Coming From:
 
@@ -1268,11 +1268,11 @@ Identify the first missing post-I50 live transaction without changing decoder or
 
 #### Outcome:
 
-The uploaded 14.501-second, 30 fps hardware capture disproves coded-order presentation: visible timestamps advance monotonically from frame 0 through B and reference pictures to frame 47, then reach the third-GOP I-picture at frame 50 and never advance again. Individual queued B pictures can occupy only one 60 Hz refresh and are therefore sometimes absent from the 30 fps recording, explaining the apparent two-or-three-frame jumps without implicating scheduler order. Add a passive final-GOP progress probe that arms on the third I header and records the deepest completed boundary through third-I publication, following-P header, P raster metadata, first P row persistence, full P persistence, reference publication, following-B header and persistence, scratch selection, and future-reference presentation. Export the settled stage through the existing DISK diagnostic while leaving USER, POWER, decode, DDR, ownership, and presentation control unchanged.
+The uploaded 14.501-second, 30 fps hardware capture disproves coded-order presentation: visible timestamps advance monotonically through B and reference pictures, reach the third-GOP I-picture at frame 50, and never advance again, while one-refresh B pictures explain the apparent camera-recorded skips. Commit `bbe625e` adds a passive probe that arms on the third I header and monotonically records eleven ordered boundaries through third-I publication, following-P header, P raster metadata, row and picture persistence, P reference publication, following-B header and persistence, B scratch selection, and future-reference presentation; only an otherwise passing DISK diagnostic consumes the stage, so USER, POWER, decode, DDR, ownership, and presentation control are unchanged. The focused stage/reset, B scheduler, and fail-open transport regressions pass. The 128x96 live-raster soak passes all 72 pictures with 22 P pictures, 47 B pictures, 25 publications, 25 display identities, final source-frame identity 71, and zero parser, prediction, writer, or presentation errors; the independent 720x480 long-GOP publication run matches 22 P, 47 B, 25 publications, 25 display identities, no overwrites, and completed presentation. The clean Quartus 17.0.2 build completes in 9 minutes 27 seconds with 0 errors, 121 standing warnings, global setup/hold slack +0.105/+0.175 ns, focused decoder/video setup slack +1.601/+7.708 ns, 29,418 ALMs, 42,182 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. `MediaPlayer_commit223_bbe625e.rbf` is 4,223,132 bytes with SHA-256 `0c9c1cf5cb7dc03bf66081e0ce69af2b34b29e64272edefab99780b350252236`; its MiSTer FTP readback is byte-identical.
 
 #### Next Steps:
 
-Prove the ordered diagnostic stages and reset behavior in a focused regression, rerun the live-raster, scheduler, publication, and fail-open suites, then complete a clean Quartus build and deploy the diagnostic RBF. Reload `test_compat_long_gop.m2v` once and report the DISK blink count from its settled diagnostic window; the count will name the first post-I50 boundary that hardware does not cross.
+Reload the deployed core, load `test_compat_long_gop.m2v` once, wait for its settled diagnostic window, and report the DISK blink count while also confirming the USER and POWER states and the last visible frame. A count from one through eleven names the deepest post-I50 boundary reached and therefore isolates the next hardware correction without another observational expansion.
 
 #### Files Modified:
 
@@ -1283,7 +1283,7 @@ Prove the ordered diagnostic stages and reset behavior in a focused regression, 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
