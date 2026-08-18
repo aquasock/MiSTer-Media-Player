@@ -913,3 +913,39 @@ Run `test_p_f_code_range.m2v`, `test_p_motion_residual.m2v`, `test_p_mba_escape.
 - [ ] Passed
 
 ---
+## 194 COMMIT Unreleased ??? 2026-08-17T17:15:45-07:00
+
+#### Coming From:
+
+Unreleased a42bb74
+
+#### Purpose:
+
+Generalize the progressive 4:2:0 B path from fixed `f_code=(3,3,3,3)` to independently picture-signaled forward and backward horizontal and vertical `f_code` values from 1 through 4.
+
+#### Outcome:
+
+Commit 193 passes all six requested hardware streams with the expected settled USER/POWER solid and DISK-dark result. The six photographs confirm the standing I, P and B rasters, the visual discriminator's horizontal and vertical center seams, and the new P `f_code` range stream's localized motion-vector markers. Static tracing identifies the next remaining fixed-3 boundary in the B parser: admission requires all four picture-coding-extension fields to equal 3, every nonzero component consumes exactly two residual bits, reconstruction uses a fixed `f_code=3` function, and the shared B selector also requires the forward pair to equal 3. The existing signed eight-bit B vector transport already covers the complete `f_code=4` reconstructed range of -128 through +127, so no raster or DDR interface widening is required.
+
+#### Next Steps:
+
+Capture and independently validate all four B-picture `f_code` fields, consume zero through three residual bits for each applicable forward or backward component, apply the existing H.262 reconstruction and wraparound rule using the selected field, and relax only the generalized B selector while preserving fixed-3 behavior and the P path. Extend the shared deterministic stream patcher and add one pixel-verified 720x480 B regression covering every admitted value, unequal forward/backward component pairs, nonzero residuals, both signs, independent predictor reuse and wraparound across two B reference pairs. Run focused exact parser/raster replay, regenerate every standing stream, complete a clean Quartus 17.0.2 build with nonnegative setup and hold slack and zero TNS, then hardware-run the new stream plus the six Commit-193 guards with the visual seams retained.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- tools/streams/h262common.py
+- tools/streams/generate_test_b_f_code_range.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
