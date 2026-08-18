@@ -32,12 +32,60 @@ module tb_h262_b_presentation_scheduler;
     task automatic pulse_swap;
         begin @(negedge clk);swap<=1;@(negedge clk);swap<=0;#1;end
     endtask
+    task automatic reset_scheduler;
+        begin
+            @(negedge clk);reset<=1;swap<=0;frame_waiting<=0;b_start<=0;
+            non_b_start<=0;sequence_end<=0;b_success<=0;b_error<=0;
+            repeat(2)@(negedge clk);reset<=0;#1;
+        end
+    endtask
+    task automatic finish_one_b;
+        input expected_future_bank;
+        begin
+            pulse_success();
+            pulse_close();
+            if(!hold)$fatal(1,"single-B run did not hold compressed input");
+            pulse_swap();
+            if(!display_scratch||display_scratch_bank)
+                $fatal(1,"single-B run did not present scratch 0");
+            pulse_swap();
+            if(display_scratch||(display_bank!==expected_future_bank)||
+               !complete||error||hold)
+                $fatal(1,"single-B future reference did not retire");
+        end
+    endtask
 
     initial begin
         repeat(4)@(posedge clk);@(negedge clk);reset<=0;
 
+        // Header before publication: P47 is still both the displayed and
+        // registered reference.  Do not reject B48; wait for I50 publication.
+        reference_bank<=0;completed_bank<=1;
+        pulse_start();
+        if(!dut.future_reference_pending||error)
+            $fatal(1,"B-before-publication did not await future reference");
+        @(negedge clk);reference_bank<=1;frame_waiting<=1;
+        @(negedge clk);frame_waiting<=0;#1;
+        if(dut.future_reference_pending||(dut.future_frame_bank!==1'b1)||
+           dut.pending_frame_valid||error)
+            $fatal(1,"late publication did not bind open B run");
+        finish_one_b(1);
+
+        // Header simultaneous with publication must use completed_frame_bank,
+        // not the stale registered reference bank from the preceding cycle.
+        reset_scheduler();
+        reference_bank<=0;completed_bank<=1;
+        @(negedge clk);b_start<=1;frame_waiting<=1;
+        @(negedge clk);b_start<=0;frame_waiting<=0;reference_bank<=1;#1;
+        if(dut.future_reference_pending||(dut.future_frame_bank!==1'b1)||
+           dut.pending_frame_valid||error)
+            $fatal(1,"simultaneous publication used stale reference bank");
+        finish_one_b(1);
+
+        reset_scheduler();
+
         // A reference publication on the swap edge must remain hidden until
-        // the following header classifies it.  B owns it as the future frame.
+        // the later B header classifies it and takes future-frame ownership.
         @(negedge clk);completed_bank<=1;reference_bank<=1;
         frame_waiting<=1;swap<=1;
         @(negedge clk);frame_waiting<=0;swap<=0;#1;
@@ -104,7 +152,7 @@ module tb_h262_b_presentation_scheduler;
         if(display_scratch||display_bank)
             $fatal(1,"ordinary frame presentation did not recover after abort");
 
-        $display("B_PRESENTATION_RESULT race_barrier=1 order=scratch0,scratch1,future ordinary=1 terminal=1 fail_open=1");
+        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future ordinary=1 terminal=1 fail_open=1");
         $finish;
     end
 
