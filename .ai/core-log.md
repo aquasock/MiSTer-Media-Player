@@ -757,7 +757,7 @@ Correct the second and later B-picture parser/lifecycle behavior, require the co
 - [ ] Passed
 
 ---
-## 206 COMMIT Unreleased ??? 2026-08-18T03:32:00-07:00
+## 206 COMMIT Unreleased 2dd4c67 2026-08-18T04:27:00-07:00
 
 #### Coming From:
 
@@ -769,25 +769,38 @@ Correct repeated-B parsing and transaction lifecycle so every picture in the den
 
 #### Outcome:
 
-Commit `c9636a7` guarantees fail-open transport after the existing second-B fault but intentionally leaves that standards-valid picture rejected. This commit will isolate the earliest bit-consumption divergence in the second B picture, correct only the responsible parser or transaction state, and extend the dense regression from its former first-P and first-B stopping points through all eleven inter pictures and the sequence end.
+Commit `c9636a7` guarantees fail-open transport after the former second-B fault. Commits `10d88d0` and `2dd4c67` complete the repeated-B correction: a rightmost macroblock now enters zero-stuffing state, a stuffing-only refill tail may terminate with fewer than three buffered bytes, raw compatibility streams receive an explicit sequence end, and every accepted picture header produces its own presentation event even when adjacent coding types are both B. Two independent non-reference scratch frames preserve consecutive B display order before the retained future reference, while decoder or ownership failure aborts presentation backpressure. The full 2,875,985-byte dense parser/transform replay completes all seven B pictures, 210 row transactions, 9,450 motion records, 52,846 residual blocks, 1,539,306 coefficient events, and 3,382,144 spatial samples without error. Focused regressions also prove 4,102 accepted transport bytes with zero post-abort stalls, scratch0/scratch1/future presentation order plus fail-open recovery, all six scratch-bank/plane tag mappings, and the established 518,400-sample B residual raster.
+
+The final clean Quartus 17.0.2 build completes in 9 minutes 14 seconds with zero setup, hold, or recovery TNS, no Critical Warning, +0.496 ns global setup, +0.245 ns global hold, +3.411 ns global recovery, +1.666 ns focused decoder setup, and +14.384 ns focused decoder recovery. It uses 28,935 ALMs, 41,815 registers, 4,025,331 memory bits, 503 RAM blocks, 65 DSP blocks, and 3 PLLs. Generated RBF `MediaPlayer.rbf` has SHA-256 `c681b82a672dc7c21eff38bfd69244510481cef7cfc6bc0cb9f3dc2647cef56e`; regenerated stream `test_compat_dense_residual.m2v` has SHA-256 `f8e05f5cfd0c0385566bbc3e4133d9f42cb5547933d92e24b0d87eec3fa0a79e`. Both files were uploaded to the standard MiSTer at `10.10.0.30` and read back with matching hashes.
 
 #### Next Steps:
 
-Prove exact macroblock, residual-block, coefficient, row-retirement, persistence, reference-publication, B-presentation, and terminal stream-readiness invariants across the full dense sequence; retain the seven standing hardware generators and focused P/B row regressions, then build and deploy the resulting RBF for a complete MiSTer rerun.
+Run `test_compat_dense_residual.m2v` through its complete sequence on MiSTer. Confirm the raster remains coherent through every P/B interval, the file-transfer overlay retires instead of freezing, and the terminal LEDs are solid USER, solid POWER, and dark DISK. Report any transient image order issue separately from the settled LED state.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- MediaPlayer.sdc
+- files.qip
+- MediaPlayer_top_02.svh
 - MediaPlayer_top_04.svh
+- MediaPlayer_top_05.svh
+- MediaPlayer_top_06.svh
+- tools/streams/generate_test_progressive_compatibility.py
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_b_residual_streaming.sv
 - tools/streams/tb_h262_dense_transport_recovery.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
