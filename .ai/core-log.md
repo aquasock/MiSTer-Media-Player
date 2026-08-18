@@ -1107,3 +1107,36 @@ None.
 - [ ] Passed
 
 ---
+## 217 COMMIT Unreleased ??? 2026-08-18T10:42:27-07:00
+
+#### Coming From:
+
+Unreleased 69d1b90
+
+#### Purpose:
+
+Guarantee fail-open HPS transfer retirement when a sticky downstream decode, raster, DDR, or presentation failure makes normal persistence impossible.
+
+#### Outcome:
+
+Add an explicit MPEG-domain transport gate between the dual-clock FIFO and the decoder. During clean operation it will preserve the existing ready/valid contract exactly; after any already-latched fatal pipeline or presentation error, it will stop delivering bytes to the front end and decoder while continuing to drain the FIFO so `ioctl_wait` can release and the existing post-load LED snapshot can report the first error. Add a focused regression that proves normal backpressure, clean accepted-byte delivery, and bounded fail-open drain with decoder readiness held low, then retain the complete mixed, long, and dense publication regressions at hardware-scale swap cadence.
+
+#### Next Steps:
+
+Implement the transport gate without changing clean-stream decode or presentation ownership, run the focused fail-open and complete compatibility regressions, and produce a clean Quartus build for MiSTer. Hardware should first confirm that the long stream always retires its file overlay and reports either a precise existing LED error code or a clean final presentation; use that result to repair any remaining raster error rather than allowing another silent host-transfer lockup.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_02.svh
+- MediaPlayer_top_05.svh
+- files.qip
+- rtl/mpeg2_new/mpeg2_h262_stream_transport_gate.sv
+- tools/streams/tb_h262_stream_transport_gate.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
