@@ -832,7 +832,7 @@ None.
 - [ ] Passed
 
 ---
-## 208 COMMIT Unreleased ??? 2026-08-18T04:42:35-07:00
+## 208 COMMIT Unreleased 450f78a 2026-08-18T04:42:35-07:00
 
 #### Coming From:
 
@@ -844,11 +844,11 @@ Accept a generalized P picture whose persistence proof precedes its parser compl
 
 #### Outcome:
 
-The planned commit will make the P raster-hold admission consume an already-present persistence proof atomically instead of arming a timeout that cannot inspect the proof until it has been withdrawn. A focused regression will reproduce the hardware ordering by retiring the final streamed row with picture persistence asserted, then requiring completion without POWER-9 error or timeout delay.
+Commit `450f78a` makes P raster-hold admission consume an already-present persistence proof atomically. The focused regression reproduces the hardware ordering: before the correction all 30 rows retired but completion left `raster_hold_active` set and `raster_hold_ready` clear; afterward the same transaction completes immediately with the hold inactive, ready asserted, no error, and P acceptance retained. The dense P row regression completes 1,350 motion records, 8,100 residual blocks, 175,586 coefficients, and 518,400 samples; the seven-B corpus, fail-open transport, two-scratch presentation, and six storage-tag regressions also pass unchanged.
 
 #### Next Steps:
 
-Implement the completion/persistence handshake correction, run the focused final-row regression plus the established P row-streaming, dense B, transport-recovery, presentation, and storage-tag regressions, then complete a clean Quartus build and deploy the resulting RBF and regenerated dense compatibility stream to the standard MiSTer target.
+Complete a clean Quartus build, require timing closure with no Critical Warning, then deploy the resulting RBF and regenerated dense compatibility stream to the standard MiSTer target for hardware confirmation that the former timeout delay and USER-2/POWER-9 result are gone.
 
 #### Files Modified:
 
