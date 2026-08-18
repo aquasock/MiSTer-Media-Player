@@ -120,7 +120,7 @@ Reload the MiSTer core and load `test_compat_long_gop.m2v` while recording from 
 - [ ] Passed
 
 ---
-## 229 COMMIT Unreleased ??? 2026-08-18T15:58:14-07:00
+## 229 COMMIT Unreleased 6a4e935 2026-08-18T15:58:14-07:00
 
 #### Coming From:
 
@@ -132,11 +132,11 @@ Remove the registered cache-hit handshake from generalized P/B prediction so res
 
 #### Outcome:
 
-Entry 228 hardware remains functionally clean: the long-GOP stream reaches source frame 71, USER and POWER are solid, and DISK code 11 confirms the deepest successful final-GOP boundary, future-reference presentation. Its approximately 9.9-second load time is only about 7.3 fps and remains well below the encoded 25 fps rate. Because Entry 228 simulation removed 78.5 percent of external reads while hardware still misses the throughput target, DDR bandwidth is no longer the first boundary; static cycle tracing shows that each cache hit still passes through request capture, acceptance, registered response, and engine response consumption before a pel can advance. Expose the cache's associative lookup result to the selected P or B raster engine, add an explicit consume event for accounting, and let a hit advance the tap accumulator directly while retaining the existing registered transaction for misses and all uncached accesses.
+Entry 228 hardware is functionally clean but remains throughput-limited: `test_compat_long_gop.m2v` reaches source frame 71 in approximately 9.9 seconds with USER and POWER solid, while DISK code 11 confirms the deepest successful final-GOP boundary rather than an error. Commit `a16947a` first exposed a combinational cache-hit path and reduced the exact 72-picture live-raster soak from 25,249,996 to 19,449,996 cycles, but its -5.112 ns decoder setup slack made it ineligible for deployment. Commit `6a4e935` replaces that path with timing-safe registered lookup responses while presenting each successive half-pel tap during the preceding response. The focused cache test passes three hits, nine misses, two uncached accesses, and eleven downstream transactions; the B-residual and P-intra engine regressions remain exact. The integrated soak reconstructs and presents all 72 pictures with 622,811 DDR reads, 2,267,813 cache hits, 463,835 misses, 158,976 uncached accesses, final source-frame identity 71, and zero decoder, reconstruction, or presentation errors in 21,249,996 cycles, a 15.84 percent reduction from Entry 228. The session-authorized incremental Quartus 17.0.2 compile completes in 9 minutes 36 seconds with 0 errors and 121 standing warnings; global setup/hold slack is +0.323/+0.253 ns, focused decoder/video setup slack is +1.545/+8.686 ns, decoder recovery slack is +14.665 ns, and utilization is 30,259 ALMs, 43,273 registers, 4,027,379 memory bits, and 65 DSP blocks. `MediaPlayer_commit229_6a4e935.rbf` is 4,262,892 bytes with SHA-256 `aec392b4a8e5e4284039e8eff449d7d012c398fd67f8b8fc903f27a0476aabeb`; its MiSTer FTP readback is byte-identical.
 
 #### Next Steps:
 
-Extend the focused cache regression to prove direct-hit lookup and consumption, miss fallback, replacement, invalidation, delayed DDR response, and uncached isolation. Add cycle accounting to the integrated 72-picture live-raster soak, require exact reconstructed memory, persistence, publication, ownership, scratch selection, and final display identity to remain unchanged, and require a material cycle reduction before the session-authorized incremental Quartus build. Deploy the resulting RBF for another timed long-GOP run; if direct hits still do not reach 25 fps, preserve the measured gain and use the cycle breakdown to choose between residual-read bubbles and post-store verification traffic.
+Reload the deployed core and time one run of `test_compat_long_gop.m2v`, reporting the elapsed load time, last visible frame, and settled USER, POWER, and DISK states. The cycle model predicts approximately 8.3 seconds if the 15.84 percent reduction transfers directly to hardware, which is an improvement but still below 25 fps. If the hardware result confirms the gain, retain it and profile the remaining residual-read bubbles and post-store verification traffic before choosing the next throughput change.
 
 #### Files Modified:
 
@@ -144,14 +144,17 @@ Extend the focused cache regression to prove direct-hit lookup and consumption, 
 - rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
 - rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
 - tools/streams/tb_h262_prediction_word_cache.sv
 - tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_p_intra_macroblocks.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
