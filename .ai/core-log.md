@@ -949,3 +949,33 @@ Run `test_b_f_code_range.m2v`, `test_p_f_code_range.m2v`, `test_p_motion_residua
 - [x] Passed
 
 ---
+## 195 VERSION v0.5.0 ??? 2026-08-17T18:02:13-07:00
+
+#### Coming From:
+
+Unreleased b1bde49
+
+#### Purpose:
+
+Publish the hardware-qualified 720x480 progressive 4:2:0 I/P/B and independently signaled P/B `f_code` 1-through-4 milestone as pre-release v0.5.0.
+
+#### Outcome:
+
+Commit 194 passes the authoritative seven-stream hardware matrix with USER and POWER solid, DISK dark, and all decoded images accepted. Going forward that matrix is `test_i_baseline.m2v`, `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_b_bidirectional.m2v`, `test_p_visual_discriminator.m2v`, `test_p_f_code_range.m2v`, and `test_b_f_code_range.m2v`; the former nine-stream matrix is invalid for release qualification. This proposed v0.5.0 boundary will document the expanded 720x480 P/B envelope, picture-signaled component `f_code` coverage, qualified timing and resources, current limitations, and the authoritative regression evidence without changing decoder RTL.
+
+#### Next Steps:
+
+After approval, clone GitHub `master` into a clean directory, build it from scratch with Quartus Prime 17.0.2, require nonnegative setup and hold slack, zero TNS, and no Critical Warning, and provide that exact RBF for the seven-stream hardware matrix. Once the user accepts the fresh-clone result, update `README.md` and `CHANGELOG.md`, add `docs/RELEASE_NOTES_v0.5.0.md`, commit and push the release metadata, resolve this entry to the release commit, and have the user create the annotated `v0.5.0` tag and GitHub pre-release titled `MiSTer Media Player v0.5.0` with the date-coded `MediaPlayer_20260817.rbf` asset.
+
+#### Files Modified:
+
+- README.md
+- CHANGELOG.md
+- docs/RELEASE_NOTES_v0.5.0.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
