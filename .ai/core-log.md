@@ -1168,3 +1168,31 @@ None.
 - [ ] Passed
 
 ---
+## 219 COMMIT Unreleased ??? 2026-08-18T11:10:43-07:00
+
+#### Coming From:
+
+Unreleased a559d43
+
+#### Purpose:
+
+Preserve the settled LED diagnostic snapshot when fail-open transport intentionally discards the stream's final sequence-end code.
+
+#### Outcome:
+
+Extend only the existing settled-snapshot arm condition so either the decoded sticky sequence-end flag or the sticky transport-fatal flag starts the same four-slot, one-second stabilization delay. Keep the capture registers, first-fault priority, blink epoch, clean-stream sequence-end behavior, and transport drain unchanged. Static and synthesis validation must prove that the fatal path reaches `mpeg2_new_diag_snapshot_valid` without feeding discarded bytes back into the decoder.
+
+#### Next Steps:
+
+Apply the trigger correction, rerun the focused transport and presentation regressions, produce a clean Quartus build, deploy it to the connected MiSTer with readback verification, and reload the long-GOP stream to obtain the concealed frame-50 USER, POWER, and DISK error codes.
+
+#### Files Modified:
+
+- MediaPlayer_top_07.svh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
