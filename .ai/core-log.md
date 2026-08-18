@@ -477,6 +477,7 @@ Run the parser-window stream, Commit-197 multi-slice stream, and authoritative s
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part1.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
@@ -710,7 +711,6 @@ Install the Commit-204 RBF and run `test_compat_dense_residual.m2v`, `test_p_res
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
 - rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
@@ -926,7 +926,7 @@ Proceed to the next v0.6.0 roadmap boundary by recording its proposal before mak
 - [x] Passed
 
 ---
-## 211 COMMIT Unreleased ??? 2026-08-18T07:25:22-07:00
+## 211 COMMIT Unreleased 19914b2 2026-08-18T07:25:22-07:00
 
 #### Coming From:
 
@@ -938,11 +938,11 @@ Integrate intra-coded macroblocks into the generalized progressive B-picture pat
 
 #### Outcome:
 
-The approved boundary will add the required non-scalable B-picture intra macroblock-type syntax, DC predictor and differential handling, intra inverse quantisation metadata, and reference-bypassed clipped spatial reconstruction by reusing the shared transform and sparse-sample architecture already proven by generalized P. The implementation will preserve forward, backward, bidirectional, skipped, and non-intra residual-coded B macroblocks, add focused mixed intra and non-intra B regressions, and extend the local standards library only with the H.262 conclusions needed to control this work.
+Commit `19914b2` recognizes the H.262 Table B.4 unquantised and quantised intra macroblock types in non-scalable B pictures, applies picture-signalled DC precision and intra VLC format, carries intra ownership through the shared transform and sparse-sample protocol, and reconstructs all six 4:2:0 blocks without reference prediction. The deterministic 182,458-byte B-intra stream places unquantised and quantised intra macroblocks at column 20 in consecutive rows and passes software reference verification; RTL produces exactly 1,350 B macroblocks, two intra markers, twelve intra blocks, twelve DC events, 768 spatial samples and writes, and exactly 768 changed raster samples without parser or raster error. The complete 366,071-byte mixed corpus passes 210 P rows, seven P pictures, 450 B rows, fifteen B pictures, and eight reference publications without transport, decoder, publication, or presentation error; parser-window, standing B-residual, prediction-source, active-hierarchy, and authoritative seven-generator regressions also pass. Standards record H262-026 is published by metadata commit `d182f15`. The clean Quartus 17.0.2 build completes in 9 minutes 27 seconds with zero setup and hold TNS, no Critical Warning, +0.294 ns global setup, +0.248 ns global hold, +2.057 ns focused decoder setup, 29,442 ALMs, 42,188 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. RBF SHA-256 is `350773e5804bccd566dd4cb7c8a953427e2bafae2feebf50bbeb890fc87b1176`; B-intra stream SHA-256 is `60c914c8d9232515b21cbbd55416e1ae17c7134ee45af5f90829f06026b78166`; regenerated mixed-corpus SHA-256 is `ad1d9e81f0f7544ac16a1aaddb85ef9e1065333c1fdd305aa3cf275aa1ccc289`.
 
 #### Next Steps:
 
-Implement and simulate the B-intra path, require the 24-picture `mixed_macroblocks` compatibility stream to complete every I, P, and B picture without parser, reconstruction, publication, presentation, or transport error, reproduce the authoritative seven-stream v0.5.0 generators and focused standing regressions, perform a clean Quartus 17.0.2 build, and provide the resulting RBF for MiSTer validation.
+Install the Commit-211 RBF and run `test_b_intra_macroblocks.m2v` through one complete settled diagnostic report, confirming coherent display order I/B/P, two vertically adjacent authored intra macroblocks at column 20 in rows 8 and 9, solid USER and POWER, and dark DISK. Then run `test_compat_mixed_macroblocks.m2v` through all 24 pictures and confirm coherent I/P/B presentation, complete transfer retirement, and the same settled LED result.
 
 #### Files Modified:
 
@@ -954,11 +954,14 @@ Implement and simulate the B-intra path, require the 24-picture `mixed_macrobloc
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- tools/streams/generate_test_b_intra_macroblocks.py
 - tools/streams/tb_h262_b_intra_macroblocks.sv
+- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_dense_publication_order.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
