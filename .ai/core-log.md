@@ -993,7 +993,7 @@ None.
 - [x] Passed
 
 ---
-## 213 COMMIT Unreleased ??? 2026-08-18T08:13:58-07:00
+## 213 COMMIT Unreleased 065a775 2026-08-18T08:13:58-07:00
 
 #### Coming From:
 
@@ -1005,19 +1005,20 @@ Qualify long-GOP decoder ownership, reference rotation, publication order, and s
 
 #### Outcome:
 
-The planned commit will extend the complete I/P/B publication regression with a long-GOP mode that consumes the existing deterministic 791,528-byte corpus, retires every row and picture through the same persistence handshake as hardware, and checks all 22 P pictures, 47 B pictures, and 25 reference publications without transport, parser, reconstruction, ownership, or publication errors. Any failure will be localized to the first affected transition and corrected within this boundary without broadening the supported H.262 profile.
+Commit `065a775` extends the complete I/P/B publication regression with a long-GOP mode and corrects the single boundary it exposed: when a P parser refill ended exactly after a complete row and its alignment zeroes, the resumed capture contained only the two retained start-code-prefix bytes and was falsely rejected as a short slice chunk. The P path now accepts that empty `R_STUFF` tail for boundary classification, matching the standing B behavior without changing decoded syntax. The complete 791,528-byte long-GOP regression passes 660 P rows, 22 P pictures, 1,410 B rows, 47 B pictures, and 23 reference publications and promotions across three GOPs without transport, parser, reconstruction, ownership, persistence, or publication error. The 366,071-byte mixed and 2,875,985-byte dense publication regressions pass unchanged, and all seven authoritative stream hashes match their published values. The clean Quartus 17.0.2 build completes in 9 minutes 20 seconds with zero setup and hold TNS, no Critical Warning, +0.428 ns global setup, +0.247 ns global hold, +1.600 ns focused decoder setup, +15.088 ns focused decoder recovery, 29,576 ALMs, 42,157 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. RBF SHA-256 is `3e60392fba96cab4d5ee00215bc55401441e71e4784a92ee0ae792833832bbe4`; long-GOP stream SHA-256 is `39dd3e889d1baa42e4d65fc2d6ca7a04c58c2ac38de0a5b1dba00e6585836d96`.
 
 #### Next Steps:
 
-Run the long-GOP regression to completion, preserve the mixed and dense publication regressions and the authoritative seven-generator hashes, build any required bounded correction cleanly, and then install the resulting RBF for a full 72-picture MiSTer soak with USER and POWER solid and DISK off.
+Install `MediaPlayer_commit213_065a775.rbf` and load `test_compat_long_gop.m2v` through all 72 pictures and one complete settled diagnostic report, confirming coherent repeated-GOP I/P/B presentation, complete transfer retirement, USER and POWER solid, and DISK off.
 
 #### Files Modified:
 
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
 - tools/streams/tb_h262_dense_publication_order.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
