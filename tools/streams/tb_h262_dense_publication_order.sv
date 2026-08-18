@@ -1,9 +1,9 @@
 `timescale 1ns/1ps
 
-// Entries 210/213 complete dense I/P/B publication regression.  The combined P/B
-// sideband is retired exactly as the hardware raster engines retire it: every
-// row terminator receives one row-persistence pulse and each final-row
-// terminator receives the corresponding picture-persistence pulse.
+// Entry 215 complete repeated-GOP publication/presentation regression.  The
+// real front end admits every I picture, the combined P/B sideband is retired
+// exactly as the raster engines retire it, and a bounded vblank model requires
+// the final reference identity to reach the display without a bank overwrite.
 module tb_h262_dense_publication_order;
     localparam integer MAX_STREAM_BYTES=3145728;
 
@@ -23,7 +23,11 @@ module tb_h262_dense_publication_order;
     integer expected_b_rows,expected_b_pictures;
     integer expected_reference_publications;
 
-    wire stream_ready,picture_complete;
+    wire stream_ready,decoder_stream_ready,picture_complete;
+    wire phase1_supported;
+    wire [13:0] frontend_vertical_size;
+    wire [1:0] frontend_intra_dc_precision;
+    wire frontend_intra_vlc_format;
     wire [7:0] picture_count,reference_promotion_count;
     wire reference_valid,reference_bank,active_bank,completed_bank;
     wire sideband_valid;
@@ -32,6 +36,35 @@ module tb_h262_dense_publication_order;
     wire probe_error,b_success;
     wire [3:0] probe_error_source,p_probe_error_source,p_progress_detail;
     wire [2:0] publication_error_detail;
+    wire display_frame_bank,display_scratch,display_scratch_bank;
+    wire decode_scratch_bank,presentation_hold,presentation_complete;
+    wire presentation_error;
+    wire [2:0] framebuffer_swap_reset_count;
+    reg swap_window_pulse=0;
+    integer swap_counter=0;
+    reg [31:0] presentation_picture_window=0;
+    reg presentation_header_capture=0;
+    reg presentation_header_second_byte=0;
+    reg b_picture_start=0,non_b_picture_start=0,sequence_end=0;
+    reg reference_ownership_arm=0;
+    reg destination_ownership_hold=0;
+    integer destination_hold_count=0;
+    integer displayed_bank_overwrite_count=0;
+    reg [7:0] reference_identity[0:1];
+    reg [7:0] scratch_identity[0:1];
+    reg b_success_d=0;
+
+    wire [31:0] presentation_picture_window_next=
+        {presentation_picture_window[23:0],stream_data};
+    wire frame_waiting=picture_complete&&
+        (display_scratch||(completed_bank!=display_frame_bank));
+    wire destination_display_owned=!display_scratch&&
+        (active_bank==display_frame_bank);
+    wire [7:0] displayed_identity=display_scratch?
+        scratch_identity[display_scratch_bank]:reference_identity[display_frame_bank];
+
+    assign stream_ready=decoder_stream_ready&&!presentation_hold&&
+        !destination_ownership_hold;
 
     wire p_row_terminator=sideband_valid&&(sideband_index==6'h3f)&&
         ((sideband_value==16'shA2FE)||(sideband_value==16'shA2FF));
@@ -42,11 +75,20 @@ module tb_h262_dense_publication_order;
 
     always #5 clk=~clk;
 
+    mpeg2_h262_frontend frontend(
+        .clk(clk),.reset(reset),.stream_data(stream_data),
+        .stream_valid(stream_valid),.phase1_supported(phase1_supported),
+        .vertical_size(frontend_vertical_size),
+        .intra_dc_precision(frontend_intra_dc_precision),
+        .intra_vlc_format(frontend_intra_vlc_format));
+
     mpeg2_h262_two_picture_probe dut(
         .clk(clk),.reset(reset),.stream_data(stream_data),
-        .stream_valid(stream_valid),.stream_ready(stream_ready),
-        .phase1_supported(1'b1),.vertical_size(14'd480),
-        .intra_dc_precision(2'd0),.intra_vlc_format(1'b0),
+        .stream_valid(stream_valid),.stream_ready(decoder_stream_ready),
+        .phase1_supported(phase1_supported),
+        .vertical_size(frontend_vertical_size),
+        .intra_dc_precision(frontend_intra_dc_precision),
+        .intra_vlc_format(frontend_intra_vlc_format),
         .pipeline_block_done(1'b1),.recon_block_complete(1'b1),
         .p_persistence_complete(picture_persistence),
         .p_row_persistence_complete(row_persistence),
@@ -65,7 +107,25 @@ module tb_h262_dense_publication_order;
         .b_user_success(b_success)
     );
 
+    mpeg2_h262_b_presentation_scheduler scheduler(
+        .clk(clk),.reset(reset),.swap_window_pulse(swap_window_pulse),
+        .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
+        .reference_frame_bank(reference_bank),.b_picture_start(b_picture_start),
+        .non_b_picture_start(non_b_picture_start),.sequence_end(sequence_end),
+        .b_user_success(b_success),.b_decode_error(probe_error),
+        .display_frame_bank(display_frame_bank),.display_scratch(display_scratch),
+        .display_scratch_bank(display_scratch_bank),
+        .decode_scratch_bank(decode_scratch_bank),
+        .framebuffer_swap_reset_count(framebuffer_swap_reset_count),
+        .presentation_hold(presentation_hold),
+        .presentation_complete(presentation_complete),
+        .presentation_error(presentation_error));
+
     initial begin
+        reference_identity[0]=0;
+        reference_identity[1]=0;
+        scratch_identity[0]=0;
+        scratch_identity[1]=0;
         if(!$value$plusargs("HEX=%s",hex_path))$fatal(1,"missing +HEX");
         if(!$value$plusargs("LEN=%d",stream_len))$fatal(1,"missing +LEN");
         mixed_mode=$test$plusargs("MIXED");
@@ -76,13 +136,13 @@ module tb_h262_dense_publication_order;
             expected_p_pictures=22;
             expected_b_rows=1410;
             expected_b_pictures=47;
-            expected_reference_publications=23;
+            expected_reference_publications=25;
         end else if(mixed_mode)begin
             expected_p_rows=210;
             expected_p_pictures=7;
             expected_b_rows=450;
             expected_b_pictures=15;
-            expected_reference_publications=8;
+            expected_reference_publications=9;
         end else begin
             expected_p_rows=120;
             expected_p_pictures=4;
@@ -111,6 +171,60 @@ module tb_h262_dense_publication_order;
     end
 
     always @(posedge clk) begin
+        swap_window_pulse<=0;
+        b_picture_start<=0;
+        non_b_picture_start<=0;
+        sequence_end<=0;
+        b_success_d<=b_success;
+        // A bounded synthetic vblank cadence proves ordering without making
+        // full-corpus simulation wait for wall-clock display timing.
+        if(swap_counter==99999)begin
+            swap_counter<=0;
+            swap_window_pulse<=1;
+        end else swap_counter<=swap_counter+1;
+
+        if(stream_valid)begin
+            presentation_picture_window<=presentation_picture_window_next;
+            if(presentation_picture_window_next==32'h00000100)begin
+                presentation_header_capture<=1;
+                presentation_header_second_byte<=0;
+            end else if(presentation_header_capture)begin
+                if(!presentation_header_second_byte)
+                    presentation_header_second_byte<=1;
+                else begin
+                    presentation_header_capture<=0;
+                    presentation_header_second_byte<=0;
+                    if(stream_data[5:3]==3'b011)b_picture_start<=1;
+                    else non_b_picture_start<=1;
+                    if(reference_ownership_arm)begin
+                        reference_ownership_arm<=0;
+                        if((stream_data[5:3]==3'b010)&&
+                           destination_display_owned)begin
+                            destination_ownership_hold<=1;
+                            destination_hold_count<=destination_hold_count+1;
+                        end
+                    end
+                end
+            end
+            if(presentation_picture_window_next==32'h000001b7)
+                sequence_end<=1;
+        end
+
+        if(destination_ownership_hold&&!destination_display_owned)
+            destination_ownership_hold<=0;
+
+        if(picture_complete)begin
+            if(frontend.picture_coding_type==3'b010)
+                reference_ownership_arm<=1;
+            reference_identity[completed_bank]<=published_references+1;
+            if((published_references!=0)&&!display_scratch&&
+               (completed_bank==display_frame_bank))
+                displayed_bank_overwrite_count<=
+                    displayed_bank_overwrite_count+1;
+        end
+        if(b_success&&!b_success_d)
+            scratch_identity[decode_scratch_bank]<=b_pictures;
+
         row_persistence<=0;
         picture_persistence<=0;
         previous_wide_parser_state<=
@@ -196,11 +310,15 @@ module tb_h262_dense_publication_order;
             transport_stall_cycles<=0;
         end else if(stream_index<stream_len)begin
             transport_stall_cycles<=transport_stall_cycles+1;
-            if(transport_stall_cycles==2000000)
-                $fatal(1,"dense publication transport stalled byte=%0d inflight=%0d p_hold=%0d b_hold=%0d b_wait=%0d p_headers=%0d p_publications=%0d b_headers=%0d b_persist=%0d p_rows=%0d p=%0d b_rows=%0d b=%0d wide_candidate=%0d wide_seen=%0d wide_error=%0d proof_done=%0d current_p=%0d picture_capture=%0d slice_capture=%0d parse_active=%0d row_waiting=%0d wide_parse_hold=%0d b_candidate=%0d b_seen=%0d",
+            if(transport_stall_cycles==(presentation_hold?8000000:2000000))
+                $fatal(1,"dense publication transport stalled byte=%0d inflight=%0d p_hold=%0d b_hold=%0d b_wait=%0d presentation_hold=%0d reorder=%0d closed=%0d decode_inflight=%0d scratch=%0d%0d future=%0d p_headers=%0d p_publications=%0d b_headers=%0d b_persist=%0d p_rows=%0d p=%0d b_rows=%0d b=%0d wide_candidate=%0d wide_seen=%0d wide_error=%0d proof_done=%0d current_p=%0d picture_capture=%0d slice_capture=%0d parse_active=%0d row_waiting=%0d wide_parse_hold=%0d b_candidate=%0d b_seen=%0d",
                        stream_index,dut.b_picture_inflight,
                        dut.p_hold_effective,dut.b_parse_hold,
-                       dut.b_persistence_wait,dut.p_header_count,
+                       dut.b_persistence_wait,presentation_hold,
+                       scheduler.reorder_active,scheduler.run_closed,
+                       scheduler.decode_inflight,scheduler.scratch1_pending,
+                       scheduler.scratch0_pending,scheduler.future_frame_pending,
+                       dut.p_header_count,
                        dut.p_publication_count,dut.b_header_count,
                        dut.b_persist_count,p_rows,p_pictures,b_rows,b_pictures,
                        dut.p_controller.wide_candidate,
@@ -216,11 +334,11 @@ module tb_h262_dense_publication_order;
                        dut.b_candidate,dut.b_seen);
         end
 
-        // The compact testbench ties the legacy I reconstruction handshakes
-        // high, so its controlled bookkeeper observer can reject the dense I
-        // before mixed-GOP ownership exists.  The compiled shell gates that
-        // observer after the first B header; enforce every error from that
-        // point forward, which includes all publication-order checks.
+        // I reconstruction completion is modeled as immediately acknowledged,
+        // while the real front end still drives the per-picture I capability
+        // window. The compiled shell gates the legacy observer after the first
+        // B header; enforce every error from that point forward, including all
+        // publication-order checks.
         if(probe_error&&dut.b_picture_observed)
             $fatal(1,"publication sequence error source=%0d detail=%0d byte=%0d p_headers=%0d p_publications=%0d b_headers=%0d b_persist=%0d active=%0d completed=%0d reference_valid=%0d reference=%0d pictures=%0d promotions=%0d",
                    probe_error_source,publication_error_detail,stream_index,
@@ -234,18 +352,25 @@ module tb_h262_dense_publication_order;
         else quiet_cycles<=0;
 
         if(quiet_cycles==100)begin
-            $display("DENSE_PUBLICATION_RESULT bytes=%0d p_rows=%0d p=%0d b_rows=%0d b=%0d published=%0d pictures=%0d promotions=%0d b_success=%0d",
+            $display("DENSE_PUBLICATION_RESULT bytes=%0d p_rows=%0d p=%0d b_rows=%0d b=%0d published=%0d pictures=%0d promotions=%0d b_success=%0d display_identity=%0d destination_holds=%0d overwrites=%0d presentation_complete=%0d presentation_error=%0d",
                      stream_index,p_rows,p_pictures,b_rows,b_pictures,
                      published_references,picture_count,
-                     reference_promotion_count,b_success);
+                     reference_promotion_count,b_success,displayed_identity,
+                     destination_hold_count,displayed_bank_overwrite_count,
+                     presentation_complete,presentation_error);
             if(probe_error||publication_error_detail!=0||stream_index!=stream_len||
                p_rows!=expected_p_rows||p_pictures!=expected_p_pictures||
                b_rows!=expected_b_rows||b_pictures!=expected_b_pictures||
                published_references!=expected_reference_publications||
                picture_count!=expected_reference_publications||
                reference_promotion_count!=expected_reference_publications||
-               dut.p_header_count!=3||dut.p_publication_count!=3||
-               dut.b_header_count!=7||dut.b_persist_count!=7||!b_success)
+               displayed_identity!=expected_reference_publications||
+               displayed_bank_overwrite_count!=0||
+               !presentation_complete||presentation_error||
+               dut.p_header_count!=expected_p_pictures||
+               dut.p_publication_count!=expected_p_pictures||
+               dut.b_header_count!=expected_b_pictures||
+               dut.b_persist_count!=expected_b_pictures||!b_success)
                 $fatal(1,"dense publication-order regression failed");
             $finish;
         end
@@ -256,5 +381,6 @@ module tb_h262_dense_publication_order;
         $fatal(1,"dense publication-order regression timed out at byte %0d",stream_index);
     end
 
-    wire unused=&{1'b0,p_probe_error_source,p_progress_detail};
+    wire unused=&{1'b0,p_probe_error_source,p_progress_detail,
+                  framebuffer_swap_reset_count};
 endmodule

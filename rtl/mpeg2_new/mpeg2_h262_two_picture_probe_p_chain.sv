@@ -64,13 +64,17 @@ mpeg2_h262_picture_bookkeeper bookkeeper(
  .qfs_block_index(qfs_block_index),.qfs_block_start(qfs_block_start),.qfs_write_en(qfs_write_en),
  .qfs_write_index(qfs_write_index),.qfs_write_value(qfs_write_value),.qfs_block_end(qfs_block_end));
 
-reg p_persistence_d;reg[1:0] p_publication_count;reg publication_error;reg[2:0] publication_error_detail_reg;reg picture_complete_pulse;
+reg p_persistence_d;reg[7:0] p_publication_count;reg publication_error;reg[2:0] publication_error_detail_reg;reg picture_complete_pulse;
 reg active_frame_bank_reg,completed_frame_bank_reg;reg[7:0] picture_count_reg;reg reference_frame_valid_reg,reference_frame_bank_reg;reg[7:0] reference_promotion_count_reg;
 
 reg[31:0] picture_window;wire[31:0] picture_window_next={picture_window[23:0],stream_data};
 wire picture_start_now=(picture_window_next==32'h00000100);reg picture_header_capture,picture_header_second_byte;
-reg[1:0] p_header_count;reg consecutive_candidate_seen;reg b_picture_observed,b_picture_inflight,b_persistence_verified;
-reg[2:0] b_header_count,b_persist_count;
+// Entry 215: these are transaction proofs, not small diagnostic categories.
+// Preserve every P/B header and persistence event through the complete stream;
+// saturation at 3/7 made the first B of the second GOP indistinguishable from
+// the already-settled first-GOP state.
+reg[7:0] p_header_count;reg consecutive_candidate_seen;reg b_picture_observed,b_picture_inflight,b_persistence_verified;
+reg[7:0] b_header_count,b_persist_count;
 wire b_header_now=stream_valid&&picture_header_capture&&picture_header_second_byte&&(stream_data[5:3]==3'b011);
 wire persistence_edge=p_persistence_complete&&!p_persistence_d;
 wire p_persisted_now=persistence_edge&&!b_picture_inflight;
@@ -106,11 +110,11 @@ always @(posedge clk)begin
     else begin
      picture_header_capture<=0;picture_header_second_byte<=0;
      if(stream_data[5:3]==3'b010)begin
-      if(p_header_count!=3)p_header_count<=p_header_count+1'b1;
+      if(p_header_count!=8'hff)p_header_count<=p_header_count+1'b1;
       if(p_header_count>=1)consecutive_candidate_seen<=1;
      end else if(stream_data[5:3]==3'b011)begin
       b_picture_observed<=1;b_picture_inflight<=1;b_persistence_verified<=0;
-      if(b_header_count!=3'd7)b_header_count<=b_header_count+1'b1;
+      if(b_header_count!=8'hff)b_header_count<=b_header_count+1'b1;
       // In coded order the future reference P precedes each B.  Do not accept
       // a B transaction if an observed P header has not actually persisted.
       if(p_publication_count<p_header_count)begin
@@ -144,7 +148,7 @@ always @(posedge clk)begin
     if(!publication_error)publication_error_detail_reg<=3'd5;
    end
    else begin
-    if(p_publication_count!=3)p_publication_count<=p_publication_count+1'b1;
+    if(p_publication_count!=8'hff)p_publication_count<=p_publication_count+1'b1;
     picture_complete_pulse<=1;completed_frame_bank_reg<=active_frame_bank_reg;active_frame_bank_reg<=~active_frame_bank_reg;
     if(picture_count_reg!=8'hff)picture_count_reg<=picture_count_reg+1'b1;
     reference_frame_valid_reg<=1;reference_frame_bank_reg<=active_frame_bank_reg;
@@ -152,7 +156,7 @@ always @(posedge clk)begin
    end
   end else if(b_persisted_now)begin
    b_persistence_verified<=1;b_picture_inflight<=0;
-   if(b_persist_count!=3'd7)b_persist_count<=b_persist_count+1'b1;
+   if(b_persist_count!=8'hff)b_persist_count<=b_persist_count+1'b1;
   end
 
   // Entry 205: a failed B parser/replay transaction must never retain
