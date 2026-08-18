@@ -69,27 +69,22 @@ wire old_start, old_we, old_end;
 wire [5:0] old_widx;
 wire signed [12:0] old_wval;
 wire transform_done;
-
-mpeg2_h262_p_residual_parser_420 parser
-(
-    .clk(clk), .reset(reset),
-    .stream_data(stream_data), .stream_valid(stream_valid),
-    .p_picture_expected(p_picture_expected),
-    .transform_block_done(transform_done&&!any_general_mode),
-    .decision_complete(old_decision),
-    .residual_required(old_required),
-    .residual_success(old_success),
-    .quantiser_scale_code(old_qscale),
-    .q_scale_type(old_qtype),
-    .alternate_scan(old_alt),
-    .qfs_block_index(old_block),
-    .qfs_block_start(old_start),
-    .qfs_write_en(old_we),
-    .qfs_write_index(old_widx),
-    .qfs_write_value(old_wval),
-    .qfs_block_end(old_end),
-    .probe_error(old_parser_error)
-);
+// Commit 201 capacity closure: generalized plans own every synthesized P
+// transaction.  Retire the pre-generalized first-macroblock parser while
+// retaining zero-valued compatibility signals for the module interface.
+assign old_decision=1'b0;
+assign old_required=1'b0;
+assign old_success=1'b0;
+assign old_parser_error=1'b0;
+assign old_qscale=5'd0;
+assign old_qtype=1'b0;
+assign old_alt=1'b0;
+assign old_block=3'd0;
+assign old_start=1'b0;
+assign old_we=1'b0;
+assign old_end=1'b0;
+assign old_widx=6'd0;
+assign old_wval=13'sd0;
 
 localparam [3:0]
     G_IDLE=4'd0,
@@ -512,11 +507,11 @@ always @(posedge clk) begin
 end
 
 assign decision_complete =
-    any_general_mode ? g_decision : old_decision;
+    any_general_mode ? g_decision : 1'b0;
 assign residual_required =
-    any_general_mode ? g_required : old_required;
+    any_general_mode ? g_required : 1'b0;
 assign residual_success =
-    any_general_mode ? g_success : old_success;
+    any_general_mode ? g_success : 1'b0;
 assign mixed_replay_active = any_general_mode &&
     ((gstate==G_MOTION) ||
      (gstate==G_DESC) ||
@@ -524,16 +519,15 @@ assign mixed_replay_active = any_general_mode &&
      (gstate==G_SAMPLES) ||
      (gstate==G_FINISH));
 assign first_sample_valid =
-    any_general_mode ? first_valid_reg : tfvalid;
+    any_general_mode ? first_valid_reg : 1'b0;
 assign first_sample_value =
-    any_general_mode ? first_value_reg : tfvalue;
+    any_general_mode ? first_value_reg : 16'sd0;
 assign residual_sample_valid =
-    any_general_mode ? replay_valid : tvalid;
+    any_general_mode ? replay_valid : 1'b0;
 assign residual_sample_index =
-    any_general_mode ? replay_index : tidx;
+    any_general_mode ? replay_index : 6'd0;
 assign residual_sample_value =
-    any_general_mode ? replay_value : tvalue;
-assign probe_error = terr | g_error |
-    (!any_general_mode && old_parser_error);
+    any_general_mode ? replay_value : 16'sd0;
+assign probe_error = terr | g_error;
 
 endmodule

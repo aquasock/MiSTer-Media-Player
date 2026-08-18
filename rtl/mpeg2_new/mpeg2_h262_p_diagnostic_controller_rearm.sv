@@ -69,6 +69,45 @@ wire signed[15:0] first_value_raw,residual_value_raw;
 wire[5:0] residual_index_raw;
 wire hold_seen,hold_error,old_stream_hold;
 
+// Commit 201 capacity closure: the f-code-3 wide parser supersedes the
+// historical single-, two-, four-macroblock and 128x96 proof observers in the
+// synthesized decoder.  Keeping their interfaces tied inactive preserves the
+// controller's priority equations while allowing Quartus to remove several
+// thousand ALUTs/registers that could never own a current diagnostic stream.
+assign syntax_error_raw=1'b0;
+assign mb_seen_raw=1'b0;
+assign vector_valid_raw=1'b0;
+assign vector_x_raw=13'sd0;
+assign vector_y_raw=13'sd0;
+assign two_mb_seen=1'b0;
+assign two_mb_error=1'b0;
+assign four_mb_candidate=1'b0;
+assign four_mb_seen=1'b0;
+assign four_mb_complete_now=1'b0;
+assign four_mb_parse_hold=1'b0;
+assign four_mb_error=1'b0;
+assign legacy_candidate=1'b0;
+assign legacy_seen=1'b0;
+assign legacy_complete_now=1'b0;
+assign legacy_parse_hold=1'b0;
+assign legacy_error=1'b0;
+assign legacy_residual_present=1'b0;
+assign legacy_shift_right_map=48'd0;
+assign legacy_motion_x_plan=384'd0;
+assign legacy_motion_y_plan=384'd0;
+assign legacy_residual_block_plan=288'd0;
+assign legacy_residual_block_count=5'd0;
+assign legacy_coeff_index_plan=384'd0;
+assign legacy_coeff_value_plan=832'd0;
+assign legacy_coeff_last_plan=64'd0;
+assign legacy_coeff_count=7'd0;
+assign legacy_qscale_plan=80'd0;
+assign legacy_qtype=1'b0;
+assign legacy_alt=1'b0;
+assign hold_seen=1'b0;
+assign hold_error=1'b0;
+assign old_stream_hold=1'b0;
+
 wire legacy_mode=legacy_candidate||legacy_seen;
 wire wide_mode=wide_candidate||wide_seen;
 wire general_mode=legacy_mode||wide_mode;
@@ -284,50 +323,6 @@ assign progress_detail=
     two_mb_wait                                     ? 4'd5 :
     raster_wait                                     ? 4'd6 : 4'd0;
 
-mpeg2_h262_p_syntax_probe syntax_probe
-(
- .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),
- .p_picture_expected(p_picture_expected),
- .p_macroblock_type_seen(mb_seen_raw),
- .p_forward_vector_valid(vector_valid_raw),
- .p_forward_vector_x(vector_x_raw),
- .p_forward_vector_y(vector_y_raw),
- .probe_error(syntax_error_raw)
-);
-
-mpeg2_h262_p_two_mb_syntax_probe two_mb_probe
-(
- .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),
- .two_mb_seen(two_mb_seen),.probe_error(two_mb_error)
-);
-
-mpeg2_h262_p_four_mb_two_row_syntax_probe four_mb_probe
-(
- .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),
- .four_mb_candidate(four_mb_candidate),.four_mb_seen(four_mb_seen),
- .four_mb_complete_now(four_mb_complete_now),
- .parse_hold(four_mb_parse_hold),.probe_error(four_mb_error)
-);
-
-mpeg2_h262_p_aligned_motion_syntax_probe legacy_general_probe
-(
- .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),
- .aligned_candidate(legacy_candidate),.aligned_seen(legacy_seen),
- .aligned_complete_now(legacy_complete_now),
- .aligned_shift_right_map(legacy_shift_right_map),
- .motion_x_plan(legacy_motion_x_plan),.motion_y_plan(legacy_motion_y_plan),
- .residual_block_plan(legacy_residual_block_plan),
- .residual_block_count(legacy_residual_block_count),
- .residual_present(legacy_residual_present),
- .residual_coeff_index_plan(legacy_coeff_index_plan),
- .residual_coeff_value_plan(legacy_coeff_value_plan),
- .residual_coeff_last_plan(legacy_coeff_last_plan),
- .residual_coeff_count(legacy_coeff_count),
- .residual_qscale_plan(legacy_qscale_plan),
- .q_scale_type(legacy_qtype),.alternate_scan(legacy_alt),
- .parse_hold(legacy_parse_hold),.probe_error(legacy_error)
-);
-
 mpeg2_h262_p_wide_motion_syntax_probe wide_general_probe
 (
  .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),
@@ -398,18 +393,6 @@ mpeg2_h262_p_residual_probe residual_probe
  .residual_sample_index(residual_index_raw),
  .residual_sample_value(residual_value_raw),
  .probe_error(residual_error_raw)
-);
-
-mpeg2_h262_p_stream_hold hold_probe
-(
- .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),
- .p_picture_active(legacy_hold_owner),
- .p_macroblock_type_seen(mb_seen_for_hold),
- .p_residual_required(residual_required_raw),
- .p_persistence_complete(raster_persistence_complete),
- .stream_hold(old_stream_hold),
- .hold_seen(hold_seen),
- .hold_error(hold_error)
 );
 
 wire unused_general=&{
