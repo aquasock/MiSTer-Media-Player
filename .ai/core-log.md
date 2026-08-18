@@ -832,3 +832,32 @@ None.
 - [ ] Passed
 
 ---
+## 208 COMMIT Unreleased ??? 2026-08-18T04:42:35-07:00
+
+#### Coming From:
+
+Unreleased 2dd4c67
+
+#### Purpose:
+
+Accept a generalized P picture whose persistence proof precedes its parser completion pulse by one cycle.
+
+#### Outcome:
+
+The planned commit will make the P raster-hold admission consume an already-present persistence proof atomically instead of arming a timeout that cannot inspect the proof until it has been withdrawn. A focused regression will reproduce the hardware ordering by retiring the final streamed row with picture persistence asserted, then requiring completion without POWER-9 error or timeout delay.
+
+#### Next Steps:
+
+Implement the completion/persistence handshake correction, run the focused final-row regression plus the established P row-streaming, dense B, transport-recovery, presentation, and storage-tag regressions, then complete a clean Quartus build and deploy the resulting RBF and regenerated dense compatibility stream to the standard MiSTer target.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+- tools/streams/tb_h262_p_raster_hold.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
