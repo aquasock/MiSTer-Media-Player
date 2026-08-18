@@ -1196,3 +1196,31 @@ Reload the long-GOP stream and wait at least one second after the frame-50 stop.
 - [ ] Passed
 
 ---
+## 220 COMMIT Unreleased daf7af2 2026-08-18T11:34:27-07:00
+
+#### Coming From:
+
+Unreleased daf7af2
+
+#### Purpose:
+
+Record the MiSTer long-GOP result after restoring fatal-drain diagnostic capture.
+
+#### Outcome:
+
+Commit `daf7af2` produces the settled passing diagnostic pattern: USER is solid during its window, POWER is solid during its window, and DISK remains off, proving zero captured error and prerequisite sub-codes with normal I/P/B acceptance and presentation completion. The uploaded 17.235-second video also proves that the loading overlay retires normally after approximately fourteen seconds and the core remains responsive. The displayed source content nevertheless settles at timestamp `00:00:02.000`, frame `50`, while the deterministic 72-picture stream must finish at frame `71`, timestamp `00:00:02.840`. Frame 50 is the third-GOP I-picture, so the real hardware stops visibly advancing through the final GOP's P/B pictures without asserting any current parser, raster, DDR, publication, ownership, or presentation diagnostic. The full-stream publication regression cannot exclude this boundary because it synthesizes row and picture persistence from parser sideband terminators instead of instantiating the live raster engines and DDR transaction path.
+
+#### Next Steps:
+
+Add a full-stream live-raster soak boundary or equivalent settled counters that distinguish P/B raster starts, row persistence, picture persistence, reference publication, and actual display swaps through the final GOP. Require the long stream to reach all 72 pictures and final temporal reference 71 using real persistence acknowledgements, then correct only the first live stage that stops advancing and rebuild for MiSTer validation.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
