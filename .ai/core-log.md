@@ -910,10 +910,10 @@ Run `test_p_f_code_range.m2v`, `test_p_motion_residual.m2v`, `test_p_mba_escape.
 #### Status:
 
 - [x] Built
-- [ ] Passed
+- [x] Passed
 
 ---
-## 194 COMMIT Unreleased ??? 2026-08-17T17:15:45-07:00
+## 194 COMMIT Unreleased b1bde49 2026-08-17T17:15:45-07:00
 
 #### Coming From:
 
@@ -925,11 +925,11 @@ Generalize the progressive 4:2:0 B path from fixed `f_code=(3,3,3,3)` to indepen
 
 #### Outcome:
 
-Commit 193 passes all six requested hardware streams with the expected settled USER/POWER solid and DISK-dark result. The six photographs confirm the standing I, P and B rasters, the visual discriminator's horizontal and vertical center seams, and the new P `f_code` range stream's localized motion-vector markers. Static tracing identifies the next remaining fixed-3 boundary in the B parser: admission requires all four picture-coding-extension fields to equal 3, every nonzero component consumes exactly two residual bits, reconstruction uses a fixed `f_code=3` function, and the shared B selector also requires the forward pair to equal 3. The existing signed eight-bit B vector transport already covers the complete `f_code=4` reconstructed range of -128 through +127, so no raster or DDR interface widening is required.
+Commit 193 passes all six requested hardware streams with the expected settled USER/POWER solid and DISK-dark result; the photographs confirm the standing I, P and B rasters, the visual discriminator seams, and the P `f_code` range markers. Commit `b1bde49` captures and independently applies all four B-picture `f_code` fields from 1 through 4, consumes zero through three component residual bits, and uses the established H.262 reconstruction and wraparound rule without widening the signed eight-bit B vector transport. Exact parser replay passes both new B pictures and all 2,700 emitted vector records. The new stream is pixel-exact for both B pictures, and all nine generators pass their established pixel-exact or IDCT-tolerant verification. A clean Quartus 17.0.2 build completes with zero TNS, no Critical Warning, +0.387 ns global setup, +0.207 ns global hold, +2.012 ns decoder setup, 31,625 ALMs, 42,223 registers, 592,333 memory bits, 90 RAM blocks, 69 DSP blocks, and 3 PLLs. Qualified RBF `MediaPlayer_commit194_b1bde49.rbf` has SHA-256 `a3eeeb285c427f313987ce6c62cdef560d6293defb1841e96c66aab026d63d8e`; generated stream `test_b_f_code_range.m2v` has SHA-256 `70da72fd53a1e3a6c2ac5b87bcf26dbfbf7398fb6ae526903d06e0402d54dacd`; Audio project `fd90c77` remains integration-compatible.
 
 #### Next Steps:
 
-Capture and independently validate all four B-picture `f_code` fields, consume zero through three residual bits for each applicable forward or backward component, apply the existing H.262 reconstruction and wraparound rule using the selected field, and relax only the generalized B selector while preserving fixed-3 behavior and the P path. Extend the shared deterministic stream patcher and add one pixel-verified 720x480 B regression covering every admitted value, unequal forward/backward component pairs, nonzero residuals, both signs, independent predictor reuse and wraparound across two B reference pairs. Run focused exact parser/raster replay, regenerate every standing stream, complete a clean Quartus 17.0.2 build with nonnegative setup and hold slack and zero TNS, then hardware-run the new stream plus the six Commit-193 guards with the visual seams retained.
+Run `test_b_f_code_range.m2v`, `test_p_f_code_range.m2v`, `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_p_visual_discriminator.m2v`, `test_i_baseline.m2v`, and `test_b_bidirectional.m2v` using the qualified RBF. Each accepted stream must settle with USER and POWER solid and DISK dark; the new B stream must present a stable decoded raster, and the visual discriminator must retain its four quadrants and center seams.
 
 #### Files Modified:
 
@@ -945,7 +945,7 @@ Capture and independently validate all four B-picture `f_code` fields, consume z
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
