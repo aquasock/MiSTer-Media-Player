@@ -901,11 +901,11 @@ Identify the hidden repeated-P parser failure that prevents the second dense P r
 
 #### Outcome:
 
-Commit `3fcf22f` proves the POWER-4 publication failure was downstream of stale B ownership: `b_candidate` remained asserted after B persistence, suppressed the following P parser's refill hold, and let thousands of compressed bytes overrun its active 512-byte window until coefficient state failed. The B parser now releases candidate ownership when the following non-B header is known, the P parser and publication shell retain sticky first-fault detail, and the complete dense regression passes 120 P rows, four P pictures, 210 B rows, seven B pictures, and five reference publications with no parser, transport, or publication error. Fail-open transport, parser-window, and restricted-slice regressions pass unchanged. The clean Quartus 17.0.2 build completes in 9 minutes 25 seconds with zero setup and hold TNS, no Critical Warning, +0.062 ns global setup, +0.249 ns global hold, +2.613 ns focused decoder setup, +14.318 ns focused decoder recovery, 29,163 ALMs, 41,923 registers, 4,025,331 memory bits, 503 RAM blocks, 65 DSP blocks, and 3 PLLs. RBF SHA-256 `6692722e11d44c10bbbd716e60d4b1761072c4b72452742d1df403c7342c1120` was uploaded to `10.10.0.30` and read back with the same hash.
+Commit `3fcf22f` proves the POWER-4 publication failure was downstream of stale B ownership: `b_candidate` remained asserted after B persistence, suppressed the following P parser's refill hold, and let thousands of compressed bytes overrun its active 512-byte window until coefficient state failed. The B parser now releases candidate ownership when the following non-B header is known, the P parser and publication shell retain sticky first-fault detail, and the complete dense regression passes 120 P rows, four P pictures, 210 B rows, seven B pictures, and five reference publications with no parser, transport, or publication error. Fail-open transport, parser-window, and restricted-slice regressions pass unchanged. The clean Quartus 17.0.2 build completes in 9 minutes 25 seconds with zero setup and hold TNS, no Critical Warning, +0.062 ns global setup, +0.249 ns global hold, +2.613 ns focused decoder setup, +14.318 ns focused decoder recovery, 29,163 ALMs, 41,923 registers, 4,025,331 memory bits, 503 RAM blocks, 65 DSP blocks, and 3 PLLs. RBF SHA-256 `6692722e11d44c10bbbd716e60d4b1761072c4b72452742d1df403c7342c1120` was uploaded to `10.10.0.30` and read back with the same hash. Hardware accepts the deployed build: `test_compat_dense_residual.m2v` loads slowly but completes, visibly advances through more pattern changes, settles on the full dense diagonal raster captured in the uploaded photograph, and reports USER and POWER solid with DISK off.
 
 #### Next Steps:
 
-Run `test_compat_dense_residual.m2v` on the deployed build and report load progression, final raster, and USER, POWER, and DISK indications; acceptance requires the full stream to complete without the former USER 2 / POWER 4 publication failure.
+Proceed to the next v0.6.0 roadmap boundary by recording its proposal before making further decoder changes.
 
 #### Files Modified:
 
@@ -923,6 +923,6 @@ Run `test_compat_dense_residual.m2v` on the deployed build and report load progr
 #### Status:
 
 - [x] Built
-- [ ] Passed
+- [x] Passed
 
 ---
