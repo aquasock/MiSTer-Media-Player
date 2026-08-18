@@ -2,7 +2,8 @@
 
 module tb_h262_p_intra_macroblocks;
     localparam integer MAX_STREAM_BYTES=262144;
-    localparam integer INTRA_MB_INDEX=380;
+    integer expected_intra=1,expected_blocks=6;
+    integer first_intra_row=8,last_intra_row=8,intra_col=20;
 
     reg clk=0,reset=1,stream_valid=0;
     reg [7:0] stream_data=0;
@@ -20,16 +21,18 @@ module tb_h262_p_intra_macroblocks;
     wire signed [7:0] motion_x,motion_y;
     wire [5:0] mb_width,mb_height;
     wire [10:0] mb_count;
-    wire [351:0] residual_mb;
-    wire [95:0] residual_block;
-    wire [31:0] residual_intra;
-    wire [5:0] residual_count;
+    wire [10:0] block_read_address;
+    wire [10:0] block_read_mb;
+    wire [2:0] block_read_index;
+    wire block_read_intra;
+    wire [4:0] block_read_qscale;
+    wire [11:0] residual_count;
     wire residual_present;
-    wire [383:0] coeff_index;
-    wire [831:0] coeff_value;
-    wire [63:0] coeff_last;
-    wire [6:0] coeff_count;
-    wire [159:0] qscale_plan;
+    wire [14:0] coeff_read_address;
+    wire [5:0] coeff_read_index;
+    wire signed [12:0] coeff_read_value;
+    wire coeff_read_last;
+    wire [15:0] coeff_count;
     wire qtype,alternate;
 
     wire decision,required,success,replay_active,first_valid;
@@ -55,6 +58,25 @@ module tb_h262_p_intra_macroblocks;
     reg engine_dout_ready=0,engine_block_stored=0;
     integer intra_store_samples=0;
 
+    function automatic is_intra_mb;
+        input [10:0] index;
+        integer row,column;
+        begin
+            row=index/45;
+            column=index%45;
+            is_intra_mb=(row>=first_intra_row)&&(row<=last_intra_row)&&
+                        (column==intra_col);
+        end
+    endfunction
+
+    function automatic [10:0] expected_mb_for_block;
+        input integer block_number;
+        begin
+            expected_mb_for_block=
+                ((first_intra_row+(block_number/6))*45)+intra_col;
+        end
+    endfunction
+
     always #5 clk=~clk;
 
     mpeg2_h262_p_wide_motion_syntax_probe parser(
@@ -65,15 +87,19 @@ module tb_h262_p_intra_macroblocks;
         .motion_event_index(motion_index),.motion_event_x(motion_x),
         .motion_event_y(motion_y),.motion_event_intra(motion_intra),
         .picture_mb_width(mb_width),.picture_mb_height(mb_height),
-        .picture_mb_count(mb_count),.residual_mb_plan(residual_mb),
-        .residual_block_index_plan(residual_block),
-        .residual_intra_plan(residual_intra),
+        .picture_mb_count(mb_count),
+        .residual_block_read_address(block_read_address),
+        .residual_block_read_mb(block_read_mb),
+        .residual_block_read_index(block_read_index),
+        .residual_block_read_intra(block_read_intra),
+        .residual_block_read_qscale(block_read_qscale),
         .residual_block_count(residual_count),
         .residual_present(residual_present),
-        .residual_coeff_index_plan(coeff_index),
-        .residual_coeff_value_plan(coeff_value),
-        .residual_coeff_last_plan(coeff_last),
-        .residual_coeff_count(coeff_count),.residual_qscale_plan(qscale_plan),
+        .residual_coeff_read_address(coeff_read_address),
+        .residual_coeff_read_index(coeff_read_index),
+        .residual_coeff_read_value(coeff_read_value),
+        .residual_coeff_read_last(coeff_read_last),
+        .residual_coeff_count(coeff_count),
         .q_scale_type(qtype),.alternate_scan(alternate),
         .parse_hold(hold),.probe_error(parser_error)
     );
@@ -90,13 +116,17 @@ module tb_h262_p_intra_macroblocks;
         .general_coeff_count(7'd0),.general_qscale_plan(80'd0),
         .general_q_scale_type(1'b0),.general_alternate_scan(1'b0),
         .wide_mode(candidate||seen),.wide_picture_complete(complete),
-        .wide_residual_mb_plan(residual_mb),
-        .wide_residual_block_index_plan(residual_block),
-        .wide_residual_intra_plan(residual_intra),
+        .wide_block_read_address(block_read_address),
+        .wide_block_read_mb(block_read_mb),
+        .wide_block_read_index(block_read_index),
+        .wide_block_read_intra(block_read_intra),
+        .wide_block_read_qscale(block_read_qscale),
         .wide_residual_block_count(residual_count),
-        .wide_coeff_index_plan(coeff_index),.wide_coeff_value_plan(coeff_value),
-        .wide_coeff_last_plan(coeff_last),.wide_coeff_count(coeff_count),
-        .wide_qscale_plan(qscale_plan),.wide_q_scale_type(qtype),
+        .wide_coeff_read_address(coeff_read_address),
+        .wide_coeff_read_index(coeff_read_index),
+        .wide_coeff_read_value(coeff_read_value),
+        .wide_coeff_read_last(coeff_read_last),.wide_coeff_count(coeff_count),
+        .wide_q_scale_type(qtype),
         .wide_alternate_scan(alternate),.wide_intra_dc_precision(2'd0),
         .decision_complete(decision),.residual_required(required),
         .residual_success(success),.mixed_replay_active(replay_active),
@@ -132,6 +162,11 @@ module tb_h262_p_intra_macroblocks;
     initial begin
         if(!$value$plusargs("HEX=%s",hex_path)) $fatal(1,"missing +HEX");
         if(!$value$plusargs("LEN=%d",stream_len)) $fatal(1,"missing +LEN");
+        if(!$value$plusargs("EXPECTED_INTRA=%d",expected_intra)) expected_intra=1;
+        if(!$value$plusargs("EXPECTED_BLOCKS=%d",expected_blocks)) expected_blocks=6;
+        if(!$value$plusargs("FIRST_INTRA_ROW=%d",first_intra_row)) first_intra_row=8;
+        if(!$value$plusargs("LAST_INTRA_ROW=%d",last_intra_row)) last_intra_row=8;
+        if(!$value$plusargs("INTRA_COL=%d",intra_col)) intra_col=20;
         if(stream_len<=0||stream_len>MAX_STREAM_BYTES) $fatal(1,"invalid LEN");
         $readmemh(hex_path,stream_mem,0,stream_len-1);
         stream_index=0;quiet_cycles=0;
@@ -159,11 +194,12 @@ module tb_h262_p_intra_macroblocks;
                 $display("RESIDUAL_DETAIL g_error=%0d transform=%0d",
                          residual_pipeline.g_error,residual_pipeline.terr);
                 if(!seen||parser_error||residual_error||picture_completions!=1||
-                   motion_events!=1350||intra_motion_events!=1||
-                   replay_blocks!=6||replay_total_samples!=384||!replay_finished||
+                   motion_events!=1350||intra_motion_events!=expected_intra||
+                   replay_blocks!=expected_blocks||
+                   replay_total_samples!=(expected_blocks*64)||!replay_finished||
                    !decision||!required||!success||engine_error||
                    !engine_read_seen||!engine_reconstructed_seen||
-                   intra_store_samples!=384)
+                   intra_store_samples!=(expected_blocks*64))
                     $fatal(1,"P intra-macroblock regression failed");
                 $finish;
             end
@@ -179,11 +215,11 @@ module tb_h262_p_intra_macroblocks;
                 engine_dout<=raster_engine.resrows[raster_engine.verify_row];
             else begin
                 engine_dout<={8{8'd50}};
-                if(raster_engine.mbi==INTRA_MB_INDEX)
+                if(is_intra_mb(raster_engine.mbi))
                     $fatal(1,"intra macroblock issued a reference read");
             end
         end
-        if(engine_store_valid&&raster_engine.mbi==INTRA_MB_INDEX) begin
+        if(engine_store_valid&&is_intra_mb(raster_engine.mbi)) begin
             intra_store_samples<=intra_store_samples+1;
             if(raster_engine.blk<4) begin
                 if(engine_store_value<8'd95||engine_store_value>8'd97)
@@ -197,15 +233,14 @@ module tb_h262_p_intra_macroblocks;
             motion_events<=motion_events+1;
             if(motion_intra) begin
                 intra_motion_events<=intra_motion_events+1;
-                if(motion_index!=INTRA_MB_INDEX||motion_x!=0||motion_y!=0)
+                if(!is_intra_mb(motion_index)||motion_x!=0||motion_y!=0)
                     $fatal(1,"bad intra motion event");
             end
         end
         if(complete) begin
             picture_completions<=picture_completions+1;
             if(mb_width!=45||mb_height!=30||mb_count!=1350||
-               residual_count!=6||coeff_count!=6||
-               residual_intra[5:0]!=6'b111111)
+               residual_count!=expected_blocks||coeff_count!=expected_blocks)
                 $fatal(1,"bad completed P intra plans");
         end
 
@@ -215,14 +250,15 @@ module tb_h262_p_intra_macroblocks;
                 if(replay_index==6'h3f&&replay_value==16'shA2FF) begin
                     replay_finished<=1;
                 end else begin
-                    if(replay_index!=6'h3c||replay_value!=INTRA_MB_INDEX)
+                    if(replay_index!=6'h3c||
+                       replay_value!=expected_mb_for_block(replay_blocks))
                         $fatal(1,"bad descriptor MB header");
                     replay_state<=1;
                 end
             end
             1: begin
                 if(replay_index!=6'h3d||!replay_value[3]||
-                   replay_value[2:0]!=replay_blocks[2:0])
+                   replay_value[2:0]!=(replay_blocks%6))
                     $fatal(1,"bad intra descriptor block");
                 replay_state<=2;
                 replay_samples<=0;
@@ -231,7 +267,7 @@ module tb_h262_p_intra_macroblocks;
                 replay_total_samples<=replay_total_samples+1;
                 if(replay_index!=replay_samples[5:0])
                     $fatal(1,"bad sample order");
-                if(replay_blocks<4) begin
+                if((replay_blocks%6)<4) begin
                     if(replay_value<16'sd95||replay_value>16'sd97)
                         $fatal(1,"bad luma intra sample %0d",replay_value);
                 end else if(replay_value<16'sd127||replay_value>16'sd129)

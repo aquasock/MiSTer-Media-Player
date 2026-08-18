@@ -66,7 +66,7 @@ localparam [28:0]
     CR_BASE=29'h0600D2F0,
     BANK_OFF=29'h00010000;
 localparam integer MAX_MB=1350;
-localparam integer MAX_BLOCKS=32;
+localparam integer MAX_BLOCKS=2048;
 
 wire [14:0] horizontal_rounded =
     {1'b0,horizontal_size}+15'd15;
@@ -199,18 +199,18 @@ wire mb_intra=motion_word[16];
 wire signed [7:0] mb_mvx=$signed(motion_word[15:8]);
 wire signed [7:0] mb_mvy=$signed(motion_word[7:0]);
 
-reg signed [15:0] rm [0:2047];
-reg [10:0] desc_mb [0:31];
-reg [2:0] desc_block [0:31];
-reg desc_intra [0:31];
-reg [5:0] desc_count;
-reg [4:0] current_desc_slot;
+(* ramstyle = "M10K" *) reg signed [15:0] rm [0:131071];
+reg [10:0] desc_mb [0:2047];
+reg [2:0] desc_block [0:2047];
+reg desc_intra [0:2047];
+reg [11:0] desc_count;
+reg [10:0] current_desc_slot;
 reg desc_active;
 reg wide_desc_pending;
 reg [10:0] wide_desc_mb;
 reg [5:0] sample_expected;
 reg metadata_done;
-reg [5:0] exec_desc_slot;
+reg [10:0] exec_desc_slot;
 
 reg pending, started;
 reg reference_bank_latched, destination_bank_latched;
@@ -220,7 +220,7 @@ reg [5:0] col, mrow;
 reg [2:0] blk;
 reg [23:0] timeout;
 reg [63:0] resrows [0:7];
-reg emit, wait_store, pixel_setup, motion_load;
+reg emit, wait_store, pixel_setup, motion_load, residual_load;
 reg [5:0] ei;
 reg [2:0] verify_row;
 reg [1:0] tap_index;
@@ -285,14 +285,13 @@ wire [11:0] src_y_tap=src_y_tap_signed[11:0];
 
 wire descriptor_position_hit=
     (exec_desc_slot<desc_count)&&
-    (desc_mb[exec_desc_slot[4:0]]==mbi)&&
-    (desc_block[exec_desc_slot[4:0]]==blk);
+    (desc_mb[exec_desc_slot]==mbi)&&
+    (desc_block[exec_desc_slot]==blk);
 wire residual_hit=descriptor_position_hit&&
-    (desc_intra[exec_desc_slot[4:0]]==mb_intra);
-wire [10:0] residual_mem_index=
-    {exec_desc_slot[4:0],6'b000000}+{5'd0,ei};
-wire signed [15:0] residual_pel=
-    residual_hit?rm[residual_mem_index]:16'sd0;
+    (desc_intra[exec_desc_slot]==mb_intra);
+wire [16:0] residual_mem_index=
+    {exec_desc_slot,6'b000000}+{11'd0,ei};
+reg signed [15:0] residual_pel_q;
 
 wire [7:0] current_tap_sample=bat(ddram_dout,src_x_tap[2:0]);
 wire [10:0] pred_sum_with_current=
@@ -300,7 +299,7 @@ wire [10:0] pred_sum_with_current=
 wire [7:0] predicted_current=
     round_prediction(pred_sum_with_current,half_x,half_y);
 wire [7:0] reconstructed_current=
-    clip(predicted_current,residual_pel);
+    clip(predicted_current,residual_pel_q);
 
 assign ddram_burstcnt=req?8'd1:0;
 assign ddram_addr=req ?
@@ -324,14 +323,24 @@ wire ready_res=metadata_done;
 wire descriptor_order_error=
     (desc_count!=0)&&
     ({wide_desc_mb,residual_value[2:0]} <=
-     {desc_mb[(desc_count-1'b1)&6'h1f],
-      desc_block[(desc_count-1'b1)&6'h1f]});
+     {desc_mb[(desc_count-1'b1)&12'h7ff],
+      desc_block[(desc_count-1'b1)&12'h7ff]});
 
 wire new_picture_metadata=
     capture_enable&&residual_valid&&!desc_active&&
     ((residual_index==6'h3e)||(residual_index==6'h3b))&&
     persisted_seen&&!active;
 wire unused_shift_map=&{1'b0,shift_right_map};
+
+// Commit 202: synchronous sparse-sample lookup allows the 2048-block spatial
+// store to infer M10K RAM. residual_load inserts the required read-latency
+// cycle before pixel_setup consumes residual_pel_q.
+always @(posedge clk) begin
+    if(reset)
+        residual_pel_q<=0;
+    else
+        residual_pel_q<=residual_hit ? rm[residual_mem_index] : 16'sd0;
+end
 
 always @(posedge clk) begin
     if(reset) begin
@@ -362,6 +371,7 @@ always @(posedge clk) begin
         wait_store<=0;
         pixel_setup<=0;
         motion_load<=0;
+        residual_load<=0;
         ei<=0;
         verify_row<=0;
         tap_index<=0;
@@ -378,11 +388,6 @@ always @(posedge clk) begin
         progress_stage<=0;
         error<=0;
         error_source<=0;
-        for(i=0;i<32;i=i+1) begin
-            desc_mb[i]<=0;
-            desc_block[i]<=0;
-            desc_intra[i]<=0;
-        end
         for(i=0;i<8;i=i+1)
             resrows[i]<=0;
     end else begin
@@ -406,6 +411,7 @@ always @(posedge clk) begin
             wait_store<=0;
             pixel_setup<=0;
             motion_load<=0;
+            residual_load<=0;
             mbi<=0;
             col<=0;
             mrow<=0;
@@ -421,7 +427,8 @@ always @(posedge clk) begin
                     error<=1;
                     if(!error) error_source<=5'd1;
                 end else begin
-                    rm[{current_desc_slot,6'b000000}+residual_index]
+                    rm[{current_desc_slot,6'b000000}+
+                       {11'd0,residual_index}]
                         <=residual_value;
                     if(residual_index==6'd63) begin
                         desc_active<=0;
@@ -466,7 +473,7 @@ always @(posedge clk) begin
                     error<=1;
                     if(!error) error_source<=5'd5;
                 end else begin
-                    current_desc_slot<=desc_count[4:0];
+                    current_desc_slot<=desc_count[10:0];
                     desc_mb[desc_count]<=wide_desc_mb;
                     desc_block[desc_count]<=residual_value[2:0];
                     desc_intra[desc_count]<=residual_value[3];
@@ -486,12 +493,12 @@ always @(posedge clk) begin
                    ((desc_count!=0)&&
                     ({5'd0,residual_value[8:3],
                       residual_value[2:0]} <=
-                     {desc_mb[(desc_count-1'b1)&6'h1f],
-                      desc_block[(desc_count-1'b1)&6'h1f]}))) begin
+                     {desc_mb[(desc_count-1'b1)&12'h7ff],
+                      desc_block[(desc_count-1'b1)&12'h7ff]}))) begin
                     error<=1;
                     if(!error) error_source<=5'd6;
                 end else begin
-                    current_desc_slot<=desc_count[4:0];
+                    current_desc_slot<=desc_count[10:0];
                     desc_mb[desc_count]<={5'd0,residual_value[8:3]};
                     desc_block[desc_count]<=residual_value[2:0];
                     desc_intra[desc_count]<=1'b0;
@@ -563,8 +570,13 @@ always @(posedge clk) begin
                 timeout<=0;
             end else begin
                 motion_word<=motion_mem[mbi];
-                pixel_setup<=1;
+                residual_load<=1;
             end
+        end
+
+        if(residual_load) begin
+            residual_load<=0;
+            pixel_setup<=1;
         end
 
         if(pixel_setup) begin
@@ -578,7 +590,7 @@ always @(posedge clk) begin
                 persisted_seen<=1;
                 timeout<=0;
             end else if(mb_intra) begin
-                out_reg<=clip(8'd0,residual_pel);
+                out_reg<=clip(8'd0,residual_pel_q);
                 emit<=1;
             end else if(!source_bounds_ok) begin
                 error<=1;
@@ -664,7 +676,7 @@ always @(posedge clk) begin
                         end else begin
                             blk<=blk+1'b1;
                             ei<=0;
-                            pixel_setup<=1;
+                            residual_load<=1;
                         end
                     end else begin
                         verify_row<=verify_row+1'b1;
@@ -685,7 +697,7 @@ always @(posedge clk) begin
                 wait_store<=1;
             end else begin
                 ei<=ei+1'b1;
-                pixel_setup<=1;
+                residual_load<=1;
             end
         end
 

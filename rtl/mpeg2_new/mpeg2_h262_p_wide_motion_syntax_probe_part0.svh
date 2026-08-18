@@ -39,16 +39,18 @@ module mpeg2_h262_p_wide_motion_syntax_probe
     output reg [5:0]   picture_mb_height,
     output reg [10:0]  picture_mb_count,
 
-    output wire [351:0] residual_mb_plan,
-    output wire [95:0]  residual_block_index_plan,
-    output wire [31:0]  residual_intra_plan,
-    output reg [5:0]   residual_block_count,
+    input  wire [10:0]  residual_block_read_address,
+    output wire [10:0]  residual_block_read_mb,
+    output wire [2:0]   residual_block_read_index,
+    output wire         residual_block_read_intra,
+    output wire [4:0]   residual_block_read_qscale,
+    output reg [11:0]   residual_block_count,
     output reg         residual_present,
-    output wire [383:0] residual_coeff_index_plan,
-    output wire [831:0] residual_coeff_value_plan,
-    output wire [63:0]  residual_coeff_last_plan,
-    output reg [6:0]   residual_coeff_count,
-    output wire [159:0] residual_qscale_plan,
+    input  wire [14:0]  residual_coeff_read_address,
+    output wire [5:0]   residual_coeff_read_index,
+    output wire signed [12:0] residual_coeff_read_value,
+    output wire         residual_coeff_read_last,
+    output reg [15:0]   residual_coeff_count,
     output reg         q_scale_type,
     output reg         alternate_scan,
 
@@ -62,25 +64,26 @@ localparam [7:0]
     EXTENSION_START_CODE = 8'hB5,
     SEQUENCE_END_CODE    = 8'hB7;
 localparam integer ROW_BUFFER_BYTES = 512;
-localparam [5:0] MAX_RESIDUAL_BLOCKS = 6'd16;
-localparam [6:0] MAX_COEFF_EVENTS = 7'd32;
+localparam [11:0] MAX_RESIDUAL_BLOCKS = 12'd2048;
+localparam [15:0] MAX_COEFF_EVENTS = 16'd32768;
 
-// Commit 201 capacity closure: retain the public 32-block/64-event buses while
-// synthesizing only the bounded storage used by current generalized streams.
-reg [175:0] residual_mb_plan_store;
-reg [47:0] residual_block_index_plan_store;
-reg [15:0] residual_intra_plan_store;
-reg [191:0] residual_coeff_index_plan_store;
-reg [415:0] residual_coeff_value_plan_store;
-reg [31:0] residual_coeff_last_plan_store;
-reg [79:0] residual_qscale_plan_store;
-assign residual_mb_plan={176'd0,residual_mb_plan_store};
-assign residual_block_index_plan={48'd0,residual_block_index_plan_store};
-assign residual_intra_plan={16'd0,residual_intra_plan_store};
-assign residual_coeff_index_plan={192'd0,residual_coeff_index_plan_store};
-assign residual_coeff_value_plan={416'd0,residual_coeff_value_plan_store};
-assign residual_coeff_last_plan={32'd0,residual_coeff_last_plan_store};
-assign residual_qscale_plan={80'd0,residual_qscale_plan_store};
+// Commit 202: picture-wide sparse syntax is retained in M10K-oriented memories
+// and read back one block/event at a time by the shared transform.  This
+// replaces the flattened ALM-heavy 16-block/32-event buses without duplicating
+// inverse-quantisation or IDCT hardware.
+(* ramstyle = "M10K" *) reg [19:0] residual_block_mem [0:2047];
+(* ramstyle = "M10K" *) reg [18:0] residual_coeff_mem [0:32767];
+(* ramstyle = "M10K" *) reg residual_coeff_last_mem [0:32767];
+reg [19:0] residual_block_read_word;
+reg [18:0] residual_coeff_read_word;
+reg residual_coeff_read_last_reg;
+assign residual_block_read_mb=residual_block_read_word[10:0];
+assign residual_block_read_index=residual_block_read_word[13:11];
+assign residual_block_read_intra=residual_block_read_word[14];
+assign residual_block_read_qscale=residual_block_read_word[19:15];
+assign residual_coeff_read_index=residual_coeff_read_word[18:13];
+assign residual_coeff_read_value=$signed(residual_coeff_read_word[12:0]);
+assign residual_coeff_read_last=residual_coeff_read_last_reg;
 
 reg [31:0] byte_window;
 wire [31:0] byte_window_next = {byte_window[23:0], stream_data};
@@ -191,7 +194,7 @@ reg [8:0] cbp_vlc_bits;
 reg [3:0] cbp_vlc_len;
 reg [5:0] current_cbp;
 reg [2:0] current_block_index;
-reg [4:0] current_residual_slot;
+reg [10:0] current_residual_slot;
 
 reg [15:0] coeff_vlc_code;
 reg [4:0] coeff_vlc_len;

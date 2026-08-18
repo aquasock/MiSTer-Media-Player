@@ -373,17 +373,9 @@
                         parser_state<=R_ERROR;
                     end else begin
                         current_residual_slot<=residual_block_count;
-                        residual_mb_plan_store[
-                            (residual_block_count*11)+:11
-                        ]<=current_mb_index;
-                        residual_block_index_plan_store[
-                            (residual_block_count*3)+:3
-                        ]<=current_block_index;
-                        residual_intra_plan_store[residual_block_count]
-                            <=current_is_intra;
-                        residual_qscale_plan_store[
-                            (residual_block_count*5)+:5
-                        ]<=current_qscale;
+                        residual_block_mem[residual_block_count[10:0]]<=
+                            {current_qscale,current_is_intra,
+                             current_block_index,current_mb_index};
                         residual_block_count<=residual_block_count+1'b1;
                         qfs_index<=current_is_intra ? 7'd1 : 7'd0;
                         coeff_vlc_code<=0;

@@ -21,15 +21,16 @@ module tb_h262_parser_windows;
     wire p_motion_valid;
     wire [10:0] p_motion_index;
     wire signed [7:0] p_motion_x, p_motion_y;
-    wire [351:0] p_residual_mb;
-    wire [95:0] p_residual_block;
-    wire [5:0] p_residual_count;
+    wire [10:0] p_residual_read_mb;
+    wire [2:0] p_residual_read_block;
+    wire p_residual_read_intra;
+    wire [4:0] p_residual_read_qscale;
+    wire [11:0] p_residual_count;
     wire p_residual_present;
-    wire [383:0] p_coeff_index;
-    wire [831:0] p_coeff_value;
-    wire [63:0] p_coeff_last;
-    wire [6:0] p_coeff_count;
-    wire [159:0] p_qscale_plan;
+    wire [5:0] p_coeff_read_index;
+    wire signed [12:0] p_coeff_read_value;
+    wire p_coeff_read_last;
+    wire [15:0] p_coeff_count;
     wire p_q_scale_type, p_alternate_scan;
 
     wire b_candidate, b_seen, b_complete, b_hold, b_replay;
@@ -46,11 +47,17 @@ module tb_h262_parser_windows;
         .motion_event_valid(p_motion_valid), .motion_event_index(p_motion_index),
         .motion_event_x(p_motion_x), .motion_event_y(p_motion_y),
         .picture_mb_width(p_width), .picture_mb_height(p_height), .picture_mb_count(p_count),
-        .residual_mb_plan(p_residual_mb), .residual_block_index_plan(p_residual_block),
+        .residual_block_read_address(11'd0),
+        .residual_block_read_mb(p_residual_read_mb),
+        .residual_block_read_index(p_residual_read_block),
+        .residual_block_read_intra(p_residual_read_intra),
+        .residual_block_read_qscale(p_residual_read_qscale),
         .residual_block_count(p_residual_count), .residual_present(p_residual_present),
-        .residual_coeff_index_plan(p_coeff_index), .residual_coeff_value_plan(p_coeff_value),
-        .residual_coeff_last_plan(p_coeff_last), .residual_coeff_count(p_coeff_count),
-        .residual_qscale_plan(p_qscale_plan), .q_scale_type(p_q_scale_type),
+        .residual_coeff_read_address(15'd0),
+        .residual_coeff_read_index(p_coeff_read_index),
+        .residual_coeff_read_value(p_coeff_read_value),
+        .residual_coeff_read_last(p_coeff_read_last),
+        .residual_coeff_count(p_coeff_count), .q_scale_type(p_q_scale_type),
         .alternate_scan(p_alternate_scan), .parse_hold(p_hold), .probe_error(p_error)
     );
 

@@ -51,16 +51,18 @@ wire[10:0] wide_motion_index;
 wire signed[7:0] wide_motion_x,wide_motion_y;
 wire[5:0] wide_mb_width,wide_mb_height;
 wire[10:0] wide_mb_count;
-wire[351:0] wide_residual_mb_plan;
-wire[95:0] wide_residual_block_index_plan;
-wire[31:0] wide_residual_intra_plan;
-wire[5:0] wide_residual_block_count;
+wire[10:0] wide_block_read_address;
+wire[10:0] wide_block_read_mb;
+wire[2:0] wide_block_read_index;
+wire wide_block_read_intra;
+wire[4:0] wide_block_read_qscale;
+wire[11:0] wide_residual_block_count;
 wire wide_residual_present;
-wire[383:0] wide_coeff_index_plan;
-wire[831:0] wide_coeff_value_plan;
-wire[63:0] wide_coeff_last_plan;
-wire[6:0] wide_coeff_count;
-wire[159:0] wide_qscale_plan;
+wire[14:0] wide_coeff_read_address;
+wire[5:0] wide_coeff_read_index;
+wire signed[12:0] wide_coeff_read_value;
+wire wide_coeff_read_last;
+wire[15:0] wide_coeff_count;
 wire wide_qtype,wide_alt;
 
 wire residual_decision,residual_required_raw,residual_success_raw;
@@ -335,16 +337,18 @@ mpeg2_h262_p_wide_motion_syntax_probe wide_general_probe
  .motion_event_x(wide_motion_x),.motion_event_y(wide_motion_y),
  .picture_mb_width(wide_mb_width),.picture_mb_height(wide_mb_height),
  .picture_mb_count(wide_mb_count),
- .residual_mb_plan(wide_residual_mb_plan),
- .residual_block_index_plan(wide_residual_block_index_plan),
- .residual_intra_plan(wide_residual_intra_plan),
+ .residual_block_read_address(wide_block_read_address),
+ .residual_block_read_mb(wide_block_read_mb),
+ .residual_block_read_index(wide_block_read_index),
+ .residual_block_read_intra(wide_block_read_intra),
+ .residual_block_read_qscale(wide_block_read_qscale),
  .residual_block_count(wide_residual_block_count),
  .residual_present(wide_residual_present),
- .residual_coeff_index_plan(wide_coeff_index_plan),
- .residual_coeff_value_plan(wide_coeff_value_plan),
- .residual_coeff_last_plan(wide_coeff_last_plan),
+ .residual_coeff_read_address(wide_coeff_read_address),
+ .residual_coeff_read_index(wide_coeff_read_index),
+ .residual_coeff_read_value(wide_coeff_read_value),
+ .residual_coeff_read_last(wide_coeff_read_last),
  .residual_coeff_count(wide_coeff_count),
- .residual_qscale_plan(wide_qscale_plan),
  .q_scale_type(wide_qtype),.alternate_scan(wide_alt),
  .parse_hold(wide_parse_hold),.probe_error(wide_error)
 );
@@ -370,15 +374,17 @@ mpeg2_h262_p_residual_probe residual_probe
 
  .wide_mode(wide_mode),
  .wide_picture_complete(wide_complete_now),
- .wide_residual_mb_plan(wide_residual_mb_plan),
- .wide_residual_block_index_plan(wide_residual_block_index_plan),
- .wide_residual_intra_plan(wide_residual_intra_plan),
+ .wide_block_read_address(wide_block_read_address),
+ .wide_block_read_mb(wide_block_read_mb),
+ .wide_block_read_index(wide_block_read_index),
+ .wide_block_read_intra(wide_block_read_intra),
+ .wide_block_read_qscale(wide_block_read_qscale),
  .wide_residual_block_count(wide_residual_block_count),
- .wide_coeff_index_plan(wide_coeff_index_plan),
- .wide_coeff_value_plan(wide_coeff_value_plan),
- .wide_coeff_last_plan(wide_coeff_last_plan),
+ .wide_coeff_read_address(wide_coeff_read_address),
+ .wide_coeff_read_index(wide_coeff_read_index),
+ .wide_coeff_read_value(wide_coeff_read_value),
+ .wide_coeff_read_last(wide_coeff_read_last),
  .wide_coeff_count(wide_coeff_count),
- .wide_qscale_plan(wide_qscale_plan),
  .wide_q_scale_type(wide_qtype),
  .wide_alternate_scan(wide_alt),
  .wide_intra_dc_precision(intra_dc_precision),

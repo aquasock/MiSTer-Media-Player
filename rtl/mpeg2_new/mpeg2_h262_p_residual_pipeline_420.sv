@@ -1,10 +1,11 @@
 //============================================================================
 // MiSTer Media Player - shared H.262 P residual pipeline
 //
-// Legacy generalized mode consumes the historical 48-macroblock packed plan.
-// kate - Commit 166 adds a wide mode that reuses the same non-intra transform
-// and sparse residual RAM while motion metadata streams directly to the shared
-// raster engine. Wide residual descriptors carry an 11-bit macroblock index.
+// Commit 202 replaces the wide path's flattened picture plan with synchronous
+// read ports into parser-owned M10K memories. One sparse block at a time is
+// loaded into the existing serialized inverse-quantisation/IDCT engine, then
+// replayed immediately to the generalized raster engine. No transform is
+// duplicated and only one 64-sample spatial buffer is retained here.
 //============================================================================
 module mpeg2_h262_p_residual_probe
 (
@@ -30,15 +31,17 @@ module mpeg2_h262_p_residual_probe
 
     input wire wide_mode,
     input wire wide_picture_complete,
-    input wire [351:0] wide_residual_mb_plan,
-    input wire [95:0] wide_residual_block_index_plan,
-    input wire [31:0] wide_residual_intra_plan,
-    input wire [5:0] wide_residual_block_count,
-    input wire [383:0] wide_coeff_index_plan,
-    input wire [831:0] wide_coeff_value_plan,
-    input wire [63:0] wide_coeff_last_plan,
-    input wire [6:0] wide_coeff_count,
-    input wire [159:0] wide_qscale_plan,
+    output reg [10:0] wide_block_read_address,
+    input wire [10:0] wide_block_read_mb,
+    input wire [2:0] wide_block_read_index,
+    input wire wide_block_read_intra,
+    input wire [4:0] wide_block_read_qscale,
+    input wire [11:0] wide_residual_block_count,
+    output reg [14:0] wide_coeff_read_address,
+    input wire [5:0] wide_coeff_read_index,
+    input wire signed [12:0] wide_coeff_read_value,
+    input wire wide_coeff_read_last,
+    input wire [15:0] wide_coeff_count,
     input wire wide_q_scale_type,
     input wire wide_alternate_scan,
     input wire [1:0] wide_intra_dc_precision,
@@ -55,135 +58,60 @@ module mpeg2_h262_p_residual_probe
     output wire probe_error
 );
 
-localparam [5:0] MAX_BLOCKS=6'd32;
-localparam [6:0] MAX_COEFF_EVENTS=7'd64;
-wire any_general_mode = general_mode || wide_mode;
-
-// Accepted legacy first-macroblock parser remains available outside either
-// generalized raster client.
-wire old_decision, old_required, old_success, old_parser_error;
-wire [4:0] old_qscale;
-wire old_qtype, old_alt;
-wire [2:0] old_block;
-wire old_start, old_we, old_end;
-wire [5:0] old_widx;
-wire signed [12:0] old_wval;
-wire transform_done;
-// Commit 201 capacity closure: generalized plans own every synthesized P
-// transaction.  Retire the pre-generalized first-macroblock parser while
-// retaining zero-valued compatibility signals for the module interface.
-assign old_decision=1'b0;
-assign old_required=1'b0;
-assign old_success=1'b0;
-assign old_parser_error=1'b0;
-assign old_qscale=5'd0;
-assign old_qtype=1'b0;
-assign old_alt=1'b0;
-assign old_block=3'd0;
-assign old_start=1'b0;
-assign old_we=1'b0;
-assign old_end=1'b0;
-assign old_widx=6'd0;
-assign old_wval=13'sd0;
-
 localparam [3:0]
-    G_IDLE=4'd0,
-    G_SCAN=4'd1,
-    G_START=4'd2,
-    G_WRITE=4'd3,
-    G_END=4'd4,
-    G_WAIT=4'd5,
-    G_MOTION=4'd6,
-    G_DESC=4'd7,
-    G_DESC2=4'd8,
-    G_SAMPLES=4'd9,
-    G_FINISH=4'd10;
+    G_IDLE          = 4'd0,
+    G_BLOCK_WAIT    = 4'd1,
+    G_BLOCK_CAPTURE = 4'd2,
+    G_START         = 4'd3,
+    G_COEFF_WRITE   = 4'd4,
+    G_COEFF_WAIT    = 4'd5,
+    G_END           = 4'd6,
+    G_WAIT          = 4'd7,
+    G_DESC          = 4'd8,
+    G_DESC2         = 4'd9,
+    G_SAMPLES       = 4'd10,
+    G_FINISH        = 4'd11;
+
 reg [3:0] gstate;
-reg g_decision, g_required, g_success, g_error, g_wide;
-
-reg [383:0] g_motion_x, g_motion_y;
-reg [287:0] gplan;
-reg [383:0] g_coeff_index;
-reg [831:0] g_coeff_value;
-reg [63:0] g_coeff_last;
-reg [159:0] g_qscale;
-reg g_qtype, g_alt;
-reg [31:0] g_intra;
-reg [1:0] g_intra_dc_precision;
-reg [5:0] expected_blocks, slot_count;
-reg [6:0] expected_coeffs, coeff_read_index;
-
-reg [8:0] scan_index;
-reg [5:0] scan_mb;
-reg [2:0] scan_block, current_block;
+reg g_decision, g_required, g_success, g_error;
+reg [11:0] expected_blocks, block_slot;
+reg [15:0] expected_coeffs, coeff_consumed;
+reg [10:0] current_mb;
+reg [2:0] current_block;
+reg current_intra;
 reg [4:0] current_qscale;
-reg [10:0] desc_mb [0:31];
-reg [2:0] desc_block [0:31];
-reg signed [15:0] gmem [0:2047];
-reg [6:0] sample_cap_count;
-reg transform_armed;
+reg g_qtype, g_alt;
+reg [1:0] g_intra_dc_precision;
 
 reg gstart, gwe, gend;
 reg [5:0] gwidx;
 reg signed [12:0] gwval;
-
-reg [5:0] replay_motion_mb;
-reg [5:0] replay_slot;
-reg [5:0] replay_sample;
-reg replay_valid, first_valid_reg;
-reg [5:0] replay_index;
-reg signed [15:0] replay_value, first_value_reg;
-integer i;
-
-wire [10:0] replay_mem_index =
-    {replay_slot[4:0],6'b000000}+{5'd0,replay_sample};
-wire [5:0] coeff_idx_current =
-    g_coeff_index[(coeff_read_index*6)+:6];
-wire signed [12:0] coeff_val_current =
-    $signed(g_coeff_value[(coeff_read_index*13)+:13]);
-wire coeff_last_current = g_coeff_last[coeff_read_index];
-wire signed [7:0] replay_mvx =
-    $signed(g_motion_x[(replay_motion_mb*8)+:8]);
-wire signed [7:0] replay_mvy =
-    $signed(g_motion_y[(replay_motion_mb*8)+:8]);
-
-wire [2:0] qblock = any_general_mode ? current_block : old_block;
-wire qstart = any_general_mode ? gstart : old_start;
-wire qwe    = any_general_mode ? gwe    : old_we;
-wire qend   = any_general_mode ? gend   : old_end;
-wire [5:0] qwidx = any_general_mode ? gwidx : old_widx;
-wire signed [12:0] qwval =
-    any_general_mode ? gwval : old_wval;
-wire [4:0] qscale =
-    any_general_mode ? current_qscale : old_qscale;
-wire qtype = any_general_mode ? g_qtype : old_qtype;
-wire alt   = any_general_mode ? g_alt : old_alt;
-
-// The transform's block-index 0 is reserved for the legacy Phase-1T proof.
-// Generalized syntax must not inherit that diagnostic key.
-wire [1:0] tblock =
-    any_general_mode ? 2'd1 :
-    ((qblock==0)?2'd0:2'd1);
-wire current_transform_intra =
-    any_general_mode && g_wide && g_intra[slot_count[4:0]];
-wire tfvalid, tvalid, terr;
+wire transform_done, tfvalid, tvalid, terr;
 wire signed [15:0] tfvalue, tvalue;
 wire [1:0] unused_block;
 wire [5:0] tidx;
 
+reg signed [15:0] block_sample_mem [0:63];
+reg [6:0] sample_cap_count;
+reg [5:0] replay_sample;
+reg replay_valid, first_valid_reg;
+reg [5:0] replay_index;
+reg signed [15:0] replay_value, first_value_reg;
+
 mpeg2_h262_p_non_intra_transform transform
 (
-    .clk(clk), .reset(reset),
-    .qfs_block_index(tblock),
-    .qfs_block_start(qstart),
-    .qfs_write_en(qwe),
-    .qfs_write_index(qwidx),
-    .qfs_write_value(qwval),
-    .qfs_block_end(qend),
-    .quantiser_scale_code(qscale),
-    .q_scale_type(qtype),
-    .alternate_scan(alt),
-    .intra_block(current_transform_intra),
+    .clk(clk),
+    .reset(reset),
+    .qfs_block_index(2'd1),
+    .qfs_block_start(gstart),
+    .qfs_write_en(gwe),
+    .qfs_write_index(gwidx),
+    .qfs_write_value(gwval),
+    .qfs_block_end(gend),
+    .quantiser_scale_code(current_qscale),
+    .q_scale_type(g_qtype),
+    .alternate_scan(g_alt),
+    .intra_block(current_intra),
     .intra_dc_precision(g_intra_dc_precision),
     .block_done(transform_done),
     .first_sample_valid(tfvalid),
@@ -195,9 +123,15 @@ mpeg2_h262_p_non_intra_transform transform
     .probe_error(terr)
 );
 
-wire selected_transform_valid = tvalid;
-wire [5:0] selected_transform_index = tidx;
-wire signed [15:0] selected_transform_value = tvalue;
+wire unused_legacy=&{
+    1'b0,stream_data[0],stream_valid,p_picture_expected,general_mode,
+    general_picture_complete,general_motion_x_plan[0],
+    general_motion_y_plan[0],general_residual_block_plan[0],
+    general_residual_block_count[0],general_coeff_index_plan[0],
+    general_coeff_value_plan[0],general_coeff_last_plan[0],
+    general_coeff_count[0],general_qscale_plan[0],general_q_scale_type,
+    general_alternate_scan,tfvalid,tfvalue[0],unused_block[0]
+};
 
 always @(posedge clk) begin
     if(reset) begin
@@ -206,328 +140,200 @@ always @(posedge clk) begin
         g_required<=0;
         g_success<=0;
         g_error<=0;
-        g_wide<=0;
-        g_motion_x<=0;
-        g_motion_y<=0;
-        gplan<=0;
-        g_coeff_index<=0;
-        g_coeff_value<=0;
-        g_coeff_last<=0;
-        g_qscale<=0;
+        expected_blocks<=0;
+        block_slot<=0;
+        expected_coeffs<=0;
+        coeff_consumed<=0;
+        wide_block_read_address<=0;
+        wide_coeff_read_address<=0;
+        current_mb<=0;
+        current_block<=0;
+        current_intra<=0;
+        current_qscale<=0;
         g_qtype<=0;
         g_alt<=0;
-        g_intra<=0;
         g_intra_dc_precision<=0;
-        expected_blocks<=0;
-        slot_count<=0;
-        expected_coeffs<=0;
-        coeff_read_index<=0;
-        scan_index<=0;
-        scan_mb<=0;
-        scan_block<=0;
-        current_block<=0;
-        current_qscale<=0;
-        sample_cap_count<=0;
-        transform_armed<=0;
         gstart<=0;
         gwe<=0;
         gend<=0;
         gwidx<=0;
         gwval<=0;
-        replay_motion_mb<=0;
-        replay_slot<=0;
+        sample_cap_count<=0;
         replay_sample<=0;
         replay_valid<=0;
         first_valid_reg<=0;
         replay_index<=0;
         replay_value<=0;
         first_value_reg<=0;
-        for(i=0;i<32;i=i+1) begin
-            desc_mb[i]<=0;
-            desc_block[i]<=0;
-        end
     end else begin
         gstart<=0;
         gwe<=0;
         gend<=0;
         replay_valid<=0;
         first_valid_reg<=0;
-        if((gstate!=G_IDLE)&&!transform_done)
-            transform_armed<=1;
 
-        // kate - Commit 166: wide geometry reuses this exact transform and
-        // spatial residual buffer; only descriptor addressing is widened.
-        if(wide_picture_complete) begin
-            g_wide<=1;
-            g_decision<=1;
-            g_required<=(wide_residual_block_count!=0);
-            g_success<=0;
-            g_coeff_index<=wide_coeff_index_plan;
-            g_coeff_value<=wide_coeff_value_plan;
-            g_coeff_last<=wide_coeff_last_plan;
-            g_qscale<=wide_qscale_plan;
-            g_qtype<=wide_q_scale_type;
-            g_alt<=wide_alternate_scan;
-            g_intra<=wide_residual_intra_plan;
-            g_intra_dc_precision<=wide_intra_dc_precision;
-            expected_blocks<=wide_residual_block_count;
-            expected_coeffs<=wide_coeff_count;
-            slot_count<=0;
-            coeff_read_index<=0;
-            sample_cap_count<=0;
-            transform_armed<=0;
-            replay_slot<=0;
-            replay_sample<=0;
-            for(i=0;i<32;i=i+1) begin
-                desc_mb[i]<=wide_residual_mb_plan[(i*11)+:11];
-                desc_block[i]<=
-                    wide_residual_block_index_plan[(i*3)+:3];
-            end
-            if((wide_residual_block_count>MAX_BLOCKS) ||
-               (wide_coeff_count>MAX_COEFF_EVENTS)) begin
-                g_error<=1;
-                gstate<=G_IDLE;
-            end else if(wide_residual_block_count!=0) begin
-                current_block<=wide_residual_block_index_plan[2:0];
-                current_qscale<=wide_qscale_plan[4:0];
-                gstate<=G_START;
-            end else begin
-                if(wide_coeff_count!=0) g_error<=1;
-                g_success<=1;
-                gstate<=G_FINISH;
-            end
-        end else if(general_picture_complete) begin
-            g_wide<=0;
-            g_decision<=1;
-            g_required<=(general_residual_block_count!=0);
-            g_success<=0;
-            g_motion_x<=general_motion_x_plan;
-            g_motion_y<=general_motion_y_plan;
-            gplan<=general_residual_block_plan;
-            g_coeff_index<=general_coeff_index_plan;
-            g_coeff_value<=general_coeff_value_plan;
-            g_coeff_last<=general_coeff_last_plan;
-            g_qscale<=general_qscale_plan;
-            g_qtype<=general_q_scale_type;
-            g_alt<=general_alternate_scan;
-            expected_blocks<=general_residual_block_count;
-            expected_coeffs<=general_coeff_count;
-            slot_count<=0;
-            coeff_read_index<=0;
-            scan_index<=0;
-            scan_mb<=0;
-            scan_block<=0;
-            sample_cap_count<=0;
-            replay_motion_mb<=0;
-            replay_slot<=0;
-            replay_sample<=0;
-            if((general_residual_block_count>MAX_BLOCKS) ||
-               (general_coeff_count>MAX_COEFF_EVENTS)) begin
-                g_error<=1;
-                gstate<=G_IDLE;
-            end else if(general_residual_block_count!=0) begin
-                gstate<=G_SCAN;
-            end else begin
-                if(general_coeff_count!=0) g_error<=1;
-                g_success<=1;
-                gstate<=G_MOTION;
-            end
-        end
-
-        if(any_general_mode&&selected_transform_valid) begin
-            if(slot_count>=MAX_BLOCKS ||
-               selected_transform_index!=sample_cap_count[5:0] ||
-               sample_cap_count>=7'd64) begin
+        if(tvalid) begin
+            if((tidx!=sample_cap_count[5:0]) ||
+               (sample_cap_count>=7'd64)) begin
                 g_error<=1;
             end else begin
-                gmem[{slot_count[4:0],6'b000000}+
-                     selected_transform_index]<=selected_transform_value;
+                block_sample_mem[tidx]<=tvalue;
                 sample_cap_count<=sample_cap_count+1'b1;
             end
         end
 
-        case(gstate)
-        G_SCAN: begin
-            if(scan_index>=9'd288) begin
-                if((slot_count!=expected_blocks) ||
-                   (slot_count==0) ||
-                   (coeff_read_index!=expected_coeffs)) begin
+        if(wide_picture_complete) begin
+            g_decision<=1;
+            g_required<=(wide_residual_block_count!=0);
+            g_success<=0;
+            expected_blocks<=wide_residual_block_count;
+            expected_coeffs<=wide_coeff_count;
+            block_slot<=0;
+            coeff_consumed<=0;
+            wide_block_read_address<=0;
+            wide_coeff_read_address<=0;
+            sample_cap_count<=0;
+            replay_sample<=0;
+            g_qtype<=wide_q_scale_type;
+            g_alt<=wide_alternate_scan;
+            g_intra_dc_precision<=wide_intra_dc_precision;
+            if(wide_residual_block_count!=0) begin
+                gstate<=G_BLOCK_WAIT;
+            end else begin
+                if(wide_coeff_count!=0) g_error<=1;
+                g_success<=(wide_coeff_count==0);
+                gstate<=G_FINISH;
+            end
+        end else begin
+            case(gstate)
+            G_BLOCK_WAIT: begin
+                // Parser memories are synchronous; the following state sees
+                // the word selected by wide_block_read_address.
+                gstate<=G_BLOCK_CAPTURE;
+            end
+
+            G_BLOCK_CAPTURE: begin
+                if((block_slot>=expected_blocks) ||
+                   (wide_block_read_mb>=11'd1350) ||
+                   (wide_block_read_index>=3'd6)) begin
                     g_error<=1;
                     gstate<=G_IDLE;
                 end else begin
-                    g_success<=1;
-                    replay_motion_mb<=0;
-                    gstate<=G_MOTION;
+                    current_mb<=wide_block_read_mb;
+                    current_block<=wide_block_read_index;
+                    current_intra<=wide_block_read_intra;
+                    current_qscale<=wide_block_read_qscale;
+                    sample_cap_count<=0;
+                    gstate<=G_START;
                 end
-            end else if(gplan[scan_index]) begin
-                if(slot_count>=MAX_BLOCKS ||
-                   slot_count>=expected_blocks) begin
+            end
+
+            G_START: begin
+                gstart<=1;
+                gstate<=G_COEFF_WRITE;
+            end
+
+            G_COEFF_WRITE: begin
+                if(coeff_consumed>=expected_coeffs) begin
                     g_error<=1;
                     gstate<=G_IDLE;
                 end else begin
-                    desc_mb[slot_count]<={5'd0,scan_mb};
-                    desc_block[slot_count]<=scan_block;
-                    current_block<=scan_block;
-                    current_qscale<=
-                        g_qscale[(slot_count*5)+:5];
-                    sample_cap_count<=0;
-                    gstate<=G_START;
+                    gwe<=1;
+                    gwidx<=wide_coeff_read_index;
+                    gwval<=wide_coeff_read_value;
+                    coeff_consumed<=coeff_consumed+1'b1;
+                    wide_coeff_read_address<=wide_coeff_read_address+1'b1;
+                    if(wide_coeff_read_last)
+                        gstate<=G_END;
+                    else
+                        gstate<=G_COEFF_WAIT;
                 end
-            end else begin
-                scan_index<=scan_index+1'b1;
-                if(scan_block==5) begin
-                    scan_block<=0;
-                    scan_mb<=scan_mb+1'b1;
-                end else scan_block<=scan_block+1'b1;
             end
-        end
 
-        G_START: begin
-            gstart<=1;
-            transform_armed<=0;
-            gstate<=G_WRITE;
-        end
-
-        G_WRITE: begin
-            if(coeff_read_index>=expected_coeffs ||
-               coeff_read_index>=MAX_COEFF_EVENTS) begin
-                g_error<=1;
-                gstate<=G_IDLE;
-            end else begin
-                gwe<=1;
-                gwidx<=coeff_idx_current;
-                gwval<=coeff_val_current;
-                coeff_read_index<=coeff_read_index+1'b1;
-                if(coeff_last_current) gstate<=G_END;
+            G_COEFF_WAIT: begin
+                // One-cycle synchronous coefficient-memory read latency.
+                gstate<=G_COEFF_WRITE;
             end
-        end
 
-        G_END: begin
-            gend<=1;
-            gstate<=G_WAIT;
-        end
+            G_END: begin
+                gend<=1;
+                gstate<=G_WAIT;
+            end
 
-        G_WAIT: if(transform_armed&&transform_done) begin
-            if((sample_cap_count+(selected_transform_valid?7'd1:7'd0))!=7'd64)
-                g_error<=1;
-            if(g_wide) begin
-                if(slot_count+1'b1>=expected_blocks) begin
-                    slot_count<=slot_count+1'b1;
-                    if(coeff_read_index!=expected_coeffs)
-                        g_error<=1;
-                    g_success<=1;
-                    replay_slot<=0;
-                    gstate<=G_DESC;
+            G_WAIT: if(transform_done) begin
+                if((sample_cap_count+(tvalid?7'd1:7'd0))!=7'd64) begin
+                    g_error<=1;
+                    gstate<=G_IDLE;
                 end else begin
-                    slot_count<=slot_count+1'b1;
-                    current_block<=desc_block[slot_count+1'b1];
-                    current_qscale<=
-                        g_qscale[((slot_count+1'b1)*5)+:5];
-                    sample_cap_count<=0;
-                    gstate<=G_START;
-                end
-            end else begin
-                slot_count<=slot_count+1'b1;
-                scan_index<=scan_index+1'b1;
-                if(scan_block==5) begin
-                    scan_block<=0;
-                    scan_mb<=scan_mb+1'b1;
-                end else scan_block<=scan_block+1'b1;
-                gstate<=G_SCAN;
-            end
-        end
-
-        G_MOTION: begin
-            replay_valid<=1;
-            replay_index<=6'h3e;
-            replay_value<=$signed({replay_mvx[7:0],replay_mvy[7:0]});
-            if(replay_motion_mb==6'd47) begin
-                if(slot_count==0) gstate<=G_FINISH;
-                else begin
-                    replay_slot<=0;
+                    replay_sample<=0;
                     gstate<=G_DESC;
                 end
-            end else replay_motion_mb<=replay_motion_mb+1'b1;
-        end
+            end
 
-        G_DESC: begin
-            replay_valid<=1;
-            if(g_wide) begin
+            G_DESC: begin
+                replay_valid<=1;
                 replay_index<=6'h3c;
-                replay_value<=$signed({5'd0,desc_mb[replay_slot]});
+                replay_value<=$signed({5'd0,current_mb});
                 gstate<=G_DESC2;
-            end else begin
-                replay_index<=6'h3f;
-                replay_value<=$signed({
-                    4'hB,3'b000,
-                    desc_mb[replay_slot][5:0],
-                    desc_block[replay_slot]
-                });
+            end
+
+            G_DESC2: begin
+                replay_valid<=1;
+                replay_index<=6'h3d;
+                replay_value<=$signed({12'd0,current_intra,current_block});
                 replay_sample<=0;
                 gstate<=G_SAMPLES;
             end
-        end
 
-        G_DESC2: begin
-            replay_valid<=1;
-            replay_index<=6'h3d;
-            replay_value<=$signed({12'd0,g_intra[replay_slot],
-                                   desc_block[replay_slot]});
-            replay_sample<=0;
-            gstate<=G_SAMPLES;
-        end
-
-        G_SAMPLES: begin
-            replay_valid<=1;
-            replay_index<=replay_sample;
-            replay_value<=gmem[replay_mem_index];
-            if((replay_slot==0)&&(replay_sample==0)) begin
-                first_valid_reg<=1;
-                first_value_reg<=gmem[replay_mem_index];
-            end
-            if(replay_sample==6'd63) begin
-                if(replay_slot+1'b1>=slot_count)
-                    gstate<=G_FINISH;
-                else begin
-                    replay_slot<=replay_slot+1'b1;
-                    gstate<=G_DESC;
+            G_SAMPLES: begin
+                replay_valid<=1;
+                replay_index<=replay_sample;
+                replay_value<=block_sample_mem[replay_sample];
+                if((block_slot==0)&&(replay_sample==0)) begin
+                    first_valid_reg<=1;
+                    first_value_reg<=block_sample_mem[0];
                 end
-            end else replay_sample<=replay_sample+1'b1;
-        end
+                if(replay_sample==6'd63) begin
+                    if(block_slot+1'b1>=expected_blocks) begin
+                        if(coeff_consumed!=expected_coeffs)
+                            g_error<=1;
+                        else
+                            g_success<=1;
+                        gstate<=G_FINISH;
+                    end else begin
+                        block_slot<=block_slot+1'b1;
+                        wide_block_read_address<=wide_block_read_address+1'b1;
+                        sample_cap_count<=0;
+                        gstate<=G_BLOCK_WAIT;
+                    end
+                end else begin
+                    replay_sample<=replay_sample+1'b1;
+                end
+            end
 
-        G_FINISH: begin
-            replay_valid<=1;
-            replay_index<=6'h3f;
-            replay_value<=16'shA2FF;
-            gstate<=G_IDLE;
+            G_FINISH: begin
+                replay_valid<=1;
+                replay_index<=6'h3f;
+                replay_value<=16'shA2FF;
+                gstate<=G_IDLE;
+            end
+            default:;
+            endcase
         end
-        default:;
-        endcase
     end
 end
 
-assign decision_complete =
-    any_general_mode ? g_decision : 1'b0;
-assign residual_required =
-    any_general_mode ? g_required : 1'b0;
-assign residual_success =
-    any_general_mode ? g_success : 1'b0;
-assign mixed_replay_active = any_general_mode &&
-    ((gstate==G_MOTION) ||
-     (gstate==G_DESC) ||
-     (gstate==G_DESC2) ||
-     (gstate==G_SAMPLES) ||
-     (gstate==G_FINISH));
-assign first_sample_valid =
-    any_general_mode ? first_valid_reg : 1'b0;
-assign first_sample_value =
-    any_general_mode ? first_value_reg : 16'sd0;
-assign residual_sample_valid =
-    any_general_mode ? replay_valid : 1'b0;
-assign residual_sample_index =
-    any_general_mode ? replay_index : 6'd0;
-assign residual_sample_value =
-    any_general_mode ? replay_value : 16'sd0;
-assign probe_error = terr | g_error;
+assign decision_complete=wide_mode?g_decision:1'b0;
+assign residual_required=wide_mode?g_required:1'b0;
+assign residual_success=wide_mode?g_success:1'b0;
+assign mixed_replay_active=wide_mode&&
+    ((gstate==G_DESC)||(gstate==G_DESC2)||
+     (gstate==G_SAMPLES)||(gstate==G_FINISH));
+assign first_sample_valid=wide_mode?first_valid_reg:1'b0;
+assign first_sample_value=wide_mode?first_value_reg:16'sd0;
+assign residual_sample_valid=wide_mode?replay_valid:1'b0;
+assign residual_sample_index=wide_mode?replay_index:6'd0;
+assign residual_sample_value=wide_mode?replay_value:16'sd0;
+assign probe_error=terr|g_error;
 
 endmodule
