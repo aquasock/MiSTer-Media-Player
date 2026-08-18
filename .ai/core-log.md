@@ -1,33 +1,5 @@
 
 ---
-## 186 COMMIT Unreleased 12b22cd 2026-08-17T06:58:32-07:00
-
-#### Coming From:
-
-Unreleased d5e5f62
-
-#### Purpose:
-
-Complete generalized P parsing and raster publication when the final P picture is delimited by the MPEG sequence-end start code.
-
-#### Outcome:
-
-Commit `12b22cd` accepts MPEG sequence-end code `0xB7` as a legal boundary after the final wide-P slice. Exact controller replay changes the visual discriminator from 1,305 motion events with no completion or terminator to all 1,350 events, wide completion, and the raster terminator. The clean Quartus 17.0.2 build closes with zero setup TNS, +0.244 ns global setup, +2.139 ns decoder setup, 29,920 ALMs, and 40,850 registers. Residual and MBA-escape streams retain separate earlier parser stops outside this commit.
-
-#### Next Steps:
-
-Run `test_p_visual_discriminator.m2v` and record USER, POWER, and DISK after the initial shared blink. Acceptance must clear, DISK must advance beyond capture, and the displayed P must show the center quadrant seams. After hardware confirmation, isolate the earlier content-specific parser stops in the residual and MBA-escape streams as separate boundaries.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
 ## 187 COMMIT Unreleased 92546f5 2026-08-17T07:21:08-07:00
 
 #### Coming From:
@@ -1277,6 +1249,34 @@ Reload the deployed core and run `test_compat_long_gop.m2v` once. Confirm whethe
 
 - rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 - tools/streams/tb_h262_b_presentation_scheduler.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+## 226 COMMIT Unreleased 1b26cb5 2026-08-18T14:13:55-07:00
+
+#### Coming From:
+
+Unreleased 1b26cb5
+
+#### Purpose:
+
+Record the hardware result of the reference-classification barrier and correct the inferred B-to-future-reference event ordering.
+
+#### Outcome:
+
+The deployed `1b26cb5` RBF now stops on frame 47 rather than frame 50; POWER repeats five blinks while USER and DISK remain off. POWER code five proves that a newer reference completed but the displayed bank did not advance to it, with no encoded decoder or DDR error. This result disproves Entry 224's vblank-first ordering: the B48 accepted-header event reaches the scheduler in the I50 publication handoff before the newly registered I50 reference bank is visible. The scheduler therefore compares the displayed P47 bank with stale P47 reference state, classifies the future reference as already displayed, and aborts the B run. Before Entry 225, ordinary `frame_waiting` could still display I50 after that abort, producing the old terminal frame 50; the new classification barrier correctly removes that fallback and exposes the underlying abort as terminal frame 47 and completed-versus-displayed mismatch. The apparent two-frame steps remain compatible with 30 fps camera sampling of one-refresh B pictures and do not alter this bank-ownership result.
+
+#### Next Steps:
+
+Await approval for a two-phase future-reference acquisition in the scheduler: a B header may open the run before its future publication is registered, and the next reference publication must then supply the completed bank without being treated as ordinary display work. Cover B-header ordering before, simultaneous with, and after reference publication, retain the Entry 225 ordinary and terminal release cases, preserve fail-open behavior, and use an incremental Quartus build for the next hardware boundary.
+
+#### Files Modified:
+
+None.
 
 #### Status:
 
