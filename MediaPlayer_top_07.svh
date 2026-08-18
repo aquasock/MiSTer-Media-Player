@@ -324,7 +324,13 @@ always @(posedge clk_mpeg2) begin
         mpeg2_new_diag_slot_div <= 24'd0;
         mpeg2_new_diag_slot     <= 7'd0;
     end
-    else if (!mpeg2_new_diag_snapshot_valid && mpeg2_new_sequence_end_seen) begin
+    // Entry 219: fail-open masks decoder validity while draining, so a fatal
+    // transaction intentionally discards any later sequence-end code.  The
+    // sticky fatal result is already settled diagnostic evidence and must arm
+    // the same one-second snapshot delay as a normally decoded sequence end.
+    else if (!mpeg2_new_diag_snapshot_valid &&
+             (mpeg2_new_sequence_end_seen ||
+              mpeg2_new_transport_fatal_error)) begin
         if (mpeg2_new_diag_slot_tick && (mpeg2_new_diag_slot == 7'd3)) begin
             mpeg2_new_diag_snapshot_valid      <= 1'b1;
             mpeg2_new_diag_error_code_snapshot <= mpeg2_new_diag_error_code;
