@@ -40,8 +40,6 @@ Read this core.md file first. Treat core.md is the primary project-level source 
 
 - The user's local GitHub repository must always stay up to date with the online repository.
 
-- The user's local GitHub repository is: /run/media/vash/GIT/MiSTer-Media-Player
-
 - The tar.gz archives stored in the "archived_results" folder are not to be referenced unless approval from the user is given first.
 
 - Do not create branches if possible. Always work off of master unless otherwise instructed.
