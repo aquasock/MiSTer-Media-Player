@@ -2,7 +2,7 @@
 
 An experimental media-player core for [MiSTer FPGA](https://github.com/MiSTer-devel/Main_MiSTer), with a standards-driven MPEG-2 Video / ITU-T H.262 decoder implemented primarily in FPGA logic.
 
-> **Development status:** active, pre-release, developer-oriented. **v0.5.0 is the current hardware-qualified release candidate.** It extends the progressive 4:2:0 I/P/B path to the 720x480 regression geometry and independently applies picture-signaled P/B motion-vector `f_code` values from 1 through 4. Audio, program-stream demux, DVD support, and broader H.262 coverage remain future work.
+> **Development status:** active, pre-release, developer-oriented. **v0.5.0 is the current published hardware-qualified milestone.** It extends the progressive 4:2:0 I/P/B path to the 720x480 regression geometry and independently applies picture-signaled P/B motion-vector `f_code` values from 1 through 4. Audio, program-stream demux, DVD support, and broader H.262 coverage remain future work.
 
 ## Current status
 
@@ -49,11 +49,7 @@ Milestone releases use semantic-version tags on GitHub. MiSTer RBF assets retain
 
 Current published milestone release:
 
-- **v0.4.0** — progressive 4:2:0 I/P/B decoding and presentation within the earlier bounded regression envelope; binary asset `MediaPlayer_20260816.rbf`.
-
-Current hardware-qualified release candidate:
-
-- **v0.5.0** — 720x480 progressive 4:2:0 I/P/B regression coverage, generalized P/B motion-vector `f_code` 1-through-4 handling, full-width P parser/raster completion, and settled post-stream diagnostics.
+- **v0.5.0** — 720x480 progressive 4:2:0 I/P/B regression coverage, generalized P/B motion-vector `f_code` 1-through-4 handling, full-width P parser/raster completion, and settled post-stream diagnostics; binary asset `MediaPlayer_20260817.rbf`.
 
 The v0.5.0 release qualification checkout is commit `424eec43b0d0b4f8085e6591a15543eafab394e7`, whose synthesized RTL baseline is `b1bde49df3831669b577a1ed78404e026f19382d`. It passed a fresh-clone Quartus Prime 17.0.2 build and the authoritative seven-stream MiSTer regression matrix before the documentation-only release commits were applied.
 
