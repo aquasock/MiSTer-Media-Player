@@ -147,6 +147,11 @@ wire [3:0] mpeg2_new_diag_error_code_live =
 //
 // Otherwise LED_POWER is steady ON.  Observability only: no decode,
 // presentation, ownership or acceptance behavior changes.
+//
+// Commit 199 extends the same hierarchy when USER blinks 3 (pred_error):
+// POWER 1 plan adapter, 2 generalized P raster, 3 B raster/history,
+// 4 legacy/base probe.  DISK then reports the selected raster engine's first
+// internal assertion number; plan/base have no internal detail and report 0.
 wire [3:0] mpeg2_new_diag_prereq_code =
     !mpeg2_new_p_macroblock_type_seen          ? 4'd1  :
     !mpeg2_new_first_picture_420_parsed        ? 4'd2  :
@@ -187,6 +192,8 @@ reg [3:0] mpeg2_new_diag_error_code_first;
 reg [3:0] mpeg2_new_diag_phase1_source_first;
 reg [3:0] mpeg2_new_diag_p_source_first;
 reg [3:0] mpeg2_new_diag_progress_detail_first;
+reg [2:0] mpeg2_new_diag_pred_source_first;
+reg [4:0] mpeg2_new_diag_pred_detail_first;
 
 always @(posedge clk_mpeg2) begin
     if (reset_mpeg2) begin
@@ -195,6 +202,8 @@ always @(posedge clk_mpeg2) begin
         mpeg2_new_diag_phase1_source_first   <= 4'd0;
         mpeg2_new_diag_p_source_first        <= 4'd0;
         mpeg2_new_diag_progress_detail_first <= 4'd0;
+        mpeg2_new_diag_pred_source_first     <= 3'd0;
+        mpeg2_new_diag_pred_detail_first     <= 5'd0;
     end
     else if (!mpeg2_new_diag_first_error_valid &&
              (mpeg2_new_diag_error_code_live != 4'd0)) begin
@@ -203,6 +212,8 @@ always @(posedge clk_mpeg2) begin
         mpeg2_new_diag_phase1_source_first   <= mpeg2_new_phase1_probe_error_source;
         mpeg2_new_diag_p_source_first        <= mpeg2_new_p_probe_error_source;
         mpeg2_new_diag_progress_detail_first <= mpeg2_new_p_progress_detail;
+        mpeg2_new_diag_pred_source_first     <= mpeg2_new_pred_error_source;
+        mpeg2_new_diag_pred_detail_first     <= mpeg2_new_pred_error_detail;
     end
 end
 
@@ -214,7 +225,9 @@ wire [3:0] mpeg2_new_diag_power_code_live =
         ((mpeg2_new_diag_error_code_first == 4'd2) ?
             ((mpeg2_new_diag_phase1_source_first == 4'd2) ?
                  mpeg2_new_diag_p_source_first :
-                 mpeg2_new_diag_phase1_source_first) : 4'd0) :
+                 mpeg2_new_diag_phase1_source_first) :
+         (mpeg2_new_diag_error_code_first == 4'd3) ?
+            {1'b0, mpeg2_new_diag_pred_source_first} : 4'd0) :
         // Commit 192: prerequisites below describe the generalized P path.
         // Once the existing normal I/P/B acceptance result is true, none of
         // those P-only sub-codes is a failure and POWER must stay clear.
@@ -241,6 +254,9 @@ wire [4:0] mpeg2_new_diag_disk_code_live =
     (mpeg2_new_diag_first_error_valid &&
      (mpeg2_new_diag_error_code_first == 4'd1)) ?
         mpeg2_new_syntax_error_source :
+    (mpeg2_new_diag_first_error_valid &&
+     (mpeg2_new_diag_error_code_first == 4'd3)) ?
+        mpeg2_new_diag_pred_detail_first :
     (!mpeg2_new_diag_first_error_valid &&
      (mpeg2_new_diag_prereq_code == 4'd4)) ?
         {1'b0, mpeg2_new_pred_progress_stage} :

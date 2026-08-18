@@ -11,6 +11,11 @@
 // kate - Commit 166: geometry is derived from the live sequence dimensions,
 // up to the established 720x480 progressive 4:2:0 envelope. Ordered motion
 // words are retained in one synchronous M10K-oriented RAM instead of 48 flops.
+// Commit 199 error_source is first-fault-only: 1 sample order, 2 motion
+// metadata, 3/4/5 wide descriptor, 6 legacy descriptor, 7 terminator,
+// 8 unknown metadata, 9 admission, 10 timeout, 11 motion range, 12 source
+// bounds, 13 unexpected DDR response, 14 readback, 15 descriptor count,
+// 16 motion count.
 //============================================================================
 module mpeg2_h262_p_motion_residual_raster_engine
 (
@@ -51,7 +56,8 @@ module mpeg2_h262_p_motion_residual_raster_engine
     output reg persisted_seen,
     output reg [7:0] persisted_value,
     output reg [3:0] progress_stage,
-    output reg error
+    output reg error,
+    output reg [4:0] error_source
 );
 
 localparam [28:0]
@@ -366,6 +372,7 @@ always @(posedge clk) begin
         persisted_value<=0;
         progress_stage<=0;
         error<=0;
+        error_source<=0;
         for(i=0;i<32;i=i+1) begin
             desc_mb[i]<=0;
             desc_block[i]<=0;
@@ -406,6 +413,7 @@ always @(posedge clk) begin
             if(desc_active) begin
                 if(residual_index!=sample_expected) begin
                     error<=1;
+                    if(!error) error_source<=5'd1;
                 end else begin
                     rm[{current_desc_slot,6'b000000}+residual_index]
                         <=residual_value;
@@ -421,6 +429,7 @@ always @(posedge clk) begin
                    wide_desc_pending ||
                    (motion_count>=MAX_MB)) begin
                     error<=1;
+                    if(!error) error_source<=5'd2;
                 end else begin
                     motion_mem[motion_count]<=residual_value;
                     motion_count<=motion_count+1'b1;
@@ -432,6 +441,7 @@ always @(posedge clk) begin
                    (residual_value<0) ||
                    (residual_value>16'sd1349)) begin
                     error<=1;
+                    if(!error) error_source<=5'd3;
                 end else begin
                     wide_desc_mb<=residual_value[10:0];
                     wide_desc_pending<=1;
@@ -443,8 +453,10 @@ always @(posedge clk) begin
                    (residual_value[15:3]!=0) ||
                    (residual_value[2:0]>=6)) begin
                     error<=1;
+                    if(!error) error_source<=5'd4;
                 end else if(descriptor_order_error) begin
                     error<=1;
+                    if(!error) error_source<=5'd5;
                 end else begin
                     current_desc_slot<=desc_count[4:0];
                     desc_mb[desc_count]<=wide_desc_mb;
@@ -468,6 +480,7 @@ always @(posedge clk) begin
                      {desc_mb[(desc_count-1'b1)&6'h1f],
                       desc_block[(desc_count-1'b1)&6'h1f]}))) begin
                     error<=1;
+                    if(!error) error_source<=5'd6;
                 end else begin
                     current_desc_slot<=desc_count[4:0];
                     desc_mb[desc_count]<={5'd0,residual_value[8:3]};
@@ -482,11 +495,13 @@ always @(posedge clk) begin
                    metadata_done ||
                    wide_desc_pending) begin
                     error<=1;
+                    if(!error) error_source<=5'd7;
                 end else begin
                     metadata_done<=1;
                 end
             end else begin
                 error<=1;
+                if(!error) error_source<=5'd8;
             end
         end
 
@@ -512,6 +527,7 @@ always @(posedge clk) begin
                (reference_bank==destination_bank) ||
                (motion_count==0)) begin
                 error<=1;
+                if(!error) error_source<=5'd9;
                 active<=0;
                 persisted_seen<=1;
                 timeout<=0;
@@ -521,13 +537,17 @@ always @(posedge clk) begin
 
         if(started&&!persisted_seen&&timeout!=0) begin
             timeout<=timeout-1'b1;
-            if(timeout==1) error<=1;
+            if(timeout==1) begin
+                error<=1;
+                if(!error) error_source<=5'd10;
+            end
         end
 
         if(motion_load) begin
             motion_load<=0;
             if(mbi>=motion_count || mbi>=MAX_MB) begin
                 error<=1;
+                if(!error) error_source<=5'd11;
                 active<=0;
                 persisted_seen<=1;
                 timeout<=0;
@@ -543,6 +563,7 @@ always @(posedge clk) begin
             tap_index<=0;
             if(!source_bounds_ok) begin
                 error<=1;
+                if(!error) error_source<=5'd12;
                 active<=0;
                 persisted_seen<=1;
                 timeout<=0;
@@ -561,6 +582,7 @@ always @(posedge clk) begin
         if(ddram_dout_ready) begin
             if(!waitresp) begin
                 error<=1;
+                if(!error) error_source<=5'd13;
             end else begin
                 waitresp<=0;
                 if(!req_kind) begin
@@ -582,7 +604,10 @@ always @(posedge clk) begin
                 end else begin
                     if(progress_stage<4'd6)
                         progress_stage<=4'd6;
-                    if(ddram_dout!=resrows[verify_row]) error<=1;
+                    if(ddram_dout!=resrows[verify_row]) begin
+                        error<=1;
+                        if(!error) error_source<=5'd14;
+                    end
                     if((mbi==0)&&(blk==0)&&(verify_row==0))
                         persisted_value<=ddram_dout[7:0];
                     if(verify_row==3'd7) begin
@@ -593,9 +618,15 @@ always @(posedge clk) begin
                                (mrow+1'b1>=mb_height)) begin
                                 if((exec_desc_slot+
                                     (residual_hit?1'b1:1'b0))!=desc_count)
+                                begin
                                     error<=1;
+                                    if(!error) error_source<=5'd15;
+                                end
                                 if(mbi+1'b1!=motion_count)
+                                begin
                                     error<=1;
+                                    if(!error) error_source<=5'd16;
+                                end
                                 persisted_seen<=1;
                                 progress_stage<=4'd7;
                                 reconstructed_seen<=1;

@@ -22,7 +22,8 @@ module mpeg2_h262_reference_read_probe
  output wire p_store_pixel_valid,output wire p_store_block_start,output wire p_store_block_complete,
  output wire read_seen,output wire[7:0] sample_value,output wire sample_nonzero,output wire half_sample_seen,
  output wire reconstructed_seen,output wire[7:0] reconstructed_value,output wire persisted_seen,output wire[7:0] persisted_value,
- output wire[3:0] p_progress_stage,output wire probe_error
+ output wire[3:0] p_progress_stage,output wire probe_error,
+ output wire[2:0] probe_error_source,output wire[4:0] probe_error_detail
 );
 
 // kate - Commit 169: both generalized P and controlled B sidebands are valid
@@ -52,14 +53,17 @@ wire b_detect_now=p_residual_sample_valid&&b_direction_word&&p_forward_vector_va
  general_geometry_supported&&!p_implicit_reconstruct_request;
 reg b_mode;
 wire b_active,b_persisted_seen,b_error,b_half,b_recon,b_read,b_nonzero;
+wire[4:0] b_error_source;
 wire [7:0] b_sample,b_recon_value,b_persist_value;
 reg b_history_error;
+reg[4:0] b_history_error_source;
 wire b_rearm_now=b_mode&&b_persisted_seen&&!b_active;
 wire b_reset=reset||b_rearm_now;
 always @(posedge clk)begin
- if(reset)begin b_mode<=0;b_history_error<=0;end
+ if(reset)begin b_mode<=0;b_history_error<=0;b_history_error_source<=0;end
  else begin
   if(b_error)b_history_error<=1;
+  if(b_error&&(b_history_error_source==0))b_history_error_source<=b_error_source;
   if(b_detect_now)b_mode<=1;
   else if(b_persisted_seen&&!b_active)b_mode<=0;
  end
@@ -148,6 +152,7 @@ mpeg2_h262_reference_read_probe_base base_probe(
 wire[7:0] mix_bc_raw;wire[28:0] mix_addr_raw;wire mix_rd_raw;
 wire mix_store_sel;wire[7:0] mix_store_val;wire[11:0] mix_store_x,mix_store_y;wire mix_store_valid,mix_store_start,mix_store_complete;
 wire mix_read;wire[7:0] mix_sample;wire mix_nonzero,mix_recon;wire[7:0] mix_recon_val,mix_persist_val;wire[3:0] mix_progress_stage;
+wire[4:0] mixed_error_source;
 
 wire[7:0] b_bc_raw;wire[28:0] b_addr_raw;wire b_rd_raw;
 wire b_store_sel;wire[7:0] b_store_val;wire[11:0] b_store_x,b_store_y;wire b_store_valid,b_store_start,b_store_complete;
@@ -188,7 +193,7 @@ mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
  .store_select(mix_store_sel),.store_pixel_value(mix_store_val),.store_pixel_x(mix_store_x),.store_pixel_y(mix_store_y),.store_pixel_valid(mix_store_valid),
  .store_block_start(mix_store_start),.store_block_complete(mix_store_complete),.active(mixed_active),.read_seen(mix_read),.sample_value(mix_sample),.sample_nonzero(mix_nonzero),
  .half_sample_seen(mixed_half),.reconstructed_seen(mix_recon),.reconstructed_value(mix_recon_val),.persisted_seen(mixed_persisted_seen),.persisted_value(mix_persist_val),
- .progress_stage(mix_progress_stage),.error(mixed_error));
+ .progress_stage(mix_progress_stage),.error(mixed_error),.error_source(mixed_error_source));
 
 mpeg2_h262_b_bidirectional_raster_engine b_probe(
  .clk(clk),.reset(b_reset),.capture_enable(b_select),.request(b_select),
@@ -199,7 +204,7 @@ mpeg2_h262_b_bidirectional_raster_engine b_probe(
  .store_select(b_store_sel),.store_pixel_value(b_store_val),.store_pixel_x(b_store_x),.store_pixel_y(b_store_y),
  .store_pixel_valid(b_store_valid),.store_block_start(b_store_start),.store_block_complete(b_store_complete),
  .active(b_active),.read_seen(b_read),.sample_nonzero(b_nonzero),.half_sample_seen(b_half),
- .reconstructed_seen(b_recon),.persisted_seen(b_persisted_seen),.error(b_error));
+ .reconstructed_seen(b_recon),.persisted_seen(b_persisted_seen),.error(b_error),.error_source(b_error_source));
 assign b_sample=8'd0;assign b_recon_value=8'd0;assign b_persist_value=8'd0;
 
 assign ddram_burstcnt=shared_select?(shared_req_active?shared_bc_reg:8'd0):base_bc;
@@ -223,5 +228,16 @@ assign persisted_seen=b_select?b_persisted_seen:mixed_select?(mixed_seen_enable&
 assign persisted_value=b_select?b_persist_value:mixed_select?mix_persist_val:base_persist_val;
 assign p_progress_stage=mix_progress_stage;
 assign probe_error=plan_error||b_history_error||(b_select?b_error:(mixed_select?mixed_error:base_probe_error));
+// Commit 199 diagnostics: preserve the parent USER=3 error while naming the
+// responsible engine on POWER and its first assertion on DISK.  These outputs
+// are observational only and do not feed selection, DDR, or reconstruction.
+assign probe_error_source=plan_error?3'd1:
+ b_history_error?3'd3:
+ (b_select&&b_error)?3'd3:
+ (mixed_select&&mixed_error)?3'd2:
+ base_probe_error?3'd4:3'd0;
+assign probe_error_detail=(probe_error_source==3'd2)?mixed_error_source:
+ (probe_error_source==3'd3)?
+  ((b_history_error_source!=0)?b_history_error_source:b_error_source):5'd0;
 wire unused_b=&{1'b0,b_sample,b_recon_value,b_persist_value};
 endmodule

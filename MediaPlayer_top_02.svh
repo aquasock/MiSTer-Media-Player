@@ -5,6 +5,8 @@ wire [7:0]  mpeg2_new_pred_reconstructed_value;
 wire        mpeg2_new_pred_persisted_seen;
 wire [3:0]  mpeg2_new_pred_progress_stage;
 wire        mpeg2_new_pred_error;
+wire [2:0]  mpeg2_new_pred_error_source;
+wire [4:0]  mpeg2_new_pred_error_detail;
 
 wire        mpeg2_new_p_store_select;
 wire [7:0]  mpeg2_new_p_store_pixel_value;
