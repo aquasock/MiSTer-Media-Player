@@ -600,7 +600,7 @@ Install the Commit-201 RBF and run `test_p_intra_macroblocks.m2v` through one co
 - [ ] Passed
 
 ---
-## 202 COMMIT Unreleased ??? 2026-08-18T00:50:44-07:00
+## 202 COMMIT Unreleased 104965c 2026-08-18T00:50:44-07:00
 
 #### Coming From:
 
@@ -612,11 +612,11 @@ Replace the generalized P path's picture-wide residual-plan limits with block-at
 
 #### Outcome:
 
-Commit `9672f0a` is hardware accepted: the authored intra macroblock at row 8, column 20 is visibly reconstructed with a coherent raster, USER and POWER solid, and DISK off. Exact replay of the ordinary 366,067-byte mixed-macroblock compatibility stream reaches the first P picture and then asserts `R_ERROR` from `R_COEFF_SIGN` when the current 32-event picture-wide coefficient plan fills; B later reaches its separate residual limit. This cycle will make the P parser pause input at complete block boundaries, transform each sparse block through the existing shared serialized engine, and retain transformed samples in inferred RAM rather than widening flattened register plans, while leaving the B limit for the following independently testable commit.
+Commit `9672f0a` is hardware accepted: the authored intra macroblock at row 8, column 20 is visibly reconstructed with a coherent raster, USER and POWER solid, and DISK off. Commits `9525d69` and `104965c` replace the P parser's flattened residual plans with synchronous M10K-backed stores for 2,048 block descriptors and 32,768 coefficient events, transform one block at a time through the existing shared serialized engine, and retain 2,048 sparse reconstructed blocks in M10K RAM; the correction commit packs the raster descriptor fields into one synchronous RAM and adds the required sample-lookup staging cycle after the first fit exposed asynchronous descriptor registers. The existing intra regression remains clean at 1,350 motion events, one intra macroblock, six blocks, and 384 samples, while the new 181,161-byte streaming regression remains clean at 1,350 motion events, 20 intra macroblocks, 120 blocks, and 7,680 samples with no parser, residual, raster, or transform error. Parser-window and restricted-slice replays remain clean, the ordinary 366,067-byte mixed-macroblock corpus now completes all seven P pictures with 158 refills and no P error while retaining the separately scoped B limit, and all seven standing generators retain their hashes and reference results. The clean Quartus 17.0.2 build completes in 9 minutes 18 seconds with zero setup and hold TNS, no Critical Warning, +0.221 ns global setup, +0.251 ns global hold, +2.128 ns decoder setup, 29,590 ALMs, 42,190 registers, 3,335,155 memory bits, 421 RAM blocks, 65 DSP blocks, and 3 PLLs. Generated RBF `MediaPlayer.rbf` has SHA-256 `25c96d4d8caa2bdfc3d7935834823c956e12d3720c31bd59e56449ece1118332`; stream `test_p_residual_streaming.m2v` has SHA-256 `3120133ee6f59159ab02e1927c25d057f92d127b569db4f394e71eefa6e8a801`.
 
 #### Next Steps:
 
-Implement the block-at-a-time P transaction and a deterministic stream that exceeds both the former 16-block and 32-coefficient limits, preserve the accepted P-intra, parser-window, restricted-slice, and seven-stream regressions, then complete a clean Quartus 17.0.2 build with zero setup and hold TNS and no Critical Warning before MiSTer validation.
+Install the Commit-202 RBF and run `test_p_residual_streaming.m2v` on MiSTer through one complete 32-second diagnostic frame, recording whether USER, POWER, and DISK are solid, dark, or blinking and confirming a coherent vertical intra stripe at column 20 from rows 5 through 24. Clean acceptance is solid USER, solid POWER, and dark DISK; after acceptance, address the independently retained B residual-plan limit in the next commit.
 
 #### Files Modified:
 
@@ -627,13 +627,13 @@ Implement the block-at-a-time P transaction and a deterministic stream that exce
 - rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
 - rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
 - rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
 - tools/streams/generate_test_p_residual_streaming.py
-- tools/streams/tb_h262_p_residual_streaming.sv
+- tools/streams/tb_h262_p_intra_macroblocks.sv
+- tools/streams/tb_h262_parser_windows.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
