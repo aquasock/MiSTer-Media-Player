@@ -637,3 +637,43 @@ Install the Commit-202 RBF and run `test_p_residual_streaming.m2v` on MiSTer thr
 - [ ] Passed
 
 ---
+## 203 COMMIT Unreleased ??? 2026-08-18T01:52:05-07:00
+
+#### Coming From:
+
+Unreleased 104965c
+
+#### Purpose:
+
+Replace the generalized B path's 16-block and 64-coefficient residual-plan limits with RAM-backed block transactions and a sparse-sample store shared across mutually exclusive P and B reconstruction.
+
+#### Outcome:
+
+Commit `104965c` is hardware accepted: `test_p_residual_streaming.m2v` displays the authored vertical stripe from rows 5 through 24 at column 20 with a coherent raster, USER and POWER solid, and DISK off. Exact replay of the ordinary 366,067-byte mixed-macroblock corpus leaves all seven P pictures clean with 158 P refills, but the first B picture reaches `S_COEFF_SIGN` at macroblock column 4 of row 1 when the 64-event B coefficient plan fills. This cycle will mirror the accepted P parser capacities of 2,048 residual blocks and 32,768 coefficient events, transform and replay one B block at a time through the existing shared transform, and externalize the sparse spatial sample RAM so the mutually exclusive P and B raster engines reuse one 2,048-block M10K allocation rather than exceeding the device with duplicate storage.
+
+#### Next Steps:
+
+Implement the shared sparse-sample memory and RAM-backed B transaction path, add a deterministic B stream that exceeds both former limits and produces an unmistakable hardware-visible stripe, preserve the P streaming, P intra, parser-window, restricted-slice, prediction-source, and seven-stream regressions, prove the ordinary mixed corpus completes B pictures without its former limit, then complete a clean Quartus 17.0.2 build with zero setup and hold TNS and no Critical Warning before MiSTer validation.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- tools/streams/generate_test_b_residual_streaming.py
+- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_parser_windows.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
