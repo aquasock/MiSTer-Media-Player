@@ -525,3 +525,35 @@ Install the Commit-199 RBF and run only `test_pb_restricted_slices.m2v` on MiSTe
 - [ ] Passed
 
 ---
+## 200 COMMIT Unreleased ??? 2026-08-17T22:44:25-07:00
+
+#### Coming From:
+
+Unreleased af20d28
+
+#### Purpose:
+
+Prevent same-row P slice continuations from re-emitting motion metadata for macroblocks already covered by an earlier slice.
+
+#### Outcome:
+
+Commit-199 hardware reports USER 3, POWER 2, and DISK 2 on `test_pb_restricted_slices.m2v`, identifying generalized P raster motion-metadata sequencing rather than B reconstruction or DDR. Focused replay reproduces the fault: each 1,350-macroblock P picture emits 1,534 motion events because the second slice on each split row re-emits columns 0 through 11 and the third re-emits columns 0 through 33, adding 46 duplicates on each of four split rows. This commit will retain an explicit covered-column cursor across same-row P slice boundaries, emit only genuinely uncovered leading skips, and preserve ordinary first-slice and in-slice skip behavior.
+
+#### Next Steps:
+
+Implement the P coverage cursor, require exactly 1,350 ordered motion events for every P picture in the parser replay, rerun both restricted-slices and parser-window regressions, complete a clean Quartus 17.0.2 build with zero TNS and no Critical Warning, and rerun the restricted-slices stream on MiSTer for a complete USER, POWER, and DISK diagnostic frame.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+- tools/streams/tb_h262_parser_windows.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
