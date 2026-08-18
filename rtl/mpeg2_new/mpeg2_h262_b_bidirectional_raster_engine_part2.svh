@@ -44,6 +44,7 @@ wire [7:0] reconstructed_intra=clip(8'd0,residual_pel);
 assign ddram_burstcnt=req?8'd1:8'd0;
 assign ddram_addr=req?(req_kind?block_addr(scratch_bank_latched,col,mrow,blk,verify_row):pixel_addr(selected_reference_off,blk,src_x_tap,src_y_tap)):29'd0;
 assign ddram_rd=req;
+assign ddram_cacheable=req&&!req_kind;
 assign store_select=emit;
 assign store_pixel_value=out_reg;
 assign store_pixel_valid=emit;

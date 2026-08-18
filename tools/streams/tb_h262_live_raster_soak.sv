@@ -19,6 +19,7 @@ module tb_h262_live_raster_soak;
     integer i,p_rows=0,b_rows=0,p_pictures=0,b_pictures=0;
     integer published_references=0,display_swaps=0;
     integer reference_writes=0,scratch0_writes=0,scratch1_writes=0;
+    integer memory_reads=0,total_cycles=0;
 
     wire frontend_ready,phase1_supported;
     wire [13:0] horizontal_size,vertical_size;
@@ -238,6 +239,7 @@ module tb_h262_live_raster_soak;
     end
 
     always @(posedge clk) begin
+        if(!reset)total_cycles<=total_cycles+1;
         memory_dout_ready<=0;
         if(read_pending)begin
             memory_dout<=ddr_mem[read_index];
@@ -245,6 +247,7 @@ module tb_h262_live_raster_soak;
             read_pending<=0;
         end
         if(memory_rd)begin
+            memory_reads<=memory_reads+1;
             if((memory_addr<DDR_BASE)||((memory_addr-DDR_BASE)>=DDR_WORDS))
                 $fatal(1,"DDR read outside frame regions: %h",memory_addr);
             read_index<=memory_addr-DDR_BASE;
@@ -347,11 +350,14 @@ module tb_h262_live_raster_soak;
         else quiet_cycles<=0;
 
         if(quiet_cycles==30000)begin
-            $display("LIVE_RASTER_RESULT bytes=%0d p_rows=%0d p=%0d b_rows=%0d b=%0d published=%0d pictures=%0d promotions=%0d display_identity=%0d swaps=%0d last_p_temporal=%0d ref_writes=%0d scratch0_writes=%0d scratch1_writes=%0d read=%0d recon=%0d presentation=%0d error=%0d/%0d/%0d/%0d",
+            $display("LIVE_RASTER_RESULT bytes=%0d p_rows=%0d p=%0d b_rows=%0d b=%0d published=%0d pictures=%0d promotions=%0d display_identity=%0d swaps=%0d last_p_temporal=%0d ref_writes=%0d scratch0_writes=%0d scratch1_writes=%0d ddr_reads=%0d cache=%0d/%0d/%0d cycles=%0d read=%0d recon=%0d presentation=%0d error=%0d/%0d/%0d/%0d",
                      stream_index,p_rows,p_pictures,b_rows,b_pictures,
                      published_references,picture_count,reference_promotion_count,
                      displayed_identity,display_swaps,last_reference_temporal,
                      reference_writes,scratch0_writes,scratch1_writes,
+                     memory_reads,prediction.reference_cache.cache_hit_count,
+                     prediction.reference_cache.cache_miss_count,
+                     prediction.reference_cache.uncached_count,total_cycles,
                      pred_read_observed,pred_reconstructed_observed,
                      presentation_complete,probe_error,pred_error,writer_error,
                      presentation_error);
@@ -362,6 +368,9 @@ module tb_h262_live_raster_soak;
                publication.b_header_count!=47||publication.b_persist_count!=47||
                displayed_identity!=25||last_reference_temporal!=10'd23||
                reference_writes==0||scratch0_writes==0||scratch1_writes==0||
+               prediction.reference_cache.cache_hit_count==0||
+               prediction.reference_cache.cache_hit_count<=
+                prediction.reference_cache.cache_miss_count||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
                presentation_error)

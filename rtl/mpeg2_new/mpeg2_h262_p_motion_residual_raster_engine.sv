@@ -45,6 +45,7 @@ module mpeg2_h262_p_motion_residual_raster_engine
     output wire [7:0] ddram_burstcnt,
     output wire [28:0] ddram_addr,
     output wire ddram_rd,
+    output wire ddram_cacheable,
     output wire store_select,
     output wire [7:0] store_pixel_value,
     output wire [11:0] store_pixel_x,
@@ -325,6 +326,7 @@ assign ddram_addr=req ?
               : pixel_addr(roff,blk,src_x_tap,src_y_tap)) :
     29'd0;
 assign ddram_rd=req;
+assign ddram_cacheable=req&&!req_kind;
 
 assign store_select=emit;
 assign store_pixel_value=out_reg;

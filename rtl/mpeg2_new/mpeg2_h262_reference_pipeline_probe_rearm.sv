@@ -165,12 +165,12 @@ assign base_persisted_seen=1'b0;
 assign base_persist_val=8'd0;
 assign base_probe_error=1'b0;
 
-wire[7:0] mix_bc_raw;wire[28:0] mix_addr_raw;wire mix_rd_raw;
+wire[7:0] mix_bc_raw;wire[28:0] mix_addr_raw;wire mix_rd_raw,mix_cacheable_raw;
 wire mix_store_sel;wire[7:0] mix_store_val;wire[11:0] mix_store_x,mix_store_y;wire mix_store_valid,mix_store_start,mix_store_complete;
 wire mix_read;wire[7:0] mix_sample;wire mix_nonzero,mix_recon,mix_row_persisted;wire[7:0] mix_recon_val,mix_persist_val;wire[3:0] mix_progress_stage;
 wire[4:0] mixed_error_source;
 
-wire[7:0] b_bc_raw;wire[28:0] b_addr_raw;wire b_rd_raw;
+wire[7:0] b_bc_raw;wire[28:0] b_addr_raw;wire b_rd_raw,b_cacheable_raw;
 wire b_store_sel;wire[7:0] b_store_val;wire[11:0] b_store_x,b_store_y;wire b_store_valid,b_store_start,b_store_complete;
 
 // Commit 203: P and B parsing/reconstruction are mutually exclusive, so both
@@ -204,27 +204,30 @@ wire shared_select=mixed_select||b_select;
 wire[7:0] shared_bc_raw=b_select?b_bc_raw:mix_bc_raw;
 wire[28:0] shared_addr_raw=b_select?b_addr_raw:mix_addr_raw;
 wire shared_rd_raw=b_select?b_rd_raw:mix_rd_raw;
-reg shared_req_active,shared_response_pending;reg[7:0] shared_bc_reg;reg[28:0] shared_addr_reg;
-reg[63:0] shared_dout_reg;reg shared_dout_ready_reg;
-wire shared_engine_busy=!(shared_req_active&&!ddram_busy);
-wire mix_dout_ready_owned=shared_dout_ready_reg&&mixed_select&&!b_select;
-wire b_dout_ready_owned=shared_dout_ready_reg&&b_select;
+wire shared_cacheable_raw=b_select?b_cacheable_raw:mix_cacheable_raw;
+wire shared_engine_active=mixed_active||b_active;
+wire shared_engine_busy;
+wire[63:0] shared_engine_dout;
+wire shared_engine_dout_ready;
+wire[7:0] shared_cached_bc;
+wire[28:0] shared_cached_addr;
+wire shared_cached_rd;
+wire[31:0] shared_cache_hits,shared_cache_misses,shared_uncached_reads;
+wire mix_dout_ready_owned=shared_engine_dout_ready&&mixed_select&&!b_select;
+wire b_dout_ready_owned=shared_engine_dout_ready&&b_select;
 
-always @(posedge clk)begin
- if(reset)begin
-  shared_req_active<=0;shared_response_pending<=0;shared_bc_reg<=0;shared_addr_reg<=0;shared_dout_reg<=0;shared_dout_ready_reg<=0;
- end else begin
-  shared_dout_ready_reg<=0;
-  if(!shared_select)begin shared_req_active<=0;shared_response_pending<=0;end
-  else begin
-   if(!shared_req_active&&shared_rd_raw)begin shared_req_active<=1;shared_bc_reg<=shared_bc_raw;shared_addr_reg<=shared_addr_raw;end
-   else if(shared_req_active&&!ddram_busy)begin shared_req_active<=0;shared_response_pending<=1;end
-   if(ddram_dout_ready&&(shared_response_pending||(shared_req_active&&!ddram_busy)))begin
-    shared_dout_reg<=ddram_dout;shared_dout_ready_reg<=1;shared_response_pending<=0;
-   end
-  end
- end
-end
+mpeg2_h262_reference_word_cache reference_cache(
+ .clk(clk),.reset(reset),.active(shared_engine_active),
+ .request_burstcnt(shared_bc_raw),.request_addr(shared_addr_raw),
+ .request_read(shared_rd_raw),.request_cacheable(shared_cacheable_raw),
+ .request_busy(shared_engine_busy),.request_dout(shared_engine_dout),
+ .request_dout_ready(shared_engine_dout_ready),
+ .downstream_busy(ddram_busy),.downstream_dout(ddram_dout),
+ .downstream_dout_ready(ddram_dout_ready),
+ .downstream_burstcnt(shared_cached_bc),
+ .downstream_addr(shared_cached_addr),.downstream_read(shared_cached_rd),
+ .cache_hit_count(shared_cache_hits),.cache_miss_count(shared_cache_misses),
+ .uncached_count(shared_uncached_reads));
 
 mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
  .clk(clk),.reset(reset),.capture_enable(mixed_select),.request(mixed_select),
@@ -237,7 +240,7 @@ mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
  .residual_store_read_address(mix_residual_store_read_address),
  .residual_store_read_data(shared_residual_store_read_data),
  .reference_valid(reference_frame_valid),.reference_bank(reference_frame_bank),.destination_bank(destination_frame_bank),.store_block_stored(p_store_block_stored),
- .ddram_busy(shared_engine_busy),.ddram_dout(shared_dout_reg),.ddram_dout_ready(mix_dout_ready_owned),.ddram_burstcnt(mix_bc_raw),.ddram_addr(mix_addr_raw),.ddram_rd(mix_rd_raw),
+ .ddram_busy(shared_engine_busy),.ddram_dout(shared_engine_dout),.ddram_dout_ready(mix_dout_ready_owned),.ddram_burstcnt(mix_bc_raw),.ddram_addr(mix_addr_raw),.ddram_rd(mix_rd_raw),.ddram_cacheable(mix_cacheable_raw),
  .store_select(mix_store_sel),.store_pixel_value(mix_store_val),.store_pixel_x(mix_store_x),.store_pixel_y(mix_store_y),.store_pixel_valid(mix_store_valid),
  .store_block_start(mix_store_start),.store_block_complete(mix_store_complete),.active(mixed_active),.read_seen(mix_read),.sample_value(mix_sample),.sample_nonzero(mix_nonzero),
  .half_sample_seen(mixed_half),.reconstructed_seen(mix_recon),.reconstructed_value(mix_recon_val),.persisted_seen(mixed_persisted_seen),.row_persisted(mix_row_persisted),.persisted_value(mix_persist_val),
@@ -252,17 +255,17 @@ mpeg2_h262_b_bidirectional_raster_engine b_probe(
  .residual_store_read_address(b_residual_store_read_address),
  .residual_store_read_data(shared_residual_store_read_data),
  .reference_valid(reference_frame_valid),.future_reference_bank(reference_frame_bank),.scratch_frame_bank(b_scratch_frame_bank),.store_block_stored(p_store_block_stored),
- .ddram_busy(shared_engine_busy),.ddram_dout(shared_dout_reg),.ddram_dout_ready(b_dout_ready_owned),
- .ddram_burstcnt(b_bc_raw),.ddram_addr(b_addr_raw),.ddram_rd(b_rd_raw),
+ .ddram_busy(shared_engine_busy),.ddram_dout(shared_engine_dout),.ddram_dout_ready(b_dout_ready_owned),
+ .ddram_burstcnt(b_bc_raw),.ddram_addr(b_addr_raw),.ddram_rd(b_rd_raw),.ddram_cacheable(b_cacheable_raw),
  .store_select(b_store_sel),.store_pixel_value(b_store_val),.store_pixel_x(b_store_x),.store_pixel_y(b_store_y),
  .store_pixel_valid(b_store_valid),.store_block_start(b_store_start),.store_block_complete(b_store_complete),
  .active(b_active),.read_seen(b_read),.sample_nonzero(b_nonzero),.half_sample_seen(b_half),
  .reconstructed_seen(b_recon),.persisted_seen(b_persisted_seen),.row_persisted(b_row_persisted),.error(b_error),.error_source(b_error_source));
 assign b_sample=8'd0;assign b_recon_value=8'd0;assign b_persist_value=8'd0;
 
-assign ddram_burstcnt=shared_select?(shared_req_active?shared_bc_reg:8'd0):base_bc;
-assign ddram_addr=shared_select?(shared_req_active?shared_addr_reg:29'd0):base_addr;
-assign ddram_rd=shared_select?shared_req_active:base_rd;
+assign ddram_burstcnt=shared_select?shared_cached_bc:base_bc;
+assign ddram_addr=shared_select?shared_cached_addr:base_addr;
+assign ddram_rd=shared_select?shared_cached_rd:base_rd;
 assign p_store_select=b_select?b_store_sel:mixed_select?mix_store_sel:base_store_sel;
 assign p_store_pixel_value=b_select?b_store_val:mixed_select?mix_store_val:base_store_val;
 assign p_store_pixel_x=b_select?b_store_x:mixed_select?mix_store_x:base_store_x;
@@ -299,5 +302,6 @@ assign probe_error_source=plan_error?3'd1:
 assign probe_error_detail=(probe_error_source==3'd2)?mixed_error_source:
  (probe_error_source==3'd3)?
   ((b_history_error_source!=0)?b_history_error_source:b_error_source):5'd0;
-wire unused_b=&{1'b0,b_sample,b_recon_value,b_persist_value};
+wire unused_b=&{1'b0,b_sample,b_recon_value,b_persist_value,
+ shared_cache_hits,shared_cache_misses,shared_uncached_reads};
 endmodule

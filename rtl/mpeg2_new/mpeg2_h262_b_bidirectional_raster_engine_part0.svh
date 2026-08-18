@@ -48,6 +48,7 @@ module mpeg2_h262_b_bidirectional_raster_engine
     output wire [7:0] ddram_burstcnt,
     output wire [28:0] ddram_addr,
     output wire ddram_rd,
+    output wire ddram_cacheable,
     output wire store_select,
     output wire [7:0] store_pixel_value,
     output wire [11:0] store_pixel_x,
