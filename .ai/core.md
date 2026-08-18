@@ -106,10 +106,6 @@ Read this core.md file first. Treat core.md is the primary project-level source 
 
 - Treat the user's current MiSTer hardware configuration as the standard development target unless the user says otherwise.
 
-- The default MiSTer network target is `10.10.0.30`. Use the established FTP credentials `root:1`, upload the active development core to `/media/fat/MediaPlayer.rbf`, and upload diagnostic streams to `/media/fat/games/MediaPlayer/`.
-
-- After every successful clean development build, upload the qualified RBF and applicable diagnostic stream to the default MiSTer target unless the user says otherwise. Download each uploaded file back to a temporary local path and verify its SHA-256 against the source before reporting that hardware testing is ready.
-
 - The user's standard target is as follows:
 
 ```text
