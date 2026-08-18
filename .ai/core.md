@@ -42,8 +42,6 @@ Read this core.md file first. Treat core.md is the primary project-level source 
 
 - The user's local GitHub repository is: /run/media/vash/GIT/MiSTer-Media-Player
 
-- 
-
 - The tar.gz archives stored in the "archived_results" folder are not to be referenced unless approval from the user is given first.
 
 - Do not create branches if possible. Always work off of master unless otherwise instructed.
@@ -83,6 +81,8 @@ Read this core.md file first. Treat core.md is the primary project-level source 
 - Use the commit message "(<current_short_commit>) core-syntax.md update" for all updates you make to core-syntax.md. 
 
 - (<current_short_commit>) means the abbreviated SHA of the development/source commit being documented. Subsequent metadata-only .ai commits continue to reference that source commit for the same development cycle.
+
+- You have full read and write access to the users local GitHub repository and may run build tools in the user's local enviroment.
 
 ---
 
