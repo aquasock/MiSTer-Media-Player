@@ -1224,7 +1224,7 @@ None.
 - [ ] Passed
 
 ---
-## 221 COMMIT Unreleased ??? 2026-08-18T11:36:01-07:00
+## 221 COMMIT Unreleased 7f92945 2026-08-18T11:36:01-07:00
 
 #### Coming From:
 
@@ -1236,21 +1236,23 @@ Require real P/B raster persistence and final temporal-reference presentation ac
 
 #### Outcome:
 
-Add a live-raster soak regression that replaces synthetic row and picture acknowledgements with the compiled P/B reference pipeline, a deterministic DDR transaction model, real store completion, and the presentation scheduler. Track accepted P/B raster starts, row and picture persistence, reference publication, display swaps, and temporal-reference identity through all three GOPs. The regression must reproduce or exclude the frame-50 hardware stop and require final temporal reference 71; correct only the first live stage proven to stop or misidentify progression, preserving the established fail-open transport and diagnostic behavior.
+Commit `7f92945` adds a deterministic 128x96, 72-picture live-raster soak that drives the compiled front end, P/B reference pipeline, active tagged DDR writer and arbiter, modeled DDR memory, real persistence acknowledgements, publication shell, and presentation scheduler. The first failing run proved that B scratch-bank-one pixels were written at the correct address but verified from scratch bank zero because `block_addr` depended implicitly on mutable outer state; passing the latched bank explicitly fixed the readback failure. The completed run then exposed twenty-one duplicate P publications because returning from each B transaction re-exported the preceding P engine's sticky persistence level; edge-qualifying each selected engine's persistence export fixed the duplicate ownership transition. The final soak passes all 72 pictures with 22 P pictures and 132 P rows, 47 B pictures and 282 B rows, 25 reference publications, both B scratch banks written, final display identity 25 corresponding to source frame 71, final in-GOP P temporal reference 23, and zero parser, prediction, writer, or presentation errors. The 720x480 long-GOP publication regression independently passes 22 P, 47 B, 25 publications, final identity 25, and zero overwrites; the B residual, B presentation, and fatal-drain transport regressions also pass. The clean Quartus 17.0.2 build completes in 9 minutes 24 seconds with 0 errors, 121 standing warnings, no critical warnings, global setup/hold slack +0.297/+0.247 ns, focused decoder/video setup slack +2.016/+7.937 ns, 29,435 ALMs, 42,082 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. `MediaPlayer_commit221_7f92945.rbf` is 4,242,164 bytes with SHA-256 `5a77bf4ee8ae9c286d9d274188731dc8932ae3383336c26495e2581c6564cc65`; its MiSTer FTP readback is byte-identical.
 
 #### Next Steps:
 
-Run the new regression first against `daf7af2`, capture the earliest divergence from the expected 22 P pictures, 47 B pictures, 25 reference publications, and final temporal reference 71, then implement the bounded correction. Rerun the focused parser, raster, publication, scheduler, and fail-open suites before a clean Quartus build and MiSTer deployment.
+Reload `test_compat_long_gop.m2v` with the deployed RBF and confirm that loading retires without a crash, the LEDs retain the passing USER-solid, POWER-solid, DISK-off pattern, and the settled image advances beyond frame 50 to source frame 71 at timestamp `00:00:02.840`. Then reload `test_compat_mixed_macroblocks.m2v` and report whether its loading jitter and transient feature flicker are reduced without changing the passing LED pattern.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- tools/streams/generate_test_live_raster_soak.py
 - tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
