@@ -156,11 +156,8 @@ module tb_h262_p_intra_macroblocks;
                 $display("RESULT seen=%0d parser_error=%0d residual_error=%0d motion=%0d intra_motion=%0d blocks=%0d samples=%0d",
                          seen,parser_error,residual_error,motion_events,
                          intra_motion_events,replay_blocks,replay_total_samples);
-                $display("RESIDUAL_DETAIL g_error=%0d non_intra=%0d iq=%0d idct=%0d matrix=%0d",
-                         residual_pipeline.g_error,residual_pipeline.terr,
-                         residual_pipeline.intra_iq_error,
-                         residual_pipeline.intra_idct_error,
-                         residual_pipeline.intra_matrix_unsupported);
+                $display("RESIDUAL_DETAIL g_error=%0d transform=%0d",
+                         residual_pipeline.g_error,residual_pipeline.terr);
                 if(!seen||parser_error||residual_error||picture_completions!=1||
                    motion_events!=1350||intra_motion_events!=1||
                    replay_blocks!=6||replay_total_samples!=384||!replay_finished||

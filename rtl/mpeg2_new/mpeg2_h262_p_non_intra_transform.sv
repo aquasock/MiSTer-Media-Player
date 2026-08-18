@@ -1,5 +1,5 @@
 //============================================================================
-// MiSTer Media Player - serialized H.262 P non-intra transform engine
+// MiSTer Media Player - serialized H.262 P transform engine
 //
 // Normative basis: ITU-T H.262 / ISO/IEC 13818-2:2000, 7.3, 7.4 and 7.5.
 //
@@ -30,6 +30,8 @@ module mpeg2_h262_p_non_intra_transform
     input  wire [4:0]  quantiser_scale_code,
     input  wire        q_scale_type,
     input  wire        alternate_scan,
+    input  wire        intra_block,
+    input  wire [1:0]  intra_dc_precision,
 
     output reg         block_done,
     output reg         first_sample_valid,
@@ -175,6 +177,50 @@ function automatic [7:0] quantiser_scale_value;
     end
 endfunction
 
+// H.262 6.3.11 normative default intra quantisation matrix.  The generalized
+// P path uses this lookup in the same serialized engine as non-intra blocks so
+// only one IDCT and one coefficient store are present in the FPGA image.
+function automatic [7:0] default_intra_weight;
+    input [5:0] linear;
+    begin
+        case (linear)
+             0: default_intra_weight =  8;  1: default_intra_weight = 16;
+             2: default_intra_weight = 19;  3: default_intra_weight = 22;
+             4: default_intra_weight = 26;  5: default_intra_weight = 27;
+             6: default_intra_weight = 29;  7: default_intra_weight = 34;
+             8: default_intra_weight = 16;  9: default_intra_weight = 16;
+            10: default_intra_weight = 22; 11: default_intra_weight = 24;
+            12: default_intra_weight = 27; 13: default_intra_weight = 29;
+            14: default_intra_weight = 34; 15: default_intra_weight = 37;
+            16: default_intra_weight = 19; 17: default_intra_weight = 22;
+            18: default_intra_weight = 26; 19: default_intra_weight = 27;
+            20: default_intra_weight = 29; 21: default_intra_weight = 34;
+            22: default_intra_weight = 34; 23: default_intra_weight = 38;
+            24: default_intra_weight = 22; 25: default_intra_weight = 22;
+            26: default_intra_weight = 26; 27: default_intra_weight = 27;
+            28: default_intra_weight = 29; 29: default_intra_weight = 34;
+            30: default_intra_weight = 37; 31: default_intra_weight = 40;
+            32: default_intra_weight = 22; 33: default_intra_weight = 26;
+            34: default_intra_weight = 27; 35: default_intra_weight = 29;
+            36: default_intra_weight = 32; 37: default_intra_weight = 35;
+            38: default_intra_weight = 40; 39: default_intra_weight = 48;
+            40: default_intra_weight = 26; 41: default_intra_weight = 27;
+            42: default_intra_weight = 29; 43: default_intra_weight = 32;
+            44: default_intra_weight = 35; 45: default_intra_weight = 40;
+            46: default_intra_weight = 48; 47: default_intra_weight = 58;
+            48: default_intra_weight = 26; 49: default_intra_weight = 27;
+            50: default_intra_weight = 29; 51: default_intra_weight = 34;
+            52: default_intra_weight = 38; 53: default_intra_weight = 46;
+            54: default_intra_weight = 56; 55: default_intra_weight = 69;
+            56: default_intra_weight = 27; 57: default_intra_weight = 29;
+            58: default_intra_weight = 35; 59: default_intra_weight = 38;
+            60: default_intra_weight = 46; 61: default_intra_weight = 56;
+            62: default_intra_weight = 69; 63: default_intra_weight = 83;
+            default: default_intra_weight = 8'd16;
+        endcase
+    end
+endfunction
+
 reg        iq_active;
 reg [5:0]  iq_index;
 reg [5:0]  iq_qfs_index_reg;
@@ -183,15 +229,27 @@ reg        y0_f00_proven;
 reg [4:0]  iq_quantiser_scale_code;
 reg        iq_q_scale_type;
 reg        iq_alternate_scan;
+reg        iq_intra_block;
+reg [1:0]  iq_intra_dc_precision;
 
 wire signed [12:0] iq_qf = qfs[iq_qfs_index_reg];
 wire signed [14:0] iq_qf_extended = {{2{iq_qf[12]}}, iq_qf};
 wire [7:0] iq_qscale =
     quantiser_scale_value(iq_q_scale_type, iq_quantiser_scale_code);
+wire [7:0] iq_intra_weight = default_intra_weight(iq_index);
+wire [3:0] iq_dc_multiplier =
+    (iq_intra_dc_precision==2'd0) ? 4'd8 :
+    (iq_intra_dc_precision==2'd1) ? 4'd4 :
+    (iq_intra_dc_precision==2'd2) ? 4'd2 : 4'd1;
 
 reg signed [14:0] iq_precondition;
-reg signed [23:0] iq_product;
-reg signed [23:0] iq_unclipped;
+reg signed [23:0] iq_multiplier_a;
+reg signed [8:0]  iq_multiplier_b;
+wire signed [32:0] iq_multiplier_result =
+    iq_multiplier_a * iq_multiplier_b;
+reg               iq_stage_pending;
+reg signed [31:0] iq_stage_product;
+reg signed [31:0] iq_unclipped;
 reg signed [11:0] iq_saturated;
 reg signed [11:0] iq_final_value;
 reg               iq_parity_with_current;
@@ -204,12 +262,36 @@ always @* begin
     else
         iq_precondition = 15'sd0;
 
-    iq_product   = iq_precondition * $signed({1'b0, iq_qscale});
-    iq_unclipped = iq_product / 24'sd2;
+    iq_multiplier_a = 24'sd0;
+    iq_multiplier_b = 9'sd0;
+    iq_unclipped = 32'sd0;
+    if (iq_stage_pending && iq_intra_block && (iq_index != 6'd0)) begin
+        iq_multiplier_a = iq_stage_product[23:0];
+        iq_multiplier_b = $signed({1'b0, iq_qscale});
+        // H.262 7.4.2.3: (QF * W * quantiser_scale * 2) / 32.
+        iq_unclipped = $signed(iq_multiplier_result) / 32'sd16;
+    end
+    else if (iq_intra_block && (iq_index == 6'd0)) begin
+        iq_multiplier_a = {{11{iq_qf[12]}},iq_qf};
+        iq_multiplier_b = $signed({5'd0, iq_dc_multiplier});
+        // H.262 7.4.1: intra DC is independent of matrix and qscale.
+        if (iq_stage_pending)
+            iq_unclipped = iq_stage_product;
+    end
+    else if (iq_intra_block) begin
+        iq_multiplier_a = {{11{iq_qf[12]}},iq_qf};
+        iq_multiplier_b = $signed({1'b0, iq_intra_weight});
+    end
+    else begin
+        iq_multiplier_a = {{9{iq_precondition[14]}},iq_precondition};
+        iq_multiplier_b = $signed({1'b0, iq_qscale});
+        if (iq_stage_pending)
+            iq_unclipped = iq_stage_product / 32'sd2;
+    end
 
-    if (iq_unclipped > 24'sd2047)
+    if (iq_unclipped > 32'sd2047)
         iq_saturated = 12'sd2047;
-    else if (iq_unclipped < -24'sd2048)
+    else if (iq_unclipped < -32'sd2048)
         iq_saturated = 12'sh800;
     else
         iq_saturated = iq_unclipped[11:0];
@@ -278,6 +360,10 @@ always @(posedge clk) begin
         iq_quantiser_scale_code<= 5'd0;
         iq_q_scale_type        <= 1'b0;
         iq_alternate_scan      <= 1'b0;
+        iq_intra_block         <= 1'b0;
+        iq_intra_dc_precision  <= 2'd0;
+        iq_stage_pending       <= 1'b0;
+        iq_stage_product       <= 32'sd0;
         emit_pending           <= 1'b0;
         emit_active            <= 1'b0;
         emit_index             <= 6'd0;
@@ -339,32 +425,43 @@ always @(posedge clk) begin
                 iq_quantiser_scale_code <= quantiser_scale_code;
                 iq_q_scale_type         <= q_scale_type;
                 iq_alternate_scan       <= alternate_scan;
+                iq_intra_block          <= intra_block;
+                iq_intra_dc_precision   <= intra_dc_precision;
+                iq_stage_pending        <= 1'b0;
             end
         end
 
         if (iq_active) begin
-            iq_coeff[iq_index] <= iq_final_value;
-            iq_parity <= iq_parity_with_current;
-
-            if ((active_block_index == 2'd0) && (iq_index == 6'd0)) begin
-                if ((iq_quantiser_scale_code == 5'd2) &&
-                    !iq_q_scale_type &&
-                    (iq_qf == 13'sd7) &&
-                    (iq_final_value == 12'sd30))
-                    y0_f00_proven <= 1'b1;
-                else
-                    probe_error <= 1'b1;
-            end
-
-            if (iq_index == 6'd63) begin
-                iq_active    <= 1'b0;
-                emit_pending <= 1'b1;
-                emit_index   <= 6'd0;
+            if (!iq_stage_pending) begin
+                iq_stage_product <= iq_multiplier_result[31:0];
+                iq_stage_pending <= 1'b1;
             end
             else begin
-                iq_index         <= iq_index + 6'd1;
-                iq_qfs_index_reg <= scan_index(iq_alternate_scan,
-                                               iq_index + 6'd1);
+                iq_stage_pending <= 1'b0;
+                iq_coeff[iq_index] <= iq_final_value;
+                iq_parity <= iq_parity_with_current;
+
+                if (!iq_intra_block &&
+                    (active_block_index == 2'd0) && (iq_index == 6'd0)) begin
+                    if ((iq_quantiser_scale_code == 5'd2) &&
+                        !iq_q_scale_type &&
+                        (iq_qf == 13'sd7) &&
+                        (iq_final_value == 12'sd30))
+                        y0_f00_proven <= 1'b1;
+                    else
+                        probe_error <= 1'b1;
+                end
+
+                if (iq_index == 6'd63) begin
+                    iq_active    <= 1'b0;
+                    emit_pending <= 1'b1;
+                    emit_index   <= 6'd0;
+                end
+                else begin
+                    iq_index         <= iq_index + 6'd1;
+                    iq_qfs_index_reg <= scan_index(iq_alternate_scan,
+                                                   iq_index + 6'd1);
+                end
             end
         end
 

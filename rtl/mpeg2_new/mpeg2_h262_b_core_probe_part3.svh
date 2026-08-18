@@ -19,6 +19,7 @@ mpeg2_h262_p_non_intra_transform b_transform(
     .clk(clk),.reset(reset),.qfs_block_index(2'd1),.qfs_block_start(t_start),.qfs_write_en(t_we),
     .qfs_write_index(t_widx),.qfs_write_value(t_wval),.qfs_block_end(t_end),
     .quantiser_scale_code(t_qscale),.q_scale_type(q_scale_type),.alternate_scan(alternate_scan),
+    .intra_block(1'b0),.intra_dc_precision(2'd0),
     .block_done(t_done),.first_sample_valid(t_first_valid),.first_sample_value(t_first_value),
     .residual_sample_valid(t_valid),.residual_sample_block_index(t_unused_block),
     .residual_sample_index(t_index),.residual_sample_value(t_value),.probe_error(t_error));

@@ -171,7 +171,7 @@ wire [1:0] tblock =
     ((qblock==0)?2'd0:2'd1);
 wire current_transform_intra =
     any_general_mode && g_wide && g_intra[slot_count[4:0]];
-wire tfvalid, tvalid, terr, non_intra_transform_done;
+wire tfvalid, tvalid, terr;
 wire signed [15:0] tfvalue, tvalue;
 wire [1:0] unused_block;
 wire [5:0] tidx;
@@ -180,15 +180,17 @@ mpeg2_h262_p_non_intra_transform transform
 (
     .clk(clk), .reset(reset),
     .qfs_block_index(tblock),
-    .qfs_block_start(qstart&&!current_transform_intra),
-    .qfs_write_en(qwe&&!current_transform_intra),
+    .qfs_block_start(qstart),
+    .qfs_write_en(qwe),
     .qfs_write_index(qwidx),
     .qfs_write_value(qwval),
-    .qfs_block_end(qend&&!current_transform_intra),
+    .qfs_block_end(qend),
     .quantiser_scale_code(qscale),
     .q_scale_type(qtype),
     .alternate_scan(alt),
-    .block_done(non_intra_transform_done),
+    .intra_block(current_transform_intra),
+    .intra_dc_precision(g_intra_dc_precision),
+    .block_done(transform_done),
     .first_sample_valid(tfvalid),
     .first_sample_value(tfvalue),
     .residual_sample_valid(tvalid),
@@ -198,54 +200,9 @@ mpeg2_h262_p_non_intra_transform transform
     .probe_error(terr)
 );
 
-wire intra_iq_complete, intra_iq_error, intra_matrix_unsupported;
-wire intra_iq_start, intra_iq_valid, intra_iq_end;
-wire [5:0] intra_iq_index;
-wire signed [11:0] intra_iq_value;
-wire signed [11:0] unused_intra_f00, unused_intra_f77;
-wire intra_idct_complete, intra_idct_error, intra_sample_valid;
-wire [5:0] intra_sample_index;
-wire signed [15:0] intra_sample_value;
-wire signed [15:0] unused_intra_sample00, unused_intra_sample77;
-
-mpeg2_h262_inverse_quant p_intra_inverse_quant
-(
-    .clk(clk),.reset(reset),
-    .block_start(qstart&&current_transform_intra),
-    .coeff_write_en(qwe&&current_transform_intra),
-    .coeff_write_index(qwidx),.coeff_write_value(qwval),
-    .block_end(qend&&current_transform_intra),
-    .intra_quant_matrix_default(1'b1),
-    .intra_dc_precision(g_intra_dc_precision),
-    .quantiser_scale_code(qscale),.q_scale_type(qtype),
-    .alternate_scan(alt),.block_complete(intra_iq_complete),
-    .iq_error(intra_iq_error),.unsupported_matrix(intra_matrix_unsupported),
-    .first_luma_f00(unused_intra_f00),.first_luma_f77(unused_intra_f77),
-    .coeff_out_block_start(intra_iq_start),
-    .coeff_out_valid(intra_iq_valid),.coeff_out_index(intra_iq_index),
-    .coeff_out_value(intra_iq_value),.coeff_out_block_end(intra_iq_end)
-);
-
-mpeg2_h262_idct p_intra_idct
-(
-    .clk(clk),.reset(reset),.coeff_block_start(intra_iq_start),
-    .coeff_valid(intra_iq_valid),.coeff_index(intra_iq_index),
-    .coeff_value(intra_iq_value),.coeff_block_end(intra_iq_end),
-    .block_complete(intra_idct_complete),.idct_error(intra_idct_error),
-    .sample_valid(intra_sample_valid),.sample_index(intra_sample_index),
-    .sample_value(intra_sample_value),
-    .first_luma_sample00(unused_intra_sample00),
-    .first_luma_sample77(unused_intra_sample77)
-);
-
-assign transform_done = current_transform_intra ?
-                        intra_idct_complete : non_intra_transform_done;
-wire selected_transform_valid = current_transform_intra ?
-                                intra_sample_valid : tvalid;
-wire [5:0] selected_transform_index = current_transform_intra ?
-                                      intra_sample_index : tidx;
-wire signed [15:0] selected_transform_value = current_transform_intra ?
-                                               intra_sample_value : tvalue;
+wire selected_transform_valid = tvalid;
+wire [5:0] selected_transform_index = tidx;
+wire signed [15:0] selected_transform_value = tvalue;
 
 always @(posedge clk) begin
     if(reset) begin
@@ -576,12 +533,7 @@ assign residual_sample_index =
     any_general_mode ? replay_index : tidx;
 assign residual_sample_value =
     any_general_mode ? replay_value : tvalue;
-assign probe_error =
-    terr | intra_iq_error | intra_idct_error | intra_matrix_unsupported |
-    g_error | (!any_general_mode && old_parser_error);
-
-wire unused_intra_transform=&{1'b0,intra_iq_complete,
-    unused_intra_f00[0],unused_intra_f77[0],
-    unused_intra_sample00[0],unused_intra_sample77[0]};
+assign probe_error = terr | g_error |
+    (!any_general_mode && old_parser_error);
 
 endmodule
