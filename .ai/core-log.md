@@ -421,7 +421,7 @@ Prepare the next Unreleased capability proposal for post-v0.5.0 development, ret
 - [x] Passed
 
 ---
-## 197 COMMIT Unreleased ??? 2026-08-17T20:53:22-07:00
+## 197 COMMIT Unreleased 8c9cdaa 2026-08-17T20:53:22-07:00
 
 #### Coming From:
 
@@ -433,16 +433,48 @@ Establish the deterministic compatibility corpus and failure-classification base
 
 #### Outcome:
 
-The approved v0.6.0 roadmap assigns one source commit to each of eight hardware-validation boundaries: compatibility corpus and diagnostic classification, general slice streaming, P-picture intra macroblocks, B-picture intra macroblocks, streaming removal of residual and capture caps, remaining progressive frame syntax coverage, long-stream hardware soak, and release qualification. This first commit will add deterministic generator and analysis support for multiple slices per row, dense residuals, mixed macroblock modes, long GOP structure, and ordinary progressive encoder output without changing decoder behavior or replacing the authoritative seven-stream v0.5.0 hardware matrix.
+Commit `8c9cdaa` adds a source-only generator and H.262 structural classifier for four supplemental 720x480 progressive 4:2:0 compatibility streams without changing synthesized RTL or replacing the authoritative seven-stream v0.5.0 matrix. The authored I/P/B case verifies repeated same-row slices and predictor-reset behavior; ordinary single-threaded FFmpeg cases establish an 11,367-byte dense slice, 128 intra macroblocks within P pictures alongside predicted and skipped modes, and a 72-picture long-GOP soak input. All four remain inside the intended frontend envelope, every generated file and encoder invocation is recorded in a local JSON manifest, and all seven standing generators reproduce their published hashes and software-reference results.
 
 #### Next Steps:
 
-Implement and run the corpus generator and syntax classifier, document each stream's expected current support or first unsupported boundary, reproduce the standing seven generators, and build Quartus only if the committed files affect synthesized sources. After this commit is resolved and its evidence recorded, the second commit will generalize P/B slice ingestion while retaining the new corpus as a supplemental regression gate.
+Generalize the active P and B slice ingestion paths so independently coded legal slices no longer depend on whole-slice byte capture or restricted row-transition ownership, then validate the authored multi-slice stream and all seven standing generators before a clean Quartus build and MiSTer regression.
 
 #### Files Modified:
 
 - tools/streams/generate_test_progressive_compatibility.py
 - tools/streams/analyze_h262_compatibility.py
+- tools/streams/generate_test_pb_restricted_slices.py
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+## 198 COMMIT Unreleased ??? 2026-08-17T21:00:48-07:00
+
+#### Coming From:
+
+Unreleased 8c9cdaa
+
+#### Purpose:
+
+Generalize progressive P/B slice ingestion beyond whole-slice byte capture and restricted row-transition ownership.
+
+#### Outcome:
+
+This commit will replace the active P and B parsers' fixed captured-slice transaction boundary with backpressured syntax ingestion that preserves each slice's independent macroblock-address and motion-predictor reset semantics. Legal same-row slice continuation, early slice termination, ordinary next-row progression, picture termination, and sequence termination will share one ownership model while reconstruction ordering, reference banks, residual limits, picture structures, and the 720x480 progressive 4:2:0 envelope remain unchanged.
+
+#### Next Steps:
+
+Add focused parser replay for arbitrary legal slice partitions, run the Commit-197 multi-slice and standing seven-stream software regressions, complete a clean Quartus 17.0.2 build with zero TNS and no Critical Warning, and obtain MiSTer acceptance before beginning P-picture intra-macroblock integration as Commit 199.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
 
 #### Status:
 
