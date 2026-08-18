@@ -1140,3 +1140,31 @@ Install `MediaPlayer_commit217_a559d43.rbf` and load `test_compat_long_gop.m2v`.
 - [ ] Passed
 
 ---
+## 218 COMMIT Unreleased a559d43 2026-08-18T11:09:59-07:00
+
+#### Coming From:
+
+Unreleased a559d43
+
+#### Purpose:
+
+Record the MiSTer long-GOP result after adding fatal-error transport retirement.
+
+#### Outcome:
+
+Commit `a559d43` removes the host-transfer deadlock: the long-GOP file overlay closes, the menu remains responsive, and the uploaded post-load capture reaches timestamp `00:00:02.000`, frame `50`, before the fatal boundary. All three LEDs remain dark because fail-open correctly masks the decoder while draining the remaining compressed bytes, including the final sequence-end code, but the settled diagnostic snapshot still arms only from `mpeg2_new_sequence_end_seen`. The fatal error is therefore preserved internally while `mpeg2_new_diag_snapshot_valid` never asserts. This is an observability-trigger defect after successful fail-open retirement, not a recurrence of the MiSTer crash.
+
+#### Next Steps:
+
+Arm the existing one-second settled diagnostic delay from either a decoded sequence end or the sticky transport-fatal condition, prove that clean sequence-end capture is unchanged and fatal drain produces a stable error snapshot, then rebuild and redeploy so the frame-50 raster or DDR failure is identified by USER, POWER, and DISK.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
