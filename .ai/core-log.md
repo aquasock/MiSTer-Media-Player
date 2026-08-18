@@ -993,3 +993,31 @@ None.
 - [x] Passed
 
 ---
+## 213 COMMIT Unreleased ??? 2026-08-18T08:13:58-07:00
+
+#### Coming From:
+
+Unreleased 19914b2
+
+#### Purpose:
+
+Qualify long-GOP decoder ownership, reference rotation, publication order, and sustained progressive 4:2:0 operation across the complete 72-picture compatibility stream.
+
+#### Outcome:
+
+The planned commit will extend the complete I/P/B publication regression with a long-GOP mode that consumes the existing deterministic 791,528-byte corpus, retires every row and picture through the same persistence handshake as hardware, and checks all 22 P pictures, 47 B pictures, and 25 reference publications without transport, parser, reconstruction, ownership, or publication errors. Any failure will be localized to the first affected transition and corrected within this boundary without broadening the supported H.262 profile.
+
+#### Next Steps:
+
+Run the long-GOP regression to completion, preserve the mixed and dense publication regressions and the authoritative seven-generator hashes, build any required bounded correction cleanly, and then install the resulting RBF for a full 72-picture MiSTer soak with USER and POWER solid and DISK off.
+
+#### Files Modified:
+
+- tools/streams/tb_h262_dense_publication_order.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
