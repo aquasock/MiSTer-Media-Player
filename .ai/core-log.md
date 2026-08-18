@@ -1224,3 +1224,33 @@ None.
 - [ ] Passed
 
 ---
+## 221 COMMIT Unreleased ??? 2026-08-18T11:36:01-07:00
+
+#### Coming From:
+
+Unreleased daf7af2
+
+#### Purpose:
+
+Require real P/B raster persistence and final temporal-reference presentation across the complete long-GOP stream.
+
+#### Outcome:
+
+Add a live-raster soak regression that replaces synthetic row and picture acknowledgements with the compiled P/B reference pipeline, a deterministic DDR transaction model, real store completion, and the presentation scheduler. Track accepted P/B raster starts, row and picture persistence, reference publication, display swaps, and temporal-reference identity through all three GOPs. The regression must reproduce or exclude the frame-50 hardware stop and require final temporal reference 71; correct only the first live stage proven to stop or misidentify progression, preserving the established fail-open transport and diagnostic behavior.
+
+#### Next Steps:
+
+Run the new regression first against `daf7af2`, capture the earliest divergence from the expected 22 P pictures, 47 B pictures, 25 reference publications, and final temporal reference 71, then implement the bounded correction. Rerun the focused parser, raster, publication, scheduler, and fail-open suites before a clean Quartus build and MiSTer deployment.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
