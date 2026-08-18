@@ -525,7 +525,7 @@ Install the Commit-199 RBF and run only `test_pb_restricted_slices.m2v` on MiSTe
 - [ ] Passed
 
 ---
-## 200 COMMIT Unreleased ??? 2026-08-17T22:44:25-07:00
+## 200 COMMIT Unreleased b78ffcc 2026-08-17T22:44:25-07:00
 
 #### Coming From:
 
@@ -537,11 +537,11 @@ Prevent same-row P slice continuations from re-emitting motion metadata for macr
 
 #### Outcome:
 
-Commit-199 hardware reports USER 3, POWER 2, and DISK 2 on `test_pb_restricted_slices.m2v`, identifying generalized P raster motion-metadata sequencing rather than B reconstruction or DDR. Focused replay reproduces the fault: each 1,350-macroblock P picture emits 1,534 motion events because the second slice on each split row re-emits columns 0 through 11 and the third re-emits columns 0 through 33, adding 46 duplicates on each of four split rows. This commit will retain an explicit covered-column cursor across same-row P slice boundaries, emit only genuinely uncovered leading skips, and preserve ordinary first-slice and in-slice skip behavior.
+Commit-199 hardware reports USER 3, POWER 2, and DISK 2 on `test_pb_restricted_slices.m2v`, identifying generalized P raster motion-metadata sequencing rather than B reconstruction or DDR. Commit `b78ffcc` adds an explicit covered-column cursor across P slice boundaries, rejects overlap behind that cursor, emits only genuinely uncovered leading skips, and preserves ordinary first-slice and in-slice skip behavior. The restricted-slices replay now emits exactly 1,350 ordered motion events for each of its two P pictures instead of 1,534, while both pictures parse without P or B errors; the parser-window stream also emits exactly 1,350 events for both P pictures and retains eight P and eight B window refills. The clean Quartus 17.0.2 build completes in 13 minutes 57 seconds with zero setup and hold TNS, no Critical Warning, +0.041 ns global setup, +0.204 ns global hold, +1.838 ns decoder setup, 40,624 ALMs, 50,284 registers, 584,141 memory bits, 88 RAM blocks, 69 DSP blocks, and 3 PLLs. Generated RBF `MediaPlayer.rbf` has SHA-256 `972fd24b9c7d01ccdedfc9643c5939eb44ba347beb9a1655b7aeabffae381c81`.
 
 #### Next Steps:
 
-Implement the P coverage cursor, require exactly 1,350 ordered motion events for every P picture in the parser replay, rerun both restricted-slices and parser-window regressions, complete a clean Quartus 17.0.2 build with zero TNS and no Critical Warning, and rerun the restricted-slices stream on MiSTer for a complete USER, POWER, and DISK diagnostic frame.
+Install the Commit-200 RBF and rerun only `test_pb_restricted_slices.m2v` on MiSTer for one complete 32-second diagnostic frame, recording the USER, POWER, and DISK indications and confirming that the visible raster remains coherent.
 
 #### Files Modified:
 
@@ -553,7 +553,7 @@ Implement the P coverage cursor, require exactly 1,350 ordered motion events for
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
