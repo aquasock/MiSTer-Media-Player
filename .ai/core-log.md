@@ -1,33 +1,5 @@
 
 ---
-## 183 COMMIT Unreleased f9b9be6 2026-08-17T05:16:03-07:00
-
-#### Coming From:
-
-Unreleased a2debaa
-
-#### Purpose:
-
-Make the P-final acceptance diagnostic report the first causal observer failure instead of reclassifying sticky errors later in a multi-picture stream.
-
-#### Outcome:
-
-The exact pre-Commit-182 control reproduces the same hardware signatures, clearing ASCAL as a cause, while RTL replay makes `syntax_error_raw` rise at the same first-P byte in all three streams and never raises the four-MB observer. Commit `f9b9be6` snapshots the complete diagnostic hierarchy on the first visible parent error in `MediaPlayer_top_07.svh`, preventing later sticky flags or mutable ownership claims from relabeling it without changing decoder behavior. The clean Quartus 17.0.2 build closes with zero TNS, +0.625 ns global setup, +2.159 ns decoder setup, 30,153 ALMs, and 40,880 registers.
-
-#### Next Steps:
-
-Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_consecutive_chain.m2v` once each and record USER, POWER, and DISK. The first-fault code must remain stable through the full consecutive chain; after hardware confirms the common observer artifact, scope a separate behavioral commit to retire obsolete controlled-observer errors from acceptance.
-
-#### Files Modified:
-
-- MediaPlayer_top_07.svh
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
 ## 184 COMMIT Unreleased 4f1c057 2026-08-17T06:04:32-07:00
 
 #### Coming From:
@@ -1281,6 +1253,37 @@ None.
 #### Status:
 
 - [x] Built
+- [ ] Passed
+
+---
+## 223 COMMIT Unreleased ??? 2026-08-18T13:14:21-07:00
+
+#### Coming From:
+
+Unreleased 7f92945
+
+#### Purpose:
+
+Identify the first missing post-I50 live transaction without changing decoder or presentation behavior.
+
+#### Outcome:
+
+The uploaded 14.501-second, 30 fps hardware capture disproves coded-order presentation: visible timestamps advance monotonically from frame 0 through B and reference pictures to frame 47, then reach the third-GOP I-picture at frame 50 and never advance again. Individual queued B pictures can occupy only one 60 Hz refresh and are therefore sometimes absent from the 30 fps recording, explaining the apparent two-or-three-frame jumps without implicating scheduler order. Add a passive final-GOP progress probe that arms on the third I header and records the deepest completed boundary through third-I publication, following-P header, P raster metadata, first P row persistence, full P persistence, reference publication, following-B header and persistence, scratch selection, and future-reference presentation. Export the settled stage through the existing DISK diagnostic while leaving USER, POWER, decode, DDR, ownership, and presentation control unchanged.
+
+#### Next Steps:
+
+Prove the ordered diagnostic stages and reset behavior in a focused regression, rerun the live-raster, scheduler, publication, and fail-open suites, then complete a clean Quartus build and deploy the diagnostic RBF. Reload `test_compat_long_gop.m2v` once and report the DISK blink count from its settled diagnostic window; the count will name the first post-I50 boundary that hardware does not cross.
+
+#### Files Modified:
+
+- MediaPlayer_top_07.svh
+- files.qip
+- rtl/mpeg2_new/mpeg2_h262_final_gop_progress_probe.sv
+- tools/streams/tb_h262_final_gop_progress_probe.sv
+
+#### Status:
+
+- [ ] Built
 - [ ] Passed
 
 ---
