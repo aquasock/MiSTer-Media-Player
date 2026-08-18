@@ -301,6 +301,7 @@ always @(posedge clk) begin
         previous_col<=-8'sd1;
         current_col<=0;
         row_has_coded_mb<=0;
+        row_covered_count<=0;
         skip_emit_col<=0;
         skip_remaining<=0;
         mbtype_bits<=0;

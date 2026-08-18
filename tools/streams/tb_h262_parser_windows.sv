@@ -10,6 +10,7 @@ module tb_h262_parser_windows;
     reg [7:0] stream_mem [0:MAX_STREAM_BYTES-1];
     integer stream_len, stream_index, quiet_cycles, minimum_refills;
     integer p_refills = 0, b_refills = 0;
+    integer p_picture_motion_events = 0, p_picture_completions = 0;
     reg [1023:0] hex_path;
     reg prior_p_error = 0, prior_b_error = 0;
     reg [5:0] prior_p_state = 0, prior_b_state = 0;
@@ -95,9 +96,11 @@ module tb_h262_parser_windows;
             else
                 quiet_cycles <= 0;
             if(quiet_cycles == 100) begin
-                $display("RESULT p_seen=%0d p_error=%0d b_seen=%0d b_error=%0d p_count=%0d p_refills=%0d b_refills=%0d",
-                         p_seen, p_error, b_seen, b_error, p_count, p_refills, b_refills);
+                $display("RESULT p_seen=%0d p_error=%0d b_seen=%0d b_error=%0d p_count=%0d p_pictures=%0d p_refills=%0d b_refills=%0d",
+                         p_seen, p_error, b_seen, b_error, p_count,
+                         p_picture_completions, p_refills, b_refills);
                 if(!p_seen || p_error || !b_seen || b_error || p_count != 1350 ||
+                   p_picture_completions == 0 || p_picture_motion_events != 0 ||
                    p_refills < minimum_refills || b_refills < minimum_refills)
                     $fatal(1, "parser-window regression failed");
                 $finish;
@@ -106,6 +109,15 @@ module tb_h262_parser_windows;
     end
 
     always @(posedge clk) begin
+        if(p_motion_valid)
+            p_picture_motion_events <= p_picture_motion_events + 1;
+        if(p_complete) begin
+            if((p_picture_motion_events + (p_motion_valid ? 1 : 0)) != 1350)
+                $fatal(1, "P picture emitted %0d motion events, expected 1350",
+                       p_picture_motion_events + (p_motion_valid ? 1 : 0));
+            p_picture_motion_events <= 0;
+            p_picture_completions <= p_picture_completions + 1;
+        end
         if(p_parser.parse_active && p_parser.parser_at_end &&
            !p_parser.chunk_boundary_known)
             p_refills <= p_refills + 1;

@@ -160,6 +160,7 @@
                     end else begin
                         picture_mb_count<=
                             row_base_index+{5'd0,current_col}+11'd1;
+                        row_covered_count<=current_col+1'b1;
                         row_byte_count<=0;
                         slice_capture<=1;
                         parse_hold<=0;
@@ -177,6 +178,7 @@
                         row_base_index<=
                             row_base_index+{5'd0,picture_mb_width};
                         slice_row_number<=slice_row_number+1'b1;
+                        row_covered_count<=0;
                         row_byte_count<=0;
                         slice_capture<=1;
                         parse_hold<=0;
@@ -255,6 +257,7 @@
                         slice_row_number<=0;
                         row_byte_count<=0;
                         row_base_index<=0;
+                        row_covered_count<=0;
                         proof_done<=0;
                         parse_active<=0;
                         parse_hold<=0;
@@ -378,6 +381,7 @@
                     slice_row_number<=1;
                     row_byte_count<=0;
                     row_base_index<=0;
+                    row_covered_count<=0;
                 end else begin
                     proof_done<=1;
                     probe_error<=1;

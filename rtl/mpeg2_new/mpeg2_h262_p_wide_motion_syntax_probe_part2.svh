@@ -97,13 +97,16 @@
             end
 
             R_APPLY: begin
-                // STANDARDS_CONFORMANCE:H262-025. The first MBA of a P slice
-                // positions its first coded macroblock from the row origin;
-                // preceding positions are skipped macroblocks.  Subsequent
-                // increments remain relative to previous_col.
+                // STANDARDS_CONFORMANCE:H262-025.  The first MBA positions its
+                // coded macroblock from the row origin, but a same-row slice
+                // must not synthesize skips for columns covered by an earlier
+                // slice.  row_covered_count retains that boundary; a genuine
+                // uncovered leading gap and later in-slice gaps remain skips.
                 if((mba_increment==0) ||
                    (next_col_calc<0) ||
-                   (next_col_calc>=$signed({5'd0,picture_mb_width}))) begin
+                   (next_col_calc>=$signed({5'd0,picture_mb_width})) ||
+                   (!row_has_coded_mb &&
+                    (next_col_calc<$signed({5'd0,row_covered_count})))) begin
                     parser_state<=R_ERROR;
                 end else begin
                     current_col<=next_col_calc[5:0];
@@ -113,11 +116,18 @@
                     current_has_quant<=0;
                     mbtype_bits<=0;
                     mbtype_len<=0;
-                    if(mba_increment>1) begin
+                    if((!row_has_coded_mb &&
+                        (next_col_calc>$signed({5'd0,row_covered_count}))) ||
+                       (row_has_coded_mb && (mba_increment>1))) begin
                         predictor_x<=0;
                         predictor_y<=0;
-                        skip_emit_col<=previous_col+1'b1;
-                        skip_remaining<=mba_increment[5:0]-1'b1;
+                        if(!row_has_coded_mb) begin
+                            skip_emit_col<=row_covered_count;
+                            skip_remaining<=next_col_calc[5:0]-row_covered_count;
+                        end else begin
+                            skip_emit_col<=previous_col+1'b1;
+                            skip_remaining<=mba_increment[5:0]-1'b1;
+                        end
                         parser_state<=R_SKIP_EMIT;
                     end else begin
                         parser_state<=R_MBTYPE;

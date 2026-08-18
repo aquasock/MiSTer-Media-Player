@@ -147,6 +147,7 @@ reg [9:0] mba_escape_accum, mba_increment;
 reg signed [7:0] previous_col;
 reg [5:0] current_col;
 reg row_has_coded_mb;
+reg [5:0] row_covered_count;
 reg [5:0] skip_emit_col, skip_remaining;
 
 reg [5:0] mbtype_bits;
