@@ -1079,3 +1079,31 @@ Install `MediaPlayer_commit215_69d1b90.rbf` and load `test_compat_mixed_macroblo
 - [ ] Passed
 
 ---
+## 216 COMMIT Unreleased 69d1b90 2026-08-18T10:37:17-07:00
+
+#### Coming From:
+
+Unreleased 69d1b90
+
+#### Purpose:
+
+Record the MiSTer hardware result for exact repeated-GOP transaction counting and long-GOP presentation.
+
+#### Outcome:
+
+Commit `69d1b90` is not hardware accepted. The mixed-macroblock stream is visibly improved and reports the passing LED pattern, but remains jittery during loading; its uploaded capture reaches timestamp `00:00:00.400`, frame `10`, proving that presentation now advances into the second GOP without proving the required settled frame `23`. Loading the long-GOP stream instead leaves the MiSTer unresponsive while the file-transfer overlay is still visible. Its uploaded capture remains at timestamp `00:00:00.000`, frame `0`, and all LEDs are dark. Because the settled diagnostic snapshot is taken only after `ioctl_download` retires, the dark LEDs in this state are evidence that the transfer never completed, not a passing or ordinary sticky decoder-error report. The first unresolved boundary is therefore live compressed-stream backpressure or presentation ownership under sustained hardware timing.
+
+#### Next Steps:
+
+Reproduce the long stream with hardware-scale swap cadence and HPS-to-decoder FIFO backpressure, require bounded forward progress at every accepted-byte boundary, and expose the first asserted decoder, B-presentation, or P-destination ownership hold. Correct only the hold transition proven to keep `ioctl_wait` asserted, then rerun mixed and long full-stream presentation before another MiSTer build.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
