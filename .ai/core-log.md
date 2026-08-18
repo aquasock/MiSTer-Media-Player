@@ -637,7 +637,7 @@ Install the Commit-202 RBF and run `test_p_residual_streaming.m2v` on MiSTer thr
 - [ ] Passed
 
 ---
-## 203 COMMIT Unreleased ??? 2026-08-18T01:52:05-07:00
+## 203 COMMIT Unreleased e3036ac 2026-08-18T01:52:05-07:00
 
 #### Coming From:
 
@@ -649,11 +649,11 @@ Replace the generalized B path's 16-block and 64-coefficient residual-plan limit
 
 #### Outcome:
 
-Commit `104965c` is hardware accepted: `test_p_residual_streaming.m2v` displays the authored vertical stripe from rows 5 through 24 at column 20 with a coherent raster, USER and POWER solid, and DISK off. Exact replay of the ordinary 366,067-byte mixed-macroblock corpus leaves all seven P pictures clean with 158 P refills, but the first B picture reaches `S_COEFF_SIGN` at macroblock column 4 of row 1 when the 64-event B coefficient plan fills. This cycle will mirror the accepted P parser capacities of 2,048 residual blocks and 32,768 coefficient events, transform and replay one B block at a time through the existing shared transform, and externalize the sparse spatial sample RAM so the mutually exclusive P and B raster engines reuse one 2,048-block M10K allocation rather than exceeding the device with duplicate storage.
+Commit `104965c` is hardware accepted: `test_p_residual_streaming.m2v` displays the authored vertical stripe from rows 5 through 24 at column 20 with a coherent raster, USER and POWER solid, and DISK off. Commit `e3036ac` replaces the B parser's 16-block and 64-coefficient arrays with synchronous M10K stores for 2,048 block descriptors and 32,768 coefficient events, transforms and replays one block at a time, moves the B raster descriptors into M10K RAM, and lets mutually exclusive P/B reconstruction share one 2,048-block sparse spatial-sample store. The deterministic 182,849-byte B streaming regression reports exactly 1,350 motion records, 120 residual blocks, 7,680 spatial samples and RAM writes, and a complete 518,400-sample raster in which exactly the 7,680 stripe samples change; parser, transform, raster, ordering, and persistence checks remain clear. The original P intra and 120-block P streaming tests, parser-window and restricted-slice replays, prediction-source diagnostic, all seven standing generators, and their software references remain clean. The ordinary 366,067-byte compatibility corpus now completes its first B picture with 817 residual blocks and 17,244 coefficient events and no P or B error, exceeding the former limits by more than 50 and 269 times respectively. The clean Quartus 17.0.2 build completes in 9 minutes 15 seconds with zero setup and hold TNS, no Critical Warning, +0.515 ns global setup, +0.251 ns global hold, +1.065 ns decoder setup, 29,142 ALMs, 41,855 registers, 4,025,331 memory bits, 503 RAM blocks, 65 DSP blocks, and 3 PLLs. Generated RBF `MediaPlayer.rbf` has SHA-256 `b8695a036e4871b9aecdb7587ba603d18821e23dffb2bf17fed9eddf697cb3a7`; stream `test_b_residual_streaming.m2v` has SHA-256 `d9ee48a2d34f5054cb6754b892633a1789f892a6bc71b3119470d312d82e8aed`.
 
 #### Next Steps:
 
-Implement the shared sparse-sample memory and RAM-backed B transaction path, add a deterministic B stream that exceeds both former limits and produces an unmistakable hardware-visible stripe, preserve the P streaming, P intra, parser-window, restricted-slice, prediction-source, and seven-stream regressions, prove the ordinary mixed corpus completes B pictures without its former limit, then complete a clean Quartus 17.0.2 build with zero setup and hold TNS and no Critical Warning before MiSTer validation.
+Install the Commit-203 RBF and run `test_b_residual_streaming.m2v` on MiSTer through one complete 32-second diagnostic frame, recording whether USER, POWER, and DISK are solid, dark, or blinking and confirming a coherent vertical stripe at column 20 from rows 5 through 24. Clean acceptance is solid USER, solid POWER, and dark DISK.
 
 #### Files Modified:
 
@@ -669,11 +669,12 @@ Implement the shared sparse-sample memory and RAM-backed B transaction path, add
 - rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
 - tools/streams/generate_test_b_residual_streaming.py
 - tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_p_intra_macroblocks.sv
 - tools/streams/tb_h262_parser_windows.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
