@@ -236,12 +236,23 @@ always @(posedge clk)begin
  end
  else begin
   if(raster_complete_now&&raster_hold_ready)begin
-   raster_hold_active<=1;
    raster_hold_seen<=1;
-   raster_hold_ready<=0;
-   raster_hold_timeout<=24'hffffff;
+   // Entry 208: the final row raises row_persisted and persisted_seen before
+   // the parser can raise wide_complete_now.  Consume that saved proof in the
+   // completion cycle; otherwise the wrapper withdraws its one-cycle export
+   // before a newly armed hold can inspect it.
+   if(raster_persistence_complete)begin
+    raster_hold_active<=0;
+    raster_hold_ready<=1;
+    raster_hold_timeout<=0;
+   end
+   else begin
+    raster_hold_active<=1;
+    raster_hold_ready<=0;
+    raster_hold_timeout<=24'hffffff;
+   end
   end
-  if(raster_hold_active)begin
+  else if(raster_hold_active)begin
    if(raster_persistence_complete)begin
     raster_hold_active<=0;
     raster_hold_ready<=1;
