@@ -1091,6 +1091,9 @@ lookup:
   slice_coded_endpoints: H262-025
   multiple_slices_same_row: H262-025
   restricted_slice_structure: H262-025
+  b_intra_macroblock_type: H262-026
+  table_b4_intra: H262-026
+  table_b4_intra_quant: H262-026
 ```
 
 ## 10.2 ESTABLISHED ATOMIC RECORDS
@@ -1903,6 +1906,44 @@ lookup:
       change: >
         Added after official H.262 review to distinguish slice-start MBA positioning
         from true skipped-macroblock inference and to record restricted slice coverage.
+
+- record_id: H262-026
+  title: "Non-scalable B-picture intra macroblock_type VLCs"
+  status: VERIFIED
+  verified_date: 2026-08-18
+  confidence: HIGH
+  source_id: H262
+  source_edition: "ITU-T H.262 (02/2000), official freely available consolidated edition"
+  source_reference: "6.3.17; Annex B Table B.4"
+  normative_force: TABLE_VALUE
+  controlled_conclusion: >
+    For a non-scalable B-picture, macroblock_type VLC 00011 selects an intra
+    macroblock with macroblock_quant equal to zero, and VLC 000001 selects an
+    intra macroblock with macroblock_quant equal to one. Both entries set
+    macroblock_intra and clear forward motion, backward motion, and
+    macroblock_pattern. The quantised form is followed by the macroblock
+    quantiser_scale_code field; both forms carry the six intra blocks implied
+    by the current 4:2:0 chroma format rather than motion prediction syntax.
+  applicability: >
+    Non-scalable B-pictures using the project's current progressive 4:2:0
+    frame-picture envelope.
+  exceptions: []
+  conformance_effect: >
+    The decoder must recognize both B-picture intra VLCs, consume the optional
+    macroblock quantiser field only for 000001, decode all six intra blocks,
+    and reconstruct them without forward or backward reference prediction.
+  verification_method:
+    type: TEST
+    description: >
+      Decode controlled B pictures containing unquantised and quantised intra
+      macroblocks among ordinary predictive macroblocks, then verify syntax
+      consumption, six-block reconstruction, and reference bypass.
+  related_records: [H262-001, H262-006, H262-010]
+  supersedes: []
+  superseded_by: []
+  revision_history:
+    - date: 2026-08-18
+      change: "Added from official H.262 Table B.4 for generalized B-intra integration."
 
 ```
 
