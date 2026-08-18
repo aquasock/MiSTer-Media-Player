@@ -678,7 +678,7 @@ Install the Commit-203 RBF and run `test_b_residual_streaming.m2v` on MiSTer thr
 - [ ] Passed
 
 ---
-## 204 COMMIT Unreleased ??? 2026-08-18T02:34:46-07:00
+## 204 COMMIT Unreleased 7256a7f 2026-08-18T02:34:46-07:00
 
 #### Coming From:
 
@@ -690,11 +690,11 @@ Replace picture-wide P/B residual accumulation with row-bounded parse, transform
 
 #### Outcome:
 
-Commit `e3036ac` is hardware accepted: `test_b_residual_streaming.m2v` briefly displays its B-only vertical stripe, then correctly presents the following plain P reference, with USER and POWER solid and DISK off. Software decode independently confirms display order I/B/P, identical I and P frame hashes, and a distinct middle B frame, so the transient stripe is expected publication order rather than a storage overwrite. Fresh exact replay of the 2,875,981-byte ordinary dense-residual corpus identifies the next implementation boundary: the first P picture reaches exactly 32,768 stored coefficient events with 1,526 residual blocks at macroblock column 29 of row 6, and the first B picture reaches exactly 32,768 events with 1,314 blocks at column 42 of row 5. The clean Commit-203 fit already uses 503 of 553 RAM blocks, so another picture-wide capacity increase is not viable. This cycle will hold input at completed macroblock rows, transform and reconstruct that row before admitting the next one, then clear and reuse bounded residual storage while retaining picture-wide motion ordering, legal same-row slice predictor resets, P/B reference ownership, and final publication order.
+Commit `e3036ac` is hardware accepted: `test_b_residual_streaming.m2v` briefly displays its B-only vertical stripe, then correctly presents the following plain P reference, with USER and POWER solid and DISK off; software decode confirms display order I/B/P, identical I and P hashes, and a distinct B frame. Commits `00d4229` and `7256a7f` add explicit row-ready and row-retired handshakes across the active P/B parsers, transforms, raster engines, reference wrapper, and publication shell, holding input until each row is reconstructed and persisted before reusing descriptor, coefficient, and shared spatial-sample addresses. The 2,875,981-byte dense corpus now completes its first P picture with 8,100 blocks and 175,586 coefficients and its first B picture with 8,073 blocks and 182,707 coefficients; each path emits 1,350 ordered motion records across 30 transactions, while the largest P row uses 270 blocks and 6,017 coefficients and the largest B row uses 270 blocks and 7,441 coefficients. The existing 120-block P and B full-raster regressions, parser-window and restricted-slice replays, prediction-source diagnostics, active hierarchy elaboration, and the first ordinary mixed-corpus B picture remain clean. The clean Quartus 17.0.2 build completes in 9 minutes 21 seconds with zero setup and hold TNS, no Critical Warning, +0.126 ns global setup, +0.250 ns global hold, +1.397 ns decoder setup, 29,087 ALMs, 42,000 registers, 4,025,331 memory bits, 503 RAM blocks, 65 DSP blocks, and 3 PLLs. Generated RBF `MediaPlayer.rbf` has SHA-256 `15e53c93517a1227671fd2f8d24673858f78b80ae902b1a9e68637afaa39730f`.
 
 #### Next Steps:
 
-Implement an explicit row-ready and row-retired handshake across the active P parser, residual pipeline, B core, P/B raster engines, and reference wrapper; reuse descriptor, coefficient, and spatial-sample addresses only after row persistence; add focused dense-row RTL coverage that exceeds 32,768 total picture coefficient events; preserve the Entry-203 streaming cases, parser-window and restricted-slice tests, prediction diagnostics, full compatibility corpus, and authoritative seven-stream generators; then complete a clean Quartus 17.0.2 build and deploy the qualified RBF and dense diagnostic stream to MiSTer for hardware validation.
+Install the Commit-204 RBF and run `test_compat_dense_residual.m2v`, `test_p_residual_streaming.m2v`, and `test_b_residual_streaming.m2v` on MiSTer through complete settled diagnostic reports. Each stream must finish with USER and POWER solid and DISK dark; the dense stream must remain coherent through its P/B sequence, the P stripe must remain stable, and the B stripe must appear only during the B display interval before the following plain P reference.
 
 #### Files Modified:
 
@@ -714,12 +714,17 @@ Implement an explicit row-ready and row-retired handshake across the active P pa
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
 - rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+- MediaPlayer_top_02.svh
+- MediaPlayer_top_04.svh
+- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_p_intra_macroblocks.sv
 - tools/streams/tb_h262_parser_windows.sv
 - tools/streams/tb_h262_row_streaming.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
