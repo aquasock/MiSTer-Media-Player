@@ -804,3 +804,31 @@ Run `test_compat_dense_residual.m2v` through its complete sequence on MiSTer. Co
 - [ ] Passed
 
 ---
+## 207 COMMIT Unreleased 2dd4c67 2026-08-18T04:37:17-07:00
+
+#### Coming From:
+
+Unreleased 2dd4c67
+
+#### Purpose:
+
+Record the MiSTer hardware result for the repeated-B transport and presentation correction.
+
+#### Outcome:
+
+Commit `2dd4c67` is not hardware accepted. The 2,875,985-byte `test_compat_dense_residual.m2v` now loads completely instead of freezing the MiSTer transfer path, but does so slowly and settles on a repeated coherent diagonal test raster. The uploaded photograph records that final raster. The settled diagnostic is USER 2, POWER 9, and DISK 0: the first error is `phase1_probe_error`, its parent source is the generalized P controller, and sub-code 9 is `raster_hold_error`, meaning at least one generalized P row-complete transaction failed to observe persistence before its 24-bit hold timeout. No DISK sub-code is defined for this error class. This proves the Entry-205 fail-open transport and Entry-206 terminal stream drain worked while isolating the next failure to P row persistence or its hold-time bound rather than repeated-B parsing.
+
+#### Next Steps:
+
+Before changing decoder behavior, measure the exact dense P row that arms and expires `raster_hold_active`, distinguish a genuinely missing row-persistence acknowledgement from a valid transaction whose hardware latency exceeds the fixed timeout, and extend a focused top-level regression or first-fault diagnostic to reproduce that boundary.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
