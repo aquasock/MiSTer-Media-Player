@@ -421,3 +421,32 @@ Prepare the next Unreleased capability proposal for post-v0.5.0 development, ret
 - [x] Passed
 
 ---
+## 197 COMMIT Unreleased ??? 2026-08-17T20:53:22-07:00
+
+#### Coming From:
+
+Unreleased d26c37d
+
+#### Purpose:
+
+Establish the deterministic compatibility corpus and failure-classification baseline for the eight-commit v0.6.0 progressive 4:2:0 compatibility roadmap.
+
+#### Outcome:
+
+The approved v0.6.0 roadmap assigns one source commit to each of eight hardware-validation boundaries: compatibility corpus and diagnostic classification, general slice streaming, P-picture intra macroblocks, B-picture intra macroblocks, streaming removal of residual and capture caps, remaining progressive frame syntax coverage, long-stream hardware soak, and release qualification. This first commit will add deterministic generator and analysis support for multiple slices per row, dense residuals, mixed macroblock modes, long GOP structure, and ordinary progressive encoder output without changing decoder behavior or replacing the authoritative seven-stream v0.5.0 hardware matrix.
+
+#### Next Steps:
+
+Implement and run the corpus generator and syntax classifier, document each stream's expected current support or first unsupported boundary, reproduce the standing seven generators, and build Quartus only if the committed files affect synthesized sources. After this commit is resolved and its evidence recorded, the second commit will generalize P/B slice ingestion while retaining the new corpus as a supplemental regression gate.
+
+#### Files Modified:
+
+- tools/streams/generate_test_progressive_compatibility.py
+- tools/streams/analyze_h262_compatibility.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
