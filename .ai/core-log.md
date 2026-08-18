@@ -861,3 +861,31 @@ Run `test_compat_dense_residual.m2v` through its complete sequence on MiSTer and
 - [ ] Passed
 
 ---
+## 209 COMMIT Unreleased 450f78a 2026-08-18T05:12:25-07:00
+
+#### Coming From:
+
+Unreleased 450f78a
+
+#### Purpose:
+
+Record the MiSTer hardware result for the generalized P completion and persistence handshake correction.
+
+#### Outcome:
+
+Commit `450f78a` is not hardware accepted, but it removes the former POWER-9 raster-hold failure. The dense compatibility transfer remains slow yet now advances consistently, and the final coherent diagonal raster is unchanged. The settled diagnostic is USER 2, POWER 4, and DISK 0: the first error is `phase1_probe_error`, its parent source is `publication_error` in the compiled I/P/B publication shell, and no DISK sub-code is currently defined for that error class. This proves the final-row persistence proof is now accepted and moves the first failure to one of the shell's reference-bank, P-publication, or following-header ordering checks; the remaining load duration is consistent with live serialized raster work rather than the eliminated fixed hold timeout.
+
+#### Next Steps:
+
+Add first-fault detail for each publication-error assertion site and a complete dense I/P/B publication-order regression that drives row and picture persistence in hardware order, then use that evidence to correct only the failing reference-bank or header-order transition before another Quartus build.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
