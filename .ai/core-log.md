@@ -1,35 +1,3 @@
-
----
-## 188 COMMIT Unreleased dbc3000 2026-08-17T07:44:50-07:00
-
-#### Coming From:
-
-Unreleased 92546f5
-
-#### Purpose:
-
-Identify the frontend syntax condition that remains latched after functionally successful generalized P playback.
-
-#### Outcome:
-
-Commit 187 hardware gives the same USER/POWER `1/4` indication with no DISK activity on all three generalized P streams while the discriminator retains its four visible quadrants, passing the parsing, reconstruction, publication, and presentation boundary. Commit `dbc3000` adds a sticky five-bit source covering all 21 frontend `syntax_error` assertion sites and reports it on DISK for that error class without changing decode control. Exact frontend replay leaves error and source clear on all three streams. The clean Quartus 17.0.2 build closes with zero setup TNS, +0.276 ns global setup, +1.948 ns decoder setup, 31,043 ALMs, 41,883 registers, and no Critical Warning.
-
-#### Next Steps:
-
-Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_p_visual_discriminator.m2v`, recording USER, POWER, and DISK across one complete 16-second diagnostic frame. If USER truly reports syntax error, DISK will blink its assertion-site code from 1 through 21; DISK remaining off will prove the prior USER count was not top-level syntax error. Confirm the visual discriminator seams remain visible.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_frontend.sv
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_07.svh
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
 ---
 ## 189 COMMIT Unreleased 06bce8f 2026-08-17T08:04:37-07:00
 
@@ -143,6 +111,41 @@ Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_p_visual_discri
 
 - [x] Built
 - [x] Passed
+
+---
+## 228 COMMIT Unreleased ??? 2026-08-18T15:07:22-07:00
+
+#### Coming From:
+
+Unreleased 302bb3e
+
+#### Purpose:
+
+Raise generalized P/B long-GOP decode throughput from the observed four-frame-per-second hardware rate to at least the encoded 25-frame-per-second rate without changing reconstructed pixels or display order.
+
+#### Outcome:
+
+The uploaded 21.165-second hardware capture proves monotonic presentation through source frame 71 but requires approximately 18 seconds for a 72-frame, 25 fps stream whose encoded duration is 2.88 seconds. The loading overlay remains active throughout, identifying decoder backpressure rather than camera aliasing or intentional presentation pacing. Static tracing identifies redundant prediction traffic as the first optimization boundary: the active P and B raster engines issue a one-word DDR request for each prediction tap of each output pel, discard the other seven bytes in the returned 64-bit word, and commonly request the same word again for adjacent pels; B bidirectional prediction repeats this across both retained references. Add a small fully associative reference-word cache around the shared P/B prediction-read boundary, cache prediction reads only, retain verification reads as uncached proof traffic, and invalidate whenever no raster transaction is active so a later rewritten reference bank can never reuse stale data.
+
+#### Next Steps:
+
+Add a focused handshake regression covering misses, repeated and interleaved hits, replacement, uncached verification traffic, downstream backpressure, delayed responses, and invalidation. Count external DDR reads in the integrated live-raster and dense long-GOP regressions, require pixel, persistence, ownership, publication, and exact display-order results to remain unchanged, then perform the session-authorized incremental Quartus build and deploy it for a timed 72-frame MiSTer capture. The release candidate remains blocked unless hardware reaches at least 25 fps; if caching alone is insufficient, preserve its measured gain and use the remaining traffic breakdown to select the next throughput boundary.
+
+#### Files Modified:
+
+- files.qip
+- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- tools/streams/tb_h262_prediction_word_cache.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
 
 ---
 ## 193 COMMIT Unreleased a42bb74 2026-08-17T16:38:38-07:00
