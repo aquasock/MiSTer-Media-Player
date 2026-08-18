@@ -192,6 +192,8 @@ reg [3:0] mpeg2_new_diag_error_code_first;
 reg [3:0] mpeg2_new_diag_phase1_source_first;
 reg [3:0] mpeg2_new_diag_p_source_first;
 reg [3:0] mpeg2_new_diag_progress_detail_first;
+reg [2:0] mpeg2_new_diag_publication_detail_first;
+reg [4:0] mpeg2_new_diag_p_wide_detail_first;
 reg [2:0] mpeg2_new_diag_pred_source_first;
 reg [4:0] mpeg2_new_diag_pred_detail_first;
 
@@ -202,6 +204,8 @@ always @(posedge clk_mpeg2) begin
         mpeg2_new_diag_phase1_source_first   <= 4'd0;
         mpeg2_new_diag_p_source_first        <= 4'd0;
         mpeg2_new_diag_progress_detail_first <= 4'd0;
+        mpeg2_new_diag_publication_detail_first <= 3'd0;
+        mpeg2_new_diag_p_wide_detail_first <= 5'd0;
         mpeg2_new_diag_pred_source_first     <= 3'd0;
         mpeg2_new_diag_pred_detail_first     <= 5'd0;
     end
@@ -212,6 +216,8 @@ always @(posedge clk_mpeg2) begin
         mpeg2_new_diag_phase1_source_first   <= mpeg2_new_phase1_probe_error_source;
         mpeg2_new_diag_p_source_first        <= mpeg2_new_p_probe_error_source;
         mpeg2_new_diag_progress_detail_first <= mpeg2_new_p_progress_detail;
+        mpeg2_new_diag_publication_detail_first <= mpeg2_new_publication_error_detail;
+        mpeg2_new_diag_p_wide_detail_first <= mpeg2_new_p_wide_probe_error_detail;
         mpeg2_new_diag_pred_source_first     <= mpeg2_new_pred_error_source;
         mpeg2_new_diag_pred_detail_first     <= mpeg2_new_pred_error_detail;
     end
@@ -250,6 +256,14 @@ wire [3:0] mpeg2_new_diag_power_code_live =
 //   7 persistence asserted
 // The prior Commit-180 progress-error detail remains available for its error
 // case.  This changes observability only.
+// Entry 210 adds publication-error detail when USER is 2 and POWER is 4:
+//   1 B header before its P reference published
+//   2 later I header before two P publications
+//   3 I completion targets the retained reference bank
+//   4 P persistence without a valid reference
+//   5 P persistence targets the retained reference bank
+// When publication detail 1 follows a generalized-P parser fault, DISK shows
+// that parser's sticky first-fault code (state plus one, or 26..31) instead.
 wire [4:0] mpeg2_new_diag_disk_code_live =
     (mpeg2_new_diag_first_error_valid &&
      (mpeg2_new_diag_error_code_first == 4'd1)) ?
@@ -257,6 +271,13 @@ wire [4:0] mpeg2_new_diag_disk_code_live =
     (mpeg2_new_diag_first_error_valid &&
      (mpeg2_new_diag_error_code_first == 4'd3)) ?
         mpeg2_new_diag_pred_detail_first :
+    (mpeg2_new_diag_first_error_valid &&
+     (mpeg2_new_diag_error_code_first == 4'd2) &&
+     (mpeg2_new_diag_phase1_source_first == 4'd4)) ?
+        ((mpeg2_new_diag_publication_detail_first == 3'd1) &&
+         (mpeg2_new_diag_p_wide_detail_first != 5'd0) ?
+            mpeg2_new_diag_p_wide_detail_first :
+            {2'b00, mpeg2_new_diag_publication_detail_first}) :
     (!mpeg2_new_diag_first_error_valid &&
      (mpeg2_new_diag_prereq_code == 4'd4)) ?
         {1'b0, mpeg2_new_pred_progress_stage} :

@@ -60,7 +60,10 @@ module mpeg2_h262_p_wide_motion_syntax_probe
     output reg         alternate_scan,
 
     output reg         parse_hold,
-    output reg         probe_error
+    output reg         probe_error,
+    // Entry 210 observability: sticky first failing parser state plus one.
+    // Codes 26..31 identify errors raised outside the syntax-state fallback.
+    output reg [4:0]   probe_error_detail
 );
 
 localparam [7:0]
@@ -168,6 +171,7 @@ localparam [5:0]
     R_DC_SIZE        = 6'd23,
     R_DC_DIFF        = 6'd24;
 reg [5:0] parser_state;
+reg [5:0] parser_state_previous;
 
 reg [2:0] field_bit_count;
 reg [4:0] qscale_shift, current_qscale;

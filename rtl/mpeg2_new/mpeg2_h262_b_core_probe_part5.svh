@@ -79,6 +79,11 @@
                 picture_shift<=picture_next;
                 if(picture_count)begin
                     picture_capture<=0;picture_count<=0;current_picture_is_b<=(picture_next[5:3]==3'd3);
+                    // Entry 210: b_candidate is transaction ownership, not a
+                    // cumulative observation.  Release it as soon as the
+                    // following non-B header is known so the shared shell
+                    // honors the incoming P parser's refill hold.
+                    if(picture_next[5:3]!=3'd3)b_candidate<=0;
                     if((picture_next[5:3]==3'd3)&&!parse_active&&!replay_active)begin
                         prior_error<=prior_error|parser_error|replay_error;
                         proof_done<=0;b_seen<=0;b_candidate<=0;parse_hold<=0;parser_error<=0;replay_error<=0;

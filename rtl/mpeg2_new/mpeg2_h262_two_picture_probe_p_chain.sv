@@ -30,6 +30,8 @@ module mpeg2_h262_two_picture_probe
     // (p_error_raw) plus the progress_error conjunct detail.
     output wire[3:0] p_probe_error_source,
     output wire[3:0] p_progress_detail,
+    output wire[2:0] publication_error_detail,
+    output wire[4:0] p_wide_probe_error_detail,
     output wire b_user_success,output wire[4:0] quantiser_scale_code,output wire[11:0] macroblock_address_increment,
     output wire macroblock_quant,output wire[4:0] macroblock_quantiser_scale_code,output wire[7:0] slice_vertical_position,
     output wire[2:0] slice_vertical_position_extension,output wire[3:0] first_luma_dc_size,
@@ -62,7 +64,7 @@ mpeg2_h262_picture_bookkeeper bookkeeper(
  .qfs_block_index(qfs_block_index),.qfs_block_start(qfs_block_start),.qfs_write_en(qfs_write_en),
  .qfs_write_index(qfs_write_index),.qfs_write_value(qfs_write_value),.qfs_block_end(qfs_block_end));
 
-reg p_persistence_d;reg[1:0] p_publication_count;reg publication_error;reg picture_complete_pulse;
+reg p_persistence_d;reg[1:0] p_publication_count;reg publication_error;reg[2:0] publication_error_detail_reg;reg picture_complete_pulse;
 reg active_frame_bank_reg,completed_frame_bank_reg;reg[7:0] picture_count_reg;reg reference_frame_valid_reg,reference_frame_bank_reg;reg[7:0] reference_promotion_count_reg;
 
 reg[31:0] picture_window;wire[31:0] picture_window_next={picture_window[23:0],stream_data};
@@ -80,6 +82,7 @@ wire reference_progress_error=(picture_count_reg>=8'd2)&&(p_publication_count!=0
 assign picture_420_complete=picture_complete_pulse;assign active_frame_bank=active_frame_bank_reg;assign completed_frame_bank=completed_frame_bank_reg;
 assign picture_count=picture_count_reg;assign reference_frame_valid=reference_frame_valid_reg;assign reference_frame_bank=reference_frame_bank_reg;
 assign reference_promotion_count=reference_promotion_count_reg;
+assign publication_error_detail=publication_error_detail_reg;
 // Commit 192: the legacy bookkeeper only counts I pictures.  A generalized P
 // persistence event also publishes a reference picture through this shell, so
 // the exported second-reference prerequisite must follow the combined I/P
@@ -88,7 +91,7 @@ assign second_picture_420_parsed=base_second_picture_420_parsed||(picture_count_
 
 always @(posedge clk)begin
  if(reset)begin
-  p_persistence_d<=0;p_publication_count<=0;publication_error<=0;picture_complete_pulse<=0;active_frame_bank_reg<=0;completed_frame_bank_reg<=0;
+  p_persistence_d<=0;p_publication_count<=0;publication_error<=0;publication_error_detail_reg<=0;picture_complete_pulse<=0;active_frame_bank_reg<=0;completed_frame_bank_reg<=0;
   picture_count_reg<=0;reference_frame_valid_reg<=0;reference_frame_bank_reg<=0;reference_promotion_count_reg<=0;
   picture_window<=0;picture_header_capture<=0;picture_header_second_byte<=0;p_header_count<=0;consecutive_candidate_seen<=0;
   b_picture_observed<=0;b_picture_inflight<=0;b_persistence_verified<=0;b_header_count<=0;b_persist_count<=0;
@@ -110,8 +113,14 @@ always @(posedge clk)begin
       if(b_header_count!=3'd7)b_header_count<=b_header_count+1'b1;
       // In coded order the future reference P precedes each B.  Do not accept
       // a B transaction if an observed P header has not actually persisted.
-      if(p_publication_count<p_header_count)publication_error<=1;
-     end else if((stream_data[5:3]==3'b001)&&consecutive_candidate_seen&&(p_publication_count<2))publication_error<=1;
+      if(p_publication_count<p_header_count)begin
+       publication_error<=1;
+       if(!publication_error)publication_error_detail_reg<=3'd1;
+      end
+     end else if((stream_data[5:3]==3'b001)&&consecutive_candidate_seen&&(p_publication_count<2))begin
+      publication_error<=1;
+      if(!publication_error)publication_error_detail_reg<=3'd2;
+     end
     end
    end
   end
@@ -119,11 +128,21 @@ always @(posedge clk)begin
   if(base_picture_420_complete&&!b_picture_inflight)begin
    picture_complete_pulse<=1;completed_frame_bank_reg<=active_frame_bank_reg;active_frame_bank_reg<=~active_frame_bank_reg;
    if(picture_count_reg!=8'hff)picture_count_reg<=picture_count_reg+1'b1;
-   if(reference_frame_valid_reg&&(active_frame_bank_reg==reference_frame_bank_reg))publication_error<=1;
+   if(reference_frame_valid_reg&&(active_frame_bank_reg==reference_frame_bank_reg))begin
+    publication_error<=1;
+    if(!publication_error)publication_error_detail_reg<=3'd3;
+   end
    reference_frame_valid_reg<=1;reference_frame_bank_reg<=active_frame_bank_reg;
    if(reference_promotion_count_reg!=8'hff)reference_promotion_count_reg<=reference_promotion_count_reg+1'b1;
   end else if(p_persisted_now)begin
-   if(!reference_frame_valid_reg||(active_frame_bank_reg==reference_frame_bank_reg))publication_error<=1;
+   if(!reference_frame_valid_reg)begin
+    publication_error<=1;
+    if(!publication_error)publication_error_detail_reg<=3'd4;
+   end
+   else if(active_frame_bank_reg==reference_frame_bank_reg)begin
+    publication_error<=1;
+    if(!publication_error)publication_error_detail_reg<=3'd5;
+   end
    else begin
     if(p_publication_count!=3)p_publication_count<=p_publication_count+1'b1;
     picture_complete_pulse<=1;completed_frame_bank_reg<=active_frame_bank_reg;active_frame_bank_reg<=~active_frame_bank_reg;
@@ -161,7 +180,8 @@ mpeg2_h262_p_diagnostic_controller p_controller(
  .p_first_residual_sample_valid(p_first_residual_sample_valid_raw),.p_first_residual_sample_value(p_first_residual_sample_value_raw),
  .p_residual_sample_valid(p_residual_sample_valid_raw),.p_residual_sample_index(p_residual_sample_index_raw),
  .p_residual_sample_value(p_residual_sample_value_raw),.probe_error(p_error_raw),
- .probe_error_source(p_probe_error_source),.progress_detail(p_progress_detail));
+ .probe_error_source(p_probe_error_source),.progress_detail(p_progress_detail),
+ .wide_probe_error_detail(p_wide_probe_error_detail));
 
 wire b_candidate,b_seen,b_complete_now,b_parse_hold,b_replay_active,b_sideband_valid,b_first_valid,b_error;
 wire[5:0] b_sideband_index;wire signed[15:0] b_sideband_value,b_first_value;

@@ -23,7 +23,8 @@ module mpeg2_h262_p_diagnostic_controller
  // of p_macroblock_type_seen is false when progress_error is the winning term.
  // Neither changes probe_error or any decode behavior.
  output wire [3:0] probe_error_source,
- output wire [3:0] progress_detail
+ output wire [3:0] progress_detail,
+ output wire [4:0] wide_probe_error_detail
 );
 
 wire syntax_error_raw,mb_seen_raw,vector_valid_raw;
@@ -46,6 +47,8 @@ wire legacy_qtype,legacy_alt;
 
 // Commit-166 wide parser.
 wire wide_candidate,wide_seen,wide_complete_now,wide_parse_hold,wide_error;
+wire [4:0] wide_error_detail;
+assign wide_probe_error_detail=wide_error_detail;
 wire wide_row_complete_now,wide_row_final;
 wire wide_motion_valid;
 wire wide_motion_intra;
@@ -365,7 +368,8 @@ mpeg2_h262_p_wide_motion_syntax_probe wide_general_probe
  .residual_coeff_read_last(wide_coeff_read_last),
  .residual_coeff_count(wide_coeff_count),
  .q_scale_type(wide_qtype),.alternate_scan(wide_alt),
- .parse_hold(wide_parse_hold),.probe_error(wide_error)
+ .parse_hold(wide_parse_hold),.probe_error(wide_error),
+ .probe_error_detail(wide_error_detail)
 );
 
 mpeg2_h262_p_residual_probe residual_probe

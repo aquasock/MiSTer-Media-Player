@@ -199,11 +199,13 @@
                 chunk_boundary_known<=0;
                 if(!row_has_coded_mb) begin
                     probe_error<=1;
+                    if(!probe_error)probe_error_detail<=5'd26;
                     proof_done<=1;
                     parse_hold<=0;
                 end else if(boundary_final) begin
                     if(current_col!=(picture_mb_width-1'b1)) begin
                         probe_error<=1;
+                        if(!probe_error)probe_error_detail<=5'd27;
                         proof_done<=1;
                         parse_hold<=0;
                     end else begin
@@ -219,6 +221,7 @@
                     // following slice has the same vertical position.
                     if(current_col>=(picture_mb_width-1'b1)) begin
                         probe_error<=1;
+                        if(!probe_error)probe_error_detail<=5'd28;
                         proof_done<=1;
                         parse_hold<=0;
                     end else begin
@@ -234,6 +237,7 @@
                     // coverage for the current row reaches its right edge.
                     if(current_col!=(picture_mb_width-1'b1)) begin
                         probe_error<=1;
+                        if(!probe_error)probe_error_detail<=5'd29;
                         proof_done<=1;
                         parse_hold<=0;
                     end else begin
@@ -253,6 +257,8 @@
                 chunk_boundary_known<=0;
                 proof_done<=1;
                 probe_error<=1;
+                if(!probe_error)
+                    probe_error_detail<=parser_state_previous[4:0]+5'd1;
                 wide_candidate<=0;
             end
             endcase
@@ -315,9 +321,11 @@
                         proof_done<=0;
                         parse_active<=0;
                         parse_hold<=0;
+                        boundary_final<=0;
                         row_waiting<=0;
                         row_final<=0;
                         probe_error<=0;
+                        probe_error_detail<=0;
                     end
                 end else picture_count<=1;
             end else if(start_code_now &&
@@ -364,6 +372,7 @@
                         slice_parser_started<=0;
                         proof_done<=1;
                         probe_error<=1;
+                        if(!probe_error)probe_error_detail<=5'd30;
                     end else if(
                         (start_code_value=={2'd0,slice_row_number}) ||
                         ((slice_row_number<picture_mb_height) &&
@@ -408,6 +417,7 @@
                         slice_capture<=0;
                         proof_done<=1;
                         probe_error<=1;
+                        if(!probe_error)probe_error_detail<=5'd30;
                     end
                 end else if(row_byte_count<(ROW_BUFFER_BYTES-1)) begin
                     row_bytes[row_byte_count]<=stream_data;
@@ -442,6 +452,7 @@
                 end else begin
                     proof_done<=1;
                     probe_error<=1;
+                    if(!probe_error)probe_error_detail<=5'd31;
                 end
             end
         end

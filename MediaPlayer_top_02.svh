@@ -119,3 +119,5 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.probe_error_source          (mpeg2_new_phase1_probe_error_source),
 	.p_probe_error_source        (mpeg2_new_p_probe_error_source),
 	.p_progress_detail           (mpeg2_new_p_progress_detail),
+	.publication_error_detail    (mpeg2_new_publication_error_detail),
+	.p_wide_probe_error_detail   (mpeg2_new_p_wide_probe_error_detail),

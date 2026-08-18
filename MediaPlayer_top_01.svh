@@ -78,6 +78,8 @@ wire [3:0]  mpeg2_new_phase1_probe_error_source;
 // kate - Commit 180 observability only.
 wire [3:0]  mpeg2_new_p_probe_error_source;
 wire [3:0]  mpeg2_new_p_progress_detail;
+wire [2:0]  mpeg2_new_publication_error_detail;
+wire [4:0]  mpeg2_new_p_wide_probe_error_detail;
 wire        mpeg2_new_b_user_success;
 wire [4:0]  mpeg2_new_slice_quantiser_scale_code;
 wire [11:0] mpeg2_new_macroblock_address_increment;

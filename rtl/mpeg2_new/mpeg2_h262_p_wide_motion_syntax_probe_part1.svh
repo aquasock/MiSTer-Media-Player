@@ -340,6 +340,7 @@ always @(posedge clk) begin
         alternate_scan<=0;
         parse_hold<=0;
         probe_error<=0;
+        probe_error_detail<=0;
         slice_capture<=0;
         slice_parser_started<=0;
         chunk_boundary_known<=0;
@@ -354,6 +355,7 @@ always @(posedge clk) begin
         parse_byte_index<=0;
         parse_bit_index<=3'd7;
         parser_state<=R_H_QSCALE;
+        parser_state_previous<=R_H_QSCALE;
         field_bit_count<=0;
         qscale_shift<=0;
         current_qscale<=0;
@@ -407,6 +409,7 @@ always @(posedge clk) begin
         dc_diff_shift<=0;
         dc_diff_bit_count<=0;
     end else begin
+        parser_state_previous<=parser_state;
         residual_block_read_word<=
             residual_block_mem[residual_block_read_address];
         residual_coeff_read_word<=
