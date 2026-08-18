@@ -728,7 +728,7 @@ Install the Commit-204 RBF and run `test_compat_dense_residual.m2v`, `test_p_res
 - [ ] Passed
 
 ---
-## 205 COMMIT Unreleased ??? 2026-08-18T03:26:00-07:00
+## 205 COMMIT Unreleased c9636a7 2026-08-18T03:26:00-07:00
 
 #### Coming From:
 
@@ -740,15 +740,49 @@ Guarantee that any B parser or reconstruction failure aborts the in-flight B tra
 
 #### Outcome:
 
-Commit `7256a7f` is not hardware accepted: `test_compat_dense_residual.m2v` displays its coherent dense I/P raster but leaves the MiSTer file-transfer overlay permanently active with all diagnostic LEDs dark. The 2,875,981-byte file is far below the 27-bit transfer-address limit, the first dense B full-raster replay completes 1,350 macroblocks, 8,073 residual blocks, 516,672 residual samples, and 518,400 stored samples without raster error, and a complete parser replay identifies the first deterministic fault in the second consecutive B picture at byte 818,621, slice row 9. This commit will make every B failure terminate the active transaction, preserve the first error for diagnostics, and keep the loader draining instead of allowing an internal decoder failure to wedge `ioctl_wait`.
+Commit `7256a7f` is not hardware accepted: `test_compat_dense_residual.m2v` displays its coherent dense I/P raster but leaves the MiSTer file-transfer overlay permanently active with all diagnostic LEDs dark. Commit `c9636a7` makes sticky B parser/replay failure abort only the live B transaction and suppress its persistence wait, preserving the error for diagnostics while allowing the HPS byte path to drain. The focused transport regression holds B failure asserted and accepts all 4,102 bytes with zero post-abort stalls, while the separate full-corpus reproducer identifies the first deterministic dense failure at byte 818,622, slice row 9, and proves the parser itself releases `parse_hold`; the existing first dense B full-raster replay remains clear across 1,350 macroblocks, 8,073 residual blocks, 516,672 residual samples, and 518,400 stored samples.
 
 #### Next Steps:
 
-Add a full-corpus transport-recovery regression that injects and observes the second-B parser failure, prove that stream readiness recovers and every remaining byte is accepted, and retain all existing single-B parser, transform, raster, publication, and presentation results before addressing the repeated-B syntax and lifecycle fault in the following commit.
+Correct the second and later B-picture parser/lifecycle behavior, require the complete dense `IPBBPBBPBBPB` coded sequence to finish without parser, replay, reconstruction, publication, presentation, or transport errors, then run a clean Quartus build for the combined recovery commits.
 
 #### Files Modified:
 
 - rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+- tools/streams/tb_h262_dense_transport_recovery.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+## 206 COMMIT Unreleased ??? 2026-08-18T03:32:00-07:00
+
+#### Coming From:
+
+Unreleased c9636a7
+
+#### Purpose:
+
+Correct repeated-B parsing and transaction lifecycle so every picture in the dense `IPBBPBBPBBPB` corpus completes without error or transport stall.
+
+#### Outcome:
+
+Commit `c9636a7` guarantees fail-open transport after the existing second-B fault but intentionally leaves that standards-valid picture rejected. This commit will isolate the earliest bit-consumption divergence in the second B picture, correct only the responsible parser or transaction state, and extend the dense regression from its former first-P and first-B stopping points through all eleven inter pictures and the sequence end.
+
+#### Next Steps:
+
+Prove exact macroblock, residual-block, coefficient, row-retirement, persistence, reference-publication, B-presentation, and terminal stream-readiness invariants across the full dense sequence; retain the seven standing hardware generators and focused P/B row regressions, then build and deploy the resulting RBF for a complete MiSTer rerun.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+- MediaPlayer_top_04.svh
 - tools/streams/tb_h262_dense_transport_recovery.sv
 
 #### Status:
