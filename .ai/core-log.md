@@ -1,32 +1,4 @@
 ---
-## 189 COMMIT Unreleased 06bce8f 2026-08-17T08:04:37-07:00
-
-#### Coming From:
-
-Unreleased dbc3000
-
-#### Purpose:
-
-Replace mutable overlapping playback-time LED indications with an unambiguous settled post-stream diagnostic snapshot.
-
-#### Outcome:
-
-Commit 188 hardware again displays the generalized P discriminator's four quadrants and center seams while DISK remains off throughout the reported USER/POWER `1/4` pattern, matching exact frontend replay and proving no frontend syntax assertion occurred. Commit `06bce8f` waits one second after sequence end, snapshots the settled hierarchy, resets the epoch, and reports USER, POWER, and DISK in non-overlapping windows without changing decoder behavior. A first clean build exposed the unrelated marginal HDMI path at -0.092 ns; reusing the blink divider instead of a separate wide settlement timer produced a clean Quartus 17.0.2 build with zero setup TNS, +0.432 ns global setup, +1.724 ns decoder setup, 30,923 ALMs, 41,806 registers, and no Critical Warning.
-
-#### Next Steps:
-
-Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_p_visual_discriminator.m2v`, watching one complete 16-second frame after the one-second settlement delay. USER owns the first three seconds, POWER the next five, and DISK the final eight; record whether each window is solid, dark, or blinking and count any blinks. The clean-success expectation is solid USER, then solid POWER, then dark DISK, with discriminator seams preserved.
-
-#### Files Modified:
-
-- MediaPlayer_top_07.svh
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
 ## 190 COMMIT Unreleased 2849c38 2026-08-17T15:03:19-07:00
 
 #### Coming From:
@@ -145,6 +117,41 @@ Reload the MiSTer core and load `test_compat_long_gop.m2v` while recording from 
 #### Status:
 
 - [x] Built
+- [ ] Passed
+
+---
+## 229 COMMIT Unreleased ??? 2026-08-18T15:58:14-07:00
+
+#### Coming From:
+
+Unreleased cd73cb7
+
+#### Purpose:
+
+Remove the registered cache-hit handshake from generalized P/B prediction so resident reference words can advance the raster engines directly without changing the miss path, pixels, or display order.
+
+#### Outcome:
+
+Entry 228 hardware remains functionally clean: the long-GOP stream reaches source frame 71, USER and POWER are solid, and DISK code 11 confirms the deepest successful final-GOP boundary, future-reference presentation. Its approximately 9.9-second load time is only about 7.3 fps and remains well below the encoded 25 fps rate. Because Entry 228 simulation removed 78.5 percent of external reads while hardware still misses the throughput target, DDR bandwidth is no longer the first boundary; static cycle tracing shows that each cache hit still passes through request capture, acceptance, registered response, and engine response consumption before a pel can advance. Expose the cache's associative lookup result to the selected P or B raster engine, add an explicit consume event for accounting, and let a hit advance the tap accumulator directly while retaining the existing registered transaction for misses and all uncached accesses.
+
+#### Next Steps:
+
+Extend the focused cache regression to prove direct-hit lookup and consumption, miss fallback, replacement, invalidation, delayed DDR response, and uncached isolation. Add cycle accounting to the integrated 72-picture live-raster soak, require exact reconstructed memory, persistence, publication, ownership, scratch selection, and final display identity to remain unchanged, and require a material cycle reduction before the session-authorized incremental Quartus build. Deploy the resulting RBF for another timed long-GOP run; if direct hits still do not reach 25 fps, preserve the measured gain and use the cycle breakdown to choose between residual-read bubbles and post-store verification traffic.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- tools/streams/tb_h262_prediction_word_cache.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
 - [ ] Passed
 
 ---
