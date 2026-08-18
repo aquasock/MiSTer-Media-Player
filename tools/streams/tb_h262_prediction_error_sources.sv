@@ -69,7 +69,10 @@ initial begin
 
     // Generalized P is POWER=2.  An unrecognized metadata word is DISK=8.
     send_sideband(6'h3e,16'sd0);
+    // Commit 201 assigns 0x3b to valid P-intra macroblock metadata; prove it
+    // is accepted before applying an actually unrecognized P word.
     send_sideband(6'h3b,16'sd0);
+    send_sideband(6'h37,16'sd0);
     expect_error(3'd2,5'd8);
     // A later malformed descriptor must not relabel the first assertion.
     send_sideband(6'h3c,-16'sd1);

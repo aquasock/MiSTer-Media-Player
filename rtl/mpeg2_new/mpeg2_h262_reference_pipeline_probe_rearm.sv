@@ -2,8 +2,8 @@
 // MiSTer Media Player - consolidated re-arm wrapper for P/B reference pipeline
 //
 // Generalized P raster replay is identified by ordered motion metadata at
-// sideband index 0x3e. Historical P motion-plan transport is translated into
-// that protocol. B uses an internal sentinel vector plus B direction metadata.
+// sideband index 0x3e; intra macroblocks use index 0x3b. B uses an internal
+// sentinel vector plus B direction metadata.
 // P and B share the registered DDR request adapter and response-owner gating.
 // Phase 1V mixed-GOP work adds a one-cycle B-engine re-arm after each fully
 // persisted B picture so a later B transaction can reuse the same raster engine.
@@ -70,21 +70,18 @@ always @(posedge clk)begin
 end
 wire b_select=b_mode||b_detect_now||b_active;
 
-wire plan_capture_window=
- !p_forward_vector_valid&&!p_implicit_reconstruct_request&&
- (forward_f_code_horizontal==4'd3)&&(forward_f_code_vertical==4'd3)&&
- (horizontal_size==14'd128)&&(vertical_size==14'd96)&&!general_mixed_mode&&!b_select;
-wire plan_first_now=plan_capture_window&&p_residual_sample_valid&&
- (p_residual_sample_index==6'd0)&&(p_residual_sample_value[15:1]==15'd0);
+// Commit 201 capacity closure: the streamed generalized P protocol supersedes
+// the historical 128x96 plan adapter and base reference engine.  Current P
+// pictures identify themselves with ordered 0x3e/0x3b metadata and always use
+// mixed_probe; B continues to use b_probe.
+wire plan_capture_window=1'b0;
+wire plan_first_now=1'b0;
 
 reg[47:0] plan_shift_right_map;
 reg[5:0] plan_capture_count,plan_emit_count;
 reg plan_capture_active,plan_ready,plan_started,plan_replay_active,plan_replay_seen,plan_error;
 
-wire plan_request_now=plan_ready&&p_forward_vector_valid&&
- (p_forward_vector_x==13'sd32)&&(p_forward_vector_y==13'sd0)&&
- (forward_f_code_horizontal==4'd3)&&(forward_f_code_vertical==4'd3)&&
- (horizontal_size==14'd128)&&(vertical_size==14'd96)&&!p_implicit_reconstruct_request&&!b_select;
+wire plan_request_now=1'b0;
 
 always @(posedge clk)begin
  if(reset)begin
@@ -142,12 +139,25 @@ wire base_read;wire[7:0] base_sample;wire base_nonzero,base_half,base_recon;wire
 wire base_vector_valid=p_forward_vector_valid&&!mixed_select&&!b_select;
 wire base_residual_valid=p_residual_sample_valid&&!mixed_select&&!b_select;
 
-mpeg2_h262_reference_read_probe_base base_probe(
- .reset(base_reset),.p_forward_vector_valid(base_vector_valid),.p_residual_sample_valid(base_residual_valid),
- .ddram_burstcnt(base_bc),.ddram_addr(base_addr),.ddram_rd(base_rd),.p_store_select(base_store_sel),.p_store_pixel_value(base_store_val),
- .p_store_pixel_x(base_store_x),.p_store_pixel_y(base_store_y),.p_store_pixel_valid(base_store_valid),.p_store_block_start(base_store_start),.p_store_block_complete(base_store_complete),
- .read_seen(base_read),.sample_value(base_sample),.sample_nonzero(base_nonzero),.half_sample_seen(base_half),.reconstructed_seen(base_recon),
- .reconstructed_value(base_recon_val),.persisted_seen(base_persisted_seen),.persisted_value(base_persist_val),.probe_error(base_probe_error),.*);
+assign base_bc=8'd0;
+assign base_addr=29'd0;
+assign base_rd=1'b0;
+assign base_store_sel=1'b0;
+assign base_store_val=8'd0;
+assign base_store_x=12'd0;
+assign base_store_y=12'd0;
+assign base_store_valid=1'b0;
+assign base_store_start=1'b0;
+assign base_store_complete=1'b0;
+assign base_read=1'b0;
+assign base_sample=8'd0;
+assign base_nonzero=1'b0;
+assign base_half=1'b0;
+assign base_recon=1'b0;
+assign base_recon_val=8'd0;
+assign base_persisted_seen=1'b0;
+assign base_persist_val=8'd0;
+assign base_probe_error=1'b0;
 
 wire[7:0] mix_bc_raw;wire[28:0] mix_addr_raw;wire mix_rd_raw;
 wire mix_store_sel;wire[7:0] mix_store_val;wire[11:0] mix_store_x,mix_store_y;wire mix_store_valid,mix_store_start,mix_store_complete;
