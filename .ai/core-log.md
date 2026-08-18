@@ -949,7 +949,7 @@ Run `test_b_f_code_range.m2v`, `test_p_f_code_range.m2v`, `test_p_motion_residua
 - [x] Passed
 
 ---
-## 195 VERSION v0.5.0 ??? 2026-08-17T18:02:13-07:00
+## 195 VERSION v0.5.0 56db0c4 2026-08-17T18:02:13-07:00
 
 #### Coming From:
 
@@ -961,11 +961,11 @@ Publish the hardware-qualified 720x480 progressive 4:2:0 I/P/B and independently
 
 #### Outcome:
 
-Commit 194 passes the authoritative seven-stream hardware matrix with USER and POWER solid, DISK dark, and all decoded images accepted. Going forward that matrix is `test_i_baseline.m2v`, `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_b_bidirectional.m2v`, `test_p_visual_discriminator.m2v`, `test_p_f_code_range.m2v`, and `test_b_f_code_range.m2v`; the former nine-stream matrix is invalid for release qualification. This proposed v0.5.0 boundary will document the expanded 720x480 P/B envelope, picture-signaled component `f_code` coverage, qualified timing and resources, current limitations, and the authoritative regression evidence without changing decoder RTL.
+Commit 194 passes the authoritative seven-stream hardware matrix with USER and POWER solid, DISK dark, and all decoded images accepted; the former nine-stream matrix is invalid for release qualification going forward. A fresh GitHub `master` clone at `424eec4` with no prior build products reproduces all seven deterministic stream hashes and completes Quartus Prime 17.0.2 with zero TNS, no Critical Warning, +0.387 ns setup, +0.207 ns hold, +2.012 ns decoder setup, 31,625 ALMs, 42,223 registers, 592,333 memory bits, 90 RAM blocks, 69 DSP blocks, and 3 PLLs. Its RBF is bit-identical to the already hardware-accepted Commit-194 artifact at SHA-256 `a3eeeb285c427f313987ce6c62cdef560d6293defb1841e96c66aab026d63d8e`. Commit `56db0c4` publishes the v0.5.0 README, changelog milestone, and release notes covering the 720x480 P/B envelope, independently signaled component `f_code` values 1 through 4, qualification evidence, and current limitations without changing decoder RTL; Audio project `fd90c77` remains integration-compatible.
 
 #### Next Steps:
 
-After approval, clone GitHub `master` into a clean directory, build it from scratch with Quartus Prime 17.0.2, require nonnegative setup and hold slack, zero TNS, and no Critical Warning, and provide that exact RBF for the seven-stream hardware matrix. Once the user accepts the fresh-clone result, update `README.md` and `CHANGELOG.md`, add `docs/RELEASE_NOTES_v0.5.0.md`, commit and push the release metadata, resolve this entry to the release commit, and have the user create the annotated `v0.5.0` tag and GitHub pre-release titled `MiSTer Media Player v0.5.0` with the date-coded `MediaPlayer_20260817.rbf` asset.
+Have the user create the annotated `v0.5.0` tag at exact release commit `56db0c4` and publish the GitHub pre-release titled `MiSTer Media Player v0.5.0`, attaching the qualified artifact as `MediaPlayer_20260817.rbf` with SHA-256 `a3eeeb285c427f313987ce6c62cdef560d6293defb1841e96c66aab026d63d8e`. Verify the remote tag, release flags, title, commit target, asset name, and asset digest after publication, then resume development under a fresh Unreleased boundary.
 
 #### Files Modified:
 
@@ -975,7 +975,7 @@ After approval, clone GitHub `master` into a clean directory, build it from scra
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
