@@ -39,16 +39,16 @@ module mpeg2_h262_p_wide_motion_syntax_probe
     output reg [5:0]   picture_mb_height,
     output reg [10:0]  picture_mb_count,
 
-    output reg [351:0] residual_mb_plan,
-    output reg [95:0]  residual_block_index_plan,
-    output reg [31:0]  residual_intra_plan,
+    output wire [351:0] residual_mb_plan,
+    output wire [95:0]  residual_block_index_plan,
+    output wire [31:0]  residual_intra_plan,
     output reg [5:0]   residual_block_count,
     output reg         residual_present,
-    output reg [383:0] residual_coeff_index_plan,
-    output reg [831:0] residual_coeff_value_plan,
-    output reg [63:0]  residual_coeff_last_plan,
+    output wire [383:0] residual_coeff_index_plan,
+    output wire [831:0] residual_coeff_value_plan,
+    output wire [63:0]  residual_coeff_last_plan,
     output reg [6:0]   residual_coeff_count,
-    output reg [159:0] residual_qscale_plan,
+    output wire [159:0] residual_qscale_plan,
     output reg         q_scale_type,
     output reg         alternate_scan,
 
@@ -62,8 +62,25 @@ localparam [7:0]
     EXTENSION_START_CODE = 8'hB5,
     SEQUENCE_END_CODE    = 8'hB7;
 localparam integer ROW_BUFFER_BYTES = 512;
-localparam [5:0] MAX_RESIDUAL_BLOCKS = 6'd32;
-localparam [6:0] MAX_COEFF_EVENTS = 7'd64;
+localparam [5:0] MAX_RESIDUAL_BLOCKS = 6'd16;
+localparam [6:0] MAX_COEFF_EVENTS = 7'd32;
+
+// Commit 201 capacity closure: retain the public 32-block/64-event buses while
+// synthesizing only the bounded storage used by current generalized streams.
+reg [175:0] residual_mb_plan_store;
+reg [47:0] residual_block_index_plan_store;
+reg [15:0] residual_intra_plan_store;
+reg [191:0] residual_coeff_index_plan_store;
+reg [415:0] residual_coeff_value_plan_store;
+reg [31:0] residual_coeff_last_plan_store;
+reg [79:0] residual_qscale_plan_store;
+assign residual_mb_plan={176'd0,residual_mb_plan_store};
+assign residual_block_index_plan={48'd0,residual_block_index_plan_store};
+assign residual_intra_plan={16'd0,residual_intra_plan_store};
+assign residual_coeff_index_plan={192'd0,residual_coeff_index_plan_store};
+assign residual_coeff_value_plan={416'd0,residual_coeff_value_plan_store};
+assign residual_coeff_last_plan={32'd0,residual_coeff_last_plan_store};
+assign residual_qscale_plan={80'd0,residual_qscale_plan_store};
 
 reg [31:0] byte_window;
 wire [31:0] byte_window_next = {byte_window[23:0], stream_data};

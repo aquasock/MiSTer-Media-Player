@@ -373,15 +373,15 @@
                         parser_state<=R_ERROR;
                     end else begin
                         current_residual_slot<=residual_block_count;
-                        residual_mb_plan[
+                        residual_mb_plan_store[
                             (residual_block_count*11)+:11
                         ]<=current_mb_index;
-                        residual_block_index_plan[
+                        residual_block_index_plan_store[
                             (residual_block_count*3)+:3
                         ]<=current_block_index;
-                        residual_intra_plan[residual_block_count]
+                        residual_intra_plan_store[residual_block_count]
                             <=current_is_intra;
-                        residual_qscale_plan[
+                        residual_qscale_plan_store[
                             (residual_block_count*5)+:5
                         ]<=current_qscale;
                         residual_block_count<=residual_block_count+1'b1;

@@ -8,10 +8,10 @@
                         if(residual_coeff_count>=MAX_COEFF_EVENTS)
                             parser_state<=R_ERROR;
                         else begin
-                            residual_coeff_index_plan[
+                            residual_coeff_index_plan_store[
                                 (residual_coeff_count*6)+:6
                             ]<=6'd0;
-                            residual_coeff_value_plan[
+                            residual_coeff_value_plan_store[
                                 (residual_coeff_count*13)+:13
                             ]<=$signed({2'b00,dc_predictor_current});
                             residual_coeff_count<=residual_coeff_count+1'b1;
@@ -52,10 +52,10 @@
                                 dc_predictor_cb<=dc_coefficient_decoded[10:0];
                             else
                                 dc_predictor_cr<=dc_coefficient_decoded[10:0];
-                            residual_coeff_index_plan[
+                            residual_coeff_index_plan_store[
                                 (residual_coeff_count*6)+:6
                             ]<=6'd0;
-                            residual_coeff_value_plan[
+                            residual_coeff_value_plan_store[
                                 (residual_coeff_count*13)+:13
                             ]<=dc_coefficient_decoded;
                             residual_coeff_count<=residual_coeff_count+1'b1;
@@ -79,7 +79,7 @@
                            residual_coeff_count==0) begin
                             parser_state<=R_ERROR;
                         end else begin
-                            residual_coeff_last_plan[
+                            residual_coeff_last_plan_store[
                                 residual_coeff_count-1'b1
                             ]<=1'b1;
                             current_block_index<=
@@ -109,10 +109,10 @@
                    residual_coeff_count>=MAX_COEFF_EVENTS) begin
                     parser_state<=R_ERROR;
                 end else begin
-                    residual_coeff_index_plan[
+                    residual_coeff_index_plan_store[
                         (residual_coeff_count*6)+:6
                     ]<=normal_target_index[5:0];
-                    residual_coeff_value_plan[
+                    residual_coeff_value_plan_store[
                         (residual_coeff_count*13)+:13
                     ]<=parser_current_bit ?
                         -$signed({7'd0,coeff_level_pending}) :
@@ -150,10 +150,10 @@
                            (residual_coeff_count>=MAX_COEFF_EVENTS)) begin
                             parser_state<=R_ERROR;
                         end else begin
-                            residual_coeff_index_plan[
+                            residual_coeff_index_plan_store[
                                 (residual_coeff_count*6)+:6
                             ]<=escape_target_index[5:0];
-                            residual_coeff_value_plan[
+                            residual_coeff_value_plan_store[
                                 (residual_coeff_count*13)+:13
                             ]<={escape_level_signed[11],
                                escape_level_signed};
@@ -313,16 +313,16 @@
                        geometry_supported) begin
                         wide_seen<=0;
                         picture_mb_count<=0;
-                        residual_mb_plan<=0;
-                        residual_block_index_plan<=0;
-                        residual_intra_plan<=0;
+                        residual_mb_plan_store<=0;
+                        residual_block_index_plan_store<=0;
+                        residual_intra_plan_store<=0;
                         residual_block_count<=0;
                         residual_present<=0;
-                        residual_coeff_index_plan<=0;
-                        residual_coeff_value_plan<=0;
-                        residual_coeff_last_plan<=0;
+                        residual_coeff_index_plan_store<=0;
+                        residual_coeff_value_plan_store<=0;
+                        residual_coeff_last_plan_store<=0;
                         residual_coeff_count<=0;
-                        residual_qscale_plan<=0;
+                        residual_qscale_plan_store<=0;
                         slice_capture<=0;
                         slice_parser_started<=0;
                         chunk_boundary_known<=0;
