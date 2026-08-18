@@ -1255,7 +1255,7 @@ None.
 - [ ] Passed
 
 ---
-## 225 COMMIT Unreleased ??? 2026-08-18T13:46:18-07:00
+## 225 COMMIT Unreleased 1b26cb5 2026-08-18T13:46:18-07:00
 
 #### Coming From:
 
@@ -1267,11 +1267,11 @@ Prevent a newly published future reference from being displayed before the follo
 
 #### Outcome:
 
-Retain each ordinary reference publication as pending and make it ineligible for a display swap until a following accepted non-B header or terminal sequence boundary releases it. If the following header is B, transfer ownership directly into the existing two-scratch reorder transaction and discard the ordinary pending presentation, so even a publication pulse coincident with vblank cannot expose the future reference early. Preserve the current B decode, scratch ordering, compressed-input hold, destination ownership, and fatal fail-open rules.
+Commit `1b26cb5` retains each ordinary reference publication as pending and makes it ineligible for display until a following accepted non-B header or terminal sequence boundary releases it; a following B header instead transfers ownership directly into the existing two-scratch reorder transaction. The focused regression reproduces publication coincident with vblank and proves that the future reference remains hidden while both B scratches and then the future reference display in order; ordinary non-B release, a terminal boundary consumed before publication, and fatal fail-open recovery also pass. The transport and final-GOP observer tests pass unchanged. The DDR-backed 72-picture live-raster soak and independent 720x480 long-GOP publication test each pass 22 P pictures, 47 B pictures, 25 publications, 25 final display identities, both scratch banks, completed presentation, and zero presentation, ownership, parser, prediction, or writer errors. The session-authorized incremental Quartus 17.0.2 compile preserves the existing database, recognizes only the changed scheduler source, and completes in 9 minutes 1 second with 0 errors and 121 standing warnings; global setup/hold slack is +0.640/+0.253 ns, focused decoder/video setup slack is +1.852/+7.307 ns, and utilization is 29,589 ALMs, 42,295 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. `MediaPlayer_commit225_1b26cb5.rbf` is 4,222,572 bytes with SHA-256 `3c31afab0e8d905e12434c8cc9468160add9765f74669c44950b477cdf43208f`; its MiSTer FTP readback is byte-identical.
 
 #### Next Steps:
 
-Extend the focused scheduler test with the exact simultaneous publication and vblank event followed by two B pictures, require that the future reference remain hidden until both scratches have displayed, and cover the no-B and terminal-boundary release paths. Rerun the presentation, fail-open transport, live-raster, and dense long-GOP regressions, then use the session-authorized incremental Quartus build, timing audit, deployment, and FTP readback before requesting another hardware run.
+Reload the deployed core and run `test_compat_long_gop.m2v` once. Confirm whether visible presentation advances beyond frame 50 to the final source frame 71, USER and POWER remain solid, and the settled DISK report advances from stage two to stage eleven; if any lower stage remains, report its blink count and the last visible frame. Then reload `test_compat_mixed_macroblocks.m2v` to check that the classification barrier does not worsen its existing load-time jitter.
 
 #### Files Modified:
 
@@ -1280,7 +1280,7 @@ Extend the focused scheduler test with the exact simultaneous publication and vb
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
