@@ -979,3 +979,31 @@ Have the user create the annotated `v0.5.0` tag at exact release commit `56db0c4
 - [x] Passed
 
 ---
+## 196 COMMIT Unreleased d26c37d 2026-08-17T18:46:15-07:00
+
+#### Coming From:
+
+v0.5.0 56db0c4
+
+#### Purpose:
+
+Record the verified v0.5.0 publication on the development branch and correct the README's current-release status.
+
+#### Outcome:
+
+Commit `d26c37d` identifies v0.5.0 as the current published hardware-qualified milestone and names binary asset `MediaPlayer_20260817.rbf`, replacing the stale v0.4.0/current-candidate language without changing decoder RTL or the tagged release. Remote annotated tag `v0.5.0` peels to exact release commit `56db0c4`; the GitHub release is published as a pre-release titled `MiSTer Media Player v0.5.0`; and the uploaded RBF matches the qualified artifact at SHA-256 `a3eeeb285c427f313987ce6c62cdef560d6293defb1841e96c66aab026d63d8e`. The documentation-only commit retains the already clean-built, hardware-passed v0.5.0 RTL unchanged, so no additional Quartus or MiSTer run is required for this boundary.
+
+#### Next Steps:
+
+Prepare the next Unreleased capability proposal for post-v0.5.0 development, retaining the authoritative seven-stream hardware matrix as the mandatory regression gate and treating any new capability stream as supplemental unless the user explicitly approves a matrix change.
+
+#### Files Modified:
+
+- README.md
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
