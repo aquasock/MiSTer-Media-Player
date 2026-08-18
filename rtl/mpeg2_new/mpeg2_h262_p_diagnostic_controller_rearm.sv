@@ -10,6 +10,7 @@ module mpeg2_h262_p_diagnostic_controller
 (
  input wire clk,input wire reset,input wire [7:0] stream_data,input wire stream_valid,
  input wire p_picture_expected,input wire p_persistence_complete,
+ input wire [1:0] intra_dc_precision,
  output wire stream_hold,output wire p_macroblock_type_seen,output wire p_forward_vector_valid,
  output wire signed [12:0] p_forward_vector_x,output wire signed [12:0] p_forward_vector_y,
  output wire p_residual_required,output wire p_residual_success,
@@ -45,12 +46,14 @@ wire legacy_qtype,legacy_alt;
 // Commit-166 wide parser.
 wire wide_candidate,wide_seen,wide_complete_now,wide_parse_hold,wide_error;
 wire wide_motion_valid;
+wire wide_motion_intra;
 wire[10:0] wide_motion_index;
 wire signed[7:0] wide_motion_x,wide_motion_y;
 wire[5:0] wide_mb_width,wide_mb_height;
 wire[10:0] wide_mb_count;
 wire[351:0] wide_residual_mb_plan;
 wire[95:0] wide_residual_block_index_plan;
+wire[31:0] wide_residual_intra_plan;
 wire[5:0] wide_residual_block_count;
 wire wide_residual_present;
 wire[383:0] wide_coeff_index_plan;
@@ -79,7 +82,8 @@ wire raster_complete_now=four_mb_complete_now||legacy_complete_now||wide_complet
 // after the complete picture has been parsed and transformed.
 wire wide_sideband_valid = wide_motion_valid || residual_valid_raw;
 wire [5:0] wide_sideband_index =
-    wide_motion_valid ? 6'h3e : residual_index_raw;
+    wide_motion_valid ? (wide_motion_intra ? 6'h3b : 6'h3e) :
+                        residual_index_raw;
 wire signed [15:0] wide_sideband_value =
     wide_motion_valid ? $signed({wide_motion_x,wide_motion_y}) :
                         residual_value_raw;
@@ -327,15 +331,18 @@ mpeg2_h262_p_aligned_motion_syntax_probe legacy_general_probe
 mpeg2_h262_p_wide_motion_syntax_probe wide_general_probe
 (
  .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),
+ .intra_dc_precision(intra_dc_precision),
  .wide_candidate(wide_candidate),.wide_seen(wide_seen),
  .wide_complete_now(wide_complete_now),
  .motion_event_valid(wide_motion_valid),
+ .motion_event_intra(wide_motion_intra),
  .motion_event_index(wide_motion_index),
  .motion_event_x(wide_motion_x),.motion_event_y(wide_motion_y),
  .picture_mb_width(wide_mb_width),.picture_mb_height(wide_mb_height),
  .picture_mb_count(wide_mb_count),
  .residual_mb_plan(wide_residual_mb_plan),
  .residual_block_index_plan(wide_residual_block_index_plan),
+ .residual_intra_plan(wide_residual_intra_plan),
  .residual_block_count(wide_residual_block_count),
  .residual_present(wide_residual_present),
  .residual_coeff_index_plan(wide_coeff_index_plan),
@@ -370,6 +377,7 @@ mpeg2_h262_p_residual_probe residual_probe
  .wide_picture_complete(wide_complete_now),
  .wide_residual_mb_plan(wide_residual_mb_plan),
  .wide_residual_block_index_plan(wide_residual_block_index_plan),
+ .wide_residual_intra_plan(wide_residual_intra_plan),
  .wide_residual_block_count(wide_residual_block_count),
  .wide_coeff_index_plan(wide_coeff_index_plan),
  .wide_coeff_value_plan(wide_coeff_value_plan),
@@ -378,6 +386,7 @@ mpeg2_h262_p_residual_probe residual_probe
  .wide_qscale_plan(wide_qscale_plan),
  .wide_q_scale_type(wide_qtype),
  .wide_alternate_scan(wide_alt),
+ .wide_intra_dc_precision(intra_dc_precision),
 
  .decision_complete(residual_decision),
  .residual_required(residual_required_raw),

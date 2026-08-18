@@ -32,6 +32,7 @@ module mpeg2_h262_p_residual_probe
     input wire wide_picture_complete,
     input wire [351:0] wide_residual_mb_plan,
     input wire [95:0] wide_residual_block_index_plan,
+    input wire [31:0] wide_residual_intra_plan,
     input wire [5:0] wide_residual_block_count,
     input wire [383:0] wide_coeff_index_plan,
     input wire [831:0] wide_coeff_value_plan,
@@ -40,6 +41,7 @@ module mpeg2_h262_p_residual_probe
     input wire [159:0] wide_qscale_plan,
     input wire wide_q_scale_type,
     input wire wide_alternate_scan,
+    input wire [1:0] wide_intra_dc_precision,
 
     output wire decision_complete,
     output wire residual_required,
@@ -111,6 +113,8 @@ reg [831:0] g_coeff_value;
 reg [63:0] g_coeff_last;
 reg [159:0] g_qscale;
 reg g_qtype, g_alt;
+reg [31:0] g_intra;
+reg [1:0] g_intra_dc_precision;
 reg [5:0] expected_blocks, slot_count;
 reg [6:0] expected_coeffs, coeff_read_index;
 
@@ -122,6 +126,7 @@ reg [10:0] desc_mb [0:31];
 reg [2:0] desc_block [0:31];
 reg signed [15:0] gmem [0:2047];
 reg [6:0] sample_cap_count;
+reg transform_armed;
 
 reg gstart, gwe, gend;
 reg [5:0] gwidx;
@@ -164,7 +169,9 @@ wire alt   = any_general_mode ? g_alt : old_alt;
 wire [1:0] tblock =
     any_general_mode ? 2'd1 :
     ((qblock==0)?2'd0:2'd1);
-wire tfvalid, tvalid, terr;
+wire current_transform_intra =
+    any_general_mode && g_wide && g_intra[slot_count[4:0]];
+wire tfvalid, tvalid, terr, non_intra_transform_done;
 wire signed [15:0] tfvalue, tvalue;
 wire [1:0] unused_block;
 wire [5:0] tidx;
@@ -173,15 +180,15 @@ mpeg2_h262_p_non_intra_transform transform
 (
     .clk(clk), .reset(reset),
     .qfs_block_index(tblock),
-    .qfs_block_start(qstart),
-    .qfs_write_en(qwe),
+    .qfs_block_start(qstart&&!current_transform_intra),
+    .qfs_write_en(qwe&&!current_transform_intra),
     .qfs_write_index(qwidx),
     .qfs_write_value(qwval),
-    .qfs_block_end(qend),
+    .qfs_block_end(qend&&!current_transform_intra),
     .quantiser_scale_code(qscale),
     .q_scale_type(qtype),
     .alternate_scan(alt),
-    .block_done(transform_done),
+    .block_done(non_intra_transform_done),
     .first_sample_valid(tfvalid),
     .first_sample_value(tfvalue),
     .residual_sample_valid(tvalid),
@@ -190,6 +197,55 @@ mpeg2_h262_p_non_intra_transform transform
     .residual_sample_value(tvalue),
     .probe_error(terr)
 );
+
+wire intra_iq_complete, intra_iq_error, intra_matrix_unsupported;
+wire intra_iq_start, intra_iq_valid, intra_iq_end;
+wire [5:0] intra_iq_index;
+wire signed [11:0] intra_iq_value;
+wire signed [11:0] unused_intra_f00, unused_intra_f77;
+wire intra_idct_complete, intra_idct_error, intra_sample_valid;
+wire [5:0] intra_sample_index;
+wire signed [15:0] intra_sample_value;
+wire signed [15:0] unused_intra_sample00, unused_intra_sample77;
+
+mpeg2_h262_inverse_quant p_intra_inverse_quant
+(
+    .clk(clk),.reset(reset),
+    .block_start(qstart&&current_transform_intra),
+    .coeff_write_en(qwe&&current_transform_intra),
+    .coeff_write_index(qwidx),.coeff_write_value(qwval),
+    .block_end(qend&&current_transform_intra),
+    .intra_quant_matrix_default(1'b1),
+    .intra_dc_precision(g_intra_dc_precision),
+    .quantiser_scale_code(qscale),.q_scale_type(qtype),
+    .alternate_scan(alt),.block_complete(intra_iq_complete),
+    .iq_error(intra_iq_error),.unsupported_matrix(intra_matrix_unsupported),
+    .first_luma_f00(unused_intra_f00),.first_luma_f77(unused_intra_f77),
+    .coeff_out_block_start(intra_iq_start),
+    .coeff_out_valid(intra_iq_valid),.coeff_out_index(intra_iq_index),
+    .coeff_out_value(intra_iq_value),.coeff_out_block_end(intra_iq_end)
+);
+
+mpeg2_h262_idct p_intra_idct
+(
+    .clk(clk),.reset(reset),.coeff_block_start(intra_iq_start),
+    .coeff_valid(intra_iq_valid),.coeff_index(intra_iq_index),
+    .coeff_value(intra_iq_value),.coeff_block_end(intra_iq_end),
+    .block_complete(intra_idct_complete),.idct_error(intra_idct_error),
+    .sample_valid(intra_sample_valid),.sample_index(intra_sample_index),
+    .sample_value(intra_sample_value),
+    .first_luma_sample00(unused_intra_sample00),
+    .first_luma_sample77(unused_intra_sample77)
+);
+
+assign transform_done = current_transform_intra ?
+                        intra_idct_complete : non_intra_transform_done;
+wire selected_transform_valid = current_transform_intra ?
+                                intra_sample_valid : tvalid;
+wire [5:0] selected_transform_index = current_transform_intra ?
+                                      intra_sample_index : tidx;
+wire signed [15:0] selected_transform_value = current_transform_intra ?
+                                               intra_sample_value : tvalue;
 
 always @(posedge clk) begin
     if(reset) begin
@@ -208,6 +264,8 @@ always @(posedge clk) begin
         g_qscale<=0;
         g_qtype<=0;
         g_alt<=0;
+        g_intra<=0;
+        g_intra_dc_precision<=0;
         expected_blocks<=0;
         slot_count<=0;
         expected_coeffs<=0;
@@ -218,6 +276,7 @@ always @(posedge clk) begin
         current_block<=0;
         current_qscale<=0;
         sample_cap_count<=0;
+        transform_armed<=0;
         gstart<=0;
         gwe<=0;
         gend<=0;
@@ -241,6 +300,8 @@ always @(posedge clk) begin
         gend<=0;
         replay_valid<=0;
         first_valid_reg<=0;
+        if((gstate!=G_IDLE)&&!transform_done)
+            transform_armed<=1;
 
         // kate - Commit 166: wide geometry reuses this exact transform and
         // spatial residual buffer; only descriptor addressing is widened.
@@ -255,11 +316,14 @@ always @(posedge clk) begin
             g_qscale<=wide_qscale_plan;
             g_qtype<=wide_q_scale_type;
             g_alt<=wide_alternate_scan;
+            g_intra<=wide_residual_intra_plan;
+            g_intra_dc_precision<=wide_intra_dc_precision;
             expected_blocks<=wide_residual_block_count;
             expected_coeffs<=wide_coeff_count;
             slot_count<=0;
             coeff_read_index<=0;
             sample_cap_count<=0;
+            transform_armed<=0;
             replay_slot<=0;
             replay_sample<=0;
             for(i=0;i<32;i=i+1) begin
@@ -318,13 +382,14 @@ always @(posedge clk) begin
             end
         end
 
-        if(any_general_mode&&tvalid) begin
+        if(any_general_mode&&selected_transform_valid) begin
             if(slot_count>=MAX_BLOCKS ||
-               tidx!=sample_cap_count[5:0] ||
+               selected_transform_index!=sample_cap_count[5:0] ||
                sample_cap_count>=7'd64) begin
                 g_error<=1;
             end else begin
-                gmem[{slot_count[3:0],6'b000000}+tidx]<=tvalue;
+                gmem[{slot_count[4:0],6'b000000}+
+                     selected_transform_index]<=selected_transform_value;
                 sample_cap_count<=sample_cap_count+1'b1;
             end
         end
@@ -367,6 +432,7 @@ always @(posedge clk) begin
 
         G_START: begin
             gstart<=1;
+            transform_armed<=0;
             gstate<=G_WRITE;
         end
 
@@ -389,8 +455,8 @@ always @(posedge clk) begin
             gstate<=G_WAIT;
         end
 
-        G_WAIT: if(transform_done) begin
-            if((sample_cap_count+(tvalid?7'd1:7'd0))!=7'd64)
+        G_WAIT: if(transform_armed&&transform_done) begin
+            if((sample_cap_count+(selected_transform_valid?7'd1:7'd0))!=7'd64)
                 g_error<=1;
             if(g_wide) begin
                 if(slot_count+1'b1>=expected_blocks) begin
@@ -453,7 +519,8 @@ always @(posedge clk) begin
         G_DESC2: begin
             replay_valid<=1;
             replay_index<=6'h3d;
-            replay_value<=$signed({13'd0,desc_block[replay_slot]});
+            replay_value<=$signed({12'd0,g_intra[replay_slot],
+                                   desc_block[replay_slot]});
             replay_sample<=0;
             gstate<=G_SAMPLES;
         end
@@ -510,6 +577,11 @@ assign residual_sample_index =
 assign residual_sample_value =
     any_general_mode ? replay_value : tvalue;
 assign probe_error =
-    terr | g_error | (!any_general_mode && old_parser_error);
+    terr | intra_iq_error | intra_idct_error | intra_matrix_unsupported |
+    g_error | (!any_general_mode && old_parser_error);
+
+wire unused_intra_transform=&{1'b0,intra_iq_complete,
+    unused_intra_f00[0],unused_intra_f77[0],
+    unused_intra_sample00[0],unused_intra_sample77[0]};
 
 endmodule

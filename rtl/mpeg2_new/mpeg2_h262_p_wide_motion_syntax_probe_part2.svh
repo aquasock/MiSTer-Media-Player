@@ -114,6 +114,7 @@
                     current_has_motion<=0;
                     current_has_pattern<=0;
                     current_has_quant<=0;
+                    current_is_intra<=0;
                     mbtype_bits<=0;
                     mbtype_len<=0;
                     if((!row_has_coded_mb &&
@@ -121,6 +122,9 @@
                        (row_has_coded_mb && (mba_increment>1))) begin
                         predictor_x<=0;
                         predictor_y<=0;
+                        dc_predictor_y<=dc_predictor_reset;
+                        dc_predictor_cb<=dc_predictor_reset;
+                        dc_predictor_cr<=dc_predictor_reset;
                         if(!row_has_coded_mb) begin
                             skip_emit_col<=row_covered_count;
                             skip_remaining<=next_col_calc[5:0]-row_covered_count;
@@ -141,6 +145,7 @@
                     row_base_index+{5'd0,skip_emit_col};
                 motion_event_x<=0;
                 motion_event_y<=0;
+                motion_event_intra<=0;
                 if(skip_remaining==1) begin
                     skip_remaining<=0;
                     parser_state<=R_MBTYPE;
@@ -158,11 +163,25 @@
                     current_has_motion<=mbtype_match[3];
                     current_has_pattern<=mbtype_match[2];
                     current_has_quant<=mbtype_match[1];
-                    if(mbtype_match[0]) parser_state<=R_ERROR;
-                    else if(mbtype_match[1]) begin
+                    current_is_intra<=mbtype_match[0];
+                    if(!mbtype_match[0]) begin
+                        dc_predictor_y<=dc_predictor_reset;
+                        dc_predictor_cb<=dc_predictor_reset;
+                        dc_predictor_cr<=dc_predictor_reset;
+                    end
+                    if(mbtype_match[1]) begin
                         qscale_shift<=0;
                         field_bit_count<=0;
                         parser_state<=R_MB_QSCALE;
+                    end else if(mbtype_match[0]) begin
+                        current_motion_x<=0;
+                        current_motion_y<=0;
+                        predictor_x<=0;
+                        predictor_y<=0;
+                        current_cbp<=6'h3f;
+                        current_block_index<=0;
+                        residual_present<=1;
+                        parser_state<=R_BLOCK;
                     end else if(mbtype_match[3]) begin
                         motion_vlc_bits<=0;
                         motion_vlc_len<=0;
@@ -195,7 +214,16 @@
                         if(qscale_next==0) parser_state<=R_ERROR;
                         else begin
                             current_qscale<=qscale_next;
-                            if(current_has_motion) begin
+                            if(current_is_intra) begin
+                                current_motion_x<=0;
+                                current_motion_y<=0;
+                                predictor_x<=0;
+                                predictor_y<=0;
+                                current_cbp<=6'h3f;
+                                current_block_index<=0;
+                                residual_present<=1;
+                                parser_state<=R_BLOCK;
+                            end else if(current_has_motion) begin
                                 motion_vlc_bits<=0;
                                 motion_vlc_len<=0;
                                 parser_state<=R_MOTION_X;
@@ -339,7 +367,8 @@
 
             R_BLOCK: begin
                 if(current_block_index==3'd6) parser_state<=R_MB_DONE;
-                else if(current_cbp[5-current_block_index]) begin
+                else if(current_is_intra ||
+                        current_cbp[5-current_block_index]) begin
                     if(residual_block_count>=MAX_RESIDUAL_BLOCKS) begin
                         parser_state<=R_ERROR;
                     end else begin
@@ -350,15 +379,21 @@
                         residual_block_index_plan[
                             (residual_block_count*3)+:3
                         ]<=current_block_index;
+                        residual_intra_plan[residual_block_count]
+                            <=current_is_intra;
                         residual_qscale_plan[
                             (residual_block_count*5)+:5
                         ]<=current_qscale;
                         residual_block_count<=residual_block_count+1'b1;
-                        qfs_index<=0;
+                        qfs_index<=current_is_intra ? 7'd1 : 7'd0;
                         coeff_vlc_code<=0;
                         coeff_vlc_len<=0;
                         current_block_has_coeff<=0;
-                        parser_state<=R_FIRST_COEFF;
+                        if(current_is_intra) begin
+                            dc_vlc_code<=0;
+                            dc_vlc_len<=0;
+                            parser_state<=R_DC_SIZE;
+                        end else parser_state<=R_FIRST_COEFF;
                     end
                 end else begin
                     current_block_index<=current_block_index+1'b1;

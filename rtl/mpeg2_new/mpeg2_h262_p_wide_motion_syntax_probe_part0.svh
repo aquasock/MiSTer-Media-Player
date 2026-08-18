@@ -23,6 +23,7 @@ module mpeg2_h262_p_wide_motion_syntax_probe
     input  wire        reset,
     input  wire [7:0]  stream_data,
     input  wire        stream_valid,
+    input  wire [1:0]  intra_dc_precision,
 
     output reg         wide_candidate,
     output reg         wide_seen,
@@ -32,6 +33,7 @@ module mpeg2_h262_p_wide_motion_syntax_probe
     output reg [10:0]  motion_event_index,
     output reg signed [7:0] motion_event_x,
     output reg signed [7:0] motion_event_y,
+    output reg         motion_event_intra,
 
     output reg [5:0]   picture_mb_width,
     output reg [5:0]   picture_mb_height,
@@ -39,6 +41,7 @@ module mpeg2_h262_p_wide_motion_syntax_probe
 
     output reg [351:0] residual_mb_plan,
     output reg [95:0]  residual_block_index_plan,
+    output reg [31:0]  residual_intra_plan,
     output reg [5:0]   residual_block_count,
     output reg         residual_present,
     output reg [383:0] residual_coeff_index_plan,
@@ -98,6 +101,7 @@ reg [39:0] pce_shift;
 wire [39:0] pce_next = {pce_shift[31:0], stream_data};
 reg [3:0] p_forward_f_code_horizontal;
 reg [3:0] p_forward_f_code_vertical;
+reg p_intra_vlc_format;
 
 reg [7:0] row_bytes [0:ROW_BUFFER_BYTES-1];
 reg slice_capture;
@@ -135,6 +139,9 @@ localparam [5:0]
     R_STUFF          = 6'd20,
     R_SUCCESS        = 6'd21,
     R_ERROR          = 6'd22;
+localparam [5:0]
+    R_DC_SIZE        = 6'd23,
+    R_DC_DIFF        = 6'd24;
 reg [5:0] parser_state;
 
 reg [2:0] field_bit_count;
@@ -153,6 +160,7 @@ reg [5:0] skip_emit_col, skip_remaining;
 reg [5:0] mbtype_bits;
 reg [2:0] mbtype_len;
 reg current_has_motion, current_has_pattern, current_has_quant;
+reg current_is_intra;
 
 reg signed [7:0] predictor_x, predictor_y;
 reg signed [7:0] current_motion_x, current_motion_y;
@@ -177,7 +185,7 @@ wire [5:0] coeff_vlc_run, coeff_vlc_level;
 
 mpeg2_h262_dct_vlc p_wide_dct_vlc
 (
-    .table_one    (1'b0),
+    .table_one    (current_is_intra && p_intra_vlc_format),
     .vlc_code     (coeff_vlc_code_next),
     .vlc_len      (coeff_vlc_len_next),
     .match        (coeff_vlc_match),
@@ -204,6 +212,35 @@ wire signed [11:0] escape_level_signed = $signed(escape_level_next);
 wire [7:0] escape_target_index =
     {1'b0,qfs_index} + {2'b00,escape_run_shift};
 
+// H.262 7.2.1 / Table 7-2: each slice resets all three intra DC
+// predictors; non-intra and skipped macroblocks reset them again.
+wire [10:0] dc_predictor_reset = 11'd128 << intra_dc_precision;
+reg [10:0] dc_predictor_y, dc_predictor_cb, dc_predictor_cr;
+wire [10:0] dc_predictor_current =
+    (current_block_index < 3'd4) ? dc_predictor_y :
+    (current_block_index == 3'd4) ? dc_predictor_cb : dc_predictor_cr;
+reg [9:0] dc_vlc_code;
+reg [3:0] dc_vlc_len, dc_size, dc_diff_bit_count;
+reg [10:0] dc_diff_shift;
+wire [9:0] dc_vlc_code_next = {dc_vlc_code[8:0],parser_current_bit};
+wire [3:0] dc_vlc_len_next = dc_vlc_len + 4'd1;
+wire [10:0] dc_diff_bits_next = {dc_diff_shift[9:0],parser_current_bit};
+reg dc_size_match;
+reg [3:0] dc_size_value;
+wire [12:0] dc_half_range =
+    (dc_size==0) ? 13'd0 : (13'd1 << (dc_size-1'b1));
+wire [12:0] dc_raw_extended = {2'b00,dc_diff_bits_next};
+wire signed [12:0] dc_diff_decoded =
+    (dc_size==0) ? 13'sd0 :
+    (dc_raw_extended>=dc_half_range) ? $signed(dc_raw_extended) :
+    ($signed(dc_raw_extended)+13'sd1-$signed(dc_half_range<<1));
+wire signed [12:0] dc_coefficient_decoded =
+    $signed({2'b00,dc_predictor_current})+dc_diff_decoded;
+wire [11:0] dc_coefficient_max =
+    (12'd256 << intra_dc_precision)-12'd1;
+wire signed [12:0] dc_coefficient_max_signed =
+    $signed({1'b0,dc_coefficient_max});
+
 wire parser_state_consumes_bit =
     (parser_state == R_H_QSCALE) ||
     (parser_state == R_H_EXTRA_FLAG) ||
@@ -221,6 +258,8 @@ wire parser_state_consumes_bit =
     (parser_state == R_COEFF_SIGN) ||
     (parser_state == R_ESCAPE_RUN) ||
     (parser_state == R_ESCAPE_LEVEL) ||
+    (parser_state == R_DC_SIZE) ||
+    (parser_state == R_DC_DIFF) ||
     (parser_state == R_STUFF);
 wire parser_consume_bit =
     parse_active && parser_state_consumes_bit && !parser_at_end;

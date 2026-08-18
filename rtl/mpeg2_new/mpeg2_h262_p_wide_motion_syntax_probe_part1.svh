@@ -205,6 +205,60 @@ endfunction
 wire [6:0] cbp_match =
     match_cbp_code(cbp_vlc_bits_next,cbp_vlc_len_next);
 
+// H.262 Annex B Tables B.12 and B.13.
+always @* begin
+    dc_size_match=1'b0;
+    dc_size_value=4'd0;
+    if(current_block_index<3'd4) begin
+        case(dc_vlc_len_next)
+        4'd2: case(dc_vlc_code_next[1:0])
+            2'b00:begin dc_size_match=1;dc_size_value=1;end
+            2'b01:begin dc_size_match=1;dc_size_value=2;end
+            default:;
+        endcase
+        4'd3: case(dc_vlc_code_next[2:0])
+            3'b100:begin dc_size_match=1;dc_size_value=0;end
+            3'b101:begin dc_size_match=1;dc_size_value=3;end
+            3'b110:begin dc_size_match=1;dc_size_value=4;end
+            default:;
+        endcase
+        4'd4:if(dc_vlc_code_next[3:0]==4'b1110)begin dc_size_match=1;dc_size_value=5;end
+        4'd5:if(dc_vlc_code_next[4:0]==5'b11110)begin dc_size_match=1;dc_size_value=6;end
+        4'd6:if(dc_vlc_code_next[5:0]==6'b111110)begin dc_size_match=1;dc_size_value=7;end
+        4'd7:if(dc_vlc_code_next[6:0]==7'b1111110)begin dc_size_match=1;dc_size_value=8;end
+        4'd8:if(dc_vlc_code_next[7:0]==8'b11111110)begin dc_size_match=1;dc_size_value=9;end
+        4'd9:case(dc_vlc_code_next[8:0])
+            9'b111111110:begin dc_size_match=1;dc_size_value=10;end
+            9'b111111111:begin dc_size_match=1;dc_size_value=11;end
+            default:;
+        endcase
+        default:;
+        endcase
+    end else begin
+        case(dc_vlc_len_next)
+        4'd2:case(dc_vlc_code_next[1:0])
+            2'b00:begin dc_size_match=1;dc_size_value=0;end
+            2'b01:begin dc_size_match=1;dc_size_value=1;end
+            2'b10:begin dc_size_match=1;dc_size_value=2;end
+            default:;
+        endcase
+        4'd3:if(dc_vlc_code_next[2:0]==3'b110)begin dc_size_match=1;dc_size_value=3;end
+        4'd4:if(dc_vlc_code_next[3:0]==4'b1110)begin dc_size_match=1;dc_size_value=4;end
+        4'd5:if(dc_vlc_code_next[4:0]==5'b11110)begin dc_size_match=1;dc_size_value=5;end
+        4'd6:if(dc_vlc_code_next[5:0]==6'b111110)begin dc_size_match=1;dc_size_value=6;end
+        4'd7:if(dc_vlc_code_next[6:0]==7'b1111110)begin dc_size_match=1;dc_size_value=7;end
+        4'd8:if(dc_vlc_code_next[7:0]==8'b11111110)begin dc_size_match=1;dc_size_value=8;end
+        4'd9:if(dc_vlc_code_next[8:0]==9'b111111110)begin dc_size_match=1;dc_size_value=9;end
+        4'd10:case(dc_vlc_code_next[9:0])
+            10'b1111111110:begin dc_size_match=1;dc_size_value=10;end
+            10'b1111111111:begin dc_size_match=1;dc_size_value=11;end
+            default:;
+        endcase
+        default:;
+        endcase
+    end
+end
+
 task init_row_parser;
     begin
         parse_byte_index<=0;
@@ -226,6 +280,15 @@ task init_row_parser;
         predictor_y<=0;
         current_motion_x<=0;
         current_motion_y<=0;
+        current_is_intra<=0;
+        dc_predictor_y<=dc_predictor_reset;
+        dc_predictor_cb<=dc_predictor_reset;
+        dc_predictor_cr<=dc_predictor_reset;
+        dc_vlc_code<=0;
+        dc_vlc_len<=0;
+        dc_size<=0;
+        dc_diff_shift<=0;
+        dc_diff_bit_count<=0;
         mbtype_bits<=0;
         mbtype_len<=0;
         motion_vlc_bits<=0;
@@ -256,6 +319,7 @@ always @(posedge clk) begin
         pce_shift<=0;
         p_forward_f_code_horizontal<=0;
         p_forward_f_code_vertical<=0;
+        p_intra_vlc_format<=0;
         wide_candidate<=0;
         wide_seen<=0;
         wide_complete_now<=0;
@@ -263,8 +327,10 @@ always @(posedge clk) begin
         motion_event_index<=0;
         motion_event_x<=0;
         motion_event_y<=0;
+        motion_event_intra<=0;
         residual_mb_plan<=0;
         residual_block_index_plan<=0;
+        residual_intra_plan<=0;
         residual_block_count<=0;
         residual_present<=0;
         residual_coeff_index_plan<=0;
@@ -309,6 +375,7 @@ always @(posedge clk) begin
         current_has_motion<=0;
         current_has_pattern<=0;
         current_has_quant<=0;
+        current_is_intra<=0;
         predictor_x<=0;
         predictor_y<=0;
         current_motion_x<=0;
@@ -333,5 +400,14 @@ always @(posedge clk) begin
         escape_run_bit_count<=0;
         escape_level_shift<=0;
         escape_level_bit_count<=0;
+        dc_predictor_y<=11'd128;
+        dc_predictor_cb<=11'd128;
+        dc_predictor_cr<=11'd128;
+        dc_vlc_code<=0;
+        dc_vlc_len<=0;
+        dc_size<=0;
+        dc_diff_shift<=0;
+        dc_diff_bit_count<=0;
     end else begin
         wide_complete_now<=0;
+        motion_event_intra<=0;

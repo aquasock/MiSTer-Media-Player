@@ -192,15 +192,17 @@ endfunction
 
 // kate - Commit 166: no reset loop on this array. Synchronous read plus ordered
 // write/read phases allow Quartus to infer block RAM instead of 1350x16 flops.
-(* ramstyle = "M10K" *) reg [15:0] motion_mem [0:MAX_MB-1];
+(* ramstyle = "M10K" *) reg [16:0] motion_mem [0:MAX_MB-1];
 reg [10:0] motion_count;
-reg [15:0] motion_word;
+reg [16:0] motion_word;
+wire mb_intra=motion_word[16];
 wire signed [7:0] mb_mvx=$signed(motion_word[15:8]);
 wire signed [7:0] mb_mvy=$signed(motion_word[7:0]);
 
 reg signed [15:0] rm [0:2047];
 reg [10:0] desc_mb [0:31];
 reg [2:0] desc_block [0:31];
+reg desc_intra [0:31];
 reg [5:0] desc_count;
 reg [4:0] current_desc_slot;
 reg desc_active;
@@ -281,10 +283,12 @@ wire signed [13:0] src_y_tap_signed=
 wire [11:0] src_x_tap=src_x_tap_signed[11:0];
 wire [11:0] src_y_tap=src_y_tap_signed[11:0];
 
-wire residual_hit=
+wire descriptor_position_hit=
     (exec_desc_slot<desc_count)&&
     (desc_mb[exec_desc_slot[4:0]]==mbi)&&
     (desc_block[exec_desc_slot[4:0]]==blk);
+wire residual_hit=descriptor_position_hit&&
+    (desc_intra[exec_desc_slot[4:0]]==mb_intra);
 wire [10:0] residual_mem_index=
     {exec_desc_slot[4:0],6'b000000}+{5'd0,ei};
 wire signed [15:0] residual_pel=
@@ -325,7 +329,8 @@ wire descriptor_order_error=
 
 wire new_picture_metadata=
     capture_enable&&residual_valid&&!desc_active&&
-    (residual_index==6'h3e)&&persisted_seen&&!active;
+    ((residual_index==6'h3e)||(residual_index==6'h3b))&&
+    persisted_seen&&!active;
 wire unused_shift_map=&{1'b0,shift_right_map};
 
 always @(posedge clk) begin
@@ -376,6 +381,7 @@ always @(posedge clk) begin
         for(i=0;i<32;i=i+1) begin
             desc_mb[i]<=0;
             desc_block[i]<=0;
+            desc_intra[i]<=0;
         end
         for(i=0;i<8;i=i+1)
             resrows[i]<=0;
@@ -385,7 +391,7 @@ always @(posedge clk) begin
             progress_stage<=4'd1;
             metadata_done<=0;
             motion_count<=11'd1;
-            motion_mem[0]<=residual_value;
+            motion_mem[0]<={(residual_index==6'h3b),residual_value};
             desc_count<=0;
             current_desc_slot<=0;
             desc_active<=0;
@@ -423,7 +429,8 @@ always @(posedge clk) begin
                         sample_expected<=sample_expected+1'b1;
                     end
                 end
-            end else if(residual_index==6'h3e) begin
+            end else if((residual_index==6'h3e)||
+                        (residual_index==6'h3b)) begin
                 if(metadata_done ||
                    (desc_count!=0) ||
                    wide_desc_pending ||
@@ -431,7 +438,8 @@ always @(posedge clk) begin
                     error<=1;
                     if(!error) error_source<=5'd2;
                 end else begin
-                    motion_mem[motion_count]<=residual_value;
+                    motion_mem[motion_count]<=
+                        {(residual_index==6'h3b),residual_value};
                     motion_count<=motion_count+1'b1;
                 end
             end else if(residual_index==6'h3c) begin
@@ -450,7 +458,7 @@ always @(posedge clk) begin
                 if(!wide_desc_pending ||
                    metadata_done ||
                    (desc_count>=MAX_BLOCKS) ||
-                   (residual_value[15:3]!=0) ||
+                   (residual_value[15:4]!=0) ||
                    (residual_value[2:0]>=6)) begin
                     error<=1;
                     if(!error) error_source<=5'd4;
@@ -461,6 +469,7 @@ always @(posedge clk) begin
                     current_desc_slot<=desc_count[4:0];
                     desc_mb[desc_count]<=wide_desc_mb;
                     desc_block[desc_count]<=residual_value[2:0];
+                    desc_intra[desc_count]<=residual_value[3];
                     desc_count<=desc_count+1'b1;
                     desc_active<=1;
                     wide_desc_pending<=0;
@@ -485,6 +494,7 @@ always @(posedge clk) begin
                     current_desc_slot<=desc_count[4:0];
                     desc_mb[desc_count]<={5'd0,residual_value[8:3]};
                     desc_block[desc_count]<=residual_value[2:0];
+                    desc_intra[desc_count]<=1'b0;
                     desc_count<=desc_count+1'b1;
                     desc_active<=1;
                     sample_expected<=0;
@@ -561,7 +571,16 @@ always @(posedge clk) begin
             pixel_setup<=0;
             pred_sum<=0;
             tap_index<=0;
-            if(!source_bounds_ok) begin
+            if(mb_intra&&!residual_hit) begin
+                error<=1;
+                if(!error) error_source<=5'd17;
+                active<=0;
+                persisted_seen<=1;
+                timeout<=0;
+            end else if(mb_intra) begin
+                out_reg<=clip(8'd0,residual_pel);
+                emit<=1;
+            end else if(!source_bounds_ok) begin
                 error<=1;
                 if(!error) error_source<=5'd12;
                 active<=0;

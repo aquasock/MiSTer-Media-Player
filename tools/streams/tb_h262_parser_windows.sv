@@ -41,6 +41,7 @@ module tb_h262_parser_windows;
 
     mpeg2_h262_p_wide_motion_syntax_probe p_parser(
         .clk(clk), .reset(reset), .stream_data(stream_data), .stream_valid(stream_valid),
+        .intra_dc_precision(2'd0),
         .wide_candidate(p_candidate), .wide_seen(p_seen), .wide_complete_now(p_complete),
         .motion_event_valid(p_motion_valid), .motion_event_index(p_motion_index),
         .motion_event_x(p_motion_x), .motion_event_y(p_motion_y),

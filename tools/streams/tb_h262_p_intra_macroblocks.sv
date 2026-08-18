@@ -1,0 +1,257 @@
+`timescale 1ns/1ps
+
+module tb_h262_p_intra_macroblocks;
+    localparam integer MAX_STREAM_BYTES=262144;
+    localparam integer INTRA_MB_INDEX=380;
+
+    reg clk=0,reset=1,stream_valid=0;
+    reg [7:0] stream_data=0;
+    reg [7:0] stream_mem[0:MAX_STREAM_BYTES-1];
+    integer stream_len,stream_index,quiet_cycles;
+    integer motion_events=0,intra_motion_events=0,picture_completions=0;
+    integer replay_blocks=0,replay_samples=0,replay_total_samples=0;
+    reg [1:0] replay_state=0;
+    reg [1023:0] hex_path;
+    reg replay_finished=0;
+
+    wire candidate,seen,complete,hold,parser_error;
+    wire motion_valid,motion_intra;
+    wire [10:0] motion_index;
+    wire signed [7:0] motion_x,motion_y;
+    wire [5:0] mb_width,mb_height;
+    wire [10:0] mb_count;
+    wire [351:0] residual_mb;
+    wire [95:0] residual_block;
+    wire [31:0] residual_intra;
+    wire [5:0] residual_count;
+    wire residual_present;
+    wire [383:0] coeff_index;
+    wire [831:0] coeff_value;
+    wire [63:0] coeff_last;
+    wire [6:0] coeff_count;
+    wire [159:0] qscale_plan;
+    wire qtype,alternate;
+
+    wire decision,required,success,replay_active,first_valid;
+    wire signed [15:0] first_value,replay_value;
+    wire replay_valid,residual_error;
+    wire [5:0] replay_index;
+    wire engine_input_valid=motion_valid||replay_valid;
+    wire [5:0] engine_input_index=motion_valid ?
+        (motion_intra?6'h3b:6'h3e) : replay_index;
+    wire signed [15:0] engine_input_value=motion_valid ?
+        $signed({motion_x,motion_y}) : replay_value;
+    wire [7:0] engine_burstcnt,engine_store_value;
+    wire [28:0] engine_addr;
+    wire engine_rd,engine_store_select,engine_store_valid;
+    wire engine_store_start,engine_store_complete,engine_active;
+    wire [11:0] engine_store_x,engine_store_y;
+    wire engine_read_seen,engine_sample_nonzero,engine_half_seen;
+    wire engine_reconstructed_seen,engine_persisted,engine_error;
+    wire [7:0] engine_sample,engine_reconstructed_value,engine_persisted_value;
+    wire [3:0] engine_progress;
+    wire [4:0] engine_error_source;
+    reg [63:0] engine_dout=0;
+    reg engine_dout_ready=0,engine_block_stored=0;
+    integer intra_store_samples=0;
+
+    always #5 clk=~clk;
+
+    mpeg2_h262_p_wide_motion_syntax_probe parser(
+        .clk(clk),.reset(reset),.stream_data(stream_data),
+        .stream_valid(stream_valid),.intra_dc_precision(2'd0),
+        .wide_candidate(candidate),.wide_seen(seen),
+        .wide_complete_now(complete),.motion_event_valid(motion_valid),
+        .motion_event_index(motion_index),.motion_event_x(motion_x),
+        .motion_event_y(motion_y),.motion_event_intra(motion_intra),
+        .picture_mb_width(mb_width),.picture_mb_height(mb_height),
+        .picture_mb_count(mb_count),.residual_mb_plan(residual_mb),
+        .residual_block_index_plan(residual_block),
+        .residual_intra_plan(residual_intra),
+        .residual_block_count(residual_count),
+        .residual_present(residual_present),
+        .residual_coeff_index_plan(coeff_index),
+        .residual_coeff_value_plan(coeff_value),
+        .residual_coeff_last_plan(coeff_last),
+        .residual_coeff_count(coeff_count),.residual_qscale_plan(qscale_plan),
+        .q_scale_type(qtype),.alternate_scan(alternate),
+        .parse_hold(hold),.probe_error(parser_error)
+    );
+
+    mpeg2_h262_p_residual_probe residual_pipeline(
+        .clk(clk),.reset(reset),.stream_data(stream_data),
+        .stream_valid(stream_valid),.p_picture_expected(1'b0),
+        .general_mode(1'b0),.general_picture_complete(1'b0),
+        .general_motion_x_plan(384'd0),.general_motion_y_plan(384'd0),
+        .general_residual_block_plan(288'd0),
+        .general_residual_block_count(5'd0),
+        .general_coeff_index_plan(384'd0),
+        .general_coeff_value_plan(832'd0),.general_coeff_last_plan(64'd0),
+        .general_coeff_count(7'd0),.general_qscale_plan(80'd0),
+        .general_q_scale_type(1'b0),.general_alternate_scan(1'b0),
+        .wide_mode(candidate||seen),.wide_picture_complete(complete),
+        .wide_residual_mb_plan(residual_mb),
+        .wide_residual_block_index_plan(residual_block),
+        .wide_residual_intra_plan(residual_intra),
+        .wide_residual_block_count(residual_count),
+        .wide_coeff_index_plan(coeff_index),.wide_coeff_value_plan(coeff_value),
+        .wide_coeff_last_plan(coeff_last),.wide_coeff_count(coeff_count),
+        .wide_qscale_plan(qscale_plan),.wide_q_scale_type(qtype),
+        .wide_alternate_scan(alternate),.wide_intra_dc_precision(2'd0),
+        .decision_complete(decision),.residual_required(required),
+        .residual_success(success),.mixed_replay_active(replay_active),
+        .first_sample_valid(first_valid),.first_sample_value(first_value),
+        .residual_sample_valid(replay_valid),.residual_sample_index(replay_index),
+        .residual_sample_value(replay_value),.probe_error(residual_error)
+    );
+
+    mpeg2_h262_p_motion_residual_raster_engine raster_engine(
+        .clk(clk),.reset(reset),.capture_enable(candidate||seen),
+        .request(candidate||seen),.horizontal_size(14'd720),
+        .vertical_size(14'd480),.shift_right_map(48'd0),
+        .residual_valid(engine_input_valid),.residual_index(engine_input_index),
+        .residual_value(engine_input_value),.reference_valid(1'b1),
+        .reference_bank(1'b0),.destination_bank(1'b1),
+        .store_block_stored(engine_block_stored),.ddram_busy(1'b0),
+        .ddram_dout(engine_dout),.ddram_dout_ready(engine_dout_ready),
+        .ddram_burstcnt(engine_burstcnt),.ddram_addr(engine_addr),
+        .ddram_rd(engine_rd),.store_select(engine_store_select),
+        .store_pixel_value(engine_store_value),.store_pixel_x(engine_store_x),
+        .store_pixel_y(engine_store_y),.store_pixel_valid(engine_store_valid),
+        .store_block_start(engine_store_start),
+        .store_block_complete(engine_store_complete),.active(engine_active),
+        .read_seen(engine_read_seen),.sample_value(engine_sample),
+        .sample_nonzero(engine_sample_nonzero),.half_sample_seen(engine_half_seen),
+        .reconstructed_seen(engine_reconstructed_seen),
+        .reconstructed_value(engine_reconstructed_value),
+        .persisted_seen(engine_persisted),.persisted_value(engine_persisted_value),
+        .progress_stage(engine_progress),.error(engine_error),
+        .error_source(engine_error_source)
+    );
+
+    initial begin
+        if(!$value$plusargs("HEX=%s",hex_path)) $fatal(1,"missing +HEX");
+        if(!$value$plusargs("LEN=%d",stream_len)) $fatal(1,"missing +LEN");
+        if(stream_len<=0||stream_len>MAX_STREAM_BYTES) $fatal(1,"invalid LEN");
+        $readmemh(hex_path,stream_mem,0,stream_len-1);
+        stream_index=0;quiet_cycles=0;
+        repeat(5) @(posedge clk);
+        reset<=0;
+    end
+
+    always @(negedge clk) begin
+        if(reset) begin stream_valid<=0;stream_data<=0;end
+        else if(stream_index<stream_len) begin
+            if(!hold) begin
+                stream_data<=stream_mem[stream_index];
+                stream_valid<=1;
+                stream_index<=stream_index+1;
+            end else stream_valid<=0;
+        end else begin
+            stream_valid<=0;
+            if(replay_finished&&engine_persisted&&!hold&&!replay_active)
+                quiet_cycles<=quiet_cycles+1;
+            else quiet_cycles<=0;
+            if(quiet_cycles==100) begin
+                $display("RESULT seen=%0d parser_error=%0d residual_error=%0d motion=%0d intra_motion=%0d blocks=%0d samples=%0d",
+                         seen,parser_error,residual_error,motion_events,
+                         intra_motion_events,replay_blocks,replay_total_samples);
+                $display("RESIDUAL_DETAIL g_error=%0d non_intra=%0d iq=%0d idct=%0d matrix=%0d",
+                         residual_pipeline.g_error,residual_pipeline.terr,
+                         residual_pipeline.intra_iq_error,
+                         residual_pipeline.intra_idct_error,
+                         residual_pipeline.intra_matrix_unsupported);
+                if(!seen||parser_error||residual_error||picture_completions!=1||
+                   motion_events!=1350||intra_motion_events!=1||
+                   replay_blocks!=6||replay_total_samples!=384||!replay_finished||
+                   !decision||!required||!success||engine_error||
+                   !engine_read_seen||!engine_reconstructed_seen||
+                   intra_store_samples!=384)
+                    $fatal(1,"P intra-macroblock regression failed");
+                $finish;
+            end
+        end
+    end
+
+    always @(posedge clk) begin
+        engine_dout_ready<=0;
+        engine_block_stored<=engine_store_complete;
+        if(engine_rd) begin
+            engine_dout_ready<=1;
+            if(raster_engine.req_kind)
+                engine_dout<=raster_engine.resrows[raster_engine.verify_row];
+            else begin
+                engine_dout<={8{8'd50}};
+                if(raster_engine.mbi==INTRA_MB_INDEX)
+                    $fatal(1,"intra macroblock issued a reference read");
+            end
+        end
+        if(engine_store_valid&&raster_engine.mbi==INTRA_MB_INDEX) begin
+            intra_store_samples<=intra_store_samples+1;
+            if(raster_engine.blk<4) begin
+                if(engine_store_value<8'd95||engine_store_value>8'd97)
+                    $fatal(1,"bad raster luma intra sample");
+            end else if(engine_store_value<8'd127||engine_store_value>8'd129)
+                $fatal(1,"bad raster chroma intra sample");
+        end
+        if(motion_valid) begin
+            if(motion_index!=motion_events[10:0])
+                $fatal(1,"motion order %0d != %0d",motion_index,motion_events);
+            motion_events<=motion_events+1;
+            if(motion_intra) begin
+                intra_motion_events<=intra_motion_events+1;
+                if(motion_index!=INTRA_MB_INDEX||motion_x!=0||motion_y!=0)
+                    $fatal(1,"bad intra motion event");
+            end
+        end
+        if(complete) begin
+            picture_completions<=picture_completions+1;
+            if(mb_width!=45||mb_height!=30||mb_count!=1350||
+               residual_count!=6||coeff_count!=6||
+               residual_intra[5:0]!=6'b111111)
+                $fatal(1,"bad completed P intra plans");
+        end
+
+        if(replay_valid) begin
+            case(replay_state)
+            0: begin
+                if(replay_index==6'h3f&&replay_value==16'shA2FF) begin
+                    replay_finished<=1;
+                end else begin
+                    if(replay_index!=6'h3c||replay_value!=INTRA_MB_INDEX)
+                        $fatal(1,"bad descriptor MB header");
+                    replay_state<=1;
+                end
+            end
+            1: begin
+                if(replay_index!=6'h3d||!replay_value[3]||
+                   replay_value[2:0]!=replay_blocks[2:0])
+                    $fatal(1,"bad intra descriptor block");
+                replay_state<=2;
+                replay_samples<=0;
+            end
+            2: begin
+                replay_total_samples<=replay_total_samples+1;
+                if(replay_index!=replay_samples[5:0])
+                    $fatal(1,"bad sample order");
+                if(replay_blocks<4) begin
+                    if(replay_value<16'sd95||replay_value>16'sd97)
+                        $fatal(1,"bad luma intra sample %0d",replay_value);
+                end else if(replay_value<16'sd127||replay_value>16'sd129)
+                    $fatal(1,"bad chroma intra sample %0d",replay_value);
+                if(replay_samples==63) begin
+                    replay_blocks<=replay_blocks+1;
+                    replay_samples<=replay_samples+1;
+                    replay_state<=0;
+                end else replay_samples<=replay_samples+1;
+            end
+            default:$fatal(1,"bad replay state");
+            endcase
+        end
+    end
+
+    initial begin
+        repeat(30000000) @(posedge clk);
+        $fatal(1,"P intra-macroblock regression timed out");
+    end
+endmodule

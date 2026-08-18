@@ -1,3 +1,73 @@
+            R_DC_SIZE: begin
+                if(parser_at_end) parser_state<=R_ERROR;
+                else if(dc_size_match) begin
+                    dc_size<=dc_size_value;
+                    dc_vlc_code<=0;
+                    dc_vlc_len<=0;
+                    if(dc_size_value==0) begin
+                        if(residual_coeff_count>=MAX_COEFF_EVENTS)
+                            parser_state<=R_ERROR;
+                        else begin
+                            residual_coeff_index_plan[
+                                (residual_coeff_count*6)+:6
+                            ]<=6'd0;
+                            residual_coeff_value_plan[
+                                (residual_coeff_count*13)+:13
+                            ]<=$signed({2'b00,dc_predictor_current});
+                            residual_coeff_count<=residual_coeff_count+1'b1;
+                            qfs_index<=7'd1;
+                            current_block_has_coeff<=1;
+                            coeff_vlc_code<=0;
+                            coeff_vlc_len<=0;
+                            parser_state<=R_COEFF_VLC;
+                        end
+                    end else begin
+                        dc_diff_shift<=0;
+                        dc_diff_bit_count<=0;
+                        parser_state<=R_DC_DIFF;
+                    end
+                end else if(dc_vlc_len_next>=
+                            ((current_block_index<4)?4'd9:4'd10))
+                    parser_state<=R_ERROR;
+                else begin
+                    dc_vlc_code<=dc_vlc_code_next;
+                    dc_vlc_len<=dc_vlc_len_next;
+                end
+            end
+
+            R_DC_DIFF: begin
+                if(parser_at_end) parser_state<=R_ERROR;
+                else begin
+                    dc_diff_shift<=dc_diff_bits_next;
+                    if(dc_diff_bit_count==(dc_size-1'b1)) begin
+                        if((dc_coefficient_decoded<0) ||
+                           (dc_coefficient_decoded>
+                            dc_coefficient_max_signed) ||
+                           (residual_coeff_count>=MAX_COEFF_EVENTS)) begin
+                            parser_state<=R_ERROR;
+                        end else begin
+                            if(current_block_index<4)
+                                dc_predictor_y<=dc_coefficient_decoded[10:0];
+                            else if(current_block_index==4)
+                                dc_predictor_cb<=dc_coefficient_decoded[10:0];
+                            else
+                                dc_predictor_cr<=dc_coefficient_decoded[10:0];
+                            residual_coeff_index_plan[
+                                (residual_coeff_count*6)+:6
+                            ]<=6'd0;
+                            residual_coeff_value_plan[
+                                (residual_coeff_count*13)+:13
+                            ]<=dc_coefficient_decoded;
+                            residual_coeff_count<=residual_coeff_count+1'b1;
+                            qfs_index<=7'd1;
+                            current_block_has_coeff<=1;
+                            coeff_vlc_code<=0;
+                            coeff_vlc_len<=0;
+                            parser_state<=R_COEFF_VLC;
+                        end
+                    end else dc_diff_bit_count<=dc_diff_bit_count+1'b1;
+                end
+            end
 
             R_COEFF_VLC: begin
                 if(parser_at_end) parser_state<=R_ERROR;
@@ -108,6 +178,7 @@
                 motion_event_index<=current_mb_index;
                 motion_event_x<=current_motion_x;
                 motion_event_y<=current_motion_y;
+                motion_event_intra<=current_is_intra;
                 if(current_has_motion) begin
                     predictor_x<=current_motion_x;
                     predictor_y<=current_motion_y;
@@ -244,6 +315,7 @@
                         picture_mb_count<=0;
                         residual_mb_plan<=0;
                         residual_block_index_plan<=0;
+                        residual_intra_plan<=0;
                         residual_block_count<=0;
                         residual_present<=0;
                         residual_coeff_index_plan<=0;
@@ -278,6 +350,7 @@
                     pce_count<=0;
                     q_scale_type<=pce_next[12];
                     alternate_scan<=pce_next[10];
+                    p_intra_vlc_format<=pce_next[11];
                     p_forward_f_code_horizontal<=pce_next[35:32];
                     p_forward_f_code_vertical<=pce_next[31:28];
                     wide_candidate<=
