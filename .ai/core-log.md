@@ -1,37 +1,5 @@
 
 ---
-## 185 COMMIT Unreleased d5e5f62 2026-08-17T06:31:10-07:00
-
-#### Coming From:
-
-Unreleased 4f1c057
-
-#### Purpose:
-
-Localize the generalized P raster transaction stage that prevents parsed P pictures from reaching publication.
-
-#### Outcome:
-
-Commit `d5e5f62` adds a monotonic seven-stage trace to the compiled generalized P raster engine and reports its terminal stage on LED_DISK only when the existing diagnostic identifies missing P publication. Simulation verifies admission, execution, reference-read, reconstruction, DDR-store acknowledgement, verification-readback, and persistence codes in order. The clean Quartus 17.0.2 build closes with zero setup TNS, +0.533 ns global setup, +1.978 ns decoder setup, 30,071 ALMs, and 40,713 registers; decoder, storage, publication, and presentation behavior are unchanged.
-
-#### Next Steps:
-
-Run `test_p_motion_residual.m2v` and `test_p_visual_discriminator.m2v`, recording USER, POWER, and DISK for each. DISK codes 1 through 7 name the deepest completed raster stage; code 7 with POWER 4 isolates the loss after persistence export, while any lower code identifies the stalled engine boundary. Confirm separately whether the discriminator image still lacks the center quadrant seams.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_04.svh
-- MediaPlayer_top_07.svh
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
 ## 186 COMMIT Unreleased 12b22cd 2026-08-17T06:58:32-07:00
 
 #### Coming From:
@@ -1284,6 +1252,35 @@ None.
 #### Status:
 
 - [x] Built
+- [ ] Passed
+
+---
+## 225 COMMIT Unreleased ??? 2026-08-18T13:46:18-07:00
+
+#### Coming From:
+
+Unreleased bbe625e
+
+#### Purpose:
+
+Prevent a newly published future reference from being displayed before the following picture header assigns B-reorder ownership.
+
+#### Outcome:
+
+Retain each ordinary reference publication as pending and make it ineligible for a display swap until a following accepted non-B header or terminal sequence boundary releases it. If the following header is B, transfer ownership directly into the existing two-scratch reorder transaction and discard the ordinary pending presentation, so even a publication pulse coincident with vblank cannot expose the future reference early. Preserve the current B decode, scratch ordering, compressed-input hold, destination ownership, and fatal fail-open rules.
+
+#### Next Steps:
+
+Extend the focused scheduler test with the exact simultaneous publication and vblank event followed by two B pictures, require that the future reference remain hidden until both scratches have displayed, and cover the no-B and terminal-boundary release paths. Rerun the presentation, fail-open transport, live-raster, and dense long-GOP regressions, then use the session-authorized incremental Quartus build, timing audit, deployment, and FTP readback before requesting another hardware run.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+
+#### Status:
+
+- [ ] Built
 - [ ] Passed
 
 ---
