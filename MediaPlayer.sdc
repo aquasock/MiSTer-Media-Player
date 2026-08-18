@@ -96,7 +96,7 @@ set_false_path \
 # reset_mpeg2_sync boundary above.  Do not cut the stage-to-stage release paths
 # or any other 54 MHz -> 40 MHz logic.
 set_false_path \
-    -from [get_keepers {*|mpeg2_new_framebuffer_swap_reset_count[*]}] \
+    -from [get_keepers {*|mpeg2_h262_b_presentation_scheduler:*|framebuffer_swap_reset_count[*]}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|rd_reset_sync[*]}]
 
 # Intel documents these first-stage DCFIFO ACLR exceptions when both
