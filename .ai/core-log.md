@@ -1,37 +1,5 @@
 
 ---
-## 187 COMMIT Unreleased 92546f5 2026-08-17T07:21:08-07:00
-
-#### Coming From:
-
-Unreleased 12b22cd
-
-#### Purpose:
-
-Remove the two diagnosed wide-P parser limits blocking leading skipped macroblocks and the validated 19-block residual transaction.
-
-#### Outcome:
-
-Commit `92546f5` permits a P slice's first macroblock address increment to establish leading skipped macroblocks through the existing zero-motion skip path, and widens residual descriptor transport and raster storage from 16 to 32 entries. Exact compiled-controller replay completes the MBA-escape, motion-residual, and visual-discriminator streams without a wide-parser error; MBA-escape emits exactly 1,350 motion words, and the residual transaction carries all 19 descriptors. The dedicated raster-capacity simulation passes with 19 descriptors, 1,350 motion words, and an accepted terminator. The clean Quartus 17.0.2 build closes with zero setup TNS, +0.045 ns global setup, +2.133 ns decoder setup, 30,928 ALMs, 41,745 registers, and no Critical Warning.
-
-#### Next Steps:
-
-Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_p_visual_discriminator.m2v` on hardware. Record USER, POWER, and DISK after the initial shared blink, and confirm that the visual discriminator still displays the center quadrant seams. Clean acceptance of both formerly blocked streams and preserved discriminator seams will pass this boundary.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
-- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
 ## 188 COMMIT Unreleased dbc3000 2026-08-17T07:44:50-07:00
 
 #### Coming From:
@@ -1281,6 +1249,35 @@ None.
 #### Status:
 
 - [x] Built
+- [ ] Passed
+
+---
+## 227 COMMIT Unreleased ??? 2026-08-18T14:17:11-07:00
+
+#### Coming From:
+
+Unreleased 1b26cb5
+
+#### Purpose:
+
+Acquire a B run's future-reference bank correctly when its header and the reference publication cross the same registered handoff.
+
+#### Outcome:
+
+Extend the Entry 225 scheduler barrier with an explicit future-reference-pending state. A B header may open its decode and reorder transaction before the new reference bank is registered; a simultaneous publication supplies `completed_frame_bank` directly, an earlier publication supplies the locked ordinary pending bank, and a later publication binds the completed bank into the already-open B run instead of entering ordinary display. Defer the already-displayed conflict decision while that future reference is pending, but retain scratch ownership checks, ordered B presentation, terminal release, destination ownership, and fatal fail-open behavior.
+
+#### Next Steps:
+
+Prove B-header ordering before, simultaneous with, and after publication in the focused scheduler regression, including the frame-47 stale-bank case, and retain the ordinary non-B, terminal-boundary, two-scratch, and abort-recovery cases. Rerun transport, live-raster, and dense long-GOP regressions, then perform the session-authorized incremental Quartus build, timing audit, deployment, and byte-identical FTP readback before another hardware run.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+
+#### Status:
+
+- [ ] Built
 - [ ] Passed
 
 ---
