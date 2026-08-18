@@ -489,3 +489,39 @@ Run the parser-window stream, Commit-197 multi-slice stream, and authoritative s
 - [ ] Passed
 
 ---
+## 199 COMMIT Unreleased ??? 2026-08-17T22:13:12-07:00
+
+#### Coming From:
+
+Unreleased 6c6854c
+
+#### Purpose:
+
+Identify the first prediction-pipeline assertion raised by legal same-row P/B slice partitions without changing decoder behavior.
+
+#### Outcome:
+
+This commit will preserve USER error class 3 while snapshotting the responsible prediction engine and its first internal assertion into the existing non-overlapping POWER and DISK diagnostic windows. The accepted parser-window result and visually coherent restricted-slices raster will remain unchanged, and no parsing, reconstruction, reference, DDR, publication, or presentation control will depend on the new observability signals.
+
+#### Next Steps:
+
+Add focused replay for prediction-error source capture, rerun the parser-window and restricted-slices parser regressions, complete a clean Quartus 17.0.2 build with zero TNS and no Critical Warning, and rerun only the restricted-slices stream on MiSTer to record USER, POWER, and DISK across one complete diagnostic frame.
+
+#### Files Modified:
+
+- MediaPlayer_top_02.svh
+- MediaPlayer_top_04.svh
+- MediaPlayer_top_07.svh
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- tools/streams/tb_h262_prediction_error_sources.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
