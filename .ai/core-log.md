@@ -728,3 +728,32 @@ Install the Commit-204 RBF and run `test_compat_dense_residual.m2v`, `test_p_res
 - [ ] Passed
 
 ---
+## 205 COMMIT Unreleased ??? 2026-08-18T03:26:00-07:00
+
+#### Coming From:
+
+Unreleased 7256a7f
+
+#### Purpose:
+
+Guarantee that any B parser or reconstruction failure aborts the in-flight B transaction and releases compressed-stream backpressure.
+
+#### Outcome:
+
+Commit `7256a7f` is not hardware accepted: `test_compat_dense_residual.m2v` displays its coherent dense I/P raster but leaves the MiSTer file-transfer overlay permanently active with all diagnostic LEDs dark. The 2,875,981-byte file is far below the 27-bit transfer-address limit, the first dense B full-raster replay completes 1,350 macroblocks, 8,073 residual blocks, 516,672 residual samples, and 518,400 stored samples without raster error, and a complete parser replay identifies the first deterministic fault in the second consecutive B picture at byte 818,621, slice row 9. This commit will make every B failure terminate the active transaction, preserve the first error for diagnostics, and keep the loader draining instead of allowing an internal decoder failure to wedge `ioctl_wait`.
+
+#### Next Steps:
+
+Add a full-corpus transport-recovery regression that injects and observes the second-B parser failure, prove that stream readiness recovers and every remaining byte is accepted, and retain all existing single-B parser, transform, raster, publication, and presentation results before addressing the repeated-B syntax and lifecycle fault in the following commit.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+- tools/streams/tb_h262_dense_transport_recovery.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
