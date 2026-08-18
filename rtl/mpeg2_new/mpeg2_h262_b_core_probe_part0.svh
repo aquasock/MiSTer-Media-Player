@@ -60,16 +60,18 @@ localparam integer MAX_COEFF_EVENTS = 32768;
 // Commit 203: each block descriptor carries the exclusive coefficient end
 // pointer, eliminating a separate last-flag RAM.  Neither capacity is an
 // H.262 syntax limit.
-(* ramstyle = "M10K" *) reg [34:0] residual_block_mem [0:2047];
+(* ramstyle = "M10K" *) reg [35:0] residual_block_mem [0:2047];
 (* ramstyle = "M10K" *) reg [18:0] residual_coeff_mem [0:32767];
-reg [34:0] residual_block_word;
+reg [35:0] residual_block_word;
 reg [18:0] residual_coeff_word;
 reg [11:0] residual_count;
 reg [15:0] residual_coeff_count;
 reg [10:0] pending_residual_mb;
 reg [2:0] pending_residual_block;
 reg [4:0] pending_residual_qscale;
-reg q_scale_type, alternate_scan;
+reg pending_residual_intra;
+reg q_scale_type, alternate_scan, b_intra_vlc_format;
+reg [1:0] b_intra_dc_precision;
 
 reg parser_error, replay_error, prior_error;
 assign probe_error = prior_error | parser_error | replay_error;
@@ -118,7 +120,8 @@ localparam [5:0]
     S_CBP=13,S_BLOCK=14,S_FIRST_COEFF=15,S_COEFF_VLC=16,
     S_COEFF_SIGN=17,S_ESCAPE_RUN=18,S_ESCAPE_LEVEL=19,
     S_MB_DONE=20,S_STUFF=21,S_SUCCESS=22,S_ERROR=23,
-    S_SKIP_A=24,S_SKIP_B=25,S_GEOMETRY=26,S_MB_B=27,S_MBA_APPLY=28;
+    S_SKIP_A=24,S_SKIP_B=25,S_GEOMETRY=26,S_MB_B=27,S_MBA_APPLY=28,
+    S_MB_QSCALE=29,S_DC_SIZE=30,S_DC_DIFF=31;
 reg [5:0] state;
 
 reg [2:0] field_bit_count; reg [4:0] qscale_shift,current_qscale; reg [3:0] extra_info_count;
@@ -204,7 +207,8 @@ wire [7:0] mba_target_col_q={2'b00,current_col}+mba_increment_total_q-8'd1;
 wire [7:0] mba_escape_accum_next_q={1'b0,mba_escape_accum}+8'd33;
 wire [7:0] mba_escape_min_target_q={2'b00,current_col}+mba_escape_accum_next_q;
 
-reg [3:0] mbtype_bits; reg [2:0] mbtype_len; reg [1:0] current_direction,last_direction; reg current_pattern;
+reg [5:0] mbtype_bits; reg [2:0] mbtype_len; reg [1:0] current_direction,last_direction;
+reg current_pattern,current_intra,current_quant;
 reg signed [7:0] fpx,fpy,bpx,bpy,cur_fx,cur_fy,cur_bx,cur_by;
 reg signed [5:0] motion_code_pending; reg [10:0] motion_bits; reg [3:0] motion_len;
 reg [2:0] motion_residual_shift; reg [1:0] motion_residual_count;

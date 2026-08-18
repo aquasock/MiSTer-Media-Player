@@ -10,10 +10,11 @@
 // readback before persisted_seen.
 //
 // Sideband protocol:
+//   0x37:           intra macroblock marker (reference bypass)
 //   0x38/0x39/0x3a: first motion word, forward/backward/interpolated direction
 //   0x3c:           geometry {4'b0, mb_width[5:0], mb_height[5:0]}
 //   0x3b:           second motion word, backward vector
-//   0x3f, 11xxxxxxxxxxxbbb: residual descriptor (11-bit MB + block)
+//   0x3f, 1ixxxxxxxxxxxbbb: block descriptor (i=intra, 11-bit MB + block)
 //   0x00..0x3f:     64 signed residual samples after a descriptor
 //   0x3f, A3FE:     intermediate-row metadata terminator
 //   0x3f, A3FF:     metadata terminator

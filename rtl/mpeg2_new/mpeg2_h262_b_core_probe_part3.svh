@@ -6,20 +6,61 @@
 endfunction
 wire [6:0] cbp_match=match_cbp_code(cbp_bits_next,cbp_len_next);
 
+always @* begin
+    dc_size_match=1'b0;dc_size_value=4'd0;
+    if(current_block_index<3'd4) begin
+        case(dc_vlc_len_next)
+        2:case(dc_vlc_code_next[1:0])
+            2'b00:begin dc_size_match=1;dc_size_value=1;end
+            2'b01:begin dc_size_match=1;dc_size_value=2;end default:;endcase
+        3:case(dc_vlc_code_next[2:0])
+            3'b100:begin dc_size_match=1;dc_size_value=0;end
+            3'b101:begin dc_size_match=1;dc_size_value=3;end
+            3'b110:begin dc_size_match=1;dc_size_value=4;end default:;endcase
+        4:if(dc_vlc_code_next[3:0]==4'b1110)begin dc_size_match=1;dc_size_value=5;end
+        5:if(dc_vlc_code_next[4:0]==5'b11110)begin dc_size_match=1;dc_size_value=6;end
+        6:if(dc_vlc_code_next[5:0]==6'b111110)begin dc_size_match=1;dc_size_value=7;end
+        7:if(dc_vlc_code_next[6:0]==7'b1111110)begin dc_size_match=1;dc_size_value=8;end
+        8:if(dc_vlc_code_next[7:0]==8'b11111110)begin dc_size_match=1;dc_size_value=9;end
+        9:case(dc_vlc_code_next[8:0])
+            9'b111111110:begin dc_size_match=1;dc_size_value=10;end
+            9'b111111111:begin dc_size_match=1;dc_size_value=11;end default:;endcase
+        default:;endcase
+    end else begin
+        case(dc_vlc_len_next)
+        2:case(dc_vlc_code_next[1:0])
+            2'b00:begin dc_size_match=1;dc_size_value=0;end
+            2'b01:begin dc_size_match=1;dc_size_value=1;end
+            2'b10:begin dc_size_match=1;dc_size_value=2;end default:;endcase
+        3:if(dc_vlc_code_next[2:0]==3'b110)begin dc_size_match=1;dc_size_value=3;end
+        4:if(dc_vlc_code_next[3:0]==4'b1110)begin dc_size_match=1;dc_size_value=4;end
+        5:if(dc_vlc_code_next[4:0]==5'b11110)begin dc_size_match=1;dc_size_value=5;end
+        6:if(dc_vlc_code_next[5:0]==6'b111110)begin dc_size_match=1;dc_size_value=6;end
+        7:if(dc_vlc_code_next[6:0]==7'b1111110)begin dc_size_match=1;dc_size_value=7;end
+        8:if(dc_vlc_code_next[7:0]==8'b11111110)begin dc_size_match=1;dc_size_value=8;end
+        9:if(dc_vlc_code_next[8:0]==9'b111111110)begin dc_size_match=1;dc_size_value=9;end
+        10:case(dc_vlc_code_next[9:0])
+            10'b1111111110:begin dc_size_match=1;dc_size_value=10;end
+            10'b1111111111:begin dc_size_match=1;dc_size_value=11;end default:;endcase
+        default:;endcase
+    end
+end
+
 wire parser_consumes_bit=(state==S_QSCALE)||(state==S_EXTRA_FLAG)||(state==S_EXTRA_INFO)||(state==S_MBA)||
     (state==S_MBTYPE)||(state==S_FX)||(state==S_FX_RES)||(state==S_FY)||(state==S_FY_RES)||
     (state==S_BX)||(state==S_BX_RES)||(state==S_BY)||(state==S_BY_RES)||(state==S_CBP)||
     (state==S_FIRST_COEFF)||(state==S_COEFF_VLC)||(state==S_COEFF_SIGN)||(state==S_ESCAPE_RUN)||
-    (state==S_ESCAPE_LEVEL)||(state==S_STUFF);
+    (state==S_ESCAPE_LEVEL)||(state==S_STUFF)||(state==S_MB_QSCALE)||
+    (state==S_DC_SIZE)||(state==S_DC_DIFF);
 wire consume_bit=parse_active&&parser_consumes_bit&&!parser_at_end;
 
-reg t_start,t_we,t_end; reg [5:0] t_widx; reg signed [12:0] t_wval; reg [4:0] t_qscale;
+reg t_start,t_we,t_end,t_intra; reg [5:0] t_widx; reg signed [12:0] t_wval; reg [4:0] t_qscale;
 wire t_done,t_first_valid,t_valid,t_error; wire signed [15:0] t_first_value,t_value; wire [1:0] t_unused_block; wire [5:0] t_index;
 mpeg2_h262_p_non_intra_transform b_transform(
     .clk(clk),.reset(reset),.qfs_block_index(2'd1),.qfs_block_start(t_start),.qfs_write_en(t_we),
     .qfs_write_index(t_widx),.qfs_write_value(t_wval),.qfs_block_end(t_end),
     .quantiser_scale_code(t_qscale),.q_scale_type(q_scale_type),.alternate_scan(alternate_scan),
-    .intra_block(1'b0),.intra_dc_precision(2'd0),
+    .intra_block(t_intra),.intra_dc_precision(b_intra_dc_precision),
     .block_done(t_done),.first_sample_valid(t_first_valid),.first_sample_value(t_first_value),
     .residual_sample_valid(t_valid),.residual_sample_block_index(t_unused_block),
     .residual_sample_index(t_index),.residual_sample_value(t_value),.probe_error(t_error));
@@ -30,6 +71,7 @@ reg [15:0] t_coeff_read_index,block_coeff_end;
 reg [11:0] transform_slot;
 reg [10:0] transform_mb;
 reg [2:0] transform_block;
+reg transform_intra;
 localparam [3:0]
     R_IDLE=0,R_BLOCK_WAIT=1,R_BLOCK_CAPTURE=2,R_TSTART=3,
     R_TWRITE=4,R_COEFF_WAIT=5,R_TEND=6,R_TWAIT=7,
@@ -62,14 +104,15 @@ always @(posedge clk) begin
         parse_hold<=0;parser_error<=0;replay_error<=0;prior_error<=0;slice_capture<=0;slice_parser_started<=0;chunk_boundary_known<=0;slice_row_number<=0;row_byte_count<=0;row_base_index<=0;row_covered_count<=0;
         parse_active<=0;proof_done<=0;boundary_final<=0;row_waiting<=0;replay_row_final<=0;parse_byte_limit<=0;parse_byte_index<=0;parse_bit_index<=7;
         state<=S_QSCALE;field_bit_count<=0;qscale_shift<=0;current_qscale<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;skip_remaining<=0;geometry_sent<=0;
-        mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;mba_symbol_escape_q<=0;mba_symbol_value_q<=0;mbtype_bits<=0;mbtype_len<=0;current_direction<=0;last_direction<=0;current_pattern<=0;
+        mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;mba_symbol_escape_q<=0;mba_symbol_value_q<=0;mbtype_bits<=0;mbtype_len<=0;current_direction<=0;last_direction<=0;current_pattern<=0;current_intra<=0;current_quant<=0;
         fpx<=0;fpy<=0;bpx<=0;bpy<=0;cur_fx<=0;cur_fy<=0;cur_bx<=0;cur_by<=0;
         motion_code_pending<=0;motion_bits<=0;motion_len<=0;motion_residual_shift<=0;motion_residual_count<=0;
         cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
         qfs_index<=0;coeff_run_pending<=0;coeff_level_pending<=0;current_block_has_coeff<=0;
         escape_run_shift<=0;escape_run_bit_count<=0;escape_level_shift<=0;escape_level_bit_count<=0;
-        residual_count<=0;residual_coeff_count<=0;pending_residual_mb<=0;pending_residual_block<=0;pending_residual_qscale<=0;q_scale_type<=0;alternate_scan<=0;
-        t_start<=0;t_we<=0;t_end<=0;t_widx<=0;t_wval<=0;t_qscale<=0;t_sample_count<=0;t_coeff_read_index<=0;block_coeff_end<=0;transform_slot<=0;transform_mb<=0;transform_block<=0;
+        residual_count<=0;residual_coeff_count<=0;pending_residual_mb<=0;pending_residual_block<=0;pending_residual_qscale<=0;pending_residual_intra<=0;q_scale_type<=0;alternate_scan<=0;b_intra_vlc_format<=0;b_intra_dc_precision<=0;
+        dc_predictor_y<=11'd128;dc_predictor_cb<=11'd128;dc_predictor_cr<=11'd128;dc_vlc_code<=0;dc_vlc_len<=0;dc_size<=0;dc_diff_bit_count<=0;dc_diff_shift<=0;
+        t_start<=0;t_we<=0;t_end<=0;t_intra<=0;t_widx<=0;t_wval<=0;t_qscale<=0;t_sample_count<=0;t_coeff_read_index<=0;block_coeff_end<=0;transform_slot<=0;transform_mb<=0;transform_block<=0;transform_intra<=0;
         rstate<=R_IDLE;replay_sample<=0;replay_active<=0;sideband_valid<=0;sideband_index<=0;sideband_value<=0;
         first_sample_valid<=0;first_sample_value<=0;
     end else begin
@@ -148,7 +191,7 @@ always @(posedge clk) begin
             end
             S_SKIP_A: begin
                 if(last_direction==0)state<=S_ERROR;
-                else begin sideband_valid<=1;sideband_index<=direction_index(last_direction);sideband_value<=$signed({fpx,fpy});state<=S_SKIP_B;end
+                else begin dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;sideband_valid<=1;sideband_index<=direction_index(last_direction);sideband_value<=$signed({fpx,fpy});state<=S_SKIP_B;end
             end
             S_SKIP_B: begin
                 sideband_valid<=1;sideband_index<=6'h3b;sideband_value<=$signed({bpx,bpy});current_col<=current_col+1'b1;
@@ -157,11 +200,18 @@ always @(posedge clk) begin
             end
             S_MBTYPE: begin
                 if(parser_at_end)state<=S_ERROR;
-                else if(mbtype_match[3])begin
-                    current_direction<=mbtype_match[2:1];current_pattern<=mbtype_match[0];mbtype_bits<=0;mbtype_len<=0;
+                else if(mbtype_match[5])begin
+                    current_quant<=mbtype_match[4];current_intra<=mbtype_match[3];current_direction<=mbtype_match[2:1];current_pattern<=mbtype_match[0];mbtype_bits<=0;mbtype_len<=0;
                     cur_fx<=0;cur_fy<=0;cur_bx<=0;cur_by<=0;motion_bits<=0;motion_len<=0;
-                    if(mbtype_match[2:1]==2'd2)state<=S_BX;else state<=S_FX;
-                end else if(mbtype_len_next>=4)state<=S_ERROR;else begin mbtype_bits<=mbtype_bits_next;mbtype_len<=mbtype_len_next;end
+                    if(!mbtype_match[3])begin dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;end
+                    if(mbtype_match[4])begin qscale_shift<=0;field_bit_count<=0;state<=S_MB_QSCALE;end
+                    else if(mbtype_match[3])begin current_cbp<=6'h3f;current_block_index<=0;state<=S_BLOCK;end
+                    else if(mbtype_match[2:1]==2'd2)state<=S_BX;else state<=S_FX;
+                end else if(mbtype_len_next>=6)state<=S_ERROR;else begin mbtype_bits<=mbtype_bits_next;mbtype_len<=mbtype_len_next;end
+            end
+            S_MB_QSCALE: begin
+                if(parser_at_end)state<=S_ERROR;
+                else begin qscale_shift<=qscale_next;if(field_bit_count==4)begin field_bit_count<=0;if(qscale_next==0)state<=S_ERROR;else begin current_qscale<=qscale_next;if(current_intra)begin current_cbp<=6'h3f;current_block_index<=0;state<=S_BLOCK;end else state<=S_ERROR;end end else field_bit_count<=field_bit_count+1'b1;end
             end
             S_FX: begin
                 if(parser_at_end)state<=S_ERROR;

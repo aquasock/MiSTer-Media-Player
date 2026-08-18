@@ -68,14 +68,16 @@
             end
             S_BLOCK: begin
                 if(current_block_index==3'd6)state<=S_MB_DONE;
-                else if(current_cbp[5-current_block_index]) begin
+                else if(current_intra||current_cbp[5-current_block_index]) begin
                     if(residual_count>=MAX_RESIDUAL_BLOCKS)state<=S_ERROR;
                     else begin
                         pending_residual_mb<=current_map_index;
                         pending_residual_block<=current_block_index;
                         pending_residual_qscale<=current_qscale;
-                        qfs_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;current_block_has_coeff<=0;
-                        state<=S_FIRST_COEFF;
+                        pending_residual_intra<=current_intra;
+                        qfs_index<=current_intra?7'd1:7'd0;coeff_vlc_code<=0;coeff_vlc_len<=0;current_block_has_coeff<=0;
+                        if(current_intra)begin dc_vlc_code<=0;dc_vlc_len<=0;state<=S_DC_SIZE;end
+                        else state<=S_FIRST_COEFF;
                     end
                 end else current_block_index<=current_block_index+1'b1;
             end
@@ -85,6 +87,29 @@
                     coeff_run_pending<=0;coeff_level_pending<=1;state<=S_COEFF_SIGN;
                 end else begin coeff_vlc_code<=0;coeff_vlc_len<=5'd1;state<=S_COEFF_VLC;end
             end
+            S_DC_SIZE: begin
+                if(parser_at_end)state<=S_ERROR;
+                else if(dc_size_match)begin
+                    dc_size<=dc_size_value;dc_vlc_code<=0;dc_vlc_len<=0;
+                    if(dc_size_value==0)begin
+                        if(residual_coeff_count>=MAX_COEFF_EVENTS)state<=S_ERROR;
+                        else begin residual_coeff_mem[residual_coeff_count[14:0]]<={6'd0,$signed({2'b00,dc_predictor_current})};residual_coeff_count<=residual_coeff_count+1'b1;qfs_index<=7'd1;current_block_has_coeff<=1;coeff_vlc_code<=0;coeff_vlc_len<=0;state<=S_COEFF_VLC;end
+                    end else begin dc_diff_shift<=0;dc_diff_bit_count<=0;state<=S_DC_DIFF;end
+                end else if(dc_vlc_len_next>=((current_block_index<4)?9:10))state<=S_ERROR;
+                else begin dc_vlc_code<=dc_vlc_code_next;dc_vlc_len<=dc_vlc_len_next;end
+            end
+            S_DC_DIFF: begin
+                if(parser_at_end)state<=S_ERROR;
+                else begin dc_diff_shift<=dc_diff_bits_next;
+                    if(dc_diff_bit_count==(dc_size-1'b1))begin
+                        if((dc_coefficient_decoded<0)||(dc_coefficient_decoded>dc_coefficient_max_signed)||(residual_coeff_count>=MAX_COEFF_EVENTS))state<=S_ERROR;
+                        else begin
+                            if(current_block_index<4)dc_predictor_y<=dc_coefficient_decoded[10:0];else if(current_block_index==4)dc_predictor_cb<=dc_coefficient_decoded[10:0];else dc_predictor_cr<=dc_coefficient_decoded[10:0];
+                            residual_coeff_mem[residual_coeff_count[14:0]]<={6'd0,dc_coefficient_decoded};residual_coeff_count<=residual_coeff_count+1'b1;qfs_index<=7'd1;current_block_has_coeff<=1;coeff_vlc_code<=0;coeff_vlc_len<=0;state<=S_COEFF_VLC;
+                        end
+                    end else dc_diff_bit_count<=dc_diff_bit_count+1'b1;
+                end
+            end
             S_COEFF_VLC: begin
                 if(parser_at_end)state<=S_ERROR;
                 else if(coeff_vlc_match) begin
@@ -93,7 +118,7 @@
                         if(!current_block_has_coeff||(residual_coeff_count==0))state<=S_ERROR;
                         else begin
                             residual_block_mem[residual_count[10:0]]<=
-                                {pending_residual_mb,pending_residual_block,
+                                {pending_residual_intra,pending_residual_mb,pending_residual_block,
                                  pending_residual_qscale,residual_coeff_count};
                             residual_count<=residual_count+1'b1;
                             current_block_index<=current_block_index+1'b1;state<=S_BLOCK;
@@ -140,7 +165,7 @@
                 end
             end
             S_MB_DONE: begin
-                sideband_valid<=1;sideband_index<=direction_index(current_direction);sideband_value<=$signed({cur_fx,cur_fy});
+                sideband_valid<=1;sideband_index<=current_intra?6'h37:direction_index(current_direction);sideband_value<=$signed({cur_fx,cur_fy});
                 if(!geometry_sent)state<=S_GEOMETRY;else state<=S_MB_B;
             end
             S_GEOMETRY: begin
@@ -150,7 +175,7 @@
                 sideband_valid<=1;sideband_index<=6'h3b;sideband_value<=$signed({cur_bx,cur_by});
                 if(current_direction[0])begin fpx<=cur_fx;fpy<=cur_fy;end
                 if(current_direction[1])begin bpx<=cur_bx;bpy<=cur_by;end
-                last_direction<=current_direction;row_has_coded_mb<=1;
+                if(!current_intra)last_direction<=current_direction;row_has_coded_mb<=1;
                 // kate - Commit 173: current_col becomes the next uncovered
                 // column after every coded endpoint. S_MBA then either parses
                 // another in-slice MBA or recognizes the buffered zero tail.

@@ -34,7 +34,10 @@
 
         if(pixel_setup) begin
             pixel_setup<=0;pred_sum<=0;tap_index<=0;
-            if((mb_direction==0)||!source_bounds_ok)begin error<=1;if(!error)error_source<=5'd11;active<=0;persisted_seen<=1;timeout<=0;end
+            if(mb_direction==0)begin
+                if(!residual_hit)begin error<=1;if(!error)error_source<=5'd11;active<=0;persisted_seen<=1;timeout<=0;end
+                else begin out_reg<=reconstructed_intra;emit<=1;end
+            end else if(!source_bounds_ok)begin error<=1;if(!error)error_source<=5'd11;active<=0;persisted_seen<=1;timeout<=0;end
             else begin if(half_x||half_y)half_sample_seen<=1;req_kind<=0;req<=1;end
         end
 

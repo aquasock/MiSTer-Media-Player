@@ -39,6 +39,7 @@ wire [8:0] bidir_sum={1'b0,forward_prediction}+{1'b0,selected_prediction}+9'd1;
 wire [7:0] bidir_prediction=bidir_sum[8:1];
 wire [7:0] final_prediction=(mb_direction==2'd3)?bidir_prediction:selected_prediction;
 wire [7:0] reconstructed_current=clip(final_prediction,residual_pel);
+wire [7:0] reconstructed_intra=clip(8'd0,residual_pel);
 
 assign ddram_burstcnt=req?8'd1:8'd0;
 assign ddram_addr=req?(req_kind?block_addr(col,mrow,blk,verify_row):pixel_addr(selected_reference_off,blk,src_x_tap,src_y_tap)):29'd0;
@@ -58,10 +59,11 @@ assign store_pixel_y=(blk<4)?(scratch_bank_latched?{3'b001,luma_y[8:0]}:{3'b100,
 wire descriptor_order_error=(desc_count!=0)&&
     ({sideband_value[13:3],sideband_value[2:0]}<=
      {last_desc_word[13:3],last_desc_word[2:0]});
-wire first_direction_word=(sideband_index==6'h38)||(sideband_index==6'h39)||(sideband_index==6'h3a);
-wire [1:0] direction_word=(sideband_index==6'h38)?2'd1:(sideband_index==6'h39)?2'd2:2'd3;
+wire first_direction_word=(sideband_index==6'h37)||(sideband_index==6'h38)||(sideband_index==6'h39)||(sideband_index==6'h3a);
+wire [1:0] direction_word=(sideband_index==6'h37)?2'd0:(sideband_index==6'h38)?2'd1:(sideband_index==6'h39)?2'd2:2'd3;
 wire geometry_word=(sideband_index==6'h3c)&&(sideband_value[15:12]==4'd0);
-wire descriptor_word=(sideband_index==6'h3f)&&(sideband_value[15:14]==2'b11);
+wire descriptor_word=(sideband_index==6'h3f)&&sideband_value[15]&&
+    (sideband_value!=16'shA3FE)&&(sideband_value!=16'shA3FF);
 
 always @(posedge clk) begin
     if(reset) begin

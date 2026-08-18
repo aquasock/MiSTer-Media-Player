@@ -15,9 +15,11 @@
         case(rstate)
         R_BLOCK_WAIT:rstate<=R_BLOCK_CAPTURE;
         R_BLOCK_CAPTURE:begin
+            transform_intra<=residual_block_word[35];
             transform_mb<=residual_block_word[34:24];
             transform_block<=residual_block_word[23:21];
             t_qscale<=residual_block_word[20:16];
+            t_intra<=residual_block_word[35];
             block_coeff_end<=residual_block_word[15:0];
             t_sample_count<=0;
             if((residual_block_word[34:24]>=11'd1350)||
@@ -47,7 +49,7 @@
             if((t_sample_count+(t_valid?1'b1:1'b0))!=64)replay_error<=1;
             replay_sample<=0;rstate<=R_DESC;
         end
-        R_DESC:begin sideband_valid<=1;sideband_index<=6'h3f;sideband_value<=$signed({2'b11,transform_mb,transform_block});replay_sample<=0;rstate<=R_SAMPLE;end
+        R_DESC:begin sideband_valid<=1;sideband_index<=6'h3f;sideband_value<=$signed({transform_intra?2'b10:2'b11,transform_mb,transform_block});replay_sample<=0;rstate<=R_SAMPLE;end
         R_SAMPLE:begin
             sideband_valid<=1;sideband_index<=replay_sample;sideband_value<=block_sample_mem[replay_sample];
             if((transform_slot==0)&&(replay_sample==0))begin first_sample_valid<=1;first_sample_value<=block_sample_mem[0];end
@@ -97,7 +99,7 @@
             if(pce_capture)begin
                 pce_shift<=pce_next;
                 if(pce_count==4)begin
-                    pce_capture<=0;pce_count<=0;q_scale_type<=pce_next[12];alternate_scan<=pce_next[10];
+                    pce_capture<=0;pce_count<=0;q_scale_type<=pce_next[12];b_intra_vlc_format<=pce_next[11];alternate_scan<=pce_next[10];b_intra_dc_precision<=pce_next[19:18];
                     b_forward_f_code_horizontal<=pce_next[35:32];
                     b_forward_f_code_vertical<=pce_next[31:28];
                     b_backward_f_code_horizontal<=pce_next[27:24];
@@ -127,14 +129,14 @@
                         slice_capture<=(start_code_value=={2'd0,slice_row_number});parse_active<=1;parse_hold<=1;chunk_boundary_known<=1;boundary_final<=0;parse_byte_limit<=(row_byte_count<3)?9'd0:(row_byte_count-3'b011);parse_byte_index<=0;parse_bit_index<=7;
                         if(!slice_parser_started)begin
                             slice_parser_started<=1;state<=S_QSCALE;
-                            field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;
+                            field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;
                             cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
                         end
                     end else if((slice_row_number==picture_mb_height)&&post_b_boundary_now)begin
                         slice_capture<=0;parse_active<=1;parse_hold<=1;chunk_boundary_known<=1;boundary_final<=1;parse_byte_limit<=(row_byte_count<3)?9'd0:(row_byte_count-3'b011);parse_byte_index<=0;parse_bit_index<=7;
                         if(!slice_parser_started)begin
                             slice_parser_started<=1;state<=S_QSCALE;
-                            field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;
+                            field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;
                             cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
                         end
                     end else begin slice_capture<=0;proof_done<=1;parser_error<=1;end
@@ -143,7 +145,7 @@
                     row_bytes[row_byte_count]<=stream_data;slice_capture<=0;parse_active<=1;parse_hold<=1;chunk_boundary_known<=0;parse_byte_limit<=ROW_BUFFER_BYTES-2;parse_byte_index<=0;parse_bit_index<=7;
                     if(!slice_parser_started)begin
                         slice_parser_started<=1;state<=S_QSCALE;
-                        field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;
+                        field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;
                         cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
                     end
                 end

@@ -18,6 +18,7 @@ module tb_h262_dense_publication_order;
     reg row_persistence=0,picture_persistence=0;
     reg [5:0] previous_wide_parser_state=0;
     reg previous_wide_error=0;
+    reg mixed_mode=0;
 
     wire stream_ready,picture_complete;
     wire [7:0] picture_count,reference_promotion_count;
@@ -64,6 +65,7 @@ module tb_h262_dense_publication_order;
     initial begin
         if(!$value$plusargs("HEX=%s",hex_path))$fatal(1,"missing +HEX");
         if(!$value$plusargs("LEN=%d",stream_len))$fatal(1,"missing +LEN");
+        mixed_mode=$test$plusargs("MIXED");
         if((stream_len<=0)||(stream_len>MAX_STREAM_BYTES))
             $fatal(1,"invalid LEN %0d",stream_len);
         $readmemh(hex_path,stream_mem,0,stream_len-1);
@@ -210,11 +212,13 @@ module tb_h262_dense_publication_order;
                      stream_index,p_rows,p_pictures,b_rows,b_pictures,
                      published_references,picture_count,
                      reference_promotion_count,b_success);
-            if(probe_error||publication_error_detail!=0||
-               stream_index!=stream_len||p_rows!=120||p_pictures!=4||
-               b_rows!=210||b_pictures!=7||published_references!=5||
-               picture_count!=5||reference_promotion_count!=5||
-               dut.p_header_count!=3||dut.p_publication_count!=3||!b_success)
+            if(probe_error||publication_error_detail!=0||stream_index!=stream_len||
+               p_rows!=(mixed_mode?210:120)||p_pictures!=(mixed_mode?7:4)||
+               b_rows!=(mixed_mode?450:210)||b_pictures!=(mixed_mode?15:7)||
+               published_references!=(mixed_mode?8:5)||picture_count!=(mixed_mode?8:5)||
+               reference_promotion_count!=(mixed_mode?8:5)||
+               dut.p_header_count!=3||dut.p_publication_count!=3||
+               dut.b_header_count!=7||dut.b_persist_count!=7||!b_success)
                 $fatal(1,"dense publication-order regression failed");
             $finish;
         end

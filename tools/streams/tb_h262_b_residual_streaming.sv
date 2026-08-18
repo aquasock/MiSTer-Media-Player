@@ -11,6 +11,7 @@ module tb_h262_b_residual_streaming;
     integer residual_writes=0;
     integer store_samples=0,stripe_store_samples=0,stripe_changed_samples=0;
     reg [6:0] samples_remaining=0;
+    reg intra_mode=0;
 
     wire b_candidate,b_seen,b_complete,b_hold,b_replay;
     wire sideband_valid,first_valid,core_error;
@@ -114,11 +115,12 @@ module tb_h262_b_residual_streaming;
                            sideband_index,samples_remaining);
                 residual_samples<=residual_samples+1;
                 samples_remaining<=samples_remaining-1'b1;
-            end else if((sideband_index==6'h3f)&&
-                        (sideband_value[15:14]==2'b11)) begin
+            end else if((sideband_index==6'h3f)&&sideband_value[15]&&
+                        (sideband_value!=16'shA3FE)&&(sideband_value!=16'shA3FF)) begin
                 residual_blocks<=residual_blocks+1;
                 samples_remaining<=7'd64;
-            end else if((sideband_index==6'h38)||
+            end else if((sideband_index==6'h37)||
+                        (sideband_index==6'h38)||
                         (sideband_index==6'h39)||
                         (sideband_index==6'h3a)) begin
                 motion_events<=motion_events+1;
@@ -134,11 +136,12 @@ module tb_h262_b_residual_streaming;
                      residual_blocks,residual_samples,residual_writes,
                      store_samples,stripe_store_samples,stripe_changed_samples);
             if(!b_seen||core_error||raster_error||motion_events!=1350||
-               residual_blocks!=120||residual_samples!=7680||
-               residual_writes!=7680||samples_remaining!=0||
+               residual_blocks!=(intra_mode?12:120)||
+               residual_samples!=(intra_mode?768:7680)||
+               residual_writes!=(intra_mode?768:7680)||samples_remaining!=0||
                !raster.metadata_done||!read_seen||!reconstructed_seen||!persisted_seen||
                store_samples!=518400||stripe_store_samples!=7680||
-               stripe_changed_samples!=7680)
+               stripe_changed_samples!=(intra_mode?768:7680))
                 $fatal(1,"B residual streaming regression failed");
             $finish;
         end
@@ -147,6 +150,7 @@ module tb_h262_b_residual_streaming;
     initial begin
         if(!$value$plusargs("HEX=%s",hex_path))$fatal(1,"missing +HEX");
         if(!$value$plusargs("LEN=%d",stream_len))$fatal(1,"missing +LEN");
+        intra_mode=$test$plusargs("INTRA");
         if((stream_len<=0)||(stream_len>MAX_STREAM_BYTES))
             $fatal(1,"invalid LEN");
         $readmemh(hex_path,stream_mem,0,stream_len-1);
