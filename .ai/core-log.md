@@ -557,3 +557,38 @@ Install the Commit-200 RBF and rerun only `test_pb_restricted_slices.m2v` on MiS
 - [ ] Passed
 
 ---
+## 201 COMMIT Unreleased ??? 2026-08-17T23:12:19-07:00
+
+#### Coming From:
+
+Unreleased b78ffcc
+
+#### Purpose:
+
+Integrate intra-coded macroblocks into the generalized progressive P-picture reconstruction path without regressing predicted, skipped, residual-coded, parser-window, or restricted-slice behavior.
+
+#### Outcome:
+
+Commit `b78ffcc` is hardware accepted: `test_pb_restricted_slices.m2v` produced a coherent raster with USER and POWER solid and DISK off, confirming that the same-row duplicate motion-event fault is resolved. This cycle will add standards-derived intra macroblock parsing, DC predictor handling, intra inverse quantisation and reconstruction metadata to the wide P path, route intra blocks through the existing destination writer without reference prediction, and add a deterministic mixed P-picture regression with pixel-exact software and isolated RTL checks.
+
+#### Next Steps:
+
+Implement the bounded P intra path and deterministic regression, run the existing parser-window and restricted-slice replays plus the standing stream generators, then complete a clean Quartus 17.0.2 build with zero setup and hold TNS and no Critical Warning before requesting MiSTer validation.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- tools/streams/generate_test_p_intra_macroblocks.py
+- tools/streams/tb_h262_p_intra_macroblocks.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
