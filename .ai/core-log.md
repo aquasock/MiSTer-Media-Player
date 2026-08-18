@@ -1050,7 +1050,7 @@ None.
 - [ ] Passed
 
 ---
-## 215 COMMIT Unreleased ??? 2026-08-18T09:10:40-07:00
+## 215 COMMIT Unreleased 69d1b90 2026-08-18T09:10:40-07:00
 
 #### Coming From:
 
@@ -1062,23 +1062,20 @@ Require complete repeated-GOP I-picture publication and final-frame presentation
 
 #### Outcome:
 
-The uploaded mixed-stream capture identifies a regression gap: the hardware settles on frame 11 at the first GOP boundary while the current dense publication test counts only the first I picture and therefore accepts incomplete later-GOP reference rotation. This commit will drive the I-picture support gate from the real front end, require every I and P reference publication, model the repeated B-run presentation boundary, and correct the first decoder or scheduler ownership transition that prevents the second GOP from reaching the display.
+Commit `69d1b90` removes the first-GOP-only publication proof exposed by the frame-11 hardware result. The shell's P header/publication counters saturated at three and its B header/persistence counters saturated at seven, making B picture eight at the second-GOP boundary indistinguishable from the already-settled first-GOP state; all four counters now retain exact eight-bit transaction totals. The publication regression now uses the real front-end I support window, counts every repeated I publication, models scheduler vblank holds and scratch-to-future presentation, rejects displayed-bank overwrites, and requires the final reference identity. The 366,071-byte mixed stream passes seven P, fifteen B, nine reference publications and final identity nine; the 791,528-byte long stream passes twenty-two P, forty-seven B, twenty-five publications and final identity twenty-five; the 2,875,985-byte dense stream passes four P, seven B, five publications and final identity five, all without parser, ownership, overwrite, or presentation error. The clean Quartus 17.0.2 build completes in 9 minutes 36 seconds with zero errors, no Critical Warning, zero setup and hold TNS, +0.680 ns global setup, +0.244 ns global hold, +2.047 ns focused decoder setup, +13.351 ns focused decoder recovery, 29,506 ALMs, 42,076 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. RBF SHA-256 is `9506e967d78d2a18b9fc4bdb5a6f7e27fa8e4b0b4a6fcf8a3f235c14e042d0ee`.
 
 #### Next Steps:
 
-Reproduce the frame-11 stop in a deterministic repeated-GOP regression, implement the minimal ownership correction, then rerun the mixed, dense, and 72-picture long-GOP suites before a clean Quartus build and MiSTer visual confirmation that the mixed stream settles on frame 23.
+Install `MediaPlayer_commit215_69d1b90.rbf` and load `test_compat_mixed_macroblocks.m2v`, waiting for the presentation to settle and confirming timestamp `00:00:00.920`, frame `23`, coherent features, USER and POWER solid, and DISK off. Then load `test_compat_long_gop.m2v` through all 72 pictures and confirm the same settled LED result without feature or macroblock flicker.
 
 #### Files Modified:
 
-- MediaPlayer_top_05.svh
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 - rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
-- tools/streams/tb_h262_b_presentation_scheduler.sv
 - tools/streams/tb_h262_dense_publication_order.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
