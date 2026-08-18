@@ -3,6 +3,7 @@ wire        mpeg2_new_pred_half_sample_seen;
 wire        mpeg2_new_pred_reconstructed_seen;
 wire [7:0]  mpeg2_new_pred_reconstructed_value;
 wire        mpeg2_new_pred_persisted_seen;
+wire        mpeg2_new_pred_row_persisted;
 wire [3:0]  mpeg2_new_pred_progress_stage;
 wire        mpeg2_new_pred_error;
 wire [2:0]  mpeg2_new_pred_error_source;
@@ -87,6 +88,7 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.pipeline_block_done         (mpeg2_new_ddr_block_stored),
 	.recon_block_complete        (mpeg2_new_recon_block_complete),
 	.p_persistence_complete      (mpeg2_new_pred_persisted_seen),
+	.p_row_persistence_complete  (mpeg2_new_pred_row_persisted),
 	.slice_header_seen           (mpeg2_new_slice_header_seen),
 	.macroblock_address_seen     (mpeg2_new_macroblock_address_seen),
 	.first_i_macroblock_seen     (mpeg2_new_first_i_macroblock_seen),

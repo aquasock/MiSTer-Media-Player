@@ -323,6 +323,8 @@ always @(posedge clk) begin
         wide_candidate<=0;
         wide_seen<=0;
         wide_complete_now<=0;
+        row_complete_now<=0;
+        row_final<=0;
         motion_event_valid<=0;
         motion_event_index<=0;
         motion_event_x<=0;
@@ -347,7 +349,7 @@ always @(posedge clk) begin
         proof_done<=0;
         parse_active<=0;
         boundary_final<=0;
-        final_release_pending<=0;
+        row_waiting<=0;
         parse_byte_limit<=0;
         parse_byte_index<=0;
         parse_bit_index<=3'd7;
@@ -412,4 +414,5 @@ always @(posedge clk) begin
         residual_coeff_read_last_reg<=
             residual_coeff_last_mem[residual_coeff_read_address];
         wide_complete_now<=0;
+        row_complete_now<=0;
         motion_event_intra<=0;

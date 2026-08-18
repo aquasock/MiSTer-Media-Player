@@ -1,7 +1,22 @@
         motion_event_valid<=0;
-        if(final_release_pending) begin
+        if(row_waiting&&row_retired) begin
+            row_waiting<=0;
             parse_hold<=0;
-            final_release_pending<=0;
+            residual_block_count<=0;
+            residual_present<=0;
+            residual_coeff_count<=0;
+            row_byte_count<=0;
+            row_covered_count<=0;
+            if(row_final) begin
+                wide_seen<=1;
+                wide_complete_now<=1;
+                proof_done<=1;
+            end else begin
+                row_base_index<=
+                    row_base_index+{5'd0,picture_mb_width};
+                slice_row_number<=slice_row_number+1'b1;
+                slice_capture<=1;
+            end
         end
 
         if(parse_active) begin

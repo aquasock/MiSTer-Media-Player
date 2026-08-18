@@ -6,6 +6,8 @@
 // loaded into the existing serialized inverse-quantisation/IDCT engine, then
 // replayed immediately to the generalized raster engine. No transform is
 // duplicated and only one 64-sample spatial buffer is retained here.
+// Entry 204 starts this transaction at every completed parser row; A2FE retires
+// an intermediate row and A2FF retains its established final-picture meaning.
 //============================================================================
 module mpeg2_h262_p_residual_probe
 (
@@ -30,7 +32,8 @@ module mpeg2_h262_p_residual_probe
     input wire general_alternate_scan,
 
     input wire wide_mode,
-    input wire wide_picture_complete,
+    input wire wide_row_complete,
+    input wire wide_row_final,
     output reg [10:0] wide_block_read_address,
     input wire [10:0] wide_block_read_mb,
     input wire [2:0] wide_block_read_index,
@@ -82,6 +85,7 @@ reg current_intra;
 reg [4:0] current_qscale;
 reg g_qtype, g_alt;
 reg [1:0] g_intra_dc_precision;
+reg g_row_final;
 
 reg gstart, gwe, gend;
 reg [5:0] gwidx;
@@ -153,6 +157,7 @@ always @(posedge clk) begin
         g_qtype<=0;
         g_alt<=0;
         g_intra_dc_precision<=0;
+        g_row_final<=0;
         gstart<=0;
         gwe<=0;
         gend<=0;
@@ -162,6 +167,12 @@ always @(posedge clk) begin
         replay_sample<=0;
         replay_valid<=0;
         first_valid_reg<=0;
+
+        if(!wide_mode&&(gstate==G_IDLE)) begin
+            g_decision<=0;
+            g_required<=0;
+            g_success<=0;
+        end
         replay_index<=0;
         replay_value<=0;
         first_value_reg<=0;
@@ -182,10 +193,11 @@ always @(posedge clk) begin
             end
         end
 
-        if(wide_picture_complete) begin
+        if(wide_row_complete) begin
             g_decision<=1;
-            g_required<=(wide_residual_block_count!=0);
+            g_required<=g_required||(wide_residual_block_count!=0);
             g_success<=0;
+            g_row_final<=wide_row_final;
             expected_blocks<=wide_residual_block_count;
             expected_coeffs<=wide_coeff_count;
             block_slot<=0;
@@ -314,7 +326,7 @@ always @(posedge clk) begin
             G_FINISH: begin
                 replay_valid<=1;
                 replay_index<=6'h3f;
-                replay_value<=16'shA2FF;
+                replay_value<=g_row_final?16'shA2FF:16'shA2FE;
                 gstate<=G_IDLE;
             end
             default:;

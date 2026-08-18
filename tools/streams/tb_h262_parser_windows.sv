@@ -17,7 +17,7 @@ module tb_h262_parser_windows;
     reg prior_p_error = 0, prior_b_error = 0;
     reg [5:0] prior_p_state = 0, prior_b_state = 0;
 
-    wire p_candidate, p_seen, p_complete, p_hold, p_error;
+    wire p_candidate, p_seen, p_complete, p_row_complete, p_row_final, p_hold, p_error;
     wire [5:0] p_width, p_height;
     wire [10:0] p_count;
     wire p_motion_valid;
@@ -44,8 +44,9 @@ module tb_h262_parser_windows;
 
     mpeg2_h262_p_wide_motion_syntax_probe p_parser(
         .clk(clk), .reset(reset), .stream_data(stream_data), .stream_valid(stream_valid),
-        .intra_dc_precision(2'd0),
+        .intra_dc_precision(2'd0), .row_retired(p_row_complete),
         .wide_candidate(p_candidate), .wide_seen(p_seen), .wide_complete_now(p_complete),
+        .row_complete_now(p_row_complete), .row_final(p_row_final),
         .motion_event_valid(p_motion_valid), .motion_event_index(p_motion_index),
         .motion_event_x(p_motion_x), .motion_event_y(p_motion_y),
         .picture_mb_width(p_width), .picture_mb_height(p_height), .picture_mb_count(p_count),

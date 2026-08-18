@@ -15,6 +15,8 @@
 // kate - Commit 198: the 512-byte array is a refillable parser window rather
 // than a whole-slice capacity limit. Two trailing bytes overlap refills so a
 // 00 00 01 start-code prefix cannot be split out of boundary recognition.
+// Entry 204: a completed macroblock row is held until downstream persistence;
+// descriptor and coefficient addresses are then reused for the next row.
 // Standards authority: .ai/core-standards.md (H262-007..H262-022).
 //============================================================================
 module mpeg2_h262_p_wide_motion_syntax_probe
@@ -24,10 +26,13 @@ module mpeg2_h262_p_wide_motion_syntax_probe
     input  wire [7:0]  stream_data,
     input  wire        stream_valid,
     input  wire [1:0]  intra_dc_precision,
+    input  wire        row_retired,
 
     output reg         wide_candidate,
     output reg         wide_seen,
     output reg         wide_complete_now,
+    output reg         row_complete_now,
+    output reg         row_final,
 
     output reg         motion_event_valid,
     output reg [10:0]  motion_event_index,
@@ -67,7 +72,7 @@ localparam integer ROW_BUFFER_BYTES = 512;
 localparam [11:0] MAX_RESIDUAL_BLOCKS = 12'd2048;
 localparam [15:0] MAX_COEFF_EVENTS = 16'd32768;
 
-// Commit 202: picture-wide sparse syntax is retained in M10K-oriented memories
+// Commit 202: sparse syntax is retained in M10K-oriented memories
 // and read back one block/event at a time by the shared transform.  This
 // replaces the flattened ALM-heavy 16-block/32-event buses without duplicating
 // inverse-quantisation or IDCT hardware.
@@ -129,7 +134,7 @@ reg slice_parser_started, chunk_boundary_known;
 reg [5:0] slice_row_number;
 reg [8:0] row_byte_count;
 reg [10:0] row_base_index;
-reg proof_done, parse_active, boundary_final, final_release_pending;
+reg proof_done, parse_active, boundary_final, row_waiting;
 reg [8:0] parse_byte_limit, parse_byte_index;
 reg [2:0] parse_bit_index;
 wire parser_at_end = (parse_byte_index >= parse_byte_limit);

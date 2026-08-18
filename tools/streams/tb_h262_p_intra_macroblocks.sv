@@ -15,7 +15,7 @@ module tb_h262_p_intra_macroblocks;
     reg [1023:0] hex_path;
     reg replay_finished=0;
 
-    wire candidate,seen,complete,hold,parser_error;
+    wire candidate,seen,complete,row_complete,row_final,hold,parser_error;
     wire motion_valid,motion_intra;
     wire [10:0] motion_index;
     wire signed [7:0] motion_x,motion_y;
@@ -50,7 +50,7 @@ module tb_h262_p_intra_macroblocks;
     wire engine_store_start,engine_store_complete,engine_active;
     wire [11:0] engine_store_x,engine_store_y;
     wire engine_read_seen,engine_sample_nonzero,engine_half_seen;
-    wire engine_reconstructed_seen,engine_persisted,engine_error;
+    wire engine_reconstructed_seen,engine_persisted,engine_row_persisted,engine_error;
     wire [7:0] engine_sample,engine_reconstructed_value,engine_persisted_value;
     wire [3:0] engine_progress;
     wire [4:0] engine_error_source;
@@ -96,8 +96,10 @@ module tb_h262_p_intra_macroblocks;
     mpeg2_h262_p_wide_motion_syntax_probe parser(
         .clk(clk),.reset(reset),.stream_data(stream_data),
         .stream_valid(stream_valid),.intra_dc_precision(2'd0),
+        .row_retired(engine_row_persisted),
         .wide_candidate(candidate),.wide_seen(seen),
-        .wide_complete_now(complete),.motion_event_valid(motion_valid),
+        .wide_complete_now(complete),.row_complete_now(row_complete),
+        .row_final(row_final),.motion_event_valid(motion_valid),
         .motion_event_index(motion_index),.motion_event_x(motion_x),
         .motion_event_y(motion_y),.motion_event_intra(motion_intra),
         .picture_mb_width(mb_width),.picture_mb_height(mb_height),
@@ -129,7 +131,8 @@ module tb_h262_p_intra_macroblocks;
         .general_coeff_value_plan(832'd0),.general_coeff_last_plan(64'd0),
         .general_coeff_count(7'd0),.general_qscale_plan(80'd0),
         .general_q_scale_type(1'b0),.general_alternate_scan(1'b0),
-        .wide_mode(candidate||seen),.wide_picture_complete(complete),
+        .wide_mode(candidate||seen),.wide_row_complete(row_complete),
+        .wide_row_final(row_final),
         .wide_block_read_address(block_read_address),
         .wide_block_read_mb(block_read_mb),
         .wide_block_read_index(block_read_index),
@@ -174,7 +177,8 @@ module tb_h262_p_intra_macroblocks;
         .sample_nonzero(engine_sample_nonzero),.half_sample_seen(engine_half_seen),
         .reconstructed_seen(engine_reconstructed_seen),
         .reconstructed_value(engine_reconstructed_value),
-        .persisted_seen(engine_persisted),.persisted_value(engine_persisted_value),
+        .persisted_seen(engine_persisted),.row_persisted(engine_row_persisted),
+        .persisted_value(engine_persisted_value),
         .progress_stage(engine_progress),.error(engine_error),
         .error_source(engine_error_source)
     );
@@ -259,16 +263,18 @@ module tb_h262_p_intra_macroblocks;
         end
         if(complete) begin
             picture_completions<=picture_completions+1;
-            if(mb_width!=45||mb_height!=30||mb_count!=1350||
-               residual_count!=expected_blocks||coeff_count!=expected_blocks)
+            if(mb_width!=45||mb_height!=30||mb_count!=1350)
                 $fatal(1,"bad completed P intra plans");
         end
 
         if(replay_valid) begin
             case(replay_state)
             0: begin
-                if(replay_index==6'h3f&&replay_value==16'shA2FF) begin
-                    replay_finished<=1;
+                if(replay_index==6'h3f&&
+                   ((replay_value==16'shA2FE)||
+                    (replay_value==16'shA2FF))) begin
+                    if(replay_value==16'shA2FF)
+                        replay_finished<=1;
                 end else begin
                     if(replay_index!=6'h3c||
                        replay_value!=expected_mb_for_block(replay_blocks))

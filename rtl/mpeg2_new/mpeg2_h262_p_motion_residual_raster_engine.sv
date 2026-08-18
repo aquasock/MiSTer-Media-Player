@@ -6,6 +6,7 @@
 //   * legacy 128x96 residual descriptor: index 0x3f, value Bxxx
 //   * Commit-166 wide descriptor: 0x3c -> 11-bit MB, 0x3d -> block
 //   * 64 signed spatial samples at indices 0..63
+//   * A2FE intermediate-row terminator at index 0x3f
 //   * A2FF terminator at index 0x3f
 //
 // kate - Commit 166: geometry is derived from the live sequence dimensions,
@@ -59,6 +60,7 @@ module mpeg2_h262_p_motion_residual_raster_engine
     output reg reconstructed_seen,
     output reg [7:0] reconstructed_value,
     output reg persisted_seen,
+    output reg row_persisted,
     output reg [7:0] persisted_value,
     output reg [3:0] progress_stage,
     output reg error,
@@ -215,6 +217,9 @@ reg [10:0] wide_desc_mb;
 reg [5:0] sample_expected;
 reg metadata_done;
 reg [10:0] exec_desc_slot;
+reg [10:0] row_motion_base, row_motion_end;
+reg [5:0] exec_row;
+reg row_final_latched;
 
 reg pending, started;
 reg reference_bank_latched, destination_bank_latched;
@@ -401,13 +406,19 @@ always @(posedge clk) begin
         reconstructed_seen<=0;
         reconstructed_value<=0;
         persisted_seen<=0;
+        row_persisted<=0;
         persisted_value<=0;
         progress_stage<=0;
         error<=0;
         error_source<=0;
+        row_motion_base<=0;
+        row_motion_end<=0;
+        exec_row<=0;
+        row_final_latched<=0;
         for(i=0;i<8;i=i+1)
             resrows[i]<=0;
     end else begin
+        row_persisted<=0;
         if(new_picture_metadata) begin
             persisted_seen<=0;
             progress_stage<=4'd1;
@@ -434,6 +445,10 @@ always @(posedge clk) begin
             mbi<=0;
             col<=0;
             mrow<=0;
+            row_motion_base<=0;
+            row_motion_end<=0;
+            exec_row<=0;
+            row_final_latched<=0;
             blk<=0;
             ei<=0;
             verify_row<=0;
@@ -527,14 +542,22 @@ always @(posedge clk) begin
                     sample_expected<=0;
                 end
             end else if((residual_index==6'h3f) &&
-                        (residual_value==16'shA2FF)) begin
-                if((motion_count==0) ||
+                        ((residual_value==16'shA2FE) ||
+                         (residual_value==16'shA2FF))) begin
+                if((motion_count==row_motion_base) ||
                    metadata_done ||
-                   wide_desc_pending) begin
+                   wide_desc_pending ||
+                   (motion_count!=(row_motion_base+{5'd0,mb_width})) ||
+                   ((residual_value==16'shA2FF) &&
+                    (exec_row+1'b1!=mb_height)) ||
+                   ((residual_value==16'shA2FE) &&
+                    (exec_row+1'b1>=mb_height))) begin
                     error<=1;
                     if(!error) error_source<=5'd7;
                 end else begin
                     metadata_done<=1;
+                    row_motion_end<=motion_count;
+                    row_final_latched<=(residual_value==16'shA2FF);
                 end
             end else begin
                 error<=1;
@@ -550,9 +573,9 @@ always @(posedge clk) begin
             reference_bank_latched<=reference_bank;
             destination_bank_latched<=destination_bank;
             timeout<=24'hffffff;
-            mbi<=0;
+            mbi<=row_motion_base;
             col<=0;
-            mrow<=0;
+            mrow<=exec_row;
             blk<=0;
             ei<=0;
             exec_desc_slot<=0;
@@ -582,7 +605,7 @@ always @(posedge clk) begin
 
         if(motion_load) begin
             motion_load<=0;
-            if(mbi>=motion_count || mbi>=MAX_MB) begin
+            if(mbi>=row_motion_end || mbi>=motion_count || mbi>=MAX_MB) begin
                 error<=1;
                 if(!error) error_source<=5'd11;
                 active<=0;
@@ -670,30 +693,42 @@ always @(posedge clk) begin
                         if(residual_hit)
                             exec_desc_slot<=exec_desc_slot+1'b1;
                         if(blk==3'd5) begin
-                            if((col+1'b1>=mb_width) &&
-                               (mrow+1'b1>=mb_height)) begin
+                            if(col+1'b1>=mb_width) begin
                                 if((exec_desc_slot+
                                     (residual_hit?1'b1:1'b0))!=desc_count)
                                 begin
                                     error<=1;
                                     if(!error) error_source<=5'd15;
                                 end
-                                if(mbi+1'b1!=motion_count)
+                                if(mbi+1'b1!=row_motion_end)
                                 begin
                                     error<=1;
                                     if(!error) error_source<=5'd16;
                                 end
-                                persisted_seen<=1;
-                                progress_stage<=4'd7;
-                                reconstructed_seen<=1;
+                                row_persisted<=1;
                                 active<=0;
                                 timeout<=0;
+                                if(row_final_latched) begin
+                                    persisted_seen<=1;
+                                    progress_stage<=4'd7;
+                                    reconstructed_seen<=1;
+                                end else begin
+                                    started<=0;
+                                    metadata_done<=0;
+                                    desc_count<=0;
+                                    last_desc_word<=0;
+                                    current_desc_slot<=0;
+                                    desc_active<=0;
+                                    wide_desc_pending<=0;
+                                    sample_expected<=0;
+                                    exec_desc_slot<=0;
+                                    row_motion_base<=row_motion_end;
+                                    exec_row<=exec_row+1'b1;
+                                    row_final_latched<=0;
+                                end
                             end else begin
                                 mbi<=mbi+1'b1;
-                                if(col+1'b1>=mb_width) begin
-                                    col<=0;
-                                    mrow<=mrow+1'b1;
-                                end else col<=col+1'b1;
+                                col<=col+1'b1;
                                 blk<=0;
                                 ei<=0;
                                 motion_load<=1;

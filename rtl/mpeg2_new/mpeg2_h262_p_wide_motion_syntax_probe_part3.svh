@@ -209,10 +209,9 @@
                     end else begin
                         picture_mb_count<=
                             row_base_index+{5'd0,current_col}+11'd1;
-                        wide_seen<=1;
-                        wide_complete_now<=1;
-                        proof_done<=1;
-                        final_release_pending<=1;
+                        row_complete_now<=1;
+                        row_final<=1;
+                        row_waiting<=1;
                     end
                 end else if(slice_capture) begin
                     // kate - Commit 173: while parse_active, slice_capture is
@@ -240,13 +239,9 @@
                     end else begin
                         picture_mb_count<=
                             row_base_index+{5'd0,picture_mb_width};
-                        row_base_index<=
-                            row_base_index+{5'd0,picture_mb_width};
-                        slice_row_number<=slice_row_number+1'b1;
-                        row_covered_count<=0;
-                        row_byte_count<=0;
-                        slice_capture<=1;
-                        parse_hold<=0;
+                        row_complete_now<=1;
+                        row_final<=0;
+                        row_waiting<=1;
                     end
                 end
             end
@@ -320,6 +315,8 @@
                         proof_done<=0;
                         parse_active<=0;
                         parse_hold<=0;
+                        row_waiting<=0;
+                        row_final<=0;
                         probe_error<=0;
                     end
                 end else picture_count<=1;

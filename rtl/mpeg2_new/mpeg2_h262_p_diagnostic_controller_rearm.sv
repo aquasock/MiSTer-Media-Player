@@ -10,6 +10,7 @@ module mpeg2_h262_p_diagnostic_controller
 (
  input wire clk,input wire reset,input wire [7:0] stream_data,input wire stream_valid,
  input wire p_picture_expected,input wire p_persistence_complete,
+ input wire p_row_persistence_complete,
  input wire [1:0] intra_dc_precision,
  output wire stream_hold,output wire p_macroblock_type_seen,output wire p_forward_vector_valid,
  output wire signed [12:0] p_forward_vector_x,output wire signed [12:0] p_forward_vector_y,
@@ -45,6 +46,7 @@ wire legacy_qtype,legacy_alt;
 
 // Commit-166 wide parser.
 wire wide_candidate,wide_seen,wide_complete_now,wide_parse_hold,wide_error;
+wire wide_row_complete_now,wide_row_final;
 wire wide_motion_valid;
 wire wide_motion_intra;
 wire[10:0] wide_motion_index;
@@ -329,8 +331,10 @@ mpeg2_h262_p_wide_motion_syntax_probe wide_general_probe
 (
  .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),
  .intra_dc_precision(intra_dc_precision),
+ .row_retired(p_row_persistence_complete),
  .wide_candidate(wide_candidate),.wide_seen(wide_seen),
  .wide_complete_now(wide_complete_now),
+ .row_complete_now(wide_row_complete_now),.row_final(wide_row_final),
  .motion_event_valid(wide_motion_valid),
  .motion_event_intra(wide_motion_intra),
  .motion_event_index(wide_motion_index),
@@ -373,7 +377,8 @@ mpeg2_h262_p_residual_probe residual_probe
  .general_alternate_scan(legacy_alt),
 
  .wide_mode(wide_mode),
- .wide_picture_complete(wide_complete_now),
+ .wide_row_complete(wide_row_complete_now),
+ .wide_row_final(wide_row_final),
  .wide_block_read_address(wide_block_read_address),
  .wide_block_read_mb(wide_block_read_mb),
  .wide_block_read_index(wide_block_read_index),

@@ -12,6 +12,7 @@ module mpeg2_h262_two_picture_probe
     input wire clk,input wire reset,input wire[7:0] stream_data,input wire stream_valid,output wire stream_ready,
     input wire phase1_supported,input wire[13:0] vertical_size,input wire[1:0] intra_dc_precision,input wire intra_vlc_format,
     input wire pipeline_block_done,input wire recon_block_complete,input wire p_persistence_complete,
+    input wire p_row_persistence_complete,
     output wire slice_header_seen,output wire macroblock_address_seen,output wire first_i_macroblock_seen,
     output wire first_luma_dc_seen,output wire first_luma_block_complete,output wire first_picture_420_parsed,
     output wire second_picture_420_parsed,output wire picture_420_complete,output wire active_frame_bank,
@@ -142,7 +143,8 @@ wire p_residual_required_raw,p_residual_success_raw,p_first_residual_sample_vali
 wire signed[15:0] p_first_residual_sample_value_raw,p_residual_sample_value_raw;wire[5:0] p_residual_sample_index_raw;
 mpeg2_h262_p_diagnostic_controller p_controller(
  .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.p_picture_expected(p_picture_expected),
- .p_persistence_complete(p_persistence_complete),.intra_dc_precision(intra_dc_precision),
+ .p_persistence_complete(p_persistence_complete),.p_row_persistence_complete(p_row_persistence_complete),
+ .intra_dc_precision(intra_dc_precision),
  .stream_hold(p_hold_raw),.p_macroblock_type_seen(p_macroblock_type_seen_raw),
  .p_forward_vector_valid(p_forward_vector_valid_raw),.p_forward_vector_x(p_forward_vector_x_raw),.p_forward_vector_y(p_forward_vector_y_raw),
  .p_residual_required(p_residual_required_raw),.p_residual_success(p_residual_success_raw),
