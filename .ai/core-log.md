@@ -1,33 +1,5 @@
 
 ---
-## 184 COMMIT Unreleased 4f1c057 2026-08-17T06:04:32-07:00
-
-#### Coming From:
-
-Unreleased f9b9be6
-
-#### Purpose:
-
-Remove obsolete controlled-parser observer failures from generalized P-stream acceptance without weakening functional pipeline checks.
-
-#### Outcome:
-
-Commit 183 hardware makes all three P-final streams converge on the same USER/POWER `1/4` first-fault signature, proving that the prior late `four_mb_error` classification was a mutable diagnostic artifact. Commit `4f1c057` removes only the five historical controlled parser observers from `probe_error`; progress, residual, stream-hold, raster-hold, bookkeeper, publication, reference-progress, decoder, reconstruction, DDR, and presentation checks remain. Simulation verifies retired observers cannot raise acceptance error and functional codes 6 through 9 remain intact. The clean Quartus 17.0.2 build closes with zero TNS, +0.470 ns global setup, +2.714 ns decoder setup, 30,069 ALMs, and 40,861 registers.
-
-#### Next Steps:
-
-Run all six Commit-175 streams and record acceptance, then run `test_p_visual_discriminator.m2v` and confirm that the final displayed P frame shows two hard seams crossing at frame center in a 2x2 pattern rather than an unbroken diagonal gradient.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
 ## 185 COMMIT Unreleased d5e5f62 2026-08-17T06:31:10-07:00
 
 #### Coming From:
@@ -1280,6 +1252,34 @@ Reload the deployed core, load `test_compat_long_gop.m2v` once, wait for its set
 - files.qip
 - rtl/mpeg2_new/mpeg2_h262_final_gop_progress_probe.sv
 - tools/streams/tb_h262_final_gop_progress_probe.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+## 224 COMMIT Unreleased bbe625e 2026-08-18T13:44:27-07:00
+
+#### Coming From:
+
+Unreleased bbe625e
+
+#### Purpose:
+
+Record the hardware boundary identified by the passive final-GOP progress diagnostic.
+
+#### Outcome:
+
+The deployed `bbe625e` RBF again settles on visible frame 50 with USER and POWER solid, while DISK repeats exactly two blinks. Stage two proves that the third-GOP I50 header was accepted and I50 was published, but no following P header reached the top-level accepted-header observer before transport retirement. The source stream places B48 and B49 after coded I50 and P53 after those B pictures. Static tracing identifies a matching hardware-only vblank race: `frame_waiting` can present newly published I50 immediately when its one-cycle pulse coincides with `swap_window_pulse`; the later B48 header then finds its future reference already displayed, raises `b_presentation_error`, and causes the fatal transport gate to drain every remaining byte without exposing P53 to the decoder. The existing acceptance OR can remain true through its I-picture term and the current error encoder omits presentation errors, explaining the otherwise misleading solid USER and POWER report. This exact path accounts for the uploaded frame 47 to frame 50 transition, terminal frame 50, stage two, and clean menu recovery.
+
+#### Next Steps:
+
+Await approval for a focused scheduler correction that retains each newly published reference until the following accepted picture header determines whether B reordering owns it, adds a regression for publication coincident with vblank followed by B pictures, and preserves fail-open behavior. Use the session-authorized incremental Quartus build after the existing decoder and publication regressions pass.
+
+#### Files Modified:
+
+None.
 
 #### Status:
 
