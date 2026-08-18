@@ -8,6 +8,25 @@ This project is still in active pre-release development. Published milestone rel
 
 No unreleased milestone changes yet.
 
+## [0.5.0] - 2026-08-17 — 720x480 progressive P/B `f_code` milestone
+
+Hardware-qualified 720x480 progressive 4:2:0 I/P/B regression coverage with independently picture-signaled P/B motion-vector `f_code` handling from 1 through 4.
+
+- Widened the bounded B syntax and raster path to 45x30 macroblocks / 720x480 while retaining separate B scratch storage and coded-order/display-order presentation.
+- Generalized B residual parsing across all six 4:2:0 blocks and generalized B macroblock-address increments, escaped gaps, internal skips, and restricted same-row slice coverage within the accepted progressive envelope.
+- Replaced the earlier mixed legacy/controlled P acceptance path with deterministic full-width 720x480 generators and completed generalized P parsing, raster execution, reference reads, prediction-plus-residual reconstruction, persistence, publication, and presentation through sequence end.
+- Added leading P skips, macroblock-address Escape coverage, up to 32 residual descriptors, full coded-block-pattern coverage, quantiser changes, and visible P-presentation discrimination.
+- Generalized P forward horizontal/vertical and B forward/backward horizontal/vertical `f_code` fields independently across values 1 through 4, including zero through three residual bits, both signs, predictor reuse/independence, H.262 wraparound, and chained references.
+- Corrected the vendored ASCAL `MODE[4]` width mismatch and pipelined its vertical boundary predicate, preserving positive HDMI timing margin through the final release-candidate build.
+- Replaced overlapping playback-time LED indications with a settled post-stream report and aligned acceptance with durable generalized publication/reference completion. Successful streams settle with USER and POWER solid and DISK dark.
+- Established the authoritative seven-stream hardware matrix: `test_i_baseline.m2v`, `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_b_bidirectional.m2v`, `test_p_visual_discriminator.m2v`, `test_p_f_code_range.m2v`, and `test_b_f_code_range.m2v`. The former nine-stream matrix is not a release gate going forward.
+- Hardware qualification accepted all seven streams with the expected LED result and clean images; the P visual discriminator retained all four quadrants and both center seams.
+- Release qualification checkout: `424eec43b0d0b4f8085e6591a15543eafab394e7`; synthesized RTL baseline: `b1bde49df3831669b577a1ed78404e026f19382d`.
+- The clean GitHub-clone Quartus Prime 17.0.2 build completed with no Critical Warning, zero TNS, +0.387 ns global setup, +0.207 ns global hold, +2.012 ns decoder setup, 31,625 ALMs, 42,223 registers, 592,333 block-memory bits, 90 RAM blocks, 69 DSP blocks, and 3 PLLs.
+- The fresh-clone RBF is bit-identical to the already hardware-accepted Commit-194 artifact and has SHA-256 `a3eeeb285c427f313987ce6c62cdef560d6293defb1841e96c66aab026d63d8e`.
+- Audio project `fd90c775a129995544ea7aa9d9369408d949ca63` remains integration-compatible.
+- Current limits remain deliberate: raw MPEG-2 Video elementary streams, progressive frame pictures, 4:2:0 chroma, the proven 720x480 regression envelope, synthetic rather than PES-derived timing, fixed diagnostic video output, no audio, and no DVD/program-stream navigation.
+
 ## [0.4.0] - 2026-08-16 — Progressive 4:2:0 I/P/B milestone
 
 Hardware-qualified progressive 4:2:0 I/P/B decoding and presentation within the current bounded implementation envelope.

@@ -2,7 +2,7 @@
 
 An experimental media-player core for [MiSTer FPGA](https://github.com/MiSTer-devel/Main_MiSTer), with a standards-driven MPEG-2 Video / ITU-T H.262 decoder implemented primarily in FPGA logic.
 
-> **Development status:** active, pre-release, developer-oriented. **v0.4.0 is the current hardware-qualified release candidate.** It preserves the established progressive 4:2:0 all-I path, the generalized P-picture path, and adds the first hardware-proven bounded B-picture reconstruction/presentation path. Audio, program-stream demux, DVD support, and broader H.262 coverage remain future work.
+> **Development status:** active, pre-release, developer-oriented. **v0.5.0 is the current hardware-qualified release candidate.** It extends the progressive 4:2:0 I/P/B path to the 720x480 regression geometry and independently applies picture-signaled P/B motion-vector `f_code` values from 1 through 4. Audio, program-stream demux, DVD support, and broader H.262 coverage remain future work.
 
 ## Current status
 
@@ -17,11 +17,11 @@ The active decoder is a clean H.262 implementation under `rtl/mpeg2_new/`. It cu
 - 4:2:0 chroma expansion and limited-range BT.601 YCbCr-to-RGB presentation;
 - continuous supported all-I picture decode using one re-armed parser;
 - P-picture reference ownership, publication, consecutive reconstructed-P reference promotion, and destination-ownership pacing;
-- syntax-derived per-macroblock P forward motion with signed horizontal/vertical vectors, predictor reuse/reset, integer and half-sample interpolation, and 4:2:0 chroma-vector scaling on the generalized path;
+- syntax-derived per-macroblock P forward motion with independently signaled horizontal/vertical `f_code` values from 1 through 4, signed vectors, predictor reuse/reset, integer and half-sample interpolation, H.262 wraparound, and 4:2:0 chroma-vector scaling;
 - syntax-derived 4:2:0 coded-block-pattern selection across Y0/Y1/Y2/Y3/Cb/Cr;
 - generalized non-intra P coefficient handling including ordinary run/level VLCs, non-zero runs, signs, EOB, Escape syntax, q_scale_type, alternate_scan, and quantiser-scale changes;
 - prediction-plus-residual reconstruction, clipping, DDR persistence/readback, and generalized P-picture re-arm;
-- bounded B-picture reconstruction with forward, backward, and bidirectional prediction, internal macroblock skips, residual reconstruction, scratch persistence, and coded-order/display-order presentation handling on the hardware-proven regression path;
+- bounded B-picture reconstruction with independently signaled forward/backward horizontal/vertical `f_code` values from 1 through 4, forward/backward/bidirectional prediction, internal macroblock skips, residual reconstruction, scratch persistence, and coded-order/display-order presentation handling;
 - a 33-bit / 90 kHz synthetic elementary-stream presentation-timing foundation derived from H.262 frame-rate information and `temporal_reference`.
 
 The current implementation subset remains intentionally bounded while the decoder architecture is being proven. These are implementation limits, **not** limits of H.262.
@@ -32,10 +32,10 @@ The current implementation subset remains intentionally bounded while the decode
 | Picture type | Continuous supported I pictures; generalized hardware-proven P regression path; bounded hardware-proven B regression/presentation path |
 | Picture structure | Progressive frame pictures on the proven paths |
 | Chroma format | 4:2:0 |
-| Proven geometry | Up to 720x480 for the established I path; 128x96 / 8x6 macroblocks for the generalized P and B regression paths |
-| Generalized P motion envelope | Forward f_code=(3,3), signed H/V vectors, predictor reuse/reset, integer/H/V/bilinear half-sample prediction |
-| Generalized P residual envelope | Up to 16 coded residual blocks and 64 non-zero coefficient events per picture; implementation caps |
-| B regression envelope | Deterministic mixed I/P/B streams with forward/backward/bidirectional prediction, internal skips, bounded residuals, B scratch storage, and display reordering |
+| Proven geometry | Up to 720x480 / 45x30 macroblocks for the authoritative I, P, and B regression paths |
+| Generalized P motion envelope | Independently signaled horizontal/vertical `f_code` 1..4, signed vectors, predictor reuse/reset and wraparound, integer/H/V/bilinear half-sample prediction |
+| Generalized P residual envelope | Up to 32 coded residual blocks and 64 non-zero coefficient events per picture; implementation caps |
+| B regression envelope | Independently signaled forward/backward H/V `f_code` 1..4, forward/backward/bidirectional prediction, internal skips, bounded residuals, B scratch storage, and display reordering |
 | Reconstruction precision | 8-bit Y/Cb/Cr |
 | Frame storage | Two retained planar MiSTer DDR3 I/P frame banks plus a distinct B scratch region |
 | Timing metadata | Synthetic elementary-stream 33-bit / 90 kHz schedule; not PES-derived PTS |
@@ -49,15 +49,15 @@ Milestone releases use semantic-version tags on GitHub. MiSTer RBF assets retain
 
 Current published milestone release:
 
-- **v0.3.0** — Phase 1T reference-picture management and the first controlled hardware-proven P-picture prediction/reconstruction paths; binary asset `MediaPlayer_20260814.rbf`.
+- **v0.4.0** — progressive 4:2:0 I/P/B decoding and presentation within the earlier bounded regression envelope; binary asset `MediaPlayer_20260816.rbf`.
 
 Current hardware-qualified release candidate:
 
-- **v0.4.0** — generalized progressive 4:2:0 P-picture decoding plus the first bounded hardware-proven B-picture reconstruction/presentation path, corrected reference/display ownership handling, and the 68-DSP shared-IDCT baseline.
+- **v0.5.0** — 720x480 progressive 4:2:0 I/P/B regression coverage, generalized P/B motion-vector `f_code` 1-through-4 handling, full-width P parser/raster completion, and settled post-stream diagnostics.
 
-The v0.4.0 RTL qualification baseline is commit `1370c28e3d34b1fd603c17130986bc336da29a32`. It passed a fresh-clone Quartus Prime 17.0.2 build and the required MiSTer regression matrix before the documentation-only release commits were applied.
+The v0.5.0 release qualification checkout is commit `424eec43b0d0b4f8085e6591a15543eafab394e7`, whose synthesized RTL baseline is `b1bde49df3831669b577a1ed78404e026f19382d`. It passed a fresh-clone Quartus Prime 17.0.2 build and the authoritative seven-stream MiSTer regression matrix before the documentation-only release commits were applied.
 
-See [`docs/RELEASE_NOTES_v0.4.0.md`](docs/RELEASE_NOTES_v0.4.0.md) for release notes and qualification details.
+See [`docs/RELEASE_NOTES_v0.5.0.md`](docs/RELEASE_NOTES_v0.5.0.md) for release notes and qualification details.
 
 ## Architecture
 
@@ -112,13 +112,15 @@ See [`docs/BUILDING.md`](docs/BUILDING.md) for the full workflow.
 
 ## Diagnostic streams
 
-Binary regression streams are generated locally from deterministic scripts under `tools/streams/`. Important current regressions include:
+Binary regression streams are generated locally from deterministic scripts under `tools/streams/`. The authoritative seven-stream hardware matrix is:
 
-- `test_all_i.m2v` for the established continuous all-I path;
-- `test_p_general_decode.m2v` for the combined generalized signed-motion, interpolation, skip/predictor, quantiser, and residual P path;
-- `test_p_consecutive_reference.m2v` for reconstructed P-to-P reference promotion and destination-ownership pacing;
-- `test_b_core_decode.m2v` for the bounded B-picture core reconstruction path;
-- `test_b_mixed_gop.m2v` for mixed I/P/B coded order, B forward/backward/bidirectional prediction, and display-order presentation.
+- `test_i_baseline.m2v` for continuous full-width all-I decoding;
+- `test_p_motion_residual.m2v` for P motion phases, coded-block patterns, residual reconstruction, and quantiser changes;
+- `test_p_mba_escape.m2v` for ordinary and escaped macroblock-address gaps, including leading skips;
+- `test_b_bidirectional.m2v` for mixed I/P/B coded/display order, forward/backward/bidirectional motion, residuals, and predictor independence;
+- `test_p_visual_discriminator.m2v` for visible P-frame publication, identified by four quadrants and two center seams;
+- `test_p_f_code_range.m2v` for independent P horizontal/vertical `f_code` values 1 through 4, residual bits, signs, reuse, and wraparound;
+- `test_b_f_code_range.m2v` for independent B forward/backward horizontal/vertical `f_code` values 1 through 4 across two B reference pairs.
 
 The USER LED is used as a positive completion diagnostic during development. Its exact gating is not a public player UI.
 
@@ -135,7 +137,7 @@ The USER LED is used as a positive completion diagnostic during development. Its
 
 ## Development roadmap
 
-After v0.4.0, decoder work can broaden the currently bounded P/B implementation toward a wider real-stream H.262 compatibility envelope, including broader picture structures and chroma formats. Later work includes presentation-quality chroma improvements, H.222.0 Program Stream/PES handling and real timestamps, audio integration, and DVD navigation/optical-drive integration.
+After v0.5.0, decoder work can broaden the currently bounded P/B implementation toward a wider real-stream H.262 compatibility envelope, including broader picture structures and chroma formats. Later work includes presentation-quality chroma improvements, H.222.0 Program Stream/PES handling and real timestamps, audio integration, and DVD navigation/optical-drive integration.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for completed milestones.
 
