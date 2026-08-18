@@ -82,6 +82,8 @@ Read this core.md file first. Treat core.md is the primary project-level source 
 
 - You have full read and write access to the users local GitHub repository and may run build tools in the user's local enviroment.
 
+- When possible, provide the user with a progress bar based on historical build logs when compiling or running timing.
+
 ---
 
 ## Agent Response Loop
