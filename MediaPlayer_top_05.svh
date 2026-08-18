@@ -20,7 +20,7 @@ wire [31:0] mpeg2_new_p_ownership_picture_window_next =
 wire mpeg2_new_p_ownership_picture_start_now =
     (mpeg2_new_p_ownership_picture_window_next == 32'h00000100);
 wire mpeg2_new_picture_header_classified_now =
-    mpeg2_stream_rd &&
+    mpeg2_new_decode_stream_valid &&
     mpeg2_new_p_ownership_header_capture &&
     mpeg2_new_p_ownership_header_second_byte;
 wire [2:0] mpeg2_new_picture_header_type_now = mpeg2_stream_data[5:3];
@@ -31,7 +31,7 @@ wire mpeg2_new_non_b_picture_start_now =
     mpeg2_new_picture_header_classified_now &&
     (mpeg2_new_picture_header_type_now != 3'b011);
 wire mpeg2_new_sequence_end_now =
-    mpeg2_stream_rd &&
+    mpeg2_new_decode_stream_valid &&
     (mpeg2_new_p_ownership_picture_window_next == 32'h000001b7);
 wire mpeg2_new_p_destination_display_owned =
     !mpeg2_new_display_scratch &&
@@ -59,7 +59,7 @@ always @(posedge clk_mpeg2) begin
         if (mpeg2_new_p_publication_now)
             mpeg2_new_p_ownership_arm <= 1'b1;
 
-        if (mpeg2_stream_rd) begin
+        if (mpeg2_new_decode_stream_valid) begin
             mpeg2_new_p_ownership_picture_window <=
                 mpeg2_new_p_ownership_picture_window_next;
 

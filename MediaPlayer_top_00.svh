@@ -102,6 +102,7 @@ wire        mpeg2_stream_empty;
 wire [7:0]  mpeg2_stream_data;
 wire        mpeg2_stream_rd;
 wire        mpeg2_stream_wr;
+wire        mpeg2_new_decode_stream_valid;
 wire        mpeg2_new_stream_ready;
 wire        mpeg2_new_decoder_stream_ready;
 wire        mpeg2_new_b_presentation_hold;
@@ -211,9 +212,31 @@ assign mpeg2_new_stream_ready =
 	!mpeg2_new_b_presentation_hold &&
 	!mpeg2_new_p_destination_ownership_hold;
 
-assign mpeg2_stream_rd =
-	!mpeg2_stream_empty &&
-	mpeg2_new_stream_ready;
+// Entry 217: downstream raster and DDR errors are sticky, but their engines
+// cannot produce the persistence acknowledgement that normally releases the
+// parser.  Drain the transport after any such fatal result without presenting
+// discarded bytes as valid decoder input.  This lets ioctl_download retire so
+// the existing post-load LED snapshot can report the first failure.
+wire mpeg2_new_transport_fatal_error =
+	mpeg2_new_syntax_error ||
+	mpeg2_new_phase1_probe_error ||
+	mpeg2_new_pred_error ||
+	mpeg2_new_inverse_quant_error ||
+	mpeg2_new_inverse_quant_unsupported_matrix ||
+	mpeg2_new_idct_error ||
+	mpeg2_new_recon_error ||
+	mpeg2_new_ddr_store_error ||
+	mpeg2_new_ddr_cache_error ||
+	mpeg2_new_b_presentation_error;
+
+mpeg2_h262_stream_transport_gate mpeg2_h262_stream_transport_gate
+(
+	.fifo_empty       (mpeg2_stream_empty),
+	.decoder_ready    (mpeg2_new_stream_ready),
+	.fatal_error      (mpeg2_new_transport_fatal_error),
+	.fifo_read        (mpeg2_stream_rd),
+	.decoder_valid    (mpeg2_new_decode_stream_valid)
+);
 
 mpeg2_stream_fifo mpeg2_stream_fifo
 (
@@ -263,4 +286,3 @@ wire [7:0]  fb_video_b;
 wire        fb_video_de;
 wire        fb_video_hs;
 wire        fb_video_vs;
-
