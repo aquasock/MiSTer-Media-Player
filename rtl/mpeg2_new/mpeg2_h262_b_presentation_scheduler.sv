@@ -30,7 +30,8 @@ module mpeg2_h262_b_presentation_scheduler
     output reg  presentation_error
 );
 
-reg pending_frame_valid,pending_frame_bank;
+reg pending_frame_valid,pending_frame_bank,pending_frame_released;
+reg terminal_boundary_pending;
 reg b_user_success_d;
 reg reorder_active,run_closed,decode_inflight;
 reg scratch0_pending,scratch1_pending,next_present_scratch_bank;
@@ -42,11 +43,12 @@ wire scratch_waiting=next_present_scratch_bank?scratch1_pending:scratch0_pending
 wire future_waiting=future_frame_pending&&run_closed&&!decode_inflight&&
                     !scratch0_pending&&!scratch1_pending&&scratch_presented;
 wire scheduled_frame_valid=scratch_waiting||future_waiting||
-    (!reorder_active&&!b_picture_start&&(frame_waiting||pending_frame_valid));
+    (!reorder_active&&!b_picture_start&&pending_frame_valid&&
+     pending_frame_released);
 wire scheduled_frame_scratch=scratch_waiting;
 wire scheduled_scratch_bank=next_present_scratch_bank;
 wire scheduled_frame_bank=future_waiting?future_frame_bank:
-                          frame_waiting?completed_frame_bank:pending_frame_bank;
+                          pending_frame_bank;
 wire scheduled_frame_differs=scheduled_frame_scratch?
     (!display_scratch||(scheduled_scratch_bank!=display_scratch_bank)):
     (display_scratch||(scheduled_frame_bank!=display_frame_bank));
@@ -58,7 +60,8 @@ always @(posedge clk) begin
     if(reset) begin
         display_frame_bank<=0;display_scratch<=0;display_scratch_bank<=0;
         decode_scratch_bank<=0;framebuffer_swap_reset_count<=0;
-        pending_frame_valid<=0;pending_frame_bank<=0;b_user_success_d<=0;
+        pending_frame_valid<=0;pending_frame_bank<=0;pending_frame_released<=0;
+        terminal_boundary_pending<=0;b_user_success_d<=0;
         reorder_active<=0;run_closed<=0;decode_inflight<=0;
         scratch0_pending<=0;scratch1_pending<=0;next_present_scratch_bank<=0;
         future_frame_pending<=0;future_frame_bank<=0;scratch_presented<=0;
@@ -66,10 +69,24 @@ always @(posedge clk) begin
     end else begin
         b_user_success_d<=b_user_success;
 
+        // Entry 225: a reference publication is not display-order permission.
+        // Hold it until the following accepted header proves whether a B run
+        // owns the future reference.  This also makes publication coincident
+        // with a swap window safe: the just-published frame cannot win that
+        // same swap before the B header arrives.
+        if(sequence_end&&!reorder_active&&!pending_frame_valid&&!frame_waiting)
+            terminal_boundary_pending<=1;
+
         if(frame_waiting&&!reorder_active&&!b_picture_start&&!b_user_success_edge)begin
             pending_frame_valid<=1;
             pending_frame_bank<=completed_frame_bank;
+            pending_frame_released<=sequence_end||terminal_boundary_pending||
+                                    non_b_picture_start;
+            terminal_boundary_pending<=0;
         end
+
+        if(pending_frame_valid&&(non_b_picture_start||sequence_end))
+            pending_frame_released<=1;
 
         if(b_picture_start)begin
             if(!reorder_active)begin
@@ -79,6 +96,7 @@ always @(posedge clk) begin
                 future_frame_bank<=reference_frame_bank;scratch_presented<=0;
                 run_picture_count<=1;presentation_complete<=0;
                 presentation_error<=0;pending_frame_valid<=0;
+                pending_frame_released<=0;
                 if(display_scratch||(display_frame_bank==reference_frame_bank))begin
                     reorder_active<=0;decode_inflight<=0;future_frame_pending<=0;
                     presentation_error<=1;
@@ -128,13 +146,17 @@ always @(posedge clk) begin
                 scratch_presented<=1;
             end else if(future_waiting)begin
                 future_frame_pending<=0;reorder_active<=0;run_closed<=0;
-                pending_frame_valid<=0;
+                pending_frame_valid<=0;pending_frame_released<=0;
                 if(scratch_presented&&!presentation_error)presentation_complete<=1;
                 else presentation_error<=1;
-            end else pending_frame_valid<=0;
+            end else begin
+                pending_frame_valid<=0;
+                pending_frame_released<=0;
+            end
         end else if(swap_window_pulse&&future_waiting&&!scheduled_frame_differs)begin
             future_frame_pending<=0;reorder_active<=0;run_closed<=0;
-            pending_frame_valid<=0;presentation_error<=1;
+            pending_frame_valid<=0;pending_frame_released<=0;
+            presentation_error<=1;
         end else if(framebuffer_swap_reset_count!=0)
             framebuffer_swap_reset_count<=framebuffer_swap_reset_count-1'b1;
 

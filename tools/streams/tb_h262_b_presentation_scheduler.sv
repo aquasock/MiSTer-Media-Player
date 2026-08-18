@@ -36,6 +36,15 @@ module tb_h262_b_presentation_scheduler;
     initial begin
         repeat(4)@(posedge clk);@(negedge clk);reset<=0;
 
+        // A reference publication on the swap edge must remain hidden until
+        // the following header classifies it.  B owns it as the future frame.
+        @(negedge clk);completed_bank<=1;reference_bank<=1;
+        frame_waiting<=1;swap<=1;
+        @(negedge clk);frame_waiting<=0;swap<=0;#1;
+        if(display_bank||display_scratch||error||!dut.pending_frame_valid||
+           dut.pending_frame_released)
+            $fatal(1,"publication/vblank race exposed future reference");
+
         pulse_start();
         if(decode_scratch_bank||hold||error)$fatal(1,"first B did not select scratch 0");
         pulse_success();
@@ -55,6 +64,31 @@ module tb_h262_b_presentation_scheduler;
         if(display_scratch||!display_bank||!complete||error||hold)
             $fatal(1,"future reference did not retire the B run");
 
+        // With no B owner, the following non-B header releases the queued
+        // reference for the next swap rather than the publication swap.
+        completed_bank<=0;reference_bank<=0;
+        @(negedge clk);frame_waiting<=1;swap<=1;
+        @(negedge clk);frame_waiting<=0;swap<=0;#1;
+        if(!display_bank||!dut.pending_frame_valid||dut.pending_frame_released)
+            $fatal(1,"ordinary reference bypassed classification barrier");
+        pulse_close();
+        if(!dut.pending_frame_released)$fatal(1,"non-B header did not release reference");
+        pulse_swap();
+        if(display_scratch||display_bank||error)
+            $fatal(1,"released ordinary reference did not display");
+
+        // A terminal start code may be consumed before persistence publishes
+        // the final reference.  Retain that boundary and release on publish.
+        @(negedge clk);sequence_end<=1;@(negedge clk);sequence_end<=0;#1;
+        completed_bank<=1;reference_bank<=1;
+        @(negedge clk);frame_waiting<=1;swap<=1;
+        @(negedge clk);frame_waiting<=0;swap<=0;#1;
+        if(display_bank||!dut.pending_frame_valid||!dut.pending_frame_released)
+            $fatal(1,"terminal boundary did not release final reference");
+        pulse_swap();
+        if(display_scratch||!display_bank||error)
+            $fatal(1,"terminal reference did not display");
+
         // A failed later B must release ownership/backpressure and leave the
         // ordinary reference presentation path usable.
         reference_bank<=0;
@@ -64,11 +98,13 @@ module tb_h262_b_presentation_scheduler;
         @(negedge clk);b_error<=1;@(negedge clk);b_error<=0;#1;
         if(hold||!error)$fatal(1,"failed B transaction did not fail open");
         completed_bank<=0;frame_waiting<=1;
-        pulse_swap();frame_waiting<=0;
+        @(negedge clk);frame_waiting<=0;
+        pulse_close();
+        pulse_swap();
         if(display_scratch||display_bank)
             $fatal(1,"ordinary frame presentation did not recover after abort");
 
-        $display("B_PRESENTATION_RESULT order=scratch0,scratch1,future fail_open=1");
+        $display("B_PRESENTATION_RESULT race_barrier=1 order=scratch0,scratch1,future ordinary=1 terminal=1 fail_open=1");
         $finish;
     end
 
