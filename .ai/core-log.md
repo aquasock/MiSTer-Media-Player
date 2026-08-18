@@ -897,21 +897,25 @@ Unreleased 450f78a
 
 #### Purpose:
 
-Identify and correct the dense I/P/B publication transition that raises the first POWER-4 error.
+Identify the hidden repeated-P parser failure that prevents the second dense P reference from reaching publication.
 
 #### Outcome:
 
-The planned commit will assign a sticky detail code to each publication-error assertion site, expose that detail through the existing first-fault LED hierarchy, and drive the complete generated dense corpus through the compiled I/P/B publication shell with row and picture persistence in hardware order. The regression will establish the first failing reference-bank or header-order transition before the commit changes that transition, then require all P publications and B persistence events to complete without publication error.
+The full generated dense corpus reproduces POWER 4 at byte 1,192,302 with publication detail 1, two P headers but only one P publication, and three B headers after two B persistence events. Event tracing proves the second P emits zero rows and the generalized P parser has already latched `wide_error` with `proof_done` set before the third B header; the mixed-GOP shell gates that earlier P error after B ownership, so publication error is a downstream symptom. A speculative parked-B-header interlock deadlocked at the same byte and was removed. The remaining uncommitted changes are observational publication detail and the reproducer; no behavioral correction is retained.
 
 #### Next Steps:
 
-Implement the observability and full publication-order regression, correct only the reproduced transition, rerun the focused persistence, dense P, seven-B, transport, presentation, and storage-tag regressions, then complete a clean Quartus build and deploy the verified artifacts to the standard MiSTer target.
+Stop pending approval to retarget this commit from publication ordering to repeated-P parser rearm. The revised work will preserve publication first-fault detail, add a first-fault code inside the wide P parser, correct the reproduced second-P failure, require all four dense P pictures and seven B pictures to parse, persist, and publish in order, then rerun the surrounding regressions before Quartus.
 
 #### Files Modified:
 
 - MediaPlayer_top_01.svh
 - MediaPlayer_top_02.svh
 - MediaPlayer_top_07.svh
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
 - rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
 - tools/streams/tb_h262_dense_publication_order.sv
 
