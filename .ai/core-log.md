@@ -1168,7 +1168,7 @@ None.
 - [ ] Passed
 
 ---
-## 219 COMMIT Unreleased ??? 2026-08-18T11:10:43-07:00
+## 219 COMMIT Unreleased daf7af2 2026-08-18T11:10:43-07:00
 
 #### Coming From:
 
@@ -1180,11 +1180,11 @@ Preserve the settled LED diagnostic snapshot when fail-open transport intentiona
 
 #### Outcome:
 
-Extend only the existing settled-snapshot arm condition so either the decoded sticky sequence-end flag or the sticky transport-fatal flag starts the same four-slot, one-second stabilization delay. Keep the capture registers, first-fault priority, blink epoch, clean-stream sequence-end behavior, and transport drain unchanged. Static and synthesis validation must prove that the fatal path reaches `mpeg2_new_diag_snapshot_valid` without feeding discarded bytes back into the decoder.
+Commit `daf7af2` extends only the settled-snapshot arm condition so either the decoded sticky sequence-end flag or the sticky transport-fatal flag starts the existing four-slot, one-second stabilization delay. The capture registers, first-fault priority, blink epoch, clean-stream sequence-end behavior, and transport drain are unchanged. The focused fail-open transport and B-picture scheduler regressions pass. A clean Quartus 17.0.2 build completes with 0 errors, 121 standing warnings, no critical warnings, global setup slack +0.419 ns, hold slack +0.247 ns, recovery slack +3.470 ns, and focused decoder setup/recovery slack +1.571/+15.398 ns. The build uses 29,491 ALMs, 42,139 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. `MediaPlayer_commit219_daf7af2.rbf` is 4,235,564 bytes with SHA-256 `241237b30b480ef1b8184f7cbe0bdf25d93e9f38f97218b1fc899e4260175a5e`; its MiSTer FTP readback is byte-identical.
 
 #### Next Steps:
 
-Apply the trigger correction, rerun the focused transport and presentation regressions, produce a clean Quartus build, deploy it to the connected MiSTer with readback verification, and reload the long-GOP stream to obtain the concealed frame-50 USER, POWER, and DISK error codes.
+Reload the long-GOP stream and wait at least one second after the frame-50 stop. Record the complete 32-second LED diagnostic epoch, or count the USER blinks during its first 6 seconds, POWER blinks during the next 10 seconds, and DISK blinks during the final 16 seconds, to expose the concealed fatal error code and detail.
 
 #### Files Modified:
 
@@ -1192,7 +1192,7 @@ Apply the trigger correction, rerun the focused transport and presentation regre
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
