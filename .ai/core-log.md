@@ -489,7 +489,7 @@ Run the parser-window stream, Commit-197 multi-slice stream, and authoritative s
 - [ ] Passed
 
 ---
-## 199 COMMIT Unreleased ??? 2026-08-17T22:13:12-07:00
+## 199 COMMIT Unreleased af20d28 2026-08-17T22:13:12-07:00
 
 #### Coming From:
 
@@ -501,11 +501,11 @@ Identify the first prediction-pipeline assertion raised by legal same-row P/B sl
 
 #### Outcome:
 
-This commit will preserve USER error class 3 while snapshotting the responsible prediction engine and its first internal assertion into the existing non-overlapping POWER and DISK diagnostic windows. The accepted parser-window result and visually coherent restricted-slices raster will remain unchanged, and no parsing, reconstruction, reference, DDR, publication, or presentation control will depend on the new observability signals.
+Commit `af20d28` preserves USER error class 3 while snapshotting the responsible prediction engine and its first internal assertion into the existing non-overlapping POWER and DISK diagnostic windows: POWER 1 is the plan adapter, 2 generalized P raster, 3 B raster/history, and 4 legacy/base; DISK reports the first engine-local assertion for P or B. Focused RTL replay proves generalized P POWER 2 / DISK 8 and B POWER 3 / DISK 7 while later malformed metadata cannot relabel the first fault. The 194,005-byte parser-window stream remains clean with eight P and eight B refills, and the 185,393-byte restricted-slices stream remains clean with both pictures seen and all 1,350 P macroblocks. The clean Quartus 17.0.2 build completes in 14 minutes 12 seconds with zero setup and hold TNS, no Critical Warning, +0.173 ns global setup, +0.232 ns global hold, +1.801 ns decoder setup, 40,891 ALMs, 50,495 registers, 584,141 memory bits, 88 RAM blocks, 69 DSP blocks, and 3 PLLs. Generated RBF `MediaPlayer.rbf` has SHA-256 `24ad77f4207bb9be870e2d294cc975cfffd9529950fc356f20dedafb912751c0`; no parsing, reconstruction, reference, DDR, publication, or presentation control depends on the new observability signals.
 
 #### Next Steps:
 
-Add focused replay for prediction-error source capture, rerun the parser-window and restricted-slices parser regressions, complete a clean Quartus 17.0.2 build with zero TNS and no Critical Warning, and rerun only the restricted-slices stream on MiSTer to record USER, POWER, and DISK across one complete diagnostic frame.
+Install the Commit-199 RBF and run only `test_pb_restricted_slices.m2v` on MiSTer for one complete 32-second diagnostic frame, recording USER, POWER, and DISK counts. Use POWER to select the prediction engine and DISK to identify its first assertion before proposing any decoder-behavior change.
 
 #### Files Modified:
 
@@ -521,7 +521,7 @@ Add focused replay for prediction-error source capture, rerun the parser-window 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
