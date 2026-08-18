@@ -451,7 +451,7 @@ Generalize the active P and B slice ingestion paths so independently coded legal
 - [x] Passed
 
 ---
-## 198 COMMIT Unreleased ??? 2026-08-17T21:00:48-07:00
+## 198 COMMIT Unreleased 6c6854c 2026-08-17T21:53:24-07:00
 
 #### Coming From:
 
@@ -463,22 +463,29 @@ Generalize progressive P/B slice ingestion beyond whole-slice byte capture and r
 
 #### Outcome:
 
-This commit will replace the active P and B parsers' fixed captured-slice transaction boundary with backpressured syntax ingestion that preserves each slice's independent macroblock-address and motion-predictor reset semantics. Legal same-row slice continuation, early slice termination, ordinary next-row progression, picture termination, and sequence termination will share one ownership model while reconstruction ordering, reference banks, residual limits, picture structures, and the 720x480 progressive 4:2:0 envelope remain unchanged.
+Commit `6c6854c` converts both active 512-byte P/B capture arrays into refillable backpressured parser windows, retains the final two bytes across refills so a `00 00 01` prefix may cross a window boundary, and resumes the syntax state machine without changing macroblock, predictor, residual, reconstruction, or reference ownership. A deterministic 194,005-byte I/P/B stream places 2,285-byte P and 2,291-byte B slice payloads across eight refills per parser; isolated RTL replay reports both pictures without syntax errors and preserves all 1,350 P macroblocks, while software reference decoding makes every P/B frame pixel-identical to the I reference. The Commit-197 multi-slice replay and all seven standing generators retain their accepted hashes and reference results. Fitter seed 2 removes the unrelated marginal HDMI placement failure without changing RTL behavior; the final clean Quartus 17.0.2 build completes in 14 minutes 24 seconds with zero setup and hold TNS, no Critical Warning, +0.042 ns global setup, +0.246 ns global hold, +1.487 ns decoder setup, 40,807 ALMs, 50,336 registers, 584,141 memory bits, 88 RAM blocks, 69 DSP blocks, and 3 PLLs. Generated RBF `MediaPlayer.rbf` has SHA-256 `09e2ecf7997cbebe7e110e50b7e8238fdc14f7f27cc042de865ef9c21562dd4c`; parser-window stream `test_pb_parser_window.m2v` has SHA-256 `1659d08a7393b4b82e77cb869ae139d0205de8b6c911c3f3d770fc03b744b801`.
 
 #### Next Steps:
 
-Add focused parser replay for arbitrary legal slice partitions, run the Commit-197 multi-slice and standing seven-stream software regressions, complete a clean Quartus 17.0.2 build with zero TNS and no Critical Warning, and obtain MiSTer acceptance before beginning P-picture intra-macroblock integration as Commit 199.
+Run the parser-window stream, Commit-197 multi-slice stream, and authoritative seven-stream matrix on MiSTer using the Commit-198 RBF, confirming stable decoded output and no USER, POWER, or DISK error indication. After hardware acceptance, begin P-picture intra-macroblock integration as Commit 199 while preserving predicted, skipped, and residual-coded macroblock behavior.
 
 #### Files Modified:
 
+- MediaPlayer.qsf
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+- tools/streams/generate_test_pb_parser_window.py
+- tools/streams/tb_h262_parser_windows.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
