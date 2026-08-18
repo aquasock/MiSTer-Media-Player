@@ -2,13 +2,9 @@
 
 ---
 
----
-
----
-
 ## Purpose
 
-MiSTer-Media-Player is being developed as a simple, compatibility-focused media player for MiSTer. The immediate target is a standards-driven MPEG-2 Video / ITU-T H.262 decoder implemented primarily in FPGA logic. The long-term goal is a fully functioning DVD player core that can play commercial disks from .iso files, a DVD folder structure, or directly from a USB-attached DVD reader. Another project called MiSTer-Media-Player-Audio is being develevoped in parallel to handle standalone OGG, MP3, and FLAC files and will be integrated back into the MiSTer-Media-Player once complete.
+MiSTer-Media-Player is being developed as a simple, compatibility-focused media player for MiSTer. The immediate target is a standards-driven MPEG-2 Video / ITU-T H.262 decoder implemented primarily in FPGA logic. The long-term goal is a fully functioning DVD player core that can play commercial disks from .iso files, a DVD folder structure, or directly from a USB-attached DVD reader.
 
 ---
 
@@ -20,39 +16,37 @@ MiSTer-Media-Player is being developed as a simple, compatibility-focused media 
 
 - Use ISO-8601 timestamps with the local UTC offset. Timezone is America/Phoenix.
 
-- When needing to look up reference material, use core-standards.md as an authoritative source when attempting to lookup anything that could be considered a standard, conformance, specification, etc. as opposed to looking it up online.
+- When needing to look up reference material, use core-reference.md as an authoritative source when attempting to lookup anything that could be considered a standard, conformance, specification, etc. as opposed to looking it up online.
 
-- If you are not able to find the information you need by consulting core-standards.md, look up the standard online you trust and make an educated determination if you would like to add it to your core-standards.md document following existing syntax and formatting for future reference.
+- If you are not able to find the information you need by consulting core-reference.md, look up the standard online you trust and make an educated determination if you would like to add it to your core-reference.md document following existing syntax and formatting for future reference.
 
-- If a more recent or otherwise more valid source is discovered during your online research and it is not documented in core-standards.md, you are to notify the user.
+- If a more recent or otherwise more valid source is discovered during your online research and it is not documented in core-reference.md, you are to notify the user.
 
 - Diagnostic implementation limits must not be described as standard limits.
 
-- Respect all all standard licensing and attribution conventions.
+- Respect all standard licensing and attribution conventions.
 
 ---
 
 ## AI Agent Recovery Policy
 
-Read this core.md file first. Treat it and all the directives in it as the sole authoritative source for recovery procedure, standing workflow, and agent behavior. All directives in the document have the same priority, not just in this section. Read core-log.md second as historical engineering/build/transcript evidence. Treat core.md as RESTRICTED, authoritative project core memory. Do not edit it automatically for any reason. Only edit core.md if the user explicitly asks for it.
+Read this core.md file first. Treat core.md is the primary project-level source of directives subject to active higher-priority and current user instructions. Read core-log.md second as historical engineering/build/transcript evidence and the primary project-level source of context, The online GitHub repository is the backup source for archival information.. Treat core.md as RESTRICTED, authoritative project core memory. Do not edit it automatically for any reason. Only edit core.md if the user explicitly asks for it.
 
 ---
 
-## Build Enviroment
+## Build Environment
 
-- The github repository for this project is: https://github.com/aquasock/MiSTer-Media-Player.git
+- The GitHub repository for this project is: https://github.com/aquasock/MiSTer-Media-Player.git
 
-- The github repository for the MiSTer-Media-Player-Audio project is:
+- The user's local GitHub repository must always stay up to date with the online repository.
 
-- The users local githib repository must always stay up to date with the online repository.
+- The user's local GitHub repository is: /run/media/vash/GIT/MiSTer-Media-Player
 
-- core-log.md is the authoritative source for current project status. The github repository is the backup source.
+- 
 
 - The tar.gz archives stored in the "archived_results" folder are not to be referenced unless approval from the user is given first.
 
-- a clean build from a cloned github source from master is required for all releases.
-
-- Do not create branches if possible. always work off of master unless otherwise instructed.
+- Do not create branches if possible. Always work off of master unless otherwise instructed.
 
 - User is building on Kubuntu 26.04 LTS with Quartus Prime v17.0.2 Lite.
 
@@ -64,45 +58,43 @@ Read this core.md file first. Treat it and all the directives in it as the sole 
 
 - No need to be polite when speaking, Communicate as you would in a standard engineering enviroment.
 
-- Assume all user commands are run from the source root.
-
-- Before approval, limit work to evidence gathering, log interpretation, problem scoping, and defining the proposed commit boundaries and validation plan. Do not proceed into solution design or implementation reasoning.
-
-- After the user approves the proposed plan, carry out the approved development cycle: determine the implementation, make the source changes, commit the changes to GitHub master, update core-log.md, and report the results.
+- Assume all user commands are run from the local GitHub root.
 
 - Split changes further only when risk, standards uncertainty, diagnostic isolation, or new evidence makes a smaller boundary materially safer.
 
 - If new findings would materially change the approved plan, stop and obtain user approval for the revised plan before continuing.
 
-- Accelerated development is the default cadence. Plan each development cycle around a materially useful hardware-validation boundary rather than deliberately small micro-steps. As a guideline, combine adjacent low-risk changes into increments roughly twice the size of the earlier conservative flow when they share one clear proof boundary.
+- Accelerated development is the default cadence. Plan each development cycle around a materially useful hardware-validation boundary rather than deliberately small micro-steps.
 
-- Generated binary regression artifacts and diagnostic tools the user is intended to run such as ffmpeg generated files should normally be produced by deterministic scripts committed under tools/streams/ and generated locally by the user, rather than requiring the agent to commit the binary itself.
+- Generated binary regression artifacts and diagnostic tools the user is intended to run such as ffmpeg generated files or other large files should normally be produced by deterministic scripts committed under tools/streams/ and generated locally by the user, rather than requiring the agent to commit the binary itself.
 
 - Treat core-log.md as a ring buffer. Only 40 of the most recent entries are ever allowed. Roll over to "001" when "999" is reached.
 
-- The folder labeled ".ai" on the github repositories root is your core project folder and contains your core directives, (core.md) running project memory, (core-log.md), standards library (core-standards.md), and core-log.md formatting guidelines (core-log-format.md).
+- The folder labeled ".ai" on the GitHub repository’s root is your core project folder and contains your core directives, (core.md) running project memory, (core-log.md), reference library (core-reference.md), and syntax guidelines (core-syntax.md).
 
-- Use the commit message "(current\_short commit) core-log.md update" for all updates you make to core-log.md. 
+- A core-syntax.md audit must be done any time changes are made to any of the files in your core project folder except core-syntax.md. 
 
-- Use the commit message "(current\_short commit) core.md update" for all updates you make to core.md. 
+- Use the commit message "(<current_short_commit>) core-log.md update" for all updates you make to core-log.md. 
 
-- Use the commit message "(current\_short commit) core-standards.md update" for all updates you make to core-standards.md. 
+- Use the commit message "(<current_short_commit>) core.md update" for all updates you make to core.md. 
 
-- "current_short_commit"" means the abbreviated SHA of the current github repository. Metadata-only .ai commits do not change this value for that development cycle.
+- Use the commit message "(<current_short_commit>) core-reference.md update" for all updates you make to core-reference.md. 
 
-- Before any changes are made to core-log.md, check with the guidelines listed in core-log-format.md first. Adhere to these guidelines for any edits made.
+- Use the commit message "(<current_short_commit>) core-syntax.md update" for all updates you make to core-syntax.md. 
+
+- (<current_short_commit>) means the abbreviated SHA of the development/source commit being documented. Subsequent metadata-only .ai commits continue to reference that source commit for the same development cycle.
 
 ---
 
 ## Agent Response Loop
 
-- When responding to the user, follow the following chain of events:
+- When responding to the user, follow the chain of events:
 
-1. Record the current time in a file on the local github root named "response_timestamp.txt". If the file already exsits, replace it.
+1. Record the current time in a file on the local GitHub root named "response_timestamp.txt". If the file already exists, replace it.
 
-2. Continue normal agent "Thinking" process and respond to the user as normal.
+2. Continue normal agent "Thinking" process.
 
-3. If the recorded time in "response_timestamp.txt" is greater than 1 minute from the current time, run the command "paplay /usr/share/sounds/freedesktop/stereo/complete.oga" on the users local PC.
+3. Compare the elapsed time from "response_timestamp.txt" and if the elapsed time exceeds one minute, run the command: "paplay /usr/share/sounds/freedesktop/stereo/complete.oga" on the users local PC. Then respond to the user regardless of elapsed time.
 
 4. Await user input.
 
@@ -110,43 +102,45 @@ Read this core.md file first. Treat it and all the directives in it as the sole 
 
 ---
 
-## Target Enviroment
+## Target Environment
 
 - Treat the user's current MiSTer hardware configuration as the standard development target unless the user says otherwise.
 
 - The user's standard target is as follows:
 
+```text
 DE10-Nano-compatible Cyclone V SoC MiSTer system
 
-Linux:\
-Kernel: Linux MiSTer 5.15.1-MiSTer\
+Linux:
+Kernel: Linux MiSTer 5.15.1-MiSTer
 Build:  Wed Apr 2 20:01:54 CST 2025
 
-HPS CPU:\
-ARM Cortex-A9\
-2 cores\
-ARMv7 little-endian\
+HPS CPU:
+ARM Cortex-A9
+2 cores
+ARMv7 little-endian
 CPU range: 400 MHz - 1.2 GHz
 
-HPS RAM visible to Linux:\
-MemTotal: 504096 kB\
+HPS RAM visible to Linux:
+MemTotal: 504096 kB
 Approx. 492 MiB Linux-visible
 
-HPS <-> FPGA Bridges:\
-Lightweight HPS-to-FPGA: present\
-HPS-to-FPGA:             present\
+HPS <-> FPGA Bridges:
+Lightweight HPS-to-FPGA: present
+HPS-to-FPGA:             present
 FPGA-to-HPS:             present
 
-Ethernet:\
-Controller: Cyclone-V HPS DWMAC1000\
-PHY: Micrel/Microchip KSZ9031\
+Ethernet:
+Controller: Cyclone-V HPS DWMAC1000
+PHY: Micrel/Microchip KSZ9031
 Link: 1 Gbit/s Full Duplex
 
-I2C:\
-m41t81  @ 0x68   - operational / supplies rtc \
-\
-Power:\
-Idle Current: \~1.1A
+I2C:
+m41t81  @ 0x68   - operational / supplies rtc
+
+Power:
+Idle Current: ~1.1A
+```
 
 ---
 
@@ -154,19 +148,23 @@ Idle Current: \~1.1A
 
 1. Review the available build and test logs, identify the observed failures or required work, and prepare a proposed plan of action for the next GitHub commits. 
 
-2. Update core-log.md with your proposal and await user approval.
+2. If the plan is approved by the user, Update core-log.md with your proposal and commit it tothe online repository.
 
-3. You will then make changes to the local github source code directly that is aligned with your proposed changes in core-log.md.
+3. Make changes to the local GitHub source code directly that are aligned with your proposed changes in core-log.md.
 
-4. You will then commit the changes to the online repository with a commit message that follows previous agents commit message conventions. This will become the next builds official commit hash.
+4. Commit the changes to the online repository with a commit message that follows previous agents commit message conventions. This will become the next build's official commit hash.
 
 5. You will then build the project yourself and inform the user the files are ready for testing. 
 
-6. I will inform you when my test results are ready on the local github repository.
+6. Update core-log.md with your build results and commit it to the online repository.
 
-7. Check the MiSTer-Media-Player-Audio project's latest commit on github and verify that there are no conflicts with the MiSTer-Media-Player's functionality or later integration with MiSTer-Media-Player-Audio.
+7. I will inform you when my test results are ready on the local GitHub repository.
 
-8. Repeat.
+8. Review the test results and determine if the proposed plan of action worked.
+
+9. Update core-log.md with my test results and commit it to the online repository.
+
+10. Repeat.
 
 ---
 
@@ -184,13 +182,9 @@ Idle Current: \~1.1A
 
 - Reserve 1.0.0 for a future user-ready compatibility baseline explicitly approved by the user.
 
-- Development commits between published releases do not receive Semantic Version numbers or Git version tags. They belong to Unreleased until a hardware-proven milestone is accepted for release, at which point the next Semantic Version is assigned.
-
 ---
 
 ## Releasing
-
-- Record every published version/tag/release boundary in `core-log.md`.
 
 - GitHub release title should be `MiSTer Media Player vX.Y.Z`.
 
@@ -204,14 +198,12 @@ Idle Current: \~1.1A
 
 - MiSTer binary naming follows the MiSTer core convention rather than Semantic Versioning: use `MediaPlayer_YYYYMMDD.rbf` for the actual core binary, where the date is the release/build date.
 
-- Do not rename the RBF to `MediaPlayer_vX.Y.Z.rbf`. The user is responsible for building and packaging the binary release artifacts.
+1. Perform a full regression test suite with a clean/from-scratch Quartus build and verify the results.
 
-1. Have the user peform a full regression test suite with a clean/from-scratch Quartus build and verify the results.
-
-2. Update the README.md and CHANGELOG.md on the projects github and commit the change.
+2. Update the README.md and CHANGELOG.md on the project's GitHub repository and commit the change.
 
 3. Have the user create the annotated/version tag and GitHub Release from that exact commit so source, release notes, and binary package are reproducible.
 
-4. Finish pushing the release onto github.
+4. Push the release onto GitHub.
 
 ---
