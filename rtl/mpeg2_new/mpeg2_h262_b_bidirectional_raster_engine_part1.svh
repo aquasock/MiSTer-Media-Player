@@ -58,7 +58,7 @@ reg row_final_latched;
 
 reg pending,started;
 reg future_bank_latched;
-reg req,waitresp,req_kind;
+reg req,waitresp,req_kind,lookup_wait;
 reg [10:0] mbi;
 reg [5:0] col,mrow;
 reg [2:0] blk;

@@ -16,7 +16,7 @@
 
         if(request&&!started)pending<=1;
         if(pending&&!started&&metadata_done) begin
-            pending<=0;started<=1;active<=1;future_bank_latched<=future_reference_bank;scratch_bank_latched<=scratch_frame_bank;timeout<=26'h3ffffff;
+            pending<=0;started<=1;active<=1;future_bank_latched<=future_reference_bank;scratch_bank_latched<=scratch_frame_bank;timeout<=26'h3ffffff;lookup_wait<=0;
             mbi<=row_motion_base;col<=0;mrow<=exec_row;blk<=0;ei<=0;exec_desc_slot<=0;pred_direction<=0;motion_load<=1;pixel_setup<=0;residual_load<=0;residual_load_wait<=0;persisted_seen<=0;
             if(!reference_valid||!geometry_ok||(motion_count==0))begin error<=1;if(!error)error_source<=5'd8;active<=0;persisted_seen<=1;timeout<=0;motion_load<=0;end
         end
@@ -43,26 +43,30 @@
             else begin
                 if(half_x||half_y)half_sample_seen<=1;
                 req_kind<=0;
-                if(ddram_lookup_hit) begin
-                    if(tap_last) begin
-                        if((mb_direction==2'd3)&&!pred_direction) begin
-                            forward_prediction<=lookup_selected_prediction;
-                            pred_direction<=1;pred_sum<=0;tap_index<=0;
-                            pixel_setup<=1;
-                        end else begin
-                            out_reg<=lookup_reconstructed_current;emit<=1;
-                            if((mbi==0)&&(blk==0)&&(ei==0))begin
-                                read_seen<=1;
-                                sample_nonzero<=|lookup_final_prediction;
-                            end
-                        end
-                    end else begin
-                        pred_sum<=lookup_pred_sum_with_current;
-                        tap_index<=tap_index+1'b1;
-                        pixel_setup<=1;
-                    end
-                end else req<=1;
+                lookup_wait<=1;
             end
+        end
+
+        if(lookup_wait&&ddram_lookup_ready) begin
+            if(ddram_lookup_hit) begin
+                if(tap_last) begin
+                    lookup_wait<=0;
+                    if((mb_direction==2'd3)&&!pred_direction) begin
+                        forward_prediction<=lookup_selected_prediction;
+                        pred_direction<=1;pred_sum<=0;tap_index<=0;
+                        pixel_setup<=1;
+                    end else begin
+                        out_reg<=lookup_reconstructed_current;emit<=1;
+                        if((mbi==0)&&(blk==0)&&(ei==0))begin
+                            read_seen<=1;
+                            sample_nonzero<=|lookup_final_prediction;
+                        end
+                    end
+                end else begin
+                    pred_sum<=lookup_pred_sum_with_current;
+                    tap_index<=tap_index+1'b1;
+                end
+            end else begin lookup_wait<=0;req<=1;end
         end
 
         // kate - Commit 182: latch the returned-word byte select in the same

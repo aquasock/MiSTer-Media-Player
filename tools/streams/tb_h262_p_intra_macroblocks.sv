@@ -47,6 +47,7 @@ module tb_h262_p_intra_macroblocks;
     wire [7:0] engine_burstcnt,engine_store_value;
     wire [28:0] engine_addr;
     wire engine_rd,engine_store_select,engine_store_valid;
+    wire engine_lookup_request;
     wire engine_store_start,engine_store_complete,engine_active;
     wire [11:0] engine_store_x,engine_store_y;
     wire engine_read_seen,engine_sample_nonzero,engine_half_seen;
@@ -61,7 +62,7 @@ module tb_h262_p_intra_macroblocks;
     reg signed [15:0] engine_residual_read_data=0;
     reg signed [15:0] engine_residual_mem[0:131071];
     reg [63:0] engine_dout=0;
-    reg engine_dout_ready=0,engine_block_stored=0;
+    reg engine_dout_ready=0,engine_block_stored=0,engine_lookup_ready=0;
     integer intra_store_samples=0;
 
     function automatic is_intra_mb;
@@ -86,6 +87,7 @@ module tb_h262_p_intra_macroblocks;
     always #5 clk=~clk;
 
     always @(posedge clk) begin
+        engine_lookup_ready<=engine_lookup_request;
         if(engine_residual_write)
             engine_residual_mem[engine_residual_write_address]
                 <=engine_residual_write_data;
@@ -167,6 +169,8 @@ module tb_h262_p_intra_macroblocks;
         .reference_bank(1'b0),.destination_bank(1'b1),
         .store_block_stored(engine_block_stored),.ddram_busy(1'b0),
         .ddram_dout(engine_dout),.ddram_dout_ready(engine_dout_ready),
+        .ddram_lookup_ready(engine_lookup_ready),.ddram_lookup_hit(1'b0),
+        .ddram_lookup_data(64'd0),.ddram_lookup_request(engine_lookup_request),
         .ddram_burstcnt(engine_burstcnt),.ddram_addr(engine_addr),
         .ddram_rd(engine_rd),.store_select(engine_store_select),
         .store_pixel_value(engine_store_value),.store_pixel_x(engine_store_x),

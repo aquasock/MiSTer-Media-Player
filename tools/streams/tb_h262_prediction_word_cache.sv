@@ -5,8 +5,8 @@ module tb_h262_prediction_word_cache;
     reg [7:0] request_burstcnt=0;
     reg [28:0] request_addr=0;
     reg request_read=0,request_cacheable=0;
-    reg lookup_consume=0;
-    wire lookup_hit;
+    reg lookup_request=0,lookup_consume=0;
+    wire lookup_ready,lookup_hit;
     wire [63:0] lookup_data;
     wire request_busy;
     wire [63:0] request_dout;
@@ -39,7 +39,8 @@ module tb_h262_prediction_word_cache;
         .clk(clk),.reset(reset),.active(active),
         .request_burstcnt(request_burstcnt),.request_addr(request_addr),
         .request_read(request_read),.request_cacheable(request_cacheable),
-        .lookup_consume(lookup_consume),.lookup_hit(lookup_hit),
+        .lookup_request(lookup_request),.lookup_consume(lookup_consume),
+        .lookup_ready(lookup_ready),.lookup_hit(lookup_hit),
         .lookup_data(lookup_data),
         .request_busy(request_busy),.request_dout(request_dout),
         .request_dout_ready(request_dout_ready),
@@ -108,8 +109,10 @@ module tb_h262_prediction_word_cache;
             request_addr=addr;
             request_cacheable=1;
             request_read=0;
-            #1;
-            if(!lookup_hit)
+            lookup_request=1;
+            @(negedge clk);
+            lookup_request=0;
+            if(!lookup_ready||!lookup_hit)
                 $fatal(1,"direct lookup missed addr=%h",addr);
             if(lookup_data!==word_for(addr))
                 $fatal(1,"wrong direct lookup data addr=%h",addr);

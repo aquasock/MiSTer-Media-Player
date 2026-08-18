@@ -27,12 +27,13 @@ module tb_h262_b_residual_streaming;
     wire [7:0] burstcnt,store_value;
     wire [28:0] ddram_addr;
     wire ddram_rd,store_select,store_valid,store_start,store_complete;
+    wire ddram_lookup_request;
     wire [11:0] store_x,store_y;
     wire raster_active,read_seen,sample_nonzero,half_seen;
     wire reconstructed_seen,persisted_seen,row_persisted,raster_error;
     wire [4:0] raster_error_source;
     reg [63:0] ddram_dout=0;
-    reg ddram_dout_ready=0,store_block_stored=0;
+    reg ddram_dout_ready=0,store_block_stored=0,ddram_lookup_ready=0;
 
     function automatic is_stripe_mb;
         input [10:0] index;
@@ -68,6 +69,8 @@ module tb_h262_b_residual_streaming;
         .reference_valid(1'b1),.future_reference_bank(1'b1),.scratch_frame_bank(1'b0),
         .store_block_stored(store_block_stored),.ddram_busy(1'b0),
         .ddram_dout(ddram_dout),.ddram_dout_ready(ddram_dout_ready),
+        .ddram_lookup_ready(ddram_lookup_ready),.ddram_lookup_hit(1'b0),
+        .ddram_lookup_data(64'd0),.ddram_lookup_request(ddram_lookup_request),
         .ddram_burstcnt(burstcnt),
         .ddram_addr(ddram_addr),.ddram_rd(ddram_rd),
         .store_select(store_select),.store_pixel_value(store_value),
@@ -81,6 +84,7 @@ module tb_h262_b_residual_streaming;
     );
 
     always @(posedge clk) begin
+        ddram_lookup_ready<=ddram_lookup_request;
         ddram_dout_ready<=0;
         store_block_stored<=store_complete;
         if(ddram_rd) begin

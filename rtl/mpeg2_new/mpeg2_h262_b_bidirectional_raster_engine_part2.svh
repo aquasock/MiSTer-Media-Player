@@ -17,6 +17,17 @@ wire signed [13:0] src_x_tap_signed=src_base_x+$signed({13'd0,tap_dx});
 wire signed [13:0] src_y_tap_signed=src_base_y+$signed({13'd0,tap_dy});
 wire [11:0] src_x_tap=src_x_tap_signed[11:0];
 wire [11:0] src_y_tap=src_y_tap_signed[11:0];
+wire [1:0] next_tap_index=tap_index+1'b1;
+wire next_tap_dx=(half_x&&half_y)?next_tap_index[0]:
+    (half_x?next_tap_index[0]:1'b0);
+wire next_tap_dy=(half_x&&half_y)?next_tap_index[1]:
+    (half_y?next_tap_index[0]:1'b0);
+wire signed [13:0] next_src_x_tap_signed=
+    src_base_x+$signed({13'd0,next_tap_dx});
+wire signed [13:0] next_src_y_tap_signed=
+    src_base_y+$signed({13'd0,next_tap_dy});
+wire [11:0] next_src_x_tap=next_src_x_tap_signed[11:0];
+wire [11:0] next_src_y_tap=next_src_y_tap_signed[11:0];
 wire [28:0] selected_reference_off=use_backward?future_off:past_off;
 
 wire residual_hit=(exec_desc_slot<desc_count)&&
@@ -51,17 +62,24 @@ wire [7:0] lookup_final_prediction=
     (mb_direction==2'd3)?lookup_bidir_prediction:lookup_selected_prediction;
 wire [7:0] lookup_reconstructed_current=
     clip(lookup_final_prediction,residual_pel);
-wire prediction_lookup=pixel_setup&&(mb_direction!=0)&&source_bounds_ok;
+wire lookup_advance=lookup_wait&&ddram_lookup_ready&&
+    ddram_lookup_hit&&!tap_last;
+wire prediction_lookup=
+    (pixel_setup&&(mb_direction!=0)&&source_bounds_ok)||lookup_advance;
+wire [11:0] lookup_src_x=lookup_advance?next_src_x_tap:src_x_tap;
+wire [11:0] lookup_src_y=lookup_advance?next_src_y_tap:src_y_tap;
 
 assign ddram_burstcnt=req?8'd1:8'd0;
 assign ddram_addr=req?
     (req_kind?block_addr(scratch_bank_latched,col,mrow,blk,verify_row):
               pixel_addr(selected_reference_off,blk,src_x_tap,src_y_tap)):
     prediction_lookup?
-        pixel_addr(selected_reference_off,blk,src_x_tap,src_y_tap):29'd0;
+        pixel_addr(selected_reference_off,blk,lookup_src_x,lookup_src_y):29'd0;
 assign ddram_rd=req;
 assign ddram_cacheable=(req&&!req_kind)||prediction_lookup;
-assign ddram_lookup_consume=prediction_lookup&&ddram_lookup_hit;
+assign ddram_lookup_request=prediction_lookup;
+assign ddram_lookup_consume=
+    lookup_wait&&ddram_lookup_ready&&ddram_lookup_hit;
 assign store_select=emit;
 assign store_pixel_value=out_reg;
 assign store_pixel_valid=emit;
@@ -98,7 +116,7 @@ always @(posedge clk) begin
         mb_width<=0;mb_height<=0;geometry_seen<=0;motion_count<=0;motion_word<=0;motion_load<=0;
         motion_first_pending<=0;pending_direction<=0;pending_fmvx<=0;pending_fmvy<=0;
         desc_count<=0;last_desc_word<=0;current_desc_slot<=0;desc_active<=0;sample_expected<=0;metadata_done<=0;exec_desc_slot<=0;
-        pending<=0;started<=0;active<=0;future_bank_latched<=0;scratch_bank_latched<=0;req<=0;waitresp<=0;req_kind<=0;
+        pending<=0;started<=0;active<=0;future_bank_latched<=0;scratch_bank_latched<=0;req<=0;waitresp<=0;req_kind<=0;lookup_wait<=0;
         mbi<=0;col<=0;mrow<=0;blk<=0;timeout<=0;emit<=0;wait_store<=0;pixel_setup<=0;residual_load<=0;residual_load_wait<=0;ei<=0;verify_row<=0;
         pred_direction<=0;tap_index<=0;pred_sum<=0;forward_prediction<=0;out_reg<=0;tap_byte_sel<=0;
         read_seen<=0;sample_nonzero<=0;half_sample_seen<=0;reconstructed_seen<=0;persisted_seen<=0;row_persisted<=0;error<=0;error_source<=0;

@@ -165,12 +165,12 @@ assign base_persisted_seen=1'b0;
 assign base_persist_val=8'd0;
 assign base_probe_error=1'b0;
 
-wire[7:0] mix_bc_raw;wire[28:0] mix_addr_raw;wire mix_rd_raw,mix_cacheable_raw,mix_lookup_consume;
+wire[7:0] mix_bc_raw;wire[28:0] mix_addr_raw;wire mix_rd_raw,mix_cacheable_raw,mix_lookup_request,mix_lookup_consume;
 wire mix_store_sel;wire[7:0] mix_store_val;wire[11:0] mix_store_x,mix_store_y;wire mix_store_valid,mix_store_start,mix_store_complete;
 wire mix_read;wire[7:0] mix_sample;wire mix_nonzero,mix_recon,mix_row_persisted;wire[7:0] mix_recon_val,mix_persist_val;wire[3:0] mix_progress_stage;
 wire[4:0] mixed_error_source;
 
-wire[7:0] b_bc_raw;wire[28:0] b_addr_raw;wire b_rd_raw,b_cacheable_raw,b_lookup_consume;
+wire[7:0] b_bc_raw;wire[28:0] b_addr_raw;wire b_rd_raw,b_cacheable_raw,b_lookup_request,b_lookup_consume;
 wire b_store_sel;wire[7:0] b_store_val;wire[11:0] b_store_x,b_store_y;wire b_store_valid,b_store_start,b_store_complete;
 
 // Commit 203: P and B parsing/reconstruction are mutually exclusive, so both
@@ -213,8 +213,9 @@ wire[7:0] shared_cached_bc;
 wire[28:0] shared_cached_addr;
 wire shared_cached_rd;
 wire[31:0] shared_cache_hits,shared_cache_misses,shared_uncached_reads;
-wire shared_lookup_hit;
+wire shared_lookup_ready,shared_lookup_hit;
 wire[63:0] shared_lookup_data;
+wire shared_lookup_request=b_select?b_lookup_request:mix_lookup_request;
 wire shared_lookup_consume=b_select?b_lookup_consume:mix_lookup_consume;
 wire mix_dout_ready_owned=shared_engine_dout_ready&&mixed_select&&!b_select;
 wire b_dout_ready_owned=shared_engine_dout_ready&&b_select;
@@ -223,7 +224,8 @@ mpeg2_h262_reference_word_cache reference_cache(
  .clk(clk),.reset(reset),.active(shared_engine_active),
  .request_burstcnt(shared_bc_raw),.request_addr(shared_addr_raw),
  .request_read(shared_rd_raw),.request_cacheable(shared_cacheable_raw),
- .lookup_consume(shared_lookup_consume),.lookup_hit(shared_lookup_hit),
+ .lookup_request(shared_lookup_request),.lookup_consume(shared_lookup_consume),
+ .lookup_ready(shared_lookup_ready),.lookup_hit(shared_lookup_hit),
  .lookup_data(shared_lookup_data),
  .request_busy(shared_engine_busy),.request_dout(shared_engine_dout),
  .request_dout_ready(shared_engine_dout_ready),
@@ -246,9 +248,11 @@ mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
  .residual_store_read_data(shared_residual_store_read_data),
  .reference_valid(reference_frame_valid),.reference_bank(reference_frame_bank),.destination_bank(destination_frame_bank),.store_block_stored(p_store_block_stored),
  .ddram_busy(shared_engine_busy),.ddram_dout(shared_engine_dout),.ddram_dout_ready(mix_dout_ready_owned),
- .ddram_lookup_hit(shared_lookup_hit),.ddram_lookup_data(shared_lookup_data),
+ .ddram_lookup_ready(shared_lookup_ready),.ddram_lookup_hit(shared_lookup_hit),
+ .ddram_lookup_data(shared_lookup_data),
  .ddram_burstcnt(mix_bc_raw),.ddram_addr(mix_addr_raw),.ddram_rd(mix_rd_raw),
- .ddram_cacheable(mix_cacheable_raw),.ddram_lookup_consume(mix_lookup_consume),
+ .ddram_cacheable(mix_cacheable_raw),.ddram_lookup_request(mix_lookup_request),
+ .ddram_lookup_consume(mix_lookup_consume),
  .store_select(mix_store_sel),.store_pixel_value(mix_store_val),.store_pixel_x(mix_store_x),.store_pixel_y(mix_store_y),.store_pixel_valid(mix_store_valid),
  .store_block_start(mix_store_start),.store_block_complete(mix_store_complete),.active(mixed_active),.read_seen(mix_read),.sample_value(mix_sample),.sample_nonzero(mix_nonzero),
  .half_sample_seen(mixed_half),.reconstructed_seen(mix_recon),.reconstructed_value(mix_recon_val),.persisted_seen(mixed_persisted_seen),.row_persisted(mix_row_persisted),.persisted_value(mix_persist_val),
@@ -264,9 +268,11 @@ mpeg2_h262_b_bidirectional_raster_engine b_probe(
  .residual_store_read_data(shared_residual_store_read_data),
  .reference_valid(reference_frame_valid),.future_reference_bank(reference_frame_bank),.scratch_frame_bank(b_scratch_frame_bank),.store_block_stored(p_store_block_stored),
  .ddram_busy(shared_engine_busy),.ddram_dout(shared_engine_dout),.ddram_dout_ready(b_dout_ready_owned),
- .ddram_lookup_hit(shared_lookup_hit),.ddram_lookup_data(shared_lookup_data),
+ .ddram_lookup_ready(shared_lookup_ready),.ddram_lookup_hit(shared_lookup_hit),
+ .ddram_lookup_data(shared_lookup_data),
  .ddram_burstcnt(b_bc_raw),.ddram_addr(b_addr_raw),.ddram_rd(b_rd_raw),
- .ddram_cacheable(b_cacheable_raw),.ddram_lookup_consume(b_lookup_consume),
+ .ddram_cacheable(b_cacheable_raw),.ddram_lookup_request(b_lookup_request),
+ .ddram_lookup_consume(b_lookup_consume),
  .store_select(b_store_sel),.store_pixel_value(b_store_val),.store_pixel_x(b_store_x),.store_pixel_y(b_store_y),
  .store_pixel_valid(b_store_valid),.store_block_start(b_store_start),.store_block_complete(b_store_complete),
  .active(b_active),.read_seen(b_read),.sample_nonzero(b_nonzero),.half_sample_seen(b_half),

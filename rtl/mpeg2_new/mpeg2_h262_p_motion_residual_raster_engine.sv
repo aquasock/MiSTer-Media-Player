@@ -42,12 +42,14 @@ module mpeg2_h262_p_motion_residual_raster_engine
     input wire ddram_busy,
     input wire [63:0] ddram_dout,
     input wire ddram_dout_ready,
+    input wire ddram_lookup_ready,
     input wire ddram_lookup_hit,
     input wire [63:0] ddram_lookup_data,
     output wire [7:0] ddram_burstcnt,
     output wire [28:0] ddram_addr,
     output wire ddram_rd,
     output wire ddram_cacheable,
+    output wire ddram_lookup_request,
     output wire ddram_lookup_consume,
     output wire store_select,
     output wire [7:0] store_pixel_value,
@@ -227,7 +229,7 @@ reg row_final_latched;
 
 reg pending, started;
 reg reference_bank_latched, destination_bank_latched;
-reg req, waitresp, req_kind;
+reg req, waitresp, req_kind, lookup_wait;
 reg [10:0] mbi;
 reg [5:0] col, mrow;
 reg [2:0] blk;
@@ -296,6 +298,19 @@ wire signed [13:0] src_y_tap_signed=
     src_base_y+$signed({13'd0,tap_dy});
 wire [11:0] src_x_tap=src_x_tap_signed[11:0];
 wire [11:0] src_y_tap=src_y_tap_signed[11:0];
+wire [1:0] next_tap_index=tap_index+1'b1;
+wire next_tap_dx=
+    (half_x&&half_y)?next_tap_index[0]:
+    (half_x?next_tap_index[0]:1'b0);
+wire next_tap_dy=
+    (half_x&&half_y)?next_tap_index[1]:
+    (half_y?next_tap_index[0]:1'b0);
+wire signed [13:0] next_src_x_tap_signed=
+    src_base_x+$signed({13'd0,next_tap_dx});
+wire signed [13:0] next_src_y_tap_signed=
+    src_base_y+$signed({13'd0,next_tap_dy});
+wire [11:0] next_src_x_tap=next_src_x_tap_signed[11:0];
+wire [11:0] next_src_y_tap=next_src_y_tap_signed[11:0];
 
 wire descriptor_position_hit=
     (exec_desc_slot<desc_count)&&
@@ -330,17 +345,24 @@ wire [7:0] lookup_predicted_current=
     round_prediction(lookup_pred_sum_with_current,half_x,half_y);
 wire [7:0] lookup_reconstructed_current=
     clip(lookup_predicted_current,residual_pel_q);
-wire prediction_lookup=pixel_setup&&!mb_intra&&source_bounds_ok;
+wire lookup_advance=lookup_wait&&ddram_lookup_ready&&
+    ddram_lookup_hit&&!tap_last;
+wire prediction_lookup=
+    (pixel_setup&&!mb_intra&&source_bounds_ok)||lookup_advance;
+wire [11:0] lookup_src_x=lookup_advance?next_src_x_tap:src_x_tap;
+wire [11:0] lookup_src_y=lookup_advance?next_src_y_tap:src_y_tap;
 
 assign ddram_burstcnt=req?8'd1:0;
 assign ddram_addr=req ?
     (req_kind ? block_addr(doff,col,mrow,blk,verify_row)
               : pixel_addr(roff,blk,src_x_tap,src_y_tap)) :
-    prediction_lookup ? pixel_addr(roff,blk,src_x_tap,src_y_tap) :
+    prediction_lookup ? pixel_addr(roff,blk,lookup_src_x,lookup_src_y) :
     29'd0;
 assign ddram_rd=req;
 assign ddram_cacheable=(req&&!req_kind)||prediction_lookup;
-assign ddram_lookup_consume=prediction_lookup&&ddram_lookup_hit;
+assign ddram_lookup_request=prediction_lookup;
+assign ddram_lookup_consume=
+    lookup_wait&&ddram_lookup_ready&&ddram_lookup_hit;
 
 assign store_select=emit;
 assign store_pixel_value=out_reg;
@@ -399,6 +421,7 @@ always @(posedge clk) begin
         req<=0;
         waitresp<=0;
         req_kind<=0;
+        lookup_wait<=0;
         mbi<=0;
         col<=0;
         mrow<=0;
@@ -452,6 +475,7 @@ always @(posedge clk) begin
             started<=0;
             req<=0;
             waitresp<=0;
+            lookup_wait<=0;
             emit<=0;
             wait_store<=0;
             pixel_setup<=0;
@@ -665,23 +689,30 @@ always @(posedge clk) begin
             end else begin
                 if(half_x||half_y) half_sample_seen<=1;
                 req_kind<=0;
-                if(ddram_lookup_hit) begin
-                    if(progress_stage<4'd3)
-                        progress_stage<=4'd3;
-                    if(tap_last) begin
-                        out_reg<=lookup_reconstructed_current;
-                        emit<=1;
-                        if((mbi==0)&&(blk==0)&&(ei==0)) begin
-                            read_seen<=1;
-                            sample_value<=lookup_predicted_current;
-                            sample_nonzero<=|lookup_predicted_current;
-                        end
-                    end else begin
-                        pred_sum<=lookup_pred_sum_with_current;
-                        tap_index<=tap_index+1'b1;
-                        pixel_setup<=1;
+                lookup_wait<=1;
+            end
+        end
+
+        if(lookup_wait&&ddram_lookup_ready) begin
+            if(ddram_lookup_hit) begin
+                if(progress_stage<4'd3)
+                    progress_stage<=4'd3;
+                if(tap_last) begin
+                    lookup_wait<=0;
+                    out_reg<=lookup_reconstructed_current;
+                    emit<=1;
+                    if((mbi==0)&&(blk==0)&&(ei==0)) begin
+                        read_seen<=1;
+                        sample_value<=lookup_predicted_current;
+                        sample_nonzero<=|lookup_predicted_current;
                     end
-                end else req<=1;
+                end else begin
+                    pred_sum<=lookup_pred_sum_with_current;
+                    tap_index<=tap_index+1'b1;
+                end
+            end else begin
+                lookup_wait<=0;
+                req<=1;
             end
         end
 
