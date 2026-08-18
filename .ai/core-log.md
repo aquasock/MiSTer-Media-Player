@@ -678,3 +678,48 @@ Install the Commit-203 RBF and run `test_b_residual_streaming.m2v` on MiSTer thr
 - [ ] Passed
 
 ---
+## 204 COMMIT Unreleased ??? 2026-08-18T02:34:46-07:00
+
+#### Coming From:
+
+Unreleased e3036ac
+
+#### Purpose:
+
+Replace picture-wide P/B residual accumulation with row-bounded parse, transform, and reconstruction transactions that admit dense ordinary coefficient traffic without increasing FPGA RAM capacity.
+
+#### Outcome:
+
+Commit `e3036ac` is hardware accepted: `test_b_residual_streaming.m2v` briefly displays its B-only vertical stripe, then correctly presents the following plain P reference, with USER and POWER solid and DISK off. Software decode independently confirms display order I/B/P, identical I and P frame hashes, and a distinct middle B frame, so the transient stripe is expected publication order rather than a storage overwrite. Fresh exact replay of the 2,875,981-byte ordinary dense-residual corpus identifies the next implementation boundary: the first P picture reaches exactly 32,768 stored coefficient events with 1,526 residual blocks at macroblock column 29 of row 6, and the first B picture reaches exactly 32,768 events with 1,314 blocks at column 42 of row 5. The clean Commit-203 fit already uses 503 of 553 RAM blocks, so another picture-wide capacity increase is not viable. This cycle will hold input at completed macroblock rows, transform and reconstruct that row before admitting the next one, then clear and reuse bounded residual storage while retaining picture-wide motion ordering, legal same-row slice predictor resets, P/B reference ownership, and final publication order.
+
+#### Next Steps:
+
+Implement an explicit row-ready and row-retired handshake across the active P parser, residual pipeline, B core, P/B raster engines, and reference wrapper; reuse descriptor, coefficient, and spatial-sample addresses only after row persistence; add focused dense-row RTL coverage that exceeds 32,768 total picture coefficient events; preserve the Entry-203 streaming cases, parser-window and restricted-slice tests, prediction diagnostics, full compatibility corpus, and authoritative seven-stream generators; then complete a clean Quartus 17.0.2 build and deploy the qualified RBF and dense diagnostic stream to MiSTer for hardware validation.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- tools/streams/tb_h262_parser_windows.sv
+- tools/streams/tb_h262_row_streaming.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
