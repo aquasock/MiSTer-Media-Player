@@ -844,11 +844,11 @@ Accept a generalized P picture whose persistence proof precedes its parser compl
 
 #### Outcome:
 
-Commit `450f78a` makes P raster-hold admission consume an already-present persistence proof atomically. The focused regression reproduces the hardware ordering: before the correction all 30 rows retired but completion left `raster_hold_active` set and `raster_hold_ready` clear; afterward the same transaction completes immediately with the hold inactive, ready asserted, no error, and P acceptance retained. The dense P row regression completes 1,350 motion records, 8,100 residual blocks, 175,586 coefficients, and 518,400 samples; the seven-B corpus, fail-open transport, two-scratch presentation, and six storage-tag regressions also pass unchanged.
+Commit `450f78a` makes P raster-hold admission consume an already-present persistence proof atomically. The focused regression reproduces the hardware ordering: before the correction all 30 rows retired but completion left `raster_hold_active` set and `raster_hold_ready` clear; afterward the same transaction completes immediately with the hold inactive, ready asserted, no error, and P acceptance retained. The dense P row regression completes 1,350 motion records, 8,100 residual blocks, 175,586 coefficients, and 518,400 samples; the seven-B corpus, fail-open transport, two-scratch presentation, and six storage-tag regressions also pass unchanged. The clean Quartus 17.0.2 build completes in 9 minutes 13 seconds with no Critical Warning, zero setup, hold, or recovery TNS, +0.570 ns global setup, +0.251 ns global hold, +2.931 ns global recovery, +1.776 ns focused decoder setup, and +14.264 ns focused decoder recovery. It uses 29,045 ALMs, 41,901 registers, 4,025,331 memory bits, 503 RAM blocks, 65 DSP blocks, and 3 PLLs. RBF SHA-256 `6172e2ed1f5883b1517c838041961f6528ebe983f1935f822883b87c13d31ec1` and dense-stream SHA-256 `f8e05f5cfd0c0385566bbc3e4133d9f42cb5547933d92e24b0d87eec3fa0a79e` were uploaded to `10.10.0.30` and read back with matching hashes.
 
 #### Next Steps:
 
-Complete a clean Quartus build, require timing closure with no Critical Warning, then deploy the resulting RBF and regenerated dense compatibility stream to the standard MiSTer target for hardware confirmation that the former timeout delay and USER-2/POWER-9 result are gone.
+Run `test_compat_dense_residual.m2v` through its complete sequence on MiSTer and confirm that transfer and P-picture transitions no longer pause for the former timeout, the final raster remains coherent, and the settled diagnostic is solid USER, solid POWER, and dark DISK.
 
 #### Files Modified:
 
@@ -857,7 +857,7 @@ Complete a clean Quartus build, require timing closure with no Critical Warning,
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
