@@ -600,3 +600,40 @@ Install the Commit-201 RBF and run `test_p_intra_macroblocks.m2v` through one co
 - [ ] Passed
 
 ---
+## 202 COMMIT Unreleased ??? 2026-08-18T00:50:44-07:00
+
+#### Coming From:
+
+Unreleased 9672f0a
+
+#### Purpose:
+
+Replace the generalized P path's picture-wide residual-plan limits with block-at-a-time transform delivery and RAM-backed sparse reconstruction storage.
+
+#### Outcome:
+
+Commit `9672f0a` is hardware accepted: the authored intra macroblock at row 8, column 20 is visibly reconstructed with a coherent raster, USER and POWER solid, and DISK off. Exact replay of the ordinary 366,067-byte mixed-macroblock compatibility stream reaches the first P picture and then asserts `R_ERROR` from `R_COEFF_SIGN` when the current 32-event picture-wide coefficient plan fills; B later reaches its separate residual limit. This cycle will make the P parser pause input at complete block boundaries, transform each sparse block through the existing shared serialized engine, and retain transformed samples in inferred RAM rather than widening flattened register plans, while leaving the B limit for the following independently testable commit.
+
+#### Next Steps:
+
+Implement the block-at-a-time P transaction and a deterministic stream that exceeds both the former 16-block and 32-coefficient limits, preserve the accepted P-intra, parser-window, restricted-slice, and seven-stream regressions, then complete a clean Quartus 17.0.2 build with zero setup and hold TNS and no Critical Warning before MiSTer validation.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- tools/streams/generate_test_p_residual_streaming.py
+- tools/streams/tb_h262_p_residual_streaming.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
