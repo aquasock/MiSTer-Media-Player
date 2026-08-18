@@ -1256,3 +1256,31 @@ Reload `test_compat_long_gop.m2v` with the deployed RBF and confirm that loading
 - [ ] Passed
 
 ---
+## 222 COMMIT Unreleased 7f92945 2026-08-18T12:58:09-07:00
+
+#### Coming From:
+
+Unreleased 7f92945
+
+#### Purpose:
+
+Record the MiSTer long-GOP presentation result after correcting live B scratch verification and duplicate P persistence publication.
+
+#### Outcome:
+
+Commit `7f92945` is not hardware accepted: `test_compat_long_gop.m2v` retains the passing USER-solid diagnostic pattern but still settles at timestamp `00:00:02.000`, frame 50, instead of source frame 71. The displayed frames are materially clearer and every rendered timestamp is now readable, proving that the corrected B scratch-bank verification improves live raster integrity. Visible progression nevertheless skips approximately two or three source frames at a time in an apparently repeatable pattern before stopping at the same third-GOP I-picture boundary. Because all settled error and prerequisite diagnostics remain passing while the raster image quality changed, the unresolved boundary is the actual temporal identity selected by the hardware framebuffer display path, which the Entry 221 soak represented with abstract publication counters rather than DDR-backed source-frame identity.
+
+#### Next Steps:
+
+Trace the compiled scheduler, framebuffer-bank selector, scratch selector, and DDR display addresses together, then extend the live soak to stamp each reconstructed reference and B scratch picture with its source temporal identity and read that identity through the actual framebuffer selection path. Require exact display order rather than only final publication identity, reproduce the two-or-three-frame stepping and frame-50 stop, and correct only the first real bank or swap selection that diverges before another build.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
