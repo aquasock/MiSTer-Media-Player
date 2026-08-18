@@ -1022,3 +1022,31 @@ Install `MediaPlayer_commit213_065a775.rbf` and load `test_compat_long_gop.m2v` 
 - [ ] Passed
 
 ---
+## 214 COMMIT Unreleased 065a775 2026-08-18T09:06:35-07:00
+
+#### Coming From:
+
+Unreleased 065a775
+
+#### Purpose:
+
+Record the MiSTer visual result that separates clean LED diagnostics from failed repeated-GOP presentation on the mixed compatibility stream.
+
+#### Outcome:
+
+Commit `065a775` passes the reported USER, POWER, and DISK checks on the B-intra and mixed-macroblock streams, and the B-intra stream now loads quickly before settling on its coherent authored raster. The mixed stream still glitches during loading, and the uploaded settled capture reads timestamp `00:00:00.440` and frame `11`; it matches decoded source frame 11 exactly, which is the last displayed frame of the first 12-frame GOP rather than final frame 23 of the 24-frame stream. The clean LEDs therefore prove that the existing syntax, reconstruction, and counted publication assertions did not fire, but they do not qualify repeated-GOP presentation or the pending 72-picture long-GOP hardware boundary.
+
+#### Next Steps:
+
+Add a repeated-GOP presentation regression that distinguishes every I/P/B frame and requires the final displayed identity to cross the second I-picture boundary, then correct the first reference, bank, or scheduler transition that leaves frame 11 settled before rebuilding for MiSTer.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
