@@ -69,8 +69,15 @@
                 pce_shift<=pce_next;
                 if(pce_count==4)begin
                     pce_capture<=0;pce_count<=0;q_scale_type<=pce_next[12];alternate_scan<=pce_next[10];
+                    b_forward_f_code_horizontal<=pce_next[35:32];
+                    b_forward_f_code_vertical<=pce_next[31:28];
+                    b_backward_f_code_horizontal<=pce_next[27:24];
+                    b_backward_f_code_vertical<=pce_next[23:20];
                     b_candidate<=geometry_supported&&current_picture_is_b&&(pce_next[39:36]==4'h8)&&
-                        (pce_next[35:32]==3)&&(pce_next[31:28]==3)&&(pce_next[27:24]==3)&&(pce_next[23:20]==3)&&
+                        (pce_next[35:32]>=4'd1)&&(pce_next[35:32]<=4'd4)&&
+                        (pce_next[31:28]>=4'd1)&&(pce_next[31:28]<=4'd4)&&
+                        (pce_next[27:24]>=4'd1)&&(pce_next[27:24]<=4'd4)&&
+                        (pce_next[23:20]>=4'd1)&&(pce_next[23:20]<=4'd4)&&
                         (pce_next[17:16]==2'b11)&&pce_next[14]&&!pce_next[13];
                 end else pce_count<=pce_count+1'b1;
             end else if(current_picture_is_b&&start_code_now&&(start_code_value==EXTENSION_START_CODE))begin pce_capture<=1;pce_count<=0;pce_shift<=0;end

@@ -1,17 +1,63 @@
             end
-            S_FY_RES: begin if(parser_at_end)state<=S_ERROR;else begin motion_residual_shift<=motion_residual_next;if(motion_residual_count)begin cur_fy<=reconstruct_mv_f3(fpy,motion_code_pending,motion_residual_next);motion_residual_count<=0;motion_bits<=0;motion_len<=0;if(current_direction==2'd3)state<=S_BX;else if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end else state<=S_MB_DONE;end else motion_residual_count<=1;end end
+            S_FY_RES: begin
+                if(parser_at_end)state<=S_ERROR;
+                else begin
+                    motion_residual_shift<=motion_residual_next;
+                    if({2'b00,motion_residual_count}==(b_forward_f_code_vertical-4'd2))begin
+                        cur_fy<=reconstruct_mv(fpy,motion_code_pending,motion_residual_next,b_forward_f_code_vertical);
+                        motion_residual_count<=0;motion_bits<=0;motion_len<=0;
+                        if(current_direction==2'd3)state<=S_BX;
+                        else if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end
+                        else state<=S_MB_DONE;
+                    end else motion_residual_count<=motion_residual_count+1'b1;
+                end
+            end
             S_BX: begin
                 if(parser_at_end)state<=S_ERROR;
-                else if(motion_match[6])begin motion_code_pending<=$signed(motion_match[5:0]);motion_bits<=0;motion_len<=0;if($signed(motion_match[5:0])==0)begin cur_bx<=bpx;state<=S_BY;end else begin motion_residual_shift<=0;motion_residual_count<=0;state<=S_BX_RES;end end
+                else if(motion_match[6])begin
+                    motion_code_pending<=$signed(motion_match[5:0]);motion_bits<=0;motion_len<=0;
+                    if($signed(motion_match[5:0])==0)begin cur_bx<=bpx;state<=S_BY;end
+                    else if(b_backward_f_code_horizontal==4'd1)begin
+                        cur_bx<=reconstruct_mv(bpx,motion_match[5:0],3'd0,b_backward_f_code_horizontal);state<=S_BY;
+                    end else begin motion_residual_shift<=0;motion_residual_count<=0;state<=S_BX_RES;end
+                end
                 else if(motion_len_next==11)state<=S_ERROR;else begin motion_bits<=motion_bits_next;motion_len<=motion_len_next;end
             end
-            S_BX_RES: begin if(parser_at_end)state<=S_ERROR;else begin motion_residual_shift<=motion_residual_next;if(motion_residual_count)begin cur_bx<=reconstruct_mv_f3(bpx,motion_code_pending,motion_residual_next);motion_residual_count<=0;motion_bits<=0;motion_len<=0;state<=S_BY;end else motion_residual_count<=1;end end
+            S_BX_RES: begin
+                if(parser_at_end)state<=S_ERROR;
+                else begin
+                    motion_residual_shift<=motion_residual_next;
+                    if({2'b00,motion_residual_count}==(b_backward_f_code_horizontal-4'd2))begin
+                        cur_bx<=reconstruct_mv(bpx,motion_code_pending,motion_residual_next,b_backward_f_code_horizontal);
+                        motion_residual_count<=0;motion_bits<=0;motion_len<=0;state<=S_BY;
+                    end else motion_residual_count<=motion_residual_count+1'b1;
+                end
+            end
             S_BY: begin
                 if(parser_at_end)state<=S_ERROR;
-                else if(motion_match[6])begin motion_code_pending<=$signed(motion_match[5:0]);motion_bits<=0;motion_len<=0;if($signed(motion_match[5:0])==0)begin cur_by<=bpy;if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end else state<=S_MB_DONE;end else begin motion_residual_shift<=0;motion_residual_count<=0;state<=S_BY_RES;end end
+                else if(motion_match[6])begin
+                    motion_code_pending<=$signed(motion_match[5:0]);motion_bits<=0;motion_len<=0;
+                    if($signed(motion_match[5:0])==0)begin
+                        cur_by<=bpy;
+                        if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end else state<=S_MB_DONE;
+                    end else if(b_backward_f_code_vertical==4'd1)begin
+                        cur_by<=reconstruct_mv(bpy,motion_match[5:0],3'd0,b_backward_f_code_vertical);
+                        if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end else state<=S_MB_DONE;
+                    end else begin motion_residual_shift<=0;motion_residual_count<=0;state<=S_BY_RES;end
+                end
                 else if(motion_len_next==11)state<=S_ERROR;else begin motion_bits<=motion_bits_next;motion_len<=motion_len_next;end
             end
-            S_BY_RES: begin if(parser_at_end)state<=S_ERROR;else begin motion_residual_shift<=motion_residual_next;if(motion_residual_count)begin cur_by<=reconstruct_mv_f3(bpy,motion_code_pending,motion_residual_next);motion_residual_count<=0;if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end else state<=S_MB_DONE;end else motion_residual_count<=1;end end
+            S_BY_RES: begin
+                if(parser_at_end)state<=S_ERROR;
+                else begin
+                    motion_residual_shift<=motion_residual_next;
+                    if({2'b00,motion_residual_count}==(b_backward_f_code_vertical-4'd2))begin
+                        cur_by<=reconstruct_mv(bpy,motion_code_pending,motion_residual_next,b_backward_f_code_vertical);
+                        motion_residual_count<=0;
+                        if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end else state<=S_MB_DONE;
+                    end else motion_residual_count<=motion_residual_count+1'b1;
+                end
+            end
             S_CBP: begin
                 if(parser_at_end)state<=S_ERROR;
                 else if(cbp_match[6]) begin

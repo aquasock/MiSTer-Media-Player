@@ -48,7 +48,7 @@ end
 wire b_direction_word=(p_residual_sample_index==6'h38)||(p_residual_sample_index==6'h39)||(p_residual_sample_index==6'h3a);
 wire b_detect_now=p_residual_sample_valid&&b_direction_word&&p_forward_vector_valid&&
  (p_forward_vector_x==13'sd2047)&&(p_forward_vector_y==-13'sd2048)&&
- (forward_f_code_horizontal==4'd3)&&(forward_f_code_vertical==4'd3)&&
+ general_p_f_code_supported&&
  general_geometry_supported&&!p_implicit_reconstruct_request;
 reg b_mode;
 wire b_active,b_persisted_seen,b_error,b_half,b_recon,b_read,b_nonzero;

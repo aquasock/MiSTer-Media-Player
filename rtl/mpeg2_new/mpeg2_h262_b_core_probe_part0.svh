@@ -14,6 +14,8 @@
 // kate - Commit 172: register each decoded B macroblock-address symbol before
 // row-bound/skip arithmetic so the Commit-171 syntax does not sit on one long
 // 54 MHz combinational path. Address semantics and consumed bits are unchanged.
+// kate - Commit 194: apply each picture-signalled forward/backward horizontal
+// and vertical f_code independently across the admitted range 1..4.
 //
 // Standards authority: .ai/core-standards.md H262-006, H262-010, H262-014,
 // H262-021, H262-024 plus the established motion/address records used by
@@ -87,6 +89,8 @@ reg current_picture_is_b;
 
 reg pce_capture; reg [2:0] pce_count; reg [39:0] pce_shift;
 wire [39:0] pce_next={pce_shift[31:0],stream_data};
+reg [3:0] b_forward_f_code_horizontal,b_forward_f_code_vertical;
+reg [3:0] b_backward_f_code_horizontal,b_backward_f_code_vertical;
 
 reg [7:0] row_bytes [0:ROW_BUFFER_BYTES-1];
 reg slice_capture; reg [5:0] slice_row_number; reg [8:0] row_byte_count;
@@ -192,7 +196,7 @@ wire [7:0] mba_escape_min_target_q={2'b00,current_col}+mba_escape_accum_next_q;
 reg [3:0] mbtype_bits; reg [2:0] mbtype_len; reg [1:0] current_direction,last_direction; reg current_pattern;
 reg signed [7:0] fpx,fpy,bpx,bpy,cur_fx,cur_fy,cur_bx,cur_by;
 reg signed [5:0] motion_code_pending; reg [10:0] motion_bits; reg [3:0] motion_len;
-reg [1:0] motion_residual_shift; reg motion_residual_count;
+reg [2:0] motion_residual_shift; reg [1:0] motion_residual_count;
 
 reg [8:0] cbp_bits; reg [3:0] cbp_len; reg [5:0] current_cbp; reg [2:0] current_block_index;
 reg [15:0] coeff_vlc_code; reg [4:0] coeff_vlc_len;
