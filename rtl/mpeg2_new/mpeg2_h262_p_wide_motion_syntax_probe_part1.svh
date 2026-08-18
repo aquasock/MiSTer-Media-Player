@@ -277,6 +277,8 @@ always @(posedge clk) begin
         parse_hold<=0;
         probe_error<=0;
         slice_capture<=0;
+        slice_parser_started<=0;
+        chunk_boundary_known<=0;
         slice_row_number<=0;
         row_byte_count<=0;
         row_base_index<=0;

@@ -16,6 +16,9 @@
 // 54 MHz combinational path. Address semantics and consumed bits are unchanged.
 // kate - Commit 194: apply each picture-signalled forward/backward horizontal
 // and vertical f_code independently across the admitted range 1..4.
+// kate - Commit 198: refill the 512-byte parser window with two-byte overlap,
+// removing it as a whole-slice capacity limit while retaining start-code
+// recognition across every refill boundary.
 //
 // Standards authority: .ai/core-standards.md H262-006, H262-010, H262-014,
 // H262-021, H262-024 plus the established motion/address records used by
@@ -93,7 +96,8 @@ reg [3:0] b_forward_f_code_horizontal,b_forward_f_code_vertical;
 reg [3:0] b_backward_f_code_horizontal,b_backward_f_code_vertical;
 
 reg [7:0] row_bytes [0:ROW_BUFFER_BYTES-1];
-reg slice_capture; reg [5:0] slice_row_number; reg [8:0] row_byte_count;
+reg slice_capture, slice_parser_started, chunk_boundary_known;
+reg [5:0] slice_row_number; reg [8:0] row_byte_count;
 reg [10:0] row_base_index;
 reg parse_active,proof_done,boundary_final;
 reg [8:0] parse_byte_limit,parse_byte_index; reg [2:0] parse_bit_index;

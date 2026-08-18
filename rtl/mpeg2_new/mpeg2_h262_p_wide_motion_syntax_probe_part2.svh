@@ -5,6 +5,18 @@
         end
 
         if(parse_active) begin
+            if(parser_at_end && !chunk_boundary_known) begin
+                // Commit 198: preserve the syntax FSM and the final two bytes,
+                // then release upstream long enough to refill this window.
+                parse_active<=0;
+                parse_hold<=0;
+                slice_capture<=1;
+                row_bytes[0]<=row_bytes[ROW_BUFFER_BYTES-2];
+                row_bytes[1]<=row_bytes[ROW_BUFFER_BYTES-1];
+                row_byte_count<=9'd2;
+                parse_byte_index<=0;
+                parse_bit_index<=3'd7;
+            end else begin
             if(parser_consume_bit) begin
                 if(parse_bit_index==0) begin
                     parse_bit_index<=3'd7;

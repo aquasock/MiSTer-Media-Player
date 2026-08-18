@@ -2,8 +2,9 @@
                     end
                 end
             end
-            default: begin parse_active<=0;parse_hold<=0;proof_done<=1;parser_error<=1;b_candidate<=0;state<=S_ERROR;end
+            default: begin parse_active<=0;parse_hold<=0;proof_done<=1;parser_error<=1;b_candidate<=0;slice_parser_started<=0;chunk_boundary_known<=0;state<=S_ERROR;end
             endcase
+            end
         end
 
         if(replay_active&&t_valid)begin
@@ -58,7 +59,7 @@
                     if((picture_next[5:3]==3'd3)&&!parse_active&&!replay_active)begin
                         prior_error<=prior_error|parser_error|replay_error;
                         proof_done<=0;b_seen<=0;b_candidate<=0;parse_hold<=0;parser_error<=0;replay_error<=0;
-                        slice_capture<=0;slice_row_number<=0;row_byte_count<=0;row_base_index<=0;row_covered_count<=0;residual_count<=0;residual_coeff_count<=0;geometry_sent<=0;
+                        slice_capture<=0;slice_parser_started<=0;chunk_boundary_known<=0;slice_row_number<=0;row_byte_count<=0;row_base_index<=0;row_covered_count<=0;residual_count<=0;residual_coeff_count<=0;geometry_sent<=0;
                         current_col<=0;row_has_coded_mb<=0;skip_remaining<=0;last_direction<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;
                         mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;
                     end
@@ -84,26 +85,39 @@
 
             if(!parse_active&&!proof_done&&slice_capture)begin
                 if(start_code_now)begin
-                    if(row_byte_count<3)begin slice_capture<=0;proof_done<=1;parser_error<=1;end
+                    if(row_byte_count<3)begin slice_capture<=0;slice_parser_started<=0;chunk_boundary_known<=0;proof_done<=1;parser_error<=1;end
                     else if((start_code_value=={2'd0,slice_row_number})||
                             ((slice_row_number<picture_mb_height)&&
                              (start_code_value==({2'd0,slice_row_number}+1'b1))))begin
                         // kate - Commit 173: while the current buffered slice is
                         // parsed, slice_capture retains whether the already-seen
                         // following slice remains on the same macroblock row.
-                        slice_capture<=(start_code_value=={2'd0,slice_row_number});parse_active<=1;parse_hold<=1;boundary_final<=0;parse_byte_limit<=row_byte_count-3;parse_byte_index<=0;parse_bit_index<=7;state<=S_QSCALE;
-                        field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;
-                        cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
+                        slice_capture<=(start_code_value=={2'd0,slice_row_number});parse_active<=1;parse_hold<=1;chunk_boundary_known<=1;boundary_final<=0;parse_byte_limit<=row_byte_count-3;parse_byte_index<=0;parse_bit_index<=7;
+                        if(!slice_parser_started)begin
+                            slice_parser_started<=1;state<=S_QSCALE;
+                            field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;
+                            cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
+                        end
                     end else if((slice_row_number==picture_mb_height)&&post_b_boundary_now)begin
-                        slice_capture<=0;parse_active<=1;parse_hold<=1;boundary_final<=1;parse_byte_limit<=row_byte_count-3;parse_byte_index<=0;parse_bit_index<=7;state<=S_QSCALE;
+                        slice_capture<=0;parse_active<=1;parse_hold<=1;chunk_boundary_known<=1;boundary_final<=1;parse_byte_limit<=row_byte_count-3;parse_byte_index<=0;parse_bit_index<=7;
+                        if(!slice_parser_started)begin
+                            slice_parser_started<=1;state<=S_QSCALE;
+                            field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;
+                            cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
+                        end
+                    end else begin slice_capture<=0;proof_done<=1;parser_error<=1;end
+                end else if(row_byte_count<(ROW_BUFFER_BYTES-1))begin row_bytes[row_byte_count]<=stream_data;row_byte_count<=row_byte_count+1'b1;end
+                else begin
+                    row_bytes[row_byte_count]<=stream_data;slice_capture<=0;parse_active<=1;parse_hold<=1;chunk_boundary_known<=0;parse_byte_limit<=ROW_BUFFER_BYTES-2;parse_byte_index<=0;parse_bit_index<=7;
+                    if(!slice_parser_started)begin
+                        slice_parser_started<=1;state<=S_QSCALE;
                         field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;
                         cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
-                    end else begin slice_capture<=0;proof_done<=1;parser_error<=1;end
-                end else if(row_byte_count<ROW_BUFFER_BYTES)begin row_bytes[row_byte_count]<=stream_data;row_byte_count<=row_byte_count+1'b1;end
-                else begin slice_capture<=0;proof_done<=1;parser_error<=1;end
+                    end
+                end
             end else if(!parse_active&&!proof_done&&b_candidate&&slice_start_now)begin
                 if(start_code_value==8'h01)begin
-                    slice_capture<=1;slice_row_number<=1;row_byte_count<=0;row_base_index<=0;row_covered_count<=0;residual_count<=0;residual_coeff_count<=0;parser_error<=0;replay_error<=0;
+                    slice_capture<=1;slice_parser_started<=0;chunk_boundary_known<=0;slice_row_number<=1;row_byte_count<=0;row_base_index<=0;row_covered_count<=0;residual_count<=0;residual_coeff_count<=0;parser_error<=0;replay_error<=0;
                     geometry_sent<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;
                 end else begin proof_done<=1;parser_error<=1;end
             end

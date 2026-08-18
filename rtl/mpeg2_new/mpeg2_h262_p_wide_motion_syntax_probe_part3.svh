@@ -130,6 +130,8 @@
 
             R_SUCCESS: begin
                 parse_active<=0;
+                slice_parser_started<=0;
+                chunk_boundary_known<=0;
                 if(!row_has_coded_mb) begin
                     probe_error<=1;
                     proof_done<=1;
@@ -185,11 +187,14 @@
             default: begin
                 parse_active<=0;
                 parse_hold<=0;
+                slice_parser_started<=0;
+                chunk_boundary_known<=0;
                 proof_done<=1;
                 probe_error<=1;
                 wide_candidate<=0;
             end
             endcase
+            end
         end
 
         if(stream_valid) begin
@@ -245,6 +250,8 @@
                         residual_coeff_count<=0;
                         residual_qscale_plan<=0;
                         slice_capture<=0;
+                        slice_parser_started<=0;
+                        chunk_boundary_known<=0;
                         slice_row_number<=0;
                         row_byte_count<=0;
                         row_base_index<=0;
@@ -294,6 +301,7 @@
                 if(start_code_now) begin
                     if(row_byte_count<3) begin
                         slice_capture<=0;
+                        slice_parser_started<=0;
                         proof_done<=1;
                         probe_error<=1;
                     end else if(
@@ -309,9 +317,16 @@
                             (start_code_value=={2'd0,slice_row_number});
                         parse_active<=1;
                         parse_hold<=1;
+                        chunk_boundary_known<=1;
                         boundary_final<=0;
                         parse_byte_limit<=row_byte_count-3;
-                        init_row_parser();
+                        if(!slice_parser_started) begin
+                            slice_parser_started<=1;
+                            init_row_parser();
+                        end else begin
+                            parse_byte_index<=0;
+                            parse_bit_index<=3'd7;
+                        end
                     end else if(
                         (slice_row_number==picture_mb_height) &&
                         post_p_boundary_now
@@ -319,26 +334,47 @@
                         slice_capture<=0;
                         parse_active<=1;
                         parse_hold<=1;
+                        chunk_boundary_known<=1;
                         boundary_final<=1;
                         parse_byte_limit<=row_byte_count-3;
-                        init_row_parser();
+                        if(!slice_parser_started) begin
+                            slice_parser_started<=1;
+                            init_row_parser();
+                        end else begin
+                            parse_byte_index<=0;
+                            parse_bit_index<=3'd7;
+                        end
                     end else begin
                         slice_capture<=0;
                         proof_done<=1;
                         probe_error<=1;
                     end
-                end else if(row_byte_count<ROW_BUFFER_BYTES) begin
+                end else if(row_byte_count<(ROW_BUFFER_BYTES-1)) begin
                     row_bytes[row_byte_count]<=stream_data;
                     row_byte_count<=row_byte_count+1'b1;
                 end else begin
+                    // Fill the final byte, parse through byte 509, and retain
+                    // bytes 510..511 as start-code overlap for the next window.
+                    row_bytes[row_byte_count]<=stream_data;
                     slice_capture<=0;
-                    proof_done<=1;
-                    probe_error<=1;
+                    parse_active<=1;
+                    parse_hold<=1;
+                    chunk_boundary_known<=0;
+                    parse_byte_limit<=ROW_BUFFER_BYTES-2;
+                    if(!slice_parser_started) begin
+                        slice_parser_started<=1;
+                        init_row_parser();
+                    end else begin
+                        parse_byte_index<=0;
+                        parse_bit_index<=3'd7;
+                    end
                 end
             end else if(!parse_active && !proof_done &&
                         wide_candidate && slice_start_now) begin
                 if(start_code_value==8'h01) begin
                     slice_capture<=1;
+                    slice_parser_started<=0;
+                    chunk_boundary_known<=0;
                     slice_row_number<=1;
                     row_byte_count<=0;
                     row_base_index<=0;

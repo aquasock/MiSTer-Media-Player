@@ -12,6 +12,9 @@
 //
 // kate - Commit 193: picture-signalled horizontal/vertical f_code values 1..4
 // now drive residual length, differential reconstruction and component wrap.
+// kate - Commit 198: the 512-byte array is a refillable parser window rather
+// than a whole-slice capacity limit. Two trailing bytes overlap refills so a
+// 00 00 01 start-code prefix cannot be split out of boundary recognition.
 // Standards authority: .ai/core-standards.md (H262-007..H262-022).
 //============================================================================
 module mpeg2_h262_p_wide_motion_syntax_probe
@@ -98,6 +101,7 @@ reg [3:0] p_forward_f_code_vertical;
 
 reg [7:0] row_bytes [0:ROW_BUFFER_BYTES-1];
 reg slice_capture;
+reg slice_parser_started, chunk_boundary_known;
 reg [5:0] slice_row_number;
 reg [8:0] row_byte_count;
 reg [10:0] row_base_index;

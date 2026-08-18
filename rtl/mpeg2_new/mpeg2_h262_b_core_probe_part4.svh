@@ -156,7 +156,7 @@
             end
             S_STUFF: begin if(parser_at_end)state<=S_SUCCESS;else if(parser_current_bit)state<=S_ERROR;end
             S_SUCCESS: begin
-                parse_active<=0;
+                parse_active<=0;slice_parser_started<=0;chunk_boundary_known<=0;
                 if(!row_has_coded_mb||(current_col==0)||(current_col>{2'b00,picture_mb_width}))begin parser_error<=1;proof_done<=1;parse_hold<=0;end
                 else if(boundary_final)begin
                     if(current_col!={2'b00,picture_mb_width})begin parser_error<=1;proof_done<=1;parse_hold<=0;end

@@ -44,7 +44,7 @@ always @(posedge clk) begin
         pce_capture<=0;pce_count<=0;pce_shift<=0;b_candidate<=0;b_seen<=0;b_complete_now<=0;
         b_forward_f_code_horizontal<=0;b_forward_f_code_vertical<=0;
         b_backward_f_code_horizontal<=0;b_backward_f_code_vertical<=0;
-        parse_hold<=0;parser_error<=0;replay_error<=0;prior_error<=0;slice_capture<=0;slice_row_number<=0;row_byte_count<=0;row_base_index<=0;row_covered_count<=0;
+        parse_hold<=0;parser_error<=0;replay_error<=0;prior_error<=0;slice_capture<=0;slice_parser_started<=0;chunk_boundary_known<=0;slice_row_number<=0;row_byte_count<=0;row_base_index<=0;row_covered_count<=0;
         parse_active<=0;proof_done<=0;boundary_final<=0;parse_byte_limit<=0;parse_byte_index<=0;parse_bit_index<=7;
         state<=S_QSCALE;field_bit_count<=0;qscale_shift<=0;current_qscale<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;skip_remaining<=0;geometry_sent<=0;
         mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;mba_symbol_escape_q<=0;mba_symbol_value_q<=0;mbtype_bits<=0;mbtype_len<=0;current_direction<=0;last_direction<=0;current_pattern<=0;
@@ -64,6 +64,12 @@ always @(posedge clk) begin
         if(t_error)replay_error<=1;
 
         if(parse_active) begin
+            if(parser_at_end && !chunk_boundary_known) begin
+                parse_active<=0;parse_hold<=0;slice_capture<=1;
+                row_bytes[0]<=row_bytes[ROW_BUFFER_BYTES-2];
+                row_bytes[1]<=row_bytes[ROW_BUFFER_BYTES-1];
+                row_byte_count<=9'd2;parse_byte_index<=0;parse_bit_index<=7;
+            end else begin
             if(consume_bit) begin
                 if(parse_bit_index==0)begin parse_bit_index<=7;parse_byte_index<=parse_byte_index+1'b1;end
                 else parse_bit_index<=parse_bit_index-1'b1;
