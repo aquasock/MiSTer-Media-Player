@@ -926,3 +926,39 @@ Proceed to the next v0.6.0 roadmap boundary by recording its proposal before mak
 - [x] Passed
 
 ---
+## 211 COMMIT Unreleased ??? 2026-08-18T07:25:22-07:00
+
+#### Coming From:
+
+Unreleased 3fcf22f
+
+#### Purpose:
+
+Integrate intra-coded macroblocks into the generalized progressive B-picture path and qualify the ordinary mixed-macroblock compatibility corpus without regressing existing predictive modes.
+
+#### Outcome:
+
+The approved boundary will add the required non-scalable B-picture intra macroblock-type syntax, DC predictor and differential handling, intra inverse quantisation metadata, and reference-bypassed clipped spatial reconstruction by reusing the shared transform and sparse-sample architecture already proven by generalized P. The implementation will preserve forward, backward, bidirectional, skipped, and non-intra residual-coded B macroblocks, add focused mixed intra and non-intra B regressions, and extend the local standards library only with the H.262 conclusions needed to control this work.
+
+#### Next Steps:
+
+Implement and simulate the B-intra path, require the 24-picture `mixed_macroblocks` compatibility stream to complete every I, P, and B picture without parser, reconstruction, publication, presentation, or transport error, reproduce the authoritative seven-stream v0.5.0 generators and focused standing regressions, perform a clean Quartus 17.0.2 build, and provide the resulting RBF for MiSTer validation.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- tools/streams/tb_h262_b_intra_macroblocks.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
