@@ -264,6 +264,34 @@ wire [3:0] mpeg2_new_diag_power_code_live =
 //   5 P persistence targets the retained reference bank
 // When publication detail 1 follows a generalized-P parser fault, DISK shows
 // that parser's sticky first-fault code (state plus one, or 26..31) instead.
+// Entry 223 uses an otherwise passing DISK window to report the deepest
+// post-I50 hardware boundary:
+//   1 third I header            2 third I publication
+//   3 following P header        4 P raster metadata
+//   5 first P row persistence   6 full P persistence
+//   7 P reference publication   8 following B header
+//   9 B persistence            10 B scratch selected
+//  11 future reference presented
+// USER and POWER retain all existing acceptance and error meanings.
+wire [4:0] mpeg2_new_final_gop_progress_stage;
+mpeg2_h262_final_gop_progress_probe mpeg2_h262_final_gop_progress_probe
+(
+    .clk                  (clk_mpeg2),
+    .reset                (reset_mpeg2),
+    .picture_header       (mpeg2_new_picture_header_classified_now),
+    .picture_header_type  (mpeg2_new_picture_header_type_now),
+    .picture_complete     (mpeg2_new_picture_420_complete),
+    .picture_coding_type  (mpeg2_new_picture_coding_type),
+    .sideband_valid       (mpeg2_new_p_residual_sample_valid),
+    .sideband_index       (mpeg2_new_p_residual_sample_index),
+    .row_persisted        (mpeg2_new_pred_row_persisted),
+    .picture_persisted    (mpeg2_new_pred_persisted_seen),
+    .b_success            (mpeg2_new_b_user_success),
+    .display_scratch      (mpeg2_new_display_scratch),
+    .presentation_complete(mpeg2_new_b_presentation_complete),
+    .progress_stage       (mpeg2_new_final_gop_progress_stage)
+);
+
 wire [4:0] mpeg2_new_diag_disk_code_live =
     (mpeg2_new_diag_first_error_valid &&
      (mpeg2_new_diag_error_code_first == 4'd1)) ?
@@ -285,7 +313,10 @@ wire [4:0] mpeg2_new_diag_disk_code_live =
      (mpeg2_new_diag_error_code_first == 4'd2) &&
      (mpeg2_new_diag_phase1_source_first == 4'd2) &&
      (mpeg2_new_diag_p_source_first == 4'd6)) ?
-        {1'b0, mpeg2_new_diag_progress_detail_first} : 5'd0;
+        {1'b0, mpeg2_new_diag_progress_detail_first} :
+    (mpeg2_new_normal_user_led &&
+     (mpeg2_new_final_gop_progress_stage != 5'd0)) ?
+        mpeg2_new_final_gop_progress_stage : 5'd0;
 
 // Commit 189 snapshots only settled post-stream state.  sequence_end_seen is
 // sticky; wait one decoder-clock second after it rises so parser, raster, DDR,
