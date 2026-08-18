@@ -1050,3 +1050,35 @@ None.
 - [ ] Passed
 
 ---
+## 215 COMMIT Unreleased ??? 2026-08-18T09:10:40-07:00
+
+#### Coming From:
+
+Unreleased 065a775
+
+#### Purpose:
+
+Require complete repeated-GOP I-picture publication and final-frame presentation across the mixed and long compatibility streams.
+
+#### Outcome:
+
+The uploaded mixed-stream capture identifies a regression gap: the hardware settles on frame 11 at the first GOP boundary while the current dense publication test counts only the first I picture and therefore accepts incomplete later-GOP reference rotation. This commit will drive the I-picture support gate from the real front end, require every I and P reference publication, model the repeated B-run presentation boundary, and correct the first decoder or scheduler ownership transition that prevents the second GOP from reaching the display.
+
+#### Next Steps:
+
+Reproduce the frame-11 stop in a deterministic repeated-GOP regression, implement the minimal ownership correction, then rerun the mixed, dense, and 72-picture long-GOP suites before a clean Quartus build and MiSTer visual confirmation that the mixed stream settles on frame 23.
+
+#### Files Modified:
+
+- MediaPlayer_top_05.svh
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_dense_publication_order.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
