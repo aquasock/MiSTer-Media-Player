@@ -1,7 +1,7 @@
                 else begin
-                    current_desc_slot<=desc_count[3:0];
-                    desc_mb[desc_count[3:0]]<=sideband_value[13:3];
-                    desc_block[desc_count[3:0]]<=sideband_value[2:0];
+                    current_desc_slot<=desc_count[10:0];
+                    desc_mem[desc_count[10:0]]<=sideband_value[13:0];
+                    last_desc_word<=sideband_value[13:0];
                     desc_count<=desc_count+1'b1;desc_active<=1;sample_expected<=0;
                 end
             end else if((sideband_index==6'h3f)&&(sideband_value==16'shA3FF)) begin
@@ -12,7 +12,7 @@
         if(request&&!started)pending<=1;
         if(pending&&!started&&metadata_done) begin
             pending<=0;started<=1;active<=1;future_bank_latched<=future_reference_bank;timeout<=26'h3ffffff;
-            mbi<=0;col<=0;mrow<=0;blk<=0;ei<=0;exec_desc_slot<=0;pred_direction<=0;motion_load<=1;pixel_setup<=0;persisted_seen<=0;
+            mbi<=0;col<=0;mrow<=0;blk<=0;ei<=0;exec_desc_slot<=0;pred_direction<=0;motion_load<=1;pixel_setup<=0;residual_load<=0;residual_load_wait<=0;persisted_seen<=0;
             if(!reference_valid||!geometry_ok||(motion_count==0))begin error<=1;if(!error)error_source<=5'd8;active<=0;persisted_seen<=1;timeout<=0;motion_load<=0;end
         end
 
@@ -21,8 +21,11 @@
         if(motion_load) begin
             motion_load<=0;
             if((mbi>=motion_count)||(mbi>=MAX_MB))begin error<=1;if(!error)error_source<=5'd10;active<=0;persisted_seen<=1;timeout<=0;end
-            else begin motion_word<=motion_mem[mbi];pixel_setup<=1;end
+            else begin motion_word<=motion_mem[mbi];residual_load<=1;end
         end
+
+        if(residual_load)begin residual_load<=0;residual_load_wait<=1;end
+        if(residual_load_wait)begin residual_load_wait<=0;pixel_setup<=1;end
 
         if(pixel_setup) begin
             pixel_setup<=0;pred_sum<=0;tap_index<=0;
@@ -61,7 +64,7 @@
                                 mbi<=mbi+1'b1;if(col+1'b1>=mb_width)begin col<=0;mrow<=mrow+1'b1;end else col<=col+1'b1;
                                 blk<=0;ei<=0;pred_direction<=0;motion_load<=1;
                             end
-                        end else begin blk<=blk+1'b1;ei<=0;pred_direction<=0;pixel_setup<=1;end
+                        end else begin blk<=blk+1'b1;ei<=0;pred_direction<=0;residual_load<=1;end
                     end else begin verify_row<=verify_row+1'b1;req<=1;end
                 end
             end
@@ -69,7 +72,7 @@
 
         if(emit) begin
             resrows[er][{el,3'b000}+:8]<=out_reg;emit<=0;
-            if(ei==63)wait_store<=1;else begin ei<=ei+1'b1;pred_direction<=0;pixel_setup<=1;end
+            if(ei==63)wait_store<=1;else begin ei<=ei+1'b1;pred_direction<=0;residual_load<=1;end
         end
 
         if(wait_store&&store_block_stored)begin wait_store<=0;req_kind<=1;verify_row<=0;req<=1;end

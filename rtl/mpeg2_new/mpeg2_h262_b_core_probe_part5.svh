@@ -9,31 +9,53 @@
 
         if(replay_active&&t_valid)begin
             if(transform_slot>=MAX_RESIDUAL_BLOCKS||t_index!=t_sample_count[5:0]||t_sample_count>=64)replay_error<=1;
-            else begin residual_mem[{transform_slot[3:0],6'b000000}+t_index]<=t_value;t_sample_count<=t_sample_count+1'b1;end
+            else begin block_sample_mem[t_index]<=t_value;t_sample_count<=t_sample_count+1'b1;end
         end
         case(rstate)
-        R_TSTART:begin t_qscale<=residual_qscale[transform_slot[3:0]];t_sample_count<=0;t_start<=1;rstate<=R_TWRITE;end
+        R_BLOCK_WAIT:rstate<=R_BLOCK_CAPTURE;
+        R_BLOCK_CAPTURE:begin
+            transform_mb<=residual_block_word[34:24];
+            transform_block<=residual_block_word[23:21];
+            t_qscale<=residual_block_word[20:16];
+            block_coeff_end<=residual_block_word[15:0];
+            t_sample_count<=0;
+            if((residual_block_word[34:24]>=11'd1350)||
+               (residual_block_word[23:21]>=3'd6)||
+               (residual_block_word[20:16]==0)||
+               (residual_block_word[15:0]<=t_coeff_read_index)||
+               (residual_block_word[15:0]>residual_coeff_count))begin
+                replay_error<=1;rstate<=R_FINISH;
+            end else rstate<=R_TSTART;
+        end
+        R_TSTART:begin t_start<=1;rstate<=R_TWRITE;end
         R_TWRITE:begin
-            if((t_coeff_read_index>=residual_coeff_count)||(t_coeff_read_index>=MAX_COEFF_EVENTS))begin replay_error<=1;rstate<=R_FINISH;end
+            if((t_coeff_read_index>=block_coeff_end)||
+               (t_coeff_read_index>=residual_coeff_count)||
+               (t_coeff_read_index>=MAX_COEFF_EVENTS))begin replay_error<=1;rstate<=R_FINISH;end
             else begin
-                t_we<=1;t_widx<=residual_coeff_index[t_coeff_read_index[5:0]];t_wval<=residual_coeff_value[t_coeff_read_index[5:0]];
+                t_we<=1;t_widx<=residual_coeff_word[18:13];
+                t_wval<=residual_coeff_word[12:0];
                 t_coeff_read_index<=t_coeff_read_index+1'b1;
-                if(residual_coeff_last[t_coeff_read_index[5:0]])rstate<=R_TEND;
+                if(t_coeff_read_index+1'b1>=block_coeff_end)rstate<=R_TEND;
+                else rstate<=R_COEFF_WAIT;
             end
         end
+        R_COEFF_WAIT:rstate<=R_TWRITE;
         R_TEND:begin t_end<=1;rstate<=R_TWAIT;end
         R_TWAIT:if(t_done)begin
             if((t_sample_count+(t_valid?1'b1:1'b0))!=64)replay_error<=1;
-            if(transform_slot+1'b1>=residual_count)begin
-                if(t_coeff_read_index!=residual_coeff_count)replay_error<=1;
-                replay_slot<=0;rstate<=R_DESC;
-            end else begin transform_slot<=transform_slot+1'b1;rstate<=R_TSTART;end
+            replay_sample<=0;rstate<=R_DESC;
         end
-        R_DESC:begin sideband_valid<=1;sideband_index<=6'h3f;sideband_value<=$signed({2'b11,desc_mb,desc_block});replay_sample<=0;rstate<=R_SAMPLE;end
+        R_DESC:begin sideband_valid<=1;sideband_index<=6'h3f;sideband_value<=$signed({2'b11,transform_mb,transform_block});replay_sample<=0;rstate<=R_SAMPLE;end
         R_SAMPLE:begin
-            sideband_valid<=1;sideband_index<=replay_sample;sideband_value<=residual_mem[res_mem_addr];
-            if((replay_slot==0)&&(replay_sample==0))begin first_sample_valid<=1;first_sample_value<=residual_mem[res_mem_addr];end
-            if(replay_sample==63)begin if(replay_slot+1'b1>=residual_count)rstate<=R_FINISH;else begin replay_slot<=replay_slot+1'b1;rstate<=R_DESC;end end
+            sideband_valid<=1;sideband_index<=replay_sample;sideband_value<=block_sample_mem[replay_sample];
+            if((transform_slot==0)&&(replay_sample==0))begin first_sample_valid<=1;first_sample_value<=block_sample_mem[0];end
+            if(replay_sample==63)begin
+                if(transform_slot+1'b1>=residual_count)begin
+                    if(t_coeff_read_index!=residual_coeff_count)replay_error<=1;
+                    rstate<=R_FINISH;
+                end else begin transform_slot<=transform_slot+1'b1;rstate<=R_BLOCK_WAIT;end
+            end
             else replay_sample<=replay_sample+1'b1;
         end
         R_FINISH:begin sideband_valid<=1;sideband_index<=6'h3f;sideband_value<=16'shA3FF;b_seen<=1;b_complete_now<=1;replay_active<=0;parse_hold<=0;rstate<=R_IDLE;end

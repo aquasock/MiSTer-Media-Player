@@ -51,17 +51,21 @@ localparam [7:0]
     EXTENSION_START_CODE = 8'hB5,
     SEQUENCE_END_CODE    = 8'hB7;
 localparam integer ROW_BUFFER_BYTES = 512;
-localparam [4:0] MAX_RESIDUAL_BLOCKS = 5'd16;
-localparam [6:0] MAX_COEFF_EVENTS = 7'd64;
+localparam integer MAX_RESIDUAL_BLOCKS = 2048;
+localparam integer MAX_COEFF_EVENTS = 32768;
 
-reg [10:0] residual_mb [0:15];
-reg [2:0] residual_block [0:15];
-reg [4:0] residual_qscale [0:15];
-reg [4:0] residual_count;
-reg [5:0] residual_coeff_index [0:63];
-reg signed [12:0] residual_coeff_value [0:63];
-reg residual_coeff_last [0:63];
-reg [6:0] residual_coeff_count;
+// Commit 203: each block descriptor carries the exclusive coefficient end
+// pointer, eliminating a separate last-flag RAM.  Neither capacity is an
+// H.262 syntax limit.
+(* ramstyle = "M10K" *) reg [34:0] residual_block_mem [0:2047];
+(* ramstyle = "M10K" *) reg [18:0] residual_coeff_mem [0:32767];
+reg [34:0] residual_block_word;
+reg [18:0] residual_coeff_word;
+reg [11:0] residual_count;
+reg [15:0] residual_coeff_count;
+reg [10:0] pending_residual_mb;
+reg [2:0] pending_residual_block;
+reg [4:0] pending_residual_qscale;
 reg q_scale_type, alternate_scan;
 
 reg parser_error, replay_error, prior_error;

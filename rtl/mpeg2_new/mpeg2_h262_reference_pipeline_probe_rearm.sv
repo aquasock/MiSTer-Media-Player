@@ -167,6 +167,33 @@ wire[4:0] mixed_error_source;
 wire[7:0] b_bc_raw;wire[28:0] b_addr_raw;wire b_rd_raw;
 wire b_store_sel;wire[7:0] b_store_val;wire[11:0] b_store_x,b_store_y;wire b_store_valid,b_store_start,b_store_complete;
 
+// Commit 203: P and B parsing/reconstruction are mutually exclusive, so both
+// raster engines reuse one 2048-block sparse residual store.  Port A accepts
+// transformed samples during metadata capture; port B serves synchronous
+// reconstruction reads from whichever engine owns the shared DDR path.
+wire mix_residual_store_write,b_residual_store_write;
+wire [16:0] mix_residual_store_write_address;
+wire [16:0] b_residual_store_write_address;
+wire signed [15:0] mix_residual_store_write_data;
+wire signed [15:0] b_residual_store_write_data;
+wire [16:0] mix_residual_store_read_address;
+wire [16:0] b_residual_store_read_address;
+reg signed [15:0] shared_residual_store_read_data;
+(* ramstyle = "M10K" *) reg signed [15:0]
+    shared_residual_store [0:131071];
+
+always @(posedge clk) begin
+ if(mix_residual_store_write)
+  shared_residual_store[mix_residual_store_write_address]
+   <=mix_residual_store_write_data;
+ else if(b_residual_store_write)
+  shared_residual_store[b_residual_store_write_address]
+   <=b_residual_store_write_data;
+ shared_residual_store_read_data<=shared_residual_store[
+  b_select?b_residual_store_read_address:
+           mix_residual_store_read_address];
+end
+
 wire shared_select=mixed_select||b_select;
 wire[7:0] shared_bc_raw=b_select?b_bc_raw:mix_bc_raw;
 wire[28:0] shared_addr_raw=b_select?b_addr_raw:mix_addr_raw;
@@ -198,6 +225,11 @@ mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
  .horizontal_size(horizontal_size),.vertical_size(vertical_size),
  .shift_right_map(48'd0),
  .residual_valid(mix_residual_valid),.residual_index(mix_residual_index),.residual_value(mix_residual_value),
+ .residual_store_write(mix_residual_store_write),
+ .residual_store_write_address(mix_residual_store_write_address),
+ .residual_store_write_data(mix_residual_store_write_data),
+ .residual_store_read_address(mix_residual_store_read_address),
+ .residual_store_read_data(shared_residual_store_read_data),
  .reference_valid(reference_frame_valid),.reference_bank(reference_frame_bank),.destination_bank(destination_frame_bank),.store_block_stored(p_store_block_stored),
  .ddram_busy(shared_engine_busy),.ddram_dout(shared_dout_reg),.ddram_dout_ready(mix_dout_ready_owned),.ddram_burstcnt(mix_bc_raw),.ddram_addr(mix_addr_raw),.ddram_rd(mix_rd_raw),
  .store_select(mix_store_sel),.store_pixel_value(mix_store_val),.store_pixel_x(mix_store_x),.store_pixel_y(mix_store_y),.store_pixel_valid(mix_store_valid),
@@ -208,6 +240,11 @@ mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
 mpeg2_h262_b_bidirectional_raster_engine b_probe(
  .clk(clk),.reset(b_reset),.capture_enable(b_select),.request(b_select),
  .sideband_valid(p_residual_sample_valid&&b_select),.sideband_index(p_residual_sample_index),.sideband_value(p_residual_sample_value),
+ .residual_store_write(b_residual_store_write),
+ .residual_store_write_address(b_residual_store_write_address),
+ .residual_store_write_data(b_residual_store_write_data),
+ .residual_store_read_address(b_residual_store_read_address),
+ .residual_store_read_data(shared_residual_store_read_data),
  .reference_valid(reference_frame_valid),.future_reference_bank(reference_frame_bank),.store_block_stored(p_store_block_stored),
  .ddram_busy(shared_engine_busy),.ddram_dout(shared_dout_reg),.ddram_dout_ready(b_dout_ready_owned),
  .ddram_burstcnt(b_bc_raw),.ddram_addr(b_addr_raw),.ddram_rd(b_rd_raw),

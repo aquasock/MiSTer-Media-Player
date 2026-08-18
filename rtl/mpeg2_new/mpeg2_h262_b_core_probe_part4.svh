@@ -71,10 +71,9 @@
                 else if(current_cbp[5-current_block_index]) begin
                     if(residual_count>=MAX_RESIDUAL_BLOCKS)state<=S_ERROR;
                     else begin
-                        residual_mb[residual_count[3:0]]<=current_map_index;
-                        residual_block[residual_count[3:0]]<=current_block_index;
-                        residual_qscale[residual_count[3:0]]<=current_qscale;
-                        residual_count<=residual_count+1'b1;
+                        pending_residual_mb<=current_map_index;
+                        pending_residual_block<=current_block_index;
+                        pending_residual_qscale<=current_qscale;
                         qfs_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;current_block_has_coeff<=0;
                         state<=S_FIRST_COEFF;
                     end
@@ -93,7 +92,10 @@
                     if(coeff_vlc_eob) begin
                         if(!current_block_has_coeff||(residual_coeff_count==0))state<=S_ERROR;
                         else begin
-                            residual_coeff_last[residual_coeff_count-1'b1]<=1'b1;
+                            residual_block_mem[residual_count[10:0]]<=
+                                {pending_residual_mb,pending_residual_block,
+                                 pending_residual_qscale,residual_coeff_count};
+                            residual_count<=residual_count+1'b1;
                             current_block_index<=current_block_index+1'b1;state<=S_BLOCK;
                         end
                     end else if(coeff_vlc_escape) begin
@@ -107,9 +109,10 @@
             S_COEFF_SIGN: begin
                 if(parser_at_end||(normal_target_index>63)||(residual_coeff_count>=MAX_COEFF_EVENTS))state<=S_ERROR;
                 else begin
-                    residual_coeff_index[residual_coeff_count[5:0]]<=normal_target_index[5:0];
-                    residual_coeff_value[residual_coeff_count[5:0]]<=parser_current_bit?-$signed({7'd0,coeff_level_pending}):$signed({7'd0,coeff_level_pending});
-                    residual_coeff_last[residual_coeff_count[5:0]]<=0;
+                    residual_coeff_mem[residual_coeff_count[14:0]]<=
+                        {normal_target_index[5:0],
+                         parser_current_bit?-$signed({7'd0,coeff_level_pending}):
+                                            $signed({7'd0,coeff_level_pending})};
                     residual_coeff_count<=residual_coeff_count+1'b1;
                     qfs_index<={1'b0,normal_target_index[5:0]}+7'd1;current_block_has_coeff<=1;
                     coeff_vlc_code<=0;coeff_vlc_len<=0;state<=S_COEFF_VLC;
@@ -126,9 +129,9 @@
                     if(escape_level_bit_count==11) begin
                         if((escape_level_next==12'h000)||(escape_level_next==12'h800)||(escape_target_index>63)||(residual_coeff_count>=MAX_COEFF_EVENTS))state<=S_ERROR;
                         else begin
-                            residual_coeff_index[residual_coeff_count[5:0]]<=escape_target_index[5:0];
-                            residual_coeff_value[residual_coeff_count[5:0]]<={escape_level_signed[11],escape_level_signed};
-                            residual_coeff_last[residual_coeff_count[5:0]]<=0;
+                            residual_coeff_mem[residual_coeff_count[14:0]]<=
+                                {escape_target_index[5:0],
+                                 escape_level_signed[11],escape_level_signed};
                             residual_coeff_count<=residual_coeff_count+1'b1;
                             qfs_index<={1'b0,escape_target_index[5:0]}+7'd1;current_block_has_coeff<=1;
                             coeff_vlc_code<=0;coeff_vlc_len<=0;state<=S_COEFF_VLC;
@@ -161,8 +164,8 @@
                 else if(boundary_final)begin
                     if(current_col!={2'b00,picture_mb_width})begin parser_error<=1;proof_done<=1;parse_hold<=0;end
                     else begin
-                        proof_done<=1;transform_slot<=0;t_coeff_read_index<=0;t_sample_count<=0;replay_slot<=0;replay_sample<=0;replay_active<=1;
-                        if(residual_count!=0)rstate<=R_TSTART;else begin if(residual_coeff_count!=0)replay_error<=1;rstate<=R_FINISH;end
+                        proof_done<=1;transform_slot<=0;t_coeff_read_index<=0;t_sample_count<=0;replay_sample<=0;replay_active<=1;
+                        if(residual_count!=0)rstate<=R_BLOCK_WAIT;else begin if(residual_coeff_count!=0)replay_error<=1;rstate<=R_FINISH;end
                     end
                 end else if(slice_capture)begin
                     // While parse_active, slice_capture is the classification of

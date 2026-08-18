@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 
 module tb_h262_parser_windows;
-    localparam integer MAX_STREAM_BYTES = 262144;
+    localparam integer MAX_STREAM_BYTES = 524288;
 
     reg clk = 0;
     reg reset = 1;
@@ -9,8 +9,10 @@ module tb_h262_parser_windows;
     reg stream_valid = 0;
     reg [7:0] stream_mem [0:MAX_STREAM_BYTES-1];
     integer stream_len, stream_index, quiet_cycles, minimum_refills;
+    integer stop_after_first_b, expected_b_blocks, expected_b_coeffs;
     integer p_refills = 0, b_refills = 0;
     integer p_picture_motion_events = 0, p_picture_completions = 0;
+    integer b_picture_completions = 0;
     reg [1023:0] hex_path;
     reg prior_p_error = 0, prior_b_error = 0;
     reg [5:0] prior_p_state = 0, prior_b_state = 0;
@@ -74,6 +76,9 @@ module tb_h262_parser_windows;
         if(!$value$plusargs("HEX=%s", hex_path)) $fatal(1, "missing +HEX");
         if(!$value$plusargs("LEN=%d", stream_len)) $fatal(1, "missing +LEN");
         if(!$value$plusargs("MIN_REFILLS=%d", minimum_refills)) minimum_refills = 0;
+        if(!$value$plusargs("STOP_AFTER_FIRST_B=%d", stop_after_first_b)) stop_after_first_b = 0;
+        if(!$value$plusargs("EXPECT_B_BLOCKS=%d", expected_b_blocks)) expected_b_blocks = -1;
+        if(!$value$plusargs("EXPECT_B_COEFFS=%d", expected_b_coeffs)) expected_b_coeffs = -1;
         if(stream_len <= 0 || stream_len > MAX_STREAM_BYTES)
             $fatal(1, "invalid stream length %0d", stream_len);
         $readmemh(hex_path, stream_mem, 0, stream_len-1);
@@ -126,6 +131,19 @@ module tb_h262_parser_windows;
             p_picture_motion_events <= 0;
             p_picture_completions <= p_picture_completions + 1;
         end
+        if(b_complete) begin
+            b_picture_completions <= b_picture_completions + 1;
+            if(stop_after_first_b) begin
+                $display("FIRST_B_RESULT p_seen=%0d p_error=%0d b_seen=%0d b_error=%0d blocks=%0d coeffs=%0d p_pictures=%0d",
+                         p_seen, p_error, b_seen, b_error, b_parser.residual_count,
+                         b_parser.residual_coeff_count, p_picture_completions);
+                if(!p_seen || p_error || !b_seen || b_error || p_picture_completions == 0 ||
+                   ((expected_b_blocks >= 0) && (b_parser.residual_count != expected_b_blocks)) ||
+                   ((expected_b_coeffs >= 0) && (b_parser.residual_coeff_count != expected_b_coeffs)))
+                    $fatal(1, "first-B parser-window regression failed");
+                $finish;
+            end
+        end
         if(p_parser.parse_active && p_parser.parser_at_end &&
            !p_parser.chunk_boundary_known)
             p_refills <= p_refills + 1;
@@ -159,7 +177,12 @@ module tb_h262_parser_windows;
     end
 
     initial begin
-        repeat(2000000) @(posedge clk);
+        repeat(12000000) @(posedge clk);
+        $display("TIMEOUT stream=%0d b_state=%0d b_rstate=%0d blocks=%0d coeffs=%0d slot=%0d coeff_read=%0d samples=%0d",
+                 stream_index,b_parser.state,b_parser.rstate,
+                 b_parser.residual_count,b_parser.residual_coeff_count,
+                 b_parser.transform_slot,b_parser.t_coeff_read_index,
+                 b_parser.t_sample_count);
         $fatal(1, "parser-window regression timed out");
     end
 endmodule

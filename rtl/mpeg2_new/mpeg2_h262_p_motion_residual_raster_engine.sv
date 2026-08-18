@@ -29,6 +29,11 @@ module mpeg2_h262_p_motion_residual_raster_engine
     input wire residual_valid,
     input wire [5:0] residual_index,
     input wire signed [15:0] residual_value,
+    output wire residual_store_write,
+    output wire [16:0] residual_store_write_address,
+    output wire signed [15:0] residual_store_write_data,
+    output wire [16:0] residual_store_read_address,
+    input wire signed [15:0] residual_store_read_data,
     input wire reference_valid,
     input wire reference_bank,
     input wire destination_bank,
@@ -199,7 +204,6 @@ wire mb_intra=motion_word[16];
 wire signed [7:0] mb_mvx=$signed(motion_word[15:8]);
 wire signed [7:0] mb_mvy=$signed(motion_word[7:0]);
 
-(* ramstyle = "M10K" *) reg signed [15:0] rm [0:131071];
 (* ramstyle = "M10K" *) reg [14:0] desc_mem [0:2047];
 reg [14:0] desc_word;
 reg [14:0] last_desc_word;
@@ -294,6 +298,14 @@ wire [16:0] residual_mem_index=
     {exec_desc_slot,6'b000000}+{11'd0,ei};
 reg signed [15:0] residual_pel_q;
 
+assign residual_store_write=
+    capture_enable&&residual_valid&&desc_active&&
+    (residual_index==sample_expected);
+assign residual_store_write_address=
+    {current_desc_slot,6'b000000}+{11'd0,residual_index};
+assign residual_store_write_data=residual_value;
+assign residual_store_read_address=residual_mem_index;
+
 wire [7:0] current_tap_sample=bat(ddram_dout,src_x_tap[2:0]);
 wire [10:0] pred_sum_with_current=
     pred_sum+{3'd0,current_tap_sample};
@@ -340,7 +352,7 @@ always @(posedge clk) begin
         residual_pel_q<=0;
         desc_word<=0;
     end else begin
-        residual_pel_q<=residual_hit ? rm[residual_mem_index] : 16'sd0;
+        residual_pel_q<=residual_hit ? residual_store_read_data : 16'sd0;
         desc_word<=desc_mem[exec_desc_slot];
     end
 end
@@ -434,9 +446,6 @@ always @(posedge clk) begin
                     error<=1;
                     if(!error) error_source<=5'd1;
                 end else begin
-                    rm[{current_desc_slot,6'b000000}+
-                       {11'd0,residual_index}]
-                        <=residual_value;
                     if(residual_index==6'd63) begin
                         desc_active<=0;
                     end else begin

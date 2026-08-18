@@ -24,20 +24,34 @@ mpeg2_h262_p_non_intra_transform b_transform(
     .residual_sample_valid(t_valid),.residual_sample_block_index(t_unused_block),
     .residual_sample_index(t_index),.residual_sample_value(t_value),.probe_error(t_error));
 
-reg signed [15:0] residual_mem [0:1023];
-reg [6:0] t_sample_count,t_coeff_read_index; reg [4:0] transform_slot;
-localparam [3:0] R_IDLE=0,R_TSTART=1,R_TWRITE=2,R_TEND=3,R_TWAIT=4,R_DESC=5,R_SAMPLE=6,R_FINISH=7;
-reg [3:0] rstate; reg [5:0] replay_sample; reg [4:0] replay_slot;
-wire [10:0] desc_mb=residual_mb[replay_slot[3:0]];
-wire [2:0] desc_block=residual_block[replay_slot[3:0]];
-wire [9:0] res_mem_addr={replay_slot[3:0],6'b000000}+{4'd0,replay_sample};
+reg signed [15:0] block_sample_mem [0:63];
+reg [6:0] t_sample_count;
+reg [15:0] t_coeff_read_index,block_coeff_end;
+reg [11:0] transform_slot;
+reg [10:0] transform_mb;
+reg [2:0] transform_block;
+localparam [3:0]
+    R_IDLE=0,R_BLOCK_WAIT=1,R_BLOCK_CAPTURE=2,R_TSTART=3,
+    R_TWRITE=4,R_COEFF_WAIT=5,R_TEND=6,R_TWAIT=7,
+    R_DESC=8,R_SAMPLE=9,R_FINISH=10;
+reg [3:0] rstate;
+reg [5:0] replay_sample;
 
 // kate - Commit 173: next uncovered column in the current row across
 // same-vertical-position slices. It is reset only when restricted coverage
 // advances to the next row, not at each slice header.
 reg [5:0] row_covered_count;
 
-integer i;
+always @(posedge clk) begin
+    if(reset) begin
+        residual_block_word<=0;
+        residual_coeff_word<=0;
+    end else begin
+        residual_block_word<=residual_block_mem[transform_slot[10:0]];
+        residual_coeff_word<=residual_coeff_mem[t_coeff_read_index[14:0]];
+    end
+end
+
 always @(posedge clk) begin
     if(reset) begin
         byte_window<=0;sequence_capture<=0;sequence_count<=0;sequence_shift<=0;geometry_supported<=0;picture_mb_width<=0;picture_mb_height<=0;
@@ -54,12 +68,10 @@ always @(posedge clk) begin
         cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
         qfs_index<=0;coeff_run_pending<=0;coeff_level_pending<=0;current_block_has_coeff<=0;
         escape_run_shift<=0;escape_run_bit_count<=0;escape_level_shift<=0;escape_level_bit_count<=0;
-        residual_count<=0;residual_coeff_count<=0;q_scale_type<=0;alternate_scan<=0;
-        t_start<=0;t_we<=0;t_end<=0;t_widx<=0;t_wval<=0;t_qscale<=0;t_sample_count<=0;t_coeff_read_index<=0;transform_slot<=0;
-        rstate<=R_IDLE;replay_sample<=0;replay_slot<=0;replay_active<=0;sideband_valid<=0;sideband_index<=0;sideband_value<=0;
+        residual_count<=0;residual_coeff_count<=0;pending_residual_mb<=0;pending_residual_block<=0;pending_residual_qscale<=0;q_scale_type<=0;alternate_scan<=0;
+        t_start<=0;t_we<=0;t_end<=0;t_widx<=0;t_wval<=0;t_qscale<=0;t_sample_count<=0;t_coeff_read_index<=0;block_coeff_end<=0;transform_slot<=0;transform_mb<=0;transform_block<=0;
+        rstate<=R_IDLE;replay_sample<=0;replay_active<=0;sideband_valid<=0;sideband_index<=0;sideband_value<=0;
         first_sample_valid<=0;first_sample_value<=0;
-        for(i=0;i<16;i=i+1)begin residual_mb[i]<=0;residual_block[i]<=0;residual_qscale[i]<=0;end
-        for(i=0;i<64;i=i+1)begin residual_coeff_index[i]<=0;residual_coeff_value[i]<=0;residual_coeff_last[i]<=0;end
     end else begin
         b_complete_now<=0;sideband_valid<=0;first_sample_valid<=0;t_start<=0;t_we<=0;t_end<=0;
         if(t_error)replay_error<=1;

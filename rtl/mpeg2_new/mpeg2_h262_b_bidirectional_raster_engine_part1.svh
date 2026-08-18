@@ -42,17 +42,16 @@ wire signed [7:0] mb_fmvy=$signed(motion_word[23:16]);
 wire signed [7:0] mb_bmvx=$signed(motion_word[15:8]);
 wire signed [7:0] mb_bmvy=$signed(motion_word[7:0]);
 
-// kate - Commit 170: 16 blocks x 64 spatial samples. This is deliberately
-// bounded implementation storage, not an H.262 syntax limit.
-reg signed [15:0] rm [0:1023];
-reg [10:0] desc_mb [0:15];
-reg [2:0] desc_block [0:15];
-reg [4:0] desc_count;
-reg [3:0] current_desc_slot;
+// Commit 203: descriptors use synchronous M10K storage while P and B share
+// the 2048-block sparse spatial-sample RAM in their parent wrapper.
+(* ramstyle = "M10K" *) reg [13:0] desc_mem [0:2047];
+reg [13:0] desc_word,last_desc_word;
+reg [11:0] desc_count;
+reg [10:0] current_desc_slot;
 reg desc_active;
 reg [5:0] sample_expected;
 reg metadata_done;
-reg [4:0] exec_desc_slot;
+reg [10:0] exec_desc_slot;
 
 reg pending,started;
 reg future_bank_latched;
@@ -62,7 +61,7 @@ reg [5:0] col,mrow;
 reg [2:0] blk;
 reg [25:0] timeout;
 reg [63:0] resrows [0:7];
-reg emit,wait_store,pixel_setup;
+reg emit,wait_store,pixel_setup,residual_load,residual_load_wait;
 reg [5:0] ei;
 reg [2:0] verify_row;
 reg pred_direction;

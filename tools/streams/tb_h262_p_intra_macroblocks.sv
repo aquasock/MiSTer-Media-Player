@@ -54,6 +54,12 @@ module tb_h262_p_intra_macroblocks;
     wire [7:0] engine_sample,engine_reconstructed_value,engine_persisted_value;
     wire [3:0] engine_progress;
     wire [4:0] engine_error_source;
+    wire engine_residual_write;
+    wire [16:0] engine_residual_write_address;
+    wire signed [15:0] engine_residual_write_data;
+    wire [16:0] engine_residual_read_address;
+    reg signed [15:0] engine_residual_read_data=0;
+    reg signed [15:0] engine_residual_mem[0:131071];
     reg [63:0] engine_dout=0;
     reg engine_dout_ready=0,engine_block_stored=0;
     integer intra_store_samples=0;
@@ -78,6 +84,14 @@ module tb_h262_p_intra_macroblocks;
     endfunction
 
     always #5 clk=~clk;
+
+    always @(posedge clk) begin
+        if(engine_residual_write)
+            engine_residual_mem[engine_residual_write_address]
+                <=engine_residual_write_data;
+        engine_residual_read_data<=
+            engine_residual_mem[engine_residual_read_address];
+    end
 
     mpeg2_h262_p_wide_motion_syntax_probe parser(
         .clk(clk),.reset(reset),.stream_data(stream_data),
@@ -140,7 +154,13 @@ module tb_h262_p_intra_macroblocks;
         .request(candidate||seen),.horizontal_size(14'd720),
         .vertical_size(14'd480),.shift_right_map(48'd0),
         .residual_valid(engine_input_valid),.residual_index(engine_input_index),
-        .residual_value(engine_input_value),.reference_valid(1'b1),
+        .residual_value(engine_input_value),
+        .residual_store_write(engine_residual_write),
+        .residual_store_write_address(engine_residual_write_address),
+        .residual_store_write_data(engine_residual_write_data),
+        .residual_store_read_address(engine_residual_read_address),
+        .residual_store_read_data(engine_residual_read_data),
+        .reference_valid(1'b1),
         .reference_bank(1'b0),.destination_bank(1'b1),
         .store_block_stored(engine_block_stored),.ddram_busy(1'b0),
         .ddram_dout(engine_dout),.ddram_dout_ready(engine_dout_ready),

@@ -31,6 +31,11 @@ module mpeg2_h262_b_bidirectional_raster_engine
     input  wire sideband_valid,
     input  wire [5:0] sideband_index,
     input  wire signed [15:0] sideband_value,
+    output wire residual_store_write,
+    output wire [16:0] residual_store_write_address,
+    output wire signed [15:0] residual_store_write_data,
+    output wire [16:0] residual_store_read_address,
+    input  wire signed [15:0] residual_store_read_data,
     input  wire reference_valid,
     input  wire future_reference_bank,
     input  wire store_block_stored,
@@ -64,7 +69,7 @@ localparam [28:0]
     BANK_OFF    = 29'h00010000,
     SCRATCH_OFF = 29'h00020000;
 localparam integer MAX_MB=1350;
-localparam integer MAX_BLOCKS=16;
+localparam integer MAX_BLOCKS=2048;
 
 reg [5:0] mb_width,mb_height;
 reg geometry_seen;
