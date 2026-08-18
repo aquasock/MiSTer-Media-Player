@@ -889,3 +889,35 @@ None.
 - [ ] Passed
 
 ---
+## 210 COMMIT Unreleased ??? 2026-08-18T05:13:48-07:00
+
+#### Coming From:
+
+Unreleased 450f78a
+
+#### Purpose:
+
+Identify and correct the dense I/P/B publication transition that raises the first POWER-4 error.
+
+#### Outcome:
+
+The planned commit will assign a sticky detail code to each publication-error assertion site, expose that detail through the existing first-fault LED hierarchy, and drive the complete generated dense corpus through the compiled I/P/B publication shell with row and picture persistence in hardware order. The regression will establish the first failing reference-bank or header-order transition before the commit changes that transition, then require all P publications and B persistence events to complete without publication error.
+
+#### Next Steps:
+
+Implement the observability and full publication-order regression, correct only the reproduced transition, rerun the focused persistence, dense P, seven-B, transport, presentation, and storage-tag regressions, then complete a clean Quartus build and deploy the verified artifacts to the standard MiSTer target.
+
+#### Files Modified:
+
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_02.svh
+- MediaPlayer_top_07.svh
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+- tools/streams/tb_h262_dense_publication_order.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
