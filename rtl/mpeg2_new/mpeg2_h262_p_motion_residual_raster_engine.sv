@@ -200,9 +200,9 @@ wire signed [7:0] mb_mvx=$signed(motion_word[15:8]);
 wire signed [7:0] mb_mvy=$signed(motion_word[7:0]);
 
 (* ramstyle = "M10K" *) reg signed [15:0] rm [0:131071];
-reg [10:0] desc_mb [0:2047];
-reg [2:0] desc_block [0:2047];
-reg desc_intra [0:2047];
+(* ramstyle = "M10K" *) reg [14:0] desc_mem [0:2047];
+reg [14:0] desc_word;
+reg [14:0] last_desc_word;
 reg [11:0] desc_count;
 reg [10:0] current_desc_slot;
 reg desc_active;
@@ -220,7 +220,8 @@ reg [5:0] col, mrow;
 reg [2:0] blk;
 reg [23:0] timeout;
 reg [63:0] resrows [0:7];
-reg emit, wait_store, pixel_setup, motion_load, residual_load;
+reg emit, wait_store, pixel_setup, motion_load;
+reg residual_load, residual_load_wait;
 reg [5:0] ei;
 reg [2:0] verify_row;
 reg [1:0] tap_index;
@@ -285,10 +286,10 @@ wire [11:0] src_y_tap=src_y_tap_signed[11:0];
 
 wire descriptor_position_hit=
     (exec_desc_slot<desc_count)&&
-    (desc_mb[exec_desc_slot]==mbi)&&
-    (desc_block[exec_desc_slot]==blk);
+    (desc_word[14:4]==mbi)&&
+    (desc_word[2:0]==blk);
 wire residual_hit=descriptor_position_hit&&
-    (desc_intra[exec_desc_slot]==mb_intra);
+    (desc_word[3]==mb_intra);
 wire [16:0] residual_mem_index=
     {exec_desc_slot,6'b000000}+{11'd0,ei};
 reg signed [15:0] residual_pel_q;
@@ -323,8 +324,7 @@ wire ready_res=metadata_done;
 wire descriptor_order_error=
     (desc_count!=0)&&
     ({wide_desc_mb,residual_value[2:0]} <=
-     {desc_mb[(desc_count-1'b1)&12'h7ff],
-      desc_block[(desc_count-1'b1)&12'h7ff]});
+     {last_desc_word[14:4],last_desc_word[2:0]});
 
 wire new_picture_metadata=
     capture_enable&&residual_valid&&!desc_active&&
@@ -332,14 +332,17 @@ wire new_picture_metadata=
     persisted_seen&&!active;
 wire unused_shift_map=&{1'b0,shift_right_map};
 
-// Commit 202: synchronous sparse-sample lookup allows the 2048-block spatial
-// store to infer M10K RAM. residual_load inserts the required read-latency
-// cycle before pixel_setup consumes residual_pel_q.
+// Commit 202: synchronous descriptor and sparse-sample lookups allow both
+// 2048-block stores to infer M10K RAM. residual_load inserts the required
+// read-latency cycle before pixel_setup consumes the selected values.
 always @(posedge clk) begin
-    if(reset)
+    if(reset) begin
         residual_pel_q<=0;
-    else
+        desc_word<=0;
+    end else begin
         residual_pel_q<=residual_hit ? rm[residual_mem_index] : 16'sd0;
+        desc_word<=desc_mem[exec_desc_slot];
+    end
 end
 
 always @(posedge clk) begin
@@ -347,6 +350,7 @@ always @(posedge clk) begin
         motion_count<=0;
         motion_word<=0;
         desc_count<=0;
+        last_desc_word<=0;
         current_desc_slot<=0;
         desc_active<=0;
         wide_desc_pending<=0;
@@ -372,6 +376,7 @@ always @(posedge clk) begin
         pixel_setup<=0;
         motion_load<=0;
         residual_load<=0;
+        residual_load_wait<=0;
         ei<=0;
         verify_row<=0;
         tap_index<=0;
@@ -398,6 +403,7 @@ always @(posedge clk) begin
             motion_count<=11'd1;
             motion_mem[0]<={(residual_index==6'h3b),residual_value};
             desc_count<=0;
+            last_desc_word<=0;
             current_desc_slot<=0;
             desc_active<=0;
             wide_desc_pending<=0;
@@ -412,6 +418,7 @@ always @(posedge clk) begin
             pixel_setup<=0;
             motion_load<=0;
             residual_load<=0;
+            residual_load_wait<=0;
             mbi<=0;
             col<=0;
             mrow<=0;
@@ -474,9 +481,10 @@ always @(posedge clk) begin
                     if(!error) error_source<=5'd5;
                 end else begin
                     current_desc_slot<=desc_count[10:0];
-                    desc_mb[desc_count]<=wide_desc_mb;
-                    desc_block[desc_count]<=residual_value[2:0];
-                    desc_intra[desc_count]<=residual_value[3];
+                    desc_mem[desc_count]<=
+                        {wide_desc_mb,residual_value[3:0]};
+                    last_desc_word<=
+                        {wide_desc_mb,residual_value[3:0]};
                     desc_count<=desc_count+1'b1;
                     desc_active<=1;
                     wide_desc_pending<=0;
@@ -493,15 +501,18 @@ always @(posedge clk) begin
                    ((desc_count!=0)&&
                     ({5'd0,residual_value[8:3],
                       residual_value[2:0]} <=
-                     {desc_mb[(desc_count-1'b1)&12'h7ff],
-                      desc_block[(desc_count-1'b1)&12'h7ff]}))) begin
+                     {last_desc_word[14:4],
+                      last_desc_word[2:0]}))) begin
                     error<=1;
                     if(!error) error_source<=5'd6;
                 end else begin
                     current_desc_slot<=desc_count[10:0];
-                    desc_mb[desc_count]<={5'd0,residual_value[8:3]};
-                    desc_block[desc_count]<=residual_value[2:0];
-                    desc_intra[desc_count]<=1'b0;
+                    desc_mem[desc_count]<=
+                        {{5'd0,residual_value[8:3]},1'b0,
+                         residual_value[2:0]};
+                    last_desc_word<=
+                        {{5'd0,residual_value[8:3]},1'b0,
+                         residual_value[2:0]};
                     desc_count<=desc_count+1'b1;
                     desc_active<=1;
                     sample_expected<=0;
@@ -576,6 +587,11 @@ always @(posedge clk) begin
 
         if(residual_load) begin
             residual_load<=0;
+            residual_load_wait<=1;
+        end
+
+        if(residual_load_wait) begin
+            residual_load_wait<=0;
             pixel_setup<=1;
         end
 
