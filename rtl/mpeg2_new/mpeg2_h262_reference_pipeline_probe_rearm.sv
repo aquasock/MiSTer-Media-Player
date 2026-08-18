@@ -40,10 +40,14 @@ wire general_detect_now=p_residual_sample_valid&&(p_residual_sample_index==6'h3e
  general_geometry_supported&&!p_implicit_reconstruct_request;
 reg general_mixed_mode;
 wire mixed_active,mixed_persisted_seen,mixed_error,mixed_half;
+reg mixed_persisted_seen_d;
 always @(posedge clk)begin
- if(reset)general_mixed_mode<=0;
- else if(general_detect_now)general_mixed_mode<=1;
- else if(mixed_persisted_seen)general_mixed_mode<=0;
+ if(reset)begin general_mixed_mode<=0;mixed_persisted_seen_d<=0;end
+ else begin
+  mixed_persisted_seen_d<=mixed_persisted_seen;
+  if(general_detect_now)general_mixed_mode<=1;
+  else if(mixed_persisted_seen)general_mixed_mode<=0;
+ end
 end
 
 wire b_direction_word=(p_residual_sample_index==6'h38)||(p_residual_sample_index==6'h39)||(p_residual_sample_index==6'h3a);
@@ -52,6 +56,7 @@ wire b_detect_now=p_residual_sample_valid&&b_direction_word&&p_forward_vector_va
  general_p_f_code_supported&&
  general_geometry_supported&&!p_implicit_reconstruct_request;
 reg b_mode;
+reg b_persisted_seen_d;
 wire b_active,b_persisted_seen,b_row_persisted,b_error,b_half,b_recon,b_read,b_nonzero;
 wire[4:0] b_error_source;
 wire [7:0] b_sample,b_recon_value,b_persist_value;
@@ -60,8 +65,9 @@ reg[4:0] b_history_error_source;
 wire b_rearm_now=b_mode&&b_persisted_seen&&!b_active;
 wire b_reset=reset||b_rearm_now;
 always @(posedge clk)begin
- if(reset)begin b_mode<=0;b_history_error<=0;b_history_error_source<=0;end
+ if(reset)begin b_mode<=0;b_persisted_seen_d<=0;b_history_error<=0;b_history_error_source<=0;end
  else begin
+  b_persisted_seen_d<=b_persisted_seen;
   if(b_error)b_history_error<=1;
   if(b_error&&(b_history_error_source==0))b_history_error_source<=b_error_source;
   if(b_detect_now)b_mode<=1;
@@ -271,7 +277,13 @@ assign sample_nonzero=b_select?b_nonzero:mixed_select?(mixed_seen_enable&&mix_no
 assign half_sample_seen=b_select?b_half:mixed_select?(mixed_seen_enable&&mixed_half):base_half;
 assign reconstructed_seen=b_select?b_recon:mixed_select?(mixed_seen_enable&&mix_recon):base_recon;
 assign reconstructed_value=b_select?b_recon_value:mixed_select?mix_recon_val:base_recon_val;
-assign persisted_seen=b_select?b_persisted_seen:mixed_select?(mixed_seen_enable&&mixed_persisted_seen):base_persisted_seen;
+// Entry 221: the engines expose sticky completion levels while their selection
+// is transient.  Export one edge per engine transaction so returning from B to
+// a still-settled P engine cannot republish the preceding P reference.
+wire mixed_persisted_edge=mixed_persisted_seen&&!mixed_persisted_seen_d;
+wire b_persisted_edge=b_persisted_seen&&!b_persisted_seen_d;
+assign persisted_seen=b_select?b_persisted_edge:
+ mixed_select?(mixed_seen_enable&&mixed_persisted_edge):base_persisted_seen;
 assign row_persisted=b_select?b_row_persisted:(mixed_select&&mix_row_persisted);
 assign persisted_value=b_select?b_persist_value:mixed_select?mix_persist_val:base_persist_val;
 assign p_progress_stage=mix_progress_stage;

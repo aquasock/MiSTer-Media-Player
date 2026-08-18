@@ -98,14 +98,14 @@ function automatic [28:0] r45;
     begin x={17'd0,r}; r45=(x<<5)+(x<<3)+(x<<2)+x; end
 endfunction
 function automatic [28:0] block_addr;
-    input [5:0] c; input [5:0] mr; input [2:0] b; input [2:0] rr;
+    input sb; input [5:0] c; input [5:0] mr; input [2:0] b; input [2:0] rr;
     reg [11:0] lr,lw,cr;
     begin
         if(b<4) begin
             lr=({6'd0,mr}<<4)+{8'd0,b[1],rr};
             lw=({6'd0,c}<<1)+{11'd0,b[0]};
-            block_addr=Y_BASE+(scratch_bank_latched?SCRATCH1_OFF:SCRATCH0_OFF)+r90(lr)+{17'd0,lw};
+            block_addr=Y_BASE+(sb?SCRATCH1_OFF:SCRATCH0_OFF)+r90(lr)+{17'd0,lw};
         end else begin
             cr=({6'd0,mr}<<3)+{9'd0,rr};
-            block_addr=(b==4?CB_BASE:CR_BASE)+(scratch_bank_latched?SCRATCH1_OFF:SCRATCH0_OFF)+r45(cr)+{20'd0,c};
+            block_addr=(b==4?CB_BASE:CR_BASE)+(sb?SCRATCH1_OFF:SCRATCH0_OFF)+r45(cr)+{20'd0,c};
         end
