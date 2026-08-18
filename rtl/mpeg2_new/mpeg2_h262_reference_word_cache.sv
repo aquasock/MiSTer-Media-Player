@@ -22,6 +22,9 @@ module mpeg2_h262_reference_word_cache
     input  wire [28:0] request_addr,
     input  wire        request_read,
     input  wire        request_cacheable,
+    input  wire        lookup_consume,
+    output wire        lookup_hit,
+    output wire [63:0] lookup_data,
     output wire        request_busy,
     output reg  [63:0] request_dout,
     output reg         request_dout_ready,
@@ -47,9 +50,9 @@ wire cache_lookup0=cache_valid0&&(cache_tag0==request_addr);
 wire cache_lookup1=cache_valid1&&(cache_tag1==request_addr);
 wire cache_lookup2=cache_valid2&&(cache_tag2==request_addr);
 wire cache_lookup3=cache_valid3&&(cache_tag3==request_addr);
-wire cache_lookup_hit=request_cacheable&&
+assign lookup_hit=request_cacheable&&
     (cache_lookup0||cache_lookup1||cache_lookup2||cache_lookup3);
-wire [63:0] cache_lookup_data=cache_lookup0?cache_data0:
+assign lookup_data=cache_lookup0?cache_data0:
     cache_lookup1?cache_data1:cache_lookup2?cache_data2:cache_data3;
 
 reg        request_active;
@@ -116,15 +119,21 @@ always @(posedge clk) begin
                 request_burstcnt_reg<=request_burstcnt;
                 request_addr_reg<=request_addr;
                 request_cacheable_reg<=request_cacheable;
-                request_hit_reg<=cache_lookup_hit;
-                request_hit_data_reg<=cache_lookup_data;
-                if(cache_lookup_hit)
+                request_hit_reg<=lookup_hit;
+                request_hit_data_reg<=lookup_data;
+                if(lookup_hit)
                     cache_hit_count<=cache_hit_count+1'b1;
                 else if(request_cacheable)
                     cache_miss_count<=cache_miss_count+1'b1;
                 else
                     uncached_count<=uncached_count+1'b1;
             end
+
+            // A raster engine may consume an already-resident prediction word
+            // directly.  No request is captured and no downstream transaction
+            // is issued for this path.
+            if(lookup_consume&&lookup_hit)
+                cache_hit_count<=cache_hit_count+1'b1;
 
             if(request_active&&request_hit_reg) begin
                 request_active<=1'b0;

@@ -5,6 +5,9 @@ module tb_h262_prediction_word_cache;
     reg [7:0] request_burstcnt=0;
     reg [28:0] request_addr=0;
     reg request_read=0,request_cacheable=0;
+    reg lookup_consume=0;
+    wire lookup_hit;
+    wire [63:0] lookup_data;
     wire request_busy;
     wire [63:0] request_dout;
     wire request_dout_ready;
@@ -36,6 +39,8 @@ module tb_h262_prediction_word_cache;
         .clk(clk),.reset(reset),.active(active),
         .request_burstcnt(request_burstcnt),.request_addr(request_addr),
         .request_read(request_read),.request_cacheable(request_cacheable),
+        .lookup_consume(lookup_consume),.lookup_hit(lookup_hit),
+        .lookup_data(lookup_data),
         .request_busy(request_busy),.request_dout(request_dout),
         .request_dout_ready(request_dout_ready),
         .downstream_busy(downstream_busy),.downstream_dout(downstream_dout),
@@ -96,14 +101,33 @@ module tb_h262_prediction_word_cache;
         end
     endtask
 
+    task automatic consume_lookup;
+        input [28:0] addr;
+        begin
+            @(negedge clk);
+            request_addr=addr;
+            request_cacheable=1;
+            request_read=0;
+            #1;
+            if(!lookup_hit)
+                $fatal(1,"direct lookup missed addr=%h",addr);
+            if(lookup_data!==word_for(addr))
+                $fatal(1,"wrong direct lookup data addr=%h",addr);
+            lookup_consume=1;
+            @(negedge clk);
+            lookup_consume=0;
+        end
+    endtask
+
     initial begin
         repeat(4)@(posedge clk);
         reset=0;
         active=1;
 
-        // First access misses; an immediate repeat must hit.
+        // First access misses; an immediate direct lookup must hit without a
+        // registered request or downstream transaction.
         request_word(29'h00100,1'b1);
-        request_word(29'h00100,1'b1);
+        consume_lookup(29'h00100);
         if((downstream_reads!=1)||(cache_hits!=1)||(cache_misses!=1))
             $fatal(1,"basic hit/miss accounting failed");
 

@@ -42,10 +42,13 @@ module mpeg2_h262_p_motion_residual_raster_engine
     input wire ddram_busy,
     input wire [63:0] ddram_dout,
     input wire ddram_dout_ready,
+    input wire ddram_lookup_hit,
+    input wire [63:0] ddram_lookup_data,
     output wire [7:0] ddram_burstcnt,
     output wire [28:0] ddram_addr,
     output wire ddram_rd,
     output wire ddram_cacheable,
+    output wire ddram_lookup_consume,
     output wire store_select,
     output wire [7:0] store_pixel_value,
     output wire [11:0] store_pixel_x,
@@ -319,14 +322,25 @@ wire [7:0] predicted_current=
     round_prediction(pred_sum_with_current,half_x,half_y);
 wire [7:0] reconstructed_current=
     clip(predicted_current,residual_pel_q);
+wire [7:0] lookup_tap_sample=
+    bat(ddram_lookup_data,src_x_tap[2:0]);
+wire [10:0] lookup_pred_sum_with_current=
+    pred_sum+{3'd0,lookup_tap_sample};
+wire [7:0] lookup_predicted_current=
+    round_prediction(lookup_pred_sum_with_current,half_x,half_y);
+wire [7:0] lookup_reconstructed_current=
+    clip(lookup_predicted_current,residual_pel_q);
+wire prediction_lookup=pixel_setup&&!mb_intra&&source_bounds_ok;
 
 assign ddram_burstcnt=req?8'd1:0;
 assign ddram_addr=req ?
     (req_kind ? block_addr(doff,col,mrow,blk,verify_row)
               : pixel_addr(roff,blk,src_x_tap,src_y_tap)) :
+    prediction_lookup ? pixel_addr(roff,blk,src_x_tap,src_y_tap) :
     29'd0;
 assign ddram_rd=req;
-assign ddram_cacheable=req&&!req_kind;
+assign ddram_cacheable=(req&&!req_kind)||prediction_lookup;
+assign ddram_lookup_consume=prediction_lookup&&ddram_lookup_hit;
 
 assign store_select=emit;
 assign store_pixel_value=out_reg;
@@ -626,13 +640,13 @@ always @(posedge clk) begin
 
         if(residual_load_wait) begin
             residual_load_wait<=0;
+            pred_sum<=0;
+            tap_index<=0;
             pixel_setup<=1;
         end
 
         if(pixel_setup) begin
             pixel_setup<=0;
-            pred_sum<=0;
-            tap_index<=0;
             if(mb_intra&&!residual_hit) begin
                 error<=1;
                 if(!error) error_source<=5'd17;
@@ -651,7 +665,23 @@ always @(posedge clk) begin
             end else begin
                 if(half_x||half_y) half_sample_seen<=1;
                 req_kind<=0;
-                req<=1;
+                if(ddram_lookup_hit) begin
+                    if(progress_stage<4'd3)
+                        progress_stage<=4'd3;
+                    if(tap_last) begin
+                        out_reg<=lookup_reconstructed_current;
+                        emit<=1;
+                        if((mbi==0)&&(blk==0)&&(ei==0)) begin
+                            read_seen<=1;
+                            sample_value<=lookup_predicted_current;
+                            sample_nonzero<=|lookup_predicted_current;
+                        end
+                    end else begin
+                        pred_sum<=lookup_pred_sum_with_current;
+                        tap_index<=tap_index+1'b1;
+                        pixel_setup<=1;
+                    end
+                end else req<=1;
             end
         end
 

@@ -40,11 +40,28 @@ wire [7:0] bidir_prediction=bidir_sum[8:1];
 wire [7:0] final_prediction=(mb_direction==2'd3)?bidir_prediction:selected_prediction;
 wire [7:0] reconstructed_current=clip(final_prediction,residual_pel);
 wire [7:0] reconstructed_intra=clip(8'd0,residual_pel);
+wire [7:0] lookup_tap_sample=bat(ddram_lookup_data,src_x_tap[2:0]);
+wire [10:0] lookup_pred_sum_with_current=pred_sum+{3'd0,lookup_tap_sample};
+wire [7:0] lookup_selected_prediction=
+    round_prediction(lookup_pred_sum_with_current,half_x,half_y);
+wire [8:0] lookup_bidir_sum=
+    {1'b0,forward_prediction}+{1'b0,lookup_selected_prediction}+9'd1;
+wire [7:0] lookup_bidir_prediction=lookup_bidir_sum[8:1];
+wire [7:0] lookup_final_prediction=
+    (mb_direction==2'd3)?lookup_bidir_prediction:lookup_selected_prediction;
+wire [7:0] lookup_reconstructed_current=
+    clip(lookup_final_prediction,residual_pel);
+wire prediction_lookup=pixel_setup&&(mb_direction!=0)&&source_bounds_ok;
 
 assign ddram_burstcnt=req?8'd1:8'd0;
-assign ddram_addr=req?(req_kind?block_addr(scratch_bank_latched,col,mrow,blk,verify_row):pixel_addr(selected_reference_off,blk,src_x_tap,src_y_tap)):29'd0;
+assign ddram_addr=req?
+    (req_kind?block_addr(scratch_bank_latched,col,mrow,blk,verify_row):
+              pixel_addr(selected_reference_off,blk,src_x_tap,src_y_tap)):
+    prediction_lookup?
+        pixel_addr(selected_reference_off,blk,src_x_tap,src_y_tap):29'd0;
 assign ddram_rd=req;
-assign ddram_cacheable=req&&!req_kind;
+assign ddram_cacheable=(req&&!req_kind)||prediction_lookup;
+assign ddram_lookup_consume=prediction_lookup&&ddram_lookup_hit;
 assign store_select=emit;
 assign store_pixel_value=out_reg;
 assign store_pixel_valid=emit;
