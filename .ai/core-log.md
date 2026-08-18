@@ -879,7 +879,7 @@ Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_p_visual_discri
 - [x] Passed
 
 ---
-## 193 COMMIT Unreleased ??? 2026-08-17T16:38:38-07:00
+## 193 COMMIT Unreleased a42bb74 2026-08-17T16:38:38-07:00
 
 #### Coming From:
 
@@ -891,15 +891,16 @@ Generalize the progressive 4:2:0 P path from fixed `f_code=(3,3)` to independent
 
 #### Outcome:
 
-Commit 192 hardware accepts all five requested streams with solid USER and zero-code POWER, no DISK error, and the visual discriminator seams retained. Static tracing of the compiled generalized P path finds its remaining motion envelope fixed at `f_code=(3,3)`: picture admission requires both fields to equal 3, the motion parser consumes exactly two residual bits, and the shared reference adapter selects generalized P transactions only for that same pair. `H262-022` defines reconstruction from the picture-signaled component value, and values 1 through 4 form the next bounded expansion because their complete reconstructed range fits the existing signed eight-bit motion transport; B decoding remains outside this boundary.
+Commit `a42bb74` admits independently signaled progressive-P horizontal and vertical `f_code` values 1 through 4, consumes the corresponding zero through three residual bits per component, and applies H.262 motion-vector reconstruction and wraparound without changing the fixed-3 B path. Deterministic stream generation covers unequal component pairs, every admitted value, nonzero residuals, both signs, predictor wraparound, and chained references. Exact replay passes all 5,400 new vectors and 12,150 standing P vectors; all eight standing generators remain pixel-exact or within their established tolerance. A clean Quartus 17.0.2 build completes with zero TNS, no Critical Warning, +0.243 ns global setup, +0.245 ns global hold, +2.290 ns decoder setup, 31,398 ALMs, 41,994 registers, 592,333 memory bits, 90 RAM blocks, 69 DSP blocks, and 3 PLLs. Qualified RBF `MediaPlayer_commit193_a42bb74.rbf` has SHA-256 `ff29d0f609e57c4b55d4adaee5ca80448c7212fcbb4bae808d12b8e849ad1c18`; generated stream `test_p_f_code_range.m2v` has SHA-256 `b6a9ad050171446b2c55cd18e37d0727063858d49f4c4bdad6a817894fc6d437`; Audio project `fd90c77` remains integration-compatible.
 
 #### Next Steps:
 
-Parameterize generalized P motion reconstruction and admission for independent horizontal and vertical `f_code` values 1 through 4, preserving Table B.10 signed motion codes, predictor reuse/reset, component wraparound, current raster transport, and all fixed-3 behavior. Extend the shared deterministic stream tooling and add one pixel-verified 720x480 regression that covers every admitted value, unequal component pairs, non-zero residuals, signs, and wraparound. Run focused parser/reconstruction simulations, regenerate all standing streams, complete a clean Quartus 17.0.2 build with non-negative setup and hold slack and zero TNS, then hardware-run the new stream plus the five Commit-192 guards and `test_b_bidirectional.m2v` with the visual seams retained.
+Run `test_p_f_code_range.m2v`, `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_p_visual_discriminator.m2v`, `test_i_baseline.m2v`, and `test_b_bidirectional.m2v` using the qualified RBF. Each accepted stream must settle with USER and POWER solid and DISK dark; the visual discriminator must retain its four quadrants and center seams.
 
 #### Files Modified:
 
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
 - rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
@@ -908,7 +909,7 @@ Parameterize generalized P motion reconstruction and admission for independent h
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
