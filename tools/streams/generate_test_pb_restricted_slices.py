@@ -18,6 +18,7 @@ this feature had (see core-log Commit-175).
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import tempfile
 from pathlib import Path
@@ -119,10 +120,10 @@ def split_b_row(row: int):
     return tuple(payloads), spec
 
 
-def main() -> None:
+def generate(out: Path) -> None:
     ffmpeg = h.require_tool("ffmpeg")
     ffprobe = h.require_tool("ffprobe")
-    out = Path(__file__).resolve().parent / "test_pb_restricted_slices.m2v"
+    out.parent.mkdir(parents=True, exist_ok=True)
 
     p_groups, p_specs = [], []
     b_groups, b_specs = [], []
@@ -210,6 +211,16 @@ def main() -> None:
     print("second/third slice first MBA values: 13, 35 (macroblock_escape + 2)")
     print(f"row {RESIDUAL_ROW} additionally carries a residual macroblock in every segment")
     print("verification: pixel-exact (motion) / +-1 IDCT tolerance (residual) against FFmpeg decode, all four P/B pictures")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output", type=Path,
+        default=Path(__file__).resolve().parent / "test_pb_restricted_slices.m2v",
+    )
+    args = parser.parse_args()
+    generate(args.output.resolve())
 
 
 if __name__ == "__main__":
