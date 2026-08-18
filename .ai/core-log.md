@@ -113,7 +113,7 @@ Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_p_visual_discri
 - [x] Passed
 
 ---
-## 228 COMMIT Unreleased ??? 2026-08-18T15:07:22-07:00
+## 228 COMMIT Unreleased cd73cb7 2026-08-18T15:07:22-07:00
 
 #### Coming From:
 
@@ -125,11 +125,11 @@ Raise generalized P/B long-GOP decode throughput from the observed four-frame-pe
 
 #### Outcome:
 
-The uploaded 21.165-second hardware capture proves monotonic presentation through source frame 71 but requires approximately 18 seconds for a 72-frame, 25 fps stream whose encoded duration is 2.88 seconds. The loading overlay remains active throughout, identifying decoder backpressure rather than camera aliasing or intentional presentation pacing. Static tracing identifies redundant prediction traffic as the first optimization boundary: the active P and B raster engines issue a one-word DDR request for each prediction tap of each output pel, discard the other seven bytes in the returned 64-bit word, and commonly request the same word again for adjacent pels; B bidirectional prediction repeats this across both retained references. Add a small fully associative reference-word cache around the shared P/B prediction-read boundary, cache prediction reads only, retain verification reads as uncached proof traffic, and invalidate whenever no raster transaction is active so a later rewritten reference bank can never reuse stale data.
+The uploaded 21.165-second hardware capture proves monotonic presentation through source frame 71 but requires approximately 18 seconds for a 72-frame, 25 fps stream whose encoded duration is 2.88 seconds, identifying decoder backpressure rather than camera aliasing or intentional presentation pacing. Commit `cd73cb7` adds a four-entry fully associative cache at the shared P/B reference-read boundary, permits only prediction reads to hit or fill, keeps destination verification traffic uncached, and invalidates the cache outside each raster transaction so rewritten reference banks cannot return stale words. The focused cache regression passes misses, repeated and interleaved hits, replacement, uncached bypass, invalidation, downstream backpressure, and delayed responses. The DDR-backed 128x96 live-raster soak passes all 72 pictures with 22 P pictures, 47 B pictures, 25 publications, final identity 25 corresponding to source frame 71, both scratch banks, completed presentation, and zero parser, prediction, writer, or presentation errors; it records 2,267,813 cache hits, 463,835 prediction misses, 158,976 uncached verification reads, and 622,811 physical DDR reads, reducing external reads by 78.5 percent or 4.64 times. The independent 720x480 long-GOP publication regression passes all 791,528 bytes with 22 P pictures, 47 B pictures, 25 publications, final identity 25, and zero overwrite or presentation errors. The session-authorized incremental Quartus 17.0.2 compile preserves the project database and completes in 9 minutes 17 seconds with 0 errors and 121 standing warnings; global setup and hold slack are +0.241 and +0.246 ns, focused decoder and video setup slack are +1.407 and +6.518 ns, and utilization is 29,666 ALMs, 43,189 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. `MediaPlayer_commit228_cd73cb7.rbf` is 4,253,812 bytes with SHA-256 `3c6a612cd88449ee283dd50437c20ee07f175af028fef145b0ff48af47b9cc9e`; its MiSTer FTP readback is byte-identical.
 
 #### Next Steps:
 
-Add a focused handshake regression covering misses, repeated and interleaved hits, replacement, uncached verification traffic, downstream backpressure, delayed responses, and invalidation. Count external DDR reads in the integrated live-raster and dense long-GOP regressions, require pixel, persistence, ownership, publication, and exact display-order results to remain unchanged, then perform the session-authorized incremental Quartus build and deploy it for a timed 72-frame MiSTer capture. The release candidate remains blocked unless hardware reaches at least 25 fps; if caching alone is insufficient, preserve its measured gain and use the remaining traffic breakdown to select the next throughput boundary.
+Reload the MiSTer core and load `test_compat_long_gop.m2v` while recording from the first visible frame through settled source frame 71, then report the elapsed load time and terminal USER, POWER, and DISK state. Hardware acceptance requires the existing passing LED pattern and at least 25 fps, corresponding to no more than 2.88 seconds for all 72 frames; if the cache improves throughput but remains below that threshold, retain the measured gain and target the serialized raster-engine handshake or uncached verification boundary in the next commit.
 
 #### Files Modified:
 
@@ -144,7 +144,7 @@ Add a focused handshake regression covering misses, repeated and interleaved hit
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
