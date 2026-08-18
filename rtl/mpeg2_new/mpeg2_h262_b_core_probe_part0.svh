@@ -19,6 +19,8 @@
 // kate - Commit 198: refill the 512-byte parser window with two-byte overlap,
 // removing it as a whole-slice capacity limit while retaining start-code
 // recognition across every refill boundary.
+// Entry 204 holds each completed macroblock row through transform and scratch
+// persistence before reusing its descriptor and coefficient addresses.
 //
 // Standards authority: .ai/core-standards.md H262-006, H262-010, H262-014,
 // H262-021, H262-024 plus the established motion/address records used by
@@ -30,6 +32,7 @@ module mpeg2_h262_b_core_probe
     input  wire reset,
     input  wire [7:0] stream_data,
     input  wire stream_valid,
+    input  wire row_retired,
 
     output reg  b_candidate,
     output reg  b_seen,
@@ -103,7 +106,7 @@ reg [7:0] row_bytes [0:ROW_BUFFER_BYTES-1];
 reg slice_capture, slice_parser_started, chunk_boundary_known;
 reg [5:0] slice_row_number; reg [8:0] row_byte_count;
 reg [10:0] row_base_index;
-reg parse_active,proof_done,boundary_final;
+reg parse_active,proof_done,boundary_final,row_waiting,replay_row_final;
 reg [8:0] parse_byte_limit,parse_byte_index; reg [2:0] parse_bit_index;
 wire parser_at_end=(parse_byte_index>=parse_byte_limit);
 wire parser_current_bit=row_bytes[parse_byte_index][parse_bit_index];

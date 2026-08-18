@@ -207,3 +207,106 @@ module tb_h262_row_streaming;
         $fatal(1,"P row-streaming regression timed out");
     end
 endmodule
+
+module tb_h262_b_row_streaming;
+    localparam integer MAX_STREAM_BYTES=3145728;
+    reg clk=0,reset=1,stream_valid=0,stop_feeding=0;
+    reg [7:0] stream_data=0;
+    reg [7:0] stream_mem[0:MAX_STREAM_BYTES-1];
+    reg [1023:0] hex_path;
+    integer stream_len,stream_index=0,quiet_cycles=0;
+    integer rows=0,total_blocks=0,total_coeffs=0;
+    integer max_row_blocks=0,max_row_coeffs=0;
+    integer motion_events=0,replay_blocks=0,replay_samples=0;
+    reg [6:0] samples_remaining=0;
+
+    wire candidate,seen,complete,hold,replay_active,sideband_valid;
+    wire [5:0] sideband_index;
+    wire signed [15:0] sideband_value;
+    wire first_valid,error;
+    wire signed [15:0] first_value;
+    wire row_retired=sideband_valid&&(sideband_index==6'h3f)&&
+        ((sideband_value==16'shA3FE)||(sideband_value==16'shA3FF));
+
+    always #5 clk=~clk;
+
+    mpeg2_h262_b_core_probe parser(
+        .clk(clk),.reset(reset),.stream_data(stream_data),
+        .stream_valid(stream_valid),.row_retired(row_retired),
+        .b_candidate(candidate),.b_seen(seen),.b_complete_now(complete),
+        .parse_hold(hold),.replay_active(replay_active),
+        .sideband_valid(sideband_valid),.sideband_index(sideband_index),
+        .sideband_value(sideband_value),.first_sample_valid(first_valid),
+        .first_sample_value(first_value),.probe_error(error)
+    );
+
+    initial begin
+        if(!$value$plusargs("HEX=%s",hex_path)) $fatal(1,"missing +HEX");
+        if(!$value$plusargs("LEN=%d",stream_len)) $fatal(1,"missing +LEN");
+        if((stream_len<=0)||(stream_len>MAX_STREAM_BYTES))
+            $fatal(1,"invalid LEN %0d",stream_len);
+        $readmemh(hex_path,stream_mem,0,stream_len-1);
+        repeat(5) @(posedge clk);
+        reset<=0;
+    end
+
+    always @(negedge clk) begin
+        if(reset) begin stream_valid<=0;stream_data<=0;end
+        else if(!stop_feeding&&(stream_index<stream_len)) begin
+            if(!hold) begin
+                stream_data<=stream_mem[stream_index];stream_valid<=1;
+                stream_index<=stream_index+1;
+            end else stream_valid<=0;
+        end else begin
+            stream_valid<=0;
+            if(stop_feeding&&!replay_active&&!hold)quiet_cycles<=quiet_cycles+1;
+            else quiet_cycles<=0;
+            if(quiet_cycles==100) begin
+                $display("B_ROW_RESULT rows=%0d blocks=%0d coeffs=%0d max_blocks=%0d max_coeffs=%0d motion=%0d replay_blocks=%0d samples=%0d",
+                         rows,total_blocks,total_coeffs,max_row_blocks,
+                         max_row_coeffs,motion_events,replay_blocks,replay_samples);
+                if(!seen||error||rows!=30||motion_events!=1350||
+                   total_blocks<=1314||total_coeffs<=32768||
+                   max_row_blocks>=2048||max_row_coeffs>=32768||
+                   replay_blocks!=total_blocks||replay_samples!=(total_blocks*64))
+                    $fatal(1,"B row-streaming regression failed");
+                $finish;
+            end
+        end
+    end
+
+    always @(posedge clk) begin
+        if(complete) stop_feeding<=1;
+        if(sideband_valid) begin
+            if(samples_remaining!=0) begin
+                if(sideband_index!=(7'd64-samples_remaining))
+                    $fatal(1,"B sample order error");
+                replay_samples<=replay_samples+1;
+                samples_remaining<=samples_remaining-1'b1;
+            end else if((sideband_index==6'h3f)&&
+                        (sideband_value[15:14]==2'b11)) begin
+                replay_blocks<=replay_blocks+1;
+                samples_remaining<=7'd64;
+            end else if((sideband_index==6'h38)||
+                        (sideband_index==6'h39)||
+                        (sideband_index==6'h3a)) begin
+                motion_events<=motion_events+1;
+            end else if(row_retired) begin
+                rows<=rows+1;
+                total_blocks<=total_blocks+parser.residual_count;
+                total_coeffs<=total_coeffs+parser.residual_coeff_count;
+                if(parser.residual_count>max_row_blocks)
+                    max_row_blocks<=parser.residual_count;
+                if(parser.residual_coeff_count>max_row_coeffs)
+                    max_row_coeffs<=parser.residual_coeff_count;
+                if((rows==29)!=(sideband_value==16'shA3FF))
+                    $fatal(1,"bad B row-final marker at row %0d",rows);
+            end
+        end
+    end
+
+    initial begin
+        repeat(50000000) @(posedge clk);
+        $fatal(1,"B row-streaming regression timed out");
+    end
+endmodule

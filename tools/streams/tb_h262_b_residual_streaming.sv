@@ -28,7 +28,7 @@ module tb_h262_b_residual_streaming;
     wire ddram_rd,store_select,store_valid,store_start,store_complete;
     wire [11:0] store_x,store_y;
     wire raster_active,read_seen,sample_nonzero,half_seen;
-    wire reconstructed_seen,persisted_seen,raster_error;
+    wire reconstructed_seen,persisted_seen,row_persisted,raster_error;
     wire [4:0] raster_error_source;
     reg [63:0] ddram_dout=0;
     reg ddram_dout_ready=0,store_block_stored=0;
@@ -47,7 +47,7 @@ module tb_h262_b_residual_streaming;
 
     mpeg2_h262_b_core_probe parser(
         .clk(clk),.reset(reset),.stream_data(stream_data),
-        .stream_valid(stream_valid),.b_candidate(b_candidate),
+        .stream_valid(stream_valid),.row_retired(row_persisted),.b_candidate(b_candidate),
         .b_seen(b_seen),.b_complete_now(b_complete),.parse_hold(b_hold),
         .replay_active(b_replay),.sideband_valid(sideband_valid),
         .sideband_index(sideband_index),.sideband_value(sideband_value),
@@ -56,7 +56,7 @@ module tb_h262_b_residual_streaming;
     );
 
     mpeg2_h262_b_bidirectional_raster_engine raster(
-        .clk(clk),.reset(reset),.capture_enable(1'b1),.request(b_seen),
+        .clk(clk),.reset(reset),.capture_enable(1'b1),.request(b_candidate),
         .sideband_valid(sideband_valid),.sideband_index(sideband_index),
         .sideband_value(sideband_value),
         .residual_store_write(residual_store_write),
@@ -75,7 +75,7 @@ module tb_h262_b_residual_streaming;
         .store_block_complete(store_complete),.active(raster_active),
         .read_seen(read_seen),.sample_nonzero(sample_nonzero),
         .half_sample_seen(half_seen),.reconstructed_seen(reconstructed_seen),
-        .persisted_seen(persisted_seen),.error(raster_error),
+        .persisted_seen(persisted_seen),.row_persisted(row_persisted),.error(raster_error),
         .error_source(raster_error_source)
     );
 
@@ -136,8 +136,7 @@ module tb_h262_b_residual_streaming;
             if(!b_seen||core_error||raster_error||motion_events!=1350||
                residual_blocks!=120||residual_samples!=7680||
                residual_writes!=7680||samples_remaining!=0||
-               raster.desc_count!=120||!raster.metadata_done||
-               !read_seen||!reconstructed_seen||!persisted_seen||
+               !raster.metadata_done||!read_seen||!reconstructed_seen||!persisted_seen||
                store_samples!=518400||stripe_store_samples!=7680||
                stripe_changed_samples!=7680)
                 $fatal(1,"B residual streaming regression failed");

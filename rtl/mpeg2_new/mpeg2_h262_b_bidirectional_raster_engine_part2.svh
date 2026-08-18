@@ -79,9 +79,11 @@ always @(posedge clk) begin
         pending<=0;started<=0;active<=0;future_bank_latched<=0;req<=0;waitresp<=0;req_kind<=0;
         mbi<=0;col<=0;mrow<=0;blk<=0;timeout<=0;emit<=0;wait_store<=0;pixel_setup<=0;residual_load<=0;residual_load_wait<=0;ei<=0;verify_row<=0;
         pred_direction<=0;tap_index<=0;pred_sum<=0;forward_prediction<=0;out_reg<=0;tap_byte_sel<=0;
-        read_seen<=0;sample_nonzero<=0;half_sample_seen<=0;reconstructed_seen<=0;persisted_seen<=0;error<=0;error_source<=0;
+        read_seen<=0;sample_nonzero<=0;half_sample_seen<=0;reconstructed_seen<=0;persisted_seen<=0;row_persisted<=0;error<=0;error_source<=0;
+        row_motion_base<=0;row_motion_end<=0;exec_row<=0;row_final_latched<=0;
         for(i=0;i<8;i=i+1)resrows[i]<=0;
     end else begin
+        row_persisted<=0;
         if(capture_enable&&sideband_valid) begin
             if(desc_active) begin
                 if(sideband_index!=sample_expected)begin error<=1;if(!error)error_source<=5'd1;end

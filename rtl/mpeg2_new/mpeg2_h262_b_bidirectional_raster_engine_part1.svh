@@ -52,6 +52,9 @@ reg desc_active;
 reg [5:0] sample_expected;
 reg metadata_done;
 reg [10:0] exec_desc_slot;
+reg [10:0] row_motion_base,row_motion_end;
+reg [5:0] exec_row;
+reg row_final_latched;
 
 reg pending,started;
 reg future_bank_latched;

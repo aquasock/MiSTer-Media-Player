@@ -15,6 +15,7 @@
 //   0x3b:           second motion word, backward vector
 //   0x3f, 11xxxxxxxxxxxbbb: residual descriptor (11-bit MB + block)
 //   0x00..0x3f:     64 signed residual samples after a descriptor
+//   0x3f, A3FE:     intermediate-row metadata terminator
 //   0x3f, A3FF:     metadata terminator
 // Commit 199 error_source is first-fault-only: 1 sample order, 2 first motion,
 // 3 geometry, 4 second motion, 5 descriptor, 6 terminator, 7 unknown metadata,
@@ -58,6 +59,7 @@ module mpeg2_h262_b_bidirectional_raster_engine
     output reg  half_sample_seen,
     output reg  reconstructed_seen,
     output reg  persisted_seen,
+    output reg  row_persisted,
     output reg  error,
     output reg [4:0] error_source
 );

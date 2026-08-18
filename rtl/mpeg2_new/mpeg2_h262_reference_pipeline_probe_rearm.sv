@@ -52,7 +52,7 @@ wire b_detect_now=p_residual_sample_valid&&b_direction_word&&p_forward_vector_va
  general_p_f_code_supported&&
  general_geometry_supported&&!p_implicit_reconstruct_request;
 reg b_mode;
-wire b_active,b_persisted_seen,b_error,b_half,b_recon,b_read,b_nonzero;
+wire b_active,b_persisted_seen,b_row_persisted,b_error,b_half,b_recon,b_read,b_nonzero;
 wire[4:0] b_error_source;
 wire [7:0] b_sample,b_recon_value,b_persist_value;
 reg b_history_error;
@@ -251,7 +251,7 @@ mpeg2_h262_b_bidirectional_raster_engine b_probe(
  .store_select(b_store_sel),.store_pixel_value(b_store_val),.store_pixel_x(b_store_x),.store_pixel_y(b_store_y),
  .store_pixel_valid(b_store_valid),.store_block_start(b_store_start),.store_block_complete(b_store_complete),
  .active(b_active),.read_seen(b_read),.sample_nonzero(b_nonzero),.half_sample_seen(b_half),
- .reconstructed_seen(b_recon),.persisted_seen(b_persisted_seen),.error(b_error),.error_source(b_error_source));
+ .reconstructed_seen(b_recon),.persisted_seen(b_persisted_seen),.row_persisted(b_row_persisted),.error(b_error),.error_source(b_error_source));
 assign b_sample=8'd0;assign b_recon_value=8'd0;assign b_persist_value=8'd0;
 
 assign ddram_burstcnt=shared_select?(shared_req_active?shared_bc_reg:8'd0):base_bc;
@@ -272,7 +272,7 @@ assign half_sample_seen=b_select?b_half:mixed_select?(mixed_seen_enable&&mixed_h
 assign reconstructed_seen=b_select?b_recon:mixed_select?(mixed_seen_enable&&mix_recon):base_recon;
 assign reconstructed_value=b_select?b_recon_value:mixed_select?mix_recon_val:base_recon_val;
 assign persisted_seen=b_select?b_persisted_seen:mixed_select?(mixed_seen_enable&&mixed_persisted_seen):base_persisted_seen;
-assign row_persisted=mixed_select&&mix_row_persisted;
+assign row_persisted=b_select?b_row_persisted:(mixed_select&&mix_row_persisted);
 assign persisted_value=b_select?b_persist_value:mixed_select?mix_persist_val:base_persist_val;
 assign p_progress_stage=mix_progress_stage;
 assign probe_error=plan_error||b_history_error||(b_select?b_error:(mixed_select?mixed_error:base_probe_error));

@@ -39,6 +39,8 @@ module tb_h262_parser_windows;
     wire b_sideband_valid, b_first_valid, b_error;
     wire [5:0] b_sideband_index;
     wire signed [15:0] b_sideband_value, b_first_value;
+    wire b_row_retired=b_sideband_valid&&(b_sideband_index==6'h3f)&&
+        ((b_sideband_value==16'shA3FE)||(b_sideband_value==16'shA3FF));
 
     always #5 clk = ~clk;
 
@@ -66,6 +68,7 @@ module tb_h262_parser_windows;
 
     mpeg2_h262_b_core_probe b_parser(
         .clk(clk), .reset(reset), .stream_data(stream_data), .stream_valid(stream_valid),
+        .row_retired(b_row_retired),
         .b_candidate(b_candidate), .b_seen(b_seen), .b_complete_now(b_complete),
         .parse_hold(b_hold), .replay_active(b_replay), .sideband_valid(b_sideband_valid),
         .sideband_index(b_sideband_index), .sideband_value(b_sideband_value),

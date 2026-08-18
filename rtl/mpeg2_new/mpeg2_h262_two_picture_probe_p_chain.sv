@@ -156,7 +156,7 @@ mpeg2_h262_p_diagnostic_controller p_controller(
 wire b_candidate,b_seen,b_complete_now,b_parse_hold,b_replay_active,b_sideband_valid,b_first_valid,b_error;
 wire[5:0] b_sideband_index;wire signed[15:0] b_sideband_value,b_first_value;
 mpeg2_h262_b_core_probe b_controller(
- .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.b_candidate(b_candidate),.b_seen(b_seen),
+ .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.row_retired(p_row_persistence_complete),.b_candidate(b_candidate),.b_seen(b_seen),
  .b_complete_now(b_complete_now),.parse_hold(b_parse_hold),.replay_active(b_replay_active),.sideband_valid(b_sideband_valid),
  .sideband_index(b_sideband_index),.sideband_value(b_sideband_value),.first_sample_valid(b_first_valid),
  .first_sample_value(b_first_value),.probe_error(b_error));
