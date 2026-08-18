@@ -557,7 +557,7 @@ Install the Commit-200 RBF and rerun only `test_pb_restricted_slices.m2v` on MiS
 - [ ] Passed
 
 ---
-## 201 COMMIT Unreleased ??? 2026-08-17T23:12:19-07:00
+## 201 COMMIT Unreleased 9672f0a 2026-08-17T23:12:19-07:00
 
 #### Coming From:
 
@@ -569,11 +569,11 @@ Integrate intra-coded macroblocks into the generalized progressive P-picture rec
 
 #### Outcome:
 
-Commit `b78ffcc` is hardware accepted: `test_pb_restricted_slices.m2v` produced a coherent raster with USER and POWER solid and DISK off, confirming that the same-row duplicate motion-event fault is resolved. This cycle will add standards-derived intra macroblock parsing, DC predictor handling, intra inverse quantisation and reconstruction metadata to the wide P path, route intra blocks through the existing destination writer without reference prediction, and add a deterministic mixed P-picture regression with pixel-exact software and isolated RTL checks.
+Commit `b78ffcc` is hardware accepted: `test_pb_restricted_slices.m2v` produced a coherent raster with USER and POWER solid and DISK off, confirming that the same-row duplicate motion-event fault is resolved. Commits `40d7a70` through `9672f0a` add standards-derived intra and intra-quant macroblock parsing, DC predictor and differential handling, intra inverse quantisation metadata, and reference-bypassed clipped spatial reconstruction to the generalized P path. The final design serializes intra and non-intra work through one shared multiplier and IDCT, retires superseded P observers and legacy P reference engines, and bounds synthesized generalized-P residual storage to 16 blocks and 32 coefficient events while retaining the external interfaces. The deterministic 181,085-byte mixed-P regression reports exactly 1,350 motion events, one intra macroblock, six blocks, and 384 spatial samples with no parser, residual, or transform error; the parser-window and restricted-slice replays remain clean at exactly 1,350 P events, the shared non-intra transform remains exact, the prediction-error diagnostic test passes, all seven standing generators retain their hashes and reference results, and the active wrapper elaborates. The clean Quartus 17.0.2 build completes in 12 minutes 50 seconds with zero setup and hold TNS, no Critical Warning, +0.128 ns global setup, +0.254 ns global hold, +1.995 ns decoder setup, 35,439 ALMs, 43,615 registers, 576,499 memory bits, 86 RAM blocks, 68 DSP blocks, and 3 PLLs. Generated RBF `MediaPlayer.rbf` has SHA-256 `444fb51cf35aae0e4191208e803bae3739b3e76e36b35fb0f9087be5af5dc517`; stream `test_p_intra_macroblocks.m2v` has SHA-256 `749bc8908710bd64ddae1da499311eba24396906ebc3b8fc2d56a29077f92dda`.
 
 #### Next Steps:
 
-Implement the bounded P intra path and deterministic regression, run the existing parser-window and restricted-slice replays plus the standing stream generators, then complete a clean Quartus 17.0.2 build with zero setup and hold TNS and no Critical Warning before requesting MiSTer validation.
+Install the Commit-201 RBF and run `test_p_intra_macroblocks.m2v` through one complete 32-second diagnostic frame, recording whether USER, POWER, and DISK are solid, dark, or blinking and confirming that the displayed raster remains coherent. Clean acceptance is solid USER, solid POWER, and dark DISK; the authored intra macroblock is at row 8, column 20, with the remainder of the P picture reference-exact.
 
 #### Files Modified:
 
@@ -581,14 +581,22 @@ Implement the bounded P intra path and deterministic regression, run the existin
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
+- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline.sv
 - rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
 - rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
 - tools/streams/generate_test_p_intra_macroblocks.py
 - tools/streams/tb_h262_p_intra_macroblocks.sv
+- tools/streams/tb_h262_parser_windows.sv
+- tools/streams/tb_h262_prediction_error_sources.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
