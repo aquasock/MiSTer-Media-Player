@@ -367,7 +367,15 @@
 
             if(!parse_active && !proof_done && slice_capture) begin
                 if(start_code_now) begin
-                    if(row_byte_count<3) begin
+                    // Entry 213: a refill may end exactly after the last
+                    // macroblock and its byte-alignment zeroes.  In that case
+                    // the resumed window contains only the two retained
+                    // start-code prefix bytes; R_STUFF has already completed
+                    // the row, so classify the boundary with an empty chunk.
+                    if((row_byte_count<3) &&
+                       !(slice_parser_started &&
+                         (parser_state==R_STUFF) &&
+                         (current_col==(picture_mb_width-1'b1)))) begin
                         slice_capture<=0;
                         slice_parser_started<=0;
                         proof_done<=1;
@@ -388,7 +396,9 @@
                         parse_hold<=1;
                         chunk_boundary_known<=1;
                         boundary_final<=0;
-                        parse_byte_limit<=row_byte_count-3;
+                        parse_byte_limit<=
+                            (row_byte_count<3) ? 9'd0 :
+                            (row_byte_count-3'b011);
                         if(!slice_parser_started) begin
                             slice_parser_started<=1;
                             init_row_parser();
@@ -405,7 +415,9 @@
                         parse_hold<=1;
                         chunk_boundary_known<=1;
                         boundary_final<=1;
-                        parse_byte_limit<=row_byte_count-3;
+                        parse_byte_limit<=
+                            (row_byte_count<3) ? 9'd0 :
+                            (row_byte_count-3'b011);
                         if(!slice_parser_started) begin
                             slice_parser_started<=1;
                             init_row_parser();

@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-// Entry 210 complete dense I/P/B publication regression.  The combined P/B
+// Entries 210/213 complete dense I/P/B publication regression.  The combined P/B
 // sideband is retired exactly as the hardware raster engines retire it: every
 // row terminator receives one row-persistence pulse and each final-row
 // terminator receives the corresponding picture-persistence pulse.
@@ -18,7 +18,10 @@ module tb_h262_dense_publication_order;
     reg row_persistence=0,picture_persistence=0;
     reg [5:0] previous_wide_parser_state=0;
     reg previous_wide_error=0;
-    reg mixed_mode=0;
+    reg mixed_mode=0,long_mode=0;
+    integer expected_p_rows,expected_p_pictures;
+    integer expected_b_rows,expected_b_pictures;
+    integer expected_reference_publications;
 
     wire stream_ready,picture_complete;
     wire [7:0] picture_count,reference_promotion_count;
@@ -66,6 +69,27 @@ module tb_h262_dense_publication_order;
         if(!$value$plusargs("HEX=%s",hex_path))$fatal(1,"missing +HEX");
         if(!$value$plusargs("LEN=%d",stream_len))$fatal(1,"missing +LEN");
         mixed_mode=$test$plusargs("MIXED");
+        long_mode=$test$plusargs("LONG");
+        if(mixed_mode&&long_mode)$fatal(1,"MIXED and LONG are mutually exclusive");
+        if(long_mode)begin
+            expected_p_rows=660;
+            expected_p_pictures=22;
+            expected_b_rows=1410;
+            expected_b_pictures=47;
+            expected_reference_publications=23;
+        end else if(mixed_mode)begin
+            expected_p_rows=210;
+            expected_p_pictures=7;
+            expected_b_rows=450;
+            expected_b_pictures=15;
+            expected_reference_publications=8;
+        end else begin
+            expected_p_rows=120;
+            expected_p_pictures=4;
+            expected_b_rows=210;
+            expected_b_pictures=7;
+            expected_reference_publications=5;
+        end
         if((stream_len<=0)||(stream_len>MAX_STREAM_BYTES))
             $fatal(1,"invalid LEN %0d",stream_len);
         $readmemh(hex_path,stream_mem,0,stream_len-1);
@@ -115,8 +139,10 @@ module tb_h262_dense_publication_order;
                      dut.p_controller.wide_general_probe.current_is_intra);
 
         if(dut.p_controller.wide_error&&!previous_wide_error)
-            $display("WIDE_ERROR byte=%0d previous_state=%0d state=%0d parse_byte=%0d/%0d bit=%0d row=%0d col=%0d covered=%0d row_bytes=%0d boundary_final=%0d slice_capture=%0d parser_started=%0d",
-                     stream_index,previous_wide_parser_state,
+            $display("WIDE_ERROR byte=%0d detail=%0d previous_state=%0d state=%0d parse_byte=%0d/%0d bit=%0d row=%0d col=%0d covered=%0d row_bytes=%0d boundary_final=%0d slice_capture=%0d parser_started=%0d",
+                     stream_index,
+                     dut.p_controller.wide_general_probe.probe_error_detail,
+                     previous_wide_parser_state,
                      dut.p_controller.wide_general_probe.parser_state,
                      dut.p_controller.wide_general_probe.parse_byte_index,
                      dut.p_controller.wide_general_probe.parse_byte_limit,
@@ -213,10 +239,11 @@ module tb_h262_dense_publication_order;
                      published_references,picture_count,
                      reference_promotion_count,b_success);
             if(probe_error||publication_error_detail!=0||stream_index!=stream_len||
-               p_rows!=(mixed_mode?210:120)||p_pictures!=(mixed_mode?7:4)||
-               b_rows!=(mixed_mode?450:210)||b_pictures!=(mixed_mode?15:7)||
-               published_references!=(mixed_mode?8:5)||picture_count!=(mixed_mode?8:5)||
-               reference_promotion_count!=(mixed_mode?8:5)||
+               p_rows!=expected_p_rows||p_pictures!=expected_p_pictures||
+               b_rows!=expected_b_rows||b_pictures!=expected_b_pictures||
+               published_references!=expected_reference_publications||
+               picture_count!=expected_reference_publications||
+               reference_promotion_count!=expected_reference_publications||
                dut.p_header_count!=3||dut.p_publication_count!=3||
                dut.b_header_count!=7||dut.b_persist_count!=7||!b_success)
                 $fatal(1,"dense publication-order regression failed");
