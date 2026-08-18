@@ -135,6 +135,16 @@ always @(posedge clk)begin
    b_persistence_verified<=1;b_picture_inflight<=0;
    if(b_persist_count!=3'd7)b_persist_count<=b_persist_count+1'b1;
   end
+
+  // Entry 205: a failed B parser/replay transaction must never retain
+  // ownership of the compressed-stream path.  b_error is intentionally
+  // sticky for the settled diagnostic report; only the live transaction and
+  // its persistence prerequisite are aborted here.  Subsequent bytes can
+  // therefore drain through ioctl even when this stream is not accepted.
+  if(b_picture_inflight&&b_error)begin
+   b_picture_inflight<=0;
+   b_persistence_verified<=0;
+  end
  end
 end
 
@@ -181,7 +191,7 @@ wire p_hold_effective=p_hold_raw&&!b_picture_inflight&&!b_candidate&&!b_transpor
 // code may already be consumed when replay completes.  Hold immediately after
 // b_seen until scratch persistence finishes; the following picture header body
 // then resumes with the shared P/B execution client free.
-wire b_persistence_wait=b_picture_inflight&&b_seen&&!b_persistence_verified;
+wire b_persistence_wait=b_picture_inflight&&b_seen&&!b_persistence_verified&&!b_error;
 assign stream_ready=(b_picture_inflight?1'b1:parser_ready)&&!p_hold_effective&&!b_parse_hold&&!b_persistence_wait;
 wire b_accept_error=b_error||publication_error||reference_progress_error;
 assign b_user_success=b_final_success&&!b_accept_error;
