@@ -13,6 +13,11 @@
 // The block controls are latched when QFS capture closes, and the 64-way scan
 // mapping now terminates at iq_qfs_index_reg instead of feeding the QFS mux,
 // inverse-quant arithmetic and diagnostic checks in the same 54 MHz cycle.
+//
+// Entry 234 streams each completed inverse-quantised coefficient directly
+// into the IDCT capture port.  The IDCT already stores one coefficient per
+// cycle, so retaining a second 64-entry array and replaying it after inverse
+// quantisation only serialized two storage phases without changing data.
 //============================================================================
 
 module mpeg2_h262_p_non_intra_transform
@@ -44,7 +49,6 @@ module mpeg2_h262_p_non_intra_transform
 );
 
 reg signed [12:0] qfs [0:63];
-reg signed [11:0] iq_coeff [0:63];
 integer i;
 
 reg        capture_active;
@@ -303,9 +307,6 @@ always @* begin
         iq_final_value = iq_saturated;
 end
 
-reg        emit_pending;
-reg        emit_active;
-reg [5:0]  emit_index;
 reg        idct_coeff_block_start;
 reg        idct_coeff_valid;
 reg [5:0]  idct_coeff_index;
@@ -339,7 +340,7 @@ mpeg2_h262_idct p_residual_idct
 );
 
 reg [6:0] idct_sample_count;
-wire transform_busy = iq_active || emit_pending || emit_active;
+wire transform_busy = iq_active;
 wire unused_idct_values =
     &{1'b0, idct_first_sample00[0], idct_first_sample77[0]};
 
@@ -364,9 +365,6 @@ always @(posedge clk) begin
         iq_intra_dc_precision  <= 2'd0;
         iq_stage_pending       <= 1'b0;
         iq_stage_product       <= 32'sd0;
-        emit_pending           <= 1'b0;
-        emit_active            <= 1'b0;
-        emit_index             <= 6'd0;
         idct_coeff_block_start <= 1'b0;
         idct_coeff_valid       <= 1'b0;
         idct_coeff_index       <= 6'd0;
@@ -378,10 +376,8 @@ always @(posedge clk) begin
         first_sample_value     <= 16'sd0;
         probe_error            <= 1'b0;
 
-        for (i = 0; i < 64; i = i + 1) begin
-            qfs[i]      <= 13'sd0;
-            iq_coeff[i] <= 12'sd0;
-        end
+        for (i = 0; i < 64; i = i + 1)
+            qfs[i] <= 13'sd0;
     end
     else begin
         idct_coeff_block_start <= 1'b0;
@@ -438,8 +434,14 @@ always @(posedge clk) begin
             end
             else begin
                 iq_stage_pending <= 1'b0;
-                iq_coeff[iq_index] <= iq_final_value;
                 iq_parity <= iq_parity_with_current;
+                idct_coeff_block_start <= (iq_index == 6'd0);
+                idct_coeff_valid <= 1'b1;
+                idct_coeff_index <= iq_index;
+                idct_coeff_value <= iq_final_value;
+                idct_coeff_block_end <= (iq_index == 6'd63);
+                if (iq_index == 6'd0)
+                    idct_sample_count <= 7'd0;
 
                 if (!iq_intra_block &&
                     (active_block_index == 2'd0) && (iq_index == 6'd0)) begin
@@ -453,39 +455,13 @@ always @(posedge clk) begin
                 end
 
                 if (iq_index == 6'd63) begin
-                    iq_active    <= 1'b0;
-                    emit_pending <= 1'b1;
-                    emit_index   <= 6'd0;
+                    iq_active <= 1'b0;
                 end
                 else begin
                     iq_index         <= iq_index + 6'd1;
                     iq_qfs_index_reg <= scan_index(iq_alternate_scan,
                                                    iq_index + 6'd1);
                 end
-            end
-        end
-
-        if (emit_pending) begin
-            emit_pending           <= 1'b0;
-            emit_active            <= 1'b1;
-            emit_index             <= 6'd1;
-            idct_coeff_block_start <= 1'b1;
-            idct_coeff_valid       <= 1'b1;
-            idct_coeff_index       <= 6'd0;
-            idct_coeff_value       <= iq_coeff[0];
-            idct_sample_count      <= 7'd0;
-        end
-        else if (emit_active) begin
-            idct_coeff_valid <= 1'b1;
-            idct_coeff_index <= emit_index;
-            idct_coeff_value <= iq_coeff[emit_index];
-
-            if (emit_index == 6'd63) begin
-                idct_coeff_block_end <= 1'b1;
-                emit_active          <= 1'b0;
-            end
-            else begin
-                emit_index <= emit_index + 6'd1;
             end
         end
 

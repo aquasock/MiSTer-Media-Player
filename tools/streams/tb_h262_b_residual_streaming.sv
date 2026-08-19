@@ -147,7 +147,9 @@ module tb_h262_b_residual_streaming;
                !raster.metadata_done||!read_seen||!reconstructed_seen||!persisted_seen||
                store_samples!=518400||stripe_store_samples!=7680||
                stripe_changed_samples!=(intra_mode?768:7680)||
-               total_cycles>=4700000)
+               // Entry 234 removes 64 replay cycles from every transformed
+               // block; the 120-block path must retain that measured gain.
+               total_cycles>=3903000)
                 $fatal(1,"B residual streaming regression failed");
             $finish;
         end

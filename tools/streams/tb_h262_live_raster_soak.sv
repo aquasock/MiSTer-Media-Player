@@ -375,7 +375,9 @@ module tb_h262_live_raster_soak;
                 prediction.reference_cache.cache_miss_count||
                prediction.reference_cache.uncached_count!=0||
                memory_reads!=prediction.reference_cache.cache_miss_count||
-               total_cycles>=17800000||
+               // Entry 234 direct IQ-to-IDCT capture completes this exact
+               // soak in 15,739,996 cycles.
+               total_cycles>=15800000||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
                presentation_error)

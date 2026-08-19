@@ -229,7 +229,9 @@ module tb_h262_p_intra_macroblocks;
                    !decision||!required||!success||engine_error||
                    !engine_read_seen||!engine_reconstructed_seen||
                    intra_store_samples!=(expected_blocks*64)||
-                   total_cycles>=2550000)
+                   // Entry 234 removes the 64-cycle IQ coefficient replay
+                   // from each of the six transformed intra blocks.
+                   total_cycles>=2301200)
                     $fatal(1,"P intra-macroblock regression failed");
                 $finish;
             end
