@@ -237,7 +237,7 @@ Reload the deployed core and record `test_compat_long_gop.m2v` at 60 fps from th
 - [ ] Passed
 
 ---
-## 235 COMMIT Unreleased ??? 2026-08-19T05:02:36-07:00
+## 235 COMMIT Unreleased 6583c66 2026-08-19T05:02:36-07:00
 
 #### Coming From:
 
@@ -249,11 +249,11 @@ Expand the shared P/B reference-word cache from four fully associative entries t
 
 #### Outcome:
 
-Entry 234 is hardware accepted: the 60 fps recordings show coherent sequential presentation through long-GOP frame 71 in 5.935 seconds and mixed-macroblock frame 23 in 2.093 seconds, with USER and POWER solid, DISK dark, and no partial-block flicker. These intervals are 0.85 and 2.39 percent faster than Entry 233, confirming a smaller hardware gain than the modeled 5.64 percent transform reduction. Passive cycle profiling attributes 5,681,329 live-engine cycles to reference lookup, request, and response states versus 1,271,168 cycles to pixel emission and block-store waits, with B prediction dominant. Commit `032d08c` implemented an eight-entry fully associative cache and preserved all functional regressions while reducing exact-soak misses from 463,835 to 372,220 and cycles from 15,739,996 to 15,249,996, but its enlarged eight-way comparison cone failed decoder setup at -0.463 ns and is not deployable. The user approved a timing-safe two-way, four-set revision indexed by the low DDR word-address bits. Its external prototype preserves all functional results while reducing misses to 410,546 and cycles to 15,479,996, improvements of 11.49 and 1.65 percent over Entry 234, with only two tag comparisons on the critical lookup path.
+Entry 234 is hardware accepted: the 60 fps recordings show coherent sequential presentation through long-GOP frame 71 in 5.935 seconds and mixed-macroblock frame 23 in 2.093 seconds, with USER and POWER solid, DISK dark, and no partial-block flicker. Commit `032d08c` implemented an eight-entry fully associative cache and preserved all functional regressions while reducing exact-soak misses from 463,835 to 372,220 and cycles from 15,739,996 to 15,249,996, but its eight-way comparison cone failed decoder setup at -0.463 ns and was not deployed. Commit `6583c66` reorganizes those eight words as four two-way sets indexed by the low DDR word-address bits, adds per-set replacement, and retains the registered lookup and single-outstanding transaction contracts. The focused cache, P-intra, B-residual, B-intra, parser-window, exact live-raster, and complete long-GOP publication regressions all pass; the exact soak preserves every pixel-side and presentation result while reducing misses and DDR reads to 410,546 and cycles to 15,479,996, improvements of 11.49 and 1.65 percent over Entry 234. The user-requested clean Quartus build completed in 9 minutes 58 seconds with 0 errors and 124 warnings, using 29,583 ALMs, 41,706 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. Global setup and hold slack are +0.362 and +0.261 ns; focused decoder setup, decoder recovery, and video setup are +0.793, +13.004, and +8.619 ns with zero violations. The 4,247,012-byte RBF has SHA-256 `2e453d6f21425ff0339e4fa3d43d503d051fceb3cdf36e41dad93e3f8db88279`.
 
 #### Next Steps:
 
-Replace the fully associative revision with four two-way sets and per-set replacement, retain focused eight-word residency and ninth-word eviction coverage, and update the exact live-soak read and cycle expectations. Then rerun the focused cache, P-intra, B-residual, B-intra, parser-window, live-raster, and complete long-GOP publication regressions before the user-requested clean Quartus build; qualification requires zero timing violations as well as unchanged decoded and presentation results.
+Deploy the hash-qualified Entry 235 RBF and rerun `test_compat_long_gop.m2v` and `test_compat_mixed_macroblocks.m2v`; accept only coherent sequential presentation through final frames 71 and 23, no partial-macroblock flicker, the established POWER and USER pass state with DISK dark after completion, and compare measured load intervals against Entry 234's 5.935- and 2.093-second baselines.
 
 #### Files Modified:
 
@@ -263,7 +263,7 @@ Replace the fully associative revision with four two-way sets and per-set replac
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
