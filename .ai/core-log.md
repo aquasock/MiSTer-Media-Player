@@ -295,7 +295,7 @@ Run the session-authorized incremental Quartus build from the preserved database
 - [ ] Passed
 
 ---
-## 238 COMMIT Unreleased ??? 2026-08-19T15:44:38-07:00
+## 238 COMMIT Unreleased ca1f0fc 2026-08-19T15:44:38-07:00
 
 #### Coming From:
 
@@ -307,11 +307,11 @@ Close the download-rearm implementation's intentional clock-domain and asynchron
 
 #### Outcome:
 
-The first incremental build of `23d8410` functionally compiles but is ineligible for deployment with `-1.507 ns` setup slack and `-3.338 ns` recovery slack. Detailed TimeQuest analysis identifies the only setup violation as the intentional `clk_sys` `ioctl_download` crossing into the first `clk_mpeg2` synchronizer stage, while the recovery violations come from feeding the asynchronous top-level reset request into every register of the new controller and from the rearm output's intentional asynchronous assertion into the framebuffer read-domain reset synchronizer. The planned correction will reset the controller synchronously from the already synchronized MPEG reset, constrain only the first download synchronizer stage and framebuffer read-reset assertion boundary, and leave all ordinary same-clock and later synchronizer-stage paths fully timed.
+The first incremental build of `23d8410` functionally compiles but is ineligible for deployment with `-1.507 ns` setup slack and `-3.338 ns` recovery slack. Detailed TimeQuest analysis identifies the only setup violation as the intentional `clk_sys` `ioctl_download` crossing into the first `clk_mpeg2` synchronizer stage, while the recovery violations come from feeding the asynchronous top-level reset request into every register of the new controller and from the rearm output's intentional asynchronous assertion into the framebuffer read-domain reset synchronizer. Commit `ca1f0fc` resets the controller synchronously from the already synchronized MPEG reset and adds narrowly scoped exceptions only for the source-to-stage-zero download crossing and controller-to-framebuffer read-reset assertion boundary; ordinary same-clock logic, synchronizer release, and all later stages remain timed. The focused asynchronous-clock regression still passes two downloads, sixteen reset edges, sustained-level non-retrigger, and complete FIFO gating.
 
 #### Next Steps:
 
-Implement the scoped reset and SDC corrections, rerun the focused asynchronous-clock regression, then use the preserved incremental database for a second Quartus build and require positive setup, hold, and recovery slack before deployment.
+Use the preserved incremental database for a second Quartus build and require positive setup, hold, and recovery slack before deployment; if timing closes, publish and install the corrected RBF for immediate first-load and second-load hardware validation.
 
 #### Files Modified:
 
