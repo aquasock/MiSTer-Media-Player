@@ -295,34 +295,34 @@ Run the session-authorized incremental Quartus build from the preserved database
 - [ ] Passed
 
 ---
-## 197 COMMIT Unreleased 8c9cdaa 2026-08-17T20:53:22-07:00
+## 238 COMMIT Unreleased ??? 2026-08-19T15:44:38-07:00
 
 #### Coming From:
 
-Unreleased d26c37d
+Unreleased 23d8410
 
 #### Purpose:
 
-Establish the deterministic compatibility corpus and failure-classification baseline for the eight-commit v0.6.0 progressive 4:2:0 compatibility roadmap.
+Close the download-rearm implementation's intentional clock-domain and asynchronous framebuffer-reset boundaries without placing the rearm controller itself on an asynchronous reset path.
 
 #### Outcome:
 
-Commit `8c9cdaa` adds a source-only generator and H.262 structural classifier for four supplemental 720x480 progressive 4:2:0 compatibility streams without changing synthesized RTL or replacing the authoritative seven-stream v0.5.0 matrix. The authored I/P/B case verifies repeated same-row slices and predictor-reset behavior; ordinary single-threaded FFmpeg cases establish an 11,367-byte dense slice, 128 intra macroblocks within P pictures alongside predicted and skipped modes, and a 72-picture long-GOP soak input. All four remain inside the intended frontend envelope, every generated file and encoder invocation is recorded in a local JSON manifest, and all seven standing generators reproduce their published hashes and software-reference results.
+The first incremental build of `23d8410` functionally compiles but is ineligible for deployment with `-1.507 ns` setup slack and `-3.338 ns` recovery slack. Detailed TimeQuest analysis identifies the only setup violation as the intentional `clk_sys` `ioctl_download` crossing into the first `clk_mpeg2` synchronizer stage, while the recovery violations come from feeding the asynchronous top-level reset request into every register of the new controller and from the rearm output's intentional asynchronous assertion into the framebuffer read-domain reset synchronizer. The planned correction will reset the controller synchronously from the already synchronized MPEG reset, constrain only the first download synchronizer stage and framebuffer read-reset assertion boundary, and leave all ordinary same-clock and later synchronizer-stage paths fully timed.
 
 #### Next Steps:
 
-Generalize the active P and B slice ingestion paths so independently coded legal slices no longer depend on whole-slice byte capture or restricted row-transition ownership, then validate the authored multi-slice stream and all seven standing generators before a clean Quartus build and MiSTer regression.
+Implement the scoped reset and SDC corrections, rerun the focused asynchronous-clock regression, then use the preserved incremental database for a second Quartus build and require positive setup, hold, and recovery slack before deployment.
 
 #### Files Modified:
 
-- tools/streams/generate_test_progressive_compatibility.py
-- tools/streams/analyze_h262_compatibility.py
-- tools/streams/generate_test_pb_restricted_slices.py
+- MediaPlayer.sdc
+- MediaPlayer_top_00.svh
+- rtl/mpeg2_new/mpeg2_h262_download_rearm.sv
 
 #### Status:
 
-- [x] Built
-- [x] Passed
+- [ ] Built
+- [ ] Passed
 
 ---
 ## 198 COMMIT Unreleased 6c6854c 2026-08-17T21:53:24-07:00
