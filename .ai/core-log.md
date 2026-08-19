@@ -171,6 +171,41 @@ Reload the deployed core and run `test_compat_long_gop.m2v`, recording whether i
 - [ ] Passed
 
 ---
+## 233 COMMIT Unreleased 4e6130c 2026-08-19T02:49:58-07:00
+
+#### Coming From:
+
+Unreleased 1b1ca8f
+
+#### Purpose:
+
+Retire each reconstructed P/B block at the writer's accepted-write completion barrier instead of issuing eight serialized uncached DDR readbacks that do not feed prediction or presentation.
+
+#### Outcome:
+
+Entry 232 is fully hardware accepted: the long-GOP stream reaches source frame 71 in 7.111 seconds with monotonic presentation, USER and POWER solid, and DISK stage 11, while the mixed-macroblock stream reaches source frame 23 in 2.459 seconds with coherent features, sequential frames, USER and POWER solid, and DISK off. Commit `4e6130c` retires reconstructed P/B blocks when the writer confirms that all eight DDR row writes were accepted, removing a destination readback that neither feeds prediction nor changes presentation. The focused P-intra, B-residual, and B-intra replays remain exact in 2,301,492, 3,910,429, and 2,307,268 cycles. The exact 72-picture live soak preserves all 291,641 bytes, 22 P pictures, 47 B pictures, 71 swaps, 50,688 reference writes, 55,296 and 52,992 scratch writes, final display identity 25, cache hits and misses of 2,267,813 and 463,835, and zero errors while uncached reads fall from 158,976 to zero, physical DDR reads fall from 622,811 to 463,835, and cycles fall from 17,469,996 to 16,679,996. The full 791,528-byte long-GOP regression passes all pictures, publications, promotions, ownership checks, and presentation checks. The session-authorized incremental Quartus build completes in 9 minutes 13 seconds with zero errors, +0.517 ns global setup, +0.252 ns global hold, +0.546 ns decoder setup, +12.502 ns decoder recovery, and +7.532 ns video setup. The fit uses 29,835 ALMs, 42,407 registers, 4,027,379 block-memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. Qualified artifact `MediaPlayer_commit233_4e6130c.rbf` is 4,261,064 bytes with SHA-256 `01f617839ce1997200d3816b645ff7ce2f62b0000017cef69489cdcb518e42d4`; the uploaded MiSTer readback matches byte-for-byte.
+
+#### Next Steps:
+
+Reload the deployed core and run `test_compat_long_gop.m2v`, recording the frame-0-to-frame-71 elapsed time, whether presentation remains sequential and visibly coherent, and the settled USER, POWER, and DISK state. Then run `test_compat_mixed_macroblocks.m2v` and confirm final frame 23, coherent features without load-time flicker or partial blocks, USER and POWER solid, and DISK off; hardware acceptance requires no regression and should determine how much removing 4,471,200 full-resolution readbacks improves the remaining loading bottleneck.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- tools/streams/tb_h262_p_intra_macroblocks.sv
+- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 193 COMMIT Unreleased a42bb74 2026-08-17T16:38:38-07:00
 
 #### Coming From:
