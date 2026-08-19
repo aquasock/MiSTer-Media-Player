@@ -283,6 +283,40 @@ wire source_bounds_ok=
     (src_base_x>=0)&&(src_base_y>=0)&&
     (src_last_x<plane_width_s)&&(src_last_y<plane_height_s);
 
+// Commit 232: during emit the cache port is otherwise idle. Form the first
+// tap of the next in-block pixel here so a valid motion pixel can enter
+// lookup_wait directly; block starts, intra pixels, and bounds failures retain
+// the fully staged pixel_setup path.
+wire [5:0] next_pixel_ei=ei+1'b1;
+wire [2:0] next_pixel_er=next_pixel_ei[5:3];
+wire [2:0] next_pixel_el=next_pixel_ei[2:0];
+wire [11:0] next_pixel_luma_x=
+    ({6'd0,col}<<4)+{8'd0,blk[0],next_pixel_el};
+wire [11:0] next_pixel_luma_y=
+    ({6'd0,mrow}<<4)+{8'd0,blk[1],next_pixel_er};
+wire [11:0] next_pixel_chroma_x=
+    ({6'd0,col}<<3)+{9'd0,next_pixel_el};
+wire [11:0] next_pixel_chroma_y=
+    ({6'd0,mrow}<<3)+{9'd0,next_pixel_er};
+wire [11:0] next_pixel_dest_x=
+    (blk<4)?next_pixel_luma_x:next_pixel_chroma_x;
+wire [11:0] next_pixel_dest_y=
+    (blk<4)?next_pixel_luma_y:next_pixel_chroma_y;
+wire signed [13:0] next_pixel_src_base_x=
+    $signed({1'b0,next_pixel_dest_x})+$signed(exec_int_x);
+wire signed [13:0] next_pixel_src_base_y=
+    $signed({1'b0,next_pixel_dest_y})+$signed(exec_int_y);
+wire signed [13:0] next_pixel_src_last_x=
+    next_pixel_src_base_x+(half_x?14'sd1:14'sd0);
+wire signed [13:0] next_pixel_src_last_y=
+    next_pixel_src_base_y+(half_y?14'sd1:14'sd0);
+wire next_pixel_source_bounds_ok=
+    (next_pixel_src_base_x>=0)&&(next_pixel_src_base_y>=0)&&
+    (next_pixel_src_last_x<plane_width_s)&&
+    (next_pixel_src_last_y<plane_height_s);
+wire next_pixel_lookup=
+    emit&&(ei!=6'd63)&&!mb_intra&&next_pixel_source_bounds_ok;
+
 wire tap_dx=
     (half_x&&half_y)?tap_index[0]:
     (half_x?tap_index[0]:1'b0);
@@ -357,9 +391,14 @@ wire [7:0] lookup_reconstructed_current=
 wire lookup_advance=lookup_wait&&ddram_lookup_ready&&
     ddram_lookup_hit&&!tap_last;
 wire prediction_lookup=
-    (pixel_setup&&!mb_intra&&source_bounds_ok)||lookup_advance;
-wire [11:0] lookup_src_x=lookup_advance?next_src_x_tap:src_x_tap;
-wire [11:0] lookup_src_y=lookup_advance?next_src_y_tap:src_y_tap;
+    (pixel_setup&&!mb_intra&&source_bounds_ok)||lookup_advance||
+    next_pixel_lookup;
+wire [11:0] lookup_src_x=
+    next_pixel_lookup?next_pixel_src_base_x[11:0]:
+    lookup_advance?next_src_x_tap:src_x_tap;
+wire [11:0] lookup_src_y=
+    next_pixel_lookup?next_pixel_src_base_y[11:0]:
+    lookup_advance?next_src_y_tap:src_y_tap;
 
 assign ddram_burstcnt=req?8'd1:0;
 assign ddram_addr=req ?
@@ -833,7 +872,12 @@ always @(posedge clk) begin
                 ei<=ei+1'b1;
                 pred_sum<=0;
                 tap_index<=0;
-                pixel_setup<=1;
+                if(next_pixel_lookup) begin
+                    req_kind<=0;
+                    lookup_wait<=1;
+                end else begin
+                    pixel_setup<=1;
+                end
             end
         end
 

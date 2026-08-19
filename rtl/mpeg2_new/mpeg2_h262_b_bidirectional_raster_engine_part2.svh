@@ -10,9 +10,69 @@ wire signed [13:0] src_last_y=src_base_y+(half_y?14'sd1:14'sd0);
 wire source_bounds_ok=(src_base_x>=0)&&(src_base_y>=0)&&
     (src_last_x<$signed({2'b00,plane_width}))&&(src_last_y<$signed({2'b00,plane_height}));
 
+// Commit 232: launch a first-tap cache lookup in the otherwise idle cycle
+// that emits the preceding pixel or completes the forward half of a
+// bidirectional prediction. Invalid bounds retain the original pixel_setup
+// path, as do block starts and intra pixels.
+wire bidir_lookup_candidate;
+wire next_pixel_lookup_candidate=
+    emit&&(ei!=6'd63)&&(mb_direction!=0);
+wire early_lookup_candidate=
+    bidir_lookup_candidate||next_pixel_lookup_candidate;
+wire [5:0] early_ei=
+    bidir_lookup_candidate ? ei : (ei+1'b1);
+wire [2:0] early_er=early_ei[5:3];
+wire [2:0] early_el=early_ei[2:0];
+wire early_use_backward=
+    bidir_lookup_candidate||(mb_direction==2'd2);
+wire signed [7:0] early_luma_mvx=
+    early_use_backward?mb_bmvx:mb_fmvx;
+wire signed [7:0] early_luma_mvy=
+    early_use_backward?mb_bmvy:mb_fmvy;
+wire signed [7:0] early_exec_mvx=
+    (blk<4)?early_luma_mvx:chroma_half_vector(early_luma_mvx);
+wire signed [7:0] early_exec_mvy=
+    (blk<4)?early_luma_mvy:chroma_half_vector(early_luma_mvy);
+wire signed [8:0] early_int_x=$signed(early_exec_mvx)>>>1;
+wire signed [8:0] early_int_y=$signed(early_exec_mvy)>>>1;
+wire early_half_x=early_exec_mvx[0];
+wire early_half_y=early_exec_mvy[0];
+wire [11:0] early_luma_x=
+    ({6'd0,col}<<4)+{8'd0,blk[0],early_el};
+wire [11:0] early_luma_y=
+    ({6'd0,mrow}<<4)+{8'd0,blk[1],early_er};
+wire [11:0] early_chroma_x=
+    ({6'd0,col}<<3)+{9'd0,early_el};
+wire [11:0] early_chroma_y=
+    ({6'd0,mrow}<<3)+{9'd0,early_er};
+wire [11:0] early_dest_x=(blk<4)?early_luma_x:early_chroma_x;
+wire [11:0] early_dest_y=(blk<4)?early_luma_y:early_chroma_y;
+wire signed [13:0] early_src_base_x=
+    $signed({1'b0,early_dest_x})+$signed(early_int_x);
+wire signed [13:0] early_src_base_y=
+    $signed({1'b0,early_dest_y})+$signed(early_int_y);
+wire signed [13:0] early_src_last_x=
+    early_src_base_x+(early_half_x?14'sd1:14'sd0);
+wire signed [13:0] early_src_last_y=
+    early_src_base_y+(early_half_y?14'sd1:14'sd0);
+wire early_source_bounds_ok=
+    (early_src_base_x>=0)&&(early_src_base_y>=0)&&
+    (early_src_last_x<$signed({2'b00,plane_width}))&&
+    (early_src_last_y<$signed({2'b00,plane_height}));
+wire early_lookup=early_lookup_candidate&&early_source_bounds_ok;
+wire bidir_early_lookup=bidir_lookup_candidate&&early_source_bounds_ok;
+wire next_pixel_early_lookup=
+    next_pixel_lookup_candidate&&early_source_bounds_ok;
+wire [28:0] early_reference_off=
+    early_use_backward?future_off:past_off;
+
 wire tap_dx=(half_x&&half_y)?tap_index[0]:(half_x?tap_index[0]:1'b0);
 wire tap_dy=(half_x&&half_y)?tap_index[1]:(half_y?tap_index[0]:1'b0);
 wire tap_last=(half_x&&half_y)?(tap_index==2'd3):((half_x||half_y)?(tap_index==2'd1):(tap_index==2'd0));
+assign bidir_lookup_candidate=
+    (mb_direction==2'd3)&&!pred_direction&&tap_last&&
+    ((lookup_wait&&ddram_lookup_ready&&ddram_lookup_hit)||
+     (waitresp&&ddram_dout_ready&&!req_kind));
 wire signed [13:0] src_x_tap_signed=src_base_x+$signed({13'd0,tap_dx});
 wire signed [13:0] src_y_tap_signed=src_base_y+$signed({13'd0,tap_dy});
 wire [11:0] src_x_tap=src_x_tap_signed[11:0];
@@ -74,16 +134,23 @@ wire [7:0] lookup_reconstructed_current=
 wire lookup_advance=lookup_wait&&ddram_lookup_ready&&
     ddram_lookup_hit&&!tap_last;
 wire prediction_lookup=
-    (pixel_setup&&(mb_direction!=0)&&source_bounds_ok)||lookup_advance;
-wire [11:0] lookup_src_x=lookup_advance?next_src_x_tap:src_x_tap;
-wire [11:0] lookup_src_y=lookup_advance?next_src_y_tap:src_y_tap;
+    (pixel_setup&&(mb_direction!=0)&&source_bounds_ok)||lookup_advance||
+    early_lookup;
+wire [11:0] lookup_src_x=
+    early_lookup?early_src_base_x[11:0]:
+    lookup_advance?next_src_x_tap:src_x_tap;
+wire [11:0] lookup_src_y=
+    early_lookup?early_src_base_y[11:0]:
+    lookup_advance?next_src_y_tap:src_y_tap;
+wire [28:0] lookup_reference_off=
+    early_lookup?early_reference_off:selected_reference_off;
 
 assign ddram_burstcnt=req?8'd1:8'd0;
 assign ddram_addr=req?
     (req_kind?block_addr(scratch_bank_latched,col,mrow,blk,verify_row):
               pixel_addr(selected_reference_off,blk,src_x_tap,src_y_tap)):
     prediction_lookup?
-        pixel_addr(selected_reference_off,blk,lookup_src_x,lookup_src_y):29'd0;
+        pixel_addr(lookup_reference_off,blk,lookup_src_x,lookup_src_y):29'd0;
 assign ddram_rd=req;
 assign ddram_cacheable=(req&&!req_kind)||prediction_lookup;
 assign ddram_lookup_request=prediction_lookup;

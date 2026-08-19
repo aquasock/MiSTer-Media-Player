@@ -229,7 +229,7 @@ module tb_h262_p_intra_macroblocks;
                    !decision||!required||!success||engine_error||
                    !engine_read_seen||!engine_reconstructed_seen||
                    intra_store_samples!=(expected_blocks*64)||
-                   total_cycles>=3000000)
+                   total_cycles>=2550000)
                     $fatal(1,"P intra-macroblock regression failed");
                 $finish;
             end

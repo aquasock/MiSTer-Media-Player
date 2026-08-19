@@ -54,7 +54,13 @@
                     if((mb_direction==2'd3)&&!pred_direction) begin
                         forward_prediction<=lookup_selected_prediction;
                         pred_direction<=1;pred_sum<=0;tap_index<=0;
-                        pixel_setup<=1;
+                        if(bidir_early_lookup) begin
+                            if(early_half_x||early_half_y)
+                                half_sample_seen<=1;
+                            lookup_wait<=1;
+                        end else begin
+                            pixel_setup<=1;
+                        end
                     end else begin
                         out_reg<=lookup_reconstructed_current;emit<=1;
                         if((mbi==0)&&(blk==0)&&(ei==0))begin
@@ -81,7 +87,14 @@
                 if(!req_kind) begin
                     if(tap_last) begin
                         if((mb_direction==2'd3)&&!pred_direction) begin
-                            forward_prediction<=selected_prediction;pred_direction<=1;pred_sum<=0;tap_index<=0;pixel_setup<=1;
+                            forward_prediction<=selected_prediction;pred_direction<=1;pred_sum<=0;tap_index<=0;
+                            if(bidir_early_lookup) begin
+                                if(early_half_x||early_half_y)
+                                    half_sample_seen<=1;
+                                lookup_wait<=1;
+                            end else begin
+                                pixel_setup<=1;
+                            end
                         end else begin
                             out_reg<=reconstructed_current;emit<=1;
                             if((mbi==0)&&(blk==0)&&(ei==0))begin read_seen<=1;sample_nonzero<=|final_prediction;end
@@ -120,7 +133,12 @@
                 pred_direction<=0;
                 pred_sum<=0;
                 tap_index<=0;
-                pixel_setup<=1;
+                if(next_pixel_early_lookup) begin
+                    req_kind<=0;
+                    lookup_wait<=1;
+                end else begin
+                    pixel_setup<=1;
+                end
             end
         end
 
