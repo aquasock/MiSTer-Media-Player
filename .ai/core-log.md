@@ -264,32 +264,35 @@ Preserve the hardware-accepted four-entry cache and pixel oracle, then add `ioct
 - [x] Passed
 
 ---
-## 196 COMMIT Unreleased d26c37d 2026-08-17T18:46:15-07:00
+## 237 COMMIT Unreleased ??? 2026-08-19T15:21:10-07:00
 
 #### Coming From:
 
-v0.5.0 56db0c4
+Unreleased f206298
 
 #### Purpose:
 
-Record the verified v0.5.0 publication on the development branch and correct the README's current-release status.
+Rearm all MPEG-domain decode, publication, presentation, framebuffer-cache, and diagnostic state at the start of each new HPS file download without disturbing the accepted first-load datapath.
 
 #### Outcome:
 
-Commit `d26c37d` identifies v0.5.0 as the current published hardware-qualified milestone and names binary asset `MediaPlayer_20260817.rbf`, replacing the stale v0.4.0/current-candidate language without changing decoder RTL or the tagged release. Remote annotated tag `v0.5.0` peels to exact release commit `56db0c4`; the GitHub release is published as a pre-release titled `MiSTer Media Player v0.5.0`; and the uploaded RBF matches the qualified artifact at SHA-256 `a3eeeb285c427f313987ce6c62cdef560d6293defb1841e96c66aab026d63d8e`. The documentation-only commit retains the already clean-built, hardware-passed v0.5.0 RTL unchanged, so no additional Quartus or MiSTer run is required for this boundary.
+The planned change will synchronize the asynchronous `ioctl_download` level into `clk_mpeg2`, detect each low-to-high transfer boundary, stretch it into a short decoder reset, and prevent FIFO reads throughout that reset so the first byte of the new stream cannot be discarded. The existing system-reset synchronizers, dual-clock FIFO reset, four-entry prediction cache, pixel reconstruction, DDR layout, and video clock domain will remain unchanged. A focused asynchronous-clock regression will require one reset pulse per download, no retrigger while a transfer remains high, full release during the transfer, and correct rearming after the intervening low interval.
 
 #### Next Steps:
 
-Prepare the next Unreleased capability proposal for post-v0.5.0 development, retaining the authoritative seven-stream hardware matrix as the mandatory regression gate and treating any new capability stream as supplemental unless the user explicitly approves a matrix change.
+Implement the isolated lifecycle controller and top-level reset/read gate, run its focused repeated-download regression plus the accepted parser, cache, P-intra, B-residual, B-intra, mixed-pixel, 72-picture live-raster, and full-resolution long-GOP regressions, then perform the session-authorized incremental Quartus build and deploy the resulting RBF for first-load and immediate second-load hardware validation.
 
 #### Files Modified:
 
-- README.md
+- MediaPlayer_top_00.svh
+- files.qip
+- rtl/mpeg2_new/mpeg2_h262_download_rearm.sv
+- tools/streams/tb_h262_download_rearm.sv
 
 #### Status:
 
-- [x] Built
-- [x] Passed
+- [ ] Built
+- [ ] Passed
 
 ---
 ## 197 COMMIT Unreleased 8c9cdaa 2026-08-17T20:53:22-07:00
