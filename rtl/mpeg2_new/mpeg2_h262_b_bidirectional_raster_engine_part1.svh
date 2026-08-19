@@ -49,6 +49,8 @@ wire signed [7:0] mb_bmvy=$signed(motion_word[7:0]);
 (* preserve *) reg [1:0] exec_direction;
 (* preserve *) reg signed [7:0] exec_fmvx,exec_fmvy;
 (* preserve *) reg signed [7:0] exec_bmvx,exec_bmvy;
+(* preserve *) reg signed [7:0] phase_mvx,phase_mvy;
+(* preserve *) reg phase_backward;
 (* preserve *) reg [28:0] bidir_prelaunch_addr,next_prelaunch_addr;
 (* preserve *) reg bidir_prelaunch_valid,next_prelaunch_valid;
 
@@ -95,10 +97,8 @@ integer i;
 wire [28:0] future_off=future_bank_latched?BANK_OFF:29'd0;
 wire [28:0] past_off=future_bank_latched?29'd0:BANK_OFF;
 wire [2:0] er=ei[5:3],el=ei[2:0];
-wire use_backward=(exec_direction==2'd2)||
-    ((exec_direction==2'd3)&&pred_direction);
-wire signed [7:0] exec_mvx=use_backward?exec_bmvx:exec_fmvx;
-wire signed [7:0] exec_mvy=use_backward?exec_bmvy:exec_fmvy;
+wire signed [7:0] exec_mvx=phase_mvx;
+wire signed [7:0] exec_mvy=phase_mvy;
 wire signed [8:0] exec_int_x=$signed(exec_mvx)>>>1;
 wire signed [8:0] exec_int_y=$signed(exec_mvy)>>>1;
 wire half_x=exec_mvx[0];

@@ -92,7 +92,7 @@ wire [28:0] precompute_next_addr=pixel_addr(
 
 wire bidir_lookup_candidate;
 wire next_pixel_lookup_candidate=
-    emit&&(ei!=6'd63)&&(exec_direction!=0);
+    emit&&(ei!=6'd63);
 wire bidir_early_lookup=
     bidir_lookup_candidate&&bidir_prelaunch_valid;
 wire next_pixel_early_lookup=
@@ -113,7 +113,7 @@ wire tap_last=(half_x&&half_y)?(tap_index==2'd3):((half_x||half_y)?(tap_index==2
 // the cache response and direction mux out of the cache-address timing path.
 // Extra prelaunches during a backward final tap are harmless and ignored.
 assign bidir_lookup_candidate=
-    (exec_direction==2'd3)&&tap_last&&(lookup_wait||waitresp);
+    tap_last&&(lookup_wait||waitresp);
 wire signed [13:0] src_x_tap_signed=src_base_x+$signed({13'd0,tap_dx});
 wire signed [13:0] src_y_tap_signed=src_base_y+$signed({13'd0,tap_dy});
 wire [11:0] src_x_tap=src_x_tap_signed[11:0];
@@ -129,7 +129,7 @@ wire signed [13:0] next_src_y_tap_signed=
     src_base_y+$signed({13'd0,next_tap_dy});
 wire [11:0] next_src_x_tap=next_src_x_tap_signed[11:0];
 wire [11:0] next_src_y_tap=next_src_y_tap_signed[11:0];
-wire [28:0] selected_reference_off=use_backward?future_off:past_off;
+wire [28:0] selected_reference_off=phase_backward?future_off:past_off;
 
 wire residual_hit=(exec_desc_slot<desc_count)&&
     (desc_word[13:3]==mbi)&&
@@ -232,6 +232,7 @@ always @(posedge clk) begin
         mb_width<=0;mb_height<=0;geometry_seen<=0;motion_count<=0;motion_word<=0;motion_load<=0;
         motion_first_pending<=0;pending_direction<=0;pending_fmvx<=0;pending_fmvy<=0;
         exec_direction<=0;exec_fmvx<=0;exec_fmvy<=0;exec_bmvx<=0;exec_bmvy<=0;
+        phase_mvx<=0;phase_mvy<=0;phase_backward<=0;
         bidir_prelaunch_addr<=0;next_prelaunch_addr<=0;
         bidir_prelaunch_valid<=0;next_prelaunch_valid<=0;
         desc_count<=0;last_desc_word<=0;current_desc_slot<=0;desc_active<=0;sample_expected<=0;metadata_done<=0;exec_desc_slot<=0;

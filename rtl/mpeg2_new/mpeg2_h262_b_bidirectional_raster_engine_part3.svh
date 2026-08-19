@@ -35,12 +35,19 @@
             if(blk<4) begin
                 exec_fmvx<=mb_fmvx;exec_fmvy<=mb_fmvy;
                 exec_bmvx<=mb_bmvx;exec_bmvy<=mb_bmvy;
+                phase_mvx<=(mb_direction==2'd2)?mb_bmvx:mb_fmvx;
+                phase_mvy<=(mb_direction==2'd2)?mb_bmvy:mb_fmvy;
             end else begin
                 exec_fmvx<=chroma_half_vector(mb_fmvx);
                 exec_fmvy<=chroma_half_vector(mb_fmvy);
                 exec_bmvx<=chroma_half_vector(mb_bmvx);
                 exec_bmvy<=chroma_half_vector(mb_bmvy);
+                phase_mvx<=chroma_half_vector(
+                    (mb_direction==2'd2)?mb_bmvx:mb_fmvx);
+                phase_mvy<=chroma_half_vector(
+                    (mb_direction==2'd2)?mb_bmvy:mb_fmvy);
             end
+            phase_backward<=(mb_direction==2'd2);
         end
         if(residual_load_wait)begin
             residual_load_wait<=0;pred_sum<=0;tap_index<=0;pixel_setup<=1;
@@ -75,6 +82,8 @@
                     if((exec_direction==2'd3)&&!pred_direction) begin
                         forward_prediction<=lookup_selected_prediction;
                         pred_direction<=1;pred_sum<=0;tap_index<=0;
+                        phase_mvx<=exec_bmvx;phase_mvy<=exec_bmvy;
+                        phase_backward<=1;
                         if(bidir_early_lookup) begin
                             if(early_half_x||early_half_y)
                                 half_sample_seen<=1;
@@ -109,6 +118,8 @@
                     if(tap_last) begin
                         if((exec_direction==2'd3)&&!pred_direction) begin
                             forward_prediction<=selected_prediction;pred_direction<=1;pred_sum<=0;tap_index<=0;
+                            phase_mvx<=exec_bmvx;phase_mvy<=exec_bmvy;
+                            phase_backward<=1;
                             if(bidir_early_lookup) begin
                                 if(early_half_x||early_half_y)
                                     half_sample_seen<=1;
@@ -152,6 +163,9 @@
             else begin
                 ei<=ei+1'b1;
                 pred_direction<=0;
+                phase_mvx<=(exec_direction==2'd2)?exec_bmvx:exec_fmvx;
+                phase_mvy<=(exec_direction==2'd2)?exec_bmvy:exec_fmvy;
+                phase_backward<=(exec_direction==2'd2);
                 pred_sum<=0;
                 tap_index<=0;
                 if(next_pixel_early_lookup) begin
