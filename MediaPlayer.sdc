@@ -54,6 +54,14 @@ set_false_path \
     -from [get_keepers {*|mpeg2_new_swap_window_video}] \
     -to   [get_keepers {*|mpeg2_new_swap_window_sync[0]}]
 
+# Entry 238: ioctl_download is registered in clk_sys and sampled only by the
+# first stage of an explicit three-register clk_mpeg2 synchronizer.  Cut that
+# asynchronous source-to-stage-zero path only; both later synchronizer stages
+# and all rearm control remain timed in clk_mpeg2.
+set_false_path \
+    -from [get_keepers {*|hps_io:hps_io|ioctl_download}] \
+    -to   [get_keepers {*|mpeg2_h262_download_rearm:*|download_sync[0]}]
+
 # Asynchronous reset request sources.
 # status[0] and cfg[1] are the HPS reset controls that reach reset_request;
 # RESET is the external reset input.  These are intentional asynchronous
@@ -97,6 +105,15 @@ set_false_path \
 # or any other 54 MHz -> 40 MHz logic.
 set_false_path \
     -from [get_keepers {*|mpeg2_h262_b_presentation_scheduler:*|framebuffer_swap_reset_count[*]}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|rd_reset_sync[*]}]
+
+# Entry 238: a new download resets the framebuffer memory side synchronously
+# in clk_mpeg2, but the same level intentionally asserts the existing rd_clk
+# reset-release synchronizer asynchronously.  Cut only that controller-to-reset
+# chain boundary; release inside rd_reset_sync and all ordinary crossings stay
+# fully timed.
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_download_rearm:*|*}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|rd_reset_sync[*]}]
 
 # Intel documents these first-stage DCFIFO ACLR exceptions when both

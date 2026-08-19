@@ -196,7 +196,7 @@ wire mpeg2_download_rearm_reset;
 mpeg2_h262_download_rearm mpeg2_h262_download_rearm
 (
 	.clk            (clk_mpeg2),
-	.reset          (reset_request),
+	.reset          (reset_mpeg2_base),
 	.download_async (ioctl_download),
 	.rearm_reset    (mpeg2_download_rearm_reset)
 );

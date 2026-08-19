@@ -1,7 +1,8 @@
 // Re-establish a first-load decoder boundary for every HPS file transfer.
 // ioctl_download is generated in clk_sys and remains asserted for the complete
 // transfer.  Synchronize that level into clk_mpeg2, detect only its rising
-// edge, and hold the MPEG-domain reset active for eight clock edges.
+// edge, and hold the MPEG-domain reset active for eight clock edges.  reset is
+// the top level's already synchronized MPEG-domain reset.
 //
 // rearm_reset is combinationally asserted from download_start before the edge
 // that records the event.  The top level also uses it to block FIFO reads, so
@@ -23,7 +24,7 @@ wire download_start = download_sync[2] && !download_seen_high;
 
 assign rearm_reset = download_start || (rearm_count != 3'd0);
 
-always @(posedge clk or posedge reset) begin
+always @(posedge clk) begin
     if (reset) begin
         download_sync      <= 3'b000;
         download_seen_high <= 1'b0;
