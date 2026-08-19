@@ -232,7 +232,7 @@ Deploy the hash-qualified Entry 235 RBF and rerun `test_compat_long_gop.m2v` and
 - [ ] Passed
 
 ---
-## 236 COMMIT Unreleased ??? 2026-08-19T13:36:19-07:00
+## 236 COMMIT Unreleased f206298 2026-08-19T13:36:19-07:00
 
 #### Coming From:
 
@@ -244,22 +244,23 @@ Restore the hardware-proven four-entry reference cache and add mixed-stream pixe
 
 #### Outcome:
 
-Hardware rejects Entry 235 as a compatibility regression. Frame-correlated review of the uploaded 60 fps recording proves that `test_compat_long_gop.m2v` presents every source frame from 0 through 71 exactly once in order, with no reversal or skip, and improves the frame-0-to-frame-71 interval from Entry 234's 5.935 seconds to 5.859 seconds, a 76 ms or 1.28 percent gain. The byte-identical 366,071-byte `test_compat_mixed_macroblocks.m2v` instead reaches a repeated diagonal field rather than the expected 24-frame color-bar sequence on its first load after core reset, while USER and POWER remain solid and DISK remains dark, proving the existing success report does not validate displayed pixel content. A second download finishes faster without changing the display because `reset_mpeg2` is driven only by global reset, status reset, or the reset button and does not rearm sticky sequence and presentation state at a new `ioctl_download`; that separate multi-download defect will remain isolated from this recovery boundary. The user approved restoring Entry 234's four-entry fully associative cache, adding a deterministic mixed-stream pixel oracle, and using an incremental build.
+Hardware rejects Entry 235 as a compatibility regression: its long-GOP gain is only 76 ms or 1.28 percent while the byte-identical mixed-macroblock stream displays a repeated diagonal field and a second download never presents a new frame. Commit `f206298` restores Entry 234's exact four-entry fully associative cache and adds a deterministic 128x96, 24-picture mixed I/P/B stream containing intra macroblocks in P pictures plus an FFmpeg-decoded YUV420P oracle. The new integrated regression seeds the omitted I-writer reference model, reconstructs 423,936 P/B samples through the real parser, prediction engines, cache, tagged writer, DDR model, and scheduler, and passes every sample within a maximum MPEG IDCT delta of two; it also locks 499,551 cache hits, 71,329 misses and DDR reads, and 3,109,996 cycles. Focused cache, P-intra, B-residual, B-intra, parser-window, exact 72-picture live-raster, and full-resolution 791,528-byte long-GOP publication regressions all pass; the live soak exactly restores 2,267,813 hits, 463,835 misses and reads, 15,739,996 cycles, all 72 display identities, and zero errors. The incremental Quartus 17.0.2 build completes in 9 minutes 14 seconds with zero errors, 124 standing warnings, no critical warning, global setup and hold slack of +0.433 and +0.250 ns, focused decoder setup and recovery slack of +0.687 and +15.505 ns, video setup slack of +7.357 ns, 29,203 ALMs, 40,967 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. `MediaPlayer.rbf` is 4,261,000 bytes with SHA-256 `af041d0ca68a9540dee1d8f05f1c7335bf42c5353940d47cb2a2304bd05ec5f5`.
 
 #### Next Steps:
 
-Replace the eight-entry two-way cache with the hardware-proven four-entry implementation, restore the focused cache and exact live-soak expectations, and add a mixed-stream regression that checks reconstructed display content rather than only parser, publication, and LED prerequisites. Run focused cache, P-intra, B-residual, B-intra, parser-window, mixed-pixel, live-raster, and complete long-GOP regressions before an incremental Quartus build and focused timing analysis; deploy only if all tests and timing pass, then validate mixed macroblocks first after a core reload and long GOP second.
+Reload the deployed core before each first-load check. Run `test_compat_mixed_macroblocks.m2v` first and require coherent color-bar features through final frame 23 with USER and POWER solid and DISK off, then reload the core and run `test_compat_long_gop.m2v`, requiring sequential coherent presentation through frame 71 with USER and POWER solid and the established DISK stage eleven report. Do not use a second in-session download to judge this recovery; add `ioctl_download`-driven decoder rearming as the next separate boundary after hardware acceptance.
 
 #### Files Modified:
 
 - rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
+- tools/streams/generate_test_mixed_raster_soak.py
 - tools/streams/tb_h262_prediction_word_cache.sv
 - tools/streams/tb_h262_live_raster_soak.sv
 - tools/streams/tb_h262_mixed_raster_pixels.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
