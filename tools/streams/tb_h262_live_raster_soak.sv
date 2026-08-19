@@ -370,13 +370,13 @@ module tb_h262_live_raster_soak;
                displayed_identity!=25||last_reference_temporal!=10'd23||
                reference_writes!=50688||scratch0_writes!=55296||
                scratch1_writes!=52992||
-               prediction.reference_cache.cache_hit_count!=32'd2359428||
-               prediction.reference_cache.cache_miss_count!=32'd372220||
+               prediction.reference_cache.cache_hit_count!=32'd2321102||
+               prediction.reference_cache.cache_miss_count!=32'd410546||
                prediction.reference_cache.uncached_count!=0||
-               memory_reads!=372220||
-               // Entry 235 eight-entry cache completes this exact soak in
-               // 15,249,996 cycles.
-               total_cycles!=15249996||
+               memory_reads!=410546||
+               // Entry 235 two-way, four-set cache completes this exact soak
+               // in 15,479,996 cycles.
+               total_cycles!=15479996||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
                presentation_error)

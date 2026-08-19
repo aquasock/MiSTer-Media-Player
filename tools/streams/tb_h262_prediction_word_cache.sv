@@ -134,7 +134,7 @@ module tb_h262_prediction_word_cache;
         if((downstream_reads!=1)||(cache_hits!=1)||(cache_misses!=1))
             $fatal(1,"basic hit/miss accounting failed");
 
-        // Eight interleaved reference words fit simultaneously.
+        // Eight interleaved reference words fit across four two-way sets.
         request_word(29'h00101,1'b1);
         request_word(29'h00102,1'b1);
         request_word(29'h00103,1'b1);
@@ -146,7 +146,7 @@ module tb_h262_prediction_word_cache;
         if((downstream_reads!=8)||(cache_hits!=2)||(cache_misses!=8))
             $fatal(1,"eight-entry interleave failed");
 
-        // Round-robin replacement evicts the oldest entry.
+        // Per-set replacement evicts the older word in the selected set.
         request_word(29'h00108,1'b1);
         request_word(29'h00100,1'b1);
         if((downstream_reads!=10)||(cache_misses!=10))
