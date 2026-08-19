@@ -206,7 +206,7 @@ Reload the deployed core and run `test_compat_long_gop.m2v`, recording the frame
 - [ ] Passed
 
 ---
-## 234 COMMIT Unreleased ??? 2026-08-19T03:57:29-07:00
+## 234 COMMIT Unreleased c340da8 2026-08-19T03:57:29-07:00
 
 #### Coming From:
 
@@ -218,11 +218,11 @@ Stream each completed inverse-quantised coefficient directly into IDCT capture t
 
 #### Outcome:
 
-Entry 233 is hardware accepted: the 60 fps recordings show every long-GOP source frame from 0 through 71 and every mixed-macroblock frame from 0 through 23 in monotonic order without partial-block corruption, with the expected USER and POWER solid states, long-GOP DISK stage 11, and mixed-stream DISK off. The measured frame-zero-to-final intervals fall from 7.111 to 5.986 seconds for long GOP and from 2.459 to 2.144 seconds for mixed macroblocks, reductions of 15.8 and 12.8 percent. Profiling the exact 16,679,996-cycle soak attributes 15,472,059 input-blocked cycles to the decoder, including 4,244,999 P hold cycles and 11,080,116 B hold cycles, while P/B raster execution occupies 6,658,461 cycles. The shared transform currently writes all 64 completed inverse-quantised coefficients into a private array and then replays those same values for 64 cycles into an IDCT capture port that can accept them as they settle. The planned commit will drive the IDCT start, coefficient, and end handshakes directly from inverse-quantisation completion, retaining scan order, mismatch control, exact arithmetic, and the existing serialized multiplier and IDCT resources while removing the duplicate coefficient store and replay.
+Entry 233 is hardware accepted: the 60 fps recordings show every long-GOP source frame from 0 through 71 and every mixed-macroblock frame from 0 through 23 in monotonic order without partial-block corruption, with the expected passing LEDs. Frame-zero-to-final intervals fall from 7.111 to 5.986 seconds for long GOP and from 2.459 to 2.144 seconds for mixed macroblocks, reductions of 15.8 and 12.8 percent. Profiling the exact soak attributes 15,472,059 input-blocked cycles to the decoder and identifies a duplicate 64-cycle coefficient replay in every transformed block. Commit `c340da8` drives IDCT start, coefficient, and end capture directly from inverse-quantisation completion, removes the private 64-coefficient replay array, and preserves scan order, mismatch control, quantisation, IDCT arithmetic, and the existing shared multiplier and IDCT resources. Exact P-intra, B-residual, and B-intra regressions preserve every event, sample, write, and reconstructed value in 2,301,108, 3,902,749, and 2,306,500 cycles, exactly 64 cycles faster per transformed block. The 72-picture live soak retains all 291,641 bytes, 22 P pictures, 47 B pictures, 71 swaps, final identity 25, 463,835 physical DDR reads, cache counts 2,267,813/463,835/0, and zero errors in 15,739,996 cycles, a 940,000-cycle or 5.64 percent reduction. The eight-refill parser-window test and complete 791,528-byte long-GOP publication regression pass unchanged. The session-authorized incremental Quartus build completes in 9 minutes 5 seconds with zero errors, +0.433 ns global setup, +0.250 ns global hold, +0.687 ns decoder setup, +15.505 ns decoder recovery, and +7.357 ns video setup. The fit uses 29,203 ALMs, 40,967 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. Qualified artifact `MediaPlayer_commit234_c340da8.rbf` is 4,261,000 bytes with SHA-256 `af041d0ca68a9540dee1d8f05f1c7335bf42c5353940d47cb2a2304bd05ec5f5`; the uploaded MiSTer readback matches byte-for-byte.
 
 #### Next Steps:
 
-Implement the direct inverse-quantisation-to-IDCT handoff, then require exact P-intra, B-residual, B-intra, parser-window, live-soak, and full long-GOP publication regressions with unchanged reconstructed values, picture counts, memory traffic, ownership, and presentation order but measurably fewer cycles. If the timing-safe simulations pass, run the session-authorized incremental Quartus build, qualify and upload the RBF, and repeat the 60 fps long-GOP and mixed-macroblock hardware measurements.
+Reload the deployed core and record `test_compat_long_gop.m2v` at 60 fps from the first fully visible frame 0 through settled frame 71, reporting the elapsed interval and USER, POWER, and DISK state. Then record `test_compat_mixed_macroblocks.m2v` through settled frame 23 and report the same LEDs; hardware acceptance requires sequential coherent presentation without renewed partial-block flicker and should measure how closely the 5.64 percent modeled transform reduction carries into the remaining hardware bottleneck.
 
 #### Files Modified:
 
@@ -233,7 +233,7 @@ Implement the direct inverse-quantisation-to-IDCT handoff, then require exact P-
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
