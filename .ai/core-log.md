@@ -206,74 +206,35 @@ Reload the deployed core and run `test_compat_long_gop.m2v`, recording the frame
 - [ ] Passed
 
 ---
-## 193 COMMIT Unreleased a42bb74 2026-08-17T16:38:38-07:00
+## 234 COMMIT Unreleased ??? 2026-08-19T03:57:29-07:00
 
 #### Coming From:
 
-Unreleased 454336d
+Unreleased 4e6130c
 
 #### Purpose:
 
-Generalize the progressive 4:2:0 P path from fixed `f_code=(3,3)` to independently picture-signaled horizontal and vertical `f_code` values from 1 through 4.
+Stream each completed inverse-quantised coefficient directly into IDCT capture to remove the serialized 64-cycle coefficient replay from every transformed P/B block.
 
 #### Outcome:
 
-Commit `a42bb74` admits independently signaled progressive-P horizontal and vertical `f_code` values 1 through 4, consumes the corresponding zero through three residual bits per component, and applies H.262 motion-vector reconstruction and wraparound without changing the fixed-3 B path. Deterministic stream generation covers unequal component pairs, every admitted value, nonzero residuals, both signs, predictor wraparound, and chained references. Exact replay passes all 5,400 new vectors and 12,150 standing P vectors; all eight standing generators remain pixel-exact or within their established tolerance. A clean Quartus 17.0.2 build completes with zero TNS, no Critical Warning, +0.243 ns global setup, +0.245 ns global hold, +2.290 ns decoder setup, 31,398 ALMs, 41,994 registers, 592,333 memory bits, 90 RAM blocks, 69 DSP blocks, and 3 PLLs. Qualified RBF `MediaPlayer_commit193_a42bb74.rbf` has SHA-256 `ff29d0f609e57c4b55d4adaee5ca80448c7212fcbb4bae808d12b8e849ad1c18`; generated stream `test_p_f_code_range.m2v` has SHA-256 `b6a9ad050171446b2c55cd18e37d0727063858d49f4c4bdad6a817894fc6d437`; Audio project `fd90c77` remains integration-compatible.
+Entry 233 is hardware accepted: the 60 fps recordings show every long-GOP source frame from 0 through 71 and every mixed-macroblock frame from 0 through 23 in monotonic order without partial-block corruption, with the expected USER and POWER solid states, long-GOP DISK stage 11, and mixed-stream DISK off. The measured frame-zero-to-final intervals fall from 7.111 to 5.986 seconds for long GOP and from 2.459 to 2.144 seconds for mixed macroblocks, reductions of 15.8 and 12.8 percent. Profiling the exact 16,679,996-cycle soak attributes 15,472,059 input-blocked cycles to the decoder, including 4,244,999 P hold cycles and 11,080,116 B hold cycles, while P/B raster execution occupies 6,658,461 cycles. The shared transform currently writes all 64 completed inverse-quantised coefficients into a private array and then replays those same values for 64 cycles into an IDCT capture port that can accept them as they settle. The planned commit will drive the IDCT start, coefficient, and end handshakes directly from inverse-quantisation completion, retaining scan order, mismatch control, exact arithmetic, and the existing serialized multiplier and IDCT resources while removing the duplicate coefficient store and replay.
 
 #### Next Steps:
 
-Run `test_p_f_code_range.m2v`, `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_p_visual_discriminator.m2v`, `test_i_baseline.m2v`, and `test_b_bidirectional.m2v` using the qualified RBF. Each accepted stream must settle with USER and POWER solid and DISK dark; the visual discriminator must retain its four quadrants and center seams.
+Implement the direct inverse-quantisation-to-IDCT handoff, then require exact P-intra, B-residual, B-intra, parser-window, live-soak, and full long-GOP publication regressions with unchanged reconstructed values, picture counts, memory traffic, ownership, and presentation order but measurably fewer cycles. If the timing-safe simulations pass, run the session-authorized incremental Quartus build, qualify and upload the RBF, and repeat the 60 fps long-GOP and mixed-macroblock hardware measurements.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- tools/streams/h262common.py
-- tools/streams/generate_test_p_f_code_range.py
+- rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
+- tools/streams/tb_h262_p_intra_macroblocks.sv
+- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [x] Built
-- [x] Passed
-
----
-## 194 COMMIT Unreleased b1bde49 2026-08-17T17:15:45-07:00
-
-#### Coming From:
-
-Unreleased a42bb74
-
-#### Purpose:
-
-Generalize the progressive 4:2:0 B path from fixed `f_code=(3,3,3,3)` to independently picture-signaled forward and backward horizontal and vertical `f_code` values from 1 through 4.
-
-#### Outcome:
-
-Commit 193 passes all six requested hardware streams with the expected settled USER/POWER solid and DISK-dark result; the photographs confirm the standing I, P and B rasters, the visual discriminator seams, and the P `f_code` range markers. Commit `b1bde49` captures and independently applies all four B-picture `f_code` fields from 1 through 4, consumes zero through three component residual bits, and uses the established H.262 reconstruction and wraparound rule without widening the signed eight-bit B vector transport. Exact parser replay passes both new B pictures and all 2,700 emitted vector records. The new stream is pixel-exact for both B pictures, and all nine generators pass their established pixel-exact or IDCT-tolerant verification. A clean Quartus 17.0.2 build completes with zero TNS, no Critical Warning, +0.387 ns global setup, +0.207 ns global hold, +2.012 ns decoder setup, 31,625 ALMs, 42,223 registers, 592,333 memory bits, 90 RAM blocks, 69 DSP blocks, and 3 PLLs. Qualified RBF `MediaPlayer_commit194_b1bde49.rbf` has SHA-256 `a3eeeb285c427f313987ce6c62cdef560d6293defb1841e96c66aab026d63d8e`; generated stream `test_b_f_code_range.m2v` has SHA-256 `70da72fd53a1e3a6c2ac5b87bcf26dbfbf7398fb6ae526903d06e0402d54dacd`; Audio project `fd90c77` remains integration-compatible.
-
-#### Next Steps:
-
-Run `test_b_f_code_range.m2v`, `test_p_f_code_range.m2v`, `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_p_visual_discriminator.m2v`, `test_i_baseline.m2v`, and `test_b_bidirectional.m2v` using the qualified RBF. Each accepted stream must settle with USER and POWER solid and DISK dark; the new B stream must present a stable decoded raster, and the visual discriminator must retain its four quadrants and center seams.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- tools/streams/h262common.py
-- tools/streams/generate_test_b_f_code_range.py
-
-#### Status:
-
-- [x] Built
-- [x] Passed
+- [ ] Built
+- [ ] Passed
 
 ---
 ## 195 VERSION v0.5.0 56db0c4 2026-08-17T18:02:13-07:00
