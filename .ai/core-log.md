@@ -325,42 +325,38 @@ Continue from hardware-accepted commit `ca1f0fc`, preserving the download-rearm 
 - [x] Passed
 
 ---
-## 198 COMMIT Unreleased 6c6854c 2026-08-17T21:53:24-07:00
+## 239 COMMIT Unreleased ??? 2026-08-19T16:36:30-07:00
 
 #### Coming From:
 
-Unreleased 8c9cdaa
+Unreleased ca1f0fc
 
 #### Purpose:
 
-Generalize progressive P/B slice ingestion beyond whole-slice byte capture and restricted row-transition ownership.
+Reduce the remaining 25 fps starvation stutter by overlapping registered P/B pixel output with the next prediction lookup and establish repeatable counter-plus-raster recording analysis.
 
 #### Outcome:
 
-Commit `6c6854c` converts both active 512-byte P/B capture arrays into refillable backpressured parser windows, retains the final two bytes across refills so a `00 00 01` prefix may cross a window boundary, and resumes the syntax state machine without changing macroblock, predictor, residual, reconstruction, or reference ownership. A deterministic 194,005-byte I/P/B stream places 2,285-byte P and 2,291-byte B slice payloads across eight refills per parser; isolated RTL replay reports both pictures without syntax errors and preserves all 1,350 P macroblocks, while software reference decoding makes every P/B frame pixel-identical to the I reference. The Commit-197 multi-slice replay and all seven standing generators retain their accepted hashes and reference results. Fitter seed 2 removes the unrelated marginal HDMI placement failure without changing RTL behavior; the final clean Quartus 17.0.2 build completes in 14 minutes 24 seconds with zero setup and hold TNS, no Critical Warning, +0.042 ns global setup, +0.246 ns global hold, +1.487 ns decoder setup, 40,807 ALMs, 50,336 registers, 584,141 memory bits, 88 RAM blocks, 69 DSP blocks, and 3 PLLs. Generated RBF `MediaPlayer.rbf` has SHA-256 `09e2ecf7997cbebe7e110e50b7e8238fdc14f7f27cc042de865ef9c21562dd4c`; parser-window stream `test_pb_parser_window.m2v` has SHA-256 `1659d08a7393b4b82e77cb869ae139d0205de8b6c911c3f3d770fc03b744b801`.
+The accepted Entry 238 recordings provide a clean baseline: independent template matching of the embedded frame counter and the unobscured raster recovers every long-GOP frame 0 through 71 and every mixed-macroblock frame 0 through 23 in strict order, with no sustained counter-only update, skipped image, stale buffer, or partial-frame failure. Long GOP takes 5.939 seconds from first frame 0 to first frame 71, or 11.95 effective fps, while mixed macroblocks takes 2.102 seconds from frame 0 to frame 23, or 10.94 effective fps. B pictures ordinarily persist for three or four 59.94 fps camera samples, but I/P reference pictures persist for eight through ten samples, proving a repeatable reference-hold starvation pattern rather than random presentation loss. The approved boundary will retain the registered four-entry shared cache and add a timing-isolated registered output stage so the current reconstructed pixel can enter the writer while the next prediction lookup advances; a deterministic analyzer will preserve the same counter and actual-raster measurements for before-and-after hardware comparison.
 
 #### Next Steps:
 
-Run the parser-window stream, Commit-197 multi-slice stream, and authoritative seven-stream matrix on MiSTer using the Commit-198 RBF, confirming stable decoded output and no USER, POWER, or DISK error indication. After hardware acceptance, begin P-picture intra-macroblock integration as Commit 199 while preserving predicted, skipped, and residual-coded macroblock behavior.
+Implement the analyzer and registered P/B output overlap without exposing the former combinational four-way cache path, require exact focused reconstruction, mixed-pixel oracle, parser-window, live-raster, long-GOP, cadence, and repeated-download regressions, quantify the exact cycle reduction, then run the session-authorized incremental Quartus build and reject the boundary if decoder timing does not close. If qualified, deploy with byte-identical readback and record both streams at 60 fps using the same camera geometry so counter order, raster order, per-picture hold distributions, frame-zero-to-final time, LEDs, and repeated-load behavior can be compared directly with the Entry 238 baseline.
 
 #### Files Modified:
 
-- MediaPlayer.qsf
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
-- tools/streams/generate_test_pb_parser_window.py
-- tools/streams/tb_h262_parser_windows.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- tools/streams/analyze_recorded_cadence.py
+- tools/streams/tb_h262_p_intra_macroblocks.sv
+- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [x] Built
+- [ ] Built
 - [ ] Passed
 
 ---
