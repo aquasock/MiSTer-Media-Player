@@ -108,10 +108,12 @@ wire early_half_y=
 wire tap_dx=(half_x&&half_y)?tap_index[0]:(half_x?tap_index[0]:1'b0);
 wire tap_dy=(half_x&&half_y)?tap_index[1]:(half_y?tap_index[0]:1'b0);
 wire tap_last=(half_x&&half_y)?(tap_index==2'd3):((half_x||half_y)?(tap_index==2'd1):(tap_index==2'd0));
+// The registered state predicts the final-tap response one cycle ahead. It is
+// intentionally independent of lookup hit/ready and pred_direction, keeping
+// the cache response and direction mux out of the cache-address timing path.
+// Extra prelaunches during a backward final tap are harmless and ignored.
 assign bidir_lookup_candidate=
-    (exec_direction==2'd3)&&!pred_direction&&tap_last&&
-    ((lookup_wait&&ddram_lookup_ready&&ddram_lookup_hit)||
-     (waitresp&&ddram_dout_ready&&!req_kind));
+    (exec_direction==2'd3)&&tap_last&&(lookup_wait||waitresp);
 wire signed [13:0] src_x_tap_signed=src_base_x+$signed({13'd0,tap_dx});
 wire signed [13:0] src_y_tap_signed=src_base_y+$signed({13'd0,tap_dy});
 wire [11:0] src_x_tap=src_x_tap_signed[11:0];
