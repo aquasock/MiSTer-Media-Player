@@ -137,7 +137,7 @@ Retain the hardware-proven in-block residual prefetch and accepted 25 fps presen
 - [x] Passed
 
 ---
-## 232 COMMIT Unreleased ??? 2026-08-18T23:55:01-07:00
+## 232 COMMIT Unreleased 1b1ca8f 2026-08-18T23:55:01-07:00
 
 #### Coming From:
 
@@ -149,11 +149,11 @@ Launch the next non-intra P/B reference lookup during the current pixel's otherw
 
 #### Outcome:
 
-Entry 231 is hardware accepted at final source frame 71 with USER and POWER solid, 11 DISK blinks, and no new visible corruption. Frame-level review measures 7.864 seconds from the first fully visible frame 0 to frame 71, approximately 1.34 seconds and 14.5 percent faster than Entry 230's 9.2-second recording. The accepted exact soak completes in 19,229,996 cycles with unchanged DDR, cache, write, publication, and presentation identities. Updated profiling attributes 18,019,407 blocked cycles to decoding and 809,120 to presentation; active P/B raster work occupies 9,213,057 cycles. Entry 231 reduced residual-load staging to only 39,744 cycles, while `pixel_setup` now accounts for 405,504 P cycles and 1,382,400 B cycles. Except for the first sample at each block and intra reconstruction, the cache port is idle while this setup state validates coordinates and launches the first tap; B bidirectional pixels also return through setup between their forward and backward predictions. Issuing those already-known lookups during the preceding emit or forward-completion cycle exposes an upper bound of 1,768,032 removable setup cycles, or 9.19 percent of the full soak, without changing the cache response, miss, DDR, residual, block-store, verification, or presentation paths.
+Entry 231 is hardware accepted at final source frame 71 with USER and POWER solid, 11 DISK blinks, no new visible corruption, and a measured 7.864 seconds from frame 0 to frame 71, 14.5 percent faster than Entry 230. Commit `1b1ca8f` launches registered next-pixel and B backward-phase first-tap lookups during the preceding emit or final-tap response state, registers B motion-phase selection and base word addresses, and retains exact reconstruction while bypassing serialized pixel setup. Focused B bidirectional replay passes 7,680 samples in 4,040,029 cycles, B-intra passes 768 samples in 2,436,868 cycles, and the exact 25-picture live soak passes all 291,641 bytes, 22 P pictures, 47 B pictures, 71 swaps, 622,811 DDR reads, cache counts 2,267,813/463,835/158,976, and zero errors in 17,469,996 cycles. The user-requested clean rebuild reproduced the original unsafe revision's decoder setup failure at -7.765 ns, proving it was not stale incremental state; successive registered cuts removed the response, direction, and coordinate arithmetic from the cache cone, and the final session-authorized incremental Quartus build closes with +0.001 ns decoder setup, +0.350 ns decoder hold, +14.765 ns decoder recovery, and +6.795 ns video setup. The fit uses 30,512 ALMs, 43,228 registers, 4,027,379 block-memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. Qualified artifact `MediaPlayer_commit232_1b1ca8f.rbf` is 4,264,692 bytes with SHA-256 `2eb655010376059befdcdadd290f7d9bd6830197f02e567d51999346ad32f38d`; the uploaded MiSTer readback matches byte-for-byte.
 
 #### Next Steps:
 
-Add explicit next-pixel and backward-direction first-tap addresses and bounds checks to the generalized P/B raster engines. Retain `pixel_setup` for every block start, intra pixel, and invalid-bounds fallback; otherwise issue the lookup during the preceding emit or bidirectional forward completion and enter `lookup_wait` directly. Require exact focused P-intra and B-residual samples and traffic, unchanged live-soak DDR/cache/write/publication counts, all 72 pictures, zero decoder or presentation errors, and a total below 17.8 million cycles. Run the complete long publication regression and the session-authorized incremental Quartus build only if the fitted decoder and video paths remain timing-clean.
+Reload the deployed core and run `test_compat_long_gop.m2v`, recording whether it reaches final frame 71, the frame-0-to-frame-71 load time, visible ordering or stutter, and the settled USER, POWER, and DISK LED pattern. Then run `test_compat_mixed_macroblocks.m2v` as a corruption regression; hardware acceptance requires no new visual errors and the established passing LEDs.
 
 #### Files Modified:
 
@@ -167,7 +167,7 @@ Add explicit next-pixel and backward-direction first-tap addresses and bounds ch
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
