@@ -264,7 +264,7 @@ Preserve the hardware-accepted four-entry cache and pixel oracle, then add `ioct
 - [x] Passed
 
 ---
-## 237 COMMIT Unreleased ??? 2026-08-19T15:21:10-07:00
+## 237 COMMIT Unreleased 23d8410 2026-08-19T15:21:10-07:00
 
 #### Coming From:
 
@@ -276,11 +276,11 @@ Rearm all MPEG-domain decode, publication, presentation, framebuffer-cache, and 
 
 #### Outcome:
 
-The planned change will synchronize the asynchronous `ioctl_download` level into `clk_mpeg2`, detect each low-to-high transfer boundary, stretch it into a short decoder reset, and prevent FIFO reads throughout that reset so the first byte of the new stream cannot be discarded. The existing system-reset synchronizers, dual-clock FIFO reset, four-entry prediction cache, pixel reconstruction, DDR layout, and video clock domain will remain unchanged. A focused asynchronous-clock regression will require one reset pulse per download, no retrigger while a transfer remains high, full release during the transfer, and correct rearming after the intervening low interval.
+Commit `23d8410` synchronizes the asynchronous `ioctl_download` level into `clk_mpeg2`, detects each low-to-high transfer boundary, stretches it across exactly eight decoder clock edges, resets every existing MPEG-domain consumer through the common reset net, and blocks FIFO reads throughout that boundary so the first new byte cannot be discarded. The system-reset synchronizers, dual-clock FIFO reset, video domain, accepted four-entry cache, pixel reconstruction, and DDR layout remain unchanged. The focused asynchronous-clock regression passes two independent downloads, sixteen total reset edges, sustained-level non-retrigger, clean release, and complete FIFO gating. Cache, P-intra, B-residual, B-intra, eight-refill parser-window, mixed-pixel, 72-picture live-raster, and full-resolution long-GOP regressions all pass; the mixed oracle retains 423,936 samples with zero mismatches and maximum delta two, the live soak retains 2,267,813 hits, 463,835 misses and reads, 15,739,996 cycles and all 72 identities, and the long run retains 22 P pictures, 47 B pictures, 25 publications and promotions, final identity 25, and zero errors.
 
 #### Next Steps:
 
-Implement the isolated lifecycle controller and top-level reset/read gate, run its focused repeated-download regression plus the accepted parser, cache, P-intra, B-residual, B-intra, mixed-pixel, 72-picture live-raster, and full-resolution long-GOP regressions, then perform the session-authorized incremental Quartus build and deploy the resulting RBF for first-load and immediate second-load hardware validation.
+Run the session-authorized incremental Quartus build from the preserved database, verify timing and resource reports, deploy the resulting RBF with byte-identical readback, then validate both compatibility streams on a first load followed immediately by a second load without reloading the core.
 
 #### Files Modified:
 
