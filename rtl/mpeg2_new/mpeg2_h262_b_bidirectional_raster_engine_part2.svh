@@ -33,7 +33,16 @@ wire [28:0] selected_reference_off=use_backward?future_off:past_off;
 wire residual_hit=(exec_desc_slot<desc_count)&&
     (desc_word[13:3]==mbi)&&
     (desc_word[2:0]==blk);
-wire [16:0] residual_mem_index={exec_desc_slot,6'b000000}+{11'd0,ei};
+// Commit 231: overlap the synchronous read of the next in-block residual with
+// the current pixel's reference lookup. Block boundaries continue through the
+// staged residual_load path so descriptor changes retain the full RAM latency.
+wire residual_read_ahead=
+    (pixel_setup||lookup_wait||(req&&!req_kind)||
+     (waitresp&&!req_kind)||emit)&&(ei!=6'd63);
+wire [5:0] residual_read_index=
+    residual_read_ahead ? (ei+1'b1) : ei;
+wire [16:0] residual_mem_index=
+    {exec_desc_slot,6'b000000}+{11'd0,residual_read_index};
 reg signed [15:0] residual_pel;
 assign residual_store_write=capture_enable&&sideband_valid&&desc_active&&
     (sideband_index==sample_expected);
@@ -107,7 +116,8 @@ always @(posedge clk) begin
         residual_pel<=0;
     end else begin
         desc_word<=desc_mem[exec_desc_slot];
-        residual_pel<=residual_hit?residual_store_read_data:16'sd0;
+        if(residual_load_wait||(emit&&(ei!=6'd63)))
+            residual_pel<=residual_hit?residual_store_read_data:16'sd0;
     end
 end
 

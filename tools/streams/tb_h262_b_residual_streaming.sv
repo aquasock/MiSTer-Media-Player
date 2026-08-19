@@ -6,7 +6,7 @@ module tb_h262_b_residual_streaming;
     reg [7:0] stream_data=0;
     reg [7:0] stream_mem[0:MAX_STREAM_BYTES-1];
     reg [1023:0] hex_path;
-    integer stream_len,stream_index=0,quiet_cycles=0;
+    integer stream_len,stream_index=0,quiet_cycles=0,total_cycles=0;
     integer motion_events=0,residual_blocks=0,residual_samples=0;
     integer residual_writes=0;
     integer store_samples=0,stripe_store_samples=0,stripe_changed_samples=0;
@@ -84,6 +84,7 @@ module tb_h262_b_residual_streaming;
     );
 
     always @(posedge clk) begin
+        if(!reset)total_cycles<=total_cycles+1;
         ddram_lookup_ready<=ddram_lookup_request;
         ddram_dout_ready<=0;
         store_block_stored<=store_complete;
@@ -135,17 +136,19 @@ module tb_h262_b_residual_streaming;
         else if(quiet_cycles!=0)quiet_cycles<=quiet_cycles+1;
 
         if(quiet_cycles==100) begin
-            $display("RESULT b_seen=%0d core_error=%0d raster_error=%0d motion=%0d blocks=%0d samples=%0d writes=%0d stores=%0d stripe=%0d changed=%0d",
+            $display("RESULT b_seen=%0d core_error=%0d raster_error=%0d motion=%0d blocks=%0d samples=%0d writes=%0d stores=%0d stripe=%0d changed=%0d cycles=%0d",
                      b_seen,core_error,raster_error,motion_events,
                      residual_blocks,residual_samples,residual_writes,
-                     store_samples,stripe_store_samples,stripe_changed_samples);
+                     store_samples,stripe_store_samples,stripe_changed_samples,
+                     total_cycles);
             if(!b_seen||core_error||raster_error||motion_events!=1350||
                residual_blocks!=(intra_mode?12:120)||
                residual_samples!=(intra_mode?768:7680)||
                residual_writes!=(intra_mode?768:7680)||samples_remaining!=0||
                !raster.metadata_done||!read_seen||!reconstructed_seen||!persisted_seen||
                store_samples!=518400||stripe_store_samples!=7680||
-               stripe_changed_samples!=(intra_mode?768:7680))
+               stripe_changed_samples!=(intra_mode?768:7680)||
+               total_cycles>=5150000)
                 $fatal(1,"B residual streaming regression failed");
             $finish;
         end

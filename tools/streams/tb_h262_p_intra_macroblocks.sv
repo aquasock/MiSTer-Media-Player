@@ -8,7 +8,7 @@ module tb_h262_p_intra_macroblocks;
     reg clk=0,reset=1,stream_valid=0;
     reg [7:0] stream_data=0;
     reg [7:0] stream_mem[0:MAX_STREAM_BYTES-1];
-    integer stream_len,stream_index,quiet_cycles;
+    integer stream_len,stream_index,quiet_cycles,total_cycles=0;
     integer motion_events=0,intra_motion_events=0,picture_completions=0;
     integer replay_blocks=0,replay_samples=0,replay_total_samples=0;
     reg [1:0] replay_state=0;
@@ -216,9 +216,10 @@ module tb_h262_p_intra_macroblocks;
                 quiet_cycles<=quiet_cycles+1;
             else quiet_cycles<=0;
             if(quiet_cycles==100) begin
-                $display("RESULT seen=%0d parser_error=%0d residual_error=%0d motion=%0d intra_motion=%0d blocks=%0d samples=%0d",
+                $display("RESULT seen=%0d parser_error=%0d residual_error=%0d motion=%0d intra_motion=%0d blocks=%0d samples=%0d cycles=%0d",
                          seen,parser_error,residual_error,motion_events,
-                         intra_motion_events,replay_blocks,replay_total_samples);
+                         intra_motion_events,replay_blocks,replay_total_samples,
+                         total_cycles);
                 $display("RESIDUAL_DETAIL g_error=%0d transform=%0d",
                          residual_pipeline.g_error,residual_pipeline.terr);
                 if(!seen||parser_error||residual_error||picture_completions!=1||
@@ -227,7 +228,8 @@ module tb_h262_p_intra_macroblocks;
                    replay_total_samples!=(expected_blocks*64)||!replay_finished||
                    !decision||!required||!success||engine_error||
                    !engine_read_seen||!engine_reconstructed_seen||
-                   intra_store_samples!=(expected_blocks*64))
+                   intra_store_samples!=(expected_blocks*64)||
+                   total_cycles>=3000000)
                     $fatal(1,"P intra-macroblock regression failed");
                 $finish;
             end
@@ -235,6 +237,7 @@ module tb_h262_p_intra_macroblocks;
     end
 
     always @(posedge clk) begin
+        if(!reset)total_cycles<=total_cycles+1;
         engine_dout_ready<=0;
         engine_block_stored<=engine_store_complete;
         if(engine_rd) begin

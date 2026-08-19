@@ -114,7 +114,14 @@
 
         if(emit) begin
             resrows[er][{el,3'b000}+:8]<=out_reg;emit<=0;
-            if(ei==63)wait_store<=1;else begin ei<=ei+1'b1;pred_direction<=0;residual_load<=1;end
+            if(ei==63)wait_store<=1;
+            else begin
+                ei<=ei+1'b1;
+                pred_direction<=0;
+                pred_sum<=0;
+                tap_index<=0;
+                pixel_setup<=1;
+            end
         end
 
         if(wait_store&&store_block_stored)begin wait_store<=0;req_kind<=1;verify_row<=0;req<=1;end

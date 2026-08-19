@@ -318,8 +318,17 @@ wire descriptor_position_hit=
     (desc_word[2:0]==blk);
 wire residual_hit=descriptor_position_hit&&
     (desc_word[3]==mb_intra);
+// Commit 231: while the current pixel performs its reference lookup, use the
+// synchronous residual-store port to fetch the next sample in the block.
+// Block boundaries retain the staged residual_load path so descriptor changes
+// still receive the full RAM read latency.
+wire residual_read_ahead=
+    (pixel_setup||lookup_wait||(req&&!req_kind)||
+     (waitresp&&!req_kind)||emit)&&(ei!=6'd63);
+wire [5:0] residual_read_index=
+    residual_read_ahead ? (ei+1'b1) : ei;
 wire [16:0] residual_mem_index=
-    {exec_desc_slot,6'b000000}+{11'd0,ei};
+    {exec_desc_slot,6'b000000}+{11'd0,residual_read_index};
 reg signed [15:0] residual_pel_q;
 
 assign residual_store_write=
@@ -388,14 +397,16 @@ wire new_picture_metadata=
 wire unused_shift_map=&{1'b0,shift_right_map};
 
 // Commit 202: synchronous descriptor and sparse-sample lookups allow both
-// 2048-block stores to infer M10K RAM. residual_load inserts the required
-// read-latency cycle before pixel_setup consumes the selected values.
+// 2048-block stores to infer M10K RAM. Commit 231 keeps residual_load for the
+// first sample of a block, then captures each prefetched in-block sample when
+// the preceding pixel emits.
 always @(posedge clk) begin
     if(reset) begin
         residual_pel_q<=0;
         desc_word<=0;
     end else begin
-        residual_pel_q<=residual_hit ? residual_store_read_data : 16'sd0;
+        if(residual_load_wait||(emit&&(ei!=6'd63)))
+            residual_pel_q<=residual_hit ? residual_store_read_data : 16'sd0;
         desc_word<=desc_mem[exec_desc_slot];
     end
 end
@@ -820,7 +831,9 @@ always @(posedge clk) begin
                 wait_store<=1;
             end else begin
                 ei<=ei+1'b1;
-                residual_load<=1;
+                pred_sum<=0;
+                tap_index<=0;
+                pixel_setup<=1;
             end
         end
 

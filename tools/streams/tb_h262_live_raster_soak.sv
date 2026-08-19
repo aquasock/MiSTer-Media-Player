@@ -372,7 +372,7 @@ module tb_h262_live_raster_soak;
                prediction.reference_cache.cache_hit_count==0||
                prediction.reference_cache.cache_hit_count<=
                 prediction.reference_cache.cache_miss_count||
-               total_cycles>=21800000||
+               total_cycles>=19400000||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
                presentation_error)
