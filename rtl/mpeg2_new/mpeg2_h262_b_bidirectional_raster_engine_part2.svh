@@ -140,8 +140,7 @@ wire residual_hit=(exec_desc_slot<desc_count)&&
 // the current pixel's reference lookup. Block boundaries continue through the
 // staged residual_load path so descriptor changes retain the full RAM latency.
 wire residual_read_ahead=
-    (pixel_setup||lookup_wait||(req&&!req_kind)||
-     (waitresp&&!req_kind)||emit)&&(ei!=6'd63);
+    (pixel_setup||lookup_wait||req||waitresp||emit)&&(ei!=6'd63);
 wire [5:0] residual_read_index=
     residual_read_ahead ? (ei+1'b1) : ei;
 wire [16:0] residual_mem_index=
@@ -190,13 +189,11 @@ wire [28:0] normal_lookup_addr=phase_base_addr+
     {28'd0,address_tap_byte_sum[3]};
 
 assign ddram_burstcnt=req?8'd1:8'd0;
-assign ddram_addr=req?
-    (req_kind?block_addr(scratch_bank_latched,col,mrow,blk,verify_row):
-              normal_lookup_addr):
+assign ddram_addr=req?normal_lookup_addr:
     prediction_lookup?
         (early_lookup?early_lookup_addr:normal_lookup_addr):29'd0;
 assign ddram_rd=req;
-assign ddram_cacheable=(req&&!req_kind)||prediction_lookup;
+assign ddram_cacheable=req||prediction_lookup;
 assign ddram_lookup_request=prediction_lookup;
 assign ddram_lookup_consume=
     lookup_wait&&ddram_lookup_ready&&ddram_lookup_hit;
@@ -244,12 +241,11 @@ always @(posedge clk) begin
         phase_base_addr<=0;phase_base_byte<=0;phase_row_words<=0;
         phase_bounds_ok<=0;
         desc_count<=0;last_desc_word<=0;current_desc_slot<=0;desc_active<=0;sample_expected<=0;metadata_done<=0;exec_desc_slot<=0;
-        pending<=0;started<=0;active<=0;future_bank_latched<=0;scratch_bank_latched<=0;req<=0;waitresp<=0;req_kind<=0;lookup_wait<=0;
-        mbi<=0;col<=0;mrow<=0;blk<=0;timeout<=0;emit<=0;wait_store<=0;pixel_setup<=0;residual_load<=0;residual_load_wait<=0;ei<=0;verify_row<=0;
+        pending<=0;started<=0;active<=0;future_bank_latched<=0;scratch_bank_latched<=0;req<=0;waitresp<=0;lookup_wait<=0;
+        mbi<=0;col<=0;mrow<=0;blk<=0;timeout<=0;emit<=0;wait_store<=0;pixel_setup<=0;residual_load<=0;residual_load_wait<=0;ei<=0;
         pred_direction<=0;tap_index<=0;pred_sum<=0;forward_prediction<=0;out_reg<=0;tap_byte_sel<=0;
         read_seen<=0;sample_nonzero<=0;half_sample_seen<=0;reconstructed_seen<=0;persisted_seen<=0;row_persisted<=0;error<=0;error_source<=0;
         row_motion_base<=0;row_motion_end<=0;exec_row<=0;row_final_latched<=0;
-        for(i=0;i<8;i=i+1)resrows[i]<=0;
     end else begin
         row_persisted<=0;
         if(capture_enable&&sideband_valid) begin

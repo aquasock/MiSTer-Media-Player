@@ -1,5 +1,3 @@
-    end
-endfunction
 function automatic [28:0] pixel_addr;
     input [28:0] off; input [2:0] b; input [11:0] x; input [11:0] y;
     begin
@@ -75,15 +73,13 @@ reg row_final_latched;
 
 reg pending,started;
 reg future_bank_latched;
-reg req,waitresp,req_kind,lookup_wait;
+reg req,waitresp,lookup_wait;
 reg [10:0] mbi;
 reg [5:0] col,mrow;
 reg [2:0] blk;
 reg [25:0] timeout;
-reg [63:0] resrows [0:7];
 reg emit,wait_store,pixel_setup,residual_load,residual_load_wait;
 reg [5:0] ei;
-reg [2:0] verify_row;
 reg pred_direction;
 reg [1:0] tap_index;
 // kate - Commit 182 timing closure.  src_x_tap[2:0] selects the byte of the
@@ -97,7 +93,6 @@ reg [2:0] tap_byte_sel;
 reg [10:0] pred_sum;
 reg [7:0] forward_prediction;
 reg [7:0] out_reg;
-integer i;
 
 wire [28:0] future_off=future_bank_latched?BANK_OFF:29'd0;
 wire [28:0] past_off=future_bank_latched?29'd0:BANK_OFF;

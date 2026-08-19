@@ -241,14 +241,12 @@ module tb_h262_p_intra_macroblocks;
         engine_dout_ready<=0;
         engine_block_stored<=engine_store_complete;
         if(engine_rd) begin
+            if(raster_engine.wait_store)
+                $fatal(1,"P engine issued a post-write verification read");
             engine_dout_ready<=1;
-            if(raster_engine.req_kind)
-                engine_dout<=raster_engine.resrows[raster_engine.verify_row];
-            else begin
-                engine_dout<={8{8'd50}};
-                if(is_intra_mb(raster_engine.mbi))
-                    $fatal(1,"intra macroblock issued a reference read");
-            end
+            engine_dout<={8{8'd50}};
+            if(is_intra_mb(raster_engine.mbi))
+                $fatal(1,"intra macroblock issued a reference read");
         end
         if(engine_store_valid&&is_intra_mb(raster_engine.mbi)) begin
             intra_store_samples<=intra_store_samples+1;

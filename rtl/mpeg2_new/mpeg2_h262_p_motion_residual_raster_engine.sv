@@ -15,7 +15,7 @@
 // Commit 199 error_source is first-fault-only: 1 sample order, 2 motion
 // metadata, 3/4/5 wide descriptor, 6 legacy descriptor, 7 terminator,
 // 8 unknown metadata, 9 admission, 10 timeout, 11 motion range, 12 source
-// bounds, 13 unexpected DDR response, 14 readback, 15 descriptor count,
+// bounds, 13 unexpected DDR response, 14 reserved, 15 descriptor count,
 // 16 motion count.
 //============================================================================
 module mpeg2_h262_p_motion_residual_raster_engine
@@ -118,26 +118,6 @@ function automatic [28:0] r45;
     end
 endfunction
 
-function automatic [28:0] block_addr;
-    input [28:0] off;
-    input [5:0] c;
-    input [5:0] mr;
-    input [2:0] b;
-    input [2:0] rr;
-    reg [11:0] lr,lw,cr;
-    begin
-        if(b<4) begin
-            lr=({6'd0,mr}<<4)+{8'd0,b[1],rr};
-            lw=({6'd0,c}<<1)+{11'd0,b[0]};
-            block_addr=Y_BASE+off+r90(lr)+{17'd0,lw};
-        end else begin
-            cr=({6'd0,mr}<<3)+{9'd0,rr};
-            block_addr=(b==4?CB_BASE:CR_BASE)+
-                       off+r45(cr)+{20'd0,c};
-        end
-    end
-endfunction
-
 function automatic [28:0] pixel_addr;
     input [28:0] off;
     input [2:0] b;
@@ -228,24 +208,20 @@ reg [5:0] exec_row;
 reg row_final_latched;
 
 reg pending, started;
-reg reference_bank_latched, destination_bank_latched;
-reg req, waitresp, req_kind, lookup_wait;
+reg reference_bank_latched;
+reg req, waitresp, lookup_wait;
 reg [10:0] mbi;
 reg [5:0] col, mrow;
 reg [2:0] blk;
 reg [23:0] timeout;
-reg [63:0] resrows [0:7];
 reg emit, wait_store, pixel_setup, motion_load;
 reg residual_load, residual_load_wait;
 reg [5:0] ei;
-reg [2:0] verify_row;
 reg [1:0] tap_index;
 reg [10:0] pred_sum;
 reg [7:0] out_reg;
-integer i;
 
 wire [28:0] roff=reference_bank_latched?BANK_OFF:0;
-wire [28:0] doff=destination_bank_latched?BANK_OFF:0;
 wire [2:0] er=ei[5:3], el=ei[2:0];
 
 wire signed [7:0] exec_mvx =
@@ -357,8 +333,7 @@ wire residual_hit=descriptor_position_hit&&
 // Block boundaries retain the staged residual_load path so descriptor changes
 // still receive the full RAM read latency.
 wire residual_read_ahead=
-    (pixel_setup||lookup_wait||(req&&!req_kind)||
-     (waitresp&&!req_kind)||emit)&&(ei!=6'd63);
+    (pixel_setup||lookup_wait||req||waitresp||emit)&&(ei!=6'd63);
 wire [5:0] residual_read_index=
     residual_read_ahead ? (ei+1'b1) : ei;
 wire [16:0] residual_mem_index=
@@ -401,13 +376,11 @@ wire [11:0] lookup_src_y=
     lookup_advance?next_src_y_tap:src_y_tap;
 
 assign ddram_burstcnt=req?8'd1:0;
-assign ddram_addr=req ?
-    (req_kind ? block_addr(doff,col,mrow,blk,verify_row)
-              : pixel_addr(roff,blk,src_x_tap,src_y_tap)) :
+assign ddram_addr=req ? pixel_addr(roff,blk,src_x_tap,src_y_tap) :
     prediction_lookup ? pixel_addr(roff,blk,lookup_src_x,lookup_src_y) :
     29'd0;
 assign ddram_rd=req;
-assign ddram_cacheable=(req&&!req_kind)||prediction_lookup;
+assign ddram_cacheable=req||prediction_lookup;
 assign ddram_lookup_request=prediction_lookup;
 assign ddram_lookup_consume=
     lookup_wait&&ddram_lookup_ready&&ddram_lookup_hit;
@@ -467,10 +440,8 @@ always @(posedge clk) begin
         started<=0;
         active<=0;
         reference_bank_latched<=0;
-        destination_bank_latched<=0;
         req<=0;
         waitresp<=0;
-        req_kind<=0;
         lookup_wait<=0;
         mbi<=0;
         col<=0;
@@ -484,7 +455,6 @@ always @(posedge clk) begin
         residual_load<=0;
         residual_load_wait<=0;
         ei<=0;
-        verify_row<=0;
         tap_index<=0;
         pred_sum<=0;
         out_reg<=0;
@@ -504,8 +474,6 @@ always @(posedge clk) begin
         row_motion_end<=0;
         exec_row<=0;
         row_final_latched<=0;
-        for(i=0;i<8;i=i+1)
-            resrows[i]<=0;
     end else begin
         row_persisted<=0;
         if(new_picture_metadata) begin
@@ -541,7 +509,6 @@ always @(posedge clk) begin
             row_final_latched<=0;
             blk<=0;
             ei<=0;
-            verify_row<=0;
             half_sample_seen<=0;
         end else if(capture_enable&&residual_valid) begin
             if(progress_stage==4'd0)
@@ -661,7 +628,6 @@ always @(posedge clk) begin
             started<=1;
             active<=1;
             reference_bank_latched<=reference_bank;
-            destination_bank_latched<=destination_bank;
             timeout<=24'hffffff;
             mbi<=row_motion_base;
             col<=0;
@@ -738,7 +704,6 @@ always @(posedge clk) begin
                 timeout<=0;
             end else begin
                 if(half_x||half_y) half_sample_seen<=1;
-                req_kind<=0;
                 lookup_wait<=1;
             end
         end
@@ -777,84 +742,20 @@ always @(posedge clk) begin
                 if(!error) error_source<=5'd13;
             end else begin
                 waitresp<=0;
-                if(!req_kind) begin
-                    if(progress_stage<4'd3)
-                        progress_stage<=4'd3;
-                    if(tap_last) begin
-                        out_reg<=reconstructed_current;
-                        emit<=1;
-                        if((mbi==0)&&(blk==0)&&(ei==0)) begin
-                            read_seen<=1;
-                            sample_value<=predicted_current;
-                            sample_nonzero<=|predicted_current;
-                        end
-                    end else begin
-                        pred_sum<=pred_sum_with_current;
-                        tap_index<=tap_index+1'b1;
-                        req<=1;
+                if(progress_stage<4'd3)
+                    progress_stage<=4'd3;
+                if(tap_last) begin
+                    out_reg<=reconstructed_current;
+                    emit<=1;
+                    if((mbi==0)&&(blk==0)&&(ei==0)) begin
+                        read_seen<=1;
+                        sample_value<=predicted_current;
+                        sample_nonzero<=|predicted_current;
                     end
                 end else begin
-                    if(progress_stage<4'd6)
-                        progress_stage<=4'd6;
-                    if(ddram_dout!=resrows[verify_row]) begin
-                        error<=1;
-                        if(!error) error_source<=5'd14;
-                    end
-                    if((mbi==0)&&(blk==0)&&(verify_row==0))
-                        persisted_value<=ddram_dout[7:0];
-                    if(verify_row==3'd7) begin
-                        if(residual_hit)
-                            exec_desc_slot<=exec_desc_slot+1'b1;
-                        if(blk==3'd5) begin
-                            if(col+1'b1>=mb_width) begin
-                                if((exec_desc_slot+
-                                    (residual_hit?1'b1:1'b0))!=desc_count)
-                                begin
-                                    error<=1;
-                                    if(!error) error_source<=5'd15;
-                                end
-                                if(mbi+1'b1!=row_motion_end)
-                                begin
-                                    error<=1;
-                                    if(!error) error_source<=5'd16;
-                                end
-                                row_persisted<=1;
-                                active<=0;
-                                timeout<=0;
-                                if(row_final_latched) begin
-                                    persisted_seen<=1;
-                                    progress_stage<=4'd7;
-                                    reconstructed_seen<=1;
-                                end else begin
-                                    started<=0;
-                                    metadata_done<=0;
-                                    desc_count<=0;
-                                    last_desc_word<=0;
-                                    current_desc_slot<=0;
-                                    desc_active<=0;
-                                    wide_desc_pending<=0;
-                                    sample_expected<=0;
-                                    exec_desc_slot<=0;
-                                    row_motion_base<=row_motion_end;
-                                    exec_row<=exec_row+1'b1;
-                                    row_final_latched<=0;
-                                end
-                            end else begin
-                                mbi<=mbi+1'b1;
-                                col<=col+1'b1;
-                                blk<=0;
-                                ei<=0;
-                                motion_load<=1;
-                            end
-                        end else begin
-                            blk<=blk+1'b1;
-                            ei<=0;
-                            residual_load<=1;
-                        end
-                    end else begin
-                        verify_row<=verify_row+1'b1;
-                        req<=1;
-                    end
+                    pred_sum<=pred_sum_with_current;
+                    tap_index<=tap_index+1'b1;
+                    req<=1;
                 end
             end
         end
@@ -862,9 +763,10 @@ always @(posedge clk) begin
         if(emit) begin
             if(progress_stage<4'd4)
                 progress_stage<=4'd4;
-            resrows[er][{el,3'b000}+:8]<=out_reg;
-            if((mbi==0)&&(blk==0)&&(ei==0))
+            if((mbi==0)&&(blk==0)&&(ei==0)) begin
                 reconstructed_value<=out_reg;
+                persisted_value<=out_reg;
+            end
             emit<=0;
             if(ei==6'd63) begin
                 wait_store<=1;
@@ -873,7 +775,6 @@ always @(posedge clk) begin
                 pred_sum<=0;
                 tap_index<=0;
                 if(next_pixel_lookup) begin
-                    req_kind<=0;
                     lookup_wait<=1;
                 end else begin
                     pixel_setup<=1;
@@ -882,12 +783,59 @@ always @(posedge clk) begin
         end
 
         if(wait_store&&store_block_stored) begin
+            // Entry 233: block_stored is the writer's all-eight-rows-accepted
+            // barrier. Prediction reads the opposite reference bank, so a
+            // destination readback adds no dependency or reconstructed data.
             if(progress_stage<4'd5)
                 progress_stage<=4'd5;
             wait_store<=0;
-            req_kind<=1;
-            verify_row<=0;
-            req<=1;
+            if(residual_hit)
+                exec_desc_slot<=exec_desc_slot+1'b1;
+            if(blk==3'd5) begin
+                if(col+1'b1>=mb_width) begin
+                    if((exec_desc_slot+(residual_hit?1'b1:1'b0))!=desc_count)
+                    begin
+                        error<=1;
+                        if(!error) error_source<=5'd15;
+                    end
+                    if(mbi+1'b1!=row_motion_end)
+                    begin
+                        error<=1;
+                        if(!error) error_source<=5'd16;
+                    end
+                    row_persisted<=1;
+                    active<=0;
+                    timeout<=0;
+                    if(row_final_latched) begin
+                        persisted_seen<=1;
+                        progress_stage<=4'd7;
+                        reconstructed_seen<=1;
+                    end else begin
+                        started<=0;
+                        metadata_done<=0;
+                        desc_count<=0;
+                        last_desc_word<=0;
+                        current_desc_slot<=0;
+                        desc_active<=0;
+                        wide_desc_pending<=0;
+                        sample_expected<=0;
+                        exec_desc_slot<=0;
+                        row_motion_base<=row_motion_end;
+                        exec_row<=exec_row+1'b1;
+                        row_final_latched<=0;
+                    end
+                end else begin
+                    mbi<=mbi+1'b1;
+                    col<=col+1'b1;
+                    blk<=0;
+                    ei<=0;
+                    motion_load<=1;
+                end
+            end else begin
+                blk<=blk+1'b1;
+                ei<=0;
+                residual_load<=1;
+            end
         end
     end
 end

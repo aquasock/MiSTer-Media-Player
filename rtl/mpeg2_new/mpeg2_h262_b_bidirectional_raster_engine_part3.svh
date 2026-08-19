@@ -76,7 +76,6 @@
             end else if(!phase_bounds_ok)begin error<=1;if(!error)error_source<=5'd11;active<=0;persisted_seen<=1;timeout<=0;end
             else begin
                 if(half_x||half_y)half_sample_seen<=1;
-                req_kind<=0;
                 lookup_wait<=1;
             end
         end
@@ -123,54 +122,33 @@
             if(!waitresp)begin error<=1;if(!error)error_source<=5'd12;end
             else begin
                 waitresp<=0;
-                if(!req_kind) begin
-                    if(tap_last) begin
-                        if((exec_direction==2'd3)&&!pred_direction) begin
-                            forward_prediction<=selected_prediction;pred_direction<=1;pred_sum<=0;tap_index<=0;
-                            phase_mvx<=exec_bmvx;phase_mvy<=exec_bmvy;
-                            phase_backward<=1;
-                            phase_base_addr<=bidir_prelaunch_addr;
-                            phase_base_byte<=bidir_prelaunch_byte;
-                            phase_bounds_ok<=bidir_prelaunch_valid;
-                            if(bidir_early_lookup) begin
-                                if(early_half_x||early_half_y)
-                                    half_sample_seen<=1;
-                                lookup_wait<=1;
-                            end else begin
-                                pixel_setup<=1;
-                            end
+                if(tap_last) begin
+                    if((exec_direction==2'd3)&&!pred_direction) begin
+                        forward_prediction<=selected_prediction;pred_direction<=1;pred_sum<=0;tap_index<=0;
+                        phase_mvx<=exec_bmvx;phase_mvy<=exec_bmvy;
+                        phase_backward<=1;
+                        phase_base_addr<=bidir_prelaunch_addr;
+                        phase_base_byte<=bidir_prelaunch_byte;
+                        phase_bounds_ok<=bidir_prelaunch_valid;
+                        if(bidir_early_lookup) begin
+                            if(early_half_x||early_half_y)
+                                half_sample_seen<=1;
+                            lookup_wait<=1;
                         end else begin
-                            out_reg<=reconstructed_current;emit<=1;
-                            if((mbi==0)&&(blk==0)&&(ei==0))begin read_seen<=1;sample_nonzero<=|final_prediction;end
+                            pixel_setup<=1;
                         end
-                    end else begin pred_sum<=pred_sum_with_current;tap_index<=tap_index+1'b1;req<=1;end
+                    end else begin
+                        out_reg<=reconstructed_current;emit<=1;
+                        if((mbi==0)&&(blk==0)&&(ei==0))begin read_seen<=1;sample_nonzero<=|final_prediction;end
+                    end
                 end else begin
-                    if(ddram_dout!=resrows[verify_row])begin error<=1;if(!error)error_source<=5'd13;end
-                    if(verify_row==7) begin
-                        if(residual_hit)exec_desc_slot<=exec_desc_slot+1'b1;
-                        if(blk==5) begin
-                            if(col+1'b1>=mb_width) begin
-                                if((exec_desc_slot+(residual_hit?1'b1:1'b0))!=desc_count)begin error<=1;if(!error)error_source<=5'd14;end
-                                if(mbi+1'b1!=row_motion_end)begin error<=1;if(!error)error_source<=5'd15;end
-                                row_persisted<=1;active<=0;timeout<=0;
-                                if(row_final_latched)begin persisted_seen<=1;reconstructed_seen<=1;end
-                                else begin
-                                    started<=0;metadata_done<=0;desc_count<=0;last_desc_word<=0;current_desc_slot<=0;
-                                    desc_active<=0;sample_expected<=0;exec_desc_slot<=0;row_motion_base<=row_motion_end;
-                                    exec_row<=exec_row+1'b1;row_final_latched<=0;
-                                end
-                            end else begin
-                                mbi<=mbi+1'b1;col<=col+1'b1;
-                                blk<=0;ei<=0;pred_direction<=0;motion_load<=1;
-                            end
-                        end else begin blk<=blk+1'b1;ei<=0;pred_direction<=0;residual_load<=1;end
-                    end else begin verify_row<=verify_row+1'b1;req<=1;end
+                    pred_sum<=pred_sum_with_current;tap_index<=tap_index+1'b1;req<=1;
                 end
             end
         end
 
         if(emit) begin
-            resrows[er][{el,3'b000}+:8]<=out_reg;emit<=0;
+            emit<=0;
             if(ei==63)wait_store<=1;
             else begin
                 ei<=ei+1'b1;
@@ -184,7 +162,6 @@
                 pred_sum<=0;
                 tap_index<=0;
                 if(next_pixel_early_lookup) begin
-                    req_kind<=0;
                     lookup_wait<=1;
                 end else begin
                     pixel_setup<=1;
@@ -192,7 +169,29 @@
             end
         end
 
-        if(wait_store&&store_block_stored)begin wait_store<=0;req_kind<=1;verify_row<=0;req<=1;end
+        if(wait_store&&store_block_stored) begin
+            // Entry 233: B output is display-only scratch. The writer's
+            // all-eight-rows-accepted pulse is the complete persistence
+            // barrier; rereading scratch cannot affect prediction.
+            wait_store<=0;
+            if(residual_hit)exec_desc_slot<=exec_desc_slot+1'b1;
+            if(blk==5) begin
+                if(col+1'b1>=mb_width) begin
+                    if((exec_desc_slot+(residual_hit?1'b1:1'b0))!=desc_count)begin error<=1;if(!error)error_source<=5'd14;end
+                    if(mbi+1'b1!=row_motion_end)begin error<=1;if(!error)error_source<=5'd15;end
+                    row_persisted<=1;active<=0;timeout<=0;
+                    if(row_final_latched)begin persisted_seen<=1;reconstructed_seen<=1;end
+                    else begin
+                        started<=0;metadata_done<=0;desc_count<=0;last_desc_word<=0;current_desc_slot<=0;
+                        desc_active<=0;sample_expected<=0;exec_desc_slot<=0;row_motion_base<=row_motion_end;
+                        exec_row<=exec_row+1'b1;row_final_latched<=0;
+                    end
+                end else begin
+                    mbi<=mbi+1'b1;col<=col+1'b1;
+                    blk<=0;ei<=0;pred_direction<=0;motion_load<=1;
+                end
+            end else begin blk<=blk+1'b1;ei<=0;pred_direction<=0;residual_load<=1;end
+        end
     end
 end
 endmodule

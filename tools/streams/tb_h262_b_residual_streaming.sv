@@ -89,11 +89,10 @@ module tb_h262_b_residual_streaming;
         ddram_dout_ready<=0;
         store_block_stored<=store_complete;
         if(ddram_rd) begin
+            if(raster.wait_store)
+                $fatal(1,"B engine issued a post-write verification read");
             ddram_dout_ready<=1;
-            if(raster.req_kind)
-                ddram_dout<=raster.resrows[raster.verify_row];
-            else
-                ddram_dout<={8{8'd50}};
+            ddram_dout<={8{8'd50}};
         end
 
         if(residual_store_write) begin

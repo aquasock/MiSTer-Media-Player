@@ -3,7 +3,7 @@
 // Entry 221: complete 72-picture I/P/B progression through the compiled
 // generalized P/B raster wrapper, active tagged DDR writer, request arbiter,
 // memory service, publication shell, and presentation scheduler.  The 128x96
-// source keeps the real pixel/readback work inexpensive while preserving the
+// source keeps the real pixel and accepted-write work inexpensive while preserving the
 // same 3-I/22-P/47-B repeated-GOP transaction sequence as the 720x480 stream.
 module tb_h262_live_raster_soak;
     localparam integer MAX_STREAM_BYTES=1048576;
@@ -368,10 +368,13 @@ module tb_h262_live_raster_soak;
                publication.p_header_count!=22||publication.p_publication_count!=22||
                publication.b_header_count!=47||publication.b_persist_count!=47||
                displayed_identity!=25||last_reference_temporal!=10'd23||
-               reference_writes==0||scratch0_writes==0||scratch1_writes==0||
+               reference_writes!=50688||scratch0_writes!=55296||
+               scratch1_writes!=52992||
                prediction.reference_cache.cache_hit_count==0||
                prediction.reference_cache.cache_hit_count<=
                 prediction.reference_cache.cache_miss_count||
+               prediction.reference_cache.uncached_count!=0||
+               memory_reads!=prediction.reference_cache.cache_miss_count||
                total_cycles>=17800000||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
