@@ -1,33 +1,4 @@
 ---
-## 192 COMMIT Unreleased 454336d 2026-08-17T16:09:53-07:00
-
-#### Coming From:
-
-Unreleased 6281359
-
-#### Purpose:
-
-Align reference-picture completion and settled prerequisite reporting with the generalized P publication path and the already accepted I/B modes.
-
-#### Outcome:
-
-Commit `454336d` exports second-reference completion from either the legacy I-only bookkeeper or the combined I/P publication count and suppresses P-only prerequisite sub-codes after the existing normal I/P/B acceptance result passes. Focused simulation proves generalized P persistence makes the second-reference result durable, preserves the legacy result, clears accepted I/P/B prerequisite reporting, and retains real-error priority. A clean Quartus 17.0.2 build completes with zero TNS, no Critical Warning, +0.466 ns global setup, +0.249 ns global hold, +1.959 ns decoder setup, 31,036 ALMs, 41,842 registers, 592,333 memory bits, 90 RAM blocks, 69 DSP blocks, and 3 PLLs. Qualified RBF `MediaPlayer_commit192_454336d.rbf` has SHA-256 `c2c45fa1fac3514362e8181c1513c4be1887329c5c9811c7f1ed072c06ec8404`; Audio project `fd90c77` remains integration-compatible.
-
-#### Next Steps:
-
-Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_p_visual_discriminator.m2v`, `test_i_baseline.m2v`, and `test_b_bidirectional.m2v` using the qualified RBF. Each accepted stream must match the I baseline with USER solid and no POWER or DISK code; the visual discriminator must retain its four quadrants and center seams.
-
-#### Files Modified:
-
-- MediaPlayer_top_07.svh
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
 ## 228 COMMIT Unreleased cd73cb7 2026-08-18T15:07:22-07:00
 
 #### Coming From:
@@ -164,6 +135,40 @@ Retain the hardware-proven in-block residual prefetch and accepted 25 fps presen
 
 - [x] Built
 - [x] Passed
+
+---
+## 232 COMMIT Unreleased ??? 2026-08-18T23:55:01-07:00
+
+#### Coming From:
+
+Unreleased 6ddeb82
+
+#### Purpose:
+
+Launch the next non-intra P/B reference lookup during the current pixel's otherwise idle emit or bidirectional handoff cycle so motion reconstruction bypasses the serialized pixel-setup state.
+
+#### Outcome:
+
+Entry 231 is hardware accepted at final source frame 71 with USER and POWER solid, 11 DISK blinks, and no new visible corruption. Frame-level review measures 7.864 seconds from the first fully visible frame 0 to frame 71, approximately 1.34 seconds and 14.5 percent faster than Entry 230's 9.2-second recording. The accepted exact soak completes in 19,229,996 cycles with unchanged DDR, cache, write, publication, and presentation identities. Updated profiling attributes 18,019,407 blocked cycles to decoding and 809,120 to presentation; active P/B raster work occupies 9,213,057 cycles. Entry 231 reduced residual-load staging to only 39,744 cycles, while `pixel_setup` now accounts for 405,504 P cycles and 1,382,400 B cycles. Except for the first sample at each block and intra reconstruction, the cache port is idle while this setup state validates coordinates and launches the first tap; B bidirectional pixels also return through setup between their forward and backward predictions. Issuing those already-known lookups during the preceding emit or forward-completion cycle exposes an upper bound of 1,768,032 removable setup cycles, or 9.19 percent of the full soak, without changing the cache response, miss, DDR, residual, block-store, verification, or presentation paths.
+
+#### Next Steps:
+
+Add explicit next-pixel and backward-direction first-tap addresses and bounds checks to the generalized P/B raster engines. Retain `pixel_setup` for every block start, intra pixel, and invalid-bounds fallback; otherwise issue the lookup during the preceding emit or bidirectional forward completion and enter `lookup_wait` directly. Require exact focused P-intra and B-residual samples and traffic, unchanged live-soak DDR/cache/write/publication counts, all 72 pictures, zero decoder or presentation errors, and a total below 17.8 million cycles. Run the complete long publication regression and the session-authorized incremental Quartus build only if the fitted decoder and video paths remain timing-clean.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- tools/streams/tb_h262_p_intra_macroblocks.sv
+- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
 
 ---
 ## 193 COMMIT Unreleased a42bb74 2026-08-17T16:38:38-07:00
