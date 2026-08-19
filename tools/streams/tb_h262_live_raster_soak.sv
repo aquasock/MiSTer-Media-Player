@@ -195,6 +195,7 @@ module tb_h262_live_raster_soak;
 
     mpeg2_h262_b_presentation_scheduler scheduler(
         .clk(clk),.reset(reset),.swap_window_pulse(swap_window_pulse),
+        .frame_rate_code(4'h3),
         .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
         .reference_frame_bank(reference_bank),.b_picture_start(b_picture_start),
         .non_b_picture_start(non_b_picture_start),.sequence_end(sequence_end),
@@ -371,7 +372,7 @@ module tb_h262_live_raster_soak;
                prediction.reference_cache.cache_hit_count==0||
                prediction.reference_cache.cache_hit_count<=
                 prediction.reference_cache.cache_miss_count||
-               total_cycles>=21500000||
+               total_cycles>=21800000||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
                presentation_error)

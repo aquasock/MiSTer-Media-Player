@@ -96,6 +96,7 @@ mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
     .clk                         (clk_mpeg2),
     .reset                       (reset_mpeg2),
     .swap_window_pulse           (mpeg2_new_swap_window_pulse),
+    .frame_rate_code             (mpeg2_new_frame_rate_code),
     .frame_waiting               (mpeg2_new_frame_waiting),
     .completed_frame_bank        (mpeg2_new_completed_frame_bank),
     .reference_frame_bank        (mpeg2_new_reference_frame_bank),

@@ -6,10 +6,12 @@ module tb_h262_b_presentation_scheduler;
     wire display_bank,display_scratch,display_scratch_bank,decode_scratch_bank;
     wire [2:0] reset_count;
     wire hold,complete,error;
+    integer last_pulse_count=0;
 
     always #5 clk=~clk;
     mpeg2_h262_b_presentation_scheduler dut(
         .clk(clk),.reset(reset),.swap_window_pulse(swap),
+        .frame_rate_code(4'h3),
         .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
         .reference_frame_bank(reference_bank),.b_picture_start(b_start),
         .non_b_picture_start(non_b_start),.sequence_end(sequence_end),
@@ -29,8 +31,27 @@ module tb_h262_b_presentation_scheduler;
     task automatic pulse_close;
         begin @(negedge clk);non_b_start<=1;@(negedge clk);non_b_start<=0;#1;end
     endtask
-    task automatic pulse_swap;
+    task automatic pulse_window;
         begin @(negedge clk);swap<=1;@(negedge clk);swap<=0;#1;end
+    endtask
+    task automatic pulse_swap;
+        reg before_display_scratch;
+        reg before_display_scratch_bank;
+        reg before_display_bank;
+        begin
+            before_display_scratch=display_scratch;
+            before_display_scratch_bank=display_scratch_bank;
+            before_display_bank=display_bank;
+            last_pulse_count=0;
+            while((display_scratch===before_display_scratch)&&
+                  (display_scratch_bank===before_display_scratch_bank)&&
+                  (display_bank===before_display_bank))begin
+                pulse_window();
+                last_pulse_count=last_pulse_count+1;
+                if(last_pulse_count>4)
+                    $fatal(1,"cadenced presentation did not advance");
+            end
+        end
     endtask
     task automatic reset_scheduler;
         begin
@@ -103,14 +124,26 @@ module tb_h262_b_presentation_scheduler;
         if(!hold)$fatal(1,"closed B run did not hold compressed input");
 
         pulse_swap();
+        if(last_pulse_count!=1)
+            $fatal(1,"first ready scratch missed immediate cadence slot");
         if(!display_scratch||display_scratch_bank)
             $fatal(1,"first swap did not present scratch 0");
         pulse_swap();
+        if(last_pulse_count!=3)
+            $fatal(1,"second scratch cadence=%0d expected=3",last_pulse_count);
         if(!display_scratch||!display_scratch_bank)
             $fatal(1,"second swap did not present scratch 1");
         pulse_swap();
+        if(last_pulse_count!=2)
+            $fatal(1,"future cadence=%0d expected=2",last_pulse_count);
         if(display_scratch||!display_bank||!complete||error||hold)
             $fatal(1,"future reference did not retire the B run");
+
+        // Starvation may make one presentation immediately eligible, but it
+        // must not bank enough credit for a consecutive-refresh catch-up.
+        repeat(5)pulse_window();
+        if(dut.cadence_credit!=dut.CADENCE_DUE_25FPS)
+            $fatal(1,"idle cadence credit did not saturate at one slot");
 
         // With no B owner, the following non-B header releases the queued
         // reference for the next swap rather than the publication swap.
@@ -122,6 +155,8 @@ module tb_h262_b_presentation_scheduler;
         pulse_close();
         if(!dut.pending_frame_released)$fatal(1,"non-B header did not release reference");
         pulse_swap();
+        if(last_pulse_count!=1)
+            $fatal(1,"late ordinary frame did not consume one saturated slot");
         if(display_scratch||display_bank||error)
             $fatal(1,"released ordinary reference did not display");
 
@@ -134,6 +169,9 @@ module tb_h262_b_presentation_scheduler;
         if(display_bank||!dut.pending_frame_valid||!dut.pending_frame_released)
             $fatal(1,"terminal boundary did not release final reference");
         pulse_swap();
+        if(last_pulse_count!=2)
+            $fatal(1,"terminal frame caught up after only %0d later windows",
+                   last_pulse_count);
         if(display_scratch||!display_bank||error)
             $fatal(1,"terminal reference did not display");
 
@@ -152,7 +190,7 @@ module tb_h262_b_presentation_scheduler;
         if(display_scratch||display_bank)
             $fatal(1,"ordinary frame presentation did not recover after abort");
 
-        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future ordinary=1 terminal=1 fail_open=1");
+        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=1,3,2 starvation=1 ordinary=1 terminal=1 fail_open=1");
         $finish;
     end
 

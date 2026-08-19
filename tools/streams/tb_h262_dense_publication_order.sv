@@ -109,6 +109,7 @@ module tb_h262_dense_publication_order;
 
     mpeg2_h262_b_presentation_scheduler scheduler(
         .clk(clk),.reset(reset),.swap_window_pulse(swap_window_pulse),
+        .frame_rate_code(4'h3),
         .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
         .reference_frame_bank(reference_bank),.b_picture_start(b_picture_start),
         .non_b_picture_start(non_b_picture_start),.sequence_end(sequence_end),

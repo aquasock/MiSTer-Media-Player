@@ -12,6 +12,7 @@ module mpeg2_h262_b_presentation_scheduler
     input  wire clk,
     input  wire reset,
     input  wire swap_window_pulse,
+    input  wire [3:0] frame_rate_code,
     input  wire frame_waiting,
     input  wire completed_frame_bank,
     input  wire reference_frame_bank,
@@ -39,6 +40,17 @@ reg future_frame_pending,future_frame_bank,future_reference_pending;
 reg scratch_presented;
 reg [1:0] run_picture_count;
 
+// Entry 230: the fixed 40 MHz 800x600 raster produces one swap window every
+// 1056*628 pixels.  For the current 25 fps compatibility boundary, accumulate
+// source-picture credit in pixel-clock units.  Saturating at the next due slot
+// prevents a decode stall from banking credit and replaying ready pictures on
+// consecutive refreshes.
+localparam [25:0] CADENCE_LIMIT_25FPS = 26'd40000000;
+localparam [25:0] CADENCE_STEP_25FPS  = 26'd16579200;
+localparam [25:0] CADENCE_DUE_25FPS =
+    CADENCE_LIMIT_25FPS-CADENCE_STEP_25FPS;
+reg [25:0] cadence_credit;
+
 wire b_user_success_edge=b_user_success&&!b_user_success_d;
 wire scratch_waiting=next_present_scratch_bank?scratch1_pending:scratch0_pending;
 wire future_waiting=future_frame_pending&&run_closed&&!decode_inflight&&
@@ -54,6 +66,9 @@ wire scheduled_frame_bank=future_waiting?future_frame_bank:
 wire scheduled_frame_differs=scheduled_frame_scratch?
     (!display_scratch||(scheduled_scratch_bank!=display_scratch_bank)):
     (display_scratch||(scheduled_frame_bank!=display_frame_bank));
+wire cadence_25fps=(frame_rate_code==4'h3);
+wire cadence_slot=!cadence_25fps||
+                  (cadence_credit>=CADENCE_DUE_25FPS);
 
 assign presentation_hold=reorder_active&&run_closed&&
                          !presentation_complete&&!presentation_error;
@@ -69,8 +84,18 @@ always @(posedge clk) begin
         future_frame_pending<=0;future_frame_bank<=0;
         future_reference_pending<=0;scratch_presented<=0;
         run_picture_count<=0;presentation_complete<=0;presentation_error<=0;
+        cadence_credit<=CADENCE_DUE_25FPS;
     end else begin
         b_user_success_d<=b_user_success;
+
+        if(swap_window_pulse)begin
+            if(!cadence_25fps)
+                cadence_credit<=CADENCE_DUE_25FPS;
+            else if(cadence_credit<CADENCE_DUE_25FPS)
+                cadence_credit<=cadence_credit+CADENCE_STEP_25FPS;
+            else
+                cadence_credit<=CADENCE_DUE_25FPS;
+        end
 
         // Entry 225: a reference publication is not display-order permission.
         // Hold it until the following accepted header proves whether a B run
@@ -173,7 +198,11 @@ always @(posedge clk) begin
             end else run_closed<=1;
         end
 
-        if(swap_window_pulse&&scheduled_frame_valid&&scheduled_frame_differs)begin
+        if(swap_window_pulse&&cadence_slot&&scheduled_frame_valid&&
+           scheduled_frame_differs)begin
+            if(cadence_25fps)
+                cadence_credit<=cadence_credit+CADENCE_STEP_25FPS-
+                                CADENCE_LIMIT_25FPS;
             display_scratch<=scheduled_frame_scratch;
             if(scheduled_frame_scratch)display_scratch_bank<=scheduled_scratch_bank;
             else display_frame_bank<=scheduled_frame_bank;
