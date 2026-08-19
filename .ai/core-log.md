@@ -1,32 +1,4 @@
 ---
-## 190 COMMIT Unreleased 2849c38 2026-08-17T15:03:19-07:00
-
-#### Coming From:
-
-Unreleased 06bce8f
-
-#### Purpose:
-
-Slow the settled diagnostic blink cadence by half so each reported code can be counted reliably on hardware.
-
-#### Outcome:
-
-Commit `2849c38` doubles each settled diagnostic lit and dark slot from 125 ms to 250 ms while preserving the one-second post-sequence settlement delay, numeric codes, non-overlapping windows, and decoder behavior. The complete report is now 32 seconds. The clean Quartus 17.0.2 build closes with zero setup TNS, +0.180 ns global setup, +1.492 ns decoder setup, 30,974 ALMs, 41,821 registers, and no Critical Warning.
-
-#### Next Steps:
-
-Rerun `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, and `test_p_visual_discriminator.m2v`. After the one-second settlement delay, observe one complete 32-second report: USER owns six seconds, POWER the next ten, and DISK the final sixteen. Record whether each window is solid, dark, or blinking and count any blinks; confirm the visual discriminator seams remain visible.
-
-#### Files Modified:
-
-- MediaPlayer_top_07.svh
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
 ## 191 COMMIT Unreleased 6281359 2026-08-17T15:21:56-07:00
 
 #### Coming From:
@@ -156,6 +128,37 @@ Retain the verified cache gain and treat decode throughput and display cadence a
 
 - [x] Built
 - [x] Passed
+
+---
+## 230 COMMIT Unreleased ??? 2026-08-18T17:10:35-07:00
+
+#### Coming From:
+
+Unreleased 6a4e935
+
+#### Purpose:
+
+Pace accepted 25 fps picture presentation against the fixed 800x600 display refresh so no decoded B picture is exposed for only one video frame.
+
+#### Outcome:
+
+The Entry 229 hardware recording confirms both the cache gain and a separate burst-and-hold presentation defect: source frames 0 through 71 complete in approximately 8.4 seconds rather than 9.9 seconds, while 0.1-second samples near completion show 63, 64, 65, 65, 66, 68, 68, 69, 69, 71. Static tracing shows that the scheduler can drain ready scratch-zero, scratch-one, and future-reference pictures on consecutive 800x600 vblank pulses, making an intermediate picture visible for only one approximately 16.6 ms refresh. Add a saturating rational cadence credit for the current 25 fps compatibility boundary, using the fixed 40 MHz, 1056-by-628 display timing to permit swaps at alternating two- and three-refresh intervals without accumulating catch-up credit during decode starvation. Apply the gate only to distinct ordinary, B-scratch, and future-reference display changes; retain transaction ownership, display order, completion, fatal recovery, and the existing compressed-stream hold contract.
+
+#### Next Steps:
+
+Extend the focused scheduler regression with timestamped scratch readiness and swap records, require scratch-zero, scratch-one, and future-reference order, require every distinct picture to persist until the next rational 25 fps slot, and prove that late readiness cannot trigger consecutive-refresh catch-up. Retain the publication-race, header-before-publication, ordinary release, terminal release, and fail-open cases; then run the exact DDR-backed 72-picture live-raster soak and long-GOP publication regression before the session-authorized incremental Quartus build. Deploy only if timing remains clean and the functional tests preserve all 72 pictures, final source frame 71, passing LEDs, and zero ownership or presentation errors.
+
+#### Files Modified:
+
+- MediaPlayer_top_05.svh
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
 
 ---
 ## 193 COMMIT Unreleased a42bb74 2026-08-17T16:38:38-07:00
