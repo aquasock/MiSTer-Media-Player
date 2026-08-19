@@ -237,34 +237,34 @@ Reload the deployed core and record `test_compat_long_gop.m2v` at 60 fps from th
 - [ ] Passed
 
 ---
-## 195 VERSION v0.5.0 56db0c4 2026-08-17T18:02:13-07:00
+## 235 COMMIT Unreleased ??? 2026-08-19T05:02:36-07:00
 
 #### Coming From:
 
-Unreleased b1bde49
+Unreleased c340da8
 
 #### Purpose:
 
-Publish the hardware-qualified 720x480 progressive 4:2:0 I/P/B and independently signaled P/B `f_code` 1-through-4 milestone as pre-release v0.5.0.
+Expand the shared P/B reference-word cache from four to eight fully associative entries to reduce B-picture replacement misses without changing registered lookup timing or decoded pixels.
 
 #### Outcome:
 
-Commit 194 passes the authoritative seven-stream hardware matrix with USER and POWER solid, DISK dark, and all decoded images accepted; the former nine-stream matrix is invalid for release qualification going forward. A fresh GitHub `master` clone at `424eec4` with no prior build products reproduces all seven deterministic stream hashes and completes Quartus Prime 17.0.2 with zero TNS, no Critical Warning, +0.387 ns setup, +0.207 ns hold, +2.012 ns decoder setup, 31,625 ALMs, 42,223 registers, 592,333 memory bits, 90 RAM blocks, 69 DSP blocks, and 3 PLLs. Its RBF is bit-identical to the already hardware-accepted Commit-194 artifact at SHA-256 `a3eeeb285c427f313987ce6c62cdef560d6293defb1841e96c66aab026d63d8e`. Commit `56db0c4` publishes the v0.5.0 README, changelog milestone, and release notes covering the 720x480 P/B envelope, independently signaled component `f_code` values 1 through 4, qualification evidence, and current limitations without changing decoder RTL; Audio project `fd90c77` remains integration-compatible.
+Entry 234 is hardware accepted: the 60 fps recordings show coherent sequential presentation through long-GOP frame 71 in 5.935 seconds and mixed-macroblock frame 23 in 2.093 seconds, with USER and POWER solid, DISK dark, and no partial-block flicker. These intervals are 0.85 and 2.39 percent faster than Entry 233, confirming a smaller hardware gain than the modeled 5.64 percent transform reduction. Passive cycle profiling attributes 5,681,329 live-engine cycles to reference lookup, request, and response states versus 1,271,168 cycles to pixel emission and block-store waits, with B prediction dominant. An external eight-entry prototype preserves every byte, picture, pixel-side event, write, swap, final identity, and zero-error assertion while reducing cache misses and physical reads from 463,835 to 372,220 and exact soak time from 15,739,996 to 15,249,996 cycles, reductions of 19.75 and 3.11 percent. The proposed commit will make that capacity change while retaining the registered lookup interface, transaction invalidation, cacheability rules, round-robin replacement, and single-outstanding DDR contract.
 
 #### Next Steps:
 
-Have the user create the annotated `v0.5.0` tag at exact release commit `56db0c4` and publish the GitHub pre-release titled `MiSTer Media Player v0.5.0`, attaching the qualified artifact as `MediaPlayer_20260817.rbf` with SHA-256 `a3eeeb285c427f313987ce6c62cdef560d6293defb1841e96c66aab026d63d8e`. Verify the remote tag, release flags, title, commit target, asset name, and asset digest after publication, then resume development under a fresh Unreleased boundary.
+Implement eight-entry cache storage and replacement, extend the focused cache regression through eight-way residency and ninth-word eviction, and tighten the exact live-soak read and cycle expectations. Then run the focused cache, P-intra, B-residual, B-intra, parser-window, live-raster, and complete long-GOP publication regressions before a session-authorized incremental Quartus build; timing must remain clean because cache comparison and selection are the only enlarged combinational cone.
 
 #### Files Modified:
 
-- README.md
-- CHANGELOG.md
-- docs/RELEASE_NOTES_v0.5.0.md
+- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
+- tools/streams/tb_h262_prediction_word_cache.sv
+- tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [x] Built
-- [x] Passed
+- [ ] Built
+- [ ] Passed
 
 ---
 ## 196 COMMIT Unreleased d26c37d 2026-08-17T18:46:15-07:00
