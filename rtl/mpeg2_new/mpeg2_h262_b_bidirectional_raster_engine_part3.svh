@@ -51,13 +51,19 @@
         end
         if(residual_load_wait)begin
             residual_load_wait<=0;pred_sum<=0;tap_index<=0;pixel_setup<=1;
+            phase_base_addr<=computed_phase_base_addr;
+            phase_base_byte<=src_base_x[2:0];
+            phase_row_words<=(blk<4)?7'd90:7'd45;
+            phase_bounds_ok<=source_bounds_ok;
         end
 
         if(pixel_setup||precompute_after_emit) begin
             bidir_prelaunch_addr<=precompute_bidir_addr;
+            bidir_prelaunch_byte<=precompute_bidir_src_x[2:0];
             bidir_prelaunch_valid<=
                 (exec_direction==2'd3)&&precompute_bidir_bounds_ok;
             next_prelaunch_addr<=precompute_next_addr;
+            next_prelaunch_byte<=precompute_next_src_x[2:0];
             next_prelaunch_valid<=
                 (exec_direction!=0)&&precompute_next_bounds_ok;
         end
@@ -67,7 +73,7 @@
             if(exec_direction==0)begin
                 if(!residual_hit)begin error<=1;if(!error)error_source<=5'd11;active<=0;persisted_seen<=1;timeout<=0;end
                 else begin out_reg<=reconstructed_intra;emit<=1;end
-            end else if(!source_bounds_ok)begin error<=1;if(!error)error_source<=5'd11;active<=0;persisted_seen<=1;timeout<=0;end
+            end else if(!phase_bounds_ok)begin error<=1;if(!error)error_source<=5'd11;active<=0;persisted_seen<=1;timeout<=0;end
             else begin
                 if(half_x||half_y)half_sample_seen<=1;
                 req_kind<=0;
@@ -84,6 +90,9 @@
                         pred_direction<=1;pred_sum<=0;tap_index<=0;
                         phase_mvx<=exec_bmvx;phase_mvy<=exec_bmvy;
                         phase_backward<=1;
+                        phase_base_addr<=bidir_prelaunch_addr;
+                        phase_base_byte<=bidir_prelaunch_byte;
+                        phase_bounds_ok<=bidir_prelaunch_valid;
                         if(bidir_early_lookup) begin
                             if(early_half_x||early_half_y)
                                 half_sample_seen<=1;
@@ -108,7 +117,7 @@
         // kate - Commit 182: latch the returned-word byte select in the same
         // cycle the address is presented to DDR, so both come from one
         // evaluation of src_x_tap.
-        if(req&&!ddram_busy)begin req<=0;waitresp<=1;tap_byte_sel<=src_x_tap[2:0];end
+        if(req&&!ddram_busy)begin req<=0;waitresp<=1;tap_byte_sel<=phase_tap_byte;end
 
         if(ddram_dout_ready) begin
             if(!waitresp)begin error<=1;if(!error)error_source<=5'd12;end
@@ -120,6 +129,9 @@
                             forward_prediction<=selected_prediction;pred_direction<=1;pred_sum<=0;tap_index<=0;
                             phase_mvx<=exec_bmvx;phase_mvy<=exec_bmvy;
                             phase_backward<=1;
+                            phase_base_addr<=bidir_prelaunch_addr;
+                            phase_base_byte<=bidir_prelaunch_byte;
+                            phase_bounds_ok<=bidir_prelaunch_valid;
                             if(bidir_early_lookup) begin
                                 if(early_half_x||early_half_y)
                                     half_sample_seen<=1;
@@ -166,6 +178,9 @@
                 phase_mvx<=(exec_direction==2'd2)?exec_bmvx:exec_fmvx;
                 phase_mvy<=(exec_direction==2'd2)?exec_bmvy:exec_fmvy;
                 phase_backward<=(exec_direction==2'd2);
+                phase_base_addr<=next_prelaunch_addr;
+                phase_base_byte<=next_prelaunch_byte;
+                phase_bounds_ok<=next_prelaunch_valid;
                 pred_sum<=0;
                 tap_index<=0;
                 if(next_pixel_early_lookup) begin

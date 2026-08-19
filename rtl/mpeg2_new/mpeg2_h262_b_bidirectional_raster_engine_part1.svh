@@ -52,7 +52,12 @@ wire signed [7:0] mb_bmvy=$signed(motion_word[7:0]);
 (* preserve *) reg signed [7:0] phase_mvx,phase_mvy;
 (* preserve *) reg phase_backward;
 (* preserve *) reg [28:0] bidir_prelaunch_addr,next_prelaunch_addr;
+(* preserve *) reg [2:0] bidir_prelaunch_byte,next_prelaunch_byte;
 (* preserve *) reg bidir_prelaunch_valid,next_prelaunch_valid;
+(* preserve *) reg [28:0] phase_base_addr;
+(* preserve *) reg [2:0] phase_base_byte;
+(* preserve *) reg [6:0] phase_row_words;
+(* preserve *) reg phase_bounds_ok;
 
 // Commit 203: descriptors use synchronous M10K storage while P and B share
 // the 2048-block sparse spatial-sample RAM in their parent wrapper.

@@ -130,6 +130,8 @@ wire signed [13:0] next_src_y_tap_signed=
 wire [11:0] next_src_x_tap=next_src_x_tap_signed[11:0];
 wire [11:0] next_src_y_tap=next_src_y_tap_signed[11:0];
 wire [28:0] selected_reference_off=phase_backward?future_off:past_off;
+wire [28:0] computed_phase_base_addr=pixel_addr(
+    selected_reference_off,blk,src_base_x[11:0],src_base_y[11:0]);
 
 wire residual_hit=(exec_desc_slot<desc_count)&&
     (desc_word[13:3]==mbi)&&
@@ -161,7 +163,9 @@ wire [7:0] bidir_prediction=bidir_sum[8:1];
 wire [7:0] final_prediction=(exec_direction==2'd3)?bidir_prediction:selected_prediction;
 wire [7:0] reconstructed_current=clip(final_prediction,residual_pel);
 wire [7:0] reconstructed_intra=clip(8'd0,residual_pel);
-wire [7:0] lookup_tap_sample=bat(ddram_lookup_data,src_x_tap[2:0]);
+wire [3:0] phase_tap_byte_sum={1'b0,phase_base_byte}+tap_dx;
+wire [2:0] phase_tap_byte=phase_tap_byte_sum[2:0];
+wire [7:0] lookup_tap_sample=bat(ddram_lookup_data,phase_tap_byte);
 wire [10:0] lookup_pred_sum_with_current=pred_sum+{3'd0,lookup_tap_sample};
 wire [7:0] lookup_selected_prediction=
     round_prediction(lookup_pred_sum_with_current,half_x,half_y);
@@ -175,19 +179,20 @@ wire [7:0] lookup_reconstructed_current=
 wire lookup_advance=lookup_wait&&ddram_lookup_ready&&
     ddram_lookup_hit&&!tap_last;
 wire prediction_lookup=
-    (pixel_setup&&(exec_direction!=0)&&source_bounds_ok)||lookup_advance||
+    (pixel_setup&&(exec_direction!=0)&&phase_bounds_ok)||lookup_advance||
     early_lookup;
-wire [11:0] lookup_src_x=
-    lookup_advance?next_src_x_tap:src_x_tap;
-wire [11:0] lookup_src_y=
-    lookup_advance?next_src_y_tap:src_y_tap;
-wire [28:0] normal_lookup_addr=
-    pixel_addr(selected_reference_off,blk,lookup_src_x,lookup_src_y);
+wire address_tap_dx=lookup_advance?next_tap_dx:tap_dx;
+wire address_tap_dy=lookup_advance?next_tap_dy:tap_dy;
+wire [3:0] address_tap_byte_sum=
+    {1'b0,phase_base_byte}+address_tap_dx;
+wire [28:0] normal_lookup_addr=phase_base_addr+
+    (address_tap_dy?{22'd0,phase_row_words}:29'd0)+
+    {28'd0,address_tap_byte_sum[3]};
 
 assign ddram_burstcnt=req?8'd1:8'd0;
 assign ddram_addr=req?
     (req_kind?block_addr(scratch_bank_latched,col,mrow,blk,verify_row):
-              pixel_addr(selected_reference_off,blk,src_x_tap,src_y_tap)):
+              normal_lookup_addr):
     prediction_lookup?
         (early_lookup?early_lookup_addr:normal_lookup_addr):29'd0;
 assign ddram_rd=req;
@@ -234,7 +239,10 @@ always @(posedge clk) begin
         exec_direction<=0;exec_fmvx<=0;exec_fmvy<=0;exec_bmvx<=0;exec_bmvy<=0;
         phase_mvx<=0;phase_mvy<=0;phase_backward<=0;
         bidir_prelaunch_addr<=0;next_prelaunch_addr<=0;
+        bidir_prelaunch_byte<=0;next_prelaunch_byte<=0;
         bidir_prelaunch_valid<=0;next_prelaunch_valid<=0;
+        phase_base_addr<=0;phase_base_byte<=0;phase_row_words<=0;
+        phase_bounds_ok<=0;
         desc_count<=0;last_desc_word<=0;current_desc_slot<=0;desc_active<=0;sample_expected<=0;metadata_done<=0;exec_desc_slot<=0;
         pending<=0;started<=0;active<=0;future_bank_latched<=0;scratch_bank_latched<=0;req<=0;waitresp<=0;req_kind<=0;lookup_wait<=0;
         mbi<=0;col<=0;mrow<=0;blk<=0;timeout<=0;emit<=0;wait_store<=0;pixel_setup<=0;residual_load<=0;residual_load_wait<=0;ei<=0;verify_row<=0;
