@@ -130,7 +130,7 @@ Retain the verified cache gain and treat decode throughput and display cadence a
 - [x] Passed
 
 ---
-## 230 COMMIT Unreleased ??? 2026-08-18T17:10:35-07:00
+## 230 COMMIT Unreleased 1177e26 2026-08-18T17:10:35-07:00
 
 #### Coming From:
 
@@ -142,22 +142,23 @@ Pace accepted 25 fps picture presentation against the fixed 800x600 display refr
 
 #### Outcome:
 
-The Entry 229 hardware recording confirms both the cache gain and a separate burst-and-hold presentation defect: source frames 0 through 71 complete in approximately 8.4 seconds rather than 9.9 seconds, while 0.1-second samples near completion show 63, 64, 65, 65, 66, 68, 68, 69, 69, 71. Static tracing shows that the scheduler can drain ready scratch-zero, scratch-one, and future-reference pictures on consecutive 800x600 vblank pulses, making an intermediate picture visible for only one approximately 16.6 ms refresh. Add a saturating rational cadence credit for the current 25 fps compatibility boundary, using the fixed 40 MHz, 1056-by-628 display timing to permit swaps at alternating two- and three-refresh intervals without accumulating catch-up credit during decode starvation. Apply the gate only to distinct ordinary, B-scratch, and future-reference display changes; retain transaction ownership, display order, completion, fatal recovery, and the existing compressed-stream hold contract.
+The Entry 229 hardware recording confirmed both the cache gain and a separate burst-and-hold presentation defect: source frames 0 through 71 completed in approximately 8.4 seconds rather than 9.9 seconds, while 0.1-second samples near completion showed 63, 64, 65, 65, 66, 68, 68, 69, 69, 71. Commit 1177e26 adds a saturating rational cadence credit for frame-rate code 3 only, using the fixed 40 MHz, 1056-by-628 display timing to pace distinct ordinary, B-scratch, and future-reference swaps at 25 fps; starvation saturates at one pending slot so late readiness cannot cause catch-up bursts, while non-25-fps behavior remains immediate. The focused scheduler regression passed scratch-zero, scratch-one, and future-reference order with cadence intervals 1, 3, and 2, starvation saturation, publication-race barriers, ordinary and terminal release, and fail-open recovery. The exact DDR-backed 72-picture live-raster soak passed in 21,729,996 cycles versus Entry 229's 21,249,996 cycles, a 480,000-cycle or 2.26 percent modeled pacing cost, with 71 swaps, final P temporal reference 23, unchanged cache and DDR traffic counts, and no read, reconstruction, presentation, or ownership error. The full 720-by-480 long-GOP regression passed all 72 pictures, 25 publications and promotions, 47 B pictures, 25 display identities, and zero destination holds, overwrites, or presentation errors. The session-authorized incremental Quartus build completed in 9 minutes 26 seconds with zero errors, 121 standing warnings, no critical warning, +0.155 ns worst setup slack, +0.257 ns worst hold slack, +1.336 ns decoder-clock setup slack, +8.827 ns video-clock setup slack, and +14.821 ns decoder recovery slack. Utilization is 30,331 ALMs, 43,402 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and three PLLs. The 4,251,284-byte MediaPlayer_commit230_1177e26.rbf artifact has SHA-256 1cc79ae363145746fb3d94460f767b104777e82ab1e8adcbf84a4aac580be7e0; FTP upload and MiSTer readback produced the same digest.
 
 #### Next Steps:
 
-Extend the focused scheduler regression with timestamped scratch readiness and swap records, require scratch-zero, scratch-one, and future-reference order, require every distinct picture to persist until the next rational 25 fps slot, and prove that late readiness cannot trigger consecutive-refresh catch-up. Retain the publication-race, header-before-publication, ordinary release, terminal release, and fail-open cases; then run the exact DDR-backed 72-picture live-raster soak and long-GOP publication regression before the session-authorized incremental Quartus build. Deploy only if timing remains clean and the functional tests preserve all 72 pictures, final source frame 71, passing LEDs, and zero ownership or presentation errors.
+Reload the deployed core and run test_compat_long_gop.m2v once while recording the screen at 30 fps if possible. Report elapsed time from the first visible frame 0 to the first visible frame 71, the last frame, USER, POWER, and DISK LED states, and whether the prior burst-and-hold pattern is visibly reduced. The expected functional result remains frame 71, USER and POWER solid, and 11 DISK blinks; the pacing gate should make each presented picture persist for at least two display refreshes, with only a small total-load penalty rather than the earlier multi-second slowdown.
 
 #### Files Modified:
 
 - MediaPlayer_top_05.svh
 - rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 - tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_dense_publication_order.sv
 - tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
