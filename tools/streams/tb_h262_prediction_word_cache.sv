@@ -134,26 +134,30 @@ module tb_h262_prediction_word_cache;
         if((downstream_reads!=1)||(cache_hits!=1)||(cache_misses!=1))
             $fatal(1,"basic hit/miss accounting failed");
 
-        // Four interleaved reference words fit simultaneously.
+        // Eight interleaved reference words fit simultaneously.
         request_word(29'h00101,1'b1);
         request_word(29'h00102,1'b1);
         request_word(29'h00103,1'b1);
+        request_word(29'h00104,1'b1);
+        request_word(29'h00105,1'b1);
+        request_word(29'h00106,1'b1);
+        request_word(29'h00107,1'b1);
         request_word(29'h00100,1'b1);
-        if((downstream_reads!=4)||(cache_hits!=2)||(cache_misses!=4))
-            $fatal(1,"four-entry interleave failed");
+        if((downstream_reads!=8)||(cache_hits!=2)||(cache_misses!=8))
+            $fatal(1,"eight-entry interleave failed");
 
         // Round-robin replacement evicts the oldest entry.
-        request_word(29'h00104,1'b1);
+        request_word(29'h00108,1'b1);
         request_word(29'h00100,1'b1);
-        if((downstream_reads!=6)||(cache_misses!=6))
+        if((downstream_reads!=10)||(cache_misses!=10))
             $fatal(1,"replacement did not miss as expected");
 
         // Verification traffic always bypasses and never fills.
         request_word(29'h00200,1'b0);
         request_word(29'h00200,1'b0);
         request_word(29'h00200,1'b1);
-        if((downstream_reads!=9)||(uncached_reads!=2)||
-           (cache_misses!=7))
+        if((downstream_reads!=13)||(uncached_reads!=2)||
+           (cache_misses!=11))
             $fatal(1,"uncached bypass/fill separation failed");
 
         // Invalidation prevents stale reference-bank reuse.
@@ -161,7 +165,7 @@ module tb_h262_prediction_word_cache;
         repeat(2)@(posedge clk);
         active=1;
         request_word(29'h00100,1'b1);
-        if((downstream_reads!=10)||(cache_misses!=8))
+        if((downstream_reads!=14)||(cache_misses!=12))
             $fatal(1,"transaction invalidation failed");
 
         // A held downstream busy and a delayed response preserve the request.
@@ -178,7 +182,7 @@ module tb_h262_prediction_word_cache;
                 downstream_busy=0;
             end
         join
-        if((downstream_reads!=11)||(cache_misses!=9))
+        if((downstream_reads!=15)||(cache_misses!=13))
             $fatal(1,"backpressure/delayed response failed");
 
         $display("PREDICTION_WORD_CACHE_RESULT hits=%0d misses=%0d uncached=%0d downstream=%0d",
