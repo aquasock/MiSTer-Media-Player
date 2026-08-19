@@ -184,8 +184,24 @@ always @(posedge clk_video or posedge reset_request) begin
 		reset_video_sync <= {reset_video_sync[1:0], 1'b0};
 end
 
-wire reset_mpeg2 = reset_mpeg2_sync[2];
+wire reset_mpeg2_base = reset_mpeg2_sync[2];
 wire reset_video = reset_video_sync[2];
+
+// Entry 237: every ioctl_download rising edge is a new elementary-stream
+// session.  Rearm all MPEG-domain state for the same behavior as a first load,
+// while leaving the dual-clock FIFO and video timing on their existing reset
+// boundaries.  The rearm output is also an input-read gate below, preventing
+// the first newly visible FIFO byte from being consumed on a reset edge.
+wire mpeg2_download_rearm_reset;
+mpeg2_h262_download_rearm mpeg2_h262_download_rearm
+(
+	.clk            (clk_mpeg2),
+	.reset          (reset_request),
+	.download_async (ioctl_download),
+	.rearm_reset    (mpeg2_download_rearm_reset)
+);
+
+wire reset_mpeg2 = reset_mpeg2_base || mpeg2_download_rearm_reset;
 
 // kate - Phase 1Ob: the streaming H.262 bitreader continues to own input
 // backpressure while picture_data() advances across every slice of the first
@@ -208,6 +224,7 @@ assign mpeg2_stream_wr =
 // picture header has been consumed and classified.  It never blocks the header
 // needed to distinguish a consecutive P from a following B.
 assign mpeg2_new_stream_ready =
+	!mpeg2_download_rearm_reset &&
 	mpeg2_new_decoder_stream_ready &&
 	!mpeg2_new_b_presentation_hold &&
 	!mpeg2_new_p_destination_ownership_hold;
