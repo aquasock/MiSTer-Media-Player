@@ -1,39 +1,4 @@
 ---
-## 228 COMMIT Unreleased cd73cb7 2026-08-18T15:07:22-07:00
-
-#### Coming From:
-
-Unreleased 302bb3e
-
-#### Purpose:
-
-Raise generalized P/B long-GOP decode throughput from the observed four-frame-per-second hardware rate to at least the encoded 25-frame-per-second rate without changing reconstructed pixels or display order.
-
-#### Outcome:
-
-The uploaded 21.165-second hardware capture proves monotonic presentation through source frame 71 but requires approximately 18 seconds for a 72-frame, 25 fps stream whose encoded duration is 2.88 seconds, identifying decoder backpressure rather than camera aliasing or intentional presentation pacing. Commit `cd73cb7` adds a four-entry fully associative cache at the shared P/B reference-read boundary, permits only prediction reads to hit or fill, keeps destination verification traffic uncached, and invalidates the cache outside each raster transaction so rewritten reference banks cannot return stale words. The focused cache regression passes misses, repeated and interleaved hits, replacement, uncached bypass, invalidation, downstream backpressure, and delayed responses. The DDR-backed 128x96 live-raster soak passes all 72 pictures with 22 P pictures, 47 B pictures, 25 publications, final identity 25 corresponding to source frame 71, both scratch banks, completed presentation, and zero parser, prediction, writer, or presentation errors; it records 2,267,813 cache hits, 463,835 prediction misses, 158,976 uncached verification reads, and 622,811 physical DDR reads, reducing external reads by 78.5 percent or 4.64 times. The independent 720x480 long-GOP publication regression passes all 791,528 bytes with 22 P pictures, 47 B pictures, 25 publications, final identity 25, and zero overwrite or presentation errors. The session-authorized incremental Quartus 17.0.2 compile preserves the project database and completes in 9 minutes 17 seconds with 0 errors and 121 standing warnings; global setup and hold slack are +0.241 and +0.246 ns, focused decoder and video setup slack are +1.407 and +6.518 ns, and utilization is 29,666 ALMs, 43,189 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. `MediaPlayer_commit228_cd73cb7.rbf` is 4,253,812 bytes with SHA-256 `3c6a612cd88449ee283dd50437c20ee07f175af028fef145b0ff48af47b9cc9e`; its MiSTer FTP readback is byte-identical.
-
-#### Next Steps:
-
-Reload the MiSTer core and load `test_compat_long_gop.m2v` while recording from the first visible frame through settled source frame 71, then report the elapsed load time and terminal USER, POWER, and DISK state. Hardware acceptance requires the existing passing LED pattern and at least 25 fps, corresponding to no more than 2.88 seconds for all 72 frames; if the cache improves throughput but remains below that threshold, retain the measured gain and target the serialized raster-engine handshake or uncached verification boundary in the next commit.
-
-#### Files Modified:
-
-- files.qip
-- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- tools/streams/tb_h262_prediction_word_cache.sv
-- tools/streams/tb_h262_live_raster_soak.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
 ## 229 COMMIT Unreleased 6a4e935 2026-08-18T15:58:14-07:00
 
 #### Coming From:
@@ -264,6 +229,37 @@ Deploy the hash-qualified Entry 235 RBF and rerun `test_compat_long_gop.m2v` and
 #### Status:
 
 - [x] Built
+- [ ] Passed
+
+---
+## 236 COMMIT Unreleased ??? 2026-08-19T13:36:19-07:00
+
+#### Coming From:
+
+Unreleased 6583c66
+
+#### Purpose:
+
+Restore the hardware-proven four-entry reference cache and add mixed-stream pixel-content coverage after Entry 235 corrupted the mixed-macroblock display despite passing control-path diagnostics.
+
+#### Outcome:
+
+Hardware rejects Entry 235 as a compatibility regression. Frame-correlated review of the uploaded 60 fps recording proves that `test_compat_long_gop.m2v` presents every source frame from 0 through 71 exactly once in order, with no reversal or skip, and improves the frame-0-to-frame-71 interval from Entry 234's 5.935 seconds to 5.859 seconds, a 76 ms or 1.28 percent gain. The byte-identical 366,071-byte `test_compat_mixed_macroblocks.m2v` instead reaches a repeated diagonal field rather than the expected 24-frame color-bar sequence on its first load after core reset, while USER and POWER remain solid and DISK remains dark, proving the existing success report does not validate displayed pixel content. A second download finishes faster without changing the display because `reset_mpeg2` is driven only by global reset, status reset, or the reset button and does not rearm sticky sequence and presentation state at a new `ioctl_download`; that separate multi-download defect will remain isolated from this recovery boundary. The user approved restoring Entry 234's four-entry fully associative cache, adding a deterministic mixed-stream pixel oracle, and using an incremental build.
+
+#### Next Steps:
+
+Replace the eight-entry two-way cache with the hardware-proven four-entry implementation, restore the focused cache and exact live-soak expectations, and add a mixed-stream regression that checks reconstructed display content rather than only parser, publication, and LED prerequisites. Run focused cache, P-intra, B-residual, B-intra, parser-window, mixed-pixel, live-raster, and complete long-GOP regressions before an incremental Quartus build and focused timing analysis; deploy only if all tests and timing pass, then validate mixed macroblocks first after a core reload and long GOP second.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
+- tools/streams/tb_h262_prediction_word_cache.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/tb_h262_mixed_raster_pixels.sv
+
+#### Status:
+
+- [ ] Built
 - [ ] Passed
 
 ---
