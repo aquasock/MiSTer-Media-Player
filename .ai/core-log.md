@@ -1,33 +1,4 @@
 ---
-## 191 COMMIT Unreleased 6281359 2026-08-17T15:21:56-07:00
-
-#### Coming From:
-
-Unreleased 2849c38
-
-#### Purpose:
-
-Make generalized P macroblock completion evidence durable and stop classifying its normal pre-completion absence as a sticky decoder error.
-
-#### Outcome:
-
-Commit 190 hardware makes the settled report unambiguous and identical on all three generalized P streams: USER 2, POWER 6, DISK 1, while the visual discriminator retains its center seams. Commit `6281359` incorporates source commit `85e8d4c`, which latches generalized completion and retires transient `progress_error`, plus an endpoint-scoped false path for the legacy asynchronous `hps_io.video_calc` telemetry crossing that caused the first clean build's false hold failure. Exact controller replay passes all three target streams and preserves functional error codes 7 through 9. The final clean Quartus 17.0.2 build closes with zero setup and hold TNS, +0.346 ns global setup, +0.253 ns global hold, +2.107 ns decoder setup, 31,066 ALMs, 41,850 registers, and no Critical Warning. Qualified RBF `MediaPlayer_commit191_6281359.rbf` has SHA-256 `c96b98df825a23f065345185a6d914081fb59ad3a13af571970ed35344ea94af`; Audio project `fd90c77` remains integration-compatible.
-
-#### Next Steps:
-
-Run `test_p_motion_residual.m2v`, `test_p_mba_escape.m2v`, `test_p_visual_discriminator.m2v`, `test_i_baseline.m2v`, and `test_b_bidirectional.m2v` using the qualified RBF. For each stream, allow the one-second settlement and complete 32-second LED report, then record USER, POWER, and DISK behavior. The three P targets should report solid USER, solid POWER, and dark DISK; the visual discriminator must retain its four quadrants and center seams, while the I and B streams must retain their accepted display and diagnostic behavior.
-
-#### Files Modified:
-
-- MediaPlayer.sdc
-- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
 ## 192 COMMIT Unreleased 454336d 2026-08-17T16:09:53-07:00
 
 #### Coming From:
@@ -160,6 +131,40 @@ Retain the accepted cadence gate and treat the remaining stutter as decoder thro
 
 - [x] Built
 - [x] Passed
+
+---
+## 231 COMMIT Unreleased ??? 2026-08-18T22:26:51-07:00
+
+#### Coming From:
+
+Unreleased 1177e26
+
+#### Purpose:
+
+Hide synchronous residual-store latency behind current-pixel P/B reference lookup so the next in-block sample begins without two serialized staging cycles.
+
+#### Outcome:
+
+Entry 230 is hardware accepted at final source frame 71 with USER and POWER solid, 11 DISK blinks, and visibly improved presentation cadence, while its recording measures approximately 9.2 seconds for the 2.84-second source sequence. The exact 72-picture DDR-backed soak reproduces 21,729,996 total cycles, of which 21,321,343 block compressed-stream delivery, 20,517,231 are decoder rather than presentation backpressure, and only 804,112 are presentation holds. P/B raster execution occupies 11,716,929 cycles; its two synchronous residual-store staging states consume 2,543,616 cycles across 1,271,808 reconstructed samples, while the remaining frontend parse, transform, and replay work accounts for approximately 8.8 million decoder-stall cycles outside active raster execution. The proposed boundary keeps the fully staged residual fetch at block and descriptor transitions, but while a current pixel's reference lookup is active it addresses the following in-block residual, captures that prefetched value when the current pixel emits, and returns directly to pixel setup for the next sample. This removes a predicted 2,503,872 cycles, or 11.52 percent of the full soak, without changing cache lookup timing, DDR requests, post-write verification, reconstructed arithmetic, presentation order, or the accepted 25 fps display-lifetime gate.
+
+#### Next Steps:
+
+Implement identical in-block residual lookahead in the generalized P and B raster engines, retain the existing staged path for the first sample of every block, and add explicit cycle ceilings to the focused P-intra and B-residual regressions plus the complete live-raster soak. Require exact samples, write/readback counts, all 72 pictures, final source frame 71, unchanged cache and DDR traffic, zero decoder or presentation errors, and a soak below 19.4 million cycles before the session-authorized incremental Quartus build; deploy only with clean decoder and video timing.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- tools/streams/tb_h262_p_intra_macroblocks.sv
+- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
 
 ---
 ## 193 COMMIT Unreleased a42bb74 2026-08-17T16:38:38-07:00
