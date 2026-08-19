@@ -46,6 +46,15 @@
             residual_load_wait<=0;pred_sum<=0;tap_index<=0;pixel_setup<=1;
         end
 
+        if(pixel_setup||precompute_after_emit) begin
+            bidir_prelaunch_addr<=precompute_bidir_addr;
+            bidir_prelaunch_valid<=
+                (exec_direction==2'd3)&&precompute_bidir_bounds_ok;
+            next_prelaunch_addr<=precompute_next_addr;
+            next_prelaunch_valid<=
+                (exec_direction!=0)&&precompute_next_bounds_ok;
+        end
+
         if(pixel_setup) begin
             pixel_setup<=0;
             if(exec_direction==0)begin

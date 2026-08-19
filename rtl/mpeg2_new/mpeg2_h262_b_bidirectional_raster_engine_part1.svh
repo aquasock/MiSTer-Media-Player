@@ -49,6 +49,8 @@ wire signed [7:0] mb_bmvy=$signed(motion_word[7:0]);
 (* preserve *) reg [1:0] exec_direction;
 (* preserve *) reg signed [7:0] exec_fmvx,exec_fmvy;
 (* preserve *) reg signed [7:0] exec_bmvx,exec_bmvy;
+(* preserve *) reg [28:0] bidir_prelaunch_addr,next_prelaunch_addr;
+(* preserve *) reg bidir_prelaunch_valid,next_prelaunch_valid;
 
 // Commit 203: descriptors use synchronous M10K storage while P and B share
 // the 2048-block sparse spatial-sample RAM in their parent wrapper.
