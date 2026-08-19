@@ -16,7 +16,7 @@ wire source_bounds_ok=(src_base_x>=0)&&(src_base_y>=0)&&
 // path, as do block starts and intra pixels.
 wire bidir_lookup_candidate;
 wire next_pixel_lookup_candidate=
-    emit&&(ei!=6'd63)&&(mb_direction!=0);
+    emit&&(ei!=6'd63)&&(exec_direction!=0);
 wire early_lookup_candidate=
     bidir_lookup_candidate||next_pixel_lookup_candidate;
 wire [5:0] early_ei=
@@ -24,15 +24,13 @@ wire [5:0] early_ei=
 wire [2:0] early_er=early_ei[5:3];
 wire [2:0] early_el=early_ei[2:0];
 wire early_use_backward=
-    bidir_lookup_candidate||(mb_direction==2'd2);
+    bidir_lookup_candidate||(exec_direction==2'd2);
 wire signed [7:0] early_luma_mvx=
-    early_use_backward?mb_bmvx:mb_fmvx;
+    early_use_backward?exec_bmvx:exec_fmvx;
 wire signed [7:0] early_luma_mvy=
-    early_use_backward?mb_bmvy:mb_fmvy;
-wire signed [7:0] early_exec_mvx=
-    (blk<4)?early_luma_mvx:chroma_half_vector(early_luma_mvx);
-wire signed [7:0] early_exec_mvy=
-    (blk<4)?early_luma_mvy:chroma_half_vector(early_luma_mvy);
+    early_use_backward?exec_bmvy:exec_fmvy;
+wire signed [7:0] early_exec_mvx=early_luma_mvx;
+wire signed [7:0] early_exec_mvy=early_luma_mvy;
 wire signed [8:0] early_int_x=$signed(early_exec_mvx)>>>1;
 wire signed [8:0] early_int_y=$signed(early_exec_mvy)>>>1;
 wire early_half_x=early_exec_mvx[0];
@@ -70,7 +68,7 @@ wire tap_dx=(half_x&&half_y)?tap_index[0]:(half_x?tap_index[0]:1'b0);
 wire tap_dy=(half_x&&half_y)?tap_index[1]:(half_y?tap_index[0]:1'b0);
 wire tap_last=(half_x&&half_y)?(tap_index==2'd3):((half_x||half_y)?(tap_index==2'd1):(tap_index==2'd0));
 assign bidir_lookup_candidate=
-    (mb_direction==2'd3)&&!pred_direction&&tap_last&&
+    (exec_direction==2'd3)&&!pred_direction&&tap_last&&
     ((lookup_wait&&ddram_lookup_ready&&ddram_lookup_hit)||
      (waitresp&&ddram_dout_ready&&!req_kind));
 wire signed [13:0] src_x_tap_signed=src_base_x+$signed({13'd0,tap_dx});
@@ -117,7 +115,7 @@ wire [10:0] pred_sum_with_current=pred_sum+{3'd0,current_tap_sample};
 wire [7:0] selected_prediction=round_prediction(pred_sum_with_current,half_x,half_y);
 wire [8:0] bidir_sum={1'b0,forward_prediction}+{1'b0,selected_prediction}+9'd1;
 wire [7:0] bidir_prediction=bidir_sum[8:1];
-wire [7:0] final_prediction=(mb_direction==2'd3)?bidir_prediction:selected_prediction;
+wire [7:0] final_prediction=(exec_direction==2'd3)?bidir_prediction:selected_prediction;
 wire [7:0] reconstructed_current=clip(final_prediction,residual_pel);
 wire [7:0] reconstructed_intra=clip(8'd0,residual_pel);
 wire [7:0] lookup_tap_sample=bat(ddram_lookup_data,src_x_tap[2:0]);
@@ -128,13 +126,13 @@ wire [8:0] lookup_bidir_sum=
     {1'b0,forward_prediction}+{1'b0,lookup_selected_prediction}+9'd1;
 wire [7:0] lookup_bidir_prediction=lookup_bidir_sum[8:1];
 wire [7:0] lookup_final_prediction=
-    (mb_direction==2'd3)?lookup_bidir_prediction:lookup_selected_prediction;
+    (exec_direction==2'd3)?lookup_bidir_prediction:lookup_selected_prediction;
 wire [7:0] lookup_reconstructed_current=
     clip(lookup_final_prediction,residual_pel);
 wire lookup_advance=lookup_wait&&ddram_lookup_ready&&
     ddram_lookup_hit&&!tap_last;
 wire prediction_lookup=
-    (pixel_setup&&(mb_direction!=0)&&source_bounds_ok)||lookup_advance||
+    (pixel_setup&&(exec_direction!=0)&&source_bounds_ok)||lookup_advance||
     early_lookup;
 wire [11:0] lookup_src_x=
     early_lookup?early_src_base_x[11:0]:
@@ -192,6 +190,7 @@ always @(posedge clk) begin
     if(reset) begin
         mb_width<=0;mb_height<=0;geometry_seen<=0;motion_count<=0;motion_word<=0;motion_load<=0;
         motion_first_pending<=0;pending_direction<=0;pending_fmvx<=0;pending_fmvy<=0;
+        exec_direction<=0;exec_fmvx<=0;exec_fmvy<=0;exec_bmvx<=0;exec_bmvy<=0;
         desc_count<=0;last_desc_word<=0;current_desc_slot<=0;desc_active<=0;sample_expected<=0;metadata_done<=0;exec_desc_slot<=0;
         pending<=0;started<=0;active<=0;future_bank_latched<=0;scratch_bank_latched<=0;req<=0;waitresp<=0;req_kind<=0;lookup_wait<=0;
         mbi<=0;col<=0;mrow<=0;blk<=0;timeout<=0;emit<=0;wait_store<=0;pixel_setup<=0;residual_load<=0;residual_load_wait<=0;ei<=0;verify_row<=0;

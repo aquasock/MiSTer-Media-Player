@@ -29,14 +29,26 @@
             else begin motion_word<=motion_mem[mbi];residual_load<=1;end
         end
 
-        if(residual_load)begin residual_load<=0;residual_load_wait<=1;end
+        if(residual_load)begin
+            residual_load<=0;residual_load_wait<=1;
+            exec_direction<=mb_direction;
+            if(blk<4) begin
+                exec_fmvx<=mb_fmvx;exec_fmvy<=mb_fmvy;
+                exec_bmvx<=mb_bmvx;exec_bmvy<=mb_bmvy;
+            end else begin
+                exec_fmvx<=chroma_half_vector(mb_fmvx);
+                exec_fmvy<=chroma_half_vector(mb_fmvy);
+                exec_bmvx<=chroma_half_vector(mb_bmvx);
+                exec_bmvy<=chroma_half_vector(mb_bmvy);
+            end
+        end
         if(residual_load_wait)begin
             residual_load_wait<=0;pred_sum<=0;tap_index<=0;pixel_setup<=1;
         end
 
         if(pixel_setup) begin
             pixel_setup<=0;
-            if(mb_direction==0)begin
+            if(exec_direction==0)begin
                 if(!residual_hit)begin error<=1;if(!error)error_source<=5'd11;active<=0;persisted_seen<=1;timeout<=0;end
                 else begin out_reg<=reconstructed_intra;emit<=1;end
             end else if(!source_bounds_ok)begin error<=1;if(!error)error_source<=5'd11;active<=0;persisted_seen<=1;timeout<=0;end
@@ -51,7 +63,7 @@
             if(ddram_lookup_hit) begin
                 if(tap_last) begin
                     lookup_wait<=0;
-                    if((mb_direction==2'd3)&&!pred_direction) begin
+                    if((exec_direction==2'd3)&&!pred_direction) begin
                         forward_prediction<=lookup_selected_prediction;
                         pred_direction<=1;pred_sum<=0;tap_index<=0;
                         if(bidir_early_lookup) begin
@@ -86,7 +98,7 @@
                 waitresp<=0;
                 if(!req_kind) begin
                     if(tap_last) begin
-                        if((mb_direction==2'd3)&&!pred_direction) begin
+                        if((exec_direction==2'd3)&&!pred_direction) begin
                             forward_prediction<=selected_prediction;pred_direction<=1;pred_sum<=0;tap_index<=0;
                             if(bidir_early_lookup) begin
                                 if(early_half_x||early_half_y)

@@ -42,6 +42,14 @@ wire signed [7:0] mb_fmvy=$signed(motion_word[23:16]);
 wire signed [7:0] mb_bmvx=$signed(motion_word[15:8]);
 wire signed [7:0] mb_bmvy=$signed(motion_word[7:0]);
 
+// Commit 232 timing repair: execution begins two cycles after motion_word is
+// loaded. Capture block-normalized motion fields in a separate preserved stage
+// during residual_load. The prelaunch address path then starts here instead of
+// crossing the live B-sideband select and vector normalization in one cycle.
+(* preserve *) reg [1:0] exec_direction;
+(* preserve *) reg signed [7:0] exec_fmvx,exec_fmvy;
+(* preserve *) reg signed [7:0] exec_bmvx,exec_bmvy;
+
 // Commit 203: descriptors use synchronous M10K storage while P and B share
 // the 2048-block sparse spatial-sample RAM in their parent wrapper.
 (* ramstyle = "M10K" *) reg [13:0] desc_mem [0:2047];
@@ -85,11 +93,10 @@ integer i;
 wire [28:0] future_off=future_bank_latched?BANK_OFF:29'd0;
 wire [28:0] past_off=future_bank_latched?29'd0:BANK_OFF;
 wire [2:0] er=ei[5:3],el=ei[2:0];
-wire use_backward=(mb_direction==2'd2)||((mb_direction==2'd3)&&pred_direction);
-wire signed [7:0] selected_luma_mvx=use_backward?mb_bmvx:mb_fmvx;
-wire signed [7:0] selected_luma_mvy=use_backward?mb_bmvy:mb_fmvy;
-wire signed [7:0] exec_mvx=(blk<4)?selected_luma_mvx:chroma_half_vector(selected_luma_mvx);
-wire signed [7:0] exec_mvy=(blk<4)?selected_luma_mvy:chroma_half_vector(selected_luma_mvy);
+wire use_backward=(exec_direction==2'd2)||
+    ((exec_direction==2'd3)&&pred_direction);
+wire signed [7:0] exec_mvx=use_backward?exec_bmvx:exec_fmvx;
+wire signed [7:0] exec_mvy=use_backward?exec_bmvy:exec_fmvy;
 wire signed [8:0] exec_int_x=$signed(exec_mvx)>>>1;
 wire signed [8:0] exec_int_y=$signed(exec_mvy)>>>1;
 wire half_x=exec_mvx[0];
