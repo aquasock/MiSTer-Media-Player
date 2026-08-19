@@ -5,7 +5,9 @@
 // memory service, publication shell, and presentation scheduler.  The 128x96
 // source keeps the real pixel and accepted-write work inexpensive while preserving the
 // same 3-I/22-P/47-B repeated-GOP transaction sequence as the 720x480 stream.
-module tb_h262_live_raster_soak;
+module tb_h262_live_raster_soak #(
+    parameter integer MIXED_PIXEL_MODE=0
+);
     localparam integer MAX_STREAM_BYTES=1048576;
     localparam [28:0] DDR_BASE=29'h06000000;
     localparam integer DDR_WORDS=262144;
@@ -13,13 +15,17 @@ module tb_h262_live_raster_soak;
     reg clk=0,reset=1,stream_valid=0;
     reg [7:0] stream_data=0;
     reg [7:0] stream_mem[0:MAX_STREAM_BYTES-1];
+    reg [7:0] pixel_oracle[0:442367];
     reg [63:0] ddr_mem[0:DDR_WORDS-1];
-    reg [1023:0] hex_path;
+    reg [1023:0] hex_path,pixel_path;
     integer stream_len,stream_index=0,quiet_cycles=0;
     integer i,p_rows=0,b_rows=0,p_pictures=0,b_pictures=0;
     integer published_references=0,display_swaps=0;
     integer reference_writes=0,scratch0_writes=0,scratch1_writes=0;
     integer memory_reads=0,total_cycles=0;
+    integer pixel_samples=0,pixel_mismatches=0,max_pixel_delta=0;
+    integer pixel_index,pixel_delta,pixel_row,pixel_word,pixel_lane;
+    reg first_pixel_mismatch=0;
 
     wire frontend_ready,phase1_supported;
     wire [13:0] horizontal_size,vertical_size;
@@ -51,6 +57,32 @@ module tb_h262_live_raster_soak;
     wire [2:0] pred_error_source;
     wire [4:0] pred_error_detail;
     assign pred_active=prediction.mixed_active||prediction.b_active;
+
+    // Decode the compact component/scratch tags exactly as the active DDR
+    // writer does, then address the software-decoded display-order oracle by
+    // temporal_reference.  The one-GOP mixed stream gives every picture a
+    // unique temporal reference from 0 through 23.
+    wire pixel_scratch_tag=(pred_store_x[11:10]==2'b11);
+    wire pixel_wide_bs0=pixel_scratch_tag&&pred_store_y[11]&&
+        (pred_store_y[10:9]!=2'b11);
+    wire pixel_wide_bs1=pixel_scratch_tag&&!pred_store_y[11]&&
+        (pred_store_y[10:9]!=2'b00);
+    wire pixel_wide_bs=pixel_wide_bs0||pixel_wide_bs1;
+    wire [1:0] pixel_legacy_component=(pred_store_x[9:8]==2'b00)?2'd0:
+        (pred_store_x[9:8]==2'b01)?2'd1:
+        (pred_store_x[9:8]==2'b10)?2'd2:2'd3;
+    wire [1:0] pixel_wide_component=pixel_wide_bs0?
+        pred_store_y[10:9]:(pred_store_y[10:9]-2'b01);
+    wire [1:0] pixel_component=pixel_scratch_tag?
+        (pixel_wide_bs?pixel_wide_component:pixel_legacy_component):
+        (pred_store_x[11:10]==2'b01)?2'd1:
+        (pred_store_x[11:10]==2'b10)?2'd2:2'd0;
+    wire [11:0] pixel_x=pixel_wide_bs?{2'b00,pred_store_x[9:0]}:
+        pixel_scratch_tag?{4'b0000,pred_store_x[7:0]}:
+        (pred_store_x[11:10]!=2'b00)?{2'b00,pred_store_x[9:0]}:
+        pred_store_x;
+    wire [11:0] pixel_y=pixel_wide_bs?{3'b000,pred_store_y[8:0]}:
+        pred_store_y;
 
     wire writer_stored,writer_seen,writer_error,writer_busy;
     wire [7:0] writer_burstcnt,writer_be;
@@ -216,6 +248,11 @@ module tb_h262_live_raster_soak;
         for(i=0;i<DDR_WORDS;i=i+1)ddr_mem[i]=0;
         if(!$value$plusargs("HEX=%s",hex_path))$fatal(1,"missing +HEX");
         if(!$value$plusargs("LEN=%d",stream_len))$fatal(1,"missing +LEN");
+        if(MIXED_PIXEL_MODE)begin
+            if(!$value$plusargs("PIXELS=%s",pixel_path))
+                $fatal(1,"missing +PIXELS");
+            $readmemh(pixel_path,pixel_oracle,0,442367);
+        end
         if((stream_len<=0)||(stream_len>MAX_STREAM_BYTES))
             $fatal(1,"invalid LEN %0d",stream_len);
         $readmemh(hex_path,stream_mem,0,stream_len-1);
@@ -241,6 +278,35 @@ module tb_h262_live_raster_soak;
 
     always @(posedge clk) begin
         if(!reset)total_cycles<=total_cycles+1;
+        if(MIXED_PIXEL_MODE&&pred_store_valid)begin
+            if(temporal_reference>=24||pixel_component>=3||
+               (pixel_component==0&&(pixel_x>=128||pixel_y>=96))||
+               (pixel_component!=0&&(pixel_x>=64||pixel_y>=48)))
+                $fatal(1,"mixed pixel coordinate/tag error tr=%0d c=%0d x=%0d y=%0d raw=%h/%h",
+                       temporal_reference,pixel_component,pixel_x,pixel_y,
+                       pred_store_x,pred_store_y);
+            pixel_index=temporal_reference*18432;
+            if(pixel_component==0)
+                pixel_index=pixel_index+pixel_y*128+pixel_x;
+            else if(pixel_component==1)
+                pixel_index=pixel_index+12288+pixel_y*64+pixel_x;
+            else
+                pixel_index=pixel_index+15360+pixel_y*64+pixel_x;
+            pixel_delta=$signed({1'b0,pred_store_value})-
+                $signed({1'b0,pixel_oracle[pixel_index]});
+            if(pixel_delta<0)pixel_delta=-pixel_delta;
+            pixel_samples=pixel_samples+1;
+            if(pixel_delta>max_pixel_delta)max_pixel_delta=pixel_delta;
+            if(pixel_delta>2)begin
+                pixel_mismatches=pixel_mismatches+1;
+                if(!first_pixel_mismatch)begin
+                    first_pixel_mismatch=1;
+                    $display("MIXED_PIXEL_FIRST tr=%0d c=%0d x=%0d y=%0d rtl=%0d oracle=%0d delta=%0d",
+                             temporal_reference,pixel_component,pixel_x,pixel_y,
+                             pred_store_value,pixel_oracle[pixel_index],pixel_delta);
+                end
+            end
+        end
         memory_dout_ready<=0;
         if(read_pending)begin
             memory_dout<=ddr_mem[read_index];
@@ -263,6 +329,35 @@ module tb_h262_live_raster_soak;
                 2'd2:scratch0_writes<=scratch0_writes+1;
                 2'd3:scratch1_writes<=scratch1_writes+1;
             endcase
+        end
+        // The live prediction boundary does not instantiate the independent
+        // intra framebuffer writer.  Seed an accepted I picture into the same
+        // fixed-stride DDR layout so the following P/B samples are checked
+        // against real reference content instead of the historical zero fill.
+        if(MIXED_PIXEL_MODE&&picture_complete&&
+           picture_coding_type==3'b001)begin
+            for(pixel_row=0;pixel_row<96;pixel_row=pixel_row+1)
+                for(pixel_word=0;pixel_word<16;pixel_word=pixel_word+1)
+                    for(pixel_lane=0;pixel_lane<8;pixel_lane=pixel_lane+1)
+                        ddr_mem[(completed_bank?18'h10000:18'h00000)+
+                                pixel_row*90+pixel_word]
+                            [pixel_lane*8 +: 8]=
+                            pixel_oracle[pixel_row*128+
+                                         pixel_word*8+pixel_lane];
+            for(pixel_row=0;pixel_row<48;pixel_row=pixel_row+1)
+                for(pixel_word=0;pixel_word<8;pixel_word=pixel_word+1)
+                    for(pixel_lane=0;pixel_lane<8;pixel_lane=pixel_lane+1)begin
+                        ddr_mem[(completed_bank?18'h10000:18'h00000)+
+                                18'h0a8c0+pixel_row*45+pixel_word]
+                            [pixel_lane*8 +: 8]=
+                            pixel_oracle[12288+pixel_row*64+
+                                         pixel_word*8+pixel_lane];
+                        ddr_mem[(completed_bank?18'h10000:18'h00000)+
+                                18'h0d2f0+pixel_row*45+pixel_word]
+                            [pixel_lane*8 +: 8]=
+                            pixel_oracle[15360+pixel_row*64+
+                                         pixel_word*8+pixel_lane];
+                    end
         end
     end
 
@@ -362,7 +457,31 @@ module tb_h262_live_raster_soak;
                      pred_read_observed,pred_reconstructed_observed,
                      presentation_complete,probe_error,pred_error,writer_error,
                      presentation_error);
-            if(stream_index!=stream_len||p_rows!=132||p_pictures!=22||
+            if(MIXED_PIXEL_MODE)begin
+                $display("MIXED_PIXEL_RESULT samples=%0d mismatches=%0d max_delta=%0d",
+                         pixel_samples,pixel_mismatches,max_pixel_delta);
+                if(stream_index!=stream_len||p_rows!=48||p_pictures!=8||
+                   b_rows!=90||b_pictures!=15||published_references!=9||
+                   picture_count!=9||reference_promotion_count!=9||
+                   publication.p_header_count!=8||
+                   publication.p_publication_count!=8||
+                   publication.b_header_count!=15||
+                   publication.b_persist_count!=15||
+                   displayed_identity!=9||last_reference_temporal!=10'd23||
+                   reference_writes!=18432||scratch0_writes!=18432||
+                   scratch1_writes!=16128||
+                   prediction.reference_cache.cache_hit_count!=32'd499551||
+                   prediction.reference_cache.cache_miss_count!=32'd71329||
+                   prediction.reference_cache.uncached_count!=0||
+                   memory_reads!=71329||total_cycles!=3109996||
+                   pixel_samples!=423936||pixel_mismatches!=0||
+                   !writer_seen||!pred_read_observed||
+                   !pred_reconstructed_observed||!presentation_complete||
+                   probe_error||pred_error||writer_error||presentation_error)
+                    $fatal(1,"mixed raster pixel regression failed");
+                $finish;
+            end
+            else if(stream_index!=stream_len||p_rows!=132||p_pictures!=22||
                b_rows!=282||b_pictures!=47||published_references!=25||
                picture_count!=25||reference_promotion_count!=25||
                publication.p_header_count!=22||publication.p_publication_count!=22||
@@ -370,18 +489,18 @@ module tb_h262_live_raster_soak;
                displayed_identity!=25||last_reference_temporal!=10'd23||
                reference_writes!=50688||scratch0_writes!=55296||
                scratch1_writes!=52992||
-               prediction.reference_cache.cache_hit_count!=32'd2321102||
-               prediction.reference_cache.cache_miss_count!=32'd410546||
+               prediction.reference_cache.cache_hit_count!=32'd2267813||
+               prediction.reference_cache.cache_miss_count!=32'd463835||
                prediction.reference_cache.uncached_count!=0||
-               memory_reads!=410546||
-               // Entry 235 two-way, four-set cache completes this exact soak
-               // in 15,479,996 cycles.
-               total_cycles!=15479996||
+               memory_reads!=463835||
+               // Entry 234 four-entry fully-associative cache completes this
+               // exact soak in 15,739,996 cycles.
+               total_cycles!=15739996||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
                presentation_error)
                 $fatal(1,"live raster soak failed");
-            $finish;
+            else $finish;
         end
     end
 

@@ -3,8 +3,7 @@
 //
 // The generalized raster engines consume one byte from each 64-bit DDR word.
 // Adjacent integer and half-pel taps therefore revisit the same two-dimensional
-// reference words many times.  This eight-entry, two-way set-associative cache
-// sits on
+// reference words many times.  This four-entry fully-associative cache sits on
 // the engines' existing single-outstanding-request handshake and returns those
 // words without changing request order or decoded-pel arithmetic.
 //
@@ -45,29 +44,18 @@ module mpeg2_h262_reference_word_cache
 );
 
 reg        cache_valid0,cache_valid1,cache_valid2,cache_valid3;
-reg        cache_valid4,cache_valid5,cache_valid6,cache_valid7;
 reg [28:0] cache_tag0,cache_tag1,cache_tag2,cache_tag3;
-reg [28:0] cache_tag4,cache_tag5,cache_tag6,cache_tag7;
 reg [63:0] cache_data0,cache_data1,cache_data2,cache_data3;
-reg [63:0] cache_data4,cache_data5,cache_data6,cache_data7;
-reg [3:0]  cache_replace_way;
+reg [1:0]  cache_replace;
 
-wire [1:0] cache_set=request_addr[1:0];
-wire cache_lookup0=(cache_set==2'd0)&&cache_valid0&&(cache_tag0==request_addr);
-wire cache_lookup1=(cache_set==2'd1)&&cache_valid1&&(cache_tag1==request_addr);
-wire cache_lookup2=(cache_set==2'd2)&&cache_valid2&&(cache_tag2==request_addr);
-wire cache_lookup3=(cache_set==2'd3)&&cache_valid3&&(cache_tag3==request_addr);
-wire cache_lookup4=(cache_set==2'd0)&&cache_valid4&&(cache_tag4==request_addr);
-wire cache_lookup5=(cache_set==2'd1)&&cache_valid5&&(cache_tag5==request_addr);
-wire cache_lookup6=(cache_set==2'd2)&&cache_valid6&&(cache_tag6==request_addr);
-wire cache_lookup7=(cache_set==2'd3)&&cache_valid7&&(cache_tag7==request_addr);
+wire cache_lookup0=cache_valid0&&(cache_tag0==request_addr);
+wire cache_lookup1=cache_valid1&&(cache_tag1==request_addr);
+wire cache_lookup2=cache_valid2&&(cache_tag2==request_addr);
+wire cache_lookup3=cache_valid3&&(cache_tag3==request_addr);
 wire cache_lookup_hit=request_cacheable&&
-    (cache_lookup0||cache_lookup1||cache_lookup2||cache_lookup3||
-     cache_lookup4||cache_lookup5||cache_lookup6||cache_lookup7);
+    (cache_lookup0||cache_lookup1||cache_lookup2||cache_lookup3);
 wire [63:0] cache_lookup_data=cache_lookup0?cache_data0:
-    cache_lookup1?cache_data1:cache_lookup2?cache_data2:
-    cache_lookup3?cache_data3:cache_lookup4?cache_data4:
-    cache_lookup5?cache_data5:cache_lookup6?cache_data6:cache_data7;
+    cache_lookup1?cache_data1:cache_lookup2?cache_data2:cache_data3;
 
 reg        request_active;
 reg [7:0]  request_burstcnt_reg;
@@ -95,27 +83,15 @@ always @(posedge clk) begin
         cache_valid1<=1'b0;
         cache_valid2<=1'b0;
         cache_valid3<=1'b0;
-        cache_valid4<=1'b0;
-        cache_valid5<=1'b0;
-        cache_valid6<=1'b0;
-        cache_valid7<=1'b0;
         cache_tag0<=29'd0;
         cache_tag1<=29'd0;
         cache_tag2<=29'd0;
         cache_tag3<=29'd0;
-        cache_tag4<=29'd0;
-        cache_tag5<=29'd0;
-        cache_tag6<=29'd0;
-        cache_tag7<=29'd0;
         cache_data0<=64'd0;
         cache_data1<=64'd0;
         cache_data2<=64'd0;
         cache_data3<=64'd0;
-        cache_data4<=64'd0;
-        cache_data5<=64'd0;
-        cache_data6<=64'd0;
-        cache_data7<=64'd0;
-        cache_replace_way<=4'd0;
+        cache_replace<=2'd0;
         request_active<=1'b0;
         request_burstcnt_reg<=8'd0;
         request_addr_reg<=29'd0;
@@ -140,11 +116,7 @@ always @(posedge clk) begin
             cache_valid1<=1'b0;
             cache_valid2<=1'b0;
             cache_valid3<=1'b0;
-            cache_valid4<=1'b0;
-            cache_valid5<=1'b0;
-            cache_valid6<=1'b0;
-            cache_valid7<=1'b0;
-            cache_replace_way<=4'd0;
+            cache_replace<=2'd0;
             request_active<=1'b0;
             response_pending<=1'b0;
         end else begin
@@ -193,51 +165,29 @@ always @(posedge clk) begin
                 request_dout<=downstream_dout;
                 request_dout_ready<=1'b1;
                 if(request_cacheable_reg) begin
-                    case({request_addr_reg[1:0],
-                          cache_replace_way[request_addr_reg[1:0]]})
-                        3'b000: begin
+                    case(cache_replace)
+                        2'd0: begin
                             cache_valid0<=1'b1;
                             cache_tag0<=request_addr_reg;
                             cache_data0<=downstream_dout;
                         end
-                        3'b010: begin
+                        2'd1: begin
                             cache_valid1<=1'b1;
                             cache_tag1<=request_addr_reg;
                             cache_data1<=downstream_dout;
                         end
-                        3'b100: begin
+                        2'd2: begin
                             cache_valid2<=1'b1;
                             cache_tag2<=request_addr_reg;
                             cache_data2<=downstream_dout;
                         end
-                        3'b110: begin
+                        default: begin
                             cache_valid3<=1'b1;
                             cache_tag3<=request_addr_reg;
                             cache_data3<=downstream_dout;
                         end
-                        3'b001: begin
-                            cache_valid4<=1'b1;
-                            cache_tag4<=request_addr_reg;
-                            cache_data4<=downstream_dout;
-                        end
-                        3'b011: begin
-                            cache_valid5<=1'b1;
-                            cache_tag5<=request_addr_reg;
-                            cache_data5<=downstream_dout;
-                        end
-                        3'b101: begin
-                            cache_valid6<=1'b1;
-                            cache_tag6<=request_addr_reg;
-                            cache_data6<=downstream_dout;
-                        end
-                        default: begin
-                            cache_valid7<=1'b1;
-                            cache_tag7<=request_addr_reg;
-                            cache_data7<=downstream_dout;
-                        end
                     endcase
-                    cache_replace_way[request_addr_reg[1:0]]<=
-                        !cache_replace_way[request_addr_reg[1:0]];
+                    cache_replace<=cache_replace+1'b1;
                 end
             end
         end
