@@ -950,34 +950,6 @@ None.
 - [x] Passed
 
 ---
-## 209 COMMIT Unreleased 450f78a 2026-08-18T05:12:25-07:00
-
-#### Coming From:
-
-Unreleased 450f78a
-
-#### Purpose:
-
-Record the MiSTer hardware result for the generalized P completion and persistence handshake correction.
-
-#### Outcome:
-
-Commit `450f78a` is not hardware accepted, but it removes the former POWER-9 raster-hold failure. The dense compatibility transfer remains slow yet now advances consistently, and the final coherent diagonal raster is unchanged. The settled diagnostic is USER 2, POWER 4, and DISK 0: the first error is `phase1_probe_error`, its parent source is `publication_error` in the compiled I/P/B publication shell, and no DISK sub-code is currently defined for that error class. This proves the final-row persistence proof is now accepted and moves the first failure to one of the shell's reference-bank, P-publication, or following-header ordering checks; the remaining load duration is consistent with live serialized raster work rather than the eliminated fixed hold timeout.
-
-#### Next Steps:
-
-Add first-fault detail for each publication-error assertion site and a complete dense I/P/B publication-order regression that drives row and picture persistence in hardware order, then use that evidence to correct only the failing reference-bank or header-order transition before another Quartus build.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
 ## 210 COMMIT Unreleased 3fcf22f 2026-08-18T05:13:48-07:00
 
 #### Coming From:
@@ -1265,6 +1237,41 @@ Implement logical row-bank ownership in a simulation-first boundary: allow the p
 
 - tools/streams/tb_h262_live_raster_soak.sv
 - tools/streams/analyze_row_pipeline_ceiling.py
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+## 264 COMMIT Unreleased 5a3c0e4 2026-08-20T09:21:36-07:00
+
+#### Coming From:
+
+Unreleased a9c9ea9
+
+#### Purpose:
+
+Overlap B-picture parsing and transform production for the following row with reconstruction and persistence of the current row through two logical metadata banks.
+
+#### Outcome:
+
+Commit `5a3c0e4` gives the B producer and raster consumer two credit-counted row banks while reusing the existing 2,048-descriptor and 131,072-sample physical memories as two 1,024-descriptor logical halves. Capture and execution use independent bank ownership, descriptor counts, motion ranges and row identities; a bank cannot be reused before its persistence pulse, and final-picture completion waits until every queued row retires. The exact mixed oracle preserves all 423,936 pixels with zero mismatches and maximum delta two, 69,556 reads, every write, nine publications, 23 swaps and zero errors while falling from 1,809,996 to 1,459,996 cycles, a 19.34 percent reduction. The exact long boundary preserves 372,696 reads, all writes, 25 publications, 71 swaps and zero errors while falling from 9,719,996 to 7,469,996 cycles, a 23.15 percent reduction. Focused B residual, B intra, eight-refill parser-window, 8,073-block dense row-streaming and complete mixed publication regressions pass; B residual falls from 1,384,609 to 1,341,421 cycles while preserving every sample and store. The fully clean seed-six Quartus 17.0.2 build completes in 10 minutes 17 seconds with zero errors, 144 standing warnings, no Critical Warning and no combinational loop. Timing is positive at +0.412 ns global setup, +1.776 ns decoder setup, +7.089 ns video setup, +0.254 ns hold, +4.137 ns global recovery, +15.830 ns decoder recovery and +0.803 ns removal. The fit uses 31,017 ALMs, 45,564 registers, 4,027,379 memory bits, 504 RAM blocks and 65 DSP blocks. `MediaPlayer_commit264_5a3c0e4.rbf` is 4,298,100 bytes with SHA-256 `c38649282dfc6b5e859f2a0e446ff621d783b8a10b9d03406bab1a2a0932abbd`; the standard MiSTer upload and FTP readback are byte-identical. Exact MiSTer telemetry accepts both streams with every byte and picture, 71 and 23 swaps, zero errors and zero destination stalls. Long improves from 171,214,171 cycles at 22.393006 fps to 164,945,356 cycles at 23.244062 fps, removing 6,268,815 cycles or 3.66 percent and improving cadence 3.80 percent. Mixed improves from 61,408,518 cycles at 20.225207 fps to 59,871,287 cycles at 20.744501 fps, removing 1,537,231 cycles or 2.50 percent and improving cadence 2.57 percent.
+
+#### Next Steps:
+
+Retain the timing-clean hardware-proven B row pipeline and implement the corresponding logical two-bank P row producer/consumer boundary already justified by Entry 263. Preserve exact pixels, reference publication and bank ownership, and require a material complete-trace reduction before another clean Quartus build; after both row engines overlap, reprofile the remaining 11,585,356 long and 10,191,287 mixed cadence cycles required for stable 25 fps rather than assuming row pipelining alone closes the target.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+- tools/streams/tb_h262_b_residual_streaming.sv
 
 #### Status:
 
