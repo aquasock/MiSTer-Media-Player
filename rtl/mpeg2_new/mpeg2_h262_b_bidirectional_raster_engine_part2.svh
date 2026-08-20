@@ -10,13 +10,11 @@ wire signed [13:0] src_last_y=src_base_y+(half_y?14'sd1:14'sd0);
 wire source_bounds_ok=(src_base_x>=0)&&(src_base_y>=0)&&
     (src_last_x<$signed({2'b00,plane_width}))&&(src_last_y<$signed({2'b00,plane_height}));
 
-// Commit 232 timing repair: form complete backward/current and following-pixel
-// word addresses at least one cycle before they reach the cache. During
-// pixel_setup the registers describe the current and following pixel; during
-// emit they advance to describe the launched pixel and its successor.
-wire precompute_after_emit=emit&&(ei!=6'd63);
+// Entry 239: complete backward/current and following-pixel word addresses stay
+// registered ahead of the cache. A fast final response advances these
+// registers concurrently with the writer output.
 wire [5:0] precompute_current_ei=
-    precompute_after_emit?(ei+1'b1):ei;
+    precompute_after_advance?(ei+1'b1):ei;
 wire [5:0] precompute_next_ei=precompute_current_ei+1'b1;
 wire [2:0] precompute_current_er=precompute_current_ei[5:3];
 wire [2:0] precompute_current_el=precompute_current_ei[2:0];
@@ -90,30 +88,35 @@ wire [28:0] precompute_next_addr=pixel_addr(
     next_use_backward?future_off:past_off,blk,
     precompute_next_src_x[11:0],precompute_next_src_y[11:0]);
 
-wire bidir_lookup_candidate;
+wire tap_dx=(half_x&&half_y)?tap_index[0]:(half_x?tap_index[0]:1'b0);
+wire tap_dy=(half_x&&half_y)?tap_index[1]:(half_y?tap_index[0]:1'b0);
+wire tap_last=(half_x&&half_y)?(tap_index==2'd3):((half_x||half_y)?(tap_index==2'd1):(tap_index==2'd0));
+wire lookup_phase_complete=lookup_wait&&ddram_lookup_ready&&
+    ddram_lookup_hit&&tap_last;
+wire ddr_phase_complete=waitresp&&ddram_dout_ready&&tap_last;
+wire prediction_phase_complete=lookup_phase_complete||ddr_phase_complete;
+wire bidir_lookup_candidate=prediction_phase_complete&&
+    (exec_direction==2'd3)&&!pred_direction;
+wire predicted_pixel_complete=prediction_phase_complete&&
+    !((exec_direction==2'd3)&&!pred_direction);
 wire next_pixel_lookup_candidate=
-    emit&&(ei!=6'd63);
+    predicted_pixel_complete&&(ei!=6'd63);
 wire bidir_early_lookup=
     bidir_lookup_candidate&&bidir_prelaunch_valid;
 wire next_pixel_early_lookup=
     next_pixel_lookup_candidate&&next_prelaunch_valid;
 wire early_lookup=bidir_early_lookup||next_pixel_early_lookup;
 wire [28:0] early_lookup_addr=
-    bidir_lookup_candidate?bidir_prelaunch_addr:next_prelaunch_addr;
+    bidir_early_lookup?bidir_prelaunch_addr:next_prelaunch_addr;
 wire early_half_x=
-    bidir_lookup_candidate?exec_bmvx[0]:next_exec_mvx[0];
+    bidir_early_lookup?exec_bmvx[0]:next_exec_mvx[0];
 wire early_half_y=
-    bidir_lookup_candidate?exec_bmvy[0]:next_exec_mvy[0];
-
-wire tap_dx=(half_x&&half_y)?tap_index[0]:(half_x?tap_index[0]:1'b0);
-wire tap_dy=(half_x&&half_y)?tap_index[1]:(half_y?tap_index[0]:1'b0);
-wire tap_last=(half_x&&half_y)?(tap_index==2'd3):((half_x||half_y)?(tap_index==2'd1):(tap_index==2'd0));
-// The registered state predicts the final-tap response one cycle ahead. It is
-// intentionally independent of lookup hit/ready and pred_direction, keeping
-// the cache response and direction mux out of the cache-address timing path.
-// Extra prelaunches during a backward final tap are harmless and ignored.
-assign bidir_lookup_candidate=
-    tap_last&&(lookup_wait||waitresp);
+    bidir_early_lookup?exec_bmvy[0]:next_exec_mvy[0];
+assign fast_pixel_advance=predicted_pixel_complete&&
+    ((ei==6'd63)||next_prelaunch_valid);
+assign slow_pixel_advance=emit&&!emit_advanced&&(ei!=6'd63);
+assign precompute_after_advance=
+    (fast_pixel_advance&&(ei!=6'd63))||slow_pixel_advance;
 wire signed [13:0] src_x_tap_signed=src_base_x+$signed({13'd0,tap_dx});
 wire signed [13:0] src_y_tap_signed=src_base_y+$signed({13'd0,tap_dy});
 wire [11:0] src_x_tap=src_x_tap_signed[11:0];
@@ -136,12 +139,16 @@ wire [28:0] computed_phase_base_addr=pixel_addr(
 wire residual_hit=(exec_desc_slot<desc_count)&&
     (desc_word[13:3]==mbi)&&
     (desc_word[2:0]==blk);
+wire pixel_completed=
+    (pixel_setup&&(exec_direction==0)&&residual_hit)||
+    predicted_pixel_complete;
 // Commit 231: overlap the synchronous read of the next in-block residual with
 // the current pixel's reference lookup. Block boundaries continue through the
 // staged residual_load path so descriptor changes retain the full RAM latency.
 wire residual_read_ahead=
     (pixel_setup||lookup_wait||req||waitresp||emit)&&(ei!=6'd63);
 wire [5:0] residual_read_index=
+    (fast_pixel_advance&&(ei<6'd62)) ? (ei+2'd2) :
     residual_read_ahead ? (ei+1'b1) : ei;
 wire [16:0] residual_mem_index=
     {exec_desc_slot,6'b000000}+{11'd0,residual_read_index};
@@ -200,14 +207,12 @@ assign ddram_lookup_consume=
 assign store_select=emit;
 assign store_pixel_value=out_reg;
 assign store_pixel_valid=emit;
-assign store_block_start=emit&&(ei==0);
-assign store_block_complete=emit&&(ei==63);
+assign store_block_start=emit&&emit_block_start;
+assign store_block_complete=emit&&emit_block_complete;
 // Wide B scratch tag: X[11:10]=11 identifies scratch; Y[11:9]
 // identifies Y/Cb/Cr while preserving 10-bit X and 9-bit Y coordinates.
-assign store_pixel_x={2'b11,dest_x[9:0]};
-assign store_pixel_y=(blk<4)?(scratch_bank_latched?{3'b001,luma_y[8:0]}:{3'b100,luma_y[8:0]}):
-                     (blk==4)?(scratch_bank_latched?{3'b010,chroma_y[8:0]}:{3'b101,chroma_y[8:0]}):
-                              (scratch_bank_latched?{3'b011,chroma_y[8:0]}:{3'b110,chroma_y[8:0]});
+assign store_pixel_x=emit_x;
+assign store_pixel_y=emit_y;
 
 wire descriptor_order_error=(desc_count!=0)&&
     ({sideband_value[13:3],sideband_value[2:0]}<=
@@ -224,7 +229,9 @@ always @(posedge clk) begin
         residual_pel<=0;
     end else begin
         desc_word<=desc_mem[exec_desc_slot];
-        if(residual_load_wait||(emit&&(ei!=6'd63)))
+        if(residual_load_wait||
+           (fast_pixel_advance&&(ei!=6'd63))||
+           slow_pixel_advance)
             residual_pel<=residual_hit?residual_store_read_data:16'sd0;
     end
 end
@@ -244,6 +251,7 @@ always @(posedge clk) begin
         pending<=0;started<=0;active<=0;future_bank_latched<=0;scratch_bank_latched<=0;req<=0;waitresp<=0;lookup_wait<=0;
         mbi<=0;col<=0;mrow<=0;blk<=0;timeout<=0;emit<=0;wait_store<=0;pixel_setup<=0;residual_load<=0;residual_load_wait<=0;ei<=0;
         pred_direction<=0;tap_index<=0;pred_sum<=0;forward_prediction<=0;out_reg<=0;tap_byte_sel<=0;
+        emit_advanced<=0;emit_x<=0;emit_y<=0;emit_block_start<=0;emit_block_complete<=0;
         read_seen<=0;sample_nonzero<=0;half_sample_seen<=0;reconstructed_seen<=0;persisted_seen<=0;row_persisted<=0;error<=0;error_source<=0;
         row_motion_base<=0;row_motion_end<=0;exec_row<=0;row_final_latched<=0;
     end else begin

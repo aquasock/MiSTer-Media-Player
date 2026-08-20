@@ -473,7 +473,7 @@ module tb_h262_live_raster_soak #(
                    prediction.reference_cache.cache_hit_count!=32'd499551||
                    prediction.reference_cache.cache_miss_count!=32'd71329||
                    prediction.reference_cache.uncached_count!=0||
-                   memory_reads!=71329||total_cycles!=3109996||
+                   memory_reads!=71329||total_cycles!=2679996||
                    pixel_samples!=423936||pixel_mismatches!=0||
                    !writer_seen||!pred_read_observed||
                    !pred_reconstructed_observed||!presentation_complete||
@@ -493,9 +493,9 @@ module tb_h262_live_raster_soak #(
                prediction.reference_cache.cache_miss_count!=32'd463835||
                prediction.reference_cache.uncached_count!=0||
                memory_reads!=463835||
-               // Entry 234 four-entry fully-associative cache completes this
-               // exact soak in 15,739,996 cycles.
-               total_cycles!=15739996||
+               // Entry 239 registered output overlap completes this exact
+               // soak in 14,499,996 cycles without changing cache traffic.
+               total_cycles!=14499996||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
                presentation_error)

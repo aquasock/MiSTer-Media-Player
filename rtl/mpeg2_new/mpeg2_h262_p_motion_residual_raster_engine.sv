@@ -220,6 +220,12 @@ reg [5:0] ei;
 reg [1:0] tap_index;
 reg [10:0] pred_sum;
 reg [7:0] out_reg;
+reg emit_advanced, emit_first_sample;
+reg [11:0] emit_x, emit_y;
+reg emit_block_start, emit_block_complete;
+(* preserve *) reg [28:0] next_prelaunch_addr;
+(* preserve *) reg next_prelaunch_valid;
+wire fast_pixel_advance, slow_pixel_advance, precompute_after_advance;
 
 wire [28:0] roff=reference_bank_latched?BANK_OFF:0;
 wire [2:0] er=ei[5:3], el=ei[2:0];
@@ -259,11 +265,14 @@ wire source_bounds_ok=
     (src_base_x>=0)&&(src_base_y>=0)&&
     (src_last_x<plane_width_s)&&(src_last_y<plane_height_s);
 
-// Commit 232: during emit the cache port is otherwise idle. Form the first
-// tap of the next in-block pixel here so a valid motion pixel can enter
-// lookup_wait directly; block starts, intra pixels, and bounds failures retain
-// the fully staged pixel_setup path.
-wire [5:0] next_pixel_ei=ei+1'b1;
+// Entry 239: form and register the first-tap word address for the following
+// pixel before the current cache response arrives. This keeps the four-way
+// cache match out of the engine's output path while permitting back-to-back
+// registered lookup responses.
+wire [5:0] next_pixel_ei=
+    ei+(precompute_after_advance?2'd2:2'd1);
+wire next_pixel_exists=
+    precompute_after_advance?(ei<6'd62):(ei!=6'd63);
 wire [2:0] next_pixel_er=next_pixel_ei[5:3];
 wire [2:0] next_pixel_el=next_pixel_ei[2:0];
 wire [11:0] next_pixel_luma_x=
@@ -290,8 +299,8 @@ wire next_pixel_source_bounds_ok=
     (next_pixel_src_base_x>=0)&&(next_pixel_src_base_y>=0)&&
     (next_pixel_src_last_x<plane_width_s)&&
     (next_pixel_src_last_y<plane_height_s);
-wire next_pixel_lookup=
-    emit&&(ei!=6'd63)&&!mb_intra&&next_pixel_source_bounds_ok;
+wire [28:0] computed_next_prelaunch_addr=pixel_addr(
+    roff,blk,next_pixel_src_base_x[11:0],next_pixel_src_base_y[11:0]);
 
 wire tap_dx=
     (half_x&&half_y)?tap_index[0]:
@@ -335,6 +344,7 @@ wire residual_hit=descriptor_position_hit&&
 wire residual_read_ahead=
     (pixel_setup||lookup_wait||req||waitresp||emit)&&(ei!=6'd63);
 wire [5:0] residual_read_index=
+    (fast_pixel_advance&&(ei<6'd62)) ? (ei+2'd2) :
     residual_read_ahead ? (ei+1'b1) : ei;
 wire [16:0] residual_mem_index=
     {exec_desc_slot,6'b000000}+{11'd0,residual_read_index};
@@ -365,18 +375,30 @@ wire [7:0] lookup_reconstructed_current=
     clip(lookup_predicted_current,residual_pel_q);
 wire lookup_advance=lookup_wait&&ddram_lookup_ready&&
     ddram_lookup_hit&&!tap_last;
+wire lookup_pixel_complete=lookup_wait&&ddram_lookup_ready&&
+    ddram_lookup_hit&&tap_last;
+wire ddr_pixel_complete=waitresp&&ddram_dout_ready&&tap_last;
+wire predicted_pixel_complete=lookup_pixel_complete||ddr_pixel_complete;
+wire next_pixel_lookup=predicted_pixel_complete&&(ei!=6'd63)&&
+    next_prelaunch_valid;
+assign fast_pixel_advance=predicted_pixel_complete&&
+    ((ei==6'd63)||next_prelaunch_valid);
+assign slow_pixel_advance=emit&&!emit_advanced&&(ei!=6'd63);
+assign precompute_after_advance=
+    (fast_pixel_advance&&(ei!=6'd63))||slow_pixel_advance;
+wire pixel_completed=
+    (pixel_setup&&mb_intra&&residual_hit)||predicted_pixel_complete;
 wire prediction_lookup=
     (pixel_setup&&!mb_intra&&source_bounds_ok)||lookup_advance||
     next_pixel_lookup;
 wire [11:0] lookup_src_x=
-    next_pixel_lookup?next_pixel_src_base_x[11:0]:
     lookup_advance?next_src_x_tap:src_x_tap;
 wire [11:0] lookup_src_y=
-    next_pixel_lookup?next_pixel_src_base_y[11:0]:
     lookup_advance?next_src_y_tap:src_y_tap;
 
 assign ddram_burstcnt=req?8'd1:0;
 assign ddram_addr=req ? pixel_addr(roff,blk,src_x_tap,src_y_tap) :
+    next_pixel_lookup ? next_prelaunch_addr :
     prediction_lookup ? pixel_addr(roff,blk,lookup_src_x,lookup_src_y) :
     29'd0;
 assign ddram_rd=req;
@@ -388,13 +410,10 @@ assign ddram_lookup_consume=
 assign store_select=emit;
 assign store_pixel_value=out_reg;
 assign store_pixel_valid=emit;
-assign store_block_start=emit&&(ei==0);
-assign store_block_complete=emit&&(ei==63);
-assign store_pixel_x=
-    (blk<4)?luma_x:
-    (blk==4)?{2'b01,chroma_x[9:0]}:
-             {2'b10,chroma_x[9:0]};
-assign store_pixel_y=(blk<4)?luma_y:chroma_y;
+assign store_block_start=emit&&emit_block_start;
+assign store_block_complete=emit&&emit_block_complete;
+assign store_pixel_x=emit_x;
+assign store_pixel_y=emit_y;
 
 wire ready_res=metadata_done;
 wire descriptor_order_error=
@@ -411,13 +430,16 @@ wire unused_shift_map=&{1'b0,shift_right_map};
 // Commit 202: synchronous descriptor and sparse-sample lookups allow both
 // 2048-block stores to infer M10K RAM. Commit 231 keeps residual_load for the
 // first sample of a block, then captures each prefetched in-block sample when
-// the preceding pixel emits.
+// the preceding pixel advances. The two-sample address during a fast retire
+// supplies the synchronous RAM pipeline for the following back-to-back pixel.
 always @(posedge clk) begin
     if(reset) begin
         residual_pel_q<=0;
         desc_word<=0;
     end else begin
-        if(residual_load_wait||(emit&&(ei!=6'd63)))
+        if(residual_load_wait||
+           (fast_pixel_advance&&(ei!=6'd63))||
+           slow_pixel_advance)
             residual_pel_q<=residual_hit ? residual_store_read_data : 16'sd0;
         desc_word<=desc_mem[exec_desc_slot];
     end
@@ -458,6 +480,14 @@ always @(posedge clk) begin
         tap_index<=0;
         pred_sum<=0;
         out_reg<=0;
+        emit_advanced<=0;
+        emit_first_sample<=0;
+        emit_x<=0;
+        emit_y<=0;
+        emit_block_start<=0;
+        emit_block_complete<=0;
+        next_prelaunch_addr<=0;
+        next_prelaunch_valid<=0;
         read_seen<=0;
         sample_value<=0;
         sample_nonzero<=0;
@@ -495,6 +525,8 @@ always @(posedge clk) begin
             waitresp<=0;
             lookup_wait<=0;
             emit<=0;
+            emit_advanced<=0;
+            next_prelaunch_valid<=0;
             wait_store<=0;
             pixel_setup<=0;
             motion_load<=0;
@@ -685,6 +717,12 @@ always @(posedge clk) begin
             pixel_setup<=1;
         end
 
+        if(pixel_setup||precompute_after_advance) begin
+            next_prelaunch_addr<=computed_next_prelaunch_addr;
+            next_prelaunch_valid<=
+                next_pixel_exists&&!mb_intra&&next_pixel_source_bounds_ok;
+        end
+
         if(pixel_setup) begin
             pixel_setup<=0;
             if(mb_intra&&!residual_hit) begin
@@ -763,14 +801,14 @@ always @(posedge clk) begin
         if(emit) begin
             if(progress_stage<4'd4)
                 progress_stage<=4'd4;
-            if((mbi==0)&&(blk==0)&&(ei==0)) begin
+            if(emit_first_sample) begin
                 reconstructed_value<=out_reg;
                 persisted_value<=out_reg;
             end
             emit<=0;
-            if(ei==6'd63) begin
+            if(!emit_advanced&&(ei==6'd63)) begin
                 wait_store<=1;
-            end else begin
+            end else if(!emit_advanced) begin
                 ei<=ei+1'b1;
                 pred_sum<=0;
                 tap_index<=0;
@@ -779,6 +817,30 @@ always @(posedge clk) begin
                 end else begin
                     pixel_setup<=1;
                 end
+            end
+        end
+
+        if(pixel_completed) begin
+            emit<=1;
+            emit_advanced<=fast_pixel_advance;
+            emit_first_sample<=(mbi==0)&&(blk==0)&&(ei==0);
+            emit_x<=
+                (blk<4)?luma_x:
+                (blk==4)?{2'b01,chroma_x[9:0]}:
+                         {2'b10,chroma_x[9:0]};
+            emit_y<=(blk<4)?luma_y:chroma_y;
+            emit_block_start<=(ei==0);
+            emit_block_complete<=(ei==6'd63);
+        end
+
+        if(fast_pixel_advance) begin
+            if(ei==6'd63) begin
+                wait_store<=1;
+            end else begin
+                ei<=ei+1'b1;
+                pred_sum<=0;
+                tap_index<=0;
+                lookup_wait<=1;
             end
         end
 

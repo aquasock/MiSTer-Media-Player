@@ -93,6 +93,10 @@ reg [2:0] tap_byte_sel;
 reg [10:0] pred_sum;
 reg [7:0] forward_prediction;
 reg [7:0] out_reg;
+reg emit_advanced;
+reg [11:0] emit_x,emit_y;
+reg emit_block_start,emit_block_complete;
+wire fast_pixel_advance,slow_pixel_advance,precompute_after_advance;
 
 wire [28:0] future_off=future_bank_latched?BANK_OFF:29'd0;
 wire [28:0] past_off=future_bank_latched?29'd0:BANK_OFF;

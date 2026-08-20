@@ -57,7 +57,7 @@
             phase_bounds_ok<=source_bounds_ok;
         end
 
-        if(pixel_setup||precompute_after_emit) begin
+        if(pixel_setup||precompute_after_advance) begin
             bidir_prelaunch_addr<=precompute_bidir_addr;
             bidir_prelaunch_byte<=precompute_bidir_src_x[2:0];
             bidir_prelaunch_valid<=
@@ -149,8 +149,8 @@
 
         if(emit) begin
             emit<=0;
-            if(ei==63)wait_store<=1;
-            else begin
+            if(!emit_advanced&&(ei==63))wait_store<=1;
+            else if(!emit_advanced) begin
                 ei<=ei+1'b1;
                 pred_direction<=0;
                 phase_mvx<=(exec_direction==2'd2)?exec_bmvx:exec_fmvx;
@@ -166,6 +166,39 @@
                 end else begin
                     pixel_setup<=1;
                 end
+            end
+        end
+
+        if(pixel_completed) begin
+            emit<=1;
+            emit_advanced<=fast_pixel_advance;
+            emit_x<={2'b11,dest_x[9:0]};
+            emit_y<=(blk<4)?
+                (scratch_bank_latched?{3'b001,luma_y[8:0]}:
+                                      {3'b100,luma_y[8:0]}):
+                (blk==4)?
+                (scratch_bank_latched?{3'b010,chroma_y[8:0]}:
+                                      {3'b101,chroma_y[8:0]}):
+                (scratch_bank_latched?{3'b011,chroma_y[8:0]}:
+                                      {3'b110,chroma_y[8:0]});
+            emit_block_start<=(ei==0);
+            emit_block_complete<=(ei==63);
+        end
+
+        if(fast_pixel_advance) begin
+            if(ei==63)wait_store<=1;
+            else begin
+                ei<=ei+1'b1;
+                pred_direction<=0;
+                phase_mvx<=(exec_direction==2'd2)?exec_bmvx:exec_fmvx;
+                phase_mvy<=(exec_direction==2'd2)?exec_bmvy:exec_fmvy;
+                phase_backward<=(exec_direction==2'd2);
+                phase_base_addr<=next_prelaunch_addr;
+                phase_base_byte<=next_prelaunch_byte;
+                phase_bounds_ok<=next_prelaunch_valid;
+                pred_sum<=0;
+                tap_index<=0;
+                lookup_wait<=1;
             end
         end
 

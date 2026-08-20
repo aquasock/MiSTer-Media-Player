@@ -1,6 +1,8 @@
 `timescale 1ns/1ps
 
-module tb_h262_p_intra_macroblocks;
+module tb_h262_p_intra_macroblocks #(
+    parameter integer CACHE_HIT_MODE=0
+);
     localparam integer MAX_STREAM_BYTES=262144;
     integer expected_intra=1,expected_blocks=6;
     integer first_intra_row=8,last_intra_row=8,intra_col=20;
@@ -169,8 +171,10 @@ module tb_h262_p_intra_macroblocks;
         .reference_bank(1'b0),.destination_bank(1'b1),
         .store_block_stored(engine_block_stored),.ddram_busy(1'b0),
         .ddram_dout(engine_dout),.ddram_dout_ready(engine_dout_ready),
-        .ddram_lookup_ready(engine_lookup_ready),.ddram_lookup_hit(1'b0),
-        .ddram_lookup_data(64'd0),.ddram_lookup_request(engine_lookup_request),
+        .ddram_lookup_ready(engine_lookup_ready),
+        .ddram_lookup_hit(CACHE_HIT_MODE!=0),
+        .ddram_lookup_data({8{8'd50}}),
+        .ddram_lookup_request(engine_lookup_request),
         .ddram_burstcnt(engine_burstcnt),.ddram_addr(engine_addr),
         .ddram_rd(engine_rd),.store_select(engine_store_select),
         .store_pixel_value(engine_store_value),.store_pixel_x(engine_store_x),
