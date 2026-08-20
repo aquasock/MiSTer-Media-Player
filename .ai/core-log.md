@@ -1,4 +1,32 @@
 ---
+## 258 PROPOSAL ??? 2026-08-20T06:24:11-07:00
+
+#### Coming From:
+
+Unreleased f6e3877
+
+#### Purpose:
+
+Use the accepted 21.82/19.85 fps hardware boundary to determine whether modestly deeper block-fetch, cache, and DDR read-command capacity can hide enough remaining response latency to justify another production change.
+
+#### Outcome:
+
+Proposal only. Entry 257 is visually hardware accepted: both long-GOP and mixed-macroblock streams retain their established passing LED signatures, the user sees a noticeable improvement from discrete stuttering frames to a slow but continuous movie, and the MiSTer is released for continued development. Hardware telemetry shows that the accepted depth-two path leaves 27,754,704 prediction-response cycles in long and 8,925,420 in mixed, while stable 25 fps still requires reductions of 22,331,819 and 12,883,846 cadence cycles respectively. Because the mixed gap exceeds its entire recorded prediction-response wait, deeper queueing alone is not assumed sufficient; it must first prove its exact contribution before the next compute-stage optimization is selected.
+
+#### Next Steps:
+
+Make prediction descriptor depth a simulation-selectable constant across the block-footprint fetcher, reference-word cache and shared DDR arbiter, then run focused ordered-response tests plus exact mixed and complete long boundaries at depths two, three and four under one- and ten-cycle service. Preserve pixels, traffic ownership, display priority, writer exclusion and zero-latency response behavior. Commit a production depth change only if the full traces show a material reduction; otherwise retain depth two and profile the remaining P/B compute occupancy directly.
+
+#### Files Modified:
+
+- .ai/core-log.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 257 COMMIT Unreleased f6e3877 2026-08-20T06:14:25-07:00
 
 #### Coming From:
@@ -13,9 +41,11 @@ Remove the remaining zero-latency response-capacity feedback loop while preservi
 
 Commit `cc23163` removed request-valid from cache and arbiter busy equations, but its clean Quartus elaboration found a different ten-node loop: cache command valid used downstream response-ready to decide that a full descriptor FIFO would pop, while legal direct-response routing used that command valid to select response ownership. The build was interrupted before fitting completed and no RBF was produced or deployed. Commit `1d4329d` instead lets a full cache accept a replacement only when the arbiter's request-independent prediction readiness proves that its corresponding head command is retiring; response-ready now feeds only clocked pop and data association. The strengthened downstream model genuinely fills at two and reopens only on retirement. Focused cache and arbiter tests pass idle readiness, depth two, full-queue same-edge replacement, direct response, backpressure, burst ownership and prediction/display/prediction order. The exact mixed ten-cycle boundary remains all 423,936 samples, zero mismatches, 69,556 reads and 2,069,996 cycles, preserving the full Entry 255 gain with no response-routing feedback in command valid. A fully clean seed-2 Quartus build then completed with zero errors and no reported combinational loop; decoder and ordinary video timing are clean at +1.167 and +6.670 ns, but the dynamic HDMI scaler/OSD clock misses global setup by 0.179 ns across standing framework paths, so that RBF is rejected and was not deployed. Commit `0d4f679` changes only the reproducible fitter seed from two to five, leaving every decoder source and simulation result unchanged. Its fully clean build improves the standing HDMI scaler/OSD miss to 0.048 ns and improves decoder setup to +1.463 ns, but still fails the positive-global gate and is also rejected without deployment. Commit `f6e3877` changes only the fitter seed from five to six. Its fully clean Quartus 17.0.2 build completes in 10 minutes 34 seconds with zero errors, 143 standing warnings, no Critical Warning and no reported combinational loop. Timing is positive at +0.321 ns global setup, +1.139 ns decoder setup, +7.127 ns video setup, +0.247 ns hold, +3.622 ns global recovery, +13.605 ns decoder recovery and +0.695 ns removal. The fit uses 31,802 ALMs, 47,567 registers, 4,027,379 memory bits, 504 RAM blocks and 65 DSP blocks. Qualified artifact `MediaPlayer_commit257_f6e3877_seed6.rbf` is 4,282,980 bytes with SHA-256 `c32a0c363458e5a9036c75b25f17bdff3e535682bc26f08e0981ac81b2c00d0c`; the standard MiSTer FTP readback is byte-identical. Automated MiSTer acquisition accepts both streams with every expected picture, zero error flags and zero destination stalls. Long displays 72 pictures through 71 swaps in 175,691,819 cycles or 3.253552 seconds at 21.822302 fps, improving 24.96 percent over Entry 247's 17.463119 fps and reducing cadence cycles by 19.98 percent. Mixed displays 24 pictures through 23 swaps in 62,563,846 cycles or 1.158590 seconds at 19.851721 fps, improving 32.49 percent over Entry 247's 14.983129 fps and reducing cadence cycles by 24.52 percent. Both gains are substantial hardware confirmation of the two-request path, although neither test has yet reached the requested stable 25 fps.
 
+Visual hardware acceptance also passes: the user reports that both streams retain exactly their prior passing LED signatures, the gain is noticeable, and playback now resembles a slow movie rather than a series of stuttering frames.
+
 #### Next Steps:
 
-Pause with the timing-qualified and automated-hardware-accepted `f6e3877` core deployed. Ask the user to visually inspect long-GOP and mixed-macroblock playback and report coherence, apparent cadence and settled LED states. Do not begin the next optimization until that visual result is received; after acceptance, use the remaining telemetry gap from 21.82/19.85 fps to select the next bounded concurrency step toward stable 25 fps.
+Continue under Entry 258 from the accepted 21.82/19.85 fps boundary, preserving the exact timing-qualified seed-6 image as the rollback point.
 
 #### Files Modified:
 
@@ -26,7 +56,7 @@ Pause with the timing-qualified and automated-hardware-accepted `f6e3877` core d
 #### Status:
 
 - [x] Built
-- [ ] Passed
+- [x] Passed
 
 ---
 ## 256 COMMIT Unreleased cc23163 2026-08-20T05:19:52-07:00
@@ -906,47 +936,6 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 203 COMMIT Unreleased e3036ac 2026-08-18T01:52:05-07:00
-
-#### Coming From:
-
-Unreleased 104965c
-
-#### Purpose:
-
-Replace the generalized B path's 16-block and 64-coefficient residual-plan limits with RAM-backed block transactions and a sparse-sample store shared across mutually exclusive P and B reconstruction.
-
-#### Outcome:
-
-Commit `104965c` is hardware accepted: `test_p_residual_streaming.m2v` displays the authored vertical stripe from rows 5 through 24 at column 20 with a coherent raster, USER and POWER solid, and DISK off. Commit `e3036ac` replaces the B parser's 16-block and 64-coefficient arrays with synchronous M10K stores for 2,048 block descriptors and 32,768 coefficient events, transforms and replays one block at a time, moves the B raster descriptors into M10K RAM, and lets mutually exclusive P/B reconstruction share one 2,048-block sparse spatial-sample store. The deterministic 182,849-byte B streaming regression reports exactly 1,350 motion records, 120 residual blocks, 7,680 spatial samples and RAM writes, and a complete 518,400-sample raster in which exactly the 7,680 stripe samples change; parser, transform, raster, ordering, and persistence checks remain clear. The original P intra and 120-block P streaming tests, parser-window and restricted-slice replays, prediction-source diagnostic, all seven standing generators, and their software references remain clean. The ordinary 366,067-byte compatibility corpus now completes its first B picture with 817 residual blocks and 17,244 coefficient events and no P or B error, exceeding the former limits by more than 50 and 269 times respectively. The clean Quartus 17.0.2 build completes in 9 minutes 15 seconds with zero setup and hold TNS, no Critical Warning, +0.515 ns global setup, +0.251 ns global hold, +1.065 ns decoder setup, 29,142 ALMs, 41,855 registers, 4,025,331 memory bits, 503 RAM blocks, 65 DSP blocks, and 3 PLLs. Generated RBF `MediaPlayer.rbf` has SHA-256 `b8695a036e4871b9aecdb7587ba603d18821e23dffb2bf17fed9eddf697cb3a7`; stream `test_b_residual_streaming.m2v` has SHA-256 `d9ee48a2d34f5054cb6754b892633a1789f892a6bc71b3119470d312d82e8aed`.
-
-#### Next Steps:
-
-Install the Commit-203 RBF and run `test_b_residual_streaming.m2v` on MiSTer through one complete 32-second diagnostic frame, recording whether USER, POWER, and DISK are solid, dark, or blinking and confirming a coherent vertical stripe at column 20 from rows 5 through 24. Clean acceptance is solid USER, solid POWER, and dark DISK.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- tools/streams/generate_test_b_residual_streaming.py
-- tools/streams/tb_h262_b_residual_streaming.sv
-- tools/streams/tb_h262_p_intra_macroblocks.sv
-- tools/streams/tb_h262_parser_windows.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
 ## 204 COMMIT Unreleased 7256a7f 2026-08-18T02:34:46-07:00
