@@ -1,5 +1,35 @@
 ---
-## 247 COMMIT Unreleased ??? 2026-08-20T01:41:00-07:00
+## 248 COMMIT Unreleased ??? 2026-08-20T02:13:42-07:00
+
+#### Coming From:
+
+Unreleased 66e769f
+
+#### Purpose:
+
+Reduce the remaining serialized prediction-memory wait with a bank- and row-partitioned cache that retains a four-way timed lookup cone.
+
+#### Outcome:
+
+Entry 247 removes the dominant avoidable presentation serialization and raises measured MiSTer cadence to 17.463119 fps long and 14.983129 fps mixed with exact picture counts and zero errors. The remaining long cadence is 219,548,405 cycles versus the 153,360,000-cycle 25 fps target, while decoder stalls occupy 161,506,865 cycles and physical prediction request acceptance plus response wait occupy 63,001,860 cycles. Mixed independently spends 20,141,742 cycles at the same physical boundary. The current four fully associative words are shared by both reference banks and both half-pel rows; B prediction therefore lets past/future and vertical-tap working sets evict each other even though selecting the reference-bank bit and one low row-distribution bit can happen before the existing four parallel tag compares. The proposed experiment will model four sets selected by `{request_addr[16],request_addr[1]}` with four ways per set, giving P eight effective words and B sixteen total words without lengthening the proven four-way compare-and-data-select cone.
+
+#### Next Steps:
+
+Add a simulation-only mirror of the proposed cache to the exact mixed and 72-picture live regressions and measure hits, misses and per-set pressure before changing functional RTL. Proceed only if it materially exceeds the rejected read-ahead and prior eight-entry set-associative gains. If justified, implement deterministic per-set replacement in the focused cache, preserve active-boundary invalidation, one downstream outstanding request, exact pixels and transaction ordering, then require the locked regression set, positive clean timing and repeatable zero-error MiSTer cadence improvement on both streams; otherwise retain `66e769f` and select a different B reconstruction boundary.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
+- tools/streams/tb_h262_prediction_word_cache.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+## 247 COMMIT Unreleased 66e769f 2026-08-20T01:41:00-07:00
 
 #### Coming From:
 
@@ -11,24 +41,26 @@ Overlap decoding of the following reference picture with presentation of the com
 
 #### Outcome:
 
-Entry 246 rejects adjacent-word DDR read-ahead because its measured benefit is too small and its simplest form is actively harmful. Entry 245 hardware telemetry identifies the next larger serialized boundary: the long-GOP stream spends 54,737,767 of 264,581,138 cadence cycles in presentation hold and the mixed stream spends 16,974,046 of 97,132,985 cycles there. The scheduler currently blocks all compressed input from the accepted non-B header that closes a B run until both B scratch pictures and their retained future reference have been displayed. Static lifetime tracing shows that the existing P destination-ownership gate can safely delay writes only while that destination reference bank is still on screen; after the first scratch swap, the next P picture can decode into the non-future reference bank while the remaining prior-run pictures are presented. The experiment will permit exactly that one following reference transaction, capture its publication as pending work, and reassert the B-presentation hold before a later B run can reuse either scratch frame.
+Commit `66e769f` permits exactly one following P transaction to decode while the completed prior B run presents, captures that P publication behind the ordinary classification barrier, and reasserts presentation hold before a later B header can reuse either scratch frame. The existing displayed-destination ownership gate now recognizes this overlap header, so no P write can begin until the first scratch swap releases its target reference bank. The focused scheduler passes header-before/same/after-publication, cadence, exact scratch0/scratch1/future order, one-P overlap, preserved-next-reference, starvation, terminal and fail-open cases. The exact mixed oracle retains 423,936 samples, zero mismatches, maximum delta two, 499,551/71,329/0 cache accounting and 23 swaps while falling from 2,519,996 to 2,279,996 cycles, a 9.52 percent reduction. The 72-picture live soak retains every cache count, write count, 25 publications, 47 B pictures, 71 swaps and final identity while falling from 13,419,996 to 12,689,996 cycles, a 5.44 percent reduction. The complete 366,071-byte mixed publication run passes nine reference publications, fifteen B pictures, final identity nine, zero displayed-bank overwrites and completed presentation.
+
+A fully clean Quartus 17.0.2 build completes in 9 minutes 56 seconds with zero errors and 125 standing warnings. Timing is positive at +0.558 ns global setup, +1.389 ns decoder setup, +6.898 ns video setup, +0.200 ns hold, +4.253 ns global recovery, +15.227 ns decoder recovery and +0.448 ns removal. The fit uses 30,085 ALMs, 43,317 registers, 4,027,379 memory bits, 504 RAM blocks and 65 DSP blocks. Qualified artifact `MediaPlayer_commit247_66e769f.rbf` is 4,256,044 bytes with SHA-256 `5db29ae0ee415c61096c53ebcaf2ddcacb096bc048ccbecd2f0054445653fb35`. Automated MiSTer acquisition accepts both streams exactly with zero errors. Long displays 72 pictures through 71 swaps in 219,548,405 cycles or 4.065711 seconds, improving from 14.490829 to 17.463119 fps; presentation stalls fall from 54,737,767 to 7,203,116 cycles while decoder stalls remain 161,506,865 and destination stalls remain zero. Mixed displays 24 pictures through 23 swaps in 82,893,234 cycles or 1.535060 seconds, improving from 12.786594 to 14.983129 fps; presentation stalls fall from 16,974,046 to 3,131,037 cycles while decoder stalls remain 54,797,368 and destination stalls remain zero. This proves the serialized presentation boundary was a real hardware bottleneck and leaves prediction-bound P/B reconstruction as the dominant limit.
 
 #### Next Steps:
 
-First extend the focused scheduler regression with a slow prior-run presentation and prove that the next P publication may overlap it while any following B header remains blocked. Then implement the narrow scheduler/top-level handshake, rerun exact presentation order, P/B parser and raster, mixed-pixel, repeated-download, 72-picture live-raster and complete publication regressions, and compare modeled cycles against Entry 245. Accept only exact pixels and order, no displayed-bank overwrite, a material cadence reduction, positive clean Quartus setup/hold/recovery/removal slack, and zero-error hardware telemetry on both streams; otherwise revert the overlap and retain `2a26c05` as the qualified core.
+Retain and deploy the timing-qualified `66e769f` core as the new measured baseline. Continue with Entry 248's proposal-first cache partition model, because long still needs 66,188,405 fewer cadence cycles to reach stable 25 fps and physical prediction acceptance/response wait now accounts for 63,001,860 cycles. Reserve user video verification until telemetry reaches the requested stable 25 fps.
 
 #### Files Modified:
 
-- MediaPlayer_top_00.svh
 - MediaPlayer_top_05.svh
 - rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 - tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_dense_publication_order.sv
 - tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 246 COMMIT Unreleased e0db323 2026-08-20T01:19:04-07:00
@@ -1248,37 +1280,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-## 223 COMMIT Unreleased bbe625e 2026-08-18T13:14:21-07:00
-
-#### Coming From:
-
-Unreleased 7f92945
-
-#### Purpose:
-
-Identify the first missing post-I50 live transaction without changing decoder or presentation behavior.
-
-#### Outcome:
-
-The uploaded 14.501-second, 30 fps hardware capture disproves coded-order presentation: visible timestamps advance monotonically through B and reference pictures, reach the third-GOP I-picture at frame 50, and never advance again, while one-refresh B pictures explain the apparent camera-recorded skips. Commit `bbe625e` adds a passive probe that arms on the third I header and monotonically records eleven ordered boundaries through third-I publication, following-P header, P raster metadata, row and picture persistence, P reference publication, following-B header and persistence, B scratch selection, and future-reference presentation; only an otherwise passing DISK diagnostic consumes the stage, so USER, POWER, decode, DDR, ownership, and presentation control are unchanged. The focused stage/reset, B scheduler, and fail-open transport regressions pass. The 128x96 live-raster soak passes all 72 pictures with 22 P pictures, 47 B pictures, 25 publications, 25 display identities, final source-frame identity 71, and zero parser, prediction, writer, or presentation errors; the independent 720x480 long-GOP publication run matches 22 P, 47 B, 25 publications, 25 display identities, no overwrites, and completed presentation. The clean Quartus 17.0.2 build completes in 9 minutes 27 seconds with 0 errors, 121 standing warnings, global setup/hold slack +0.105/+0.175 ns, focused decoder/video setup slack +1.601/+7.708 ns, 29,418 ALMs, 42,182 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. `MediaPlayer_commit223_bbe625e.rbf` is 4,223,132 bytes with SHA-256 `0c9c1cf5cb7dc03bf66081e0ce69af2b34b29e64272edefab99780b350252236`; its MiSTer FTP readback is byte-identical.
-
-#### Next Steps:
-
-Reload the deployed core, load `test_compat_long_gop.m2v` once, wait for its settled diagnostic window, and report the DISK blink count while also confirming the USER and POWER states and the last visible frame. A count from one through eleven names the deepest post-I50 boundary reached and therefore isolates the next hardware correction without another observational expansion.
-
-#### Files Modified:
-
-- MediaPlayer_top_07.svh
-- files.qip
-- rtl/mpeg2_new/mpeg2_h262_final_gop_progress_probe.sv
-- tools/streams/tb_h262_final_gop_progress_probe.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
 
 ---
