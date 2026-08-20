@@ -54,6 +54,8 @@ wire signed [7:0] mb_bmvy=$signed(motion_word[7:0]);
 (* preserve *) reg bidir_prelaunch_valid,next_prelaunch_valid;
 (* preserve *) reg [28:0] phase_base_addr;
 (* preserve *) reg [2:0] phase_base_byte;
+(* preserve *) reg [28:0] miss_prelaunch_addr;
+(* preserve *) reg [2:0] miss_prelaunch_byte;
 (* preserve *) reg [6:0] phase_row_words;
 (* preserve *) reg phase_bounds_ok;
 

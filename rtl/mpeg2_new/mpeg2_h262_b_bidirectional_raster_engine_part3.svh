@@ -116,7 +116,11 @@
         // kate - Commit 182: latch the returned-word byte select in the same
         // cycle the address is presented to DDR, so both come from one
         // evaluation of src_x_tap.
-        if(req&&!ddram_busy)begin req<=0;waitresp<=1;tap_byte_sel<=phase_tap_byte;end
+        if(req&&!ddram_busy)begin
+            req<=0;waitresp<=1;tap_byte_sel<=phase_tap_byte;
+            miss_prelaunch_addr<=next_miss_prelaunch_addr;
+            miss_prelaunch_byte<=next_miss_tap_byte_sum[2:0];
+        end
 
         if(ddram_dout_ready) begin
             if(!waitresp)begin error<=1;if(!error)error_source<=5'd12;end
