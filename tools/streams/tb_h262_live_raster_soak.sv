@@ -26,6 +26,7 @@ module tb_h262_live_raster_soak #(
     reg [7:0] pixel_oracle[0:442367];
     reg [63:0] ddr_mem[0:DDR_WORDS-1];
     reg [1023:0] hex_path,pixel_path,prediction_trace_path,row_trace_path;
+    reg [1023:0] b_block_trace_path;
     integer stream_len,stream_index=0,quiet_cycles=0;
     integer i,p_rows=0,b_rows=0,p_pictures=0,b_pictures=0;
     integer published_references=0,display_swaps=0;
@@ -34,7 +35,9 @@ module tb_h262_live_raster_soak #(
     integer prediction_no_progress_cycles=0;
     integer prediction_trace_fd=0;
     integer row_trace_fd=0,row_trace_cycle=0;
+    integer b_block_trace_fd=0,b_block_trace_cycle=0;
     reg p_row_waiting_d=0,b_row_waiting_d=0;
+    reg b_block_fetch_complete_d=0;
     integer prediction_trace_demands=0,prediction_trace_hits=0;
     integer prediction_trace_misses=0,prediction_trace_block_starts=0;
     integer prediction_trace_block_ends=0;
@@ -365,6 +368,13 @@ module tb_h262_live_raster_soak #(
             $fdisplay(row_trace_fd,
                 "cycle,engine,event,temporal_reference");
         end
+        if($value$plusargs("B_BLOCK_TRACE=%s",b_block_trace_path))begin
+            b_block_trace_fd=$fopen(b_block_trace_path,"w");
+            if(b_block_trace_fd==0)
+                $fatal(1,"cannot open B block trace");
+            $fdisplay(b_block_trace_fd,
+                "cycle,event,temporal_reference,mbi,blk,direction");
+        end
         if(MIXED_PIXEL_MODE)begin
             if(!$value$plusargs("PIXELS=%s",pixel_path))
                 $fatal(1,"missing +PIXELS");
@@ -409,6 +419,40 @@ module tb_h262_live_raster_soak #(
             p_row_waiting_d<=
                 publication.p_controller.wide_general_probe.row_waiting;
             b_row_waiting_d<=publication.b_controller.row_waiting;
+        end
+    end
+
+    // Entry 266: simulation-only B block ownership boundaries. START is the
+    // current serial fetch launch, FETCHED is the optimistic instant at which
+    // a ping-pong fetch bank could be reassigned to the following block, and
+    // RETIRE is the writer persistence barrier that releases this block.
+    always @(posedge clk) begin
+        if(reset)begin
+            b_block_trace_cycle<=0;
+            b_block_fetch_complete_d<=0;
+        end else begin
+            b_block_trace_cycle<=b_block_trace_cycle+1;
+            if(b_block_trace_fd!=0)begin
+                if(prediction.b_probe.block_fetch_start)
+                    $fdisplay(b_block_trace_fd,"%0d,START,%0d,%0d,%0d,%0d",
+                        b_block_trace_cycle,temporal_reference,
+                        prediction.b_probe.mbi,prediction.b_probe.blk,
+                        prediction.b_probe.exec_direction);
+                if(prediction.b_probe.block_fetch_complete&&
+                   !b_block_fetch_complete_d)
+                    $fdisplay(b_block_trace_fd,"%0d,FETCHED,%0d,%0d,%0d,%0d",
+                        b_block_trace_cycle,temporal_reference,
+                        prediction.b_probe.mbi,prediction.b_probe.blk,
+                        prediction.b_probe.exec_direction);
+                if(prediction.b_probe.wait_store&&writer_stored&&
+                   (prediction.b_probe.exec_direction!=0))
+                    $fdisplay(b_block_trace_fd,"%0d,RETIRE,%0d,%0d,%0d,%0d",
+                        b_block_trace_cycle,temporal_reference,
+                        prediction.b_probe.mbi,prediction.b_probe.blk,
+                        prediction.b_probe.exec_direction);
+            end
+            b_block_fetch_complete_d<=
+                prediction.b_probe.block_fetch_complete;
         end
     end
 
