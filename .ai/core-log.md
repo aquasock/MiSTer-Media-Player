@@ -529,39 +529,6 @@ Await approval for a focused B prediction refill optimization that launches the 
 - [ ] Passed
 
 ---
-## 231 COMMIT Unreleased 6ddeb82 2026-08-18T22:26:51-07:00
-
-#### Coming From:
-
-Unreleased 1177e26
-
-#### Purpose:
-
-Hide synchronous residual-store latency behind current-pixel P/B reference lookup so the next in-block sample begins without two serialized staging cycles.
-
-#### Outcome:
-
-Entry 230 is hardware accepted at final source frame 71 with USER and POWER solid, 11 DISK blinks, and visibly improved presentation cadence, while its recording measures approximately 9.2 seconds for the 2.84-second source sequence. Profiling its exact 72-picture DDR-backed soak found 21,729,996 total cycles, 20,517,231 cycles of decoder rather than presentation backpressure, and two serialized synchronous residual-store staging states on every reconstructed sample. Commit `6ddeb82` retains those staged reads at block and descriptor transitions, but prefetches the following in-block residual while the current pixel performs its reference lookup and returns directly to pixel setup after emit. Focused P-intra and B-residual regressions pass exact motion, block, residual, store, and changed-sample counts in 2,941,014 and 5,068,729 cycles, respectively. The exact live-raster soak preserves all 72 pictures, 25 publications and promotions, final display identity 25, 50,688 reference writes, 55,296/52,992 B scratch writes, 622,811 DDR reads, 2,267,813/463,835/158,976 cache hit/miss/uncached counts, and zero decoder, reconstruction, writer, or presentation errors while falling to 19,229,996 cycles: an exact 2,500,000-cycle or 11.50 percent reduction. The full 791,528-byte long-GOP publication regression also passes 22 P pictures, 47 B pictures, 25 promotions, final source frame 71, and zero destination holds, overwrites, or presentation errors. The session-authorized incremental Quartus 17.0.2 compile completes in 9 minutes 26 seconds with zero errors and 121 standing warnings; global setup/hold slack is +0.603/+0.246 ns, focused decoder/video setup slack is +1.169/+7.417 ns, and decoder recovery slack is +13.741 ns. Utilization is 30,146 ALMs, 43,384 registers, 4,027,379 memory bits, 504 M10K blocks, and 65 DSP blocks. The 4,259,412-byte `MediaPlayer_commit231_6ddeb82.rbf` artifact has SHA-256 `2347a1bc7cc9879bf42117678d9a99dc20a5a2a3e846920d8eee85f0c56e4abb`; FTP upload and MiSTer readback produced the same digest. Hardware acceptance retains final frame 71, USER and POWER solid, and 11 DISK blinks with no new visible corruption. Frame-level review of the uploaded 30 fps recording places the first fully visible frame 0 at 0.500 seconds and frame 71 at 8.364 seconds, or 7.864 seconds total: approximately 1.34 seconds and 14.5 percent faster than Entry 230's 9.2-second recording, with late frames 61 through 71 remaining monotonic.
-
-#### Next Steps:
-
-Retain the hardware-proven in-block residual prefetch and accepted 25 fps presentation lifetime. Profile the new exact soak outside active raster execution, especially frontend parse, inverse-transform replay, block-store completion, and uncached post-write verification, then target the largest timing-safe serialized boundary while preserving all 72 pictures, final frame 71, and the passing LED signature.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- tools/streams/tb_h262_p_intra_macroblocks.sv
-- tools/streams/tb_h262_b_residual_streaming.sv
-- tools/streams/tb_h262_live_raster_soak.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
 ## 270 COMMIT Unreleased f298a67 2026-08-20T11:15:00-07:00
 
 #### Coming From:
@@ -588,6 +555,35 @@ Retain Entry 269's timing-clean scheduler, reject bounded P predecode, and do no
 
 - [x] Built
 - [x] Passed
+
+---
+## 271 COMMIT Unreleased ??? 2026-08-20T11:25:00-07:00
+
+#### Coming From:
+
+Unreleased f298a67
+
+#### Purpose:
+
+Measure one joint B block-fetch and two-lane interpolation schedule against the fifth-frame residual so shared execution time is never counted twice.
+
+#### Outcome:
+
+Proposal only. Entry 270 proves that ownership decoupling alone cannot close mixed: even zero-cost removal of every destination and presentation wait leaves a 1,288,483-cycle or 5.71-percent decoder-wait shortfall. Entries 266 and 267 separately measured queued next-block fetch and two-lane tap consumption, but their reported savings overlap inside each block's fetch-to-retire span and must not be added. Extend the existing complete B block replay so each block's consumer duration is reduced only by its exact parity-derived two-lane tap saving, then pass those adjusted durations through the same two-bank producer/consumer schedule. Scale only the resulting joint B-span fraction against Entry 269's measured B stall counters and combine it with Entry 270's deliberately optimistic fifth-frame ownership bound. Report both streams, retain the decoded block/direction counts as invariants, and reject the combined architecture unless it closes both targets without additive double counting.
+
+#### Next Steps:
+
+Use the recorded 4,320-block mixed and 13,536-block long traces without rerunning RTL, validate that the unmodified serial, two-bank and tap-only figures exactly reproduce Entries 266 and 267, and calculate the joint schedule plus hardware-scaled residual. If the joint ceiling closes both targets, choose the lower-risk functional order by testing the B block queue first while preserving Entry 269 scheduler ownership; if it does not, return to measured decoder serialization rather than widening frame identity.
+
+#### Files Modified:
+
+- tools/streams/analyze_b_block_pipeline_ceiling.py
+- tools/streams/analyze_destination_predecode_ceiling.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
 
 ---
 ## 232 COMMIT Unreleased 1b1ca8f 2026-08-18T23:55:01-07:00
