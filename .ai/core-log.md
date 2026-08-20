@@ -1,5 +1,5 @@
 ---
-## 244 COMMIT Unreleased ??? 2026-08-19T23:05:34-07:00
+## 244 COMMIT Unreleased 8d76c43 2026-08-19T23:05:34-07:00
 
 #### Coming From:
 
@@ -11,11 +11,11 @@ Allow Quartus to optimize the already-registered P following-pixel prelaunch add
 
 #### Outcome:
 
-The approved implementation will remove only the synthesis `preserve` attributes from P `next_prelaunch_addr` and `next_prelaunch_valid`. Both signals remain clocked registers with their existing update conditions, lookup timing, and one-outstanding transaction contract; decoded pixels, P/B cache traffic, writer and presentation ownership, and Entry 243 B miss prelaunch behavior remain unchanged.
+Commit `8d76c43` removes only the synthesis `preserve` attributes from P `next_prelaunch_addr` and `next_prelaunch_valid`; both signals remain clocked registers with unchanged update conditions, lookup timing, and one-outstanding transaction behavior. P-intra, B-residual, four-entry cache accounting, repeated-download rearm, eight-refill parser-window, mixed-pixel, exact 72-picture live-raster, and full 791,528-byte publication regressions all pass unchanged. The mixed oracle retains 423,936 samples, zero mismatches, maximum delta two, 499,551/71,329/0 cache counts, and 6,803 B miss prelaunches in 2,519,996 cycles. The live soak retains 22 P pictures, 47 B pictures, 25 publications, 71 swaps, 2,267,813/463,835/0 cache counts, 463,835 DDR reads, 151,039 B miss prelaunches, 13,419,996 cycles, and zero decoder, writer, or presentation errors. The full publication run retains 25 promotions, final identity 25, zero displayed-bank overwrites, and completed presentation. A fully clean seed-2 Quartus 17.0.2 build after removing `db`, `incremental_db`, and `output_files` completes in 9 minutes 24 seconds with zero errors and 124 standing warnings. Physical synthesis can now retime eligible logic and final timing closes with +0.094 ns global and decoder setup slack, +0.249 ns global hold, +3.803 ns global recovery, +0.895 ns removal, +14.826 ns focused decoder recovery, +7.364 ns video setup, and zero TNS or focused violations; the former P prelaunch cone remains the limiting decoder path but is positive. The fit uses 29,421 ALMs, 40,603 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. Qualified artifact `MediaPlayer_commit244_8d76c43.rbf` is 4,234,900 bytes with SHA-256 `0767ca4b1d87c595b9cd300133504518710ef5a659f9288153ca35130e68e66a`; its MiSTer FTP readback is byte-identical.
 
 #### Next Steps:
 
-Apply the narrow attribute change on seed 2, rerun P-intra, B-residual, cache, mixed-pixel, exact 72-picture live-raster, repeated-download, parser-window, and full-resolution publication regressions, then commit the source and perform a fully clean Quartus build. Require positive setup, hold, recovery, and removal slack before producing or uploading a qualified RBF; revert Entry 244 if timing does not close.
+Reload the deployed Entry 244 core and run `test_compat_long_gop.m2v` followed by `test_compat_mixed_macroblocks.m2v`. Confirm sequential coherent playback through final frames 71 and 23, no lockup or partial-block corruption, USER and POWER solid, and the expected DISK state; hardware acceptance requires no regression from the previously tested timing-failed image.
 
 #### Files Modified:
 
@@ -23,7 +23,7 @@ Apply the narrow attribute change on seed 2, rerun P-intra, B-residual, cache, m
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
