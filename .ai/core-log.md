@@ -681,7 +681,7 @@ Do not build or deploy the cross-macroblock candidate alone. Use the 27,344 mixe
 - [ ] Passed
 
 ---
-## 275 COMMIT Unreleased ??? 2026-08-20T12:49:21-07:00
+## 275 COMMIT Unreleased 45bdfc8 2026-08-20T12:49:21-07:00
 
 #### Coming From:
 
@@ -693,24 +693,26 @@ Pair vertically adjacent B-picture interpolation taps through a registered adjac
 
 #### Outcome:
 
-Proposal only. Entry 273 leaves 27,344 mixed and 488,608 long single-tap advances after same-row pairing, while Entry 274 proves that deeper block production alone cannot reduce mixed total cycles. Each bounded fetch bank already retains up to nine rows and two words per row, but its registered lookup exposes only the selected row. This boundary will add a separately registered adjacent-row word and validity result from the same retained footprint, not another DDR read, cache request or combinational external lookup port. A pair may consume that response only for a pure vertical half-pel phase when current and following taps select equal word columns on consecutive valid rows; horizontal, bidirectional phase order, four-tap interpolation, word crossings and invalid adjacent rows retain the established path.
+Commit `b23744c` adds a registered adjacent-row result to each retained B fetch bank and consumes two pure-vertical half-pel taps when consecutive valid rows select the same word column, without adding a DDR read, cache request or combinational external lookup port. Its first clean synthesis exposed that Entry 274's staged cross-macroblock motion-record read had changed the B motion table into uninferred registers, so that build was stopped before place-and-route and never deployed. Corrective commit `45bdfc8` removes the unqualified Entry 274 staging while preserving vertical pairing and restores `motion_mem` as a 34-by-1,350 dual-port M10K. Focused predicted and intra replays preserve every motion record, block, sample and store exactly at 1,286,071 and 758,941 cycles. Exact mixed preserves all 423,936 pixels with zero mismatches, maximum channel delta two and all 69,556 reads at 1,259,996 cycles, with 52,679 paired, 5,017 fallback and 22,327 vertical events; complete long preserves every picture, swap, read and write with zero errors at 6,859,996 cycles, with 755,845 paired, 62,827 fallback and 425,781 vertical events. These are 0.79 and 1.01 percent simulation reductions from Entry 273. The corrected fully clean Quartus 17.0.2 build completes in 11 minutes 24 seconds with zero errors and 149 standing warnings. Timing is positive at +0.335 ns global setup, +2.274 ns decoder setup, +8.062 ns video setup, +0.249 ns hold, +4.437 ns global recovery, +15.079 ns decoder recovery, +0.695 ns removal and +0.462 ns minimum pulse slack. The fit uses 33,322 ALMs, 48,416 registers, 4,027,379 memory bits, 504 RAM blocks and 65 DSP blocks. Qualified artifact `MediaPlayer_commit275_45bdfc8.rbf` is 4,368,628 bytes with SHA-256 `7749cf0dc2d974ae132fcc019de40ffa4a140cf7fe2193a0f48040bb5a97f275`; its standard MiSTer upload and FTP readback are byte-identical. Hardware long accepts all 791,528 bytes, 72 pictures and 71 swaps with zero errors in 164,045,684 cycles or 23.371538 fps; B stall falls by 350,541 cycles and decoder stall by 338,202 from Entry 273, while cadence improves by only 23,626 cycles. Mixed accepts all 366,071 bytes, 24 pictures and 23 swaps with zero errors in 56,954,583 cycles or 21.806849 fps; B stall falls by 84,528 cycles and decoder stall by 79,999, but cadence is 19,595 cycles slower. The registered vertical pair is therefore exact, timing-clean and removes real decoder work, while frame ownership and presentation again absorb essentially all end-to-end savings.
 
 #### Next Steps:
 
-Instrument vertical-eligible and remaining fallback events, preserve all focused prediction values, residual and intra stores, mixed pixels, long display order, physical reads, cross-macroblock counts and bank ownership, and compare complete cycles against both Entry 273 and the combined Entry 274 candidate. Perform a clean Quartus build only if mixed and long total-cycle savings are material enough to justify the second retained-word mux; otherwise remove both unqualified additions before the next hardware boundary.
+Retain the timing-clean vertical pair and leave Entry 274's cross-macroblock staging removed. Implement the previously bounded fifth full-frame destination identity so decode can continue while the visible past reference, future prediction reference and two B scratch frames are occupied; preserve strict display order, reference dependencies, scratch generation identity and the 25 fps cadence gate. Re-run the exact mixed and long regressions plus a clean timing build and hardware telemetry, noting that erasing current mixed presentation and destination waits would reach 49,947,143 cycles, only 267,143 cycles above the 49,680,000-cycle 25 fps target, so the ownership change must preserve the accumulated decoder savings and expose or remove that small residual rather than claiming success from isolated stall reduction.
 
 #### Files Modified:
 
 - rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- tools/streams/tb_h262_prediction_block_fetcher.sv
 - tools/streams/tb_h262_live_raster_soak.sv
 - tools/streams/tb_h262_b_residual_streaming.sv
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 236 COMMIT Unreleased f206298 2026-08-19T13:36:19-07:00
