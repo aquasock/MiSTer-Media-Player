@@ -21,6 +21,7 @@ module tb_h262_b_residual_streaming #(
     integer vertical_tap_pairs=0;
     integer quad_tap_lookups=0;
     integer bank2_reference_reads=0;
+    integer replay_cycles=0,replay_coeff_writes=0,replay_coeff_waits=0;
 
     wire b_candidate,b_seen,b_complete,b_hold,b_replay;
     wire sideband_valid,first_valid,core_error;
@@ -97,6 +98,9 @@ module tb_h262_b_residual_streaming #(
 
     always @(posedge clk) begin
         if(!reset)total_cycles<=total_cycles+1;
+        if(!reset&&parser.replay_active)replay_cycles<=replay_cycles+1;
+        if(!reset&&parser.t_we)replay_coeff_writes<=replay_coeff_writes+1;
+        if(!reset&&(parser.rstate==4'd5))replay_coeff_waits<=replay_coeff_waits+1;
         raster_error_d<=raster_error;
         if(raster.block_fetch_active0&&raster.block_fetch_active1)
             $fatal(1,"both B footprint producers active at cycle %0d",
@@ -187,7 +191,7 @@ module tb_h262_b_residual_streaming #(
         else if(quiet_cycles!=0)quiet_cycles<=quiet_cycles+1;
 
         if(quiet_cycles==100) begin
-            $display("RESULT b_seen=%0d core_error=%0d raster_error=%0d/%0d motion=%0d blocks=%0d samples=%0d writes=%0d stores=%0d stripe=%0d changed=%0d cycles=%0d fetches=%0d prefetches=%0d handoffs=%0d banks=%0d/%0d taps=%0d/%0d vertical=%0d quad=%0d bank2_reads=%0d",
+            $display("RESULT b_seen=%0d core_error=%0d raster_error=%0d/%0d motion=%0d blocks=%0d samples=%0d writes=%0d stores=%0d stripe=%0d changed=%0d cycles=%0d fetches=%0d prefetches=%0d handoffs=%0d banks=%0d/%0d taps=%0d/%0d vertical=%0d quad=%0d bank2_reads=%0d replay=%0d coeff_writes=%0d coeff_waits=%0d",
                      b_seen,core_error,raster_error,raster_error_source,motion_events,
                      residual_blocks,residual_samples,residual_writes,
                      store_samples,stripe_store_samples,stripe_changed_samples,
@@ -195,7 +199,8 @@ module tb_h262_b_residual_streaming #(
                      prefetch_handoffs,fetch_bank0_starts,
                      fetch_bank1_starts,paired_tap_lookups,
                      single_tap_advances,vertical_tap_pairs,quad_tap_lookups,
-                     bank2_reference_reads);
+                     bank2_reference_reads,replay_cycles,replay_coeff_writes,
+                     replay_coeff_waits);
             if(!b_seen||core_error||raster_error||motion_events!=1350||
                residual_blocks!=(intra_mode?12:120)||
                residual_samples!=(intra_mode?768:7680)||
@@ -205,6 +210,8 @@ module tb_h262_b_residual_streaming #(
                stripe_changed_samples!=(intra_mode?768:7680)||
                paired_tap_lookups!=0||single_tap_advances!=0||
                vertical_tap_pairs!=0||quad_tap_lookups!=0||
+               replay_coeff_waits!=0||
+               replay_coeff_writes!=(intra_mode?12:120)||
                (!intra_mode&&bank2_reference_reads==0)||
                // Entry 254 retains each predicted block footprint, so the
                // former upstream cold/hit modes converge while authored

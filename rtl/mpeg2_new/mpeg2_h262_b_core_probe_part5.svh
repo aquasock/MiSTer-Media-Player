@@ -58,7 +58,7 @@
                 t_wval<=residual_coeff_word[12:0];
                 t_coeff_read_index<=t_coeff_read_index+1'b1;
                 if(t_coeff_read_index+1'b1>=block_coeff_end)rstate<=R_TEND;
-                else rstate<=R_COEFF_WAIT;
+                else rstate<=R_TWRITE;
             end
         end
         R_COEFF_WAIT:rstate<=R_TWRITE;

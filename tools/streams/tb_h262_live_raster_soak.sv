@@ -67,6 +67,8 @@ module tb_h262_live_raster_soak #(
     integer profile_p_wide_parse_active=0,profile_p_wide_replay=0;
     integer profile_p_wide_raster=0,profile_p_wide_wait_other=0;
     integer profile_b_parse_active=0,profile_b_replay_active=0;
+    integer profile_b_replay_twrite=0,profile_b_replay_coeff_wait=0;
+    integer profile_b_replay_coeff_writes=0;
     integer profile_b_row_waiting=0,profile_b_parse_other=0;
     integer profile_b_row_raster=0,profile_b_row_other=0;
     integer profile_p_transform=0,profile_b_transform=0;
@@ -958,6 +960,14 @@ module tb_h262_live_raster_soak #(
             end
             if(sideband_valid)
                 profile_p_transform<=profile_p_transform+1;
+            if(publication.b_controller.replay_active&&
+               (publication.b_controller.rstate==4'd4))
+                profile_b_replay_twrite<=profile_b_replay_twrite+1;
+            if(publication.b_controller.replay_active&&
+               (publication.b_controller.rstate==4'd5))
+                profile_b_replay_coeff_wait<=profile_b_replay_coeff_wait+1;
+            if(publication.b_controller.t_we)
+                profile_b_replay_coeff_writes<=profile_b_replay_coeff_writes+1;
             if(publication.b_controller.t_valid)
                 profile_b_transform<=profile_b_transform+1;
             if(prediction.mixed_active)profile_p_raster<=profile_p_raster+1;
@@ -1322,6 +1332,9 @@ module tb_h262_live_raster_soak #(
                      profile_p_wide_parse_active,profile_p_wide_replay,
                      profile_p_wide_raster,profile_p_wide_wait_other,
                      profile_b_row_raster,profile_b_row_other);
+            $display("LIVE_RASTER_B_REPLAY twrite=%0d coeff_wait=%0d coeff_writes=%0d",
+                     profile_b_replay_twrite,profile_b_replay_coeff_wait,
+                     profile_b_replay_coeff_writes);
             $display("LIVE_RASTER_PREFETCH lookups=%0d requests=%0d avoided=%0d induced=%0d",
                      profile_prefetch_lookups,profile_prefetch_requests,
                      profile_prefetch_avoided,profile_prefetch_induced);
@@ -1383,8 +1396,13 @@ module tb_h262_live_raster_soak #(
                    b_single_tap_advances!=5017||
                    b_vertical_tap_pairs!=22327||
                    b_quad_tap_lookups!=4241||
+                   profile_b_replay_twrite!=26591||
+                   profile_b_replay_coeff_writes!=26591||
+                   profile_b_replay_coeff_wait!=0||
                    ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
-                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1259996))||
+                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1239996))||
+                   ((EXPECTED_DESCRIPTOR_DEPTH==4)&&
+                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1239996))||
                    pixel_samples!=423936||pixel_mismatches!=0||
                    !writer_seen||!pred_read_observed||
                    !pred_reconstructed_observed||!presentation_complete||
@@ -1433,8 +1451,13 @@ module tb_h262_live_raster_soak #(
                b_single_tap_advances!=62827||
                b_vertical_tap_pairs!=425781||
                b_quad_tap_lookups!=102888||
+               profile_b_replay_twrite!=262671||
+               profile_b_replay_coeff_writes!=262671||
+               profile_b_replay_coeff_wait!=0||
                ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
-                (MEMORY_READ_LATENCY==1)&&(total_cycles!=6859996))||
+                (MEMORY_READ_LATENCY==1)&&(total_cycles!=6589996))||
+               ((EXPECTED_DESCRIPTOR_DEPTH==4)&&
+                (MEMORY_READ_LATENCY==1)&&(total_cycles!=6589996))||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
                presentation_error)
