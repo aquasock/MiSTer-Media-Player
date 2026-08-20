@@ -1,6 +1,11 @@
 `timescale 1ns/1ps
 
+`ifndef H262_PREDICTION_DESCRIPTOR_DEPTH
+`define H262_PREDICTION_DESCRIPTOR_DEPTH 2
+`endif
+
 module tb_h262_prediction_word_cache;
+    localparam integer EXPECTED_DEPTH=`H262_PREDICTION_DESCRIPTOR_DEPTH;
     reg clk=0,reset=1,active=0;
     reg [7:0] request_burstcnt=0;
     reg [28:0] request_addr=0;
@@ -24,12 +29,12 @@ module tb_h262_prediction_word_cache;
     integer response_delay_config=1;
     integer memory_cycle=0;
     integer response_head=0,response_tail=0,response_count=0;
-    integer response_due[0:3];
-    reg [28:0] response_addr[0:3];
+    integer response_due[0:7];
+    reg [28:0] response_addr[0:7];
     reg memory_model_enabled=1;
     integer max_response_descriptors=0;
     wire downstream_busy=downstream_busy_override||
-        (memory_model_enabled&&(response_count>=2)&&
+        (memory_model_enabled&&(response_count>=EXPECTED_DEPTH)&&
          !downstream_dout_ready);
 
     integer ordered_baseline_cycles=0;
@@ -38,6 +43,7 @@ module tb_h262_prediction_word_cache;
     integer ordered_zero_latency_cycles=0;
     integer ordered_accepts=0;
     integer ordered_returns=0;
+    integer test_index;
 
     always #5 clk=~clk;
 
@@ -74,10 +80,10 @@ module tb_h262_prediction_word_cache;
                (response_due[response_head]<=memory_cycle)) begin
                 downstream_dout<=word_for(response_addr[response_head]);
                 downstream_dout_ready<=1;
-                response_head<=(response_head+1)&3;
+                response_head<=(response_head+1)&7;
             end
             if(downstream_read&&!downstream_busy) begin
-                if(response_count>=4)
+                if(response_count>=8)
                     $fatal(1,"downstream response queue overflow");
                 if(downstream_burstcnt!=8'd1)
                     $fatal(1,"wrong downstream burst count %0d",downstream_burstcnt);
@@ -85,7 +91,7 @@ module tb_h262_prediction_word_cache;
                 response_addr[response_tail]<=downstream_addr;
                 response_due[response_tail]<=memory_cycle+
                     response_delay_config;
-                response_tail<=(response_tail+1)&3;
+                response_tail<=(response_tail+1)&7;
             end
             case({downstream_read&&!downstream_busy,
                   (response_count!=0)&&
@@ -364,38 +370,42 @@ module tb_h262_prediction_word_cache;
             $fatal(1,"backpressure/delayed response failed");
 
         // Exercise the live RTL contract rather than only the abstract model:
-        // two misses may be accepted before either response returns, and the
-        // responses must retain request order.
-        response_delay_config=6;
-        issue_word(29'h00400,1'b1);
-        issue_word(29'h00401,1'b1);
-        if(dut.response_descriptor_count!=2)
-            $fatal(1,"cache did not retain two ordered descriptors count=%0d",
+        // The configured number of misses may be accepted before any response
+        // returns, and every response must retain request order.
+        response_delay_config=EXPECTED_DEPTH*4+4;
+        for(test_index=0;test_index<EXPECTED_DEPTH;
+            test_index=test_index+1)
+            issue_word(29'h00400+test_index,1'b1);
+        if(dut.response_descriptor_count!=EXPECTED_DEPTH)
+            $fatal(1,"cache did not retain configured descriptors count=%0d",
                    dut.response_descriptor_count);
-        expect_word(29'h00400);
-        expect_word(29'h00401);
+        for(test_index=0;test_index<EXPECTED_DEPTH;
+            test_index=test_index+1)
+            expect_word(29'h00400+test_index);
 
         // A resident word behind an older miss may not respond early.  It is
         // deliberately reissued downstream and returns after the older miss.
         response_delay_config=6;
-        issue_word(29'h00402,1'b1);
+        issue_word(29'h00405,1'b1);
         issue_word(29'h00401,1'b1);
-        expect_word(29'h00402);
+        expect_word(29'h00405);
         expect_word(29'h00401);
 
         // A response may retire the head descriptor on the same edge that a
         // held successor is accepted into the newly freed tail slot.
-        response_delay_config=4;
-        issue_word(29'h00410,1'b1);
-        issue_word(29'h00411,1'b1);
+        response_delay_config=EXPECTED_DEPTH*2+2;
+        for(test_index=0;test_index<EXPECTED_DEPTH;
+            test_index=test_index+1)
+            issue_word(29'h00410+test_index,1'b1);
         fork
-            issue_word(29'h00412,1'b1);
+            issue_word(29'h00410+EXPECTED_DEPTH,1'b1);
             expect_word(29'h00410);
         join
-        expect_word(29'h00411);
-        expect_word(29'h00412);
+        for(test_index=1;test_index<=EXPECTED_DEPTH;
+            test_index=test_index+1)
+            expect_word(29'h00410+test_index);
 
-        if(max_response_descriptors!=2)
+        if(max_response_descriptors!=EXPECTED_DEPTH)
             $fatal(1,"cache descriptor depth coverage failed max=%0d",
                    max_response_descriptors);
 

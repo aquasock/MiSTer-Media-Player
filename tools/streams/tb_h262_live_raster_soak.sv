@@ -1,5 +1,9 @@
 `timescale 1ns/1ps
 
+`ifndef H262_PREDICTION_DESCRIPTOR_DEPTH
+`define H262_PREDICTION_DESCRIPTOR_DEPTH 2
+`endif
+
 // Entry 221: complete 72-picture I/P/B progression through the compiled
 // generalized P/B raster wrapper, active tagged DDR writer, request arbiter,
 // memory service, publication shell, and presentation scheduler.  The 128x96
@@ -9,6 +13,8 @@ module tb_h262_live_raster_soak #(
     parameter integer MIXED_PIXEL_MODE=0,
     parameter integer MEMORY_READ_LATENCY=1
 );
+    localparam integer EXPECTED_DESCRIPTOR_DEPTH=
+        `H262_PREDICTION_DESCRIPTOR_DEPTH;
     localparam integer MAX_STREAM_BYTES=1048576;
     localparam [28:0] DDR_BASE=29'h06000000;
     localparam integer DDR_WORDS=262144;
@@ -949,10 +955,12 @@ module tb_h262_live_raster_soak #(
                    // word is pending.  Potential hits therefore remain
                    // ordered downstream reads rather than overtaking it.
                    prediction.reference_cache.cache_hit_count!=0||
-                   prediction.reference_cache.cache_miss_count!=32'd69556||
+                   ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
+                    (prediction.reference_cache.cache_miss_count!=32'd69556))||
                    prediction.reference_cache.uncached_count!=0||
-                   memory_reads!=69556||
-                   ((MEMORY_READ_LATENCY==1)&&(total_cycles!=1969996))||
+                   (memory_reads!=prediction.reference_cache.cache_miss_count)||
+                   ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
+                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1969996))||
                    pixel_samples!=423936||pixel_mismatches!=0||
                    !writer_seen||!pred_read_observed||
                    !pred_reconstructed_observed||!presentation_complete||
@@ -987,10 +995,12 @@ module tb_h262_live_raster_soak #(
                reference_writes!=50688||scratch0_writes!=55296||
                scratch1_writes!=52992||
                prediction.reference_cache.cache_hit_count!=0||
-               prediction.reference_cache.cache_miss_count!=32'd372696||
+               ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
+                (prediction.reference_cache.cache_miss_count!=32'd372696))||
                prediction.reference_cache.uncached_count!=0||
-               memory_reads!=372696||
-               ((MEMORY_READ_LATENCY==1)&&(total_cycles!=10719996))||
+               (memory_reads!=prediction.reference_cache.cache_miss_count)||
+               ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
+                (MEMORY_READ_LATENCY==1)&&(total_cycles!=10719996))||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
                presentation_error)

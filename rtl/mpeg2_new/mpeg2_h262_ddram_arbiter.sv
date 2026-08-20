@@ -6,10 +6,11 @@
 // frame-bank ownership: a new picture may not overwrite the bank still owned by
 // the display reader.
 //
-// Reader requests have priority.  Two ordered read-command descriptors retain
+// Reader requests have priority.  A bounded ordered descriptor queue retains
 // response owner and burst length while DDR services accepted commands.  The
 // display reader's accepted bank transfers presentation ownership; prediction
-// reads never alter that ownership.
+// reads never alter that ownership. Production defaults to depth two;
+// simulation may override the shared descriptor-depth macro.
 //
 // kate - Phase 1T-f adds one decoder-side prediction reader. Display reads keep
 // highest priority, prediction reads are next, and writes remain lowest priority.
@@ -25,6 +26,10 @@
 // reference banks occupy regions 00/01 while B scratch occupies region 10, so
 // writer exclusion must compare address bits [17:16] rather than bit 16 alone.
 //============================================================================
+
+`ifndef H262_PREDICTION_DESCRIPTOR_DEPTH
+`define H262_PREDICTION_DESCRIPTOR_DEPTH 2
+`endif
 
 module mpeg2_h262_ddram_arbiter
 (
@@ -61,10 +66,16 @@ module mpeg2_h262_ddram_arbiter
     output wire        ddram_we
 );
 
-reg [1:0] read_descriptor_count;
-reg       read_descriptor_head,read_descriptor_tail;
-reg       read_descriptor_owner [0:1];
-reg [7:0] read_descriptor_words [0:1];
+localparam integer DESCRIPTOR_DEPTH=`H262_PREDICTION_DESCRIPTOR_DEPTH;
+localparam integer DESCRIPTOR_POINTER_WIDTH=
+    (DESCRIPTOR_DEPTH<=2)?1:$clog2(DESCRIPTOR_DEPTH);
+localparam integer DESCRIPTOR_COUNT_WIDTH=$clog2(DESCRIPTOR_DEPTH+1);
+
+reg [DESCRIPTOR_COUNT_WIDTH-1:0] read_descriptor_count;
+reg [DESCRIPTOR_POINTER_WIDTH-1:0]
+    read_descriptor_head,read_descriptor_tail;
+reg       read_descriptor_owner [0:DESCRIPTOR_DEPTH-1];
+reg [7:0] read_descriptor_words [0:DESCRIPTOR_DEPTH-1];
 reg       reader_bank_valid;
 reg [1:0] reader_frame_region;
 
@@ -75,7 +86,8 @@ wire [7:0] read_words_remaining=read_outstanding?
     read_descriptor_words[read_descriptor_head]:8'd0;
 wire response_existing=ddram_dout_ready&&read_outstanding;
 wire response_finishes=response_existing&&(read_words_remaining<=8'd1);
-wire read_descriptor_room=(read_descriptor_count<2)||response_finishes;
+wire read_descriptor_room=(read_descriptor_count<DESCRIPTOR_DEPTH)||
+    response_finishes;
 
 wire writer_targets_reader_region =
     reader_bank_valid && (writer_addr[17:16] == reader_frame_region);
@@ -136,6 +148,12 @@ wire descriptor_push=read_accept&&!direct_response_finishes;
 wire descriptor_pop=response_finishes;
 wire [7:0] pushed_words=direct_response?
     (accepted_words-8'd1):accepted_words;
+wire [DESCRIPTOR_POINTER_WIDTH-1:0] read_descriptor_head_next=
+    (read_descriptor_head==(DESCRIPTOR_DEPTH-1))?
+    {DESCRIPTOR_POINTER_WIDTH{1'b0}}:read_descriptor_head+1'b1;
+wire [DESCRIPTOR_POINTER_WIDTH-1:0] read_descriptor_tail_next=
+    (read_descriptor_tail==(DESCRIPTOR_DEPTH-1))?
+    {DESCRIPTOR_POINTER_WIDTH{1'b0}}:read_descriptor_tail+1'b1;
 
 assign reader_dout_ready =
     (response_existing&&!read_owner_prediction)||
@@ -145,15 +163,17 @@ assign prediction_dout_ready =
     (response_existing&&read_owner_prediction)||
     (direct_response&&prediction_accept);
 
+integer descriptor_index;
 always @(posedge clk) begin
     if (reset) begin
-        read_descriptor_count <= 2'd0;
-        read_descriptor_head  <= 1'b0;
-        read_descriptor_tail  <= 1'b0;
-        read_descriptor_owner[0] <= 1'b0;
-        read_descriptor_owner[1] <= 1'b0;
-        read_descriptor_words[0] <= 8'd0;
-        read_descriptor_words[1] <= 8'd0;
+        read_descriptor_count <= {DESCRIPTOR_COUNT_WIDTH{1'b0}};
+        read_descriptor_head  <= {DESCRIPTOR_POINTER_WIDTH{1'b0}};
+        read_descriptor_tail  <= {DESCRIPTOR_POINTER_WIDTH{1'b0}};
+        for(descriptor_index=0;descriptor_index<DESCRIPTOR_DEPTH;
+            descriptor_index=descriptor_index+1)begin
+            read_descriptor_owner[descriptor_index] <= 1'b0;
+            read_descriptor_words[descriptor_index] <= 8'd0;
+        end
         reader_bank_valid     <= 1'b0;
         reader_frame_region   <= 2'b00;
     end
@@ -162,10 +182,10 @@ always @(posedge clk) begin
             read_descriptor_owner[read_descriptor_tail]<=
                 accepted_owner_prediction;
             read_descriptor_words[read_descriptor_tail]<=pushed_words;
-            read_descriptor_tail<=read_descriptor_tail+1'b1;
+            read_descriptor_tail<=read_descriptor_tail_next;
         end
         if(descriptor_pop)
-            read_descriptor_head<=read_descriptor_head+1'b1;
+            read_descriptor_head<=read_descriptor_head_next;
         else if(response_existing)
             read_descriptor_words[read_descriptor_head]<=
                 read_words_remaining-8'd1;

@@ -1,6 +1,11 @@
 `timescale 1ns/1ps
 
+`ifndef H262_PREDICTION_DESCRIPTOR_DEPTH
+`define H262_PREDICTION_DESCRIPTOR_DEPTH 2
+`endif
+
 module tb_h262_prediction_block_fetcher;
+    localparam integer EXPECTED_DEPTH=`H262_PREDICTION_DESCRIPTOR_DEPTH;
     reg clk=0,reset=1,start=0;
     reg [1:0] phase_count=0;
     reg [28:0] phase0_base_addr=0,phase1_base_addr=0;
@@ -30,7 +35,7 @@ module tb_h262_prediction_block_fetcher;
     wire [63:0] lookup_data;
     wire active,complete,error;
     wire [6:0] issued_count,returned_count;
-    wire [1:0] outstanding_count;
+    wire [2:0] outstanding_count;
 
     reg [28:0] expected_addr[0:35];
     integer expected_count=0,accepted_count=0,response_count=0;
@@ -107,7 +112,7 @@ module tb_h262_prediction_block_fetcher;
         endcase
         if(model_outstanding>max_outstanding)
             max_outstanding=model_outstanding;
-        if(model_outstanding<0||model_outstanding>2)
+        if(model_outstanding<0||model_outstanding>EXPECTED_DEPTH)
             $fatal(1,"outstanding bound failed count=%0d",
                    model_outstanding);
     end
@@ -234,7 +239,7 @@ module tb_h262_prediction_block_fetcher;
 
         inject_backpressure=1;
         launch(1,29'h0600a8c1,2,9,29'd0,1,1,45);
-        if(max_outstanding!=2||simultaneous_accept_response==0)
+        if(max_outstanding!=EXPECTED_DEPTH||simultaneous_accept_response==0)
             $fatal(1,"delayed service did not cover simultaneous response/accept depth=%0d simultaneous=%0d",
                    max_outstanding,simultaneous_accept_response);
         for(test_row=0;test_row<9;test_row=test_row+1)
@@ -244,8 +249,8 @@ module tb_h262_prediction_block_fetcher;
         inject_backpressure=0;
 
         launch(2,29'h0601000e,2,9,29'h06020011,2,9,90);
-        if(max_outstanding!=2)
-            $fatal(1,"dual rectangle did not reach depth two");
+        if(max_outstanding!=EXPECTED_DEPTH)
+            $fatal(1,"dual rectangle did not reach configured depth");
         for(test_index=0;test_index<2;test_index=test_index+1)
             for(test_row=0;test_row<9;test_row=test_row+1)
                 for(test_column=0;test_column<2;
@@ -275,7 +280,7 @@ module tb_h262_prediction_block_fetcher;
         if(!error||active||complete)
             $fatal(1,"invalid phase count was not rejected");
 
-        $display("PREDICTION_BLOCK_FETCHER_RESULT transactions=4 phases=6 words=88 depth=2 delayed=1 backpressure=1 simultaneous=1 zero_latency=1 invalid=1");
+        $display("PREDICTION_BLOCK_FETCHER_RESULT transactions=4 phases=6 words=88 depth=%0d delayed=1 backpressure=1 simultaneous=1 zero_latency=1 invalid=1",EXPECTED_DEPTH);
         $finish;
     end
 endmodule

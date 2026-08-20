@@ -110,7 +110,7 @@ wire block_fetch_active,block_fetch_complete,block_fetch_error;
 wire [28:0] block_fetch_addr;
 wire block_fetch_rd;
 wire [6:0] block_fetch_issued,block_fetch_returned;
-wire [1:0] block_fetch_outstanding;
+wire [2:0] block_fetch_outstanding;
 
 wire [28:0] future_off=future_bank_latched?BANK_OFF:29'd0;
 wire [28:0] past_off=future_bank_latched?29'd0:BANK_OFF;

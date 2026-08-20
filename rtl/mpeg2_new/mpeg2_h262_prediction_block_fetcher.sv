@@ -4,11 +4,18 @@
 // A progressive 4:2:0 prediction phase touches a complete reference-word
 // rectangle no wider than two 64-bit words and no taller than nine rows.  A B
 // block may use two such phases.  This module assigns eighteen direct slots to
-// each phase, generates every rectangle address once, keeps two ordered reads
-// in flight, and associates each ordered response with its destination slot.
+// each phase, generates every rectangle address once, keeps a bounded number
+// of ordered reads in flight, and associates each ordered response with its
+// destination slot.  Production defaults to two; simulation may override the
+// shared macro to measure a deeper end-to-end command path before committing
+// more hardware capacity.
 // Pixel engines consume the retained words by phase/row/column, avoiding an
 // associative tag cone on their reconstruction path.
 //============================================================================
+`ifndef H262_PREDICTION_DESCRIPTOR_DEPTH
+`define H262_PREDICTION_DESCRIPTOR_DEPTH 2
+`endif
+
 module mpeg2_h262_prediction_block_fetcher
 (
     input  wire        clk,
@@ -42,8 +49,13 @@ module mpeg2_h262_prediction_block_fetcher
     output reg         error,
     output reg  [6:0]  issued_count,
     output reg  [6:0]  returned_count,
-    output wire [1:0]  outstanding_count
+    output wire [2:0]  outstanding_count
 );
+
+localparam integer DESCRIPTOR_DEPTH=`H262_PREDICTION_DESCRIPTOR_DEPTH;
+localparam integer DESCRIPTOR_POINTER_WIDTH=
+    (DESCRIPTOR_DEPTH<=2)?1:$clog2(DESCRIPTOR_DEPTH);
+localparam integer DESCRIPTOR_COUNT_WIDTH=$clog2(DESCRIPTOR_DEPTH+1);
 
 reg [63:0] word_data [0:35];
 reg [35:0] word_valid;
@@ -59,9 +71,9 @@ reg phase0_two_words_reg,phase1_two_words_reg;
 reg [3:0] phase0_rows_reg,phase1_rows_reg;
 reg [6:0] row_words_reg;
 
-reg [5:0] descriptor_slot [0:1];
-reg descriptor_head,descriptor_tail;
-reg [1:0] descriptor_count;
+reg [5:0] descriptor_slot [0:DESCRIPTOR_DEPTH-1];
+reg [DESCRIPTOR_POINTER_WIDTH-1:0] descriptor_head,descriptor_tail;
+reg [DESCRIPTOR_COUNT_WIDTH-1:0] descriptor_count;
 
 wire generator_two_words=generator_phase?
     phase1_two_words_reg:phase0_two_words_reg;
@@ -79,15 +91,21 @@ wire [5:0] generator_slot=
 assign memory_addr=generator_row_addr+generator_column;
 
 wire response_existing=memory_dout_ready&&(descriptor_count!=0);
-wire descriptor_room=(descriptor_count<2)||response_existing;
+wire descriptor_room=(descriptor_count<DESCRIPTOR_DEPTH)||response_existing;
 assign memory_rd=active&&!all_issued&&descriptor_room;
 wire issue_accept=memory_rd&&!memory_busy;
 wire response_direct=memory_dout_ready&&(descriptor_count==0)&&issue_accept;
 wire response_pop=memory_dout_ready&&(descriptor_count!=0);
 wire descriptor_push=issue_accept&&!response_direct;
-wire [2:0] descriptor_count_after=
+wire [DESCRIPTOR_COUNT_WIDTH:0] descriptor_count_after=
     {1'b0,descriptor_count}+descriptor_push-response_pop;
 assign outstanding_count=descriptor_count;
+wire [DESCRIPTOR_POINTER_WIDTH-1:0] descriptor_head_next=
+    (descriptor_head==(DESCRIPTOR_DEPTH-1))?
+    {DESCRIPTOR_POINTER_WIDTH{1'b0}}:descriptor_head+1'b1;
+wire [DESCRIPTOR_POINTER_WIDTH-1:0] descriptor_tail_next=
+    (descriptor_tail==(DESCRIPTOR_DEPTH-1))?
+    {DESCRIPTOR_POINTER_WIDTH{1'b0}}:descriptor_tail+1'b1;
 
 wire [5:0] lookup_slot=(lookup_phase?6'd18:6'd0)+
     {lookup_row,1'b0}+lookup_column;
@@ -99,7 +117,7 @@ wire lookup_in_range=(lookup_phase<phase_count_reg)&&
     (lookup_row<selected_lookup_rows)&&
     (!lookup_column||selected_lookup_two_words);
 
-integer clear_index;
+integer clear_index,descriptor_index;
 always @(posedge clk) begin
     if(reset) begin
         word_valid<=36'd0;
@@ -115,11 +133,12 @@ always @(posedge clk) begin
         phase0_rows_reg<=4'd0;
         phase1_rows_reg<=4'd0;
         row_words_reg<=7'd0;
-        descriptor_slot[0]<=6'd0;
-        descriptor_slot[1]<=6'd0;
-        descriptor_head<=1'b0;
-        descriptor_tail<=1'b0;
-        descriptor_count<=2'd0;
+        for(descriptor_index=0;descriptor_index<DESCRIPTOR_DEPTH;
+            descriptor_index=descriptor_index+1)
+            descriptor_slot[descriptor_index]<=6'd0;
+        descriptor_head<={DESCRIPTOR_POINTER_WIDTH{1'b0}};
+        descriptor_tail<={DESCRIPTOR_POINTER_WIDTH{1'b0}};
+        descriptor_count<={DESCRIPTOR_COUNT_WIDTH{1'b0}};
         lookup_ready<=1'b0;
         lookup_valid<=1'b0;
         lookup_data<=64'd0;
@@ -138,9 +157,9 @@ always @(posedge clk) begin
             issued_count<=7'd0;
             returned_count<=7'd0;
             word_valid<=36'd0;
-            descriptor_head<=1'b0;
-            descriptor_tail<=1'b0;
-            descriptor_count<=2'd0;
+            descriptor_head<={DESCRIPTOR_POINTER_WIDTH{1'b0}};
+            descriptor_tail<={DESCRIPTOR_POINTER_WIDTH{1'b0}};
+            descriptor_count<={DESCRIPTOR_COUNT_WIDTH{1'b0}};
             generator_phase<=1'b0;
             generator_row<=4'd0;
             generator_column<=1'b0;
@@ -167,10 +186,10 @@ always @(posedge clk) begin
         end else begin
             if(descriptor_push) begin
                 descriptor_slot[descriptor_tail]<=generator_slot;
-                descriptor_tail<=descriptor_tail+1'b1;
+                descriptor_tail<=descriptor_tail_next;
             end
             if(response_pop)
-                descriptor_head<=descriptor_head+1'b1;
+                descriptor_head<=descriptor_head_next;
 
             case({descriptor_push,response_pop})
                 2'b10:descriptor_count<=descriptor_count+1'b1;
