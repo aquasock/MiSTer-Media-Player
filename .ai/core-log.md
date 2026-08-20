@@ -1,5 +1,5 @@
 ---
-## 254 COMMIT Unreleased ??? 2026-08-20T04:16:09-07:00
+## 254 COMMIT Unreleased 5b37c1f 2026-08-20T04:16:09-07:00
 
 #### Coming From:
 
@@ -11,11 +11,11 @@ Replace serialized per-tap B-picture prediction with one- or two-phase direct-in
 
 #### Outcome:
 
-Entry 253 proves that the fetcher can replace live P tap traffic without changing pixels, ordering or ownership and exposes a measurable cycle gain before DDR concurrency. This boundary will give the B engine the same latched block lifecycle: phase zero contains the sole forward or backward rectangle for unidirectional blocks, while bidirectional blocks retain forward words in phase zero and backward words in phase one. The shared cache and arbiter remain one-outstanding so forward/backward phase selection, byte mapping, interpolation and rounding are proven independently of response concurrency.
+Commit `5b37c1f` gives B reconstruction the same latched direct-buffer lifecycle as P while retaining the one-outstanding cache and arbiter. Forward-only and backward-only blocks map their sole reference rectangle to phase zero; bidirectional blocks map forward to phase zero and backward to phase one, and synchronous retries preserve phase, tap, byte selection, interpolation and rounding until each retained word is valid. The exact mixed boundary passes all 423,936 samples with zero mismatches, maximum delta two, 23 swaps, zero errors, 69,528 DDR reads and 1,999,996 cycles. The complete long boundary passes all 22 P and 47 B pictures, 71 swaps, zero errors, 372,648 reads and 11,069,996 cycles. Relative to Entry 247 this removes 1,801 mixed and 91,187 long physical reads and reduces cycles by 12.28 and 12.77 percent before hiding response latency. Focused B residual cold and hit modes converge at 1,392,289 cycles while both pass 1,350 motion records, 120 residual blocks, 7,680 residual samples and all 518,400 stores; the authored B-intra case passes 12 blocks, 768 samples and the exact 768 changed stripe samples at 785,956 cycles. No stale phase, response reassociation, arithmetic, scratch-write or presentation regression remains.
 
 #### Next Steps:
 
-Derive both B rectangles from registered direction and motion vectors, start one fetch per non-intra block, map current prediction phase and tap coordinates into the retained slots, and retry until each word is valid. Preserve forward prediction capture, backward averaging, residual alignment, scratch-bank writes and presentation handoff, then require focused B residual and bidirectional regressions, exact mixed pixels and complete long order with explained read, cache and cycle counts before expanding the arbiter.
+Expand the shared cache and DDR arbiter to accept the fetchers' already-proven depth-two ordered request stream. Track prediction and display response ownership explicitly in command order, permit a response to free a descriptor while the next command is accepted, retain display priority and writer exclusion, and require the standalone simultaneous-response test, exact mixed pixels, complete long order and a substantial ten-cycle reduction before any Quartus build.
 
 #### Files Modified:
 
@@ -27,7 +27,7 @@ Derive both B rectangles from registered direction and motion vectors, start one
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
