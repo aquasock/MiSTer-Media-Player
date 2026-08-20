@@ -649,7 +649,7 @@ Retain the timing-clean paired lookup because hardware confirms that it removes 
 - [x] Passed
 
 ---
-## 274 COMMIT Unreleased ??? 2026-08-20T12:28:01-07:00
+## 274 COMMIT Unreleased 5d0e18c 2026-08-20T12:28:01-07:00
 
 #### Coming From:
 
@@ -661,11 +661,11 @@ Prefetch B-picture block zero of the next macroblock while block five of the cur
 
 #### Outcome:
 
-Proposal only. Entry 272 overlaps five of the six block transitions in each B macroblock, but deliberately leaves block five to the following block zero serialized because the next motion record is held in synchronous M10K memory. Entry 273 then confirms that 187,231 fewer mixed and 450,189 fewer long B-stall cycles are hidden by frame ownership rather than lost. This boundary will use the existing single motion-memory read port to capture the next record into a dedicated staging register only after the current macroblock's block-five motion has been secured. That staged record will derive the following macroblock's block-zero footprint and may launch the alternate fetch bank during current block-five reconstruction. Row boundaries, the last macroblock, capture ownership, the one-active-producer rule, the retained-word consumer handoff and MPEG-2 motion normalization remain unchanged.
+Commit `5d0e18c` stages the next synchronous motion record after current block-five fields are secured and extends the alternate fetch-bank producer through block zero of the following macroblock without adding a motion-memory port or another active DDR producer. Focused predicted replay preserves all 1,350 motion records, 120 residual blocks, 7,680 samples, 518,400 stores, exact prediction values and balanced bank reuse while proving 1,320 cross-macroblock launches and handoffs; it falls from 1,286,071 to 1,275,511 cycles, 0.82 percent. Focused intra preserves all 12 blocks, 768 samples and stores while proving 1,316 eligible cross-boundary handoffs at 757,621 cycles, 1,320 cycles faster. Exact mixed preserves all 423,936 pixels with zero mismatches, maximum channel delta two, all 69,556 reads, 4,230 prefetched handoffs including 630 cross-macroblock handoffs, all tap counts and zero errors, but remains exactly 1,269,996 cycles. Complete long preserves every picture, swap, write and all 372,696 reads with 13,254 prefetched handoffs including 1,974 cross-macroblock handoffs and zero errors at 6,919,996 cycles, only 10,000 cycles or 0.14 percent faster. The candidate therefore fails its material complete-trace threshold: its extra production is already hidden in mixed and almost entirely hidden in long. Per the proposal, no Quartus build, RBF or MiSTer deployment was performed; the standard MiSTer remains on timing-clean Entry 273.
 
 #### Next Steps:
 
-Add explicit next-motion valid and identity state, prove that current block five still uses the current motion record, and permit the existing successor launch and bank handoff at block five only when the staged next record is valid and remains in the same row. Instrument internal versus cross-macroblock prefetch and handoff counts, require exact focused prediction, residual and intra stores, mixed pixels, long display order, physical reads and bank ownership, then perform a fully clean timing-qualified hardware build only if complete simulation shows a material reduction.
+Do not build or deploy the cross-macroblock candidate alone. Use the 27,344 mixed and 488,608 long single-tap fallback events left by Entry 273 to measure a dual-row retained-word lookup ceiling, then compose that reduction with this exact candidate in complete simulation. Proceed to a clean physical build only if the combined boundary materially reduces mixed and long total cycles; otherwise remove the staged-motion control before the next hardware-qualified source commit.
 
 #### Files Modified:
 
@@ -677,7 +677,7 @@ Add explicit next-motion valid and identity state, prove that current block five
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
