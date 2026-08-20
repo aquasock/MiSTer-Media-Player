@@ -1,4 +1,34 @@
 ---
+## 253 COMMIT Unreleased ??? 2026-08-20T03:51:26-07:00
+
+#### Coming From:
+
+Unreleased c9e5a90
+
+#### Purpose:
+
+Replace serialized per-tap P-picture prediction with the proven direct-index block fetcher while retaining the current cache and arbiter contract.
+
+#### Outcome:
+
+Entry 252 proves the bounded rectangle generator, two-slot response association and thirty-six-word direct buffer independently. This first live integration will instantiate that fetcher only inside the generalized P raster engine, derive its single reference rectangle from registered block motion state, and serve every tap through synchronous phase/row/column lookup. The existing shared cache and one-outstanding DDR arbiter will remain unchanged, deliberately limiting performance while isolating address geometry, byte selection, half-pel accumulation, residual alignment and block lifecycle correctness before B-picture or shared-memory concurrency changes.
+
+#### Next Steps:
+
+Add the fetcher to the active source list, start it at each non-intra P block, retry buffered lookups until the required slot is returned, and leave intra reconstruction untouched. Run focused P intra, motion, half-pel and residual regressions followed by the exact mixed pixel and long ordering boundaries; require identical reconstructed pixels and picture order, and explain all changed read, cache and cycle counts before proceeding to B integration.
+
+#### Files Modified:
+
+- files.qip
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 252 COMMIT Unreleased c9e5a90 2026-08-20T03:46:05-07:00
 
 #### Coming From:
@@ -1246,34 +1276,6 @@ Install `MediaPlayer_commit217_a559d43.rbf` and load `test_compat_long_gop.m2v`.
 - files.qip
 - rtl/mpeg2_new/mpeg2_h262_stream_transport_gate.sv
 - tools/streams/tb_h262_stream_transport_gate.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 218 COMMIT Unreleased a559d43 2026-08-18T11:09:59-07:00
-
-#### Coming From:
-
-Unreleased a559d43
-
-#### Purpose:
-
-Record the MiSTer long-GOP result after adding fatal-error transport retirement.
-
-#### Outcome:
-
-Commit `a559d43` removes the host-transfer deadlock: the long-GOP file overlay closes, the menu remains responsive, and the uploaded post-load capture reaches timestamp `00:00:02.000`, frame `50`, before the fatal boundary. All three LEDs remain dark because fail-open correctly masks the decoder while draining the remaining compressed bytes, including the final sequence-end code, but the settled diagnostic snapshot still arms only from `mpeg2_new_sequence_end_seen`. The fatal error is therefore preserved internally while `mpeg2_new_diag_snapshot_valid` never asserts. This is an observability-trigger defect after successful fail-open retirement, not a recurrence of the MiSTer crash.
-
-#### Next Steps:
-
-Arm the existing one-second settled diagnostic delay from either a decoded sequence end or the sticky transport-fatal condition, prove that clean sequence-end capture is unchanged and fatal drain produces a stable error snapshot, then rebuild and redeploy so the frame-50 raster or DDR failure is identified by USER, POWER, and DISK.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
