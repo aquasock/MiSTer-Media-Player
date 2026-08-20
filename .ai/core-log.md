@@ -1,4 +1,36 @@
 ---
+## 254 COMMIT Unreleased ??? 2026-08-20T04:16:09-07:00
+
+#### Coming From:
+
+Unreleased 5f1d561
+
+#### Purpose:
+
+Replace serialized per-tap B-picture prediction with one- or two-phase direct-index block footprints while retaining the current cache and arbiter contract.
+
+#### Outcome:
+
+Entry 253 proves that the fetcher can replace live P tap traffic without changing pixels, ordering or ownership and exposes a measurable cycle gain before DDR concurrency. This boundary will give the B engine the same latched block lifecycle: phase zero contains the sole forward or backward rectangle for unidirectional blocks, while bidirectional blocks retain forward words in phase zero and backward words in phase one. The shared cache and arbiter remain one-outstanding so forward/backward phase selection, byte mapping, interpolation and rounding are proven independently of response concurrency.
+
+#### Next Steps:
+
+Derive both B rectangles from registered direction and motion vectors, start one fetch per non-intra block, map current prediction phase and tap coordinates into the retained slots, and retry until each word is valid. Preserve forward prediction capture, backward averaging, residual alignment, scratch-bank writes and presentation handoff, then require focused B residual and bidirectional regressions, exact mixed pixels and complete long order with explained read, cache and cycle counts before expanding the arbiter.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/tb_h262_b_residual_streaming.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 253 COMMIT Unreleased 5f1d561 2026-08-20T03:51:26-07:00
 
 #### Coming From:
@@ -1245,39 +1277,6 @@ Reproduce the long stream with hardware-scale swap cadence and HPS-to-decoder FI
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 217 COMMIT Unreleased a559d43 2026-08-18T10:42:27-07:00
-
-#### Coming From:
-
-Unreleased 69d1b90
-
-#### Purpose:
-
-Guarantee fail-open HPS transfer retirement when a sticky downstream decode, raster, DDR, or presentation failure makes normal persistence impossible.
-
-#### Outcome:
-
-Commit `a559d43` adds an explicit MPEG-domain transport gate between the dual-clock FIFO and the decoder. Clean operation preserves the existing ready/valid contract; after any sticky syntax, decoder, raster, DDR, or presentation error, the gate masks decoder validity while draining the FIFO so `ioctl_wait` can release and the post-load LED snapshot can report the first failure. The focused regression proves normal backpressure and accepted-byte delivery, then drains sixteen queued bytes with decoder readiness low and zero invalid decoder deliveries. The B scheduler regression still passes scratch-zero, scratch-one, future-reference order and fail-open retirement. At a hardware-scale one-million-cycle swap cadence, the complete 791,528-byte long regression passes twenty-two P, forty-seven B, twenty-five reference publications, final display identity twenty-five, and no overwrite or presentation error, ruling out the widened counters and real vblank cadence as the hardware lockup source. The clean Quartus 17.0.2 build completes in 9 minutes 32 seconds with zero errors, no Critical Warning, zero setup and hold TNS, +0.230 ns global setup, +0.246 ns global hold, +1.391 ns focused decoder setup, +15.274 ns focused decoder recovery, 29,398 ALMs, 42,225 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. RBF SHA-256 is `874b37b9be25c28ed85e2767d9381ebf9650a9db9689098d5fb6fb67822a350f`.
-
-#### Next Steps:
-
-Install `MediaPlayer_commit217_a559d43.rbf` and load `test_compat_long_gop.m2v`. Confirm first that the file overlay always closes and the MiSTer remains responsive. If the stream is not cleanly accepted, report the repeating USER, POWER, and DISK blink counts from the settled snapshot; those codes will identify the live raster or DDR failure that the former deadlock concealed. Then load `test_compat_mixed_macroblocks.m2v` and confirm that its passing LED pattern and second-GOP presentation remain unchanged.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_05.svh
-- files.qip
-- rtl/mpeg2_new/mpeg2_h262_stream_transport_gate.sv
-- tools/streams/tb_h262_stream_transport_gate.sv
 
 #### Status:
 
