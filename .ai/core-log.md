@@ -1,4 +1,33 @@
 ---
+## 257 COMMIT Unreleased ??? 2026-08-20T05:33:27-07:00
+
+#### Coming From:
+
+Unreleased cc23163
+
+#### Purpose:
+
+Remove the remaining zero-latency response-capacity feedback loop while preserving full-cache same-edge retirement and replacement.
+
+#### Outcome:
+
+Commit `cc23163` removes request-valid from the cache and arbiter busy equations and preserves every focused and complete simulation result, but its clean Quartus elaboration finds a different ten-node loop. Cache command valid still uses downstream response-ready to decide that a full two-entry descriptor FIFO will pop, while the arbiter's legal direct-response routing uses that command valid to select response ownership. The second build was interrupted before fitting completed and no RBF was produced or deployed. The clocked cache and arbiter descriptors remain correct; only the combinational proof that a full cache slot is becoming available must stop depending on response routing.
+
+#### Next Steps:
+
+When the cache descriptor FIFO is full, derive replacement availability from the arbiter's now request-independent prediction readiness rather than downstream response-ready. Retain downstream response-ready only for clocked pop and data association, rerun idle-ready, depth-two, full replacement and direct-response tests plus exact mixed latency, commit the correction, and require a new fully clean Quartus report with zero combinational loops and positive timing before deployment.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
+- tools/streams/tb_h262_prediction_word_cache.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 256 COMMIT Unreleased cc23163 2026-08-20T05:19:52-07:00
 
 #### Coming From:
@@ -1255,34 +1284,6 @@ Install `MediaPlayer_commit213_065a775.rbf` and load `test_compat_long_gop.m2v` 
 
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
 - tools/streams/tb_h262_dense_publication_order.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 214 COMMIT Unreleased 065a775 2026-08-18T09:06:35-07:00
-
-#### Coming From:
-
-Unreleased 065a775
-
-#### Purpose:
-
-Record the MiSTer visual result that separates clean LED diagnostics from failed repeated-GOP presentation on the mixed compatibility stream.
-
-#### Outcome:
-
-Commit `065a775` passes the reported USER, POWER, and DISK checks on the B-intra and mixed-macroblock streams, and the B-intra stream now loads quickly before settling on its coherent authored raster. The mixed stream still glitches during loading, and the uploaded settled capture reads timestamp `00:00:00.440` and frame `11`; it matches decoded source frame 11 exactly, which is the last displayed frame of the first 12-frame GOP rather than final frame 23 of the 24-frame stream. The clean LEDs therefore prove that the existing syntax, reconstruction, and counted publication assertions did not fire, but they do not qualify repeated-GOP presentation or the pending 72-picture long-GOP hardware boundary.
-
-#### Next Steps:
-
-Add a repeated-GOP presentation regression that distinguishes every I/P/B frame and requires the final displayed identity to cross the second I-picture boundary, then correct the first reference, bank, or scheduler transition that leaves frame 11 settled before rebuilding for MiSTer.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
