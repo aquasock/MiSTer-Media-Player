@@ -1,5 +1,37 @@
 ---
-## 246 COMMIT Unreleased ??? 2026-08-20T01:19:04-07:00
+## 247 COMMIT Unreleased ??? 2026-08-20T01:41:00-07:00
+
+#### Coming From:
+
+Unreleased e0db323
+
+#### Purpose:
+
+Overlap decoding of the following reference picture with presentation of the completed B-picture run while preserving every reference and scratch-frame lifetime.
+
+#### Outcome:
+
+Entry 246 rejects adjacent-word DDR read-ahead because its measured benefit is too small and its simplest form is actively harmful. Entry 245 hardware telemetry identifies the next larger serialized boundary: the long-GOP stream spends 54,737,767 of 264,581,138 cadence cycles in presentation hold and the mixed stream spends 16,974,046 of 97,132,985 cycles there. The scheduler currently blocks all compressed input from the accepted non-B header that closes a B run until both B scratch pictures and their retained future reference have been displayed. Static lifetime tracing shows that the existing P destination-ownership gate can safely delay writes only while that destination reference bank is still on screen; after the first scratch swap, the next P picture can decode into the non-future reference bank while the remaining prior-run pictures are presented. The experiment will permit exactly that one following reference transaction, capture its publication as pending work, and reassert the B-presentation hold before a later B run can reuse either scratch frame.
+
+#### Next Steps:
+
+First extend the focused scheduler regression with a slow prior-run presentation and prove that the next P publication may overlap it while any following B header remains blocked. Then implement the narrow scheduler/top-level handshake, rerun exact presentation order, P/B parser and raster, mixed-pixel, repeated-download, 72-picture live-raster and complete publication regressions, and compare modeled cycles against Entry 245. Accept only exact pixels and order, no displayed-bank overwrite, a material cadence reduction, positive clean Quartus setup/hold/recovery/removal slack, and zero-error hardware telemetry on both streams; otherwise revert the overlap and retain `2a26c05` as the qualified core.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_05.svh
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+## 246 COMMIT Unreleased e0db323 2026-08-20T01:19:04-07:00
 
 #### Coming From:
 
@@ -11,22 +43,19 @@ Reduce the dominant physical prediction-read wait by fetching the immediately fo
 
 #### Outcome:
 
-Entry 245 hardware telemetry establishes strict, error-free baselines of 14.490829 fps for the 72-picture long-GOP stream and 12.786594 fps for the 24-picture mixed-macroblock stream. The long run accepts 5,523,274 physical prediction requests and spends 54,535,837 cycles waiting for their responses plus 8,483,066 cycles waiting for request acceptance; mixed accepts 1,763,554 requests and spends 17,424,973 response cycles plus 2,731,151 acceptance-wait cycles. Destination ownership never stalls either stream and writer waits are only 2,264,405 and 736,622 cycles, so physical prediction traffic is the largest directly reducible serialized boundary. The approved experiment will first count consecutive miss-address locality in the exact mixed and long regressions, then, only if the count is substantial, extend the existing four-entry cache to issue a two-word burst on a cacheable miss, return the requested word at the first response, and retain the following word for the next registered lookup. It will preserve one outstanding downstream transaction, active-boundary invalidation, the four-entry fully associative hit cone, exact decoded pixels, display order, presentation lifetime, reload behavior, and every current hardware telemetry check.
+Commit `e0db323` adds simulation-only models for the proposed four-entry following-word fill and a safer two-bank sidecar that never evicts a proven cache entry. The exact mixed oracle still passes 423,936 samples with zero mismatches, maximum delta two, 499,551 cache hits, 71,329 cache misses, 23 swaps and zero decoder, writer or presentation errors in 2,519,996 cycles. The proposed four-entry fill performs 97,354 modeled requests, avoids only 8,883 baseline misses, and induces 37,368 new misses by evicting useful resident words: a net regression of 26,025 requests, or 36.49 percent over the existing physical miss count. The non-evicting sidecar is directionally positive but only converts 8,632 of 68,869 observed lookup misses, split 4,160/4,472 across the two reference banks; it requires 60,237 two-word fills and therefore doubles transferred word traffic on nearly every remaining miss. Even optimistically scaling its 12.10 percent request reduction against Entry 245's complete hardware response wait predicts only a two-to-three percent FPS improvement, far below the 25 fps requirement. The hard negative mixed result is sufficient to reject functional RTL before the much slower long simulation. No cache, decoder, scheduler or synthesis source changed, and no RBF was built or deployed.
 
 #### Next Steps:
 
-Add simulation-only adjacent-miss counters and establish the achievable upper bound before changing functional RTL. If justified, implement the two-response fill state in the four-entry cache and extend its focused model for delayed and acceptance-cycle responses, then require exact P, B, parser-window, mixed-oracle, publication and live-raster results. Accept the optimization only with positive clean Quartus setup, hold, recovery and removal slack, zero MiSTer telemetry errors, exact byte and picture counts, and a repeatable FPS improvement on both hardware streams; otherwise retain Entry 245 unchanged and select a different measured bottleneck.
+Retain the qualified Entry 245 hardware core and the negative locality evidence. Do not add two-response DDR behavior or disturb the timing-safe four-way cache cone. Continue with Entry 247's larger measured presentation/decode serialization boundary, preserving the same exact oracle and hardware cadence gates.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
-- tools/streams/tb_h262_prediction_word_cache.sv
-- tools/streams/tb_h262_mixed_raster_pixels.sv
 - tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
@@ -1251,32 +1280,5 @@ Reload the deployed core, load `test_compat_long_gop.m2v` once, wait for its set
 - [x] Built
 - [ ] Passed
 
----
-## 224 COMMIT Unreleased bbe625e 2026-08-18T13:44:27-07:00
-
-#### Coming From:
-
-Unreleased bbe625e
-
-#### Purpose:
-
-Record the hardware boundary identified by the passive final-GOP progress diagnostic.
-
-#### Outcome:
-
-The deployed `bbe625e` RBF again settles on visible frame 50 with USER and POWER solid, while DISK repeats exactly two blinks. Stage two proves that the third-GOP I50 header was accepted and I50 was published, but no following P header reached the top-level accepted-header observer before transport retirement. The source stream places B48 and B49 after coded I50 and P53 after those B pictures. Static tracing identifies a matching hardware-only vblank race: `frame_waiting` can present newly published I50 immediately when its one-cycle pulse coincides with `swap_window_pulse`; the later B48 header then finds its future reference already displayed, raises `b_presentation_error`, and causes the fatal transport gate to drain every remaining byte without exposing P53 to the decoder. The existing acceptance OR can remain true through its I-picture term and the current error encoder omits presentation errors, explaining the otherwise misleading solid USER and POWER report. This exact path accounts for the uploaded frame 47 to frame 50 transition, terminal frame 50, stage two, and clean menu recovery.
-
-#### Next Steps:
-
-Await approval for a focused scheduler correction that retains each newly published reference until the following accepted picture header determines whether B reordering owns it, adds a regression for publication coincident with vblank followed by B pictures, and preserves fail-open behavior. Use the session-authorized incremental Quartus build after the existing decoder and publication regressions pass.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
