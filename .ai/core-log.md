@@ -1231,7 +1231,7 @@ Retain the accepted Entry 265 hardware and implement cross-run ownership as a se
 - [x] Passed
 
 ---
-## 269 COMMIT Unreleased ??? 2026-08-20T10:25:00-07:00
+## 269 COMMIT Unreleased f24e0f5 2026-08-20T10:25:00-07:00
 
 #### Coming From:
 
@@ -1243,21 +1243,22 @@ Permit the following two-B run to decode into scratch banks released by the curr
 
 #### Outcome:
 
-Proposal only. Entry 268 proves that actual-25-fps cross-run reuse of the existing two scratch banks sustains both hardware traces at exactly 25.000 fps, including every accepted-byte cycle, while preserving decode and temporal display order. Refactor the presentation scheduler into explicit current-presentation and next-decode generations: the current generation retains its two scratch-pending bits and future reference; after its first scratch frame leaves display, the released bank may hold next-generation B one, and the reciprocal release may hold B two. The P reference published during the current run remains the next generation's future reference, while the P decoded after that next B pair remains the ordinary overlap candidate for the following generation. Promotion must be atomic only after the current future reference displays, and any early header, bank collision, missing reference, third B picture, decode error or out-of-order swap must fail closed under the existing error contract.
+Commit `f24e0f5` separates the currently presenting B run from one queued decode generation while retaining exactly two physical scratch banks. A released scratch bank can accept the following run's first B picture, the reciprocal release can accept its second, and ownership promotes atomically only after the old future reference displays; the focused regression covers two adjacent runs, explicit generation identities, a queued B completion coincident with delayed promotion, ordered scratch-zero/scratch-one/future display, and every prior race, cadence and fail-open case. The exact mixed oracle remains 1,289,996 cycles with all 423,936 pixels, maximum delta two, 69,556 reads, every write, nine publications, 23 swaps and zero errors; the complete long oracle remains 6,999,996 cycles with 372,696 reads, every write, 25 publications, 71 swaps and zero errors. A cadence-stressed mixed run performs seven queued admissions and seven promotions with identical pixels and accounting; it exposed and then locked a critical rule that presentation hold must not starve an already admitted queued B decode. The clean seed-six Quartus 17.0.2 build completes in 10 minutes 31 seconds with zero errors and 145 standing warnings. Timing is positive at +0.524 ns global setup, +1.771 ns decoder setup, +8.356 ns video setup, +0.246 ns hold, +4.360 ns global recovery, +14.753 ns decoder recovery and +0.611 ns removal; utilization is 31,255 ALMs, 45,603 registers, 4,027,379 memory bits, 504 RAM blocks and 65 DSP blocks. `MediaPlayer_commit269_f24e0f5.rbf` is 4,312,872 bytes with SHA-256 `f6cba79842bb41a0b574c2d815efc78d4f878a78efacc84946585f7a8beeb461`, and its standard MiSTer upload is byte-identical on readback. Hardware is functionally clean with every byte and picture, all 71 and 23 swaps, and zero errors. Mixed improves from 59,868,266 cycles at 20.745548 fps to 57,180,519 cycles at 21.720684 fps, saving 2,687,747 cycles or 4.49 percent. Long remains effectively flat at 164,947,334 cycles and 23.243783 fps: presentation wait falls from 47,362,881 to 35,406,540 cycles, but destination ownership rises from zero to 10,805,922 cycles. Entry 268's no-extra-frame model therefore omitted the two-reference-bank destination dependency; scratch reuse is real and retained, but it does not close 25 fps by itself.
 
 #### Next Steps:
 
-Strengthen the focused scheduler test with at least two adjacent closed B runs and explicit bank-generation identities, implement the smallest internal generation state without changing top-level ports, then require the focused test, exact mixed pixels, complete long publication, every read and write count, all swaps and zero-error accounting to pass with a material cycle reduction before a clean Quartus build.
+Retain the timing-clean cross-run scratch scheduler and measure the smallest destination-safe P predecode boundary before changing frame storage. The next ceiling must account for all four occupied full-frame buffers during a queued two-B run: visible past reference, future prediction reference and two B scratch frames. Quantify how much of the newly exposed 10,805,922-cycle long destination wait can be hidden by allowing the P parser and two-bank row producer to fill bounded metadata rows while persistence remains blocked until display releases the destination reference bank; compare that against a true fifth-frame destination only if bounded predecode cannot close both hardware gaps.
 
 #### Files Modified:
 
 - rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 - tools/streams/tb_h262_b_presentation_scheduler.sv
 - tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/tb_h262_mixed_raster_pixels.sv
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
