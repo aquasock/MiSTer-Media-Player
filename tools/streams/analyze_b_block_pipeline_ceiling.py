@@ -15,6 +15,10 @@ class Block:
     mbi: int
     blk: int
     direction: int
+    fmvx: int
+    fmvy: int
+    bmvx: int
+    bmvy: int
     start: int
     fetched: int | None = None
     retire: int | None = None
@@ -38,7 +42,8 @@ def read_pictures(path: Path) -> list[Picture]:
             mbi = int(row["mbi"])
             blk = int(row["blk"])
             direction = int(row["direction"])
-            identity = (temporal_reference, mbi, blk, direction)
+            vectors = tuple(int(row[name]) for name in ("fmvx", "fmvy", "bmvx", "bmvy"))
+            identity = (temporal_reference, mbi, blk, direction, *vectors)
             if event == "START":
                 if active is not None:
                     raise ValueError(f"START before prior RETIRE: {row}")
@@ -55,6 +60,10 @@ def read_pictures(path: Path) -> list[Picture]:
                     active.mbi,
                     active.blk,
                     active.direction,
+                    active.fmvx,
+                    active.fmvy,
+                    active.bmvx,
+                    active.bmvy,
                 ):
                     raise ValueError(f"FETCHED identity mismatch: {row}")
                 if active.fetched is not None:
@@ -66,6 +75,10 @@ def read_pictures(path: Path) -> list[Picture]:
                     active.mbi,
                     active.blk,
                     active.direction,
+                    active.fmvx,
+                    active.fmvy,
+                    active.bmvx,
+                    active.bmvy,
                 ):
                     raise ValueError(f"RETIRE identity mismatch: {row}")
                 if active.fetched is None or active.retire is not None:
@@ -125,6 +138,10 @@ def main() -> int:
     args = parser.parse_args()
 
     totals = [0, 0, 0, 0, 0, 0, 0]
+    directions = {1: 0, 2: 0, 3: 0}
+    one_lane_taps = 0
+    two_lane_cycles = 0
+    full_parallel_cycles = 0
     for picture in read_pictures(args.trace):
         serial, overlapped, producer, consumer, gaps = replay(picture)
         totals[0] += 1
@@ -134,6 +151,21 @@ def main() -> int:
         totals[4] += producer
         totals[5] += consumer
         totals[6] += gaps
+        for block in picture.blocks:
+            forward_taps = 1 << ((block.fmvx & 1) + (block.fmvy & 1))
+            backward_taps = 1 << ((block.bmvx & 1) + (block.bmvy & 1))
+            if block.direction == 1:
+                taps = forward_taps
+            elif block.direction == 2:
+                taps = backward_taps
+            elif block.direction == 3:
+                taps = forward_taps + backward_taps
+            else:
+                raise ValueError(f"invalid prediction direction: {block}")
+            directions[block.direction] += 1
+            one_lane_taps += 64 * taps
+            two_lane_cycles += 64 * ((taps + 1) // 2)
+            full_parallel_cycles += 64
     pictures, blocks, serial, overlapped, producer, consumer, gaps = totals
     saved = serial - overlapped
     percent = 100.0 * saved / serial if serial else 0.0
@@ -150,6 +182,27 @@ def main() -> int:
             f"whole_trace_upper_percent={whole_percent:.2f}"
         )
     print(message)
+    two_lane_saved = one_lane_taps - two_lane_cycles
+    full_parallel_saved = one_lane_taps - full_parallel_cycles
+    two_lane_whole = (
+        100.0 * two_lane_saved / args.total_cycles
+        if args.total_cycles is not None
+        else 0.0
+    )
+    full_parallel_whole = (
+        100.0 * full_parallel_saved / args.total_cycles
+        if args.total_cycles is not None
+        else 0.0
+    )
+    print(
+        f"B tap blocks={directions[1]}/{directions[2]}/{directions[3]} "
+        f"one_lane={one_lane_taps} two_lane={two_lane_cycles} "
+        f"two_lane_saved={two_lane_saved} "
+        f"two_lane_whole_percent={two_lane_whole:.2f} "
+        f"full_parallel={full_parallel_cycles} "
+        f"full_parallel_saved={full_parallel_saved} "
+        f"full_parallel_whole_percent={full_parallel_whole:.2f}"
+    )
     return 0
 
 

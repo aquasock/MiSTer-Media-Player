@@ -373,7 +373,7 @@ module tb_h262_live_raster_soak #(
             if(b_block_trace_fd==0)
                 $fatal(1,"cannot open B block trace");
             $fdisplay(b_block_trace_fd,
-                "cycle,event,temporal_reference,mbi,blk,direction");
+                "cycle,event,temporal_reference,mbi,blk,direction,fmvx,fmvy,bmvx,bmvy");
         end
         if(MIXED_PIXEL_MODE)begin
             if(!$value$plusargs("PIXELS=%s",pixel_path))
@@ -434,22 +434,37 @@ module tb_h262_live_raster_soak #(
             b_block_trace_cycle<=b_block_trace_cycle+1;
             if(b_block_trace_fd!=0)begin
                 if(prediction.b_probe.block_fetch_start)
-                    $fdisplay(b_block_trace_fd,"%0d,START,%0d,%0d,%0d,%0d",
+                    $fdisplay(b_block_trace_fd,
+                        "%0d,START,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d",
                         b_block_trace_cycle,temporal_reference,
                         prediction.b_probe.mbi,prediction.b_probe.blk,
-                        prediction.b_probe.exec_direction);
+                        prediction.b_probe.exec_direction,
+                        $signed(prediction.b_probe.exec_fmvx),
+                        $signed(prediction.b_probe.exec_fmvy),
+                        $signed(prediction.b_probe.exec_bmvx),
+                        $signed(prediction.b_probe.exec_bmvy));
                 if(prediction.b_probe.block_fetch_complete&&
                    !b_block_fetch_complete_d)
-                    $fdisplay(b_block_trace_fd,"%0d,FETCHED,%0d,%0d,%0d,%0d",
+                    $fdisplay(b_block_trace_fd,
+                        "%0d,FETCHED,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d",
                         b_block_trace_cycle,temporal_reference,
                         prediction.b_probe.mbi,prediction.b_probe.blk,
-                        prediction.b_probe.exec_direction);
+                        prediction.b_probe.exec_direction,
+                        $signed(prediction.b_probe.exec_fmvx),
+                        $signed(prediction.b_probe.exec_fmvy),
+                        $signed(prediction.b_probe.exec_bmvx),
+                        $signed(prediction.b_probe.exec_bmvy));
                 if(prediction.b_probe.wait_store&&writer_stored&&
                    (prediction.b_probe.exec_direction!=0))
-                    $fdisplay(b_block_trace_fd,"%0d,RETIRE,%0d,%0d,%0d,%0d",
+                    $fdisplay(b_block_trace_fd,
+                        "%0d,RETIRE,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d",
                         b_block_trace_cycle,temporal_reference,
                         prediction.b_probe.mbi,prediction.b_probe.blk,
-                        prediction.b_probe.exec_direction);
+                        prediction.b_probe.exec_direction,
+                        $signed(prediction.b_probe.exec_fmvx),
+                        $signed(prediction.b_probe.exec_fmvy),
+                        $signed(prediction.b_probe.exec_bmvx),
+                        $signed(prediction.b_probe.exec_bmvy));
             end
             b_block_fetch_complete_d<=
                 prediction.b_probe.block_fetch_complete;
