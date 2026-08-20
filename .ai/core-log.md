@@ -1,5 +1,36 @@
 ---
-## 245 COMMIT Unreleased ??? 2026-08-20T00:00:02-07:00
+## 246 COMMIT Unreleased ??? 2026-08-20T01:19:04-07:00
+
+#### Coming From:
+
+Unreleased 2a26c05
+
+#### Purpose:
+
+Reduce the dominant physical prediction-read wait by fetching the immediately following reference word with each cacheable DDR miss when measured address locality proves that read-ahead is useful.
+
+#### Outcome:
+
+Entry 245 hardware telemetry establishes strict, error-free baselines of 14.490829 fps for the 72-picture long-GOP stream and 12.786594 fps for the 24-picture mixed-macroblock stream. The long run accepts 5,523,274 physical prediction requests and spends 54,535,837 cycles waiting for their responses plus 8,483,066 cycles waiting for request acceptance; mixed accepts 1,763,554 requests and spends 17,424,973 response cycles plus 2,731,151 acceptance-wait cycles. Destination ownership never stalls either stream and writer waits are only 2,264,405 and 736,622 cycles, so physical prediction traffic is the largest directly reducible serialized boundary. The approved experiment will first count consecutive miss-address locality in the exact mixed and long regressions, then, only if the count is substantial, extend the existing four-entry cache to issue a two-word burst on a cacheable miss, return the requested word at the first response, and retain the following word for the next registered lookup. It will preserve one outstanding downstream transaction, active-boundary invalidation, the four-entry fully associative hit cone, exact decoded pixels, display order, presentation lifetime, reload behavior, and every current hardware telemetry check.
+
+#### Next Steps:
+
+Add simulation-only adjacent-miss counters and establish the achievable upper bound before changing functional RTL. If justified, implement the two-response fill state in the four-entry cache and extend its focused model for delayed and acceptance-cycle responses, then require exact P, B, parser-window, mixed-oracle, publication and live-raster results. Accept the optimization only with positive clean Quartus setup, hold, recovery and removal slack, zero MiSTer telemetry errors, exact byte and picture counts, and a repeatable FPS improvement on both hardware streams; otherwise retain Entry 245 unchanged and select a different measured bottleneck.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
+- tools/streams/tb_h262_prediction_word_cache.sv
+- tools/streams/tb_h262_mixed_raster_pixels.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+## 245 COMMIT Unreleased 2a26c05 2026-08-20T00:00:02-07:00
 
 #### Coming From:
 
@@ -11,18 +42,18 @@ Measure real MiSTer picture cadence and decoder bottlenecks without requiring HD
 
 #### Outcome:
 
-The approved development boundary will add timing-isolated decoder-domain counters for accepted input, decoder, presentation and destination stalls, picture-type work, prediction traffic, writer activity, picture completion and actual display swaps, then freeze a versioned checksummed snapshot after sequence completion. A video-domain overlay will encode that stable snapshot as a machine-readable bit grid without feeding any telemetry result back into decode, DDR, publication or presentation control. A deterministic local decoder and MiSTer runner will load the long-GOP and mixed-macroblock streams, request native screenshots through `/dev/MiSTer_cmd`, retrieve them over the network and report measured hardware durations, delivered frame rate and bottleneck totals. Entry 244's independently measured 14.38 fps long-GOP and 12.65 fps mixed-macroblock results are the locked baselines; hardware success requires strict completion and display counts with no functional error, no timing failure, and first-to-final spans no greater than 2.84 seconds for frames 0 through 71 and 0.92 seconds for frames 0 through 23.
+Commits `71c59dd`, `d54e3f3`, and `2a26c05` add timing-isolated decoder-domain counters, a stable versioned and checksummed cross-clock snapshot, a row-serialized machine-readable video overlay, its deterministic PNG decoder, and an automated FTP/SSH MiSTer acquisition runner. The profiler is observational only and no result feeds decode, DDR, publication, presentation, or LEDs. The focused profiler passes all 21 words with picture counts `02020403`, cadence 29 and checksum `7a5b03de`; cache, repeated-download, P-intra, B-residual, parser-window, exact mixed-pixel and complete long-GOP publication regressions retain their locked functional results. The mixed oracle keeps 423,936 samples, zero mismatches, maximum delta two and 499,551/71,329/0 cache accounting; the full publication run keeps 22 P, 47 B, 25 promotions, final display identity 25 and zero holds, overwrites or errors. A fully clean seed-2 Quartus 17.0.2 build completes in 9 minutes 34 seconds with zero errors and 125 standing warnings. Final timing is positive at +0.181 ns global setup, +0.195 ns decoder setup, +7.561 ns video setup, +0.244 ns hold, +2.927 ns recovery and +0.951 ns removal; the stable snapshot and trailing-ready synchronizers have narrowly scoped first-stage CDC exceptions while every settling and ordinary logic path remains timed. Qualified artifact `MediaPlayer_commit245_2a26c05.rbf` is 4,281,080 bytes with SHA-256 `71f4180d07dc57f1d981c793c8af34277e7a4d7eee1f528bce2753cb1ee25b38`. Automated MiSTer acquisition accepts both streams exactly with zero error flags. Long GOP accepts 791,528 bytes, completes 25 reference plus 47 B pictures, displays 72 pictures through 71 swaps in 264,581,138 cycles or 4.899651 seconds, and measures 14.490829 fps; decoder, presentation and destination stalls are 161,508,107/54,737,767/0, prediction request/acceptance-wait/response counts are 5,523,274/8,483,066/54,535,837, and writer wait is 2,264,405. Mixed accepts 366,071 bytes, completes 9 reference plus 15 B pictures, displays 24 pictures through 23 swaps in 97,132,985 cycles or 1.798759 seconds, and measures 12.786594 fps; stalls are 54,845,205/16,974,046/0, prediction counts are 1,763,554/2,731,151/17,424,973, and writer wait is 736,622. These results closely validate Entry 244's video estimates while providing exact internal attribution without HDMI recordings.
 
 #### Next Steps:
 
-Implement the profiler, stable cross-clock snapshot, overlay, focused regression and local acquisition tools while keeping all taps registered and outside the timing-critical P prelaunch cone. Run the focused test and the locked parser, raster, mixed-pixel, publication and exact live-soak regressions, then require a fully clean Quartus build with positive setup, hold, recovery and removal slack before deploying the development RBF. Establish both hardware baselines from decoded screenshots and use the largest measured stall class to define the next proposal-first throughput optimization; HDMI video remains reserved for final visual verification after hardware telemetry reaches stable 25 fps.
+Retain the qualified profiler and use its exact hardware baselines for Entry 246's proposal-first prediction-read optimization. Preserve the timing-safe registered cache cone and 25 fps presentation gate, compare every candidate against both decoded screenshots, and reserve HDMI video for final visual verification only after telemetry reaches stable 25 fps.
 
 #### Files Modified:
 
-- MediaPlayer.qsf
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_04.svh
+- MediaPlayer.sdc
+- MediaPlayer_top_00.svh
 - MediaPlayer_top_07.svh
+- files.qip
 - rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
 - tools/streams/decode_hardware_cadence.py
 - tools/streams/run_hardware_cadence.py
@@ -30,8 +61,8 @@ Implement the profiler, stable cross-clock snapshot, overlay, focused regression
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 244 COMMIT Unreleased 8d76c43 2026-08-19T23:05:34-07:00
@@ -1242,35 +1273,6 @@ Await approval for a focused scheduler correction that retains each newly publis
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 225 COMMIT Unreleased 1b26cb5 2026-08-18T13:46:18-07:00
-
-#### Coming From:
-
-Unreleased bbe625e
-
-#### Purpose:
-
-Prevent a newly published future reference from being displayed before the following picture header assigns B-reorder ownership.
-
-#### Outcome:
-
-Commit `1b26cb5` retains each ordinary reference publication as pending and makes it ineligible for display until a following accepted non-B header or terminal sequence boundary releases it; a following B header instead transfers ownership directly into the existing two-scratch reorder transaction. The focused regression reproduces publication coincident with vblank and proves that the future reference remains hidden while both B scratches and then the future reference display in order; ordinary non-B release, a terminal boundary consumed before publication, and fatal fail-open recovery also pass. The transport and final-GOP observer tests pass unchanged. The DDR-backed 72-picture live-raster soak and independent 720x480 long-GOP publication test each pass 22 P pictures, 47 B pictures, 25 publications, 25 final display identities, both scratch banks, completed presentation, and zero presentation, ownership, parser, prediction, or writer errors. The session-authorized incremental Quartus 17.0.2 compile preserves the existing database, recognizes only the changed scheduler source, and completes in 9 minutes 1 second with 0 errors and 121 standing warnings; global setup/hold slack is +0.640/+0.253 ns, focused decoder/video setup slack is +1.852/+7.307 ns, and utilization is 29,589 ALMs, 42,295 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. `MediaPlayer_commit225_1b26cb5.rbf` is 4,222,572 bytes with SHA-256 `3c31afab0e8d905e12434c8cc9468160add9765f74669c44950b477cdf43208f`; its MiSTer FTP readback is byte-identical.
-
-#### Next Steps:
-
-Reload the deployed core and run `test_compat_long_gop.m2v` once. Confirm whether visible presentation advances beyond frame 50 to the final source frame 71, USER and POWER remain solid, and the settled DISK report advances from stage two to stage eleven; if any lower stage remains, report its blink count and the last visible frame. Then reload `test_compat_mixed_macroblocks.m2v` to check that the classification barrier does not worsen its existing load-time jitter.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_b_presentation_scheduler.sv
 
 #### Status:
 
