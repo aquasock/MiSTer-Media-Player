@@ -38,6 +38,16 @@ module tb_h262_live_raster_soak #(
     integer profile_input_decoder=0,profile_input_presentation=0;
     integer profile_input_destination=0;
     integer profile_input_i=0,profile_input_p=0,profile_input_b=0;
+    integer profile_decoder_base_parser=0,profile_decoder_p_hold=0;
+    integer profile_decoder_b_parse=0,profile_decoder_b_persist=0;
+    integer profile_p_four_parse=0,profile_p_legacy_parse=0;
+    integer profile_p_wide_parse=0,profile_p_raster_hold=0;
+    integer profile_p_old_hold=0,profile_p_hold_other=0;
+    integer profile_p_wide_parse_active=0,profile_p_wide_replay=0;
+    integer profile_p_wide_raster=0,profile_p_wide_wait_other=0;
+    integer profile_b_parse_active=0,profile_b_replay_active=0;
+    integer profile_b_row_waiting=0,profile_b_parse_other=0;
+    integer profile_b_row_raster=0,profile_b_row_other=0;
     integer profile_p_transform=0,profile_b_transform=0;
     integer profile_p_raster=0,profile_b_raster=0;
     integer profile_p_lookup=0,profile_b_lookup=0;
@@ -682,6 +692,58 @@ module tb_h262_live_raster_soak #(
                         3'b011:profile_input_b<=profile_input_b+1;
                         default:;
                     endcase
+                    // Entry 259: mirror the publication shell's mutually
+                    // exclusive ready equation, then split each row-bounded
+                    // P/B hold by its live owner. These counters are
+                    // simulation-only and do not alter the decoder contract.
+                    if(publication.p_hold_effective)begin
+                        profile_decoder_p_hold<=profile_decoder_p_hold+1;
+                        if(publication.p_controller.four_mb_parse_hold)
+                            profile_p_four_parse<=profile_p_four_parse+1;
+                        else if(publication.p_controller.legacy_parse_hold)
+                            profile_p_legacy_parse<=profile_p_legacy_parse+1;
+                        else if(publication.p_controller.wide_parse_hold)begin
+                            profile_p_wide_parse<=profile_p_wide_parse+1;
+                            if(publication.p_controller.wide_general_probe.parse_active)
+                                profile_p_wide_parse_active<=profile_p_wide_parse_active+1;
+                            else if(publication.p_controller.wide_general_probe.row_waiting)begin
+                                if(prediction.mixed_active)
+                                    profile_p_wide_raster<=profile_p_wide_raster+1;
+                                else if(publication.p_controller.mixed_replay_active)
+                                    profile_p_wide_replay<=profile_p_wide_replay+1;
+                                else
+                                    profile_p_wide_wait_other<=profile_p_wide_wait_other+1;
+                            end
+                            else
+                                profile_p_wide_wait_other<=profile_p_wide_wait_other+1;
+                        end
+                        else if(publication.p_controller.raster_hold_active)
+                            profile_p_raster_hold<=profile_p_raster_hold+1;
+                        else if(publication.p_controller.old_stream_hold)
+                            profile_p_old_hold<=profile_p_old_hold+1;
+                        else
+                            profile_p_hold_other<=profile_p_hold_other+1;
+                    end
+                    else if(publication.b_parse_hold)begin
+                        profile_decoder_b_parse<=profile_decoder_b_parse+1;
+                        if(publication.b_controller.parse_active)
+                            profile_b_parse_active<=profile_b_parse_active+1;
+                        else if(publication.b_controller.replay_active)
+                            profile_b_replay_active<=profile_b_replay_active+1;
+                        else if(publication.b_controller.row_waiting)begin
+                            profile_b_row_waiting<=profile_b_row_waiting+1;
+                            if(prediction.b_active)
+                                profile_b_row_raster<=profile_b_row_raster+1;
+                            else
+                                profile_b_row_other<=profile_b_row_other+1;
+                        end
+                        else
+                            profile_b_parse_other<=profile_b_parse_other+1;
+                    end
+                    else if(publication.b_persistence_wait)
+                        profile_decoder_b_persist<=profile_decoder_b_persist+1;
+                    else
+                        profile_decoder_base_parser<=profile_decoder_base_parser+1;
                 end
                 else if(presentation_hold)
                     profile_input_presentation<=profile_input_presentation+1;
@@ -923,6 +985,19 @@ module tb_h262_live_raster_soak #(
                      profile_p_store,profile_b_store,
                      profile_writer,profile_presentation,
                      profile_b_miss_prelaunch);
+            $display("LIVE_RASTER_BACKPRESSURE decoder=%0d base_parser=%0d p_hold=%0d b_parse=%0d b_persist=%0d p_owner=%0d/%0d/%0d/%0d/%0d/%0d b_owner=%0d/%0d/%0d/%0d",
+                     profile_input_decoder,profile_decoder_base_parser,
+                     profile_decoder_p_hold,profile_decoder_b_parse,
+                     profile_decoder_b_persist,profile_p_four_parse,
+                     profile_p_legacy_parse,profile_p_wide_parse,
+                     profile_p_raster_hold,profile_p_old_hold,
+                     profile_p_hold_other,profile_b_parse_active,
+                     profile_b_replay_active,profile_b_row_waiting,
+                     profile_b_parse_other);
+            $display("LIVE_RASTER_ROW_STAGES p=%0d/%0d/%0d/%0d b=%0d/%0d",
+                     profile_p_wide_parse_active,profile_p_wide_replay,
+                     profile_p_wide_raster,profile_p_wide_wait_other,
+                     profile_b_row_raster,profile_b_row_other);
             $display("LIVE_RASTER_PREFETCH lookups=%0d requests=%0d avoided=%0d induced=%0d",
                      profile_prefetch_lookups,profile_prefetch_requests,
                      profile_prefetch_avoided,profile_prefetch_induced);
