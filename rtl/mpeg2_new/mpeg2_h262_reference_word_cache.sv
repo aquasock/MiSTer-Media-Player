@@ -68,8 +68,11 @@ reg response_descriptor_cacheable[0:1];
 wire ordered_request_hit=cache_lookup_hit&&(response_descriptor_count==0);
 wire response_existing=downstream_dout_ready&&
     (response_descriptor_count!=0);
+// When full, downstream readiness proves that the arbiter is retiring its
+// corresponding head command and can accept the replacement.  Unlike response
+// routing, that readiness is independent of this request valid.
 wire response_descriptor_room=(response_descriptor_count<2)||
-    response_existing;
+    !downstream_busy;
 // Ready is independent of request assertion.  Keeping valid and ready
 // separate prevents a combinational loop through the shared DDR arbiter.
 wire request_ready=active&&response_descriptor_room&&

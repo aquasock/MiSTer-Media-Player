@@ -12,7 +12,7 @@ module tb_h262_prediction_word_cache;
     wire [63:0] request_dout;
     wire request_dout_ready;
 
-    reg downstream_busy=0;
+    reg downstream_busy_override=0;
     reg [63:0] downstream_dout=0;
     reg downstream_dout_ready=0;
     wire [7:0] downstream_burstcnt;
@@ -28,6 +28,9 @@ module tb_h262_prediction_word_cache;
     reg [28:0] response_addr[0:3];
     reg memory_model_enabled=1;
     integer max_response_descriptors=0;
+    wire downstream_busy=downstream_busy_override||
+        (memory_model_enabled&&(response_count>=2)&&
+         !downstream_dout_ready);
 
     integer ordered_baseline_cycles=0;
     integer ordered_depth2_cycles=0;
@@ -343,7 +346,7 @@ module tb_h262_prediction_word_cache;
             $fatal(1,"transaction invalidation failed");
 
         // A held downstream busy and a delayed response preserve the request.
-        downstream_busy=1;
+        downstream_busy_override=1;
         response_delay_config=3;
         fork
             begin
@@ -354,7 +357,7 @@ module tb_h262_prediction_word_cache;
                 if(!request_busy)
                     $fatal(1,"request accepted while downstream busy");
                 @(negedge clk);
-                downstream_busy=0;
+                downstream_busy_override=0;
             end
         join
         if((downstream_reads!=11)||(cache_misses!=9))
