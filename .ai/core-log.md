@@ -1250,9 +1250,11 @@ Entry 260 is timing-clean and exact on both hardware streams, but removing 8.12 
 
 The fully clean seed-six Quartus 17.0.2 build completes in 10 minutes 8 seconds with zero errors, 143 standing warnings, no Critical Warning and no combinational loop. Timing is positive at +0.410 ns global setup, +1.524 ns decoder setup, +7.062 ns video setup, +0.249 ns hold, +3.082 ns global recovery, +15.519 ns decoder recovery and +0.685 ns removal. The fit uses 30,981 ALMs, 45,493 registers, 4,027,379 memory bits, 504 RAM blocks and 65 DSP blocks. `MediaPlayer_commit261_3dc020b.rbf` is 4,314,724 bytes with SHA-256 `2c4a6436f13d601659a0166e532ab82948e3862cc5b16900b53f21e57b1efe64`; the standard MiSTer upload and FTP readback match byte-for-byte.
 
+Exact MiSTer telemetry accepts Entry 261 on both streams with every byte and picture, 71 and 23 swaps, zero error flags and zero destination stalls. Long improves from 173,900,457 cycles at 22.047096 fps to 171,214,171 cycles at 22.393006 fps, removing 2,686,286 cycles or 1.54 percent and improving delivered cadence 1.57 percent. Mixed changes only from 61,431,804 cycles at 20.217541 fps to 61,408,518 cycles at 20.225207 fps, removing 23,286 cycles or 0.04 percent. Prediction-response occupancy nevertheless falls from 27,723,374 to 14,270,560 long and from 8,941,202 to 4,609,850 mixed, approximately halving on both streams; only 2,141,506 long and 677,908 mixed decoder-stall cycles reach the input boundary. Writer wait simultaneously rises by 418,436 long and 158,157 mixed, while mixed presentation wait rises by 532,378 cycles. The depth-four path is exact, timing-safe and a real long-stream gain, but the calibrated fixed-latency model overstates end-to-end benefit because read overlap now starves lower-priority writes and earlier decode completion converts to cadence-gated presentation wait.
+
 #### Next Steps:
 
-Acquire exact long and mixed MiSTer cadence telemetry from the deployed `3dc020b` RBF. Accept it only if every byte and expected picture completes with zero decoder and destination errors and the measured gain materially agrees with the calibrated depth-four response-overlap model; otherwise retain Entry 260 and attribute the discrepancy before another production change.
+Retain the exact timing-safe depth-four boundary and test whether reconstruction writes may be accepted in command gaps while ordered read responses remain outstanding. Preserve display priority, reader-region exclusion and read-response ownership; require a focused read/write/read overlap proof plus the calibrated complete traces to show that removing the arbiter's all-reads-drained writer barrier reduces writer and row-persistence wait before another Quartus build.
 
 #### Files Modified:
 
@@ -1267,6 +1269,6 @@ Acquire exact long and mixed MiSTer cadence telemetry from the deployed `3dc020b
 #### Status:
 
 - [x] Built
-- [ ] Passed
+- [x] Passed
 
 ---
