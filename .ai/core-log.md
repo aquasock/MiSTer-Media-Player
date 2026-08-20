@@ -1243,7 +1243,7 @@ None.
 - [x] Passed
 
 ---
-## 263 COMMIT Unreleased ??? 2026-08-20T08:22:46-07:00
+## 263 COMMIT Unreleased a9c9ea9 2026-08-20T08:22:46-07:00
 
 #### Coming From:
 
@@ -1255,11 +1255,11 @@ Measure the complete-trace ceiling of a two-bank P/B row pipeline that overlaps 
 
 #### Outcome:
 
-Proposal only. Entry 262 proves command-level write interleave cannot help because every active block completes its prediction footprint before persistence begins. Entry 261 mixed hardware still spends 8,728,601 P and 18,442,660 B decoder-stall cycles, while the exact one-cycle trace attributes 232,026 P and 476,547 B cycles to row reconstruction beside 424,521 P and 520,297 B parser/transform coordination cycles. The existing per-picture memories are already substantially larger than one 720-pixel macroblock row, so a logical two-bank schedule may be possible without increasing the design's 91 percent RAM-block use, but its attainable whole-stream overlap must be measured before changing tightly coupled parser ownership.
+Entry 262 proves command-level write interleave cannot help because every active block completes its prediction footprint before persistence begins. Commit `a9c9ea9` adds optional simulation-only READY/RETIRE tracing at the live P/B row-ownership boundaries plus a deterministic two-machine, two-bank flow-shop replay; neither changes production RTL. The exact mixed boundary remains 1,809,996 cycles with all 423,936 pixels, 69,556 reads, every write, 23 swaps and zero errors. Across its eight P and fifteen B pictures, P row span falls from 637,492 to 496,136 modeled cycles, saving 22.17 percent, while B falls from 933,494 to 592,188, saving 36.56 percent; 482,662 combined cycles equal 26.67 percent of the whole trace. The exact long boundary remains 9,719,996 cycles with 372,696 reads, all writes, 25 publications, 71 swaps and zero errors. Across its 22 P and 47 B pictures, P row span falls from 2,422,526 to 1,818,516 cycles, saving 24.93 percent, while B falls from 6,111,471 to 3,854,559, saving 36.93 percent; 2,860,922 combined cycles equal 29.43 percent of the whole trace. The consistent complete-stream ceiling justifies functional ping-pong ownership, and the existing row memories have sufficient logical address space to bank without adding a physical RAM block.
 
 #### Next Steps:
 
-Add simulation-only row-ready and row-retired event tracing for P and B, replay each engine through an exact two-stage flow-shop model with one queued row, and report serial versus overlapped cycles per stream and picture type. Require the unchanged exact pixel, transaction, publication and display regressions, and proceed to functional ping-pong ownership only if the modeled hardware-scaled reduction materially closes the remaining 25 fps gap without requiring another physical RAM block.
+Implement logical row-bank ownership in a simulation-first boundary: allow the parser/transform producer to fill the alternate bank while reconstruction consumes the current bank, prevent bank reuse until row persistence retires it, and preserve picture-final publication barriers. Begin with one engine if shared controller coupling makes a combined P/B change unsafe, reuse existing memory address space, and require exact pixels, reads, writes, publications and swaps plus a material complete-trace reduction before Quartus.
 
 #### Files Modified:
 
@@ -1268,7 +1268,7 @@ Add simulation-only row-ready and row-retired event tracing for P and B, replay 
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
