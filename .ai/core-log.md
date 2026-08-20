@@ -1240,7 +1240,7 @@ Retain the accepted Entry 265 hardware and both reusable B profilers without wid
 - [x] Passed
 
 ---
-## 268 COMMIT Unreleased ??? 2026-08-20T10:13:18-07:00
+## 268 COMMIT Unreleased 200f14b 2026-08-20T10:13:18-07:00
 
 #### Coming From:
 
@@ -1252,11 +1252,11 @@ Measure whether reusing each released scratch bank for the following B run can o
 
 #### Outcome:
 
-Proposal only. Entry 267 proves raster lookup width cannot solve mixed cadence, while Entry 265 hardware records 47,362,881 long and 9,983,304 mixed presentation-wait cycles with exactly zero destination-bank stalls. The existing scheduler retains two B pictures in scratch banks zero and one, decodes the following P reference during their presentation, but holds all later input until both scratch frames and that future reference display; after the display advances from scratch zero to scratch one, scratch zero is physically free for the next run, and the reciprocal release follows. Add optional simulation-only picture decode START, READY and DISPLAY tracing and a deterministic actual-25-fps queue replay that preserves decode order, temporal display order, reference dependencies and two scratch-bank ownership. Compare a one-run-ahead model with the current closed-run schedule and the exact hardware cadence gaps before changing scheduler RTL.
+Commit `200f14b` adds optional simulation-only picture START, READY and DISPLAY tracing plus a deterministic actual-25-fps decode/presentation replay that preserves traced decode order, temporal display order, reference dependencies and exactly two scratch banks. The observer handles the established one-cycle overlap between the next header and prior reference publication with independent start and completion ordering, and validates every traced display transition against temporal-reference order. Both default exact boundaries remain unchanged: mixed preserves all 423,936 pixels, 69,556 reads, every write, nine publications, 23 swaps and zero errors at 1,289,996 cycles; long preserves 372,696 reads, every write, 25 publications, 71 swaps and zero errors at 6,999,996 cycles. The replay scales each picture's traced work distribution to Entry 265's exact hardware I/P/B stall totals and additionally charges every accepted compressed byte as one decode cycle. With no added frame memory, a scratch bank becomes reusable only after display leaves it. Mixed carries 22,930,301 decode-work cycles, waits 25,763,616 cycles for bounded scratch ownership, and still sustains every due slot at exactly 49,680,000 cadence cycles or 25.000 fps, saving the full remaining 10,188,266 cycles. Long carries 62,046,857 decode-work cycles, waits 87,350,996 bounded ownership cycles, and sustains exactly 153,360,000 cadence cycles or 25.000 fps, saving the full remaining 11,572,359 cycles. Cross-run scratch reuse is therefore the first measured architecture that closes both targets without impossible arithmetic or additional DDR frame storage.
 
 #### Next Steps:
 
-Implement only the trace and queue analyzer, preserve both exact default regressions, and proceed to a functional cross-run scheduler proposal only if two physical scratch banks can model the required overlap without overwrite and the predicted mixed and long cadence both reach or closely approach 25 fps.
+Retain the accepted Entry 265 hardware and implement cross-run ownership as a separate proposal: after the overlap P reference publishes and display releases the prior run's first scratch bank, admit the following B header into that bank while the old run continues presenting, then use the reciprocal release for its second B picture. Preserve both runs' future-reference identity and temporal queues, reject any overwrite or early display in focused scheduler tests, and require exact mixed and long end-to-end reductions before Quartus.
 
 #### Files Modified:
 
@@ -1265,7 +1265,7 @@ Implement only the trace and queue analyzer, preserve both exact default regress
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
