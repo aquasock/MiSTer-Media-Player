@@ -950,53 +950,6 @@ None.
 - [x] Passed
 
 ---
-## 206 COMMIT Unreleased 2dd4c67 2026-08-18T04:27:00-07:00
-
-#### Coming From:
-
-Unreleased c9636a7
-
-#### Purpose:
-
-Correct repeated-B parsing and transaction lifecycle so every picture in the dense `IPBBPBBPBBPB` corpus completes without error or transport stall.
-
-#### Outcome:
-
-Commit `c9636a7` guarantees fail-open transport after the former second-B fault. Commits `10d88d0` and `2dd4c67` complete the repeated-B correction: a rightmost macroblock now enters zero-stuffing state, a stuffing-only refill tail may terminate with fewer than three buffered bytes, raw compatibility streams receive an explicit sequence end, and every accepted picture header produces its own presentation event even when adjacent coding types are both B. Two independent non-reference scratch frames preserve consecutive B display order before the retained future reference, while decoder or ownership failure aborts presentation backpressure. The full 2,875,985-byte dense parser/transform replay completes all seven B pictures, 210 row transactions, 9,450 motion records, 52,846 residual blocks, 1,539,306 coefficient events, and 3,382,144 spatial samples without error. Focused regressions also prove 4,102 accepted transport bytes with zero post-abort stalls, scratch0/scratch1/future presentation order plus fail-open recovery, all six scratch-bank/plane tag mappings, and the established 518,400-sample B residual raster.
-
-The final clean Quartus 17.0.2 build completes in 9 minutes 14 seconds with zero setup, hold, or recovery TNS, no Critical Warning, +0.496 ns global setup, +0.245 ns global hold, +3.411 ns global recovery, +1.666 ns focused decoder setup, and +14.384 ns focused decoder recovery. It uses 28,935 ALMs, 41,815 registers, 4,025,331 memory bits, 503 RAM blocks, 65 DSP blocks, and 3 PLLs. Generated RBF `MediaPlayer.rbf` has SHA-256 `c681b82a672dc7c21eff38bfd69244510481cef7cfc6bc0cb9f3dc2647cef56e`; regenerated stream `test_compat_dense_residual.m2v` has SHA-256 `f8e05f5cfd0c0385566bbc3e4133d9f42cb5547933d92e24b0d87eec3fa0a79e`. Both files were uploaded to the standard MiSTer at `10.10.0.30` and read back with matching hashes.
-
-#### Next Steps:
-
-Run `test_compat_dense_residual.m2v` through its complete sequence on MiSTer. Confirm the raster remains coherent through every P/B interval, the file-transfer overlay retires instead of freezing, and the terminal LEDs are solid USER, solid POWER, and dark DISK. Report any transient image order issue separately from the settled LED state.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- MediaPlayer.sdc
-- files.qip
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_04.svh
-- MediaPlayer_top_05.svh
-- MediaPlayer_top_06.svh
-- tools/streams/generate_test_progressive_compatibility.py
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_b_residual_streaming.sv
-- tools/streams/tb_h262_dense_transport_recovery.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
 ## 207 COMMIT Unreleased 2dd4c67 2026-08-18T04:37:17-07:00
 
 #### Coming From:
@@ -1279,5 +1232,39 @@ Pause on the deployed Entry 260 RBF for the user's visual check of both compatib
 
 - [x] Built
 - [x] Passed
+
+---
+## 261 COMMIT Unreleased ??? 2026-08-20T07:38:21-07:00
+
+#### Coming From:
+
+Unreleased c958794
+
+#### Purpose:
+
+Recalibrate the proven prediction-request queue against measured MiSTer DDR response latency and deploy a deeper ordered boundary only if complete exact traces predict a material cadence gain.
+
+#### Outcome:
+
+Proposal only. Entry 260 is timing-clean and exact on both hardware streams, but removing 8.12 percent of mixed and 8.77 percent of long isolated simulation cycles improves MiSTer cadence by only 1.84 and 1.03 percent. Its telemetry records 8,941,202 mixed and 27,723,374 long cycles with at least one prediction response outstanding, while 69,556 and 372,696 physical prediction reads imply roughly 129 and 74 outstanding cycles per read. The earlier depth rejection used at most ten cycles of fixed service; an unchanged sixteen-cycle replay already increases the exact depth-four advantage over depth two from 0.51 to 4.93 percent on mixed while preserving all 423,936 pixels, 69,556 reads, 23 swaps and zero errors. Extend only the simulation memory model far enough to cover measured hardware latency, compare complete depth-two through depth-four traces, and change the guarded production default only if the exact hardware-scaled ceiling justifies a clean build.
+
+#### Next Steps:
+
+Parameterize the regression response pipeline to at least 128 cycles, require exact mixed pixels and long transaction, publication and display order at every tested depth, then retain depth two if the measured ceiling remains small or set the already-proven fetcher, cache and arbiter boundary to the best bounded depth if it materially closes the remaining 25 fps gap. A production change must then pass the focused full-queue retire-and-replace tests, default-latency full regressions, clean positive timing, byte-identical deployment readback and both automated MiSTer cadence streams.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
+- tools/streams/tb_h262_prediction_block_fetcher.sv
+- tools/streams/tb_h262_prediction_word_cache.sv
+- tools/streams/tb_h262_ddram_arbiter.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
 
 ---
