@@ -1234,7 +1234,7 @@ Pause on the deployed Entry 260 RBF for the user's visual check of both compatib
 - [x] Passed
 
 ---
-## 261 COMMIT Unreleased ??? 2026-08-20T07:38:21-07:00
+## 261 COMMIT Unreleased 3dc020b 2026-08-20T07:38:21-07:00
 
 #### Coming From:
 
@@ -1246,11 +1246,11 @@ Recalibrate the proven prediction-request queue against measured MiSTer DDR resp
 
 #### Outcome:
 
-Proposal only. Entry 260 is timing-clean and exact on both hardware streams, but removing 8.12 percent of mixed and 8.77 percent of long isolated simulation cycles improves MiSTer cadence by only 1.84 and 1.03 percent. Its telemetry records 8,941,202 mixed and 27,723,374 long cycles with at least one prediction response outstanding, while 69,556 and 372,696 physical prediction reads imply roughly 129 and 74 outstanding cycles per read. The earlier depth rejection used at most ten cycles of fixed service; an unchanged sixteen-cycle replay already increases the exact depth-four advantage over depth two from 0.51 to 4.93 percent on mixed while preserving all 423,936 pixels, 69,556 reads, 23 swaps and zero errors. Extend only the simulation memory model far enough to cover measured hardware latency, compare complete depth-two through depth-four traces, and change the guarded production default only if the exact hardware-scaled ceiling justifies a clean build.
+Entry 260 is timing-clean and exact on both hardware streams, but removing 8.12 percent of mixed and 8.77 percent of long isolated simulation cycles improves MiSTer cadence by only 1.84 and 1.03 percent. Its telemetry records 8,941,202 mixed and 27,723,374 long cycles with at least one prediction response outstanding, while 69,556 and 372,696 physical prediction reads imply roughly 129 and 74 outstanding cycles per read. Commit `3dc020b` replaces the simulation delay shifter with an exact circular response queue supporting up to 256 cycles and raises the already-proven block-fetcher, cache and arbiter production depth from two to four. At the calibrated 128-cycle mixed latency, depth four reduces the complete trace from 5,869,996 to 3,729,996 cycles, 36.46 percent, while preserving all 423,936 pixels with maximum delta two, 69,556 reads, 23 swaps and zero errors. At the calibrated 74-cycle long latency it reduces the complete trace from 21,539,996 to 15,039,996 cycles, 30.18 percent, while preserving 372,696 reads, all writes, 25 publications, 71 swaps and zero errors. Default one-cycle mixed and long boundaries remain exact at 1,809,996 and 9,719,996 cycles, and focused fetcher, cache and arbiter regressions pass depth-four fill/drain, response order, backpressure, display priority, same-cycle full-queue replacement, direct response and writer exclusion.
 
 #### Next Steps:
 
-Parameterize the regression response pipeline to at least 128 cycles, require exact mixed pixels and long transaction, publication and display order at every tested depth, then retain depth two if the measured ceiling remains small or set the already-proven fetcher, cache and arbiter boundary to the best bounded depth if it materially closes the remaining 25 fps gap. A production change must then pass the focused full-queue retire-and-replace tests, default-latency full regressions, clean positive timing, byte-identical deployment readback and both automated MiSTer cadence streams.
+Run a fully clean seed-six Quartus build from `3dc020b` and require positive global and decoder timing with no combinational loop. If it closes, preserve the named RBF, upload and verify it byte-for-byte, then require exact long and mixed MiSTer telemetry before accepting the hardware-scaled queue gain and selecting any remaining work toward stable 25 fps.
 
 #### Files Modified:
 
