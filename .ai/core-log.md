@@ -1,5 +1,5 @@
 ---
-## 257 COMMIT Unreleased ??? 2026-08-20T05:33:27-07:00
+## 257 COMMIT Unreleased 1d4329d 2026-08-20T05:33:27-07:00
 
 #### Coming From:
 
@@ -11,11 +11,11 @@ Remove the remaining zero-latency response-capacity feedback loop while preservi
 
 #### Outcome:
 
-Commit `cc23163` removes request-valid from the cache and arbiter busy equations and preserves every focused and complete simulation result, but its clean Quartus elaboration finds a different ten-node loop. Cache command valid still uses downstream response-ready to decide that a full two-entry descriptor FIFO will pop, while the arbiter's legal direct-response routing uses that command valid to select response ownership. The second build was interrupted before fitting completed and no RBF was produced or deployed. The clocked cache and arbiter descriptors remain correct; only the combinational proof that a full cache slot is becoming available must stop depending on response routing.
+Commit `cc23163` removed request-valid from cache and arbiter busy equations, but its clean Quartus elaboration found a different ten-node loop: cache command valid used downstream response-ready to decide that a full descriptor FIFO would pop, while legal direct-response routing used that command valid to select response ownership. The build was interrupted before fitting completed and no RBF was produced or deployed. Commit `1d4329d` instead lets a full cache accept a replacement only when the arbiter's request-independent prediction readiness proves that its corresponding head command is retiring; response-ready now feeds only clocked pop and data association. The strengthened downstream model genuinely fills at two and reopens only on retirement. Focused cache and arbiter tests pass idle readiness, depth two, full-queue same-edge replacement, direct response, backpressure, burst ownership and prediction/display/prediction order. The exact mixed ten-cycle boundary remains all 423,936 samples, zero mismatches, 69,556 reads and 2,069,996 cycles, preserving the full Entry 255 gain with no response-routing feedback in command valid.
 
 #### Next Steps:
 
-When the cache descriptor FIFO is full, derive replacement availability from the arbiter's now request-independent prediction readiness rather than downstream response-ready. Retain downstream response-ready only for clocked pop and data association, rerun idle-ready, depth-two, full replacement and direct-response tests plus exact mixed latency, commit the correction, and require a new fully clean Quartus report with zero combinational loops and positive timing before deployment.
+Run a fully clean Quartus build from `1d4329d`, inspect the synthesis map for zero combinational-loop logic, and require positive global and decoder timing. If qualified, hash and deploy the RBF, run automated mixed and long hardware cadence acquisition against Entry 247, and then pause with an alert for the user's visual inspection before any further optimization.
 
 #### Files Modified:
 
@@ -24,7 +24,7 @@ When the cache descriptor FIFO is full, derive replacement availability from the
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
