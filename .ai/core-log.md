@@ -1,5 +1,5 @@
 ---
-## 253 COMMIT Unreleased ??? 2026-08-20T03:51:26-07:00
+## 253 COMMIT Unreleased 5f1d561 2026-08-20T03:51:26-07:00
 
 #### Coming From:
 
@@ -11,21 +11,23 @@ Replace serialized per-tap P-picture prediction with the proven direct-index blo
 
 #### Outcome:
 
-Entry 252 proves the bounded rectangle generator, two-slot response association and thirty-six-word direct buffer independently. This first live integration will instantiate that fetcher only inside the generalized P raster engine, derive its single reference rectangle from registered block motion state, and serve every tap through synchronous phase/row/column lookup. The existing shared cache and one-outstanding DDR arbiter will remain unchanged, deliberately limiting performance while isolating address geometry, byte selection, half-pel accumulation, residual alignment and block lifecycle correctness before B-picture or shared-memory concurrency changes.
+Commit `5f1d561` integrates the block fetcher only into generalized P reconstruction while retaining the shared cache and one-outstanding arbiter. P block geometry is latched before address generation, every tap uses synchronous direct phase/row/column lookup, invalid early lookups retry without consuming stale data, and intra arithmetic, residual look-ahead, writer barriers and presentation ownership remain unchanged. The exact mixed boundary passes 423,936 samples with zero mismatches, maximum delta two, 23 swaps, zero errors, 71,317 DDR reads and 2,189,996 cycles, improving 90,000 cycles or 3.95 percent from Entry 247 before multi-outstanding service. The complete long boundary passes 71 swaps, all 22 P and 47 B pictures, zero errors, 463,831 reads and 12,269,996 cycles, improving 420,000 cycles or 3.31 percent. Both focused 720x480 P/intra modes pass 1,350 ordered motion records, the authored intra macroblock, six blocks and 384 exact samples at 787,530 cycles, and the standalone fetcher still passes delayed, backpressured, simultaneous and zero-latency response association. The first live attempt exposed that fetch width was not latched and stopped at a deterministic missing final word; latching every rectangle parameter eliminated the stall and all final regressions pass.
 
 #### Next Steps:
 
-Add the fetcher to the active source list, start it at each non-intra P block, retry buffered lookups until the required slot is returned, and leave intra reconstruction untouched. Run focused P intra, motion, half-pel and residual regressions followed by the exact mixed pixel and long ordering boundaries; require identical reconstructed pixels and picture order, and explain all changed read, cache and cycle counts before proceeding to B integration.
+Apply the same latched one- or two-rectangle direct-buffer contract to B reconstruction while keeping the one-outstanding cache and arbiter unchanged. Map forward-only and backward-only blocks to phase zero, bidirectional forward and backward references to phases zero and one, preserve rounding and phase order exactly, and require residual-focused B regressions plus exact mixed pixels and complete long ordering before expanding shared DDR concurrency.
 
 #### Files Modified:
 
 - files.qip
 - rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
 - tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/tb_h262_p_intra_macroblocks.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
