@@ -22,9 +22,12 @@ module tb_h262_prediction_word_cache;
 
     integer downstream_reads=0;
     integer response_delay_config=1;
-    integer response_delay=0;
-    reg response_pending=0;
-    reg [28:0] response_addr=0;
+    integer memory_cycle=0;
+    integer response_head=0,response_tail=0,response_count=0;
+    integer response_due[0:3];
+    reg [28:0] response_addr[0:3];
+    reg memory_model_enabled=1;
+    integer max_response_descriptors=0;
 
     integer ordered_baseline_cycles=0;
     integer ordered_depth2_cycles=0;
@@ -60,24 +63,73 @@ module tb_h262_prediction_word_cache;
 
     always @(posedge clk) begin
         downstream_dout_ready<=0;
-        if(response_pending) begin
-            if(response_delay==0) begin
-                downstream_dout<=word_for(response_addr);
+        memory_cycle<=memory_cycle+1;
+        if(dut.response_descriptor_count>max_response_descriptors)
+            max_response_descriptors<=dut.response_descriptor_count;
+        if(memory_model_enabled) begin
+            if((response_count!=0)&&
+               (response_due[response_head]<=memory_cycle)) begin
+                downstream_dout<=word_for(response_addr[response_head]);
                 downstream_dout_ready<=1;
-                response_pending<=0;
-            end else response_delay<=response_delay-1;
-        end
-        if(downstream_read&&!downstream_busy) begin
-            if(response_pending)
-                $fatal(1,"cache issued more than one downstream request");
-            if(downstream_burstcnt!=8'd1)
-                $fatal(1,"wrong downstream burst count %0d",downstream_burstcnt);
-            downstream_reads<=downstream_reads+1;
-            response_addr<=downstream_addr;
-            response_delay<=response_delay_config;
-            response_pending<=1;
+                response_head<=(response_head+1)&3;
+            end
+            if(downstream_read&&!downstream_busy) begin
+                if(response_count>=4)
+                    $fatal(1,"downstream response queue overflow");
+                if(downstream_burstcnt!=8'd1)
+                    $fatal(1,"wrong downstream burst count %0d",downstream_burstcnt);
+                downstream_reads<=downstream_reads+1;
+                response_addr[response_tail]<=downstream_addr;
+                response_due[response_tail]<=memory_cycle+
+                    response_delay_config;
+                response_tail<=(response_tail+1)&3;
+            end
+            case({downstream_read&&!downstream_busy,
+                  (response_count!=0)&&
+                  (response_due[response_head]<=memory_cycle)})
+                2'b10:response_count<=response_count+1;
+                2'b01:response_count<=response_count-1;
+                default:response_count<=response_count;
+            endcase
         end
     end
+
+    task automatic issue_word;
+        input [28:0] addr;
+        input cacheable;
+        integer guard;
+        begin
+            @(negedge clk);
+            request_addr=addr;
+            request_burstcnt=8'd1;
+            request_cacheable=cacheable;
+            request_read=1;
+            guard=0;
+            while(request_busy) begin
+                @(negedge clk);
+                guard=guard+1;
+                if(guard>100)$fatal(1,"request acceptance timeout addr=%h",addr);
+            end
+            request_read=0;
+        end
+    endtask
+
+    task automatic expect_word;
+        input [28:0] addr;
+        integer guard;
+        begin
+            guard=0;
+            while(!request_dout_ready) begin
+                @(negedge clk);
+                guard=guard+1;
+                if(guard>100)$fatal(1,"request response timeout addr=%h",addr);
+            end
+            if(request_dout!==word_for(addr))
+                $fatal(1,"wrong ordered response addr=%h got=%h expected=%h",
+                       addr,request_dout,word_for(addr));
+            @(negedge clk);
+        end
+    endtask
 
     task automatic request_word;
         input [28:0] addr;
@@ -299,6 +351,67 @@ module tb_h262_prediction_word_cache;
         if((downstream_reads!=11)||(cache_misses!=9))
             $fatal(1,"backpressure/delayed response failed");
 
+        // Exercise the live RTL contract rather than only the abstract model:
+        // two misses may be accepted before either response returns, and the
+        // responses must retain request order.
+        response_delay_config=6;
+        issue_word(29'h00400,1'b1);
+        issue_word(29'h00401,1'b1);
+        if(dut.response_descriptor_count!=2)
+            $fatal(1,"cache did not retain two ordered descriptors count=%0d",
+                   dut.response_descriptor_count);
+        expect_word(29'h00400);
+        expect_word(29'h00401);
+
+        // A resident word behind an older miss may not respond early.  It is
+        // deliberately reissued downstream and returns after the older miss.
+        response_delay_config=6;
+        issue_word(29'h00402,1'b1);
+        issue_word(29'h00401,1'b1);
+        expect_word(29'h00402);
+        expect_word(29'h00401);
+
+        // A response may retire the head descriptor on the same edge that a
+        // held successor is accepted into the newly freed tail slot.
+        response_delay_config=4;
+        issue_word(29'h00410,1'b1);
+        issue_word(29'h00411,1'b1);
+        fork
+            issue_word(29'h00412,1'b1);
+            expect_word(29'h00410);
+        join
+        expect_word(29'h00411);
+        expect_word(29'h00412);
+
+        if(max_response_descriptors!=2)
+            $fatal(1,"cache descriptor depth coverage failed max=%0d",
+                   max_response_descriptors);
+
+        // Preserve the bridge's legal zero-latency boundary: an accepted miss
+        // and its response may share one edge without allocating a descriptor.
+        if(response_count!=0||dut.response_descriptor_count!=0)
+            $fatal(1,"cache not empty before direct-response test");
+        memory_model_enabled=0;
+        @(negedge clk);
+        request_addr=29'h00420;
+        request_burstcnt=8'd1;
+        request_cacheable=1;
+        request_read=1;
+        downstream_dout=word_for(29'h00420);
+        downstream_dout_ready=1;
+        #1;
+        if(request_busy||!downstream_read)
+            $fatal(1,"direct-response request was not accepted");
+        @(posedge clk);
+        @(negedge clk);
+        request_read=0;
+        downstream_dout_ready=0;
+        if(!request_dout_ready||(request_dout!==word_for(29'h00420))||
+           (dut.response_descriptor_count!=0))
+            $fatal(1,"direct-response association failed");
+        memory_model_enabled=1;
+        @(negedge clk);
+
         run_ordered_model(1,10,64,0,ordered_baseline_cycles,
                           ordered_accepts,ordered_returns);
         if((ordered_accepts!=64)||(ordered_returns!=64))
@@ -322,8 +435,9 @@ module tb_h262_prediction_word_cache;
                    ordered_zero_latency_cycles);
         check_owner_order();
 
-        $display("PREDICTION_WORD_CACHE_RESULT hits=%0d misses=%0d uncached=%0d downstream=%0d",
-                 cache_hits,cache_misses,uncached_reads,downstream_reads);
+        $display("PREDICTION_WORD_CACHE_RESULT hits=%0d misses=%0d uncached=%0d downstream=%0d depth=%0d ordered=1 same_cycle_reuse=1 direct_response=1",
+                 cache_hits,cache_misses,uncached_reads,downstream_reads,
+                 max_response_descriptors);
         $display("ORDERED_READ_MODEL_RESULT baseline=%0d depth2=%0d depth2_backpressure=%0d zero_latency=%0d requests=64 owner_order=P/D/P",
                  ordered_baseline_cycles,ordered_depth2_cycles,
                  ordered_depth2_stalled_cycles,ordered_zero_latency_cycles);

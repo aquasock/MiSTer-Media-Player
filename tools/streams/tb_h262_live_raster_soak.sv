@@ -174,11 +174,9 @@ module tb_h262_live_raster_soak #(
         (prediction.b_probe.pixel_setup&&(prediction.b_probe.ei==0)):
         (prediction.mixed_probe.pixel_setup&&(prediction.mixed_probe.ei==0));
     wire prediction_trace_capture=
-        !prediction.reference_cache.request_active&&
-        !prediction.reference_cache.response_pending&&
-        prediction.reference_cache.request_read;
+        prediction.reference_cache.request_accept;
     wire prediction_trace_capture_hit=
-        prediction.reference_cache.cache_lookup_hit;
+        prediction.reference_cache.ordered_request_hit;
     wire prediction_trace_lookup_hit=
         prediction.reference_cache.lookup_request&&
         prediction.reference_cache.cache_lookup_hit;
@@ -947,13 +945,14 @@ module tb_h262_live_raster_soak #(
                    displayed_identity!=9||last_reference_temporal!=10'd23||
                    reference_writes!=18432||scratch0_writes!=18432||
                    scratch1_writes!=16128||
-                   // Entry 253 serves P taps from the exact block buffer;
-                   // shared-cache accounting now covers block fetches plus B.
-                   prediction.reference_cache.cache_hit_count!=32'd28||
-                   prediction.reference_cache.cache_miss_count!=32'd69528||
+                   // Entry 255 launches the exact successor while an older
+                   // word is pending.  Potential hits therefore remain
+                   // ordered downstream reads rather than overtaking it.
+                   prediction.reference_cache.cache_hit_count!=0||
+                   prediction.reference_cache.cache_miss_count!=32'd69556||
                    prediction.reference_cache.uncached_count!=0||
-                   memory_reads!=69528||
-                   ((MEMORY_READ_LATENCY==1)&&(total_cycles!=1999996))||
+                   memory_reads!=69556||
+                   ((MEMORY_READ_LATENCY==1)&&(total_cycles!=1969996))||
                    pixel_samples!=423936||pixel_mismatches!=0||
                    !writer_seen||!pred_read_observed||
                    !pred_reconstructed_observed||!presentation_complete||
@@ -987,11 +986,11 @@ module tb_h262_live_raster_soak #(
                displayed_identity!=25||last_reference_temporal!=10'd23||
                reference_writes!=50688||scratch0_writes!=55296||
                scratch1_writes!=52992||
-               prediction.reference_cache.cache_hit_count!=32'd48||
-               prediction.reference_cache.cache_miss_count!=32'd372648||
+               prediction.reference_cache.cache_hit_count!=0||
+               prediction.reference_cache.cache_miss_count!=32'd372696||
                prediction.reference_cache.uncached_count!=0||
-               memory_reads!=372648||
-               ((MEMORY_READ_LATENCY==1)&&(total_cycles!=11069996))||
+               memory_reads!=372696||
+               ((MEMORY_READ_LATENCY==1)&&(total_cycles!=10719996))||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
                presentation_error)

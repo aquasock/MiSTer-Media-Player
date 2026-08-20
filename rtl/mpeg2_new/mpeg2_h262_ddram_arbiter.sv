@@ -6,8 +6,8 @@
 // frame-bank ownership: a new picture may not overwrite the bank still owned by
 // the display reader.
 //
-// Reader requests have priority. Once a read burst is accepted, hold every
-// other client off until every response word for that burst has returned. The
+// Reader requests have priority.  Two ordered read-command descriptors retain
+// response owner and burst length while DDR services accepted commands.  The
 // display reader's accepted bank transfers presentation ownership; prediction
 // reads never alter that ownership.
 //
@@ -61,20 +61,30 @@ module mpeg2_h262_ddram_arbiter
     output wire        ddram_we
 );
 
-reg       read_outstanding;
-reg       read_owner_prediction;
-reg [7:0] read_words_remaining;
+reg [1:0] read_descriptor_count;
+reg       read_descriptor_head,read_descriptor_tail;
+reg       read_descriptor_owner [0:1];
+reg [7:0] read_descriptor_words [0:1];
 reg       reader_bank_valid;
 reg [1:0] reader_frame_region;
+
+wire read_outstanding=(read_descriptor_count!=0);
+wire read_owner_prediction=read_outstanding?
+    read_descriptor_owner[read_descriptor_head]:1'b0;
+wire [7:0] read_words_remaining=read_outstanding?
+    read_descriptor_words[read_descriptor_head]:8'd0;
+wire response_existing=ddram_dout_ready&&read_outstanding;
+wire response_finishes=response_existing&&(read_words_remaining<=8'd1);
+wire read_descriptor_room=(read_descriptor_count<2)||response_finishes;
 
 wire writer_targets_reader_region =
     reader_bank_valid && (writer_addr[17:16] == reader_frame_region);
 
 wire grant_reader =
-    !read_outstanding && reader_rd;
+    read_descriptor_room && reader_rd;
 
 wire grant_prediction =
-    !read_outstanding && !reader_rd && prediction_rd;
+    read_descriptor_room && !reader_rd && prediction_rd;
 
 wire grant_writer =
     !read_outstanding && !reader_rd && !prediction_rd &&
@@ -112,44 +122,61 @@ assign ddram_be =
 assign ddram_we =
     grant_writer ? writer_we : 1'b0;
 
+wire reader_accept=grant_reader&&!ddram_busy;
+wire prediction_accept=grant_prediction&&!ddram_busy;
+wire read_accept=reader_accept||prediction_accept;
+wire accepted_owner_prediction=prediction_accept;
+wire [7:0] accepted_words=reader_accept?
+    reader_burstcnt:prediction_burstcnt;
+wire direct_response=ddram_dout_ready&&!read_outstanding&&read_accept;
+wire direct_response_finishes=direct_response&&(accepted_words<=8'd1);
+wire descriptor_push=read_accept&&!direct_response_finishes;
+wire descriptor_pop=response_finishes;
+wire [7:0] pushed_words=direct_response?
+    (accepted_words-8'd1):accepted_words;
+
 assign reader_dout_ready =
-    read_outstanding && !read_owner_prediction && ddram_dout_ready;
+    (response_existing&&!read_owner_prediction)||
+    (direct_response&&reader_accept);
 
 assign prediction_dout_ready =
-    read_outstanding && read_owner_prediction && ddram_dout_ready;
+    (response_existing&&read_owner_prediction)||
+    (direct_response&&prediction_accept);
 
 always @(posedge clk) begin
     if (reset) begin
-        read_outstanding      <= 1'b0;
-        read_owner_prediction <= 1'b0;
-        read_words_remaining  <= 8'd0;
+        read_descriptor_count <= 2'd0;
+        read_descriptor_head  <= 1'b0;
+        read_descriptor_tail  <= 1'b0;
+        read_descriptor_owner[0] <= 1'b0;
+        read_descriptor_owner[1] <= 1'b0;
+        read_descriptor_words[0] <= 8'd0;
+        read_descriptor_words[1] <= 8'd0;
         reader_bank_valid     <= 1'b0;
         reader_frame_region   <= 2'b00;
     end
     else begin
-        if (!read_outstanding) begin
-            if (grant_reader && !ddram_busy) begin
-                read_outstanding      <= 1'b1;
-                read_owner_prediction <= 1'b0;
-                read_words_remaining  <= reader_burstcnt;
-                reader_bank_valid     <= 1'b1;
-                reader_frame_region   <= reader_addr[17:16];
-            end
-            else if (grant_prediction && !ddram_busy) begin
-                read_outstanding      <= 1'b1;
-                read_owner_prediction <= 1'b1;
-                read_words_remaining  <= prediction_burstcnt;
-            end
+        if(descriptor_push)begin
+            read_descriptor_owner[read_descriptor_tail]<=
+                accepted_owner_prediction;
+            read_descriptor_words[read_descriptor_tail]<=pushed_words;
+            read_descriptor_tail<=read_descriptor_tail+1'b1;
         end
-        else if (ddram_dout_ready) begin
-            if (read_words_remaining <= 8'd1) begin
-                read_outstanding      <= 1'b0;
-                read_owner_prediction <= 1'b0;
-                read_words_remaining  <= 8'd0;
-            end
-            else begin
-                read_words_remaining <= read_words_remaining - 8'd1;
-            end
+        if(descriptor_pop)
+            read_descriptor_head<=read_descriptor_head+1'b1;
+        else if(response_existing)
+            read_descriptor_words[read_descriptor_head]<=
+                read_words_remaining-8'd1;
+
+        case({descriptor_push,descriptor_pop})
+            2'b10:read_descriptor_count<=read_descriptor_count+1'b1;
+            2'b01:read_descriptor_count<=read_descriptor_count-1'b1;
+            default:read_descriptor_count<=read_descriptor_count;
+        endcase
+
+        if(reader_accept)begin
+            reader_bank_valid<=1'b1;
+            reader_frame_region<=reader_addr[17:16];
         end
     end
 end

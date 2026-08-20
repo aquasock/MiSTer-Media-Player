@@ -3,9 +3,9 @@
 //
 // The generalized raster engines consume one byte from each 64-bit DDR word.
 // Adjacent integer and half-pel taps therefore revisit the same two-dimensional
-// reference words many times.  This four-entry fully-associative cache sits on
-// the engines' existing single-outstanding-request handshake and returns those
-// words without changing request order or decoded-pel arithmetic.
+// reference words many times.  This four-entry fully-associative cache accepts
+// at most two ordered word misses and returns them without changing request
+// order or decoded-pel arithmetic.
 //
 // Only requests explicitly marked cacheable may fill or hit.  Destination
 // verification reads always bypass the cache.  active is the live raster
@@ -57,25 +57,41 @@ wire cache_lookup_hit=request_cacheable&&
 wire [63:0] cache_lookup_data=cache_lookup0?cache_data0:
     cache_lookup1?cache_data1:cache_lookup2?cache_data2:cache_data3;
 
-reg        request_active;
-reg [7:0]  request_burstcnt_reg;
-reg [28:0] request_addr_reg;
-reg        request_cacheable_reg;
-reg        request_hit_reg;
-reg [63:0] request_hit_data_reg;
-reg        response_pending;
+reg [1:0] response_descriptor_count;
+reg response_descriptor_head,response_descriptor_tail;
+reg [28:0] response_descriptor_addr[0:1];
+reg response_descriptor_cacheable[0:1];
 
-// Match the established raster handshake: busy becomes low for the one cycle
-// in which the held request is accepted.  A hit is always immediately
-// acceptable; a miss follows the downstream DDR client's busy indication.
-assign request_busy=!(request_active&&
-    (request_hit_reg||!downstream_busy));
+// Request hits remain immediate only when no older response precedes them.
+// While a miss is outstanding, a matching later request is issued as another
+// ordered miss so downstream response order alone remains sufficient.
+wire ordered_request_hit=cache_lookup_hit&&(response_descriptor_count==0);
+wire response_existing=downstream_dout_ready&&
+    (response_descriptor_count!=0);
+wire response_descriptor_room=(response_descriptor_count<2)||
+    response_existing;
+wire request_accept_hit=request_read&&response_descriptor_room&&
+    ordered_request_hit;
+wire request_accept_miss=request_read&&response_descriptor_room&&
+    !ordered_request_hit&&!downstream_busy;
+wire request_accept=request_accept_hit||request_accept_miss;
+wire direct_miss_response=downstream_dout_ready&&
+    (response_descriptor_count==0)&&request_accept_miss;
+wire response_descriptor_push=request_accept_miss&&!direct_miss_response;
+wire response_descriptor_pop=response_existing;
 
-assign downstream_burstcnt=
-    (request_active&&!request_hit_reg)?request_burstcnt_reg:8'd0;
-assign downstream_addr=
-    (request_active&&!request_hit_reg)?request_addr_reg:29'd0;
-assign downstream_read=request_active&&!request_hit_reg;
+wire request_active=request_read;
+wire response_pending=(response_descriptor_count!=0);
+wire [28:0] request_addr_reg=response_pending?
+    response_descriptor_addr[response_descriptor_head]:request_addr;
+
+assign request_busy=!request_accept;
+assign downstream_burstcnt=(request_read&&response_descriptor_room&&
+    !ordered_request_hit)?request_burstcnt:8'd0;
+assign downstream_addr=(request_read&&response_descriptor_room&&
+    !ordered_request_hit)?request_addr:29'd0;
+assign downstream_read=request_read&&response_descriptor_room&&
+    !ordered_request_hit;
 
 always @(posedge clk) begin
     if(reset) begin
@@ -92,13 +108,13 @@ always @(posedge clk) begin
         cache_data2<=64'd0;
         cache_data3<=64'd0;
         cache_replace<=2'd0;
-        request_active<=1'b0;
-        request_burstcnt_reg<=8'd0;
-        request_addr_reg<=29'd0;
-        request_cacheable_reg<=1'b0;
-        request_hit_reg<=1'b0;
-        request_hit_data_reg<=64'd0;
-        response_pending<=1'b0;
+        response_descriptor_count<=2'd0;
+        response_descriptor_head<=1'b0;
+        response_descriptor_tail<=1'b0;
+        response_descriptor_addr[0]<=29'd0;
+        response_descriptor_addr[1]<=29'd0;
+        response_descriptor_cacheable[0]<=1'b0;
+        response_descriptor_cacheable[1]<=1'b0;
         request_dout<=64'd0;
         request_dout_ready<=1'b0;
         lookup_ready<=1'b0;
@@ -117,8 +133,9 @@ always @(posedge clk) begin
             cache_valid2<=1'b0;
             cache_valid3<=1'b0;
             cache_replace<=2'd0;
-            request_active<=1'b0;
-            response_pending<=1'b0;
+            response_descriptor_count<=2'd0;
+            response_descriptor_head<=1'b0;
+            response_descriptor_tail<=1'b0;
         end else begin
             if(lookup_request) begin
                 lookup_ready<=1'b1;
@@ -126,64 +143,72 @@ always @(posedge clk) begin
                 lookup_data<=cache_lookup_data;
             end
 
-            if(!request_active&&!response_pending&&request_read) begin
-                request_active<=1'b1;
-                request_burstcnt_reg<=request_burstcnt;
-                request_addr_reg<=request_addr;
-                request_cacheable_reg<=request_cacheable;
-                request_hit_reg<=cache_lookup_hit;
-                request_hit_data_reg<=cache_lookup_data;
-                if(cache_lookup_hit)
-                    cache_hit_count<=cache_hit_count+1'b1;
-                else if(request_cacheable)
+            // A raster engine may consume an already-resident prediction word
+            // directly.  No request is captured and no downstream transaction
+            // is issued for this path.
+            case({request_accept_hit,
+                  lookup_consume&&lookup_ready&&lookup_hit})
+                2'b01,2'b10:cache_hit_count<=cache_hit_count+1'b1;
+                2'b11:cache_hit_count<=cache_hit_count+2'd2;
+                default:cache_hit_count<=cache_hit_count;
+            endcase
+            if(request_accept_miss)begin
+                if(request_cacheable)
                     cache_miss_count<=cache_miss_count+1'b1;
                 else
                     uncached_count<=uncached_count+1'b1;
             end
 
-            // A raster engine may consume an already-resident prediction word
-            // directly.  No request is captured and no downstream transaction
-            // is issued for this path.
-            if(lookup_consume&&lookup_ready&&lookup_hit)
-                cache_hit_count<=cache_hit_count+1'b1;
+            if(response_descriptor_push)begin
+                response_descriptor_addr[response_descriptor_tail]<=
+                    request_addr;
+                response_descriptor_cacheable[response_descriptor_tail]<=
+                    request_cacheable;
+                response_descriptor_tail<=response_descriptor_tail+1'b1;
+            end
+            if(response_descriptor_pop)
+                response_descriptor_head<=response_descriptor_head+1'b1;
+            case({response_descriptor_push,response_descriptor_pop})
+                2'b10:response_descriptor_count<=
+                    response_descriptor_count+1'b1;
+                2'b01:response_descriptor_count<=
+                    response_descriptor_count-1'b1;
+                default:response_descriptor_count<=response_descriptor_count;
+            endcase
 
-            if(request_active&&request_hit_reg) begin
-                request_active<=1'b0;
-                request_dout<=request_hit_data_reg;
+            if(request_accept_hit)begin
+                request_dout<=cache_lookup_data;
                 request_dout_ready<=1'b1;
-            end else if(request_active&&!downstream_busy) begin
-                request_active<=1'b0;
-                response_pending<=1'b1;
             end
 
-            // Some DDR models return in the acceptance cycle; the second term
-            // preserves that legal behavior as well as ordinary delayed data.
-            if(downstream_dout_ready&&
-               (response_pending||
-                (request_active&&!request_hit_reg&&!downstream_busy))) begin
-                response_pending<=1'b0;
+            if(response_existing||direct_miss_response)begin
                 request_dout<=downstream_dout;
                 request_dout_ready<=1'b1;
-                if(request_cacheable_reg) begin
+                if(direct_miss_response?request_cacheable:
+                   response_descriptor_cacheable[response_descriptor_head])begin
                     case(cache_replace)
                         2'd0: begin
                             cache_valid0<=1'b1;
-                            cache_tag0<=request_addr_reg;
+                            cache_tag0<=direct_miss_response?request_addr:
+                                response_descriptor_addr[response_descriptor_head];
                             cache_data0<=downstream_dout;
                         end
                         2'd1: begin
                             cache_valid1<=1'b1;
-                            cache_tag1<=request_addr_reg;
+                            cache_tag1<=direct_miss_response?request_addr:
+                                response_descriptor_addr[response_descriptor_head];
                             cache_data1<=downstream_dout;
                         end
                         2'd2: begin
                             cache_valid2<=1'b1;
-                            cache_tag2<=request_addr_reg;
+                            cache_tag2<=direct_miss_response?request_addr:
+                                response_descriptor_addr[response_descriptor_head];
                             cache_data2<=downstream_dout;
                         end
                         default: begin
                             cache_valid3<=1'b1;
-                            cache_tag3<=request_addr_reg;
+                            cache_tag3<=direct_miss_response?request_addr:
+                                response_descriptor_addr[response_descriptor_head];
                             cache_data3<=downstream_dout;
                         end
                     endcase
