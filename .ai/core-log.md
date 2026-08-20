@@ -768,7 +768,7 @@ Retain the exact three-bank ownership correction because it removes destination 
 - [x] Passed
 
 ---
-## 277 COMMIT Unreleased ??? 2026-08-20T15:13:00-07:00
+## 277 COMMIT Unreleased d374f42 2026-08-20T15:13:00-07:00
 
 #### Coming From:
 
@@ -780,11 +780,13 @@ Collapse eligible B-picture 2-by-2 half-pel phases into one registered retained-
 
 #### Outcome:
 
-Proposal only. Entry 276 proves that another frame destination cannot improve cadence while decoder production misses presentation windows. The current prediction block fetcher already generates the complete one- or two-phase footprint, retains the current and adjacent row words, and keeps up to four ordered DDR reads in flight; Entry 258 also proved that increasing passive descriptor capacity beyond this active producer does not materially improve the complete traces. The remaining B lookup path nevertheless handles a 2-by-2 half-pel phase as two horizontal pairs on consecutive registered lookup cycles even when both required row words are valid and both horizontal taps remain within the same retained word. This boundary will add an explicit quad predicate only for tap zero of that exact case, sum the four selected bytes from the current and registered adjacent-row words, and complete the phase in one lookup. Horizontal word crossings, missing adjacent rows, one- and two-tap interpolation, forward/backward phase order, bidirectional rounding, residual addition, writer persistence and all DDR request behavior remain on their accepted paths.
+Commit `d374f42` adds the proposed quad predicate only for tap zero of a 2-by-2 half-pel phase when the current and adjacent-row retained words are both valid and each horizontal pair remains within one word. It consumes all four selected bytes in one registered lookup event while leaving word crossings, missing adjacent rows, one- and two-tap interpolation, forward/backward phase order, bidirectional rounding, residual addition, writer persistence and DDR behavior on their accepted paths. The focused predicted and intra regressions remain exact at 1,286,071 and 758,941 cycles; their integer-vector fixtures correctly consume zero quad events.
+
+The complete 423,936-pixel mixed trace remains exact with zero mismatches, maximum channel delta two, 69,556 reads and 1,259,996 total cycles. Its 4,241 quad events replace 8,482 former horizontal-pair events and reduce B lookup/raster work from 351,188/412,388 to 346,225/407,425 cycles, but presentation overlap absorbs the saving and total cadence is unchanged. The long trace likewise preserves all 25 reference publications, 47 B pictures, 71 swaps, 372,696 reads, bank writes and zero errors at exactly 6,859,996 total cycles. Its 102,888 quad events replace 205,776 former pair events and reduce B lookup/raster work from 1,607,305/1,799,065 to 1,494,530/1,686,290 cycles, yet the complete trace again does not move. The candidate therefore fails the proposal's material end-to-end threshold. No Quartus build or hardware deployment is warranted, and the MiSTer remains on the timing-qualified Entry 276 `eae80fd` RBF.
 
 #### Next Steps:
 
-Instrument eligible and consumed quad phases in the focused B replay and both complete traces, then require exact motion, residual, pixel, read, write, publication, swap and error accounting. Compare against Entry 276's locked 1,259,996 mixed and 6,859,996 long simulation cycles and proceed to a clean physical build only if both complete boundaries improve materially; otherwise leave the timing-clean Entry 276 RBF on the MiSTer and record the candidate as simulation-only.
+Retain the exact quad implementation as a composable internal reduction, but do not build it by itself. Target the B sideband producer that now dominates the optimized raster path: long spends 2,466,163 cycles in replay and 1,548,488 in active parse versus 1,686,290 in raster, while mixed spends 338,293 in replay and 182,004 in active parse versus 407,425 in raster. Profile replay states and transform-launch gaps, then remove or overlap a sufficiently large producer bubble to cross the current presentation windows before starting another clean physical build.
 
 #### Files Modified:
 
@@ -794,7 +796,7 @@ Instrument eligible and consumed quad phases in the focused B replay and both co
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
