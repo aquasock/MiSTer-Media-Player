@@ -15,9 +15,11 @@ Proposal only. Entry 257 is visually hardware accepted: both long-GOP and mixed-
 
 Commit `1138b7a` makes the shared descriptor depth a guarded compile-time constant across the block-footprint fetcher, reference cache and DDR arbiter while retaining production depth two by default. Pointer widths, count widths and non-power-of-two wrap are derived from the selected depth, and the focused tests now fill and drain the configured capacity rather than assuming two. Depths two, three and four each pass exact address and response order, delayed service, deterministic backpressure, display-over-prediction priority, multiword display ownership, same-cycle full-queue retire-and-replace, zero-latency direct response and writer exclusion. The focused 88-word block footprint completes at simulation times 5.64, 4.56 and 4.03 million respectively, providing an initial reason to run the complete boundaries without yet changing production capacity.
 
+The complete traces reject a production depth increase. The 423,936-pixel mixed boundary remains exact at every depth with zero mismatches and maximum channel delta two: at one-cycle service depth two takes 1,969,996 cycles and depths three/four both take 1,959,996, only 10,000 cycles or 0.51% saved; at ten-cycle service the corresponding results are 2,069,996 and 2,039,996, only 1.45% saved. The 69-picture long decode likewise preserves 372,696 reads, 25 publications, 71 swaps, all reference/scratch writes and zero errors: at one-cycle service depth two takes 10,719,996 cycles and depths three/four both take 10,659,996, only 60,000 cycles or 0.56% saved. Even with the artificial ten-cycle delay, depth two takes 11,619,996 cycles, depth three 11,199,996 and depth four 11,069,996. The descriptor-capacity hypothesis is therefore measured and rejected for production; default depth two remains unchanged, and no Quartus or hardware cycle is warranted for this infrastructure-only commit.
+
 #### Next Steps:
 
-Run the exact mixed-pixel and complete long boundaries at depths two, three and four under one- and ten-cycle service. Preserve all pixels, picture order, publications, swaps, writes and response accounting. Commit a production depth change only if the full traces show a material reduction; otherwise retain depth two and profile the remaining P/B compute occupancy directly.
+Retain production depth two. Use the exact occupancy profile to attack the registered per-pixel lookup/emit sequence next: the mixed trace spends 617,354 state-cycles in prediction lookup and exactly 423,936 state-cycles emitting pixels, while the long trace spends 2,999,376 lookup and 1,271,808 emit cycles. Determine whether the first lookup for the following pixel can be issued while the current pixel is emitted, preserving registered timing and exact output, before committing another production optimization.
 
 #### Files Modified:
 
@@ -34,7 +36,7 @@ Run the exact mixed-pixel and complete long boundaries at depths two, three and 
 #### Status:
 
 - [x] Built
-- [ ] Passed
+- [x] Passed
 
 ---
 ## 257 COMMIT Unreleased f6e3877 2026-08-20T06:14:25-07:00
