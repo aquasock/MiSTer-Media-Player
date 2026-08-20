@@ -1,5 +1,35 @@
 ---
-## 248 COMMIT Unreleased ??? 2026-08-20T02:13:42-07:00
+## 249 COMMIT Unreleased ??? 2026-08-20T02:20:30-07:00
+
+#### Coming From:
+
+Unreleased d9231a7
+
+#### Purpose:
+
+Recover prediction conflict misses through a second-stage victim cache without lengthening the accepted four-entry fast-hit path.
+
+#### Outcome:
+
+Entry 248 proves that statically partitioning the primary cache is ineffective, while historical Entry 234 evidence shows that a flat eight-entry fully associative cache could remove 91,615 of 463,835 long-soak misses but failed timing when all eight comparisons drove the first registered result. A timing-safe alternative is an exclusive victim stage: retain the current four-entry fully associative primary cache and its exact one-cycle response, then, only after a primary miss, compare four victim tags selected by the reference-bank bit. A victim hit costs one additional registered cycle but avoids the roughly ten-cycle physical DDR response; a full miss pays that one-cycle probe and preserves the existing one-outstanding transaction. Four victim words per reference bank provide twelve total resident words while no live stage contains more than four tag comparisons.
+
+#### Next Steps:
+
+First add a simulation-only exclusive primary/victim model to the exact mixed and long traces, including promotion, eviction, per-bank replacement, victim hits, full misses and the added probe-cycle cost. Proceed to functional RTL only if the net modeled cycle saving remains material after charging every primary miss for the second stage. If justified, extend the focused cache test for primary hit, victim promotion, full miss, response timing and active invalidation, then require exact pixel/order/traffic regressions, positive clean timing and repeatable zero-error MiSTer FPS improvement; otherwise retain `66e769f` and move to request-latency overlap rather than cache capacity.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
+- tools/streams/tb_h262_prediction_word_cache.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+## 248 COMMIT Unreleased d9231a7 2026-08-20T02:13:42-07:00
 
 #### Coming From:
 
@@ -11,21 +41,19 @@ Reduce the remaining serialized prediction-memory wait with a bank- and row-part
 
 #### Outcome:
 
-Entry 247 removes the dominant avoidable presentation serialization and raises measured MiSTer cadence to 17.463119 fps long and 14.983129 fps mixed with exact picture counts and zero errors. The remaining long cadence is 219,548,405 cycles versus the 153,360,000-cycle 25 fps target, while decoder stalls occupy 161,506,865 cycles and physical prediction request acceptance plus response wait occupy 63,001,860 cycles. Mixed independently spends 20,141,742 cycles at the same physical boundary. The current four fully associative words are shared by both reference banks and both half-pel rows; B prediction therefore lets past/future and vertical-tap working sets evict each other even though selecting the reference-bank bit and one low row-distribution bit can happen before the existing four parallel tag compares. The proposed experiment will model four sets selected by `{request_addr[16],request_addr[1]}` with four ways per set, giving P eight effective words and B sixteen total words without lengthening the proven four-way compare-and-data-select cone.
+Commit `d9231a7` adds simulation-only mirrors of two four-comparison partition candidates without changing cache or decoder RTL. The exact mixed regression remains at 423,936 samples, zero mismatches, maximum delta two, 499,551/71,329/0 physical cache accounting, 23 swaps and 2,279,996 cycles. Across 561,243 registered lookups, the existing cache produces 68,869 observed lookup misses. Two four-way sets selected only by reference bank produce 69,499 modeled misses, 630 worse than baseline; four four-way sets selected by reference bank and address bit one produce 69,484 misses, 615 worse than baseline. Static bank and row distribution therefore fragment useful capacity instead of resolving conflict pressure. The hard negative mixed result rejects functional RTL before a long simulation or Quartus build; the timing-qualified Entry 247 core remains deployed and unchanged.
 
 #### Next Steps:
 
-Add a simulation-only mirror of the proposed cache to the exact mixed and 72-picture live regressions and measure hits, misses and per-set pressure before changing functional RTL. Proceed only if it materially exceeds the rejected read-ahead and prior eight-entry set-associative gains. If justified, implement deterministic per-set replacement in the focused cache, preserve active-boundary invalidation, one downstream outstanding request, exact pixels and transaction ordering, then require the locked regression set, positive clean timing and repeatable zero-error MiSTer cadence improvement on both streams; otherwise retain `66e769f` and select a different B reconstruction boundary.
+Retain the existing four-entry primary cache and the negative partition evidence. Continue with Entry 249's proposal-first second-stage victim model, which can exploit additional capacity without adding comparisons to the fast primary hit cone.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
-- tools/streams/tb_h262_prediction_word_cache.sv
 - tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
@@ -1247,34 +1275,6 @@ Reload `test_compat_long_gop.m2v` with the deployed RBF and confirm that loading
 - rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
 - tools/streams/generate_test_live_raster_soak.py
 - tools/streams/tb_h262_live_raster_soak.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 222 COMMIT Unreleased 7f92945 2026-08-18T12:58:09-07:00
-
-#### Coming From:
-
-Unreleased 7f92945
-
-#### Purpose:
-
-Record the MiSTer long-GOP presentation result after correcting live B scratch verification and duplicate P persistence publication.
-
-#### Outcome:
-
-Commit `7f92945` is not hardware accepted: `test_compat_long_gop.m2v` retains the passing USER-solid diagnostic pattern but still settles at timestamp `00:00:02.000`, frame 50, instead of source frame 71. The displayed frames are materially clearer and every rendered timestamp is now readable, proving that the corrected B scratch-bank verification improves live raster integrity. Visible progression nevertheless skips approximately two or three source frames at a time in an apparently repeatable pattern before stopping at the same third-GOP I-picture boundary. Because all settled error and prerequisite diagnostics remain passing while the raster image quality changed, the unresolved boundary is the actual temporal identity selected by the hardware framebuffer display path, which the Entry 221 soak represented with abstract publication counters rather than DDR-backed source-frame identity.
-
-#### Next Steps:
-
-Trace the compiled scheduler, framebuffer-bank selector, scratch selector, and DDR display addresses together, then extend the live soak to stamp each reconstructed reference and B scratch picture with its source temporal identity and read that identity through the actual framebuffer selection path. Require exact display order rather than only final publication identity, reproduce the two-or-three-frame stepping and frame-50 stop, and correct only the first real bank or swap selection that diverges before another build.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
