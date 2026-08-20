@@ -18,6 +18,7 @@ module mpeg2_h262_b_presentation_scheduler
     input  wire reference_frame_bank,
     input  wire b_picture_start,
     input  wire non_b_picture_start,
+    input  wire p_picture_start,
     input  wire sequence_end,
     input  wire b_user_success,
     input  wire b_decode_error,
@@ -26,6 +27,7 @@ module mpeg2_h262_b_presentation_scheduler
     output reg  display_scratch_bank,
     output reg  decode_scratch_bank,
     output reg [2:0] framebuffer_swap_reset_count,
+    output wire reference_overlap_header,
     output wire presentation_hold,
     output reg  presentation_complete,
     output reg  presentation_error
@@ -39,6 +41,7 @@ reg scratch0_pending,scratch1_pending,next_present_scratch_bank;
 reg future_frame_pending,future_frame_bank,future_reference_pending;
 reg scratch_presented;
 reg [1:0] run_picture_count;
+reg overlap_decode_open,overlap_frame_pending;
 
 // Entry 230: the fixed 40 MHz 800x600 raster produces one swap window every
 // 1056*628 pixels.  For the current 25 fps compatibility boundary, accumulate
@@ -70,7 +73,11 @@ wire cadence_25fps=(frame_rate_code==4'h3);
 wire cadence_slot=!cadence_25fps||
                   (cadence_credit>=CADENCE_DUE_25FPS);
 
-assign presentation_hold=reorder_active&&run_closed&&
+// Entry 247: after the accepted P header closes a B run, allow that one P
+// transaction to decode while the prior scratch/future sequence is presented.
+// Its publication closes the window before a later header can reuse scratch.
+assign reference_overlap_header=reorder_active&&!run_closed;
+assign presentation_hold=reorder_active&&run_closed&&!overlap_decode_open&&
                          !presentation_complete&&!presentation_error;
 
 always @(posedge clk) begin
@@ -83,6 +90,7 @@ always @(posedge clk) begin
         scratch0_pending<=0;scratch1_pending<=0;next_present_scratch_bank<=0;
         future_frame_pending<=0;future_frame_bank<=0;
         future_reference_pending<=0;scratch_presented<=0;
+        overlap_decode_open<=0;overlap_frame_pending<=0;
         run_picture_count<=0;presentation_complete<=0;presentation_error<=0;
         cadence_credit<=CADENCE_DUE_25FPS;
     end else begin
@@ -113,6 +121,17 @@ always @(posedge clk) begin
             terminal_boundary_pending<=0;
         end
 
+        // The publication produced by the one permitted overlap transaction
+        // is the next reference candidate, not the retained future reference
+        // owned by the B run that is still being displayed.
+        if(frame_waiting&&reorder_active&&run_closed&&overlap_decode_open)begin
+            pending_frame_valid<=1;
+            pending_frame_bank<=completed_frame_bank;
+            pending_frame_released<=0;
+            overlap_frame_pending<=1;
+            overlap_decode_open<=0;
+        end
+
         if(pending_frame_valid&&(non_b_picture_start||sequence_end))
             pending_frame_released<=1;
 
@@ -134,6 +153,7 @@ always @(posedge clk) begin
                 run_picture_count<=1;presentation_complete<=0;
                 presentation_error<=0;pending_frame_valid<=0;
                 pending_frame_released<=0;
+                overlap_decode_open<=0;overlap_frame_pending<=0;
                 if(frame_waiting)begin
                     future_frame_bank<=completed_frame_bank;
                     future_reference_pending<=0;
@@ -195,7 +215,14 @@ always @(posedge clk) begin
                 scratch0_pending<=0;scratch1_pending<=0;
                 future_frame_pending<=0;future_reference_pending<=0;
                 presentation_error<=1;
-            end else run_closed<=1;
+            end else begin
+                run_closed<=1;
+                // A non-B close is overlap-eligible only when it is the P
+                // header explicitly classified by the caller. sequence_end
+                // retains the original immediate presentation hold.
+                overlap_decode_open<=p_picture_start&&
+                                     reference_overlap_header;
+            end
         end
 
         if(swap_window_pulse&&cadence_slot&&scheduled_frame_valid&&
@@ -215,7 +242,19 @@ always @(posedge clk) begin
             end else if(future_waiting)begin
                 future_frame_pending<=0;reorder_active<=0;run_closed<=0;
                 future_reference_pending<=0;
-                pending_frame_valid<=0;pending_frame_released<=0;
+                overlap_decode_open<=0;
+                // Preserve a reference decoded during this presentation run.
+                // It now becomes the ordinary classification barrier for the
+                // following accepted header.
+                if(overlap_frame_pending||
+                   (frame_waiting&&overlap_decode_open))begin
+                    pending_frame_valid<=1;
+                    pending_frame_released<=0;
+                end else begin
+                    pending_frame_valid<=0;
+                    pending_frame_released<=0;
+                end
+                overlap_frame_pending<=0;
                 if(scratch_presented&&!presentation_error)presentation_complete<=1;
                 else presentation_error<=1;
             end else begin
@@ -226,6 +265,7 @@ always @(posedge clk) begin
             future_frame_pending<=0;reorder_active<=0;run_closed<=0;
             future_reference_pending<=0;
             pending_frame_valid<=0;pending_frame_released<=0;
+            overlap_decode_open<=0;overlap_frame_pending<=0;
             presentation_error<=1;
         end else if(framebuffer_swap_reset_count!=0)
             framebuffer_swap_reset_count<=framebuffer_swap_reset_count-1'b1;
@@ -234,6 +274,7 @@ always @(posedge clk) begin
             reorder_active<=0;run_closed<=0;decode_inflight<=0;
             scratch0_pending<=0;scratch1_pending<=0;future_frame_pending<=0;
             future_reference_pending<=0;
+            overlap_decode_open<=0;
             presentation_error<=1;
         end
     end

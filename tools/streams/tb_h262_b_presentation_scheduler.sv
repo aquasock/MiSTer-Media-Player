@@ -2,10 +2,10 @@
 
 module tb_h262_b_presentation_scheduler;
     reg clk=0,reset=1,swap=0,frame_waiting=0,completed_bank=0,reference_bank=1;
-    reg b_start=0,non_b_start=0,sequence_end=0,b_success=0,b_error=0;
+    reg b_start=0,non_b_start=0,p_start=0,sequence_end=0,b_success=0,b_error=0;
     wire display_bank,display_scratch,display_scratch_bank,decode_scratch_bank;
     wire [2:0] reset_count;
-    wire hold,complete,error;
+    wire overlap_header,hold,complete,error;
     integer last_pulse_count=0;
 
     always #5 clk=~clk;
@@ -14,12 +14,14 @@ module tb_h262_b_presentation_scheduler;
         .frame_rate_code(4'h3),
         .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
         .reference_frame_bank(reference_bank),.b_picture_start(b_start),
-        .non_b_picture_start(non_b_start),.sequence_end(sequence_end),
+        .non_b_picture_start(non_b_start),.p_picture_start(p_start),
+        .sequence_end(sequence_end),
         .b_user_success(b_success),.b_decode_error(b_error),
         .display_frame_bank(display_bank),.display_scratch(display_scratch),
         .display_scratch_bank(display_scratch_bank),
         .decode_scratch_bank(decode_scratch_bank),
-        .framebuffer_swap_reset_count(reset_count),.presentation_hold(hold),
+        .framebuffer_swap_reset_count(reset_count),
+        .reference_overlap_header(overlap_header),.presentation_hold(hold),
         .presentation_complete(complete),.presentation_error(error));
 
     task automatic pulse_start;
@@ -30,6 +32,12 @@ module tb_h262_b_presentation_scheduler;
     endtask
     task automatic pulse_close;
         begin @(negedge clk);non_b_start<=1;@(negedge clk);non_b_start<=0;#1;end
+    endtask
+    task automatic pulse_p_close;
+        begin
+            @(negedge clk);non_b_start<=1;p_start<=1;
+            @(negedge clk);non_b_start<=0;p_start<=0;#1;
+        end
     endtask
     task automatic pulse_window;
         begin @(negedge clk);swap<=1;@(negedge clk);swap<=0;#1;end
@@ -56,7 +64,7 @@ module tb_h262_b_presentation_scheduler;
     task automatic reset_scheduler;
         begin
             @(negedge clk);reset<=1;swap<=0;frame_waiting<=0;b_start<=0;
-            non_b_start<=0;sequence_end<=0;b_success<=0;b_error<=0;
+            non_b_start<=0;p_start<=0;sequence_end<=0;b_success<=0;b_error<=0;
             repeat(2)@(negedge clk);reset<=0;#1;
         end
     endtask
@@ -139,6 +147,43 @@ module tb_h262_b_presentation_scheduler;
         if(display_scratch||!display_bank||!complete||error||hold)
             $fatal(1,"future reference did not retire the B run");
 
+        // Entry 247: decode exactly one following P while the completed B run
+        // presents. Its publication must restore hold before a new B header,
+        // survive retirement of the old run, and then become that B's future.
+        reset_scheduler();
+        reference_bank<=0;completed_bank<=1;
+        @(negedge clk);b_start<=1;frame_waiting<=1;
+        @(negedge clk);b_start<=0;frame_waiting<=0;reference_bank<=1;#1;
+        pulse_success();
+        pulse_start();
+        pulse_success();
+        if(!overlap_header)$fatal(1,"closed-run P header was not overlap eligible");
+        pulse_p_close();
+        if(hold||!dut.overlap_decode_open)
+            $fatal(1,"following P was not admitted during prior presentation");
+        completed_bank<=0;reference_bank<=0;
+        @(negedge clk);frame_waiting<=1;
+        @(negedge clk);frame_waiting<=0;#1;
+        if(!hold||!dut.pending_frame_valid||
+           (dut.pending_frame_bank!==1'b0)||!dut.overlap_frame_pending)
+            $fatal(1,"overlap P publication did not restore presentation hold");
+        pulse_swap();
+        if(!display_scratch||display_scratch_bank)
+            $fatal(1,"overlap run did not present scratch 0");
+        pulse_swap();
+        if(!display_scratch||!display_scratch_bank)
+            $fatal(1,"overlap run did not present scratch 1");
+        pulse_swap();
+        if(display_scratch||!display_bank||!complete||hold||error||
+           !dut.pending_frame_valid||dut.pending_frame_released||
+           (dut.pending_frame_bank!==1'b0))
+            $fatal(1,"overlap reference was not preserved after prior run");
+        pulse_start();
+        if(error||dut.future_reference_pending||
+           (dut.future_frame_bank!==1'b0)||dut.pending_frame_valid)
+            $fatal(1,"following B did not claim overlapped future reference");
+        reset_scheduler();
+
         // Starvation may make one presentation immediately eligible, but it
         // must not bank enough credit for a consecutive-refresh catch-up.
         repeat(5)pulse_window();
@@ -147,50 +192,50 @@ module tb_h262_b_presentation_scheduler;
 
         // With no B owner, the following non-B header releases the queued
         // reference for the next swap rather than the publication swap.
-        completed_bank<=0;reference_bank<=0;
+        completed_bank<=1;reference_bank<=1;
         @(negedge clk);frame_waiting<=1;swap<=1;
         @(negedge clk);frame_waiting<=0;swap<=0;#1;
-        if(!display_bank||!dut.pending_frame_valid||dut.pending_frame_released)
+        if(display_bank||!dut.pending_frame_valid||dut.pending_frame_released)
             $fatal(1,"ordinary reference bypassed classification barrier");
         pulse_close();
         if(!dut.pending_frame_released)$fatal(1,"non-B header did not release reference");
         pulse_swap();
         if(last_pulse_count!=1)
             $fatal(1,"late ordinary frame did not consume one saturated slot");
-        if(display_scratch||display_bank||error)
+        if(display_scratch||!display_bank||error)
             $fatal(1,"released ordinary reference did not display");
 
         // A terminal start code may be consumed before persistence publishes
         // the final reference.  Retain that boundary and release on publish.
         @(negedge clk);sequence_end<=1;@(negedge clk);sequence_end<=0;#1;
-        completed_bank<=1;reference_bank<=1;
+        completed_bank<=0;reference_bank<=0;
         @(negedge clk);frame_waiting<=1;swap<=1;
         @(negedge clk);frame_waiting<=0;swap<=0;#1;
-        if(display_bank||!dut.pending_frame_valid||!dut.pending_frame_released)
+        if(!display_bank||!dut.pending_frame_valid||!dut.pending_frame_released)
             $fatal(1,"terminal boundary did not release final reference");
         pulse_swap();
         if(last_pulse_count!=2)
             $fatal(1,"terminal frame caught up after only %0d later windows",
                    last_pulse_count);
-        if(display_scratch||!display_bank||error)
+        if(display_scratch||display_bank||error)
             $fatal(1,"terminal reference did not display");
 
         // A failed later B must release ownership/backpressure and leave the
         // ordinary reference presentation path usable.
-        reference_bank<=0;
+        reference_bank<=1;
         pulse_start();
         @(negedge clk);sequence_end<=1;@(negedge clk);sequence_end<=0;#1;
         if(!hold)$fatal(1,"sequence-end close did not hold pending B run");
         @(negedge clk);b_error<=1;@(negedge clk);b_error<=0;#1;
         if(hold||!error)$fatal(1,"failed B transaction did not fail open");
-        completed_bank<=0;frame_waiting<=1;
+        completed_bank<=1;frame_waiting<=1;
         @(negedge clk);frame_waiting<=0;
         pulse_close();
         pulse_swap();
-        if(display_scratch||display_bank)
+        if(display_scratch||!display_bank)
             $fatal(1,"ordinary frame presentation did not recover after abort");
 
-        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=1,3,2 starvation=1 ordinary=1 terminal=1 fail_open=1");
+        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=1,3,2 overlap_p=1 starvation=1 ordinary=1 terminal=1 fail_open=1");
         $finish;
     end
 

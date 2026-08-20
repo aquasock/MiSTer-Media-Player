@@ -127,6 +127,7 @@ module tb_h262_live_raster_soak #(
     wire display_frame_bank,display_scratch,display_scratch_bank;
     wire decode_scratch_bank,presentation_hold,presentation_complete;
     wire presentation_error;
+    wire reference_overlap_header;
     wire [2:0] framebuffer_swap_reset_count;
     reg swap_window_pulse=0;
     integer swap_counter=0;
@@ -134,7 +135,7 @@ module tb_h262_live_raster_soak #(
     reg [31:0] picture_window=0;
     wire [31:0] picture_window_next={picture_window[23:0],stream_data};
     reg picture_header_capture=0,picture_header_second_byte=0;
-    reg b_picture_start=0,non_b_picture_start=0,sequence_end=0;
+    reg b_picture_start=0,non_b_picture_start=0,p_picture_start=0,sequence_end=0;
     reg reference_ownership_arm=0,destination_ownership_hold=0;
 
     reg pred_persisted_d=0;
@@ -254,12 +255,14 @@ module tb_h262_live_raster_soak #(
         .frame_rate_code(4'h3),
         .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
         .reference_frame_bank(reference_bank),.b_picture_start(b_picture_start),
-        .non_b_picture_start(non_b_picture_start),.sequence_end(sequence_end),
+        .non_b_picture_start(non_b_picture_start),
+        .p_picture_start(p_picture_start),.sequence_end(sequence_end),
         .b_user_success(b_success),.b_decode_error(probe_error||pred_error),
         .display_frame_bank(display_frame_bank),.display_scratch(display_scratch),
         .display_scratch_bank(display_scratch_bank),
         .decode_scratch_bank(decode_scratch_bank),
         .framebuffer_swap_reset_count(framebuffer_swap_reset_count),
+        .reference_overlap_header(reference_overlap_header),
         .presentation_hold(presentation_hold),
         .presentation_complete(presentation_complete),
         .presentation_error(presentation_error));
@@ -513,6 +516,7 @@ module tb_h262_live_raster_soak #(
         swap_window_pulse<=0;
         b_picture_start<=0;
         non_b_picture_start<=0;
+        p_picture_start<=0;
         sequence_end<=0;
         pred_persisted_d<=pred_persisted;
         if(pred_read_seen)pred_read_observed<=1;
@@ -536,8 +540,11 @@ module tb_h262_live_raster_soak #(
                     picture_header_capture<=0;
                     picture_header_second_byte<=0;
                     if(stream_data[5:3]==3'b011)b_picture_start<=1;
-                    else non_b_picture_start<=1;
-                    if(reference_ownership_arm)begin
+                    else begin
+                        non_b_picture_start<=1;
+                        if(stream_data[5:3]==3'b010)p_picture_start<=1;
+                    end
+                    if(reference_ownership_arm||reference_overlap_header)begin
                         reference_ownership_arm<=0;
                         if((stream_data[5:3]==3'b010)&&destination_display_owned)
                             destination_ownership_hold<=1;
@@ -641,9 +648,9 @@ module tb_h262_live_raster_soak #(
                    prediction.reference_cache.cache_hit_count!=32'd499551||
                    prediction.reference_cache.cache_miss_count!=32'd71329||
                    prediction.reference_cache.uncached_count!=0||
-                   // Entry 240 pipelines non-intra IQ issue/retirement while
-                   // preserving every mixed-stream pixel and transaction.
-                   memory_reads!=71329||total_cycles!=2519996||
+                   // Entry 247 overlaps the following P decode with prior B
+                   // presentation without changing pixels or transactions.
+                   memory_reads!=71329||total_cycles!=2279996||
                    profile_b_miss_prelaunch==0||
                    pixel_samples!=423936||pixel_mismatches!=0||
                    !writer_seen||!pred_read_observed||
@@ -664,9 +671,9 @@ module tb_h262_live_raster_soak #(
                prediction.reference_cache.cache_miss_count!=32'd463835||
                prediction.reference_cache.uncached_count!=0||
                memory_reads!=463835||
-               // Entry 243 overlaps eligible same-phase B miss successors
-               // without changing cache or DDR traffic.
-               total_cycles!=13419996||profile_b_miss_prelaunch==0||
+               // Entry 247 overlaps the next P decode with the completed B
+               // run while preserving cache traffic and display order.
+               total_cycles!=12689996||profile_b_miss_prelaunch==0||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
                presentation_error)

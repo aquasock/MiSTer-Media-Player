@@ -39,13 +39,14 @@ module tb_h262_dense_publication_order;
     wire display_frame_bank,display_scratch,display_scratch_bank;
     wire decode_scratch_bank,presentation_hold,presentation_complete;
     wire presentation_error;
+    wire reference_overlap_header;
     wire [2:0] framebuffer_swap_reset_count;
     reg swap_window_pulse=0;
     integer swap_counter=0;
     reg [31:0] presentation_picture_window=0;
     reg presentation_header_capture=0;
     reg presentation_header_second_byte=0;
-    reg b_picture_start=0,non_b_picture_start=0,sequence_end=0;
+    reg b_picture_start=0,non_b_picture_start=0,p_picture_start=0,sequence_end=0;
     reg reference_ownership_arm=0;
     reg destination_ownership_hold=0;
     integer destination_hold_count=0;
@@ -112,12 +113,14 @@ module tb_h262_dense_publication_order;
         .frame_rate_code(4'h3),
         .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
         .reference_frame_bank(reference_bank),.b_picture_start(b_picture_start),
-        .non_b_picture_start(non_b_picture_start),.sequence_end(sequence_end),
+        .non_b_picture_start(non_b_picture_start),
+        .p_picture_start(p_picture_start),.sequence_end(sequence_end),
         .b_user_success(b_success),.b_decode_error(probe_error),
         .display_frame_bank(display_frame_bank),.display_scratch(display_scratch),
         .display_scratch_bank(display_scratch_bank),
         .decode_scratch_bank(decode_scratch_bank),
         .framebuffer_swap_reset_count(framebuffer_swap_reset_count),
+        .reference_overlap_header(reference_overlap_header),
         .presentation_hold(presentation_hold),
         .presentation_complete(presentation_complete),
         .presentation_error(presentation_error));
@@ -175,6 +178,7 @@ module tb_h262_dense_publication_order;
         swap_window_pulse<=0;
         b_picture_start<=0;
         non_b_picture_start<=0;
+        p_picture_start<=0;
         sequence_end<=0;
         b_success_d<=b_success;
         // A bounded synthetic vblank cadence proves ordering without making
@@ -196,8 +200,11 @@ module tb_h262_dense_publication_order;
                     presentation_header_capture<=0;
                     presentation_header_second_byte<=0;
                     if(stream_data[5:3]==3'b011)b_picture_start<=1;
-                    else non_b_picture_start<=1;
-                    if(reference_ownership_arm)begin
+                    else begin
+                        non_b_picture_start<=1;
+                        if(stream_data[5:3]==3'b010)p_picture_start<=1;
+                    end
+                    if(reference_ownership_arm||reference_overlap_header)begin
                         reference_ownership_arm<=0;
                         if((stream_data[5:3]==3'b010)&&
                            destination_display_owned)begin
