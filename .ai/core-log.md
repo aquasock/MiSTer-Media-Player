@@ -800,34 +800,35 @@ Retain the exact quad implementation as a composable internal reduction, but do 
 - [ ] Passed
 
 ---
-## 238 COMMIT Unreleased ca1f0fc 2026-08-19T15:44:38-07:00
+## 278 COMMIT Unreleased ??? 2026-08-20T15:30:02-07:00
 
 #### Coming From:
 
-Unreleased 23d8410
+Unreleased d374f42
 
 #### Purpose:
 
-Close the download-rearm implementation's intentional clock-domain and asynchronous framebuffer-reset boundaries without placing the rearm controller itself on an asynchronous reset path.
+Remove the idle cycle between consecutive B residual-coefficient writes by reading the next coefficient while the current registered coefficient enters the transform.
 
 #### Outcome:
 
-The first incremental build of `23d8410` functionally compiles but is ineligible for deployment with `-1.507 ns` setup slack and `-3.338 ns` recovery slack. Detailed TimeQuest analysis identifies the only setup violation as the intentional `clk_sys` `ioctl_download` crossing into the first `clk_mpeg2` synchronizer stage, while the recovery violations come from feeding the asynchronous top-level reset request into every register of the new controller and from the rearm output's intentional asynchronous assertion into the framebuffer read-domain reset synchronizer. Commit `ca1f0fc` resets the controller synchronously from the already synchronized MPEG reset and adds narrowly scoped exceptions only for the source-to-stage-zero download crossing and controller-to-framebuffer read-reset assertion boundary; ordinary same-clock logic, synchronizer release, and all later stages remain timed. The focused asynchronous-clock regression still passes two downloads, sixteen reset edges, sustained-level non-retrigger, and complete FIFO gating. The second incremental Quartus 17.0.2 build completes in 9 minutes 14 seconds with zero errors, 124 standing warnings, no critical warning, global setup, hold, and recovery slack of +0.285, +0.253, and +3.158 ns, decoder setup and recovery slack of +0.423 and +14.019 ns, and video setup slack of +7.004 ns. The fit uses 29,263 ALMs, 40,917 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. The 4,234,588-byte `MediaPlayer_commit238_ca1f0fc.rbf` has SHA-256 `af4992a7b4a1156661162273c01475413a222ad311a147849700cdb2eda364de`; its MiSTer FTP readback is byte-identical. Hardware accepts the completed boundary: both `test_compat_long_gop.m2v` and `test_compat_mixed_macroblocks.m2v` play correctly on their first and consecutive second loads without reloading the core, and every run visibly updates rather than retaining the prior frame. Both files report USER and POWER solid with DISK off; the long-GOP DISK result differs from the pre-test stage-eleven expectation but accompanies correct completion and no stale-screen, decode, or presentation failure.
+Proposal only. Entry 277 proves that the optimized B raster is no longer the largest local producer: the long trace spends 2,466,163 decoder-wait cycles in B replay and 1,548,488 in B parse versus 1,686,290 in B raster, while mixed spends 338,293 in replay and 182,004 in parse versus 407,425 in raster. Static inspection identifies a deterministic replay bubble before transform execution: `residual_coeff_mem` is synchronous, so every `R_TWRITE` increments its read index and then enters `R_COEFF_WAIT` solely to obtain the following word. The retained coefficient is already stable when the current transform write occurs. This boundary will select the following RAM address during that write edge and keep `R_TWRITE` active for consecutive coefficients, preserving the existing preload before the first coefficient, block descriptors, coefficient order and count, inverse quantisation, IDCT, sideband ordering and all row ownership. It adds state-cycle and coefficient accounting to measure the exact saving before physical implementation is considered.
 
 #### Next Steps:
 
-Continue from hardware-accepted commit `ca1f0fc`, preserving the download-rearm controller, timing exceptions, four-entry reference cache, and mixed-pixel oracle while selecting the next compatibility or performance boundary under the proposal-first workflow.
+Require focused residual and intra replay to preserve every descriptor, coefficient, transform sample and reconstructed store, and require both complete traces to preserve exact pixels, reads, writes, publications, swaps and zero-error accounting. Compare the reduction in replay and total cadence against Entry 277's locked 1,259,996 mixed and 6,859,996 long cycles. Proceed to a fully clean Quartus build only if the complete-stream gain is material enough to cross presentation windows; otherwise retain the timing-qualified Entry 276 RBF and record this as another simulation-only candidate.
 
 #### Files Modified:
 
-- MediaPlayer.sdc
-- MediaPlayer_top_00.svh
-- rtl/mpeg2_new/mpeg2_h262_download_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [x] Built
-- [x] Passed
+- [ ] Built
+- [ ] Passed
 
 ---
 ## 239 COMMIT Unreleased 3c03570 2026-08-19T16:36:30-07:00
