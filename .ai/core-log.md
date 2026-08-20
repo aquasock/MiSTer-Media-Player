@@ -586,37 +586,36 @@ Retain Entry 269 scheduler ownership and implement only the lower-risk two-bank 
 - [x] Passed
 
 ---
-## 232 COMMIT Unreleased 1b1ca8f 2026-08-18T23:55:01-07:00
+## 272 COMMIT Unreleased ??? 2026-08-20T11:30:00-07:00
 
 #### Coming From:
 
-Unreleased 6ddeb82
+Unreleased 0cf21a2
 
 #### Purpose:
 
-Launch the next non-intra P/B reference lookup during the current pixel's otherwise idle emit or bidirectional handoff cycle so motion reconstruction bypasses the serialized pixel-setup state.
+Overlap B-picture prediction fetch for the next block with reconstruction of the current block through two explicitly owned retained-word banks.
 
 #### Outcome:
 
-Entry 231 is hardware accepted at final source frame 71 with USER and POWER solid, 11 DISK blinks, no new visible corruption, and a measured 7.864 seconds from frame 0 to frame 71, 14.5 percent faster than Entry 230. Commit `1b1ca8f` launches registered next-pixel and B backward-phase first-tap lookups during the preceding emit or final-tap response state, registers B motion-phase selection and base word addresses, and retains exact reconstruction while bypassing serialized pixel setup. Focused B bidirectional replay passes 7,680 samples in 4,040,029 cycles, B-intra passes 768 samples in 2,436,868 cycles, and the exact 25-picture live soak passes all 291,641 bytes, 22 P pictures, 47 B pictures, 71 swaps, 622,811 DDR reads, cache counts 2,267,813/463,835/158,976, and zero errors in 17,469,996 cycles. The user-requested clean rebuild reproduced the original unsafe revision's decoder setup failure at -7.765 ns, proving it was not stale incremental state; successive registered cuts removed the response, direction, and coordinate arithmetic from the cache cone, and the final session-authorized incremental Quartus build closes with +0.001 ns decoder setup, +0.350 ns decoder hold, +14.765 ns decoder recovery, and +6.795 ns video setup. The fit uses 30,512 ALMs, 43,228 registers, 4,027,379 block-memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. Qualified artifact `MediaPlayer_commit232_1b1ca8f.rbf` is 4,264,692 bytes with SHA-256 `2eb655010376059befdcdadd290f7d9bd6830197f02e567d51999346ad32f38d`; the uploaded MiSTer readback matches byte-for-byte.
+Proposal only. Retain the timing-clean Entry 269 presentation scheduler and current ordered cache and DDR transaction contract. Instantiate two bounded prediction-footprint stores for B reconstruction, assign one bank to the current consumer and the other to at most one successor producer, and permit producer launch only after the current footprint has completed so the shared request interface still has one unambiguous owner. The first bounded implementation will prefetch only the five successor blocks inside a macroblock, where motion identity is already registered; the block-five transition remains serialized until a later change can stage the next synchronous motion record safely. A bank may be reused only after its consumer block reaches the writer persistence barrier, and incomplete prefetch must stall the next block without exposing invalid retained words.
 
 #### Next Steps:
 
-Reload the deployed core and run `test_compat_long_gop.m2v`, recording whether it reaches final frame 71, the frame-0-to-frame-71 load time, visible ordering or stutter, and the settled USER, POWER, and DISK LED pattern. Then run `test_compat_mixed_macroblocks.m2v` as a corruption regression; hardware acceptance requires no new visual errors and the established passing LEDs.
+Implement the two-bank producer and consumer handoff, strengthen focused simulation for alternating ownership, incomplete-prefetch wait, intra transitions and bank reuse, then require exact B residual and intra samples, exact mixed pixels, complete long picture and write accounting, zero errors and a material end-to-end cycle reduction before committing source or starting a clean Quartus build.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- tools/streams/tb_h262_p_intra_macroblocks.sv
 - tools/streams/tb_h262_b_residual_streaming.sv
 - tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [x] Built
+- [ ] Built
 - [ ] Passed
 
 ---
