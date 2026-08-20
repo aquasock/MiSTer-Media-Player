@@ -26,6 +26,13 @@ module tb_h262_prediction_word_cache;
     reg response_pending=0;
     reg [28:0] response_addr=0;
 
+    integer ordered_baseline_cycles=0;
+    integer ordered_depth2_cycles=0;
+    integer ordered_depth2_stalled_cycles=0;
+    integer ordered_zero_latency_cycles=0;
+    integer ordered_accepts=0;
+    integer ordered_returns=0;
+
     always #5 clk=~clk;
 
     function automatic [63:0] word_for;
@@ -122,6 +129,116 @@ module tb_h262_prediction_word_cache;
         end
     endtask
 
+    // Entry 250 proposal model.  The MiSTer bridge accepts a later read while
+    // an earlier response is outstanding and returns responses in command
+    // order.  Model the deliberately bounded decoder contract: only the
+    // current demand and its one exact registered successor may be in flight.
+    // A response frees its descriptor before command arbitration, exercising
+    // the legal same-cycle return/next-accept boundary.
+    task automatic run_ordered_model;
+        input integer depth;
+        input integer service_latency;
+        input integer request_count;
+        input integer inject_backpressure;
+        output integer elapsed_cycles;
+        output integer accepted_count;
+        output integer returned_count;
+        integer due_cycle[0:127];
+        integer request_id[0:127];
+        integer head,tail,count,cycle,next_id,next_return;
+        integer command_busy;
+        begin
+            head=0;
+            tail=0;
+            count=0;
+            cycle=0;
+            next_id=0;
+            next_return=0;
+            accepted_count=0;
+            returned_count=0;
+            while(returned_count<request_count) begin
+                if((count!=0)&&(due_cycle[head]<=cycle)) begin
+                    if(request_id[head]!=next_return)
+                        $fatal(1,"ordered model response association failed got=%0d expected=%0d",
+                               request_id[head],next_return);
+                    head=(head+1)&127;
+                    count=count-1;
+                    next_return=next_return+1;
+                    returned_count=returned_count+1;
+                end
+
+                // Deterministic command backpressure covers a held exact
+                // successor without affecting response retirement.
+                command_busy=inject_backpressure&&
+                    (((cycle%11)==2)||((cycle%11)==3));
+                if((next_id<request_count)&&(count<depth)&&!command_busy) begin
+                    due_cycle[tail]=cycle+service_latency;
+                    request_id[tail]=next_id;
+                    tail=(tail+1)&127;
+                    count=count+1;
+                    next_id=next_id+1;
+                    accepted_count=accepted_count+1;
+
+                    // A zero-latency service may legally accept and return on
+                    // the same edge.  Keep the descriptor ordering check live.
+                    if((service_latency==0)&&(count!=0)&&
+                       (due_cycle[head]<=cycle)) begin
+                        if(request_id[head]!=next_return)
+                            $fatal(1,"zero-latency response association failed");
+                        head=(head+1)&127;
+                        count=count-1;
+                        next_return=next_return+1;
+                        returned_count=returned_count+1;
+                    end
+                end
+                cycle=cycle+1;
+                if(cycle>100000)
+                    $fatal(1,"ordered model timed out depth=%0d",depth);
+            end
+            elapsed_cycles=cycle;
+        end
+    endtask
+
+    task automatic check_owner_order;
+        integer owner_queue[0:2];
+        integer owner_head,owner_tail,owner_count;
+        integer response0,response1,response2;
+        begin
+            owner_head=0;
+            owner_tail=0;
+            owner_count=0;
+
+            // Prediction demand is accepted first.  A display request arrives
+            // before the prediction successor and wins the next command slot.
+            owner_queue[owner_tail]=1; // prediction
+            owner_tail=owner_tail+1;
+            owner_count=owner_count+1;
+            owner_queue[owner_tail]=0; // display
+            owner_tail=owner_tail+1;
+            owner_count=owner_count+1;
+
+            response0=owner_queue[owner_head];
+            owner_head=owner_head+1;
+            owner_count=owner_count-1;
+
+            // The first response frees one descriptor, so the held exact
+            // successor can now be accepted without overtaking display.
+            owner_queue[owner_tail]=1;
+            owner_tail=owner_tail+1;
+            owner_count=owner_count+1;
+            response1=owner_queue[owner_head];
+            owner_head=owner_head+1;
+            owner_count=owner_count-1;
+            response2=owner_queue[owner_head];
+            owner_head=owner_head+1;
+            owner_count=owner_count-1;
+            if((response0!=1)||(response1!=0)||(response2!=1)||
+               (owner_count!=0))
+                $fatal(1,"display/prediction owner order failed %0d/%0d/%0d",
+                       response0,response1,response2);
+        end
+    endtask
+
     initial begin
         repeat(4)@(posedge clk);
         reset=0;
@@ -175,14 +292,41 @@ module tb_h262_prediction_word_cache;
                 repeat(5)@(posedge clk);
                 if(!request_busy)
                     $fatal(1,"request accepted while downstream busy");
+                @(negedge clk);
                 downstream_busy=0;
             end
         join
         if((downstream_reads!=11)||(cache_misses!=9))
             $fatal(1,"backpressure/delayed response failed");
 
+        run_ordered_model(1,10,64,0,ordered_baseline_cycles,
+                          ordered_accepts,ordered_returns);
+        if((ordered_accepts!=64)||(ordered_returns!=64))
+            $fatal(1,"one-outstanding ordered model lost requests");
+        run_ordered_model(2,10,64,0,ordered_depth2_cycles,
+                          ordered_accepts,ordered_returns);
+        if((ordered_accepts!=64)||(ordered_returns!=64)||
+           (ordered_depth2_cycles*100>ordered_baseline_cycles*55))
+            $fatal(1,"depth-two model did not hide substantial occupancy baseline=%0d depth2=%0d",
+                   ordered_baseline_cycles,ordered_depth2_cycles);
+        run_ordered_model(2,10,64,1,ordered_depth2_stalled_cycles,
+                          ordered_accepts,ordered_returns);
+        if((ordered_accepts!=64)||(ordered_returns!=64)||
+           (ordered_depth2_stalled_cycles>=ordered_baseline_cycles))
+            $fatal(1,"backpressured depth-two model lost its advantage");
+        run_ordered_model(2,0,64,0,ordered_zero_latency_cycles,
+                          ordered_accepts,ordered_returns);
+        if((ordered_accepts!=64)||(ordered_returns!=64)||
+           (ordered_zero_latency_cycles!=64))
+            $fatal(1,"same-cycle acceptance/return model failed cycles=%0d",
+                   ordered_zero_latency_cycles);
+        check_owner_order();
+
         $display("PREDICTION_WORD_CACHE_RESULT hits=%0d misses=%0d uncached=%0d downstream=%0d",
                  cache_hits,cache_misses,uncached_reads,downstream_reads);
+        $display("ORDERED_READ_MODEL_RESULT baseline=%0d depth2=%0d depth2_backpressure=%0d zero_latency=%0d requests=64 owner_order=P/D/P",
+                 ordered_baseline_cycles,ordered_depth2_cycles,
+                 ordered_depth2_stalled_cycles,ordered_zero_latency_cycles);
         $finish;
     end
 

@@ -6,7 +6,8 @@
 // source keeps the real pixel and accepted-write work inexpensive while preserving the
 // same 3-I/22-P/47-B repeated-GOP transaction sequence as the 720x480 stream.
 module tb_h262_live_raster_soak #(
-    parameter integer MIXED_PIXEL_MODE=0
+    parameter integer MIXED_PIXEL_MODE=0,
+    parameter integer MEMORY_READ_LATENCY=1
 );
     localparam integer MAX_STREAM_BYTES=1048576;
     localparam [28:0] DDR_BASE=29'h06000000;
@@ -23,6 +24,7 @@ module tb_h262_live_raster_soak #(
     integer published_references=0,display_swaps=0;
     integer reference_writes=0,scratch0_writes=0,scratch1_writes=0;
     integer memory_reads=0,total_cycles=0;
+    integer prediction_no_progress_cycles=0;
     integer profile_input_decoder=0,profile_input_presentation=0;
     integer profile_input_destination=0;
     integer profile_input_i=0,profile_input_p=0,profile_input_b=0;
@@ -146,8 +148,11 @@ module tb_h262_live_raster_soak #(
     wire [63:0] memory_din;
     wire [7:0] memory_be;
     reg [63:0] memory_dout=0;
-    reg memory_dout_ready=0,read_pending=0;
-    reg [17:0] read_index=0;
+    reg memory_dout_ready=0;
+    reg [15:0] read_valid_pipe=0;
+    reg [17:0] read_index_pipe[0:15];
+    integer read_pipe_stage;
+    wire read_pending=|read_valid_pipe;
     wire pred_busy,pred_dout_ready;
 
     wire display_frame_bank,display_scratch,display_scratch_bank;
@@ -542,6 +547,26 @@ module tb_h262_live_raster_soak #(
         end
         if(!reset)begin
             total_cycles<=total_cycles+1;
+            if(!pred_active||pred_store_valid||memory_rd||memory_dout_ready||
+               writer_stored)
+                prediction_no_progress_cycles<=0;
+            else
+                prediction_no_progress_cycles<=
+                    prediction_no_progress_cycles+1;
+            if(prediction_no_progress_cycles==10000)
+                $fatal(1,"prediction liveness failed engine=%0d/%0d/%0d tap=%0d ei=%0d cache=%0d/%0d addr=%h arb=%0d/%0d/%0d mem=%0d/%0d/%0d",
+                       prediction.mixed_probe.req,
+                       prediction.mixed_probe.waitresp,
+                       prediction.mixed_probe.lookup_wait,
+                       prediction.mixed_probe.tap_index,
+                       prediction.mixed_probe.ei,
+                       prediction.reference_cache.request_active,
+                       prediction.reference_cache.response_pending,
+                       prediction.reference_cache.request_addr_reg,
+                       arbiter.read_outstanding,
+                       arbiter.read_owner_prediction,
+                       arbiter.read_words_remaining,
+                       read_pending,memory_rd,memory_dout_ready);
             // Simulation-only attribution. Input stalls use mutually
             // exclusive priority; engine-stage counters intentionally
             // overlap so each active pipeline exposes its actual occupancy.
@@ -611,18 +636,25 @@ module tb_h262_live_raster_soak #(
                 end
             end
         end
-        memory_dout_ready<=0;
-        if(read_pending)begin
-            memory_dout<=ddr_mem[read_index];
-            memory_dout_ready<=1;
-            read_pending<=0;
+        if((MEMORY_READ_LATENCY<1)||(MEMORY_READ_LATENCY>16))
+            $fatal(1,"unsupported memory latency %0d",MEMORY_READ_LATENCY);
+        memory_dout_ready<=read_valid_pipe[MEMORY_READ_LATENCY-1];
+        if(read_valid_pipe[MEMORY_READ_LATENCY-1])
+            memory_dout<=ddr_mem[
+                read_index_pipe[MEMORY_READ_LATENCY-1]];
+        for(read_pipe_stage=15;read_pipe_stage>0;
+            read_pipe_stage=read_pipe_stage-1)begin
+            read_valid_pipe[read_pipe_stage]<=
+                read_valid_pipe[read_pipe_stage-1];
+            read_index_pipe[read_pipe_stage]<=
+                read_index_pipe[read_pipe_stage-1];
         end
+        read_valid_pipe[0]<=memory_rd;
         if(memory_rd)begin
             memory_reads<=memory_reads+1;
             if((memory_addr<DDR_BASE)||((memory_addr-DDR_BASE)>=DDR_WORDS))
                 $fatal(1,"DDR read outside frame regions: %h",memory_addr);
-            read_index<=memory_addr-DDR_BASE;
-            read_pending<=1;
+            read_index_pipe[0]<=memory_addr-DDR_BASE;
         end
         if(memory_we)begin
             if((memory_addr<DDR_BASE)||((memory_addr-DDR_BASE)>=DDR_WORDS))
@@ -741,11 +773,21 @@ module tb_h262_live_raster_soak #(
         display_scratch_bank_d<=display_scratch_bank;
 
         if(probe_error||pred_error||writer_error||presentation_error)
-            $fatal(1,"live raster error byte=%0d shell=%0d/%0d/%0d pred=%0d/%0d writer=%0d presentation=%0d p_headers=%0d p_publications=%0d p_rows=%0d p_pictures=%0d",
+            $fatal(1,"live raster error byte=%0d shell=%0d/%0d/%0d pred=%0d/%0d writer=%0d presentation=%0d p_headers=%0d p_publications=%0d p_rows=%0d p_pictures=%0d engine=%0d/%0d/%0d tap=%0d ei=%0d cache=%0d/%0d addr=%h arb=%0d/%0d/%0d mem=%0d/%0d/%0d",
                    stream_index,probe_error_source,p_probe_error_source,
                    publication_error_detail,pred_error_source,pred_error_detail,
                    writer_error,presentation_error,publication.p_header_count,
-                   publication.p_publication_count,p_rows,p_pictures);
+                   publication.p_publication_count,p_rows,p_pictures,
+                   prediction.mixed_probe.req,prediction.mixed_probe.waitresp,
+                   prediction.mixed_probe.lookup_wait,
+                   prediction.mixed_probe.tap_index,prediction.mixed_probe.ei,
+                   prediction.reference_cache.request_active,
+                   prediction.reference_cache.response_pending,
+                   prediction.reference_cache.request_addr_reg,
+                   arbiter.read_outstanding,
+                   arbiter.read_owner_prediction,
+                   arbiter.read_words_remaining,
+                   read_pending,memory_rd,memory_dout_ready);
 
         if((stream_index==stream_len)&&sequence_end_seen&&!pred_active&&
            !presentation_hold&&!destination_ownership_hold&&!writer.writing&&
@@ -811,7 +853,8 @@ module tb_h262_live_raster_soak #(
                    prediction.reference_cache.uncached_count!=0||
                    // Entry 247 overlaps the following P decode with prior B
                    // presentation without changing pixels or transactions.
-                   memory_reads!=71329||total_cycles!=2279996||
+                   memory_reads!=71329||
+                   ((MEMORY_READ_LATENCY==1)&&(total_cycles!=2279996))||
                    profile_b_miss_prelaunch==0||
                    pixel_samples!=423936||pixel_mismatches!=0||
                    !writer_seen||!pred_read_observed||
