@@ -104,12 +104,15 @@ module tb_h262_prediction_word_cache;
             request_burstcnt=8'd1;
             request_cacheable=cacheable;
             request_read=1;
+            #1;
             guard=0;
             while(request_busy) begin
-                @(negedge clk);
+                @(negedge clk); #1;
                 guard=guard+1;
                 if(guard>100)$fatal(1,"request acceptance timeout addr=%h",addr);
             end
+            @(posedge clk);
+            @(negedge clk);
             request_read=0;
         end
     endtask
@@ -141,12 +144,15 @@ module tb_h262_prediction_word_cache;
             request_burstcnt=8'd1;
             request_cacheable=cacheable;
             request_read=1;
+            #1;
             guard=0;
             while(request_busy) begin
-                @(negedge clk);
+                @(negedge clk); #1;
                 guard=guard+1;
                 if(guard>100)$fatal(1,"request acceptance timeout addr=%h",addr);
             end
+            @(posedge clk);
+            @(negedge clk);
             request_read=0;
             guard=0;
             while(!request_dout_ready) begin
@@ -295,6 +301,9 @@ module tb_h262_prediction_word_cache;
         repeat(4)@(posedge clk);
         reset=0;
         active=1;
+        #1;
+        if(request_busy)
+            $fatal(1,"cache did not advertise idle request readiness");
 
         // First access misses; an immediate direct lookup must hit without a
         // registered request or downstream transaction.

@@ -90,14 +90,16 @@ wire grant_writer =
     !read_outstanding && !reader_rd && !prediction_rd &&
     writer_we && !writer_targets_reader_region;
 
-assign reader_busy =
-    grant_reader ? ddram_busy : 1'b1;
+// Busy reports capacity/priority independently of the corresponding request.
+// This is a ready/valid boundary: acceptance below remains request-qualified,
+// but no client valid may feed back combinationally into its own readiness.
+assign reader_busy = !read_descriptor_room||ddram_busy;
 
 assign prediction_busy =
-    grant_prediction ? ddram_busy : 1'b1;
+    !read_descriptor_room||reader_rd||ddram_busy;
 
-assign writer_busy =
-    grant_writer ? ddram_busy : 1'b1;
+assign writer_busy = read_outstanding||reader_rd||prediction_rd||
+    writer_targets_reader_region||ddram_busy;
 
 assign ddram_burstcnt =
     grant_reader ? reader_burstcnt :

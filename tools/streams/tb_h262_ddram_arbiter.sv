@@ -132,6 +132,9 @@ module tb_h262_ddram_arbiter;
     initial begin
         repeat(4)@(posedge clk);
         reset=0;
+        #1;
+        if(reader_busy||prediction_busy)
+            $fatal(1,"arbiter did not advertise idle read readiness");
 
         // Queue owner order P/D/P.  Display wins the second command slot, then
         // the first prediction response frees a descriptor on the same edge

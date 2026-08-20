@@ -70,10 +70,13 @@ wire response_existing=downstream_dout_ready&&
     (response_descriptor_count!=0);
 wire response_descriptor_room=(response_descriptor_count<2)||
     response_existing;
-wire request_accept_hit=request_read&&response_descriptor_room&&
-    ordered_request_hit;
-wire request_accept_miss=request_read&&response_descriptor_room&&
-    !ordered_request_hit&&!downstream_busy;
+// Ready is independent of request assertion.  Keeping valid and ready
+// separate prevents a combinational loop through the shared DDR arbiter.
+wire request_ready=active&&response_descriptor_room&&
+    (ordered_request_hit||!downstream_busy);
+wire request_accept_hit=request_read&&request_ready&&ordered_request_hit;
+wire request_accept_miss=request_read&&request_ready&&
+    !ordered_request_hit;
 wire request_accept=request_accept_hit||request_accept_miss;
 wire direct_miss_response=downstream_dout_ready&&
     (response_descriptor_count==0)&&request_accept_miss;
@@ -85,12 +88,12 @@ wire response_pending=(response_descriptor_count!=0);
 wire [28:0] request_addr_reg=response_pending?
     response_descriptor_addr[response_descriptor_head]:request_addr;
 
-assign request_busy=!request_accept;
-assign downstream_burstcnt=(request_read&&response_descriptor_room&&
+assign request_busy=!request_ready;
+assign downstream_burstcnt=(active&&request_read&&response_descriptor_room&&
     !ordered_request_hit)?request_burstcnt:8'd0;
-assign downstream_addr=(request_read&&response_descriptor_room&&
+assign downstream_addr=(active&&request_read&&response_descriptor_room&&
     !ordered_request_hit)?request_addr:29'd0;
-assign downstream_read=request_read&&response_descriptor_room&&
+assign downstream_read=active&&request_read&&response_descriptor_room&&
     !ordered_request_hit;
 
 always @(posedge clk) begin
