@@ -1,5 +1,5 @@
 ---
-## 243 COMMIT Unreleased ??? 2026-08-19T20:45:57-07:00
+## 243 COMMIT Unreleased 28b717c 2026-08-19T20:45:57-07:00
 
 #### Coming From:
 
@@ -11,16 +11,18 @@ Prelaunch the next B prediction cache-miss DDR request at the current registered
 
 #### Outcome:
 
-The approved implementation will extend only the B bidirectional raster engine so a known following tap, direction phase, or pixel address can enter the existing one-outstanding DDR request path as the current registered miss response retires. The four-entry fully associative cache, registered cache-hit response, P engine, reconstructed values, bidirectional rounding, writer protocol, presentation cadence, framebuffer ownership, and download lifecycle will remain unchanged.
+Commit `00e215f` prelaunches an eligible same-phase B half-pel successor miss while the current registered miss response retires; `8189a46` registers the successor word address and byte select at current-request acceptance so live address arithmetic no longer extends the shared cache input cone. The focused cache, B residual, B intra, P intra, parser-window, mixed-pixel oracle, repeated-download, exact live-raster, and full-resolution publication regressions pass with unchanged pixels, identities, ownership, and traffic. The exact 72-picture soak retains 22 P pictures, 47 B pictures, 71 swaps, 2,267,813 cache hits, 463,835 misses and DDR reads, and zero errors while falling from 13,599,996 to 13,419,996 cycles, a 180,000-cycle or 1.32 percent reduction, with 151,039 B miss prelaunches; the mixed oracle retains 423,936 samples, zero mismatches, and maximum delta two while falling by 10,000 cycles. Timing qualification is not complete: the original fit failed setup at -0.481 ns, the registered-address seed-2 fit reduced that to -0.054 ns, and attempted geometry isolation plus seeds 1, 3, and 4 remained negative, with final reproducible commit `9c57bfd` at -0.693 ns setup, +0.271 ns hold, +3.881 ns recovery, and +1.095 ns removal. No RBF was qualified, uploaded, or deployed.
 
 #### Next Steps:
 
-Implement the registered B refill prelaunch, add focused coverage for consecutive misses and direction transitions, run cache, B residual, B intra, P intra, parser-window, mixed-pixel, exact live-raster, repeated-download, and full-resolution publication regressions, then require a timing-clean Quartus build before producing a hash-qualified RBF for MiSTer validation.
+Retain the functionally exact registered successor-miss implementation but do not deploy it until decoder setup is positive. Start from the near-clean seed-2 registered-address result and shorten or floorplan the existing P following-pixel `next_prelaunch_addr` cone without exposing combinational cache-hit data, then rerun the locked regression set and require a timing-clean build before creating or uploading a hash-qualified RBF; if that cannot close with a narrow cut, revert Entry 243 rather than weakening timing constraints.
 
 #### Files Modified:
 
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- MediaPlayer.qsf
 - tools/streams/tb_h262_b_residual_streaming.sv
 - tools/streams/tb_h262_live_raster_soak.sv
 
