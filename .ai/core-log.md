@@ -950,34 +950,6 @@ None.
 - [x] Passed
 
 ---
-## 212 COMMIT Unreleased 19914b2 2026-08-18T08:12:31-07:00
-
-#### Coming From:
-
-Unreleased 19914b2
-
-#### Purpose:
-
-Record MiSTer hardware acceptance of the B-picture intra-macroblock and ordinary mixed-macroblock compatibility boundary.
-
-#### Outcome:
-
-Commit `19914b2` passes both requested MiSTer LED tests with USER and POWER solid and DISK off. The uploaded B-intra capture shows the coherent repeated diagonal reference field and the authored vertically adjacent intra region at column 20 in rows 8 and 9 after complete I/B/P presentation. The uploaded mixed-corpus capture matches decoded source frame 8 at timestamp `00:00:00.320`, including the vertical color bars, moving diagonal, gray bar, sparse dots, and checkerboard feature. Frame-by-frame software review confirms the reported feature flicker during file loading is the intended motion of the 24-frame `testsrc2` source combined with rapid load-time picture publication, rather than missing decode regions, publication-order corruption, or a settled hardware error.
-
-#### Next Steps:
-
-Record the proposal for the long-GOP ownership, reference-rotation, publication, and soak-validation boundary before making further decoder changes.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
 ## 213 COMMIT Unreleased 065a775 2026-08-18T08:13:58-07:00
 
 #### Coming From:
@@ -1266,5 +1238,34 @@ Retain the accepted Entry 265 hardware and the reusable block trace, but do not 
 
 - [x] Built
 - [x] Passed
+
+---
+## 267 COMMIT Unreleased ??? 2026-08-20T10:04:41-07:00
+
+#### Coming From:
+
+Unreleased c7b70cb
+
+#### Purpose:
+
+Measure the complete-trace ceiling of replacing the B raster engine's single retained-word interpolation lookup with a bounded two-lane tap or dual-phase lookup path.
+
+#### Outcome:
+
+Proposal only. Entry 266 rejects next-block ping-pong fetch because its cost-free upper bound saves only 6.28 percent mixed and 5.90 percent long. The larger remaining B consumer term serializes one retained-word lookup for every integer or half-pel interpolation tap; a unidirectional pixel needs one, two or four taps and a bidirectional pixel needs the sum of its forward and backward phases. Extend only the optional B block trace with the already-latched forward and backward vector parity, then calculate exact one-lane tap demand, ideal two-lane demand and full-parallel one-cycle-per-pixel demand for every predicted block. Preserve both exact functional traces unchanged and compare the cost-free whole-trace ceilings against the remaining hardware cadence gaps before modifying the timing-sensitive block lookup interface.
+
+#### Next Steps:
+
+Run the extended trace and deterministic analyzer on mixed and long, reject a two-lane raster change without Quartus if its upper bound is insufficient on either stream, and otherwise use the measured parity distribution to define the narrowest functional lookup boundary with explicit registered timing and unchanged word-buffer ownership.
+
+#### Files Modified:
+
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/analyze_b_block_pipeline_ceiling.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
 
 ---
