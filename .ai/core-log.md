@@ -562,7 +562,7 @@ Retain the hardware-proven in-block residual prefetch and accepted 25 fps presen
 - [x] Passed
 
 ---
-## 270 COMMIT Unreleased ??? 2026-08-20T11:15:00-07:00
+## 270 COMMIT Unreleased f298a67 2026-08-20T11:15:00-07:00
 
 #### Coming From:
 
@@ -574,21 +574,20 @@ Measure whether bounded destination-safe P row predecode can close both Entry 26
 
 #### Outcome:
 
-Proposal only. Entry 269 proves cross-run scratch ownership is functional and removes substantial presentation backpressure, but it also falsifies Entry 268's four-buffer closure model: long presentation wait falls by 11,956,341 cycles while 10,805,922 destination-ownership cycles appear because the visible past reference, future prediction reference and two queued B pictures occupy all four full-frame buffers. Mixed gains 2,687,747 cycles and reaches 21.720684 fps, yet its remaining 7,500,519-cycle target gap is much larger than the directly observed 535,828 destination wait, so a useful ceiling must model the cascade from earlier P completion into following-B readiness rather than merely subtracting one counter. Extend the deterministic picture replay with explicit two-reference-bank ownership and compare three policies against both Entry 269 traces: current header-level destination hold, two-row parser/transform predecode with persistence delayed until the destination bank is released, and an ideal fifth destination frame. Preserve exact decode order, temporal display order, two scratch banks, 25-fps cadence and measured I/P/B work totals; report the first policy that closes both streams and reject any implementation whose complete-trace ceiling cannot do so.
+Commit `f298a67` converts the Entry 269 counters into strict zero-cost upper bounds without assuming unobserved per-picture overlap. An attempted reference-bank replay is rejected because aggregated I/P/B totals reproduce 25 fps even for the measured current policy, the same falsified optimism as Entry 268; the retained analyzer instead asks whether an architecture can close the target after granting it more savings than physically possible. Long measures 164,947,334 cycles against 153,360,000: erasing every one of its 10,805,922 destination-wait cycles still leaves 154,141,412 cycles or 24.873264 fps, 781,412 cycles short, so bounded two-row predecode is rejected. Mixed measures 57,180,519 cycles against 49,680,000: erasing every one of its 535,828 destination-wait cycles leaves 56,644,691 cycles or 21.926150 fps, 6,964,691 cycles short. A fifth-frame absolute bound is deliberately stronger still and erases every destination plus presentation wait cycle at zero cost. That can close long, but mixed bottoms out at 50,968,483 cycles or 24.368000 fps and remains 1,288,483 cycles short. Therefore neither destination predecode nor a fifth frame can close both streams alone; even ideal frame ownership must be paired with at least a 5.71 percent reduction of mixed's measured decoder-wait cycles. The analyzer compiles and both deterministic hardware boundaries pass; no functional RTL or Quartus build is warranted.
 
 #### Next Steps:
 
-Generate any additional per-row P trace needed to separate parser/transform work from destination-dependent raster persistence, validate the baseline replay against Entry 269's measured cadence and destination counters, and implement no functional RTL in this entry. If bounded two-row predecode closes both targets, propose the smallest gated-raster interface next; otherwise document its exact shortfall and scope the fifth frame across address mapping, reference publication, display ownership and DDR capacity before touching production storage.
+Retain Entry 269's timing-clean scheduler, reject bounded P predecode, and do not undertake the fifth-frame widening alone. Build the next combined ceiling from the ideal fifth-frame residual and an independently measured decoder change: Entry 266's queued B block fetcher removes an optimistic 13.69 percent of mixed B-span work, which scales above the required 1,288,483-cycle residual, while Entry 267's wider tap lanes provide a separate comparison. Require the combined bound to include realistic rather than zero-cost ownership savings and close both streams before choosing whether to implement B block queueing first or widen full-frame bank identity first.
 
 #### Files Modified:
 
-- tools/streams/tb_h262_live_raster_soak.sv
 - tools/streams/analyze_destination_predecode_ceiling.py
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 232 COMMIT Unreleased 1b1ca8f 2026-08-18T23:55:01-07:00
