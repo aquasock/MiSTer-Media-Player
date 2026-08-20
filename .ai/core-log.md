@@ -618,7 +618,7 @@ Retain the timing-clean Entry 272 image while implementing the independently mea
 - [x] Passed
 
 ---
-## 273 COMMIT Unreleased ??? 2026-08-20T12:01:05-07:00
+## 273 COMMIT Unreleased 22e54d9 2026-08-20T12:01:05-07:00
 
 #### Coming From:
 
@@ -630,11 +630,11 @@ Consume two horizontally adjacent B-picture interpolation taps from one retained
 
 #### Outcome:
 
-Proposal only. Entry 272 proves that prediction-footprint availability removes 7.51 to 8.10 percent of B decoder stall but that downstream ownership absorbs most of the end-to-end benefit. This boundary therefore changes only retained-word consumption. For horizontal half-pel and bidirectional horizontal components, the current and following tap may be accumulated on one registered lookup response when both select the same retained 64-bit word and row. A pair that crosses a word boundary, changes row, or reaches an invalid slot remains on the established single-tap request path. Prediction sum width, MPEG-2 rounding, forward/backward phase order, next-pixel launch, bank ownership, cache traffic and DDR traffic remain unchanged.
+Commit `22e54d9` adds an explicit same-row, same-retained-word pair predicate to the B lookup path so one registered response can contribute two adjacent interpolation bytes while row changes and word crossings retain the single-tap path. Focused predicted and intra replays remain exact at 1,286,071 and 758,941 cycles with every motion record, residual sample and store preserved. Exact mixed preserves all 423,936 pixels with zero mismatches, maximum channel delta two, all 69,556 reads and all queue ownership counts at 1,269,996 one-cycle cycles, with 30,352 paired and 27,344 fallback lookup events. Complete long preserves every picture, swap, read and write with zero errors at 6,929,996 cycles, with 330,064 paired and 488,608 fallback events. These are 0.78 and 0.72 percent simulation reductions from Entry 272. A fully clean Quartus 17.0.2 build completes in 11 minutes 10 seconds with zero errors, 149 standing warnings and positive timing: +0.306 ns global setup, +1.548 ns decoder setup, +7.876 ns video setup, +0.247 ns hold, +4.090 ns global recovery, +15.856 ns decoder recovery and +0.592 ns removal. The fit uses 32,944 ALMs, 48,452 registers, 4,027,379 memory bits, 504 RAM blocks and 65 DSP blocks. Qualified artifact `MediaPlayer_commit273_22e54d9.rbf` is 4,351,884 bytes with SHA-256 `f4ce7bc421b83f37e65d30c2abc683c5dc720cc0ab89f55050eafa7c3a46e805`; the standard MiSTer upload and FTP readback are byte-identical. Hardware long accepts all 791,528 bytes, 72 pictures and 71 swaps with zero errors in 164,069,310 cycles or 23.368173 fps; B stall falls by 450,189 cycles and decoder stall falls by 456,389, but cadence is 31,615 cycles slower than Entry 272. Mixed accepts all 366,071 bytes, 24 pictures and 23 swaps with zero errors in 56,934,988 cycles or 21.814354 fps; B stall falls by 187,231 cycles and decoder stall falls by 189,142, but cadence is 16,024 cycles slower. The paired path therefore removes measured decoder work correctly, yet the existing frame-ownership and presentation boundary absorbs all of that saving.
 
 #### Next Steps:
 
-Implement an explicit pair-valid predicate and one widened registered accumulation step, instrument exact pair and fallback counts, and require all focused prediction values, residual and intra stores, mixed pixels, long picture order, queue ownership and physical read counts to remain exact. Proceed to clean Quartus and hardware only if both complete traces show a meaningful decoder-cycle reduction without adding a combinational lookup port.
+Retain the timing-clean paired lookup because hardware confirms that it removes B decoder cycles needed by the combined Entry 271 ceiling, but do not claim an end-to-end cadence gain while presentation ownership absorbs it. Extend the two-bank B producer across the remaining block-five to next-macroblock boundary by reading and validating the next motion record early, preserving the single active producer and synchronous motion-memory semantics; require exact recorded traces and a measured B-stall reduction large enough to clear mixed's remaining ideal fifth-frame residual before widening full-frame destination identity.
 
 #### Files Modified:
 
@@ -645,8 +645,8 @@ Implement an explicit pair-valid predicate and one widened registered accumulati
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 234 COMMIT Unreleased c340da8 2026-08-19T03:57:29-07:00
