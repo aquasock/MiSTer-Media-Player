@@ -1244,7 +1244,7 @@ Retain the exact timing-safe depth-four boundary and test whether reconstruction
 - [x] Passed
 
 ---
-## 262 COMMIT Unreleased ??? 2026-08-20T08:18:22-07:00
+## 262 COMMIT Unreleased 3dc020b 2026-08-20T08:18:22-07:00
 
 #### Coming From:
 
@@ -1256,21 +1256,19 @@ Permit non-aliasing reconstruction writes to use idle DDR command slots while or
 
 #### Outcome:
 
-Proposal only. Entry 261 proves that four ordered reads are exact and nearly halve prediction-response occupancy, but hardware cadence improves only 1.57 percent long and 0.04 percent mixed. The deeper queue increases writer wait from 2,919,542 to 3,337,978 cycles long and from 963,004 to 1,121,161 mixed because the arbiter currently asserts writer busy whenever any read descriptor remains outstanding, even when neither display nor prediction presents a new command. Prediction and presentation reads target retained or displayed regions while the existing reader-region exclusion prevents writes to the displayed region; reconstruction writes can therefore be considered for otherwise idle command slots without changing read response order or ownership.
+Entry 261 proves that four ordered reads are exact and nearly halve prediction-response occupancy, but hardware cadence improves only 1.57 percent long and 0.04 percent mixed. The deeper queue increases writer wait from 2,919,542 to 3,337,978 cycles long and from 963,004 to 1,121,161 mixed because the arbiter currently asserts writer busy whenever any read descriptor remains outstanding. A temporary candidate removed only that term while retaining live reader priority, prediction priority, DDR busy, displayed-region exclusion and ordered response ownership; the strengthened arbiter test passed a prediction-read, non-aliasing write and prediction-response sequence with the write accepted before the response. The calibrated exact mixed boundary nevertheless remained identically 3,729,996 cycles with all 423,936 pixels, 69,556 reads, every write, 23 swaps and zero errors. Active reconstruction completes every block's footprint reads before it begins persistence, so the proposed command gap does not exist on the path being optimized. The candidate and its test expectation were fully removed, no source change remains, and no Quartus or hardware cycle is justified.
 
 #### Next Steps:
 
-Remove only the all-reads-drained term from writer grant and busy while retaining live reader priority, prediction priority, DDR busy, displayed-region exclusion and the ordered response descriptor queue. Extend the focused arbiter regression with a read/write/read sequence whose write is accepted before the first read response and require exact default and calibrated mixed/long traces, unchanged reads and writes, all publications and swaps, zero errors, and a material reduction in writer or row-persistence wait before any Quartus build.
+Retain accepted Entry 261 unchanged. Target the serialized P/B row schedule instead: measure a bounded ping-pong or descriptor queue that permits parsing and transforming the following row while the completed row reconstructs and persists, with explicit residual/motion bank ownership and unchanged publication order. Prove its complete-trace ceiling before functional RTL because this is a larger architectural boundary.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
-- tools/streams/tb_h262_ddram_arbiter.sv
-- tools/streams/tb_h262_live_raster_soak.sv
+None.
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
