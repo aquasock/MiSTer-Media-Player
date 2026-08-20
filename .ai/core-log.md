@@ -1,4 +1,34 @@
 ---
+## 252 COMMIT Unreleased ??? 2026-08-20T03:46:05-07:00
+
+#### Coming From:
+
+Unreleased 6218ff5
+
+#### Purpose:
+
+Prove a direct-index block-footprint fetcher that retains at most thirty-six prediction words while issuing two ordered DDR reads.
+
+#### Outcome:
+
+Entry 251 shows that every exact mixed and long non-intra block footprint is one or two complete rectangles, each at most two 64-bit words wide and nine rows high, and that queue depths above two provide no measurable benefit. This boundary will encode those limits in a standalone fetcher with eighteen fixed slots per reference phase, sequential rectangle address generation, a two-entry ordered response-slot FIFO and synchronous direct-slot lookup. It will not yet alter or instantiate into production P/B decoding, the shared cache or the DDR arbiter.
+
+#### Next Steps:
+
+Extend the replay analyzer to enforce the rectangular-footprint invariant, then verify the fetcher with one- and two-phase footprints, all width and height limits, deterministic command backpressure, delayed ordered responses, simultaneous response and next acceptance, legal same-cycle acceptance and response, exact slot data and invalid-parameter rejection. Proceed to live P/B integration only after every address, descriptor and lookup is proven without loss, duplication or response reassociation.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
+- tools/streams/tb_h262_prediction_block_fetcher.sv
+- tools/streams/analyze_prediction_queue_ceiling.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 251 COMMIT Unreleased 6218ff5 2026-08-20T03:16:07-07:00
 
 #### Coming From:
@@ -1244,34 +1274,6 @@ Arm the existing one-second settled diagnostic delay from either a decoded seque
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 219 COMMIT Unreleased daf7af2 2026-08-18T11:10:43-07:00
-
-#### Coming From:
-
-Unreleased a559d43
-
-#### Purpose:
-
-Preserve the settled LED diagnostic snapshot when fail-open transport intentionally discards the stream's final sequence-end code.
-
-#### Outcome:
-
-Commit `daf7af2` extends only the settled-snapshot arm condition so either the decoded sticky sequence-end flag or the sticky transport-fatal flag starts the existing four-slot, one-second stabilization delay. The capture registers, first-fault priority, blink epoch, clean-stream sequence-end behavior, and transport drain are unchanged. The focused fail-open transport and B-picture scheduler regressions pass. A clean Quartus 17.0.2 build completes with 0 errors, 121 standing warnings, no critical warnings, global setup slack +0.419 ns, hold slack +0.247 ns, recovery slack +3.470 ns, and focused decoder setup/recovery slack +1.571/+15.398 ns. The build uses 29,491 ALMs, 42,139 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. `MediaPlayer_commit219_daf7af2.rbf` is 4,235,564 bytes with SHA-256 `241237b30b480ef1b8184f7cbe0bdf25d93e9f38f97218b1fc899e4260175a5e`; its MiSTer FTP readback is byte-identical.
-
-#### Next Steps:
-
-Reload the long-GOP stream and wait at least one second after the frame-50 stop. Record the complete 32-second LED diagnostic epoch, or count the USER blinks during its first 6 seconds, POWER blinks during the next 10 seconds, and DISK blinks during the final 16 seconds, to expose the concealed fatal error code and detail.
-
-#### Files Modified:
-
-- MediaPlayer_top_07.svh
 
 #### Status:
 
