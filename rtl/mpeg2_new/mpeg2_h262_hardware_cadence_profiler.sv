@@ -353,57 +353,66 @@ end
 
 assign snapshot_ready = snapshot_ready_sync[2];
 
-reg [4:0] overlay_row;
-reg [5:0] overlay_cell;
-reg [31:0] overlay_word;
-reg overlay_bit;
+reg [41:0] overlay_shift;
+reg [31:0] overlay_row_word;
+wire [4:0] overlay_row_index = (v_pos-OVERLAY_Y) >> 2;
 
 always @* begin
-    overlay_row  = (v_pos-OVERLAY_Y) >> 2;
-    overlay_cell = (h_pos-OVERLAY_X) >> 2;
-    case (overlay_row)
-        5'd0:  overlay_word = snapshot_sync_2[31:0];
-        5'd1:  overlay_word = snapshot_sync_2[63:32];
-        5'd2:  overlay_word = snapshot_sync_2[95:64];
-        5'd3:  overlay_word = snapshot_sync_2[127:96];
-        5'd4:  overlay_word = snapshot_sync_2[159:128];
-        5'd5:  overlay_word = snapshot_sync_2[191:160];
-        5'd6:  overlay_word = snapshot_sync_2[223:192];
-        5'd7:  overlay_word = snapshot_sync_2[255:224];
-        5'd8:  overlay_word = snapshot_sync_2[287:256];
-        5'd9:  overlay_word = snapshot_sync_2[319:288];
-        5'd10: overlay_word = snapshot_sync_2[351:320];
-        5'd11: overlay_word = snapshot_sync_2[383:352];
-        5'd12: overlay_word = snapshot_sync_2[415:384];
-        5'd13: overlay_word = snapshot_sync_2[447:416];
-        5'd14: overlay_word = snapshot_sync_2[479:448];
-        5'd15: overlay_word = snapshot_sync_2[511:480];
-        5'd16: overlay_word = snapshot_sync_2[543:512];
-        5'd17: overlay_word = snapshot_sync_2[575:544];
-        5'd18: overlay_word = snapshot_sync_2[607:576];
-        5'd19: overlay_word = snapshot_sync_2[639:608];
-        5'd20: overlay_word = snapshot_sync_2[671:640];
-        default: overlay_word = 32'd0;
+    case (overlay_row_index)
+        5'd0:  overlay_row_word = snapshot_sync_2[31:0];
+        5'd1:  overlay_row_word = snapshot_sync_2[63:32];
+        5'd2:  overlay_row_word = snapshot_sync_2[95:64];
+        5'd3:  overlay_row_word = snapshot_sync_2[127:96];
+        5'd4:  overlay_row_word = snapshot_sync_2[159:128];
+        5'd5:  overlay_row_word = snapshot_sync_2[191:160];
+        5'd6:  overlay_row_word = snapshot_sync_2[223:192];
+        5'd7:  overlay_row_word = snapshot_sync_2[255:224];
+        5'd8:  overlay_row_word = snapshot_sync_2[287:256];
+        5'd9:  overlay_row_word = snapshot_sync_2[319:288];
+        5'd10: overlay_row_word = snapshot_sync_2[351:320];
+        5'd11: overlay_row_word = snapshot_sync_2[383:352];
+        5'd12: overlay_row_word = snapshot_sync_2[415:384];
+        5'd13: overlay_row_word = snapshot_sync_2[447:416];
+        5'd14: overlay_row_word = snapshot_sync_2[479:448];
+        5'd15: overlay_row_word = snapshot_sync_2[511:480];
+        5'd16: overlay_row_word = snapshot_sync_2[543:512];
+        5'd17: overlay_row_word = snapshot_sync_2[575:544];
+        5'd18: overlay_row_word = snapshot_sync_2[607:576];
+        5'd19: overlay_row_word = snapshot_sync_2[639:608];
+        5'd20: overlay_row_word = snapshot_sync_2[671:640];
+        default: overlay_row_word = 32'd0;
     endcase
+end
 
-    if (overlay_cell < 6'd4)
-        overlay_bit = (overlay_cell == 6'd0) || (overlay_cell == 6'd2);
-    else if (overlay_cell < 6'd9)
-        overlay_bit = overlay_row[4-(overlay_cell-6'd4)];
-    else if (overlay_cell < 6'd41)
-        overlay_bit = overlay_word[31-(overlay_cell-6'd9)];
-    else
-        overlay_bit = ^overlay_word;
+always @(posedge clk_video) begin
+    if (reset_video)
+        overlay_shift <= 42'd0;
+    else if (h_pos == 12'd0) begin
+        if (snapshot_ready &&
+            (v_pos >= OVERLAY_Y) && (v_pos < OVERLAY_Y+OVERLAY_HEIGHT))
+            overlay_shift <= {
+                4'b1010, overlay_row_index,
+                overlay_row_word, ^overlay_row_word
+            };
+        else
+            overlay_shift <= 42'd0;
+    end
+    else if ((h_pos >= OVERLAY_X) &&
+             (h_pos < OVERLAY_X+OVERLAY_WIDTH) &&
+             (h_pos[1:0] == 2'b11))
+        overlay_shift <= {overlay_shift[40:0], 1'b0};
+end
 
+always @* begin
     video_r = base_r;
     video_g = base_g;
     video_b = base_b;
     if (snapshot_ready && base_de &&
         (h_pos >= OVERLAY_X) && (h_pos < OVERLAY_X+OVERLAY_WIDTH) &&
         (v_pos >= OVERLAY_Y) && (v_pos < OVERLAY_Y+OVERLAY_HEIGHT)) begin
-        video_r = overlay_bit ? 8'hff : 8'h00;
-        video_g = overlay_bit ? 8'hff : 8'h00;
-        video_b = overlay_bit ? 8'hff : 8'h00;
+        video_r = overlay_shift[41] ? 8'hff : 8'h00;
+        video_g = overlay_shift[41] ? 8'hff : 8'h00;
+        video_b = overlay_shift[41] ? 8'hff : 8'h00;
     end
 end
 

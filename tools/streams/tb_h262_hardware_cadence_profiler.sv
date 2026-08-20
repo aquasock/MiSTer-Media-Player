@@ -74,18 +74,19 @@ module tb_h262_hardware_cadence_profiler;
         end
     endtask
 
-    task sample_overlay;
-        input [11:0] x;
-        input [11:0] y;
-        input expected_white;
+    task render_overlay_row_zero;
+        integer x;
         begin
-            @(negedge clk_video);h_pos=x;v_pos=y;
-            @(posedge clk_video);#1;
-            if(expected_white)begin
-                if({video_r,video_g,video_b}!==24'hffffff)
-                    $fatal(1,"overlay expected white at %0d,%0d got %h/%h/%h",x,y,video_r,video_g,video_b);
-            end else if({video_r,video_g,video_b}!==24'h000000)
-                $fatal(1,"overlay expected black at %0d,%0d got %h/%h/%h",x,y,video_r,video_g,video_b);
+            v_pos=12'd513;
+            for(x=0;x<=49;x=x+1)begin
+                @(negedge clk_video);h_pos=x;
+                @(posedge clk_video);#1;
+                if((x==9 || x==49) &&
+                   {video_r,video_g,video_b}!==24'hffffff)
+                    $fatal(1,"overlay expected white at %0d,513 got %h/%h/%h",x,video_r,video_g,video_b);
+                if(x==45 && {video_r,video_g,video_b}!==24'h000000)
+                    $fatal(1,"overlay expected black at 45,513 got %h/%h/%h",video_r,video_g,video_b);
+            end
         end
     endtask
 
@@ -153,9 +154,7 @@ module tb_h262_hardware_cadence_profiler;
         if(checksum!==dut.snapshot_sync_2[671:640])
             $fatal(1,"checksum mismatch %h/%h",checksum,dut.snapshot_sync_2[671:640]);
 
-        sample_overlay(12'd9,12'd513,1'b1);
-        sample_overlay(12'd49,12'd513,1'b1);
-        sample_overlay(12'd45,12'd513,1'b0);
+        render_overlay_row_zero();
         @(negedge clk_video);h_pos=12'd300;v_pos=12'd300;
         @(posedge clk_video);#1;
         if({video_r,video_g,video_b}!==24'h123456)
