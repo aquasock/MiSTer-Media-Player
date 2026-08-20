@@ -768,30 +768,29 @@ Retain the exact three-bank ownership correction because it removes destination 
 - [x] Passed
 
 ---
-## 237 COMMIT Unreleased 23d8410 2026-08-19T15:21:10-07:00
+## 277 COMMIT Unreleased ??? 2026-08-20T15:13:00-07:00
 
 #### Coming From:
 
-Unreleased f206298
+Unreleased eae80fd
 
 #### Purpose:
 
-Rearm all MPEG-domain decode, publication, presentation, framebuffer-cache, and diagnostic state at the start of each new HPS file download without disturbing the accepted first-load datapath.
+Collapse eligible B-picture 2-by-2 half-pel phases into one registered retained-word lookup so all four interpolation taps are consumed together.
 
 #### Outcome:
 
-Commit `23d8410` synchronizes the asynchronous `ioctl_download` level into `clk_mpeg2`, detects each low-to-high transfer boundary, stretches it across exactly eight decoder clock edges, resets every existing MPEG-domain consumer through the common reset net, and blocks FIFO reads throughout that boundary so the first new byte cannot be discarded. The system-reset synchronizers, dual-clock FIFO reset, video domain, accepted four-entry cache, pixel reconstruction, and DDR layout remain unchanged. The focused asynchronous-clock regression passes two independent downloads, sixteen total reset edges, sustained-level non-retrigger, clean release, and complete FIFO gating. Cache, P-intra, B-residual, B-intra, eight-refill parser-window, mixed-pixel, 72-picture live-raster, and full-resolution long-GOP regressions all pass; the mixed oracle retains 423,936 samples with zero mismatches and maximum delta two, the live soak retains 2,267,813 hits, 463,835 misses and reads, 15,739,996 cycles and all 72 identities, and the long run retains 22 P pictures, 47 B pictures, 25 publications and promotions, final identity 25, and zero errors.
+Proposal only. Entry 276 proves that another frame destination cannot improve cadence while decoder production misses presentation windows. The current prediction block fetcher already generates the complete one- or two-phase footprint, retains the current and adjacent row words, and keeps up to four ordered DDR reads in flight; Entry 258 also proved that increasing passive descriptor capacity beyond this active producer does not materially improve the complete traces. The remaining B lookup path nevertheless handles a 2-by-2 half-pel phase as two horizontal pairs on consecutive registered lookup cycles even when both required row words are valid and both horizontal taps remain within the same retained word. This boundary will add an explicit quad predicate only for tap zero of that exact case, sum the four selected bytes from the current and registered adjacent-row words, and complete the phase in one lookup. Horizontal word crossings, missing adjacent rows, one- and two-tap interpolation, forward/backward phase order, bidirectional rounding, residual addition, writer persistence and all DDR request behavior remain on their accepted paths.
 
 #### Next Steps:
 
-Run the session-authorized incremental Quartus build from the preserved database, verify timing and resource reports, deploy the resulting RBF with byte-identical readback, then validate both compatibility streams on a first load followed immediately by a second load without reloading the core.
+Instrument eligible and consumed quad phases in the focused B replay and both complete traces, then require exact motion, residual, pixel, read, write, publication, swap and error accounting. Compare against Entry 276's locked 1,259,996 mixed and 6,859,996 long simulation cycles and proceed to a clean physical build only if both complete boundaries improve materially; otherwise leave the timing-clean Entry 276 RBF on the MiSTer and record the candidate as simulation-only.
 
 #### Files Modified:
 
-- MediaPlayer_top_00.svh
-- files.qip
-- rtl/mpeg2_new/mpeg2_h262_download_rearm.sv
-- tools/streams/tb_h262_download_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
