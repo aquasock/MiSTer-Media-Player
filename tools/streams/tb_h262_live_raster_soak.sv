@@ -27,6 +27,7 @@ module tb_h262_live_raster_soak #(
     reg [63:0] ddr_mem[0:DDR_WORDS-1];
     reg [1023:0] hex_path,pixel_path,prediction_trace_path,row_trace_path;
     reg [1023:0] b_block_trace_path;
+    reg [1023:0] picture_trace_path;
     integer stream_len,stream_index=0,quiet_cycles=0;
     integer i,p_rows=0,b_rows=0,p_pictures=0,b_pictures=0;
     integer published_references=0,display_swaps=0;
@@ -36,6 +37,9 @@ module tb_h262_live_raster_soak #(
     integer prediction_trace_fd=0;
     integer row_trace_fd=0,row_trace_cycle=0;
     integer b_block_trace_fd=0,b_block_trace_cycle=0;
+    integer picture_trace_fd=0,picture_trace_cycle=0;
+    integer picture_trace_next_id=0,picture_trace_ready_id=0;
+    integer picture_trace_hold_total=0;
     reg p_row_waiting_d=0,b_row_waiting_d=0;
     reg b_block_fetch_complete_d=0;
     integer prediction_trace_demands=0,prediction_trace_hits=0;
@@ -214,6 +218,7 @@ module tb_h262_live_raster_soak #(
     reg [31:0] picture_window=0;
     wire [31:0] picture_window_next={picture_window[23:0],stream_data};
     reg picture_header_capture=0,picture_header_second_byte=0;
+    reg [7:0] picture_trace_header_first=0;
     reg b_picture_start=0,non_b_picture_start=0,p_picture_start=0,sequence_end=0;
     reg reference_ownership_arm=0,destination_ownership_hold=0;
 
@@ -222,6 +227,12 @@ module tb_h262_live_raster_soak #(
     reg display_frame_bank_d=0,display_scratch_d=0,display_scratch_bank_d=0;
     reg [7:0] reference_identity[0:1];
     reg [7:0] scratch_identity[0:1];
+    reg [7:0] picture_trace_reference_id[0:1];
+    reg [7:0] picture_trace_scratch_id[0:1];
+    reg [2:0] picture_trace_reference_type[0:1];
+    reg [2:0] picture_trace_scratch_type[0:1];
+    reg [9:0] picture_trace_reference_tr[0:1];
+    reg [9:0] picture_trace_scratch_tr[0:1];
     reg [9:0] last_reference_temporal=0;
     wire [7:0] displayed_identity=display_scratch ?
         scratch_identity[display_scratch_bank] : reference_identity[display_frame_bank];
@@ -351,6 +362,18 @@ module tb_h262_live_raster_soak #(
         reference_identity[1]=0;
         scratch_identity[0]=0;
         scratch_identity[1]=0;
+        picture_trace_reference_id[0]=0;
+        picture_trace_reference_id[1]=0;
+        picture_trace_scratch_id[0]=0;
+        picture_trace_scratch_id[1]=0;
+        picture_trace_reference_type[0]=0;
+        picture_trace_reference_type[1]=0;
+        picture_trace_scratch_type[0]=0;
+        picture_trace_scratch_type[1]=0;
+        picture_trace_reference_tr[0]=0;
+        picture_trace_reference_tr[1]=0;
+        picture_trace_scratch_tr[0]=0;
+        picture_trace_scratch_tr[1]=0;
         for(i=0;i<DDR_WORDS;i=i+1)ddr_mem[i]=0;
         if(!$value$plusargs("HEX=%s",hex_path))$fatal(1,"missing +HEX");
         if(!$value$plusargs("LEN=%d",stream_len))$fatal(1,"missing +LEN");
@@ -374,6 +397,13 @@ module tb_h262_live_raster_soak #(
                 $fatal(1,"cannot open B block trace");
             $fdisplay(b_block_trace_fd,
                 "cycle,event,temporal_reference,mbi,blk,direction,fmvx,fmvy,bmvx,bmvy");
+        end
+        if($value$plusargs("PICTURE_TRACE=%s",picture_trace_path))begin
+            picture_trace_fd=$fopen(picture_trace_path,"w");
+            if(picture_trace_fd==0)
+                $fatal(1,"cannot open picture trace");
+            $fdisplay(picture_trace_fd,
+                "cycle,event,id,type,temporal_reference,bank,hold_total");
         end
         if(MIXED_PIXEL_MODE)begin
             if(!$value$plusargs("PIXELS=%s",pixel_path))
@@ -971,6 +1001,14 @@ module tb_h262_live_raster_soak #(
         p_picture_start<=0;
         sequence_end<=0;
         pred_persisted_d<=pred_persisted;
+        if(reset)begin
+            picture_trace_cycle<=0;
+            picture_trace_hold_total<=0;
+        end else begin
+            picture_trace_cycle<=picture_trace_cycle+1;
+            if(presentation_hold)
+                picture_trace_hold_total<=picture_trace_hold_total+1;
+        end
         if(pred_read_seen)pred_read_observed<=1;
         if(pred_reconstructed_seen)pred_reconstructed_observed<=1;
         if(swap_counter==9999)begin
@@ -986,11 +1024,20 @@ module tb_h262_live_raster_soak #(
                 picture_header_second_byte<=0;
             end
             else if(picture_header_capture)begin
-                if(!picture_header_second_byte)
+                if(!picture_header_second_byte)begin
                     picture_header_second_byte<=1;
-                else begin
+                    picture_trace_header_first<=stream_data;
+                end else begin
                     picture_header_capture<=0;
                     picture_header_second_byte<=0;
+                    if(picture_trace_fd!=0)
+                        $fdisplay(picture_trace_fd,
+                            "%0d,START,%0d,%0d,%0d,-1,%0d",
+                            picture_trace_cycle,picture_trace_next_id,
+                            stream_data[5:3],
+                            {picture_trace_header_first,stream_data[7:6]},
+                            picture_trace_hold_total);
+                    picture_trace_next_id<=picture_trace_next_id+1;
                     if(stream_data[5:3]==3'b011)b_picture_start<=1;
                     else begin
                         non_b_picture_start<=1;
@@ -1019,6 +1066,18 @@ module tb_h262_live_raster_soak #(
             if(publication.b_picture_inflight)begin
                 b_pictures<=b_pictures+1;
                 scratch_identity[decode_scratch_bank]<=b_pictures+1;
+                picture_trace_scratch_id[decode_scratch_bank]<=
+                    picture_trace_ready_id;
+                picture_trace_scratch_type[decode_scratch_bank]<=3;
+                picture_trace_scratch_tr[decode_scratch_bank]<=
+                    temporal_reference;
+                if(picture_trace_fd!=0)
+                    $fdisplay(picture_trace_fd,
+                        "%0d,READY,%0d,3,%0d,%0d,%0d",
+                        picture_trace_cycle,picture_trace_ready_id,
+                        temporal_reference,2+decode_scratch_bank,
+                        picture_trace_hold_total);
+                picture_trace_ready_id<=picture_trace_ready_id+1;
             end
             else begin
                 p_pictures<=p_pictures+1;
@@ -1028,13 +1087,43 @@ module tb_h262_live_raster_soak #(
         if(picture_complete)begin
             published_references<=published_references+1;
             reference_identity[completed_bank]<=published_references+1;
+            picture_trace_reference_id[completed_bank]<=
+                picture_trace_ready_id;
+            picture_trace_reference_type[completed_bank]<=picture_coding_type;
+            picture_trace_reference_tr[completed_bank]<=temporal_reference;
+            if(picture_trace_fd!=0)
+                $fdisplay(picture_trace_fd,
+                    "%0d,READY,%0d,%0d,%0d,%0d,%0d",
+                    picture_trace_cycle,picture_trace_ready_id,
+                    picture_coding_type,temporal_reference,completed_bank,
+                    picture_trace_hold_total);
+            picture_trace_ready_id<=picture_trace_ready_id+1;
         end
 
         if((display_frame_bank!=display_frame_bank_d)||
            (display_scratch!=display_scratch_d)||
            (display_scratch&&
-            (display_scratch_bank!=display_scratch_bank_d)))
+            (display_scratch_bank!=display_scratch_bank_d)))begin
             display_swaps<=display_swaps+1;
+            if(picture_trace_fd!=0)begin
+                if(display_scratch)
+                    $fdisplay(picture_trace_fd,
+                        "%0d,DISPLAY,%0d,%0d,%0d,%0d,%0d",
+                        picture_trace_cycle,
+                        picture_trace_scratch_id[display_scratch_bank],
+                        picture_trace_scratch_type[display_scratch_bank],
+                        picture_trace_scratch_tr[display_scratch_bank],
+                        2+display_scratch_bank,picture_trace_hold_total);
+                else
+                    $fdisplay(picture_trace_fd,
+                        "%0d,DISPLAY,%0d,%0d,%0d,%0d,%0d",
+                        picture_trace_cycle,
+                        picture_trace_reference_id[display_frame_bank],
+                        picture_trace_reference_type[display_frame_bank],
+                        picture_trace_reference_tr[display_frame_bank],
+                        display_frame_bank,picture_trace_hold_total);
+            end
+        end
         display_frame_bank_d<=display_frame_bank;
         display_scratch_d<=display_scratch;
         display_scratch_bank_d<=display_scratch_bank;
