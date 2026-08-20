@@ -681,33 +681,35 @@ Do not build or deploy the cross-macroblock candidate alone. Use the 27,344 mixe
 - [ ] Passed
 
 ---
-## 235 COMMIT Unreleased 6583c66 2026-08-19T05:02:36-07:00
+## 275 COMMIT Unreleased ??? 2026-08-20T12:49:21-07:00
 
 #### Coming From:
 
-Unreleased c340da8
+Unreleased 5d0e18c
 
 #### Purpose:
 
-Expand the shared P/B reference-word cache from four fully associative entries to eight timing-safe two-way set-associative entries without changing registered lookup timing or decoded pixels.
+Pair vertically adjacent B-picture interpolation taps through a registered adjacent-row retained-word response.
 
 #### Outcome:
 
-Entry 234 is hardware accepted: the 60 fps recordings show coherent sequential presentation through long-GOP frame 71 in 5.935 seconds and mixed-macroblock frame 23 in 2.093 seconds, with USER and POWER solid, DISK dark, and no partial-block flicker. Commit `032d08c` implemented an eight-entry fully associative cache and preserved all functional regressions while reducing exact-soak misses from 463,835 to 372,220 and cycles from 15,739,996 to 15,249,996, but its eight-way comparison cone failed decoder setup at -0.463 ns and was not deployed. Commit `6583c66` reorganizes those eight words as four two-way sets indexed by the low DDR word-address bits, adds per-set replacement, and retains the registered lookup and single-outstanding transaction contracts. The focused cache, P-intra, B-residual, B-intra, parser-window, exact live-raster, and complete long-GOP publication regressions all pass; the exact soak preserves every pixel-side and presentation result while reducing misses and DDR reads to 410,546 and cycles to 15,479,996, improvements of 11.49 and 1.65 percent over Entry 234. The user-requested clean Quartus build completed in 9 minutes 58 seconds with 0 errors and 124 warnings, using 29,583 ALMs, 41,706 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. Global setup and hold slack are +0.362 and +0.261 ns; focused decoder setup, decoder recovery, and video setup are +0.793, +13.004, and +8.619 ns with zero violations. The 4,247,012-byte RBF has SHA-256 `2e453d6f21425ff0339e4fa3d43d503d051fceb3cdf36e41dad93e3f8db88279`.
+Proposal only. Entry 273 leaves 27,344 mixed and 488,608 long single-tap advances after same-row pairing, while Entry 274 proves that deeper block production alone cannot reduce mixed total cycles. Each bounded fetch bank already retains up to nine rows and two words per row, but its registered lookup exposes only the selected row. This boundary will add a separately registered adjacent-row word and validity result from the same retained footprint, not another DDR read, cache request or combinational external lookup port. A pair may consume that response only for a pure vertical half-pel phase when current and following taps select equal word columns on consecutive valid rows; horizontal, bidirectional phase order, four-tap interpolation, word crossings and invalid adjacent rows retain the established path.
 
 #### Next Steps:
 
-Deploy the hash-qualified Entry 235 RBF and rerun `test_compat_long_gop.m2v` and `test_compat_mixed_macroblocks.m2v`; accept only coherent sequential presentation through final frames 71 and 23, no partial-macroblock flicker, the established POWER and USER pass state with DISK dark after completion, and compare measured load intervals against Entry 234's 5.935- and 2.093-second baselines.
+Instrument vertical-eligible and remaining fallback events, preserve all focused prediction values, residual and intra stores, mixed pixels, long display order, physical reads, cross-macroblock counts and bank ownership, and compare complete cycles against both Entry 273 and the combined Entry 274 candidate. Perform a clean Quartus build only if mixed and long total-cycle savings are material enough to justify the second retained-word mux; otherwise remove both unqualified additions before the next hardware boundary.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
-- tools/streams/tb_h262_prediction_word_cache.sv
+- rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
 - tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/tb_h262_b_residual_streaming.sv
 
 #### Status:
 
-- [x] Built
+- [ ] Built
 - [ ] Passed
 
 ---
