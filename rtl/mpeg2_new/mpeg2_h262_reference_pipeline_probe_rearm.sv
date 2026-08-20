@@ -75,6 +75,11 @@ always @(posedge clk)begin
  end
 end
 wire b_select=b_mode||b_detect_now||b_active;
+// Entry 240 timing closure: b_detect_now is required combinationally only to
+// capture the first B metadata word.  The raster/cache path cannot issue a
+// request until the following cycle, when b_mode is registered, so keep the
+// geometry-qualified detector out of the shared address/response cone.
+wire b_engine_select=b_mode||b_active;
 
 // Commit 201 capacity closure: the streamed generalized P protocol supersedes
 // the historical 128x96 plan adapter and base reference engine.  Current P
@@ -202,15 +207,15 @@ always @(posedge clk) begin
   shared_residual_store[b_residual_store_write_address]
    <=b_residual_store_write_data;
  shared_residual_store_read_data<=shared_residual_store[
-  b_select?b_residual_store_read_address:
+  b_engine_select?b_residual_store_read_address:
            mix_residual_store_read_address];
 end
 
-wire shared_select=mixed_select||b_select;
-wire[7:0] shared_bc_raw=b_select?b_bc_raw:mix_bc_raw;
-wire[28:0] shared_addr_raw=b_select?b_addr_raw:mix_addr_raw;
-wire shared_rd_raw=b_select?b_rd_raw:mix_rd_raw;
-wire shared_cacheable_raw=b_select?b_cacheable_raw:mix_cacheable_raw;
+wire shared_select=mixed_select||b_engine_select;
+wire[7:0] shared_bc_raw=b_engine_select?b_bc_raw:mix_bc_raw;
+wire[28:0] shared_addr_raw=b_engine_select?b_addr_raw:mix_addr_raw;
+wire shared_rd_raw=b_engine_select?b_rd_raw:mix_rd_raw;
+wire shared_cacheable_raw=b_engine_select?b_cacheable_raw:mix_cacheable_raw;
 wire shared_engine_active=mixed_active||b_active;
 wire shared_engine_busy;
 wire[63:0] shared_engine_dout;
@@ -221,10 +226,10 @@ wire shared_cached_rd;
 wire[31:0] shared_cache_hits,shared_cache_misses,shared_uncached_reads;
 wire shared_lookup_ready,shared_lookup_hit;
 wire[63:0] shared_lookup_data;
-wire shared_lookup_request=b_select?b_lookup_request:mix_lookup_request;
-wire shared_lookup_consume=b_select?b_lookup_consume:mix_lookup_consume;
-wire mix_dout_ready_owned=shared_engine_dout_ready&&mixed_select&&!b_select;
-wire b_dout_ready_owned=shared_engine_dout_ready&&b_select;
+wire shared_lookup_request=b_engine_select?b_lookup_request:mix_lookup_request;
+wire shared_lookup_consume=b_engine_select?b_lookup_consume:mix_lookup_consume;
+wire mix_dout_ready_owned=shared_engine_dout_ready&&mixed_select&&!b_engine_select;
+wire b_dout_ready_owned=shared_engine_dout_ready&&b_engine_select;
 
 mpeg2_h262_reference_word_cache reference_cache(
  .clk(clk),.reset(reset),.active(shared_engine_active),
