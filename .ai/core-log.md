@@ -1,4 +1,36 @@
 ---
+## 255 COMMIT Unreleased ??? 2026-08-20T04:40:42-07:00
+
+#### Coming From:
+
+Unreleased 5b37c1f
+
+#### Purpose:
+
+Permit two ordered prediction reads to remain outstanding through the shared cache and DDR arbiter without weakening display priority or response ownership.
+
+#### Outcome:
+
+Entries 252 through 254 prove that both live prediction engines produce bounded block-footprint commands and preserve exact reconstruction while the current cache and arbiter serialize them. Each fetcher already contains a proven two-entry response-slot FIFO, so this boundary will extend only the intervening request path: the cache may accept a second ordered miss while the first response is pending, and the arbiter will retain two ordered command descriptors containing response owner and remaining burst words. Cache hits remain immediate only when no older response precedes them; otherwise the request is safely issued as an ordered miss.
+
+#### Next Steps:
+
+Add focused cache and arbiter regressions for back-to-back prediction commands, display-before-prediction priority, prediction/display/prediction response order, multiword display bursts, command backpressure, simultaneous response and next acceptance and legal same-cycle response. Then run exact mixed pixels and complete long order at one- and ten-cycle service, require two-outstanding occupancy with no changed pixels or response association, and proceed to Quartus only if the complete-stream cycle reduction is substantial.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
+- tools/streams/tb_h262_prediction_word_cache.sv
+- tools/streams/tb_h262_ddram_arbiter.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 254 COMMIT Unreleased 5b37c1f 2026-08-20T04:16:09-07:00
 
 #### Coming From:
@@ -1249,34 +1281,6 @@ Install `MediaPlayer_commit215_69d1b90.rbf` and load `test_compat_mixed_macroblo
 
 - rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
 - tools/streams/tb_h262_dense_publication_order.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 216 COMMIT Unreleased 69d1b90 2026-08-18T10:37:17-07:00
-
-#### Coming From:
-
-Unreleased 69d1b90
-
-#### Purpose:
-
-Record the MiSTer hardware result for exact repeated-GOP transaction counting and long-GOP presentation.
-
-#### Outcome:
-
-Commit `69d1b90` is not hardware accepted. The mixed-macroblock stream is visibly improved and reports the passing LED pattern, but remains jittery during loading; its uploaded capture reaches timestamp `00:00:00.400`, frame `10`, proving that presentation now advances into the second GOP without proving the required settled frame `23`. Loading the long-GOP stream instead leaves the MiSTer unresponsive while the file-transfer overlay is still visible. Its uploaded capture remains at timestamp `00:00:00.000`, frame `0`, and all LEDs are dark. Because the settled diagnostic snapshot is taken only after `ioctl_download` retires, the dark LEDs in this state are evidence that the transfer never completed, not a passing or ordinary sticky decoder-error report. The first unresolved boundary is therefore live compressed-stream backpressure or presentation ownership under sustained hardware timing.
-
-#### Next Steps:
-
-Reproduce the long stream with hardware-scale swap cadence and HPS-to-decoder FIFO backpressure, require bounded forward progress at every accepted-byte boundary, and expose the first asserted decoder, B-presentation, or P-destination ownership hold. Correct only the hold transition proven to keep `ioctl_wait` asserted, then rerun mixed and long full-stream presentation before another MiSTer build.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
