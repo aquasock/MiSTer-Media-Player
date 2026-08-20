@@ -831,7 +831,7 @@ Apply the proven registered coefficient read-ahead pattern to the analogous P re
 - [x] Passed
 
 ---
-## 279 COMMIT Unreleased ??? 2026-08-20T16:07:40-07:00
+## 279 COMMIT Unreleased 62f2654 2026-08-20T16:07:40-07:00
 
 #### Coming From:
 
@@ -839,26 +839,24 @@ Unreleased 62f2654
 
 #### Purpose:
 
-Remove the idle cycle between consecutive P residual-coefficient writes by advancing the already registered parser-memory address while the current coefficient enters the transform.
+Close the uncommitted P residual-coefficient experiment and designate hardware-qualified Entry 278 `62f2654` as the new independent-build baseline.
 
 #### Outcome:
 
-Proposal only. Entry 278 proves that coefficient read-ahead removes stable decoder work without changing reconstruction, but mixed cadence remains approximately 21.72 fps and its P pictures still account for about 5.57 million decoder-stall cycles. The shared P residual pipeline uses the same serialized pattern: `G_COEFF_WRITE` advances the synchronous parser-memory address, `G_COEFF_WAIT` idles for one cycle, and only then may the following registered coefficient enter inverse quantisation. Unlike the rejected first B implementation, this address is already a registered output of the residual pipeline and directly feeds the parser RAM, so the optimization does not require combinational RAM addressing. This boundary will prime the successor address in `G_START`, keep consecutive coefficients in `G_COEFF_WRITE`, and restore the consumed-count address at each block transition. Descriptor order, coefficient indices and last flags, inverse quantisation, IDCT, direct spatial streaming, row banking, publication and all prediction-memory behavior remain unchanged. Simulation-only state and coefficient counters will prove both the removed bubble and exact event accounting.
+The temporary Entry 279 candidate remained exact in its focused P regression and in the complete mixed trace, where it reduced simulation from 1,239,996 to 1,209,996 cycles, but the user elected to stop optimization before the long regression, Quartus build, source commit or hardware validation. All three temporary tracked-file edits were removed, so no Entry 279 source commit exists. Entry 278 `62f2654` remains the timing-clean, hardware-accepted baseline: its best measured long-GOP result is 23.723813 fps, its mixed result is approximately 21.718 fps, all hardware counters and LED checks pass, and qualified RBF SHA-256 `5118e024936a332ce3de2247da758e6f5b73b0cd5bda039dba570ff6762ed022` remains installed on the MiSTer.
 
 #### Next Steps:
 
-Require the focused P intra regression to preserve every descriptor, coefficient, transform sample, reconstructed pixel and store while eliminating `G_COEFF_WAIT` for multi-coefficient blocks. Require both complete traces to preserve all exact pixels, reads, writes, publications, swaps and zero-error accounting and compare against Entry 278's 1,239,996 mixed and 6,589,996 long cycles. Start another fully clean Quartus build only if the complete reduction is material and verify that all P coefficient memories remain inferred M10Ks before fitting.
+Stop further optimization and use source commit `62f2654` as the reproducible baseline for the user's independent clean Quartus build and testing; preserve the abandoned Entry 279 measurements only as historical evidence if development resumes later.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
-- tools/streams/tb_h262_p_intra_macroblocks.sv
-- tools/streams/tb_h262_live_raster_soak.sv
+None.
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 240 COMMIT Unreleased c667f2c 2026-08-19T18:05:31-07:00
