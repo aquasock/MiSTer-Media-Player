@@ -360,7 +360,7 @@ Retain the hardware-accepted registered output overlap and target the remaining 
 - [x] Passed
 
 ---
-## 240 COMMIT Unreleased ??? 2026-08-19T18:05:31-07:00
+## 240 COMMIT Unreleased c667f2c 2026-08-19T18:05:31-07:00
 
 #### Coming From:
 
@@ -372,22 +372,23 @@ Pipeline non-intra inverse-quantisation issue and retirement so each registered 
 
 #### Outcome:
 
-Entry 239 is hardware accepted with every long-GOP and mixed-macroblock frame present in strict order, 14.89 and 7.14 percent shorter recorded intervals, and correct consecutive reloads, while its remaining seven-to-eight-sample I/P holds versus three-sample B holds are visible starvation rather than stale presentation. A picture-separated profile of the unchanged 14,499,996-cycle exact soak measures 13,296,807 decoder-blocked cycles, 3,531,843 P-hold cycles, 9,618,020 B-parse-hold cycles, 3,681,299 B-sideband replay cycles, and 1,006,628 P versus 4,408,213 B raster-active cycles. Completed coded-picture intervals average 197,738 cycles for P and 209,099 for B, proving that the longer visible P hold is created by coded-order reference-plus-first-B dependency rather than a slower P raster engine. The shared transform nevertheless forces every non-intra coefficient through alternating product-issue and product-retirement cycles even though retirement only consumes the registered product and does not require a second multiplication. The proposed boundary will pre-register the following scan address, retire the current non-intra product into the existing IDCT capture port while launching the next product, and retain the current two-cycle intra-AC path, mismatch parity, saturation, scan order, diagnostic proof, IDCT arithmetic, shared multiplier, cache, writer, reorder scheduler, and download lifecycle.
+Entry 239 is hardware accepted with every long-GOP and mixed-macroblock frame present in strict order, while profiling its unchanged 14,499,996-cycle exact soak attributes 13,296,807 cycles to decoder backpressure and shows that longer visible P holds come from coded-order reference-plus-first-B dependency rather than a slower P raster engine. Commit `c667f2c` pre-registers the following scan address and retires each current non-intra inverse-quantisation product into IDCT while launching the next product, preserving the two-cycle intra path, mismatch parity, saturation, scan order, and arithmetic; it also separates first-word B metadata detection from registered B cache ownership so geometry qualification cannot enter the shared cache-to-prelaunch timing cone. P-intra latency remains exactly 1,791,186 cycles, B residual replay falls by exactly 7,560 cycles to 3,384,889, the complete mixed oracle retains 423,936 samples with zero mismatches and maximum delta two while falling from 2,679,996 to 2,529,996 cycles, and the exact 72-picture soak retains all 22 P pictures, 47 B pictures, 25 display identities, 71 swaps, cache and DDR counts, and zero errors while falling to 13,599,996 cycles, a 6.21 percent reduction. Parser windows, repeated-download rearm, B-intra, cache-hit, and the complete 791,528-byte publication regression also pass. An initial incremental build exposed a setup violation, and the user-requested clean rebuild reproduced it at -0.207 ns; the registered ownership cut removes that path, after which the normal incremental Quartus 17.0.2 build completes in 9 minutes 8 seconds with zero errors, 124 standing warnings, no critical warning, and global setup, hold, recovery, and removal slack of +0.195, +0.243, +2.951, and +0.619 ns. The fit uses 29,336 ALMs, 40,715 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. Qualified artifact `MediaPlayer_commit240_c667f2c.rbf` is 4,233,504 bytes with SHA-256 `17915fc7b2b2a35c957332abc4ea43516ef7e4286ac4b715445291e41ce021c0`; its deployed MiSTer FTP readback is byte-identical.
 
 #### Next Steps:
 
-Implement the non-intra issue/retire pipeline and prove exact coefficient, sample, pixel, cache, DDR, publication, and presentation identities with focused P and B residual tests, P/B intra regressions, the mixed-pixel oracle, parser windows, the exact 72-picture soak, repeated-download rearm, and the full-resolution long-GOP run. Accept the source boundary only if it removes approximately one cycle per non-intra coefficient without changing intra latency or arithmetic; then run the session-authorized incremental Quartus build, require positive timing slack, deploy a hash-qualified RBF with byte-identical readback, and repeat the two 60 fps hardware recordings and reload checks.
+Reload the deployed core and record both `test_compat_long_gop.m2v` and `test_compat_mixed_macroblocks.m2v` at nominal 60 fps on a first load and an immediate consecutive second load without reloading the core. For each stream, report the final visible frame, settled USER, POWER, and DISK states, any corruption or stale-screen behavior, and the frame-zero-to-final interval; upload the recordings so counter and independent raster cadence can be compared with Entry 239's 5.055-second long-GOP and 1.952-second mixed-macroblock baselines.
 
 #### Files Modified:
 
 - rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
 - tools/streams/tb_h262_p_intra_macroblocks.sv
 - tools/streams/tb_h262_b_residual_streaming.sv
 - tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
