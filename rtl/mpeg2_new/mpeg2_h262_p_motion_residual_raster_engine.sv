@@ -95,14 +95,10 @@ wire geometry_ok =
     (mb_width!=0) && (mb_width<=6'd45) &&
     (mb_height!=0) && (mb_height<=6'd30);
 
-// Entry 243 timing closure: prediction geometry is immutable for an admitted
-// row. Latch it at admission so following-pixel prelaunch does not cross the
-// live frontend dimension bus in the shared cache-address cycle.
-reg [5:0] prediction_mb_width,prediction_mb_height;
-wire [11:0] padded_luma_width = {6'd0,prediction_mb_width} << 4;
-wire [11:0] padded_luma_height = {6'd0,prediction_mb_height} << 4;
-wire [11:0] padded_chroma_width = {6'd0,prediction_mb_width} << 3;
-wire [11:0] padded_chroma_height = {6'd0,prediction_mb_height} << 3;
+wire [11:0] padded_luma_width = {6'd0,mb_width} << 4;
+wire [11:0] padded_luma_height = {6'd0,mb_height} << 4;
+wire [11:0] padded_chroma_width = {6'd0,mb_width} << 3;
+wire [11:0] padded_chroma_height = {6'd0,mb_height} << 3;
 
 function automatic [28:0] r90;
     input [11:0] r;
@@ -466,8 +462,6 @@ always @(posedge clk) begin
         started<=0;
         active<=0;
         reference_bank_latched<=0;
-        prediction_mb_width<=0;
-        prediction_mb_height<=0;
         req<=0;
         waitresp<=0;
         lookup_wait<=0;
@@ -666,8 +660,6 @@ always @(posedge clk) begin
             started<=1;
             active<=1;
             reference_bank_latched<=reference_bank;
-            prediction_mb_width<=mb_width;
-            prediction_mb_height<=mb_height;
             timeout<=24'hffffff;
             mbi<=row_motion_base;
             col<=0;
