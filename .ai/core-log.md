@@ -950,45 +950,6 @@ None.
 - [x] Passed
 
 ---
-## 211 COMMIT Unreleased 19914b2 2026-08-18T07:25:22-07:00
-
-#### Coming From:
-
-Unreleased 3fcf22f
-
-#### Purpose:
-
-Integrate intra-coded macroblocks into the generalized progressive B-picture path and qualify the ordinary mixed-macroblock compatibility corpus without regressing existing predictive modes.
-
-#### Outcome:
-
-Commit `19914b2` recognizes the H.262 Table B.4 unquantised and quantised intra macroblock types in non-scalable B pictures, applies picture-signalled DC precision and intra VLC format, carries intra ownership through the shared transform and sparse-sample protocol, and reconstructs all six 4:2:0 blocks without reference prediction. The deterministic 182,458-byte B-intra stream places unquantised and quantised intra macroblocks at column 20 in consecutive rows and passes software reference verification; RTL produces exactly 1,350 B macroblocks, two intra markers, twelve intra blocks, twelve DC events, 768 spatial samples and writes, and exactly 768 changed raster samples without parser or raster error. The complete 366,071-byte mixed corpus passes 210 P rows, seven P pictures, 450 B rows, fifteen B pictures, and eight reference publications without transport, decoder, publication, or presentation error; parser-window, standing B-residual, prediction-source, active-hierarchy, and authoritative seven-generator regressions also pass. Standards record H262-026 is published by metadata commit `d182f15`. The clean Quartus 17.0.2 build completes in 9 minutes 27 seconds with zero setup and hold TNS, no Critical Warning, +0.294 ns global setup, +0.248 ns global hold, +2.057 ns focused decoder setup, 29,442 ALMs, 42,188 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. RBF SHA-256 is `350773e5804bccd566dd4cb7c8a953427e2bafae2feebf50bbeb890fc87b1176`; B-intra stream SHA-256 is `60c914c8d9232515b21cbbd55416e1ae17c7134ee45af5f90829f06026b78166`; regenerated mixed-corpus SHA-256 is `ad1d9e81f0f7544ac16a1aaddb85ef9e1065333c1fdd305aa3cf275aa1ccc289`.
-
-#### Next Steps:
-
-Install the Commit-211 RBF and run `test_b_intra_macroblocks.m2v` through one complete settled diagnostic report, confirming coherent display order I/B/P, two vertically adjacent authored intra macroblocks at column 20 in rows 8 and 9, solid USER and POWER, and dark DISK. Then run `test_compat_mixed_macroblocks.m2v` through all 24 pictures and confirm coherent I/P/B presentation, complete transfer retirement, and the same settled LED result.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- tools/streams/generate_test_b_intra_macroblocks.py
-- tools/streams/tb_h262_b_intra_macroblocks.sv
-- tools/streams/tb_h262_b_residual_streaming.sv
-- tools/streams/tb_h262_dense_publication_order.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
 ## 212 COMMIT Unreleased 19914b2 2026-08-18T08:12:31-07:00
 
 #### Coming From:
@@ -1276,5 +1237,34 @@ Retain the exact timing-safe P and B row pipelines and measure the complete-trac
 
 - [x] Built
 - [x] Passed
+
+---
+## 266 COMMIT Unreleased ??? 2026-08-20T09:55:41-07:00
+
+#### Coming From:
+
+Unreleased 65ecd2e
+
+#### Purpose:
+
+Measure the complete-trace performance ceiling of overlapping B-picture next-block reference fetch with current-block reconstruction before changing production decoder RTL.
+
+#### Outcome:
+
+Proposal only. Entry 265 proves that P row production is no longer cadence-critical: hardware P stalls fall by 9,839,341 cycles long and 3,174,894 cycles mixed while B stalls change by only 2,238 and 10,397 cycles, and the end-to-end gain is absorbed almost entirely by presentation waiting. Add optional simulation-only B block START, FETCHED and RETIRE tracing to the exact live-raster harness and a deterministic two-machine, two-bank replay that treats current serial fetch completion as an optimistic producer boundary. Preserve default exact cycle, pixel, read, write, publication and swap results because the profiler must not feed functional logic. Compare mixed and long upper bounds against the remaining stable-25-fps gaps before considering a ping-pong reference-block store or dedicated next-block address pipeline.
+
+#### Next Steps:
+
+Implement only the optional trace and analyzer, run both exact streams, and reject the architecture without Quartus if even its optimistic two-bank ceiling is not material. If the ceiling is material on both traces, update this entry with the measured result and begin a separate proposal for bounded functional B block prefetch with explicit buffer ownership and unchanged DDR response order.
+
+#### Files Modified:
+
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/analyze_b_block_pipeline_ceiling.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
 
 ---
