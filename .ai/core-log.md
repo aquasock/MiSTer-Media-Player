@@ -1,5 +1,5 @@
 ---
-## 251 COMMIT Unreleased ??? 2026-08-20T03:16:07-07:00
+## 251 COMMIT Unreleased 6218ff5 2026-08-20T03:16:07-07:00
 
 #### Coming From:
 
@@ -11,11 +11,11 @@ Measure the full-trace performance ceiling of block-scoped prediction address, o
 
 #### Outcome:
 
-Entry 250 proves that a two-entry path can nearly halve isolated ten-cycle service occupancy but exposes only 8,072 immediate successors across 71,329 mixed physical reads, limiting the complete trace to a 3.42 percent reduction. The approved deeper experiment will capture exact per-block prediction demand, address, hit and response timing from the unchanged Entry 247 decoder and replay it through block-local word storage with ordered request depths sufficient to cover the modeled DDR latency. Queue depths, occupancy, demand stalls, cache reuse and theoretical complete-stream cycles will be compared without changing decoded pixels, presentation ownership, display priority or production RTL.
+Commit `6218ff5` adds optional exact prediction tracing and a deterministic block-scoped queue replay without changing production RTL. The mixed trace self-audits 499,551 hits, 71,329 misses, 6,624 block starts and ends, 423,936 exact pixels, zero errors and the unchanged 2,279,996-cycle default result; its exact ten-cycle serialized baseline is 2,919,996 cycles. A depth-two ordered queue with a retained block-word buffer predicts 2,332,586 cycles, a 20.12 percent reduction and hardware-scaled 18.756 fps, while depths four through sixteen improve by only thirty more cycles; the absolute prediction-memory ceiling is 19.189 fps. The long trace self-audits 2,267,813 hits, 463,835 misses, 19,872 blocks, 71 swaps, zero errors and the unchanged 12,689,996-cycle default result; its exact ten-cycle baseline is 16,869,996 cycles. Depth two predicts 12,848,592 cycles, a 23.84 percent reduction and hardware-scaled 22.929 fps, with an absolute ceiling of 23.215 fps. Mixed blocks require at most 34 distinct words and long blocks at most 36, while depths above two are ineffective because block-start address production supplies enough lead. The queue is therefore a material next step but cannot reach 25 fps without later non-memory overlap.
 
 #### Next Steps:
 
-Add an optional deterministic prediction trace to the exact live-raster regression and a replay analyzer for depths two, four, eight and sixteen at one- and ten-cycle service. Validate trace accounting against the established 499,551 hits, 71,329 misses, 423,936 exact samples and 2,279,996 default cycles, then proceed to functional RTL only if the replay demonstrates a material whole-stream gain and identifies a bounded queue and block-buffer organization; otherwise reject the architecture before Quartus.
+Proceed with a functional block-footprint fetcher that generates the current P or B block's bounded reference-word rectangle ahead of pixel consumption, retains up to thirty-six tagged words for that block, and permits two ordered DDR requests with explicit response-slot ownership. Preserve the global cache, display-reader priority, decoded arithmetic and write/presentation contracts; require exact mixed pixels, long ordering, unchanged transaction identity, positive clean timing and a substantial hardware cadence gain before accepting it. After this memory stage, profile the remaining mixed compute and transform occupancy because even perfect prediction-memory removal cannot independently reach 25 fps.
 
 #### Files Modified:
 
@@ -24,7 +24,7 @@ Add an optional deterministic prediction trace to the exact live-raster regressi
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
