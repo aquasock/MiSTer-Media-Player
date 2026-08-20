@@ -1259,9 +1259,11 @@ Commit `c958794` publishes each P/B block descriptor before transform start and 
 
 The fully clean seed-six Quartus 17.0.2 build completes in 10 minutes 12 seconds with zero errors, 143 standing warnings, no Critical Warning and no combinational loop. Timing is positive at +0.364 ns global setup, +1.385 ns decoder setup, +7.828 ns video setup, +0.248 ns hold, +3.006 ns global recovery, +14.138 ns decoder recovery and +0.724 ns removal. The fit uses 30,826 ALMs, 45,389 registers, 4,027,379 memory bits, 504 RAM blocks and 65 DSP blocks. Generated `MediaPlayer.rbf` is 4,295,800 bytes with SHA-256 `1861768efab90d93a5805f9545aa1565be7884df1eab0b4fb38386b3be1e77bf`.
 
+Exact MiSTer telemetry passes both compatibility streams with the timing-qualified RBF. Long GOP accepts all 791,528 bytes, displays all 72 pictures with 71 swaps, zero error flags and zero destination stalls, and improves from 175,691,819 cycles at 21.822302 fps to 173,900,457 cycles at 22.047096 fps: 1,791,362 cycles or 1.02 percent removed and 1.03 percent more delivered cadence. Mixed macroblocks accepts all 366,071 bytes, displays all 24 pictures with 23 swaps, zero error flags and zero destination stalls, and improves from 62,563,846 cycles at 19.851721 fps to 61,431,804 cycles at 20.217541 fps: 1,132,042 cycles or 1.81 percent removed and 1.84 percent more delivered cadence. The hardware gain is therefore real but substantially smaller than the isolated simulation projection; presentation and memory-response overlap mask most of the eliminated local replay cycles. `MediaPlayer_commit260_c958794.rbf` is deployed and retained for the requested visual acceptance check.
+
 #### Next Steps:
 
-Run Quartus from the timing-qualified seed-six boundary, require positive global and decoder timing with no combinational loop, deploy only a fully passing RBF, and acquire exact MiSTer telemetry for both compatibility streams. If both preserve their accepted LED/transaction signatures and materially improve cadence, pause for the user's visual check before selecting the remaining path to stable 25 fps.
+Pause on the deployed Entry 260 RBF for the user's visual check of both compatibility streams. If its accepted LED signatures and visibly smoother playback remain correct, attribute the newly exposed hardware stalls before selecting the next overlap or queueing change toward stable 25 fps.
 
 #### Files Modified:
 
@@ -1276,6 +1278,6 @@ Run Quartus from the timing-qualified seed-six boundary, require positive global
 #### Status:
 
 - [x] Built
-- [ ] Passed
+- [x] Passed
 
 ---
