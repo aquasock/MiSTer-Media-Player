@@ -1,4 +1,32 @@
 ---
+## 244 COMMIT Unreleased ??? 2026-08-19T23:05:34-07:00
+
+#### Coming From:
+
+Unreleased 28b717c
+
+#### Purpose:
+
+Allow Quartus to optimize the already-registered P following-pixel prelaunch address without changing prediction sequencing or cache behavior.
+
+#### Outcome:
+
+The approved implementation will remove only the synthesis `preserve` attributes from P `next_prelaunch_addr` and `next_prelaunch_valid`. Both signals remain clocked registers with their existing update conditions, lookup timing, and one-outstanding transaction contract; decoded pixels, P/B cache traffic, writer and presentation ownership, and Entry 243 B miss prelaunch behavior remain unchanged.
+
+#### Next Steps:
+
+Apply the narrow attribute change on seed 2, rerun P-intra, B-residual, cache, mixed-pixel, exact 72-picture live-raster, repeated-download, parser-window, and full-resolution publication regressions, then commit the source and perform a fully clean Quartus build. Require positive setup, hold, recovery, and removal slack before producing or uploading a qualified RBF; revert Entry 244 if timing does not close.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 243 COMMIT Unreleased 28b717c 2026-08-19T20:45:57-07:00
 
 #### Coming From:
@@ -1241,34 +1269,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-## 227 COMMIT Unreleased 302bb3e 2026-08-18T14:17:11-07:00
-
-#### Coming From:
-
-Unreleased 1b26cb5
-
-#### Purpose:
-
-Acquire a B run's future-reference bank correctly when its header and the reference publication cross the same registered handoff.
-
-#### Outcome:
-
-Commit `302bb3e` extends the Entry 225 scheduler barrier with an explicit future-reference-pending state. A B header can now open its decode and reorder transaction before the new reference bank is registered; a simultaneous publication supplies `completed_frame_bank` directly, an earlier publication supplies the locked ordinary pending bank, and a later publication binds the completed bank into the already-open B run instead of entering ordinary display. The scheduler defers the already-displayed conflict decision while that future reference is pending, while retaining scratch ownership checks, ordered B presentation, terminal release, destination ownership, and fatal fail-open behavior. The focused regression passes B-header ordering before, simultaneous with, and after publication, including the frame-47 stale-bank case, the vblank classification barrier, two-scratch order, ordinary non-B release, terminal-boundary release, and abort recovery. The transport and final-GOP observer tests pass unchanged. The DDR-backed 72-picture live-raster soak and independent 720x480 long-GOP publication run each pass 22 P pictures, 47 B pictures, 25 publications, 25 display identities, final source-frame identity 71, both scratch banks, completed presentation, and zero presentation or ownership errors. The session-authorized incremental Quartus 17.0.2 compile preserves the project database, recognizes the changed scheduler source, and completes in 9 minutes 12 seconds with 0 errors and 121 standing warnings; global setup/hold slack is +0.297/+0.202 ns, focused decoder/video setup slack is +0.648/+7.689 ns, and utilization is 29,470 ALMs, 42,060 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. `MediaPlayer_commit227_302bb3e.rbf` is 4,270,644 bytes with SHA-256 `ffad40366cc00d14ecce4575fd44766dd2fedd3fbbc346082d65b908ee9e1a24`; its MiSTer FTP readback is byte-identical. Hardware acceptance passes all requested stream and LED checks: `test_compat_long_gop.m2v` reaches its final source frame 71 with the passing LED report, and the companion compatibility tests also pass.
-
-#### Next Steps:
-
-Continue from hardware-accepted commit `302bb3e`; select the next compatibility target under the standard proposal-first workflow without reopening the completed long-GOP reference-handoff correction.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
