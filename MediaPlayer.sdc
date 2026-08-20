@@ -62,6 +62,21 @@ set_false_path \
     -from [get_keepers {*|hps_io:hps_io|ioctl_download}] \
     -to   [get_keepers {*|mpeg2_h262_download_rearm:*|download_sync[0]}]
 
+# Entry 245: the frozen hardware-cadence snapshot is produced in clk_mpeg2 and
+# remains stable permanently before its trailing ready level can enable the
+# video overlay.  The snapshot bus uses two explicit clk_video sampling stages;
+# ready uses three and trails the data stages.  Cut only each asynchronous
+# source -> first sampling stage.  The settling stages, overlay serializer, and
+# all ordinary decoder/video logic remain timed normally.
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_hardware_cadence_profiler:*|snapshot_mpeg2[*]}] \
+    -to   [get_keepers {*|mpeg2_h262_hardware_cadence_profiler:*|snapshot_sync_1[*]}]
+# Quartus may merge snapshot_ready_mpeg2 with the constant-one snapshot magic
+# bit because both freeze on the same event, so identify this single-bit CDC by
+# its first-stage destination rather than by an optimization-dependent source.
+set_false_path \
+    -to [get_keepers {*|mpeg2_h262_hardware_cadence_profiler:*|snapshot_ready_sync[0]}]
+
 # Asynchronous reset request sources.
 # status[0] and cfg[1] are the HPS reset controls that reach reset_request;
 # RESET is the external reset input.  These are intentional asynchronous
