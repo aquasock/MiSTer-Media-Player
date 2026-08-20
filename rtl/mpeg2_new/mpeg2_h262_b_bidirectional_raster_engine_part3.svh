@@ -125,7 +125,7 @@
 
         if(lookup_wait&&block_lookup_ready) begin
             if(block_lookup_valid) begin
-                if(tap_last) begin
+                if(lookup_phase_complete) begin
                     lookup_wait<=0;
                     if((exec_direction==2'd3)&&!pred_direction) begin
                         forward_prediction<=lookup_selected_prediction;
@@ -147,7 +147,7 @@
                     end
                 end else begin
                     pred_sum<=lookup_pred_sum_with_current;
-                    tap_index<=tap_index+1'b1;
+                    tap_index<=lookup_advance_tap_index;
                 end
             end
         end

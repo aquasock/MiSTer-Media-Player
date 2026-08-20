@@ -37,6 +37,7 @@ module tb_h262_live_raster_soak #(
     integer b_queue_current_starts=0,b_queue_prefetch_starts=0;
     integer b_queue_handoffs=0,b_queue_bank0_starts=0;
     integer b_queue_bank1_starts=0;
+    integer b_paired_tap_lookups=0,b_single_tap_advances=0;
     integer reference_writes=0,scratch0_writes=0,scratch1_writes=0;
     integer memory_reads=0,total_cycles=0;
     integer stream_stall_cycles=0,last_stream_index=0;
@@ -488,6 +489,14 @@ module tb_h262_live_raster_soak #(
                (prediction.b_probe.blk<5)&&
                prediction.b_probe.block_prefetch_valid)
                 b_queue_handoffs<=b_queue_handoffs+1;
+            if(prediction.b_probe.lookup_pair)
+                b_paired_tap_lookups<=b_paired_tap_lookups+1;
+            if(prediction.b_probe.lookup_wait&&
+               prediction.b_probe.block_lookup_ready&&
+               prediction.b_probe.block_lookup_valid&&
+               !prediction.b_probe.tap_last&&
+               !prediction.b_probe.lookup_pair)
+                b_single_tap_advances<=b_single_tap_advances+1;
             if(b_block_trace_fd!=0)begin
                 if(prediction.b_probe.block_fetch_start)
                     $fdisplay(b_block_trace_fd,
@@ -1288,6 +1297,8 @@ module tb_h262_live_raster_soak #(
                      b_queue_current_starts,b_queue_prefetch_starts,
                      b_queue_handoffs,b_queue_bank0_starts,
                      b_queue_bank1_starts);
+            $display("LIVE_RASTER_B_TAPS paired=%0d single_advance=%0d",
+                     b_paired_tap_lookups,b_single_tap_advances);
             if(MIXED_PIXEL_MODE)begin
                 $display("MIXED_PIXEL_RESULT samples=%0d mismatches=%0d max_delta=%0d",
                          pixel_samples,pixel_mismatches,max_pixel_delta);
@@ -1314,6 +1325,8 @@ module tb_h262_live_raster_soak #(
                    b_queue_handoffs!=3600||
                    b_queue_bank0_starts!=2160||
                    b_queue_bank1_starts!=2160||
+                   b_paired_tap_lookups!=30352||
+                   b_single_tap_advances!=27344||
                    ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
                     (MEMORY_READ_LATENCY==1)&&(total_cycles!=1809996))||
                    pixel_samples!=423936||pixel_mismatches!=0||
@@ -1359,6 +1372,8 @@ module tb_h262_live_raster_soak #(
                b_queue_handoffs!=11280||
                b_queue_bank0_starts!=6768||
                b_queue_bank1_starts!=6768||
+               b_paired_tap_lookups!=330064||
+               b_single_tap_advances!=488608||
                ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
                 (MEMORY_READ_LATENCY==1)&&(total_cycles!=9779996))||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||

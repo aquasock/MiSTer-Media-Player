@@ -302,8 +302,25 @@ wire [28:0] precompute_next_addr=pixel_addr(
 wire tap_dx=(half_x&&half_y)?tap_index[0]:(half_x?tap_index[0]:1'b0);
 wire tap_dy=(half_x&&half_y)?tap_index[1]:(half_y?tap_index[0]:1'b0);
 wire tap_last=(half_x&&half_y)?(tap_index==2'd3):((half_x||half_y)?(tap_index==2'd1):(tap_index==2'd0));
+wire [1:0] next_tap_index=tap_index+1'b1;
+wire next_tap_dx=(half_x&&half_y)?next_tap_index[0]:
+    (half_x?next_tap_index[0]:1'b0);
+wire next_tap_dy=(half_x&&half_y)?next_tap_index[1]:
+    (half_y?next_tap_index[0]:1'b0);
+wire next_tap_last=(half_x&&half_y)?(next_tap_index==2'd3):
+    ((half_x||half_y)?(next_tap_index==2'd1):
+     (next_tap_index==2'd0));
+wire [3:0] phase_tap_byte_sum={1'b0,phase_base_byte}+tap_dx;
+wire [3:0] next_phase_tap_byte_sum=
+    {1'b0,phase_base_byte}+next_tap_dx;
+// Entry 273: a retained word may supply the following horizontal tap without
+// a second lookup.  Row and word identity are explicit; vertical and
+// byte-seven crossings remain on the one-tap path.
+wire lookup_pair=lookup_wait&&block_lookup_ready&&block_lookup_valid&&
+    !tap_last&&(tap_dy==next_tap_dy)&&
+    (phase_tap_byte_sum[3]==next_phase_tap_byte_sum[3]);
 wire lookup_phase_complete=lookup_wait&&block_lookup_ready&&
-    block_lookup_valid&&tap_last;
+    block_lookup_valid&&(tap_last||(lookup_pair&&next_tap_last));
 wire prediction_phase_complete=lookup_phase_complete;
 wire bidir_lookup_candidate=prediction_phase_complete&&
     (exec_direction==2'd3)&&!pred_direction;
@@ -339,11 +356,6 @@ wire signed [13:0] src_x_tap_signed=src_base_x+$signed({13'd0,tap_dx});
 wire signed [13:0] src_y_tap_signed=src_base_y+$signed({13'd0,tap_dy});
 wire [11:0] src_x_tap=src_x_tap_signed[11:0];
 wire [11:0] src_y_tap=src_y_tap_signed[11:0];
-wire [1:0] next_tap_index=tap_index+1'b1;
-wire next_tap_dx=(half_x&&half_y)?next_tap_index[0]:
-    (half_x?next_tap_index[0]:1'b0);
-wire next_tap_dy=(half_x&&half_y)?next_tap_index[1]:
-    (half_y?next_tap_index[0]:1'b0);
 wire signed [13:0] next_src_x_tap_signed=
     src_base_x+$signed({13'd0,next_tap_dx});
 wire signed [13:0] next_src_y_tap_signed=
@@ -387,10 +399,14 @@ wire [7:0] bidir_prediction=bidir_sum[8:1];
 wire [7:0] final_prediction=(exec_direction==2'd3)?bidir_prediction:selected_prediction;
 wire [7:0] reconstructed_current=clip(final_prediction,residual_pel);
 wire [7:0] reconstructed_intra=clip(8'd0,residual_pel);
-wire [3:0] phase_tap_byte_sum={1'b0,phase_base_byte}+tap_dx;
 wire [2:0] phase_tap_byte=phase_tap_byte_sum[2:0];
 wire [7:0] lookup_tap_sample=bat(block_lookup_data,phase_tap_byte);
-wire [10:0] lookup_pred_sum_with_current=pred_sum+{3'd0,lookup_tap_sample};
+wire [2:0] lookup_next_tap_byte=next_phase_tap_byte_sum[2:0];
+wire [7:0] lookup_next_tap_sample=
+    bat(block_lookup_data,lookup_next_tap_byte);
+wire [10:0] lookup_pred_sum_with_current=
+    pred_sum+{3'd0,lookup_tap_sample}+
+    (lookup_pair?{3'd0,lookup_next_tap_sample}:11'd0);
 wire [7:0] lookup_selected_prediction=
     round_prediction(lookup_pred_sum_with_current,half_x,half_y);
 wire [8:0] lookup_bidir_sum=
@@ -401,13 +417,21 @@ wire [7:0] lookup_final_prediction=
 wire [7:0] lookup_reconstructed_current=
     clip(lookup_final_prediction,residual_pel);
 wire lookup_advance=lookup_wait&&block_lookup_ready&&
-    block_lookup_valid&&!tap_last;
+    block_lookup_valid&&!lookup_phase_complete;
+wire [1:0] lookup_advance_tap_index=
+    tap_index+(lookup_pair?2'd2:2'd1);
+wire lookup_advance_tap_dx=(half_x&&half_y)?
+    lookup_advance_tap_index[0]:
+    (half_x?lookup_advance_tap_index[0]:1'b0);
+wire lookup_advance_tap_dy=(half_x&&half_y)?
+    lookup_advance_tap_index[1]:
+    (half_y?lookup_advance_tap_index[0]:1'b0);
 wire prediction_lookup=
     (pixel_setup&&(exec_direction!=0)&&phase_bounds_ok)||lookup_advance||
     bidir_lookup_candidate||next_pixel_lookup_candidate;
 wire advance_tap_address=lookup_advance;
-wire address_tap_dx=advance_tap_address?next_tap_dx:tap_dx;
-wire address_tap_dy=advance_tap_address?next_tap_dy:tap_dy;
+wire address_tap_dx=advance_tap_address?lookup_advance_tap_dx:tap_dx;
+wire address_tap_dy=advance_tap_address?lookup_advance_tap_dy:tap_dy;
 wire [3:0] address_tap_byte_sum=
     {1'b0,phase_base_byte}+address_tap_dx;
 wire [28:0] normal_lookup_addr=phase_base_addr+
@@ -429,7 +453,7 @@ assign block_lookup_phase=bidir_lookup_candidate?1'b1:
 wire [5:0] block_request_ei=next_pixel_lookup_candidate?
     (ei+1'b1):ei;
 wire [1:0] block_request_tap=lookup_advance?
-    (tap_index+1'b1):
+    lookup_advance_tap_index:
     (bidir_lookup_candidate||next_pixel_lookup_candidate)?2'd0:tap_index;
 wire signed [7:0] block_request_mvx=block_lookup_phase?
     exec_bmvx:((exec_direction==2'd2)?exec_bmvx:exec_fmvx);
