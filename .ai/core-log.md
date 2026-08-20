@@ -950,55 +950,6 @@ None.
 - [x] Passed
 
 ---
-## 204 COMMIT Unreleased 7256a7f 2026-08-18T02:34:46-07:00
-
-#### Coming From:
-
-Unreleased e3036ac
-
-#### Purpose:
-
-Replace picture-wide P/B residual accumulation with row-bounded parse, transform, and reconstruction transactions that admit dense ordinary coefficient traffic without increasing FPGA RAM capacity.
-
-#### Outcome:
-
-Commit `e3036ac` is hardware accepted: `test_b_residual_streaming.m2v` briefly displays its B-only vertical stripe, then correctly presents the following plain P reference, with USER and POWER solid and DISK off; software decode confirms display order I/B/P, identical I and P hashes, and a distinct B frame. Commits `00d4229` and `7256a7f` add explicit row-ready and row-retired handshakes across the active P/B parsers, transforms, raster engines, reference wrapper, and publication shell, holding input until each row is reconstructed and persisted before reusing descriptor, coefficient, and shared spatial-sample addresses. The 2,875,981-byte dense corpus now completes its first P picture with 8,100 blocks and 175,586 coefficients and its first B picture with 8,073 blocks and 182,707 coefficients; each path emits 1,350 ordered motion records across 30 transactions, while the largest P row uses 270 blocks and 6,017 coefficients and the largest B row uses 270 blocks and 7,441 coefficients. The existing 120-block P and B full-raster regressions, parser-window and restricted-slice replays, prediction-source diagnostics, active hierarchy elaboration, and the first ordinary mixed-corpus B picture remain clean. The clean Quartus 17.0.2 build completes in 9 minutes 21 seconds with zero setup and hold TNS, no Critical Warning, +0.126 ns global setup, +0.250 ns global hold, +1.397 ns decoder setup, 29,087 ALMs, 42,000 registers, 4,025,331 memory bits, 503 RAM blocks, 65 DSP blocks, and 3 PLLs. Generated RBF `MediaPlayer.rbf` has SHA-256 `15e53c93517a1227671fd2f8d24673858f78b80ae902b1a9e68637afaa39730f`.
-
-#### Next Steps:
-
-Install the Commit-204 RBF and run `test_compat_dense_residual.m2v`, `test_p_residual_streaming.m2v`, and `test_b_residual_streaming.m2v` on MiSTer through complete settled diagnostic reports. Each stream must finish with USER and POWER solid and DISK dark; the dense stream must remain coherent through its P/B sequence, the P stripe must remain stable, and the B stripe must appear only during the B display interval before the following plain P reference.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
-- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_04.svh
-- tools/streams/tb_h262_b_residual_streaming.sv
-- tools/streams/tb_h262_p_intra_macroblocks.sv
-- tools/streams/tb_h262_parser_windows.sv
-- tools/streams/tb_h262_row_streaming.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
 ## 205 COMMIT Unreleased c9636a7 2026-08-18T03:26:00-07:00
 
 #### Coming From:
@@ -1290,6 +1241,34 @@ Install `MediaPlayer_commit213_065a775.rbf` and load `test_compat_long_gop.m2v` 
 #### Status:
 
 - [x] Built
+- [ ] Passed
+
+---
+## 259 COMMIT Unreleased ??? 2026-08-20T06:47:21-07:00
+
+#### Coming From:
+
+Unreleased 1138b7a
+
+#### Purpose:
+
+Attribute the remaining exact decoder backpressure to its mutually exclusive parser, replay, reconstruction, persistence, and presentation owners before selecting the next production optimization.
+
+#### Outcome:
+
+Proposal only. Entry 258 proves that deeper prediction descriptor capacity saves only 0.51% on the mixed boundary and 0.56% on the long boundary at normal service latency, so production depth remains two. The existing lookup and emit occupancy counters overlap by design because the following pixel lookup is already launched as the current pixel completes; treating both totals as serial cost would overstate the opportunity. Add simulation-only attribution at the publication and P/B controller boundaries so the exact stream-ready stall can be divided without changing decoder behavior.
+
+#### Next Steps:
+
+Run the exact mixed-pixel and long-GOP boundaries with mutually exclusive counters for parser readiness, P parse/raster hold, B parse/replay/persistence hold, writer persistence, destination ownership, and presentation. Use the largest proven serial owner to define one accelerated production boundary, then preserve exact pixels, picture order, reads, writes, publications, swaps, and zero-error accounting before any Quartus build.
+
+#### Files Modified:
+
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
 - [ ] Passed
 
 ---
