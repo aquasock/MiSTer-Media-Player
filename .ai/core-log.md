@@ -392,36 +392,32 @@ Reload the deployed core and record both `test_compat_long_gop.m2v` and `test_co
 - [ ] Passed
 
 ---
-## 200 COMMIT Unreleased b78ffcc 2026-08-17T22:44:25-07:00
+## 241 COMMIT Unreleased c667f2c 2026-08-19T19:59:35-07:00
 
 #### Coming From:
 
-Unreleased af20d28
+Unreleased c667f2c
 
 #### Purpose:
 
-Prevent same-row P slice continuations from re-emitting motion metadata for macroblocks already covered by an earlier slice.
+Record the MiSTer cadence and raster result of the pipelined non-intra inverse-quantisation build.
 
 #### Outcome:
 
-Commit-199 hardware reports USER 3, POWER 2, and DISK 2 on `test_pb_restricted_slices.m2v`, identifying generalized P raster motion-metadata sequencing rather than B reconstruction or DDR. Commit `b78ffcc` adds an explicit covered-column cursor across P slice boundaries, rejects overlap behind that cursor, emits only genuinely uncovered leading skips, and preserves ordinary first-slice and in-slice skip behavior. The restricted-slices replay now emits exactly 1,350 ordered motion events for each of its two P pictures instead of 1,534, while both pictures parse without P or B errors; the parser-window stream also emits exactly 1,350 events for both P pictures and retains eight P and eight B window refills. The clean Quartus 17.0.2 build completes in 13 minutes 57 seconds with zero setup and hold TNS, no Critical Warning, +0.041 ns global setup, +0.204 ns global hold, +1.838 ns decoder setup, 40,624 ALMs, 50,284 registers, 584,141 memory bits, 88 RAM blocks, 69 DSP blocks, and 3 PLLs. Generated RBF `MediaPlayer.rbf` has SHA-256 `972fd24b9c7d01ccdedfc9643c5939eb44ba347beb9a1655b7aeabffae381c81`.
+The user reports unchanged passing LED behavior and no visible screen regression on the deployed `c667f2c` RBF. Recalibrated analysis of the new nominal-60 fps recordings recovers all 72 long-GOP pictures and all 24 mixed-macroblock pictures in strict unit-step order. Long GOP advances from first frame 0 to first frame 71 in 4.977 seconds, or 14.27 effective fps, with camera holds ranging from two through nine samples; this is 1.55 percent faster than Entry 239's 5.055-second baseline. Mixed macroblocks advances from first frame 0 to first frame 23 in 1.817 seconds, or 12.66 effective fps, with holds ranging from two through nine samples; this is 6.93 percent faster than Entry 239's 1.952-second baseline. Independent temporal comparison finds a visible raster change for every one of the 71 and 23 logical counter transitions within the 60 fps camera's two-sample ambiguity, ruling out missing pictures, counter-only advancement, and a stale displayed buffer. The inverse-quantisation optimization is therefore hardware accepted and measurably improves throughput, while the remaining two-to-nine-sample hold variation explains why the presentation still looks stuttery.
 
 #### Next Steps:
 
-Install the Commit-200 RBF and rerun only `test_pb_restricted_slices.m2v` on MiSTer for one complete 32-second diagnostic frame, recording the USER, POWER, and DISK indications and confirming that the visible raster remains coherent.
+Continue from hardware-accepted commit `c667f2c`, preserve strict counter and raster identity plus reload behavior, and use the remaining two-to-nine-sample hold distribution to profile the next dominant decoder-backpressure stage before proposing another throughput optimization rather than changing the presentation cadence gate.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
-- tools/streams/tb_h262_parser_windows.sv
+None.
 
 #### Status:
 
 - [x] Built
-- [ ] Passed
+- [x] Passed
 
 ---
 ## 201 COMMIT Unreleased 9672f0a 2026-08-17T23:12:19-07:00
