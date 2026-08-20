@@ -360,39 +360,34 @@ Retain the hardware-accepted registered output overlap and target the remaining 
 - [x] Passed
 
 ---
-## 199 COMMIT Unreleased af20d28 2026-08-17T22:13:12-07:00
+## 240 COMMIT Unreleased ??? 2026-08-19T18:05:31-07:00
 
 #### Coming From:
 
-Unreleased 6c6854c
+Unreleased 3c03570
 
 #### Purpose:
 
-Identify the first prediction-pipeline assertion raised by legal same-row P/B slice partitions without changing decoder behavior.
+Pipeline non-intra inverse-quantisation issue and retirement so each registered product can enter IDCT capture while the following coefficient product is launched.
 
 #### Outcome:
 
-Commit `af20d28` preserves USER error class 3 while snapshotting the responsible prediction engine and its first internal assertion into the existing non-overlapping POWER and DISK diagnostic windows: POWER 1 is the plan adapter, 2 generalized P raster, 3 B raster/history, and 4 legacy/base; DISK reports the first engine-local assertion for P or B. Focused RTL replay proves generalized P POWER 2 / DISK 8 and B POWER 3 / DISK 7 while later malformed metadata cannot relabel the first fault. The 194,005-byte parser-window stream remains clean with eight P and eight B refills, and the 185,393-byte restricted-slices stream remains clean with both pictures seen and all 1,350 P macroblocks. The clean Quartus 17.0.2 build completes in 14 minutes 12 seconds with zero setup and hold TNS, no Critical Warning, +0.173 ns global setup, +0.232 ns global hold, +1.801 ns decoder setup, 40,891 ALMs, 50,495 registers, 584,141 memory bits, 88 RAM blocks, 69 DSP blocks, and 3 PLLs. Generated RBF `MediaPlayer.rbf` has SHA-256 `24ad77f4207bb9be870e2d294cc975cfffd9529950fc356f20dedafb912751c0`; no parsing, reconstruction, reference, DDR, publication, or presentation control depends on the new observability signals.
+Entry 239 is hardware accepted with every long-GOP and mixed-macroblock frame present in strict order, 14.89 and 7.14 percent shorter recorded intervals, and correct consecutive reloads, while its remaining seven-to-eight-sample I/P holds versus three-sample B holds are visible starvation rather than stale presentation. A picture-separated profile of the unchanged 14,499,996-cycle exact soak measures 13,296,807 decoder-blocked cycles, 3,531,843 P-hold cycles, 9,618,020 B-parse-hold cycles, 3,681,299 B-sideband replay cycles, and 1,006,628 P versus 4,408,213 B raster-active cycles. Completed coded-picture intervals average 197,738 cycles for P and 209,099 for B, proving that the longer visible P hold is created by coded-order reference-plus-first-B dependency rather than a slower P raster engine. The shared transform nevertheless forces every non-intra coefficient through alternating product-issue and product-retirement cycles even though retirement only consumes the registered product and does not require a second multiplication. The proposed boundary will pre-register the following scan address, retire the current non-intra product into the existing IDCT capture port while launching the next product, and retain the current two-cycle intra-AC path, mismatch parity, saturation, scan order, diagnostic proof, IDCT arithmetic, shared multiplier, cache, writer, reorder scheduler, and download lifecycle.
 
 #### Next Steps:
 
-Install the Commit-199 RBF and run only `test_pb_restricted_slices.m2v` on MiSTer for one complete 32-second diagnostic frame, recording USER, POWER, and DISK counts. Use POWER to select the prediction engine and DISK to identify its first assertion before proposing any decoder-behavior change.
+Implement the non-intra issue/retire pipeline and prove exact coefficient, sample, pixel, cache, DDR, publication, and presentation identities with focused P and B residual tests, P/B intra regressions, the mixed-pixel oracle, parser windows, the exact 72-picture soak, repeated-download rearm, and the full-resolution long-GOP run. Accept the source boundary only if it removes approximately one cycle per non-intra coefficient without changing intra latency or arithmetic; then run the session-authorized incremental Quartus build, require positive timing slack, deploy a hash-qualified RBF with byte-identical readback, and repeat the two 60 fps hardware recordings and reload checks.
 
 #### Files Modified:
 
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_04.svh
-- MediaPlayer_top_07.svh
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- tools/streams/tb_h262_prediction_error_sources.sv
+- rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
+- tools/streams/tb_h262_p_intra_macroblocks.sv
+- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [x] Built
+- [ ] Built
 - [ ] Passed
 
 ---
