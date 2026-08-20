@@ -15,6 +15,8 @@ module tb_h262_b_residual_streaming #(
     reg [6:0] samples_remaining=0;
     reg intra_mode=0;
     reg raster_error_d=0;
+    integer fetch_starts=0,prefetch_starts=0,prefetch_handoffs=0;
+    integer fetch_bank0_starts=0,fetch_bank1_starts=0;
 
     wire b_candidate,b_seen,b_complete,b_hold,b_replay;
     wire sideband_valid,first_valid,core_error;
@@ -91,11 +93,33 @@ module tb_h262_b_residual_streaming #(
     always @(posedge clk) begin
         if(!reset)total_cycles<=total_cycles+1;
         raster_error_d<=raster_error;
+        if(raster.block_fetch_active0&&raster.block_fetch_active1)
+            $fatal(1,"both B footprint producers active at cycle %0d",
+                   total_cycles);
+        if(raster.block_fetch_start)begin
+            fetch_starts<=fetch_starts+1;
+            if(raster.block_fetch_start_prefetch)
+                prefetch_starts<=prefetch_starts+1;
+            if(raster.block_fetch_start_bank)
+                fetch_bank1_starts<=fetch_bank1_starts+1;
+            else
+                fetch_bank0_starts<=fetch_bank0_starts+1;
+        end
+        if(raster.wait_store&&store_block_stored&&(raster.blk<5)&&
+           raster.block_prefetch_valid)
+            prefetch_handoffs<=prefetch_handoffs+1;
         if(raster_error&&!raster_error_d)
-            $display("B_RASTER_FIRST_ERROR source=%0d cycles=%0d req=%0d waitresp=%0d lookup_wait=%0d dout_ready=%0d tap=%0d last=%0d early=%0d",
+            $display("B_RASTER_FIRST_ERROR source=%0d cycles=%0d req=%0d waitresp=%0d lookup_wait=%0d dout_ready=%0d tap=%0d last=%0d early=%0d consumer=%0d prefetch=%0d starts=%0d/%0d active=%0d/%0d complete=%0d/%0d errors=%0d/%0d outstanding=%0d/%0d",
                      raster_error_source,total_cycles,raster.req,raster.waitresp,
                      raster.lookup_wait,ddram_dout_ready,raster.tap_index,
-                     raster.tap_last,raster.early_lookup);
+                     raster.tap_last,raster.early_lookup,
+                     raster.block_consumer_bank,raster.block_prefetch_valid,
+                     raster.block_fetch_start,raster.block_fetch_start_bank,
+                     raster.block_fetch_active0,raster.block_fetch_active1,
+                     raster.block_fetch_complete0,raster.block_fetch_complete1,
+                     raster.block_fetch_error0,raster.block_fetch_error1,
+                     raster.block_fetch_outstanding0,
+                     raster.block_fetch_outstanding1);
         ddram_lookup_ready<=ddram_lookup_request;
         ddram_dout_ready<=0;
         store_block_stored<=store_complete;
@@ -146,11 +170,13 @@ module tb_h262_b_residual_streaming #(
         else if(quiet_cycles!=0)quiet_cycles<=quiet_cycles+1;
 
         if(quiet_cycles==100) begin
-            $display("RESULT b_seen=%0d core_error=%0d raster_error=%0d/%0d motion=%0d blocks=%0d samples=%0d writes=%0d stores=%0d stripe=%0d changed=%0d cycles=%0d",
+            $display("RESULT b_seen=%0d core_error=%0d raster_error=%0d/%0d motion=%0d blocks=%0d samples=%0d writes=%0d stores=%0d stripe=%0d changed=%0d cycles=%0d fetches=%0d prefetches=%0d handoffs=%0d banks=%0d/%0d",
                      b_seen,core_error,raster_error,raster_error_source,motion_events,
                      residual_blocks,residual_samples,residual_writes,
                      store_samples,stripe_store_samples,stripe_changed_samples,
-                     total_cycles);
+                     total_cycles,fetch_starts,prefetch_starts,
+                     prefetch_handoffs,fetch_bank0_starts,
+                     fetch_bank1_starts);
             if(!b_seen||core_error||raster_error||motion_events!=1350||
                residual_blocks!=(intra_mode?12:120)||
                residual_samples!=(intra_mode?768:7680)||
@@ -163,8 +189,14 @@ module tb_h262_b_residual_streaming #(
                // residual and intra samples remain exact.
                // Entry 264 overlaps following-row production with current-row
                // raster persistence through two logical metadata banks.
-               (!intra_mode&&(total_cycles!=1341421))||
-               (intra_mode&&(total_cycles>=3903000)))
+               (!intra_mode&&((total_cycles!=1286071)||
+                (fetch_starts!=8100)||(prefetch_starts!=6750)||
+                (prefetch_handoffs!=6750)||(fetch_bank0_starts!=4050)||
+                (fetch_bank1_starts!=4050)))||
+               (intra_mode&&((total_cycles!=758941)||
+                (fetch_starts!=8088)||(prefetch_starts!=6740)||
+                (prefetch_handoffs!=6740)||(fetch_bank0_starts!=4044)||
+                (fetch_bank1_starts!=4044))))
                 $fatal(1,"B residual streaming regression failed");
             $finish;
         end

@@ -34,6 +34,9 @@ module tb_h262_live_raster_soak #(
     integer i,p_rows=0,b_rows=0,p_pictures=0,b_pictures=0;
     integer published_references=0,display_swaps=0;
     integer queued_run_admissions=0,generation_promotions=0;
+    integer b_queue_current_starts=0,b_queue_prefetch_starts=0;
+    integer b_queue_handoffs=0,b_queue_bank0_starts=0;
+    integer b_queue_bank1_starts=0;
     integer reference_writes=0,scratch0_writes=0,scratch1_writes=0;
     integer memory_reads=0,total_cycles=0;
     integer stream_stall_cycles=0,last_stream_index=0;
@@ -457,27 +460,55 @@ module tb_h262_live_raster_soak #(
         end
     end
 
-    // Entry 266: simulation-only B block ownership boundaries. START is the
-    // current serial fetch launch, FETCHED is the optimistic instant at which
-    // a ping-pong fetch bank could be reassigned to the following block, and
-    // RETIRE is the writer persistence barrier that releases this block.
+    // Entry 272: simulation-only B block ownership boundaries. START names
+    // either the current launch or its actual prefetched successor, FETCHED
+    // tracks the selected consumer bank, and RETIRE is the writer persistence
+    // barrier that permits the released bank to be reused.
     always @(posedge clk) begin
         if(reset)begin
             b_block_trace_cycle<=0;
             b_block_fetch_complete_d<=0;
         end else begin
             b_block_trace_cycle<=b_block_trace_cycle+1;
+            if(prediction.b_probe.block_fetch_active0&&
+               prediction.b_probe.block_fetch_active1)
+                $fatal(1,"both B footprint producers active at cycle %0d",
+                       b_block_trace_cycle);
+            if(prediction.b_probe.block_fetch_start)begin
+                if(prediction.b_probe.block_fetch_start_prefetch)
+                    b_queue_prefetch_starts<=b_queue_prefetch_starts+1;
+                else
+                    b_queue_current_starts<=b_queue_current_starts+1;
+                if(prediction.b_probe.block_fetch_start_bank)
+                    b_queue_bank1_starts<=b_queue_bank1_starts+1;
+                else
+                    b_queue_bank0_starts<=b_queue_bank0_starts+1;
+            end
+            if(prediction.b_probe.wait_store&&writer_stored&&
+               (prediction.b_probe.blk<5)&&
+               prediction.b_probe.block_prefetch_valid)
+                b_queue_handoffs<=b_queue_handoffs+1;
             if(b_block_trace_fd!=0)begin
                 if(prediction.b_probe.block_fetch_start)
                     $fdisplay(b_block_trace_fd,
                         "%0d,START,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d",
                         b_block_trace_cycle,temporal_reference,
-                        prediction.b_probe.mbi,prediction.b_probe.blk,
+                        prediction.b_probe.mbi,
+                        prediction.b_probe.blk+
+                            prediction.b_probe.block_fetch_start_prefetch,
                         prediction.b_probe.exec_direction,
-                        $signed(prediction.b_probe.exec_fmvx),
-                        $signed(prediction.b_probe.exec_fmvy),
-                        $signed(prediction.b_probe.exec_bmvx),
-                        $signed(prediction.b_probe.exec_bmvy));
+                        $signed(prediction.b_probe.block_fetch_start_prefetch?
+                            prediction.b_probe.successor_fmvx:
+                            prediction.b_probe.exec_fmvx),
+                        $signed(prediction.b_probe.block_fetch_start_prefetch?
+                            prediction.b_probe.successor_fmvy:
+                            prediction.b_probe.exec_fmvy),
+                        $signed(prediction.b_probe.block_fetch_start_prefetch?
+                            prediction.b_probe.successor_bmvx:
+                            prediction.b_probe.exec_bmvx),
+                        $signed(prediction.b_probe.block_fetch_start_prefetch?
+                            prediction.b_probe.successor_bmvy:
+                            prediction.b_probe.exec_bmvy));
                 if(prediction.b_probe.block_fetch_complete&&
                    !b_block_fetch_complete_d)
                     $fdisplay(b_block_trace_fd,
@@ -915,9 +946,13 @@ module tb_h262_live_raster_soak #(
             if(temporal_reference>=24||pixel_component>=3||
                (pixel_component==0&&(pixel_x>=128||pixel_y>=96))||
                (pixel_component!=0&&(pixel_x>=64||pixel_y>=48)))
-                $fatal(1,"mixed pixel coordinate/tag error tr=%0d c=%0d x=%0d y=%0d raw=%h/%h",
+                $fatal(1,"mixed pixel coordinate/tag error tr=%0d c=%0d x=%0d y=%0d raw=%h/%h b_mbi=%0d b_col=%0d b_blk=%0d b_ei=%0d bank=%0d prefetch=%0d",
                        temporal_reference,pixel_component,pixel_x,pixel_y,
-                       pred_store_x,pred_store_y);
+                       pred_store_x,pred_store_y,prediction.b_probe.mbi,
+                       prediction.b_probe.col,prediction.b_probe.blk,
+                       prediction.b_probe.ei,
+                       prediction.b_probe.block_consumer_bank,
+                       prediction.b_probe.block_prefetch_valid);
             pixel_index=temporal_reference*18432;
             if(pixel_component==0)
                 pixel_index=pixel_index+pixel_y*128+pixel_x;
@@ -1249,6 +1284,10 @@ module tb_h262_live_raster_soak #(
                      profile_victim_lookups,profile_victim_primary_hits,
                      profile_victim_hits,profile_victim_full_misses,
                      profile_victim_hits+profile_victim_full_misses);
+            $display("LIVE_RASTER_B_QUEUE current=%0d prefetch=%0d handoffs=%0d banks=%0d/%0d",
+                     b_queue_current_starts,b_queue_prefetch_starts,
+                     b_queue_handoffs,b_queue_bank0_starts,
+                     b_queue_bank1_starts);
             if(MIXED_PIXEL_MODE)begin
                 $display("MIXED_PIXEL_RESULT samples=%0d mismatches=%0d max_delta=%0d",
                          pixel_samples,pixel_mismatches,max_pixel_delta);
@@ -1270,6 +1309,11 @@ module tb_h262_live_raster_soak #(
                     (prediction.reference_cache.cache_miss_count!=32'd69556))||
                    prediction.reference_cache.uncached_count!=0||
                    (memory_reads!=prediction.reference_cache.cache_miss_count)||
+                   b_queue_current_starts!=720||
+                   b_queue_prefetch_starts!=3600||
+                   b_queue_handoffs!=3600||
+                   b_queue_bank0_starts!=2160||
+                   b_queue_bank1_starts!=2160||
                    ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
                     (MEMORY_READ_LATENCY==1)&&(total_cycles!=1809996))||
                    pixel_samples!=423936||pixel_mismatches!=0||
@@ -1310,6 +1354,11 @@ module tb_h262_live_raster_soak #(
                 (prediction.reference_cache.cache_miss_count!=32'd372696))||
                prediction.reference_cache.uncached_count!=0||
                (memory_reads!=prediction.reference_cache.cache_miss_count)||
+               b_queue_current_starts!=2256||
+               b_queue_prefetch_starts!=11280||
+               b_queue_handoffs!=11280||
+               b_queue_bank0_starts!=6768||
+               b_queue_bank1_starts!=6768||
                ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
                 (MEMORY_READ_LATENCY==1)&&(total_cycles!=9779996))||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||

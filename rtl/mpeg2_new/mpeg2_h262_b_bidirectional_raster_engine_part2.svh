@@ -63,26 +63,163 @@ wire [28:0] block_phase1_base_addr=pixel_addr(
     block_backward_src_y[11:0]);
 wire [6:0] block_row_words=(blk<4)?7'd90:7'd45;
 
+// Entry 272: the successor footprint is derived from the already loaded
+// macroblock motion record.  Only blk 0..4 use it; the blk-5 boundary keeps
+// the synchronous next-macroblock motion load as the serialization point.
+wire [2:0] successor_blk=blk+1'b1;
+wire successor_luma=(successor_blk<4);
+wire [11:0] successor_dest_x=successor_luma?
+    (({6'd0,col}<<4)+{8'd0,successor_blk[0],3'b000}):
+    ({6'd0,col}<<3);
+wire [11:0] successor_dest_y=successor_luma?
+    (({6'd0,mrow}<<4)+{8'd0,successor_blk[1],3'b000}):
+    ({6'd0,mrow}<<3);
+wire [11:0] successor_plane_width=successor_luma?
+    padded_luma_width:padded_chroma_width;
+wire [11:0] successor_plane_height=successor_luma?
+    padded_luma_height:padded_chroma_height;
+wire signed [7:0] successor_fmvx=successor_luma?
+    mb_fmvx:chroma_half_vector(mb_fmvx);
+wire signed [7:0] successor_fmvy=successor_luma?
+    mb_fmvy:chroma_half_vector(mb_fmvy);
+wire signed [7:0] successor_bmvx=successor_luma?
+    mb_bmvx:chroma_half_vector(mb_bmvx);
+wire signed [7:0] successor_bmvy=successor_luma?
+    mb_bmvy:chroma_half_vector(mb_bmvy);
+wire successor_phase0_backward=(exec_direction==2'd2);
+wire signed [7:0] successor_phase0_mvx=successor_phase0_backward?
+    successor_bmvx:successor_fmvx;
+wire signed [7:0] successor_phase0_mvy=successor_phase0_backward?
+    successor_bmvy:successor_fmvy;
+wire signed [13:0] successor_phase0_src_x=
+    $signed({1'b0,successor_dest_x})+
+    ($signed(successor_phase0_mvx)>>>1);
+wire signed [13:0] successor_phase0_src_y=
+    $signed({1'b0,successor_dest_y})+
+    ($signed(successor_phase0_mvy)>>>1);
+wire signed [13:0] successor_phase1_src_x=
+    $signed({1'b0,successor_dest_x})+
+    ($signed(successor_bmvx)>>>1);
+wire signed [13:0] successor_phase1_src_y=
+    $signed({1'b0,successor_dest_y})+
+    ($signed(successor_bmvy)>>>1);
+wire signed [13:0] successor_phase0_last_x=successor_phase0_src_x+
+    14'sd7+(successor_phase0_mvx[0]?14'sd1:14'sd0);
+wire signed [13:0] successor_phase0_last_y=successor_phase0_src_y+
+    14'sd7+(successor_phase0_mvy[0]?14'sd1:14'sd0);
+wire signed [13:0] successor_phase1_last_x=successor_phase1_src_x+
+    14'sd7+(successor_bmvx[0]?14'sd1:14'sd0);
+wire signed [13:0] successor_phase1_last_y=successor_phase1_src_y+
+    14'sd7+(successor_bmvy[0]?14'sd1:14'sd0);
+wire successor_phase0_bounds_ok=(successor_phase0_src_x>=0)&&
+    (successor_phase0_src_y>=0)&&
+    (successor_phase0_last_x<$signed({2'b00,successor_plane_width}))&&
+    (successor_phase0_last_y<$signed({2'b00,successor_plane_height}));
+wire successor_phase1_bounds_ok=(successor_phase1_src_x>=0)&&
+    (successor_phase1_src_y>=0)&&
+    (successor_phase1_last_x<$signed({2'b00,successor_plane_width}))&&
+    (successor_phase1_last_y<$signed({2'b00,successor_plane_height}));
+wire successor_all_bounds_ok=successor_phase0_bounds_ok&&
+    ((exec_direction!=2'd3)||successor_phase1_bounds_ok);
+wire [3:0] successor_phase0_word_span=
+    {1'b0,successor_phase0_src_x[2:0]}+4'd7+
+    {3'd0,successor_phase0_mvx[0]};
+wire [3:0] successor_phase1_word_span=
+    {1'b0,successor_phase1_src_x[2:0]}+4'd7+
+    {3'd0,successor_bmvx[0]};
+wire [28:0] successor_phase0_base_addr=pixel_addr(
+    successor_phase0_backward?future_off:past_off,successor_blk,
+    successor_phase0_src_x[11:0],successor_phase0_src_y[11:0]);
+wire [28:0] successor_phase1_base_addr=pixel_addr(
+    future_off,successor_blk,successor_phase1_src_x[11:0],
+    successor_phase1_src_y[11:0]);
+wire [6:0] successor_row_words=successor_luma?7'd90:7'd45;
+
+wire [28:0] launch_phase0_base_addr=block_fetch_start_prefetch?
+    successor_phase0_base_addr:block_phase0_base_addr;
+wire [28:0] launch_phase1_base_addr=block_fetch_start_prefetch?
+    successor_phase1_base_addr:block_phase1_base_addr;
+wire launch_phase0_two_words=block_fetch_start_prefetch?
+    successor_phase0_word_span[3]:block_phase0_word_span[3];
+wire launch_phase1_two_words=block_fetch_start_prefetch?
+    successor_phase1_word_span[3]:block_phase1_word_span[3];
+wire launch_phase0_half_y=block_fetch_start_prefetch?
+    successor_phase0_mvy[0]:block_phase0_half_y;
+wire launch_phase1_half_y=block_fetch_start_prefetch?
+    successor_bmvy[0]:exec_bmvy[0];
+wire [6:0] launch_row_words=block_fetch_start_prefetch?
+    successor_row_words:block_row_words;
+
 mpeg2_h262_prediction_block_fetcher block_fetcher(
-    .clk(clk),.reset(reset),.start(block_fetch_start),
+    .clk(clk),.reset(reset),
+    .start(block_fetch_start&&!block_fetch_start_bank),
     .phase_count((exec_direction==2'd3)?2'd2:2'd1),
-    .phase0_base_addr(block_phase0_base_addr),
-    .phase1_base_addr(block_phase1_base_addr),
-    .phase0_two_words(block_phase0_word_span[3]),
-    .phase1_two_words(block_phase1_word_span[3]),
-    .phase0_rows(4'd8+{3'd0,block_phase0_half_y}),
-    .phase1_rows(4'd8+{3'd0,exec_bmvy[0]}),
-    .row_words(block_row_words),.memory_busy(ddram_busy),
-    .memory_dout(ddram_dout),.memory_dout_ready(ddram_dout_ready),
-    .memory_addr(block_fetch_addr),.memory_rd(block_fetch_rd),
+    .phase0_base_addr(launch_phase0_base_addr),
+    .phase1_base_addr(launch_phase1_base_addr),
+    .phase0_two_words(launch_phase0_two_words),
+    .phase1_two_words(launch_phase1_two_words),
+    .phase0_rows(4'd8+{3'd0,launch_phase0_half_y}),
+    .phase1_rows(4'd8+{3'd0,launch_phase1_half_y}),
+    .row_words(launch_row_words),.memory_busy(ddram_busy),
+    .memory_dout(ddram_dout),
+    .memory_dout_ready(ddram_dout_ready&&block_fetch_active0),
+    .memory_addr(block_fetch_addr0),.memory_rd(block_fetch_rd0),
     .lookup_request(block_lookup_request),
     .lookup_phase(block_lookup_phase),.lookup_row(block_lookup_row),
     .lookup_column(block_lookup_column),
-    .lookup_ready(block_lookup_ready),.lookup_valid(block_lookup_valid),
-    .lookup_data(block_lookup_data),.active(block_fetch_active),
-    .complete(block_fetch_complete),.error(block_fetch_error),
-    .issued_count(block_fetch_issued),.returned_count(block_fetch_returned),
-    .outstanding_count(block_fetch_outstanding));
+    .lookup_ready(block_lookup_ready0),.lookup_valid(block_lookup_valid0),
+    .lookup_data(block_lookup_data0),.active(block_fetch_active0),
+    .complete(block_fetch_complete0),.error(block_fetch_error0),
+    .issued_count(block_fetch_issued0),
+    .returned_count(block_fetch_returned0),
+    .outstanding_count(block_fetch_outstanding0));
+
+mpeg2_h262_prediction_block_fetcher block_fetcher1(
+    .clk(clk),.reset(reset),
+    .start(block_fetch_start&&block_fetch_start_bank),
+    .phase_count((exec_direction==2'd3)?2'd2:2'd1),
+    .phase0_base_addr(launch_phase0_base_addr),
+    .phase1_base_addr(launch_phase1_base_addr),
+    .phase0_two_words(launch_phase0_two_words),
+    .phase1_two_words(launch_phase1_two_words),
+    .phase0_rows(4'd8+{3'd0,launch_phase0_half_y}),
+    .phase1_rows(4'd8+{3'd0,launch_phase1_half_y}),
+    .row_words(launch_row_words),.memory_busy(ddram_busy),
+    .memory_dout(ddram_dout),
+    .memory_dout_ready(ddram_dout_ready&&block_fetch_active1),
+    .memory_addr(block_fetch_addr1),.memory_rd(block_fetch_rd1),
+    .lookup_request(block_lookup_request),
+    .lookup_phase(block_lookup_phase),.lookup_row(block_lookup_row),
+    .lookup_column(block_lookup_column),
+    .lookup_ready(block_lookup_ready1),.lookup_valid(block_lookup_valid1),
+    .lookup_data(block_lookup_data1),.active(block_fetch_active1),
+    .complete(block_fetch_complete1),.error(block_fetch_error1),
+    .issued_count(block_fetch_issued1),
+    .returned_count(block_fetch_returned1),
+    .outstanding_count(block_fetch_outstanding1));
+
+assign block_lookup_ready=block_consumer_bank?
+    block_lookup_ready1:block_lookup_ready0;
+assign block_lookup_valid=block_consumer_bank?
+    block_lookup_valid1:block_lookup_valid0;
+assign block_lookup_data=block_consumer_bank?
+    block_lookup_data1:block_lookup_data0;
+assign block_fetch_active=block_fetch_active0||block_fetch_active1;
+assign block_fetch_complete=block_consumer_bank?
+    block_fetch_complete1:block_fetch_complete0;
+assign block_fetch_error=block_fetch_error0||block_fetch_error1||
+    (block_fetch_rd0&&block_fetch_rd1);
+assign block_fetch_addr=block_fetch_rd1?block_fetch_addr1:block_fetch_addr0;
+assign block_fetch_rd=block_fetch_rd0||block_fetch_rd1;
+assign block_fetch_issued=block_fetch_active1?block_fetch_issued1:
+    block_fetch_active0?block_fetch_issued0:
+    block_consumer_bank?block_fetch_issued1:block_fetch_issued0;
+assign block_fetch_returned=block_fetch_active1?block_fetch_returned1:
+    block_fetch_active0?block_fetch_returned0:
+    block_consumer_bank?block_fetch_returned1:block_fetch_returned0;
+assign block_fetch_outstanding=block_fetch_active1?block_fetch_outstanding1:
+    block_fetch_active0?block_fetch_outstanding0:
+    block_consumer_bank?block_fetch_outstanding1:block_fetch_outstanding0;
 
 // Entry 239: complete backward/current and following-pixel word addresses stay
 // registered ahead of the cache. A fast final response advances these
@@ -380,7 +517,11 @@ always @(posedge clk) begin
         mbi<=0;col<=0;mrow<=0;blk<=0;timeout<=0;emit<=0;wait_store<=0;pixel_setup<=0;residual_load<=0;residual_load_wait<=0;ei<=0;
         pred_direction<=0;tap_index<=0;pred_sum<=0;forward_prediction<=0;out_reg<=0;tap_byte_sel<=0;
         emit_advanced<=0;emit_x<=0;emit_y<=0;emit_block_start<=0;emit_block_complete<=0;
-        block_fetch_start<=0;block_phase0_base_byte<=0;
+        block_fetch_start<=0;block_fetch_start_bank<=0;
+        block_fetch_start_prefetch<=0;block_consumer_bank<=0;
+        block_prefetch_valid<=0;block_current_prefetched<=0;
+        block_current_started<=0;
+        block_phase0_base_byte<=0;
         block_phase1_base_byte<=0;
         read_seen<=0;sample_nonzero<=0;half_sample_seen<=0;reconstructed_seen<=0;persisted_seen<=0;row_persisted<=0;error<=0;error_source<=0;
         row_final_latched<=0;

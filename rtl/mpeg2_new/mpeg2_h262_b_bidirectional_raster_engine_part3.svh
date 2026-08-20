@@ -33,6 +33,8 @@
                 (bank_row[execute_bank]+1'b1==mb_height);
             pred_direction<=0;motion_load<=1;pixel_setup<=0;
             residual_load<=0;residual_load_wait<=0;persisted_seen<=0;
+            block_prefetch_valid<=0;block_current_prefetched<=0;
+            block_current_started<=0;
             if(!reference_valid||!geometry_ok||(motion_count==0))begin error<=1;if(!error)error_source<=5'd8;active<=0;persisted_seen<=1;timeout<=0;motion_load<=0;end
         end
 
@@ -71,10 +73,30 @@
             phase_row_words<=(blk<4)?7'd90:7'd45;
             phase_bounds_ok<=source_bounds_ok;
             if((exec_direction!=0)&&block_all_bounds_ok)begin
-                block_fetch_start<=1;
+                if(block_current_prefetched)
+                    block_current_prefetched<=0;
+                else begin
+                    block_fetch_start<=1;
+                    block_fetch_start_bank<=block_consumer_bank;
+                    block_fetch_start_prefetch<=0;
+                    block_current_started<=1;
+                end
                 block_phase0_base_byte<=block_phase0_src_x[2:0];
                 block_phase1_base_byte<=block_backward_src_x[2:0];
             end
+        end
+
+        // Once the current footprint is complete, the shared request port is
+        // idle and the released alternate bank may produce exactly one
+        // successor footprint while reconstruction consumes retained words.
+        if(!residual_load_wait&&!block_fetch_start&&block_current_started&&
+           !block_current_prefetched&&(exec_direction!=0)&&(blk<5)&&
+           block_fetch_complete&&!block_prefetch_valid&&
+           successor_all_bounds_ok)begin
+            block_fetch_start<=1;
+            block_fetch_start_bank<=~block_consumer_bank;
+            block_fetch_start_prefetch<=1;
+            block_prefetch_valid<=1;
         end
 
         if(pixel_setup||precompute_after_advance) begin
@@ -217,8 +239,24 @@
                 end else begin
                     mbi<=mbi+1'b1;col<=col+1'b1;
                     blk<=0;ei<=0;pred_direction<=0;motion_load<=1;
+                    block_prefetch_valid<=0;
+                    block_current_prefetched<=0;
+                    block_current_started<=0;
                 end
-            end else begin blk<=blk+1'b1;ei<=0;pred_direction<=0;residual_load<=1;end
+            end else begin
+                if(block_prefetch_valid)begin
+                    block_consumer_bank<=~block_consumer_bank;
+                    block_current_prefetched<=1;
+                    block_prefetch_valid<=0;
+                    block_current_started<=1;
+                    block_phase0_base_byte<=successor_phase0_src_x[2:0];
+                    block_phase1_base_byte<=successor_phase1_src_x[2:0];
+                end else begin
+                    block_current_prefetched<=0;
+                    block_current_started<=0;
+                end
+                blk<=blk+1'b1;ei<=0;pred_direction<=0;residual_load<=1;
+            end
         end
     end
 end
