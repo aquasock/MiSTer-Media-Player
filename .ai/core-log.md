@@ -1248,9 +1248,11 @@ Recalibrate the proven prediction-request queue against measured MiSTer DDR resp
 
 Entry 260 is timing-clean and exact on both hardware streams, but removing 8.12 percent of mixed and 8.77 percent of long isolated simulation cycles improves MiSTer cadence by only 1.84 and 1.03 percent. Its telemetry records 8,941,202 mixed and 27,723,374 long cycles with at least one prediction response outstanding, while 69,556 and 372,696 physical prediction reads imply roughly 129 and 74 outstanding cycles per read. Commit `3dc020b` replaces the simulation delay shifter with an exact circular response queue supporting up to 256 cycles and raises the already-proven block-fetcher, cache and arbiter production depth from two to four. At the calibrated 128-cycle mixed latency, depth four reduces the complete trace from 5,869,996 to 3,729,996 cycles, 36.46 percent, while preserving all 423,936 pixels with maximum delta two, 69,556 reads, 23 swaps and zero errors. At the calibrated 74-cycle long latency it reduces the complete trace from 21,539,996 to 15,039,996 cycles, 30.18 percent, while preserving 372,696 reads, all writes, 25 publications, 71 swaps and zero errors. Default one-cycle mixed and long boundaries remain exact at 1,809,996 and 9,719,996 cycles, and focused fetcher, cache and arbiter regressions pass depth-four fill/drain, response order, backpressure, display priority, same-cycle full-queue replacement, direct response and writer exclusion.
 
+The fully clean seed-six Quartus 17.0.2 build completes in 10 minutes 8 seconds with zero errors, 143 standing warnings, no Critical Warning and no combinational loop. Timing is positive at +0.410 ns global setup, +1.524 ns decoder setup, +7.062 ns video setup, +0.249 ns hold, +3.082 ns global recovery, +15.519 ns decoder recovery and +0.685 ns removal. The fit uses 30,981 ALMs, 45,493 registers, 4,027,379 memory bits, 504 RAM blocks and 65 DSP blocks. `MediaPlayer_commit261_3dc020b.rbf` is 4,314,724 bytes with SHA-256 `2c4a6436f13d601659a0166e532ab82948e3862cc5b16900b53f21e57b1efe64`; the standard MiSTer upload and FTP readback match byte-for-byte.
+
 #### Next Steps:
 
-Run a fully clean seed-six Quartus build from `3dc020b` and require positive global and decoder timing with no combinational loop. If it closes, preserve the named RBF, upload and verify it byte-for-byte, then require exact long and mixed MiSTer telemetry before accepting the hardware-scaled queue gain and selecting any remaining work toward stable 25 fps.
+Acquire exact long and mixed MiSTer cadence telemetry from the deployed `3dc020b` RBF. Accept it only if every byte and expected picture completes with zero decoder and destination errors and the measured gain materially agrees with the calibrated depth-four response-overlap model; otherwise retain Entry 260 and attribute the discrepancy before another production change.
 
 #### Files Modified:
 
@@ -1264,7 +1266,7 @@ Run a fully clean seed-six Quartus build from `3dc020b` and require positive glo
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
