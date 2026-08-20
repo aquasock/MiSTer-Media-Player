@@ -1,5 +1,39 @@
 ---
-## 249 COMMIT Unreleased ??? 2026-08-20T02:20:30-07:00
+## 250 COMMIT Unreleased ??? 2026-08-20T02:22:32-07:00
+
+#### Coming From:
+
+Unreleased 25d7b50
+
+#### Purpose:
+
+Hide physical prediction-read latency by issuing one exact following prediction address while the current ordered DDR response remains outstanding.
+
+#### Outcome:
+
+Entries 246, 248 and 249 rule out adjacent read-ahead, static cache partitioning and second-stage victim capacity on the exact mixed trace. The local MiSTer DDR bridge documents and implements the missing capability directly: accepted reads need not wait for a prior response, and `DDRAM_DOUT_READY` returns their data later in request order. The active H.262 arbiter nevertheless holds every client busy until the current response returns, while the P and B engines already register exact following-tap and following-pixel addresses ahead of that boundary. Entry 247 hardware spends 63,001,860 long and 20,141,742 mixed cycles in physical prediction request acceptance plus response wait, nearly the complete remaining 66,188,405-cycle long gap to 25 fps. The proposed experiment will permit at most two ordered prediction reads, issue only a registered exact successor address, retain response order explicitly, and keep display-reader priority, reconstruction-write exclusion, cache invalidation, decoded arithmetic and presentation ownership unchanged.
+
+#### Next Steps:
+
+First extend the DDR/cache focused model with a ten-cycle ordered response service and compare one-outstanding against a depth-two exact-successor queue, including backpressure, same-cycle acceptance/return, cache hits that cancel a successor, and display-reader arbitration. Proceed only if the model hides substantial response occupancy without changing request addresses or returned-word association. Then expose the already-registered P/B successor address through the shared cache, add a two-entry ordered response descriptor queue, rerun exact pixels/order/traffic/reload regressions, and require positive clean timing plus zero-error MiSTer cadence improvement on both streams; any ambiguous response ownership or stale successor invalidates the candidate.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- tools/streams/tb_h262_prediction_word_cache.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+## 249 COMMIT Unreleased 25d7b50 2026-08-20T02:20:30-07:00
 
 #### Coming From:
 
@@ -11,21 +45,19 @@ Recover prediction conflict misses through a second-stage victim cache without l
 
 #### Outcome:
 
-Entry 248 proves that statically partitioning the primary cache is ineffective, while historical Entry 234 evidence shows that a flat eight-entry fully associative cache could remove 91,615 of 463,835 long-soak misses but failed timing when all eight comparisons drove the first registered result. A timing-safe alternative is an exclusive victim stage: retain the current four-entry fully associative primary cache and its exact one-cycle response, then, only after a primary miss, compare four victim tags selected by the reference-bank bit. A victim hit costs one additional registered cycle but avoids the roughly ten-cycle physical DDR response; a full miss pays that one-cycle probe and preserves the existing one-outstanding transaction. Four victim words per reference bank provide twelve total resident words while no live stage contains more than four tag comparisons.
+Commit `25d7b50` adds a simulation-only exclusive-cache model with the accepted four-entry fully associative primary and four victim entries per reference bank. It models deterministic promotion, primary eviction, victim replacement, active invalidation and the extra probe cycle without feeding live RTL. The exact mixed oracle remains fully passing at 423,936 samples, zero mismatches, maximum delta two, 499,551/71,329/0 physical cache accounting, 23 swaps and 2,279,996 cycles. Across 561,243 lookups, the model produces 490,752 primary hits, only 863 victim hits and 69,628 full misses, so the second stage probes 70,491 times to avoid only 863 DDR transactions. Charging one cycle per primary miss costs about 70,000 cycles while even an optimistic ten-cycle hardware response credit saves fewer than 9,000 cycles. The victim design is therefore a clear mixed-stream slowdown and is rejected before functional RTL, long simulation or Quartus build.
 
 #### Next Steps:
 
-First add a simulation-only exclusive primary/victim model to the exact mixed and long traces, including promotion, eviction, per-bank replacement, victim hits, full misses and the added probe-cycle cost. Proceed to functional RTL only if the net modeled cycle saving remains material after charging every primary miss for the second stage. If justified, extend the focused cache test for primary hit, victim promotion, full miss, response timing and active invalidation, then require exact pixel/order/traffic regressions, positive clean timing and repeatable zero-error MiSTer FPS improvement; otherwise retain `66e769f` and move to request-latency overlap rather than cache capacity.
+Retain the timing-qualified Entry 247 cache and scheduler. Continue with Entry 250's proposal-first depth-two ordered request experiment, using the MiSTer interface's explicit pipelined-read contract to hide latency rather than trying to reduce a locality stream that three independent models show is not cache-capacity limited.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
-- tools/streams/tb_h262_prediction_word_cache.sv
 - tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
@@ -1243,38 +1275,6 @@ Add a full-stream live-raster soak boundary or equivalent settled counters that 
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 221 COMMIT Unreleased 7f92945 2026-08-18T11:36:01-07:00
-
-#### Coming From:
-
-Unreleased daf7af2
-
-#### Purpose:
-
-Require real P/B raster persistence and final temporal-reference presentation across the complete long-GOP stream.
-
-#### Outcome:
-
-Commit `7f92945` adds a deterministic 128x96, 72-picture live-raster soak that drives the compiled front end, P/B reference pipeline, active tagged DDR writer and arbiter, modeled DDR memory, real persistence acknowledgements, publication shell, and presentation scheduler. The first failing run proved that B scratch-bank-one pixels were written at the correct address but verified from scratch bank zero because `block_addr` depended implicitly on mutable outer state; passing the latched bank explicitly fixed the readback failure. The completed run then exposed twenty-one duplicate P publications because returning from each B transaction re-exported the preceding P engine's sticky persistence level; edge-qualifying each selected engine's persistence export fixed the duplicate ownership transition. The final soak passes all 72 pictures with 22 P pictures and 132 P rows, 47 B pictures and 282 B rows, 25 reference publications, both B scratch banks written, final display identity 25 corresponding to source frame 71, final in-GOP P temporal reference 23, and zero parser, prediction, writer, or presentation errors. The 720x480 long-GOP publication regression independently passes 22 P, 47 B, 25 publications, final identity 25, and zero overwrites; the B residual, B presentation, and fatal-drain transport regressions also pass. The clean Quartus 17.0.2 build completes in 9 minutes 24 seconds with 0 errors, 121 standing warnings, no critical warnings, global setup/hold slack +0.297/+0.247 ns, focused decoder/video setup slack +2.016/+7.937 ns, 29,435 ALMs, 42,082 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. `MediaPlayer_commit221_7f92945.rbf` is 4,242,164 bytes with SHA-256 `5a77bf4ee8ae9c286d9d274188731dc8932ae3383336c26495e2581c6564cc65`; its MiSTer FTP readback is byte-identical.
-
-#### Next Steps:
-
-Reload `test_compat_long_gop.m2v` with the deployed RBF and confirm that loading retires without a crash, the LEDs retain the passing USER-solid, POWER-solid, DISK-off pattern, and the settled image advances beyond frame 50 to source frame 71 at timestamp `00:00:02.840`. Then reload `test_compat_mixed_macroblocks.m2v` and report whether its loading jitter and transient feature flicker are reduced without changing the passing LED pattern.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- tools/streams/generate_test_live_raster_soak.py
-- tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
