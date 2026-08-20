@@ -649,34 +649,35 @@ Retain the timing-clean paired lookup because hardware confirms that it removes 
 - [x] Passed
 
 ---
-## 234 COMMIT Unreleased c340da8 2026-08-19T03:57:29-07:00
+## 274 COMMIT Unreleased ??? 2026-08-20T12:28:01-07:00
 
 #### Coming From:
 
-Unreleased 4e6130c
+Unreleased 22e54d9
 
 #### Purpose:
 
-Stream each completed inverse-quantised coefficient directly into IDCT capture to remove the serialized 64-cycle coefficient replay from every transformed P/B block.
+Prefetch B-picture block zero of the next macroblock while block five of the current macroblock reconstructs.
 
 #### Outcome:
 
-Entry 233 is hardware accepted: the 60 fps recordings show every long-GOP source frame from 0 through 71 and every mixed-macroblock frame from 0 through 23 in monotonic order without partial-block corruption, with the expected passing LEDs. Frame-zero-to-final intervals fall from 7.111 to 5.986 seconds for long GOP and from 2.459 to 2.144 seconds for mixed macroblocks, reductions of 15.8 and 12.8 percent. Profiling the exact soak attributes 15,472,059 input-blocked cycles to the decoder and identifies a duplicate 64-cycle coefficient replay in every transformed block. Commit `c340da8` drives IDCT start, coefficient, and end capture directly from inverse-quantisation completion, removes the private 64-coefficient replay array, and preserves scan order, mismatch control, quantisation, IDCT arithmetic, and the existing shared multiplier and IDCT resources. Exact P-intra, B-residual, and B-intra regressions preserve every event, sample, write, and reconstructed value in 2,301,108, 3,902,749, and 2,306,500 cycles, exactly 64 cycles faster per transformed block. The 72-picture live soak retains all 291,641 bytes, 22 P pictures, 47 B pictures, 71 swaps, final identity 25, 463,835 physical DDR reads, cache counts 2,267,813/463,835/0, and zero errors in 15,739,996 cycles, a 940,000-cycle or 5.64 percent reduction. The eight-refill parser-window test and complete 791,528-byte long-GOP publication regression pass unchanged. The session-authorized incremental Quartus build completes in 9 minutes 5 seconds with zero errors, +0.433 ns global setup, +0.250 ns global hold, +0.687 ns decoder setup, +15.505 ns decoder recovery, and +7.357 ns video setup. The fit uses 29,203 ALMs, 40,967 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. Qualified artifact `MediaPlayer_commit234_c340da8.rbf` is 4,261,000 bytes with SHA-256 `af041d0ca68a9540dee1d8f05f1c7335bf42c5353940d47cb2a2304bd05ec5f5`; the uploaded MiSTer readback matches byte-for-byte.
+Proposal only. Entry 272 overlaps five of the six block transitions in each B macroblock, but deliberately leaves block five to the following block zero serialized because the next motion record is held in synchronous M10K memory. Entry 273 then confirms that 187,231 fewer mixed and 450,189 fewer long B-stall cycles are hidden by frame ownership rather than lost. This boundary will use the existing single motion-memory read port to capture the next record into a dedicated staging register only after the current macroblock's block-five motion has been secured. That staged record will derive the following macroblock's block-zero footprint and may launch the alternate fetch bank during current block-five reconstruction. Row boundaries, the last macroblock, capture ownership, the one-active-producer rule, the retained-word consumer handoff and MPEG-2 motion normalization remain unchanged.
 
 #### Next Steps:
 
-Reload the deployed core and record `test_compat_long_gop.m2v` at 60 fps from the first fully visible frame 0 through settled frame 71, reporting the elapsed interval and USER, POWER, and DISK state. Then record `test_compat_mixed_macroblocks.m2v` through settled frame 23 and report the same LEDs; hardware acceptance requires sequential coherent presentation without renewed partial-block flicker and should measure how closely the 5.64 percent modeled transform reduction carries into the remaining hardware bottleneck.
+Add explicit next-motion valid and identity state, prove that current block five still uses the current motion record, and permit the existing successor launch and bank handoff at block five only when the staged next record is valid and remains in the same row. Instrument internal versus cross-macroblock prefetch and handoff counts, require exact focused prediction, residual and intra stores, mixed pixels, long display order, physical reads and bank ownership, then perform a fully clean timing-qualified hardware build only if complete simulation shows a material reduction.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
-- tools/streams/tb_h262_p_intra_macroblocks.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
 - tools/streams/tb_h262_b_residual_streaming.sv
 - tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [x] Built
+- [ ] Built
 - [ ] Passed
 
 ---
