@@ -25,7 +25,7 @@ module tb_h262_live_raster_soak #(
     reg [7:0] stream_mem[0:MAX_STREAM_BYTES-1];
     reg [7:0] pixel_oracle[0:442367];
     reg [63:0] ddr_mem[0:DDR_WORDS-1];
-    reg [1023:0] hex_path,pixel_path,prediction_trace_path;
+    reg [1023:0] hex_path,pixel_path,prediction_trace_path,row_trace_path;
     integer stream_len,stream_index=0,quiet_cycles=0;
     integer i,p_rows=0,b_rows=0,p_pictures=0,b_pictures=0;
     integer published_references=0,display_swaps=0;
@@ -33,6 +33,8 @@ module tb_h262_live_raster_soak #(
     integer memory_reads=0,total_cycles=0;
     integer prediction_no_progress_cycles=0;
     integer prediction_trace_fd=0;
+    integer row_trace_fd=0,row_trace_cycle=0;
+    reg p_row_waiting_d=0,b_row_waiting_d=0;
     integer prediction_trace_demands=0,prediction_trace_hits=0;
     integer prediction_trace_misses=0,prediction_trace_block_starts=0;
     integer prediction_trace_block_ends=0;
@@ -356,6 +358,13 @@ module tb_h262_live_raster_soak #(
             $fdisplay(prediction_trace_fd,
                 "cycle,event,engine,temporal_reference,mbi,blk,ei,tap,direction,address");
         end
+        if($value$plusargs("ROW_TRACE=%s",row_trace_path))begin
+            row_trace_fd=$fopen(row_trace_path,"w");
+            if(row_trace_fd==0)
+                $fatal(1,"cannot open row trace");
+            $fdisplay(row_trace_fd,
+                "cycle,engine,event,temporal_reference");
+        end
         if(MIXED_PIXEL_MODE)begin
             if(!$value$plusargs("PIXELS=%s",pixel_path))
                 $fatal(1,"missing +PIXELS");
@@ -366,6 +375,41 @@ module tb_h262_live_raster_soak #(
         $readmemh(hex_path,stream_mem,0,stream_len-1);
         repeat(5)@(posedge clk);
         reset<=0;
+    end
+
+    // Entry 263: expose only row-buffer ownership boundaries.  READY marks
+    // the instant parsing/transform production has filled the current row;
+    // RETIRE marks reconstruction and persistence releasing that row.  The
+    // sidecar analyzer can replay these intervals through a two-bank schedule
+    // without changing functional timing or adding production logic.
+    always @(posedge clk) begin
+        if(reset)begin
+            row_trace_cycle<=0;
+            p_row_waiting_d<=0;
+            b_row_waiting_d<=0;
+        end else begin
+            row_trace_cycle<=row_trace_cycle+1;
+            if(row_trace_fd!=0)begin
+                if(publication.p_controller.wide_general_probe.row_waiting&&
+                   !p_row_waiting_d)
+                    $fdisplay(row_trace_fd,"%0d,P,READY,%0d",
+                        row_trace_cycle,temporal_reference);
+                if(publication.p_controller.wide_general_probe.row_retired&&
+                   publication.p_controller.wide_general_probe.row_waiting)
+                    $fdisplay(row_trace_fd,"%0d,P,RETIRE,%0d",
+                        row_trace_cycle,temporal_reference);
+                if(publication.b_controller.row_waiting&&!b_row_waiting_d)
+                    $fdisplay(row_trace_fd,"%0d,B,READY,%0d",
+                        row_trace_cycle,temporal_reference);
+                if(publication.b_controller.row_retired&&
+                   publication.b_controller.row_waiting)
+                    $fdisplay(row_trace_fd,"%0d,B,RETIRE,%0d",
+                        row_trace_cycle,temporal_reference);
+            end
+            p_row_waiting_d<=
+                publication.p_controller.wide_general_probe.row_waiting;
+            b_row_waiting_d<=publication.b_controller.row_waiting;
+        end
     end
 
     always @(negedge clk) begin
