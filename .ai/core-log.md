@@ -1,5 +1,5 @@
 ---
-## 255 COMMIT Unreleased ??? 2026-08-20T04:40:42-07:00
+## 255 COMMIT Unreleased 0f5baad 2026-08-20T04:40:42-07:00
 
 #### Coming From:
 
@@ -11,11 +11,11 @@ Permit two ordered prediction reads to remain outstanding through the shared cac
 
 #### Outcome:
 
-Entries 252 through 254 prove that both live prediction engines produce bounded block-footprint commands and preserve exact reconstruction while the current cache and arbiter serialize them. Each fetcher already contains a proven two-entry response-slot FIFO, so this boundary will extend only the intervening request path: the cache may accept a second ordered miss while the first response is pending, and the arbiter will retain two ordered command descriptors containing response owner and remaining burst words. Cache hits remain immediate only when no older response precedes them; otherwise the request is safely issued as an ordered miss.
+Commit `0f5baad` extends only the intervening cache and shared DDR boundary to two ordered read descriptors while retaining display priority, burst ownership and writer-region exclusion. Focused RTL proves back-to-back misses, command backpressure, prediction/display/prediction response order, a three-word display burst, full-queue response/accept reuse and legal direct response. The exact mixed boundary passes all 423,936 samples with zero mismatches, maximum delta two, 23 swaps and zero errors at 1,969,996 one-cycle and 2,069,996 ten-cycle cycles. The complete long boundary passes all 22 P and 47 B pictures, 71 swaps and zero errors at 10,719,996 and 11,619,996 cycles. Against Entry 254's identical ten-cycle runs, 2,379,996 mixed and 13,449,996 long, this is a 13.03 and 13.61 percent reduction; the 82,806-row mixed request trace also balances exactly. Potential hits behind an older response intentionally become ordered misses, changing physical reads only from 69,528 to 69,556 mixed and 372,648 to 372,696 long. No pixel, response-association, ownership, burst or shutdown regression remains.
 
 #### Next Steps:
 
-Add focused cache and arbiter regressions for back-to-back prediction commands, display-before-prediction priority, prediction/display/prediction response order, multiword display bursts, command backpressure, simultaneous response and next acceptance and legal same-cycle response. Then run exact mixed pixels and complete long order at one- and ten-cycle service, require two-outstanding occupancy with no changed pixels or response association, and proceed to Quartus only if the complete-stream cycle reduction is substantial.
+Run a clean Quartus build from `0f5baad`, require timing closure, deploy the resulting RBF and capture the same hardware cadence/stall telemetry. If hardware confirms the simulated overlap, retain this boundary and use the remaining mixed-stream gap to choose the next bounded concurrency step; HDMI recordings remain final visual verification after measured cadence reaches 25 FPS.
 
 #### Files Modified:
 
@@ -27,7 +27,7 @@ Add focused cache and arbiter regressions for back-to-back prediction commands, 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
