@@ -161,7 +161,9 @@ module tb_h262_b_residual_streaming #(
                // Entry 254 retains each predicted block footprint, so the
                // former upstream cold/hit modes converge while authored
                // residual and intra samples remain exact.
-               (!intra_mode&&(total_cycles!=1384609))||
+               // Entry 264 overlaps following-row production with current-row
+               // raster persistence through two logical metadata banks.
+               (!intra_mode&&(total_cycles!=1341421))||
                (intra_mode&&(total_cycles>=3903000)))
                 $fatal(1,"B residual streaming regression failed");
             $finish;

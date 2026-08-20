@@ -76,6 +76,7 @@ localparam [3:0]
     R_TWRITE=4,R_COEFF_WAIT=5,R_TEND=6,R_TWAIT=7,
     R_DESC=8,R_SAMPLE=9,R_FINISH=10;
 reg [3:0] rstate;
+wire producer_row_done=replay_active&&(rstate==R_FINISH);
 
 // kate - Commit 173: next uncovered column in the current row across
 // same-vertical-position slices. It is reset only when restricted coverage
@@ -100,7 +101,9 @@ always @(posedge clk) begin
         b_forward_f_code_horizontal<=0;b_forward_f_code_vertical<=0;
         b_backward_f_code_horizontal<=0;b_backward_f_code_vertical<=0;
         parse_hold<=0;parser_error<=0;replay_error<=0;prior_error<=0;slice_capture<=0;slice_parser_started<=0;chunk_boundary_known<=0;slice_row_number<=0;row_byte_count<=0;row_base_index<=0;row_covered_count<=0;
-        parse_active<=0;proof_done<=0;boundary_final<=0;row_waiting<=0;replay_row_final<=0;parse_byte_limit<=0;parse_byte_index<=0;parse_bit_index<=7;
+        parse_active<=0;proof_done<=0;boundary_final<=0;row_waiting<=0;replay_row_final<=0;
+        outstanding_rows<=0;final_row_queued<=0;producer_rearm_pending<=0;
+        parse_byte_limit<=0;parse_byte_index<=0;parse_bit_index<=7;
         state<=S_QSCALE;field_bit_count<=0;qscale_shift<=0;current_qscale<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;skip_remaining<=0;geometry_sent<=0;
         mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;mba_symbol_escape_q<=0;mba_symbol_value_q<=0;mbtype_bits<=0;mbtype_len<=0;current_direction<=0;last_direction<=0;current_pattern<=0;current_intra<=0;current_quant<=0;
         fpx<=0;fpy<=0;bpx<=0;bpy<=0;cur_fx<=0;cur_fy<=0;cur_bx<=0;cur_by<=0;
@@ -116,17 +119,33 @@ always @(posedge clk) begin
     end else begin
         b_complete_now<=0;sideband_valid<=0;first_sample_valid<=0;t_start<=0;t_we<=0;t_end<=0;
         if(t_error)replay_error<=1;
+        if(producer_rearm_pending)begin
+            producer_rearm_pending<=0;
+            residual_count<=0;residual_coeff_count<=0;
+        end
 
-        if(row_waiting&&row_retired) begin
-            row_waiting<=0;parse_hold<=0;residual_count<=0;residual_coeff_count<=0;
+        // Entry 264: the producer and raster consumer share two logical row
+        // banks.  A completed transform row consumes one credit; persistence
+        // returns one.  Parsing can therefore advance immediately while one
+        // older row reconstructs, and stalls only when both banks are full.
+        case({producer_row_done,row_retired})
+        2'b10:outstanding_rows<=outstanding_rows+1'b1;
+        2'b01:outstanding_rows<=outstanding_rows-1'b1;
+        default:outstanding_rows<=outstanding_rows;
+        endcase
+
+        if(row_retired&&final_row_queued&&(outstanding_rows==1)&&
+           !producer_row_done) begin
+            row_waiting<=0;parse_hold<=0;final_row_queued<=0;
+            b_seen<=1;b_complete_now<=1;proof_done<=1;
+        end else if(row_waiting&&row_retired&&!producer_row_done&&
+                    !final_row_queued) begin
+            row_waiting<=0;parse_hold<=0;
+            residual_count<=0;residual_coeff_count<=0;
             row_byte_count<=0;row_covered_count<=0;
-            if(replay_row_final) begin
-                b_seen<=1;b_complete_now<=1;proof_done<=1;
-            end else begin
-                slice_row_number<=slice_row_number+1'b1;
-                row_base_index<=row_base_index+{5'd0,picture_mb_width};
-                slice_capture<=1;
-            end
+            slice_row_number<=slice_row_number+1'b1;
+            row_base_index<=row_base_index+{5'd0,picture_mb_width};
+            slice_capture<=1;
         end
 
         if(parse_active) begin

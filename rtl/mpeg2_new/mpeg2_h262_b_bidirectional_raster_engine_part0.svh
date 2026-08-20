@@ -79,6 +79,7 @@ localparam [28:0]
     BANK_OFF    = 29'h00010000;
 localparam integer MAX_MB=1350;
 localparam integer MAX_BLOCKS=2048;
+localparam integer MAX_BANK_BLOCKS=1024;
 
 // Captured before any scratch address is issued.  Declare it ahead of the
 // address helpers so both simulation and Quartus resolve the selected bank

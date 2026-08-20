@@ -62,15 +62,28 @@ wire signed [7:0] mb_bmvy=$signed(motion_word[7:0]);
 // Commit 203: descriptors use synchronous M10K storage while P and B share
 // the 2048-block sparse spatial-sample RAM in their parent wrapper.
 (* ramstyle = "M10K" *) reg [13:0] desc_mem [0:2047];
-reg [13:0] desc_word,last_desc_word;
-reg [11:0] desc_count;
-reg [10:0] current_desc_slot;
+reg [13:0] desc_word;
+reg [10:0] bank_desc_count [0:1];
+reg [13:0] bank_last_desc_word [0:1];
+reg [10:0] bank_motion_base [0:1];
+reg [10:0] bank_motion_end [0:1];
+reg [5:0] bank_row [0:1];
+reg [1:0] bank_ready;
+reg capture_bank,execute_bank;
+wire [10:0] capture_desc_count=bank_desc_count[capture_bank];
+wire [13:0] capture_last_desc_word=bank_last_desc_word[capture_bank];
+wire [10:0] capture_motion_base=bank_motion_base[capture_bank];
+wire [5:0] capture_row=bank_row[capture_bank];
+wire execute_ready=bank_ready[execute_bank];
+// Preserve the established internal proof name used by focused regressions;
+// it now means that the oldest execution bank contains a complete row.
+wire metadata_done=execute_ready;
+reg [9:0] current_desc_slot;
 reg desc_active;
 reg [5:0] sample_expected;
-reg metadata_done;
-reg [10:0] exec_desc_slot;
-reg [10:0] row_motion_base,row_motion_end;
-reg [5:0] exec_row;
+reg [9:0] exec_desc_slot;
+reg [10:0] exec_desc_count_latched;
+reg [10:0] exec_motion_end;
 reg row_final_latched;
 
 reg pending,started;

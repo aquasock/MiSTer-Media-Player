@@ -1,23 +1,38 @@
                 else begin
-                    current_desc_slot<=desc_count[10:0];
-                    desc_mem[desc_count[10:0]]<=sideband_value[13:0];
-                    last_desc_word<=sideband_value[13:0];
-                    desc_count<=desc_count+1'b1;desc_active<=1;sample_expected<=0;
+                    current_desc_slot<=capture_desc_count[9:0];
+                    desc_mem[{capture_bank,capture_desc_count[9:0]}]<=sideband_value[13:0];
+                    bank_last_desc_word[capture_bank]<=sideband_value[13:0];
+                    bank_desc_count[capture_bank]<=capture_desc_count+1'b1;
+                    desc_active<=1;sample_expected<=0;
                 end
             end else if((sideband_index==6'h3f)&&
                         ((sideband_value==16'shA3FE)||(sideband_value==16'shA3FF))) begin
-                if((motion_count==row_motion_base)||motion_first_pending||metadata_done||!geometry_seen||
-                   (motion_count!=(row_motion_base+{5'd0,mb_width}))||
-                   ((sideband_value==16'shA3FF)&&(exec_row+1'b1!=mb_height))||
-                   ((sideband_value==16'shA3FE)&&(exec_row+1'b1>=mb_height)))begin error<=1;if(!error)error_source<=5'd6;end
-                else begin metadata_done<=1;row_motion_end<=motion_count;row_final_latched<=(sideband_value==16'shA3FF);end
+                if((motion_count==capture_motion_base)||motion_first_pending||
+                   bank_ready[capture_bank]||!geometry_seen||
+                   (motion_count!=(capture_motion_base+{5'd0,mb_width}))||
+                   ((sideband_value==16'shA3FF)&&(capture_row+1'b1!=mb_height))||
+                   ((sideband_value==16'shA3FE)&&(capture_row+1'b1>=mb_height)))begin error<=1;if(!error)error_source<=5'd6;end
+                else begin
+                    bank_ready[capture_bank]<=1'b1;
+                    bank_motion_end[capture_bank]<=motion_count;
+                    bank_motion_base[~capture_bank]<=motion_count;
+                    bank_row[~capture_bank]<=capture_row+1'b1;
+                    capture_bank<=~capture_bank;
+                end
             end else begin error<=1;if(!error)error_source<=5'd7;end
         end
 
         if(request&&!started)pending<=1;
-        if(pending&&!started&&metadata_done) begin
+        if(pending&&!started&&execute_ready) begin
             pending<=0;started<=1;active<=1;future_bank_latched<=future_reference_bank;scratch_bank_latched<=scratch_frame_bank;timeout<=26'h3ffffff;lookup_wait<=0;
-            mbi<=row_motion_base;col<=0;mrow<=exec_row;blk<=0;ei<=0;exec_desc_slot<=0;pred_direction<=0;motion_load<=1;pixel_setup<=0;residual_load<=0;residual_load_wait<=0;persisted_seen<=0;
+            mbi<=bank_motion_base[execute_bank];col<=0;
+            mrow<=bank_row[execute_bank];blk<=0;ei<=0;exec_desc_slot<=0;
+            exec_desc_count_latched<=bank_desc_count[execute_bank];
+            exec_motion_end<=bank_motion_end[execute_bank];
+            row_final_latched<=
+                (bank_row[execute_bank]+1'b1==mb_height);
+            pred_direction<=0;motion_load<=1;pixel_setup<=0;
+            residual_load<=0;residual_load_wait<=0;persisted_seen<=0;
             if(!reference_valid||!geometry_ok||(motion_count==0))begin error<=1;if(!error)error_source<=5'd8;active<=0;persisted_seen<=1;timeout<=0;motion_load<=0;end
         end
 
@@ -25,7 +40,7 @@
 
         if(motion_load) begin
             motion_load<=0;
-            if((mbi>=row_motion_end)||(mbi>=motion_count)||(mbi>=MAX_MB))begin error<=1;if(!error)error_source<=5'd10;active<=0;persisted_seen<=1;timeout<=0;end
+            if((mbi>=exec_motion_end)||(mbi>=motion_count)||(mbi>=MAX_MB))begin error<=1;if(!error)error_source<=5'd10;active<=0;persisted_seen<=1;timeout<=0;end
             else begin motion_word<=motion_mem[mbi];residual_load<=1;end
         end
 
@@ -186,14 +201,18 @@
             if(residual_hit)exec_desc_slot<=exec_desc_slot+1'b1;
             if(blk==5) begin
                 if(col+1'b1>=mb_width) begin
-                    if((exec_desc_slot+(residual_hit?1'b1:1'b0))!=desc_count)begin error<=1;if(!error)error_source<=5'd14;end
-                    if(mbi+1'b1!=row_motion_end)begin error<=1;if(!error)error_source<=5'd15;end
+                    if((exec_desc_slot+(residual_hit?1'b1:1'b0))!=exec_desc_count_latched)begin error<=1;if(!error)error_source<=5'd14;end
+                    if(mbi+1'b1!=exec_motion_end)begin error<=1;if(!error)error_source<=5'd15;end
                     row_persisted<=1;active<=0;timeout<=0;
                     if(row_final_latched)begin persisted_seen<=1;reconstructed_seen<=1;end
                     else begin
-                        started<=0;metadata_done<=0;desc_count<=0;last_desc_word<=0;current_desc_slot<=0;
-                        desc_active<=0;sample_expected<=0;exec_desc_slot<=0;row_motion_base<=row_motion_end;
-                        exec_row<=exec_row+1'b1;row_final_latched<=0;
+                        started<=0;pending<=0;
+                        bank_ready[execute_bank]<=1'b0;
+                        bank_desc_count[execute_bank]<=0;
+                        bank_last_desc_word[execute_bank]<=0;
+                        execute_bank<=~execute_bank;
+                        exec_desc_slot<=0;exec_desc_count_latched<=0;
+                        exec_motion_end<=0;row_final_latched<=0;
                     end
                 end else begin
                     mbi<=mbi+1'b1;col<=col+1'b1;
