@@ -529,38 +529,6 @@ Await approval for a focused B prediction refill optimization that launches the 
 - [ ] Passed
 
 ---
-## 230 COMMIT Unreleased 1177e26 2026-08-18T17:10:35-07:00
-
-#### Coming From:
-
-Unreleased 6a4e935
-
-#### Purpose:
-
-Pace accepted 25 fps picture presentation against the fixed 800x600 display refresh so no decoded B picture is exposed for only one video frame.
-
-#### Outcome:
-
-The Entry 229 hardware recording confirmed both the cache gain and a separate burst-and-hold presentation defect: source frames 0 through 71 completed in approximately 8.4 seconds rather than 9.9 seconds, while 0.1-second samples near completion showed 63, 64, 65, 65, 66, 68, 68, 69, 69, 71. Commit 1177e26 adds a saturating rational cadence credit for frame-rate code 3 only, using the fixed 40 MHz, 1056-by-628 display timing to pace distinct ordinary, B-scratch, and future-reference swaps at 25 fps; starvation saturates at one pending slot so late readiness cannot cause catch-up bursts, while non-25-fps behavior remains immediate. The focused scheduler regression passed scratch-zero, scratch-one, and future-reference order with cadence intervals 1, 3, and 2, starvation saturation, publication-race barriers, ordinary and terminal release, and fail-open recovery. The exact DDR-backed 72-picture live-raster soak passed in 21,729,996 cycles versus Entry 229's 21,249,996 cycles, a 480,000-cycle or 2.26 percent modeled pacing cost, with 71 swaps, final P temporal reference 23, unchanged cache and DDR traffic counts, and no read, reconstruction, presentation, or ownership error. The full 720-by-480 long-GOP regression passed all 72 pictures, 25 publications and promotions, 47 B pictures, 25 display identities, and zero destination holds, overwrites, or presentation errors. The session-authorized incremental Quartus build completed in 9 minutes 26 seconds with zero errors, 121 standing warnings, no critical warning, +0.155 ns worst setup slack, +0.257 ns worst hold slack, +1.336 ns decoder-clock setup slack, +8.827 ns video-clock setup slack, and +14.821 ns decoder recovery slack. Utilization is 30,331 ALMs, 43,402 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and three PLLs. The 4,251,284-byte MediaPlayer_commit230_1177e26.rbf artifact has SHA-256 1cc79ae363145746fb3d94460f767b104777e82ab1e8adcbf84a4aac580be7e0; FTP upload and MiSTer readback produced the same digest. The deployed hardware recording reaches frame 71 without a crash and is visibly smoother; the user reports that every frame now appears to be produced. Thirty-frame-per-second contact sheets place the first visible frame 0 at approximately 0.73 seconds and the first frame 71 at approximately 9.93 seconds, or about 9.2 seconds for the 2.84-second source sequence. Ten-frame-per-second samples progress monotonically and show that the remaining visible stutter consists of decoder-starvation holds rather than the former one-refresh presentation flashes: effective delivered-picture throughput is approximately 7.7 fps, well below the encoded 25 fps rate. Hardware acceptance passes with USER and POWER solid and 11 DISK blinks, matching the expected frame-71 success signature.
-
-#### Next Steps:
-
-Retain the accepted cadence gate and treat the remaining stutter as decoder throughput work. Profile the exact DDR-backed soak by read, reconstruction, cache-refill, and presentation idle intervals before proposing the next optimization, while preserving all 72 pictures, the passing LED signature, and the new minimum display lifetime.
-
-#### Files Modified:
-
-- MediaPlayer_top_05.svh
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_dense_publication_order.sv
-- tools/streams/tb_h262_live_raster_soak.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
 ## 231 COMMIT Unreleased 6ddeb82 2026-08-18T22:26:51-07:00
 
 #### Coming From:
@@ -592,6 +560,35 @@ Retain the hardware-proven in-block residual prefetch and accepted 25 fps presen
 
 - [x] Built
 - [x] Passed
+
+---
+## 270 COMMIT Unreleased ??? 2026-08-20T11:15:00-07:00
+
+#### Coming From:
+
+Unreleased f24e0f5
+
+#### Purpose:
+
+Measure whether bounded destination-safe P row predecode can close both Entry 269 hardware gaps before allocating a fifth full-frame DDR destination.
+
+#### Outcome:
+
+Proposal only. Entry 269 proves cross-run scratch ownership is functional and removes substantial presentation backpressure, but it also falsifies Entry 268's four-buffer closure model: long presentation wait falls by 11,956,341 cycles while 10,805,922 destination-ownership cycles appear because the visible past reference, future prediction reference and two queued B pictures occupy all four full-frame buffers. Mixed gains 2,687,747 cycles and reaches 21.720684 fps, yet its remaining 7,500,519-cycle target gap is much larger than the directly observed 535,828 destination wait, so a useful ceiling must model the cascade from earlier P completion into following-B readiness rather than merely subtracting one counter. Extend the deterministic picture replay with explicit two-reference-bank ownership and compare three policies against both Entry 269 traces: current header-level destination hold, two-row parser/transform predecode with persistence delayed until the destination bank is released, and an ideal fifth destination frame. Preserve exact decode order, temporal display order, two scratch banks, 25-fps cadence and measured I/P/B work totals; report the first policy that closes both streams and reject any implementation whose complete-trace ceiling cannot do so.
+
+#### Next Steps:
+
+Generate any additional per-row P trace needed to separate parser/transform work from destination-dependent raster persistence, validate the baseline replay against Entry 269's measured cadence and destination counters, and implement no functional RTL in this entry. If bounded two-row predecode closes both targets, propose the smallest gated-raster interface next; otherwise document its exact shortfall and scope the fifth frame across address mapping, reference publication, display ownership and DDR capacity before touching production storage.
+
+#### Files Modified:
+
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/analyze_destination_predecode_ceiling.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
 
 ---
 ## 232 COMMIT Unreleased 1b1ca8f 2026-08-18T23:55:01-07:00
