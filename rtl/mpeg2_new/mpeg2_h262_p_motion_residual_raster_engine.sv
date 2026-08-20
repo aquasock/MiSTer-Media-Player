@@ -225,7 +225,19 @@ reg [11:0] emit_x, emit_y;
 reg emit_block_start, emit_block_complete;
 reg [28:0] next_prelaunch_addr;
 reg next_prelaunch_valid;
+reg block_fetch_start;
+reg [2:0] block_base_byte;
 wire fast_pixel_advance, slow_pixel_advance, precompute_after_advance;
+wire block_lookup_request;
+wire [3:0] block_lookup_row;
+wire block_lookup_column;
+wire block_lookup_ready,block_lookup_valid;
+wire [63:0] block_lookup_data;
+wire block_fetch_active,block_fetch_complete,block_fetch_error;
+wire [28:0] block_fetch_addr;
+wire block_fetch_rd;
+wire [6:0] block_fetch_issued,block_fetch_returned;
+wire [1:0] block_fetch_outstanding;
 
 wire [28:0] roff=reference_bank_latched?BANK_OFF:0;
 wire [2:0] er=ei[5:3], el=ei[2:0];
@@ -264,6 +276,34 @@ wire signed [13:0] plane_height_s=
 wire source_bounds_ok=
     (src_base_x>=0)&&(src_base_y>=0)&&
     (src_last_x<plane_width_s)&&(src_last_y<plane_height_s);
+wire signed [13:0] block_src_last_x=src_base_x+14'sd7+
+    (half_x?14'sd1:14'sd0);
+wire signed [13:0] block_src_last_y=src_base_y+14'sd7+
+    (half_y?14'sd1:14'sd0);
+wire block_source_bounds_ok=(src_base_x>=0)&&(src_base_y>=0)&&
+    (block_src_last_x<plane_width_s)&&(block_src_last_y<plane_height_s);
+wire [3:0] block_word_span=
+    {1'b0,src_base_x[2:0]}+4'd7+{3'd0,half_x};
+wire [28:0] block_phase0_base_addr=pixel_addr(
+    roff,blk,src_base_x[11:0],src_base_y[11:0]);
+wire [6:0] block_row_words=(blk<4)?7'd90:7'd45;
+
+mpeg2_h262_prediction_block_fetcher block_fetcher(
+    .clk(clk),.reset(reset),.start(block_fetch_start),
+    .phase_count(2'd1),.phase0_base_addr(block_phase0_base_addr),
+    .phase1_base_addr(29'd0),
+    .phase0_two_words(block_word_span[3]),.phase1_two_words(1'b0),
+    .phase0_rows(4'd8+{3'd0,half_y}),.phase1_rows(4'd1),
+    .row_words(block_row_words),.memory_busy(ddram_busy),
+    .memory_dout(ddram_dout),.memory_dout_ready(ddram_dout_ready),
+    .memory_addr(block_fetch_addr),.memory_rd(block_fetch_rd),
+    .lookup_request(block_lookup_request),.lookup_phase(1'b0),
+    .lookup_row(block_lookup_row),.lookup_column(block_lookup_column),
+    .lookup_ready(block_lookup_ready),.lookup_valid(block_lookup_valid),
+    .lookup_data(block_lookup_data),.active(block_fetch_active),
+    .complete(block_fetch_complete),.error(block_fetch_error),
+    .issued_count(block_fetch_issued),.returned_count(block_fetch_returned),
+    .outstanding_count(block_fetch_outstanding));
 
 // Entry 239: form and register the first-tap word address for the following
 // pixel before the current cache response arrives. This keeps the four-way
@@ -366,19 +406,18 @@ wire [7:0] predicted_current=
 wire [7:0] reconstructed_current=
     clip(predicted_current,residual_pel_q);
 wire [7:0] lookup_tap_sample=
-    bat(ddram_lookup_data,src_x_tap[2:0]);
+    bat(block_lookup_data,src_x_tap[2:0]);
 wire [10:0] lookup_pred_sum_with_current=
     pred_sum+{3'd0,lookup_tap_sample};
 wire [7:0] lookup_predicted_current=
     round_prediction(lookup_pred_sum_with_current,half_x,half_y);
 wire [7:0] lookup_reconstructed_current=
     clip(lookup_predicted_current,residual_pel_q);
-wire lookup_advance=lookup_wait&&ddram_lookup_ready&&
-    ddram_lookup_hit&&!tap_last;
-wire lookup_pixel_complete=lookup_wait&&ddram_lookup_ready&&
-    ddram_lookup_hit&&tap_last;
-wire ddr_pixel_complete=waitresp&&ddram_dout_ready&&tap_last;
-wire predicted_pixel_complete=lookup_pixel_complete||ddr_pixel_complete;
+wire lookup_advance=lookup_wait&&block_lookup_ready&&
+    block_lookup_valid&&!tap_last;
+wire lookup_pixel_complete=lookup_wait&&block_lookup_ready&&
+    block_lookup_valid&&tap_last;
+wire predicted_pixel_complete=lookup_pixel_complete;
 wire next_pixel_lookup=predicted_pixel_complete&&(ei!=6'd63)&&
     next_prelaunch_valid;
 assign fast_pixel_advance=predicted_pixel_complete&&
@@ -391,21 +430,35 @@ wire pixel_completed=
 wire prediction_lookup=
     (pixel_setup&&!mb_intra&&source_bounds_ok)||lookup_advance||
     next_pixel_lookup;
-wire [11:0] lookup_src_x=
-    lookup_advance?next_src_x_tap:src_x_tap;
-wire [11:0] lookup_src_y=
-    lookup_advance?next_src_y_tap:src_y_tap;
+wire block_lookup_retry=lookup_wait&&block_lookup_ready&&
+    !block_lookup_valid;
+wire block_lookup_idle_request=lookup_wait&&!block_fetch_start&&
+    !block_lookup_ready;
+wire [5:0] block_request_ei=next_pixel_lookup?(ei+1'b1):ei;
+wire [1:0] block_request_tap=lookup_advance?
+    (tap_index+1'b1):next_pixel_lookup?2'd0:tap_index;
+wire block_request_tap_dx=
+    (half_x&&half_y)?block_request_tap[0]:
+    (half_x?block_request_tap[0]:1'b0);
+wire block_request_tap_dy=
+    (half_x&&half_y)?block_request_tap[1]:
+    (half_y?block_request_tap[0]:1'b0);
+wire [4:0] block_request_byte=
+    {2'd0,block_base_byte}+{2'd0,block_request_ei[2:0]}+
+    {4'd0,block_request_tap_dx};
+assign block_lookup_row=
+    {1'b0,block_request_ei[5:3]}+block_request_tap_dy;
+assign block_lookup_column=block_request_byte[3];
+assign block_lookup_request=
+    (prediction_lookup&&!(pixel_setup&&(ei==0)))||
+    block_lookup_retry||block_lookup_idle_request;
 
-assign ddram_burstcnt=req?8'd1:0;
-assign ddram_addr=req ? pixel_addr(roff,blk,src_x_tap,src_y_tap) :
-    next_pixel_lookup ? next_prelaunch_addr :
-    prediction_lookup ? pixel_addr(roff,blk,lookup_src_x,lookup_src_y) :
-    29'd0;
-assign ddram_rd=req;
-assign ddram_cacheable=req||prediction_lookup;
-assign ddram_lookup_request=prediction_lookup;
-assign ddram_lookup_consume=
-    lookup_wait&&ddram_lookup_ready&&ddram_lookup_hit;
+assign ddram_burstcnt=block_fetch_rd?8'd1:0;
+assign ddram_addr=block_fetch_rd?block_fetch_addr:29'd0;
+assign ddram_rd=block_fetch_rd;
+assign ddram_cacheable=block_fetch_rd;
+assign ddram_lookup_request=1'b0;
+assign ddram_lookup_consume=1'b0;
 
 assign store_select=emit;
 assign store_pixel_value=out_reg;
@@ -488,6 +541,8 @@ always @(posedge clk) begin
         emit_block_complete<=0;
         next_prelaunch_addr<=0;
         next_prelaunch_valid<=0;
+        block_fetch_start<=0;
+        block_base_byte<=0;
         read_seen<=0;
         sample_value<=0;
         sample_nonzero<=0;
@@ -506,6 +561,7 @@ always @(posedge clk) begin
         row_final_latched<=0;
     end else begin
         row_persisted<=0;
+        block_fetch_start<=0;
         if(new_picture_metadata) begin
             persisted_seen<=0;
             progress_stage<=4'd1;
@@ -527,6 +583,8 @@ always @(posedge clk) begin
             emit<=0;
             emit_advanced<=0;
             next_prelaunch_valid<=0;
+            block_fetch_start<=0;
+            block_base_byte<=0;
             wait_store<=0;
             pixel_setup<=0;
             motion_load<=0;
@@ -734,20 +792,25 @@ always @(posedge clk) begin
             end else if(mb_intra) begin
                 out_reg<=clip(8'd0,residual_pel_q);
                 emit<=1;
-            end else if(!source_bounds_ok) begin
+            end else if(!source_bounds_ok||
+                        ((ei==0)&&!block_source_bounds_ok)) begin
                 error<=1;
                 if(!error) error_source<=5'd12;
                 active<=0;
                 persisted_seen<=1;
                 timeout<=0;
             end else begin
+                if(ei==0)begin
+                    block_fetch_start<=1;
+                    block_base_byte<=src_base_x[2:0];
+                end
                 if(half_x||half_y) half_sample_seen<=1;
                 lookup_wait<=1;
             end
         end
 
-        if(lookup_wait&&ddram_lookup_ready) begin
-            if(ddram_lookup_hit) begin
+        if(lookup_wait&&block_lookup_ready) begin
+            if(block_lookup_valid) begin
                 if(progress_stage<4'd3)
                     progress_stage<=4'd3;
                 if(tap_last) begin
@@ -763,39 +826,15 @@ always @(posedge clk) begin
                     pred_sum<=lookup_pred_sum_with_current;
                     tap_index<=tap_index+1'b1;
                 end
-            end else begin
-                lookup_wait<=0;
-                req<=1;
             end
         end
 
-        if(req&&!ddram_busy) begin
-            req<=0;
-            waitresp<=1;
-        end
-
-        if(ddram_dout_ready) begin
-            if(!waitresp) begin
-                error<=1;
-                if(!error) error_source<=5'd13;
-            end else begin
-                waitresp<=0;
-                if(progress_stage<4'd3)
-                    progress_stage<=4'd3;
-                if(tap_last) begin
-                    out_reg<=reconstructed_current;
-                    emit<=1;
-                    if((mbi==0)&&(blk==0)&&(ei==0)) begin
-                        read_seen<=1;
-                        sample_value<=predicted_current;
-                        sample_nonzero<=|predicted_current;
-                    end
-                end else begin
-                    pred_sum<=pred_sum_with_current;
-                    tap_index<=tap_index+1'b1;
-                    req<=1;
-                end
-            end
+        if(block_fetch_error)begin
+            error<=1;
+            if(!error)error_source<=5'd18;
+            active<=0;
+            persisted_seen<=1;
+            timeout<=0;
         end
 
         if(emit) begin

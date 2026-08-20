@@ -643,7 +643,7 @@ module tb_h262_live_raster_soak #(
                 prediction_no_progress_cycles<=
                     prediction_no_progress_cycles+1;
             if(prediction_no_progress_cycles==10000)
-                $fatal(1,"prediction liveness failed engine=%0d/%0d/%0d tap=%0d ei=%0d cache=%0d/%0d addr=%h arb=%0d/%0d/%0d mem=%0d/%0d/%0d",
+                $fatal(1,"prediction liveness failed engine=%0d/%0d/%0d tap=%0d ei=%0d cache=%0d/%0d addr=%h arb=%0d/%0d/%0d mem=%0d/%0d/%0d pblock=%0d/%0d/%0d/%0d base=%0d fetch=%0d/%0d/%0d/%0d valid=%h",
                        prediction.mixed_probe.req,
                        prediction.mixed_probe.waitresp,
                        prediction.mixed_probe.lookup_wait,
@@ -655,7 +655,17 @@ module tb_h262_live_raster_soak #(
                        arbiter.read_outstanding,
                        arbiter.read_owner_prediction,
                        arbiter.read_words_remaining,
-                       read_pending,memory_rd,memory_dout_ready);
+                       read_pending,memory_rd,memory_dout_ready,
+                       prediction.mixed_probe.block_lookup_row,
+                       prediction.mixed_probe.block_lookup_column,
+                       prediction.mixed_probe.block_lookup_ready,
+                       prediction.mixed_probe.block_lookup_valid,
+                       prediction.mixed_probe.block_base_byte,
+                       prediction.mixed_probe.block_fetch_active,
+                       prediction.mixed_probe.block_fetch_complete,
+                       prediction.mixed_probe.block_fetch_issued,
+                       prediction.mixed_probe.block_fetch_returned,
+                       prediction.mixed_probe.block_fetcher.word_valid);
             // Simulation-only attribution. Input stalls use mutually
             // exclusive priority; engine-stage counters intentionally
             // overlap so each active pipeline exposes its actual occupancy.
@@ -937,13 +947,13 @@ module tb_h262_live_raster_soak #(
                    displayed_identity!=9||last_reference_temporal!=10'd23||
                    reference_writes!=18432||scratch0_writes!=18432||
                    scratch1_writes!=16128||
-                   prediction.reference_cache.cache_hit_count!=32'd499551||
-                   prediction.reference_cache.cache_miss_count!=32'd71329||
+                   // Entry 253 serves P taps from the exact block buffer;
+                   // shared-cache accounting now covers block fetches plus B.
+                   prediction.reference_cache.cache_hit_count!=32'd342521||
+                   prediction.reference_cache.cache_miss_count!=32'd71317||
                    prediction.reference_cache.uncached_count!=0||
-                   // Entry 247 overlaps the following P decode with prior B
-                   // presentation without changing pixels or transactions.
-                   memory_reads!=71329||
-                   ((MEMORY_READ_LATENCY==1)&&(total_cycles!=2279996))||
+                   memory_reads!=71317||
+                   ((MEMORY_READ_LATENCY==1)&&(total_cycles!=2189996))||
                    profile_b_miss_prelaunch==0||
                    pixel_samples!=423936||pixel_mismatches!=0||
                    !writer_seen||!pred_read_observed||
@@ -978,13 +988,11 @@ module tb_h262_live_raster_soak #(
                displayed_identity!=25||last_reference_temporal!=10'd23||
                reference_writes!=50688||scratch0_writes!=55296||
                scratch1_writes!=52992||
-               prediction.reference_cache.cache_hit_count!=32'd2267813||
-               prediction.reference_cache.cache_miss_count!=32'd463835||
+               prediction.reference_cache.cache_hit_count!=32'd1934457||
+               prediction.reference_cache.cache_miss_count!=32'd463831||
                prediction.reference_cache.uncached_count!=0||
-               memory_reads!=463835||
-               // Entry 247 overlaps the next P decode with the completed B
-               // run while preserving cache traffic and display order.
-               ((MEMORY_READ_LATENCY==1)&&(total_cycles!=12689996))||
+               memory_reads!=463831||
+               ((MEMORY_READ_LATENCY==1)&&(total_cycles!=12269996))||
                profile_b_miss_prelaunch==0||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||

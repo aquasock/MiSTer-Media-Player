@@ -53,17 +53,23 @@ reg [3:0] generator_row;
 reg generator_column;
 reg [28:0] generator_row_addr;
 reg all_issued;
+reg [1:0] phase_count_reg;
+reg [28:0] phase1_base_addr_reg;
+reg phase0_two_words_reg,phase1_two_words_reg;
+reg [3:0] phase0_rows_reg,phase1_rows_reg;
+reg [6:0] row_words_reg;
 
 reg [5:0] descriptor_slot [0:1];
 reg descriptor_head,descriptor_tail;
 reg [1:0] descriptor_count;
 
 wire generator_two_words=generator_phase?
-    phase1_two_words:phase0_two_words;
-wire [3:0] generator_rows=generator_phase?phase1_rows:phase0_rows;
+    phase1_two_words_reg:phase0_two_words_reg;
+wire [3:0] generator_rows=generator_phase?
+    phase1_rows_reg:phase0_rows_reg;
 wire generator_last_column=!generator_two_words||generator_column;
 wire generator_last_row=(generator_row+1'b1)>=generator_rows;
-wire generator_last_phase=generator_phase||(phase_count==2'd1);
+wire generator_last_phase=generator_phase||(phase_count_reg==2'd1);
 wire generator_last=generator_last_column&&generator_last_row&&
     generator_last_phase;
 
@@ -85,10 +91,11 @@ assign outstanding_count=descriptor_count;
 
 wire [5:0] lookup_slot=(lookup_phase?6'd18:6'd0)+
     {lookup_row,1'b0}+lookup_column;
-wire [3:0] selected_lookup_rows=lookup_phase?phase1_rows:phase0_rows;
+wire [3:0] selected_lookup_rows=lookup_phase?
+    phase1_rows_reg:phase0_rows_reg;
 wire selected_lookup_two_words=lookup_phase?
-    phase1_two_words:phase0_two_words;
-wire lookup_in_range=(lookup_phase<phase_count)&&
+    phase1_two_words_reg:phase0_two_words_reg;
+wire lookup_in_range=(lookup_phase<phase_count_reg)&&
     (lookup_row<selected_lookup_rows)&&
     (!lookup_column||selected_lookup_two_words);
 
@@ -101,6 +108,13 @@ always @(posedge clk) begin
         generator_column<=1'b0;
         generator_row_addr<=29'd0;
         all_issued<=1'b0;
+        phase_count_reg<=2'd0;
+        phase1_base_addr_reg<=29'd0;
+        phase0_two_words_reg<=1'b0;
+        phase1_two_words_reg<=1'b0;
+        phase0_rows_reg<=4'd0;
+        phase1_rows_reg<=4'd0;
+        row_words_reg<=7'd0;
         descriptor_slot[0]<=6'd0;
         descriptor_slot[1]<=6'd0;
         descriptor_head<=1'b0;
@@ -132,6 +146,13 @@ always @(posedge clk) begin
             generator_column<=1'b0;
             generator_row_addr<=phase0_base_addr;
             all_issued<=1'b0;
+            phase_count_reg<=phase_count;
+            phase1_base_addr_reg<=phase1_base_addr;
+            phase0_two_words_reg<=phase0_two_words;
+            phase1_two_words_reg<=phase1_two_words;
+            phase0_rows_reg<=phase0_rows;
+            phase1_rows_reg<=phase1_rows;
+            row_words_reg<=row_words;
             if(active||(phase_count<1)||(phase_count>2)||
                (phase0_rows<1)||(phase0_rows>9)||
                ((phase_count==2)&&
@@ -167,12 +188,12 @@ always @(posedge clk) begin
                     generator_row<=generator_row+1'b1;
                     generator_column<=1'b0;
                     generator_row_addr<=generator_row_addr+
-                        {22'd0,row_words};
+                        {22'd0,row_words_reg};
                 end else begin
                     generator_phase<=1'b1;
                     generator_row<=4'd0;
                     generator_column<=1'b0;
-                    generator_row_addr<=phase1_base_addr;
+                    generator_row_addr<=phase1_base_addr_reg;
                 end
             end
 

@@ -233,11 +233,10 @@ module tb_h262_p_intra_macroblocks #(
                    !decision||!required||!success||engine_error||
                    !engine_read_seen||!engine_reconstructed_seen||
                    intra_store_samples!=(expected_blocks*64)||
-                   // Entry 240 pipelines only non-intra IQ.  These exact
-                   // cold/hit totals prove the six intra transforms retain
-                   // their established two-multiply cadence.
-                   ((CACHE_HIT_MODE==0)&&(total_cycles!=1791186))||
-                   ((CACHE_HIT_MODE!=0)&&(total_cycles!=755154)))
+                   // Entry 253 retains each non-intra block's reference
+                   // footprint internally, so the former upstream cold/hit
+                   // modes converge while intra arithmetic stays exact.
+                   total_cycles!=787530)
                     $fatal(1,"P intra-macroblock regression failed");
                 $finish;
             end
