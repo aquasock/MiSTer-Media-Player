@@ -1,5 +1,5 @@
 ---
-## 258 PROPOSAL ??? 2026-08-20T06:24:11-07:00
+## 258 COMMIT Unreleased 1138b7a 2026-08-20T06:31:37-07:00
 
 #### Coming From:
 
@@ -13,17 +13,27 @@ Use the accepted 21.82/19.85 fps hardware boundary to determine whether modestly
 
 Proposal only. Entry 257 is visually hardware accepted: both long-GOP and mixed-macroblock streams retain their established passing LED signatures, the user sees a noticeable improvement from discrete stuttering frames to a slow but continuous movie, and the MiSTer is released for continued development. Hardware telemetry shows that the accepted depth-two path leaves 27,754,704 prediction-response cycles in long and 8,925,420 in mixed, while stable 25 fps still requires reductions of 22,331,819 and 12,883,846 cadence cycles respectively. Because the mixed gap exceeds its entire recorded prediction-response wait, deeper queueing alone is not assumed sufficient; it must first prove its exact contribution before the next compute-stage optimization is selected.
 
+Commit `1138b7a` makes the shared descriptor depth a guarded compile-time constant across the block-footprint fetcher, reference cache and DDR arbiter while retaining production depth two by default. Pointer widths, count widths and non-power-of-two wrap are derived from the selected depth, and the focused tests now fill and drain the configured capacity rather than assuming two. Depths two, three and four each pass exact address and response order, delayed service, deterministic backpressure, display-over-prediction priority, multiword display ownership, same-cycle full-queue retire-and-replace, zero-latency direct response and writer exclusion. The focused 88-word block footprint completes at simulation times 5.64, 4.56 and 4.03 million respectively, providing an initial reason to run the complete boundaries without yet changing production capacity.
+
 #### Next Steps:
 
-Make prediction descriptor depth a simulation-selectable constant across the block-footprint fetcher, reference-word cache and shared DDR arbiter, then run focused ordered-response tests plus exact mixed and complete long boundaries at depths two, three and four under one- and ten-cycle service. Preserve pixels, traffic ownership, display priority, writer exclusion and zero-latency response behavior. Commit a production depth change only if the full traces show a material reduction; otherwise retain depth two and profile the remaining P/B compute occupancy directly.
+Run the exact mixed-pixel and complete long boundaries at depths two, three and four under one- and ten-cycle service. Preserve all pixels, picture order, publications, swaps, writes and response accounting. Commit a production depth change only if the full traces show a material reduction; otherwise retain depth two and profile the remaining P/B compute occupancy directly.
 
 #### Files Modified:
 
-- .ai/core-log.md
+- rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- tools/streams/tb_h262_prediction_block_fetcher.sv
+- tools/streams/tb_h262_prediction_word_cache.sv
+- tools/streams/tb_h262_ddram_arbiter.sv
+- tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
