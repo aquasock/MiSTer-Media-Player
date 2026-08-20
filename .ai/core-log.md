@@ -1244,7 +1244,7 @@ Install `MediaPlayer_commit213_065a775.rbf` and load `test_compat_long_gop.m2v` 
 - [ ] Passed
 
 ---
-## 259 COMMIT Unreleased ??? 2026-08-20T06:47:21-07:00
+## 259 COMMIT Unreleased 9101fcc 2026-08-20T06:47:21-07:00
 
 #### Coming From:
 
@@ -1256,11 +1256,11 @@ Attribute the remaining exact decoder backpressure to its mutually exclusive par
 
 #### Outcome:
 
-Proposal only. Entry 258 proves that deeper prediction descriptor capacity saves only 0.51% on the mixed boundary and 0.56% on the long boundary at normal service latency, so production depth remains two. The existing lookup and emit occupancy counters overlap by design because the following pixel lookup is already launched as the current pixel completes; treating both totals as serial cost would overstate the opportunity. Add simulation-only attribution at the publication and P/B controller boundaries so the exact stream-ready stall can be divided without changing decoder behavior.
+Commit `9101fcc` adds simulation-only attribution at the publication and row-controller boundaries without changing decoder behavior. The exact 423,936-pixel mixed trace remains 1,969,996 cycles with zero mismatches, maximum delta two, 69,556 reads, 23 swaps and zero errors; its 1,845,062 decoder-wait cycles divide into 29,877 base-parser, 724,223 P-row and 1,090,962 B-row cycles. The P hold divides into 160,555 parse, 69,546 spatial replay, 232,118 raster and 262,004 transform/coordination cycles; the B hold divides into 182,004 parse, 428,277 transform/replay and 480,681 row-persistence cycles. The exact long trace remains 10,719,996 cycles with 372,696 reads, 25 publications, 71 swaps and zero errors; its 10,276,423 decoder-wait cycles divide into 146,944 base-parser, 2,787,631 P-row and 7,341,848 B-row cycles. Long P holds divide into 646,591 parse, 332,508 spatial replay, 571,368 raster and 1,237,164 transform/coordination cycles, while B holds divide into 1,548,488 parse, 3,078,515 transform/replay and 2,714,845 row-persistence cycles. The measurements prove whole rows still serialize parse, transform replay and raster, and also show an immediate contained waste: transformed spatial blocks are first captured and then replayed for another 64 cycles each.
 
 #### Next Steps:
 
-Run the exact mixed-pixel and long-GOP boundaries with mutually exclusive counters for parser readiness, P parse/raster hold, B parse/replay/persistence hold, writer persistence, destination ownership, and presentation. Use the largest proven serial owner to define one accelerated production boundary, then preserve exact pixels, picture order, reads, writes, publications, swaps, and zero-error accounting before any Quartus build.
+Forward each transform's already ordered spatial output directly into the P/B raster capture protocol after its descriptor, removing the duplicate 64-cycle temporary-buffer replay while retaining complete-row reconstruction and every existing ownership barrier. Require the mixed exact-pixel oracle to remain bit-exact and the long boundary to preserve all reads, writes, publications, swaps and zero-error accounting; proceed to Quartus only if the measured cycle reduction is material.
 
 #### Files Modified:
 
@@ -1268,7 +1268,7 @@ Run the exact mixed-pixel and long-GOP boundaries with mutually exclusive counte
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
