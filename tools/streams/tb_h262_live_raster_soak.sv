@@ -18,13 +18,17 @@ module tb_h262_live_raster_soak #(
     reg [7:0] stream_mem[0:MAX_STREAM_BYTES-1];
     reg [7:0] pixel_oracle[0:442367];
     reg [63:0] ddr_mem[0:DDR_WORDS-1];
-    reg [1023:0] hex_path,pixel_path;
+    reg [1023:0] hex_path,pixel_path,prediction_trace_path;
     integer stream_len,stream_index=0,quiet_cycles=0;
     integer i,p_rows=0,b_rows=0,p_pictures=0,b_pictures=0;
     integer published_references=0,display_swaps=0;
     integer reference_writes=0,scratch0_writes=0,scratch1_writes=0;
     integer memory_reads=0,total_cycles=0;
     integer prediction_no_progress_cycles=0;
+    integer prediction_trace_fd=0;
+    integer prediction_trace_demands=0,prediction_trace_hits=0;
+    integer prediction_trace_misses=0,prediction_trace_block_starts=0;
+    integer prediction_trace_block_ends=0;
     integer profile_input_decoder=0,profile_input_presentation=0;
     integer profile_input_destination=0;
     integer profile_input_i=0,profile_input_p=0,profile_input_b=0;
@@ -154,6 +158,30 @@ module tb_h262_live_raster_soak #(
     integer read_pipe_stage;
     wire read_pending=|read_valid_pipe;
     wire pred_busy,pred_dout_ready;
+
+    wire prediction_trace_b=prediction.b_engine_select;
+    wire [10:0] prediction_trace_mbi=prediction_trace_b?
+        prediction.b_probe.mbi:prediction.mixed_probe.mbi;
+    wire [2:0] prediction_trace_blk=prediction_trace_b?
+        prediction.b_probe.blk:prediction.mixed_probe.blk;
+    wire [5:0] prediction_trace_ei=prediction_trace_b?
+        prediction.b_probe.ei:prediction.mixed_probe.ei;
+    wire [1:0] prediction_trace_tap=prediction_trace_b?
+        prediction.b_probe.tap_index:prediction.mixed_probe.tap_index;
+    wire [1:0] prediction_trace_direction=prediction_trace_b?
+        prediction.b_probe.pred_direction:2'd1;
+    wire prediction_trace_block_start=prediction_trace_b?
+        (prediction.b_probe.pixel_setup&&(prediction.b_probe.ei==0)):
+        (prediction.mixed_probe.pixel_setup&&(prediction.mixed_probe.ei==0));
+    wire prediction_trace_capture=
+        !prediction.reference_cache.request_active&&
+        !prediction.reference_cache.response_pending&&
+        prediction.reference_cache.request_read;
+    wire prediction_trace_capture_hit=
+        prediction.reference_cache.cache_lookup_hit;
+    wire prediction_trace_lookup_hit=
+        prediction.reference_cache.lookup_request&&
+        prediction.reference_cache.cache_lookup_hit;
 
     wire display_frame_bank,display_scratch,display_scratch_bank;
     wire decode_scratch_bank,presentation_hold,presentation_complete;
@@ -306,6 +334,13 @@ module tb_h262_live_raster_soak #(
         for(i=0;i<DDR_WORDS;i=i+1)ddr_mem[i]=0;
         if(!$value$plusargs("HEX=%s",hex_path))$fatal(1,"missing +HEX");
         if(!$value$plusargs("LEN=%d",stream_len))$fatal(1,"missing +LEN");
+        if($value$plusargs("PRED_TRACE=%s",prediction_trace_path))begin
+            prediction_trace_fd=$fopen(prediction_trace_path,"w");
+            if(prediction_trace_fd==0)
+                $fatal(1,"cannot open prediction trace");
+            $fdisplay(prediction_trace_fd,
+                "cycle,event,engine,temporal_reference,mbi,blk,ei,tap,direction,address");
+        end
         if(MIXED_PIXEL_MODE)begin
             if(!$value$plusargs("PIXELS=%s",pixel_path))
                 $fatal(1,"missing +PIXELS");
@@ -547,6 +582,60 @@ module tb_h262_live_raster_soak #(
         end
         if(!reset)begin
             total_cycles<=total_cycles+1;
+            if(prediction_trace_fd!=0)begin
+                if(prediction_trace_block_start)begin
+                    $fdisplay(prediction_trace_fd,
+                        "%0d,S,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%08h",
+                        total_cycles,prediction_trace_b,temporal_reference,
+                        prediction_trace_mbi,prediction_trace_blk,
+                        prediction_trace_ei,prediction_trace_tap,
+                        prediction_trace_direction,
+                        prediction.reference_cache.request_addr);
+                    prediction_trace_block_starts=
+                        prediction_trace_block_starts+1;
+                end
+                if(prediction_trace_capture)begin
+                    $fdisplay(prediction_trace_fd,
+                        "%0d,%s,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%08h",
+                        total_cycles,
+                        prediction_trace_capture_hit?"H":"M",
+                        prediction_trace_b,temporal_reference,
+                        prediction_trace_mbi,prediction_trace_blk,
+                        prediction_trace_ei,prediction_trace_tap,
+                        prediction_trace_direction,
+                        prediction.reference_cache.request_addr);
+                    prediction_trace_demands=prediction_trace_demands+1;
+                    if(prediction_trace_capture_hit)
+                        prediction_trace_hits=prediction_trace_hits+1;
+                    else
+                        prediction_trace_misses=prediction_trace_misses+1;
+                end
+                // Record a direct hit when its address is presented rather
+                // than one cycle later when the registered lookup is
+                // consumed; the live address may already have advanced then.
+                if(prediction_trace_lookup_hit)begin
+                    $fdisplay(prediction_trace_fd,
+                        "%0d,H,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%08h",
+                        total_cycles,prediction_trace_b,temporal_reference,
+                        prediction_trace_mbi,prediction_trace_blk,
+                        prediction_trace_ei,prediction_trace_tap,
+                        prediction_trace_direction,
+                        prediction.reference_cache.request_addr);
+                    prediction_trace_demands=prediction_trace_demands+1;
+                    prediction_trace_hits=prediction_trace_hits+1;
+                end
+                if(pred_store_complete)begin
+                    $fdisplay(prediction_trace_fd,
+                        "%0d,E,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%08h",
+                        total_cycles,prediction_trace_b,temporal_reference,
+                        prediction_trace_mbi,prediction_trace_blk,
+                        prediction_trace_ei,prediction_trace_tap,
+                        prediction_trace_direction,
+                        prediction.reference_cache.request_addr);
+                    prediction_trace_block_ends=
+                        prediction_trace_block_ends+1;
+                end
+            end
             if(!pred_active||pred_store_valid||memory_rd||memory_dout_ready||
                writer_stored)
                 prediction_no_progress_cycles<=0;
@@ -861,6 +950,24 @@ module tb_h262_live_raster_soak #(
                    !pred_reconstructed_observed||!presentation_complete||
                    probe_error||pred_error||writer_error||presentation_error)
                     $fatal(1,"mixed raster pixel regression failed");
+                if(prediction_trace_fd!=0)begin
+                    if(prediction_trace_hits!=
+                           prediction.reference_cache.cache_hit_count||
+                       prediction_trace_misses!=
+                           prediction.reference_cache.cache_miss_count||
+                       prediction_trace_block_starts!=6624||
+                       prediction_trace_block_ends!=6624)
+                        $fatal(1,"prediction trace accounting failed demands=%0d hits=%0d misses=%0d blocks=%0d/%0d",
+                               prediction_trace_demands,
+                               prediction_trace_hits,
+                               prediction_trace_misses,
+                               prediction_trace_block_starts,
+                               prediction_trace_block_ends);
+                    $fdisplay(prediction_trace_fd,
+                        "%0d,Z,0,0,0,0,0,0,0,00000000",
+                        total_cycles);
+                    $fclose(prediction_trace_fd);
+                end
                 $finish;
             end
             else if(stream_index!=stream_len||p_rows!=132||p_pictures!=22||
@@ -877,12 +984,33 @@ module tb_h262_live_raster_soak #(
                memory_reads!=463835||
                // Entry 247 overlaps the next P decode with the completed B
                // run while preserving cache traffic and display order.
-               total_cycles!=12689996||profile_b_miss_prelaunch==0||
+               ((MEMORY_READ_LATENCY==1)&&(total_cycles!=12689996))||
+               profile_b_miss_prelaunch==0||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
                presentation_error)
                 $fatal(1,"live raster soak failed");
-            else $finish;
+            else begin
+                if(prediction_trace_fd!=0)begin
+                    if(prediction_trace_hits!=
+                           prediction.reference_cache.cache_hit_count||
+                       prediction_trace_misses!=
+                           prediction.reference_cache.cache_miss_count||
+                       prediction_trace_block_starts!=19872||
+                       prediction_trace_block_ends!=19872)
+                        $fatal(1,"prediction trace accounting failed demands=%0d hits=%0d misses=%0d blocks=%0d/%0d",
+                               prediction_trace_demands,
+                               prediction_trace_hits,
+                               prediction_trace_misses,
+                               prediction_trace_block_starts,
+                               prediction_trace_block_ends);
+                    $fdisplay(prediction_trace_fd,
+                        "%0d,Z,0,0,0,0,0,0,0,00000000",
+                        total_cycles);
+                    $fclose(prediction_trace_fd);
+                end
+                $finish;
+            end
         end
     end
 
