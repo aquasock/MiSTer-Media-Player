@@ -34,6 +34,7 @@ module tb_h262_live_raster_soak #(
     integer profile_p_emit=0,profile_b_emit=0;
     integer profile_p_store=0,profile_b_store=0;
     integer profile_writer=0,profile_presentation=0;
+    integer profile_b_miss_prelaunch=0;
     integer pixel_samples=0,pixel_mismatches=0,max_pixel_delta=0;
     integer pixel_index,pixel_delta,pixel_row,pixel_word,pixel_lane;
     reg first_pixel_mismatch=0;
@@ -324,6 +325,8 @@ module tb_h262_live_raster_soak #(
             if(prediction.b_probe.emit)profile_b_emit<=profile_b_emit+1;
             if(prediction.mixed_probe.wait_store)profile_p_store<=profile_p_store+1;
             if(prediction.b_probe.wait_store)profile_b_store<=profile_b_store+1;
+            if(prediction.b_probe.miss_response_prelaunch)
+                profile_b_miss_prelaunch<=profile_b_miss_prelaunch+1;
             if(memory_we)
                 profile_writer<=profile_writer+1;
             if(presentation_hold)profile_presentation<=profile_presentation+1;
@@ -507,7 +510,7 @@ module tb_h262_live_raster_soak #(
                      pred_read_observed,pred_reconstructed_observed,
                      presentation_complete,probe_error,pred_error,writer_error,
                      presentation_error);
-            $display("LIVE_RASTER_PROFILE input=%0d/%0d/%0d input_type=%0d/%0d/%0d transform=%0d/%0d raster=%0d/%0d lookup=%0d/%0d ddr_request=%0d/%0d ddr_response=%0d/%0d emit=%0d/%0d store=%0d/%0d writer=%0d presentation=%0d",
+            $display("LIVE_RASTER_PROFILE input=%0d/%0d/%0d input_type=%0d/%0d/%0d transform=%0d/%0d raster=%0d/%0d lookup=%0d/%0d ddr_request=%0d/%0d ddr_response=%0d/%0d emit=%0d/%0d store=%0d/%0d writer=%0d presentation=%0d b_miss_prelaunch=%0d",
                      profile_input_decoder,profile_input_presentation,
                      profile_input_destination,
                      profile_input_i,profile_input_p,profile_input_b,
@@ -518,7 +521,8 @@ module tb_h262_live_raster_soak #(
                      profile_p_ddr_response,profile_b_ddr_response,
                      profile_p_emit,profile_b_emit,
                      profile_p_store,profile_b_store,
-                     profile_writer,profile_presentation);
+                     profile_writer,profile_presentation,
+                     profile_b_miss_prelaunch);
             if(MIXED_PIXEL_MODE)begin
                 $display("MIXED_PIXEL_RESULT samples=%0d mismatches=%0d max_delta=%0d",
                          pixel_samples,pixel_mismatches,max_pixel_delta);
@@ -537,7 +541,8 @@ module tb_h262_live_raster_soak #(
                    prediction.reference_cache.uncached_count!=0||
                    // Entry 240 pipelines non-intra IQ issue/retirement while
                    // preserving every mixed-stream pixel and transaction.
-                   memory_reads!=71329||total_cycles!=2529996||
+                   memory_reads!=71329||total_cycles!=2519996||
+                   profile_b_miss_prelaunch==0||
                    pixel_samples!=423936||pixel_mismatches!=0||
                    !writer_seen||!pred_read_observed||
                    !pred_reconstructed_observed||!presentation_complete||
@@ -557,9 +562,9 @@ module tb_h262_live_raster_soak #(
                prediction.reference_cache.cache_miss_count!=32'd463835||
                prediction.reference_cache.uncached_count!=0||
                memory_reads!=463835||
-               // Entry 240 removes 900,000 non-intra IQ issue bubbles from
-               // the Entry 239 soak without changing cache traffic.
-               total_cycles!=13599996||
+               // Entry 243 overlaps eligible same-phase B miss successors
+               // without changing cache or DDR traffic.
+               total_cycles!=13419996||profile_b_miss_prelaunch==0||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
                presentation_error)

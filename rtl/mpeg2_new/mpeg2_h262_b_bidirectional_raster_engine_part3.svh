@@ -142,7 +142,11 @@
                         if((mbi==0)&&(blk==0)&&(ei==0))begin read_seen<=1;sample_nonzero<=|final_prediction;end
                     end
                 end else begin
-                    pred_sum<=pred_sum_with_current;tap_index<=tap_index+1'b1;req<=1;
+                    pred_sum<=pred_sum_with_current;tap_index<=tap_index+1'b1;
+                    if(miss_response_prelaunch&&!ddram_busy)begin
+                        waitresp<=1;
+                        tap_byte_sel<=miss_response_prelaunch_byte;
+                    end else req<=1;
                 end
             end
         end

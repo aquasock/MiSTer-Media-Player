@@ -112,6 +112,16 @@ wire early_half_x=
     bidir_early_lookup?exec_bmvx[0]:next_exec_mvx[0];
 wire early_half_y=
     bidir_early_lookup?exec_bmvy[0]:next_exec_mvy[0];
+// Entry 243: while a registered DDR miss response retires, present the
+// following tap address to the cache request
+// port. The cache captures it on that response edge; req remains asserted
+// afterward until the unchanged one-outstanding downstream handshake accepts
+// it. This removes the idle capture bubble without adding transaction depth.
+wire miss_response_prelaunch=waitresp&&ddram_dout_ready&&!tap_last;
+wire [3:0] miss_prelaunch_tap_byte_sum=
+    {1'b0,phase_base_byte}+next_tap_dx;
+wire [2:0] miss_response_prelaunch_byte=
+    miss_prelaunch_tap_byte_sum[2:0];
 assign fast_pixel_advance=predicted_pixel_complete&&
     ((ei==6'd63)||next_prelaunch_valid);
 assign slow_pixel_advance=emit&&!emit_advanced&&(ei!=6'd63);
@@ -187,20 +197,22 @@ wire lookup_advance=lookup_wait&&ddram_lookup_ready&&
 wire prediction_lookup=
     (pixel_setup&&(exec_direction!=0)&&phase_bounds_ok)||lookup_advance||
     early_lookup;
-wire address_tap_dx=lookup_advance?next_tap_dx:tap_dx;
-wire address_tap_dy=lookup_advance?next_tap_dy:tap_dy;
+wire advance_tap_address=lookup_advance||miss_response_prelaunch;
+wire address_tap_dx=advance_tap_address?next_tap_dx:tap_dx;
+wire address_tap_dy=advance_tap_address?next_tap_dy:tap_dy;
 wire [3:0] address_tap_byte_sum=
     {1'b0,phase_base_byte}+address_tap_dx;
 wire [28:0] normal_lookup_addr=phase_base_addr+
     (address_tap_dy?{22'd0,phase_row_words}:29'd0)+
     {28'd0,address_tap_byte_sum[3]};
 
-assign ddram_burstcnt=req?8'd1:8'd0;
-assign ddram_addr=req?normal_lookup_addr:
+assign ddram_burstcnt=(req||miss_response_prelaunch)?8'd1:8'd0;
+assign ddram_addr=miss_response_prelaunch?normal_lookup_addr:
+    req?normal_lookup_addr:
     prediction_lookup?
         (early_lookup?early_lookup_addr:normal_lookup_addr):29'd0;
-assign ddram_rd=req;
-assign ddram_cacheable=req||prediction_lookup;
+assign ddram_rd=req||miss_response_prelaunch;
+assign ddram_cacheable=req||miss_response_prelaunch||prediction_lookup;
 assign ddram_lookup_request=prediction_lookup;
 assign ddram_lookup_consume=
     lookup_wait&&ddram_lookup_ready&&ddram_lookup_hit;
