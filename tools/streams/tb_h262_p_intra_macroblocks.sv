@@ -233,9 +233,11 @@ module tb_h262_p_intra_macroblocks #(
                    !decision||!required||!success||engine_error||
                    !engine_read_seen||!engine_reconstructed_seen||
                    intra_store_samples!=(expected_blocks*64)||
-                   // Entry 234 removes the 64-cycle IQ coefficient replay
-                   // from each of the six transformed intra blocks.
-                   total_cycles>=2301200)
+                   // Entry 240 pipelines only non-intra IQ.  These exact
+                   // cold/hit totals prove the six intra transforms retain
+                   // their established two-multiply cadence.
+                   ((CACHE_HIT_MODE==0)&&(total_cycles!=1791186))||
+                   ((CACHE_HIT_MODE!=0)&&(total_cycles!=755154)))
                     $fatal(1,"P intra-macroblock regression failed");
                 $finish;
             end

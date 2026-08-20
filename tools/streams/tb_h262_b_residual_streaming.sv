@@ -151,9 +151,12 @@ module tb_h262_b_residual_streaming #(
                !raster.metadata_done||!read_seen||!reconstructed_seen||!persisted_seen||
                store_samples!=518400||stripe_store_samples!=7680||
                stripe_changed_samples!=(intra_mode?768:7680)||
-               // Entry 234 removes 64 replay cycles from every transformed
-               // block; the 120-block path must retain that measured gain.
-               total_cycles>=3903000)
+               // Entry 240 saves exactly 63 issue bubbles in each of the 120
+               // non-intra transforms in both cold-read and cache-hit modes.
+               (!intra_mode&&
+                (((CACHE_HIT_MODE==0)&&(total_cycles!=3384889))||
+                 ((CACHE_HIT_MODE!=0)&&(total_cycles!=1311289))))||
+               (intra_mode&&(total_cycles>=3903000)))
                 $fatal(1,"B residual streaming regression failed");
             $finish;
         end

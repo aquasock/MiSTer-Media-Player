@@ -18,6 +18,12 @@
 // into the IDCT capture port.  The IDCT already stores one coefficient per
 // cycle, so retaining a second 64-entry array and replaying it after inverse
 // quantisation only serialized two storage phases without changing data.
+//
+// Entry 240 overlaps non-intra product retirement with the following product
+// issue.  Non-intra retirement only scales the registered product by two, so
+// the shared multiplier is free to launch the next QF in that cycle.  Intra AC
+// retains its two serialized multiplies and therefore keeps the established
+// issue/retire cadence.
 //============================================================================
 
 module mpeg2_h262_p_non_intra_transform
@@ -253,6 +259,7 @@ wire signed [32:0] iq_multiplier_result =
     iq_multiplier_a * iq_multiplier_b;
 reg               iq_stage_pending;
 reg signed [31:0] iq_stage_product;
+reg signed [12:0] iq_stage_qf;
 reg signed [31:0] iq_unclipped;
 reg signed [11:0] iq_saturated;
 reg signed [11:0] iq_final_value;
@@ -365,6 +372,7 @@ always @(posedge clk) begin
         iq_intra_dc_precision  <= 2'd0;
         iq_stage_pending       <= 1'b0;
         iq_stage_product       <= 32'sd0;
+        iq_stage_qf            <= 13'sd0;
         idct_coeff_block_start <= 1'b0;
         idct_coeff_valid       <= 1'b0;
         idct_coeff_index       <= 6'd0;
@@ -430,10 +438,13 @@ always @(posedge clk) begin
         if (iq_active) begin
             if (!iq_stage_pending) begin
                 iq_stage_product <= iq_multiplier_result[31:0];
+                iq_stage_qf <= iq_qf;
                 iq_stage_pending <= 1'b1;
+                if (!iq_intra_block && (iq_index != 6'd63))
+                    iq_qfs_index_reg <= scan_index(
+                        iq_alternate_scan, iq_index + 6'd1);
             end
             else begin
-                iq_stage_pending <= 1'b0;
                 iq_parity <= iq_parity_with_current;
                 idct_coeff_block_start <= (iq_index == 6'd0);
                 idct_coeff_valid <= 1'b1;
@@ -447,7 +458,7 @@ always @(posedge clk) begin
                     (active_block_index == 2'd0) && (iq_index == 6'd0)) begin
                     if ((iq_quantiser_scale_code == 5'd2) &&
                         !iq_q_scale_type &&
-                        (iq_qf == 13'sd7) &&
+                        (iq_stage_qf == 13'sd7) &&
                         (iq_final_value == 12'sd30))
                         y0_f00_proven <= 1'b1;
                     else
@@ -456,8 +467,19 @@ always @(posedge clk) begin
 
                 if (iq_index == 6'd63) begin
                     iq_active <= 1'b0;
+                    iq_stage_pending <= 1'b0;
+                end
+                else if (!iq_intra_block) begin
+                    iq_stage_product <= iq_multiplier_result[31:0];
+                    iq_stage_qf <= iq_qf;
+                    iq_stage_pending <= 1'b1;
+                    iq_index <= iq_index + 6'd1;
+                    if (iq_index != 6'd62)
+                        iq_qfs_index_reg <= scan_index(
+                            iq_alternate_scan, iq_index + 6'd2);
                 end
                 else begin
+                    iq_stage_pending <= 1'b0;
                     iq_index         <= iq_index + 6'd1;
                     iq_qfs_index_reg <= scan_index(iq_alternate_scan,
                                                    iq_index + 6'd1);
