@@ -1,5 +1,5 @@
 ---
-## 250 COMMIT Unreleased ??? 2026-08-20T02:22:32-07:00
+## 250 COMMIT Unreleased 0c8d2c4 2026-08-20T02:22:32-07:00
 
 #### Coming From:
 
@@ -7,29 +7,25 @@ Unreleased 25d7b50
 
 #### Purpose:
 
-Hide physical prediction-read latency by issuing one exact following prediction address while the current ordered DDR response remains outstanding.
+Measure whether one exact following prediction address can hide enough ordered DDR response latency to justify a depth-two hardware path.
 
 #### Outcome:
 
-Entries 246, 248 and 249 rule out adjacent read-ahead, static cache partitioning and second-stage victim capacity on the exact mixed trace. The local MiSTer DDR bridge documents and implements the missing capability directly: accepted reads need not wait for a prior response, and `DDRAM_DOUT_READY` returns their data later in request order. The active H.262 arbiter nevertheless holds every client busy until the current response returns, while the P and B engines already register exact following-tap and following-pixel addresses ahead of that boundary. Entry 247 hardware spends 63,001,860 long and 20,141,742 mixed cycles in physical prediction request acceptance plus response wait, nearly the complete remaining 66,188,405-cycle long gap to 25 fps. The proposed experiment will permit at most two ordered prediction reads, issue only a registered exact successor address, retain response order explicitly, and keep display-reader priority, reconstruction-write exclusion, cache invalidation, decoded arithmetic and presentation ownership unchanged.
+Commit `0c8d2c4` adds simulation-only ordered-read and variable-latency models without changing production RTL. The focused ten-cycle service completes 64 reads in 641 cycles with one outstanding, 322 with depth two, 346 under deterministic backpressure and 64 with zero latency while preserving prediction/display/prediction owner order. A temporary depth-two decoder candidate remained exact across 423,936 mixed samples with zero mismatches and maximum delta two, but at ten-cycle latency it reduced the safe Entry 247 trace only from 2,919,996 to 2,819,996 cycles because just 8,072 of 71,329 physical reads had an immediately usable exact successor. The 100,000-cycle or 3.42 percent whole-stream reduction would move the measured 14.983 mixed rate only to roughly 15.5 fps, far short of 25 fps, so the candidate was rejected and fully removed before Quartus or MiSTer deployment. The committed default-latency regression remains unchanged at 2,279,996 cycles, 499,551 cache hits, 71,329 misses, 23 swaps, zero errors and exact pixels; the ten-cycle baseline also passes at 2,919,996 cycles.
 
 #### Next Steps:
 
-First extend the DDR/cache focused model with a ten-cycle ordered response service and compare one-outstanding against a depth-two exact-successor queue, including backpressure, same-cycle acceptance/return, cache hits that cancel a successor, and display-reader arbitration. Proceed only if the model hides substantial response occupancy without changing request addresses or returned-word association. Then expose the already-registered P/B successor address through the shared cache, add a two-entry ordered response descriptor queue, rerun exact pixels/order/traffic/reload regressions, and require positive clean timing plus zero-error MiSTer cadence improvement on both streams; any ambiguous response ownership or stale successor invalidates the candidate.
+Retain the timing-qualified Entry 247 production RTL and obtain approval for a materially deeper prediction architecture. The next proposal should decouple block-scoped address production from pixel consumption, queue enough ordered requests and returned words to cover the measured memory latency rather than only one successor, preserve display priority and explicit response ownership, and prove the attainable full-trace ceiling in simulation before functional RTL, Quartus or MiSTer deployment.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
 - tools/streams/tb_h262_prediction_word_cache.sv
 - tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/tb_h262_mixed_raster_pixels.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
