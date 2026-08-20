@@ -715,7 +715,7 @@ Retain the timing-clean vertical pair and leave Entry 274's cross-macroblock sta
 - [x] Passed
 
 ---
-## 276 COMMIT Unreleased ??? 2026-08-20T13:37:33-07:00
+## 276 COMMIT Unreleased eae80fd 2026-08-20T13:37:33-07:00
 
 #### Coming From:
 
@@ -727,39 +727,45 @@ Add a third reference-picture destination so queued decode can proceed while two
 
 #### Outcome:
 
-Proposal only. Entry 275 leaves mixed at 56,954,583 cadence cycles with 6,273,403 presentation-wait and 734,037 destination-wait cycles; removing both ownership waits would reach 49,947,143 cycles, only 267,143 above the 49,680,000-cycle 25 fps target. The current two-reference-bank design can occupy its visible past reference and future prediction reference while the two B scratch frames hold a queued run, leaving no legal P destination. This boundary will add reference bank 2 at DDR word offset `0x00040000`, retain scratch banks at `0x00020000` and `0x00030000`, widen reference, destination, completed and display identities to two bits, rotate reference destinations across banks zero, one and two, and carry an explicit previous-reference identity into B prediction instead of deriving the past reference as the inverse of a one-bit future bank. The destination-display hold remains as a safety assertion for any unexpected three-bank collision; no cadence constants, pixel arithmetic, cache ordering, scratch generation ownership or DDR transaction concurrency will change.
+Commit `e8d4085` adds reference bank two at DDR word offset `0x00040000`, rotates reference destinations across banks zero, one and two, widens publication, destination, completed, display and profiler identities to two bits, and supplies B prediction with the explicit previous and future reference identities while retaining both existing scratch banks. The scheduler also binds wrapped reference-bank identities with the monotonic promotion count so a later bank reuse cannot be mistaken for an already displayed generation. Focused scheduler, profiler, B prediction and B intra tests pass; the complete 720-by-480 publication streams use bank two three times in mixed and eight times in long with zero overwrite or presentation errors. Exact mixed preserves all 423,936 samples with zero mismatch, maximum delta two, 69,556 reads and 1,259,996 cycles, while exact long preserves every picture, swap, read and write with zero errors at 6,859,996 cycles.
+
+The first fully clean `e8d4085` build completed with zero errors and 148 standing warnings at +0.168 ns global setup, +1.557 ns decoder setup and +7.905 ns video setup. Its 4,329,740-byte RBF had SHA-256 `6b20e26fb7efc1342dd9860f3a939b13d79fef039e1b48e861c02590a988e865`, but both clean-state hardware attempts stalled the MiSTer host inside the stream transfer and prevented later command processing, so that artifact was rejected and Entry 275 was restored. The hardware-only smoking gun was the DDR arbiter's two-bit displayed-region tag: bank two region `100` aliased bank zero region `000`, permanently blocking the next reference write after a live framebuffer read. Commit `eae80fd` widens the ownership tag and comparison to address bits `[18:16]`; the focused arbiter test now proves bank-two exclusion and simultaneous bank-zero writability at descriptor depths two and four.
+
+The corrected fully clean Quartus 17.0.2 build completes in 11 minutes 11 seconds with zero errors and 148 standing warnings. Timing is positive at +0.355 ns global setup, +1.418 ns decoder setup, +7.648 ns video setup, +0.249 ns hold, +3.301 ns global recovery, +15.786 ns decoder recovery, +0.909 ns removal and +0.462 ns minimum pulse slack. The fit uses 33,349 ALMs, 48,497 registers, 4,027,379 memory bits, 504 RAM blocks and 65 DSP blocks. Qualified artifact `MediaPlayer_commit276_eae80fd.rbf` is 4,315,640 bytes with SHA-256 `70a03ba5d45a22d9a7b998e7720f0b07d6ce4cb041e875d84f8f0de6ec4d2f13`; its standard MiSTer upload and FTP readback are byte-identical. Hardware accepts both streams with every byte and picture, 71 and 23 swaps, zero errors and zero destination stalls. A same-session Entry 275 long control measures 162,257,847 cycles at 23.629058 fps with 11,035,408 destination-wait and 35,863,879 presentation-wait cycles; Entry 276 measures 162,259,999 cycles at 23.628744 fps with zero destination wait but 46,960,320 presentation-wait cycles. Mixed similarly moves from a restored Entry 275 control of 56,882,093 cycles at 21.834640 fps with 639,948 destination-wait cycles to 56,956,680 cycles at 21.806046 fps with zero destination wait. The third destination is therefore functionally correct and removes the physical ownership collision, but cadence absorbs the released time almost exactly and no material end-to-end gain remains.
 
 #### Next Steps:
 
-Add focused three-bank publication and B past/future-address tests, extend scheduler and complete-trace identity scoreboards to three reference banks, and require exact focused prediction values, all 423,936 mixed pixels, every long-GOP picture and swap, zero overwrites, zero errors and unchanged scratch ordering. Compare cadence-stressed simulation ownership stalls with Entry 275 before committing source; only then run a fully clean Quartus build, audit every decoder and video timing group, deploy a timing-clean RBF, and use hardware telemetry to decide whether the remaining 267,143-cycle ideal residual requires one final decoder reduction.
+Retain the exact three-bank ownership correction because it removes destination stalls safely, but do not count it as an FPS optimization. Use the paired hardware result to target decoder concurrency rather than another destination: mixed remains 7,276,680 cycles above its 49,680,000-cycle 25 fps target with 21,349,182 decoder-stall cycles, including 11,104,109 in B pictures, while long remains 8,899,999 cycles above target with 57,430,275 decoder-stall cycles. Before changing production RTL, measure a tagged two-word prediction-request producer that separates reference address generation from pixel consumption and permits useful overlap beyond the already rejected passive descriptor-depth increase.
 
 #### Files Modified:
 
 - MediaPlayer_top_01.svh
-- MediaPlayer_top_03.svh
+- MediaPlayer_top_02.svh
 - MediaPlayer_top_04.svh
 - MediaPlayer_top_05.svh
 - MediaPlayer_top_06.svh
-- MediaPlayer_top_07.svh
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
 - rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
 - rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
 - tools/streams/tb_h262_b_presentation_scheduler.sv
 - tools/streams/tb_h262_b_residual_streaming.sv
 - tools/streams/tb_h262_dense_publication_order.sv
+- tools/streams/tb_h262_ddram_arbiter.sv
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
 - tools/streams/tb_h262_live_raster_soak.sv
-- tools/streams/tb_h262_mixed_raster_pixels.sv
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 237 COMMIT Unreleased 23d8410 2026-08-19T15:21:10-07:00
