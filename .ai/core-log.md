@@ -950,35 +950,6 @@ None.
 - [x] Passed
 
 ---
-## 208 COMMIT Unreleased 450f78a 2026-08-18T04:42:35-07:00
-
-#### Coming From:
-
-Unreleased 2dd4c67
-
-#### Purpose:
-
-Accept a generalized P picture whose persistence proof precedes its parser completion pulse by one cycle.
-
-#### Outcome:
-
-Commit `450f78a` makes P raster-hold admission consume an already-present persistence proof atomically. The focused regression reproduces the hardware ordering: before the correction all 30 rows retired but completion left `raster_hold_active` set and `raster_hold_ready` clear; afterward the same transaction completes immediately with the hold inactive, ready asserted, no error, and P acceptance retained. The dense P row regression completes 1,350 motion records, 8,100 residual blocks, 175,586 coefficients, and 518,400 samples; the seven-B corpus, fail-open transport, two-scratch presentation, and six storage-tag regressions also pass unchanged. The clean Quartus 17.0.2 build completes in 9 minutes 13 seconds with no Critical Warning, zero setup, hold, or recovery TNS, +0.570 ns global setup, +0.251 ns global hold, +2.931 ns global recovery, +1.776 ns focused decoder setup, and +14.264 ns focused decoder recovery. It uses 29,045 ALMs, 41,901 registers, 4,025,331 memory bits, 503 RAM blocks, 65 DSP blocks, and 3 PLLs. RBF SHA-256 `6172e2ed1f5883b1517c838041961f6528ebe983f1935f822883b87c13d31ec1` and dense-stream SHA-256 `f8e05f5cfd0c0385566bbc3e4133d9f42cb5547933d92e24b0d87eec3fa0a79e` were uploaded to `10.10.0.30` and read back with matching hashes.
-
-#### Next Steps:
-
-Run `test_compat_dense_residual.m2v` through its complete sequence on MiSTer and confirm that transfer and P-picture transitions no longer pause for the former timeout, the final raster remains coherent, and the settled diagnostic is solid USER, solid POWER, and dark DISK.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
-- tools/streams/tb_h262_p_raster_hold.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
 ## 209 COMMIT Unreleased 450f78a 2026-08-18T05:12:25-07:00
 
 #### Coming From:
@@ -1270,5 +1241,34 @@ None.
 
 - [x] Built
 - [x] Passed
+
+---
+## 263 COMMIT Unreleased ??? 2026-08-20T08:22:46-07:00
+
+#### Coming From:
+
+Unreleased 3dc020b
+
+#### Purpose:
+
+Measure the complete-trace ceiling of a two-bank P/B row pipeline that overlaps parsing and transform production for the following row with reconstruction and persistence of the current row.
+
+#### Outcome:
+
+Proposal only. Entry 262 proves command-level write interleave cannot help because every active block completes its prediction footprint before persistence begins. Entry 261 mixed hardware still spends 8,728,601 P and 18,442,660 B decoder-stall cycles, while the exact one-cycle trace attributes 232,026 P and 476,547 B cycles to row reconstruction beside 424,521 P and 520,297 B parser/transform coordination cycles. The existing per-picture memories are already substantially larger than one 720-pixel macroblock row, so a logical two-bank schedule may be possible without increasing the design's 91 percent RAM-block use, but its attainable whole-stream overlap must be measured before changing tightly coupled parser ownership.
+
+#### Next Steps:
+
+Add simulation-only row-ready and row-retired event tracing for P and B, replay each engine through an exact two-stage flow-shop model with one queued row, and report serial versus overlapped cycles per stream and picture type. Require the unchanged exact pixel, transaction, publication and display regressions, and proceed to functional ping-pong ownership only if the modeled hardware-scaled reduction materially closes the remaining 25 fps gap without requiring another physical RAM block.
+
+#### Files Modified:
+
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/analyze_row_pipeline_ceiling.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
 
 ---
