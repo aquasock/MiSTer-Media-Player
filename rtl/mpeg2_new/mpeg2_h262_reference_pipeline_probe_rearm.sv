@@ -129,6 +129,12 @@ wire signed[15:0] plan_adapter_value=(plan_emit_count<6'd48)?{plan_emit_mvx,8'sd
 wire plan_select=plan_first_now||plan_capture_active||plan_ready||plan_started||plan_replay_active;
 wire general_input_select=(general_mixed_mode||general_detect_now)&&!b_select;
 wire mixed_select=general_input_select||plan_select||mixed_active;
+// Entry 240 timing closure: B selection must retain priority on the shared
+// cache/DDR muxes, but it need not enter the P engine's internal address cone.
+// P mode remains latched from its first metadata word through persistence, and
+// mix_residual_valid below still rejects every B sideband.
+wire mixed_engine_select=general_mixed_mode||general_detect_now||
+    plan_select||mixed_active;
 wire mix_residual_valid=plan_adapter_valid?1'b1:(p_residual_sample_valid&&general_input_select);
 wire[5:0] mix_residual_index=plan_adapter_valid?plan_adapter_index:p_residual_sample_index;
 wire signed[15:0] mix_residual_value=plan_adapter_valid?plan_adapter_value:p_residual_sample_value;
@@ -237,7 +243,8 @@ mpeg2_h262_reference_word_cache reference_cache(
  .uncached_count(shared_uncached_reads));
 
 mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
- .clk(clk),.reset(reset),.capture_enable(mixed_select),.request(mixed_select),
+ .clk(clk),.reset(reset),.capture_enable(mixed_engine_select),
+ .request(mixed_engine_select),
  .horizontal_size(horizontal_size),.vertical_size(vertical_size),
  .shift_right_map(48'd0),
  .residual_valid(mix_residual_valid),.residual_index(mix_residual_index),.residual_value(mix_residual_value),

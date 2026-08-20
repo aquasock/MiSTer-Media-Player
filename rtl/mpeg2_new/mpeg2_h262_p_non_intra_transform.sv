@@ -259,7 +259,7 @@ wire signed [32:0] iq_multiplier_result =
     iq_multiplier_a * iq_multiplier_b;
 reg               iq_stage_pending;
 reg signed [31:0] iq_stage_product;
-reg signed [12:0] iq_stage_qf;
+reg               iq_stage_qf_seven;
 reg signed [31:0] iq_unclipped;
 reg signed [11:0] iq_saturated;
 reg signed [11:0] iq_final_value;
@@ -372,7 +372,7 @@ always @(posedge clk) begin
         iq_intra_dc_precision  <= 2'd0;
         iq_stage_pending       <= 1'b0;
         iq_stage_product       <= 32'sd0;
-        iq_stage_qf            <= 13'sd0;
+        iq_stage_qf_seven      <= 1'b0;
         idct_coeff_block_start <= 1'b0;
         idct_coeff_valid       <= 1'b0;
         idct_coeff_index       <= 6'd0;
@@ -438,7 +438,7 @@ always @(posedge clk) begin
         if (iq_active) begin
             if (!iq_stage_pending) begin
                 iq_stage_product <= iq_multiplier_result[31:0];
-                iq_stage_qf <= iq_qf;
+                iq_stage_qf_seven <= (iq_qf == 13'sd7);
                 iq_stage_pending <= 1'b1;
                 if (!iq_intra_block && (iq_index != 6'd63))
                     iq_qfs_index_reg <= scan_index(
@@ -458,7 +458,7 @@ always @(posedge clk) begin
                     (active_block_index == 2'd0) && (iq_index == 6'd0)) begin
                     if ((iq_quantiser_scale_code == 5'd2) &&
                         !iq_q_scale_type &&
-                        (iq_stage_qf == 13'sd7) &&
+                        iq_stage_qf_seven &&
                         (iq_final_value == 12'sd30))
                         y0_f00_proven <= 1'b1;
                     else
@@ -471,7 +471,7 @@ always @(posedge clk) begin
                 end
                 else if (!iq_intra_block) begin
                     iq_stage_product <= iq_multiplier_result[31:0];
-                    iq_stage_qf <= iq_qf;
+                    iq_stage_qf_seven <= (iq_qf == 13'sd7);
                     iq_stage_pending <= 1'b1;
                     iq_index <= iq_index + 6'd1;
                     if (iq_index != 6'd62)
