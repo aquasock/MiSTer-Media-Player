@@ -1,5 +1,5 @@
 ---
-## 257 COMMIT Unreleased 1d4329d 2026-08-20T05:33:27-07:00
+## 257 COMMIT Unreleased 0d4f679 2026-08-20T05:49:38-07:00
 
 #### Coming From:
 
@@ -7,20 +7,21 @@ Unreleased cc23163
 
 #### Purpose:
 
-Remove the remaining zero-latency response-capacity feedback loop while preserving full-cache same-edge retirement and replacement.
+Remove the remaining zero-latency response-capacity feedback loop while preserving full-cache same-edge retirement and replacement, then obtain a reproducibly timing-qualified placement without changing decoder RTL.
 
 #### Outcome:
 
-Commit `cc23163` removed request-valid from cache and arbiter busy equations, but its clean Quartus elaboration found a different ten-node loop: cache command valid used downstream response-ready to decide that a full descriptor FIFO would pop, while legal direct-response routing used that command valid to select response ownership. The build was interrupted before fitting completed and no RBF was produced or deployed. Commit `1d4329d` instead lets a full cache accept a replacement only when the arbiter's request-independent prediction readiness proves that its corresponding head command is retiring; response-ready now feeds only clocked pop and data association. The strengthened downstream model genuinely fills at two and reopens only on retirement. Focused cache and arbiter tests pass idle readiness, depth two, full-queue same-edge replacement, direct response, backpressure, burst ownership and prediction/display/prediction order. The exact mixed ten-cycle boundary remains all 423,936 samples, zero mismatches, 69,556 reads and 2,069,996 cycles, preserving the full Entry 255 gain with no response-routing feedback in command valid.
+Commit `cc23163` removed request-valid from cache and arbiter busy equations, but its clean Quartus elaboration found a different ten-node loop: cache command valid used downstream response-ready to decide that a full descriptor FIFO would pop, while legal direct-response routing used that command valid to select response ownership. The build was interrupted before fitting completed and no RBF was produced or deployed. Commit `1d4329d` instead lets a full cache accept a replacement only when the arbiter's request-independent prediction readiness proves that its corresponding head command is retiring; response-ready now feeds only clocked pop and data association. The strengthened downstream model genuinely fills at two and reopens only on retirement. Focused cache and arbiter tests pass idle readiness, depth two, full-queue same-edge replacement, direct response, backpressure, burst ownership and prediction/display/prediction order. The exact mixed ten-cycle boundary remains all 423,936 samples, zero mismatches, 69,556 reads and 2,069,996 cycles, preserving the full Entry 255 gain with no response-routing feedback in command valid. A fully clean seed-2 Quartus build then completed with zero errors and no reported combinational loop; decoder and ordinary video timing are clean at +1.167 and +6.670 ns, but the dynamic HDMI scaler/OSD clock misses global setup by 0.179 ns across standing framework paths, so that RBF is rejected and was not deployed. Commit `0d4f679` changes only the reproducible fitter seed from two to five, leaving every decoder source and simulation result unchanged for a fresh clean placement attempt.
 
 #### Next Steps:
 
-Run a fully clean Quartus build from `1d4329d`, inspect the synthesis map for zero combinational-loop logic, and require positive global and decoder timing. If qualified, hash and deploy the RBF, run automated mixed and long hardware cadence acquisition against Entry 247, and then pause with an alert for the user's visual inspection before any further optimization.
+Run a fully clean seed-5 Quartus build from `0d4f679`, inspect the synthesis map for zero combinational-loop logic, and require positive global and decoder timing. If qualified, hash and deploy the RBF, run automated mixed and long hardware cadence acquisition against Entry 247, and then pause with an alert for the user's visual inspection before any further optimization.
 
 #### Files Modified:
 
 - rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
 - tools/streams/tb_h262_prediction_word_cache.sv
+- MediaPlayer.qsf
 
 #### Status:
 
