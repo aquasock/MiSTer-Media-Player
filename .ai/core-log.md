@@ -1257,6 +1257,8 @@ Remove the duplicate 64-cycle spatial-sample replay after each transformed P/B r
 
 Commit `c958794` publishes each P/B block descriptor before transform start and forwards the transform's existing registered index-zero-through-index-63 spatial output directly into row capture, removing both private 64-sample arrays and their duplicate replay states. The exact mixed boundary preserves all 423,936 pixels with zero mismatches and maximum delta two, 69,556 reads, every write, nine publications, 23 swaps and zero errors while falling from 1,969,996 to 1,809,996 cycles, an 8.12 percent reduction. The complete long boundary preserves 372,696 reads, all reference/scratch writes, 25 publications, 71 swaps and zero errors while falling from 10,719,996 to 9,779,996 cycles, an 8.77 percent reduction. Focused B residual streaming falls by exactly 7,680 cycles across 120 blocks while preserving 7,680 samples, 518,400 stores and its authored stripe; P intra falls by exactly 384 cycles across six blocks with all samples exact. B intra, eight-refill parser windows, dense P row streaming across 8,100 blocks and 518,400 samples, and dense B row streaming across 8,073 blocks and 516,672 samples all pass exact ordering and accounting. The measured simulation gain projects the accepted hardware from 19.85 to approximately 21.61 fps mixed and from 21.82 to approximately 23.92 fps long if timing and hardware scale proportionally.
 
+The fully clean seed-six Quartus 17.0.2 build completes in 10 minutes 12 seconds with zero errors, 143 standing warnings, no Critical Warning and no combinational loop. Timing is positive at +0.364 ns global setup, +1.385 ns decoder setup, +7.828 ns video setup, +0.248 ns hold, +3.006 ns global recovery, +14.138 ns decoder recovery and +0.724 ns removal. The fit uses 30,826 ALMs, 45,389 registers, 4,027,379 memory bits, 504 RAM blocks and 65 DSP blocks. Generated `MediaPlayer.rbf` is 4,295,800 bytes with SHA-256 `1861768efab90d93a5805f9545aa1565be7884df1eab0b4fb38386b3be1e77bf`.
+
 #### Next Steps:
 
 Run Quartus from the timing-qualified seed-six boundary, require positive global and decoder timing with no combinational loop, deploy only a fully passing RBF, and acquire exact MiSTer telemetry for both compatibility streams. If both preserve their accepted LED/transaction signatures and materially improve cadence, pause for the user's visual check before selecting the remaining path to stable 25 fps.
@@ -1273,7 +1275,7 @@ Run Quartus from the timing-qualified seed-six boundary, require positive global
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
