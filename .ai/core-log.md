@@ -715,36 +715,51 @@ Retain the timing-clean vertical pair and leave Entry 274's cross-macroblock sta
 - [x] Passed
 
 ---
-## 236 COMMIT Unreleased f206298 2026-08-19T13:36:19-07:00
+## 276 COMMIT Unreleased ??? 2026-08-20T13:37:33-07:00
 
 #### Coming From:
 
-Unreleased 6583c66
+Unreleased 45bdfc8
 
 #### Purpose:
 
-Restore the hardware-proven four-entry reference cache and add mixed-stream pixel-content coverage after Entry 235 corrupted the mixed-macroblock display despite passing control-path diagnostics.
+Add a third reference-picture destination so queued decode can proceed while two references and both B scratch frames remain owned by presentation.
 
 #### Outcome:
 
-Hardware rejects Entry 235 as a compatibility regression: its long-GOP gain is only 76 ms or 1.28 percent while the byte-identical mixed-macroblock stream displays a repeated diagonal field and a second download never presents a new frame. Commit `f206298` restores Entry 234's exact four-entry fully associative cache and adds a deterministic 128x96, 24-picture mixed I/P/B stream containing intra macroblocks in P pictures plus an FFmpeg-decoded YUV420P oracle. The new integrated regression seeds the omitted I-writer reference model, reconstructs 423,936 P/B samples through the real parser, prediction engines, cache, tagged writer, DDR model, and scheduler, and passes every sample within a maximum MPEG IDCT delta of two; it also locks 499,551 cache hits, 71,329 misses and DDR reads, and 3,109,996 cycles. Focused cache, P-intra, B-residual, B-intra, parser-window, exact 72-picture live-raster, and full-resolution 791,528-byte long-GOP publication regressions all pass; the live soak exactly restores 2,267,813 hits, 463,835 misses and reads, 15,739,996 cycles, all 72 display identities, and zero errors. The incremental Quartus 17.0.2 build completes in 9 minutes 14 seconds with zero errors, 124 standing warnings, no critical warning, global setup and hold slack of +0.433 and +0.250 ns, focused decoder setup and recovery slack of +0.687 and +15.505 ns, video setup slack of +7.357 ns, 29,203 ALMs, 40,967 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. `MediaPlayer.rbf` is 4,261,000 bytes with SHA-256 `af041d0ca68a9540dee1d8f05f1c7335bf42c5353940d47cb2a2304bd05ec5f5`; its MiSTer FTP readback is byte-identical. Replacement first-load hardware captures supersede the invalid earlier recordings and fully accept the recovery. The mixed-macroblock capture reaches timestamp `00:00:00.920`, frame `23`, with the intended bars, checkerboard, dots, and moving features coherent and stable, USER and POWER solid, and DISK off. The long-GOP capture reaches timestamp `00:00:02.840`, frame `71`, with a coherent settled raster and no repeated diagonal-field corruption, USER and POWER solid, and DISK stage eleven.
+Proposal only. Entry 275 leaves mixed at 56,954,583 cadence cycles with 6,273,403 presentation-wait and 734,037 destination-wait cycles; removing both ownership waits would reach 49,947,143 cycles, only 267,143 above the 49,680,000-cycle 25 fps target. The current two-reference-bank design can occupy its visible past reference and future prediction reference while the two B scratch frames hold a queued run, leaving no legal P destination. This boundary will add reference bank 2 at DDR word offset `0x00040000`, retain scratch banks at `0x00020000` and `0x00030000`, widen reference, destination, completed and display identities to two bits, rotate reference destinations across banks zero, one and two, and carry an explicit previous-reference identity into B prediction instead of deriving the past reference as the inverse of a one-bit future bank. The destination-display hold remains as a safety assertion for any unexpected three-bank collision; no cadence constants, pixel arithmetic, cache ordering, scratch generation ownership or DDR transaction concurrency will change.
 
 #### Next Steps:
 
-Preserve the hardware-accepted four-entry cache and pixel oracle, then add `ioctl_download`-driven decoder rearming as the next separate boundary so repeated downloads reliably start a new decode without coupling that lifecycle change to the recovered first-load datapath.
+Add focused three-bank publication and B past/future-address tests, extend scheduler and complete-trace identity scoreboards to three reference banks, and require exact focused prediction values, all 423,936 mixed pixels, every long-GOP picture and swap, zero overwrites, zero errors and unchanged scratch ordering. Compare cadence-stressed simulation ownership stalls with Entry 275 before committing source; only then run a fully clean Quartus build, audit every decoder and video timing group, deploy a timing-clean RBF, and use hardware telemetry to decide whether the remaining 267,143-cycle ideal residual requires one final decoder reduction.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
-- tools/streams/generate_test_mixed_raster_soak.py
-- tools/streams/tb_h262_prediction_word_cache.sv
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_03.svh
+- MediaPlayer_top_04.svh
+- MediaPlayer_top_05.svh
+- MediaPlayer_top_06.svh
+- MediaPlayer_top_07.svh
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_dense_publication_order.sv
 - tools/streams/tb_h262_live_raster_soak.sv
 - tools/streams/tb_h262_mixed_raster_pixels.sv
 
 #### Status:
 
-- [x] Built
-- [x] Passed
+- [ ] Built
+- [ ] Passed
 
 ---
 ## 237 COMMIT Unreleased 23d8410 2026-08-19T15:21:10-07:00
