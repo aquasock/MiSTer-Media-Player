@@ -950,43 +950,6 @@ None.
 - [x] Passed
 
 ---
-## 210 COMMIT Unreleased 3fcf22f 2026-08-18T05:13:48-07:00
-
-#### Coming From:
-
-Unreleased 450f78a
-
-#### Purpose:
-
-Identify the hidden repeated-P parser failure that prevents the second dense P reference from reaching publication.
-
-#### Outcome:
-
-Commit `3fcf22f` proves the POWER-4 publication failure was downstream of stale B ownership: `b_candidate` remained asserted after B persistence, suppressed the following P parser's refill hold, and let thousands of compressed bytes overrun its active 512-byte window until coefficient state failed. The B parser now releases candidate ownership when the following non-B header is known, the P parser and publication shell retain sticky first-fault detail, and the complete dense regression passes 120 P rows, four P pictures, 210 B rows, seven B pictures, and five reference publications with no parser, transport, or publication error. Fail-open transport, parser-window, and restricted-slice regressions pass unchanged. The clean Quartus 17.0.2 build completes in 9 minutes 25 seconds with zero setup and hold TNS, no Critical Warning, +0.062 ns global setup, +0.249 ns global hold, +2.613 ns focused decoder setup, +14.318 ns focused decoder recovery, 29,163 ALMs, 41,923 registers, 4,025,331 memory bits, 503 RAM blocks, 65 DSP blocks, and 3 PLLs. RBF SHA-256 `6692722e11d44c10bbbd716e60d4b1761072c4b72452742d1df403c7342c1120` was uploaded to `10.10.0.30` and read back with the same hash. Hardware accepts the deployed build: `test_compat_dense_residual.m2v` loads slowly but completes, visibly advances through more pattern changes, settles on the full dense diagonal raster captured in the uploaded photograph, and reports USER and POWER solid with DISK off.
-
-#### Next Steps:
-
-Proceed to the next v0.6.0 roadmap boundary by recording its proposal before making further decoder changes.
-
-#### Files Modified:
-
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_07.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
-- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
-- tools/streams/tb_h262_dense_publication_order.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
 ## 211 COMMIT Unreleased 19914b2 2026-08-18T07:25:22-07:00
 
 #### Coming From:
@@ -1272,6 +1235,42 @@ Retain the timing-clean hardware-proven B row pipeline and implement the corresp
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
 - tools/streams/tb_h262_b_residual_streaming.sv
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+## 265 COMMIT Unreleased 65ecd2e 2026-08-20T09:53:29-07:00
+
+#### Coming From:
+
+Unreleased 5a3c0e4
+
+#### Purpose:
+
+Overlap P-picture parsing and transform production for the following row with reconstruction and persistence of the current row through two logical metadata banks.
+
+#### Outcome:
+
+Commit `65ecd2e` gives the P producer and raster consumer two credit-counted row banks while retaining the existing 2,048-descriptor and 131,072-sample physical memories as two 1,024-descriptor logical halves. Independent capture and execution bank ownership preserves descriptor counts, motion ranges, row identity and final-picture retirement; the producer advances while one older row reconstructs and blocks only when both banks are occupied. The exact mixed oracle preserves all 423,936 samples with zero mismatches and maximum delta two, 69,556 reads, every write, nine publications, 23 swaps and zero errors while falling from 1,459,996 to 1,289,996 cycles, an 11.64 percent reduction. The exact long boundary preserves 372,696 reads, every write, 25 publications, 71 swaps and zero errors while falling from 7,469,996 to 6,999,996 cycles, a 6.29 percent reduction. Focused single-intra, 120-block residual, 8,100-block dense P row-streaming, eight-refill parser-window, final-row persistence and complete mixed publication regressions pass with exact sample, transform and ownership accounting. A fully clean seed-six Quartus 17.0.2 build completes in 10 minutes 29 seconds with zero errors and 145 standing warnings. Timing is positive at +0.117 ns global setup, +1.778 ns decoder setup, +7.885 ns video setup, +0.251 ns hold, +2.694 ns global recovery, +15.698 ns decoder recovery and +0.961 ns removal. The fit uses 30,927 ALMs, 45,708 registers, 4,027,379 memory bits, 504 RAM blocks and 65 DSP blocks. `MediaPlayer_commit265_65ecd2e.rbf` is 4,305,820 bytes with SHA-256 `a2f127e6d80d9a01215364ed6328a091763929aa32dfc1e73c4e03014a64cd38`; the standard MiSTer upload and FTP readback are byte-identical. Hardware accepts both streams with every byte and picture, 71 and 23 swaps, zero errors and zero destination stalls. Long measures 164,932,359 cycles at 23.245893 fps, only 12,997 cycles faster than Entry 264, while decoder stalls fall by 9,845,014 and presentation stalls rise by 8,587,991 cycles. Mixed measures 59,868,266 cycles at 20.745548 fps, only 3,021 cycles faster, while decoder stalls fall by 3,184,646 and presentation stalls rise by 2,800,593 cycles. The P overlap is therefore functionally real and removes substantial internal work, but B-picture reconstruction and cadence-gated presentation remain on the end-to-end critical path.
+
+#### Next Steps:
+
+Retain the exact timing-safe P and B row pipelines and measure the complete-trace ceiling of a B-specific block pipeline that separates next-block prediction address production and reference fetch from current-block pixel reconstruction and persistence. Trace block fetch-ready and block-retire boundaries, model two bounded reference-block banks without changing production RTL, and proceed to functional implementation only if exact mixed and long replays predict a material cadence reduction toward the remaining 10,188,266 and 11,572,359 cycles required for stable 25 fps.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+- tools/streams/tb_h262_p_intra_macroblocks.sv
+- tools/streams/tb_h262_parser_windows.sv
+- tools/streams/tb_h262_row_streaming.sv
 
 #### Status:
 
