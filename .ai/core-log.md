@@ -1,4 +1,39 @@
 ---
+## 245 COMMIT Unreleased ??? 2026-08-20T00:00:02-07:00
+
+#### Coming From:
+
+Unreleased 8d76c43
+
+#### Purpose:
+
+Measure real MiSTer picture cadence and decoder bottlenecks without requiring HDMI recordings for each development iteration.
+
+#### Outcome:
+
+The approved development boundary will add timing-isolated decoder-domain counters for accepted input, decoder, presentation and destination stalls, picture-type work, prediction traffic, writer activity, picture completion and actual display swaps, then freeze a versioned checksummed snapshot after sequence completion. A video-domain overlay will encode that stable snapshot as a machine-readable bit grid without feeding any telemetry result back into decode, DDR, publication or presentation control. A deterministic local decoder and MiSTer runner will load the long-GOP and mixed-macroblock streams, request native screenshots through `/dev/MiSTer_cmd`, retrieve them over the network and report measured hardware durations, delivered frame rate and bottleneck totals. Entry 244's independently measured 14.38 fps long-GOP and 12.65 fps mixed-macroblock results are the locked baselines; hardware success requires strict completion and display counts with no functional error, no timing failure, and first-to-final spans no greater than 2.84 seconds for frames 0 through 71 and 0.92 seconds for frames 0 through 23.
+
+#### Next Steps:
+
+Implement the profiler, stable cross-clock snapshot, overlay, focused regression and local acquisition tools while keeping all taps registered and outside the timing-critical P prelaunch cone. Run the focused test and the locked parser, raster, mixed-pixel, publication and exact live-soak regressions, then require a fully clean Quartus build with positive setup, hold, recovery and removal slack before deploying the development RBF. Establish both hardware baselines from decoded screenshots and use the largest measured stall class to define the next proposal-first throughput optimization; HDMI video remains reserved for final visual verification after hardware telemetry reaches stable 25 fps.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_04.svh
+- MediaPlayer_top_07.svh
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/run_hardware_cadence.py
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 244 COMMIT Unreleased 8d76c43 2026-08-19T23:05:34-07:00
 
 #### Coming From:
@@ -1236,34 +1271,6 @@ Reload the deployed core and run `test_compat_long_gop.m2v` once. Confirm whethe
 
 - rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 - tools/streams/tb_h262_b_presentation_scheduler.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 226 COMMIT Unreleased 1b26cb5 2026-08-18T14:13:55-07:00
-
-#### Coming From:
-
-Unreleased 1b26cb5
-
-#### Purpose:
-
-Record the hardware result of the reference-classification barrier and correct the inferred B-to-future-reference event ordering.
-
-#### Outcome:
-
-The deployed `1b26cb5` RBF now stops on frame 47 rather than frame 50; POWER repeats five blinks while USER and DISK remain off. POWER code five proves that a newer reference completed but the displayed bank did not advance to it, with no encoded decoder or DDR error. This result disproves Entry 224's vblank-first ordering: the B48 accepted-header event reaches the scheduler in the I50 publication handoff before the newly registered I50 reference bank is visible. The scheduler therefore compares the displayed P47 bank with stale P47 reference state, classifies the future reference as already displayed, and aborts the B run. Before Entry 225, ordinary `frame_waiting` could still display I50 after that abort, producing the old terminal frame 50; the new classification barrier correctly removes that fallback and exposes the underlying abort as terminal frame 47 and completed-versus-displayed mismatch. The apparent two-frame steps remain compatible with 30 fps camera sampling of one-refresh B pictures and do not alter this bank-ownership result.
-
-#### Next Steps:
-
-Await approval for a two-phase future-reference acquisition in the scheduler: a B header may open the run before its future publication is registered, and the next reference publication must then supply the completed bank without being treated as ordinary display work. Cover B-header ordering before, simultaneous with, and after reference publication, retain the Entry 225 ordinary and terminal release cases, preserve fail-open behavior, and use an incremental Quartus build for the next hardware boundary.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
