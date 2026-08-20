@@ -321,10 +321,17 @@ wire next_tap_last=(half_x&&half_y)?(next_tap_index==2'd3):
 wire [3:0] phase_tap_byte_sum={1'b0,phase_base_byte}+tap_dx;
 wire [3:0] next_phase_tap_byte_sum=
     {1'b0,phase_base_byte}+next_tap_dx;
+// Entry 277: the footprint lookup already returns the same word column from
+// the adjacent row.  When a 2-by-2 phase starts at tap zero and both horizontal
+// samples stay in that column, all four registered bytes are available now.
+wire lookup_quad=lookup_wait&&block_lookup_ready&&
+    block_lookup_valid&&block_lookup_next_row_valid&&
+    (tap_index==2'd0)&&half_x&&half_y&&
+    (phase_tap_byte_sum[3]==next_phase_tap_byte_sum[3]);
 // Entry 273: a retained word may supply the following horizontal tap without
 // a second lookup.  Row and word identity are explicit.
 wire lookup_horizontal_pair=lookup_wait&&block_lookup_ready&&
-    block_lookup_valid&&
+    block_lookup_valid&&!lookup_quad&&
     !tap_last&&(tap_dy==next_tap_dy)&&
     (phase_tap_byte_sum[3]==next_phase_tap_byte_sum[3]);
 // Entry 275: the separately registered adjacent-row response supplies the
@@ -336,7 +343,8 @@ wire lookup_vertical_pair=lookup_wait&&block_lookup_ready&&
     (phase_tap_byte_sum[3]==next_phase_tap_byte_sum[3]);
 wire lookup_pair=lookup_horizontal_pair||lookup_vertical_pair;
 wire lookup_phase_complete=lookup_wait&&block_lookup_ready&&
-    block_lookup_valid&&(tap_last||(lookup_pair&&next_tap_last));
+    block_lookup_valid&&(tap_last||lookup_quad||
+                         (lookup_pair&&next_tap_last));
 wire prediction_phase_complete=lookup_phase_complete;
 wire bidir_lookup_candidate=prediction_phase_complete&&
     (exec_direction==2'd3)&&!pred_direction;
@@ -422,9 +430,16 @@ wire [7:0] lookup_next_tap_sample=
     lookup_vertical_pair?
         bat(block_lookup_next_row_data,lookup_next_tap_byte):
         bat(block_lookup_data,lookup_next_tap_byte);
+wire [7:0] lookup_quad_bottom_left=
+    bat(block_lookup_next_row_data,phase_tap_byte);
+wire [7:0] lookup_quad_bottom_right=
+    bat(block_lookup_next_row_data,lookup_next_tap_byte);
 wire [10:0] lookup_pred_sum_with_current=
     pred_sum+{3'd0,lookup_tap_sample}+
-    (lookup_pair?{3'd0,lookup_next_tap_sample}:11'd0);
+    (lookup_quad?({3'd0,lookup_next_tap_sample}+
+                  {3'd0,lookup_quad_bottom_left}+
+                  {3'd0,lookup_quad_bottom_right}):
+     lookup_pair?{3'd0,lookup_next_tap_sample}:11'd0);
 wire [7:0] lookup_selected_prediction=
     round_prediction(lookup_pred_sum_with_current,half_x,half_y);
 wire [8:0] lookup_bidir_sum=
