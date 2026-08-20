@@ -1,4 +1,35 @@
 ---
+## 243 COMMIT Unreleased ??? 2026-08-19T20:45:57-07:00
+
+#### Coming From:
+
+Unreleased 748fb3f
+
+#### Purpose:
+
+Prelaunch the next B prediction cache-miss DDR request at the current registered response boundary without weakening cache timing or transaction ownership.
+
+#### Outcome:
+
+The approved implementation will extend only the B bidirectional raster engine so a known following tap, direction phase, or pixel address can enter the existing one-outstanding DDR request path as the current registered miss response retires. The four-entry fully associative cache, registered cache-hit response, P engine, reconstructed values, bidirectional rounding, writer protocol, presentation cadence, framebuffer ownership, and download lifecycle will remain unchanged.
+
+#### Next Steps:
+
+Implement the registered B refill prelaunch, add focused coverage for consecutive misses and direction transitions, run cache, B residual, B intra, P intra, parser-window, mixed-pixel, exact live-raster, repeated-download, and full-resolution publication regressions, then require a timing-clean Quartus build before producing a hash-qualified RBF for MiSTer validation.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 242 COMMIT Unreleased 748fb3f 2026-08-19T20:05:43-07:00
 
 #### Coming From:
@@ -446,43 +477,6 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 202 COMMIT Unreleased 104965c 2026-08-18T00:50:44-07:00
-
-#### Coming From:
-
-Unreleased 9672f0a
-
-#### Purpose:
-
-Replace the generalized P path's picture-wide residual-plan limits with block-at-a-time transform delivery and RAM-backed sparse reconstruction storage.
-
-#### Outcome:
-
-Commit `9672f0a` is hardware accepted: the authored intra macroblock at row 8, column 20 is visibly reconstructed with a coherent raster, USER and POWER solid, and DISK off. Commits `9525d69` and `104965c` replace the P parser's flattened residual plans with synchronous M10K-backed stores for 2,048 block descriptors and 32,768 coefficient events, transform one block at a time through the existing shared serialized engine, and retain 2,048 sparse reconstructed blocks in M10K RAM; the correction commit packs the raster descriptor fields into one synchronous RAM and adds the required sample-lookup staging cycle after the first fit exposed asynchronous descriptor registers. The existing intra regression remains clean at 1,350 motion events, one intra macroblock, six blocks, and 384 samples, while the new 181,161-byte streaming regression remains clean at 1,350 motion events, 20 intra macroblocks, 120 blocks, and 7,680 samples with no parser, residual, raster, or transform error. Parser-window and restricted-slice replays remain clean, the ordinary 366,067-byte mixed-macroblock corpus now completes all seven P pictures with 158 refills and no P error while retaining the separately scoped B limit, and all seven standing generators retain their hashes and reference results. The clean Quartus 17.0.2 build completes in 9 minutes 18 seconds with zero setup and hold TNS, no Critical Warning, +0.221 ns global setup, +0.251 ns global hold, +2.128 ns decoder setup, 29,590 ALMs, 42,190 registers, 3,335,155 memory bits, 421 RAM blocks, 65 DSP blocks, and 3 PLLs. Generated RBF `MediaPlayer.rbf` has SHA-256 `25c96d4d8caa2bdfc3d7935834823c956e12d3720c31bd59e56449ece1118332`; stream `test_p_residual_streaming.m2v` has SHA-256 `3120133ee6f59159ab02e1927c25d057f92d127b569db4f394e71eefa6e8a801`.
-
-#### Next Steps:
-
-Install the Commit-202 RBF and run `test_p_residual_streaming.m2v` on MiSTer through one complete 32-second diagnostic frame, recording whether USER, POWER, and DISK are solid, dark, or blinking and confirming a coherent vertical intra stripe at column 20 from rows 5 through 24. Clean acceptance is solid USER, solid POWER, and dark DISK; after acceptance, address the independently retained B residual-plan limit in the next commit.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
-- tools/streams/generate_test_p_residual_streaming.py
-- tools/streams/tb_h262_p_intra_macroblocks.sv
-- tools/streams/tb_h262_parser_windows.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
 ## 203 COMMIT Unreleased e3036ac 2026-08-18T01:52:05-07:00
