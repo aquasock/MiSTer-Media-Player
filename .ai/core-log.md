@@ -1239,7 +1239,7 @@ Retain the exact timing-safe P and B row pipelines and measure the complete-trac
 - [x] Passed
 
 ---
-## 266 COMMIT Unreleased ??? 2026-08-20T09:55:41-07:00
+## 266 COMMIT Unreleased c7b70cb 2026-08-20T09:55:41-07:00
 
 #### Coming From:
 
@@ -1251,11 +1251,11 @@ Measure the complete-trace performance ceiling of overlapping B-picture next-blo
 
 #### Outcome:
 
-Proposal only. Entry 265 proves that P row production is no longer cadence-critical: hardware P stalls fall by 9,839,341 cycles long and 3,174,894 cycles mixed while B stalls change by only 2,238 and 10,397 cycles, and the end-to-end gain is absorbed almost entirely by presentation waiting. Add optional simulation-only B block START, FETCHED and RETIRE tracing to the exact live-raster harness and a deterministic two-machine, two-bank replay that treats current serial fetch completion as an optimistic producer boundary. Preserve default exact cycle, pixel, read, write, publication and swap results because the profiler must not feed functional logic. Compare mixed and long upper bounds against the remaining stable-25-fps gaps before considering a ping-pong reference-block store or dedicated next-block address pipeline.
+Commit `c7b70cb` adds optional simulation-only B block START, FETCHED and RETIRE tracing to the exact live-raster harness plus a deterministic two-machine, two-bank replay. The model is deliberately optimistic: it treats full-footprint fetch completion as the instant the producer bank can begin the following block and assigns already-overlapped current-block work only to the consumer remainder. With tracing enabled, the mixed oracle remains exact at 1,289,996 cycles with all 423,936 pixels, 69,556 reads, every write, nine publications, 23 swaps and zero errors. Its 4,320 predicted B blocks span 592,054 serial cycles; the upper-bound replay takes 511,007, saving at most 81,047 cycles or 13.69 percent of the B block span and 6.28 percent of the whole trace. The long boundary remains exact at 6,999,996 cycles with 372,696 reads, every write, 25 publications, 71 swaps and zero errors. Its 13,536 predicted B blocks span 3,854,042 cycles; the upper-bound replay takes 3,441,302, saving at most 412,740 cycles or 10.71 percent of the B block span and 5.90 percent of the whole trace. Because even these cost-free upper bounds cannot close either stable-25-fps gap, a functional ping-pong block fetcher is rejected and no Quartus or hardware cycle is warranted.
 
 #### Next Steps:
 
-Implement only the optional trace and analyzer, run both exact streams, and reject the architecture without Quartus if even its optimistic two-bank ceiling is not material. If the ceiling is material on both traces, update this entry with the measured result and begin a separate proposal for bounded functional B block prefetch with explicit buffer ownership and unchanged DDR response order.
+Retain the accepted Entry 265 hardware and the reusable block trace, but do not implement a second reference-block bank. Measure the larger B pixel-consumption ceiling next: use block direction and forward/backward half-pel parity to quantify one-lane tap work versus a bounded two-lane interpolation or dual-phase lookup path, and compare the exact whole-trace upper bound against both remaining hardware gaps before changing the timing-sensitive raster engine.
 
 #### Files Modified:
 
@@ -1264,7 +1264,7 @@ Implement only the optional trace and analyzer, run both exact streams, and reje
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
