@@ -557,7 +557,7 @@ Retain Entry 269's timing-clean scheduler, reject bounded P predecode, and do no
 - [x] Passed
 
 ---
-## 271 COMMIT Unreleased ??? 2026-08-20T11:25:00-07:00
+## 271 COMMIT Unreleased 0cf21a2 2026-08-20T11:25:00-07:00
 
 #### Coming From:
 
@@ -569,11 +569,11 @@ Measure one joint B block-fetch and two-lane interpolation schedule against the 
 
 #### Outcome:
 
-Proposal only. Entry 270 proves that ownership decoupling alone cannot close mixed: even zero-cost removal of every destination and presentation wait leaves a 1,288,483-cycle or 5.71-percent decoder-wait shortfall. Entries 266 and 267 separately measured queued next-block fetch and two-lane tap consumption, but their reported savings overlap inside each block's fetch-to-retire span and must not be added. Extend the existing complete B block replay so each block's consumer duration is reduced only by its exact parity-derived two-lane tap saving, then pass those adjusted durations through the same two-bank producer/consumer schedule. Scale only the resulting joint B-span fraction against Entry 269's measured B stall counters and combine it with Entry 270's deliberately optimistic fifth-frame ownership bound. Report both streams, retain the decoded block/direction counts as invariants, and reject the combined architecture unless it closes both targets without additive double counting.
+Commit `0cf21a2` extends the recorded-block replay with exact per-block one-lane and two-lane tap durations, subtracts only that parity-derived saving from each observed consumer interval, and passes the adjusted interval through the same two-bank producer/consumer schedule; fetch overlap and lookup width are therefore composed rather than added. Every Entry 266 and 267 invariant reproduces exactly. Mixed retains 15 B pictures, 4,320 blocks, 592,054 serial B-span cycles, 64,806 fetch cycles, 124,012 setup-gap cycles, 403,236 consumer cycles, direction counts 894/2,592/834 and 391,808 one-lane tap cycles. Its fetch-only ceiling remains 511,007 cycles and its two-lane tap saving remains 85,760; the joint schedule is 425,567 cycles, saving 166,487 or 28.12 percent of B span. Scaled only against Entry 269's 12,303,219 measured mixed B-stall cycles, that is an optimistic 3,459,694-cycle decoder reduction. Long retains 47 B pictures, 13,536 blocks, 3,854,042 serial cycles, 332,552 fetch cycles, 1,230,804 gap cycles, 2,290,686 consumer cycles, direction counts 1,878/3,594/8,064 and 2,304,000 one-lane taps. Its fetch-only ceiling remains 3,441,302 and two-lane saving remains 908,800; the joint schedule is 2,553,302 cycles, saving 1,300,740 or 33.75 percent of B span, scaled to an optimistic 12,652,760 of Entry 269's measured B stalls. Entry 270's deliberately impossible zero-cost fifth-frame bound plus those non-double-counted decoder ceilings reaches 26.142531 fps mixed and clears long as well. The combined architecture therefore has sufficient upper-bound headroom, while neither constituent alone is justified as a 25-fps claim. Both analyzers compile and both complete recorded traces pass; no RTL or Quartus build is warranted.
 
 #### Next Steps:
 
-Use the recorded 4,320-block mixed and 13,536-block long traces without rerunning RTL, validate that the unmodified serial, two-bank and tap-only figures exactly reproduce Entries 266 and 267, and calculate the joint schedule plus hardware-scaled residual. If the joint ceiling closes both targets, choose the lower-risk functional order by testing the B block queue first while preserving Entry 269 scheduler ownership; if it does not, return to measured decoder serialization rather than widening frame identity.
+Retain Entry 269 scheduler ownership and implement only the lower-risk two-bank B block fetch queue next. Separate block address/fetch production from pixel consumption, permit at most one prefetched successor block, retain the existing one-outstanding tagged DDR/cache contract, and prevent either bank from reuse before its block retires. Require focused B pixels and stores, exact mixed pixels, complete long accounting and a material end-to-end cycle reduction before Quartus; measure hardware before deciding whether to add the two-lane lookup or widen full-frame identity.
 
 #### Files Modified:
 
@@ -582,8 +582,8 @@ Use the recorded 4,320-block mixed and 13,536-block long traces without rerunnin
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 232 COMMIT Unreleased 1b1ca8f 2026-08-18T23:55:01-07:00
