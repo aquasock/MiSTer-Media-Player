@@ -950,35 +950,6 @@ None.
 - [x] Passed
 
 ---
-## 205 COMMIT Unreleased c9636a7 2026-08-18T03:26:00-07:00
-
-#### Coming From:
-
-Unreleased 7256a7f
-
-#### Purpose:
-
-Guarantee that any B parser or reconstruction failure aborts the in-flight B transaction and releases compressed-stream backpressure.
-
-#### Outcome:
-
-Commit `7256a7f` is not hardware accepted: `test_compat_dense_residual.m2v` displays its coherent dense I/P raster but leaves the MiSTer file-transfer overlay permanently active with all diagnostic LEDs dark. Commit `c9636a7` makes sticky B parser/replay failure abort only the live B transaction and suppress its persistence wait, preserving the error for diagnostics while allowing the HPS byte path to drain. The focused transport regression holds B failure asserted and accepts all 4,102 bytes with zero post-abort stalls, while the separate full-corpus reproducer identifies the first deterministic dense failure at byte 818,622, slice row 9, and proves the parser itself releases `parse_hold`; the existing first dense B full-raster replay remains clear across 1,350 macroblocks, 8,073 residual blocks, 516,672 residual samples, and 518,400 stored samples.
-
-#### Next Steps:
-
-Correct the second and later B-picture parser/lifecycle behavior, require the complete dense `IPBBPBBPBBPB` coded sequence to finish without parser, replay, reconstruction, publication, presentation, or transport errors, then run a clean Quartus build for the combined recovery commits.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
-- tools/streams/tb_h262_dense_transport_recovery.sv
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
 ## 206 COMMIT Unreleased 2dd4c67 2026-08-18T04:27:00-07:00
 
 #### Coming From:
@@ -1270,5 +1241,34 @@ Forward each transform's already ordered spatial output directly into the P/B ra
 
 - [x] Built
 - [x] Passed
+
+---
+## 260 COMMIT Unreleased ??? 2026-08-20T07:03:18-07:00
+
+#### Coming From:
+
+Unreleased 9101fcc
+
+#### Purpose:
+
+Remove the duplicate 64-cycle spatial-sample replay after each transformed P/B residual block by streaming the transform's ordered output directly into row capture.
+
+#### Outcome:
+
+Proposal only. Entry 259 proves that every transformed block is emitted once by the shared transform into a private 64-sample temporary array and then emitted a second time in index order to the raster capture store. The second pass contributes approximately 160,000 mixed and 947,000 long simulation cycles while adding no arithmetic, ordering, buffering, or ownership information. Move each block descriptor before transform start and forward the transform's existing index-zero-through-index-63 output directly; retain complete-row capture, final row markers, exact sample validation and all parser, persistence, writer, publication, and presentation barriers.
+
+#### Next Steps:
+
+Implement the direct P and B spatial stream symmetrically, then run focused residual, intra, parser-window and row-streaming tests before the 423,936-pixel mixed oracle. If every pixel and transaction remains exact, run the complete long soak and compare cycle counts against 1,969,996 mixed and 10,719,996 long; reject the change before Quartus if the measured gain is not material.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
 
 ---
