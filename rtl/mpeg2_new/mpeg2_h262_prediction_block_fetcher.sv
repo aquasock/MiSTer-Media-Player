@@ -43,6 +43,8 @@ module mpeg2_h262_prediction_block_fetcher
     output reg         lookup_ready,
     output reg         lookup_valid,
     output reg  [63:0] lookup_data,
+    output reg         lookup_next_row_valid,
+    output reg  [63:0] lookup_next_row_data,
 
     output reg         active,
     output reg         complete,
@@ -109,6 +111,7 @@ wire [DESCRIPTOR_POINTER_WIDTH-1:0] descriptor_tail_next=
 
 wire [5:0] lookup_slot=(lookup_phase?6'd18:6'd0)+
     {lookup_row,1'b0}+lookup_column;
+wire [5:0] lookup_next_row_slot=lookup_slot+6'd2;
 wire [3:0] selected_lookup_rows=lookup_phase?
     phase1_rows_reg:phase0_rows_reg;
 wire selected_lookup_two_words=lookup_phase?
@@ -116,6 +119,8 @@ wire selected_lookup_two_words=lookup_phase?
 wire lookup_in_range=(lookup_phase<phase_count_reg)&&
     (lookup_row<selected_lookup_rows)&&
     (!lookup_column||selected_lookup_two_words);
+wire lookup_next_row_in_range=lookup_in_range&&
+    (lookup_row+1'b1<selected_lookup_rows);
 
 integer clear_index,descriptor_index;
 always @(posedge clk) begin
@@ -142,6 +147,8 @@ always @(posedge clk) begin
         lookup_ready<=1'b0;
         lookup_valid<=1'b0;
         lookup_data<=64'd0;
+        lookup_next_row_valid<=1'b0;
+        lookup_next_row_data<=64'd0;
         active<=1'b0;
         complete<=1'b0;
         error<=1'b0;
@@ -239,10 +246,16 @@ always @(posedge clk) begin
         if(lookup_request) begin
             lookup_ready<=1'b1;
             lookup_valid<=lookup_in_range&&word_valid[lookup_slot];
+            lookup_next_row_valid<=lookup_next_row_in_range&&
+                word_valid[lookup_next_row_slot];
             if(lookup_in_range&&word_valid[lookup_slot])
                 lookup_data<=word_data[lookup_slot];
             else
                 lookup_data<=64'd0;
+            if(lookup_next_row_in_range&&word_valid[lookup_next_row_slot])
+                lookup_next_row_data<=word_data[lookup_next_row_slot];
+            else
+                lookup_next_row_data<=64'd0;
         end
     end
 end

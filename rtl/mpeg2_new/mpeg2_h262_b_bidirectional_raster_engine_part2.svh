@@ -190,6 +190,8 @@ mpeg2_h262_prediction_block_fetcher block_fetcher(
     .lookup_column(block_lookup_column),
     .lookup_ready(block_lookup_ready0),.lookup_valid(block_lookup_valid0),
     .lookup_data(block_lookup_data0),.active(block_fetch_active0),
+    .lookup_next_row_valid(block_lookup_next_row_valid0),
+    .lookup_next_row_data(block_lookup_next_row_data0),
     .complete(block_fetch_complete0),.error(block_fetch_error0),
     .issued_count(block_fetch_issued0),
     .returned_count(block_fetch_returned0),
@@ -214,6 +216,8 @@ mpeg2_h262_prediction_block_fetcher block_fetcher1(
     .lookup_column(block_lookup_column),
     .lookup_ready(block_lookup_ready1),.lookup_valid(block_lookup_valid1),
     .lookup_data(block_lookup_data1),.active(block_fetch_active1),
+    .lookup_next_row_valid(block_lookup_next_row_valid1),
+    .lookup_next_row_data(block_lookup_next_row_data1),
     .complete(block_fetch_complete1),.error(block_fetch_error1),
     .issued_count(block_fetch_issued1),
     .returned_count(block_fetch_returned1),
@@ -225,6 +229,10 @@ assign block_lookup_valid=block_consumer_bank?
     block_lookup_valid1:block_lookup_valid0;
 assign block_lookup_data=block_consumer_bank?
     block_lookup_data1:block_lookup_data0;
+assign block_lookup_next_row_valid=block_consumer_bank?
+    block_lookup_next_row_valid1:block_lookup_next_row_valid0;
+assign block_lookup_next_row_data=block_consumer_bank?
+    block_lookup_next_row_data1:block_lookup_next_row_data0;
 assign block_fetch_active=block_fetch_active0||block_fetch_active1;
 assign block_fetch_complete=block_consumer_bank?
     block_fetch_complete1:block_fetch_complete0;
@@ -335,11 +343,19 @@ wire [3:0] phase_tap_byte_sum={1'b0,phase_base_byte}+tap_dx;
 wire [3:0] next_phase_tap_byte_sum=
     {1'b0,phase_base_byte}+next_tap_dx;
 // Entry 273: a retained word may supply the following horizontal tap without
-// a second lookup.  Row and word identity are explicit; vertical and
-// byte-seven crossings remain on the one-tap path.
-wire lookup_pair=lookup_wait&&block_lookup_ready&&block_lookup_valid&&
+// a second lookup.  Row and word identity are explicit.
+wire lookup_horizontal_pair=lookup_wait&&block_lookup_ready&&
+    block_lookup_valid&&
     !tap_last&&(tap_dy==next_tap_dy)&&
     (phase_tap_byte_sum[3]==next_phase_tap_byte_sum[3]);
+// Entry 275: the separately registered adjacent-row response supplies the
+// second tap of a pure vertical half-pel phase.  Four-tap interpolation and
+// horizontal word crossings remain on the established path.
+wire lookup_vertical_pair=lookup_wait&&block_lookup_ready&&
+    block_lookup_valid&&block_lookup_next_row_valid&&!tap_last&&
+    !half_x&&half_y&&(next_tap_dy==(tap_dy+1'b1))&&
+    (phase_tap_byte_sum[3]==next_phase_tap_byte_sum[3]);
+wire lookup_pair=lookup_horizontal_pair||lookup_vertical_pair;
 wire lookup_phase_complete=lookup_wait&&block_lookup_ready&&
     block_lookup_valid&&(tap_last||(lookup_pair&&next_tap_last));
 wire prediction_phase_complete=lookup_phase_complete;
@@ -424,7 +440,9 @@ wire [2:0] phase_tap_byte=phase_tap_byte_sum[2:0];
 wire [7:0] lookup_tap_sample=bat(block_lookup_data,phase_tap_byte);
 wire [2:0] lookup_next_tap_byte=next_phase_tap_byte_sum[2:0];
 wire [7:0] lookup_next_tap_sample=
-    bat(block_lookup_data,lookup_next_tap_byte);
+    lookup_vertical_pair?
+        bat(block_lookup_next_row_data,lookup_next_tap_byte):
+        bat(block_lookup_data,lookup_next_tap_byte);
 wire [10:0] lookup_pred_sum_with_current=
     pred_sum+{3'd0,lookup_tap_sample}+
     (lookup_pair?{3'd0,lookup_next_tap_sample}:11'd0);

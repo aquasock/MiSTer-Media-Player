@@ -33,6 +33,8 @@ module tb_h262_prediction_block_fetcher;
     reg [3:0] lookup_row=0;
     wire lookup_ready,lookup_valid;
     wire [63:0] lookup_data;
+    wire lookup_next_row_valid;
+    wire [63:0] lookup_next_row_data;
     wire active,complete,error;
     wire [6:0] issued_count,returned_count;
     wire [2:0] outstanding_count;
@@ -66,7 +68,10 @@ module tb_h262_prediction_block_fetcher;
         .lookup_request(lookup_request),.lookup_phase(lookup_phase),
         .lookup_row(lookup_row),.lookup_column(lookup_column),
         .lookup_ready(lookup_ready),.lookup_valid(lookup_valid),
-        .lookup_data(lookup_data),.active(active),.complete(complete),
+        .lookup_data(lookup_data),
+        .lookup_next_row_valid(lookup_next_row_valid),
+        .lookup_next_row_data(lookup_next_row_data),
+        .active(active),.complete(complete),
         .error(error),.issued_count(issued_count),
         .returned_count(returned_count),
         .outstanding_count(outstanding_count));
@@ -198,6 +203,7 @@ module tb_h262_prediction_block_fetcher;
         input integer row_index;
         input integer column_index;
         input [28:0] expected_address;
+        input integer expected_rows;
         begin
             @(negedge clk);
             lookup_phase=phase;
@@ -210,6 +216,17 @@ module tb_h262_prediction_block_fetcher;
                 $fatal(1,"lookup failed phase=%0d row=%0d col=%0d got=%h expected=%h ready=%0d valid=%0d",
                        phase,row_index,column_index,lookup_data,
                        word_for(expected_address),lookup_ready,lookup_valid);
+            if(row_index+1<expected_rows)begin
+                if(!lookup_next_row_valid||
+                   lookup_next_row_data!==
+                       word_for(expected_address+row_words))
+                    $fatal(1,"next-row lookup failed phase=%0d row=%0d col=%0d got=%h expected=%h valid=%0d",
+                           phase,row_index,column_index,
+                           lookup_next_row_data,
+                           word_for(expected_address+row_words),
+                           lookup_next_row_valid);
+            end else if(lookup_next_row_valid)
+                $fatal(1,"last-row lookup exposed an invalid adjacent row");
             lookup_request=0;
         end
     endtask
@@ -234,7 +251,7 @@ module tb_h262_prediction_block_fetcher;
 
         launch(1,29'h06000007,1,8,29'd0,1,1,90);
         for(test_row=0;test_row<8;test_row=test_row+1)
-            check_lookup(0,test_row,0,29'h06000007+test_row*90);
+            check_lookup(0,test_row,0,29'h06000007+test_row*90,8);
         check_invalid_lookup();
 
         inject_backpressure=1;
@@ -245,7 +262,7 @@ module tb_h262_prediction_block_fetcher;
         for(test_row=0;test_row<9;test_row=test_row+1)
             for(test_column=0;test_column<2;test_column=test_column+1)
                 check_lookup(0,test_row,test_column,
-                    29'h0600a8c1+test_row*45+test_column);
+                    29'h0600a8c1+test_row*45+test_column,9);
         inject_backpressure=0;
 
         launch(2,29'h0601000e,2,9,29'h06020011,2,9,90);
@@ -257,16 +274,16 @@ module tb_h262_prediction_block_fetcher;
                     test_column=test_column+1)
                     check_lookup(test_index,test_row,test_column,
                         (test_index?29'h06020011:29'h0601000e)+
-                        test_row*90+test_column);
+                        test_row*90+test_column,9);
 
         zero_latency=1;
         launch(2,29'h0600d2f2,1,8,29'h0601d2f4,2,9,45);
         for(test_row=0;test_row<8;test_row=test_row+1)
-            check_lookup(0,test_row,0,29'h0600d2f2+test_row*45);
+            check_lookup(0,test_row,0,29'h0600d2f2+test_row*45,8);
         for(test_row=0;test_row<9;test_row=test_row+1)
             for(test_column=0;test_column<2;test_column=test_column+1)
                 check_lookup(1,test_row,test_column,
-                    29'h0601d2f4+test_row*45+test_column);
+                    29'h0601d2f4+test_row*45+test_column,9);
         zero_latency=0;
 
         @(negedge clk);

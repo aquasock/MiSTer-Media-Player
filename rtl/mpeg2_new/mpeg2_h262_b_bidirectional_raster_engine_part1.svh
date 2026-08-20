@@ -129,6 +129,8 @@ wire [3:0] block_lookup_row;
 wire block_lookup_column;
 wire block_lookup_ready,block_lookup_valid;
 wire [63:0] block_lookup_data;
+wire block_lookup_next_row_valid;
+wire [63:0] block_lookup_next_row_data;
 wire block_fetch_active,block_fetch_complete,block_fetch_error;
 wire [28:0] block_fetch_addr;
 wire block_fetch_rd;
@@ -145,6 +147,8 @@ wire [2:0] block_fetch_outstanding0,block_fetch_outstanding1;
 wire block_lookup_ready0,block_lookup_ready1;
 wire block_lookup_valid0,block_lookup_valid1;
 wire [63:0] block_lookup_data0,block_lookup_data1;
+wire block_lookup_next_row_valid0,block_lookup_next_row_valid1;
+wire [63:0] block_lookup_next_row_data0,block_lookup_next_row_data1;
 
 wire [28:0] future_off=future_bank_latched?BANK_OFF:29'd0;
 wire [28:0] past_off=future_bank_latched?29'd0:BANK_OFF;

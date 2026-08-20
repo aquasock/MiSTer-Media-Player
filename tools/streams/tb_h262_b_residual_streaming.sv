@@ -19,6 +19,7 @@ module tb_h262_b_residual_streaming #(
     integer cross_prefetch_starts=0,cross_prefetch_handoffs=0;
     integer fetch_bank0_starts=0,fetch_bank1_starts=0;
     integer paired_tap_lookups=0,single_tap_advances=0;
+    integer vertical_tap_pairs=0;
 
     wire b_candidate,b_seen,b_complete,b_hold,b_replay;
     wire sideband_valid,first_valid,core_error;
@@ -118,6 +119,8 @@ module tb_h262_b_residual_streaming #(
         end
         if(raster.lookup_pair)
             paired_tap_lookups<=paired_tap_lookups+1;
+        if(raster.lookup_vertical_pair)
+            vertical_tap_pairs<=vertical_tap_pairs+1;
         if(raster.lookup_wait&&raster.block_lookup_ready&&
            raster.block_lookup_valid&&!raster.tap_last&&!raster.lookup_pair)
             single_tap_advances<=single_tap_advances+1;
@@ -183,7 +186,7 @@ module tb_h262_b_residual_streaming #(
         else if(quiet_cycles!=0)quiet_cycles<=quiet_cycles+1;
 
         if(quiet_cycles==100) begin
-            $display("RESULT b_seen=%0d core_error=%0d raster_error=%0d/%0d motion=%0d blocks=%0d samples=%0d writes=%0d stores=%0d stripe=%0d changed=%0d cycles=%0d fetches=%0d prefetches=%0d handoffs=%0d cross=%0d/%0d banks=%0d/%0d taps=%0d/%0d",
+            $display("RESULT b_seen=%0d core_error=%0d raster_error=%0d/%0d motion=%0d blocks=%0d samples=%0d writes=%0d stores=%0d stripe=%0d changed=%0d cycles=%0d fetches=%0d prefetches=%0d handoffs=%0d cross=%0d/%0d banks=%0d/%0d taps=%0d/%0d vertical=%0d",
                      b_seen,core_error,raster_error,raster_error_source,motion_events,
                      residual_blocks,residual_samples,residual_writes,
                      store_samples,stripe_store_samples,stripe_changed_samples,
@@ -191,7 +194,7 @@ module tb_h262_b_residual_streaming #(
                      prefetch_handoffs,cross_prefetch_starts,
                      cross_prefetch_handoffs,fetch_bank0_starts,
                      fetch_bank1_starts,paired_tap_lookups,
-                     single_tap_advances);
+                     single_tap_advances,vertical_tap_pairs);
             if(!b_seen||core_error||raster_error||motion_events!=1350||
                residual_blocks!=(intra_mode?12:120)||
                residual_samples!=(intra_mode?768:7680)||
@@ -200,6 +203,7 @@ module tb_h262_b_residual_streaming #(
                store_samples!=518400||stripe_store_samples!=7680||
                stripe_changed_samples!=(intra_mode?768:7680)||
                paired_tap_lookups!=0||single_tap_advances!=0||
+               vertical_tap_pairs!=0||
                // Entry 254 retains each predicted block footprint, so the
                // former upstream cold/hit modes converge while authored
                // residual and intra samples remain exact.
