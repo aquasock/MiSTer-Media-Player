@@ -1240,7 +1240,7 @@ Retain the accepted Entry 265 hardware and the reusable block trace, but do not 
 - [x] Passed
 
 ---
-## 267 COMMIT Unreleased ??? 2026-08-20T10:04:41-07:00
+## 267 COMMIT Unreleased ed074f3 2026-08-20T10:04:41-07:00
 
 #### Coming From:
 
@@ -1252,11 +1252,11 @@ Measure the complete-trace ceiling of replacing the B raster engine's single ret
 
 #### Outcome:
 
-Proposal only. Entry 266 rejects next-block ping-pong fetch because its cost-free upper bound saves only 6.28 percent mixed and 5.90 percent long. The larger remaining B consumer term serializes one retained-word lookup for every integer or half-pel interpolation tap; a unidirectional pixel needs one, two or four taps and a bidirectional pixel needs the sum of its forward and backward phases. Extend only the optional B block trace with the already-latched forward and backward vector parity, then calculate exact one-lane tap demand, ideal two-lane demand and full-parallel one-cycle-per-pixel demand for every predicted block. Preserve both exact functional traces unchanged and compare the cost-free whole-trace ceilings against the remaining hardware cadence gaps before modifying the timing-sensitive block lookup interface.
+Commit `ed074f3` extends only the optional B block trace with already-latched forward and backward vector parity and calculates exact one-lane tap demand, ideal two-lane demand and impossible full-parallel one-cycle-per-pixel demand for every predicted block. The mixed oracle remains exact at 1,289,996 cycles with all 423,936 pixels, 69,556 reads, every write, nine publications, 23 swaps and zero errors. Its 894 forward, 2,592 backward and 834 bidirectional blocks require 391,808 serialized tap cycles; ideal two-lane consumption needs 306,048, saving at most 85,760 cycles or 6.65 percent of the whole trace, while full parallelism saves only 115,328 cycles or 8.94 percent. The long boundary remains exact at 6,999,996 cycles with 372,696 reads, every write, 25 publications, 71 swaps and zero errors. Its 1,878 forward, 3,594 backward and 8,064 bidirectional blocks require 2,304,000 serialized tap cycles; ideal two-lane consumption needs 1,395,200, saving at most 908,800 cycles or 12.98 percent of the whole trace, while full parallelism saves 1,437,696 cycles or 20.54 percent. Lookup width is therefore promising for long but insufficient for mixed; even adding Entry 266's independent cost-free block-fetch ceiling to impossible full tap parallelism reaches only 15.22 percent mixed versus the 17.02 percent hardware gap. A functional lookup-width change is rejected as the next standalone build, and no Quartus or hardware cycle is warranted.
 
 #### Next Steps:
 
-Run the extended trace and deterministic analyzer on mixed and long, reject a two-lane raster change without Quartus if its upper bound is insufficient on either stream, and otherwise use the measured parity distribution to define the narrowest functional lookup boundary with explicit registered timing and unchanged word-buffer ownership.
+Retain the accepted Entry 265 hardware and both reusable B profilers without widening the timing-sensitive lookup path. Measure cross-run presentation decoupling next: the current scheduler already decodes one future P reference while presenting a closed two-B run, but then holds input until all scratch and future frames display even after a scratch bank becomes free; quantify a bounded next-run queue or scratch-bank reuse ceiling against the 47,362,881 long and 9,983,304 mixed hardware presentation-wait cycles before changing scheduler ownership.
 
 #### Files Modified:
 
@@ -1265,7 +1265,7 @@ Run the extended trace and deterministic analyzer on mixed and long, reject a tw
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
