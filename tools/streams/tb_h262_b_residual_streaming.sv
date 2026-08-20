@@ -16,6 +16,7 @@ module tb_h262_b_residual_streaming #(
     reg intra_mode=0;
     reg raster_error_d=0;
     integer fetch_starts=0,prefetch_starts=0,prefetch_handoffs=0;
+    integer cross_prefetch_starts=0,cross_prefetch_handoffs=0;
     integer fetch_bank0_starts=0,fetch_bank1_starts=0;
     integer paired_tap_lookups=0,single_tap_advances=0;
 
@@ -101,14 +102,20 @@ module tb_h262_b_residual_streaming #(
             fetch_starts<=fetch_starts+1;
             if(raster.block_fetch_start_prefetch)
                 prefetch_starts<=prefetch_starts+1;
+            if(raster.block_fetch_start_prefetch&&
+               raster.successor_cross_macroblock)
+                cross_prefetch_starts<=cross_prefetch_starts+1;
             if(raster.block_fetch_start_bank)
                 fetch_bank1_starts<=fetch_bank1_starts+1;
             else
                 fetch_bank0_starts<=fetch_bank0_starts+1;
         end
-        if(raster.wait_store&&store_block_stored&&(raster.blk<5)&&
-           raster.block_prefetch_valid)
+        if(raster.wait_store&&store_block_stored&&
+           raster.block_prefetch_valid)begin
             prefetch_handoffs<=prefetch_handoffs+1;
+            if(raster.blk==3'd5)
+                cross_prefetch_handoffs<=cross_prefetch_handoffs+1;
+        end
         if(raster.lookup_pair)
             paired_tap_lookups<=paired_tap_lookups+1;
         if(raster.lookup_wait&&raster.block_lookup_ready&&
@@ -176,12 +183,13 @@ module tb_h262_b_residual_streaming #(
         else if(quiet_cycles!=0)quiet_cycles<=quiet_cycles+1;
 
         if(quiet_cycles==100) begin
-            $display("RESULT b_seen=%0d core_error=%0d raster_error=%0d/%0d motion=%0d blocks=%0d samples=%0d writes=%0d stores=%0d stripe=%0d changed=%0d cycles=%0d fetches=%0d prefetches=%0d handoffs=%0d banks=%0d/%0d taps=%0d/%0d",
+            $display("RESULT b_seen=%0d core_error=%0d raster_error=%0d/%0d motion=%0d blocks=%0d samples=%0d writes=%0d stores=%0d stripe=%0d changed=%0d cycles=%0d fetches=%0d prefetches=%0d handoffs=%0d cross=%0d/%0d banks=%0d/%0d taps=%0d/%0d",
                      b_seen,core_error,raster_error,raster_error_source,motion_events,
                      residual_blocks,residual_samples,residual_writes,
                      store_samples,stripe_store_samples,stripe_changed_samples,
                      total_cycles,fetch_starts,prefetch_starts,
-                     prefetch_handoffs,fetch_bank0_starts,
+                     prefetch_handoffs,cross_prefetch_starts,
+                     cross_prefetch_handoffs,fetch_bank0_starts,
                      fetch_bank1_starts,paired_tap_lookups,
                      single_tap_advances);
             if(!b_seen||core_error||raster_error||motion_events!=1350||
@@ -197,13 +205,19 @@ module tb_h262_b_residual_streaming #(
                // residual and intra samples remain exact.
                // Entry 264 overlaps following-row production with current-row
                // raster persistence through two logical metadata banks.
-               (!intra_mode&&((total_cycles!=1286071)||
-                (fetch_starts!=8100)||(prefetch_starts!=6750)||
-                (prefetch_handoffs!=6750)||(fetch_bank0_starts!=4050)||
+               (!intra_mode&&((total_cycles!=1275511)||
+                (fetch_starts!=8100)||(prefetch_starts!=8070)||
+                (prefetch_handoffs!=8070)||
+                (cross_prefetch_starts!=1320)||
+                (cross_prefetch_handoffs!=1320)||
+                (fetch_bank0_starts!=4050)||
                 (fetch_bank1_starts!=4050)))||
-               (intra_mode&&((total_cycles!=758941)||
-                (fetch_starts!=8088)||(prefetch_starts!=6740)||
-                (prefetch_handoffs!=6740)||(fetch_bank0_starts!=4044)||
+               (intra_mode&&((total_cycles!=757621)||
+                (fetch_starts!=8088)||(prefetch_starts!=8056)||
+                (prefetch_handoffs!=8056)||
+                (cross_prefetch_starts!=1316)||
+                (cross_prefetch_handoffs!=1316)||
+                (fetch_bank0_starts!=4044)||
                 (fetch_bank1_starts!=4044))))
                 $fatal(1,"B residual streaming regression failed");
             $finish;

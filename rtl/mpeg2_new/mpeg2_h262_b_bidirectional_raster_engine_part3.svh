@@ -33,6 +33,7 @@
                 (bank_row[execute_bank]+1'b1==mb_height);
             pred_direction<=0;motion_load<=1;pixel_setup<=0;
             residual_load<=0;residual_load_wait<=0;persisted_seen<=0;
+            next_motion_word_valid<=0;
             block_prefetch_valid<=0;block_current_prefetched<=0;
             block_current_started<=0;
             if(!reference_valid||!geometry_ok||(motion_count==0))begin error<=1;if(!error)error_source<=5'd8;active<=0;persisted_seen<=1;timeout<=0;motion_load<=0;end
@@ -44,11 +45,21 @@
             motion_load<=0;
             if((mbi>=exec_motion_end)||(mbi>=motion_count)||(mbi>=MAX_MB))begin error<=1;if(!error)error_source<=5'd10;active<=0;persisted_seen<=1;timeout<=0;end
             else begin motion_word<=motion_mem[mbi];residual_load<=1;end
+        end else if(residual_load&&(blk==3'd5)&&
+                    (col+1'b1<mb_width))begin
+            // Mutually exclusive with motion_load, so motion_mem retains one
+            // synchronous execution read port.
+            next_motion_word<=motion_mem[mbi+1'b1];
         end
 
         if(residual_load)begin
             residual_load<=0;residual_load_wait<=1;
             exec_direction<=mb_direction;
+            // Entry 274: after the current block-five fields are captured,
+            // the single synchronous read port is free to stage the following
+            // macroblock record.  motion_word remains unchanged for block five.
+            if(blk==3'd5)
+                next_motion_word_valid<=(col+1'b1<mb_width);
             if(blk<4) begin
                 exec_fmvx<=mb_fmvx;exec_fmvy<=mb_fmvy;
                 exec_bmvx<=mb_bmvx;exec_bmvy<=mb_bmvy;
@@ -90,9 +101,9 @@
         // idle and the released alternate bank may produce exactly one
         // successor footprint while reconstruction consumes retained words.
         if(!residual_load_wait&&!block_fetch_start&&block_current_started&&
-           !block_current_prefetched&&(exec_direction!=0)&&(blk<5)&&
+           !block_current_prefetched&&(exec_direction!=0)&&
            block_fetch_complete&&!block_prefetch_valid&&
-           successor_all_bounds_ok)begin
+           successor_launch_valid&&successor_all_bounds_ok)begin
             block_fetch_start<=1;
             block_fetch_start_bank<=~block_consumer_bank;
             block_fetch_start_prefetch<=1;
@@ -238,10 +249,23 @@
                     end
                 end else begin
                     mbi<=mbi+1'b1;col<=col+1'b1;
-                    blk<=0;ei<=0;pred_direction<=0;motion_load<=1;
-                    block_prefetch_valid<=0;
-                    block_current_prefetched<=0;
-                    block_current_started<=0;
+                    blk<=0;ei<=0;pred_direction<=0;
+                    motion_word<=next_motion_word;
+                    next_motion_word_valid<=0;
+                    residual_load<=1;
+                    if(block_prefetch_valid)begin
+                        block_consumer_bank<=~block_consumer_bank;
+                        block_current_prefetched<=1;
+                        block_prefetch_valid<=0;
+                        block_current_started<=1;
+                        block_phase0_base_byte<=
+                            successor_phase0_src_x[2:0];
+                        block_phase1_base_byte<=
+                            successor_phase1_src_x[2:0];
+                    end else begin
+                        block_current_prefetched<=0;
+                        block_current_started<=0;
+                    end
                 end
             end else begin
                 if(block_prefetch_valid)begin
