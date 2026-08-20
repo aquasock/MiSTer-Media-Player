@@ -800,7 +800,7 @@ Retain the exact quad implementation as a composable internal reduction, but do 
 - [ ] Passed
 
 ---
-## 278 COMMIT Unreleased ??? 2026-08-20T15:30:02-07:00
+## 278 COMMIT Unreleased 62f2654 2026-08-20T15:30:02-07:00
 
 #### Coming From:
 
@@ -812,11 +812,11 @@ Remove the idle cycle between consecutive B residual-coefficient writes by readi
 
 #### Outcome:
 
-Proposal only. Entry 277 proves that the optimized B raster is no longer the largest local producer: the long trace spends 2,466,163 decoder-wait cycles in B replay and 1,548,488 in B parse versus 1,686,290 in B raster, while mixed spends 338,293 in replay and 182,004 in parse versus 407,425 in raster. Static inspection identifies a deterministic replay bubble before transform execution: `residual_coeff_mem` is synchronous, so every `R_TWRITE` increments its read index and then enters `R_COEFF_WAIT` solely to obtain the following word. The retained coefficient is already stable when the current transform write occurs. This boundary will select the following RAM address during that write edge and keep `R_TWRITE` active for consecutive coefficients, preserving the existing preload before the first coefficient, block descriptors, coefficient order and count, inverse quantisation, IDCT, sideband ordering and all row ownership. It adds state-cycle and coefficient accounting to measure the exact saving before physical implementation is considered.
+Commit `edc1e1b` removed `R_COEFF_WAIT` between consecutive B coefficients and added exact accounting. Focused predicted and intra replays preserve every event and store at their unchanged 1,286,071 and 758,941 cycles; their one-coefficient blocks correctly expose 120 and 12 writes with no removable wait. Mixed preserves all 423,936 pixels with zero mismatches, maximum delta two, 69,556 reads, every write, publication and swap, and zero errors while 26,591 coefficient writes consume no wait state; B replay falls from 338,293 to 313,306 cycles and the complete trace falls from 1,259,996 to 1,239,996, a 1.59 percent reduction. Long preserves all 25 reference publications, 47 B pictures, 71 swaps, 372,696 reads, all bank writes and zero errors while 262,671 coefficient writes consume no wait state; B replay falls from 2,466,163 to 2,213,942 and the complete trace falls from 6,859,996 to 6,589,996, a 3.94 percent reduction. Its first clean synthesis correctly exposed that the combinational successor-address form prevented inference of the 32K-by-19 coefficient M10K, so that build was stopped before fitting and produced no RBF. Corrective commit `62f2654` registers the read address one stage ahead, preserves the same exact simulation results, and restores the coefficient store as a 32,768-word dual-port M10K. The fully clean Quartus 17.0.2 build completes in 11 minutes 15 seconds with zero errors and 148 standing warnings. Timing is positive at +0.431 ns global setup, +1.573 ns decoder setup, +7.382 ns video setup, +0.255 ns hold, +4.064 ns global recovery, +14.210 ns decoder recovery, +1.129 ns removal and +0.462 ns minimum pulse slack. The fit uses 33,176 ALMs, 48,491 registers, 4,027,379 memory bits, 504 RAM blocks and 65 DSP blocks. Qualified artifact `MediaPlayer_commit278_62f2654.rbf` is 4,339,252 bytes with SHA-256 `5118e024936a332ce3de2247da758e6f5b73b0cd5bda039dba570ff6762ed022`; standard-path and cadence-path readbacks are byte-identical. Hardware accepts every byte and picture with zero errors and zero destination stalls. Two long runs deliver 23.643907 and 23.723813 fps with B stalls of 33,056,106 and 33,056,971 and decoder stalls of 56,881,180 and 56,860,739, versus the paired Entry 276 control's 23.513141 fps, 33,677,170 B stalls and 57,489,128 decoder stalls. Two mixed runs deliver 21.718370 and 21.718210 fps versus the paired Entry 276 control's 21.721273 fps, so cadence is neutral, but B stalls fall from 11,126,437 to 10,864,539/10,865,031 and decoder stalls fall from 21,401,633 to 21,140,036/21,142,269. Presentation phase still absorbs most of the local saving, but the decoder reduction is stable and the timing-clean Entry 278 RBF is retained on the MiSTer.
 
 #### Next Steps:
 
-Require focused residual and intra replay to preserve every descriptor, coefficient, transform sample and reconstructed store, and require both complete traces to preserve exact pixels, reads, writes, publications, swaps and zero-error accounting. Compare the reduction in replay and total cadence against Entry 277's locked 1,259,996 mixed and 6,859,996 long cycles. Proceed to a fully clean Quartus build only if the complete-stream gain is material enough to cross presentation windows; otherwise retain the timing-qualified Entry 276 RBF and record this as another simulation-only candidate.
+Apply the proven registered coefficient read-ahead pattern to the analogous P residual pipeline, whose `G_COEFF_WAIT` still inserts one idle cycle between synchronous coefficient reads. Instrument exact P coefficient and state occupancy first, preserve RAM inference and every existing P/I pixel and publication invariant, and require a material complete mixed and long reduction before another clean hardware build; mixed cadence remains the limiting boundary at approximately 21.72 fps.
 
 #### Files Modified:
 
@@ -827,8 +827,8 @@ Require focused residual and intra replay to preserve every descriptor, coeffici
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 239 COMMIT Unreleased 3c03570 2026-08-19T16:36:30-07:00
