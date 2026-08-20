@@ -47,6 +47,19 @@ module tb_h262_live_raster_soak #(
     integer profile_sidecar_bank1_hits=0;
     reg profile_sidecar_valid0=0,profile_sidecar_valid1=0;
     reg [28:0] profile_sidecar_tag0=0,profile_sidecar_tag1=0;
+    integer profile_partition_lookups=0;
+    integer profile_partition8_hits=0,profile_partition8_misses=0;
+    integer profile_partition16_hits=0,profile_partition16_misses=0;
+    reg [7:0] profile_partition8_valid=0;
+    reg [15:0] profile_partition16_valid=0;
+    reg [28:0] profile_partition8_tag[0:7];
+    reg [28:0] profile_partition16_tag[0:15];
+    reg [1:0] profile_partition8_replace[0:1];
+    reg [1:0] profile_partition16_replace[0:3];
+    integer profile_partition_set8,profile_partition_set16;
+    integer profile_partition_base8,profile_partition_base16;
+    integer profile_partition_way;
+    reg profile_partition_hit8,profile_partition_hit16;
     integer pixel_samples=0,pixel_mismatches=0,max_pixel_delta=0;
     integer pixel_index,pixel_delta,pixel_row,pixel_word,pixel_lane;
     reg first_pixel_mismatch=0;
@@ -309,6 +322,14 @@ module tb_h262_live_raster_soak #(
             profile_prefetch_valid2<=0;profile_prefetch_valid3<=0;
             profile_prefetch_replace<=0;
             profile_sidecar_valid0<=0;profile_sidecar_valid1<=0;
+            profile_partition8_valid<=0;
+            profile_partition16_valid<=0;
+            profile_partition8_replace[0]<=0;
+            profile_partition8_replace[1]<=0;
+            profile_partition16_replace[0]<=0;
+            profile_partition16_replace[1]<=0;
+            profile_partition16_replace[2]<=0;
+            profile_partition16_replace[3]<=0;
         end else if(prediction.reference_cache.lookup_request)begin
             profile_prefetch_lookups<=profile_prefetch_lookups+1;
             if((profile_prefetch_valid0&&
@@ -385,6 +406,58 @@ module tb_h262_live_raster_soak #(
                         profile_sidecar_tag0<=prediction.reference_cache.request_addr+1'b1;
                     end
                 end
+            end
+
+            // Entry 248 proposal model.  Both candidates retain four parallel
+            // tag comparisons: the first partitions only by reference bank;
+            // the second also separates the low address bit that distributes
+            // adjacent vertical-row working sets.  They never affect live RTL.
+            profile_partition_lookups<=profile_partition_lookups+1;
+            profile_partition_set8=prediction.reference_cache.request_addr[16];
+            profile_partition_set16={prediction.reference_cache.request_addr[16],
+                                     prediction.reference_cache.request_addr[1]};
+            profile_partition_base8=profile_partition_set8*4;
+            profile_partition_base16=profile_partition_set16*4;
+            profile_partition_hit8=0;
+            profile_partition_hit16=0;
+            for(profile_partition_way=0;profile_partition_way<4;
+                profile_partition_way=profile_partition_way+1)begin
+                if(profile_partition8_valid[profile_partition_base8+
+                                            profile_partition_way]&&
+                   profile_partition8_tag[profile_partition_base8+
+                                          profile_partition_way]==
+                       prediction.reference_cache.request_addr)
+                    profile_partition_hit8=1;
+                if(profile_partition16_valid[profile_partition_base16+
+                                             profile_partition_way]&&
+                   profile_partition16_tag[profile_partition_base16+
+                                           profile_partition_way]==
+                       prediction.reference_cache.request_addr)
+                    profile_partition_hit16=1;
+            end
+            if(profile_partition_hit8)
+                profile_partition8_hits<=profile_partition8_hits+1;
+            else begin
+                profile_partition8_misses<=profile_partition8_misses+1;
+                profile_partition8_valid[profile_partition_base8+
+                    profile_partition8_replace[profile_partition_set8]]<=1;
+                profile_partition8_tag[profile_partition_base8+
+                    profile_partition8_replace[profile_partition_set8]]<=
+                        prediction.reference_cache.request_addr;
+                profile_partition8_replace[profile_partition_set8]<=
+                    profile_partition8_replace[profile_partition_set8]+1'b1;
+            end
+            if(profile_partition_hit16)
+                profile_partition16_hits<=profile_partition16_hits+1;
+            else begin
+                profile_partition16_misses<=profile_partition16_misses+1;
+                profile_partition16_valid[profile_partition_base16+
+                    profile_partition16_replace[profile_partition_set16]]<=1;
+                profile_partition16_tag[profile_partition_base16+
+                    profile_partition16_replace[profile_partition_set16]]<=
+                        prediction.reference_cache.request_addr;
+                profile_partition16_replace[profile_partition_set16]<=
+                    profile_partition16_replace[profile_partition_set16]+1'b1;
             end
         end
         if(!reset)begin
@@ -632,6 +705,10 @@ module tb_h262_live_raster_soak #(
                      profile_sidecar_misses,profile_sidecar_fills,
                      profile_sidecar_hits,profile_sidecar_bank0_hits,
                      profile_sidecar_bank1_hits);
+            $display("LIVE_RASTER_PARTITION lookups=%0d bank4=%0d/%0d bankrow4=%0d/%0d",
+                     profile_partition_lookups,
+                     profile_partition8_hits,profile_partition8_misses,
+                     profile_partition16_hits,profile_partition16_misses);
             if(MIXED_PIXEL_MODE)begin
                 $display("MIXED_PIXEL_RESULT samples=%0d mismatches=%0d max_delta=%0d",
                          pixel_samples,pixel_mismatches,max_pixel_delta);
