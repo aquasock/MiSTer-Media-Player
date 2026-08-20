@@ -529,44 +529,6 @@ Await approval for a focused B prediction refill optimization that launches the 
 - [ ] Passed
 
 ---
-## 229 COMMIT Unreleased 6a4e935 2026-08-18T15:58:14-07:00
-
-#### Coming From:
-
-Unreleased cd73cb7
-
-#### Purpose:
-
-Remove the registered cache-hit handshake from generalized P/B prediction so resident reference words can advance the raster engines directly without changing the miss path, pixels, or display order.
-
-#### Outcome:
-
-Entry 228 hardware is functionally clean but remains throughput-limited: `test_compat_long_gop.m2v` reaches source frame 71 in approximately 9.9 seconds with USER and POWER solid, while DISK code 11 confirms the deepest successful final-GOP boundary rather than an error. Commit `a16947a` first exposed a combinational cache-hit path and reduced the exact 72-picture live-raster soak from 25,249,996 to 19,449,996 cycles, but its -5.112 ns decoder setup slack made it ineligible for deployment. Commit `6a4e935` replaces that path with timing-safe registered lookup responses while presenting each successive half-pel tap during the preceding response. The focused cache test passes three hits, nine misses, two uncached accesses, and eleven downstream transactions; the B-residual and P-intra engine regressions remain exact. The integrated soak reconstructs and presents all 72 pictures with 622,811 DDR reads, 2,267,813 cache hits, 463,835 misses, 158,976 uncached accesses, final source-frame identity 71, and zero decoder, reconstruction, or presentation errors in 21,249,996 cycles, a 15.84 percent reduction from Entry 228. The session-authorized incremental Quartus 17.0.2 compile completes in 9 minutes 36 seconds with 0 errors and 121 standing warnings; global setup/hold slack is +0.323/+0.253 ns, focused decoder/video setup slack is +1.545/+8.686 ns, decoder recovery slack is +14.665 ns, and utilization is 30,259 ALMs, 43,273 registers, 4,027,379 memory bits, and 65 DSP blocks. `MediaPlayer_commit229_6a4e935.rbf` is 4,262,892 bytes with SHA-256 `aec392b4a8e5e4284039e8eff449d7d012c398fd67f8b8fc903f27a0476aabeb`; its MiSTer FTP readback is byte-identical. Hardware acceptance retains USER and POWER solid, DISK stage 11, and final source frame 71; the uploaded 30 fps recording measures approximately 8.4 seconds from first frame 0 to first frame 71, confirming the predicted performance gain. It also exposes a separate presentation-cadence defect: 0.1-second samples near completion show 63, 64, 65, 65, 66, 68, 68, 69, 69, 71, proving that some pictures persist for multiple samples while intermediate pictures 67 and 70 are visible for less than one camera interval.
-
-#### Next Steps:
-
-Retain the verified cache gain and treat decode throughput and display cadence as separate boundaries. Before another throughput change, add focused timestamped observation of picture completion, scratch readiness, future-reference readiness, and framebuffer swaps; then use it to pace already-decoded pictures so no B picture is exposed for only one video refresh, without weakening display order or adding compressed-stream backpressure. The decoder remains approximately 8.5 fps, so true 25 fps playback will still require further reconstruction throughput after the burst-and-hold presentation defect is isolated.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- tools/streams/tb_h262_prediction_word_cache.sv
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/streams/tb_h262_b_residual_streaming.sv
-- tools/streams/tb_h262_p_intra_macroblocks.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
 ## 230 COMMIT Unreleased 1177e26 2026-08-18T17:10:35-07:00
 
 #### Coming From:
@@ -1267,5 +1229,35 @@ Retain the accepted Entry 265 hardware and implement cross-run ownership as a se
 
 - [x] Built
 - [x] Passed
+
+---
+## 269 COMMIT Unreleased ??? 2026-08-20T10:25:00-07:00
+
+#### Coming From:
+
+Unreleased 200f14b
+
+#### Purpose:
+
+Permit the following two-B run to decode into scratch banks released by the currently presenting run without exposing, overwriting, or misbinding either run's frames.
+
+#### Outcome:
+
+Proposal only. Entry 268 proves that actual-25-fps cross-run reuse of the existing two scratch banks sustains both hardware traces at exactly 25.000 fps, including every accepted-byte cycle, while preserving decode and temporal display order. Refactor the presentation scheduler into explicit current-presentation and next-decode generations: the current generation retains its two scratch-pending bits and future reference; after its first scratch frame leaves display, the released bank may hold next-generation B one, and the reciprocal release may hold B two. The P reference published during the current run remains the next generation's future reference, while the P decoded after that next B pair remains the ordinary overlap candidate for the following generation. Promotion must be atomic only after the current future reference displays, and any early header, bank collision, missing reference, third B picture, decode error or out-of-order swap must fail closed under the existing error contract.
+
+#### Next Steps:
+
+Strengthen the focused scheduler test with at least two adjacent closed B runs and explicit bank-generation identities, implement the smallest internal generation state without changing top-level ports, then require the focused test, exact mixed pixels, complete long publication, every read and write count, all swaps and zero-error accounting to pass with a material cycle reduction before a clean Quartus build.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
 
 ---
