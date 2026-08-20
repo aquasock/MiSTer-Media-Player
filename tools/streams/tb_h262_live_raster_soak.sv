@@ -23,6 +23,17 @@ module tb_h262_live_raster_soak #(
     integer published_references=0,display_swaps=0;
     integer reference_writes=0,scratch0_writes=0,scratch1_writes=0;
     integer memory_reads=0,total_cycles=0;
+    integer profile_input_decoder=0,profile_input_presentation=0;
+    integer profile_input_destination=0;
+    integer profile_input_i=0,profile_input_p=0,profile_input_b=0;
+    integer profile_p_transform=0,profile_b_transform=0;
+    integer profile_p_raster=0,profile_b_raster=0;
+    integer profile_p_lookup=0,profile_b_lookup=0;
+    integer profile_p_ddr_request=0,profile_b_ddr_request=0;
+    integer profile_p_ddr_response=0,profile_b_ddr_response=0;
+    integer profile_p_emit=0,profile_b_emit=0;
+    integer profile_p_store=0,profile_b_store=0;
+    integer profile_writer=0,profile_presentation=0;
     integer pixel_samples=0,pixel_mismatches=0,max_pixel_delta=0;
     integer pixel_index,pixel_delta,pixel_row,pixel_word,pixel_lane;
     reg first_pixel_mismatch=0;
@@ -277,7 +288,46 @@ module tb_h262_live_raster_soak #(
     end
 
     always @(posedge clk) begin
-        if(!reset)total_cycles<=total_cycles+1;
+        if(!reset)begin
+            total_cycles<=total_cycles+1;
+            // Simulation-only attribution. Input stalls use mutually
+            // exclusive priority; engine-stage counters intentionally
+            // overlap so each active pipeline exposes its actual occupancy.
+            if(stream_index<stream_len)begin
+                if(!decoder_ready)begin
+                    profile_input_decoder<=profile_input_decoder+1;
+                    case(picture_coding_type)
+                        3'b001:profile_input_i<=profile_input_i+1;
+                        3'b010:profile_input_p<=profile_input_p+1;
+                        3'b011:profile_input_b<=profile_input_b+1;
+                        default:;
+                    endcase
+                end
+                else if(presentation_hold)
+                    profile_input_presentation<=profile_input_presentation+1;
+                else if(destination_ownership_hold)
+                    profile_input_destination<=profile_input_destination+1;
+            end
+            if(sideband_valid)
+                profile_p_transform<=profile_p_transform+1;
+            if(publication.b_controller.t_valid)
+                profile_b_transform<=profile_b_transform+1;
+            if(prediction.mixed_active)profile_p_raster<=profile_p_raster+1;
+            if(prediction.b_active)profile_b_raster<=profile_b_raster+1;
+            if(prediction.mixed_probe.lookup_wait)profile_p_lookup<=profile_p_lookup+1;
+            if(prediction.b_probe.lookup_wait)profile_b_lookup<=profile_b_lookup+1;
+            if(prediction.mixed_probe.req)profile_p_ddr_request<=profile_p_ddr_request+1;
+            if(prediction.b_probe.req)profile_b_ddr_request<=profile_b_ddr_request+1;
+            if(prediction.mixed_probe.waitresp)profile_p_ddr_response<=profile_p_ddr_response+1;
+            if(prediction.b_probe.waitresp)profile_b_ddr_response<=profile_b_ddr_response+1;
+            if(prediction.mixed_probe.emit)profile_p_emit<=profile_p_emit+1;
+            if(prediction.b_probe.emit)profile_b_emit<=profile_b_emit+1;
+            if(prediction.mixed_probe.wait_store)profile_p_store<=profile_p_store+1;
+            if(prediction.b_probe.wait_store)profile_b_store<=profile_b_store+1;
+            if(memory_we)
+                profile_writer<=profile_writer+1;
+            if(presentation_hold)profile_presentation<=profile_presentation+1;
+        end
         if(MIXED_PIXEL_MODE&&pred_store_valid)begin
             if(temporal_reference>=24||pixel_component>=3||
                (pixel_component==0&&(pixel_x>=128||pixel_y>=96))||
@@ -457,6 +507,18 @@ module tb_h262_live_raster_soak #(
                      pred_read_observed,pred_reconstructed_observed,
                      presentation_complete,probe_error,pred_error,writer_error,
                      presentation_error);
+            $display("LIVE_RASTER_PROFILE input=%0d/%0d/%0d input_type=%0d/%0d/%0d transform=%0d/%0d raster=%0d/%0d lookup=%0d/%0d ddr_request=%0d/%0d ddr_response=%0d/%0d emit=%0d/%0d store=%0d/%0d writer=%0d presentation=%0d",
+                     profile_input_decoder,profile_input_presentation,
+                     profile_input_destination,
+                     profile_input_i,profile_input_p,profile_input_b,
+                     profile_p_transform,profile_b_transform,
+                     profile_p_raster,profile_b_raster,
+                     profile_p_lookup,profile_b_lookup,
+                     profile_p_ddr_request,profile_b_ddr_request,
+                     profile_p_ddr_response,profile_b_ddr_response,
+                     profile_p_emit,profile_b_emit,
+                     profile_p_store,profile_b_store,
+                     profile_writer,profile_presentation);
             if(MIXED_PIXEL_MODE)begin
                 $display("MIXED_PIXEL_RESULT samples=%0d mismatches=%0d max_delta=%0d",
                          pixel_samples,pixel_mismatches,max_pixel_delta);
