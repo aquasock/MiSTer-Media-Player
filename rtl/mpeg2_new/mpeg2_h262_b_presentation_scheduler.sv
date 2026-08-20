@@ -43,6 +43,19 @@ reg scratch_presented;
 reg [1:0] run_picture_count;
 reg overlap_decode_open,overlap_frame_pending;
 
+// Entry 269: while one closed run is being presented, retain the following
+// run in a distinct logical generation.  Both generations still share the
+// same two physical scratch banks; the availability terms below prevent a
+// bank from being reused until display has left it.
+reg queued_run_active,queued_run_closed,queued_decode_inflight;
+reg queued_scratch0_pending,queued_scratch1_pending;
+reg queued_first_scratch_bank;
+reg queued_future_frame_pending,queued_future_frame_bank;
+reg queued_future_reference_pending;
+reg [1:0] queued_run_picture_count;
+reg queued_overlap_decode_open,queued_overlap_frame_pending;
+reg decode_generation_queued,promotion_pending;
+
 // Entry 230: the fixed 40 MHz 800x600 raster produces one swap window every
 // 1056*628 pixels.  For the current 25 fps compatibility boundary, accumulate
 // source-picture credit in pixel-clock units.  Saturating at the next due slot
@@ -72,12 +85,31 @@ wire scheduled_frame_differs=scheduled_frame_scratch?
 wire cadence_25fps=(frame_rate_code==4'h3);
 wire cadence_slot=!cadence_25fps||
                   (cadence_credit>=CADENCE_DUE_25FPS);
+wire scratch0_available=!scratch0_pending&&!queued_scratch0_pending&&
+    !(display_scratch&&!display_scratch_bank)&&
+    !(decode_inflight&&!decode_scratch_bank)&&
+    !(queued_decode_inflight&&!decode_scratch_bank);
+wire scratch1_available=!scratch1_pending&&!queued_scratch1_pending&&
+    !(display_scratch&&display_scratch_bank)&&
+    !(decode_inflight&&decode_scratch_bank)&&
+    !(queued_decode_inflight&&decode_scratch_bank);
+wire queued_scratch_available=scratch0_available||scratch1_available;
+wire queued_header_capacity=
+    (!queued_run_active&&
+     (pending_frame_valid||(frame_waiting&&overlap_decode_open))&&
+     queued_scratch_available)||
+    (queued_run_active&&!queued_run_closed&&!queued_decode_inflight&&
+     (queued_run_picture_count<2)&&queued_scratch_available)||
+    queued_overlap_decode_open;
 
 // Entry 247: after the accepted P header closes a B run, allow that one P
 // transaction to decode while the prior scratch/future sequence is presented.
 // Its publication closes the window before a later header can reuse scratch.
-assign reference_overlap_header=reorder_active&&!run_closed;
-assign presentation_hold=reorder_active&&run_closed&&!overlap_decode_open&&
+assign reference_overlap_header=(reorder_active&&!run_closed)||
+                                (queued_run_active&&!queued_run_closed);
+assign presentation_hold=reorder_active&&run_closed&&
+                         !overlap_decode_open&&!queued_decode_inflight&&
+                         (promotion_pending||!queued_header_capacity)&&
                          !presentation_complete&&!presentation_error;
 
 always @(posedge clk) begin
@@ -91,6 +123,15 @@ always @(posedge clk) begin
         future_frame_pending<=0;future_frame_bank<=0;
         future_reference_pending<=0;scratch_presented<=0;
         overlap_decode_open<=0;overlap_frame_pending<=0;
+        queued_run_active<=0;queued_run_closed<=0;
+        queued_decode_inflight<=0;
+        queued_scratch0_pending<=0;queued_scratch1_pending<=0;
+        queued_first_scratch_bank<=0;
+        queued_future_frame_pending<=0;queued_future_frame_bank<=0;
+        queued_future_reference_pending<=0;
+        queued_run_picture_count<=0;
+        queued_overlap_decode_open<=0;queued_overlap_frame_pending<=0;
+        decode_generation_queued<=0;promotion_pending<=0;
         run_picture_count<=0;presentation_complete<=0;presentation_error<=0;
         cadence_credit<=CADENCE_DUE_25FPS;
     end else begin
@@ -132,6 +173,18 @@ always @(posedge clk) begin
             overlap_decode_open<=0;
         end
 
+        // The P decoded after the queued B pair is one generation farther
+        // ahead.  Keep its publication behind the same classification
+        // barrier, but bind it to the queued generation until promotion.
+        if(frame_waiting&&queued_run_active&&queued_run_closed&&
+           queued_overlap_decode_open)begin
+            pending_frame_valid<=1;
+            pending_frame_bank<=completed_frame_bank;
+            pending_frame_released<=0;
+            queued_overlap_frame_pending<=1;
+            queued_overlap_decode_open<=0;
+        end
+
         if(pending_frame_valid&&(non_b_picture_start||sequence_end))
             pending_frame_released<=1;
 
@@ -154,6 +207,7 @@ always @(posedge clk) begin
                 presentation_error<=0;pending_frame_valid<=0;
                 pending_frame_released<=0;
                 overlap_decode_open<=0;overlap_frame_pending<=0;
+                decode_generation_queued<=0;
                 if(frame_waiting)begin
                     future_frame_bank<=completed_frame_bank;
                     future_reference_pending<=0;
@@ -172,27 +226,113 @@ always @(posedge clk) begin
                     reorder_active<=0;decode_inflight<=0;future_frame_pending<=0;
                     future_reference_pending<=0;presentation_error<=1;
                 end
-            end else if((future_reference_pending&&!frame_waiting)||
-                decode_inflight||(run_picture_count>=2)||
-                (!decode_scratch_bank&&(scratch1_pending||
-                 (display_scratch&&display_scratch_bank)))||
-                (decode_scratch_bank&&(scratch0_pending||
-                 (display_scratch&&!display_scratch_bank))))begin
-                reorder_active<=0;decode_inflight<=0;scratch0_pending<=0;
-                scratch1_pending<=0;future_frame_pending<=0;
-                future_reference_pending<=0;presentation_error<=1;
+            end else if(!run_closed)begin
+                if((future_reference_pending&&!frame_waiting)||
+                   decode_inflight||(run_picture_count>=2)||
+                   (!decode_scratch_bank&&(scratch1_pending||
+                    (display_scratch&&display_scratch_bank)))||
+                   (decode_scratch_bank&&(scratch0_pending||
+                    (display_scratch&&!display_scratch_bank))))begin
+                    reorder_active<=0;decode_inflight<=0;scratch0_pending<=0;
+                    scratch1_pending<=0;future_frame_pending<=0;
+                    future_reference_pending<=0;presentation_error<=1;
+                end else begin
+                    decode_scratch_bank<=!decode_scratch_bank;
+                    decode_inflight<=1;decode_generation_queued<=0;
+                    run_picture_count<=run_picture_count+1'b1;
+                end
+            end else if(!queued_run_active)begin
+                if(promotion_pending||
+                   !(pending_frame_valid||
+                     (frame_waiting&&overlap_decode_open))||
+                   !queued_scratch_available)begin
+                    reorder_active<=0;run_closed<=0;decode_inflight<=0;
+                    scratch0_pending<=0;scratch1_pending<=0;
+                    future_frame_pending<=0;future_reference_pending<=0;
+                    queued_run_active<=0;queued_decode_inflight<=0;
+                    queued_scratch0_pending<=0;queued_scratch1_pending<=0;
+                    queued_future_frame_pending<=0;
+                    presentation_error<=1;
+                end else begin
+                    queued_run_active<=1;queued_run_closed<=0;
+                    queued_decode_inflight<=1;
+                    decode_scratch_bank<=scratch0_available?1'b0:1'b1;
+                    decode_generation_queued<=1;
+                    queued_first_scratch_bank<=scratch0_available?1'b0:1'b1;
+                    queued_run_picture_count<=1;
+                    queued_scratch0_pending<=0;
+                    queued_scratch1_pending<=0;
+                    queued_future_frame_pending<=1;
+                    queued_future_frame_bank<=
+                        (frame_waiting&&overlap_decode_open)?
+                        completed_frame_bank:pending_frame_bank;
+                    queued_future_reference_pending<=0;
+                    queued_overlap_decode_open<=0;
+                    queued_overlap_frame_pending<=0;
+                    pending_frame_valid<=0;pending_frame_released<=0;
+                    overlap_frame_pending<=0;overlap_decode_open<=0;
+                end
+            end else if(!queued_run_closed)begin
+                if(queued_decode_inflight||
+                   (queued_run_picture_count>=2)||
+                   !queued_scratch_available)begin
+                    reorder_active<=0;run_closed<=0;decode_inflight<=0;
+                    scratch0_pending<=0;scratch1_pending<=0;
+                    future_frame_pending<=0;future_reference_pending<=0;
+                    queued_run_active<=0;queued_decode_inflight<=0;
+                    queued_scratch0_pending<=0;queued_scratch1_pending<=0;
+                    queued_future_frame_pending<=0;
+                    presentation_error<=1;
+                end else begin
+                    decode_scratch_bank<=scratch0_available?1'b0:1'b1;
+                    queued_decode_inflight<=1;
+                    decode_generation_queued<=1;
+                    queued_run_picture_count<=queued_run_picture_count+1'b1;
+                end
             end else begin
-                decode_scratch_bank<=!decode_scratch_bank;
-                decode_inflight<=1;
-                run_picture_count<=run_picture_count+1'b1;
+                reorder_active<=0;run_closed<=0;decode_inflight<=0;
+                scratch0_pending<=0;scratch1_pending<=0;
+                future_frame_pending<=0;future_reference_pending<=0;
+                queued_run_active<=0;queued_decode_inflight<=0;
+                queued_scratch0_pending<=0;queued_scratch1_pending<=0;
+                queued_future_frame_pending<=0;
+                presentation_error<=1;
             end
         end
 
         if(b_user_success_edge)begin
-            if((future_reference_pending&&!frame_waiting)||
-               !reorder_active||!decode_inflight)begin
+            if(decode_generation_queued)begin
+                if(!queued_run_active||!queued_decode_inflight||
+                   queued_future_reference_pending)begin
+                    reorder_active<=0;run_closed<=0;decode_inflight<=0;
+                    future_frame_pending<=0;future_reference_pending<=0;
+                    queued_run_active<=0;queued_decode_inflight<=0;
+                    queued_scratch0_pending<=0;queued_scratch1_pending<=0;
+                    queued_future_frame_pending<=0;
+                    presentation_error<=1;
+                end else begin
+                    queued_decode_inflight<=0;
+                    if(decode_scratch_bank)begin
+                        if(queued_scratch1_pending||
+                           (display_scratch&&display_scratch_bank))begin
+                            reorder_active<=0;queued_run_active<=0;
+                            queued_future_frame_pending<=0;
+                            presentation_error<=1;
+                        end else queued_scratch1_pending<=1;
+                    end else begin
+                        if(queued_scratch0_pending||
+                           (display_scratch&&!display_scratch_bank))begin
+                            reorder_active<=0;queued_run_active<=0;
+                            queued_future_frame_pending<=0;
+                            presentation_error<=1;
+                        end else queued_scratch0_pending<=1;
+                    end
+                end
+            end else if((future_reference_pending&&!frame_waiting)||
+                        !reorder_active||!decode_inflight)begin
                 reorder_active<=0;future_frame_pending<=0;
-                future_reference_pending<=0;presentation_error<=1;
+                future_reference_pending<=0;queued_run_active<=0;
+                queued_future_frame_pending<=0;presentation_error<=1;
             end else begin
                 decode_inflight<=0;
                 if(decode_scratch_bank)begin
@@ -210,18 +350,34 @@ always @(posedge clk) begin
         end
 
         if(reorder_active&&(non_b_picture_start||sequence_end))begin
-            if(future_reference_pending&&!frame_waiting)begin
-                reorder_active<=0;run_closed<=0;decode_inflight<=0;
-                scratch0_pending<=0;scratch1_pending<=0;
-                future_frame_pending<=0;future_reference_pending<=0;
-                presentation_error<=1;
-            end else begin
-                run_closed<=1;
-                // A non-B close is overlap-eligible only when it is the P
-                // header explicitly classified by the caller. sequence_end
-                // retains the original immediate presentation hold.
-                overlap_decode_open<=p_picture_start&&
-                                     reference_overlap_header;
+            if(!run_closed)begin
+                if(future_reference_pending&&!frame_waiting)begin
+                    reorder_active<=0;run_closed<=0;decode_inflight<=0;
+                    scratch0_pending<=0;scratch1_pending<=0;
+                    future_frame_pending<=0;future_reference_pending<=0;
+                    presentation_error<=1;
+                end else begin
+                    run_closed<=1;
+                    // A non-B close is overlap-eligible only when it is the P
+                    // header explicitly classified by the caller. sequence_end
+                    // retains the original immediate presentation hold.
+                    overlap_decode_open<=p_picture_start&&
+                                         reference_overlap_header;
+                end
+            end else if(queued_run_active&&!queued_run_closed)begin
+                if(queued_future_reference_pending)begin
+                    reorder_active<=0;run_closed<=0;decode_inflight<=0;
+                    scratch0_pending<=0;scratch1_pending<=0;
+                    future_frame_pending<=0;future_reference_pending<=0;
+                    queued_run_active<=0;queued_decode_inflight<=0;
+                    queued_scratch0_pending<=0;queued_scratch1_pending<=0;
+                    queued_future_frame_pending<=0;
+                    presentation_error<=1;
+                end else begin
+                    queued_run_closed<=1;
+                    queued_overlap_decode_open<=p_picture_start&&
+                                                reference_overlap_header;
+                end
             end
         end
 
@@ -240,23 +396,34 @@ always @(posedge clk) begin
                 next_present_scratch_bank<=!next_present_scratch_bank;
                 scratch_presented<=1;
             end else if(future_waiting)begin
-                future_frame_pending<=0;reorder_active<=0;run_closed<=0;
+                future_frame_pending<=0;
                 future_reference_pending<=0;
-                overlap_decode_open<=0;
-                // Preserve a reference decoded during this presentation run.
-                // It now becomes the ordinary classification barrier for the
-                // following accepted header.
-                if(overlap_frame_pending||
-                   (frame_waiting&&overlap_decode_open))begin
-                    pending_frame_valid<=1;
-                    pending_frame_released<=0;
+                if(queued_run_active)begin
+                    // Retire the visible generation first.  Promotion waits
+                    // for any queued B completion edge so that ownership can
+                    // never be lost on a coincident cadence window.
+                    promotion_pending<=1;
+                    overlap_decode_open<=0;
+                    overlap_frame_pending<=0;
                 end else begin
-                    pending_frame_valid<=0;
-                    pending_frame_released<=0;
+                    reorder_active<=0;run_closed<=0;
+                    overlap_decode_open<=0;
+                    // Preserve a reference decoded during this presentation
+                    // run.  It becomes the ordinary classification barrier
+                    // for the following accepted header.
+                    if(overlap_frame_pending||
+                       (frame_waiting&&overlap_decode_open))begin
+                        pending_frame_valid<=1;
+                        pending_frame_released<=0;
+                    end else begin
+                        pending_frame_valid<=0;
+                        pending_frame_released<=0;
+                    end
+                    overlap_frame_pending<=0;
+                    if(scratch_presented&&!presentation_error)
+                        presentation_complete<=1;
+                    else presentation_error<=1;
                 end
-                overlap_frame_pending<=0;
-                if(scratch_presented&&!presentation_error)presentation_complete<=1;
-                else presentation_error<=1;
             end else begin
                 pending_frame_valid<=0;
                 pending_frame_released<=0;
@@ -266,15 +433,64 @@ always @(posedge clk) begin
             future_reference_pending<=0;
             pending_frame_valid<=0;pending_frame_released<=0;
             overlap_decode_open<=0;overlap_frame_pending<=0;
+            queued_run_active<=0;queued_decode_inflight<=0;
+            queued_scratch0_pending<=0;queued_scratch1_pending<=0;
+            queued_future_frame_pending<=0;promotion_pending<=0;
             presentation_error<=1;
         end else if(framebuffer_swap_reset_count!=0)
             framebuffer_swap_reset_count<=framebuffer_swap_reset_count-1'b1;
+
+        // Promotion is deliberately a registered ownership handoff after the
+        // old future frame becomes visible.  Waiting for queued B persistence
+        // eliminates the only ambiguous same-edge completion case.
+        if(promotion_pending&&!queued_decode_inflight&&
+           !(frame_waiting&&queued_overlap_decode_open))begin
+            if(!queued_run_active||!queued_future_frame_pending||
+               queued_future_reference_pending)begin
+                reorder_active<=0;run_closed<=0;decode_inflight<=0;
+                scratch0_pending<=0;scratch1_pending<=0;
+                future_frame_pending<=0;future_reference_pending<=0;
+                queued_run_active<=0;queued_future_frame_pending<=0;
+                promotion_pending<=0;presentation_error<=1;
+            end else begin
+                reorder_active<=1;
+                scratch0_pending<=queued_scratch0_pending;
+                scratch1_pending<=queued_scratch1_pending;
+                next_present_scratch_bank<=queued_first_scratch_bank;
+                future_frame_pending<=queued_future_frame_pending;
+                future_frame_bank<=queued_future_frame_bank;
+                future_reference_pending<=queued_future_reference_pending;
+                scratch_presented<=0;
+                run_picture_count<=queued_run_picture_count;
+                run_closed<=queued_run_closed;
+                decode_inflight<=0;
+                overlap_decode_open<=queued_overlap_decode_open;
+                overlap_frame_pending<=queued_overlap_frame_pending;
+                queued_run_active<=0;queued_run_closed<=0;
+                queued_decode_inflight<=0;
+                queued_scratch0_pending<=0;queued_scratch1_pending<=0;
+                queued_future_frame_pending<=0;
+                queued_future_reference_pending<=0;
+                queued_run_picture_count<=0;
+                queued_overlap_decode_open<=0;
+                queued_overlap_frame_pending<=0;
+                decode_generation_queued<=0;promotion_pending<=0;
+                presentation_complete<=0;
+            end
+        end
 
         if(reorder_active&&b_decode_error)begin
             reorder_active<=0;run_closed<=0;decode_inflight<=0;
             scratch0_pending<=0;scratch1_pending<=0;future_frame_pending<=0;
             future_reference_pending<=0;
             overlap_decode_open<=0;
+            queued_run_active<=0;queued_run_closed<=0;
+            queued_decode_inflight<=0;
+            queued_scratch0_pending<=0;queued_scratch1_pending<=0;
+            queued_future_frame_pending<=0;
+            queued_future_reference_pending<=0;
+            queued_overlap_decode_open<=0;
+            promotion_pending<=0;
             presentation_error<=1;
         end
     end

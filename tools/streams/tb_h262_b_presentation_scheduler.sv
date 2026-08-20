@@ -184,6 +184,69 @@ module tb_h262_b_presentation_scheduler;
             $fatal(1,"following B did not claim overlapped future reference");
         reset_scheduler();
 
+        // Entry 269: the first B of the next run may occupy scratch 0 only
+        // after the old display leaves it for scratch 1.  It must remain in a
+        // separate generation until the old future reference is visible;
+        // promotion then exposes that exact identity and admits B two into the
+        // reciprocally released scratch 1 bank.
+        reference_bank<=0;completed_bank<=1;
+        @(negedge clk);b_start<=1;frame_waiting<=1;
+        @(negedge clk);b_start<=0;frame_waiting<=0;reference_bank<=1;#1;
+        pulse_success();
+        pulse_start();
+        pulse_success();
+        pulse_p_close();
+        completed_bank<=0;reference_bank<=0;
+        @(negedge clk);frame_waiting<=1;
+        @(negedge clk);frame_waiting<=0;#1;
+        if(!hold||!dut.overlap_frame_pending||
+           (dut.pending_frame_bank!==1'b0))
+            $fatal(1,"next-run future reference was not retained");
+        pulse_swap();
+        if(!display_scratch||display_scratch_bank||!hold)
+            $fatal(1,"first generation scratch 0 ownership was released early");
+        pulse_swap();
+        if(!display_scratch||!display_scratch_bank||hold)
+            $fatal(1,"released scratch 0 did not open next-generation input");
+        pulse_start();
+        if(decode_scratch_bank||!dut.queued_run_active||
+           (dut.queued_future_frame_bank!==1'b0)||
+           dut.scratch0_pending||dut.queued_scratch0_pending||hold||error)
+            $fatal(1,"next-generation B one did not claim released scratch 0");
+        // Let the old future frame display while queued B one still needs
+        // compressed bytes.  Promotion may wait, but input must remain open.
+        pulse_swap();
+        if(!dut.promotion_pending||!dut.queued_decode_inflight||hold||
+           display_scratch||(display_bank!==1'b1)||error)
+            $fatal(1,"promotion blocked an admitted queued B decode");
+        pulse_success();
+        if(!dut.queued_scratch0_pending||dut.scratch0_pending||!hold||error)
+            $fatal(1,"queued scratch 0 identity leaked into current generation");
+        @(posedge clk);#1;
+        if(dut.promotion_pending||dut.queued_run_active||
+           !dut.scratch0_pending||(dut.next_present_scratch_bank!==1'b0)||
+           dut.run_closed||hold||error)
+            $fatal(1,"atomic generation promotion lost queued scratch 0");
+        pulse_start();
+        if(!decode_scratch_bank||error)
+            $fatal(1,"reciprocal scratch 1 release did not admit B two");
+        pulse_success();
+        pulse_p_close();
+        completed_bank<=1;reference_bank<=1;
+        @(negedge clk);frame_waiting<=1;
+        @(negedge clk);frame_waiting<=0;#1;
+        pulse_swap();
+        if(!display_scratch||display_scratch_bank)
+            $fatal(1,"promoted run did not present scratch 0 first");
+        pulse_swap();
+        if(!display_scratch||!display_scratch_bank)
+            $fatal(1,"promoted run did not present scratch 1 second");
+        pulse_swap();
+        if(display_scratch||display_bank||!complete||hold||error||
+           !dut.pending_frame_valid||(dut.pending_frame_bank!==1'b1))
+            $fatal(1,"promoted run did not retire to its P6 future reference");
+        reset_scheduler();
+
         // Starvation may make one presentation immediately eligible, but it
         // must not bank enough credit for a consecutive-refresh catch-up.
         repeat(5)pulse_window();
@@ -235,11 +298,11 @@ module tb_h262_b_presentation_scheduler;
         if(display_scratch||!display_bank)
             $fatal(1,"ordinary frame presentation did not recover after abort");
 
-        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=1,3,2 overlap_p=1 starvation=1 ordinary=1 terminal=1 fail_open=1");
+        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=1,3,2 overlap_p=1 generations=2 bank_reuse=0,1 starvation=1 ordinary=1 terminal=1 fail_open=1");
         $finish;
     end
 
-    initial begin repeat(200)@(posedge clk);$fatal(1,"presentation test timed out");end
+    initial begin repeat(400)@(posedge clk);$fatal(1,"presentation test timed out");end
 endmodule
 
 module tb_h262_double_scratch_tags;

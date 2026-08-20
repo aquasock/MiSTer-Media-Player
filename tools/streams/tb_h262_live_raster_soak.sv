@@ -11,7 +11,9 @@
 // same 3-I/22-P/47-B repeated-GOP transaction sequence as the 720x480 stream.
 module tb_h262_live_raster_soak #(
     parameter integer MIXED_PIXEL_MODE=0,
-    parameter integer MEMORY_READ_LATENCY=1
+    parameter integer MEMORY_READ_LATENCY=1,
+    parameter integer SWAP_WINDOW_CYCLES=10000,
+    parameter integer STALL_TRACE_CYCLES=0
 );
     localparam integer EXPECTED_DESCRIPTOR_DEPTH=
         `H262_PREDICTION_DESCRIPTOR_DEPTH;
@@ -31,8 +33,10 @@ module tb_h262_live_raster_soak #(
     integer stream_len,stream_index=0,quiet_cycles=0;
     integer i,p_rows=0,b_rows=0,p_pictures=0,b_pictures=0;
     integer published_references=0,display_swaps=0;
+    integer queued_run_admissions=0,generation_promotions=0;
     integer reference_writes=0,scratch0_writes=0,scratch1_writes=0;
     integer memory_reads=0,total_cycles=0;
+    integer stream_stall_cycles=0,last_stream_index=0;
     integer prediction_no_progress_cycles=0;
     integer prediction_trace_fd=0;
     integer row_trace_fd=0,row_trace_cycle=0;
@@ -223,6 +227,7 @@ module tb_h262_live_raster_soak #(
     reg reference_ownership_arm=0,destination_ownership_hold=0;
 
     reg pred_persisted_d=0;
+    reg queued_run_active_d=0,promotion_pending_d=0;
     reg pred_read_observed=0,pred_reconstructed_observed=0;
     reg display_frame_bank_d=0,display_scratch_d=0,display_scratch_bank_d=0;
     reg [7:0] reference_identity[0:1];
@@ -1011,11 +1016,50 @@ module tb_h262_live_raster_soak #(
         end
         if(pred_read_seen)pred_read_observed<=1;
         if(pred_reconstructed_seen)pred_reconstructed_observed<=1;
-        if(swap_counter==9999)begin
+        if(swap_counter==(SWAP_WINDOW_CYCLES-1))begin
             swap_counter<=0;
             swap_window_pulse<=1;
         end
         else swap_counter<=swap_counter+1;
+
+        if(stream_index!=last_stream_index)begin
+            last_stream_index<=stream_index;
+            stream_stall_cycles<=0;
+        end else if(stream_index<stream_len)
+            stream_stall_cycles<=stream_stall_cycles+1;
+        if((STALL_TRACE_CYCLES!=0)&&
+           (stream_stall_cycles==STALL_TRACE_CYCLES))
+            $fatal(1,"stream stall byte=%0d ready=%0d/%0d/%0d current=%0d/%0d/%0d/%0d scratch=%0d%0d next=%0d future=%0d/%0d overlap=%0d queued=%0d/%0d/%0d/%0d qs=%0d%0d qfuture=%0d/%0d qoverlap=%0d promotion=%0d display=%0d/%0d frame=%0d pending=%0d/%0d",
+                   stream_index,decoder_ready,presentation_hold,
+                   destination_ownership_hold,scheduler.reorder_active,
+                   scheduler.run_closed,scheduler.decode_inflight,
+                   scheduler.run_picture_count,scheduler.scratch0_pending,
+                   scheduler.scratch1_pending,
+                   scheduler.next_present_scratch_bank,
+                   scheduler.future_frame_pending,
+                   scheduler.future_reference_pending,
+                   scheduler.overlap_decode_open,
+                   scheduler.queued_run_active,
+                   scheduler.queued_run_closed,
+                   scheduler.queued_decode_inflight,
+                   scheduler.queued_run_picture_count,
+                   scheduler.queued_scratch0_pending,
+                   scheduler.queued_scratch1_pending,
+                   scheduler.queued_future_frame_pending,
+                   scheduler.queued_future_reference_pending,
+                   scheduler.queued_overlap_decode_open,
+                   scheduler.promotion_pending,display_scratch,
+                   display_scratch_bank,frame_waiting,
+                   scheduler.pending_frame_valid,
+                   scheduler.overlap_frame_pending);
+
+        queued_run_active_d<=scheduler.queued_run_active;
+        promotion_pending_d<=scheduler.promotion_pending;
+        if(!queued_run_active_d&&scheduler.queued_run_active)
+            queued_run_admissions<=queued_run_admissions+1;
+        if(promotion_pending_d&&!scheduler.promotion_pending&&
+           scheduler.reorder_active)
+            generation_promotions<=generation_promotions+1;
 
         if(stream_valid)begin
             picture_window<=picture_window_next;
@@ -1152,7 +1196,7 @@ module tb_h262_live_raster_soak #(
         else quiet_cycles<=0;
 
         if(quiet_cycles==30000)begin
-            $display("LIVE_RASTER_RESULT bytes=%0d p_rows=%0d p=%0d b_rows=%0d b=%0d published=%0d pictures=%0d promotions=%0d display_identity=%0d swaps=%0d last_p_temporal=%0d ref_writes=%0d scratch0_writes=%0d scratch1_writes=%0d ddr_reads=%0d cache=%0d/%0d/%0d cycles=%0d read=%0d recon=%0d presentation=%0d error=%0d/%0d/%0d/%0d",
+            $display("LIVE_RASTER_RESULT bytes=%0d p_rows=%0d p=%0d b_rows=%0d b=%0d published=%0d pictures=%0d promotions=%0d display_identity=%0d swaps=%0d last_p_temporal=%0d ref_writes=%0d scratch0_writes=%0d scratch1_writes=%0d ddr_reads=%0d cache=%0d/%0d/%0d cycles=%0d read=%0d recon=%0d presentation=%0d queued=%0d promoted=%0d error=%0d/%0d/%0d/%0d",
                      stream_index,p_rows,p_pictures,b_rows,b_pictures,
                      published_references,picture_count,reference_promotion_count,
                      displayed_identity,display_swaps,last_reference_temporal,
@@ -1161,7 +1205,8 @@ module tb_h262_live_raster_soak #(
                      prediction.reference_cache.cache_miss_count,
                      prediction.reference_cache.uncached_count,total_cycles,
                      pred_read_observed,pred_reconstructed_observed,
-                     presentation_complete,probe_error,pred_error,writer_error,
+                     presentation_complete,queued_run_admissions,
+                     generation_promotions,probe_error,pred_error,writer_error,
                      presentation_error);
             $display("LIVE_RASTER_PROFILE input=%0d/%0d/%0d input_type=%0d/%0d/%0d transform=%0d/%0d raster=%0d/%0d lookup=%0d/%0d ddr_request=%0d/%0d ddr_response=%0d/%0d emit=%0d/%0d store=%0d/%0d writer=%0d presentation=%0d b_miss_prelaunch=%0d",
                      profile_input_decoder,profile_input_presentation,
