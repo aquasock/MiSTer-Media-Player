@@ -1243,7 +1243,7 @@ Forward each transform's already ordered spatial output directly into the P/B ra
 - [x] Passed
 
 ---
-## 260 COMMIT Unreleased ??? 2026-08-20T07:03:18-07:00
+## 260 COMMIT Unreleased c958794 2026-08-20T07:03:18-07:00
 
 #### Coming From:
 
@@ -1255,16 +1255,21 @@ Remove the duplicate 64-cycle spatial-sample replay after each transformed P/B r
 
 #### Outcome:
 
-Proposal only. Entry 259 proves that every transformed block is emitted once by the shared transform into a private 64-sample temporary array and then emitted a second time in index order to the raster capture store. The second pass contributes approximately 160,000 mixed and 947,000 long simulation cycles while adding no arithmetic, ordering, buffering, or ownership information. Move each block descriptor before transform start and forward the transform's existing index-zero-through-index-63 output directly; retain complete-row capture, final row markers, exact sample validation and all parser, persistence, writer, publication, and presentation barriers.
+Commit `c958794` publishes each P/B block descriptor before transform start and forwards the transform's existing registered index-zero-through-index-63 spatial output directly into row capture, removing both private 64-sample arrays and their duplicate replay states. The exact mixed boundary preserves all 423,936 pixels with zero mismatches and maximum delta two, 69,556 reads, every write, nine publications, 23 swaps and zero errors while falling from 1,969,996 to 1,809,996 cycles, an 8.12 percent reduction. The complete long boundary preserves 372,696 reads, all reference/scratch writes, 25 publications, 71 swaps and zero errors while falling from 10,719,996 to 9,779,996 cycles, an 8.77 percent reduction. Focused B residual streaming falls by exactly 7,680 cycles across 120 blocks while preserving 7,680 samples, 518,400 stores and its authored stripe; P intra falls by exactly 384 cycles across six blocks with all samples exact. B intra, eight-refill parser windows, dense P row streaming across 8,100 blocks and 518,400 samples, and dense B row streaming across 8,073 blocks and 516,672 samples all pass exact ordering and accounting. The measured simulation gain projects the accepted hardware from 19.85 to approximately 21.61 fps mixed and from 21.82 to approximately 23.92 fps long if timing and hardware scale proportionally.
 
 #### Next Steps:
 
-Implement the direct P and B spatial stream symmetrically, then run focused residual, intra, parser-window and row-streaming tests before the 423,936-pixel mixed oracle. If every pixel and transaction remains exact, run the complete long soak and compare cycle counts against 1,969,996 mixed and 10,719,996 long; reject the change before Quartus if the measured gain is not material.
+Run Quartus from the timing-qualified seed-six boundary, require positive global and decoder timing with no combinational loop, deploy only a fully passing RBF, and acquire exact MiSTer telemetry for both compatibility streams. If both preserve their accepted LED/transaction signatures and materially improve cadence, pause for the user's visual check before selecting the remaining path to stable 25 fps.
 
 #### Files Modified:
 
 - rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_p_intra_macroblocks.sv
 
 #### Status:
 
