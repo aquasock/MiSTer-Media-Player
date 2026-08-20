@@ -223,8 +223,8 @@ reg [7:0] out_reg;
 reg emit_advanced, emit_first_sample;
 reg [11:0] emit_x, emit_y;
 reg emit_block_start, emit_block_complete;
-(* preserve *) reg [28:0] next_prelaunch_addr;
-(* preserve *) reg next_prelaunch_valid;
+reg [28:0] next_prelaunch_addr;
+reg next_prelaunch_valid;
 wire fast_pixel_advance, slow_pixel_advance, precompute_after_advance;
 
 wire [28:0] roff=reference_bank_latched?BANK_OFF:0;
