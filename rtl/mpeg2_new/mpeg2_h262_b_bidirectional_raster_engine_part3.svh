@@ -55,6 +55,11 @@
             phase_base_byte<=src_base_x[2:0];
             phase_row_words<=(blk<4)?7'd90:7'd45;
             phase_bounds_ok<=source_bounds_ok;
+            if((exec_direction!=0)&&block_all_bounds_ok)begin
+                block_fetch_start<=1;
+                block_phase0_base_byte<=block_phase0_src_x[2:0];
+                block_phase1_base_byte<=block_backward_src_x[2:0];
+            end
         end
 
         if(pixel_setup||precompute_after_advance) begin
@@ -73,15 +78,16 @@
             if(exec_direction==0)begin
                 if(!residual_hit)begin error<=1;if(!error)error_source<=5'd11;active<=0;persisted_seen<=1;timeout<=0;end
                 else begin out_reg<=reconstructed_intra;emit<=1;end
-            end else if(!phase_bounds_ok)begin error<=1;if(!error)error_source<=5'd11;active<=0;persisted_seen<=1;timeout<=0;end
+            end else if(!phase_bounds_ok||
+                        ((ei==0)&&!block_all_bounds_ok))begin error<=1;if(!error)error_source<=5'd11;active<=0;persisted_seen<=1;timeout<=0;end
             else begin
                 if(half_x||half_y)half_sample_seen<=1;
                 lookup_wait<=1;
             end
         end
 
-        if(lookup_wait&&ddram_lookup_ready) begin
-            if(ddram_lookup_hit) begin
+        if(lookup_wait&&block_lookup_ready) begin
+            if(block_lookup_valid) begin
                 if(tap_last) begin
                     lookup_wait<=0;
                     if((exec_direction==2'd3)&&!pred_direction) begin
@@ -92,13 +98,9 @@
                         phase_base_addr<=bidir_prelaunch_addr;
                         phase_base_byte<=bidir_prelaunch_byte;
                         phase_bounds_ok<=bidir_prelaunch_valid;
-                        if(bidir_early_lookup) begin
-                            if(early_half_x||early_half_y)
-                                half_sample_seen<=1;
-                            lookup_wait<=1;
-                        end else begin
-                            pixel_setup<=1;
-                        end
+                        if(exec_bmvx[0]||exec_bmvy[0])
+                            half_sample_seen<=1;
+                        lookup_wait<=1;
                     end else begin
                         out_reg<=lookup_reconstructed_current;emit<=1;
                         if((mbi==0)&&(blk==0)&&(ei==0))begin
@@ -110,49 +112,15 @@
                     pred_sum<=lookup_pred_sum_with_current;
                     tap_index<=tap_index+1'b1;
                 end
-            end else begin lookup_wait<=0;req<=1;end
-        end
-
-        // kate - Commit 182: latch the returned-word byte select in the same
-        // cycle the address is presented to DDR, so both come from one
-        // evaluation of src_x_tap.
-        if(req&&!ddram_busy)begin
-            req<=0;waitresp<=1;tap_byte_sel<=phase_tap_byte;
-            miss_prelaunch_addr<=next_miss_prelaunch_addr;
-            miss_prelaunch_byte<=next_miss_tap_byte_sum[2:0];
-        end
-
-        if(ddram_dout_ready) begin
-            if(!waitresp)begin error<=1;if(!error)error_source<=5'd12;end
-            else begin
-                waitresp<=0;
-                if(tap_last) begin
-                    if((exec_direction==2'd3)&&!pred_direction) begin
-                        forward_prediction<=selected_prediction;pred_direction<=1;pred_sum<=0;tap_index<=0;
-                        phase_mvx<=exec_bmvx;phase_mvy<=exec_bmvy;
-                        phase_backward<=1;
-                        phase_base_addr<=bidir_prelaunch_addr;
-                        phase_base_byte<=bidir_prelaunch_byte;
-                        phase_bounds_ok<=bidir_prelaunch_valid;
-                        if(bidir_early_lookup) begin
-                            if(early_half_x||early_half_y)
-                                half_sample_seen<=1;
-                            lookup_wait<=1;
-                        end else begin
-                            pixel_setup<=1;
-                        end
-                    end else begin
-                        out_reg<=reconstructed_current;emit<=1;
-                        if((mbi==0)&&(blk==0)&&(ei==0))begin read_seen<=1;sample_nonzero<=|final_prediction;end
-                    end
-                end else begin
-                    pred_sum<=pred_sum_with_current;tap_index<=tap_index+1'b1;
-                    if(miss_response_prelaunch&&!ddram_busy)begin
-                        waitresp<=1;
-                        tap_byte_sel<=miss_response_prelaunch_byte;
-                    end else req<=1;
-                end
             end
+        end
+
+        if(block_fetch_error)begin
+            error<=1;
+            if(!error)error_source<=5'd16;
+            active<=0;
+            persisted_seen<=1;
+            timeout<=0;
         end
 
         if(emit) begin

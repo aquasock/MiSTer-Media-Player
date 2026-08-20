@@ -949,12 +949,11 @@ module tb_h262_live_raster_soak #(
                    scratch1_writes!=16128||
                    // Entry 253 serves P taps from the exact block buffer;
                    // shared-cache accounting now covers block fetches plus B.
-                   prediction.reference_cache.cache_hit_count!=32'd342521||
-                   prediction.reference_cache.cache_miss_count!=32'd71317||
+                   prediction.reference_cache.cache_hit_count!=32'd28||
+                   prediction.reference_cache.cache_miss_count!=32'd69528||
                    prediction.reference_cache.uncached_count!=0||
-                   memory_reads!=71317||
-                   ((MEMORY_READ_LATENCY==1)&&(total_cycles!=2189996))||
-                   profile_b_miss_prelaunch==0||
+                   memory_reads!=69528||
+                   ((MEMORY_READ_LATENCY==1)&&(total_cycles!=1999996))||
                    pixel_samples!=423936||pixel_mismatches!=0||
                    !writer_seen||!pred_read_observed||
                    !pred_reconstructed_observed||!presentation_complete||
@@ -988,12 +987,11 @@ module tb_h262_live_raster_soak #(
                displayed_identity!=25||last_reference_temporal!=10'd23||
                reference_writes!=50688||scratch0_writes!=55296||
                scratch1_writes!=52992||
-               prediction.reference_cache.cache_hit_count!=32'd1934457||
-               prediction.reference_cache.cache_miss_count!=32'd463831||
+               prediction.reference_cache.cache_hit_count!=32'd48||
+               prediction.reference_cache.cache_miss_count!=32'd372648||
                prediction.reference_cache.uncached_count!=0||
-               memory_reads!=463831||
-               ((MEMORY_READ_LATENCY==1)&&(total_cycles!=12269996))||
-               profile_b_miss_prelaunch==0||
+               memory_reads!=372648||
+               ((MEMORY_READ_LATENCY==1)&&(total_cycles!=11069996))||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
                presentation_error)

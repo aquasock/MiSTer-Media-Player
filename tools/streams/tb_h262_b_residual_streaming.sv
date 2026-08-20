@@ -158,11 +158,10 @@ module tb_h262_b_residual_streaming #(
                !raster.metadata_done||!read_seen||!reconstructed_seen||!persisted_seen||
                store_samples!=518400||stripe_store_samples!=7680||
                stripe_changed_samples!=(intra_mode?768:7680)||
-               // Entry 243 affects only additional half-pel taps; this
-               // integer-motion replay and cache-hit timing remain unchanged.
-               (!intra_mode&&
-                (((CACHE_HIT_MODE==0)&&(total_cycles!=3384889))||
-                 ((CACHE_HIT_MODE!=0)&&(total_cycles!=1311289))))||
+               // Entry 254 retains each predicted block footprint, so the
+               // former upstream cold/hit modes converge while authored
+               // residual and intra samples remain exact.
+               (!intra_mode&&(total_cycles!=1392289))||
                (intra_mode&&(total_cycles>=3903000)))
                 $fatal(1,"B residual streaming regression failed");
             $finish;

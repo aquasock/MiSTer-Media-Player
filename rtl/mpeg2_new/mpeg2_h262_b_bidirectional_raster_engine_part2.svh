@@ -10,6 +10,80 @@ wire signed [13:0] src_last_y=src_base_y+(half_y?14'sd1:14'sd0);
 wire source_bounds_ok=(src_base_x>=0)&&(src_base_y>=0)&&
     (src_last_x<$signed({2'b00,plane_width}))&&(src_last_y<$signed({2'b00,plane_height}));
 
+wire signed [8:0] block_forward_int_x=$signed(exec_fmvx)>>>1;
+wire signed [8:0] block_forward_int_y=$signed(exec_fmvy)>>>1;
+wire signed [8:0] block_backward_int_x=$signed(exec_bmvx)>>>1;
+wire signed [8:0] block_backward_int_y=$signed(exec_bmvy)>>>1;
+wire signed [13:0] block_forward_src_x=
+    $signed({1'b0,dest_x})+$signed(block_forward_int_x);
+wire signed [13:0] block_forward_src_y=
+    $signed({1'b0,dest_y})+$signed(block_forward_int_y);
+wire signed [13:0] block_backward_src_x=
+    $signed({1'b0,dest_x})+$signed(block_backward_int_x);
+wire signed [13:0] block_backward_src_y=
+    $signed({1'b0,dest_y})+$signed(block_backward_int_y);
+wire block_phase0_backward=(exec_direction==2'd2);
+wire signed [13:0] block_phase0_src_x=block_phase0_backward?
+    block_backward_src_x:block_forward_src_x;
+wire signed [13:0] block_phase0_src_y=block_phase0_backward?
+    block_backward_src_y:block_forward_src_y;
+wire block_phase0_half_x=block_phase0_backward?
+    exec_bmvx[0]:exec_fmvx[0];
+wire block_phase0_half_y=block_phase0_backward?
+    exec_bmvy[0]:exec_fmvy[0];
+wire signed [13:0] block_phase0_last_x=block_phase0_src_x+14'sd7+
+    (block_phase0_half_x?14'sd1:14'sd0);
+wire signed [13:0] block_phase0_last_y=block_phase0_src_y+14'sd7+
+    (block_phase0_half_y?14'sd1:14'sd0);
+wire signed [13:0] block_phase1_last_x=block_backward_src_x+14'sd7+
+    (exec_bmvx[0]?14'sd1:14'sd0);
+wire signed [13:0] block_phase1_last_y=block_backward_src_y+14'sd7+
+    (exec_bmvy[0]?14'sd1:14'sd0);
+wire block_phase0_bounds_ok=(block_phase0_src_x>=0)&&
+    (block_phase0_src_y>=0)&&
+    (block_phase0_last_x<$signed({2'b00,plane_width}))&&
+    (block_phase0_last_y<$signed({2'b00,plane_height}));
+wire block_phase1_bounds_ok=(block_backward_src_x>=0)&&
+    (block_backward_src_y>=0)&&
+    (block_phase1_last_x<$signed({2'b00,plane_width}))&&
+    (block_phase1_last_y<$signed({2'b00,plane_height}));
+wire block_all_bounds_ok=block_phase0_bounds_ok&&
+    ((exec_direction!=2'd3)||block_phase1_bounds_ok);
+wire [3:0] block_phase0_word_span=
+    {1'b0,block_phase0_src_x[2:0]}+4'd7+
+    {3'd0,block_phase0_half_x};
+wire [3:0] block_phase1_word_span=
+    {1'b0,block_backward_src_x[2:0]}+4'd7+
+    {3'd0,exec_bmvx[0]};
+wire [28:0] block_phase0_base_addr=pixel_addr(
+    block_phase0_backward?future_off:past_off,blk,
+    block_phase0_src_x[11:0],block_phase0_src_y[11:0]);
+wire [28:0] block_phase1_base_addr=pixel_addr(
+    future_off,blk,block_backward_src_x[11:0],
+    block_backward_src_y[11:0]);
+wire [6:0] block_row_words=(blk<4)?7'd90:7'd45;
+
+mpeg2_h262_prediction_block_fetcher block_fetcher(
+    .clk(clk),.reset(reset),.start(block_fetch_start),
+    .phase_count((exec_direction==2'd3)?2'd2:2'd1),
+    .phase0_base_addr(block_phase0_base_addr),
+    .phase1_base_addr(block_phase1_base_addr),
+    .phase0_two_words(block_phase0_word_span[3]),
+    .phase1_two_words(block_phase1_word_span[3]),
+    .phase0_rows(4'd8+{3'd0,block_phase0_half_y}),
+    .phase1_rows(4'd8+{3'd0,exec_bmvy[0]}),
+    .row_words(block_row_words),.memory_busy(ddram_busy),
+    .memory_dout(ddram_dout),.memory_dout_ready(ddram_dout_ready),
+    .memory_addr(block_fetch_addr),.memory_rd(block_fetch_rd),
+    .lookup_request(block_lookup_request),
+    .lookup_phase(block_lookup_phase),.lookup_row(block_lookup_row),
+    .lookup_column(block_lookup_column),
+    .lookup_ready(block_lookup_ready),.lookup_valid(block_lookup_valid),
+    .lookup_data(block_lookup_data),.active(block_fetch_active),
+    .complete(block_fetch_complete),.error(block_fetch_error),
+    .issued_count(block_fetch_issued),.returned_count(block_fetch_returned),
+    .outstanding_count(block_fetch_outstanding));
+
 // Entry 239: complete backward/current and following-pixel word addresses stay
 // registered ahead of the cache. A fast final response advances these
 // registers concurrently with the writer output.
@@ -91,10 +165,9 @@ wire [28:0] precompute_next_addr=pixel_addr(
 wire tap_dx=(half_x&&half_y)?tap_index[0]:(half_x?tap_index[0]:1'b0);
 wire tap_dy=(half_x&&half_y)?tap_index[1]:(half_y?tap_index[0]:1'b0);
 wire tap_last=(half_x&&half_y)?(tap_index==2'd3):((half_x||half_y)?(tap_index==2'd1):(tap_index==2'd0));
-wire lookup_phase_complete=lookup_wait&&ddram_lookup_ready&&
-    ddram_lookup_hit&&tap_last;
-wire ddr_phase_complete=waitresp&&ddram_dout_ready&&tap_last;
-wire prediction_phase_complete=lookup_phase_complete||ddr_phase_complete;
+wire lookup_phase_complete=lookup_wait&&block_lookup_ready&&
+    block_lookup_valid&&tap_last;
+wire prediction_phase_complete=lookup_phase_complete;
 wire bidir_lookup_candidate=prediction_phase_complete&&
     (exec_direction==2'd3)&&!pred_direction;
 wire predicted_pixel_complete=prediction_phase_complete&&
@@ -179,7 +252,7 @@ wire [7:0] reconstructed_current=clip(final_prediction,residual_pel);
 wire [7:0] reconstructed_intra=clip(8'd0,residual_pel);
 wire [3:0] phase_tap_byte_sum={1'b0,phase_base_byte}+tap_dx;
 wire [2:0] phase_tap_byte=phase_tap_byte_sum[2:0];
-wire [7:0] lookup_tap_sample=bat(ddram_lookup_data,phase_tap_byte);
+wire [7:0] lookup_tap_sample=bat(block_lookup_data,phase_tap_byte);
 wire [10:0] lookup_pred_sum_with_current=pred_sum+{3'd0,lookup_tap_sample};
 wire [7:0] lookup_selected_prediction=
     round_prediction(lookup_pred_sum_with_current,half_x,half_y);
@@ -190,11 +263,11 @@ wire [7:0] lookup_final_prediction=
     (exec_direction==2'd3)?lookup_bidir_prediction:lookup_selected_prediction;
 wire [7:0] lookup_reconstructed_current=
     clip(lookup_final_prediction,residual_pel);
-wire lookup_advance=lookup_wait&&ddram_lookup_ready&&
-    ddram_lookup_hit&&!tap_last;
+wire lookup_advance=lookup_wait&&block_lookup_ready&&
+    block_lookup_valid&&!tap_last;
 wire prediction_lookup=
     (pixel_setup&&(exec_direction!=0)&&phase_bounds_ok)||lookup_advance||
-    early_lookup;
+    bidir_lookup_candidate||next_pixel_lookup_candidate;
 wire advance_tap_address=lookup_advance;
 wire address_tap_dx=advance_tap_address?next_tap_dx:tap_dx;
 wire address_tap_dy=advance_tap_address?next_tap_dy:tap_dy;
@@ -209,16 +282,48 @@ wire [28:0] next_miss_prelaunch_addr=phase_base_addr+
     (next_tap_dy?{22'd0,phase_row_words}:29'd0)+
     {28'd0,next_miss_tap_byte_sum[3]};
 
-assign ddram_burstcnt=(req||miss_response_prelaunch)?8'd1:8'd0;
-assign ddram_addr=miss_response_prelaunch?miss_prelaunch_addr:
-    req?normal_lookup_addr:
-    prediction_lookup?
-        (early_lookup?early_lookup_addr:normal_lookup_addr):29'd0;
-assign ddram_rd=req||miss_response_prelaunch;
-assign ddram_cacheable=req||miss_response_prelaunch||prediction_lookup;
-assign ddram_lookup_request=prediction_lookup;
-assign ddram_lookup_consume=
-    lookup_wait&&ddram_lookup_ready&&ddram_lookup_hit;
+wire block_lookup_retry=lookup_wait&&block_lookup_ready&&
+    !block_lookup_valid;
+wire block_lookup_idle_request=lookup_wait&&!block_fetch_start&&
+    !block_lookup_ready;
+assign block_lookup_phase=bidir_lookup_candidate?1'b1:
+    next_pixel_lookup_candidate?1'b0:
+    ((exec_direction==2'd3)&&pred_direction);
+wire [5:0] block_request_ei=next_pixel_lookup_candidate?
+    (ei+1'b1):ei;
+wire [1:0] block_request_tap=lookup_advance?
+    (tap_index+1'b1):
+    (bidir_lookup_candidate||next_pixel_lookup_candidate)?2'd0:tap_index;
+wire signed [7:0] block_request_mvx=block_lookup_phase?
+    exec_bmvx:((exec_direction==2'd2)?exec_bmvx:exec_fmvx);
+wire signed [7:0] block_request_mvy=block_lookup_phase?
+    exec_bmvy:((exec_direction==2'd2)?exec_bmvy:exec_fmvy);
+wire block_request_half_x=block_request_mvx[0];
+wire block_request_half_y=block_request_mvy[0];
+wire block_request_tap_dx=
+    (block_request_half_x&&block_request_half_y)?block_request_tap[0]:
+    (block_request_half_x?block_request_tap[0]:1'b0);
+wire block_request_tap_dy=
+    (block_request_half_x&&block_request_half_y)?block_request_tap[1]:
+    (block_request_half_y?block_request_tap[0]:1'b0);
+wire [2:0] block_request_base_byte=block_lookup_phase?
+    block_phase1_base_byte:block_phase0_base_byte;
+wire [4:0] block_request_byte=
+    {2'd0,block_request_base_byte}+{2'd0,block_request_ei[2:0]}+
+    {4'd0,block_request_tap_dx};
+assign block_lookup_row=
+    {1'b0,block_request_ei[5:3]}+block_request_tap_dy;
+assign block_lookup_column=block_request_byte[3];
+assign block_lookup_request=
+    (prediction_lookup&&!(pixel_setup&&(ei==0)))||
+    block_lookup_retry||block_lookup_idle_request;
+
+assign ddram_burstcnt=block_fetch_rd?8'd1:8'd0;
+assign ddram_addr=block_fetch_rd?block_fetch_addr:29'd0;
+assign ddram_rd=block_fetch_rd;
+assign ddram_cacheable=block_fetch_rd;
+assign ddram_lookup_request=1'b0;
+assign ddram_lookup_consume=1'b0;
 assign store_select=emit;
 assign store_pixel_value=out_reg;
 assign store_pixel_valid=emit;
@@ -268,10 +373,13 @@ always @(posedge clk) begin
         mbi<=0;col<=0;mrow<=0;blk<=0;timeout<=0;emit<=0;wait_store<=0;pixel_setup<=0;residual_load<=0;residual_load_wait<=0;ei<=0;
         pred_direction<=0;tap_index<=0;pred_sum<=0;forward_prediction<=0;out_reg<=0;tap_byte_sel<=0;
         emit_advanced<=0;emit_x<=0;emit_y<=0;emit_block_start<=0;emit_block_complete<=0;
+        block_fetch_start<=0;block_phase0_base_byte<=0;
+        block_phase1_base_byte<=0;
         read_seen<=0;sample_nonzero<=0;half_sample_seen<=0;reconstructed_seen<=0;persisted_seen<=0;row_persisted<=0;error<=0;error_source<=0;
         row_motion_base<=0;row_motion_end<=0;exec_row<=0;row_final_latched<=0;
     end else begin
         row_persisted<=0;
+        block_fetch_start<=0;
         if(capture_enable&&sideband_valid) begin
             if(desc_active) begin
                 if(sideband_index!=sample_expected)begin error<=1;if(!error)error_source<=5'd1;end
