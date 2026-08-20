@@ -236,7 +236,7 @@ module tb_h262_p_intra_macroblocks #(
                    // Entry 253 retains each non-intra block's reference
                    // footprint internally, so the former upstream cold/hit
                    // modes converge while intra arithmetic stays exact.
-                   total_cycles!=787530)
+                   total_cycles!=787146)
                     $fatal(1,"P intra-macroblock regression failed");
                 $finish;
             end

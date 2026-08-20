@@ -195,7 +195,7 @@
                 else if(boundary_final)begin
                     if(current_col!={2'b00,picture_mb_width})begin parser_error<=1;proof_done<=1;parse_hold<=0;end
                     else begin
-                        replay_row_final<=1;transform_slot<=0;t_coeff_read_index<=0;t_sample_count<=0;replay_sample<=0;replay_active<=1;
+                        replay_row_final<=1;transform_slot<=0;t_coeff_read_index<=0;t_sample_count<=0;replay_active<=1;
                         if(residual_count!=0)rstate<=R_BLOCK_WAIT;else begin if(residual_coeff_count!=0)replay_error<=1;rstate<=R_FINISH;end
                     end
                 end else if(slice_capture)begin

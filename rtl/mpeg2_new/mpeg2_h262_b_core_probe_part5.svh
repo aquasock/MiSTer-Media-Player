@@ -1,4 +1,4 @@
-                        replay_row_final<=0;transform_slot<=0;t_coeff_read_index<=0;t_sample_count<=0;replay_sample<=0;replay_active<=1;
+                        replay_row_final<=0;transform_slot<=0;t_coeff_read_index<=0;t_sample_count<=0;replay_active<=1;
                         if(residual_count!=0)rstate<=R_BLOCK_WAIT;else begin if(residual_coeff_count!=0)replay_error<=1;rstate<=R_FINISH;end
                     end
                 end
@@ -10,7 +10,19 @@
 
         if(replay_active&&t_valid)begin
             if(transform_slot>=MAX_RESIDUAL_BLOCKS||t_index!=t_sample_count[5:0]||t_sample_count>=64)replay_error<=1;
-            else begin block_sample_mem[t_index]<=t_value;t_sample_count<=t_sample_count+1'b1;end
+            else begin
+                t_sample_count<=t_sample_count+1'b1;
+                // Entry 260: the transform output is already registered and
+                // ordered. Send it directly to row capture after the descriptor
+                // instead of writing and replaying a private 64-sample array.
+                sideband_valid<=1;
+                sideband_index<=t_index;
+                sideband_value<=t_value;
+                if((transform_slot==0)&&(t_index==0))begin
+                    first_sample_valid<=1;
+                    first_sample_value<=t_value;
+                end
+            end
         end
         case(rstate)
         R_BLOCK_WAIT:rstate<=R_BLOCK_CAPTURE;
@@ -28,7 +40,13 @@
                (residual_block_word[15:0]<=t_coeff_read_index)||
                (residual_block_word[15:0]>residual_coeff_count))begin
                 replay_error<=1;rstate<=R_FINISH;
-            end else rstate<=R_TSTART;
+            end else rstate<=R_DESC;
+        end
+        R_DESC:begin
+            sideband_valid<=1;
+            sideband_index<=6'h3f;
+            sideband_value<=$signed({transform_intra?2'b10:2'b11,transform_mb,transform_block});
+            rstate<=R_TSTART;
         end
         R_TSTART:begin t_start<=1;rstate<=R_TWRITE;end
         R_TWRITE:begin
@@ -47,19 +65,10 @@
         R_TEND:begin t_end<=1;rstate<=R_TWAIT;end
         R_TWAIT:if(t_done)begin
             if((t_sample_count+(t_valid?1'b1:1'b0))!=64)replay_error<=1;
-            replay_sample<=0;rstate<=R_DESC;
-        end
-        R_DESC:begin sideband_valid<=1;sideband_index<=6'h3f;sideband_value<=$signed({transform_intra?2'b10:2'b11,transform_mb,transform_block});replay_sample<=0;rstate<=R_SAMPLE;end
-        R_SAMPLE:begin
-            sideband_valid<=1;sideband_index<=replay_sample;sideband_value<=block_sample_mem[replay_sample];
-            if((transform_slot==0)&&(replay_sample==0))begin first_sample_valid<=1;first_sample_value<=block_sample_mem[0];end
-            if(replay_sample==63)begin
-                if(transform_slot+1'b1>=residual_count)begin
-                    if(t_coeff_read_index!=residual_coeff_count)replay_error<=1;
-                    rstate<=R_FINISH;
-                end else begin transform_slot<=transform_slot+1'b1;rstate<=R_BLOCK_WAIT;end
-            end
-            else replay_sample<=replay_sample+1'b1;
+            if(transform_slot+1'b1>=residual_count)begin
+                if(t_coeff_read_index!=residual_coeff_count)replay_error<=1;
+                rstate<=R_FINISH;
+            end else begin transform_slot<=transform_slot+1'b1;rstate<=R_BLOCK_WAIT;end
         end
         R_FINISH:begin sideband_valid<=1;sideband_index<=6'h3f;sideband_value<=replay_row_final?16'shA3FF:16'shA3FE;replay_active<=0;row_waiting<=1;rstate<=R_IDLE;end
         default:;

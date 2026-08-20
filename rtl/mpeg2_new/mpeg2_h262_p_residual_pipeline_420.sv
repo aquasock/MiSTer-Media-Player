@@ -95,9 +95,7 @@ wire signed [15:0] tfvalue, tvalue;
 wire [1:0] unused_block;
 wire [5:0] tidx;
 
-reg signed [15:0] block_sample_mem [0:63];
 reg [6:0] sample_cap_count;
-reg [5:0] replay_sample;
 reg replay_valid, first_valid_reg;
 reg [5:0] replay_index;
 reg signed [15:0] replay_value, first_value_reg;
@@ -164,7 +162,6 @@ always @(posedge clk) begin
         gwidx<=0;
         gwval<=0;
         sample_cap_count<=0;
-        replay_sample<=0;
         replay_valid<=0;
         first_valid_reg<=0;
 
@@ -188,8 +185,17 @@ always @(posedge clk) begin
                (sample_cap_count>=7'd64)) begin
                 g_error<=1;
             end else begin
-                block_sample_mem[tidx]<=tvalue;
                 sample_cap_count<=sample_cap_count+1'b1;
+                // Entry 260: the transform already emits one complete block
+                // in index order. Forward that registered stream directly to
+                // row capture instead of storing and replaying all 64 samples.
+                replay_valid<=1;
+                replay_index<=tidx;
+                replay_value<=tvalue;
+                if((block_slot==0)&&(tidx==0)) begin
+                    first_valid_reg<=1;
+                    first_value_reg<=tvalue;
+                end
             end
         end
 
@@ -205,7 +211,6 @@ always @(posedge clk) begin
             wide_block_read_address<=0;
             wide_coeff_read_address<=0;
             sample_cap_count<=0;
-            replay_sample<=0;
             g_qtype<=wide_q_scale_type;
             g_alt<=wide_alternate_scan;
             g_intra_dc_precision<=wide_intra_dc_precision;
@@ -236,8 +241,25 @@ always @(posedge clk) begin
                     current_intra<=wide_block_read_intra;
                     current_qscale<=wide_block_read_qscale;
                     sample_cap_count<=0;
-                    gstate<=G_START;
+                    // Publish both descriptor words before transform output.
+                    // The existing output gap while IQ/IDCT starts is legal;
+                    // row capture retains the descriptor until its samples.
+                    gstate<=G_DESC;
                 end
+            end
+
+            G_DESC: begin
+                replay_valid<=1;
+                replay_index<=6'h3c;
+                replay_value<=$signed({5'd0,current_mb});
+                gstate<=G_DESC2;
+            end
+
+            G_DESC2: begin
+                replay_valid<=1;
+                replay_index<=6'h3d;
+                replay_value<=$signed({12'd0,current_intra,current_block});
+                gstate<=G_START;
             end
 
             G_START: begin
@@ -277,35 +299,6 @@ always @(posedge clk) begin
                     g_error<=1;
                     gstate<=G_IDLE;
                 end else begin
-                    replay_sample<=0;
-                    gstate<=G_DESC;
-                end
-            end
-
-            G_DESC: begin
-                replay_valid<=1;
-                replay_index<=6'h3c;
-                replay_value<=$signed({5'd0,current_mb});
-                gstate<=G_DESC2;
-            end
-
-            G_DESC2: begin
-                replay_valid<=1;
-                replay_index<=6'h3d;
-                replay_value<=$signed({12'd0,current_intra,current_block});
-                replay_sample<=0;
-                gstate<=G_SAMPLES;
-            end
-
-            G_SAMPLES: begin
-                replay_valid<=1;
-                replay_index<=replay_sample;
-                replay_value<=block_sample_mem[replay_sample];
-                if((block_slot==0)&&(replay_sample==0)) begin
-                    first_valid_reg<=1;
-                    first_value_reg<=block_sample_mem[0];
-                end
-                if(replay_sample==6'd63) begin
                     if(block_slot+1'b1>=expected_blocks) begin
                         if(coeff_consumed!=expected_coeffs)
                             g_error<=1;
@@ -318,8 +311,6 @@ always @(posedge clk) begin
                         sample_cap_count<=0;
                         gstate<=G_BLOCK_WAIT;
                     end
-                end else begin
-                    replay_sample<=replay_sample+1'b1;
                 end
             end
 
@@ -338,9 +329,7 @@ end
 assign decision_complete=wide_mode?g_decision:1'b0;
 assign residual_required=wide_mode?g_required:1'b0;
 assign residual_success=wide_mode?g_success:1'b0;
-assign mixed_replay_active=wide_mode&&
-    ((gstate==G_DESC)||(gstate==G_DESC2)||
-     (gstate==G_SAMPLES)||(gstate==G_FINISH));
+assign mixed_replay_active=wide_mode&&(gstate!=G_IDLE);
 assign first_sample_valid=wide_mode?first_valid_reg:1'b0;
 assign first_sample_value=wide_mode?first_value_reg:16'sd0;
 assign residual_sample_valid=wide_mode?replay_valid:1'b0;

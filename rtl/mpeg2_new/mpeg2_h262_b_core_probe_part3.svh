@@ -65,7 +65,6 @@ mpeg2_h262_p_non_intra_transform b_transform(
     .residual_sample_valid(t_valid),.residual_sample_block_index(t_unused_block),
     .residual_sample_index(t_index),.residual_sample_value(t_value),.probe_error(t_error));
 
-reg signed [15:0] block_sample_mem [0:63];
 reg [6:0] t_sample_count;
 reg [15:0] t_coeff_read_index,block_coeff_end;
 reg [11:0] transform_slot;
@@ -77,7 +76,6 @@ localparam [3:0]
     R_TWRITE=4,R_COEFF_WAIT=5,R_TEND=6,R_TWAIT=7,
     R_DESC=8,R_SAMPLE=9,R_FINISH=10;
 reg [3:0] rstate;
-reg [5:0] replay_sample;
 
 // kate - Commit 173: next uncovered column in the current row across
 // same-vertical-position slices. It is reset only when restricted coverage
@@ -113,7 +111,7 @@ always @(posedge clk) begin
         residual_count<=0;residual_coeff_count<=0;pending_residual_mb<=0;pending_residual_block<=0;pending_residual_qscale<=0;pending_residual_intra<=0;q_scale_type<=0;alternate_scan<=0;b_intra_vlc_format<=0;b_intra_dc_precision<=0;
         dc_predictor_y<=11'd128;dc_predictor_cb<=11'd128;dc_predictor_cr<=11'd128;dc_vlc_code<=0;dc_vlc_len<=0;dc_size<=0;dc_diff_bit_count<=0;dc_diff_shift<=0;
         t_start<=0;t_we<=0;t_end<=0;t_intra<=0;t_widx<=0;t_wval<=0;t_qscale<=0;t_sample_count<=0;t_coeff_read_index<=0;block_coeff_end<=0;transform_slot<=0;transform_mb<=0;transform_block<=0;transform_intra<=0;
-        rstate<=R_IDLE;replay_sample<=0;replay_active<=0;sideband_valid<=0;sideband_index<=0;sideband_value<=0;
+        rstate<=R_IDLE;replay_active<=0;sideband_valid<=0;sideband_index<=0;sideband_value<=0;
         first_sample_valid<=0;first_sample_value<=0;
     end else begin
         b_complete_now<=0;sideband_valid<=0;first_sample_valid<=0;t_start<=0;t_we<=0;t_end<=0;
