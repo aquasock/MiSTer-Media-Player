@@ -35,6 +35,18 @@ module tb_h262_live_raster_soak #(
     integer profile_p_store=0,profile_b_store=0;
     integer profile_writer=0,profile_presentation=0;
     integer profile_b_miss_prelaunch=0;
+    integer profile_prefetch_lookups=0,profile_prefetch_requests=0;
+    integer profile_prefetch_avoided=0,profile_prefetch_induced=0;
+    reg profile_prefetch_valid0=0,profile_prefetch_valid1=0;
+    reg profile_prefetch_valid2=0,profile_prefetch_valid3=0;
+    reg [28:0] profile_prefetch_tag0=0,profile_prefetch_tag1=0;
+    reg [28:0] profile_prefetch_tag2=0,profile_prefetch_tag3=0;
+    reg [1:0] profile_prefetch_replace=0;
+    integer profile_sidecar_misses=0,profile_sidecar_fills=0;
+    integer profile_sidecar_hits=0,profile_sidecar_bank0_hits=0;
+    integer profile_sidecar_bank1_hits=0;
+    reg profile_sidecar_valid0=0,profile_sidecar_valid1=0;
+    reg [28:0] profile_sidecar_tag0=0,profile_sidecar_tag1=0;
     integer pixel_samples=0,pixel_mismatches=0,max_pixel_delta=0;
     integer pixel_index,pixel_delta,pixel_row,pixel_word,pixel_lane;
     reg first_pixel_mismatch=0;
@@ -289,6 +301,89 @@ module tb_h262_live_raster_soak #(
     end
 
     always @(posedge clk) begin
+        if(reset||!prediction.reference_cache.active)begin
+            profile_prefetch_valid0<=0;profile_prefetch_valid1<=0;
+            profile_prefetch_valid2<=0;profile_prefetch_valid3<=0;
+            profile_prefetch_replace<=0;
+            profile_sidecar_valid0<=0;profile_sidecar_valid1<=0;
+        end else if(prediction.reference_cache.lookup_request)begin
+            profile_prefetch_lookups<=profile_prefetch_lookups+1;
+            if((profile_prefetch_valid0&&
+                profile_prefetch_tag0==prediction.reference_cache.request_addr)||
+               (profile_prefetch_valid1&&
+                profile_prefetch_tag1==prediction.reference_cache.request_addr)||
+               (profile_prefetch_valid2&&
+                profile_prefetch_tag2==prediction.reference_cache.request_addr)||
+               (profile_prefetch_valid3&&
+                profile_prefetch_tag3==prediction.reference_cache.request_addr))begin
+                if(!prediction.reference_cache.cache_lookup_hit)
+                    profile_prefetch_avoided<=profile_prefetch_avoided+1;
+            end else begin
+                profile_prefetch_requests<=profile_prefetch_requests+1;
+                if(prediction.reference_cache.cache_lookup_hit)
+                    profile_prefetch_induced<=profile_prefetch_induced+1;
+                case(profile_prefetch_replace)
+                    2'd0:begin
+                        profile_prefetch_valid0<=1;profile_prefetch_valid1<=1;
+                        profile_prefetch_tag0<=prediction.reference_cache.request_addr;
+                        profile_prefetch_tag1<=prediction.reference_cache.request_addr+1'b1;
+                        profile_prefetch_replace<=2'd2;
+                    end
+                    2'd1:begin
+                        profile_prefetch_valid1<=1;profile_prefetch_valid2<=1;
+                        profile_prefetch_tag1<=prediction.reference_cache.request_addr;
+                        profile_prefetch_tag2<=prediction.reference_cache.request_addr+1'b1;
+                        profile_prefetch_replace<=2'd3;
+                    end
+                    2'd2:begin
+                        profile_prefetch_valid2<=1;profile_prefetch_valid3<=1;
+                        profile_prefetch_tag2<=prediction.reference_cache.request_addr;
+                        profile_prefetch_tag3<=prediction.reference_cache.request_addr+1'b1;
+                        profile_prefetch_replace<=2'd0;
+                    end
+                    default:begin
+                        profile_prefetch_valid3<=1;profile_prefetch_valid0<=1;
+                        profile_prefetch_tag3<=prediction.reference_cache.request_addr;
+                        profile_prefetch_tag0<=prediction.reference_cache.request_addr+1'b1;
+                        profile_prefetch_replace<=2'd1;
+                    end
+                endcase
+            end
+
+            // A safer alternative keeps the proven four-entry cache exactly
+            // as-is and stores only the speculative following word in one
+            // side entry per reference bank.  Model the physical transaction
+            // stream here: a side hit consumes its saved word without starting
+            // another burst; a miss starts a two-word burst and replaces only
+            // that bank's side entry.  This deliberately does not credit an
+            // impossible chained prefetch after a side hit.
+            if(!prediction.reference_cache.cache_lookup_hit)begin
+                profile_sidecar_misses<=profile_sidecar_misses+1;
+                if(prediction.reference_cache.request_addr[16])begin
+                    if(profile_sidecar_valid1&&
+                       profile_sidecar_tag1==prediction.reference_cache.request_addr)begin
+                        profile_sidecar_hits<=profile_sidecar_hits+1;
+                        profile_sidecar_bank1_hits<=profile_sidecar_bank1_hits+1;
+                        profile_sidecar_valid1<=0;
+                    end else begin
+                        profile_sidecar_fills<=profile_sidecar_fills+1;
+                        profile_sidecar_valid1<=1;
+                        profile_sidecar_tag1<=prediction.reference_cache.request_addr+1'b1;
+                    end
+                end else begin
+                    if(profile_sidecar_valid0&&
+                       profile_sidecar_tag0==prediction.reference_cache.request_addr)begin
+                        profile_sidecar_hits<=profile_sidecar_hits+1;
+                        profile_sidecar_bank0_hits<=profile_sidecar_bank0_hits+1;
+                        profile_sidecar_valid0<=0;
+                    end else begin
+                        profile_sidecar_fills<=profile_sidecar_fills+1;
+                        profile_sidecar_valid0<=1;
+                        profile_sidecar_tag0<=prediction.reference_cache.request_addr+1'b1;
+                    end
+                end
+            end
+        end
         if(!reset)begin
             total_cycles<=total_cycles+1;
             // Simulation-only attribution. Input stalls use mutually
@@ -523,6 +618,13 @@ module tb_h262_live_raster_soak #(
                      profile_p_store,profile_b_store,
                      profile_writer,profile_presentation,
                      profile_b_miss_prelaunch);
+            $display("LIVE_RASTER_PREFETCH lookups=%0d requests=%0d avoided=%0d induced=%0d",
+                     profile_prefetch_lookups,profile_prefetch_requests,
+                     profile_prefetch_avoided,profile_prefetch_induced);
+            $display("LIVE_RASTER_SIDECAR misses=%0d fills=%0d hits=%0d bank0=%0d bank1=%0d",
+                     profile_sidecar_misses,profile_sidecar_fills,
+                     profile_sidecar_hits,profile_sidecar_bank0_hits,
+                     profile_sidecar_bank1_hits);
             if(MIXED_PIXEL_MODE)begin
                 $display("MIXED_PIXEL_RESULT samples=%0d mismatches=%0d max_delta=%0d",
                          pixel_samples,pixel_mismatches,max_pixel_delta);
