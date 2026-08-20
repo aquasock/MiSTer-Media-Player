@@ -831,39 +831,34 @@ Apply the proven registered coefficient read-ahead pattern to the analogous P re
 - [x] Passed
 
 ---
-## 239 COMMIT Unreleased 3c03570 2026-08-19T16:36:30-07:00
+## 279 COMMIT Unreleased ??? 2026-08-20T16:07:40-07:00
 
 #### Coming From:
 
-Unreleased ca1f0fc
+Unreleased 62f2654
 
 #### Purpose:
 
-Reduce the remaining 25 fps starvation stutter by overlapping registered P/B pixel output with the next prediction lookup and establish repeatable counter-plus-raster recording analysis.
+Remove the idle cycle between consecutive P residual-coefficient writes by advancing the already registered parser-memory address while the current coefficient enters the transform.
 
 #### Outcome:
 
-The accepted Entry 238 recordings provide a clean baseline: independent matching of the embedded frame counter and unobscured raster recovers every long-GOP frame 0 through 71 and mixed-macroblock frame 0 through 23 in strict order, with no sustained counter-only update, skipped image, stale buffer, or partial-frame failure. Long GOP takes 5.939 seconds from first frame 0 to first frame 71, or 11.95 effective fps, while mixed macroblocks takes 2.102 seconds from frame 0 to frame 23, or 10.94 effective fps; B pictures ordinarily persist for three or four 59.94 fps camera samples, but I/P reference pictures persist for eight through ten, proving repeatable reference-hold starvation. Commit `3c03570` adds a deterministic two-track analyzer and retains the registered four-entry cache while latching reconstructed pixel value, coordinates, and block markers into the writer stage; a registered following-pixel address may launch during the current final cache or DDR response, so state advances behind the stable output without exposing the former failing combinational four-way cache data path. Cache-hit focused replay preserves exact P and B pixels while reducing P from 1,791,186 to 755,154 cycles, or 57.84 percent, and B from 3,392,449 to 1,318,849 cycles, or 61.12 percent. The complete 24-picture mixed oracle retains 423,936 samples, zero mismatches, maximum delta two, 499,551 hits, 71,329 misses and reads, and all 24 display identities while falling from 3,109,996 to 2,679,996 cycles, or 13.83 percent. The exact 72-picture soak retains 2,267,813 hits, 463,835 misses and reads, 22 P pictures, 47 B pictures, 25 publications, final identity 25, and zero errors while falling from 15,739,996 to 14,499,996 cycles, or 7.88 percent. Cache accounting, P intra, B residual, B intra, eight-refill parser-window, repeated-download rearm, and full-resolution 791,528-byte long-GOP publication regressions also pass. The session-authorized incremental Quartus 17.0.2 build completes in 9 minutes 28 seconds with zero errors, 124 standing warnings, no critical warning, global setup, hold, and recovery slack of +0.152, +0.252, and +3.862 ns, focused decoder setup and recovery slack of +0.475 and +14.510 ns, and video setup slack of +7.604 ns. The fit uses 29,307 ALMs, 40,943 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. The 4,228,160-byte `MediaPlayer_commit239_3c03570.rbf` has SHA-256 `c780cb66d92832c0e22a1b3ec110993fb98212e30eb76e7814d50cf34cec0419`; FTP upload to the standard MiSTer and readback are byte-identical. Hardware acceptance passes all requested tests, including consecutive reload behavior. The recalibrated 59.94 fps recording analysis recovers every frame in strict unit-step order on both the counter and independent raster tracks: long GOP is 0 through 71 and mixed macroblocks is 0 through 23, with no missing raster identity. Long GOP falls from 5.939 to 5.055 seconds, a 14.89 percent reduction, and rises from 11.95 to 14.05 effective fps; its mean interior hold falls from 4.97 to 4.24 camera samples, while median I, P, and B holds change from 8.5, 8, and 3 samples to 7, 7, and 3. Mixed macroblocks falls from 2.102 to 1.952 seconds, a 7.14 percent reduction, and rises from 10.94 to 11.78 effective fps; its mean interior hold falls from 5.27 to 4.91 samples, while median I, P, and B holds change from 10, 8, and 3 samples to 7, 8, and 3. The recordings therefore validate the optimization and rule out skipped-counter, stale-buffer, or missing-picture explanations, but they also confirm visible starvation remains: reference pictures still persist for approximately seven or eight camera samples while B pictures ordinarily persist for three.
+Proposal only. Entry 278 proves that coefficient read-ahead removes stable decoder work without changing reconstruction, but mixed cadence remains approximately 21.72 fps and its P pictures still account for about 5.57 million decoder-stall cycles. The shared P residual pipeline uses the same serialized pattern: `G_COEFF_WRITE` advances the synchronous parser-memory address, `G_COEFF_WAIT` idles for one cycle, and only then may the following registered coefficient enter inverse quantisation. Unlike the rejected first B implementation, this address is already a registered output of the residual pipeline and directly feeds the parser RAM, so the optimization does not require combinational RAM addressing. This boundary will prime the successor address in `G_START`, keep consecutive coefficients in `G_COEFF_WRITE`, and restore the consumed-count address at each block transition. Descriptor order, coefficient indices and last flags, inverse quantisation, IDCT, direct spatial streaming, row banking, publication and all prediction-memory behavior remain unchanged. Simulation-only state and coefficient counters will prove both the removed bubble and exact event accounting.
 
 #### Next Steps:
 
-Retain the hardware-accepted registered output overlap and target the remaining asymmetric reference-picture latency. Profile P-picture and I-picture completion separately from B-picture completion, preserving strict display order, minimum presentation lifetime, reload behavior, all frame identities, and the accepted LED result; use the measured seven-to-eight-sample P/I holds versus three-sample B holds to select the next proposal rather than changing the cadence gate.
+Require the focused P intra regression to preserve every descriptor, coefficient, transform sample, reconstructed pixel and store while eliminating `G_COEFF_WAIT` for multi-coefficient blocks. Require both complete traces to preserve all exact pixels, reads, writes, publications, swaps and zero-error accounting and compare against Entry 278's 1,239,996 mixed and 6,589,996 long cycles. Start another fully clean Quartus build only if the complete reduction is material and verify that all P coefficient memories remain inferred M10Ks before fitting.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- tools/streams/analyze_recorded_cadence.py
+- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
 - tools/streams/tb_h262_p_intra_macroblocks.sv
-- tools/streams/tb_h262_b_residual_streaming.sv
 - tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [x] Built
-- [x] Passed
+- [ ] Built
+- [ ] Passed
 
 ---
 ## 240 COMMIT Unreleased c667f2c 2026-08-19T18:05:31-07:00
