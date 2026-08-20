@@ -77,12 +77,11 @@ localparam [3:0]
     R_DESC=8,R_SAMPLE=9,R_FINISH=10;
 reg [3:0] rstate;
 wire producer_row_done=replay_active&&(rstate==R_FINISH);
-// Entry 278: while the registered current coefficient is written into the
-// transform, launch the synchronous RAM read for its successor.  All other
-// states retain the current-index preload used by the first coefficient of a
-// block.
-wire [15:0] t_coeff_read_address=t_coeff_read_index+
-    ((rstate==R_TWRITE)?16'd1:16'd0);
+// Entry 278: keep the RAM address itself registered so Quartus retains the
+// 32Kx19 M10K inference.  R_TSTART primes the successor address before the
+// first write; every consecutive R_TWRITE then consumes the retained word
+// while the synchronous port captures its successor.
+reg [14:0] residual_coeff_read_address;
 
 // kate - Commit 173: next uncovered column in the current row across
 // same-vertical-position slices. It is reset only when restricted coverage
@@ -93,9 +92,19 @@ always @(posedge clk) begin
     if(reset) begin
         residual_block_word<=0;
         residual_coeff_word<=0;
+        residual_coeff_read_address<=0;
     end else begin
         residual_block_word<=residual_block_mem[transform_slot[10:0]];
-        residual_coeff_word<=residual_coeff_mem[t_coeff_read_address[14:0]];
+        residual_coeff_word<=residual_coeff_mem[residual_coeff_read_address];
+        if(!replay_active||(rstate==R_BLOCK_WAIT))
+            residual_coeff_read_address<=t_coeff_read_index[14:0];
+        else if(rstate==R_TSTART)
+            residual_coeff_read_address<=t_coeff_read_index[14:0]+15'd1;
+        else if(rstate==R_TWRITE)
+            residual_coeff_read_address<=t_coeff_read_index[14:0]+15'd2;
+        else if((rstate==R_TWAIT)&&t_done&&
+                (transform_slot+1'b1<residual_count))
+            residual_coeff_read_address<=t_coeff_read_index[14:0];
     end
 end
 
