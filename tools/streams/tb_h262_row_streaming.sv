@@ -41,13 +41,15 @@ module tb_h262_row_streaming;
     wire signed [15:0] first_value,replay_value;
     wire replay_valid,residual_error;
     wire [5:0] replay_index;
+    wire row_produced=replay_valid&&(replay_index==6'h3f)&&
+        ((replay_value==16'shA2FE)||(replay_value==16'shA2FF));
 
     always #5 clk=~clk;
 
     mpeg2_h262_p_wide_motion_syntax_probe parser(
         .clk(clk),.reset(reset),.stream_data(stream_data),
         .stream_valid(stream_valid),.intra_dc_precision(2'd0),
-        .row_retired(row_retired),
+        .row_retired(row_retired),.row_produced(row_produced),
         .wide_candidate(candidate),.wide_seen(seen),
         .wide_complete_now(picture_complete),
         .row_complete_now(row_complete),.row_final(row_final),

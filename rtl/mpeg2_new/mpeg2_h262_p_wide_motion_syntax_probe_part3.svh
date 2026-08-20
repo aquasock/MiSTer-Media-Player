@@ -323,6 +323,10 @@
                         parse_hold<=0;
                         boundary_final<=0;
                         row_waiting<=0;
+                        outstanding_rows<=0;
+                        final_row_queued<=0;
+                        bank_blocked<=0;
+                        producer_rearm_pending<=0;
                         row_final<=0;
                         probe_error<=0;
                         probe_error_detail<=0;

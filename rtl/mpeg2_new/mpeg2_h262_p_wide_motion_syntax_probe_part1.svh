@@ -351,6 +351,10 @@ always @(posedge clk) begin
         parse_active<=0;
         boundary_final<=0;
         row_waiting<=0;
+        outstanding_rows<=0;
+        final_row_queued<=0;
+        bank_blocked<=0;
+        producer_rearm_pending<=0;
         parse_byte_limit<=0;
         parse_byte_index<=0;
         parse_bit_index<=3'd7;

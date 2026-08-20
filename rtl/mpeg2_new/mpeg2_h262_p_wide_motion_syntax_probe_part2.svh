@@ -1,21 +1,66 @@
         motion_event_valid<=0;
-        if(row_waiting&&row_retired) begin
+        if(producer_rearm_pending) begin
+            producer_rearm_pending<=0;
+            residual_block_count<=0;
+            residual_present<=0;
+            residual_coeff_count<=0;
+        end
+
+        // Entry 265: transformed P rows consume one of two logical sparse
+        // row banks; raster persistence returns the credit. This lets syntax
+        // parsing and transform production overlap the older DDR-bound row.
+        case({row_produced,row_retired})
+        2'b10:outstanding_rows<=outstanding_rows+1'b1;
+        2'b01:outstanding_rows<=outstanding_rows-1'b1;
+        default:outstanding_rows<=outstanding_rows;
+        endcase
+
+        if(row_retired&&final_row_queued&&(outstanding_rows==1)&&
+           !row_produced) begin
             row_waiting<=0;
             parse_hold<=0;
+            final_row_queued<=0;
+            bank_blocked<=0;
+            wide_seen<=1;
+            wide_complete_now<=1;
+            proof_done<=1;
+        end else if(row_waiting&&bank_blocked&&row_retired&&!row_produced) begin
+            row_waiting<=0;
+            parse_hold<=0;
+            bank_blocked<=0;
             residual_block_count<=0;
             residual_present<=0;
             residual_coeff_count<=0;
             row_byte_count<=0;
             row_covered_count<=0;
+            row_base_index<=
+                row_base_index+{5'd0,picture_mb_width};
+            slice_row_number<=slice_row_number+1'b1;
+            slice_capture<=1;
+        end
+
+        if(row_produced) begin
             if(row_final) begin
-                wide_seen<=1;
-                wide_complete_now<=1;
-                proof_done<=1;
-            end else begin
+                final_row_queued<=1;
+                row_waiting<=1;
+                bank_blocked<=0;
+            end else if((outstanding_rows==0)||row_retired) begin
+                row_waiting<=0;
+                parse_hold<=0;
+                bank_blocked<=0;
+                producer_rearm_pending<=1;
+                row_byte_count<=0;
+                row_covered_count<=0;
                 row_base_index<=
                     row_base_index+{5'd0,picture_mb_width};
                 slice_row_number<=slice_row_number+1'b1;
                 slice_capture<=1;
+            end else begin
+                // Both banks are occupied. Keep the compressed input held
+                // until the oldest reconstructed row is persistent.
+                row_waiting<=1;
+                parse_hold<=1;
+                bank_blocked<=1;
             end
         end
 

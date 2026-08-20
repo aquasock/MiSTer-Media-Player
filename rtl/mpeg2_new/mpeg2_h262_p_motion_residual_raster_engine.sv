@@ -80,6 +80,7 @@ localparam [28:0]
     BANK_OFF=29'h00010000;
 localparam integer MAX_MB=1350;
 localparam integer MAX_BLOCKS=2048;
+localparam integer MAX_BANK_BLOCKS=1024;
 
 wire [14:0] horizontal_rounded =
     {1'b0,horizontal_size}+15'd15;
@@ -194,17 +195,29 @@ wire signed [7:0] mb_mvy=$signed(motion_word[7:0]);
 
 (* ramstyle = "M10K" *) reg [14:0] desc_mem [0:2047];
 reg [14:0] desc_word;
-reg [14:0] last_desc_word;
-reg [11:0] desc_count;
-reg [10:0] current_desc_slot;
+reg [10:0] bank_desc_count [0:1];
+reg [14:0] bank_last_desc_word [0:1];
+reg [10:0] bank_motion_base [0:1];
+reg [10:0] bank_motion_end [0:1];
+reg [5:0] bank_row [0:1];
+reg [1:0] bank_ready;
+reg capture_bank, execute_bank;
+wire [10:0] capture_desc_count=bank_desc_count[capture_bank];
+wire [14:0] capture_last_desc_word=bank_last_desc_word[capture_bank];
+wire [10:0] capture_motion_base=bank_motion_base[capture_bank];
+wire [5:0] capture_row=bank_row[capture_bank];
+wire execute_ready=bank_ready[execute_bank];
+// Preserve the established internal proof name used by focused regressions;
+// it now means that the oldest execution bank contains a complete row.
+wire metadata_done=execute_ready;
+reg [9:0] current_desc_slot;
 reg desc_active;
 reg wide_desc_pending;
 reg [10:0] wide_desc_mb;
 reg [5:0] sample_expected;
-reg metadata_done;
-reg [10:0] exec_desc_slot;
-reg [10:0] row_motion_base, row_motion_end;
-reg [5:0] exec_row;
+reg [9:0] exec_desc_slot;
+reg [10:0] exec_desc_count_latched;
+reg [10:0] exec_motion_end;
 reg row_final_latched;
 
 reg pending, started;
@@ -372,7 +385,7 @@ wire [11:0] next_src_x_tap=next_src_x_tap_signed[11:0];
 wire [11:0] next_src_y_tap=next_src_y_tap_signed[11:0];
 
 wire descriptor_position_hit=
-    (exec_desc_slot<desc_count)&&
+    (exec_desc_slot<exec_desc_count_latched)&&
     (desc_word[14:4]==mbi)&&
     (desc_word[2:0]==blk);
 wire residual_hit=descriptor_position_hit&&
@@ -387,14 +400,14 @@ wire [5:0] residual_read_index=
     (fast_pixel_advance&&(ei<6'd62)) ? (ei+2'd2) :
     residual_read_ahead ? (ei+1'b1) : ei;
 wire [16:0] residual_mem_index=
-    {exec_desc_slot,6'b000000}+{11'd0,residual_read_index};
+    {execute_bank,exec_desc_slot,6'b000000}+{11'd0,residual_read_index};
 reg signed [15:0] residual_pel_q;
 
 assign residual_store_write=
     capture_enable&&residual_valid&&desc_active&&
     (residual_index==sample_expected);
 assign residual_store_write_address=
-    {current_desc_slot,6'b000000}+{11'd0,residual_index};
+    {capture_bank,current_desc_slot,6'b000000}+{11'd0,residual_index};
 assign residual_store_write_data=residual_value;
 assign residual_store_read_address=residual_mem_index;
 
@@ -468,11 +481,11 @@ assign store_block_complete=emit&&emit_block_complete;
 assign store_pixel_x=emit_x;
 assign store_pixel_y=emit_y;
 
-wire ready_res=metadata_done;
+wire ready_res=execute_ready;
 wire descriptor_order_error=
-    (desc_count!=0)&&
+    (capture_desc_count!=0)&&
     ({wide_desc_mb,residual_value[2:0]} <=
-     {last_desc_word[14:4],last_desc_word[2:0]});
+     {capture_last_desc_word[14:4],capture_last_desc_word[2:0]});
 
 wire new_picture_metadata=
     capture_enable&&residual_valid&&!desc_active&&
@@ -494,7 +507,7 @@ always @(posedge clk) begin
            (fast_pixel_advance&&(ei!=6'd63))||
            slow_pixel_advance)
             residual_pel_q<=residual_hit ? residual_store_read_data : 16'sd0;
-        desc_word<=desc_mem[exec_desc_slot];
+        desc_word<=desc_mem[{execute_bank,exec_desc_slot}];
     end
 end
 
@@ -502,15 +515,27 @@ always @(posedge clk) begin
     if(reset) begin
         motion_count<=0;
         motion_word<=0;
-        desc_count<=0;
-        last_desc_word<=0;
+        bank_desc_count[0]<=0;
+        bank_desc_count[1]<=0;
+        bank_last_desc_word[0]<=0;
+        bank_last_desc_word[1]<=0;
+        bank_motion_base[0]<=0;
+        bank_motion_base[1]<=0;
+        bank_motion_end[0]<=0;
+        bank_motion_end[1]<=0;
+        bank_row[0]<=0;
+        bank_row[1]<=0;
+        bank_ready<=0;
+        capture_bank<=0;
+        execute_bank<=0;
         current_desc_slot<=0;
         desc_active<=0;
         wide_desc_pending<=0;
         wide_desc_mb<=0;
         sample_expected<=0;
-        metadata_done<=0;
         exec_desc_slot<=0;
+        exec_desc_count_latched<=0;
+        exec_motion_end<=0;
         pending<=0;
         started<=0;
         active<=0;
@@ -555,9 +580,6 @@ always @(posedge clk) begin
         progress_stage<=0;
         error<=0;
         error_source<=0;
-        row_motion_base<=0;
-        row_motion_end<=0;
-        exec_row<=0;
         row_final_latched<=0;
     end else begin
         row_persisted<=0;
@@ -565,16 +587,28 @@ always @(posedge clk) begin
         if(new_picture_metadata) begin
             persisted_seen<=0;
             progress_stage<=4'd1;
-            metadata_done<=0;
             motion_count<=11'd1;
             motion_mem[0]<={(residual_index==6'h3b),residual_value};
-            desc_count<=0;
-            last_desc_word<=0;
+            bank_desc_count[0]<=0;
+            bank_desc_count[1]<=0;
+            bank_last_desc_word[0]<=0;
+            bank_last_desc_word[1]<=0;
+            bank_motion_base[0]<=0;
+            bank_motion_base[1]<=0;
+            bank_motion_end[0]<=0;
+            bank_motion_end[1]<=0;
+            bank_row[0]<=0;
+            bank_row[1]<=0;
+            bank_ready<=0;
+            capture_bank<=0;
+            execute_bank<=0;
             current_desc_slot<=0;
             desc_active<=0;
             wide_desc_pending<=0;
             sample_expected<=0;
             exec_desc_slot<=0;
+            exec_desc_count_latched<=0;
+            exec_motion_end<=0;
             pending<=request;
             started<=0;
             req<=0;
@@ -593,9 +627,6 @@ always @(posedge clk) begin
             mbi<=0;
             col<=0;
             mrow<=0;
-            row_motion_base<=0;
-            row_motion_end<=0;
-            exec_row<=0;
             row_final_latched<=0;
             blk<=0;
             ei<=0;
@@ -616,8 +647,8 @@ always @(posedge clk) begin
                 end
             end else if((residual_index==6'h3e)||
                         (residual_index==6'h3b)) begin
-                if(metadata_done ||
-                   (desc_count!=0) ||
+                if(bank_ready[capture_bank] ||
+                   (capture_desc_count!=0) ||
                    wide_desc_pending ||
                    (motion_count>=MAX_MB)) begin
                     error<=1;
@@ -628,9 +659,9 @@ always @(posedge clk) begin
                     motion_count<=motion_count+1'b1;
                 end
             end else if(residual_index==6'h3c) begin
-                if(metadata_done ||
+                if(bank_ready[capture_bank] ||
                    wide_desc_pending ||
-                   (desc_count>=MAX_BLOCKS) ||
+                   (capture_desc_count>=MAX_BANK_BLOCKS) ||
                    (residual_value<0) ||
                    (residual_value>16'sd1349)) begin
                     error<=1;
@@ -641,8 +672,8 @@ always @(posedge clk) begin
                 end
             end else if(residual_index==6'h3d) begin
                 if(!wide_desc_pending ||
-                   metadata_done ||
-                   (desc_count>=MAX_BLOCKS) ||
+                   bank_ready[capture_bank] ||
+                   (capture_desc_count>=MAX_BANK_BLOCKS) ||
                    (residual_value[15:4]!=0) ||
                    (residual_value[2:0]>=6)) begin
                     error<=1;
@@ -651,12 +682,12 @@ always @(posedge clk) begin
                     error<=1;
                     if(!error) error_source<=5'd5;
                 end else begin
-                    current_desc_slot<=desc_count[10:0];
-                    desc_mem[desc_count]<=
+                    current_desc_slot<=capture_desc_count[9:0];
+                    desc_mem[{capture_bank,capture_desc_count[9:0]}]<=
                         {wide_desc_mb,residual_value[3:0]};
-                    last_desc_word<=
+                    bank_last_desc_word[capture_bank]<=
                         {wide_desc_mb,residual_value[3:0]};
-                    desc_count<=desc_count+1'b1;
+                    bank_desc_count[capture_bank]<=capture_desc_count+1'b1;
                     desc_active<=1;
                     wide_desc_pending<=0;
                     sample_expected<=0;
@@ -664,47 +695,49 @@ always @(posedge clk) begin
             end else if((residual_index==6'h3f) &&
                         (residual_value[15:12]==4'hB)) begin
                 if((motion_count!=11'd48) ||
-                   metadata_done ||
+                   bank_ready[capture_bank] ||
                    wide_desc_pending ||
-                   (desc_count>=MAX_BLOCKS) ||
+                   (capture_desc_count>=MAX_BANK_BLOCKS) ||
                    (residual_value[8:3]>=48) ||
                    (residual_value[2:0]>=6) ||
-                   ((desc_count!=0)&&
+                   ((capture_desc_count!=0)&&
                     ({5'd0,residual_value[8:3],
                       residual_value[2:0]} <=
-                     {last_desc_word[14:4],
-                      last_desc_word[2:0]}))) begin
+                     {capture_last_desc_word[14:4],
+                      capture_last_desc_word[2:0]}))) begin
                     error<=1;
                     if(!error) error_source<=5'd6;
                 end else begin
-                    current_desc_slot<=desc_count[10:0];
-                    desc_mem[desc_count]<=
+                    current_desc_slot<=capture_desc_count[9:0];
+                    desc_mem[{capture_bank,capture_desc_count[9:0]}]<=
                         {{5'd0,residual_value[8:3]},1'b0,
                          residual_value[2:0]};
-                    last_desc_word<=
+                    bank_last_desc_word[capture_bank]<=
                         {{5'd0,residual_value[8:3]},1'b0,
                          residual_value[2:0]};
-                    desc_count<=desc_count+1'b1;
+                    bank_desc_count[capture_bank]<=capture_desc_count+1'b1;
                     desc_active<=1;
                     sample_expected<=0;
                 end
             end else if((residual_index==6'h3f) &&
                         ((residual_value==16'shA2FE) ||
                          (residual_value==16'shA2FF))) begin
-                if((motion_count==row_motion_base) ||
-                   metadata_done ||
+                if((motion_count==capture_motion_base) ||
+                   bank_ready[capture_bank] ||
                    wide_desc_pending ||
-                   (motion_count!=(row_motion_base+{5'd0,mb_width})) ||
+                   (motion_count!=(capture_motion_base+{5'd0,mb_width})) ||
                    ((residual_value==16'shA2FF) &&
-                    (exec_row+1'b1!=mb_height)) ||
+                    (capture_row+1'b1!=mb_height)) ||
                    ((residual_value==16'shA2FE) &&
-                    (exec_row+1'b1>=mb_height))) begin
+                    (capture_row+1'b1>=mb_height))) begin
                     error<=1;
                     if(!error) error_source<=5'd7;
                 end else begin
-                    metadata_done<=1;
-                    row_motion_end<=motion_count;
-                    row_final_latched<=(residual_value==16'shA2FF);
+                    bank_ready[capture_bank]<=1'b1;
+                    bank_motion_end[capture_bank]<=motion_count;
+                    bank_motion_base[~capture_bank]<=motion_count;
+                    bank_row[~capture_bank]<=capture_row+1'b1;
+                    capture_bank<=~capture_bank;
                 end
             end else begin
                 error<=1;
@@ -719,12 +752,16 @@ always @(posedge clk) begin
             active<=1;
             reference_bank_latched<=reference_bank;
             timeout<=24'hffffff;
-            mbi<=row_motion_base;
+            mbi<=bank_motion_base[execute_bank];
             col<=0;
-            mrow<=exec_row;
+            mrow<=bank_row[execute_bank];
             blk<=0;
             ei<=0;
             exec_desc_slot<=0;
+            exec_desc_count_latched<=bank_desc_count[execute_bank];
+            exec_motion_end<=bank_motion_end[execute_bank];
+            row_final_latched<=
+                (bank_row[execute_bank]+1'b1==mb_height);
             motion_load<=1;
             progress_stage<=4'd2;
             pixel_setup<=0;
@@ -751,7 +788,7 @@ always @(posedge clk) begin
 
         if(motion_load) begin
             motion_load<=0;
-            if(mbi>=row_motion_end || mbi>=motion_count || mbi>=MAX_MB) begin
+            if(mbi>=exec_motion_end || mbi>=motion_count || mbi>=MAX_MB) begin
                 error<=1;
                 if(!error) error_source<=5'd11;
                 active<=0;
@@ -894,12 +931,12 @@ always @(posedge clk) begin
                 exec_desc_slot<=exec_desc_slot+1'b1;
             if(blk==3'd5) begin
                 if(col+1'b1>=mb_width) begin
-                    if((exec_desc_slot+(residual_hit?1'b1:1'b0))!=desc_count)
+                    if((exec_desc_slot+(residual_hit?1'b1:1'b0))!=exec_desc_count_latched)
                     begin
                         error<=1;
                         if(!error) error_source<=5'd15;
                     end
-                    if(mbi+1'b1!=row_motion_end)
+                    if(mbi+1'b1!=exec_motion_end)
                     begin
                         error<=1;
                         if(!error) error_source<=5'd16;
@@ -913,16 +950,14 @@ always @(posedge clk) begin
                         reconstructed_seen<=1;
                     end else begin
                         started<=0;
-                        metadata_done<=0;
-                        desc_count<=0;
-                        last_desc_word<=0;
-                        current_desc_slot<=0;
-                        desc_active<=0;
-                        wide_desc_pending<=0;
-                        sample_expected<=0;
+                        pending<=0;
+                        bank_ready[execute_bank]<=1'b0;
+                        bank_desc_count[execute_bank]<=0;
+                        bank_last_desc_word[execute_bank]<=0;
+                        execute_bank<=~execute_bank;
                         exec_desc_slot<=0;
-                        row_motion_base<=row_motion_end;
-                        exec_row<=exec_row+1'b1;
+                        exec_desc_count_latched<=0;
+                        exec_motion_end<=0;
                         row_final_latched<=0;
                     end
                 end else begin

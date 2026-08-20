@@ -16,6 +16,7 @@ module tb_h262_parser_windows;
     reg [1023:0] hex_path;
     reg prior_p_error = 0, prior_b_error = 0;
     reg [5:0] prior_p_state = 0, prior_b_state = 0;
+    reg p_row_retired = 0;
 
     wire p_candidate, p_seen, p_complete, p_row_complete, p_row_final, p_hold, p_error;
     wire [5:0] p_width, p_height;
@@ -44,9 +45,16 @@ module tb_h262_parser_windows;
 
     always #5 clk = ~clk;
 
+    // Model the downstream consumer returning the row credit after, rather
+    // than on, the parser's producer-complete pulse.
+    always @(posedge clk)
+        if(reset) p_row_retired<=0;
+        else p_row_retired<=p_row_complete;
+
     mpeg2_h262_p_wide_motion_syntax_probe p_parser(
         .clk(clk), .reset(reset), .stream_data(stream_data), .stream_valid(stream_valid),
-        .intra_dc_precision(2'd0), .row_retired(p_row_complete),
+        .intra_dc_precision(2'd0), .row_retired(p_row_retired),
+        .row_produced(p_row_complete),
         .wide_candidate(p_candidate), .wide_seen(p_seen), .wide_complete_now(p_complete),
         .row_complete_now(p_row_complete), .row_final(p_row_final),
         .motion_event_valid(p_motion_valid), .motion_event_index(p_motion_index),

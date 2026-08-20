@@ -133,6 +133,10 @@ wire [5:0] wide_sideband_index =
 wire signed [15:0] wide_sideband_value =
     wide_motion_valid ? $signed({wide_motion_x,wide_motion_y}) :
                         residual_value_raw;
+wire wide_row_produced=wide_mode&&residual_valid_raw&&
+    (residual_index_raw==6'h3f)&&
+    ((residual_value_raw==16'shA2FE)||
+     (residual_value_raw==16'shA2FF));
 
 wire signed [7:0] legacy_mvx0=$signed(legacy_motion_x_plan[7:0]);
 wire signed [7:0] legacy_mvy0=$signed(legacy_motion_y_plan[7:0]);
@@ -346,6 +350,7 @@ mpeg2_h262_p_wide_motion_syntax_probe wide_general_probe
  .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),
  .intra_dc_precision(intra_dc_precision),
  .row_retired(p_row_persistence_complete),
+ .row_produced(wide_row_produced),
  .wide_candidate(wide_candidate),.wide_seen(wide_seen),
  .wide_complete_now(wide_complete_now),
  .row_complete_now(wide_row_complete_now),.row_final(wide_row_final),

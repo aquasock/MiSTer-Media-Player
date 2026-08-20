@@ -5,6 +5,7 @@ module tb_h262_p_intra_macroblocks #(
 );
     localparam integer MAX_STREAM_BYTES=262144;
     integer expected_intra=1,expected_blocks=6;
+    integer expected_cycles=773483;
     integer first_intra_row=8,last_intra_row=8,intra_col=20;
 
     reg clk=0,reset=1,stream_valid=0;
@@ -41,6 +42,8 @@ module tb_h262_p_intra_macroblocks #(
     wire signed [15:0] first_value,replay_value;
     wire replay_valid,residual_error;
     wire [5:0] replay_index;
+    wire row_produced=replay_valid&&(replay_index==6'h3f)&&
+        ((replay_value==16'shA2FE)||(replay_value==16'shA2FF));
     wire engine_input_valid=motion_valid||replay_valid;
     wire [5:0] engine_input_index=motion_valid ?
         (motion_intra?6'h3b:6'h3e) : replay_index;
@@ -100,7 +103,7 @@ module tb_h262_p_intra_macroblocks #(
     mpeg2_h262_p_wide_motion_syntax_probe parser(
         .clk(clk),.reset(reset),.stream_data(stream_data),
         .stream_valid(stream_valid),.intra_dc_precision(2'd0),
-        .row_retired(engine_row_persisted),
+        .row_retired(engine_row_persisted),.row_produced(row_produced),
         .wide_candidate(candidate),.wide_seen(seen),
         .wide_complete_now(complete),.row_complete_now(row_complete),
         .row_final(row_final),.motion_event_valid(motion_valid),
@@ -196,6 +199,7 @@ module tb_h262_p_intra_macroblocks #(
         if(!$value$plusargs("LEN=%d",stream_len)) $fatal(1,"missing +LEN");
         if(!$value$plusargs("EXPECTED_INTRA=%d",expected_intra)) expected_intra=1;
         if(!$value$plusargs("EXPECTED_BLOCKS=%d",expected_blocks)) expected_blocks=6;
+        if(!$value$plusargs("EXPECTED_CYCLES=%d",expected_cycles)) expected_cycles=773483;
         if(!$value$plusargs("FIRST_INTRA_ROW=%d",first_intra_row)) first_intra_row=8;
         if(!$value$plusargs("LAST_INTRA_ROW=%d",last_intra_row)) last_intra_row=8;
         if(!$value$plusargs("INTRA_COL=%d",intra_col)) intra_col=20;
@@ -233,10 +237,9 @@ module tb_h262_p_intra_macroblocks #(
                    !decision||!required||!success||engine_error||
                    !engine_read_seen||!engine_reconstructed_seen||
                    intra_store_samples!=(expected_blocks*64)||
-                   // Entry 253 retains each non-intra block's reference
-                   // footprint internally, so the former upstream cold/hit
-                   // modes converge while intra arithmetic stays exact.
-                   total_cycles!=787146)
+                   // Entry 265 overlaps P row production and reconstruction;
+                   // the exact end-to-end cycle count guards that boundary.
+                   total_cycles!=expected_cycles)
                     $fatal(1,"P intra-macroblock regression failed");
                 $finish;
             end

@@ -27,6 +27,7 @@ module mpeg2_h262_p_wide_motion_syntax_probe
     input  wire        stream_valid,
     input  wire [1:0]  intra_dc_precision,
     input  wire        row_retired,
+    input  wire        row_produced,
 
     output reg         wide_candidate,
     output reg         wide_seen,
@@ -138,6 +139,8 @@ reg [5:0] slice_row_number;
 reg [8:0] row_byte_count;
 reg [10:0] row_base_index;
 reg proof_done, parse_active, boundary_final, row_waiting;
+reg [1:0] outstanding_rows;
+reg final_row_queued, bank_blocked, producer_rearm_pending;
 reg [8:0] parse_byte_limit, parse_byte_index;
 reg [2:0] parse_bit_index;
 wire parser_at_end = (parse_byte_index >= parse_byte_limit);
