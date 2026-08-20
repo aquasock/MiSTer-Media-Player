@@ -22,9 +22,10 @@
 // arbiter returns to three explicit clients: presentation read, prediction read,
 // and reconstruction write. No prediction-side write encoding remains.
 //
-// Commit 142 extends display ownership to the B scratch frame.  The two retained
-// reference banks occupy regions 00/01 while B scratch occupies region 10, so
-// writer exclusion must compare address bits [17:16] rather than bit 16 alone.
+// Commit 142 extends display ownership to the B scratch frame.  Entry 276 adds
+// a third retained reference at region 100.  Writer exclusion therefore keeps
+// all three region bits [18:16]; truncating the tag would alias reference bank
+// two with bank zero and can permanently block the next reference write.
 //============================================================================
 
 `ifndef H262_PREDICTION_DESCRIPTOR_DEPTH
@@ -77,7 +78,7 @@ reg [DESCRIPTOR_POINTER_WIDTH-1:0]
 reg       read_descriptor_owner [0:DESCRIPTOR_DEPTH-1];
 reg [7:0] read_descriptor_words [0:DESCRIPTOR_DEPTH-1];
 reg       reader_bank_valid;
-reg [1:0] reader_frame_region;
+reg [2:0] reader_frame_region;
 
 wire read_outstanding=(read_descriptor_count!=0);
 wire read_owner_prediction=read_outstanding?
@@ -90,7 +91,7 @@ wire read_descriptor_room=(read_descriptor_count<DESCRIPTOR_DEPTH)||
     response_finishes;
 
 wire writer_targets_reader_region =
-    reader_bank_valid && (writer_addr[17:16] == reader_frame_region);
+    reader_bank_valid && (writer_addr[18:16] == reader_frame_region);
 
 wire grant_reader =
     read_descriptor_room && reader_rd;
@@ -175,7 +176,7 @@ always @(posedge clk) begin
             read_descriptor_words[descriptor_index] <= 8'd0;
         end
         reader_bank_valid     <= 1'b0;
-        reader_frame_region   <= 2'b00;
+        reader_frame_region   <= 3'b000;
     end
     else begin
         if(descriptor_push)begin
@@ -198,7 +199,7 @@ always @(posedge clk) begin
 
         if(reader_accept)begin
             reader_bank_valid<=1'b1;
-            reader_frame_region<=reader_addr[17:16];
+            reader_frame_region<=reader_addr[18:16];
         end
     end
 end

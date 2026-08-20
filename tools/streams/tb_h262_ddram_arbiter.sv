@@ -270,14 +270,32 @@ module tb_h262_ddram_arbiter;
         @(negedge clk);
         writer_we=0;
 
+        // Reference bank two occupies region 100, which must not alias bank
+        // zero.  This is the live-hardware ownership boundary for Entry 276.
+        accept_reader(29'h40030,8'd1);
+        return_word(1'b0);
+        @(negedge clk);
+        writer_addr=29'h00040;
+        writer_we=1;
+        #1;
+        if(writer_busy||!ddram_we||(ddram_addr!=writer_addr))
+            $fatal(1,"bank two display ownership aliased safe bank zero");
+        @(posedge clk);
+        @(negedge clk);
+        writer_addr=29'h40040;
+        #1;
+        if(!writer_busy||ddram_we)
+            $fatal(1,"writer entered display-owned reference bank two");
+        writer_we=0;
+
         if(max_descriptors!=EXPECTED_DEPTH)
             $fatal(1,"arbiter descriptor depth coverage failed max=%0d",
                    max_descriptors);
-        if((routed_prediction!=(5+EXPECTED_DEPTH))||(routed_reader!=5))
+        if((routed_prediction!=(5+EXPECTED_DEPTH))||(routed_reader!=6))
             $fatal(1,"response route totals failed prediction=%0d reader=%0d",
                    routed_prediction,routed_reader);
 
-        $display("DDRAM_ARBITER_RESULT depth=%0d owner_order=P/D/P display_burst=3 prediction_responses=%0d display_responses=%0d same_cycle_reuse=1 direct_response=1 writer_exclusion=1",
+        $display("DDRAM_ARBITER_RESULT depth=%0d owner_order=P/D/P display_burst=3 prediction_responses=%0d display_responses=%0d same_cycle_reuse=1 direct_response=1 writer_exclusion=1 bank2_alias=0",
                  max_descriptors,routed_prediction,routed_reader);
         $finish;
     end
