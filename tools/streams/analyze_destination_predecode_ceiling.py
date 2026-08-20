@@ -33,6 +33,7 @@ def main() -> int:
     parser.add_argument("--presentation-wait", type=int, required=True)
     parser.add_argument("--destination-wait", type=int, required=True)
     parser.add_argument("--decoder-wait", type=int, required=True)
+    parser.add_argument("--additional-decoder-reduction", type=int, default=0)
     parser.add_argument("--target-fps", type=float, default=25.0)
     args = parser.parse_args()
 
@@ -43,6 +44,7 @@ def main() -> int:
         args.presentation_wait,
         args.destination_wait,
         args.decoder_wait,
+        args.additional_decoder_reduction,
     )
     if any(value < 0 for value in values) or args.pictures < 2:
         parser.error("cycle counts must be nonnegative and pictures at least two")
@@ -94,6 +96,15 @@ def main() -> int:
     print(
         f"minimum_additional_decoder_reduction={required_decoder} "
         f"decoder_wait_percent={decoder_percent:.2f}"
+    )
+    combined_best = fifth.best_cycles - args.additional_decoder_reduction
+    combined_shortfall = max(0, combined_best - args.target_cadence)
+    combined_fps = args.target_fps * args.target_cadence / combined_best
+    print(
+        f"policy=fifth-plus-decoder reduction="
+        f"{args.additional_decoder_reduction} best={combined_best} "
+        f"best_fps={combined_fps:.6f} shortfall={combined_shortfall} "
+        f"closes={int(combined_shortfall == 0)}"
     )
     return 0
 

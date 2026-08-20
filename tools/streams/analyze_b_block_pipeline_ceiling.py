@@ -94,7 +94,21 @@ def read_pictures(path: Path) -> list[Picture]:
     return pictures
 
 
-def replay(picture: Picture) -> tuple[int, int, int, int, int]:
+def block_tap_cycles(block: Block, lanes: int) -> int:
+    forward_taps = 1 << ((block.fmvx & 1) + (block.fmvy & 1))
+    backward_taps = 1 << ((block.bmvx & 1) + (block.bmvy & 1))
+    if block.direction == 1:
+        taps = forward_taps
+    elif block.direction == 2:
+        taps = backward_taps
+    elif block.direction == 3:
+        taps = forward_taps + backward_taps
+    else:
+        raise ValueError(f"invalid prediction direction: {block}")
+    return 64 * ((taps + lanes - 1) // lanes)
+
+
+def replay(picture: Picture, tap_lanes: int = 1) -> tuple[int, int, int, int, int]:
     if not picture.blocks:
         raise ValueError(f"picture has no predicted blocks: {picture}")
     producer: list[int] = []
@@ -109,6 +123,13 @@ def replay(picture: Picture) -> tuple[int, int, int, int, int]:
         gap = block.start - prior_retire
         fetch = block.fetched - block.start
         consume_remainder = block.retire - block.fetched
+        if tap_lanes > 1:
+            tap_saving = block_tap_cycles(block, 1) - block_tap_cycles(
+                block, tap_lanes
+            )
+            if tap_saving > consume_remainder:
+                raise ValueError(f"tap saving exceeds consumer interval: {block}")
+            consume_remainder -= tap_saving
         if min(gap, fetch, consume_remainder) < 0:
             raise ValueError(f"negative block interval: {block}")
         gaps += gap
@@ -135,15 +156,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("trace", type=Path)
     parser.add_argument("--total-cycles", type=int)
+    parser.add_argument("--hardware-b-cycles", type=int)
     args = parser.parse_args()
 
-    totals = [0, 0, 0, 0, 0, 0, 0]
+    totals = [0, 0, 0, 0, 0, 0, 0, 0]
     directions = {1: 0, 2: 0, 3: 0}
     one_lane_taps = 0
     two_lane_cycles = 0
     full_parallel_cycles = 0
     for picture in read_pictures(args.trace):
         serial, overlapped, producer, consumer, gaps = replay(picture)
+        _, joint, _, _, _ = replay(picture, tap_lanes=2)
         totals[0] += 1
         totals[1] += len(picture.blocks)
         totals[2] += serial
@@ -151,22 +174,13 @@ def main() -> int:
         totals[4] += producer
         totals[5] += consumer
         totals[6] += gaps
+        totals[7] += joint
         for block in picture.blocks:
-            forward_taps = 1 << ((block.fmvx & 1) + (block.fmvy & 1))
-            backward_taps = 1 << ((block.bmvx & 1) + (block.bmvy & 1))
-            if block.direction == 1:
-                taps = forward_taps
-            elif block.direction == 2:
-                taps = backward_taps
-            elif block.direction == 3:
-                taps = forward_taps + backward_taps
-            else:
-                raise ValueError(f"invalid prediction direction: {block}")
             directions[block.direction] += 1
-            one_lane_taps += 64 * taps
-            two_lane_cycles += 64 * ((taps + 1) // 2)
+            one_lane_taps += block_tap_cycles(block, 1)
+            two_lane_cycles += block_tap_cycles(block, 2)
             full_parallel_cycles += 64
-    pictures, blocks, serial, overlapped, producer, consumer, gaps = totals
+    pictures, blocks, serial, overlapped, producer, consumer, gaps, joint = totals
     saved = serial - overlapped
     percent = 100.0 * saved / serial if serial else 0.0
     message = (
@@ -182,6 +196,18 @@ def main() -> int:
             f"whole_trace_upper_percent={whole_percent:.2f}"
         )
     print(message)
+    joint_saved = serial - joint
+    joint_message = (
+        f"B joint two_bank_two_lane={joint} saved={joint_saved} "
+        f"percent={100.0*joint_saved/serial:.2f}"
+    )
+    if args.hardware_b_cycles is not None:
+        hardware_saved = args.hardware_b_cycles * joint_saved // serial
+        joint_message += (
+            f" hardware_b_cycles={args.hardware_b_cycles} "
+            f"hardware_joint_saved={hardware_saved}"
+        )
+    print(joint_message)
     two_lane_saved = one_lane_taps - two_lane_cycles
     full_parallel_saved = one_lane_taps - full_parallel_cycles
     two_lane_whole = (
