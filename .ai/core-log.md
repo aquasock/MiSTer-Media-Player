@@ -586,7 +586,7 @@ Retain Entry 269 scheduler ownership and implement only the lower-risk two-bank 
 - [x] Passed
 
 ---
-## 272 COMMIT Unreleased ??? 2026-08-20T11:30:00-07:00
+## 272 COMMIT Unreleased 41ce63f 2026-08-20T11:30:00-07:00
 
 #### Coming From:
 
@@ -598,15 +598,14 @@ Overlap B-picture prediction fetch for the next block with reconstruction of the
 
 #### Outcome:
 
-Proposal only. Retain the timing-clean Entry 269 presentation scheduler and current ordered cache and DDR transaction contract. Instantiate two bounded prediction-footprint stores for B reconstruction, assign one bank to the current consumer and the other to at most one successor producer, and permit producer launch only after the current footprint has completed so the shared request interface still has one unambiguous owner. The first bounded implementation will prefetch only the five successor blocks inside a macroblock, where motion identity is already registered; the block-five transition remains serialized until a later change can stage the next synchronous motion record safely. A bank may be reused only after its consumer block reaches the writer persistence barrier, and incomplete prefetch must stall the next block without exposing invalid retained words.
+Commit `41ce63f` gives B reconstruction two explicitly selected retained-word fetchers while preserving a single active producer and the existing ordered cache and DDR interface. The current bank remains lookup-owned until the writer persistence barrier; only then may its already launched successor become the consumer and release the old bank. Prefetch is limited to the five internal block transitions of a macroblock, with block five retaining the synchronous next-motion-record boundary. A `current_started` guard found by the focused regression prevents a stale completion from launching block one with the previous macroblock's motion record. Predicted and intra-focused replays preserve all 1,350 motion records, 120/12 residual blocks, 7,680/768 residual samples and all 518,400 stores at 1,286,071 and 758,941 cycles; they prove 8,100/8,088 total launches, 6,750/6,740 prefetched handoffs, balanced bank reuse and zero simultaneous producers. Exact mixed preserves 423,936 pixels with zero mismatches, maximum channel delta two, all 69,556 reads and all ownership counts at 1,279,996 one-cycle cycles; the identical ten-cycle Entry 269 comparison falls from 1,329,996 to 1,289,996 cycles, 3.01 percent. Complete long preserves every picture, swap, read and write with zero errors at 6,979,996 cycles. A fully clean seed-six Quartus 17.0.2 build completes in 10 minutes 52 seconds with zero errors, 149 standing warnings and positive timing: +0.065 ns global setup, +1.118 ns decoder setup, +7.469 ns video setup, +0.244 ns hold, +3.059 ns global recovery, +14.915 ns decoder recovery and +0.703 ns removal. The fit uses 32,713 ALMs, 48,156 registers, 4,027,379 memory bits, 504 RAM blocks and 65 DSP blocks. Qualified artifact `MediaPlayer_commit272_41ce63f.rbf` is 4,318,908 bytes with SHA-256 `faa2f35639311d5544f94572307ba1ad2d06ecf7e0e49bd27788b378dfec45c9`; standard-path and cadence-path MiSTer uploads are byte-identical. Hardware long accepts 791,528 bytes, 72 pictures and 71 swaps with zero errors in 164,037,695 cycles or 23.372677 fps, improving 0.55 percent from Entry 269. Mixed accepts 366,071 bytes, 24 pictures and 23 swaps with zero errors in 56,918,964 cycles or 21.820496 fps, improving 0.46 percent. B stall falls 8.10 percent long and 7.51 percent mixed, but increased presentation and writer ownership absorbs most of that decoder gain; the queue is therefore safe pipeline infrastructure, not a large standalone cadence win.
 
 #### Next Steps:
 
-Implement the two-bank producer and consumer handoff, strengthen focused simulation for alternating ownership, incomplete-prefetch wait, intra transitions and bank reuse, then require exact B residual and intra samples, exact mixed pixels, complete long picture and write accounting, zero errors and a material end-to-end cycle reduction before committing source or starting a clean Quartus build.
+Retain the timing-clean Entry 272 image while implementing the independently measured two-lane B interpolation step from Entry 271. Consume two taps from a retained 64-bit word only when both requested bytes are valid in that word, preserve the existing one-tap path across word and row boundaries, and require parity-exact prediction sums, all focused and complete regressions, a clean timing result and measured hardware cadence before deciding whether the added compute width plus this queue merits its resource cost or should be collapsed back to one retained bank.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
@@ -615,8 +614,8 @@ Implement the two-bank producer and consumer handoff, strengthen focused simulat
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 233 COMMIT Unreleased 4e6130c 2026-08-19T02:49:58-07:00
