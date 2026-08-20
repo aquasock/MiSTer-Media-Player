@@ -1,5 +1,5 @@
 ---
-## 252 COMMIT Unreleased ??? 2026-08-20T03:46:05-07:00
+## 252 COMMIT Unreleased c9e5a90 2026-08-20T03:46:05-07:00
 
 #### Coming From:
 
@@ -11,11 +11,11 @@ Prove a direct-index block-footprint fetcher that retains at most thirty-six pre
 
 #### Outcome:
 
-Entry 251 shows that every exact mixed and long non-intra block footprint is one or two complete rectangles, each at most two 64-bit words wide and nine rows high, and that queue depths above two provide no measurable benefit. This boundary will encode those limits in a standalone fetcher with eighteen fixed slots per reference phase, sequential rectangle address generation, a two-entry ordered response-slot FIFO and synchronous direct-slot lookup. It will not yet alter or instantiate into production P/B decoding, the shared cache or the DDR arbiter.
+Commit `c9e5a90` adds an uninstantiated standalone block-footprint fetcher and focused regression, so the production Entry 247 netlist remains unaffected. The committed analyzer now rejects any non-rectangular trace footprint and proves exact mixed counts of 54 intra, 5,736 single-reference and 834 dual-reference blocks plus exact long counts of 132 intra, 11,676 single-reference and 8,064 dual-reference blocks; every reference phase is a complete rectangle no wider than two words or taller than nine rows. The fetcher assigns eighteen direct slots per phase, generates each rectangle word once, permits two ordered reads, stores responses through an explicit two-entry slot descriptor FIFO and returns retained data through synchronous phase/row/column lookup. Its regression passes four transactions, six phases and 88 exact words across both width and height limits, delayed service, deterministic command backpressure, simultaneous response and next acceptance, same-cycle acceptance and response, maximum outstanding depth two, direct lookup and invalid phase-count rejection without address loss, duplication or response reassociation.
 
 #### Next Steps:
 
-Extend the replay analyzer to enforce the rectangular-footprint invariant, then verify the fetcher with one- and two-phase footprints, all width and height limits, deterministic command backpressure, delayed ordered responses, simultaneous response and next acceptance, legal same-cycle acceptance and response, exact slot data and invalid-parameter rejection. Proceed to live P/B integration only after every address, descriptor and lookup is proven without loss, duplication or response reassociation.
+Integrate the proven fetcher behind the P/B wrapper in a simulation-first boundary. Derive each phase's top-left word, one- or two-word width and eight- or nine-row height from the already registered block motion state, route its two ordered requests through an expanded response-owner queue, and replace per-tap cache waits with direct buffered slot lookup while leaving intra blocks, pel arithmetic, residual timing, writer ownership, display priority and presentation unchanged. Require exact mixed pixels and long order before any Quartus build.
 
 #### Files Modified:
 
@@ -25,7 +25,7 @@ Extend the replay analyzer to enforce the rectangular-footprint invariant, then 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
