@@ -3,9 +3,77 @@ assign CE_PIXEL  = 1'b1;
 assign VGA_DE = fb_video_de;
 assign VGA_HS = fb_video_hs;
 assign VGA_VS = fb_video_vs;
-assign VGA_R = fb_video_r;
-assign VGA_G = fb_video_g;
-assign VGA_B = fb_video_b;
+assign VGA_R = cadence_video_r;
+assign VGA_G = cadence_video_g;
+assign VGA_B = cadence_video_b;
+
+// Entry 245: development-only hardware cadence snapshot. Every input is an
+// already registered top-level boundary. The profiler has no control output,
+// and its overlay is enabled only after the terminal presentation has drained.
+wire mpeg2_new_cadence_session_quiet =
+    mpeg2_new_sequence_end_seen &&
+    mpeg2_stream_empty &&
+    !mpeg2_new_decode_stream_valid &&
+    !mpeg2_new_frame_waiting &&
+    !mpeg2_new_b_presentation_hold &&
+    !mpeg2_new_p_destination_ownership_hold &&
+    !mpeg2_new_pred_rd &&
+    !mpeg2_new_ddr_wr_we;
+
+wire [15:0] mpeg2_new_cadence_error_flags = {
+    6'd0,
+    mpeg2_new_b_presentation_error,
+    mpeg2_new_ddr_cache_error,
+    mpeg2_new_ddr_store_error,
+    mpeg2_new_recon_error,
+    mpeg2_new_idct_error,
+    mpeg2_new_inverse_quant_unsupported_matrix,
+    mpeg2_new_inverse_quant_error,
+    mpeg2_new_pred_error,
+    mpeg2_new_phase1_probe_error,
+    mpeg2_new_syntax_error
+};
+
+mpeg2_h262_hardware_cadence_profiler
+mpeg2_h262_hardware_cadence_profiler
+(
+    .clk_mpeg2                 (clk_mpeg2),
+    .reset_mpeg2               (reset_mpeg2),
+    .clk_video                 (clk_video),
+    .reset_video               (reset_video),
+    .fifo_pending              (!mpeg2_stream_empty),
+    .decoder_ready             (mpeg2_new_decoder_stream_ready),
+    .presentation_hold         (mpeg2_new_b_presentation_hold),
+    .destination_hold          (mpeg2_new_p_destination_ownership_hold),
+    .decoder_byte_accepted     (mpeg2_new_decode_stream_valid),
+    .picture_coding_type       (mpeg2_new_picture_coding_type),
+    .temporal_reference        (mpeg2_new_temporal_reference),
+    .frame_rate_code           (mpeg2_new_frame_rate_code),
+    .picture_count             (mpeg2_new_picture_count),
+    .reference_picture_complete(mpeg2_new_picture_420_complete),
+    .b_picture_complete        (mpeg2_new_b_user_success),
+    .prediction_read           (mpeg2_new_pred_rd),
+    .prediction_busy           (mpeg2_new_pred_busy),
+    .prediction_data_ready     (mpeg2_new_pred_dout_ready),
+    .writer_write              (mpeg2_new_ddr_wr_we),
+    .writer_busy               (mpeg2_new_ddr_writer_busy),
+    .display_frame_bank        (mpeg2_new_display_frame_bank),
+    .display_scratch           (mpeg2_new_display_scratch),
+    .display_scratch_bank      (mpeg2_new_display_scratch_bank),
+    .sequence_end_seen         (mpeg2_new_sequence_end_seen),
+    .session_quiet             (mpeg2_new_cadence_session_quiet),
+    .error_flags               (mpeg2_new_cadence_error_flags),
+    .h_pos                     (display_h_pos),
+    .v_pos                     (display_v_pos),
+    .base_r                    (fb_video_r),
+    .base_g                    (fb_video_g),
+    .base_b                    (fb_video_b),
+    .base_de                   (fb_video_de),
+    .video_r                   (cadence_video_r),
+    .video_g                   (cadence_video_g),
+    .video_b                   (cadence_video_b),
+    .snapshot_ready            (cadence_snapshot_ready)
+);
 
 wire mpeg2_new_phase1s_all_i_user_success =
     mpeg2_new_first_picture_420_parsed &&

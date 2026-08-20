@@ -1,0 +1,218 @@
+#!/usr/bin/env python3
+"""Decode the Entry-245 machine-readable cadence overlay from a MiSTer PNG."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+from typing import Any
+
+from PIL import Image
+
+
+MAGIC = 0x4D4D5031
+WORDS = 21
+X0 = 8
+Y0 = 512
+CELL = 4
+ROW_PREFIX = (1, 0, 1, 0)
+
+
+class TelemetryDecodeError(RuntimeError):
+    pass
+
+
+def _cell_bit(image: Image.Image, column: int, row: int) -> int:
+    x0 = X0 + column * CELL + 1
+    y0 = Y0 + row * CELL + 1
+    pixels = []
+    for y in range(y0, y0 + 2):
+        for x in range(x0, x0 + 2):
+            r, g, b = image.getpixel((x, y))[:3]
+            pixels.append((int(r) + int(g) + int(b)) // 3)
+    return int(sum(pixels) >= 128 * len(pixels))
+
+
+def decode_words(path: Path | str) -> list[int]:
+    image = Image.open(path).convert("RGB")
+    if image.width < X0 + 42 * CELL or image.height < Y0 + WORDS * CELL:
+        raise TelemetryDecodeError(
+            f"image is {image.width}x{image.height}; an unscaled 800x600 "
+            "MiSTer screenshot is required"
+        )
+
+    words: list[int] = []
+    for row in range(WORDS):
+        bits = [_cell_bit(image, column, row) for column in range(42)]
+        if tuple(bits[:4]) != ROW_PREFIX:
+            raise TelemetryDecodeError(
+                f"row {row}: telemetry prefix absent ({bits[:4]})"
+            )
+        encoded_row = 0
+        for bit in bits[4:9]:
+            encoded_row = (encoded_row << 1) | bit
+        if encoded_row != row:
+            raise TelemetryDecodeError(
+                f"row {row}: encoded row index is {encoded_row}"
+            )
+        word = 0
+        for bit in bits[9:41]:
+            word = (word << 1) | bit
+        if bits[41] != (word.bit_count() & 1):
+            raise TelemetryDecodeError(f"row {row}: parity mismatch")
+        words.append(word)
+
+    if words[0] != MAGIC:
+        raise TelemetryDecodeError(f"bad magic 0x{words[0]:08x}")
+    if ((words[1] >> 16) & 0xFF) != WORDS:
+        raise TelemetryDecodeError(
+            f"snapshot declares {(words[1] >> 16) & 0xFF} words, expected {WORDS}"
+        )
+    checksum = 0
+    for word in words[:-1]:
+        checksum ^= word
+    if checksum != words[-1]:
+        raise TelemetryDecodeError(
+            f"checksum mismatch 0x{checksum:08x}/0x{words[-1]:08x}"
+        )
+    return words
+
+
+def parse_words(words: list[int]) -> dict[str, Any]:
+    format_word = words[1]
+    clock_hz = (format_word & 0xFFFF) * 1000
+    counts = words[17]
+    metadata = words[18]
+    cadence_cycles = words[6]
+    display_swaps = counts & 0xFF
+    cadence_seconds = cadence_cycles / clock_hz if clock_hz else 0.0
+    delivered_fps = (
+        display_swaps / cadence_seconds if cadence_seconds > 0.0 else 0.0
+    )
+    return {
+        "schema_version": (format_word >> 24) & 0xFF,
+        "snapshot_words": (format_word >> 16) & 0xFF,
+        "decoder_clock_hz": clock_hz,
+        "accepted_bytes": words[2],
+        "session_cycles": words[3],
+        "first_present_cycle": words[4],
+        "last_present_cycle": words[5],
+        "cadence_cycles": cadence_cycles,
+        "cadence_seconds": cadence_seconds,
+        "delivered_fps": delivered_fps,
+        "decoder_stall_cycles": words[7],
+        "presentation_stall_cycles": words[8],
+        "destination_stall_cycles": words[9],
+        "i_stall_cycles": words[10],
+        "p_stall_cycles": words[11],
+        "b_stall_cycles": words[12],
+        "prediction_requests": words[13],
+        "prediction_request_wait_cycles": words[14],
+        "prediction_response_cycles": words[15],
+        "writer_wait_cycles": words[16],
+        "reference_pictures": (counts >> 24) & 0xFF,
+        "b_pictures": (counts >> 16) & 0xFF,
+        "display_pictures": (counts >> 8) & 0xFF,
+        "display_swaps": display_swaps,
+        "frame_rate_code": (metadata >> 28) & 0xF,
+        "final_picture_type": (metadata >> 25) & 0x7,
+        "final_temporal_reference": (metadata >> 15) & 0x3FF,
+        "reference_picture_count": (metadata >> 7) & 0xFF,
+        "error_flags": (words[19] >> 16) & 0xFFFF,
+        "checksum": words[20],
+    }
+
+
+def decode(path: Path | str) -> dict[str, Any]:
+    return parse_words(decode_words(path))
+
+
+def validate(
+    result: dict[str, Any],
+    expected_pictures: int | None = None,
+    expected_bytes: int | None = None,
+    require_fps: float | None = None,
+) -> list[str]:
+    failures: list[str] = []
+    if result["error_flags"]:
+        failures.append(f"hardware error flags 0x{result['error_flags']:04x}")
+    if expected_pictures is not None:
+        if result["display_pictures"] != expected_pictures:
+            failures.append(
+                f"displayed {result['display_pictures']} pictures, "
+                f"expected {expected_pictures}"
+            )
+        if result["reference_pictures"] + result["b_pictures"] != expected_pictures:
+            failures.append(
+                "reference+B completion count does not equal expected pictures"
+            )
+        if result["display_swaps"] != max(expected_pictures - 1, 0):
+            failures.append(
+                f"observed {result['display_swaps']} swaps, expected "
+                f"{max(expected_pictures - 1, 0)}"
+            )
+    if expected_bytes is not None and result["accepted_bytes"] != expected_bytes:
+        failures.append(
+            f"accepted {result['accepted_bytes']} bytes, expected {expected_bytes}"
+        )
+    if require_fps is not None and result["delivered_fps"] + 1e-9 < require_fps:
+        failures.append(
+            f"delivered {result['delivered_fps']:.6f} fps, "
+            f"required {require_fps:.6f} fps"
+        )
+    return failures
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("screenshot", type=Path)
+    parser.add_argument("--expected-pictures", type=int)
+    parser.add_argument("--expected-bytes", type=int)
+    parser.add_argument("--require-fps", type=float)
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args()
+
+    try:
+        result = decode(args.screenshot)
+    except TelemetryDecodeError as exc:
+        parser.error(str(exc))
+
+    failures = validate(
+        result,
+        expected_pictures=args.expected_pictures,
+        expected_bytes=args.expected_bytes,
+        require_fps=args.require_fps,
+    )
+    result["validation_failures"] = failures
+
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print(
+            f"hardware cadence: {result['display_pictures']} pictures, "
+            f"{result['display_swaps']} intervals in "
+            f"{result['cadence_seconds']:.6f} s = "
+            f"{result['delivered_fps']:.6f} fps"
+        )
+        print(
+            "stalls: decoder={decoder_stall_cycles} "
+            "presentation={presentation_stall_cycles} "
+            "destination={destination_stall_cycles} "
+            "I/P/B={i_stall_cycles}/{p_stall_cycles}/{b_stall_cycles}".format(
+                **result
+            )
+        )
+        print(
+            "prediction: requests={prediction_requests} "
+            "request_wait={prediction_request_wait_cycles} "
+            "response={prediction_response_cycles}; "
+            "writer_wait={writer_wait_cycles}".format(**result)
+        )
+        for failure in failures:
+            print(f"FAIL: {failure}")
+    return int(bool(failures))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
