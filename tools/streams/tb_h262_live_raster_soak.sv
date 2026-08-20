@@ -60,6 +60,19 @@ module tb_h262_live_raster_soak #(
     integer profile_partition_base8,profile_partition_base16;
     integer profile_partition_way;
     reg profile_partition_hit8,profile_partition_hit16;
+    integer profile_victim_lookups=0,profile_victim_primary_hits=0;
+    integer profile_victim_hits=0,profile_victim_full_misses=0;
+    reg [3:0] profile_victim_primary_valid=0;
+    reg [7:0] profile_victim_second_valid=0;
+    reg [28:0] profile_victim_primary_tag[0:3];
+    reg [28:0] profile_victim_second_tag[0:7];
+    reg [1:0] profile_victim_primary_replace=0;
+    reg [1:0] profile_victim_second_replace[0:1];
+    integer profile_victim_way,profile_victim_bank;
+    integer profile_victim_base,profile_victim_slot;
+    reg profile_victim_primary_hit,profile_victim_second_hit;
+    reg profile_victim_evicted_valid;
+    reg [28:0] profile_victim_evicted_tag;
     integer pixel_samples=0,pixel_mismatches=0,max_pixel_delta=0;
     integer pixel_index,pixel_delta,pixel_row,pixel_word,pixel_lane;
     reg first_pixel_mismatch=0;
@@ -330,6 +343,11 @@ module tb_h262_live_raster_soak #(
             profile_partition16_replace[1]<=0;
             profile_partition16_replace[2]<=0;
             profile_partition16_replace[3]<=0;
+            profile_victim_primary_valid<=0;
+            profile_victim_second_valid<=0;
+            profile_victim_primary_replace<=0;
+            profile_victim_second_replace[0]<=0;
+            profile_victim_second_replace[1]<=0;
         end else if(prediction.reference_cache.lookup_request)begin
             profile_prefetch_lookups<=profile_prefetch_lookups+1;
             if((profile_prefetch_valid0&&
@@ -458,6 +476,68 @@ module tb_h262_live_raster_soak #(
                         prediction.reference_cache.request_addr;
                 profile_partition16_replace[profile_partition_set16]<=
                     profile_partition16_replace[profile_partition_set16]+1'b1;
+            end
+
+            // Entry 249 proposal model: the current four-word primary stays
+            // on the fast path.  Only a primary miss probes four victim tags
+            // selected by reference bank.  Victim hits swap with the next
+            // primary replacement slot; full misses preserve that evicted
+            // primary word in the victim stage.
+            profile_victim_lookups<=profile_victim_lookups+1;
+            profile_victim_primary_hit=0;
+            profile_victim_second_hit=0;
+            profile_victim_bank=prediction.reference_cache.request_addr[16];
+            profile_victim_base=profile_victim_bank*4;
+            profile_victim_slot=profile_victim_base;
+            for(profile_victim_way=0;profile_victim_way<4;
+                profile_victim_way=profile_victim_way+1)begin
+                if(profile_victim_primary_valid[profile_victim_way]&&
+                   profile_victim_primary_tag[profile_victim_way]==
+                       prediction.reference_cache.request_addr)
+                    profile_victim_primary_hit=1;
+                if(profile_victim_second_valid[profile_victim_base+
+                                               profile_victim_way]&&
+                   profile_victim_second_tag[profile_victim_base+
+                                             profile_victim_way]==
+                       prediction.reference_cache.request_addr)begin
+                    profile_victim_second_hit=1;
+                    profile_victim_slot=profile_victim_base+
+                                        profile_victim_way;
+                end
+            end
+            if(profile_victim_primary_hit)
+                profile_victim_primary_hits<=profile_victim_primary_hits+1;
+            else begin
+                profile_victim_evicted_valid=
+                    profile_victim_primary_valid[profile_victim_primary_replace];
+                profile_victim_evicted_tag=
+                    profile_victim_primary_tag[profile_victim_primary_replace];
+                profile_victim_primary_valid[profile_victim_primary_replace]<=1;
+                profile_victim_primary_tag[profile_victim_primary_replace]<=
+                    prediction.reference_cache.request_addr;
+                profile_victim_primary_replace<=
+                    profile_victim_primary_replace+1'b1;
+                if(profile_victim_second_hit)begin
+                    profile_victim_hits<=profile_victim_hits+1;
+                    if(profile_victim_evicted_valid)begin
+                        profile_victim_second_valid[profile_victim_slot]<=1;
+                        profile_victim_second_tag[profile_victim_slot]<=
+                            profile_victim_evicted_tag;
+                    end else
+                        profile_victim_second_valid[profile_victim_slot]<=0;
+                end else begin
+                    profile_victim_full_misses<=profile_victim_full_misses+1;
+                    if(profile_victim_evicted_valid)begin
+                        profile_victim_bank=profile_victim_evicted_tag[16];
+                        profile_victim_slot=profile_victim_bank*4+
+                            profile_victim_second_replace[profile_victim_bank];
+                        profile_victim_second_valid[profile_victim_slot]<=1;
+                        profile_victim_second_tag[profile_victim_slot]<=
+                            profile_victim_evicted_tag;
+                        profile_victim_second_replace[profile_victim_bank]<=
+                            profile_victim_second_replace[profile_victim_bank]+1'b1;
+                    end
+                end
             end
         end
         if(!reset)begin
@@ -709,6 +789,10 @@ module tb_h262_live_raster_soak #(
                      profile_partition_lookups,
                      profile_partition8_hits,profile_partition8_misses,
                      profile_partition16_hits,profile_partition16_misses);
+            $display("LIVE_RASTER_VICTIM lookups=%0d primary_hits=%0d victim_hits=%0d full_misses=%0d probe_cycles=%0d",
+                     profile_victim_lookups,profile_victim_primary_hits,
+                     profile_victim_hits,profile_victim_full_misses,
+                     profile_victim_hits+profile_victim_full_misses);
             if(MIXED_PIXEL_MODE)begin
                 $display("MIXED_PIXEL_RESULT samples=%0d mismatches=%0d max_delta=%0d",
                          pixel_samples,pixel_mismatches,max_pixel_delta);
