@@ -30,9 +30,7 @@ endfunction
 (* ramstyle = "M10K" *) reg [33:0] motion_mem [0:MAX_MB-1];
 reg [10:0] motion_count;
 reg [33:0] motion_word;
-reg [33:0] next_motion_word;
 reg motion_load;
-reg next_motion_word_valid;
 reg motion_first_pending;
 reg [1:0] pending_direction;
 reg signed [7:0] pending_fmvx,pending_fmvy;
@@ -41,11 +39,6 @@ wire signed [7:0] mb_fmvx=$signed(motion_word[31:24]);
 wire signed [7:0] mb_fmvy=$signed(motion_word[23:16]);
 wire signed [7:0] mb_bmvx=$signed(motion_word[15:8]);
 wire signed [7:0] mb_bmvy=$signed(motion_word[7:0]);
-wire [1:0] next_mb_direction=next_motion_word[33:32];
-wire signed [7:0] next_mb_fmvx=$signed(next_motion_word[31:24]);
-wire signed [7:0] next_mb_fmvy=$signed(next_motion_word[23:16]);
-wire signed [7:0] next_mb_bmvx=$signed(next_motion_word[15:8]);
-wire signed [7:0] next_mb_bmvy=$signed(next_motion_word[7:0]);
 
 // Commit 232 timing repair: execution begins two cycles after motion_word is
 // loaded. Capture block-normalized motion fields in a separate preserved stage

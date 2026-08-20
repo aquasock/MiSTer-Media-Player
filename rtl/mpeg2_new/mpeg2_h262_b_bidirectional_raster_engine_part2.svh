@@ -63,21 +63,14 @@ wire [28:0] block_phase1_base_addr=pixel_addr(
     block_backward_src_y[11:0]);
 wire [6:0] block_row_words=(blk<4)?7'd90:7'd45;
 
-// Entry 274: blk 0..4 still derive their successor from the current motion
-// record.  At blk 5, the one synchronous motion-memory read port has already
-// staged the following record, allowing block zero of the next macroblock to
-// use the same alternate-bank producer without adding a memory port.
-wire successor_cross_macroblock=(blk==3'd5);
-wire [2:0] successor_blk=successor_cross_macroblock?3'd0:(blk+1'b1);
-wire [10:0] successor_mbi=successor_cross_macroblock?(mbi+1'b1):mbi;
-wire [5:0] successor_col=successor_cross_macroblock?(col+1'b1):col;
-wire [1:0] successor_direction=successor_cross_macroblock?
-    next_mb_direction:exec_direction;
+// Entry 272: the successor footprint is derived from the already loaded
+// macroblock motion record.  Only blk 0..4 use it; the blk-5 boundary keeps
+// the synchronous next-macroblock motion load as the serialization point.
+wire [2:0] successor_blk=blk+1'b1;
 wire successor_luma=(successor_blk<4);
 wire [11:0] successor_dest_x=successor_luma?
-    (({6'd0,successor_col}<<4)+
-     {8'd0,successor_blk[0],3'b000}):
-    ({6'd0,successor_col}<<3);
+    (({6'd0,col}<<4)+{8'd0,successor_blk[0],3'b000}):
+    ({6'd0,col}<<3);
 wire [11:0] successor_dest_y=successor_luma?
     (({6'd0,mrow}<<4)+{8'd0,successor_blk[1],3'b000}):
     ({6'd0,mrow}<<3);
@@ -85,23 +78,15 @@ wire [11:0] successor_plane_width=successor_luma?
     padded_luma_width:padded_chroma_width;
 wire [11:0] successor_plane_height=successor_luma?
     padded_luma_height:padded_chroma_height;
-wire signed [7:0] successor_mb_fmvx=successor_cross_macroblock?
-    next_mb_fmvx:mb_fmvx;
-wire signed [7:0] successor_mb_fmvy=successor_cross_macroblock?
-    next_mb_fmvy:mb_fmvy;
-wire signed [7:0] successor_mb_bmvx=successor_cross_macroblock?
-    next_mb_bmvx:mb_bmvx;
-wire signed [7:0] successor_mb_bmvy=successor_cross_macroblock?
-    next_mb_bmvy:mb_bmvy;
 wire signed [7:0] successor_fmvx=successor_luma?
-    successor_mb_fmvx:chroma_half_vector(successor_mb_fmvx);
+    mb_fmvx:chroma_half_vector(mb_fmvx);
 wire signed [7:0] successor_fmvy=successor_luma?
-    successor_mb_fmvy:chroma_half_vector(successor_mb_fmvy);
+    mb_fmvy:chroma_half_vector(mb_fmvy);
 wire signed [7:0] successor_bmvx=successor_luma?
-    successor_mb_bmvx:chroma_half_vector(successor_mb_bmvx);
+    mb_bmvx:chroma_half_vector(mb_bmvx);
 wire signed [7:0] successor_bmvy=successor_luma?
-    successor_mb_bmvy:chroma_half_vector(successor_mb_bmvy);
-wire successor_phase0_backward=(successor_direction==2'd2);
+    mb_bmvy:chroma_half_vector(mb_bmvy);
+wire successor_phase0_backward=(exec_direction==2'd2);
 wire signed [7:0] successor_phase0_mvx=successor_phase0_backward?
     successor_bmvx:successor_fmvx;
 wire signed [7:0] successor_phase0_mvy=successor_phase0_backward?
@@ -135,7 +120,7 @@ wire successor_phase1_bounds_ok=(successor_phase1_src_x>=0)&&
     (successor_phase1_last_x<$signed({2'b00,successor_plane_width}))&&
     (successor_phase1_last_y<$signed({2'b00,successor_plane_height}));
 wire successor_all_bounds_ok=successor_phase0_bounds_ok&&
-    ((successor_direction!=2'd3)||successor_phase1_bounds_ok);
+    ((exec_direction!=2'd3)||successor_phase1_bounds_ok);
 wire [3:0] successor_phase0_word_span=
     {1'b0,successor_phase0_src_x[2:0]}+4'd7+
     {3'd0,successor_phase0_mvx[0]};
@@ -149,10 +134,6 @@ wire [28:0] successor_phase1_base_addr=pixel_addr(
     future_off,successor_blk,successor_phase1_src_x[11:0],
     successor_phase1_src_y[11:0]);
 wire [6:0] successor_row_words=successor_luma?7'd90:7'd45;
-wire successor_launch_valid=successor_cross_macroblock?
-    (next_motion_word_valid&&(col+1'b1<mb_width)&&
-     (successor_direction!=2'd0)):
-    ((blk<3'd5)&&(successor_direction!=2'd0));
 
 wire [28:0] launch_phase0_base_addr=block_fetch_start_prefetch?
     successor_phase0_base_addr:block_phase0_base_addr;
@@ -168,13 +149,11 @@ wire launch_phase1_half_y=block_fetch_start_prefetch?
     successor_bmvy[0]:exec_bmvy[0];
 wire [6:0] launch_row_words=block_fetch_start_prefetch?
     successor_row_words:block_row_words;
-wire [1:0] launch_direction=block_fetch_start_prefetch?
-    successor_direction:exec_direction;
 
 mpeg2_h262_prediction_block_fetcher block_fetcher(
     .clk(clk),.reset(reset),
     .start(block_fetch_start&&!block_fetch_start_bank),
-    .phase_count((launch_direction==2'd3)?2'd2:2'd1),
+    .phase_count((exec_direction==2'd3)?2'd2:2'd1),
     .phase0_base_addr(launch_phase0_base_addr),
     .phase1_base_addr(launch_phase1_base_addr),
     .phase0_two_words(launch_phase0_two_words),
@@ -200,7 +179,7 @@ mpeg2_h262_prediction_block_fetcher block_fetcher(
 mpeg2_h262_prediction_block_fetcher block_fetcher1(
     .clk(clk),.reset(reset),
     .start(block_fetch_start&&block_fetch_start_bank),
-    .phase_count((launch_direction==2'd3)?2'd2:2'd1),
+    .phase_count((exec_direction==2'd3)?2'd2:2'd1),
     .phase0_base_addr(launch_phase0_base_addr),
     .phase1_base_addr(launch_phase1_base_addr),
     .phase0_two_words(launch_phase0_two_words),
@@ -558,9 +537,7 @@ end
 
 always @(posedge clk) begin
     if(reset) begin
-        mb_width<=0;mb_height<=0;geometry_seen<=0;motion_count<=0;
-        motion_word<=0;next_motion_word<=0;motion_load<=0;
-        next_motion_word_valid<=0;
+        mb_width<=0;mb_height<=0;geometry_seen<=0;motion_count<=0;motion_word<=0;motion_load<=0;
         motion_first_pending<=0;pending_direction<=0;pending_fmvx<=0;pending_fmvy<=0;
         exec_direction<=0;exec_fmvx<=0;exec_fmvy<=0;exec_bmvx<=0;exec_bmvy<=0;
         phase_mvx<=0;phase_mvy<=0;phase_backward<=0;

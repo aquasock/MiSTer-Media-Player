@@ -37,7 +37,6 @@ module tb_h262_live_raster_soak #(
     integer b_queue_current_starts=0,b_queue_prefetch_starts=0;
     integer b_queue_handoffs=0,b_queue_bank0_starts=0;
     integer b_queue_bank1_starts=0;
-    integer b_queue_cross_starts=0,b_queue_cross_handoffs=0;
     integer b_paired_tap_lookups=0,b_single_tap_advances=0;
     integer b_vertical_tap_pairs=0;
     integer reference_writes=0,scratch0_writes=0,scratch1_writes=0;
@@ -482,20 +481,15 @@ module tb_h262_live_raster_soak #(
                     b_queue_prefetch_starts<=b_queue_prefetch_starts+1;
                 else
                     b_queue_current_starts<=b_queue_current_starts+1;
-                if(prediction.b_probe.block_fetch_start_prefetch&&
-                   prediction.b_probe.successor_cross_macroblock)
-                    b_queue_cross_starts<=b_queue_cross_starts+1;
                 if(prediction.b_probe.block_fetch_start_bank)
                     b_queue_bank1_starts<=b_queue_bank1_starts+1;
                 else
                     b_queue_bank0_starts<=b_queue_bank0_starts+1;
             end
             if(prediction.b_probe.wait_store&&writer_stored&&
-               prediction.b_probe.block_prefetch_valid)begin
+               (prediction.b_probe.blk<5)&&
+               prediction.b_probe.block_prefetch_valid)
                 b_queue_handoffs<=b_queue_handoffs+1;
-                if(prediction.b_probe.blk==3'd5)
-                    b_queue_cross_handoffs<=b_queue_cross_handoffs+1;
-            end
             if(prediction.b_probe.lookup_pair)
                 b_paired_tap_lookups<=b_paired_tap_lookups+1;
             if(prediction.b_probe.lookup_vertical_pair)
@@ -511,15 +505,10 @@ module tb_h262_live_raster_soak #(
                     $fdisplay(b_block_trace_fd,
                         "%0d,START,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d",
                         b_block_trace_cycle,temporal_reference,
-                        prediction.b_probe.block_fetch_start_prefetch?
-                            prediction.b_probe.successor_mbi:
-                            prediction.b_probe.mbi,
-                        prediction.b_probe.block_fetch_start_prefetch?
-                            prediction.b_probe.successor_blk:
-                            prediction.b_probe.blk,
-                        prediction.b_probe.block_fetch_start_prefetch?
-                            prediction.b_probe.successor_direction:
-                            prediction.b_probe.exec_direction,
+                        prediction.b_probe.mbi,
+                        prediction.b_probe.blk+
+                            prediction.b_probe.block_fetch_start_prefetch,
+                        prediction.b_probe.exec_direction,
                         $signed(prediction.b_probe.block_fetch_start_prefetch?
                             prediction.b_probe.successor_fmvx:
                             prediction.b_probe.exec_fmvx),
@@ -1307,10 +1296,9 @@ module tb_h262_live_raster_soak #(
                      profile_victim_lookups,profile_victim_primary_hits,
                      profile_victim_hits,profile_victim_full_misses,
                      profile_victim_hits+profile_victim_full_misses);
-            $display("LIVE_RASTER_B_QUEUE current=%0d prefetch=%0d handoffs=%0d cross=%0d/%0d banks=%0d/%0d",
+            $display("LIVE_RASTER_B_QUEUE current=%0d prefetch=%0d handoffs=%0d banks=%0d/%0d",
                      b_queue_current_starts,b_queue_prefetch_starts,
-                     b_queue_handoffs,b_queue_cross_starts,
-                     b_queue_cross_handoffs,b_queue_bank0_starts,
+                     b_queue_handoffs,b_queue_bank0_starts,
                      b_queue_bank1_starts);
             $display("LIVE_RASTER_B_TAPS paired=%0d single_advance=%0d vertical=%0d",
                      b_paired_tap_lookups,b_single_tap_advances,
@@ -1336,16 +1324,14 @@ module tb_h262_live_raster_soak #(
                     (prediction.reference_cache.cache_miss_count!=32'd69556))||
                    prediction.reference_cache.uncached_count!=0||
                    (memory_reads!=prediction.reference_cache.cache_miss_count)||
-                   b_queue_current_starts!=90||
-                   b_queue_prefetch_starts!=4230||
-                   b_queue_handoffs!=4230||
-                   b_queue_cross_starts!=630||
-                   b_queue_cross_handoffs!=630||
+                   b_queue_current_starts!=720||
+                   b_queue_prefetch_starts!=3600||
+                   b_queue_handoffs!=3600||
                    b_queue_bank0_starts!=2160||
                    b_queue_bank1_starts!=2160||
-                   b_paired_tap_lookups!=52746||
-                   b_single_tap_advances!=4950||
-                   b_vertical_tap_pairs!=22394||
+                   b_paired_tap_lookups!=52679||
+                   b_single_tap_advances!=5017||
+                   b_vertical_tap_pairs!=22327||
                    ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
                     (MEMORY_READ_LATENCY==1)&&(total_cycles!=1259996))||
                    pixel_samples!=423936||pixel_mismatches!=0||
@@ -1386,16 +1372,14 @@ module tb_h262_live_raster_soak #(
                 (prediction.reference_cache.cache_miss_count!=32'd372696))||
                prediction.reference_cache.uncached_count!=0||
                (memory_reads!=prediction.reference_cache.cache_miss_count)||
-               b_queue_current_starts!=282||
-               b_queue_prefetch_starts!=13254||
-               b_queue_handoffs!=13254||
-               b_queue_cross_starts!=1974||
-               b_queue_cross_handoffs!=1974||
+               b_queue_current_starts!=2256||
+               b_queue_prefetch_starts!=11280||
+               b_queue_handoffs!=11280||
                b_queue_bank0_starts!=6768||
                b_queue_bank1_starts!=6768||
-               b_paired_tap_lookups!=756656||
-               b_single_tap_advances!=62016||
-               b_vertical_tap_pairs!=426592||
+               b_paired_tap_lookups!=755845||
+               b_single_tap_advances!=62827||
+               b_vertical_tap_pairs!=425781||
                ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
                 (MEMORY_READ_LATENCY==1)&&(total_cycles!=6859996))||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
