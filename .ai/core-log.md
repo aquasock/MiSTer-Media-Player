@@ -1,5 +1,5 @@
 ---
-## 242 COMMIT Unreleased ??? 2026-08-19T20:05:43-07:00
+## 242 COMMIT Unreleased 748fb3f 2026-08-19T20:05:43-07:00
 
 #### Coming From:
 
@@ -11,11 +11,11 @@ Measure picture-type and stage-specific decoder backpressure before selecting th
 
 #### Outcome:
 
-The approved profiling boundary will add simulation-only counters and timestamps to the exact DDR-backed live-raster regression so I, P, and B pictures can be separated across frontend acceptance, transform work, raster reconstruction, reference-cache and DDR waiting, publication, and presentation. Functional RTL, cadence behavior, framebuffer ownership, and generated stream content will remain unchanged while the existing focused and integrated regressions establish which serialized stage dominates the remaining two-to-nine-sample hardware hold distribution.
+Commit `748fb3f` adds simulation-only input-stall, picture-type, transform-output, raster, cache-lookup, DDR request and response, emit, store, writer, and presentation counters to the exact live-raster regression without changing functional RTL or expected results. The 13,599,996-cycle 72-picture soak passes unchanged and attributes 12,385,071 input-stalled cycles to the decoder, split as 146,937 I, 3,222,891 P, and 9,015,236 B cycles; B raster occupies 4,408,213 cycles, including 2,152,961 registered lookup-wait and 1,180,560 DDR-response cycles, while destination ownership causes zero input stalls and presentation occupies 893,283 cycles. The 2,529,996-cycle mixed-pixel run independently attributes 1,309,851 of 2,164,749 decoder-stalled cycles to B pictures and passes 423,936 oracle samples with zero mismatches and maximum delta two. Cache, eight-refill parser-window, P-intra, B-residual, B-intra, repeated-download, and full 791,528-byte publication regressions pass; the latter retains 22 P pictures, 47 B pictures, 25 publications, zero destination holds or overwrites, and completed presentation. Because this commit changes only a simulation testbench, no Quartus build or MiSTer deployment is required.
 
 #### Next Steps:
 
-Implement the profiling instrumentation, run the cache, parser-window, P-intra, B-residual, B-intra, mixed-pixel, repeated-download, exact live-raster, and full-resolution publication regressions, then use measured cycle evidence to propose a focused RTL optimization that preserves every frame identity, pixel oracle, display order, minimum presentation lifetime, reload behavior, and timing margin.
+Await approval for a focused B prediction refill optimization that launches the next cache-miss DDR request at the current registered response boundary when the following tap or pixel address is already known, while preserving the four-entry fully associative cache, one-outstanding-DDR contract, registered cache-hit timing, exact bidirectional rounding, display order, cadence lifetime, reload behavior, and all pixel and transaction regressions; require a clean Quartus timing result before hardware deployment because the shared cache-to-B prelaunch cone has previously been timing-sensitive.
 
 #### Files Modified:
 
@@ -23,7 +23,7 @@ Implement the profiling instrumentation, run the cache, parser-window, P-intra, 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
