@@ -325,7 +325,7 @@ Continue from hardware-accepted commit `ca1f0fc`, preserving the download-rearm 
 - [x] Passed
 
 ---
-## 239 COMMIT Unreleased ??? 2026-08-19T16:36:30-07:00
+## 239 COMMIT Unreleased 3c03570 2026-08-19T16:36:30-07:00
 
 #### Coming From:
 
@@ -337,11 +337,11 @@ Reduce the remaining 25 fps starvation stutter by overlapping registered P/B pix
 
 #### Outcome:
 
-The accepted Entry 238 recordings provide a clean baseline: independent template matching of the embedded frame counter and the unobscured raster recovers every long-GOP frame 0 through 71 and every mixed-macroblock frame 0 through 23 in strict order, with no sustained counter-only update, skipped image, stale buffer, or partial-frame failure. Long GOP takes 5.939 seconds from first frame 0 to first frame 71, or 11.95 effective fps, while mixed macroblocks takes 2.102 seconds from frame 0 to frame 23, or 10.94 effective fps. B pictures ordinarily persist for three or four 59.94 fps camera samples, but I/P reference pictures persist for eight through ten samples, proving a repeatable reference-hold starvation pattern rather than random presentation loss. The approved boundary will retain the registered four-entry shared cache and add a timing-isolated registered output stage so the current reconstructed pixel can enter the writer while the next prediction lookup advances; a deterministic analyzer will preserve the same counter and actual-raster measurements for before-and-after hardware comparison.
+The accepted Entry 238 recordings provide a clean baseline: independent matching of the embedded frame counter and unobscured raster recovers every long-GOP frame 0 through 71 and mixed-macroblock frame 0 through 23 in strict order, with no sustained counter-only update, skipped image, stale buffer, or partial-frame failure. Long GOP takes 5.939 seconds from first frame 0 to first frame 71, or 11.95 effective fps, while mixed macroblocks takes 2.102 seconds from frame 0 to frame 23, or 10.94 effective fps; B pictures ordinarily persist for three or four 59.94 fps camera samples, but I/P reference pictures persist for eight through ten, proving repeatable reference-hold starvation. Commit `3c03570` adds a deterministic two-track analyzer and retains the registered four-entry cache while latching reconstructed pixel value, coordinates, and block markers into the writer stage; a registered following-pixel address may launch during the current final cache or DDR response, so state advances behind the stable output without exposing the former failing combinational four-way cache data path. Cache-hit focused replay preserves exact P and B pixels while reducing P from 1,791,186 to 755,154 cycles, or 57.84 percent, and B from 3,392,449 to 1,318,849 cycles, or 61.12 percent. The complete 24-picture mixed oracle retains 423,936 samples, zero mismatches, maximum delta two, 499,551 hits, 71,329 misses and reads, and all 24 display identities while falling from 3,109,996 to 2,679,996 cycles, or 13.83 percent. The exact 72-picture soak retains 2,267,813 hits, 463,835 misses and reads, 22 P pictures, 47 B pictures, 25 publications, final identity 25, and zero errors while falling from 15,739,996 to 14,499,996 cycles, or 7.88 percent. Cache accounting, P intra, B residual, B intra, eight-refill parser-window, repeated-download rearm, and full-resolution 791,528-byte long-GOP publication regressions also pass. The session-authorized incremental Quartus 17.0.2 build completes in 9 minutes 28 seconds with zero errors, 124 standing warnings, no critical warning, global setup, hold, and recovery slack of +0.152, +0.252, and +3.862 ns, focused decoder setup and recovery slack of +0.475 and +14.510 ns, and video setup slack of +7.604 ns. The fit uses 29,307 ALMs, 40,943 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. The 4,228,160-byte `MediaPlayer_commit239_3c03570.rbf` has SHA-256 `c780cb66d92832c0e22a1b3ec110993fb98212e30eb76e7814d50cf34cec0419`; FTP upload to the standard MiSTer and readback are byte-identical.
 
 #### Next Steps:
 
-Implement the analyzer and registered P/B output overlap without exposing the former combinational four-way cache path, require exact focused reconstruction, mixed-pixel oracle, parser-window, live-raster, long-GOP, cadence, and repeated-download regressions, quantify the exact cycle reduction, then run the session-authorized incremental Quartus build and reject the boundary if decoder timing does not close. If qualified, deploy with byte-identical readback and record both streams at 60 fps using the same camera geometry so counter order, raster order, per-picture hold distributions, frame-zero-to-final time, LEDs, and repeated-load behavior can be compared directly with the Entry 238 baseline.
+Reload the deployed core, then record `test_compat_long_gop.m2v` and `test_compat_mixed_macroblocks.m2v` at nominal 60 fps using the same camera geometry. For each stream, confirm first and consecutive second loads, final frame, elapsed first-frame-to-final-frame time, and USER, POWER, and DISK state. Analyze both recordings with the committed counter-plus-raster tool and compare ordered frames, frame-type hold distributions, sustained counter/raster mismatch, and effective delivered-picture rate directly against the Entry 238 baseline before accepting or rejecting the boundary.
 
 #### Files Modified:
 
@@ -356,7 +356,7 @@ Implement the analyzer and registered P/B output overlap without exposing the fo
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
