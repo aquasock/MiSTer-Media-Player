@@ -1,4 +1,35 @@
 ---
+## 256 COMMIT Unreleased ??? 2026-08-20T05:19:52-07:00
+
+#### Coming From:
+
+Unreleased 0f5baad
+
+#### Purpose:
+
+Remove the synthesis-discovered cache-to-arbiter combinational handshake loop without reducing Entry 255's two-command capacity or changing response order.
+
+#### Outcome:
+
+Entry 255 passes every focused, exact-pixel and long-order simulation, but the first clean Quartus elaboration reports a six-node combinational loop from the reference probe request through prediction busy and back to that request. The build was interrupted before fitting completed and no RBF was produced or deployed. The loop is confined to ready/valid expression: cache busy currently depends on request assertion and arbiter prediction busy depends on prediction request assertion, so the newly transparent command boundary lets valid and ready depend on one another even though all stored descriptors remain clocked.
+
+#### Next Steps:
+
+Express cache readiness only from descriptor capacity, hit state and downstream backpressure, and express reader/prediction arbiter readiness only from descriptor capacity, display priority and DDR backpressure; qualify acceptance separately with each request. Extend focused tests to require useful busy readiness before request assertion, rerun exact mixed latency and ordered long coverage, commit the correction, and restart a fully clean Quartus build requiring zero combinational loops and positive timing before deployment.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_reference_word_cache.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
+- tools/streams/tb_h262_prediction_word_cache.sv
+- tools/streams/tb_h262_ddram_arbiter.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 255 COMMIT Unreleased 0f5baad 2026-08-20T04:40:42-07:00
 
 #### Coming From:
@@ -1252,35 +1283,6 @@ Add a repeated-GOP presentation regression that distinguishes every I/P/B frame 
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 215 COMMIT Unreleased 69d1b90 2026-08-18T09:10:40-07:00
-
-#### Coming From:
-
-Unreleased 065a775
-
-#### Purpose:
-
-Require complete repeated-GOP I-picture publication and final-frame presentation across the mixed and long compatibility streams.
-
-#### Outcome:
-
-Commit `69d1b90` removes the first-GOP-only publication proof exposed by the frame-11 hardware result. The shell's P header/publication counters saturated at three and its B header/persistence counters saturated at seven, making B picture eight at the second-GOP boundary indistinguishable from the already-settled first-GOP state; all four counters now retain exact eight-bit transaction totals. The publication regression now uses the real front-end I support window, counts every repeated I publication, models scheduler vblank holds and scratch-to-future presentation, rejects displayed-bank overwrites, and requires the final reference identity. The 366,071-byte mixed stream passes seven P, fifteen B, nine reference publications and final identity nine; the 791,528-byte long stream passes twenty-two P, forty-seven B, twenty-five publications and final identity twenty-five; the 2,875,985-byte dense stream passes four P, seven B, five publications and final identity five, all without parser, ownership, overwrite, or presentation error. The clean Quartus 17.0.2 build completes in 9 minutes 36 seconds with zero errors, no Critical Warning, zero setup and hold TNS, +0.680 ns global setup, +0.244 ns global hold, +2.047 ns focused decoder setup, +13.351 ns focused decoder recovery, 29,506 ALMs, 42,076 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. RBF SHA-256 is `9506e967d78d2a18b9fc4bdb5a6f7e27fa8e4b0b4a6fcf8a3f235c14e042d0ee`.
-
-#### Next Steps:
-
-Install `MediaPlayer_commit215_69d1b90.rbf` and load `test_compat_mixed_macroblocks.m2v`, waiting for the presentation to settle and confirming timestamp `00:00:00.920`, frame `23`, coherent features, USER and POWER solid, and DISK off. Then load `test_compat_long_gop.m2v` through all 72 pictures and confirm the same settled LED result without feature or macroblock flicker.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
-- tools/streams/tb_h262_dense_publication_order.sv
 
 #### Status:
 
