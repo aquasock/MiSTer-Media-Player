@@ -36,8 +36,8 @@ module mpeg2_h262_p_motion_residual_raster_engine
     output wire [16:0] residual_store_read_address,
     input wire signed [15:0] residual_store_read_data,
     input wire reference_valid,
-    input wire reference_bank,
-    input wire destination_bank,
+    input wire [1:0] reference_bank,
+    input wire [1:0] destination_bank,
     input wire store_block_stored,
     input wire ddram_busy,
     input wire [63:0] ddram_dout,
@@ -221,7 +221,7 @@ reg [10:0] exec_motion_end;
 reg row_final_latched;
 
 reg pending, started;
-reg reference_bank_latched;
+reg [1:0] reference_bank_latched;
 reg req, waitresp, lookup_wait;
 reg [10:0] mbi;
 reg [5:0] col, mrow;
@@ -252,7 +252,8 @@ wire block_fetch_rd;
 wire [6:0] block_fetch_issued,block_fetch_returned;
 wire [2:0] block_fetch_outstanding;
 
-wire [28:0] roff=reference_bank_latched?BANK_OFF:0;
+wire [28:0] roff=(reference_bank_latched==2'd1)?BANK_OFF:
+                 (reference_bank_latched==2'd2)?29'h00040000:29'd0;
 wire [2:0] er=ei[5:3], el=ei[2:0];
 
 wire signed [7:0] exec_mvx =

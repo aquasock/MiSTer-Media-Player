@@ -555,7 +555,7 @@ always @(posedge clk) begin
         capture_bank<=0;execute_bank<=0;current_desc_slot<=0;
         desc_active<=0;sample_expected<=0;exec_desc_slot<=0;
         exec_desc_count_latched<=0;exec_motion_end<=0;
-        pending<=0;started<=0;active<=0;future_bank_latched<=0;scratch_bank_latched<=0;req<=0;waitresp<=0;lookup_wait<=0;
+        pending<=0;started<=0;active<=0;past_bank_latched<=0;future_bank_latched<=0;scratch_bank_latched<=0;req<=0;waitresp<=0;lookup_wait<=0;
         mbi<=0;col<=0;mrow<=0;blk<=0;timeout<=0;emit<=0;wait_store<=0;pixel_setup<=0;residual_load<=0;residual_load_wait<=0;ei<=0;
         pred_direction<=0;tap_index<=0;pred_sum<=0;forward_prediction<=0;out_reg<=0;tap_byte_sel<=0;
         emit_advanced<=0;emit_x<=0;emit_y<=0;emit_block_start<=0;emit_block_complete<=0;

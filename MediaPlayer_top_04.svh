@@ -51,6 +51,7 @@ mpeg2_h262_reference_read_probe mpeg2_h262_reference_read_probe
     .p_residual_sample_value   (mpeg2_new_p_residual_sample_value),
     .reference_frame_valid     (mpeg2_new_reference_frame_valid),
     .reference_frame_bank      (mpeg2_new_reference_frame_bank),
+    .previous_reference_frame_bank(mpeg2_new_previous_reference_frame_bank),
     .destination_frame_bank    (mpeg2_new_active_frame_bank),
     .b_scratch_frame_bank      (mpeg2_new_b_decode_scratch_bank),
     .p_store_block_stored      (mpeg2_new_ddr_block_stored),
@@ -81,7 +82,7 @@ mpeg2_h262_reference_read_probe mpeg2_h262_reference_read_probe
     .probe_error_detail        (mpeg2_new_pred_error_detail)
 );
 
-wire      mpeg2_new_display_frame_bank;
+wire [1:0] mpeg2_new_display_frame_bank;
 wire      mpeg2_new_display_scratch;
 wire      mpeg2_new_display_scratch_bank;
 wire [2:0] mpeg2_new_framebuffer_swap_reset_count;

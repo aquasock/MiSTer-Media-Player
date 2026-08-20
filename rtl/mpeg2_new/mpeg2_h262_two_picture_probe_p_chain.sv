@@ -15,9 +15,10 @@ module mpeg2_h262_two_picture_probe
     input wire p_row_persistence_complete,
     output wire slice_header_seen,output wire macroblock_address_seen,output wire first_i_macroblock_seen,
     output wire first_luma_dc_seen,output wire first_luma_block_complete,output wire first_picture_420_parsed,
-    output wire second_picture_420_parsed,output wire picture_420_complete,output wire active_frame_bank,
-    output wire completed_frame_bank,output wire[7:0] picture_count,output wire reference_frame_valid,
-    output wire reference_frame_bank,output wire[7:0] reference_promotion_count,
+    output wire second_picture_420_parsed,output wire picture_420_complete,output wire[1:0] active_frame_bank,
+    output wire[1:0] completed_frame_bank,output wire[7:0] picture_count,output wire reference_frame_valid,
+    output wire[1:0] reference_frame_bank,output wire[1:0] previous_reference_frame_bank,
+    output wire[7:0] reference_promotion_count,
     output wire p_macroblock_type_seen,output wire p_forward_vector_valid,output wire signed[12:0] p_forward_vector_x,
     output wire signed[12:0] p_forward_vector_y,output wire p_residual_required,output wire p_residual_success,
     output wire p_first_residual_sample_valid,output wire signed[15:0] p_first_residual_sample_value,
@@ -65,7 +66,9 @@ mpeg2_h262_picture_bookkeeper bookkeeper(
  .qfs_write_index(qfs_write_index),.qfs_write_value(qfs_write_value),.qfs_block_end(qfs_block_end));
 
 reg p_persistence_d;reg[7:0] p_publication_count;reg publication_error;reg[2:0] publication_error_detail_reg;reg picture_complete_pulse;
-reg active_frame_bank_reg,completed_frame_bank_reg;reg[7:0] picture_count_reg;reg reference_frame_valid_reg,reference_frame_bank_reg;reg[7:0] reference_promotion_count_reg;
+reg[1:0] active_frame_bank_reg,completed_frame_bank_reg;reg[7:0] picture_count_reg;
+reg reference_frame_valid_reg;reg[1:0] reference_frame_bank_reg,previous_reference_frame_bank_reg;
+reg[7:0] reference_promotion_count_reg;
 
 reg[31:0] picture_window;wire[31:0] picture_window_next={picture_window[23:0],stream_data};
 wire picture_start_now=(picture_window_next==32'h00000100);reg picture_header_capture,picture_header_second_byte;
@@ -85,6 +88,7 @@ wire reference_progress_error=(picture_count_reg>=8'd2)&&(p_publication_count!=0
   (reference_frame_bank_reg!=completed_frame_bank_reg)||(reference_frame_bank_reg==active_frame_bank_reg));
 assign picture_420_complete=picture_complete_pulse;assign active_frame_bank=active_frame_bank_reg;assign completed_frame_bank=completed_frame_bank_reg;
 assign picture_count=picture_count_reg;assign reference_frame_valid=reference_frame_valid_reg;assign reference_frame_bank=reference_frame_bank_reg;
+assign previous_reference_frame_bank=previous_reference_frame_bank_reg;
 assign reference_promotion_count=reference_promotion_count_reg;
 assign publication_error_detail=publication_error_detail_reg;
 // Commit 192: the legacy bookkeeper only counts I pictures.  A generalized P
@@ -96,7 +100,7 @@ assign second_picture_420_parsed=base_second_picture_420_parsed||(picture_count_
 always @(posedge clk)begin
  if(reset)begin
   p_persistence_d<=0;p_publication_count<=0;publication_error<=0;publication_error_detail_reg<=0;picture_complete_pulse<=0;active_frame_bank_reg<=0;completed_frame_bank_reg<=0;
-  picture_count_reg<=0;reference_frame_valid_reg<=0;reference_frame_bank_reg<=0;reference_promotion_count_reg<=0;
+  picture_count_reg<=0;reference_frame_valid_reg<=0;reference_frame_bank_reg<=0;previous_reference_frame_bank_reg<=0;reference_promotion_count_reg<=0;
   picture_window<=0;picture_header_capture<=0;picture_header_second_byte<=0;p_header_count<=0;consecutive_candidate_seen<=0;
   b_picture_observed<=0;b_picture_inflight<=0;b_persistence_verified<=0;b_header_count<=0;b_persist_count<=0;
  end else begin
@@ -130,12 +134,14 @@ always @(posedge clk)begin
   end
 
   if(base_picture_420_complete&&!b_picture_inflight)begin
-   picture_complete_pulse<=1;completed_frame_bank_reg<=active_frame_bank_reg;active_frame_bank_reg<=~active_frame_bank_reg;
+   picture_complete_pulse<=1;completed_frame_bank_reg<=active_frame_bank_reg;
+   active_frame_bank_reg<=(active_frame_bank_reg==2'd2)?2'd0:(active_frame_bank_reg+1'b1);
    if(picture_count_reg!=8'hff)picture_count_reg<=picture_count_reg+1'b1;
    if(reference_frame_valid_reg&&(active_frame_bank_reg==reference_frame_bank_reg))begin
     publication_error<=1;
     if(!publication_error)publication_error_detail_reg<=3'd3;
    end
+   previous_reference_frame_bank_reg<=reference_frame_valid_reg?reference_frame_bank_reg:active_frame_bank_reg;
    reference_frame_valid_reg<=1;reference_frame_bank_reg<=active_frame_bank_reg;
    if(reference_promotion_count_reg!=8'hff)reference_promotion_count_reg<=reference_promotion_count_reg+1'b1;
   end else if(p_persisted_now)begin
@@ -149,8 +155,10 @@ always @(posedge clk)begin
    end
    else begin
     if(p_publication_count!=8'hff)p_publication_count<=p_publication_count+1'b1;
-    picture_complete_pulse<=1;completed_frame_bank_reg<=active_frame_bank_reg;active_frame_bank_reg<=~active_frame_bank_reg;
+    picture_complete_pulse<=1;completed_frame_bank_reg<=active_frame_bank_reg;
+    active_frame_bank_reg<=(active_frame_bank_reg==2'd2)?2'd0:(active_frame_bank_reg+1'b1);
     if(picture_count_reg!=8'hff)picture_count_reg<=picture_count_reg+1'b1;
+    previous_reference_frame_bank_reg<=reference_frame_bank_reg;
     reference_frame_valid_reg<=1;reference_frame_bank_reg<=active_frame_bank_reg;
     if(reference_promotion_count_reg!=8'hff)reference_promotion_count_reg<=reference_promotion_count_reg+1'b1;
    end

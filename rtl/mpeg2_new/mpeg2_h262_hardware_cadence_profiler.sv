@@ -33,7 +33,7 @@ module mpeg2_h262_hardware_cadence_profiler
     input  wire        writer_write,
     input  wire        writer_busy,
 
-    input  wire        display_frame_bank,
+    input  wire [1:0]  display_frame_bank,
     input  wire        display_scratch,
     input  wire        display_scratch_bank,
     input  wire        sequence_end_seen,
@@ -78,7 +78,7 @@ reg prediction_busy_q;
 reg prediction_data_ready_q;
 reg writer_write_q;
 reg writer_busy_q;
-reg display_frame_bank_q;
+reg [1:0] display_frame_bank_q;
 reg display_scratch_q;
 reg display_scratch_bank_q;
 reg sequence_end_seen_q;
@@ -105,7 +105,7 @@ reg [7:0]  b_picture_count;
 reg [7:0]  display_picture_count;
 reg [7:0]  display_swap_count;
 reg        b_picture_complete_d;
-reg        display_frame_bank_d;
+reg [1:0] display_frame_bank_d;
 reg        display_scratch_d;
 reg        display_scratch_bank_d;
 reg [9:0]  quiet_count;

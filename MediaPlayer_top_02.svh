@@ -103,6 +103,7 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.picture_count               (mpeg2_new_picture_count),
 	.reference_frame_valid       (mpeg2_new_reference_frame_valid),
 	.reference_frame_bank        (mpeg2_new_reference_frame_bank),
+	.previous_reference_frame_bank(mpeg2_new_previous_reference_frame_bank),
 	.reference_promotion_count   (mpeg2_new_reference_promotion_count),
 	.p_macroblock_type_seen      (mpeg2_new_p_macroblock_type_seen),
 	.p_forward_vector_valid      (mpeg2_new_p_forward_vector_valid),

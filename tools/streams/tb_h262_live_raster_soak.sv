@@ -20,7 +20,7 @@ module tb_h262_live_raster_soak #(
     localparam integer MAX_STREAM_BYTES=1048576;
     localparam integer MAX_MEMORY_READ_LATENCY=256;
     localparam [28:0] DDR_BASE=29'h06000000;
-    localparam integer DDR_WORDS=262144;
+    localparam integer DDR_WORDS=327680;
 
     reg clk=0,reset=1,stream_valid=0;
     reg [7:0] stream_data=0;
@@ -40,6 +40,7 @@ module tb_h262_live_raster_soak #(
     integer b_paired_tap_lookups=0,b_single_tap_advances=0;
     integer b_vertical_tap_pairs=0;
     integer reference_writes=0,scratch0_writes=0,scratch1_writes=0;
+    integer bank2_reference_writes=0;
     integer memory_reads=0,total_cycles=0;
     integer stream_stall_cycles=0,last_stream_index=0;
     integer prediction_no_progress_cycles=0;
@@ -118,6 +119,14 @@ module tb_h262_live_raster_soak #(
     integer pixel_index,pixel_delta,pixel_row,pixel_word,pixel_lane;
     reg first_pixel_mismatch=0;
 
+    function automatic [18:0] reference_frame_offset;
+        input [1:0] bank;
+        begin
+            reference_frame_offset=(bank==2'd1)?19'h10000:
+                                   (bank==2'd2)?19'h40000:19'h00000;
+        end
+    endfunction
+
     wire frontend_ready,phase1_supported;
     wire [13:0] horizontal_size,vertical_size;
     wire [1:0] intra_dc_precision;
@@ -127,7 +136,8 @@ module tb_h262_live_raster_soak #(
     wire sequence_end_seen;
 
     wire decoder_ready,picture_complete;
-    wire active_bank,completed_bank,reference_valid,reference_bank;
+    wire [1:0] active_bank,completed_bank,reference_bank,previous_reference_bank;
+    wire reference_valid;
     wire [7:0] picture_count,reference_promotion_count;
     wire sideband_valid;
     wire [5:0] sideband_index;
@@ -189,7 +199,7 @@ module tb_h262_live_raster_soak #(
     reg [63:0] memory_dout=0;
     reg memory_dout_ready=0;
     reg [MAX_MEMORY_READ_LATENCY-1:0] read_valid_pipe=0;
-    reg [17:0] read_index_pipe[0:MAX_MEMORY_READ_LATENCY-1];
+    reg [18:0] read_index_pipe[0:MAX_MEMORY_READ_LATENCY-1];
     integer read_pipe_pointer=0;
     wire read_pending=|read_valid_pipe;
     wire pred_busy,pred_dout_ready;
@@ -216,7 +226,8 @@ module tb_h262_live_raster_soak #(
         prediction.reference_cache.lookup_request&&
         prediction.reference_cache.cache_lookup_hit;
 
-    wire display_frame_bank,display_scratch,display_scratch_bank;
+    wire [1:0] display_frame_bank;
+    wire display_scratch,display_scratch_bank;
     wire decode_scratch_bank,presentation_hold,presentation_complete;
     wire presentation_error;
     wire reference_overlap_header;
@@ -234,14 +245,15 @@ module tb_h262_live_raster_soak #(
     reg pred_persisted_d=0;
     reg queued_run_active_d=0,promotion_pending_d=0;
     reg pred_read_observed=0,pred_reconstructed_observed=0;
-    reg display_frame_bank_d=0,display_scratch_d=0,display_scratch_bank_d=0;
-    reg [7:0] reference_identity[0:1];
+    reg [1:0] display_frame_bank_d=0;
+    reg display_scratch_d=0,display_scratch_bank_d=0;
+    reg [7:0] reference_identity[0:2];
     reg [7:0] scratch_identity[0:1];
-    reg [7:0] picture_trace_reference_id[0:1];
+    reg [7:0] picture_trace_reference_id[0:2];
     reg [7:0] picture_trace_scratch_id[0:1];
-    reg [2:0] picture_trace_reference_type[0:1];
+    reg [2:0] picture_trace_reference_type[0:2];
     reg [2:0] picture_trace_scratch_type[0:1];
-    reg [9:0] picture_trace_reference_tr[0:1];
+    reg [9:0] picture_trace_reference_tr[0:2];
     reg [9:0] picture_trace_scratch_tr[0:1];
     reg [9:0] last_reference_temporal=0;
     wire [7:0] displayed_identity=display_scratch ?
@@ -255,6 +267,7 @@ module tb_h262_live_raster_soak #(
         !destination_ownership_hold;
 
     always #5 clk=~clk;
+
 
     mpeg2_h262_frontend frontend(
         .clk(clk),.reset(reset),.stream_data(stream_data),
@@ -279,6 +292,7 @@ module tb_h262_live_raster_soak #(
         .active_frame_bank(active_bank),.completed_frame_bank(completed_bank),
         .picture_count(picture_count),.reference_frame_valid(reference_valid),
         .reference_frame_bank(reference_bank),
+        .previous_reference_frame_bank(previous_reference_bank),
         .reference_promotion_count(reference_promotion_count),
         .p_residual_sample_valid(sideband_valid),
         .p_residual_sample_index(sideband_index),
@@ -304,6 +318,7 @@ module tb_h262_live_raster_soak #(
         .p_residual_sample_value(sideband_value),
         .reference_frame_valid(reference_valid),
         .reference_frame_bank(reference_bank),
+        .previous_reference_frame_bank(previous_reference_bank),
         .destination_frame_bank(active_bank),
         .b_scratch_frame_bank(decode_scratch_bank),
         .p_store_block_stored(writer_stored),.ddram_busy(pred_busy),
@@ -355,6 +370,7 @@ module tb_h262_live_raster_soak #(
         .frame_rate_code(4'h3),
         .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
         .reference_frame_bank(reference_bank),.b_picture_start(b_picture_start),
+        .reference_promotion_count(reference_promotion_count),
         .non_b_picture_start(non_b_picture_start),
         .p_picture_start(p_picture_start),.sequence_end(sequence_end),
         .b_user_success(b_success),.b_decode_error(probe_error||pred_error),
@@ -370,18 +386,22 @@ module tb_h262_live_raster_soak #(
     initial begin
         reference_identity[0]=0;
         reference_identity[1]=0;
+        reference_identity[2]=0;
         scratch_identity[0]=0;
         scratch_identity[1]=0;
         picture_trace_reference_id[0]=0;
         picture_trace_reference_id[1]=0;
+        picture_trace_reference_id[2]=0;
         picture_trace_scratch_id[0]=0;
         picture_trace_scratch_id[1]=0;
         picture_trace_reference_type[0]=0;
         picture_trace_reference_type[1]=0;
+        picture_trace_reference_type[2]=0;
         picture_trace_scratch_type[0]=0;
         picture_trace_scratch_type[1]=0;
         picture_trace_reference_tr[0]=0;
         picture_trace_reference_tr[1]=0;
+        picture_trace_reference_tr[2]=0;
         picture_trace_scratch_tr[0]=0;
         picture_trace_scratch_tr[1]=0;
         for(i=0;i<DDR_WORDS;i=i+1)ddr_mem[i]=0;
@@ -958,9 +978,12 @@ module tb_h262_live_raster_soak #(
             if(temporal_reference>=24||pixel_component>=3||
                (pixel_component==0&&(pixel_x>=128||pixel_y>=96))||
                (pixel_component!=0&&(pixel_x>=64||pixel_y>=48)))
-                $fatal(1,"mixed pixel coordinate/tag error tr=%0d c=%0d x=%0d y=%0d raw=%h/%h b_mbi=%0d b_col=%0d b_blk=%0d b_ei=%0d bank=%0d prefetch=%0d",
+                $fatal(1,"mixed pixel coordinate/tag error tr=%0d c=%0d x=%0d y=%0d raw=%h/%h refs=%0d/%0d active=%0d p_ref=%0d b_mbi=%0d b_col=%0d b_blk=%0d b_ei=%0d bank=%0d prefetch=%0d",
                        temporal_reference,pixel_component,pixel_x,pixel_y,
-                       pred_store_x,pred_store_y,prediction.b_probe.mbi,
+                       pred_store_x,pred_store_y,previous_reference_bank,
+                       reference_bank,active_bank,
+                       prediction.mixed_probe.reference_bank_latched,
+                       prediction.b_probe.mbi,
                        prediction.b_probe.col,prediction.b_probe.blk,
                        prediction.b_probe.ei,
                        prediction.b_probe.block_consumer_bank,
@@ -1009,10 +1032,14 @@ module tb_h262_live_raster_soak #(
             if((memory_addr<DDR_BASE)||((memory_addr-DDR_BASE)>=DDR_WORDS))
                 $fatal(1,"DDR write outside frame regions: %h",memory_addr);
             ddr_mem[memory_addr-DDR_BASE]<=memory_din;
-            case(memory_addr[17:16])
-                2'd0,2'd1:reference_writes<=reference_writes+1;
-                2'd2:scratch0_writes<=scratch0_writes+1;
-                2'd3:scratch1_writes<=scratch1_writes+1;
+            case(memory_addr[18:16])
+                3'd0,3'd1:reference_writes<=reference_writes+1;
+                3'd2:scratch0_writes<=scratch0_writes+1;
+                3'd3:scratch1_writes<=scratch1_writes+1;
+                3'd4:begin
+                    reference_writes<=reference_writes+1;
+                    bank2_reference_writes<=bank2_reference_writes+1;
+                end
             endcase
         end
         // The live prediction boundary does not instantiate the independent
@@ -1024,7 +1051,7 @@ module tb_h262_live_raster_soak #(
             for(pixel_row=0;pixel_row<96;pixel_row=pixel_row+1)
                 for(pixel_word=0;pixel_word<16;pixel_word=pixel_word+1)
                     for(pixel_lane=0;pixel_lane<8;pixel_lane=pixel_lane+1)
-                        ddr_mem[(completed_bank?18'h10000:18'h00000)+
+                        ddr_mem[reference_frame_offset(completed_bank)+
                                 pixel_row*90+pixel_word]
                             [pixel_lane*8 +: 8]=
                             pixel_oracle[pixel_row*128+
@@ -1032,12 +1059,12 @@ module tb_h262_live_raster_soak #(
             for(pixel_row=0;pixel_row<48;pixel_row=pixel_row+1)
                 for(pixel_word=0;pixel_word<8;pixel_word=pixel_word+1)
                     for(pixel_lane=0;pixel_lane<8;pixel_lane=pixel_lane+1)begin
-                        ddr_mem[(completed_bank?18'h10000:18'h00000)+
+                        ddr_mem[reference_frame_offset(completed_bank)+
                                 18'h0a8c0+pixel_row*45+pixel_word]
                             [pixel_lane*8 +: 8]=
                             pixel_oracle[12288+pixel_row*64+
                                          pixel_word*8+pixel_lane];
-                        ddr_mem[(completed_bank?18'h10000:18'h00000)+
+                        ddr_mem[reference_frame_offset(completed_bank)+
                                 18'h0d2f0+pixel_row*45+pixel_word]
                             [pixel_lane*8 +: 8]=
                             pixel_oracle[15360+pixel_row*64+
@@ -1220,10 +1247,19 @@ module tb_h262_live_raster_soak #(
         display_scratch_bank_d<=display_scratch_bank;
 
         if(probe_error||pred_error||writer_error||presentation_error)
-            $fatal(1,"live raster error byte=%0d shell=%0d/%0d/%0d pred=%0d/%0d writer=%0d presentation=%0d p_headers=%0d p_publications=%0d p_rows=%0d p_pictures=%0d engine=%0d/%0d/%0d tap=%0d ei=%0d cache=%0d/%0d addr=%h arb=%0d/%0d/%0d mem=%0d/%0d/%0d",
+            $fatal(1,"live raster error byte=%0d shell=%0d/%0d/%0d pred=%0d/%0d writer=%0d presentation=%0d sched=%0d/%0d/%0d/%0d scratch=%0d/%0d queued=%0d/%0d/%0d promote=%0d future=%0d/%0d pending=%0d/%0d display=%0d/%0d p_headers=%0d p_publications=%0d p_rows=%0d p_pictures=%0d engine=%0d/%0d/%0d tap=%0d ei=%0d cache=%0d/%0d addr=%h arb=%0d/%0d/%0d mem=%0d/%0d/%0d",
                    stream_index,probe_error_source,p_probe_error_source,
                    publication_error_detail,pred_error_source,pred_error_detail,
-                   writer_error,presentation_error,publication.p_header_count,
+                   writer_error,presentation_error,scheduler.reorder_active,
+                   scheduler.run_closed,scheduler.decode_inflight,
+                   scheduler.run_picture_count,scheduler.scratch0_pending,
+                   scheduler.scratch1_pending,scheduler.queued_run_active,
+                   scheduler.queued_run_closed,
+                   scheduler.queued_decode_inflight,
+                   scheduler.promotion_pending,scheduler.future_frame_pending,
+                   scheduler.future_frame_bank,scheduler.pending_frame_valid,
+                   scheduler.pending_frame_bank,display_scratch,
+                   display_frame_bank,publication.p_header_count,
                    publication.p_publication_count,p_rows,p_pictures,
                    prediction.mixed_probe.req,prediction.mixed_probe.waitresp,
                    prediction.mixed_probe.lookup_wait,
@@ -1243,11 +1279,12 @@ module tb_h262_live_raster_soak #(
         else quiet_cycles<=0;
 
         if(quiet_cycles==30000)begin
-            $display("LIVE_RASTER_RESULT bytes=%0d p_rows=%0d p=%0d b_rows=%0d b=%0d published=%0d pictures=%0d promotions=%0d display_identity=%0d swaps=%0d last_p_temporal=%0d ref_writes=%0d scratch0_writes=%0d scratch1_writes=%0d ddr_reads=%0d cache=%0d/%0d/%0d cycles=%0d read=%0d recon=%0d presentation=%0d queued=%0d promoted=%0d error=%0d/%0d/%0d/%0d",
+            $display("LIVE_RASTER_RESULT bytes=%0d p_rows=%0d p=%0d b_rows=%0d b=%0d published=%0d pictures=%0d promotions=%0d display_identity=%0d swaps=%0d last_p_temporal=%0d ref_writes=%0d bank2_ref_writes=%0d scratch0_writes=%0d scratch1_writes=%0d ddr_reads=%0d cache=%0d/%0d/%0d cycles=%0d read=%0d recon=%0d presentation=%0d queued=%0d promoted=%0d error=%0d/%0d/%0d/%0d",
                      stream_index,p_rows,p_pictures,b_rows,b_pictures,
                      published_references,picture_count,reference_promotion_count,
                      displayed_identity,display_swaps,last_reference_temporal,
-                     reference_writes,scratch0_writes,scratch1_writes,
+                     reference_writes,bank2_reference_writes,
+                     scratch0_writes,scratch1_writes,
                      memory_reads,prediction.reference_cache.cache_hit_count,
                      prediction.reference_cache.cache_miss_count,
                      prediction.reference_cache.uncached_count,total_cycles,
@@ -1303,6 +1340,14 @@ module tb_h262_live_raster_soak #(
             $display("LIVE_RASTER_B_TAPS paired=%0d single_advance=%0d vertical=%0d",
                      b_paired_tap_lookups,b_single_tap_advances,
                      b_vertical_tap_pairs);
+            $display("LIVE_RASTER_ASSERT publication=%0d/%0d/%0d/%0d writer=%0d read=%0d recon=%0d complete=%0d errors=%0d/%0d/%0d/%0d",
+                     publication.p_header_count,
+                     publication.p_publication_count,
+                     publication.b_header_count,
+                     publication.b_persist_count,writer_seen,
+                     pred_read_observed,pred_reconstructed_observed,
+                     presentation_complete,probe_error,pred_error,
+                     writer_error,presentation_error);
             if(MIXED_PIXEL_MODE)begin
                 $display("MIXED_PIXEL_RESULT samples=%0d mismatches=%0d max_delta=%0d",
                          pixel_samples,pixel_mismatches,max_pixel_delta);
@@ -1314,7 +1359,8 @@ module tb_h262_live_raster_soak #(
                    publication.b_header_count!=15||
                    publication.b_persist_count!=15||
                    displayed_identity!=9||last_reference_temporal!=10'd23||
-                   reference_writes!=18432||scratch0_writes!=18432||
+                   reference_writes!=18432||bank2_reference_writes!=6912||
+                   scratch0_writes!=18432||
                    scratch1_writes!=16128||
                    // Entry 255 launches the exact successor while an older
                    // word is pending.  Potential hits therefore remain
@@ -1365,7 +1411,8 @@ module tb_h262_live_raster_soak #(
                publication.p_header_count!=22||publication.p_publication_count!=22||
                publication.b_header_count!=47||publication.b_persist_count!=47||
                displayed_identity!=25||last_reference_temporal!=10'd23||
-               reference_writes!=50688||scratch0_writes!=55296||
+               reference_writes!=50688||bank2_reference_writes!=16128||
+               scratch0_writes!=55296||
                scratch1_writes!=52992||
                prediction.reference_cache.cache_hit_count!=0||
                ((EXPECTED_DESCRIPTOR_DEPTH==2)&&

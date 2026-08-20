@@ -19,6 +19,7 @@ module tb_h262_b_residual_streaming #(
     integer fetch_bank0_starts=0,fetch_bank1_starts=0;
     integer paired_tap_lookups=0,single_tap_advances=0;
     integer vertical_tap_pairs=0;
+    integer bank2_reference_reads=0;
 
     wire b_candidate,b_seen,b_complete,b_hold,b_replay;
     wire sideband_valid,first_valid,core_error;
@@ -73,7 +74,8 @@ module tb_h262_b_residual_streaming #(
         .residual_store_write_data(residual_store_write_data),
         .residual_store_read_address(residual_store_read_address),
         .residual_store_read_data(residual_store_read_data),
-        .reference_valid(1'b1),.future_reference_bank(1'b1),.scratch_frame_bank(1'b0),
+        .reference_valid(1'b1),.past_reference_bank(2'd2),
+        .future_reference_bank(2'd1),.scratch_frame_bank(1'b0),
         .store_block_stored(store_block_stored),.ddram_busy(1'b0),
         .ddram_dout(ddram_dout),.ddram_dout_ready(ddram_dout_ready),
         .ddram_lookup_ready(ddram_lookup_ready),
@@ -135,6 +137,8 @@ module tb_h262_b_residual_streaming #(
         if(ddram_rd) begin
             if(raster.wait_store)
                 $fatal(1,"B engine issued a post-write verification read");
+            if((ddram_addr>=29'h06040000)&&(ddram_addr<29'h06050000))
+                bank2_reference_reads<=bank2_reference_reads+1;
             ddram_dout_ready<=1;
             ddram_dout<={8{8'd50}};
         end
@@ -179,14 +183,15 @@ module tb_h262_b_residual_streaming #(
         else if(quiet_cycles!=0)quiet_cycles<=quiet_cycles+1;
 
         if(quiet_cycles==100) begin
-            $display("RESULT b_seen=%0d core_error=%0d raster_error=%0d/%0d motion=%0d blocks=%0d samples=%0d writes=%0d stores=%0d stripe=%0d changed=%0d cycles=%0d fetches=%0d prefetches=%0d handoffs=%0d banks=%0d/%0d taps=%0d/%0d vertical=%0d",
+            $display("RESULT b_seen=%0d core_error=%0d raster_error=%0d/%0d motion=%0d blocks=%0d samples=%0d writes=%0d stores=%0d stripe=%0d changed=%0d cycles=%0d fetches=%0d prefetches=%0d handoffs=%0d banks=%0d/%0d taps=%0d/%0d vertical=%0d bank2_reads=%0d",
                      b_seen,core_error,raster_error,raster_error_source,motion_events,
                      residual_blocks,residual_samples,residual_writes,
                      store_samples,stripe_store_samples,stripe_changed_samples,
                      total_cycles,fetch_starts,prefetch_starts,
                      prefetch_handoffs,fetch_bank0_starts,
                      fetch_bank1_starts,paired_tap_lookups,
-                     single_tap_advances,vertical_tap_pairs);
+                     single_tap_advances,vertical_tap_pairs,
+                     bank2_reference_reads);
             if(!b_seen||core_error||raster_error||motion_events!=1350||
                residual_blocks!=(intra_mode?12:120)||
                residual_samples!=(intra_mode?768:7680)||
@@ -195,7 +200,7 @@ module tb_h262_b_residual_streaming #(
                store_samples!=518400||stripe_store_samples!=7680||
                stripe_changed_samples!=(intra_mode?768:7680)||
                paired_tap_lookups!=0||single_tap_advances!=0||
-               vertical_tap_pairs!=0||
+               vertical_tap_pairs!=0||(!intra_mode&&bank2_reference_reads==0)||
                // Entry 254 retains each predicted block footprint, so the
                // former upstream cold/hit modes converge while authored
                // residual and intra samples remain exact.

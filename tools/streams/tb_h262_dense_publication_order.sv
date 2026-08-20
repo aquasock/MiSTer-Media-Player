@@ -14,14 +14,14 @@ module tb_h262_dense_publication_order;
     integer stream_len,stream_index=0,quiet_cycles=0;
     integer last_stream_index=0,transport_stall_cycles=0;
     integer p_rows=0,b_rows=0,p_pictures=0,b_pictures=0;
-    integer published_references=0;
+    integer published_references=0,bank2_publications=0;
     reg row_persistence=0,picture_persistence=0;
     reg [5:0] previous_wide_parser_state=0;
     reg previous_wide_error=0;
     reg mixed_mode=0,long_mode=0;
     integer expected_p_rows,expected_p_pictures;
     integer expected_b_rows,expected_b_pictures;
-    integer expected_reference_publications;
+    integer expected_reference_publications,expected_bank2_publications;
 
     wire stream_ready,decoder_stream_ready,picture_complete;
     wire phase1_supported;
@@ -29,14 +29,14 @@ module tb_h262_dense_publication_order;
     wire [1:0] frontend_intra_dc_precision;
     wire frontend_intra_vlc_format;
     wire [7:0] picture_count,reference_promotion_count;
-    wire reference_valid,reference_bank,active_bank,completed_bank;
+    wire reference_valid;wire[1:0] reference_bank,previous_reference_bank,active_bank,completed_bank;
     wire sideband_valid;
     wire [5:0] sideband_index;
     wire signed [15:0] sideband_value;
     wire probe_error,b_success;
     wire [3:0] probe_error_source,p_probe_error_source,p_progress_detail;
     wire [2:0] publication_error_detail;
-    wire display_frame_bank,display_scratch,display_scratch_bank;
+    wire[1:0] display_frame_bank;wire display_scratch,display_scratch_bank;
     wire decode_scratch_bank,presentation_hold,presentation_complete;
     wire presentation_error;
     wire reference_overlap_header;
@@ -51,7 +51,7 @@ module tb_h262_dense_publication_order;
     reg destination_ownership_hold=0;
     integer destination_hold_count=0;
     integer displayed_bank_overwrite_count=0;
-    reg [7:0] reference_identity[0:1];
+    reg [7:0] reference_identity[0:2];
     reg [7:0] scratch_identity[0:1];
     reg b_success_d=0;
 
@@ -97,6 +97,7 @@ module tb_h262_dense_publication_order;
         .active_frame_bank(active_bank),.completed_frame_bank(completed_bank),
         .picture_count(picture_count),.reference_frame_valid(reference_valid),
         .reference_frame_bank(reference_bank),
+        .previous_reference_frame_bank(previous_reference_bank),
         .reference_promotion_count(reference_promotion_count),
         .p_residual_sample_valid(sideband_valid),
         .p_residual_sample_index(sideband_index),
@@ -113,6 +114,7 @@ module tb_h262_dense_publication_order;
         .frame_rate_code(4'h3),
         .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
         .reference_frame_bank(reference_bank),.b_picture_start(b_picture_start),
+        .reference_promotion_count(reference_promotion_count),
         .non_b_picture_start(non_b_picture_start),
         .p_picture_start(p_picture_start),.sequence_end(sequence_end),
         .b_user_success(b_success),.b_decode_error(probe_error),
@@ -128,6 +130,7 @@ module tb_h262_dense_publication_order;
     initial begin
         reference_identity[0]=0;
         reference_identity[1]=0;
+        reference_identity[2]=0;
         scratch_identity[0]=0;
         scratch_identity[1]=0;
         if(!$value$plusargs("HEX=%s",hex_path))$fatal(1,"missing +HEX");
@@ -141,18 +144,21 @@ module tb_h262_dense_publication_order;
             expected_b_rows=1410;
             expected_b_pictures=47;
             expected_reference_publications=25;
+            expected_bank2_publications=8;
         end else if(mixed_mode)begin
             expected_p_rows=210;
             expected_p_pictures=7;
             expected_b_rows=450;
             expected_b_pictures=15;
             expected_reference_publications=9;
+            expected_bank2_publications=3;
         end else begin
             expected_p_rows=120;
             expected_p_pictures=4;
             expected_b_rows=210;
             expected_b_pictures=7;
             expected_reference_publications=5;
+            expected_bank2_publications=1;
         end
         if((stream_len<=0)||(stream_len>MAX_STREAM_BYTES))
             $fatal(1,"invalid LEN %0d",stream_len);
@@ -222,6 +228,8 @@ module tb_h262_dense_publication_order;
             destination_ownership_hold<=0;
 
         if(picture_complete)begin
+            if(completed_bank==2'd2)
+                bank2_publications<=bank2_publications+1;
             if(frontend.picture_coding_type==3'b010)
                 reference_ownership_arm<=1;
             reference_identity[completed_bank]<=published_references+1;
@@ -360,10 +368,12 @@ module tb_h262_dense_publication_order;
         else quiet_cycles<=0;
 
         if(quiet_cycles==100)begin
-            $display("DENSE_PUBLICATION_RESULT bytes=%0d p_rows=%0d p=%0d b_rows=%0d b=%0d published=%0d pictures=%0d promotions=%0d b_success=%0d display_identity=%0d destination_holds=%0d overwrites=%0d presentation_complete=%0d presentation_error=%0d",
+            $display("DENSE_PUBLICATION_RESULT bytes=%0d p_rows=%0d p=%0d b_rows=%0d b=%0d published=%0d pictures=%0d promotions=%0d bank2=%0d/%0d banks=%0d/%0d/%0d/%0d b_success=%0d display_identity=%0d destination_holds=%0d overwrites=%0d presentation_complete=%0d presentation_error=%0d",
                      stream_index,p_rows,p_pictures,b_rows,b_pictures,
                      published_references,picture_count,
-                     reference_promotion_count,b_success,displayed_identity,
+                     reference_promotion_count,bank2_publications,
+                     expected_bank2_publications,active_bank,completed_bank,
+                     previous_reference_bank,reference_bank,b_success,displayed_identity,
                      destination_hold_count,displayed_bank_overwrite_count,
                      presentation_complete,presentation_error);
             if(probe_error||publication_error_detail!=0||stream_index!=stream_len||
@@ -372,6 +382,9 @@ module tb_h262_dense_publication_order;
                published_references!=expected_reference_publications||
                picture_count!=expected_reference_publications||
                reference_promotion_count!=expected_reference_publications||
+               bank2_publications!=expected_bank2_publications||
+               active_bank>2||completed_bank>2||reference_bank>2||
+               previous_reference_bank>2||reference_bank==active_bank||
                displayed_identity!=expected_reference_publications||
                displayed_bank_overwrite_count!=0||
                !presentation_complete||presentation_error||

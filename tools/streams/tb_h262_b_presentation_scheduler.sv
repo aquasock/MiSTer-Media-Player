@@ -1,9 +1,10 @@
 `timescale 1ns/1ps
 
 module tb_h262_b_presentation_scheduler;
-    reg clk=0,reset=1,swap=0,frame_waiting=0,completed_bank=0,reference_bank=1;
+    reg clk=0,reset=1,swap=0,frame_waiting=0;reg[1:0] completed_bank=0,reference_bank=1;
     reg b_start=0,non_b_start=0,p_start=0,sequence_end=0,b_success=0,b_error=0;
-    wire display_bank,display_scratch,display_scratch_bank,decode_scratch_bank;
+    reg[7:0] reference_count=0;
+    wire[1:0] display_bank;wire display_scratch,display_scratch_bank,decode_scratch_bank;
     wire [2:0] reset_count;
     wire overlap_header,hold,complete,error;
     integer last_pulse_count=0;
@@ -14,6 +15,7 @@ module tb_h262_b_presentation_scheduler;
         .frame_rate_code(4'h3),
         .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
         .reference_frame_bank(reference_bank),.b_picture_start(b_start),
+        .reference_promotion_count(reference_count),
         .non_b_picture_start(non_b_start),.p_picture_start(p_start),
         .sequence_end(sequence_end),
         .b_user_success(b_success),.b_decode_error(b_error),
@@ -45,7 +47,7 @@ module tb_h262_b_presentation_scheduler;
     task automatic pulse_swap;
         reg before_display_scratch;
         reg before_display_scratch_bank;
-        reg before_display_bank;
+        reg[1:0] before_display_bank;
         begin
             before_display_scratch=display_scratch;
             before_display_scratch_bank=display_scratch_bank;
@@ -65,11 +67,12 @@ module tb_h262_b_presentation_scheduler;
         begin
             @(negedge clk);reset<=1;swap<=0;frame_waiting<=0;b_start<=0;
             non_b_start<=0;p_start<=0;sequence_end<=0;b_success<=0;b_error<=0;
+            reference_count<=0;
             repeat(2)@(negedge clk);reset<=0;#1;
         end
     endtask
     task automatic finish_one_b;
-        input expected_future_bank;
+        input[1:0] expected_future_bank;
         begin
             pulse_success();
             pulse_close();
@@ -110,6 +113,20 @@ module tb_h262_b_presentation_scheduler;
            dut.pending_frame_valid||error)
             $fatal(1,"simultaneous publication used stale reference bank");
         finish_one_b(1);
+
+        // Entry 276: the third reference identity must survive the same
+        // publication handoff and become the exact displayed future frame.
+        reset_scheduler();
+        reference_bank<=2'd1;completed_bank<=2'd2;
+        @(negedge clk);b_start<=1;frame_waiting<=1;
+        @(negedge clk);b_start<=0;frame_waiting<=0;reference_bank<=2'd2;#1;
+        if(dut.future_reference_pending||(dut.future_frame_bank!==2'd2)||
+           !dut.last_bound_reference_valid||
+           (dut.last_bound_reference_bank!==2'd2)||error)
+            $fatal(1,"third reference bank was truncated at B handoff");
+        finish_one_b(2'd2);
+        if(display_bank!==2'd2)
+            $fatal(1,"third reference bank was truncated at display");
 
         reset_scheduler();
 
@@ -288,7 +305,13 @@ module tb_h262_b_presentation_scheduler;
         reference_bank<=1;
         pulse_start();
         @(negedge clk);sequence_end<=1;@(negedge clk);sequence_end<=0;#1;
-        if(!hold)$fatal(1,"sequence-end close did not hold pending B run");
+        if(!hold)$fatal(1,"sequence-end close did not hold pending B run state=%0d/%0d/%0d future=%0d/%0d pending=%0d/%0d last=%0d/%0d display=%0d/%0d",
+                        dut.reorder_active,dut.run_closed,dut.decode_inflight,
+                        dut.future_frame_pending,dut.future_reference_pending,
+                        dut.pending_frame_valid,dut.pending_frame_bank,
+                        dut.last_bound_reference_valid,
+                        dut.last_bound_reference_bank,display_scratch,
+                        display_bank);
         @(negedge clk);b_error<=1;@(negedge clk);b_error<=0;#1;
         if(hold||!error)$fatal(1,"failed B transaction did not fail open");
         completed_bank<=1;frame_waiting<=1;
@@ -298,7 +321,7 @@ module tb_h262_b_presentation_scheduler;
         if(display_scratch||!display_bank)
             $fatal(1,"ordinary frame presentation did not recover after abort");
 
-        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=1,3,2 overlap_p=1 generations=2 bank_reuse=0,1 starvation=1 ordinary=1 terminal=1 fail_open=1");
+        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=1,3,2 overlap_p=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=1 fail_open=1");
         $finish;
     end
 

@@ -4,11 +4,14 @@ wire mpeg2_new_framebuffer_reset =
 localparam [28:0] MPEG2_NEW_DDR_FRAME_BANK_WORDS     = 29'h00010000;
 localparam [28:0] MPEG2_NEW_DDR_FRAME_SCRATCH0_WORDS = 29'h00020000;
 localparam [28:0] MPEG2_NEW_DDR_FRAME_SCRATCH1_WORDS = 29'h00030000;
+localparam [28:0] MPEG2_NEW_DDR_FRAME_BANK2_WORDS    = 29'h00040000;
 wire [28:0] mpeg2_new_display_frame_offset =
     mpeg2_new_display_scratch ?
         (mpeg2_new_display_scratch_bank ? MPEG2_NEW_DDR_FRAME_SCRATCH1_WORDS :
                                            MPEG2_NEW_DDR_FRAME_SCRATCH0_WORDS) :
-    mpeg2_new_display_frame_bank ? MPEG2_NEW_DDR_FRAME_BANK_WORDS : 29'd0;
+    (mpeg2_new_display_frame_bank == 2'd1) ? MPEG2_NEW_DDR_FRAME_BANK_WORDS :
+    (mpeg2_new_display_frame_bank == 2'd2) ? MPEG2_NEW_DDR_FRAME_BANK2_WORDS :
+                                             29'd0;
 assign mpeg2_new_ddr_rd_banked_addr =
     mpeg2_new_ddr_rd_addr + mpeg2_new_display_frame_offset;
 

@@ -106,6 +106,7 @@ mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
     .frame_waiting               (mpeg2_new_frame_waiting),
     .completed_frame_bank        (mpeg2_new_completed_frame_bank),
     .reference_frame_bank        (mpeg2_new_reference_frame_bank),
+    .reference_promotion_count   (mpeg2_new_reference_promotion_count),
     .b_picture_start             (mpeg2_new_b_picture_start_now),
     .non_b_picture_start         (mpeg2_new_non_b_picture_start_now),
     .p_picture_start             (mpeg2_new_p_picture_start_now),

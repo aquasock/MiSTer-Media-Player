@@ -14,15 +14,16 @@ module mpeg2_h262_b_presentation_scheduler
     input  wire swap_window_pulse,
     input  wire [3:0] frame_rate_code,
     input  wire frame_waiting,
-    input  wire completed_frame_bank,
-    input  wire reference_frame_bank,
+    input  wire [1:0] completed_frame_bank,
+    input  wire [1:0] reference_frame_bank,
+    input  wire [7:0] reference_promotion_count,
     input  wire b_picture_start,
     input  wire non_b_picture_start,
     input  wire p_picture_start,
     input  wire sequence_end,
     input  wire b_user_success,
     input  wire b_decode_error,
-    output reg  display_frame_bank,
+    output reg [1:0] display_frame_bank,
     output reg  display_scratch,
     output reg  display_scratch_bank,
     output reg  decode_scratch_bank,
@@ -33,12 +34,12 @@ module mpeg2_h262_b_presentation_scheduler
     output reg  presentation_error
 );
 
-reg pending_frame_valid,pending_frame_bank,pending_frame_released;
+reg pending_frame_valid,pending_frame_released;reg[1:0] pending_frame_bank;
 reg terminal_boundary_pending;
 reg b_user_success_d;
 reg reorder_active,run_closed,decode_inflight;
 reg scratch0_pending,scratch1_pending,next_present_scratch_bank;
-reg future_frame_pending,future_frame_bank,future_reference_pending;
+reg future_frame_pending,future_reference_pending;reg[1:0] future_frame_bank;
 reg scratch_presented;
 reg [1:0] run_picture_count;
 reg overlap_decode_open,overlap_frame_pending;
@@ -50,11 +51,14 @@ reg overlap_decode_open,overlap_frame_pending;
 reg queued_run_active,queued_run_closed,queued_decode_inflight;
 reg queued_scratch0_pending,queued_scratch1_pending;
 reg queued_first_scratch_bank;
-reg queued_future_frame_pending,queued_future_frame_bank;
+reg queued_future_frame_pending;reg[1:0] queued_future_frame_bank;
 reg queued_future_reference_pending;
 reg [1:0] queued_run_picture_count;
 reg queued_overlap_decode_open,queued_overlap_frame_pending;
 reg decode_generation_queued,promotion_pending;
+reg last_bound_reference_valid;
+reg [1:0] last_bound_reference_bank;
+reg [7:0] last_bound_reference_count;
 
 // Entry 230: the fixed 40 MHz 800x600 raster produces one swap window every
 // 1056*628 pixels.  For the current 25 fps compatibility boundary, accumulate
@@ -77,8 +81,8 @@ wire scheduled_frame_valid=scratch_waiting||future_waiting||
      pending_frame_released);
 wire scheduled_frame_scratch=scratch_waiting;
 wire scheduled_scratch_bank=next_present_scratch_bank;
-wire scheduled_frame_bank=future_waiting?future_frame_bank:
-                          pending_frame_bank;
+wire [1:0] scheduled_frame_bank=future_waiting?future_frame_bank:
+                                pending_frame_bank;
 wire scheduled_frame_differs=scheduled_frame_scratch?
     (!display_scratch||(scheduled_scratch_bank!=display_scratch_bank)):
     (display_scratch||(scheduled_frame_bank!=display_frame_bank));
@@ -132,10 +136,21 @@ always @(posedge clk) begin
         queued_run_picture_count<=0;
         queued_overlap_decode_open<=0;queued_overlap_frame_pending<=0;
         decode_generation_queued<=0;promotion_pending<=0;
+        last_bound_reference_valid<=0;last_bound_reference_bank<=0;
+        last_bound_reference_count<=0;
         run_picture_count<=0;presentation_complete<=0;presentation_error<=0;
         cadence_credit<=CADENCE_DUE_25FPS;
     end else begin
         b_user_success_d<=b_user_success;
+
+        // Seed the generation comparison from the first published reference.
+        // Thereafter only a B future binding advances it, so a later bank wrap
+        // remains distinguishable from an unpublished future reference.
+        if(!last_bound_reference_valid&&(reference_promotion_count!=0))begin
+            last_bound_reference_valid<=1;
+            last_bound_reference_bank<=reference_frame_bank;
+            last_bound_reference_count<=reference_promotion_count;
+        end
 
         if(swap_window_pulse)begin
             if(!cadence_25fps)
@@ -195,6 +210,9 @@ always @(posedge clk) begin
         if(frame_waiting&&reorder_active&&future_reference_pending)begin
             future_frame_bank<=completed_frame_bank;
             future_reference_pending<=0;
+            last_bound_reference_valid<=1;
+            last_bound_reference_bank<=completed_frame_bank;
+            last_bound_reference_count<=reference_promotion_count;
         end
 
         if(b_picture_start)begin
@@ -211,13 +229,25 @@ always @(posedge clk) begin
                 if(frame_waiting)begin
                     future_frame_bank<=completed_frame_bank;
                     future_reference_pending<=0;
+                    last_bound_reference_valid<=1;
+                    last_bound_reference_bank<=completed_frame_bank;
+                    last_bound_reference_count<=reference_promotion_count;
                 end else if(pending_frame_valid)begin
                     future_frame_bank<=pending_frame_bank;
                     future_reference_pending<=0;
-                end else if(!display_scratch&&
-                            (display_frame_bank!=reference_frame_bank))begin
+                    last_bound_reference_valid<=1;
+                    last_bound_reference_bank<=pending_frame_bank;
+                    last_bound_reference_count<=reference_promotion_count;
+                end else if((!display_scratch&&
+                             (display_frame_bank!=reference_frame_bank))||
+                            (last_bound_reference_valid&&
+                             (reference_promotion_count!=
+                              last_bound_reference_count)))begin
                     future_frame_bank<=reference_frame_bank;
                     future_reference_pending<=0;
+                    last_bound_reference_valid<=1;
+                    last_bound_reference_bank<=reference_frame_bank;
+                    last_bound_reference_count<=reference_promotion_count;
                 end else begin
                     future_frame_bank<=reference_frame_bank;
                     future_reference_pending<=1;
@@ -266,6 +296,11 @@ always @(posedge clk) begin
                     queued_future_frame_bank<=
                         (frame_waiting&&overlap_decode_open)?
                         completed_frame_bank:pending_frame_bank;
+                    last_bound_reference_valid<=1;
+                    last_bound_reference_bank<=
+                        (frame_waiting&&overlap_decode_open)?
+                        completed_frame_bank:pending_frame_bank;
+                    last_bound_reference_count<=reference_promotion_count;
                     queued_future_reference_pending<=0;
                     queued_overlap_decode_open<=0;
                     queued_overlap_frame_pending<=0;

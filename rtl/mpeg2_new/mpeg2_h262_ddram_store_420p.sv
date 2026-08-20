@@ -4,7 +4,7 @@
 // encoding: pixel_x[9:0] carries X while pixel_y[11:9]=100/101/110 selects
 // Y/Cb/Cr and pixel_y[8:0] carries Y. Both forms target only SCRATCH.
 module mpeg2_h262_ddram_store(
- input wire clk,input wire reset,input wire frame_bank,input wire [7:0] pixel_value,
+ input wire clk,input wire reset,input wire[1:0] frame_bank,input wire [7:0] pixel_value,
  input wire [1:0] pixel_component,input wire [11:0] pixel_x,input wire [11:0] pixel_y,
  input wire pixel_valid,input wire block_start,input wire block_complete,
  output reg block_stored,output reg write_seen,output reg store_error,
@@ -30,9 +30,10 @@ function automatic [28:0] r90;input [11:0] r;reg [28:0] x;begin x={17'd0,r};r90=
 function automatic [28:0] r45;input [11:0] r;reg [28:0] x;begin x={17'd0,r};r45=(x<<5)+(x<<3)+(x<<2)+x;end endfunction
 reg [63:0] b0,b1,b2,b3,b4,b5,b6,b7,sh;
 wire [63:0] shn={pixel_value,sh[63:8]};
-reg cap,flush,writing,ab,ascratch,ascratch_bank;reg [1:0] ac;reg [11:0] ox,oy;reg [2:0] wr;reg [28:0] wa;
+reg cap,flush,writing,ascratch,ascratch_bank;reg[1:0] ab;reg [1:0] ac;reg [11:0] ox,oy;reg [2:0] wr;reg [28:0] wa;
 wire good=((ac==Y)&&(ox<720)&&(oy<480))||(((ac==CB)||(ac==CR))&&(ox<360)&&(oy<240));
-wire [28:0] off=ascratch?(ascratch_bank?SCRATCH1:SCRATCH0):(ab?BANK:0);
+wire [28:0] off=ascratch?(ascratch_bank?SCRATCH1:SCRATCH0):
+                 (ab==2'd1)?BANK:(ab==2'd2)?29'h00040000:29'd0;
 wire [28:0] first=(ac==Y)?YB+off+r90(oy)+{20'd0,ox[11:3]}:(ac==CB)?CBB+off+r45(oy)+{20'd0,ox[11:3]}:CRB+off+r45(oy)+{20'd0,ox[11:3]};
 wire [28:0] stride=(ac==Y)?90:45;
 assign ddram_burstcnt=writing?1:0;assign ddram_addr=writing?wa:0;assign ddram_rd=0;

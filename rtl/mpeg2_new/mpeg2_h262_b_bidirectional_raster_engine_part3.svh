@@ -24,7 +24,8 @@
 
         if(request&&!started)pending<=1;
         if(pending&&!started&&execute_ready) begin
-            pending<=0;started<=1;active<=1;future_bank_latched<=future_reference_bank;scratch_bank_latched<=scratch_frame_bank;timeout<=26'h3ffffff;lookup_wait<=0;
+            pending<=0;started<=1;active<=1;past_bank_latched<=past_reference_bank;
+            future_bank_latched<=future_reference_bank;scratch_bank_latched<=scratch_frame_bank;timeout<=26'h3ffffff;lookup_wait<=0;
             mbi<=bank_motion_base[execute_bank];col<=0;
             mrow<=bank_row[execute_bank];blk<=0;ei<=0;exec_desc_slot<=0;
             exec_desc_count_latched<=bank_desc_count[execute_bank];
@@ -35,7 +36,9 @@
             residual_load<=0;residual_load_wait<=0;persisted_seen<=0;
             block_prefetch_valid<=0;block_current_prefetched<=0;
             block_current_started<=0;
-            if(!reference_valid||!geometry_ok||(motion_count==0))begin error<=1;if(!error)error_source<=5'd8;active<=0;persisted_seen<=1;timeout<=0;motion_load<=0;end
+            if(!reference_valid||!geometry_ok||(motion_count==0)||
+               (past_reference_bank==future_reference_bank)||
+               (past_reference_bank==2'd3)||(future_reference_bank==2'd3))begin error<=1;if(!error)error_source<=5'd8;active<=0;persisted_seen<=1;timeout<=0;motion_load<=0;end
         end
 
         if(started&&!persisted_seen&&timeout!=0)begin timeout<=timeout-1'b1;if(timeout==1)begin error<=1;if(!error)error_source<=5'd9;end end

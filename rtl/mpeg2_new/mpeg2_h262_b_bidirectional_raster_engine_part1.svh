@@ -87,7 +87,7 @@ reg [10:0] exec_motion_end;
 reg row_final_latched;
 
 reg pending,started;
-reg future_bank_latched;
+reg [1:0] past_bank_latched,future_bank_latched;
 reg req,waitresp,lookup_wait;
 reg [10:0] mbi;
 reg [5:0] col,mrow;
@@ -143,8 +143,10 @@ wire [63:0] block_lookup_data0,block_lookup_data1;
 wire block_lookup_next_row_valid0,block_lookup_next_row_valid1;
 wire [63:0] block_lookup_next_row_data0,block_lookup_next_row_data1;
 
-wire [28:0] future_off=future_bank_latched?BANK_OFF:29'd0;
-wire [28:0] past_off=future_bank_latched?29'd0:BANK_OFF;
+wire [28:0] future_off=(future_bank_latched==2'd1)?BANK_OFF:
+                       (future_bank_latched==2'd2)?29'h00040000:29'd0;
+wire [28:0] past_off=(past_bank_latched==2'd1)?BANK_OFF:
+                     (past_bank_latched==2'd2)?29'h00040000:29'd0;
 wire [2:0] er=ei[5:3],el=ei[2:0];
 wire signed [7:0] exec_mvx=phase_mvx;
 wire signed [7:0] exec_mvy=phase_mvy;
