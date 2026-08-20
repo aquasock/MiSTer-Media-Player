@@ -5,7 +5,7 @@
 // Adjacent integer and half-pel taps therefore revisit the same two-dimensional
 // reference words many times.  This four-entry fully-associative cache accepts
 // a bounded number of ordered word misses and returns them without changing
-// request order or decoded-pel arithmetic. Production defaults to two;
+// request order or decoded-pel arithmetic. Production defaults to four;
 // simulation may override the shared descriptor-depth macro.
 //
 // Only requests explicitly marked cacheable may fill or hit.  Destination
@@ -14,7 +14,7 @@
 // picture can reuse a rewritten reference-bank address.
 //============================================================================
 `ifndef H262_PREDICTION_DESCRIPTOR_DEPTH
-`define H262_PREDICTION_DESCRIPTOR_DEPTH 2
+`define H262_PREDICTION_DESCRIPTOR_DEPTH 4
 `endif
 
 module mpeg2_h262_reference_word_cache

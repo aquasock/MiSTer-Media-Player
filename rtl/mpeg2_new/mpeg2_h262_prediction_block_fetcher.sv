@@ -6,14 +6,14 @@
 // block may use two such phases.  This module assigns eighteen direct slots to
 // each phase, generates every rectangle address once, keeps a bounded number
 // of ordered reads in flight, and associates each ordered response with its
-// destination slot.  Production defaults to two; simulation may override the
+// destination slot.  Production defaults to four; simulation may override the
 // shared macro to measure a deeper end-to-end command path before committing
 // more hardware capacity.
 // Pixel engines consume the retained words by phase/row/column, avoiding an
 // associative tag cone on their reconstruction path.
 //============================================================================
 `ifndef H262_PREDICTION_DESCRIPTOR_DEPTH
-`define H262_PREDICTION_DESCRIPTOR_DEPTH 2
+`define H262_PREDICTION_DESCRIPTOR_DEPTH 4
 `endif
 
 module mpeg2_h262_prediction_block_fetcher

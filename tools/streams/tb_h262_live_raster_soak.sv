@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 
 `ifndef H262_PREDICTION_DESCRIPTOR_DEPTH
-`define H262_PREDICTION_DESCRIPTOR_DEPTH 2
+`define H262_PREDICTION_DESCRIPTOR_DEPTH 4
 `endif
 
 // Entry 221: complete 72-picture I/P/B progression through the compiled
@@ -16,6 +16,7 @@ module tb_h262_live_raster_soak #(
     localparam integer EXPECTED_DESCRIPTOR_DEPTH=
         `H262_PREDICTION_DESCRIPTOR_DEPTH;
     localparam integer MAX_STREAM_BYTES=1048576;
+    localparam integer MAX_MEMORY_READ_LATENCY=256;
     localparam [28:0] DDR_BASE=29'h06000000;
     localparam integer DDR_WORDS=262144;
 
@@ -169,9 +170,9 @@ module tb_h262_live_raster_soak #(
     wire [7:0] memory_be;
     reg [63:0] memory_dout=0;
     reg memory_dout_ready=0;
-    reg [15:0] read_valid_pipe=0;
-    reg [17:0] read_index_pipe[0:15];
-    integer read_pipe_stage;
+    reg [MAX_MEMORY_READ_LATENCY-1:0] read_valid_pipe=0;
+    reg [17:0] read_index_pipe[0:MAX_MEMORY_READ_LATENCY-1];
+    integer read_pipe_pointer=0;
     wire read_pending=|read_valid_pipe;
     wire pred_busy,pred_dout_ready;
 
@@ -801,26 +802,24 @@ module tb_h262_live_raster_soak #(
                 end
             end
         end
-        if((MEMORY_READ_LATENCY<1)||(MEMORY_READ_LATENCY>16))
+        if((MEMORY_READ_LATENCY<1)||
+           (MEMORY_READ_LATENCY>MAX_MEMORY_READ_LATENCY))
             $fatal(1,"unsupported memory latency %0d",MEMORY_READ_LATENCY);
-        memory_dout_ready<=read_valid_pipe[MEMORY_READ_LATENCY-1];
-        if(read_valid_pipe[MEMORY_READ_LATENCY-1])
+        memory_dout_ready<=read_valid_pipe[read_pipe_pointer];
+        if(read_valid_pipe[read_pipe_pointer])
             memory_dout<=ddr_mem[
-                read_index_pipe[MEMORY_READ_LATENCY-1]];
-        for(read_pipe_stage=15;read_pipe_stage>0;
-            read_pipe_stage=read_pipe_stage-1)begin
-            read_valid_pipe[read_pipe_stage]<=
-                read_valid_pipe[read_pipe_stage-1];
-            read_index_pipe[read_pipe_stage]<=
-                read_index_pipe[read_pipe_stage-1];
-        end
-        read_valid_pipe[0]<=memory_rd;
+                read_index_pipe[read_pipe_pointer]];
+        read_valid_pipe[read_pipe_pointer]<=memory_rd;
         if(memory_rd)begin
             memory_reads<=memory_reads+1;
             if((memory_addr<DDR_BASE)||((memory_addr-DDR_BASE)>=DDR_WORDS))
                 $fatal(1,"DDR read outside frame regions: %h",memory_addr);
-            read_index_pipe[0]<=memory_addr-DDR_BASE;
+            read_index_pipe[read_pipe_pointer]<=memory_addr-DDR_BASE;
         end
+        if((read_pipe_pointer+1)>=MEMORY_READ_LATENCY)
+            read_pipe_pointer<=0;
+        else
+            read_pipe_pointer<=read_pipe_pointer+1;
         if(memory_we)begin
             if((memory_addr<DDR_BASE)||((memory_addr-DDR_BASE)>=DDR_WORDS))
                 $fatal(1,"DDR write outside frame regions: %h",memory_addr);

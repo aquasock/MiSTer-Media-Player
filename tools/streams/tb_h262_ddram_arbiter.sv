@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 
 `ifndef H262_PREDICTION_DESCRIPTOR_DEPTH
-`define H262_PREDICTION_DESCRIPTOR_DEPTH 2
+`define H262_PREDICTION_DESCRIPTOR_DEPTH 4
 `endif
 
 module tb_h262_ddram_arbiter;

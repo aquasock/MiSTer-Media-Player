@@ -9,7 +9,7 @@
 // Reader requests have priority.  A bounded ordered descriptor queue retains
 // response owner and burst length while DDR services accepted commands.  The
 // display reader's accepted bank transfers presentation ownership; prediction
-// reads never alter that ownership. Production defaults to depth two;
+// reads never alter that ownership. Production defaults to depth four;
 // simulation may override the shared descriptor-depth macro.
 //
 // kate - Phase 1T-f adds one decoder-side prediction reader. Display reads keep
@@ -28,7 +28,7 @@
 //============================================================================
 
 `ifndef H262_PREDICTION_DESCRIPTOR_DEPTH
-`define H262_PREDICTION_DESCRIPTOR_DEPTH 2
+`define H262_PREDICTION_DESCRIPTOR_DEPTH 4
 `endif
 
 module mpeg2_h262_ddram_arbiter
