@@ -1,5 +1,5 @@
 ---
-## 256 COMMIT Unreleased ??? 2026-08-20T05:19:52-07:00
+## 256 COMMIT Unreleased cc23163 2026-08-20T05:19:52-07:00
 
 #### Coming From:
 
@@ -11,11 +11,11 @@ Remove the synthesis-discovered cache-to-arbiter combinational handshake loop wi
 
 #### Outcome:
 
-Entry 255 passes every focused, exact-pixel and long-order simulation, but the first clean Quartus elaboration reports a six-node combinational loop from the reference probe request through prediction busy and back to that request. The build was interrupted before fitting completed and no RBF was produced or deployed. The loop is confined to ready/valid expression: cache busy currently depends on request assertion and arbiter prediction busy depends on prediction request assertion, so the newly transparent command boundary lets valid and ready depend on one another even though all stored descriptors remain clocked.
+The first Entry 255 clean Quartus elaboration reported a six-node combinational loop from the reference probe request through prediction busy and back to that request; the build was interrupted before fitting completed and no RBF was produced or deployed. Commit `cc23163` makes cache readiness depend only on active transaction, descriptor capacity, hit state and downstream backpressure, while reader and prediction arbiter readiness depend only on descriptor capacity, display priority and DDR backpressure. Acceptance remains separately request-qualified, so valid no longer feeds its own ready and no latency stage is added. Focused cache and arbiter tests explicitly require idle readiness and still pass depth two, prediction/display/prediction ordering, command backpressure, burst ownership, same-edge replacement and direct response. The exact mixed ten-cycle boundary remains 423,936 samples, zero mismatches, maximum delta two, 69,556 reads and 2,069,996 cycles; the complete long ten-cycle boundary remains 22 P and 47 B pictures, 71 swaps, 372,696 reads, 11,619,996 cycles and zero errors. The correction therefore preserves all Entry 255 behavior and gain while removing the source-level ready/valid dependency.
 
 #### Next Steps:
 
-Express cache readiness only from descriptor capacity, hit state and downstream backpressure, and express reader/prediction arbiter readiness only from descriptor capacity, display priority and DDR backpressure; qualify acceptance separately with each request. Extend focused tests to require useful busy readiness before request assertion, rerun exact mixed latency and ordered long coverage, commit the correction, and restart a fully clean Quartus build requiring zero combinational loops and positive timing before deployment.
+Restart a fully clean Quartus build from `cc23163`, require the synthesis report to contain zero combinational-loop logic and require positive global and decoder timing. If qualified, hash and deploy the RBF, run automated mixed and long hardware cadence acquisition, compare against Entry 247, and then pause with an alert for the user's own visual inspection before any further optimization.
 
 #### Files Modified:
 
@@ -26,7 +26,7 @@ Express cache readiness only from descriptor capacity, hit state and downstream 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
