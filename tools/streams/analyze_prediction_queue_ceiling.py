@@ -22,6 +22,10 @@ EXPECTED_MISSES = 71_329
 EXPECTED_BLOCKS = 6_624
 SERIALIZED_TEN_CYCLE_BASELINE = 2_919_996
 MIXED_HARDWARE_BASELINE_FPS = 14.983129
+Y_BASE = 0x06000000
+CB_BASE = 0x0600A8C0
+CR_BASE = 0x0600D2F0
+BANK_OFFSET = 0x00010000
 
 
 @dataclass
@@ -170,6 +174,46 @@ def percentile(values: list[int], numerator: int, denominator: int) -> int:
     return ordered[index]
 
 
+def validate_block_rectangles(blocks: list[Block]) -> tuple[int, int, int]:
+    empty = 0
+    single = 0
+    dual = 0
+    for block in blocks:
+        addresses = set(block.demands)
+        if not addresses:
+            empty += 1
+            continue
+        stride = 90 if block.blk < 4 else 45
+        base = Y_BASE if block.blk < 4 else CB_BASE if block.blk == 4 else CR_BASE
+        rectangles: dict[int, set[tuple[int, int]]] = {}
+        for address in addresses:
+            bank = int(address >= base + BANK_OFFSET)
+            offset = address - base - bank * BANK_OFFSET
+            row, column = divmod(offset, stride)
+            rectangles.setdefault(bank, set()).add((row, column))
+        if len(rectangles) == 1:
+            single += 1
+        elif len(rectangles) == 2:
+            dual += 1
+        else:
+            raise ValueError(
+                f"block has {len(rectangles)} reference rectangles: "
+                f"engine={block.engine} tr={block.temporal_reference} "
+                f"mbi={block.mbi} blk={block.blk}"
+            )
+        for points in rectangles.values():
+            rows = [point[0] for point in points]
+            columns = [point[1] for point in points]
+            height = max(rows) - min(rows) + 1
+            width = max(columns) - min(columns) + 1
+            if width > 2 or height > 9 or len(points) != width * height:
+                raise ValueError(
+                    f"non-rectangular block footprint width={width} "
+                    f"height={height} words={len(points)}"
+                )
+    return empty, single, dual
+
+
 def analyze(trace: Trace, depths: list[int], latencies: list[int],
             serialized_cycles: int, baseline_fps: float,
             expected_hits: int, expected_misses: int,
@@ -182,6 +226,9 @@ def analyze(trace: Trace, depths: list[int], latencies: list[int],
         raise ValueError(f"trace block mismatch blocks={len(trace.blocks)}")
     if any(block.end is None for block in trace.blocks):
         raise ValueError("trace contains an incomplete block")
+
+    empty_rectangles, single_rectangles, dual_rectangles = \
+        validate_block_rectangles(trace.blocks)
 
     unique_miss_counts = [
         len(unique_first_misses(block)) for block in trace.blocks
@@ -212,6 +259,12 @@ def analyze(trace: Trace, depths: list[int], latencies: list[int],
         f"p95={percentile(unique_demand_counts, 95, 100)} "
         f"p99={percentile(unique_demand_counts, 99, 100)} "
         f"maximum={max(unique_demand_counts)}"
+    )
+    print(
+        "PREDICTION_QUEUE_RECTANGLES "
+        f"intra={empty_rectangles} single={single_rectangles} "
+        f"dual={dual_rectangles} maximum_width=2 maximum_height=9 "
+        "maximum_words=36"
     )
 
     for latency in latencies:
