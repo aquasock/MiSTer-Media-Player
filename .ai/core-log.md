@@ -287,7 +287,7 @@ Retain the timing-qualified Entry 247 production RTL and obtain approval for a m
 - [ ] Passed
 
 ---
-## 289 COMMIT Unreleased ??? 2026-08-21T01:29:22-07:00
+## 289 COMMIT Unreleased cba5371 2026-08-21T01:29:22-07:00
 
 #### Coming From:
 
@@ -303,6 +303,9 @@ Entry 288 established that a P picture carrying f_code five is rejected by the o
 
 This commit adds a precise unsupported-feature report and changes no decode behaviour. The distinction it preserves matters, because `mpeg2_h262_p_diagnostic_controller_rearm.sv` deliberately records at its `probe_error` assembly that the historical controlled-pattern observers must not fail acceptance on their own documented subset rejections, since another observer may still own the picture. The new condition is narrower than that and does not disturb it: it fires only when no engine claims the picture at all, so nothing downstream will ever decode it. The wide motion syntax probe already evaluates every P picture's coding extension in one place and either raises `wide_candidate` or does not, so that evaluation point is where the rejection becomes knowable, and it exports a one-cycle rejection pulse rather than having the controller infer the same fact from timing. The controller raises `probe_error` with a new source code ten when that pulse arrives while no other candidate is engaged, which routes the condition through the existing acceptance and transport-drain path so the stream stops cleanly with an error flag rather than hanging with a correct final picture on screen.
 
+
+Simulation confirms all four required boundaries. The complete corpus soak is byte-identical at 6,589,996 cycles with 22/22/47/47 publications and zero errors, and the focused scheduler regression is unchanged at cadence one, three, two with a minimum present gap of two and every case intact. A Big Buck Bunny clip carrying f_code five now fails at input byte 41,205, twenty bytes into the offending picture, reporting `probe_error_source` ten with `presentation_error` low; previously the same clip ran on to byte 60,823 and surfaced a presentation-scheduler error nineteen kilobytes past the real cause. The Entry 288 clip whose f_codes stay within one to four still decodes end to end at 24,049,996 cycles with zero errors, so content inside the supported envelope is unaffected. One correction was needed during implementation: routing the new condition through `p_error_raw` left it visible in diagnostics but still inert, because that path is gated by `b_picture_observed`, so the first attempt reported source ten and nonetheless hung. A hard capability gap is not a controlled-pattern observer's subset rejection and must reach acceptance ungated, which the committed version does. The fully clean Quartus 17.0.2 build completes in 11 minutes 14 seconds with zero errors, zero Critical Warnings and 136 standing warnings, at +0.151 ns global setup, +1.172 ns decoder setup, +7.689 ns video setup, +0.246 ns hold, +3.693 ns recovery, +0.915 ns removal and +0.462 ns minimum pulse slack, using 33,621 ALMs, 49,362 registers, 4,027,379 memory bits, 504 RAM blocks and 65 DSP blocks. The artifact is 4,365,644 bytes with SHA-256 `587f738006a1d4d78118be2072f255244e9b3d124136d3545bd4bc11308649ed`, and it is the first build in several cycles whose source matches the repository.
+
 #### Next Steps:
 
 Require the complete corpus soak to stay at exactly 6,589,996 cycles with 22/22/47/47 publications and zero errors, since no accepted stream may newly fail, and require the focused scheduler regression to remain unchanged. Require a Big Buck Bunny clip containing f_code five to report the new error instead of stalling, and require a clip whose f_codes stay within one to four, already proven decodable end to end in Entry 288 at 24,049,996 cycles with zero errors, to remain unaffected. Then rebuild, because the artifact currently on the MiSTer predates the probe fix in `73dada5` and no hardware result since then reflects committed source. After this lands, proceed to step two of the plan and isolate which term of the six-way condition raises `error_source` seven in `mpeg2_h262_p_motion_residual_raster_engine.sv`, instrumenting only and changing no RTL, with the documented bound of sixteen coded blocks and sixty-four coefficient events as the leading hypothesis. Note separately that thirteen RTL files cite `.ai/core-standards.md` as their standards authority and that file is absent from the repository, so the conformance rationale for those modules is currently unrecoverable.
@@ -310,12 +313,14 @@ Require the complete corpus soak to stay at exactly 6,589,996 cycles with 22/22/
 #### Files Modified:
 
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
 - rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
