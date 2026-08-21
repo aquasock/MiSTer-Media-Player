@@ -287,31 +287,35 @@ Retain the timing-qualified Entry 247 production RTL and obtain approval for a m
 - [ ] Passed
 
 ---
-## 249 COMMIT Unreleased 25d7b50 2026-08-20T02:20:30-07:00
+## 289 COMMIT Unreleased ??? 2026-08-21T01:29:22-07:00
 
 #### Coming From:
 
-Unreleased d9231a7
+Unreleased 73dada5
 
 #### Purpose:
 
-Recover prediction conflict misses through a second-stage victim cache without lengthening the accepted four-entry fast-hit path.
+Report an unsupported P picture as an explicit error instead of silently consuming it, so a capability gap fails loudly rather than freezing the core.
 
 #### Outcome:
 
-Commit `25d7b50` adds a simulation-only exclusive-cache model with the accepted four-entry fully associative primary and four victim entries per reference bank. It models deterministic promotion, primary eviction, victim replacement, active invalidation and the extra probe cycle without feeding live RTL. The exact mixed oracle remains fully passing at 423,936 samples, zero mismatches, maximum delta two, 499,551/71,329/0 physical cache accounting, 23 swaps and 2,279,996 cycles. Across 561,243 lookups, the model produces 490,752 primary hits, only 863 victim hits and 69,628 full misses, so the second stage probes 70,491 times to avoid only 863 DDR transactions. Charging one cycle per primary miss costs about 70,000 cycles while even an optimistic ten-cycle hardware response credit saves fewer than 9,000 cycles. The victim design is therefore a clear mixed-stream slowdown and is rejected before functional RTL, long simulation or Quartus build.
+Entry 288 established that a P picture carrying f_code five is rejected by the only active P engine, that the rejection is expressed as a candidate signal which simply stays low, and that the picture is then consumed without reconstruction until the presentation scheduler fail-stops on a condition it cannot explain. That silence, not the capability gap itself, is what turned a documented subset boundary into a permanent freeze and into four misdirected repairs across Entries 284 to 287.
+
+This commit adds a precise unsupported-feature report and changes no decode behaviour. The distinction it preserves matters, because `mpeg2_h262_p_diagnostic_controller_rearm.sv` deliberately records at its `probe_error` assembly that the historical controlled-pattern observers must not fail acceptance on their own documented subset rejections, since another observer may still own the picture. The new condition is narrower than that and does not disturb it: it fires only when no engine claims the picture at all, so nothing downstream will ever decode it. The wide motion syntax probe already evaluates every P picture's coding extension in one place and either raises `wide_candidate` or does not, so that evaluation point is where the rejection becomes knowable, and it exports a one-cycle rejection pulse rather than having the controller infer the same fact from timing. The controller raises `probe_error` with a new source code ten when that pulse arrives while no other candidate is engaged, which routes the condition through the existing acceptance and transport-drain path so the stream stops cleanly with an error flag rather than hanging with a correct final picture on screen.
 
 #### Next Steps:
 
-Retain the timing-qualified Entry 247 cache and scheduler. Continue with Entry 250's proposal-first depth-two ordered request experiment, using the MiSTer interface's explicit pipelined-read contract to hide latency rather than trying to reduce a locality stream that three independent models show is not cache-capacity limited.
+Require the complete corpus soak to stay at exactly 6,589,996 cycles with 22/22/47/47 publications and zero errors, since no accepted stream may newly fail, and require the focused scheduler regression to remain unchanged. Require a Big Buck Bunny clip containing f_code five to report the new error instead of stalling, and require a clip whose f_codes stay within one to four, already proven decodable end to end in Entry 288 at 24,049,996 cycles with zero errors, to remain unaffected. Then rebuild, because the artifact currently on the MiSTer predates the probe fix in `73dada5` and no hardware result since then reflects committed source. After this lands, proceed to step two of the plan and isolate which term of the six-way condition raises `error_source` seven in `mpeg2_h262_p_motion_residual_raster_engine.sv`, instrumenting only and changing no RTL, with the documented bound of sixteen coded blocks and sixty-four coefficient events as the leading hypothesis. Note separately that thirteen RTL files cite `.ai/core-standards.md` as their standards authority and that file is absent from the repository, so the conformance rationale for those modules is currently unrecoverable.
 
 #### Files Modified:
 
-- tools/streams/tb_h262_live_raster_soak.sv
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
 
 #### Status:
 
-- [x] Built
+- [ ] Built
 - [ ] Passed
 
 ---
