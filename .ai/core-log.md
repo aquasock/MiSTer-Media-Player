@@ -1,4 +1,36 @@
 ---
+## 298 COMMIT Unreleased 7ba1184 2026-08-21T15:10:54-07:00
+
+#### Coming From:
+
+Unreleased 221db79
+
+#### Purpose:
+
+Settle the row-bank credit contract left open by Entry 297 by counting both engines' produce and retire events on one timebase.
+
+#### Outcome:
+
+The contract is settled and the defect is larger than Entry 297 described. `row_produced` is `wide_row_produced`, the P parser's own row-final marker, so it is genuinely P-side and fires once per P row. Counting confirms the P side is already correct: every P picture in the failing clip produces exactly thirty rows and receives exactly thirty P-sourced retires, fourteen pictures in a row without deviation. `outstanding_rows` is therefore meant to track P rows outstanding, and the roughly sixty B-sourced retires each picture also receives are unambiguously spurious, 897 of them against 450 legitimate ones across the run.
+
+The consequence is not merely a corrupted count. The picture-completion latch in the wide probe fires on `row_retired&&final_row_queued&&(outstanding_rows==1)&&!row_produced`, and that is the only path that sets `wide_complete_now` and `proof_done` and so the only path that lets the producer rearm for the next picture. Because `outstanding_rows` is two bits it wraps rather than saturates, and the stream of spurious B retires walks it three, two, one, zero, three continuously. Every picture's retire tail is B-sourced, and pictures one through fourteen pass through the value one sixteen times each, twenty-three times for picture eight. One of those spurious events eventually coincides with `final_row_queued` and completes the picture. Picture completion in this design is therefore triggered by B-engine retires arriving by luck, not by the P engine persisting its own final row. Picture fifteen receives only seven such passes before that GOP's B pictures are exhausted, the coincidence never occurs, picture fifteen never completes, the producer never rearms and emits nothing for picture sixteen, and the raster engine's watchdog raises error source 10 after its full `24'hffffff` wait.
+
+This also explains why both repairs attempted in Entry 297 failed earlier rather than later. Removing the B retires removes precisely the events that were completing pictures, so the failure moved forward to byte 30,477 instead of 156,882. The two defects are coupled: the routing error supplies the corruption, and the completion latch depends on that corruption to fire at all. Neither can be fixed alone.
+
+#### Next Steps:
+
+Replace the completion trigger rather than clean the counter, and obtain approval before writing it because this changes a contract rather than correcting a wire. Picture completion should latch when the P engine persists the row that the producer marked final, tracked explicitly as its own event, instead of being inferred from a shared count reaching a particular value. With that in place the retire input can be narrowed to P-sourced persistence and `outstanding_rows` can be widened or made to saturate, since it would then serve only as bank backpressure and no longer carry completion semantics. Validate any candidate on the failing clip, on the 48 frame prefix that already completes cleanly, and on the 128 by 96 corpus soak whose golden values must not move. Note also that the bench cannot currently express success for any geometry other than the corpus, so a clean 720 by 480 run still ends in a golden-value `$fatal` and that must be fixed before the clip can be certified as playing to completion.
+
+#### Files Modified:
+
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 297 COMMIT Unreleased 221db79 2026-08-21T14:54:26-07:00
 
 #### Coming From:
