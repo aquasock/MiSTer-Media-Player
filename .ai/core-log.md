@@ -134,31 +134,33 @@ Run a clean Quartus build from `0f5baad`, require timing closure, deploy the res
 - [ ] Passed
 
 ---
-## 254 COMMIT Unreleased 5b37c1f 2026-08-20T04:16:09-07:00
+## 294 COMMIT Unreleased cba5371 2026-08-21T04:06:03-07:00
 
 #### Coming From:
 
-Unreleased 5f1d561
+Unreleased cba5371
 
 #### Purpose:
 
-Replace serialized per-tap B-picture prediction with one- or two-phase direct-index block footprints while retaining the current cache and arbiter contract.
+Determine whether the raster engine consumes motion validity as a level or an edge, and confirm on a single timebase whether the held producer assertion is what corrupts the picture.
 
 #### Outcome:
 
-Commit `5b37c1f` gives B reconstruction the same latched direct-buffer lifecycle as P while retaining the one-outstanding cache and arbiter. Forward-only and backward-only blocks map their sole reference rectangle to phase zero; bidirectional blocks map forward to phase zero and backward to phase one, and synchronous retries preserve phase, tap, byte selection, interpolation and rounding until each retained word is valid. The exact mixed boundary passes all 423,936 samples with zero mismatches, maximum delta two, 23 swaps, zero errors, 69,528 DDR reads and 1,999,996 cycles. The complete long boundary passes all 22 P and 47 B pictures, 71 swaps, zero errors, 372,648 reads and 11,069,996 cycles. Relative to Entry 247 this removes 1,801 mixed and 91,187 long physical reads and reduces cycles by 12.28 and 12.77 percent before hiding response latency. Focused B residual cold and hit modes converge at 1,392,289 cycles while both pass 1,350 motion records, 120 residual blocks, 7,680 residual samples and all 518,400 stores; the authored B-intra case passes 12 blocks, 768 samples and the exact 768 changed stripe samples at 785,956 cycles. No stale phase, response reassociation, arithmetic, scratch-write or presentation regression remains.
+No source changed. The mechanism is established directly and survives its control, which none of the four earlier candidates did.
+
+The consumer is level sensitive. The match chain in `mpeg2_h262_p_motion_residual_raster_engine.sv` is entered under `capture_enable && residual_valid` evaluated every clock, with no edge detection anywhere in the path, so any cycle in which validity is high and the index is a motion index executes the motion branch and increments `motion_count`. The producer is expected to answer that with one cycle per record, and it does so almost everywhere: counting sideband validity per clock yields exactly forty-five records in every row of the failing 720 by 480 stream, a figure only reachable when each record occupies a single cycle.
+
+At the failure the producer does not honour that contract. Instrumenting the engine to detect a motion record ingested on consecutive cycles with an identical index and value records a run of seven or more identical intakes of index `6'h3e` with value zero, one per clock, driving `motion_count` from two to seven within row zero, and 4,468 duplicate intakes in total before the error is raised. The corpus control run over the same instrumented build records zero duplicates. That contrast is the whole finding: a held validity assertion is silently multiplied into spurious motion records by a level-sensitive intake, `motion_count` inflates, and the row-completion test that requires exactly `capture_motion_base` plus `mb_width` can no longer be satisfied. This accounts for both reachable errors from one cause, source seven directly through the corrupted row arithmetic and source eight through the boundary state that follows from it, which matches the suspicion recorded in Entry 291 that the two were not independent limits.
+
+The earlier per-row measurement of exactly forty-five records is not contradicted. It was taken over the first eight rows of the first picture, where the producer is well behaved; the duplication appears in a later picture, so both observations are correct and describe different parts of the stream.
 
 #### Next Steps:
 
-Expand the shared cache and DDR arbiter to accept the fetchers' already-proven depth-two ordered request stream. Track prediction and display response ownership explicitly in command order, permit a response to free a descriptor while the next command is accepted, retain display priority and writer exclusion, and require the standalone simultaneous-response test, exact mixed pixels, complete long order and a substantial ten-cycle reduction before any Quartus build.
+Establish why the producer holds the assertion before changing anything, because the fix differs by cause and this is the point at which four previous attempts went wrong. The contract is not in doubt: every other producer path emits one cycle per event and the consumer is level gated throughout and works, so a held assertion is the defect rather than a consumer that should have edge detected. What is not yet known is whether the hold is a stall condition being expressed incorrectly, in which case the producer should withhold validity while stalled, or a genuine repeat that some downstream handshake was expected to absorb. Trace the producer's motion emission state machine across the duplicated run and identify what keeps it asserted. Only then choose between suppressing the repeat at the source and adding an accept handshake, and prefer the source fix if both are viable, since an added handshake would change a contract that the rest of the design already satisfies. When a candidate exists, gate it on the corpus soak, the focused scheduler regression, the 720 by 480 clip that already decodes cleanly, and this failing clip, and record that the corpus cannot detect a regression in this path because it never exercises the duplication at all.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/streams/tb_h262_b_residual_streaming.sv
+None.
 
 #### Status:
 
