@@ -1,4 +1,36 @@
 ---
+## 297 COMMIT Unreleased 221db79 2026-08-21T14:54:26-07:00
+
+#### Coming From:
+
+Unreleased 489aa0d
+
+#### Purpose:
+
+Determine why the raster engine's row-execution watchdog fires at P picture 16 of the Big Buck Bunny clip.
+
+#### Outcome:
+
+The cause is established by direct observation and is a shared-signal defect rather than anything in the parser. The P syntax probe tracks row-bank credit in `outstanding_rows`, incrementing on `row_produced` and decrementing on `row_retired`. That `row_retired` input arrives from `p_row_persistence_complete`, which is wired to the reference probe's `row_persisted` output, and that output is `b_select?b_row_persisted:(mixed_select&&mix_row_persisted)`. While `b_select` is high the P producer therefore receives B row persistence as its own retire event. Tracing the boundary shows exactly that: a long run of retire pulses each carrying `b_select=1` and `b_rowpers=1` while the P engine's own `mix_rowpers` stays low, with `row_produced` never asserting. Since `outstanding_rows` is only two bits it does not saturate but wraps, and the trace shows it walking three, two, one, zero, three repeatedly. The producer parks in parser state 21, emits no sideband event whatsoever for picture 16, and the raster engine, correctly armed and waiting on `new_picture_metadata`, sits until its `24'hffffff` watchdog expires and raises error source 10. The same wiring is present in `MediaPlayer_top_02.svh`, so this is a defect in the design and not an artifact of the bench.
+
+One hypothesis formed during this work was disproven by its own instrument before it could be acted on. Because the engine only rearms on a motion record, it appeared that picture 16 might open with a non-motion sideband event. Logging the opening events of every P picture shows pictures one through fifteen each opening with index `3e` and `motion=1` at the exact moment `persisted` is high and `active` and `desc_active` are low, while picture 16 produces no logged event at all. The rearm condition is satisfied and waiting; nothing is presented to it.
+
+Two candidate repairs were tried and both are worse, so neither is committed. Giving the P producer a dedicated retire derived from `mixed_select&&mix_row_persisted` and then from `mix_row_persisted` alone each moved the failure much earlier, to a bench timeout at byte 30,477 rather than the deadlock at byte 156,882. The P producer therefore depends on receiving the shared retire events rather than merely being corrupted by them, which means the row-bank credit is an entangled resource between the P and B engines and not a simple miswire. The working tree was returned to the recorded state and the original failure signature confirmed to reproduce.
+
+#### Next Steps:
+
+Establish what the row-bank credit contract is meant to be before attempting a third repair, since two have now failed for the same reason: the accounting is shared between two engines that produce and retire rows independently, and no single-signal substitution can express that. Determine whether `outstanding_rows` is intended to count only the P producer's own outstanding rows, in which case the B retires are spurious and the P producer's dependence on them is a second defect layered on the first, or whether it is intended to count a genuinely shared bank pool, in which case the two-bit width is wrong and the counter needs to saturate rather than wrap. Instrument both engines' produce and retire events on one timebase across several picture boundaries before choosing. Separately, the user has directed that compatibility with the existing structure is not required and that the work should be shaped around what the SuperStation needs; this entanglement is a reasonable argument for replacing the shared credit path rather than patching it, but the SuperStation target is still not described anywhere in the repository and must be defined first.
+
+#### Files Modified:
+
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 296 COMMIT Unreleased 489aa0d 2026-08-21T14:37:48-07:00
 
 #### Coming From:
