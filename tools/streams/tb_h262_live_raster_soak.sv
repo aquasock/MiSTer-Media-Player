@@ -434,6 +434,11 @@ module tb_h262_live_raster_soak #(
             if(row_event_fd==0)$fatal(1,"cannot open row event trace");
             $fdisplay(row_event_fd,"cycle,hdr,event,src,outstanding,waiting,state");
         end
+        if($value$plusargs("PATH1=%s",path1_path))begin
+            path1_fd=$fopen(path1_path,"w");
+            if(path1_fd==0)$fatal(1,"cannot open path1 trace");
+            $fdisplay(path1_fd,"cycle,hdr,final_queued,retired,produced,outstanding,waiting,blocked,state");
+        end
         // Entry 294 keyed its duplicate detector on the residual sideband
         // index, which is a fixed class code (3e non-intra / 3b intra) and is
         // therefore constant across any run of skipped macroblocks.  This
@@ -1670,12 +1675,24 @@ module tb_h262_live_raster_soak #(
     // timebase.  row_produced is the P parser's own row-final marker; row_retired
     // is the b_select-muxed persistence, so each retire is attributed to the
     // engine that actually sourced it.
+    integer path1_fd=0;
+    reg [1023:0] path1_path;
     reg [1023:0] row_event_path;
     integer row_event_fd=0,row_event_cycle=0;
     always @(posedge clk) begin
         if(reset)row_event_cycle<=0;
         else begin
             row_event_cycle<=row_event_cycle+1;
+            if((path1_fd!=0)&&
+               publication.p_controller.wide_general_probe.final_row_queued)
+                $fdisplay(path1_fd,"%0d,%0d,1,%0d,%0d,%0d,%0d,%0d,%0d",
+                    row_event_cycle,publication.p_header_count,
+                    publication.p_controller.wide_general_probe.row_retired,
+                    publication.p_controller.wide_general_probe.row_produced,
+                    publication.p_controller.wide_general_probe.outstanding_rows,
+                    publication.p_controller.wide_general_probe.row_waiting,
+                    publication.p_controller.wide_general_probe.bank_blocked,
+                    publication.p_controller.wide_general_probe.parser_state);
             if(row_event_fd!=0)begin
                 if(publication.p_controller.wide_general_probe.row_produced)
                     $fdisplay(row_event_fd,"%0d,%0d,PRODUCE,P,%0d,%0d,%0d",
