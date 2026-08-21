@@ -30,6 +30,11 @@ module mpeg2_h262_b_presentation_scheduler
     output reg [2:0] framebuffer_swap_reset_count,
     output wire reference_overlap_header,
     output wire presentation_hold,
+    // Entry 282: pure observability taps for the cadence profiler.  These
+    // expose existing internal terms so presentation hold can be attributed;
+    // they drive no scheduler logic and change no ownership rule.
+    output wire scratch_available,
+    output wire promotion_active,
     output reg  presentation_complete,
     output reg  presentation_error
 );
@@ -111,6 +116,8 @@ wire queued_header_capacity=
 // Its publication closes the window before a later header can reuse scratch.
 assign reference_overlap_header=(reorder_active&&!run_closed)||
                                 (queued_run_active&&!queued_run_closed);
+assign scratch_available=queued_scratch_available;
+assign promotion_active=promotion_pending;
 assign presentation_hold=reorder_active&&run_closed&&
                          !overlap_decode_open&&!queued_decode_inflight&&
                          (promotion_pending||!queued_header_capacity)&&

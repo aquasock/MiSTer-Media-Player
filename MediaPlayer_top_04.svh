@@ -88,6 +88,10 @@ wire      mpeg2_new_display_scratch_bank;
 wire [2:0] mpeg2_new_framebuffer_swap_reset_count;
 reg       mpeg2_new_swap_window_video;
 wire      mpeg2_new_b_presentation_complete;
+// Entry 282: scheduler observability taps consumed only by the cadence
+// profiler's unconditional hold-attribution counters.
+wire      mpeg2_new_b_scratch_available;
+wire      mpeg2_new_b_promotion_active;
 wire      mpeg2_new_b_presentation_error;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] mpeg2_new_swap_window_sync;

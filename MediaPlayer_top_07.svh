@@ -45,6 +45,8 @@ mpeg2_h262_hardware_cadence_profiler
     .decoder_ready             (mpeg2_new_decoder_stream_ready),
     .presentation_hold         (mpeg2_new_b_presentation_hold),
     .destination_hold          (mpeg2_new_p_destination_ownership_hold),
+    .scratch_available         (mpeg2_new_b_scratch_available),
+    .promotion_active          (mpeg2_new_b_promotion_active),
     .decoder_byte_accepted     (mpeg2_new_decode_stream_valid),
     .picture_coding_type       (mpeg2_new_picture_coding_type),
     .temporal_reference        (mpeg2_new_temporal_reference),

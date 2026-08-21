@@ -120,6 +120,8 @@ mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
     .framebuffer_swap_reset_count(mpeg2_new_framebuffer_swap_reset_count),
     .reference_overlap_header    (mpeg2_new_b_reference_overlap_header),
     .presentation_hold           (mpeg2_new_b_presentation_hold),
+    .scratch_available           (mpeg2_new_b_scratch_available),
+    .promotion_active            (mpeg2_new_b_promotion_active),
     .presentation_complete       (mpeg2_new_b_presentation_complete),
     .presentation_error          (mpeg2_new_b_presentation_error)
 );

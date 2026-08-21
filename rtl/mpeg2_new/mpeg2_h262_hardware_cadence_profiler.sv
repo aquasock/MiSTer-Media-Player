@@ -19,6 +19,10 @@ module mpeg2_h262_hardware_cadence_profiler
     input  wire        decoder_ready,
     input  wire        presentation_hold,
     input  wire        destination_hold,
+    // Entry 282: scheduler observability taps, used only by the unconditional
+    // hold-attribution counters below.
+    input  wire        scratch_available,
+    input  wire        promotion_active,
     input  wire        decoder_byte_accepted,
     input  wire [2:0]  picture_coding_type,
     input  wire [9:0]  temporal_reference,
@@ -52,14 +56,14 @@ module mpeg2_h262_hardware_cadence_profiler
     output wire        snapshot_ready
 );
 
-localparam integer SNAPSHOT_WORDS = 21;
+localparam integer SNAPSHOT_WORDS = 26;
 localparam integer SNAPSHOT_BITS  = SNAPSHOT_WORDS * 32;
 localparam [31:0] SNAPSHOT_MAGIC  = 32'h4d4d5031; // "MMP1"
-localparam [31:0] SNAPSHOT_FORMAT = {8'd1, 8'd21, 16'd54000};
+localparam [31:0] SNAPSHOT_FORMAT = {8'd2, 8'd26, 16'd54000};
 localparam [11:0] OVERLAY_X       = 12'd8;
-localparam [11:0] OVERLAY_Y       = 12'd512;
+localparam [11:0] OVERLAY_Y       = 12'd492;
 localparam [11:0] OVERLAY_WIDTH   = 12'd168;
-localparam [11:0] OVERLAY_HEIGHT  = 12'd84;
+localparam [11:0] OVERLAY_HEIGHT  = 12'd104;
 
 reg session_active;
 reg fifo_pending_q;
@@ -92,6 +96,18 @@ reg        first_present_valid;
 reg [31:0] decoder_stall_cycles;
 reg [31:0] presentation_stall_cycles;
 reg [31:0] destination_stall_cycles;
+// Entry 282: unconditional hold attribution.  Unlike the three stall counters
+// above, which are a mutually exclusive priority chain, each of these counts
+// every cycle its own condition is true.  Their sums may therefore overlap one
+// another and the stall counters, which is precisely what makes the overlap
+// measurable.
+reg [31:0] presentation_hold_total_cycles;
+reg [31:0] destination_hold_total_cycles;
+reg [31:0] hold_overlap_cycles;
+reg [31:0] hold_scratch_available_cycles;
+reg [31:0] hold_promotion_pending_cycles;
+reg scratch_available_q;
+reg promotion_active_q;
 reg [31:0] i_stall_cycles;
 reg [31:0] p_stall_cycles;
 reg [31:0] b_stall_cycles;
@@ -145,14 +161,21 @@ wire [31:0] snapshot_word_18 =
     {frame_rate_code_q, picture_coding_type_q, temporal_reference_q,
      picture_count_q, 7'd0};
 wire [31:0] snapshot_word_19 = {error_flags_q, 16'd0};
-wire [31:0] snapshot_word_20 =
+wire [31:0] snapshot_word_20 = presentation_hold_total_cycles;
+wire [31:0] snapshot_word_21 = destination_hold_total_cycles;
+wire [31:0] snapshot_word_22 = hold_overlap_cycles;
+wire [31:0] snapshot_word_23 = hold_scratch_available_cycles;
+wire [31:0] snapshot_word_24 = hold_promotion_pending_cycles;
+wire [31:0] snapshot_word_25 =
     snapshot_word_00 ^ snapshot_word_01 ^ snapshot_word_02 ^
     snapshot_word_03 ^ snapshot_word_04 ^ snapshot_word_05 ^
     snapshot_word_06 ^ snapshot_word_07 ^ snapshot_word_08 ^
     snapshot_word_09 ^ snapshot_word_10 ^ snapshot_word_11 ^
     snapshot_word_12 ^ snapshot_word_13 ^ snapshot_word_14 ^
     snapshot_word_15 ^ snapshot_word_16 ^ snapshot_word_17 ^
-    snapshot_word_18 ^ snapshot_word_19;
+    snapshot_word_18 ^ snapshot_word_19 ^ snapshot_word_20 ^
+    snapshot_word_21 ^ snapshot_word_22 ^ snapshot_word_23 ^
+    snapshot_word_24;
 
 always @(posedge clk_mpeg2) begin
     if (reset_mpeg2) begin
@@ -161,6 +184,8 @@ always @(posedge clk_mpeg2) begin
         decoder_ready_q                <= 1'b0;
         presentation_hold_q            <= 1'b0;
         destination_hold_q             <= 1'b0;
+        scratch_available_q            <= 1'b0;
+        promotion_active_q             <= 1'b0;
         decoder_byte_accepted_q        <= 1'b0;
         picture_coding_type_q          <= 3'd0;
         temporal_reference_q           <= 10'd0;
@@ -187,6 +212,11 @@ always @(posedge clk_mpeg2) begin
         decoder_stall_cycles           <= 32'd0;
         presentation_stall_cycles      <= 32'd0;
         destination_stall_cycles       <= 32'd0;
+        presentation_hold_total_cycles <= 32'd0;
+        destination_hold_total_cycles  <= 32'd0;
+        hold_overlap_cycles            <= 32'd0;
+        hold_scratch_available_cycles  <= 32'd0;
+        hold_promotion_pending_cycles  <= 32'd0;
         i_stall_cycles                 <= 32'd0;
         p_stall_cycles                 <= 32'd0;
         b_stall_cycles                 <= 32'd0;
@@ -213,6 +243,8 @@ always @(posedge clk_mpeg2) begin
         fifo_pending_q               <= fifo_pending;
         decoder_ready_q              <= decoder_ready;
         presentation_hold_q          <= presentation_hold;
+        scratch_available_q          <= scratch_available;
+        promotion_active_q           <= promotion_active;
         destination_hold_q           <= destination_hold;
         decoder_byte_accepted_q      <= decoder_byte_accepted;
         picture_coding_type_q        <= picture_coding_type;
@@ -266,6 +298,24 @@ always @(posedge clk_mpeg2) begin
                         destination_stall_cycles + 1'b1;
             end
 
+            // Entry 282: attribution independent of the priority chain above
+            // and of fifo_pending, so overlapping holds are visible instead of
+            // being masked by whichever cause happens to rank first.
+            if (presentation_hold_q)
+                presentation_hold_total_cycles <=
+                    presentation_hold_total_cycles + 1'b1;
+            if (destination_hold_q)
+                destination_hold_total_cycles <=
+                    destination_hold_total_cycles + 1'b1;
+            if (presentation_hold_q && destination_hold_q)
+                hold_overlap_cycles <= hold_overlap_cycles + 1'b1;
+            if (presentation_hold_q && scratch_available_q)
+                hold_scratch_available_cycles <=
+                    hold_scratch_available_cycles + 1'b1;
+            if (presentation_hold_q && promotion_active_q)
+                hold_promotion_pending_cycles <=
+                    hold_promotion_pending_cycles + 1'b1;
+
             if (prediction_request_accepted)
                 prediction_requests <= prediction_requests + 1'b1;
             if (prediction_read_q && prediction_busy_q)
@@ -308,7 +358,10 @@ always @(posedge clk_mpeg2) begin
             sequence_end_seen_q && session_quiet_q) begin
             if (quiet_count == 10'd1023) begin
                 snapshot_mpeg2 <= {
-                    snapshot_word_20, snapshot_word_19,
+                    snapshot_word_25, snapshot_word_24,
+                    snapshot_word_23, snapshot_word_22,
+                    snapshot_word_21, snapshot_word_20,
+                    snapshot_word_19,
                     snapshot_word_18, snapshot_word_17,
                     snapshot_word_16, snapshot_word_15,
                     snapshot_word_14, snapshot_word_13,

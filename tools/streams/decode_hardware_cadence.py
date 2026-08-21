@@ -12,9 +12,9 @@ from PIL import Image
 
 
 MAGIC = 0x4D4D5031
-WORDS = 21
+WORDS = 26
 X0 = 8
-Y0 = 512
+Y0 = 492
 CELL = 4
 ROW_PREFIX = (1, 0, 1, 0)
 
@@ -120,7 +120,15 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "final_temporal_reference": (metadata >> 15) & 0x3FF,
         "reference_picture_count": (metadata >> 7) & 0xFF,
         "error_flags": (words[19] >> 16) & 0xFFFF,
-        "checksum": words[20],
+        # Entry 282: unconditional hold attribution.  These are NOT mutually
+        # exclusive with each other or with the stall counters above, so they
+        # must not be summed against them.
+        "presentation_hold_total_cycles": words[20],
+        "destination_hold_total_cycles": words[21],
+        "hold_overlap_cycles": words[22],
+        "hold_scratch_available_cycles": words[23],
+        "hold_promotion_pending_cycles": words[24],
+        "checksum": words[25],
     }
 
 
@@ -208,6 +216,13 @@ def main() -> int:
             "request_wait={prediction_request_wait_cycles} "
             "response={prediction_response_cycles}; "
             "writer_wait={writer_wait_cycles}".format(**result)
+        )
+        print(
+            "holds: presentation={presentation_hold_total_cycles} "
+            "destination={destination_hold_total_cycles} "
+            "overlap={hold_overlap_cycles} "
+            "scratch_free={hold_scratch_available_cycles} "
+            "promotion={hold_promotion_pending_cycles}".format(**result)
         )
         for failure in failures:
             print(f"FAIL: {failure}")
