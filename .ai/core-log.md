@@ -257,29 +257,31 @@ Proceed with a functional block-footprint fetcher that generates the current P o
 - [ ] Passed
 
 ---
-## 250 COMMIT Unreleased 0c8d2c4 2026-08-20T02:22:32-07:00
+## 290 COMMIT Unreleased cba5371 2026-08-21T02:33:40-07:00
 
 #### Coming From:
 
-Unreleased 25d7b50
+Unreleased cba5371
 
 #### Purpose:
 
-Measure whether one exact following prediction address can hide enough ordered DDR response latency to justify a depth-two hardware path.
+Isolate which condition in the P motion residual raster engine rejects dense real-content pictures, instrumenting only and changing no RTL.
 
 #### Outcome:
 
-Commit `0c8d2c4` adds simulation-only ordered-read and variable-latency models without changing production RTL. The focused ten-cycle service completes 64 reads in 641 cycles with one outstanding, 322 with depth two, 346 under deterministic backpressure and 64 with zero latency while preserving prediction/display/prediction owner order. A temporary depth-two decoder candidate remained exact across 423,936 mixed samples with zero mismatches and maximum delta two, but at ten-cycle latency it reduced the safe Entry 247 trace only from 2,919,996 to 2,819,996 cycles because just 8,072 of 71,329 physical reads had an immediately usable exact successor. The 100,000-cycle or 3.42 percent whole-stream reduction would move the measured 14.983 mixed rate only to roughly 15.5 fps, far short of 25 fps, so the candidate was rejected and fully removed before Quartus or MiSTer deployment. The committed default-latency regression remains unchanged at 2,279,996 cycles, 499,551 cache hits, 71,329 misses, 23 swaps, zero errors and exact pixels; the ten-cycle baseline also passes at 2,919,996 cycles.
+No source changed. The step narrows the defect substantially and disproves the hypothesis it started from, but does not close it. The leading hypothesis was the documented bound of sixteen coded blocks and sixty-four coefficient events quoted in the wide probe header. That bound belongs to a different module: the raster engine's own capacity limit is `MAX_BANK_BLOCKS` at 1024, far above anything these streams reach, so capacity is not the mechanism.
+
+Instrumenting the engine also shows the problem is broader than a single condition. The engine carries sixteen distinct error sources, and different real-content encodes reach different ones. The clip that failed in Entry 288 raised source seven, a row-completion consistency check; a clip encoded from the same source at quality eight with motion search capped to sixteen instead raises source eight at input byte 35,722, well before any f_code gate is reached. Source eight is not a bounds check at all. It is the terminal `else` of a chain of `else if` arms that match residual metadata patterns, so it means the engine received a sideband event whose shape it does not recognise.
+
+The captured event is precise: residual index 63, which is `6'h3f`, carrying value `0x00a4`, with `desc_active` and `sample_expected` both low, `capture_row` zero, `motion_count` one and `capture_desc_count` zero. That is the first macroblock row of the picture, so the rejection happens almost immediately rather than deep into dense content. The recognised vocabulary at index `6'h3f` is a descriptor whose top nibble is `4'hB`, or the row markers `A2FE` and `A2FF`, and `0x00a4` is none of these. The producer in `mpeg2_h262_p_residual_pipeline_420.sv` emits the macroblock number at index `6'h3c` and the intra and block identity at index `6'h3d`, and a value of `0x00a4` is a plausible macroblock number but is arriving on the index reserved for row markers. Whether that is an index and value pairing the engine does not expect, or a second producer path reaching the same consumer through the `mixed_select` routing in `mpeg2_h262_reference_pipeline_probe_rearm.sv`, is not yet established and is the next thing to determine.
 
 #### Next Steps:
 
-Retain the timing-qualified Entry 247 production RTL and obtain approval for a materially deeper prediction architecture. The next proposal should decouple block-scoped address production from pixel consumption, queue enough ordered requests and returned words to cover the measured memory latency rather than only one successor, preserve display priority and explicit response ownership, and prove the attainable full-trace ceiling in simulation before functional RTL, Quartus or MiSTer deployment.
+Trace the producer side rather than the consumer, recording every `replay_index` and `replay_value` pair the residual pipeline emits for the failing picture and comparing that sequence against a corpus picture that decodes cleanly. That distinguishes the two remaining explanations directly: either the producer emits `0x00a4` on index `6'h3f`, which makes this a producer defect, or it does not, which makes it a routing or arbitration defect where a second source reaches the consumer. Do not modify the engine's pattern chain before that is known, because adding an arm for an event whose origin is not understood would hide a routing fault rather than fix it. Record also that the earlier plan's framing of a single density limit was wrong: there is no single second limit, there is a family of sixteen rejection conditions of which at least two are reachable by ordinary encodes of the same source file, so the scope decision for v0.6.0 should be taken against that family rather than against one bound. The unsupported-feature report added in Entry 289 remains valuable independently, because it is what allows each of these to be identified at the picture that causes it instead of surfacing as an unrelated downstream stall.
 
 #### Files Modified:
 
-- tools/streams/tb_h262_prediction_word_cache.sv
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/streams/tb_h262_mixed_raster_pixels.sv
+None.
 
 #### Status:
 
