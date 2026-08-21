@@ -4,6 +4,10 @@
 `define H262_PREDICTION_DESCRIPTOR_DEPTH 4
 `endif
 
+`ifndef H262_SOAK_MAX_STREAM_BYTES
+`define H262_SOAK_MAX_STREAM_BYTES 4194304
+`endif
+
 // Entry 221: complete 72-picture I/P/B progression through the compiled
 // generalized P/B raster wrapper, active tagged DDR writer, request arbiter,
 // memory service, publication shell, and presentation scheduler.  The 128x96
@@ -18,7 +22,11 @@ module tb_h262_live_raster_soak #(
 );
     localparam integer EXPECTED_DESCRIPTOR_DEPTH=
         `H262_PREDICTION_DESCRIPTOR_DEPTH;
-    localparam integer MAX_STREAM_BYTES=1048576;
+    // A 720x480 photographic clip at the encoder's default quality does not
+    // fit the 1 MiB budget the 128x96 corpus needed, and shrinking the encode
+    // to fit changes the content under test.  Size the load buffer for the
+    // real stream instead and leave the override available.
+    localparam integer MAX_STREAM_BYTES=`H262_SOAK_MAX_STREAM_BYTES;
     localparam integer MAX_MEMORY_READ_LATENCY=256;
     localparam [28:0] DDR_BASE=29'h06000000;
     localparam integer DDR_WORDS=327680;
@@ -45,6 +53,11 @@ module tb_h262_live_raster_soak #(
     integer bank2_reference_writes=0;
     integer memory_reads=0,total_cycles=0;
     integer stream_stall_cycles=0,last_stream_index=0;
+    integer progress_interval=0;
+    reg [1023:0] motion_trace_path;
+    integer motion_trace_fd=0,motion_trace_cycle=0,motion_repeat_count=0;
+    reg [10:0] motion_index_d=0;
+    reg motion_valid_d=0;
     integer post_input_cycles=0;
     integer prediction_no_progress_cycles=0;
     integer prediction_trace_fd=0;
@@ -412,6 +425,21 @@ module tb_h262_live_raster_soak #(
         for(i=0;i<DDR_WORDS;i=i+1)ddr_mem[i]=0;
         if(!$value$plusargs("HEX=%s",hex_path))$fatal(1,"missing +HEX");
         if(!$value$plusargs("LEN=%d",stream_len))$fatal(1,"missing +LEN");
+        // A 720x480 replay runs for tens of minutes with no output until it
+        // either completes or fails.  +PROGRESS=<cycles> makes that visible
+        // without changing any functional timing.
+        void'($value$plusargs("PROGRESS=%d",progress_interval));
+        // Entry 294 keyed its duplicate detector on the residual sideband
+        // index, which is a fixed class code (3e non-intra / 3b intra) and is
+        // therefore constant across any run of skipped macroblocks.  This
+        // trace records the 11-bit macroblock index instead, which is the only
+        // field that can distinguish a repeated record from a legitimate skip
+        // run.  Observation only: no RTL signal is driven from here.
+        if($value$plusargs("MOTION_TRACE=%s",motion_trace_path))begin
+            motion_trace_fd=$fopen(motion_trace_path,"w");
+            if(motion_trace_fd==0)$fatal(1,"cannot open motion trace");
+            $fdisplay(motion_trace_fd,"cycle,index,intra,x,y,repeat");
+        end
         if($value$plusargs("PRED_TRACE=%s",prediction_trace_path))begin
             prediction_trace_fd=$fopen(prediction_trace_path,"w");
             if(prediction_trace_fd==0)
@@ -806,6 +834,14 @@ module tb_h262_live_raster_soak #(
         end
         if(!reset)begin
             total_cycles<=total_cycles+1;
+            if((progress_interval!=0)&&
+               ((total_cycles%progress_interval)==0))begin
+                $display("SOAK_PROGRESS cycles=%0d byte=%0d/%0d p_pictures=%0d b_pictures=%0d published=%0d swaps=%0d motion_repeats=%0d",
+                         total_cycles,stream_index,stream_len,
+                         p_pictures,b_pictures,published_references,
+                         display_swaps,motion_repeat_count);
+                $fflush;
+            end
             if(prediction_trace_fd!=0)begin
                 if(prediction_trace_block_start)begin
                     $fdisplay(prediction_trace_fd,
@@ -1262,7 +1298,38 @@ module tb_h262_live_raster_soak #(
         display_scratch_d<=display_scratch;
         display_scratch_bank_d<=display_scratch_bank;
 
-        if(probe_error||pred_error||writer_error||presentation_error)
+        if(probe_error||pred_error||writer_error||presentation_error) begin
+            // Error source 10 is the row-execution watchdog: the engine
+            // started a row and never observed persistence.  The fatal above
+            // reports the surrounding shell but not the engine's own position,
+            // which is what identifies the stalled stage.
+            $display("RASTER_STALL stage=%0d started=%0d active=%0d persisted=%0d row_persisted=%0d timeout=%0d mbi=%0d col=%0d blk=%0d ei=%0d mrow=%0d desc_slot=%0d desc_latched=%0d motion_end=%0d motion_count=%0d pending=%0d request=%0d ready_res=%0d ref_valid=%0d geom=%0d exec_bank=%0d cap_bank=%0d cap_row=%0d cap_desc=%0d desc_active=%0d sample_expected=%0d",
+                prediction.mixed_probe.progress_stage,
+                prediction.mixed_probe.started,
+                prediction.mixed_probe.active,
+                prediction.mixed_probe.persisted_seen,
+                prediction.mixed_probe.row_persisted,
+                prediction.mixed_probe.timeout,
+                prediction.mixed_probe.mbi,
+                prediction.mixed_probe.col,
+                prediction.mixed_probe.blk,
+                prediction.mixed_probe.ei,
+                prediction.mixed_probe.mrow,
+                prediction.mixed_probe.exec_desc_slot,
+                prediction.mixed_probe.exec_desc_count_latched,
+                prediction.mixed_probe.exec_motion_end,
+                prediction.mixed_probe.motion_count,
+                prediction.mixed_probe.pending,
+                prediction.mixed_probe.request,
+                prediction.mixed_probe.ready_res,
+                prediction.mixed_probe.reference_valid,
+                prediction.mixed_probe.geometry_ok,
+                prediction.mixed_probe.execute_bank,
+                prediction.mixed_probe.capture_bank,
+                prediction.mixed_probe.capture_row,
+                prediction.mixed_probe.capture_desc_count,
+                prediction.mixed_probe.desc_active,
+                prediction.mixed_probe.sample_expected);
             $fatal(1,"live raster error byte=%0d shell=%0d/%0d/%0d pred=%0d/%0d writer=%0d presentation=%0d sched=%0d/%0d/%0d/%0d scratch=%0d/%0d queued=%0d/%0d/%0d promote=%0d future=%0d/%0d pending=%0d/%0d display=%0d/%0d p_headers=%0d p_publications=%0d p_rows=%0d p_pictures=%0d engine=%0d/%0d/%0d tap=%0d ei=%0d cache=%0d/%0d addr=%h arb=%0d/%0d/%0d mem=%0d/%0d/%0d",
                    stream_index,probe_error_source,p_probe_error_source,
                    publication_error_detail,pred_error_source,pred_error_detail,
@@ -1287,6 +1354,7 @@ module tb_h262_live_raster_soak #(
                    arbiter.read_owner_prediction,
                    arbiter.read_words_remaining,
                    read_pending,memory_rd,memory_dout_ready);
+        end
 
         if((stream_index==stream_len)&&sequence_end_seen&&!pred_active&&
            !presentation_hold&&!destination_ownership_hold&&!writer.writing&&
@@ -1527,4 +1595,37 @@ module tb_h262_live_raster_soak #(
                   pred_sample_nonzero,pred_half_seen,pred_recon_value,
                   pred_progress,p_wide_probe_error_detail,memory_burstcnt,
                   memory_din,memory_be,framebuffer_swap_reset_count};
+
+    // Producer-side motion emission trace.  A repeat is an emission on the
+    // cycle immediately after another emission carrying the same macroblock
+    // index; consecutive skipped macroblocks advance the index and are not
+    // repeats.
+    always @(posedge clk) begin
+        if(reset)begin
+            motion_trace_cycle<=0;
+            motion_valid_d<=0;
+            motion_index_d<=0;
+        end else begin
+            motion_trace_cycle<=motion_trace_cycle+1;
+            motion_valid_d<=publication.p_controller.wide_motion_valid;
+            if(publication.p_controller.wide_motion_valid)
+                motion_index_d<=publication.p_controller.wide_motion_index;
+            if(publication.p_controller.wide_motion_valid)begin
+                if(motion_valid_d&&
+                   (publication.p_controller.wide_motion_index==motion_index_d))
+                    motion_repeat_count<=motion_repeat_count+1;
+                if(motion_trace_fd!=0)
+                    $fdisplay(motion_trace_fd,"%0d,%0d,%0d,%0d,%0d,%0d",
+                        motion_trace_cycle,
+                        publication.p_controller.wide_motion_index,
+                        publication.p_controller.wide_motion_intra,
+                        publication.p_controller.wide_motion_x,
+                        publication.p_controller.wide_motion_y,
+                        (motion_valid_d&&
+                         (publication.p_controller.wide_motion_index==
+                          motion_index_d))?1:0);
+            end
+        end
+    end
+
 endmodule

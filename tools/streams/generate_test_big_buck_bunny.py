@@ -48,6 +48,11 @@ def main() -> int:
     parser.add_argument("--gop", type=int, default=24)
     parser.add_argument("--bframes", type=int, default=2)
     parser.add_argument("--quality", type=int, default=6)
+    parser.add_argument(
+        "--me-range", type=int, default=None,
+        help="cap the encoder motion search range (ffmpeg -me_range); "
+             "omit to leave the encoder default in place",
+    )
     args = parser.parse_args()
 
     source = args.source.resolve()
@@ -73,6 +78,8 @@ def main() -> int:
         "-sc_threshold", "1000000000", "-mpv_flags", "+strict_gop",
         "-f", "mpeg2video", str(output),
     ]
+    if args.me_range is not None:
+        command[-3:-3] = ["-me_range", str(args.me_range)]
     subprocess.run(command, check=True)
 
     # H.262 6.2.2: an elementary stream ends with sequence_end_code 0x000001B7.
@@ -93,6 +100,8 @@ def main() -> int:
     print(f"bytes   : {len(payload)}")
     print(f"sha256  : {digest}")
     print(f"frames  : {args.frames} at 25 fps, GOP {args.gop}, {args.bframes} B")
+    print(f"quality : q:v {args.quality}, me_range "
+          f"{args.me_range if args.me_range is not None else 'encoder default'}")
     return 0
 
 
