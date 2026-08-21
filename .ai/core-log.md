@@ -468,36 +468,36 @@ Continue from hardware-accepted commit `8d76c43` and its timing-qualified seed-2
 - [x] Passed
 
 ---
-## 243 COMMIT Unreleased 28b717c 2026-08-19T20:45:57-07:00
+## 283 COMMIT Unreleased b9c2ddb 2026-08-20T21:14:39-07:00
 
 #### Coming From:
 
-Unreleased 748fb3f
+Unreleased 1e68cf9
 
 #### Purpose:
 
-Prelaunch the next B prediction cache-miss DDR request at the current registered response boundary without weakening cache timing or transaction ownership.
+Add a real-content test stream at the user's request and diagnose the reproducible playback freeze it exposes on the road to v0.6.0.
 
 #### Outcome:
 
-Commit `00e215f` prelaunches an eligible same-phase B half-pel successor miss while the current registered miss response retires; `8189a46` registers the successor word address and byte select at current-request acceptance so live address arithmetic no longer extends the shared cache input cone. The focused cache, B residual, B intra, P intra, parser-window, mixed-pixel oracle, repeated-download, exact live-raster, and full-resolution publication regressions pass with unchanged pixels, identities, ownership, and traffic. The exact 72-picture soak retains 22 P pictures, 47 B pictures, 71 swaps, 2,267,813 cache hits, 463,835 misses and DDR reads, and zero errors while falling from 13,599,996 to 13,419,996 cycles, a 180,000-cycle or 1.32 percent reduction, with 151,039 B miss prelaunches; the mixed oracle retains 423,936 samples, zero mismatches, and maximum delta two while falling by 10,000 cycles. Timing qualification is not complete: the original fit failed setup at -0.481 ns, the registered-address seed-2 fit reduced that to -0.054 ns, and attempted geometry isolation plus seeds 1, 3, and 4 remained negative, with final reproducible commit `9c57bfd` at -0.693 ns setup, +0.271 ns hold, +3.881 ns recovery, and +1.095 ns removal. No RBF was qualified; at the user's explicit request the timing-failed 4,251,320-byte seed-4 image was subsequently uploaded to the standard MiSTer for diagnostic hardware testing, and FTP readback matched SHA-256 `1f773357e317b87cd012e2ed3a1d306c41810907c5aabefc04d80d59691b3170` byte-for-byte. Diagnostic hardware testing reports no lockup or other instability and video playback appears unchanged from the accepted baseline, confirming functional stability on the tested board while also showing that the modeled 1.32 percent gain is not visually distinguishable. A user-approved fully clean seed-2 rebuild after deleting `db`, `incremental_db`, and `output_files` exactly reproduces the prior near miss: 9 minutes 38 seconds, zero errors, 125 standing warnings, -0.054 ns setup with -0.064 ns TNS, +0.254 ns decoder hold, +2.760 ns recovery, +0.696 ns removal, 29,424 ALMs, 40,548 registers, and RBF SHA-256 `ef8a91fd6c4593baace804685125229df35e083fc9be815578c2a13775acc99c`; focused timing again terminates at P `next_prelaunch_addr` from live `vertical_size`, ruling out stale incremental state.
+The user supplied an archived Big Buck Bunny source and asked for a playable elementary stream, which `generate_test_big_buck_bunny.py` now produces. The source is 854 pels wide and 24 fps, so it is scaled to the framebuffer's 720-pel `SRC_WIDTH` guard and resampled to frame rate code three to engage the cadence accumulator. The stream freezes on hardware after roughly three displayed pictures, reproducibly, with the MiSTer menu and OSD fully responsive and the last decoded picture retained on screen. The retained picture is visually correct with clean gradients and no artefacts, so this is a liveness defect and not a decode-correctness defect, and the user captured video confirming the OSD opens over the frozen frame. HDMI is confirmed as 1920 by 1080 at 60 Hz on the user's panel, matching the assumption recorded in Entry 281.
+
+Two independent defects were found. The first is in the project's own tooling: FFmpeg 8.0.1 no longer emits the H.262 sequence_end_code, while the FFmpeg that produced the committed corpus did. Every committed stream ends with `000001b7`; every stream generated on the current host, including a synthetic `testsrc2` control built with the existing generator's exact flags, does not. The decoder's frontend needs that code to raise `sequence_end_seen`, and the cadence profiler publishes its telemetry overlay only once that is set, so any regenerated stream can never be measured and never quiesces. `generate_test_big_buck_bunny.py` now appends the terminator when the encoder omits it. This affects `generate_test_progressive_compatibility.py` and the other committed generators equally, which are not yet corrected, so the corpus is not currently reproducible on this host as the build environment policy intends.
+
+The second defect is the freeze itself, and the terminator fix does not cure it. A `POST_INPUT_TRACE_CYCLES` watchdog was added to the soak testbench because the existing `STALL_TRACE_CYCLES` guard is gated by `stream_index<stream_len` and therefore cannot observe a decoder that accepts every byte and then fails to quiesce. With a 30-picture terminated clip the failure reproduces exactly in simulation at input byte 60,822 of 107,344, and it is a real error rather than a timeout: `probe_error` fires from `mpeg2_h262_two_picture_probe_p_chain.sv` with source four and publication detail one. That condition rejects a B picture header arriving while `p_publication_count` is below `p_header_count`, and the trace records six P headers observed against five publications. Because `probe_error` feeds `mpeg2_new_phase1_probe_error`, which `MediaPlayer_top_00.svh` treats as a fatal transport error, the transport drains and decoding stops permanently, which is precisely the observed freeze with a live OSD. Earlier hypotheses were eliminated with evidence: capping motion search so no f_code exceeds two did not change the failure, the macroblock symbol sets of the new and working streams are identical, the picture coding extension flags are byte-identical, no custom quantiser matrices are present, and the project's own analyser classifies both streams the same. The distinguishing property is density, since the new stream carries roughly sixteen times the bidirectional macroblock count, which lets a P picture still be persisting when the following B header is parsed.
 
 #### Next Steps:
 
-Retain the functionally exact registered successor-miss implementation but do not deploy it until decoder setup is positive. Start from the near-clean seed-2 registered-address result and shorten or floorplan the existing P following-pixel `next_prelaunch_addr` cone without exposing combinational cache-hit data, then rerun the locked regression set and require a timing-clean build before creating or uploading a hash-qualified RBF; if that cannot close with a narrow cut, revert Entry 243 rather than weakening timing constraints.
+Establish before changing any RTL whether the publication ordering rule is correct or merely too strict for the overlap path. The rule is checked at B header time, but Entry 247 deliberately permits one P transaction to decode while a prior scratch and future sequence is presented, so a B header may legitimately be parsed while its future reference is still persisting provided the B decode itself waits for publication. Determine which of those two readings the surrounding logic actually implements, because the fix differs entirely: if the invariant is correct then the parser must be held until the observed P publishes, most likely by extending the existing `mpeg2_new_p_destination_ownership_hold`, and if the probe is too strict then it must distinguish header parsing from transaction acceptance rather than failing the transport. Do not relax a diagnostic that is protecting a genuine ordering requirement merely to make the stream play. Correct the remaining generator scripts to guarantee the sequence_end_code in the same cycle, then re-validate the corpus and the new stream on hardware with paired controls before treating v0.6.0 as reachable, and note that this liveness defect is a release blocker for real content while the synthetic corpus passes.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
-- MediaPlayer.qsf
-- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/generate_test_big_buck_bunny.py
 - tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
