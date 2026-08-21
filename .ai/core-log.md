@@ -198,29 +198,31 @@ Apply the same latched one- or two-rectangle direct-buffer contract to B reconst
 - [ ] Passed
 
 ---
-## 252 COMMIT Unreleased c9e5a90 2026-08-20T03:46:05-07:00
+## 292 COMMIT Unreleased cba5371 2026-08-21T03:26:14-07:00
 
 #### Coming From:
 
-Unreleased 6218ff5
+Unreleased cba5371
 
 #### Purpose:
 
-Prove a direct-index block-footprint fetcher that retains at most thirty-six prediction words while issuing two ordered DDR reads.
+Compare motion record emission against macroblock count per row to decide whether the skipped-macroblock defect lies in the producer or the consumer.
 
 #### Outcome:
 
-Commit `c9e5a90` adds an uninstantiated standalone block-footprint fetcher and focused regression, so the production Entry 247 netlist remains unaffected. The committed analyzer now rejects any non-rectangular trace footprint and proves exact mixed counts of 54 intra, 5,736 single-reference and 834 dual-reference blocks plus exact long counts of 132 intra, 11,676 single-reference and 8,064 dual-reference blocks; every reference phase is a complete rectangle no wider than two words or taller than nine rows. The fetcher assigns eighteen direct slots per phase, generates each rectangle word once, permits two ordered reads, stores responses through an explicit two-entry slot descriptor FIFO and returns retained data through synchronous phase/row/column lookup. Its regression passes four transactions, six phases and 88 exact words across both width and height limits, delayed service, deterministic command backpressure, simultaneous response and next acceptance, same-cycle acceptance and response, maximum outstanding depth two, direct lookup and invalid phase-count rejection without address loss, duplication or response reassociation.
+No source changed. The comparison rejects the hypothesis it was designed to test and exposes a weakness in the regression suite that is more consequential than the bug being chased.
+
+The producer's motion accounting is correct. Counting emissions on the motion sideband indices shows the failing 720 by 480 stream producing exactly forty-five motion records in every row, which is precisely its `mb_width`, sustained across at least the first eight rows and three hundred and sixty records before the failure occurs. Skipped macroblocks are therefore already carrying motion records, the row-completion arithmetic in `mpeg2_h262_p_motion_residual_raster_engine.sv` is being satisfied, and the leading-skip explanation offered in Entry 291 is not supported. That entry's inference from a first coded macroblock of forty was a correlation drawn from residual metadata only; it did not account for the motion sideband, which is emitted separately and completely.
+
+The control run produced the finding that matters. The corpus soak stream reports eight motion records per row, not forty-five, because `test_live_raster_soak.m2v` is 128 by 96. The regression that has been treated throughout this work as the authoritative gate, the one held at exactly 6,589,996 cycles across every change since Entry 285, exercises an eight by six macroblock frame. The hardware target and every real stream is 720 by 480, which is forty-five by thirty, so the fast gate covers a frame roughly thirty times smaller in macroblock count than the content the core is meant to play. `test_compat_long_gop.m2v` is genuinely 720 by 480, but a complete replay of it costs thirty to forty-five minutes against roughly four for the soak, so the small stream is what actually runs on most changes. This does not invalidate any recorded result, since each measurement is accurate for the stream it was taken on, but it does mean the routine gate is far weaker evidence of 720 by 480 correctness than its use throughout this log implies, and it is a further instance of the coverage problem already recorded for f_code above four and for the queued admission path.
 
 #### Next Steps:
 
-Integrate the proven fetcher behind the P/B wrapper in a simulation-first boundary. Derive each phase's top-left word, one- or two-word width and eight- or nine-row height from the already registered block motion state, route its two ordered requests through an expanded response-owner queue, and replace per-tap cache waits with direct buffered slot lookup while leaving intra blocks, pel arithmetic, residual timing, writer ownership, display priority and presentation unchanged. Require exact mixed pixels and long order before any Quartus build.
+Locate the failure by row rather than by hypothesis. The stream survives at least eight complete rows with correct motion accounting before raising source eight, so capture the engine's full state at the transition into the failing row and compare it against the same transition in a row that succeeds, rather than reasoning forward from stream properties again. Three successive hypotheses have now been rejected by their own controls, which is the method working but also a signal to stop proposing mechanisms and start bisecting the failure point directly. Separately, promote a 720 by 480 stream to the routine gate. The soak's speed advantage comes from a frame size that no longer represents the target, so either generate a short 720 by 480 soak whose replay cost is acceptable or accept the longer run on changes that touch the P or raster paths; continuing to certify those paths on a 128 by 96 frame will keep producing green regressions that say little about real content.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
-- tools/streams/tb_h262_prediction_block_fetcher.sv
-- tools/streams/analyze_prediction_queue_ceiling.py
+None.
 
 #### Status:
 
