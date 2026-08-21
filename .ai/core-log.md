@@ -859,35 +859,32 @@ None.
 - [x] Passed
 
 ---
-## 240 COMMIT Unreleased c667f2c 2026-08-19T18:05:31-07:00
+## 280 COMMIT Unreleased ??? 2026-08-20T18:22:47-07:00
 
 #### Coming From:
 
-Unreleased 3c03570
+Unreleased 62f2654
 
 #### Purpose:
 
-Pipeline non-intra inverse-quantisation issue and retirement so each registered product can enter IDCT capture while the following coefficient product is launched.
+Retime the display raster to approximately 50 Hz so every 25 fps presentation slot receives a uniform 40 ms decode budget instead of alternating 33 and 50 ms budgets.
 
 #### Outcome:
 
-Entry 239 is hardware accepted with every long-GOP and mixed-macroblock frame present in strict order, while profiling its unchanged 14,499,996-cycle exact soak attributes 13,296,807 cycles to decoder backpressure and shows that longer visible P holds come from coded-order reference-plus-first-B dependency rather than a slower P raster engine. Commit `c667f2c` pre-registers the following scan address and retires each current non-intra inverse-quantisation product into IDCT while launching the next product, preserving the two-cycle intra path, mismatch parity, saturation, scan order, and arithmetic; it also separates first-word B metadata detection from registered B cache ownership so geometry qualification cannot enter the shared cache-to-prelaunch timing cone. P-intra latency remains exactly 1,791,186 cycles, B residual replay falls by exactly 7,560 cycles to 3,384,889, the complete mixed oracle retains 423,936 samples with zero mismatches and maximum delta two while falling from 2,679,996 to 2,529,996 cycles, and the exact 72-picture soak retains all 22 P pictures, 47 B pictures, 25 display identities, 71 swaps, cache and DDR counts, and zero errors while falling to 13,599,996 cycles, a 6.21 percent reduction. Parser windows, repeated-download rearm, B-intra, cache-hit, and the complete 791,528-byte publication regression also pass. An initial incremental build exposed a setup violation, and the user-requested clean rebuild reproduced it at -0.207 ns; the registered ownership cut removes that path, after which the normal incremental Quartus 17.0.2 build completes in 9 minutes 8 seconds with zero errors, 124 standing warnings, no critical warning, and global setup, hold, recovery, and removal slack of +0.195, +0.243, +2.951, and +0.619 ns. The fit uses 29,336 ALMs, 40,715 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. Qualified artifact `MediaPlayer_commit240_c667f2c.rbf` is 4,233,504 bytes with SHA-256 `17915fc7b2b2a35c957332abc4ea43516ef7e4286ac4b715445291e41ce021c0`; its deployed MiSTer FTP readback is byte-identical.
+Re-analysis of the Entry 278 baseline finds that long-GOP is limited by presentation slot geometry rather than by decoder throughput, which explains why the decoder reductions accepted in Entries 272, 273, 276, 277 and 278 each removed real cycles without moving cadence. The fixed raster in `mpeg2_video_svga_800x600.sv` is 800 by 600 active within 1056 by 628 total at a 40 MHz dot clock, so the refresh is 60.3165 Hz and `MediaPlayer_top_04.svh` derives exactly one swap opportunity every 16.5792 ms from the `display_v_pos` threshold. The presentation scheduler paces 25 fps material against that grid with a nanosecond credit accumulator whose `CADENCE_STEP_25FPS` of 16,579,200 is precisely that refresh period, and a corrected replay of the accumulator confirms it is functionally right: with every picture ready it presents on a repeating two-and-three refresh pattern averaging 2.4127 refreshes per frame, or 24.9995 fps. The defect is that this pattern makes alternating slots of 33.158 and 49.738 ms rather than uniform ones. Subtracting long's recorded presentation wait from its measured cadence leaves 1,614,781 cycles, or 29.903 ms of actual work per frame at 54 MHz, against a nominal 40 ms budget, so average throughput already satisfies 25 fps while the narrow 33.158 ms slots are missed frequently; Entry 278 measures 2.5424 refreshes per displayed frame against the 2.4127 required. Because the accumulator deliberately saturates at its due threshold so a stalled decode cannot bank credit, every missed slot is lost permanently instead of being recovered later. This commit therefore lengthens vertical blanking by raising `V_BACK` from 23 to 153, making the total 1056 by 758 for a 49.9720 Hz refresh, and retunes `CADENCE_STEP_25FPS` to the matching 20,011,200 ns period so the accumulator continues to track the real refresh. The replayed result is a uniform two-refresh interval with a 40.022 ms slot at 24.986 fps. No decoder, memory, arithmetic or ownership path is touched, and all `v_pos` consumers use thresholds at or below 600 so added vertical blanking cannot disturb line fetch, overlay placement or the swap window.
 
 #### Next Steps:
 
-Reload the deployed core and record both `test_compat_long_gop.m2v` and `test_compat_mixed_macroblocks.m2v` at nominal 60 fps on a first load and an immediate consecutive second load without reloading the core. For each stream, report the final visible frame, settled USER, POWER, and DISK states, any corruption or stale-screen behavior, and the frame-zero-to-final interval; upload the recordings so counter and independent raster cadence can be compared with Entry 239's 5.055-second long-GOP and 1.952-second mixed-macroblock baselines.
+Build cleanly and validate on hardware against the Entry 278 control, requiring the long-GOP stream to preserve every byte, all 72 pictures, all 71 swaps and zero error flags while cadence rises from 23.723813 fps toward the 24.986 fps paced ceiling. The result also measures the decode work distribution directly, because uniform 40.022 ms slots help every frame whose work exceeds 33.158 ms but remove the 49.738 ms relief that frames above 40.022 ms currently rely upon; a partial gain therefore quantifies how much of the long stream exceeds 40 ms and identifies whether the input transport hold in `MediaPlayer_top_00.svh` must be relaxed next so decode of the following picture can overlap presentation using the third reference bank that Entry 276 already allocated. If hardware confirms the mechanism, a follow-up may retune the dot clock to land exactly 50.000 Hz and recover the residual 0.056 percent, and the mixed-macroblock stream should be re-measured separately because its frame rate code and work profile differ.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- tools/streams/tb_h262_p_intra_macroblocks.sv
-- tools/streams/tb_h262_b_residual_streaming.sv
-- tools/streams/tb_h262_live_raster_soak.sv
+- rtl/mpeg2_video_svga_800x600.sv
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 
 #### Status:
 
-- [x] Built
+- [ ] Built
 - [ ] Passed
 
 ---
