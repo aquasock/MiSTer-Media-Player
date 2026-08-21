@@ -501,31 +501,38 @@ Retain the functionally exact registered successor-miss implementation but do no
 - [ ] Passed
 
 ---
-## 242 COMMIT Unreleased 748fb3f 2026-08-19T20:05:43-07:00
+## 282 COMMIT Unreleased ??? 2026-08-20T19:32:17-07:00
 
 #### Coming From:
 
-Unreleased c667f2c
+Unreleased c98aeef
 
 #### Purpose:
 
-Measure picture-type and stage-specific decoder backpressure before selecting the next timing-safe throughput optimization.
+Replace the priority-encoded stall counters with unconditional hold, overlap and availability counters so the presentation-hold bottleneck can be attributed before any functional change is attempted.
 
 #### Outcome:
 
-Commit `748fb3f` adds simulation-only input-stall, picture-type, transform-output, raster, cache-lookup, DDR request and response, emit, store, writer, and presentation counters to the exact live-raster regression without changing functional RTL or expected results. The 13,599,996-cycle 72-picture soak passes unchanged and attributes 12,385,071 input-stalled cycles to the decoder, split as 146,937 I, 3,222,891 P, and 9,015,236 B cycles; B raster occupies 4,408,213 cycles, including 2,152,961 registered lookup-wait and 1,180,560 DDR-response cycles, while destination ownership causes zero input stalls and presentation occupies 893,283 cycles. The 2,529,996-cycle mixed-pixel run independently attributes 1,309,851 of 2,164,749 decoder-stalled cycles to B pictures and passes 423,936 oracle samples with zero mismatches and maximum delta two. Cache, eight-refill parser-window, P-intra, B-residual, B-intra, repeated-download, and full 791,528-byte publication regressions pass; the latter retains 22 P pictures, 47 B pictures, 25 publications, zero destination holds or overwrites, and completed presentation. Because this commit changes only a simulation testbench, no Quartus build or MiSTer deployment is required.
+Review of `mpeg2_h262_hardware_cadence_profiler.sv` establishes that the three existing stall counters cannot answer the question Entry 281 leaves open. Their attribution is a strict priority chain in which a non-ready decoder is counted first, presentation hold second and destination hold only third, so the categories are mutually exclusive by construction. A destination hold that overlaps a presentation hold contributes nothing to `destination_stall_cycles`, which means the zero destination stall standing since Entry 276 does not establish that a destination bank was free, and the Entry 281 claim that the third reference bank is provably idle is withdrawn. The same chain makes decoder and presentation stall inseparable whenever both conditions hold. The profiler's `decoder_ready` input is confirmed to be the pre-hold `mpeg2_new_decoder_stream_ready`, so the holds do not feed back into their own counter and the existing totals remain valid for what they measure; they simply cannot decompose the overlap.
+
+This commit therefore adds five unconditional counters that increment whenever their condition is true, independent of any other counter: total presentation hold cycles, total destination hold cycles, cycles where both holds are asserted together, cycles where presentation hold is asserted while a scratch destination is actually available, and cycles where presentation hold is asserted while a promotion is pending. The fourth is the direct test of the withdrawn claim, because it measures storage that is free while the parser is blocked, and the fifth separates the two disjoint reasons the scheduler asserts the hold. Two pure observability outputs are added to `mpeg2_h262_b_presentation_scheduler.sv` to expose the existing internal `queued_scratch_available` and `promotion_pending` terms; no scheduler logic, ownership rule or presentation behaviour changes. The telemetry snapshot grows from 21 to 26 words and its format word advances to schema version two. Because the overlay renders one four-pixel row per word from `OVERLAY_Y`, 26 rows occupy 104 lines and would overrun the 600-line active area at the present origin, so `OVERLAY_Y` moves from 512 to 492 and `OVERLAY_HEIGHT` from 84 to 104, ending at line 596 exactly as the 21-word overlay does today. `decode_hardware_cadence.py` is updated in the same commit because its `WORDS` and `Y0` constants must match the RTL or telemetry decode fails. The scheduler regression additionally regains the reset-aware consecutive-window monitor that was written and validated against the unmodified 60.3165 Hz scheduler during Entry 280 and then lost to that entry's revert; its window counts remain the 60 Hz values of one, three and two.
 
 #### Next Steps:
 
-Await approval for a focused B prediction refill optimization that launches the next cache-miss DDR request at the current registered response boundary when the following tap or pixel address is already known, while preserving the four-entry fully associative cache, one-outstanding-DDR contract, registered cache-hit timing, exact bidirectional rounding, display order, cadence lifetime, reload behavior, and all pixel and transaction regressions; require a clean Quartus timing result before hardware deployment because the shared cache-to-B prelaunch cone has previously been timing-sensitive.
+Build cleanly, confirm the scheduler and soak regressions still pass, and take one long-GOP hardware reading against the Entry 278 baseline to populate the new counters, expecting delivered cadence to stay at approximately 23.6 fps because this commit is instrumentation only and changes no functional path. Read the result as a decision gate rather than a performance measurement. If presentation hold is largely concurrent with an available scratch destination, a bounded one-picture lookahead during presentation is justified and the input transport hold in `MediaPlayer_top_00.svh` can be relaxed only for that verified-free case rather than removed. If instead the hold is dominated by pending promotion, or a destination is rarely free while held, then the lookahead cannot help and the ownership and promotion sequence itself becomes the target. Treat the 20.7 percent of presentation stall computed in Entry 281 as a necessary lower bound rather than a sufficient one, because six consecutive commits have shown removed cycles migrating into another stall category rather than into cadence. Mixed-macroblock remains outside the user's current long-GOP scope and is not measured here.
 
 #### Files Modified:
 
-- tools/streams/tb_h262_live_raster_soak.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- MediaPlayer_top_05.svh
+- MediaPlayer_top_07.svh
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/tb_h262_b_presentation_scheduler.sv
 
 #### Status:
 
-- [x] Built
+- [ ] Built
 - [ ] Passed
 
 ---
