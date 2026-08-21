@@ -1,4 +1,36 @@
 ---
+## 300 COMMIT Unreleased dc7da26 2026-08-21T15:36:44-07:00
+
+#### Coming From:
+
+Unreleased 7daf716
+
+#### Purpose:
+
+Apply the three coupled corrections approved in Entry 299 and record what they did.
+
+#### Outcome:
+
+The approved change was written in full and does not work, so it is not committed. All three corrections were applied together: a dedicated `p_row_persisted` output carrying `mix_row_persisted` driving the producer's `row_retired`, a clear of `outstanding_rows` in the per-picture initialisation block so its zero point is defined, and a widening to three bits with saturating increment and decrement. The failure moved from byte 156,882 to byte 30,477, which is the same forward move both Entry 297 attempts produced, and the run ends in the bench's two hundred million cycle timeout rather than the watchdog.
+
+Instrumenting the corrected design settles what is actually wrong with the approved plan. Over picture one the counts are exactly balanced and correct: thirty rows produced, thirty retires delivered, thirty P engine persistence pulses, and thirty of those with `mixed_select` asserted. The pipeline then halts without processing a second picture. Balanced accounting and a defined zero point are therefore not sufficient, and the premise of Entry 299 was wrong. The completion latch's comparison of `outstanding_rows` against the literal one is the wrong mechanism irrespective of where the counter is zeroed, because it asks an absolute question of a running count whose value at the final retire depends on how far the engine's persistence lags the producer's parsing. It is satisfiable only by coincidence, which is precisely what the spurious B retires were supplying.
+
+Reverting restored the recorded signature exactly, and the stock run now quantifies the routing defect precisely. The producer emits 390 rows, the P engine persists 390 rows, and 390 of those carry `mixed_select`, yet the producer's retire input receives 1,171 events. The excess 781 are B-sourced. The P side of the accounting has never been in doubt at any point in this investigation; only the retire input and the completion latch are defective.
+
+#### Next Steps:
+
+Replace the completion condition with a differential test rather than an absolute one, and keep `outstanding_rows` for bank backpressure only. When the producer emits the picture's final row, latch the number of retires still owed at that instant, decrement that latched value on each P-sourced retire, and fire completion when it reaches zero. Expressed that way the latch cannot be affected by how far persistence lags parsing, by the counter's zero point, or by any constant offset, and it fires on the final row's own retire rather than on a coincidence. The dedicated `p_row_persisted` retire source from Entry 299 remains necessary and should be applied with it, since a differential count is still corrupted by 781 foreign decrements. Do not reuse `outstanding_rows` to carry completion semantics. Validate on the failing clip, the 48 frame prefix, and the corpus soak whose 6,589,996 cycle count must not move. Three repairs have now failed, all of them by substituting one signal or zero point while leaving the absolute comparison in place, so a candidate that does not remove that comparison should not be attempted.
+
+#### Files Modified:
+
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 299 COMMIT Unreleased 7daf716 2026-08-21T15:17:00-07:00
 
 #### Coming From:
