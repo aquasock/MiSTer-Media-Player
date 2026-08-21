@@ -3,9 +3,18 @@
 // This module deliberately has no MPEG inputs.  The compressed stream can
 // therefore change framebuffer contents, but it cannot change display timing.
 //
-// Timing is the standard 800x600, 40 MHz-pixel-clock geometry:
-//   horizontal: 800 active + 40 front + 128 sync + 88 back = 1056
-//   vertical:   600 active +  1 front +   4 sync + 23 back =  628
+// Entry 280: the 40 MHz dot clock and the 800x600 active area are unchanged,
+// but blanking is retimed to 1000x800 total so the refresh is exactly 50.000 Hz
+// instead of 60.3165 Hz.  This makes every 25 fps presentation slot a uniform
+// two-refresh 40.000 ms window rather than the alternating 33.158/49.738 ms
+// windows the 60 Hz grid produced.  The 88-pixel back porch is deliberately
+// preserved because it is the framebuffer line-fetch window; the reduction is
+// taken from the front porch and sync width.  CADENCE_STEP_25FPS in the
+// presentation scheduler is the refresh period and must track this geometry.
+//
+// Timing is the 800x600, 40 MHz-pixel-clock geometry:
+//   horizontal: 800 active + 16 front +  96 sync + 88 back = 1000
+//   vertical:   600 active +  1 front +   4 sync + 195 back =  800
 // Both sync pulses are positive polarity for this mode.
 
 module mpeg2_video_svga_800x600
@@ -21,15 +30,15 @@ module mpeg2_video_svga_800x600
 );
 
 localparam integer H_ACTIVE = 800;
-localparam integer H_FRONT  = 40;
-localparam integer H_SYNC   = 128;
+localparam integer H_FRONT  = 16;
+localparam integer H_SYNC   = 96;
 localparam integer H_BACK   = 88;
 localparam integer H_TOTAL  = H_ACTIVE + H_FRONT + H_SYNC + H_BACK;
 
 localparam integer V_ACTIVE = 600;
 localparam integer V_FRONT  = 1;
 localparam integer V_SYNC   = 4;
-localparam integer V_BACK   = 23;
+localparam integer V_BACK   = 195;
 localparam integer V_TOTAL  = V_ACTIVE + V_FRONT + V_SYNC + V_BACK;
 
 reg [11:0] h_count;

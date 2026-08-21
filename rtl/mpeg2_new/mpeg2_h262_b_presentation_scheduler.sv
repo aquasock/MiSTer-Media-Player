@@ -61,12 +61,22 @@ reg [1:0] last_bound_reference_bank;
 reg [7:0] last_bound_reference_count;
 
 // Entry 230: the fixed 40 MHz 800x600 raster produces one swap window every
-// 1056*628 pixels.  For the current 25 fps compatibility boundary, accumulate
-// source-picture credit in pixel-clock units.  Saturating at the next due slot
+// 1000*800 pixels.  For the current 25 fps compatibility boundary, accumulate
+// source-picture credit in nanoseconds.  Saturating at the next due slot
 // prevents a decode stall from banking credit and replaying ready pictures on
 // consecutive refreshes.
+//
+// Entry 280: STEP is the real refresh period and must be retuned whenever the
+// raster changes.  At the former 1056*628 geometry the 60.3165 Hz grid paced a
+// correct 24.9995 fps average, but only by alternating 33.158 and 49.738 ms
+// slots, and long-GOP decode missed the narrow slot often enough to settle at
+// 23.723813 fps.  The 1000*800 raster is exactly 50.000 Hz, so STEP is exactly
+// half of LIMIT and DUE equals STEP.  Because the due comparison is made before
+// the credit advances, a frame becomes due every second refresh in a uniform
+// 40.000 ms slot at exactly 25 fps, and a saturated slot still cannot replay on
+// the immediately following refresh.
 localparam [25:0] CADENCE_LIMIT_25FPS = 26'd40000000;
-localparam [25:0] CADENCE_STEP_25FPS  = 26'd16579200;
+localparam [25:0] CADENCE_STEP_25FPS  = 26'd20000000;
 localparam [25:0] CADENCE_DUE_25FPS =
     CADENCE_LIMIT_25FPS-CADENCE_STEP_25FPS;
 reg [25:0] cadence_credit;
