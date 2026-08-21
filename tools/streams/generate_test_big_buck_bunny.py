@@ -76,7 +76,19 @@ def main() -> int:
     ]
     subprocess.run(command, check=True)
 
+    # H.262 6.2.2: an elementary stream ends with sequence_end_code 0x000001B7.
+    # FFmpeg 8.0.1's mpeg2video muxer no longer emits it, while the ffmpeg that
+    # produced the committed corpus did.  The decoder's frontend needs that code
+    # to raise sequence_end_seen, and the cadence profiler only publishes its
+    # telemetry overlay once that is set, so a stream without it can never be
+    # measured and never quiesces.  Append it when the encoder omits it.
     payload = output.read_bytes()
+    SEQUENCE_END = b"\x00\x00\x01\xb7"
+    if not payload.endswith(SEQUENCE_END):
+        payload += SEQUENCE_END
+        output.write_bytes(payload)
+        print("note    : appended missing sequence_end_code")
+
     digest = hashlib.sha256(payload).hexdigest()
     print(f"stream  : {output}")
     print(f"bytes   : {len(payload)}")

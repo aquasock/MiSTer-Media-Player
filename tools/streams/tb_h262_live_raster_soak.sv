@@ -13,7 +13,8 @@ module tb_h262_live_raster_soak #(
     parameter integer MIXED_PIXEL_MODE=0,
     parameter integer MEMORY_READ_LATENCY=1,
     parameter integer SWAP_WINDOW_CYCLES=10000,
-    parameter integer STALL_TRACE_CYCLES=0
+    parameter integer STALL_TRACE_CYCLES=0,
+    parameter integer POST_INPUT_TRACE_CYCLES=0
 );
     localparam integer EXPECTED_DESCRIPTOR_DEPTH=
         `H262_PREDICTION_DESCRIPTOR_DEPTH;
@@ -44,6 +45,7 @@ module tb_h262_live_raster_soak #(
     integer bank2_reference_writes=0;
     integer memory_reads=0,total_cycles=0;
     integer stream_stall_cycles=0,last_stream_index=0;
+    integer post_input_cycles=0;
     integer prediction_no_progress_cycles=0;
     integer prediction_trace_fd=0;
     integer row_trace_fd=0,row_trace_cycle=0;
@@ -1291,6 +1293,36 @@ module tb_h262_live_raster_soak #(
            !arbiter.read_outstanding&&!read_pending)
             quiet_cycles<=quiet_cycles+1;
         else quiet_cycles<=0;
+
+        // Entry 283: the STALL_TRACE_CYCLES watchdog above is gated by
+        // stream_index<stream_len, so it cannot see a decoder that accepted
+        // every byte and then failed to quiesce.  Watch that case separately.
+        if((stream_index==stream_len)&&(quiet_cycles==0))
+            post_input_cycles<=post_input_cycles+1;
+        else if(quiet_cycles!=0)
+            post_input_cycles<=0;
+        if((POST_INPUT_TRACE_CYCLES!=0)&&
+           (post_input_cycles==POST_INPUT_TRACE_CYCLES))
+            $fatal(1,"post-input stall seq_end=%0d pred_active=%0d phold=%0d dhold=%0d writing=%0d rd_outstanding=%0d rd_pending=%0d pictures=%0d published=%0d swaps=%0d b_pics=%0d p_pics=%0d reorder=%0d run_closed=%0d inflight=%0d runcount=%0d scratch=%0d%0d next=%0d future=%0d/%0d overlap=%0d queued=%0d/%0d/%0d/%0d promotion=%0d display=%0d/%0d/%0d frame_waiting=%0d err=%0d/%0d/%0d/%0d",
+                   sequence_end_seen,pred_active,presentation_hold,
+                   destination_ownership_hold,writer.writing,
+                   arbiter.read_outstanding,read_pending,
+                   picture_count,published_references,display_swaps,
+                   b_pictures,p_pictures,
+                   scheduler.reorder_active,scheduler.run_closed,
+                   scheduler.decode_inflight,scheduler.run_picture_count,
+                   scheduler.scratch0_pending,scheduler.scratch1_pending,
+                   scheduler.next_present_scratch_bank,
+                   scheduler.future_frame_pending,
+                   scheduler.future_reference_pending,
+                   scheduler.overlap_decode_open,
+                   scheduler.queued_run_active,scheduler.queued_run_closed,
+                   scheduler.queued_decode_inflight,
+                   scheduler.queued_run_picture_count,
+                   scheduler.promotion_pending,
+                   scheduler.display_scratch,scheduler.display_scratch_bank,
+                   scheduler.display_frame_bank,frame_waiting,
+                   probe_error,writer_error,pred_error,presentation_error);
 
         if(quiet_cycles==30000)begin
             $display("LIVE_RASTER_RESULT bytes=%0d p_rows=%0d p=%0d b_rows=%0d b=%0d published=%0d pictures=%0d promotions=%0d display_identity=%0d swaps=%0d last_p_temporal=%0d ref_writes=%0d bank2_ref_writes=%0d scratch0_writes=%0d scratch1_writes=%0d ddr_reads=%0d cache=%0d/%0d/%0d cycles=%0d read=%0d recon=%0d presentation=%0d queued=%0d promoted=%0d error=%0d/%0d/%0d/%0d",
