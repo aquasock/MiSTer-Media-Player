@@ -65,7 +65,12 @@ mpeg2_h262_picture_bookkeeper bookkeeper(
  .qfs_block_index(qfs_block_index),.qfs_block_start(qfs_block_start),.qfs_write_en(qfs_write_en),
  .qfs_write_index(qfs_write_index),.qfs_write_value(qfs_write_value),.qfs_block_end(qfs_block_end));
 
-reg p_persistence_d;reg[7:0] p_publication_count;reg publication_error;reg[2:0] publication_error_detail_reg;reg picture_complete_pulse;
+// Entry 285: Entry 227 lets a B header be accepted before its future
+// reference publishes, binding the publication into the open transaction
+// later.  Checking publication at header time therefore rejects a legal
+// ordering.  Track the wait instead and enforce the real invariant, which is
+// that a B must not COMPLETE against an unpublished reference.
+reg b_reference_publication_pending;reg p_persistence_d;reg[7:0] p_publication_count;reg publication_error;reg[2:0] publication_error_detail_reg;reg picture_complete_pulse;
 reg[1:0] active_frame_bank_reg,completed_frame_bank_reg;reg[7:0] picture_count_reg;
 reg reference_frame_valid_reg;reg[1:0] reference_frame_bank_reg,previous_reference_frame_bank_reg;
 reg[7:0] reference_promotion_count_reg;
@@ -99,7 +104,7 @@ assign second_picture_420_parsed=base_second_picture_420_parsed||(picture_count_
 
 always @(posedge clk)begin
  if(reset)begin
-  p_persistence_d<=0;p_publication_count<=0;publication_error<=0;publication_error_detail_reg<=0;picture_complete_pulse<=0;active_frame_bank_reg<=0;completed_frame_bank_reg<=0;
+  b_reference_publication_pending<=0;p_persistence_d<=0;p_publication_count<=0;publication_error<=0;publication_error_detail_reg<=0;picture_complete_pulse<=0;active_frame_bank_reg<=0;completed_frame_bank_reg<=0;
   picture_count_reg<=0;reference_frame_valid_reg<=0;reference_frame_bank_reg<=0;previous_reference_frame_bank_reg<=0;reference_promotion_count_reg<=0;
   picture_window<=0;picture_header_capture<=0;picture_header_second_byte<=0;p_header_count<=0;consecutive_candidate_seen<=0;
   b_picture_observed<=0;b_picture_inflight<=0;b_persistence_verified<=0;b_header_count<=0;b_persist_count<=0;
@@ -121,10 +126,8 @@ always @(posedge clk)begin
       if(b_header_count!=8'hff)b_header_count<=b_header_count+1'b1;
       // In coded order the future reference P precedes each B.  Do not accept
       // a B transaction if an observed P header has not actually persisted.
-      if(p_publication_count<p_header_count)begin
-       publication_error<=1;
-       if(!publication_error)publication_error_detail_reg<=3'd1;
-      end
+      if(p_publication_count<p_header_count)
+       b_reference_publication_pending<=1;
      end else if((stream_data[5:3]==3'b001)&&consecutive_candidate_seen&&(p_publication_count<2))begin
       publication_error<=1;
       if(!publication_error)publication_error_detail_reg<=3'd2;
@@ -155,6 +158,7 @@ always @(posedge clk)begin
    end
    else begin
     if(p_publication_count!=8'hff)p_publication_count<=p_publication_count+1'b1;
+    b_reference_publication_pending<=0;
     picture_complete_pulse<=1;completed_frame_bank_reg<=active_frame_bank_reg;
     active_frame_bank_reg<=(active_frame_bank_reg==2'd2)?2'd0:(active_frame_bank_reg+1'b1);
     if(picture_count_reg!=8'hff)picture_count_reg<=picture_count_reg+1'b1;
@@ -164,6 +168,11 @@ always @(posedge clk)begin
    end
   end else if(b_persisted_now)begin
    b_persistence_verified<=1;b_picture_inflight<=0;
+   // The deferred binding never arrived before this B completed.
+   if(b_reference_publication_pending)begin
+    publication_error<=1;
+    if(!publication_error)publication_error_detail_reg<=3'd1;
+   end
    if(b_persist_count!=8'hff)b_persist_count<=b_persist_count+1'b1;
   end
 
