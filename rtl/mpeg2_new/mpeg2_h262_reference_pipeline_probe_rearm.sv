@@ -254,6 +254,7 @@ mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
  .horizontal_size(horizontal_size),.vertical_size(vertical_size),
  .shift_right_map(48'd0),
  .residual_valid(mix_residual_valid),.residual_index(mix_residual_index),.residual_value(mix_residual_value),
+ .motion_vector_x(p_forward_vector_x),.motion_vector_y(p_forward_vector_y),
  .residual_store_write(mix_residual_store_write),
  .residual_store_write_address(mix_residual_store_write_address),
  .residual_store_write_data(mix_residual_store_write_data),

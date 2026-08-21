@@ -10,7 +10,8 @@
 // Sparse residual metadata remains bounded
 // to 16 coded blocks / 64 coefficient events (implementation limits, not H.262).
 //
-// kate - Commit 193: picture-signalled horizontal/vertical f_code values 1..4
+// kate - Commit 193: picture-signalled horizontal/vertical f_code values 1..9
+// (Entry 304 widened this from 1..4; the vector datapath is 13 bits.)
 // now drive residual length, differential reconstruction and component wrap.
 // kate - Commit 198: the 512-byte array is a refillable parser window rather
 // than a whole-slice capacity limit. Two trailing bytes overlap refills so a
@@ -42,8 +43,8 @@ module mpeg2_h262_p_wide_motion_syntax_probe
 
     output reg         motion_event_valid,
     output reg [10:0]  motion_event_index,
-    output reg signed [7:0] motion_event_x,
-    output reg signed [7:0] motion_event_y,
+    output reg signed [12:0] motion_event_x,
+    output reg signed [12:0] motion_event_y,
     output reg         motion_event_intra,
 
     output reg [5:0]   picture_mb_width,
@@ -199,13 +200,15 @@ reg [2:0] mbtype_len;
 reg current_has_motion, current_has_pattern, current_has_quant;
 reg current_is_intra;
 
-reg signed [7:0] predictor_x, predictor_y;
-reg signed [7:0] current_motion_x, current_motion_y;
+// Entry 304: f_code 1..9 needs a 13-bit vector.  r_size is f_code-1, so the
+// H.262 range is +/-(16<<r_size), which reaches +/-4096 at f_code 9.
+reg signed [12:0] predictor_x, predictor_y;
+reg signed [12:0] current_motion_x, current_motion_y;
 reg signed [5:0] motion_code_pending;
 reg [10:0] motion_vlc_bits;
 reg [3:0] motion_vlc_len;
-reg [2:0] motion_residual_shift;
-reg [1:0] motion_residual_count;
+reg [7:0] motion_residual_shift;
+reg [3:0] motion_residual_count;
 
 reg [8:0] cbp_vlc_bits;
 reg [3:0] cbp_vlc_len;
@@ -319,8 +322,8 @@ wire [10:0] current_mb_index =
     row_base_index + {5'd0,current_col};
 wire [4:0] qscale_next =
     {qscale_shift[3:0], parser_current_bit};
-wire [2:0] motion_residual_next =
-    {motion_residual_shift[1:0], parser_current_bit};
+wire [7:0] motion_residual_next =
+    {motion_residual_shift[6:0], parser_current_bit};
 
 function automatic [6:0] match_mba_code;
     input [10:0] bits;

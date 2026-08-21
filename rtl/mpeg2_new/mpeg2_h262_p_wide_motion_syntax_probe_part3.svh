@@ -354,9 +354,9 @@
                         current_picture_is_p &&
                         (pce_next[39:36]==4'h8) &&
                         (pce_next[35:32]>=4'd1) &&
-                        (pce_next[35:32]<=4'd4) &&
+                        (pce_next[35:32]<=4'd9) &&
                         (pce_next[31:28]>=4'd1) &&
-                        (pce_next[31:28]<=4'd4) &&
+                        (pce_next[31:28]<=4'd9) &&
                         (pce_next[17:16]==2'b11) &&
                         pce_next[14] &&
                         !pce_next[13];
@@ -371,9 +371,9 @@
                         (pce_next[39:36]==4'h8) &&
                         !(geometry_supported &&
                           (pce_next[35:32]>=4'd1) &&
-                          (pce_next[35:32]<=4'd4) &&
+                          (pce_next[35:32]<=4'd9) &&
                           (pce_next[31:28]>=4'd1) &&
-                          (pce_next[31:28]<=4'd4) &&
+                          (pce_next[31:28]<=4'd9) &&
                           (pce_next[17:16]==2'b11) &&
                           pce_next[14] &&
                           !pce_next[13]);

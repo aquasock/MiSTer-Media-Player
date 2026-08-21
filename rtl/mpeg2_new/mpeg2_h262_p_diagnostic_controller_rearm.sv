@@ -58,7 +58,7 @@ wire wide_row_complete_now,wide_row_final;
 wire wide_motion_valid;
 wire wide_motion_intra;
 wire[10:0] wide_motion_index;
-wire signed[7:0] wide_motion_x,wide_motion_y;
+wire signed[12:0] wide_motion_x,wide_motion_y;
 wire[5:0] wide_mb_width,wide_mb_height;
 wire[10:0] wide_mb_count;
 wire[10:0] wide_block_read_address;
@@ -136,7 +136,10 @@ wire [5:0] wide_sideband_index =
     wide_motion_valid ? (wide_motion_intra ? 6'h3b : 6'h3e) :
                         residual_index_raw;
 wire signed [15:0] wide_sideband_value =
-    wide_motion_valid ? $signed({wide_motion_x,wide_motion_y}) :
+    // Entry 304: the packed form cannot hold two 13-bit components; the
+    // engine now takes vectors on the dedicated channel and this value is
+    // only a placeholder for motion records.
+    wide_motion_valid ? 16'sd0 :
                         residual_value_raw;
 wire wide_row_produced=wide_mode&&residual_valid_raw&&
     (residual_index_raw==6'h3f)&&
@@ -156,13 +159,13 @@ assign p_forward_vector_valid =
 
 assign p_forward_vector_x =
     wide_mode ?
-        (wide_motion_valid ? {{5{wide_motion_x[7]}},wide_motion_x} : 13'sd0) :
+        (wide_motion_valid ? wide_motion_x : 13'sd0) :
     legacy_seen ? {{5{legacy_mvx0[7]}},legacy_mvx0} :
     (four_mb_seen||two_mb_seen) ? 13'sd0 : vector_x_raw;
 
 assign p_forward_vector_y =
     wide_mode ?
-        (wide_motion_valid ? {{5{wide_motion_y[7]}},wide_motion_y} : 13'sd0) :
+        (wide_motion_valid ? wide_motion_y : 13'sd0) :
     legacy_seen ? {{5{legacy_mvy0[7]}},legacy_mvy0} :
     (four_mb_seen||two_mb_seen) ? 13'sd0 : vector_y_raw;
 

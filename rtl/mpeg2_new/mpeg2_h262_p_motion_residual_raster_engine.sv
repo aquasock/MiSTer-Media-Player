@@ -30,6 +30,11 @@ module mpeg2_h262_p_motion_residual_raster_engine
     input wire residual_valid,
     input wire [5:0] residual_index,
     input wire signed [15:0] residual_value,
+    // Entry 304: motion vectors ride a dedicated 13-bit channel rather than
+    // the 16-bit residual sideband, which cannot carry two 13-bit components.
+    // The sideband index still identifies the record as motion (3e/3b).
+    input wire signed [12:0] motion_vector_x,
+    input wire signed [12:0] motion_vector_y,
     output wire residual_store_write,
     output wire [16:0] residual_store_write_address,
     output wire signed [15:0] residual_store_write_data,
@@ -162,9 +167,9 @@ function automatic [7:0] clip;
     end
 endfunction
 
-function automatic signed [7:0] chroma_half_vector;
-    input signed [7:0] v;
-    reg signed [8:0] a;
+function automatic signed [12:0] chroma_half_vector;
+    input signed [12:0] v;
+    reg signed [13:0] a;
     begin
         if(v<0) begin
             a=-$signed(v);
@@ -186,12 +191,12 @@ endfunction
 
 // kate - Commit 166: no reset loop on this array. Synchronous read plus ordered
 // write/read phases allow Quartus to infer block RAM instead of 1350x16 flops.
-(* ramstyle = "M10K" *) reg [16:0] motion_mem [0:MAX_MB-1];
+(* ramstyle = "M10K" *) reg [26:0] motion_mem [0:MAX_MB-1];
 reg [10:0] motion_count;
-reg [16:0] motion_word;
-wire mb_intra=motion_word[16];
-wire signed [7:0] mb_mvx=$signed(motion_word[15:8]);
-wire signed [7:0] mb_mvy=$signed(motion_word[7:0]);
+reg [26:0] motion_word;
+wire mb_intra=motion_word[26];
+wire signed [12:0] mb_mvx=$signed(motion_word[25:13]);
+wire signed [12:0] mb_mvy=$signed(motion_word[12:0]);
 
 (* ramstyle = "M10K" *) reg [14:0] desc_mem [0:2047];
 reg [14:0] desc_word;
@@ -256,12 +261,12 @@ wire [28:0] roff=(reference_bank_latched==2'd1)?BANK_OFF:
                  (reference_bank_latched==2'd2)?29'h00040000:29'd0;
 wire [2:0] er=ei[5:3], el=ei[2:0];
 
-wire signed [7:0] exec_mvx =
+wire signed [12:0] exec_mvx =
     (blk<4)?mb_mvx:chroma_half_vector(mb_mvx);
-wire signed [7:0] exec_mvy =
+wire signed [12:0] exec_mvy =
     (blk<4)?mb_mvy:chroma_half_vector(mb_mvy);
-wire signed [8:0] exec_int_x=$signed(exec_mvx)>>>1;
-wire signed [8:0] exec_int_y=$signed(exec_mvy)>>>1;
+wire signed [12:0] exec_int_x=$signed(exec_mvx)>>>1;
+wire signed [12:0] exec_int_y=$signed(exec_mvy)>>>1;
 wire half_x=exec_mvx[0];
 wire half_y=exec_mvy[0];
 
@@ -589,7 +594,7 @@ always @(posedge clk) begin
             persisted_seen<=0;
             progress_stage<=4'd1;
             motion_count<=11'd1;
-            motion_mem[0]<={(residual_index==6'h3b),residual_value};
+            motion_mem[0]<={(residual_index==6'h3b),motion_vector_x,motion_vector_y};
             bank_desc_count[0]<=0;
             bank_desc_count[1]<=0;
             bank_last_desc_word[0]<=0;
@@ -656,7 +661,7 @@ always @(posedge clk) begin
                     if(!error) error_source<=5'd2;
                 end else begin
                     motion_mem[motion_count]<=
-                        {(residual_index==6'h3b),residual_value};
+                        {(residual_index==6'h3b),motion_vector_x,motion_vector_y};
                     motion_count<=motion_count+1'b1;
                 end
             end else if(residual_index==6'h3c) begin

@@ -80,14 +80,14 @@ endfunction
 wire [6:0] motion_match =
     match_motion_code(motion_vlc_bits_next,motion_vlc_len_next);
 
-function automatic signed [7:0] reconstruct_mv;
-    input signed [7:0] pred;
+function automatic signed [12:0] reconstruct_mv;
+    input signed [12:0] pred;
     input signed [5:0] code;
-    input [2:0] residual;
+    input [7:0] residual;
     input [3:0] f_code;
     reg [5:0] mag;
-    reg [2:0] r_size;
-    reg signed [10:0] delta, vec, low_limit, high_limit, vector_range;
+    reg [3:0] r_size;
+    reg signed [17:0] delta, vec, low_limit, high_limit, vector_range;
     begin
         r_size=f_code-1'b1;
         if(code==0) delta=0;
@@ -95,16 +95,16 @@ function automatic signed [7:0] reconstruct_mv;
         else begin
             if(code<0) mag=-code; else mag=code;
             delta=(($signed({1'b0,mag})-1) <<< r_size) +
-                  $signed({8'd0,residual}) + 1;
+                  $signed({10'd0,residual}) + 1;
             if(code<0) delta=-delta;
         end
         vec=$signed(pred)+delta;
-        low_limit=-(11'sd16 <<< r_size);
-        high_limit=(11'sd16 <<< r_size)-1'b1;
-        vector_range=11'sd32 <<< r_size;
+        low_limit=-(18'sd16 <<< r_size);
+        high_limit=(18'sd16 <<< r_size)-1'b1;
+        vector_range=18'sd32 <<< r_size;
         if(vec>high_limit) vec=vec-vector_range;
         else if(vec<low_limit) vec=vec+vector_range;
-        reconstruct_mv=vec[7:0];
+        reconstruct_mv=vec[12:0];
     end
 endfunction
 
