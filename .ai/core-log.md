@@ -1,4 +1,41 @@
 ---
+## 296 COMMIT Unreleased 489aa0d 2026-08-21T14:37:48-07:00
+
+#### Coming From:
+
+Unreleased 3992070
+
+#### Purpose:
+
+Retarget the regression loop onto a real 720 by 480 clip that must play to completion, and make that clip fast enough to iterate against.
+
+#### Outcome:
+
+The source is now `big_buck_bunny_480p_stereo_10s.avi`, encoded by the committed generator at 720 by 480, 25 fps, 250 frames, GOP 24 with two B pictures and encoder default quality, giving `test_bbb_10s_480p.m2v` at 1,178,034 bytes with sha256 `b392b65d`. The encode was validated against ffmpeg and the project analyzer before any simulation time was spent on it, so a bench failure is attributable to the decoder rather than to the stream. Note that the bench previously capped `MAX_STREAM_BYTES` at one mebibyte, which is why the preceding interrupted session was encoding at `q8` with `me_range 16` and landing just under that limit; that was shrinking the encode to fit the bench rather than testing the content, and the cap is now a define defaulting to four mebibytes.
+
+The decisive change is the simulator. Icarus interprets this design at roughly 21,300 cycles per second, which puts the 250 picture replay beyond two hours and makes a deadlock investigation impractical. The same bench and the same file list built under Verilator 5.032 completes in 45 seconds, a factor of about forty, and reproduces the failure bit for bit: identical `byte=156882`, identical `shell=10/10/0`, identical `p_rows=450` and `p_pictures=15`. That equivalence is what licenses using the faster build. Both drivers are committed so either can be run.
+
+A 48 frame prefix of the same clip decodes cleanly and completely, consuming all 125,948 bytes across 15 P and 31 B pictures with `error=0/0/0/0` and presentation complete. The `$fatal` that follows it is not a decode failure but the bench's hardcoded golden values for the 128 by 96 corpus, which cannot apply to a 720 by 480 stream; the bench currently has no way to express success for any other geometry. The full clip fails at P picture 16 with raster error source 10, which is the row execution watchdog rather than any parsing or accounting check, after waiting the full `24'hffffff` cycles for a persistence that never arrives. The stall state places the engine at `mbi=1349`, `col=44`, `mrow=29`, `blk=5` and `ei=63`, which is the final element of the final block of the final macroblock of the final row, with `motion_count` equal to `motion_end` at 1350 and capture already advanced to row 30. Nothing is pending or requested, the reference is valid and geometry is fine, so the picture is fully accounted for and only the completion handshake fails to fire.
+
+Entry 294 is superseded. Its duplicate detector keyed on the residual sideband index, which is the fixed class code `6'h3e` for non-intra and `6'h3b` for intra and is therefore constant across any run of skipped macroblocks by construction. Tracing the 11 bit `wide_motion_index` instead, which is the only field that can separate a repeat from a skip run, records zero true repeats across 13,501 emissions while finding 1,506 back to back emissions whose index advances by one, in 202 runs of which the longest is 43. The run length histogram contains eight runs of exactly seven, which are the events Entry 294 reported as seven or more identical intakes. The producer emits one record per macroblock as contracted, the held assertion described in entries 293 through 295 does not exist, and the producer side repair those entries queued up must not be written.
+
+#### Next Steps:
+
+Instrument the row persistence handshake at the end of a picture and compare P picture 16 against P picture 15, which persists correctly, rather than proposing a mechanism from the stall state. The scheduler reports `run_closed` with no decode in flight, a pending future frame on bank 2 and `scratch1_pending` set, which is consistent with bank rotation being involved, but that is a correlation and the recent history of this investigation is four mechanisms rejected by their own controls. Separately, give the bench a way to express completion for a geometry other than the corpus, since the current golden constants make a clean 720 by 480 run indistinguishable from a failure. The user has directed that compatibility with the existing MiSTer Media Player structure is no longer required and that this work should be shaped around what the SuperStation needs; that target is not yet described anywhere in the repository and must be defined before any rearchitecture is attempted.
+
+#### Files Modified:
+
+- tools/streams/generate_test_big_buck_bunny.py
+- tools/streams/run_live_raster_soak.sh
+- tools/streams/run_live_raster_soak_verilator.sh
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 295 COMMIT Unreleased 3992070 2026-08-21T13:04:45-07:00
 
 #### Coming From:
