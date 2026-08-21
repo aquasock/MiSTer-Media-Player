@@ -43,3 +43,11 @@ c5_pin_model_dump.txt
 **/.DS_Store
 response_timestamp.txt
 
+
+# Large local media and generated regression artifacts. Per core.md these are
+# produced locally by the committed scripts in tools/streams/ rather than
+# committed as binaries. The small legacy .m2v files directly under
+# tools/streams/ predate that policy and remain tracked.
+*.avi
+*.mp4
+tools/streams/generated_compatibility/

@@ -25,8 +25,7 @@ from pathlib import Path
 import h262common as h
 
 DEFAULT_SOURCE = (
-    Path(__file__).resolve().parents[2]
-    / ".ai" / "archived_results" / "big_buck_bunny_480p_stereo.avi"
+    Path(__file__).resolve().parent / "big_buck_bunny_480p_stereo.avi"
 )
 DEFAULT_OUTPUT = (
     Path(__file__).resolve().parent
