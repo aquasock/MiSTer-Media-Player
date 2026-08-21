@@ -405,39 +405,35 @@ Retain the qualified Entry 245 hardware core and the negative locality evidence.
 - [ ] Passed
 
 ---
-## 245 COMMIT Unreleased 2a26c05 2026-08-20T00:00:02-07:00
+## 285 COMMIT Unreleased ??? 2026-08-20T21:43:04-07:00
 
 #### Coming From:
 
-Unreleased 8d76c43
+Unreleased ddcc8f3
 
 #### Purpose:
 
-Measure real MiSTer picture cadence and decoder bottlenecks without requiring HDMI recordings for each development iteration.
+Make a late reference publication a condition both the scheduler and the publication probe wait for rather than fail-stop on, so real photographic content stops freezing after three pictures.
 
 #### Outcome:
 
-Commits `71c59dd`, `d54e3f3`, and `2a26c05` add timing-isolated decoder-domain counters, a stable versioned and checksummed cross-clock snapshot, a row-serialized machine-readable video overlay, its deterministic PNG decoder, and an automated FTP/SSH MiSTer acquisition runner. The profiler is observational only and no result feeds decode, DDR, publication, presentation, or LEDs. The focused profiler passes all 21 words with picture counts `02020403`, cadence 29 and checksum `7a5b03de`; cache, repeated-download, P-intra, B-residual, parser-window, exact mixed-pixel and complete long-GOP publication regressions retain their locked functional results. The mixed oracle keeps 423,936 samples, zero mismatches, maximum delta two and 499,551/71,329/0 cache accounting; the full publication run keeps 22 P, 47 B, 25 promotions, final display identity 25 and zero holds, overwrites or errors. A fully clean seed-2 Quartus 17.0.2 build completes in 9 minutes 34 seconds with zero errors and 125 standing warnings. Final timing is positive at +0.181 ns global setup, +0.195 ns decoder setup, +7.561 ns video setup, +0.244 ns hold, +2.927 ns recovery and +0.951 ns removal; the stable snapshot and trailing-ready synchronizers have narrowly scoped first-stage CDC exceptions while every settling and ordinary logic path remains timed. Qualified artifact `MediaPlayer_commit245_2a26c05.rbf` is 4,281,080 bytes with SHA-256 `71f4180d07dc57f1d981c793c8af34277e7a4d7eee1f528bce2753cb1ee25b38`. Automated MiSTer acquisition accepts both streams exactly with zero error flags. Long GOP accepts 791,528 bytes, completes 25 reference plus 47 B pictures, displays 72 pictures through 71 swaps in 264,581,138 cycles or 4.899651 seconds, and measures 14.490829 fps; decoder, presentation and destination stalls are 161,508,107/54,737,767/0, prediction request/acceptance-wait/response counts are 5,523,274/8,483,066/54,535,837, and writer wait is 2,264,405. Mixed accepts 366,071 bytes, completes 9 reference plus 15 B pictures, displays 24 pictures through 23 swaps in 97,132,985 cycles or 1.798759 seconds, and measures 12.786594 fps; stalls are 54,845,205/16,974,046/0, prediction counts are 1,763,554/2,731,151/17,424,973, and writer wait is 736,622. These results closely validate Entry 244's video estimates while providing exact internal attribution without HDMI recordings.
+Entry 284 established that a P reference publishing later than assumed trips two independent fail-stops, and that relaxing either alone is insufficient. This commit changes both, and nothing else. In `mpeg2_h262_b_presentation_scheduler.sv` the run-closing branch no longer raises `presentation_error` when a non-B header arrives while `future_reference_pending` is set with no coincident publication. It instead latches a deferred close, recording the overlap eligibility that the immediate path would have computed from `p_picture_start` and `reference_overlap_header`, and completes that close inside the existing Entry 227 deferred-binding block at the moment the publication actually binds. The correctness argument for waiting is that the run's future reference is the P preceding the run in coded order, so its slice data is fully parsed before any B header of that run is seen and its outstanding work is DDR persistence alone; the publication therefore cannot require further compressed input and the wait cannot deadlock against the transport. To keep that guarantee, `presentation_hold` is extended to assert while the deferred close is outstanding, stopping input during the wait, and the deferred state is cleared on reset and on every existing error path. The identical fail-stop on the queued-run branch is deliberately left unchanged because no evidence yet shows it being reached, and widening the change would enlarge the risk boundary without evidence.
+
+In `mpeg2_h262_two_picture_probe_p_chain.sv` the header-time comparison of `p_publication_count` against `p_header_count` no longer raises `publication_error`. It latches that the in-flight B transaction is waiting for its future reference, clears that state when the publication arrives, and raises `publication_error` with detail one only if the B transaction reaches `b_persisted_now` while still waiting. This preserves the genuine invariant, which is that a B must not complete against an unpublished reference, while permitting the deferred binding Entry 227 introduced. The distinction matters beyond diagnostics because `b_user_success` is gated by `b_accept_error`, so a latched publication error permanently suppresses the completion edge the scheduler waits on and converts a transient ordering condition into a permanent freeze.
 
 #### Next Steps:
 
-Retain the qualified profiler and use its exact hardware baselines for Entry 246's proposal-first prediction-read optimization. Preserve the timing-safe registered cache cone and 25 fps presentation gate, compare every candidate against both decoded screenshots, and reserve HDMI video for final visual verification only after telemetry reaches stable 25 fps.
+Validate in simulation before any Quartus build, requiring the complete corpus soak to remain exactly at 6,589,996 cycles with 22/22/47/47 publications and zero errors, the focused scheduler regression to keep its 60.3165 Hz cadence counts of one, three and two with a minimum present gap of two, and the 30-picture Big Buck Bunny clip to run to completion with correct publication and swap counts instead of failing at input byte 60,822. Only then take a clean build and a paired hardware comparison against the Entry 278 baseline on both the corpus long-GOP stream and the Big Buck Bunny stream, expecting cadence to be unchanged because this is a liveness fix rather than a throughput change. If the Big Buck Bunny clip completes in simulation but a longer run still stalls, suspect the queued-run branch left unchanged here and treat that as the next boundary. Resume the 25 fps scratch-pool work only after real content plays end to end, since v0.6.0 cannot ship a core that freezes on ordinary video.
 
 #### Files Modified:
 
-- MediaPlayer.sdc
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_07.svh
-- files.qip
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/run_hardware_cadence.py
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
 
 #### Status:
 
-- [x] Built
-- [x] Passed
+- [ ] Built
+- [ ] Passed
 
 ---
 ## 284 COMMIT Unreleased ddcc8f3 2026-08-20T21:38:55-07:00
