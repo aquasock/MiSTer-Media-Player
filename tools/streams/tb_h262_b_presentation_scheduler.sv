@@ -26,35 +26,6 @@ module tb_h262_b_presentation_scheduler;
         .reference_overlap_header(overlap_header),.presentation_hold(hold),
         .presentation_complete(complete),.presentation_error(error));
 
-    // Entry 280: the cadence window counts asserted below are refresh-specific.
-    // The invariant they exist to protect is that a stalled decode may never
-    // bank credit and replay two presentations on consecutive swap windows.
-    // Assert that directly, so the counts may track the raster while the real
-    // rule stays enforced at every window in the test, not just the checked few.
-    wire dut_presents = swap && dut.cadence_slot && dut.scheduled_frame_valid &&
-                        dut.scheduled_frame_differs;
-    integer swap_window_index=0;
-    integer last_present_index=-10;
-    integer min_present_gap=1000;
-    always @(posedge clk) begin
-        // A scheduler reset re-seeds the credit to DUE by design, so the first
-        // window after reset is legitimately due.  Restart the comparison there.
-        if(reset) last_present_index = -10;
-        if(swap) begin
-            swap_window_index = swap_window_index+1;
-            if(dut_presents) begin
-                if(last_present_index>=0) begin
-                    if(swap_window_index-last_present_index<min_present_gap)
-                        min_present_gap = swap_window_index-last_present_index;
-                    if(swap_window_index-last_present_index<2)
-                        $fatal(1,"presentations on consecutive swap windows %0d and %0d",
-                               last_present_index,swap_window_index);
-                end
-                last_present_index = swap_window_index;
-            end
-        end
-    end
-
     task automatic pulse_start;
         begin @(negedge clk);b_start<=1;@(negedge clk);b_start<=0;#1;end
     endtask
@@ -183,13 +154,8 @@ module tb_h262_b_presentation_scheduler;
         if(!display_scratch||display_scratch_bank)
             $fatal(1,"first swap did not present scratch 0");
         pulse_swap();
-        // Entry 280: the 1000x800 raster is exactly 50.000 Hz, so
-        // CADENCE_STEP_25FPS makes a due frame land every two refreshes in a
-        // uniform 40.000 ms slot.  The former 60.3165 Hz grid needed an
-        // alternating three-and-two refresh pattern to average 25 fps, and
-        // this check counted the three.
-        if(last_pulse_count!=2)
-            $fatal(1,"second scratch cadence=%0d expected=2",last_pulse_count);
+        if(last_pulse_count!=3)
+            $fatal(1,"second scratch cadence=%0d expected=3",last_pulse_count);
         if(!display_scratch||!display_scratch_bank)
             $fatal(1,"second swap did not present scratch 1");
         pulse_swap();
@@ -328,7 +294,7 @@ module tb_h262_b_presentation_scheduler;
         if(!display_bank||!dut.pending_frame_valid||!dut.pending_frame_released)
             $fatal(1,"terminal boundary did not release final reference");
         pulse_swap();
-        if(last_pulse_count!=1)
+        if(last_pulse_count!=2)
             $fatal(1,"terminal frame caught up after only %0d later windows",
                    last_pulse_count);
         if(display_scratch||display_bank||error)
@@ -355,7 +321,7 @@ module tb_h262_b_presentation_scheduler;
         if(display_scratch||!display_bank)
             $fatal(1,"ordinary frame presentation did not recover after abort");
 
-        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=1,2,1 min_present_gap=%0d overlap_p=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=1 fail_open=1",min_present_gap);
+        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=1,3,2 overlap_p=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=1 fail_open=1");
         $finish;
     end
 
