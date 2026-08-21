@@ -1,4 +1,48 @@
 ---
+## 295 COMMIT Unreleased 3992070 2026-08-21T13:04:45-07:00
+
+#### Coming From:
+
+Unreleased cba5371
+
+#### Purpose:
+
+Retarget the thirteen RTL standards citations that name the absent `core-standards.md` so they resolve against `core-reference.md`.
+
+#### Outcome:
+
+Entry 289 recorded that thirteen RTL files cite `core-standards.md` as their standards authority while that file is absent from the repository, leaving the conformance rationale for those modules unrecoverable. Its absence is confirmed, and this commit closes the gap by pointing the citations at `core-reference.md`, which `core.md` already names as the project's authoritative reference library.
+
+The retarget was checked before it was made rather than assumed to be a straight rename. `core-reference.md` declares `source_id: H262` in its controlled source catalog and carries atomic conformance records `H262-001` through `H262-026` in section 10.2, and every identifier the RTL headers cite resolves there to a real `record_id`: `H262-006`, `H262-010` and `H262-014` named in the B core probe, and the `H262-007` to `H262-022` range named in the wide motion syntax probe. The identifiers were therefore never wrong and no conformance claim needed re-deriving; only the filename was stale. That makes this a repair of a broken pointer rather than a change of authority, which matters because a citation that silently named a missing file was indistinguishable from one that had never been substantiated.
+
+The two filenames are the same length, so no header comment rewrapped and each file's diff is a single token on a single line. Every changed line was verified to be a `//` comment before committing, so the synthesized netlist cannot differ from `cba5371` and no Quartus build was run; the Built box is left unchecked rather than carrying a tick that no compile earned. One cosmetic inconsistency was left as found to keep the diff minimal: two of the thirteen headers write the path as `.ai/core-reference.md` while the other eleven name the file bare.
+
+#### Next Steps:
+
+Resume the Entry 294 line of work, which is unaffected by this commit and remains the v0.6.0 blocker. Entry 294 established that the raster engine consumes motion validity as a level and that the producer holds `wide_motion_valid` asserted across a picture boundary, multiplying one event into seven or more identical motion records and inflating `motion_count` past what the row-completion test can satisfy. The instruction there was to establish why the assertion is held before changing anything, and that remains the next action. The emission state machine is in the wide motion syntax probe, which sets `motion_event_valid` at two sites and clears it at two others, and it reaches the controller as `wide_motion_valid` through the `wide_general_probe` instance; trace its state across the duplicated run and determine whether the hold expresses a stall that should instead withhold validity, or a genuine repeat that a downstream handshake was expected to absorb. Prefer the producer-side fix if both are viable, since an accept handshake would change a contract the rest of the design already satisfies. Three gaps recorded earlier still stand and are not addressed here: the routine regression gate runs a 128 by 96 frame against a 720 by 480 target, no corpus stream exercises the queued admission path, and the artifact on the MiSTer has not been hardware-validated since Entry 289.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_syntax_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_syntax_probe_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_p_four_mb_two_row_copy_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_p_four_mb_two_row_syntax_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_p_macroblock_420_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_residual_parser_420.sv
+- rtl/mpeg2_new/mpeg2_h262_p_two_mb_copy_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_p_two_mb_syntax_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 294 COMMIT Unreleased cba5371 2026-08-21T04:06:03-07:00
 
 #### Coming From:
