@@ -853,6 +853,11 @@ module tb_h262_live_raster_soak #(
                 $display("ROWCOUNT produced=%0d retired=%0d mix_pers=%0d mix_pers_sel=%0d pic_pers=%0d mixed_edge=%0d",
                          prod_count,ret_count,mixpers_count,mixsel_pers_count,
                          picpers_count,mixedge_count);
+                $display("WATCHDOG timeout=%0d started=%0d persisted=%0d active=%0d arms=%0d",
+                         prediction.mixed_probe.timeout,
+                         prediction.mixed_probe.started,
+                         prediction.mixed_probe.persisted_seen,
+                         prediction.mixed_probe.active, arm_count);
                 $fflush;
             end
             if(prediction_trace_fd!=0)begin
@@ -1755,6 +1760,65 @@ module tb_h262_live_raster_soak #(
                 $display("ORDER COMPLETE cycle=%0d hdr=%0d outstanding=%0d",
                     row_event_cycle,publication.p_header_count,
                     publication.p_controller.wide_general_probe.outstanding_rows);
+        end
+    end
+
+    // Entry 302 next step: the producer parks in R_SUCCESS after picture 15 and
+    // never starts picture 16.  Name the failing term in its picture-start
+    // condition by observation.
+    reg piccap_d=0;
+    integer arm_count=0;
+    reg persisted_d=0;
+    reg [23:0] timeout_d=0;
+    integer startcode_count=0;
+    always @(posedge clk) begin
+        if(reset)begin piccap_d<=0; startcode_count<=0; end
+        else begin
+            piccap_d<=publication.p_controller.wide_general_probe.picture_capture;
+            timeout_d<=prediction.mixed_probe.timeout;
+            if((prediction.mixed_probe.timeout==24'hffffff)&&(timeout_d!=24'hffffff))begin
+                arm_count<=arm_count+1;
+                $display("ARM n=%0d cycle=%0d hdr=%0d persisted=%0d started=%0d",
+                    arm_count+1,row_event_cycle,publication.p_header_count,
+                    prediction.mixed_probe.persisted_seen,
+                    prediction.mixed_probe.started);
+            end
+            if(publication.p_controller.wide_general_probe.wide_unsupported_now)
+                $display("UNSUPPORTED cycle=%0d hdr=%0d fcode_h=%0d fcode_v=%0d intra_vlc=%0d geom=%0d mbw=%0d mbh=%0d",
+                    row_event_cycle,publication.p_header_count,
+                    publication.p_controller.wide_general_probe.p_forward_f_code_horizontal,
+                    publication.p_controller.wide_general_probe.p_forward_f_code_vertical,
+                    publication.p_controller.wide_general_probe.p_intra_vlc_format,
+                    publication.p_controller.wide_general_probe.geometry_supported,
+                    publication.p_controller.wide_general_probe.picture_mb_width,
+                    publication.p_controller.wide_general_probe.picture_mb_height);
+            if(persisted_d&&!prediction.mixed_probe.persisted_seen)
+                $display("PERSIST_FALL cycle=%0d hdr=%0d timeout=%0d started=%0d",
+                    row_event_cycle,publication.p_header_count,
+                    prediction.mixed_probe.timeout,
+                    prediction.mixed_probe.started);
+            persisted_d<=prediction.mixed_probe.persisted_seen;
+            if(publication.p_controller.wide_general_probe.picture_capture&&!piccap_d)begin
+                startcode_count<=startcode_count+1;
+                $display("PICSTART n=%0d cycle=%0d hdr=%0d state=%0d geom=%0d cand=%0d proof=%0d rearm_pend=%0d hold=%0d waiting=%0d",
+                    startcode_count+1,row_event_cycle,publication.p_header_count,
+                    publication.p_controller.wide_general_probe.parser_state,
+                    publication.p_controller.wide_general_probe.geometry_supported,
+                    publication.p_controller.wide_general_probe.wide_candidate,
+                    publication.p_controller.wide_general_probe.proof_done,
+                    publication.p_controller.wide_general_probe.producer_rearm_pending,
+                    publication.p_controller.wide_general_probe.parse_hold,
+                    publication.p_controller.wide_general_probe.row_waiting);
+            end
+            if(publication.p_controller.wide_general_probe.picture_capture&&
+               publication.p_controller.wide_general_probe.picture_count)
+                $display("PICEVAL cycle=%0d hdr=%0d type=%0d geom=%0d is_p=%0d wide_mode=%0d gen_mode=%0d",
+                    row_event_cycle,publication.p_header_count,
+                    publication.p_controller.wide_general_probe.picture_next[5:3],
+                    publication.p_controller.wide_general_probe.geometry_supported,
+                    publication.p_controller.wide_general_probe.current_picture_is_p,
+                    publication.p_controller.wide_mode,
+                    publication.p_controller.general_mode);
         end
     end
 
