@@ -440,32 +440,37 @@ Retain the qualified profiler and use its exact hardware baselines for Entry 246
 - [x] Passed
 
 ---
-## 244 COMMIT Unreleased 8d76c43 2026-08-19T23:05:34-07:00
+## 284 COMMIT Unreleased ddcc8f3 2026-08-20T21:38:55-07:00
 
 #### Coming From:
 
-Unreleased 28b717c
+Unreleased b9c2ddb
 
 #### Purpose:
 
-Allow Quartus to optimize the already-registered P following-pixel prelaunch address without changing prediction sequencing or cache behavior.
+Determine whether the publication ordering rule that freezes real content is a correct invariant or an over-strict diagnostic, before changing any decoder logic.
 
 #### Outcome:
 
-Commit `8d76c43` removes only the synthesis `preserve` attributes from P `next_prelaunch_addr` and `next_prelaunch_valid`; both signals remain clocked registers with unchanged update conditions, lookup timing, and one-outstanding transaction behavior. P-intra, B-residual, four-entry cache accounting, repeated-download rearm, eight-refill parser-window, mixed-pixel, exact 72-picture live-raster, and full 791,528-byte publication regressions all pass unchanged. The mixed oracle retains 423,936 samples, zero mismatches, maximum delta two, 499,551/71,329/0 cache counts, and 6,803 B miss prelaunches in 2,519,996 cycles. The live soak retains 22 P pictures, 47 B pictures, 25 publications, 71 swaps, 2,267,813/463,835/0 cache counts, 463,835 DDR reads, 151,039 B miss prelaunches, 13,419,996 cycles, and zero decoder, writer, or presentation errors. The full publication run retains 25 promotions, final identity 25, zero displayed-bank overwrites, and completed presentation. A fully clean seed-2 Quartus 17.0.2 build after removing `db`, `incremental_db`, and `output_files` completes in 9 minutes 24 seconds with zero errors and 124 standing warnings. Physical synthesis can now retime eligible logic and final timing closes with +0.094 ns global and decoder setup slack, +0.249 ns global hold, +3.803 ns global recovery, +0.895 ns removal, +14.826 ns focused decoder recovery, +7.364 ns video setup, and zero TNS or focused violations; the former P prelaunch cone remains the limiting decoder path but is positive. The fit uses 29,421 ALMs, 40,603 registers, 4,027,379 memory bits, 504 RAM blocks, 65 DSP blocks, and 3 PLLs. Qualified artifact `MediaPlayer_commit244_8d76c43.rbf` is 4,234,900 bytes with SHA-256 `0767ca4b1d87c595b9cd300133504518710ef5a659f9288153ca35130e68e66a`; its MiSTer FTP readback is byte-identical. Hardware acceptance passes. The user reports playback visually unchanged, with long GOP POWER and USER solid plus eleven DISK blinks, and mixed macroblocks POWER and USER solid plus DISK dark. Geometry-rectified 59.94 fps analysis independently recovers both the embedded counter and unobscured raster in strict unit-step order from frame 0 through 71 for long GOP and frame 0 through 23 for mixed macroblocks, with no missing identity or visible partial-frame corruption. Counter/raster first-to-final spans are 4.938/4.955 seconds for long GOP and 1.818/1.818 seconds for mixed macroblocks. The 30,976,315-byte long recording has SHA-256 `b130c9914d9ac9f36f27268fe92af5e720bdcfd046f54b572bc587aa8fba6ed7`; the 19,615,496-byte mixed recording has SHA-256 `4b5fe2425cbfbba244807707db13068205e81f0b325765b39d359e8d9626cef0`.
+It is both, and neither fix alone is sufficient. The question posed by Entry 283 is answered against the source: `mpeg2_h262_b_presentation_scheduler.sv` was given deferred future-reference binding by Entry 227, which explicitly accepts a B header arriving before its future reference publishes and binds that publication into the already open transaction when it later arrives. `mpeg2_h262_two_picture_probe_p_chain.sv` predates that capability and still fails at B header time whenever `p_publication_count` is below `p_header_count`. The two are in direct contradiction, and `MediaPlayer_top_05.svh` sides with the scheduler because its ownership hold arms only for a P successor, while the probe's own `p_hold_effective` is deliberately released as soon as a B candidate appears. Synthetic content never exposed the disagreement because its P pictures always publish before the following B header is parsed.
+
+A simulation-only lenient probe, which counts the late-publication case instead of failing on it, isolates the two layers. The corpus control is unaffected: the complete soak replay is byte-identical at 6,589,996 cycles with 22/22/47/47 publications and zero errors, so relaxing that check does not perturb any accepted behaviour. The Big Buck Bunny clip, however, then fails one byte later at 60,823 instead of 60,822, this time with `presentation_error` from the scheduler rather than `probe_error`. The probe was therefore masking a deeper defect rather than causing the freeze by itself.
+
+The scheduler defect is at the run-closing branch. When a non-B header arrives while `future_reference_pending` is set and no publication is arriving in that same cycle, the scheduler does not wait; it clears `reorder_active`, `run_closed` and `decode_inflight` and raises `presentation_error`. The recorded state `sched=0/0/0/2` matches that branch exactly, including the stale run count. The apparent `run_picture_count>=2` cause was excluded by checking coded order directly: the clip is `IPBBPBBPBB...` with at most two consecutive B pictures, structurally identical to both corpus streams, so no third B exists and the run simply failed to close. The single physical trigger for both failures is a P reference that publishes later than either layer assumes, which real photographic content produces because its P pictures carry far denser residuals and roughly sixteen times the bidirectional macroblock count of the synthetic corpus. Both layers respond to lateness by fail-stopping rather than by applying backpressure, and because `b_user_success` is gated by `b_accept_error`, a latched publication error also permanently suppresses the completion edge the scheduler waits on, which is why the hardware symptom is a permanent freeze with a correct final picture and a fully responsive OSD rather than a visible error.
 
 #### Next Steps:
 
-Continue from hardware-accepted commit `8d76c43` and its timing-qualified seed-2 image. Preserve the registered B miss prelaunch optimization and now-closed P prelaunch cone; select the next compatibility or throughput target under the standard proposal-first workflow.
+Treat lateness as a legal condition to be waited on rather than an illegal state to be trapped, in both layers, and change nothing else. In the scheduler, the run-closing branch should hold the pending non-B header until `future_reference_pending` clears instead of raising `presentation_error`, which requires proving that the publication is genuinely guaranteed to arrive so the hold cannot deadlock, and requires the parser backpressure to reach the transport without violating the Entry 247 overlap contract. In the probe, the header-time comparison should be replaced by a check at the point the B transaction actually binds or consumes its future reference, so that Entry 227's deferred binding is permitted while a genuine unpublished-reference consumption is still caught. Bound both changes in simulation before any Quartus build, requiring the corpus soak to stay exactly at 6,589,996 cycles with zero errors and the Big Buck Bunny clip to complete with correct publication counts, then validate on hardware with a paired control. Do not relax the probe alone, because the lenient experiment proves the scheduler fails immediately afterwards. This defect is a v0.6.0 release blocker for real content, and it should be fixed before resuming the 25 fps scratch-pool work, since a compatibility-focused player cannot ship a core that freezes after three pictures of ordinary video.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- .gitignore
+- tools/streams/generate_test_big_buck_bunny.py
 
 #### Status:
 
 - [x] Built
-- [x] Passed
+- [ ] Passed
 
 ---
 ## 283 COMMIT Unreleased b9c2ddb 2026-08-20T21:14:39-07:00
