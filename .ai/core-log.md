@@ -228,28 +228,33 @@ Integrate the proven fetcher behind the P/B wrapper in a simulation-first bounda
 - [ ] Passed
 
 ---
-## 251 COMMIT Unreleased 6218ff5 2026-08-20T03:16:07-07:00
+## 291 COMMIT Unreleased cba5371 2026-08-21T03:12:15-07:00
 
 #### Coming From:
 
-Unreleased 0c8d2c4
+Unreleased cba5371
 
 #### Purpose:
 
-Measure the full-trace performance ceiling of block-scoped prediction address, ordered request and returned-word queues before changing production RTL.
+Determine whether the unrecognised residual event that raises raster error source eight originates in the producer or in sideband routing.
 
 #### Outcome:
 
-Commit `6218ff5` adds optional exact prediction tracing and a deterministic block-scoped queue replay without changing production RTL. The mixed trace self-audits 499,551 hits, 71,329 misses, 6,624 block starts and ends, 423,936 exact pixels, zero errors and the unchanged 2,279,996-cycle default result; its exact ten-cycle serialized baseline is 2,919,996 cycles. A depth-two ordered queue with a retained block-word buffer predicts 2,332,586 cycles, a 20.12 percent reduction and hardware-scaled 18.756 fps, while depths four through sixteen improve by only thirty more cycles; the absolute prediction-memory ceiling is 19.189 fps. The long trace self-audits 2,267,813 hits, 463,835 misses, 19,872 blocks, 71 swaps, zero errors and the unchanged 12,689,996-cycle default result; its exact ten-cycle baseline is 16,869,996 cycles. Depth two predicts 12,848,592 cycles, a 23.84 percent reduction and hardware-scaled 22.929 fps, with an absolute ceiling of 23.215 fps. Mixed blocks require at most 34 distinct words and long blocks at most 36, while depths above two are ineffective because block-start address production supplies enough lead. The queue is therefore a material next step but cannot reach 25 fps without later non-memory overlap.
+No source changed. Both hypotheses from Entry 290 are now settled, and one conclusion formed during this work was disproven by its own control before it could be acted on.
+
+The routing hypothesis is rejected. `mpeg2_h262_reference_pipeline_probe_rearm.sv` does mux two producers into the engine's residual input, a plan adapter and the shared `p_residual_sample_*` path, and `mpeg2_h262_two_picture_probe_p_chain.sv` muxes the B sideband onto that same shared path under `b_transport` while the consumer gates it with a different signal, `b_select`, computed in another module from unrelated state. That asymmetry looked like a leak. Instrumenting every cycle where `b_transport` is high, `b_select` is low and a residual sample is valid records zero such cycles across the failing stream, so no B sideband reaches the P engine and the plan adapter emits only `A2FF` on the metadata index. Neither is the source.
+
+The producer is emitting the event, but the reason is not the one it first appeared to be. Tracing every metadata-class emission shows that at `G_SAMPLES` the pipeline forwards the transform output directly with `replay_index<=tidx`, so coefficient positions sixty through sixty-three occupy indices `6'h3c` through `6'h3f`, the same indices the raster engine reads as macroblock number, block identity and row marker. That collision is real, but it is not the defect: the corpus control emits exactly the same pattern, index `6'h3f` at that state carrying coefficient value `0xffff`, twenty-six such events in the same window as the failing stream, and it decodes cleanly. The index space is overloaded by design and disambiguated by consumer state, so the failure is a state disagreement rather than an encoding collision.
+
+The discriminator is visible in the first event each stream produces. The corpus begins at macroblock zero, while the failing picture's first coded macroblock is number forty, so it opens with forty consecutive skipped macroblocks. At the point of failure the consumer holds `capture_desc_count` at zero, `desc_active` and `sample_expected` both low and `motion_count` at one, meaning coefficients arrived before any descriptor established what to expect. Leading skipped macroblocks are therefore the property that separates the two streams, which also fits the row-completion check that raises error source seven on a different encode, since that check requires exactly `mb_width` motion records per completed row and skipped macroblocks carry none. An earlier attempt to test this by adding encoder noise to suppress skipping was inconclusive for an unrelated reason: it raised picture density enough to trip a different limit before the skip path was reached.
 
 #### Next Steps:
 
-Proceed with a functional block-footprint fetcher that generates the current P or B block's bounded reference-word rectangle ahead of pixel consumption, retains up to thirty-six tagged words for that block, and permits two ordered DDR requests with explicit response-slot ownership. Preserve the global cache, display-reader priority, decoded arithmetic and write/presentation contracts; require exact mixed pixels, long ordering, unchanged transaction identity, positive clean timing and a substantial hardware cadence gain before accepting it. After this memory stage, profile the remaining mixed compute and transform occupancy because even perfect prediction-memory removal cannot independently reach 25 fps.
+Establish how the producer and consumer are meant to account for skipped macroblocks before changing either. Trace the motion record stream against macroblock numbers across a row for both streams and determine whether the producer emits a record for a skipped macroblock, whether the consumer expects one, and which of the two the row-completion arithmetic assumes. That single comparison decides whether the defect is a missing synthesis of skipped-macroblock motion records in the producer or an incorrect expectation in the consumer's row accounting, and the fix differs completely between them. Do not add a pattern arm to the engine's match chain, because the chain is not the problem; the corpus proves the same events are accepted when the consumer is in the expected state. Note for the eventual scope decision that the two reachable errors, source seven and source eight, now appear to share this single cause rather than being independent limits, which would make the family smaller than Entry 290 estimated.
 
 #### Files Modified:
 
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/streams/analyze_prediction_queue_ceiling.py
+None.
 
 #### Status:
 
