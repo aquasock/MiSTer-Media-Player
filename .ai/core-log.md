@@ -343,38 +343,36 @@ Retain the existing four-entry primary cache and the negative partition evidence
 - [ ] Passed
 
 ---
-## 247 COMMIT Unreleased 66e769f 2026-08-20T01:41:00-07:00
+## 287 COMMIT Unreleased 73dada5 2026-08-21T00:18:53-07:00
 
 #### Coming From:
 
-Unreleased e0db323
+Unreleased 73dada5
 
 #### Purpose:
 
-Overlap decoding of the following reference picture with presentation of the completed B-picture run while preserving every reference and scratch-frame lifetime.
+Establish why the P picture never publishes, which Entry 286 identified as the single unexplained fact blocking every candidate repair.
 
 #### Outcome:
 
-Commit `66e769f` permits exactly one following P transaction to decode while the completed prior B run presents, captures that P publication behind the ordinary classification barrier, and reasserts presentation hold before a later B header can reuse either scratch frame. The existing displayed-destination ownership gate now recognizes this overlap header, so no P write can begin until the first scratch swap releases its target reference bank. The focused scheduler passes header-before/same/after-publication, cadence, exact scratch0/scratch1/future order, one-P overlap, preserved-next-reference, starvation, terminal and fail-open cases. The exact mixed oracle retains 423,936 samples, zero mismatches, maximum delta two, 499,551/71,329/0 cache accounting and 23 swaps while falling from 2,519,996 to 2,279,996 cycles, a 9.52 percent reduction. The 72-picture live soak retains every cache count, write count, 25 publications, 47 B pictures, 71 swaps and final identity while falling from 13,419,996 to 12,689,996 cycles, a 5.44 percent reduction. The complete 366,071-byte mixed publication run passes nine reference publications, fifteen B pictures, final identity nine, zero displayed-bank overwrites and completed presentation.
+No source changed. The answer relocates the defect out of the presentation scheduler entirely, which invalidates the layer all four previous repair attempts targeted. Two hypotheses were tested and rejected before the real cause was found. The publication gate at `mpeg2_h262_two_picture_probe_p_chain.sv`, which refuses to publish while `b_picture_inflight` is high, looked like an exact match for a circular wait, but a tracer on that condition never fired once, so the picture never even reaches `base_picture_420_complete`. The stream-boundary hypothesis was also excluded by measuring byte geometry: the sixth P occupies bytes 41,185 to 60,815 and the transport stalls at 60,822, which is seven bytes into the following B picture header, so the start code that terminates the P's final slice had already been delivered and the picture was not starved of its own data.
 
-A fully clean Quartus 17.0.2 build completes in 9 minutes 56 seconds with zero errors and 125 standing warnings. Timing is positive at +0.558 ns global setup, +1.389 ns decoder setup, +6.898 ns video setup, +0.200 ns hold, +4.253 ns global recovery, +15.227 ns decoder recovery and +0.448 ns removal. The fit uses 30,085 ALMs, 43,317 registers, 4,027,379 memory bits, 504 RAM blocks and 65 DSP blocks. Qualified artifact `MediaPlayer_commit247_66e769f.rbf` is 4,256,044 bytes with SHA-256 `5db29ae0ee415c61096c53ebcaf2ddcacb096bc048ccbecd2f0054445653fb35`. Automated MiSTer acquisition accepts both streams exactly with zero errors. Long displays 72 pictures through 71 swaps in 219,548,405 cycles or 4.065711 seconds, improving from 14.490829 to 17.463119 fps; presentation stalls fall from 54,737,767 to 7,203,116 cycles while decoder stalls remain 161,506,865 and destination stalls remain zero. Mixed displays 24 pictures through 23 swaps in 82,893,234 cycles or 1.535060 seconds, improving from 12.786594 to 14.983129 fps; presentation stalls fall from 16,974,046 to 3,131,037 cycles while decoder stalls remain 54,797,368 and destination stalls remain zero. This proves the serialized presentation boundary was a real hardware bottleneck and leaves prediction-bound P/B reconstruction as the dominant limit.
+The measured cause is that the P reconstruction path never engages for that picture at all. Tracing the probe's parser handshake shows `p_hold_effective` toggling continuously for roughly 734,000 cycles while the fifth P reconstructs, which is the backpressure that normally throttles the transport across a P picture, and shows it never asserting even once while the sixth P is consumed. The last assertion anywhere in the run occurs during the fifth P. With no backpressure the sixth P's 19,630 bytes are accepted at one byte per cycle in 19,630 cycles, and the picture-row counter confirms the consequence: it stands at exactly 150 rows for five completed pictures of thirty rows each, so the sixth P reconstructed nothing. A picture that reconstructs nothing never completes, never publishes, and never sets `pending_frame_valid`, which is precisely the condition the queued-admission branch fail-stops on.
+
+The scheduler error recorded in Entries 284 through 286 is therefore a downstream symptom rather than the defect. This also explains why every repair failed on its own terms: deferring the run close addressed a branch never reached, holding from `overlap_decode_open` starved a P that genuinely needed its data, and deferring the queued admission with a hold at the B header livelocked because it waited on a publication that could never arrive no matter how long the wait. None of those repairs could have worked, because the picture they were all waiting for was never being decoded. The distinguishing property of that picture remains its size, 19,630 bytes against 1,157 to 3,104 for every other P in the clip and 3,388 to 4,830 across the corpus, but size alone is a correlation and the mechanism inside the controller is not yet identified. `p_hold_raw` originates in `mpeg2_h262_p_diagnostic_controller`, and its `p_picture_expected` input was checked and excluded: that signal is a sticky latch in `mpeg2_h262_picture_bookkeeper.sv` set on the first transition out of phase-1 support and never cleared, so it is high throughout.
 
 #### Next Steps:
 
-Retain and deploy the timing-qualified `66e769f` core as the new measured baseline. Continue with Entry 248's proposal-first cache partition model, because long still needs 66,188,405 fewer cadence cycles to reach stable 25 fps and physical prediction acceptance/response wait now accounts for 63,001,860 cycles. Reserve user video verification until telemetry reaches the requested stable 25 fps.
+Trace inside `mpeg2_h262_p_diagnostic_controller` to find why it does not assert `stream_hold` for this picture, comparing its internal state directly against the fifth P where the same signal toggles normally. Its `p_picture_expected`, `p_persistence_complete` and `p_row_persistence_complete` inputs are the obvious first candidates, followed by whatever internal decision state governs `p_controls_seen` and `decision_complete` in the residual parser, since those gate the equivalent conditions there. Treat the presentation scheduler as correct until that trace shows otherwise, and do not attempt a fifth repair in that module. The three reverted scheduler experiments should not be revived even though two of them passed the corpus and the focused regression, because passing tests while fixing nothing is exactly how the first four attempts consumed a full development cycle. Retain the separately identified gap that no corpus stream exercises the queued admission path at all, both corpus streams reporting `queued=0 promoted=0`, and close it with a synthetic cross-run stream once the decode defect is understood. This remains the v0.6.0 blocker ahead of the 25 fps scratch-pool work.
 
 #### Files Modified:
 
-- MediaPlayer_top_05.svh
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_dense_publication_order.sv
-- tools/streams/tb_h262_live_raster_soak.sv
+None.
 
 #### Status:
 
 - [x] Built
-- [x] Passed
+- [ ] Passed
 
 ---
 ## 286 COMMIT Unreleased 73dada5 2026-08-20T23:47:12-07:00
