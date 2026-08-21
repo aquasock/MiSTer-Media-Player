@@ -315,27 +315,31 @@ Retain the timing-qualified Entry 247 cache and scheduler. Continue with Entry 2
 - [ ] Passed
 
 ---
-## 248 COMMIT Unreleased d9231a7 2026-08-20T02:13:42-07:00
+## 288 COMMIT Unreleased 73dada5 2026-08-21T00:44:24-07:00
 
 #### Coming From:
 
-Unreleased 66e769f
+Unreleased 73dada5
 
 #### Purpose:
 
-Reduce the remaining serialized prediction-memory wait with a bank- and row-partitioned cache that retains a four-way timed lookup cone.
+Identify why the P diagnostic controller never asserts its stream hold for the sixth P picture, which Entry 287 isolated as the reason that picture never reconstructs.
 
 #### Outcome:
 
-Commit `d9231a7` adds simulation-only mirrors of two four-comparison partition candidates without changing cache or decoder RTL. The exact mixed regression remains at 423,936 samples, zero mismatches, maximum delta two, 499,551/71,329/0 physical cache accounting, 23 swaps and 2,279,996 cycles. Across 561,243 registered lookups, the existing cache produces 68,869 observed lookup misses. Two four-way sets selected only by reference bank produce 69,499 modeled misses, 630 worse than baseline; four four-way sets selected by reference bank and address bit one produce 69,484 misses, 615 worse than baseline. Static bank and row distribution therefore fragment useful capacity instead of resolving conflict pressure. The hard negative mixed result rejects functional RTL before a long simulation or Quartus build; the timing-qualified Entry 247 core remains deployed and unchanged.
+No source changed. The freeze is a decoder capability boundary, not a presentation-scheduling defect, which retires the entire line of investigation from Entry 283 onward and explains why four repairs in the scheduler could not work. Tracing the controller shows `stream_hold` reduces to `wide_parse_hold` or `raster_hold_active`, because `four_mb_parse_hold` and `legacy_parse_hold` are tied to zero and `old_stream_hold` is tied to zero. For the fifth P the trace records `wide_candidate` rising twelve cycles after the picture header and `wide_parse_hold` following thirteen cycles later, which is the backpressure that throttles the transport for the roughly 734,000 cycles that picture takes to reconstruct. For the sixth P the same trace records the header accepted and then no further transition of any kind: `wide_candidate` never rises, no engine engages, and the payload is consumed at one byte per cycle without producing a single reconstructed row.
+
+The gate is explicit in `mpeg2_h262_p_wide_motion_syntax_probe_part3.svh`, where `wide_candidate` requires both forward f_codes to lie between one and four inclusive. Extracting the picture coding extension of every picture in the clip shows the sixth P carries f_code five in both components while every other P carries one or two, and the corpus streams never exceed four. That single picture is therefore rejected by the only P engine still active, and because rejection is expressed as a candidate signal that simply stays low rather than as an unsupported-feature error, the picture is silently swallowed. Nothing downstream can recover: it never completes, never publishes, never sets `pending_frame_valid`, and the queued-admission branch then fail-stops on exactly that condition. The silence is the more serious half of this defect, because an unsupported syntax feature that raises no error is indistinguishable at every downstream layer from a picture that is merely late, which is precisely the misreading that consumed Entries 284 through 287.
+
+This also corrects Entry 283, which recorded f_code as eliminated. That elimination rested on a hardware test of a motion-capped stream run before the missing sequence_end_code was understood, so that stream could not have produced telemetry whatever the f_code did; the evidence was contaminated and the conclusion was wrong. Re-testing properly with both the cap and the terminator in place moves the failure rather than removing it. The capped clip now fails in simulation at input byte 42,062 inside the same sixth P with prediction error source two and detail seven, which resolves to the row-completion consistency check in `mpeg2_h262_p_motion_residual_raster_engine.sv`, where a completed row must carry exactly `mb_width` motion records. That picture therefore breaches at least two independent limits, so real content requires more than a single capability extension. Separately, the RBF currently in `output_files` and on the MiSTer was built from `1e68cf9` and predates the committed probe fix `73dada5`, so no hardware result gathered since then reflects the current source.
 
 #### Next Steps:
 
-Retain the existing four-entry primary cache and the negative partition evidence. Continue with Entry 249's proposal-first second-stage victim model, which can exploit additional capacity without adding comparisons to the fast primary hit cone.
+Decide the scope question before writing any RTL, because it is a product decision rather than a technical one: whether v0.6.0 raises the supported f_code range to nine as H.262 permits and extends the P raster engine's row accounting, or whether it declares a documented compatibility subset and fails unsupported streams loudly instead of hanging. Both are defensible, and the second is far cheaper. Independent of that choice, make non-engagement explicit: every P engine candidate rejection should raise an unsupported-feature error that reaches the existing error flags and LED signature, so an unsupported stream reports rather than freezes, and so no future investigation mistakes a capability gap for a timing race. Only after that should the f_code range and the `mb_width` motion-record accounting be extended, each with its own bounded regression. Retain the separately identified coverage gap that no corpus stream exercises the queued admission path, both corpus streams reporting `queued=0 promoted=0`, and add a synthetic stream carrying f_code above four so this class is caught by regression rather than by the user's own media. Rebuild before any further hardware measurement.
 
 #### Files Modified:
 
-- tools/streams/tb_h262_live_raster_soak.sv
+None.
 
 #### Status:
 
