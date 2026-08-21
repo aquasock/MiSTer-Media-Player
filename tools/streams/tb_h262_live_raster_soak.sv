@@ -850,8 +850,9 @@ module tb_h262_live_raster_soak #(
                          total_cycles,stream_index,stream_len,
                          p_pictures,b_pictures,published_references,
                          display_swaps,motion_repeat_count);
-                $display("ROWCOUNT produced=%0d retired=%0d mix_pers=%0d mix_pers_sel=%0d",
-                         prod_count,ret_count,mixpers_count,mixsel_pers_count);
+                $display("ROWCOUNT produced=%0d retired=%0d mix_pers=%0d mix_pers_sel=%0d pic_pers=%0d mixed_edge=%0d",
+                         prod_count,ret_count,mixpers_count,mixsel_pers_count,
+                         picpers_count,mixedge_count);
                 $fflush;
             end
             if(prediction_trace_fd!=0)begin
@@ -1678,6 +1679,7 @@ module tb_h262_live_raster_soak #(
     // is the b_select-muxed persistence, so each retire is attributed to the
     // engine that actually sourced it.
     integer prod_count=0,ret_count=0,mixpers_count=0,mixsel_pers_count=0;
+    integer picpers_count=0,mixedge_count=0;
     integer path1_fd=0;
     reg [1023:0] path1_path;
     reg [1023:0] row_event_path;
@@ -1693,6 +1695,8 @@ module tb_h262_live_raster_soak #(
             if(prediction.mix_row_persisted)mixpers_count<=mixpers_count+1;
             if(prediction.mix_row_persisted&&prediction.mixed_select)
                 mixsel_pers_count<=mixsel_pers_count+1;
+            if(pred_persisted)picpers_count<=picpers_count+1;
+            if(prediction.mixed_persisted_edge)mixedge_count<=mixedge_count+1;
             if((path1_fd!=0)&&
                publication.p_controller.wide_general_probe.final_row_queued)
                 $fdisplay(path1_fd,"%0d,%0d,1,%0d,%0d,%0d,%0d,%0d,%0d",
