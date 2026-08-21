@@ -44,6 +44,7 @@ module mpeg2_h262_two_picture_probe
 );
 
 wire parser_ready,p_picture_expected,bookkeeper_error,p_hold_raw,p_error_raw;
+wire p_unsupported_raw;
 wire base_second_picture_420_parsed,base_picture_420_complete,base_active_frame_bank,base_completed_frame_bank;
 wire[7:0] base_picture_count;wire base_reference_frame_valid,base_reference_frame_bank;wire[7:0] base_reference_promotion_count;
 
@@ -195,7 +196,8 @@ mpeg2_h262_p_diagnostic_controller p_controller(
  .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.p_picture_expected(p_picture_expected),
  .p_persistence_complete(p_persistence_complete),.p_row_persistence_complete(p_row_persistence_complete),
  .intra_dc_precision(intra_dc_precision),
- .stream_hold(p_hold_raw),.p_macroblock_type_seen(p_macroblock_type_seen_raw),
+ .stream_hold(p_hold_raw),.p_unsupported(p_unsupported_raw),
+ .p_macroblock_type_seen(p_macroblock_type_seen_raw),
  .p_forward_vector_valid(p_forward_vector_valid_raw),.p_forward_vector_x(p_forward_vector_x_raw),.p_forward_vector_y(p_forward_vector_y_raw),
  .p_residual_required(p_residual_required_raw),.p_residual_success(p_residual_success_raw),
  .p_first_residual_sample_valid(p_first_residual_sample_valid_raw),.p_first_residual_sample_value(p_first_residual_sample_value_raw),
@@ -236,14 +238,21 @@ wire b_persistence_wait=b_picture_inflight&&b_seen&&!b_persistence_verified&&!b_
 assign stream_ready=(b_picture_inflight?1'b1:parser_ready)&&!p_hold_effective&&!b_parse_hold&&!b_persistence_wait;
 wire b_accept_error=b_error||publication_error||reference_progress_error;
 assign b_user_success=b_final_success&&!b_accept_error;
+// Entry 289: p_error_raw is gated by b_picture_observed because a controlled
+// pattern observer's subset rejection may still be owned by another observer.
+// p_unsupported_raw is not such a rejection: it means no engine claimed the
+// picture, so it must reach acceptance ungated or the stream hangs instead of
+// reporting.
 assign probe_error=(b_picture_observed?1'b0:bookkeeper_error)||
                    (b_picture_observed?1'b0:p_error_raw)||
+                   p_unsupported_raw||
                    b_error||publication_error||reference_progress_error;
 
 // kate - Commit 179 observability only.  Priority order matches the OR above.
 wire bookkeeper_error_gated=b_picture_observed?1'b0:bookkeeper_error;
 wire p_error_gated=b_picture_observed?1'b0:p_error_raw;
 assign probe_error_source=
+    p_unsupported_raw         ? 4'd10 :
     bookkeeper_error_gated    ? 4'd1 :
     p_error_gated             ? 4'd2 :
     b_error                   ? 4'd3 :

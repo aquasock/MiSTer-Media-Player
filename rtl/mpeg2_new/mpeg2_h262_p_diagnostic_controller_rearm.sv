@@ -24,7 +24,11 @@ module mpeg2_h262_p_diagnostic_controller
  // Neither changes probe_error or any decode behavior.
  output wire [3:0] probe_error_source,
  output wire [3:0] progress_detail,
- output wire [4:0] wide_probe_error_detail
+ output wire [4:0] wide_probe_error_detail,
+ // Entry 289: a hard capability gap, distinct from the controlled-pattern
+ // observers' subset rejections.  Exported separately so the acceptance path
+ // can treat it ungated.
+ output wire p_unsupported
 );
 
 wire syntax_error_raw,mb_seen_raw,vector_valid_raw;
@@ -47,6 +51,7 @@ wire legacy_qtype,legacy_alt;
 
 // Commit-166 wide parser.
 wire wide_candidate,wide_seen,wide_complete_now,wide_parse_hold,wide_error;
+wire wide_unsupported_now;
 wire [4:0] wide_error_detail;
 assign wide_probe_error_detail=wide_error_detail;
 wire wide_row_complete_now,wide_row_final;
@@ -291,6 +296,20 @@ assign stream_hold =
     raster_hold_active ||
     (!raster_candidate&&!raster_seen&&old_stream_hold);
 
+// Entry 289: the probe_error assembly below deliberately drops the historical
+// controlled-pattern observers' subset rejections, because another observer
+// may still own the picture.  This term is strictly narrower: it fires only
+// when the wide probe rejects a well formed P coding extension AND no other
+// engine has claimed or is claiming the picture, so nothing will decode it.
+reg p_unsupported_feature;
+assign p_unsupported=p_unsupported_feature;
+always @(posedge clk) begin
+    if(reset) p_unsupported_feature<=1'b0;
+    else if(wide_unsupported_now&&!four_mb_candidate&&!legacy_candidate&&
+            !four_mb_seen&&!legacy_seen&&!wide_seen)
+        p_unsupported_feature<=1'b1;
+end
+
 wire syntax_error=
     syntax_error_raw &&
     !two_mb_seen &&
@@ -323,13 +342,14 @@ wire progress_error=p_picture_expected&&!p_macroblock_type_seen;
 // it is naturally true before parsing completes and therefore is not an error
 // event.  The top-level prerequisite report still exposes genuine absence.
 assign probe_error=
-    residual_error_raw|hold_error|raster_hold_error;
+    residual_error_raw|hold_error|raster_hold_error|p_unsupported_feature;
 
 // Preserve the established numeric codes for the remaining functional terms.
 assign probe_error_source=
-    residual_error_raw? 4'd7 :
-    hold_error        ? 4'd8 :
-    raster_hold_error ? 4'd9 : 4'd0;
+    residual_error_raw   ? 4'd7 :
+    hold_error           ? 4'd8 :
+    raster_hold_error    ? 4'd9 :
+    p_unsupported_feature? 4'd10 : 4'd0;
 
 // kate - Commit 180 observability only.  progress_error is a symptom: it is
 // p_picture_expected && !p_macroblock_type_seen, and p_macroblock_type_seen is
@@ -351,7 +371,8 @@ mpeg2_h262_p_wide_motion_syntax_probe wide_general_probe
  .intra_dc_precision(intra_dc_precision),
  .row_retired(p_row_persistence_complete),
  .row_produced(wide_row_produced),
- .wide_candidate(wide_candidate),.wide_seen(wide_seen),
+ .wide_candidate(wide_candidate),.wide_unsupported_now(wide_unsupported_now),
+ .wide_seen(wide_seen),
  .wide_complete_now(wide_complete_now),
  .row_complete_now(wide_row_complete_now),.row_final(wide_row_final),
  .motion_event_valid(wide_motion_valid),

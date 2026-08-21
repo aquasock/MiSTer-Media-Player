@@ -360,6 +360,23 @@
                         (pce_next[17:16]==2'b11) &&
                         pce_next[14] &&
                         !pce_next[13];
+                    // Entry 289: announce the rejection.  This is a well
+                    // formed P picture coding extension that this probe will
+                    // not claim, so unless another engine claims it nothing
+                    // will decode the picture at all.  Reporting it here is
+                    // what separates an unsupported feature from a picture
+                    // that is merely still being evaluated.
+                    wide_unsupported_now<=
+                        current_picture_is_p &&
+                        (pce_next[39:36]==4'h8) &&
+                        !(geometry_supported &&
+                          (pce_next[35:32]>=4'd1) &&
+                          (pce_next[35:32]<=4'd4) &&
+                          (pce_next[31:28]>=4'd1) &&
+                          (pce_next[31:28]<=4'd4) &&
+                          (pce_next[17:16]==2'b11) &&
+                          pce_next[14] &&
+                          !pce_next[13]);
                 end else pce_count<=pce_count+1'b1;
             end else if(current_picture_is_p &&
                         start_code_now &&

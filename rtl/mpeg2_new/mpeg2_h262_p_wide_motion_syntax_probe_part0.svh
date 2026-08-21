@@ -30,6 +30,11 @@ module mpeg2_h262_p_wide_motion_syntax_probe
     input  wire        row_produced,
 
     output reg         wide_candidate,
+    // Entry 289: one-cycle pulse when this probe evaluates a P picture's
+    // coding extension and rejects it.  Rejection is otherwise expressed only
+    // as wide_candidate staying low, which is indistinguishable downstream
+    // from a picture that has not been evaluated yet.
+    output reg         wide_unsupported_now,
     output reg         wide_seen,
     output reg         wide_complete_now,
     output reg         row_complete_now,

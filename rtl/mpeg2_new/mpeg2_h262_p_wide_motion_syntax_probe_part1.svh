@@ -321,6 +321,7 @@ always @(posedge clk) begin
         p_forward_f_code_vertical<=0;
         p_intra_vlc_format<=0;
         wide_candidate<=0;
+        wide_unsupported_now<=0;
         wide_seen<=0;
         wide_complete_now<=0;
         row_complete_now<=0;
@@ -421,5 +422,6 @@ always @(posedge clk) begin
         residual_coeff_read_last_reg<=
             residual_coeff_last_mem[residual_coeff_read_address];
         wide_complete_now<=0;
+        wide_unsupported_now<=0;
         row_complete_now<=0;
         motion_event_intra<=0;
