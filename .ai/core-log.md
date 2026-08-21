@@ -405,7 +405,7 @@ Retain the qualified Entry 245 hardware core and the negative locality evidence.
 - [ ] Passed
 
 ---
-## 285 COMMIT Unreleased ??? 2026-08-20T21:43:04-07:00
+## 285 COMMIT Unreleased 73dada5 2026-08-20T22:39:09-07:00
 
 #### Coming From:
 
@@ -413,26 +413,27 @@ Unreleased ddcc8f3
 
 #### Purpose:
 
-Make a late reference publication a condition both the scheduler and the publication probe wait for rather than fail-stop on, so real photographic content stops freezing after three pictures.
+Make a late reference publication a condition the publication probe waits for rather than fail-stops on, and locate precisely why the scheduler still fail-stops afterwards.
 
 #### Outcome:
 
-Entry 284 established that a P reference publishing later than assumed trips two independent fail-stops, and that relaxing either alone is insufficient. This commit changes both, and nothing else. In `mpeg2_h262_b_presentation_scheduler.sv` the run-closing branch no longer raises `presentation_error` when a non-B header arrives while `future_reference_pending` is set with no coincident publication. It instead latches a deferred close, recording the overlap eligibility that the immediate path would have computed from `p_picture_start` and `reference_overlap_header`, and completes that close inside the existing Entry 227 deferred-binding block at the moment the publication actually binds. The correctness argument for waiting is that the run's future reference is the P preceding the run in coded order, so its slice data is fully parsed before any B header of that run is seen and its outstanding work is DDR persistence alone; the publication therefore cannot require further compressed input and the wait cannot deadlock against the transport. To keep that guarantee, `presentation_hold` is extended to assert while the deferred close is outstanding, stopping input during the wait, and the deferred state is cleared on reset and on every existing error path. The identical fail-stop on the queued-run branch is deliberately left unchanged because no evidence yet shows it being reached, and widening the change would enlarge the risk boundary without evidence.
+Only the probe layer is delivered. In `mpeg2_h262_two_picture_probe_p_chain.sv` the header-time comparison of `p_publication_count` against `p_header_count` no longer raises `publication_error`. It latches that the in-flight B transaction is waiting for its future reference, clears that state when the publication arrives, and raises the error with detail one only if the B reaches `b_persisted_now` while still waiting. This preserves the real invariant, that a B must not complete against an unpublished reference, while permitting the deferred binding Entry 227 introduced, and it matters beyond diagnostics because `b_user_success` is gated by `b_accept_error`, so a latched error permanently suppresses the completion edge the scheduler waits on. The complete corpus soak is byte-identical at 6,589,996 cycles with 22/22/47/47 publications and zero errors, and the focused scheduler regression is unchanged at cadence one, three, two with a minimum present gap of two.
 
-In `mpeg2_h262_two_picture_probe_p_chain.sv` the header-time comparison of `p_publication_count` against `p_header_count` no longer raises `publication_error`. It latches that the in-flight B transaction is waiting for its future reference, clears that state when the publication arrives, and raises `publication_error` with detail one only if the B transaction reaches `b_persisted_now` while still waiting. This preserves the genuine invariant, which is that a B must not complete against an unpublished reference, while permitting the deferred binding Entry 227 introduced. The distinction matters beyond diagnostics because `b_user_success` is gated by `b_accept_error`, so a latched publication error permanently suppresses the completion edge the scheduler waits on and converts a transient ordering condition into a permanent freeze.
+The scheduler layer proposed in the previous revision of this entry was implemented, disproven and reverted, and the reasons are recorded because they constrain the correct fix. A first attempt deferred the run-closing branch when `future_reference_pending` was set, holding the transport until the publication bound. It left the corpus byte-identical but did not change the Big Buck Bunny failure at all, because instrumenting every `presentation_error` site proved that branch is never reached by this stream. That instrumentation initially misreported its site, because a blanket textual insertion of the deferred-state clear had been applied into a brace-less `else`, which made both the clear and the diagnostic unconditional; the file was reverted and the edit redone against a single audited site.
+
+Correct instrumentation then identified the true failure exactly. It is the queued-run admission path added by Entry 269, at the branch guarded by `promotion_pending`, `pending_frame_valid` and `queued_scratch_available`, with the deciding state `pending_frame_valid=0`, `overlap_decode_open=1`, `queued_scratch_available=1`, `queued_header_capacity=0` and `presentation_hold=0`. Entry 247's overlap deliberately releases the presentation hold so one P may decode during presentation, and the existing hold expression contains `!overlap_decode_open`. When that overlapping P has not yet published, `queued_header_capacity` is low, so the next B header reaches an admission path that cannot succeed and fail-stops on a condition that is merely late. A second attempt therefore held the transport across that window. The focused scheduler regression rejected it immediately with "following P was not admitted during prior presentation", which is correct: `overlap_decode_open` denotes a P that has just been admitted and still requires its own slice data, so holding input starves it and it can never publish. The deadlock-safety argument that holds for the run-closing branch does not hold here, and the regression caught the difference. Both attempts were reverted; the committed source contains the probe change only, so the freeze is not yet fixed.
 
 #### Next Steps:
 
-Validate in simulation before any Quartus build, requiring the complete corpus soak to remain exactly at 6,589,996 cycles with 22/22/47/47 publications and zero errors, the focused scheduler regression to keep its 60.3165 Hz cadence counts of one, three and two with a minimum present gap of two, and the 30-picture Big Buck Bunny clip to run to completion with correct publication and swap counts instead of failing at input byte 60,822. Only then take a clean build and a paired hardware comparison against the Entry 278 baseline on both the corpus long-GOP stream and the Big Buck Bunny stream, expecting cadence to be unchanged because this is a liveness fix rather than a throughput change. If the Big Buck Bunny clip completes in simulation but a longer run still stalls, suspect the queued-run branch left unchanged here and treat that as the next boundary. Resume the 25 fps scratch-pool work only after real content plays end to end, since v0.6.0 cannot ship a core that freezes on ordinary video.
+Defer the queued admission rather than holding the transport, because holding is now proven to starve the very publication being waited for. Latch the B admission request when the queued path would fail only for the transient reasons `promotion_pending` or absent `pending_frame_valid`, leave the transport running so the overlapping P can finish parsing and publish, and complete the admission when `pending_frame_valid` or `frame_waiting` asserts. Keep `!queued_scratch_available` as a genuine fail-stop unless evidence shows it is also transient, since the Entry 282 measurement shows scratch exhaustion is a real resource limit rather than a timing artifact. The retry must not lose the B's coding-type event or its scratch-bank selection, and it must be proven against the focused regression's overlap, starvation, generation and fail-open cases before any full soak. Require the corpus soak to stay at exactly 6,589,996 cycles with zero errors and the 30-picture Big Buck Bunny clip to complete, then take a clean build and a paired hardware comparison. Treat this as the v0.6.0 blocker and keep the 25 fps scratch-pool work behind it.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 - rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
