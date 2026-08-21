@@ -433,6 +433,11 @@ always @* begin
         5'd18: overlay_row_word = snapshot_sync_2[607:576];
         5'd19: overlay_row_word = snapshot_sync_2[639:608];
         5'd20: overlay_row_word = snapshot_sync_2[671:640];
+        5'd21: overlay_row_word = snapshot_sync_2[703:672];
+        5'd22: overlay_row_word = snapshot_sync_2[735:704];
+        5'd23: overlay_row_word = snapshot_sync_2[767:736];
+        5'd24: overlay_row_word = snapshot_sync_2[799:768];
+        5'd25: overlay_row_word = snapshot_sync_2[831:800];
         default: overlay_row_word = 32'd0;
     endcase
 end
