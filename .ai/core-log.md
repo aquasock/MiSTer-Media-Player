@@ -166,31 +166,31 @@ Expand the shared cache and DDR arbiter to accept the fetchers' already-proven d
 - [ ] Passed
 
 ---
-## 253 COMMIT Unreleased 5f1d561 2026-08-20T03:51:26-07:00
+## 293 COMMIT Unreleased cba5371 2026-08-21T03:52:49-07:00
 
 #### Coming From:
 
-Unreleased c9e5a90
+Unreleased cba5371
 
 #### Purpose:
 
-Replace serialized per-tap P-picture prediction with the proven direct-index block fetcher while retaining the current cache and arbiter contract.
+Bisect the raster engine failure by capturing the event sequence that precedes it, rather than proposing a fifth mechanism from stream properties.
 
 #### Outcome:
 
-Commit `5f1d561` integrates the block fetcher only into generalized P reconstruction while retaining the shared cache and one-outstanding arbiter. P block geometry is latched before address generation, every tap uses synchronous direct phase/row/column lookup, invalid early lookups retry without consuming stale data, and intra arithmetic, residual look-ahead, writer barriers and presentation ownership remain unchanged. The exact mixed boundary passes 423,936 samples with zero mismatches, maximum delta two, 23 swaps, zero errors, 71,317 DDR reads and 2,189,996 cycles, improving 90,000 cycles or 3.95 percent from Entry 247 before multi-outstanding service. The complete long boundary passes 71 swaps, all 22 P and 47 B pictures, zero errors, 463,831 reads and 12,269,996 cycles, improving 420,000 cycles or 3.31 percent. Both focused 720x480 P/intra modes pass 1,350 ordered motion records, the authored intra macroblock, six blocks and 384 exact samples at 787,530 cycles, and the standalone fetcher still passes delayed, backpressured, simultaneous and zero-latency response association. The first live attempt exposed that fetch width was not latched and stopped at a deterministic missing final word; latching every rectangle parameter eliminated the stall and all final regressions pass.
+No source changed. The bisect locates the failure at a picture boundary and produces the first direct observation of an anomaly rather than another inference. A ring buffer holding the last twenty-four residual events, dumped at the instant `error` first asserts, shows the failing picture completing correctly and the fault arriving immediately afterwards. Event 80,093 carries index `6'h3f` with value `A2FF`, the picture-final row marker, at row twenty-nine with `motion_count` at 1,350, which is exactly forty-five by thirty and therefore a complete and correctly accounted picture. The next two events carry the identical value `0x00a4` on two different indices, `6'h3e` and then `6'h3f`, the second arriving after the engine has already reset to `motion_count` one and row zero for the following picture. The engine has no metadata interpretation for `6'h3f` carrying that value in that state, so it falls through its match chain to source eight. Nothing about the picture's content is implicated; the fault is in what crosses the sideband between one picture and the next.
+
+Tracing both legs of the producer mux in `mpeg2_h262_p_diagnostic_controller_rearm.sv` shows the mechanism on the producer side. Immediately after the residual leg presents the `A2FF` marker, `wide_motion_valid` asserts and remains asserted for five consecutive cycles, emitting an identical intra motion record on index `6'h3b` with value zero each time. Single-cycle assertion is the norm everywhere else, which is established independently by the per-row count: the same stream produces exactly forty-five motion records in every row, and that figure is only reachable if each record occupies one cycle. A record held for five cycles at the picture boundary is therefore anomalous, and it is the first mechanism in this investigation observed directly rather than deduced.
+
+Two caveats are recorded so the next step does not build on sand. The two traces use different counters, the ring buffer counting residual events accepted at the engine and the mux trace counting sideband validity at the producer, so their event numbers are not aligned and the held assertion has not yet been proven to be the same instant as the misread event. It is also not yet established whether the consumer edge-detects motion validity, in which case a held assertion would be harmless and the fault would lie elsewhere in the same window.
 
 #### Next Steps:
 
-Apply the same latched one- or two-rectangle direct-buffer contract to B reconstruction while keeping the one-outstanding cache and arbiter unchanged. Map forward-only and backward-only blocks to phase zero, bidirectional forward and backward references to phases zero and one, preserve rounding and phase order exactly, and require residual-focused B regressions plus exact mixed pixels and complete long ordering before expanding shared DDR concurrency.
+Align the two observations on a single timebase before proposing any repair, then determine whether the consumer treats `wide_motion_valid` as a level or an edge. Those two facts together decide the fix: if validity is consumed as a level and the producer holds it across a picture boundary, the defect is the held assertion and belongs to the producer's boundary sequencing; if the consumer edge-detects, the held assertion is benign and the misread `6'h3f` event must have another origin in the same handful of cycles. Continue to instrument rather than repair, since four mechanisms have now been rejected by their own controls and the one surviving lead is still only a correlation in time. The unsupported-feature report from Entry 289 is unaffected by any of this and remains committed and built.
 
 #### Files Modified:
 
-- files.qip
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/streams/tb_h262_p_intra_macroblocks.sv
+None.
 
 #### Status:
 
