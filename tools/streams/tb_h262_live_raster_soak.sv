@@ -1628,4 +1628,69 @@ module tb_h262_live_raster_soak #(
         end
     end
 
+    // Entry 296 follow-up: the raster engine only rearms for a new picture on
+    // new_picture_metadata, which requires the FIRST sideband event of the
+    // picture to be a motion record (index 3e/3b).  Log the opening events of
+    // every P picture so a picture that opens with a non-motion event is
+    // visible directly rather than inferred.
+    integer sb_pic=0,sb_left=0;
+    integer p_header_count_d=0;
+    always @(posedge clk) begin
+        if(reset)begin
+            p_header_count_d<=0;
+            sb_left<=0;
+            sb_pic<=0;
+        end else begin
+            p_header_count_d<=publication.p_header_count;
+            if(publication.p_header_count!=p_header_count_d)begin
+                sb_pic<=publication.p_header_count;
+                sb_left<=4;
+            end
+            if((sb_left!=0)&&publication.p_controller.wide_sideband_valid)begin
+                sb_left<=sb_left-1;
+                $display("PIC_FIRST_SIDEBAND pic=%0d idx=%h val=%h motion=%0d desc_active=%0d persisted=%0d active=%0d",
+                    sb_pic,
+                    publication.p_controller.wide_sideband_index,
+                    publication.p_controller.wide_sideband_value,
+                    publication.p_controller.wide_motion_valid,
+                    prediction.mixed_probe.desc_active,
+                    prediction.mixed_probe.persisted_seen,
+                    prediction.mixed_probe.active);
+                $fflush;
+            end
+        end
+    end
+
+    // Row-bank credit accounting across the picture 15 -> 16 boundary.  The
+    // engine's row_final_latched branch does not perform the bank cleanup its
+    // non-final sibling does, so the question is whether the last row of a
+    // picture ever returns its credit to the producer.
+    integer credit_left=0;
+    always @(posedge clk) begin
+        if(reset)credit_left<=0;
+        else begin
+            if(publication.p_header_count>=15)credit_left<=1;
+            if(credit_left!=0)begin
+                if(publication.p_controller.wide_general_probe.row_produced||
+                   publication.p_controller.wide_general_probe.row_retired||
+                   (publication.p_header_count!=p_header_count_d))
+                    $display("ROWCREDIT hdr=%0d state=%0d outstanding=%0d waiting=%0d final_queued=%0d produced=%0d retired=%0d blocked=%0d rearm_pending=%0d parse_hold=%0d b_select=%0d b_rowpers=%0d mixed_select=%0d mix_rowpers=%0d",
+                        publication.p_header_count,
+                        publication.p_controller.wide_general_probe.parser_state,
+                        publication.p_controller.wide_general_probe.outstanding_rows,
+                        publication.p_controller.wide_general_probe.row_waiting,
+                        publication.p_controller.wide_general_probe.final_row_queued,
+                        publication.p_controller.wide_general_probe.row_produced,
+                        publication.p_controller.wide_general_probe.row_retired,
+                        publication.p_controller.wide_general_probe.bank_blocked,
+                        publication.p_controller.wide_general_probe.producer_rearm_pending,
+                        publication.p_controller.wide_general_probe.parse_hold,
+                        prediction.b_select,
+                        prediction.b_row_persisted,
+                        prediction.mixed_select,
+                        prediction.mix_row_persisted);
+            end
+        end
+    end
+
 endmodule
