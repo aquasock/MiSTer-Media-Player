@@ -377,27 +377,33 @@ Retain and deploy the timing-qualified `66e769f` core as the new measured baseli
 - [x] Passed
 
 ---
-## 246 COMMIT Unreleased e0db323 2026-08-20T01:19:04-07:00
+## 286 COMMIT Unreleased 73dada5 2026-08-20T23:47:12-07:00
 
 #### Coming From:
 
-Unreleased 2a26c05
+Unreleased 73dada5
 
 #### Purpose:
 
-Reduce the dominant physical prediction-read wait by fetching the immediately following reference word with each cacheable DDR miss when measured address locality proves that read-ahead is useful.
+Trace the freeze at picture level before attempting a fifth repair, after three scheduler repairs were disproven.
 
 #### Outcome:
 
-Commit `e0db323` adds simulation-only models for the proposed four-entry following-word fill and a safer two-bank sidecar that never evicts a proven cache entry. The exact mixed oracle still passes 423,936 samples with zero mismatches, maximum delta two, 499,551 cache hits, 71,329 cache misses, 23 swaps and zero decoder, writer or presentation errors in 2,519,996 cycles. The proposed four-entry fill performs 97,354 modeled requests, avoids only 8,883 baseline misses, and induces 37,368 new misses by evicting useful resident words: a net regression of 26,025 requests, or 36.49 percent over the existing physical miss count. The non-evicting sidecar is directionally positive but only converts 8,632 of 68,869 observed lookup misses, split 4,160/4,472 across the two reference banks; it requires 60,237 two-word fills and therefore doubles transferred word traffic on nearly every remaining miss. Even optimistically scaling its 12.10 percent request reduction against Entry 245's complete hardware response wait predicts only a two-to-three percent FPS improvement, far below the 25 fps requirement. The hard negative mixed result is sufficient to reject functional RTL before the much slower long simulation. No cache, decoder, scheduler or synthesis source changed, and no RBF was built or deployed.
+No source changed. A simulation-only state tracer and the testbench's picture trace were run against the Big Buck Bunny clip on the committed baseline, and they explain the failure and the three failed repairs together. The decisive discovery is that the queued-run admission path added by Entry 269, which is where the failure occurs, has no coverage whatsoever in the regression corpus: both the long-GOP and the soak streams report `queued=0 promoted=0`, so that branch has never executed in any accepted regression. Real content is the first stream to reach it, which is why a defect there survived every prior commit.
+
+The picture trace shows why the corpus never reaches it. In the accepted pattern the presentation run completes before the following B header arrives: at cycle 10,540,001 `presentation_complete` asserts and `reorder_active` falls, the P publishes 743,000 cycles later, `pending_frame_valid` rises, and only then does the B header appear, so the B is admitted through the ordinary fresh-run path and the queued path is bypassed entirely. In the failing sequence the run is still active when the B header arrives. The P header is accepted at cycle 13,042,608, the run closes with `overlap_decode_open` set one cycle later, the swap window at 13,050,001 leaves the run still open, and the B header arrives at 13,062,238 with `reorder_active` and `run_closed` both high. That reaches the queued-admission branch with `pending_frame_valid` low, and it fail-stops. Nothing throttles the early header because the existing `presentation_hold` expression contains `!overlap_decode_open`, and the trace confirms `presentation_hold` is low across the whole window while `queued_header_capacity` is already low.
+
+The interval between that P header and the following B header is 19,630 cycles, which is exactly the byte length of that P picture, so the transport ran unthrottled for its entire payload. That P is the largest in the clip at 19,630 bytes against 1,157 to 3,104 bytes for every other P, while the corpus soak's P pictures are a uniform 3,388 to 4,830 bytes. Whatever the precise coupling, the distinguishing property is a P whose payload profile differs sharply from the synthetic corpus, and the earlier assumption that the trigger was simply high bidirectional density is too coarse to be the mechanism.
+
+Three repairs were attempted, disproven and reverted before this entry, and each constrains the next. Deferring the run-closing branch left the corpus byte-identical but did not touch the failure, because instrumentation proved that branch is never reached. Holding the transport from `overlap_decode_open` was rejected immediately by the focused regression with "following P was not admitted during prior presentation", because that signal denotes a P that has just been admitted and still requires its own slice data. Deferring the queued admission and holding from the B header instead passed the focused regression with every case intact and kept the corpus at exactly 6,589,996 cycles, and it carried the Big Buck Bunny clip past the failing byte for the first time, but it then livelocked: the run completed with the admission still latched, so the retry condition could never fire, the latch never cleared and the transport stalled permanently with `presentation_hold` high. In that livelock the P never published even though its payload had been fully consumed, which is the single fact still unexplained and the reason no fourth repair is proposed here.
 
 #### Next Steps:
 
-Retain the qualified Entry 245 hardware core and the negative locality evidence. Do not add two-response DDR behavior or disturb the timing-safe four-way cache cone. Continue with Entry 247's larger measured presentation/decode serialization boundary, preserving the same exact oracle and hardware cadence gates.
+Establish why that P fails to publish once the transport is held, because every remaining repair depends on the answer. If publication is reachable and merely slow, the deferred admission needs only a release path for the case where the run completes first, since the ordinary fresh-run admission is then the correct destination for the latched header. If publication genuinely requires further transport activity, then holding is unusable at any point in this window and the admission must instead be made to succeed against an unpublished reference by deferring the reference binding the way Entry 227 already does for the non-queued path. Instrument the picture-completion and writer-drain path for that specific P under a held transport to distinguish the two, rather than attempting another repair first. Separately, and independently of the fix, the absence of any corpus coverage for the queued admission path is itself a defect worth closing, because a regression suite that never executes a branch cannot protect it; a synthetic stream that forces cross-run admission would have caught this before real content did. Keep this ahead of the 25 fps scratch-pool work as the v0.6.0 blocker.
 
 #### Files Modified:
 
-- tools/streams/tb_h262_live_raster_soak.sv
+None.
 
 #### Status:
 
