@@ -1725,4 +1725,37 @@ module tb_h262_live_raster_soak #(
         end
     end
 
+    // Entry 301 next step: cycle ordering of the events a completion latch
+    // could key on.  A one-cycle pulse tested against a condition that also
+    // requires !row_produced has no second chance, so the question is whether
+    // the pulse lands while final_row_queued is high and row_produced is low.
+    reg finalq_d=0, picpers_d=0;
+    always @(posedge clk) begin
+        if(reset)begin finalq_d<=0; picpers_d<=0; end
+        else begin
+            finalq_d<=publication.p_controller.wide_general_probe.final_row_queued;
+            picpers_d<=pred_persisted;
+            if(publication.p_controller.wide_general_probe.final_row_queued&&!finalq_d)
+                $display("ORDER FINALQ_RISE cycle=%0d hdr=%0d outstanding=%0d",
+                    row_event_cycle,publication.p_header_count,
+                    publication.p_controller.wide_general_probe.outstanding_rows);
+            if(prediction.mixed_persisted_edge)
+                $display("ORDER MIXEDGE cycle=%0d hdr=%0d finalq=%0d produced=%0d retired=%0d",
+                    row_event_cycle,publication.p_header_count,
+                    publication.p_controller.wide_general_probe.final_row_queued,
+                    publication.p_controller.wide_general_probe.row_produced,
+                    publication.p_controller.wide_general_probe.row_retired);
+            if(pred_persisted&&!picpers_d)
+                $display("ORDER PICPERS cycle=%0d hdr=%0d finalq=%0d produced=%0d bsel=%0d",
+                    row_event_cycle,publication.p_header_count,
+                    publication.p_controller.wide_general_probe.final_row_queued,
+                    publication.p_controller.wide_general_probe.row_produced,
+                    prediction.b_select);
+            if(publication.p_controller.wide_general_probe.wide_complete_now)
+                $display("ORDER COMPLETE cycle=%0d hdr=%0d outstanding=%0d",
+                    row_event_cycle,publication.p_header_count,
+                    publication.p_controller.wide_general_probe.outstanding_rows);
+        end
+    end
+
 endmodule
