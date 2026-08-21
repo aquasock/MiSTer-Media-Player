@@ -1,7 +1,7 @@
 //============================================================================
 // MiSTer Media Player - controlled raster H.262 P copy/readback engine
 //
-// Standards authority: core-standards.md, source_id H262.
+// Standards authority: core-reference.md, source_id H262.
 //   H262-003 prediction samples come from the applicable reference picture.
 //   H262-006 4:2:0 block order is Y0,Y1,Y2,Y3,Cb,Cr.
 //   H262-007 coded macroblock width is derived from horizontal_size.

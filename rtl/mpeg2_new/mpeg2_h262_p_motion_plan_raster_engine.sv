@@ -1,7 +1,7 @@
 //============================================================================
 // MiSTer Media Player - controlled per-macroblock aligned P motion engine
 //
-// Standards authority: core-standards.md.
+// Standards authority: core-reference.md.
 // H262-003 selects prediction samples by reconstructed motion vector.
 // H262-006 defines 4:2:0 block order Y0,Y1,Y2,Y3,Cb,Cr.
 // H262-016 proves the controlled luma vector (+32,0) half-sample units.

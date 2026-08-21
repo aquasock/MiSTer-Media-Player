@@ -22,7 +22,7 @@
 // Entry 204 holds each completed macroblock row through transform and scratch
 // persistence before reusing its descriptor and coefficient addresses.
 //
-// Standards authority: .ai/core-standards.md H262-006, H262-010, H262-014,
+// Standards authority: .ai/core-reference.md H262-006, H262-010, H262-014,
 // H262-021, H262-024 plus the established motion/address records used by
 // Commit 169.
 //============================================================================

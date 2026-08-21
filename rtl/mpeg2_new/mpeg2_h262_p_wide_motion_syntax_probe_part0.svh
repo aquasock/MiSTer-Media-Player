@@ -17,7 +17,7 @@
 // 00 00 01 start-code prefix cannot be split out of boundary recognition.
 // Entry 204: a completed macroblock row is held until downstream persistence;
 // descriptor and coefficient addresses are then reused for the next row.
-// Standards authority: .ai/core-standards.md (H262-007..H262-022).
+// Standards authority: .ai/core-reference.md (H262-007..H262-022).
 //============================================================================
 module mpeg2_h262_p_wide_motion_syntax_probe
 (

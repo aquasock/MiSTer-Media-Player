@@ -6,7 +6,7 @@
 // signed frame-motion vector per macroblock and captures sparse non-intra QFS
 // coefficient events for the existing serialized IQ/IDCT engine.
 //
-// Standards authority: project core-standards.md / ITU-T H.262.
+// Standards authority: project core-reference.md / ITU-T H.262.
 // Diagnostic implementation limits (not H.262 limits): at most 16 coded
 // residual blocks and 64 non-zero coefficient events per picture.
 //============================================================================

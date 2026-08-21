@@ -1,7 +1,7 @@
 //============================================================================
 // MiSTer Media Player - controlled two-macroblock H.262 P syntax observer
 //
-// Standards authority: core-standards.md, source_id H262.
+// Standards authority: core-reference.md, source_id H262.
 // Relevant established records:
 //   H262-007 macroblock width
 //   H262-008 slice vertical position

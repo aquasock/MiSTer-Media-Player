@@ -1,5 +1,5 @@
 // kate - Phase 1T-q: controlled first P macroblock, Y0/Y1/Y2/Y3/Cb/Cr.
-// core-standards.md source_id H262 is the project standards authority.
+// core-reference.md source_id H262 is the project standards authority.
 // Cb/Cr are temporarily tagged in store_pixel_x[11:10]: 01=Cb, 10=Cr.
 module mpeg2_h262_p_luma_macroblock_engine(
  input wire clk,input wire reset,input wire request,input wire residual_valid,input wire [5:0] residual_index,

@@ -1,7 +1,7 @@
 //============================================================================
 // MiSTer Media Player - controlled aligned non-zero H.262 P motion observer
 //
-// Standards authority: core-standards.md, source_id H262.
+// Standards authority: core-reference.md, source_id H262.
 // Relevant records:
 //   H262-003 prediction samples derive from reference samples and motion vectors
 //   H262-008 slice vertical position identifies the macroblock row

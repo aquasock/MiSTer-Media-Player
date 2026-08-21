@@ -1,7 +1,7 @@
 //============================================================================
 // MiSTer Media Player - controlled multi-macroblock/multi-row H.262 P observer
 //
-// Standards authority: core-standards.md, source_id H262.
+// Standards authority: core-reference.md, source_id H262.
 // Relevant established records:
 //   H262-007 macroblock width = (horizontal_size + 15) / 16
 //   H262-008 slice vertical position identifies the macroblock row

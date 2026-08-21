@@ -1,7 +1,7 @@
 //============================================================================
 // MiSTer Media Player - controlled six-block H.262 P residual syntax parser
 //
-// Standards source: project-controlled core-standards.md, source_id H262.
+// Standards source: project-controlled core-reference.md, source_id H262.
 // The controlled first 4:2:0 macroblock is decoded in block order
 // Y0, Y1, Y2, Y3, Cb, Cr.  This parser remains intentionally bounded to the
 // first P slice / first pattern-only macroblock proof used by Phase 1T.
