@@ -429,6 +429,11 @@ module tb_h262_live_raster_soak #(
         // either completes or fails.  +PROGRESS=<cycles> makes that visible
         // without changing any functional timing.
         void'($value$plusargs("PROGRESS=%d",progress_interval));
+        if($value$plusargs("ROW_EVENT=%s",row_event_path))begin
+            row_event_fd=$fopen(row_event_path,"w");
+            if(row_event_fd==0)$fatal(1,"cannot open row event trace");
+            $fdisplay(row_event_fd,"cycle,hdr,event,src,outstanding,waiting,state");
+        end
         // Entry 294 keyed its duplicate detector on the residual sideband
         // index, which is a fixed class code (3e non-intra / 3b intra) and is
         // therefore constant across any run of skipped macroblocks.  This
@@ -1661,34 +1666,30 @@ module tb_h262_live_raster_soak #(
         end
     end
 
-    // Row-bank credit accounting across the picture 15 -> 16 boundary.  The
-    // engine's row_final_latched branch does not perform the bank cleanup its
-    // non-final sibling does, so the question is whether the last row of a
-    // picture ever returns its credit to the producer.
-    integer credit_left=0;
+    // Entry 297 next step: both engines' produce and retire events on one
+    // timebase.  row_produced is the P parser's own row-final marker; row_retired
+    // is the b_select-muxed persistence, so each retire is attributed to the
+    // engine that actually sourced it.
+    reg [1023:0] row_event_path;
+    integer row_event_fd=0,row_event_cycle=0;
     always @(posedge clk) begin
-        if(reset)credit_left<=0;
+        if(reset)row_event_cycle<=0;
         else begin
-            if(publication.p_header_count>=15)credit_left<=1;
-            if(credit_left!=0)begin
-                if(publication.p_controller.wide_general_probe.row_produced||
-                   publication.p_controller.wide_general_probe.row_retired||
-                   (publication.p_header_count!=p_header_count_d))
-                    $display("ROWCREDIT hdr=%0d state=%0d outstanding=%0d waiting=%0d final_queued=%0d produced=%0d retired=%0d blocked=%0d rearm_pending=%0d parse_hold=%0d b_select=%0d b_rowpers=%0d mixed_select=%0d mix_rowpers=%0d",
-                        publication.p_header_count,
-                        publication.p_controller.wide_general_probe.parser_state,
+            row_event_cycle<=row_event_cycle+1;
+            if(row_event_fd!=0)begin
+                if(publication.p_controller.wide_general_probe.row_produced)
+                    $fdisplay(row_event_fd,"%0d,%0d,PRODUCE,P,%0d,%0d,%0d",
+                        row_event_cycle,publication.p_header_count,
                         publication.p_controller.wide_general_probe.outstanding_rows,
                         publication.p_controller.wide_general_probe.row_waiting,
-                        publication.p_controller.wide_general_probe.final_row_queued,
-                        publication.p_controller.wide_general_probe.row_produced,
-                        publication.p_controller.wide_general_probe.row_retired,
-                        publication.p_controller.wide_general_probe.bank_blocked,
-                        publication.p_controller.wide_general_probe.producer_rearm_pending,
-                        publication.p_controller.wide_general_probe.parse_hold,
-                        prediction.b_select,
-                        prediction.b_row_persisted,
-                        prediction.mixed_select,
-                        prediction.mix_row_persisted);
+                        publication.p_controller.wide_general_probe.parser_state);
+                if(publication.p_controller.wide_general_probe.row_retired)
+                    $fdisplay(row_event_fd,"%0d,%0d,RETIRE,%0s,%0d,%0d,%0d",
+                        row_event_cycle,publication.p_header_count,
+                        prediction.b_select?"B":"P",
+                        publication.p_controller.wide_general_probe.outstanding_rows,
+                        publication.p_controller.wide_general_probe.row_waiting,
+                        publication.p_controller.wide_general_probe.parser_state);
             end
         end
     end
