@@ -891,23 +891,25 @@ Validate on hardware against the Entry 278 control, requiring the long-GOP strea
 - [ ] Passed
 
 ---
-## 241 COMMIT Unreleased c667f2c 2026-08-19T19:59:35-07:00
+## 281 COMMIT Unreleased b3e8085 2026-08-20T19:22:04-07:00
 
 #### Coming From:
 
-Unreleased c667f2c
+Unreleased b3e8085
 
 #### Purpose:
 
-Record the MiSTer cadence and raster result of the pipelined non-intra inverse-quantisation build.
+Record the paired long-GOP hardware result of the 50.000 Hz raster retiming and correct the Entry 280 diagnosis it was built on.
 
 #### Outcome:
 
-The user reports unchanged passing LED behavior and no visible screen regression on the deployed `c667f2c` RBF. Recalibrated analysis of the new nominal-60 fps recordings recovers all 72 long-GOP pictures and all 24 mixed-macroblock pictures in strict unit-step order. Long GOP advances from first frame 0 to first frame 71 in 4.977 seconds, or 14.27 effective fps, with camera holds ranging from two through nine samples; this is 1.55 percent faster than Entry 239's 5.055-second baseline. Mixed macroblocks advances from first frame 0 to first frame 23 in 1.817 seconds, or 12.66 effective fps, with holds ranging from two through nine samples; this is 6.93 percent faster than Entry 239's 1.952-second baseline. Independent temporal comparison finds a visible raster change for every one of the 71 and 23 logical counter transitions within the 60 fps camera's two-sample ambiguity, ruling out missing pictures, counter-only advancement, and a stale displayed buffer. The inverse-quantisation optimization is therefore hardware accepted and measurably improves throughput, while the remaining two-to-nine-sample hold variation explains why the presentation still looks stuttery.
+Hardware rejects the cadence claim. Both cores were measured in one session against the same long-GOP stream with the automated profiler, and the Entry 278 baseline was fetched back from the MiSTer and confirmed as SHA-256 `5118e024936a332ce3de2247da758e6f5b73b0cd5bda039dba570ff6762ed022` before use. Entry 280 `b3e8085` delivers 23.426986 fps against a same-session Entry 278 control of 23.635634 fps, a 0.88 percent regression. Both runs are functionally clean with all 72 pictures, all 71 swaps, 25 reference pictures, zero error flags, zero destination stalls and no validation failures, so the retimed raster is correct; it is simply not faster. The internal movement is the same pattern the log has now recorded six times: decoder stall falls from 56,842,916 to 55,601,714 cycles, a genuine 2.18 percent reduction, while presentation stall rises from 47,150,448 to 49,653,263, a 5.31 percent increase that more than absorbs it. Writer wait also falls from 3,831,708 to 2,335,832 while I and P stalls are effectively unchanged.
+
+The Entry 280 reasoning was wrong in one specific and consequential way. It subtracted recorded presentation wait from measured cadence, obtained 29.903 ms of work per frame, and concluded that the work already fitted a 40 ms budget so only the narrow 33.158 ms slot was blocking 25 fps. The non-stall figure is confirmed at 30.544 ms per frame, but presentation stall is not removable idle time waiting for a grid; it is 12.951 ms per frame of decode blocked on presentation, and it sits on the critical path. The real per-frame requirement is therefore about 43.5 ms, which exceeds the old 33.158 ms narrow slot and the new uniform 40.000 ms slot alike. That is why the measured frame period barely moved, from 42.309 ms on the control to 42.686 ms, and why the refresh grid changed the quantisation without changing the result: the control spent 2.5519 refreshes per frame at 16.5792 ms while Entry 280 spends 2.1343 at 20.000 ms. The retiming is very slightly worse because a coarser 20 ms grid loses more when a frame overruns, and because it removed the 49.738 ms relief slot that roughly one frame in eight had been relying on. The user separately reports that both streams play correctly with a stutter approximately once per second, which is consistent with the roughly thirteen percent of frames that still overrun a uniform slot, and reports the picture as subjectively acceptable; that subjective improvement is plausible because a uniform two-refresh cadence is regular where the former two-and-three alternation was not, but it is not evidence of higher throughput and must not be recorded as such.
 
 #### Next Steps:
 
-Continue from hardware-accepted commit `c667f2c`, preserve strict counter and raster identity plus reload behavior, and use the remaining two-to-nine-sample hold distribution to profile the next dominant decoder-backpressure stage before proposing another throughput optimization rather than changing the presentation cadence gate.
+Treat presentation stall as the sole remaining target, because it is now measured at 12.951 ms of every 42.686 ms frame and reaching 25 fps requires removing 10,297,414 cycles, or 20.7 percent of it, with no other reduction. The specific mechanism is the input transport hold in `MediaPlayer_top_00.svh`, where `mpeg2_new_stream_ready` is gated by `mpeg2_new_b_presentation_hold` and `mpeg2_new_p_destination_ownership_hold` so the parser stops for the duration of a presentation transaction; Entry 276 already allocated the third reference bank that would let the following picture decode during that window, and its destination stall has been zero ever since, so the storage is provably idle while the parser is blocked. Propose and measure a bounded relaxation of that hold before changing the raster again. Decide with the user whether to retain the 50.000 Hz raster or revert to the Entry 278 geometry while that work proceeds, noting that the counter favours reverting by 0.88 percent, that the subjective report favours retaining, that the two questions are independent, and that with no active `MiSTer.ini` a 60 Hz panel is still frame-rate converting the 50 Hz output so the picture assessment is not yet a clean measurement of the core. The outstanding forced 50 Hz HDMI comparison would settle that last point and requires a configuration change on the user's MiSTer.
 
 #### Files Modified:
 
@@ -916,7 +918,7 @@ None.
 #### Status:
 
 - [x] Built
-- [x] Passed
+- [ ] Passed
 
 ---
 ## 259 COMMIT Unreleased 9101fcc 2026-08-20T06:47:21-07:00
