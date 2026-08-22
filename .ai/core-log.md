@@ -1,4 +1,32 @@
-## 318 COMMIT Unreleased ??? 2026-08-22T00:09:56-07:00
+## 319 COMMIT Unreleased ??? 2026-08-22T00:24:17-07:00
+
+#### Coming From:
+
+Unreleased 385ead5
+
+#### Purpose:
+
+Retry the unchanged terminal cadence snapshot qualification with fitter seed nine after seed eight misses timing only on the standing HDMI framework path.
+
+#### Outcome:
+
+The planned commit changes only the reproducible Quartus fitter seed from eight to nine. It does not alter decoder, scheduler, display, loading-bar or diagnostic logic, and follows the previously accepted seed retry procedure for the same placement-sensitive HDMI clock.
+
+#### Next Steps:
+
+Build incrementally without clearing Quartus databases and accept the fit only with zero errors and positive slack in every reported timing category. If it closes timing, install its exact RBF and rerun the 48-, 72- and 250-picture hardware clips; require 250 pictures and 249 swaps from the corrected terminal snapshot, zero errors, zero cadence outliers and unchanged visible playback.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+## 318 COMMIT Unreleased 385ead5 2026-08-22T00:09:56-07:00
 
 #### Coming From:
 
@@ -10,11 +38,11 @@ Require the development cadence snapshot to wait for terminal presentation compl
 
 #### Outcome:
 
-The 48- and 72-picture hardware reruns consume every byte, display every picture and finish with zero errors and zero cadence outliers, while the full 250-picture run consumes all 1,178,034 bytes, decodes all 250 pictures, reaches sequence end and plays smoothly to the authored black ending according to direct user observation. Its telemetry snapshot nevertheless latches at 248 displayed pictures only 1,023 decoder clocks after the latest swap because the development `session_quiet` term describes transport and decoder inactivity but does not require `presentation_complete`; the scheduler state still contains a valid released frame and a closed two-picture run, so this is an observability race rather than the former playback failure.
+Commit `385ead5` adds `presentation_complete` to the development-only quiet qualification and leaves the bounded forced-terminal snapshot path intact. The focused cadence-profiler regression passes its quiet, forced, fatal and no-progress cases with schema-four checksum `e82b5cad`. The incremental Quartus 17.0.2 compile completes in 11 minutes 59 seconds with zero errors and 147 warnings, but the fit is rejected before hardware deployment because global setup is minus 0.105 ns on the standing seed-sensitive HDMI framework clock; decoder and video setup remain positive at plus 0.569 ns and plus 7.555 ns, with hold plus 0.245 ns, recovery plus 3.289 ns, removal plus 0.709 ns and minimum pulse width plus 0.462 ns. Seed eight uses 34,569 ALMs, 51,316 registers, 4,046,279 memory bits, 507 RAM blocks and 65 DSP blocks; its rejected 4,409,220-byte RBF has SHA-256 `502b306668c15f4ba0becdb34313737ccd6f8ccd5140e86885fe25a34bdfdb0c` and was not uploaded.
 
 #### Next Steps:
 
-Add `presentation_complete` to the development-only quiet qualification while preserving the existing bounded terminal-timeout path for genuine non-completion, run focused profiler verification, rebuild incrementally without clearing Quartus databases, and rerun all three hardware clips. Accept the diagnostic correction only if the controls remain exact and the full stream reports 250 pictures, 249 swaps, terminal quiet, zero errors and zero cadence outliers without any change to visible playback or the loading bar.
+Retry the unchanged design incrementally with fitter seed nine, explicitly recording that any timing closure is seed-dependent. Only a build with zero errors and positive global, decoder, video, hold, recovery, removal and pulse-width slack may proceed to the same three hardware clips.
 
 #### Files Modified:
 
