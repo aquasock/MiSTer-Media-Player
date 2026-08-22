@@ -1,5 +1,5 @@
 ---
-## 317 COMMIT Unreleased ??? 2026-08-21T22:52:35-07:00
+## 317 COMMIT Unreleased d95baa6 2026-08-21T23:50:22-07:00
 
 #### Coming From:
 
@@ -11,11 +11,11 @@ Implement exact B-picture f_code five motion support so the 250-picture compatib
 
 #### Outcome:
 
-The accepted source reproduces the 250-picture stop at stream byte 310,629, but the causal transaction is picture 80 rather than the following header. Complete syntax inventory shows picture 80 is the first B picture whose forward and backward horizontal and vertical f_codes are all five; the stream uses only one through five, while the B parser deliberately accepts only one through four and represents both motion vectors in packed signed 8-bit fields. The parser therefore declines picture 80 without an error, while the outer publication shell still counts its header and the scheduler waits permanently for an inflight B transaction that no decoder owns. P f_code support was already widened through nine with a dedicated vector channel, but the separate B parser and raster engine were not. The proposed repair extends only B f_code five with exact signed 9-bit reconstruction, carries forward and backward vectors on a dedicated channel rather than the 16-bit residual sideband, and widens the B raster motion store and address arithmetic accordingly; scheduler, loading-bar and cadence behavior remain unchanged.
+Commit `d95baa6` extends the B parser and raster path from f_code one through four to exact f_code five support. Predictors, residual reconstruction and emitted forward/backward vectors are signed 9-bit values, the raster motion record is widened from 34 to 38 bits, and an explicit B transport qualifier distinguishes direction records from ordinary P residual sample indices while the vectors travel independently of the 16-bit residual sideband. The deterministic range generator now exercises one through five, including signed 9-bit wraparound, and FFmpeg verifies both authored B pictures pixel-exact; the parser-window and residual-streaming regressions pass with zero errors and the latter retains its exact 1,286,071-cycle Icarus count. The canonical fixed-count 72-picture raster remains exactly 6,519,997 cycles, the scheduler cadence remains one, three and two with a minimum presentation gap of two, and real 48-, 72- and 250-picture Verilator runs consume every byte and terminate with zero decoder, raster, ownership or presentation errors. The 250-picture run finishes all 1,178,034 bytes with 74 P pictures, 165 B pictures, 85 reference publications and 249 display swaps, proving both the former picture-80 stop and the terminal non-quiet state are gone in simulation. The loading bar and scheduler behavior are unchanged.
 
 #### Next Steps:
 
-Widen the B parser's predictor, residual reconstruction and motion outputs to signed 9-bit values, route those vectors independently of residual metadata, widen the B raster engine's motion store and coordinate arithmetic, and add an f_code-five focused gate alongside the existing one-through-four regression. Require the complete 250-picture Verilator stream to consume all bytes and reach quiet terminal presentation with zero decoder, ownership, scheduler or cadence errors. Then build incrementally as requested, install the candidate on the connected MiSTer, and require the 48-, 72- and 250-picture hardware clips to finish with every byte and picture, zero error flags and no regression of the accepted GOP cadence.
+Build `d95baa6` incrementally as requested without clearing Quartus compilation databases, require zero errors and positive timing, install the exact RBF on the connected MiSTer, and run the 48-, 72- and 250-picture hardware clips. Accept the repair only if each consumes every byte, presents every picture through terminal quiet, reports zero error flags and preserves the accepted GOP cadence; retain the loading bar as the diagnostic requested by the user.
 
 #### Files Modified:
 
