@@ -1,3 +1,33 @@
+## 331 COMMIT Unreleased 374ef38 2026-08-22T05:43:51-07:00
+
+#### Coming From:
+
+Unreleased 374ef38
+
+#### Purpose:
+
+Qualify the accepted mixed-width MPEG-2 ingress image as an exact clean-build release candidate rather than relying on its incremental Quartus build.
+
+#### Outcome:
+
+The previous `db`, `incremental_db` and `output_files` directories were moved intact to `/tmp/mmp_clean_build.QMl28H`, and Quartus then rebuilt seed twelve completely from scratch. Full compilation completed in 13 minutes 44 seconds with zero errors. Every required timing category is positive: global and decoder setup are plus 0.049 ns, video setup is plus 7.752 ns, hold is plus 0.243 ns, recovery is plus 3.800 ns, removal is plus 0.613 ns and minimum pulse width is plus 1.122 ns. The clean fit uses 35,146 ALMs, 51,998 registers, 4,306,375 block-memory bits, 538 of 553 RAM blocks and 65 DSP blocks.
+
+The resulting 4,463,616-byte `MediaPlayer.rbf` has SHA-256 `566ecf44d65c9d483be247ae942280d23269b7100ce0d75ef3b8a5bc4bdf2dbc`, exactly matching the previously installed incremental image that passed the focused five-second and full fifteen-second squirrel tests and the user's repeated visual inspection. Because the images are bit-for-bit identical, the MiSTer already runs the clean release-candidate bits and was deliberately not interrupted while the user tests additional converted media.
+
+#### Next Steps:
+
+Continue broad hardware playback testing with user-selected files on the already installed, bit-identical clean release candidate. Record any reproducible decode artefact, cadence problem, freeze or terminal failure with its source properties and timestamp. Do not rebuild or replace the image unless a new defect requires a source change.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 330 COMMIT Unreleased 374ef38 2026-08-22T05:01:06-07:00
 
 #### Coming From:
@@ -1218,40 +1248,6 @@ The control run produced the finding that matters. The corpus soak stream report
 #### Next Steps:
 
 Locate the failure by row rather than by hypothesis. The stream survives at least eight complete rows with correct motion accounting before raising source eight, so capture the engine's full state at the transition into the failing row and compare it against the same transition in a row that succeeds, rather than reasoning forward from stream properties again. Three successive hypotheses have now been rejected by their own controls, which is the method working but also a signal to stop proposing mechanisms and start bisecting the failure point directly. Separately, promote a 720 by 480 stream to the routine gate. The soak's speed advantage comes from a frame size that no longer represents the target, so either generate a short 720 by 480 soak whose replay cost is acceptable or accept the longer run on changes that touch the P or raster paths; continuing to certify those paths on a 128 by 96 frame will keep producing green regressions that say little about real content.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 291 COMMIT Unreleased cba5371 2026-08-21T03:12:15-07:00
-
-#### Coming From:
-
-Unreleased cba5371
-
-#### Purpose:
-
-Determine whether the unrecognised residual event that raises raster error source eight originates in the producer or in sideband routing.
-
-#### Outcome:
-
-No source changed. Both hypotheses from Entry 290 are now settled, and one conclusion formed during this work was disproven by its own control before it could be acted on.
-
-The routing hypothesis is rejected. `mpeg2_h262_reference_pipeline_probe_rearm.sv` does mux two producers into the engine's residual input, a plan adapter and the shared `p_residual_sample_*` path, and `mpeg2_h262_two_picture_probe_p_chain.sv` muxes the B sideband onto that same shared path under `b_transport` while the consumer gates it with a different signal, `b_select`, computed in another module from unrelated state. That asymmetry looked like a leak. Instrumenting every cycle where `b_transport` is high, `b_select` is low and a residual sample is valid records zero such cycles across the failing stream, so no B sideband reaches the P engine and the plan adapter emits only `A2FF` on the metadata index. Neither is the source.
-
-The producer is emitting the event, but the reason is not the one it first appeared to be. Tracing every metadata-class emission shows that at `G_SAMPLES` the pipeline forwards the transform output directly with `replay_index<=tidx`, so coefficient positions sixty through sixty-three occupy indices `6'h3c` through `6'h3f`, the same indices the raster engine reads as macroblock number, block identity and row marker. That collision is real, but it is not the defect: the corpus control emits exactly the same pattern, index `6'h3f` at that state carrying coefficient value `0xffff`, twenty-six such events in the same window as the failing stream, and it decodes cleanly. The index space is overloaded by design and disambiguated by consumer state, so the failure is a state disagreement rather than an encoding collision.
-
-The discriminator is visible in the first event each stream produces. The corpus begins at macroblock zero, while the failing picture's first coded macroblock is number forty, so it opens with forty consecutive skipped macroblocks. At the point of failure the consumer holds `capture_desc_count` at zero, `desc_active` and `sample_expected` both low and `motion_count` at one, meaning coefficients arrived before any descriptor established what to expect. Leading skipped macroblocks are therefore the property that separates the two streams, which also fits the row-completion check that raises error source seven on a different encode, since that check requires exactly `mb_width` motion records per completed row and skipped macroblocks carry none. An earlier attempt to test this by adding encoder noise to suppress skipping was inconclusive for an unrelated reason: it raised picture density enough to trip a different limit before the skip path was reached.
-
-#### Next Steps:
-
-Establish how the producer and consumer are meant to account for skipped macroblocks before changing either. Trace the motion record stream against macroblock numbers across a row for both streams and determine whether the producer emits a record for a skipped macroblock, whether the consumer expects one, and which of the two the row-completion arithmetic assumes. That single comparison decides whether the defect is a missing synthesis of skipped-macroblock motion records in the producer or an incorrect expectation in the consumer's row accounting, and the fix differs completely between them. Do not add a pattern arm to the engine's match chain, because the chain is not the problem; the corpus proves the same events are accepted when the consumer is in the expected state. Note for the eventual scope decision that the two reachable errors, source seven and source eight, now appear to share this single cause rather than being independent limits, which would make the family smaller than Entry 290 estimated.
 
 #### Files Modified:
 
