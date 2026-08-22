@@ -20,6 +20,7 @@ Add focused profiler cases proving fatal and no-progress capture retain the exac
 #### Files Modified:
 
 - rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/decode_hardware_cadence.py
 - tools/streams/tb_h262_hardware_cadence_profiler.sv
 
 #### Status:
