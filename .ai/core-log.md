@@ -7,19 +7,19 @@ Unreleased 3c80bef
 
 #### Purpose:
 
-Preserve generalized P-engine ownership while a final parsed row is still waiting for persistence across an already-classified following B header.
+Honor generalized P-parser backpressure when a new reference header overlaps an older outstanding B transaction.
 
 #### Outcome:
 
-The accepted source reproduces the 250-picture stop at stream byte 310,629, inside picture 82's B header rather than at sequence end. Picture 81 has produced its first generalized P row and asserted the parser hold, but the following B classification clears `wide_candidate` before that row is persisted; `wide_mode` therefore falls, the row-end metadata is no longer forwarded to the shared raster engine, and the parser remains permanently held with internal detail 31. The proposed repair retains `wide_mode` while `wide_parse_hold` is asserted, using the existing parser ownership state to carry only the unfinished P transaction across the header handoff without changing accepted scheduler overlap, loading-bar backpressure or display cadence.
+The accepted source reproduces the 250-picture stop at stream byte 310,629, inside picture 82's B header rather than at sequence end. Cycle tracing proves the causal loss begins in picture 81: a preceding B transaction is still outstanding when this P header is accepted, and the mixed publication shell's historical `!b_picture_inflight` gate suppresses every asserted P parser hold. The input therefore advances through P slices 2 through 30 while the parser is still processing row 1, discarding those rows; the following B header merely exposes the loss as internal detail 31 and a permanent scheduler wait for the reference that can no longer publish. The proposed repair uses the existing monotonic P-header and P-publication counters to recognize the pending reference and honor its parser hold even while the older B flag remains set, without changing the accepted B-only bypass, scheduler overlap, loading-bar semantics or display cadence.
 
 #### Next Steps:
 
-Extend the generalized-mode ownership expression with `wide_parse_hold`, rerun the focused parser and presentation regressions, and require the complete 250-picture Verilator stream to consume all bytes and reach quiet terminal presentation with zero decoder, ownership, scheduler or cadence errors. Then build incrementally as requested, install the candidate on the connected MiSTer, and require the 48-, 72- and 250-picture hardware clips to finish with every byte and picture, zero error flags and no regression of the accepted GOP cadence.
+Qualify the historical B hold bypass with the already-proven pending-P counter relation, rerun the focused parser and presentation regressions, and require the complete 250-picture Verilator stream to consume all bytes and reach quiet terminal presentation with zero decoder, ownership, scheduler or cadence errors. Then build incrementally as requested, install the candidate on the connected MiSTer, and require the 48-, 72- and 250-picture hardware clips to finish with every byte and picture, zero error flags and no regression of the accepted GOP cadence.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
 
 #### Status:
 
