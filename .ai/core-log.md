@@ -1,5 +1,5 @@
 ---
-## 314 COMMIT Unreleased ??? 2026-08-21T21:33:01-07:00
+## 314 COMMIT Unreleased 9367b7e 2026-08-21T21:33:01-07:00
 
 #### Coming From:
 
@@ -11,11 +11,11 @@ Capture the rejected I-overlap build's hardware state when playback terminates b
 
 #### Outcome:
 
-The diagnostic change will leave decode, scheduling, frame ownership and presentation behavior untouched while allowing the existing schema-four cadence profiler to snapshot after either a sticky fatal error or a bounded session no-progress interval. This closes the current observability gap in which the first-GOP freeze produces neither terminal telemetry nor a valid automated result because the sequence-end marker is never accepted.
+Commit `9367b7e` leaves decode, scheduling, frame ownership and presentation behavior untouched while allowing the schema-four cadence profiler to snapshot after either a sticky fatal error or one decoder-clock second without byte, persistence, display, prediction or writer progress. Focused Icarus verification covers quiet, forced-terminal, fatal and no-progress capture with valid checksums, and Verilator lint passes with only standing testbench warnings. The incremental Quartus 17.0.2 build completes in 12 minutes 41 seconds with zero errors and positive timing at plus 0.253 ns global setup, plus 1.311 ns decoder setup, plus 7.273 ns video setup, plus 0.248 ns hold, plus 3.619 ns recovery, plus 0.880 ns removal and plus 0.462 ns minimum pulse width. It uses 34,520 ALMs and 51,206 registers; the 4,415,436-byte RBF has SHA-256 `a7e34a96d69a551aab24e042f53ac4bf152b6e3713000d0efc2f31ac52d8919b`. Hardware capture succeeds and proves the rejected Entry 313 behavior is a scheduler fail-stop, not a deadlock or reference corruption: only 84,756 of 125,948 bytes are accepted, 10 references and 15 B pictures complete, 23 pictures and 22 swaps are displayed, cadence remains legal at 24.787 fps with zero gap outliers, and error flags are exactly `0x0200`, the presentation-error bit. The terminal scheduler state retains `overlap_decode_open=1` and `pending_frame_valid=1` after clearing the active run, which identifies the queued B admission failure: the following B header arrived while the new-GOP I overlap was open but before its reference publication was visible, and the scheduler treated that transient absence as fatal. The known-working Entry 312 RBF with SHA-256 `af63bb9c8433247d4b5b54ab511efd12d9e2aaec8cf664e021e48c7b4fcb1b31` was restored on the MiSTer after capture.
 
 #### Next Steps:
 
-Add focused profiler cases proving fatal and no-progress capture retain the exact accepted-byte, picture, error, bank and scheduler state, then build and run the 48-picture clip on the connected MiSTer. Use the decoded terminal state to identify the failed I-overlap invariant, restore a known-working hardware image after evidence capture, and propose the next functional repair separately.
+Replace the queued-run fail-stop only for this proven transient. When a B header reaches a closed run with `overlap_decode_open` set but no overlap publication yet, latch one deferred queued-B request and assert presentation backpressure after that header so the already accepted I picture may finish publishing without allowing B payload bytes to outrun scratch-bank ownership. Complete the ordinary queued admission atomically when `frame_waiting` or `pending_frame_valid` supplies the I reference, preserve scratch-exhaustion and duplicate-request cases as genuine errors, and add a focused case in which B classification precedes delayed I publication. Keep the Entry 313 I-overlap behavior otherwise unchanged, build incrementally as requested, and require the 48- and 72-picture hardware clips to finish with every byte and picture, zero errors and zero GOP outliers before persistent installation.
 
 #### Files Modified:
 
@@ -25,8 +25,8 @@ Add focused profiler cases proving fatal and no-progress capture retain the exac
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 313 COMMIT Unreleased f3f2395 2026-08-21T21:08:56-07:00
