@@ -1,4 +1,32 @@
-## 322 COMMIT Unreleased ??? 2026-08-22T01:52:41-07:00
+## 323 COMMIT Unreleased ??? 2026-08-22T02:19:15-07:00
+
+#### Coming From:
+
+Unreleased cc39b46
+
+#### Purpose:
+
+Retry the unchanged native-24-fps design with fitter seed ten after seed nine misses timing only on the standing HDMI framework path.
+
+#### Outcome:
+
+The seed-nine incremental build of `cc39b46` compiles with zero errors but is rejected before deployment because its global setup slack is minus 0.180 ns on the HDMI PLL clock. The changed 40 MHz presentation logic remains at plus 6.621 ns and the 54 MHz decoder remains at plus 1.322 ns, with hold, recovery, removal and pulse width all positive, matching the project's documented seed-sensitive framework placement behavior rather than identifying a cadence-path violation. The rejected artifact is not installed on the MiSTer.
+
+#### Next Steps:
+
+Change only the reproducible fitter seed from nine to ten and rebuild incrementally. Accept the candidate only with zero errors and positive global, decoder, video, hold, recovery, removal and pulse-width timing; then verify and install the exact RBF, upload the validated native 24 fps full-movie stream, and run short hardware cadence telemetry before handing the movie to the user for the once-per-second stutter comparison.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+## 322 COMMIT Unreleased cc39b46 2026-08-22T01:52:41-07:00
 
 #### Coming From:
 
@@ -10,11 +38,11 @@ Add exact 24 fps presentation cadence and generate Big Buck Bunny at its native 
 
 #### Outcome:
 
-The complete 14,911-picture 25 fps endurance stream consumes all 85,680,318 bytes, presents every picture and terminates quietly with zero error flags, while the user reports clean playback and sharp scene transitions. The user also identifies a small once-per-second hitch on smooth pans and credits plus stronger jerkiness from 7:20 through 7:25. Source analysis proves that the forced 24-to-25 conversion inserts one repeated picture at the same phase every second, including 7:22.48 inside the squirrel motion burst. The hardware snapshot's modulo picture ordinals place its three largest gaps at candidate times 7:20.88, 7:22.24 and 7:22.36 in the reported interval; the two largest capture an empty input FIFO while the decoder is ready, so the concentrated transport burst remains a separate issue from cadence conversion. The frontend already parses direct H.262 frame-rate code two and computes its 90 kHz duration exactly, but the presentation accumulator and cadence profiler currently recognize only code three.
+Commit `cc39b46` adds exact frame-rate-code-two credit to the saturating pixel-clock presentation accumulator while preserving code three and extends cadence outlier capture to both rates. Focused tests deliver exactly 240 native-rate pictures and the existing 250 pictures across the same 603 raster windows with a minimum two-window gap, and profiler schema four retains checksum `e82b5cad` while capturing code-two outliers. The native 250-picture BBB encode has frame-rate code two, maps all 250 source pictures without inserted duplicates and completes all 1,070,782 bytes in the full Verilator raster at 225,134,082 cycles with 74 P pictures, 165 B pictures, 85 reference publications, 249 swaps and zero errors. The existing 25 fps corpus remains exact at 6,519,997 cycles. The complete native stream is 720 by 480, 14,315 pictures, 84,423,309 bytes, SHA-256 `015c8811932ce8b324af6ccd9e235cd621307aa43fcaf62b413b93badba52de5`, frame-rate code two and a valid sequence-end marker. The incremental seed-nine Quartus build finishes in 11 minutes 28 seconds with zero errors and 147 warnings, using 34,391 ALMs, 51,100 registers, 4,046,279 memory bits, 507 RAM blocks and 65 DSP blocks, but it is rejected because the standing HDMI framework path misses setup by 0.180 ns; decoder and video setup remain positive at plus 1.322 ns and plus 6.621 ns, with hold plus 0.246 ns, recovery plus 3.834 ns, removal plus 1.020 ns and pulse width plus 0.462 ns. The rejected 4,384,288-byte RBF has SHA-256 `e48f74cdab417336e434c81a2a8b6548a880f6f4099879bf8693cc2671bc5a02` and is not installed.
 
 #### Next Steps:
 
-Extend the existing saturating presentation accumulator with exact 24 fps pixel-clock credit while preserving the accepted 25 fps constants and starvation behavior. Add focused regression coverage for both frame-rate codes, enable cadence outlier capture for code two, and change the Big Buck Bunny generator to retain the source's native 24 fps rather than inserting pictures. Prove the generated stream reports frame-rate code two, contains no adjacent repeated source pictures, decodes completely in software regression and preserves the existing 25 fps gates; then build incrementally with seed nine, require positive timing, install the exact RBF on the connected MiSTer and provide a full native-rate movie for visual comparison.
+Retry the unchanged design with a new documented fitter seed because seed nine misses only the standing placement-sensitive HDMI framework path. Require positive timing before installing any artifact, then run a short native 24 fps hardware cadence gate and the complete movie so the user can determine whether the exact once-per-second duplicate hitch is gone while keeping the separate 7:20-to-7:25 transport burst under observation.
 
 #### Files Modified:
 
