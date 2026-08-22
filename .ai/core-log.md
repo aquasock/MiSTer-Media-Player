@@ -1,3 +1,31 @@
+## 341 COMMIT Unreleased ??? 2026-08-22T08:46:15-07:00
+
+#### Coming From:
+
+Unreleased a6e25b4
+
+#### Purpose:
+
+Write the final v0.6.0 milestone entry in the public changelog as the first step of the approved seven-step release plan.
+
+#### Outcome:
+
+The proposed documentation change will replace the empty Unreleased placeholder with a dated v0.6.0 milestone that records the accepted real-stream decoder, corrected presentation and terminal behavior, expanded motion-vector range, 60 MHz decode and mixed-width 32 KiB ingress, native frame-rate codes one through three, clean-build timing and resources, focused and full-length hardware qualification, release artifact identity, and explicit implementation limits. The user's revised release plan drops the deferred Python conversion recipe and instead reserves a plain FFmpeg command for the later README step; this changelog commit will modify no README content.
+
+#### Next Steps:
+
+Edit only `CHANGELOG.md`, verify that the new milestone agrees with the hardware-qualified seed-ten baseline and preserves the Keep-a-Changelog Unreleased section, then commit and push the documentation update before proceeding to v0.6.0 release notes.
+
+#### Files Modified:
+
+- CHANGELOG.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 340 COMMIT Unreleased a6e25b4 2026-08-22T08:32:00-07:00
 
 #### Coming From:
@@ -1171,38 +1199,6 @@ The defect lies in whatever should begin P picture sixteen after picture fifteen
 #### Next Steps:
 
 Instrument the producer's picture-start path rather than anything downstream of it. Capture `picture_capture`, `picture_count`, `current_picture_is_p`, `wide_candidate`, `geometry_supported`, `producer_rearm_pending` and `proof_done` in the wide probe across the start of picture sixteen, and compare that trace against the start of picture fifteen, which succeeds, and picture nine, which occupies the equivalent position in the previous GOP and also succeeds. The question is narrow and factual: which term in the probe's picture-start condition is not satisfied for picture sixteen. Do not propose a repair until that term is named. Five repairs have now been attempted across entries 297 to 302 and every one addressed a subsystem that measurement later showed to be working correctly, so the standing instruction is to identify the failing term by observation first and to treat any hypothesis not grounded in a recorded cycle as unproven.
-
-#### Files Modified:
-
-- tools/streams/tb_h262_live_raster_soak.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 301 COMMIT Unreleased c792ca8 2026-08-21T16:01:57-07:00
-
-#### Coming From:
-
-Unreleased dc7da26
-
-#### Purpose:
-
-Implement the differential completion latch approved in Entry 300 and record why it and its successor both fail.
-
-#### Outcome:
-
-Two further repairs were written and neither works, so neither is committed, and one factual claim in the two preceding entries must be corrected. Entry 299 stated that nothing resets `outstanding_rows` at a picture boundary and Entry 300 repeated it; both are wrong. The per-picture initialisation block in part three of the wide probe has always contained `outstanding_rows<=0`, so the counter's zero point was defined all along and the offset theory those entries were built on had no basis. The corresponding correction applied in Entry 300 was a duplicate of an existing line.
-
-The differential latch was implemented as specified: a `rows_owed` counter latched at the final row from the then-current outstanding count plus one, decremented on each P-sourced retire, with completion firing as it reaches one. Instrumenting it shows the counter behaving exactly as designed and the repair still failing at byte 30,477. At the final row `rows_owed` latches to two, one retire arrives and takes it to one, and it then holds at one for 22,644 traced cycles while no further retire ever appears. The conclusion is firm and it invalidates the whole family of counting repairs: the final row's persistence is never delivered to the producer as a countable retire, so no arithmetic over retire events can express picture completion regardless of how the counter is defined.
-
-The successor attempt keyed the latch on the engine's picture-level persistence instead of on any count, routing the controller's existing `p_persistence_complete` into the probe as a new input. It also fails at byte 30,477, though the event itself is present: the signal pulses exactly once for the picture, so the latch and the pulse are failing to overlap and the remaining question is one of cycle ordering rather than of a missing event. Reverting to the recorded state and counting the same signals on the stock design then produced the most useful measurement of this cycle. Over the first eight P pictures the P engine's own `mixed_persisted_edge` fires exactly eight times, once per picture, while the `p_persistence_complete` the producer actually receives fires twenty-four times. Both of the persistence signals reaching the P producer are `b_select` muxed and carry B events, the row-level one at 727 against 240 and the picture-level one at 24 against 8, and the attempted repair was wired to the contaminated one.
-
-#### Next Steps:
-
-Route the P engine's own `mixed_persisted_edge` to the producer rather than the muxed `p_persistence_complete`, since it is measured at exactly one pulse per P picture and is the only uncontaminated picture-completion event available. Before wiring it, establish the cycle ordering that defeated the previous attempt by capturing the exact cycles on which `final_row_queued` rises, the persistence pulse occurs, and `row_produced` asserts across picture one's tail; a one-cycle pulse tested against a condition that also requires `!row_produced` has no second chance, and that is the most likely reason a present event failed to latch. Keep the dedicated `p_row_persisted` row-level source as part of the same change, since the row credit remains contaminated three to one and still drives backpressure. Four repairs have now failed. Do not write a fifth without first recording the ordering measurement, because every failure so far has come from assuming when a signal arrives rather than observing it.
 
 #### Files Modified:
 
