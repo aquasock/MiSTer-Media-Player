@@ -7,20 +7,19 @@ Unreleased 3c80bef
 
 #### Purpose:
 
-Preserve generalized P parsing and consecutive B/P publication events when a new reference overlaps an older B transaction.
+Serialize an overlapping P payload behind the older B transaction that still owns the shared execution engine.
 
 #### Outcome:
 
-The accepted source reproduces the 250-picture stop at stream byte 310,629, inside picture 82's B header rather than at sequence end. Cycle tracing proves the causal loss begins in picture 81: the older B transaction is still outstanding when this P reference is accepted, and the mixed publication shell's historical `!b_picture_inflight` gate suppresses every asserted P parser hold. The input therefore advances through P slices 2 through 30 while the parser is still processing row 1, discarding those rows. After the hold is corrected, all 1,350 macroblocks reconstruct cleanly while the older B and newer P finish together, but B priority on the shared completion mux discards the simultaneous P edge; the publication shell's redundant second edge detector would also collapse adjacent completion pulses. The scheduler is left waiting for a P reference that physically completed but never published. The proposed repair uses the existing monotonic P-header and P-publication counters to honor pending-reference backpressure, removes the redundant edge detector, and retains one P completion behind B priority so both publish in order, without changing the accepted B-only bypass, scheduler overlap, loading-bar semantics or display cadence.
+The accepted source reproduces the 250-picture stop at stream byte 310,629, inside picture 82's B header rather than at sequence end. Cycle tracing proves the causal loss begins in picture 81: its header is legally classified while picture 80's B decode is still inflight, but the mixed publication shell suppresses P parser backpressure whenever any B flag is set and then permits P payload to select the shared execution engine before that older B persists. The input advances through P slices 2 through 30 while the parser is still processing row 1, and the shared engine abandons the B transaction; honoring only the row hold reconstructs all 1,350 P macroblocks but cannot recover the displaced B completion. The proposed repair uses the existing monotonic P-header and P-publication counters to recognize the new reference immediately after classification, park its payload until `b_picture_inflight` clears, and continue honoring its parser backpressure thereafter. This preserves the intended header overlap while serializing the two users of the shared engine, without changing the accepted scheduler policy, loading-bar semantics or display cadence.
 
 #### Next Steps:
 
-Qualify the historical B hold bypass with the already-proven pending-P counter relation, remove the redundant second edge detector from the wrapper's qualified persistence pulses, retain one P completion behind simultaneous B priority, rerun the focused parser and presentation regressions, and require the complete 250-picture Verilator stream to consume all bytes and reach quiet terminal presentation with zero decoder, ownership, scheduler or cadence errors. Then build incrementally as requested, install the candidate on the connected MiSTer, and require the 48-, 72- and 250-picture hardware clips to finish with every byte and picture, zero error flags and no regression of the accepted GOP cadence.
+Use the already-proven pending-P counter relation to park the overlapping P payload until the older B persistence event and to honor every later P parser hold, rerun the focused parser and presentation regressions, and require the complete 250-picture Verilator stream to consume all bytes and reach quiet terminal presentation with zero decoder, ownership, scheduler or cadence errors. Then build incrementally as requested, install the candidate on the connected MiSTer, and require the 48-, 72- and 250-picture hardware clips to finish with every byte and picture, zero error flags and no regression of the accepted GOP cadence.
 
 #### Files Modified:
 
 - rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
 
 #### Status:
 
