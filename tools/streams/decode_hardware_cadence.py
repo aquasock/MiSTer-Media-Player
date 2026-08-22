@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Decode the Entry-311 machine-readable cadence overlay from a MiSTer PNG."""
+"""Decode the Entry-312 machine-readable cadence overlay from a MiSTer PNG."""
 
 from __future__ import annotations
 
@@ -12,9 +12,9 @@ from PIL import Image
 
 
 MAGIC = 0x4D4D5031
-WORDS = 35
+WORDS = 38
 X0 = 8
-Y0 = 456
+Y0 = 444
 CELL = 4
 ROW_PREFIX = (1, 0, 1, 0)
 
@@ -91,20 +91,69 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         display_swaps / cadence_seconds if cadence_seconds > 0.0 else 0.0
     )
     snapshot_meta = words[25]
-    terminal = words[32]
-    scheduler = words[33]
+    terminal = words[35]
+    scheduler = words[36]
+
+    def scheduler_flags(state: int) -> dict[str, Any]:
+        return {
+            "reorder_active": bool(state & (1 << 0)),
+            "run_closed": bool(state & (1 << 1)),
+            "decode_inflight": bool(state & (1 << 2)),
+            "scratch0_pending": bool(state & (1 << 3)),
+            "scratch1_pending": bool(state & (1 << 4)),
+            "next_present_scratch_bank": bool(state & (1 << 5)),
+            "future_frame_pending": bool(state & (1 << 6)),
+            "future_reference_pending": bool(state & (1 << 7)),
+            "scratch_presented": bool(state & (1 << 8)),
+            "run_picture_count": (state >> 9) & 0x3,
+            "overlap_decode_open": bool(state & (1 << 11)),
+            "overlap_frame_pending": bool(state & (1 << 12)),
+            "queued_run_active": bool(state & (1 << 13)),
+            "queued_run_closed": bool(state & (1 << 14)),
+            "queued_decode_inflight": bool(state & (1 << 15)),
+            "queued_scratch0_pending": bool(state & (1 << 16)),
+            "queued_scratch1_pending": bool(state & (1 << 17)),
+            "queued_future_frame_pending": bool(state & (1 << 18)),
+            "queued_future_reference_pending": bool(state & (1 << 19)),
+            "queued_run_picture_count": (state >> 20) & 0x3,
+            "queued_overlap_decode_open": bool(state & (1 << 22)),
+            "queued_overlap_frame_pending": bool(state & (1 << 23)),
+            "decode_generation_queued": bool(state & (1 << 24)),
+            "promotion_pending": bool(state & (1 << 25)),
+            "pending_frame_valid": bool(state & (1 << 26)),
+            "pending_frame_released": bool(state & (1 << 27)),
+            "terminal_boundary_pending": bool(state & (1 << 28)),
+            "queued_first_scratch_bank": bool(state & (1 << 29)),
+            "last_bound_reference_valid": bool(state & (1 << 30)),
+            "scheduler_presentation_complete": bool(state & (1 << 31)),
+        }
 
     def gap(rank: int, word_index: int) -> dict[str, Any]:
         cycles = words[word_index]
         metadata = words[word_index + 1]
+        state = words[word_index + 2]
         return {
             "rank": rank,
             "cycles": cycles,
             "seconds": cycles / clock_hz if clock_hz else 0.0,
             "display_picture_ordinal": (metadata >> 24) & 0xFF,
-            "display_frame_bank": (metadata >> 2) & 0x3,
-            "display_scratch": bool((metadata >> 1) & 1),
-            "display_scratch_bank": metadata & 1,
+            "presentation_hold": bool((metadata >> 23) & 1),
+            "destination_hold": bool((metadata >> 22) & 1),
+            "fifo_pending": bool((metadata >> 21) & 1),
+            "decoder_ready": bool((metadata >> 20) & 1),
+            "scratch_available": bool((metadata >> 19) & 1),
+            "promotion_active": bool((metadata >> 18) & 1),
+            "frame_waiting": bool((metadata >> 17) & 1),
+            "presentation_complete": bool((metadata >> 16) & 1),
+            "presentation_error": bool((metadata >> 15) & 1),
+            "sequence_end_seen": bool((metadata >> 14) & 1),
+            "session_quiet": bool((metadata >> 13) & 1),
+            "completed_frame_bank": (metadata >> 11) & 0x3,
+            "display_frame_bank": (metadata >> 9) & 0x3,
+            "display_scratch": bool((metadata >> 8) & 1),
+            "display_scratch_bank": (metadata >> 7) & 1,
+            "scheduler_debug_word": state,
+            "scheduler_flags": scheduler_flags(state),
         }
 
     return {
@@ -151,7 +200,7 @@ def parse_words(words: list[int]) -> dict[str, Any]:
             2: "forced_terminal_timeout",
         }.get((snapshot_meta >> 30) & 0x3, "unknown"),
         "gap_outlier_count": snapshot_meta & 0xFFFF,
-        "largest_display_gaps": [gap(1, 26), gap(2, 28), gap(3, 30)],
+        "largest_display_gaps": [gap(1, 26), gap(2, 29), gap(3, 32)],
         "completed_frame_bank": (terminal >> 30) & 0x3,
         "display_frame_bank": (terminal >> 28) & 0x3,
         "display_scratch": bool((terminal >> 27) & 1),
@@ -164,39 +213,8 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "presentation_complete": bool((terminal >> 20) & 1),
         "presentation_error": bool((terminal >> 19) & 1),
         "scheduler_debug_word": scheduler,
-        "scheduler_flags": {
-            "reorder_active": bool(scheduler & (1 << 0)),
-            "run_closed": bool(scheduler & (1 << 1)),
-            "decode_inflight": bool(scheduler & (1 << 2)),
-            "scratch0_pending": bool(scheduler & (1 << 3)),
-            "scratch1_pending": bool(scheduler & (1 << 4)),
-            "next_present_scratch_bank": bool(scheduler & (1 << 5)),
-            "future_frame_pending": bool(scheduler & (1 << 6)),
-            "future_reference_pending": bool(scheduler & (1 << 7)),
-            "scratch_presented": bool(scheduler & (1 << 8)),
-            "run_picture_count": (scheduler >> 9) & 0x3,
-            "overlap_decode_open": bool(scheduler & (1 << 11)),
-            "overlap_frame_pending": bool(scheduler & (1 << 12)),
-            "queued_run_active": bool(scheduler & (1 << 13)),
-            "queued_run_closed": bool(scheduler & (1 << 14)),
-            "queued_decode_inflight": bool(scheduler & (1 << 15)),
-            "queued_scratch0_pending": bool(scheduler & (1 << 16)),
-            "queued_scratch1_pending": bool(scheduler & (1 << 17)),
-            "queued_future_frame_pending": bool(scheduler & (1 << 18)),
-            "queued_future_reference_pending": bool(scheduler & (1 << 19)),
-            "queued_run_picture_count": (scheduler >> 20) & 0x3,
-            "queued_overlap_decode_open": bool(scheduler & (1 << 22)),
-            "queued_overlap_frame_pending": bool(scheduler & (1 << 23)),
-            "decode_generation_queued": bool(scheduler & (1 << 24)),
-            "promotion_pending": bool(scheduler & (1 << 25)),
-            "pending_frame_valid": bool(scheduler & (1 << 26)),
-            "pending_frame_released": bool(scheduler & (1 << 27)),
-            "terminal_boundary_pending": bool(scheduler & (1 << 28)),
-            "queued_first_scratch_bank": bool(scheduler & (1 << 29)),
-            "last_bound_reference_valid": bool(scheduler & (1 << 30)),
-            "scheduler_presentation_complete": bool(scheduler & (1 << 31)),
-        },
-        "checksum": words[34],
+        "scheduler_flags": scheduler_flags(scheduler),
+        "checksum": words[37],
     }
 
 

@@ -90,8 +90,9 @@ endtask
 task reset_all;
 begin
     reset_mpeg2=1;reset_video=1;
-    sequence_end_seen=0;session_quiet=0;fifo_pending=0;
+    sequence_end_seen=0;session_quiet=0;fifo_pending=0;decoder_ready=1;
     presentation_hold=0;destination_hold=0;frame_waiting=0;
+    scratch_available=0;promotion_active=0;
     completed_frame_bank=0;display_frame_bank=0;display_scratch=0;
     display_scratch_bank=0;presentation_complete=0;presentation_error=0;
     scheduler_debug_state=0;decoder_byte_accepted=0;
@@ -103,18 +104,18 @@ endtask
 task verify_checksum;
 begin
     checksum=0;
-    for(i=0;i<34;i=i+1)
+    for(i=0;i<37;i=i+1)
         checksum=checksum^dut.snapshot_sync_2[i*32+:32];
-    if(checksum!==dut.snapshot_sync_2[1119:1088])
+    if(checksum!==dut.snapshot_sync_2[1215:1184])
         $fatal(1,"checksum mismatch %h/%h",checksum,
-               dut.snapshot_sync_2[1119:1088]);
+               dut.snapshot_sync_2[1215:1184]);
 end
 endtask
 
 task verify_overlay_prefix;
     integer x;
 begin
-    v_pos=12'd457;
+    v_pos=12'd445;
     for(x=0;x<=29;x=x+1)begin
         @(negedge clk_video);h_pos=x;
         @(posedge clk_video);#1;
@@ -137,19 +138,33 @@ initial begin
     // Three deliberately different display gaps exercise ranking and ordinals.
     repeat(12)@(posedge clk_mpeg2);swap_bank(1);
     repeat(6) @(posedge clk_mpeg2);swap_bank(2);
-    repeat(20)@(posedge clk_mpeg2);swap_bank(0);
+    presentation_hold=1;scratch_available=1;frame_waiting=1;
+    completed_frame_bank=2;scheduler_debug_state=32'h13579bdf;
+    repeat(12)@(posedge clk_mpeg2);
+    // The ranked state must remain the threshold-crossing value even though
+    // all observed inputs release before the display eventually swaps.
+    presentation_hold=0;scratch_available=0;frame_waiting=0;
+    scheduler_debug_state=32'hdeadbeef;
+    repeat(8)@(posedge clk_mpeg2);swap_bank(0);
     sequence_end_seen=1;fifo_pending=0;session_quiet=1;
     wait(snapshot_ready);repeat(4)@(posedge clk_video);
 
     if(dut.snapshot_sync_2[31:0]!==32'h4d4d5031)
         $fatal(1,"bad magic %h",dut.snapshot_sync_2[31:0]);
-    if(dut.snapshot_sync_2[63:32]!==32'h0323d2f0)
+    if(dut.snapshot_sync_2[63:32]!==32'h0426d2f0)
         $fatal(1,"bad format %h",dut.snapshot_sync_2[63:32]);
     if(dut.snapshot_sync_2[831:830]!==2'd1)
         $fatal(1,"quiet snapshot reason missing");
-    if(!(dut.snapshot_sync_2[863:832]>=dut.snapshot_sync_2[927:896]&&
-         dut.snapshot_sync_2[927:896]>=dut.snapshot_sync_2[991:960]))
+    if(!(dut.snapshot_sync_2[863:832]>=dut.snapshot_sync_2[959:928]&&
+         dut.snapshot_sync_2[959:928]>=dut.snapshot_sync_2[1055:1024]))
         $fatal(1,"gap ranking is not descending");
+    if(dut.snapshot_sync_2[927:896]!==32'h13579bdf)
+        $fatal(1,"outlier state was not retained at threshold %h",
+               dut.snapshot_sync_2[927:896]);
+    if(dut.snapshot_sync_2[895:864]!==
+       {8'd4,1'b1,1'b0,1'b1,1'b1,1'b1,1'b0,1'b1,
+        1'b0,1'b0,1'b0,1'b0,2'd2,2'd2,1'b0,1'b0,7'd0})
+        $fatal(1,"outlier context mismatch %h",dut.snapshot_sync_2[895:864]);
     if(dut.snapshot_sync_2[815:800]==0)
         $fatal(1,"expected at least one outlier gap");
     verify_checksum();
@@ -165,12 +180,12 @@ initial begin
     wait(snapshot_ready);repeat(4)@(posedge clk_video);
     if(dut.snapshot_sync_2[831:830]!==2'd2)
         $fatal(1,"forced snapshot reason missing");
-    if(dut.snapshot_sync_2[1055:1047]!==9'b100100111)
+    if(dut.snapshot_sync_2[1151:1143]!==9'b100100111)
         $fatal(1,"terminal state mismatch %h",
-               dut.snapshot_sync_2[1055:1024]);
-    if(dut.snapshot_sync_2[1087:1056]!==32'ha5c35a69)
+               dut.snapshot_sync_2[1151:1120]);
+    if(dut.snapshot_sync_2[1183:1152]!==32'ha5c35a69)
         $fatal(1,"scheduler debug mismatch %h",
-               dut.snapshot_sync_2[1087:1056]);
+               dut.snapshot_sync_2[1183:1152]);
     verify_checksum();
 
     @(negedge clk_video);h_pos=300;v_pos=300;
@@ -178,7 +193,7 @@ initial begin
     if({video_r,video_g,video_b}!==24'h123456)
         $fatal(1,"base video changed outside overlay");
 
-    $display("HARDWARE_CADENCE_PROFILER_PASS schema=3 quiet+forced checksum=%h",
+    $display("HARDWARE_CADENCE_PROFILER_PASS schema=4 gap-state+forced checksum=%h",
              checksum);
     $finish;
 end

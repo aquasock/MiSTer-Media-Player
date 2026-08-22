@@ -23,9 +23,12 @@ from decode_hardware_cadence import (
 
 
 REMOTE_DIR = "/media/fat/_cadence"
+REMOTE_GAME_DIR = "/media/fat/games/MediaPlayer"
+REMOTE_STREAM = f"{REMOTE_GAME_DIR}/cadence_stream.m2v"
 REMOTE_SCREENSHOT_DIR = "/media/fat/screenshots"
 REMOTE_SCREENSHOT = f"{REMOTE_SCREENSHOT_DIR}/cadence_probe.png"
 REMOTE_MGL = f"{REMOTE_DIR}/run.mgl"
+MGL_DELAY_SECONDS = 4
 
 
 def ensure_ftp_directory(ftp: FTP, path: str) -> None:
@@ -97,8 +100,8 @@ def make_mgl() -> bytes:
     return (
         "<mistergamedescription>\n"
         "  <rbf>_cadence/cadence</rbf>\n"
-        "  <file delay=\"2\" type=\"f\" index=\"1\" "
-        f"path=\"{REMOTE_DIR}/stream.m2v\"/>\n"
+        f"  <file delay=\"{MGL_DELAY_SECONDS}\" type=\"f\" index=\"1\" "
+        "path=\"cadence_stream.m2v\"/>\n"
         "</mistergamedescription>\n"
     ).encode("utf-8")
 
@@ -123,6 +126,12 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, default=60.0)
     parser.add_argument("--poll-interval", type=float, default=2.0)
     parser.add_argument(
+        "--initial-wait",
+        type=float,
+        default=5.0,
+        help="seconds to wait before the first screenshot request",
+    )
+    parser.add_argument(
         "--output", type=Path, default=Path("/tmp/mister_cadence.png")
     )
     parser.add_argument("--json", action="store_true")
@@ -134,15 +143,21 @@ def main() -> int:
         parser.error(f"stream not found: {args.stream}")
     if args.poll_interval <= 0 or args.timeout <= 0:
         parser.error("timeout and poll interval must be positive")
+    if args.initial_wait < MGL_DELAY_SECONDS:
+        parser.error(
+            f"initial wait must be at least the {MGL_DELAY_SECONDS}-second "
+            "MGL file-injection delay"
+        )
 
     ftp = FTP(args.host, timeout=15)
     shell: MisterShell | None = None
     try:
         ftp.login(args.user, args.password)
         ensure_ftp_directory(ftp, REMOTE_DIR)
+        ensure_ftp_directory(ftp, REMOTE_GAME_DIR)
         ensure_ftp_directory(ftp, REMOTE_SCREENSHOT_DIR)
         upload_file(ftp, args.rbf, f"{REMOTE_DIR}/cadence.rbf")
-        upload_file(ftp, args.stream, f"{REMOTE_DIR}/stream.m2v")
+        upload_file(ftp, args.stream, REMOTE_STREAM)
         ftp.storbinary(f"STOR {REMOTE_MGL}", BytesIO(make_mgl()))
         try:
             ftp.delete(REMOTE_SCREENSHOT)
@@ -151,6 +166,7 @@ def main() -> int:
 
         shell = MisterShell(args.host, args.user, args.password)
         shell.fifo(f"load_core {REMOTE_MGL}")
+        time.sleep(args.initial_wait)
 
         deadline = time.monotonic() + args.timeout
         last_error = "telemetry screenshot not yet available"

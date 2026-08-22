@@ -1,8 +1,8 @@
 //============================================================================
 // MiSTer Media Player - development hardware cadence profiler
 //
-// Entry 311: retain schema-v2 aggregates, rank the three largest visible
-// display gaps, and capture quiet or bounded nonquiet terminal state.
+// Entry 312: retain schema-v3 aggregates and capture the scheduler/hold state
+// when each ranked gap first exceeds the legal cadence window.
 // All inputs are observational; no output feeds decoder or presentation logic.
 //============================================================================
 `timescale 1ns/1ps
@@ -35,14 +35,14 @@ module mpeg2_h262_hardware_cadence_profiler #(
     output reg [7:0] video_b,output wire snapshot_ready
 );
 
-localparam integer SNAPSHOT_WORDS=35;
+localparam integer SNAPSHOT_WORDS=38;
 localparam integer SNAPSHOT_BITS=SNAPSHOT_WORDS*32;
 localparam [23:0] TERMINAL_SNAPSHOT_LIMIT=
     TERMINAL_SNAPSHOT_DELAY-24'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
-localparam [31:0] SNAPSHOT_FORMAT={8'd3,8'd35,16'd54000};
-localparam [11:0] OVERLAY_X=12'd8,OVERLAY_Y=12'd456;
-localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd140;
+localparam [31:0] SNAPSHOT_FORMAT={8'd4,8'd38,16'd54000};
+localparam [11:0] OVERLAY_X=12'd8,OVERLAY_Y=12'd444;
+localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd152;
 
 reg session_active;
 reg fifo_pending_q,decoder_ready_q,presentation_hold_q,destination_hold_q;
@@ -84,6 +84,9 @@ reg display_scratch_d,display_scratch_bank_d;
 
 reg [31:0] largest_gap_0,largest_gap_1,largest_gap_2;
 reg [31:0] largest_gap_meta_0,largest_gap_meta_1,largest_gap_meta_2;
+reg [31:0] largest_gap_state_0,largest_gap_state_1,largest_gap_state_2;
+reg [31:0] current_gap_meta,current_gap_state;
+reg current_gap_context_valid;
 reg [15:0] gap_outlier_count;
 reg [9:0] quiet_count;
 reg [23:0] terminal_wait_count;
@@ -98,8 +101,19 @@ wire display_swap_now=first_present_valid&&
      (display_scratch_q&&(display_scratch_bank_q!=display_scratch_bank_d)));
 wire prediction_request_accepted=prediction_read_q&&!prediction_busy_q;
 wire [31:0] display_gap_now=session_cycles-last_present_cycle;
-wire [31:0] display_gap_meta_now={display_picture_count+1'b1,20'd0,
-    display_frame_bank_q,display_scratch_q,display_scratch_bank_q};
+wire [31:0] display_gap_meta_now={
+    display_picture_count+1'b1,
+    presentation_hold_q,destination_hold_q,fifo_pending_q,decoder_ready_q,
+    scratch_available_q,promotion_active_q,frame_waiting_q,
+    presentation_complete_q,presentation_error_q,
+    sequence_end_seen_q,session_quiet_q,
+    completed_frame_bank_q,display_frame_bank_q,
+    display_scratch_q,display_scratch_bank_q,7'd0
+};
+wire [31:0] completed_gap_meta=current_gap_context_valid?
+    current_gap_meta:display_gap_meta_now;
+wire [31:0] completed_gap_state=current_gap_context_valid?
+    current_gap_state:scheduler_debug_state_q;
 
 wire [31:0] snapshot_word_00=SNAPSHOT_MAGIC;
 wire [31:0] snapshot_word_01=SNAPSHOT_FORMAT;
@@ -131,16 +145,19 @@ wire [31:0] snapshot_word_24=hold_promotion_pending_cycles;
 wire [31:0] snapshot_word_25={snapshot_reason,14'd0,gap_outlier_count};
 wire [31:0] snapshot_word_26=largest_gap_0;
 wire [31:0] snapshot_word_27=largest_gap_meta_0;
-wire [31:0] snapshot_word_28=largest_gap_1;
-wire [31:0] snapshot_word_29=largest_gap_meta_1;
-wire [31:0] snapshot_word_30=largest_gap_2;
-wire [31:0] snapshot_word_31=largest_gap_meta_2;
-wire [31:0] snapshot_word_32={completed_frame_bank_q,display_frame_bank_q,
+wire [31:0] snapshot_word_28=largest_gap_state_0;
+wire [31:0] snapshot_word_29=largest_gap_1;
+wire [31:0] snapshot_word_30=largest_gap_meta_1;
+wire [31:0] snapshot_word_31=largest_gap_state_1;
+wire [31:0] snapshot_word_32=largest_gap_2;
+wire [31:0] snapshot_word_33=largest_gap_meta_2;
+wire [31:0] snapshot_word_34=largest_gap_state_2;
+wire [31:0] snapshot_word_35={completed_frame_bank_q,display_frame_bank_q,
     display_scratch_q,display_scratch_bank_q,frame_waiting_q,
     presentation_hold_q,destination_hold_q,session_quiet_q,
     sequence_end_seen_q,presentation_complete_q,presentation_error_q,19'd0};
-wire [31:0] snapshot_word_33=scheduler_debug_state_q;
-wire [31:0] snapshot_word_34=snapshot_word_00^snapshot_word_01^
+wire [31:0] snapshot_word_36=scheduler_debug_state_q;
+wire [31:0] snapshot_word_37=snapshot_word_00^snapshot_word_01^
     snapshot_word_02^snapshot_word_03^snapshot_word_04^snapshot_word_05^
     snapshot_word_06^snapshot_word_07^snapshot_word_08^snapshot_word_09^
     snapshot_word_10^snapshot_word_11^snapshot_word_12^snapshot_word_13^
@@ -148,11 +165,13 @@ wire [31:0] snapshot_word_34=snapshot_word_00^snapshot_word_01^
     snapshot_word_18^snapshot_word_19^snapshot_word_20^snapshot_word_21^
     snapshot_word_22^snapshot_word_23^snapshot_word_24^snapshot_word_25^
     snapshot_word_26^snapshot_word_27^snapshot_word_28^snapshot_word_29^
-    snapshot_word_30^snapshot_word_31^snapshot_word_32^snapshot_word_33;
+    snapshot_word_30^snapshot_word_31^snapshot_word_32^snapshot_word_33^
+    snapshot_word_34^snapshot_word_35^snapshot_word_36;
 
 task capture_snapshot;
 begin
-    snapshot_mpeg2<={snapshot_word_34,snapshot_word_33,snapshot_word_32,
+    snapshot_mpeg2<={snapshot_word_37,snapshot_word_36,snapshot_word_35,
+        snapshot_word_34,snapshot_word_33,snapshot_word_32,
         snapshot_word_31,snapshot_word_30,snapshot_word_29,snapshot_word_28,
         snapshot_word_27,snapshot_word_26,snapshot_word_25,snapshot_word_24,
         snapshot_word_23,snapshot_word_22,snapshot_word_21,snapshot_word_20,
@@ -195,6 +214,8 @@ always @(posedge clk_mpeg2) begin
         display_scratch_d<=0;display_scratch_bank_d<=0;
         largest_gap_0<=0;largest_gap_1<=0;largest_gap_2<=0;
         largest_gap_meta_0<=0;largest_gap_meta_1<=0;largest_gap_meta_2<=0;
+        largest_gap_state_0<=0;largest_gap_state_1<=0;largest_gap_state_2<=0;
+        current_gap_meta<=0;current_gap_state<=0;current_gap_context_valid<=0;
         gap_outlier_count<=0;quiet_count<=0;terminal_wait_count<=0;
         snapshot_reason<=0;snapshot_mpeg2<=0;snapshot_ready_mpeg2<=0;
     end else begin
@@ -274,28 +295,45 @@ always @(posedge clk_mpeg2) begin
                 end
             end
             if(b_picture_complete_edge)b_picture_count<=b_picture_count+1'b1;
+
+            // Capture the blocking state at threshold crossing, not at the
+            // eventual swap where the scheduler may already have released it.
+            if(first_present_valid&&!display_swap_now&&
+               !current_gap_context_valid&&(frame_rate_code_q==4'h3)&&
+               (display_gap_now>OUTLIER_GAP_CYCLES))begin
+                current_gap_meta<=display_gap_meta_now;
+                current_gap_state<=scheduler_debug_state_q;
+                current_gap_context_valid<=1;
+            end
             if(display_swap_now)begin
                 last_present_cycle<=session_cycles;
                 display_swap_count<=display_swap_count+1'b1;
                 display_picture_count<=display_picture_count+1'b1;
+                current_gap_context_valid<=0;
                 if((frame_rate_code_q==4'h3)&&(display_gap_now>OUTLIER_GAP_CYCLES)&&
                    (gap_outlier_count!=16'hffff))
                     gap_outlier_count<=gap_outlier_count+1'b1;
                 if(display_gap_now>largest_gap_0)begin
                     largest_gap_2<=largest_gap_1;
                     largest_gap_meta_2<=largest_gap_meta_1;
+                    largest_gap_state_2<=largest_gap_state_1;
                     largest_gap_1<=largest_gap_0;
                     largest_gap_meta_1<=largest_gap_meta_0;
+                    largest_gap_state_1<=largest_gap_state_0;
                     largest_gap_0<=display_gap_now;
-                    largest_gap_meta_0<=display_gap_meta_now;
+                    largest_gap_meta_0<=completed_gap_meta;
+                    largest_gap_state_0<=completed_gap_state;
                 end else if(display_gap_now>largest_gap_1)begin
                     largest_gap_2<=largest_gap_1;
                     largest_gap_meta_2<=largest_gap_meta_1;
+                    largest_gap_state_2<=largest_gap_state_1;
                     largest_gap_1<=display_gap_now;
-                    largest_gap_meta_1<=display_gap_meta_now;
+                    largest_gap_meta_1<=completed_gap_meta;
+                    largest_gap_state_1<=completed_gap_state;
                 end else if(display_gap_now>largest_gap_2)begin
                     largest_gap_2<=display_gap_now;
-                    largest_gap_meta_2<=display_gap_meta_now;
+                    largest_gap_meta_2<=completed_gap_meta;
+                    largest_gap_state_2<=completed_gap_state;
                 end
             end
         end
@@ -370,6 +408,9 @@ always @* begin
     32:overlay_row_word=snapshot_sync_2[1055:1024];
     33:overlay_row_word=snapshot_sync_2[1087:1056];
     34:overlay_row_word=snapshot_sync_2[1119:1088];
+    35:overlay_row_word=snapshot_sync_2[1151:1120];
+    36:overlay_row_word=snapshot_sync_2[1183:1152];
+    37:overlay_row_word=snapshot_sync_2[1215:1184];
     default:overlay_row_word=0;
     endcase
 end
