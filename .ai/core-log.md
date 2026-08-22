@@ -1,4 +1,4 @@
-## 344 COMMIT Unreleased ??? 2026-08-22T09:04:12-07:00
+## 344 COMMIT Unreleased ae51759 2026-08-22T09:04:12-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Package and independently verify the qualified v0.6.0 RBF as the fourth step of 
 
 #### Outcome:
 
-The proposed packaging step will create a dedicated release directory outside the Git worktree, copy the clean seed-ten `MediaPlayer.rbf` to the required `MediaPlayer_20260822.rbf` name, and add human-readable SHA-256 metadata. Acceptance requires the package artifact to be exactly 4,455,376 bytes, byte-for-byte identical to both the current clean output and the preserved accepted incremental output, and to reproduce SHA-256 `e95e9ec43cb11917d5a904fdd8016bcc23dcbe2d8f36f678544f42ad1a6d5f10`. No generated binary or package metadata will be committed to the source repository.
+The external directory `/run/media/vash/GIT/MiSTer-Media-Player-v0.6.0-release-20260822` now contains `MediaPlayer_20260822.rbf`, `SHA256SUMS`, and local human-readable `RELEASE_INFO.txt` metadata. The date-coded RBF is exactly 4,455,376 bytes, passes its checksum file at SHA-256 `e95e9ec43cb11917d5a904fdd8016bcc23dcbe2d8f36f678544f42ad1a6d5f10`, and is byte-for-byte identical to both the current clean `output_files/MediaPlayer.rbf` and the preserved accepted incremental image. The metadata identifies the required `v0.6.0` annotated tag, `MiSTer Media Player v0.6.0` pre-release title, synthesized baseline `b64ec6a`, and the sole binary asset that must be uploaded. The package remains outside the Git worktree and no generated artifact was committed.
 
 #### Next Steps:
 
-Create the external package directory, refuse to overwrite a conflicting pre-existing package, copy and verify the artifact through independent size, checksum and byte-comparison checks, then retain the package for the final release commit, tag and GitHub asset steps.
+Proceed to step five by auditing the complete online release documentation, protected README section, repository synchronization, absence of a `v0.6.0` tag or release, and packaged asset one final time, then identify the exact commit the user should tag in step six. No rebuild is necessary because packaging preserved the already built and hardware-accepted binary exactly.
 
 #### Files Modified:
 
@@ -22,8 +22,8 @@ None.
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 343 COMMIT Unreleased ae51759 2026-08-22T08:55:25-07:00
