@@ -1,4 +1,4 @@
-## 329 COMMIT Unreleased ??? 2026-08-22T04:33:13-07:00
+## 329 COMMIT Unreleased 374ef38 2026-08-22T04:33:13-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Deliver wide MiSTer file transfers without per-word software stalls by replacing
 
 #### Outcome:
 
-Entry 328 proves the wide-transfer image is timing-clean at seed twelve but cannot finish a real file load because its serializer asserts `ioctl_wait` for the upper byte of every word. The upper byte retires after one FPGA clock, yet the host observes each wait through software and pays a stop/retry latency hundreds of thousands of times, preventing the cadence runner from obtaining even a screenshot within twenty seconds. Intel Quartus provides `dcfifo_mixed_widths` specifically for asymmetric dual-clock ports, allowing the existing 32 KiB reservoir to accept a full 16-bit host word per write and present ordered 8-bit bytes to the decoder while exposing full only when all storage is occupied.
+Commit `374ef38` removes the per-word serializer and uses Intel's native `dcfifo_mixed_widths`, retaining exactly 32 KiB while accepting consecutive 16-bit MiSTer transfers and presenting ordered 8-bit decoder bytes. The actual Intel behavioral primitive test proves low-byte-first ordering, three back-to-back words, read-side empty and asynchronous reset; transport drains sixteen bytes, the scheduler preserves exact 24 and 25 fps cadence with a minimum two-window gap, and profiler schema four passes with checksum `e82b643d`. The exact quality-six dense stream passes the full raster replay at 134,979,997 cycles with all 1,430,191 source bytes, 36 P pictures, 79 B pictures, 41 reference publications, 119 swaps and zero errors. The incremental seed-twelve Quartus build completes in 12 minutes 55 seconds with zero errors and positive timing at plus 0.049 ns global and decoder setup, plus 7.752 ns video setup, plus 0.243 ns hold, plus 3.800 ns recovery, plus 0.613 ns removal and plus 1.122 ns pulse width. It uses 35,146 ALMs, 51,998 registers, 4,306,375 memory bits, 538 of 553 RAM blocks and 65 DSP blocks. The accepted 4,463,616-byte RBF has SHA-256 `566ecf44d65c9d483be247ae942280d23269b7100ce0d75ef3b8a5bc4bdf2dbc`, matches after persistent installation and needs no clean rebuild. After rebooting the MiSTer to clear Entry 328's wedged loader, the five-second hardware run presents all 120 pictures in 4.989397 seconds at 23.850578 fps with zero errors and zero gap outliers; its 1,430,192 accepted-byte count is the expected single padding byte for the odd-length source. The full 7:15-through-7:30 run accepts exactly 2,603,570 bytes, reaches sequence end and terminal quiet, decodes 121 reference plus 239 B pictures for all 360 pictures, and reports zero errors and zero gap outliers across the former 7:22 failure. Its eight-bit display and swap counters wrap to 104 and 103 as expected. The user watches the ordinary clip and reports that the issue appears fixed, pending repeated visual confirmation.
 
 #### Next Steps:
 
-Replace the serializer and ordinary `dcfifo` with `dcfifo_mixed_widths`, preserving 32 KiB total capacity, synchronized asynchronous-clear release and show-ahead decoder reads. Rewrite the focused test to instantiate the actual Intel behavioral primitive and prove low-byte-first ordering, back-to-back word acceptance, read-side empty behavior and reset. Rerun transport, scheduler, profiler and the exact dense-stream replay, then compile incrementally at timing-clean seed twelve. Verify and install only a zero-error artifact with positive global, decoder, video, hold, recovery, removal and pulse-width timing, then rerun the five-second and 7:15-through-7:30 hardware captures before asking the user to inspect 7:22.
+Replay the ordinary 7:15-through-7:30 clip as often as the user needs to confirm the wooden-spike motion visually, then rerun the ten-minute Big Buck Bunny baseline with the accepted artifact. Preserve the cadence overlay as a diagnostic tool but treat its eight-bit display/swap counter wrapping and odd-length WIDE padding as acquisition-validator limitations rather than decoder failures. Investigate reducing the design's 538-of-553 RAM-block occupancy separately, without shrinking buffers whose capacity is now proven necessary for smooth dense MPEG-2 transfer.
 
 #### Files Modified:
 
@@ -23,8 +23,8 @@ Replace the serializer and ordinary `dcfifo` with `dcfifo_mixed_widths`, preserv
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 328 COMMIT Unreleased b426ba4 2026-08-22T04:17:21-07:00
