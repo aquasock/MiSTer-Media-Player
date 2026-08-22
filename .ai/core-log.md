@@ -1,3 +1,33 @@
+## 333 COMMIT Unreleased 374ef38 2026-08-22T06:25:25-07:00
+
+#### Coming From:
+
+Unreleased 374ef38
+
+#### Purpose:
+
+Determine whether the user's visibly accelerated playback of `40. 2000 - The Emperor's New Groove.m2v` is encoded into the file or caused by the current presentation scheduler.
+
+#### Outcome:
+
+No source changed. A read-only inspection of the 642,033,469-byte file on the MiSTer identifies 720-by-480 progressive Main Profile 4:2:0 video with 16:9 display aspect and direct frame rate `24000/1001`, which is H.262 `frame_rate_code` one. This is not a 29.97-fps stream, and its 0.1-percent difference from exact 24 fps cannot itself explain an obvious speedup.
+
+The cause is explicit in the current RTL. The frontend timeline correctly recognizes rate code one and assigns its exact 15,015 quarter-90-kHz-tick duration, but `mpeg2_h262_b_presentation_scheduler.sv` declares only rate codes two and three—exact 24 and 25 fps—as cadence-supported. For every other code, `cadence_slot` is unconditionally true and the scheduler reseeds its credit at each swap window, so decoded pictures publish as soon as they are ready instead of at their encoded cadence. The user's report that the film runs fast without visible frame drops is therefore consistent with unpaced presentation and provides encouraging evidence that the decoder sustains this stream's workload; it is not evidence of correct 23.976-fps timing.
+
+#### Next Steps:
+
+Add native `24000/1001` cadence support as the next narrowly scoped scheduler change, using an exact rational credit step rather than treating it as 24 fps. Extend the scheduler and cadence-profiler regressions for H.262 rate code one, build incrementally, require all timing categories positive, then replay this exact movie and compare its wall-clock duration and smooth motion. Keep direct 29.97, 30, 50, 59.94 and 60 fps as separately explicit support decisions rather than silently leaving them unpaced.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 332 COMMIT Unreleased 374ef38 2026-08-22T06:14:03-07:00
 
 #### Coming From:
@@ -1216,38 +1246,6 @@ The earlier per-row measurement of exactly forty-five records is not contradicte
 #### Next Steps:
 
 Establish why the producer holds the assertion before changing anything, because the fix differs by cause and this is the point at which four previous attempts went wrong. The contract is not in doubt: every other producer path emits one cycle per event and the consumer is level gated throughout and works, so a held assertion is the defect rather than a consumer that should have edge detected. What is not yet known is whether the hold is a stall condition being expressed incorrectly, in which case the producer should withhold validity while stalled, or a genuine repeat that some downstream handshake was expected to absorb. Trace the producer's motion emission state machine across the duplicated run and identify what keeps it asserted. Only then choose between suppressing the repeat at the source and adding an accept handshake, and prefer the source fix if both are viable, since an added handshake would change a contract that the rest of the design already satisfies. When a candidate exists, gate it on the corpus soak, the focused scheduler regression, the 720 by 480 clip that already decodes cleanly, and this failing clip, and record that the corpus cannot detect a regression in this path because it never exercises the duplication at all.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 293 COMMIT Unreleased cba5371 2026-08-21T03:52:49-07:00
-
-#### Coming From:
-
-Unreleased cba5371
-
-#### Purpose:
-
-Bisect the raster engine failure by capturing the event sequence that precedes it, rather than proposing a fifth mechanism from stream properties.
-
-#### Outcome:
-
-No source changed. The bisect locates the failure at a picture boundary and produces the first direct observation of an anomaly rather than another inference. A ring buffer holding the last twenty-four residual events, dumped at the instant `error` first asserts, shows the failing picture completing correctly and the fault arriving immediately afterwards. Event 80,093 carries index `6'h3f` with value `A2FF`, the picture-final row marker, at row twenty-nine with `motion_count` at 1,350, which is exactly forty-five by thirty and therefore a complete and correctly accounted picture. The next two events carry the identical value `0x00a4` on two different indices, `6'h3e` and then `6'h3f`, the second arriving after the engine has already reset to `motion_count` one and row zero for the following picture. The engine has no metadata interpretation for `6'h3f` carrying that value in that state, so it falls through its match chain to source eight. Nothing about the picture's content is implicated; the fault is in what crosses the sideband between one picture and the next.
-
-Tracing both legs of the producer mux in `mpeg2_h262_p_diagnostic_controller_rearm.sv` shows the mechanism on the producer side. Immediately after the residual leg presents the `A2FF` marker, `wide_motion_valid` asserts and remains asserted for five consecutive cycles, emitting an identical intra motion record on index `6'h3b` with value zero each time. Single-cycle assertion is the norm everywhere else, which is established independently by the per-row count: the same stream produces exactly forty-five motion records in every row, and that figure is only reachable if each record occupies one cycle. A record held for five cycles at the picture boundary is therefore anomalous, and it is the first mechanism in this investigation observed directly rather than deduced.
-
-Two caveats are recorded so the next step does not build on sand. The two traces use different counters, the ring buffer counting residual events accepted at the engine and the mux trace counting sideband validity at the producer, so their event numbers are not aligned and the held assertion has not yet been proven to be the same instant as the misread event. It is also not yet established whether the consumer edge-detects motion validity, in which case a held assertion would be harmless and the fault would lie elsewhere in the same window.
-
-#### Next Steps:
-
-Align the two observations on a single timebase before proposing any repair, then determine whether the consumer treats `wide_motion_valid` as a level or an edge. Those two facts together decide the fix: if validity is consumed as a level and the producer holds it across a picture boundary, the defect is the held assertion and belongs to the producer's boundary sequencing; if the consumer edge-detects, the held assertion is benign and the misread `6'h3f` event must have another origin in the same handful of cycles. Continue to instrument rather than repair, since four mechanisms have now been rejected by their own controls and the one surviving lead is still only a correlation in time. The unsupported-feature report from Entry 289 is unaffected by any of this and remains committed and built.
 
 #### Files Modified:
 
