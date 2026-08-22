@@ -1,5 +1,5 @@
 ---
-## 315 COMMIT Unreleased ??? 2026-08-21T21:54:45-07:00
+## 315 COMMIT Unreleased 3c80bef 2026-08-21T21:54:45-07:00
 
 #### Coming From:
 
@@ -11,22 +11,21 @@ Defer a queued B-picture header until the already-admitted new-GOP I reference p
 
 #### Outcome:
 
-The approved repair will add one bounded deferred queued-B transaction to the presentation scheduler. It will latch only when a B header reaches a closed run with the I/P overlap transaction still open, no overlap frame published yet, no promotion active and a scratch destination available; after consuming that classification byte it will assert presentation backpressure, preserve the B event and scratch choice, and complete normal queued admission atomically when the overlap publication arrives. Existing duplicate-header, scratch-exhaustion, promotion-conflict, decode and ownership failures will remain errors.
+Commit `3c80bef` adds one bounded deferred queued-B transaction to the presentation scheduler. When a B header reaches a closed run while the admitted I/P overlap is still open but either its reference publication or a scratch destination is temporarily unavailable, the scheduler consumes and retains that one classification event, asserts presentation backpressure before payload, and completes ordinary queued-generation admission atomically once both resources are safe. Duplicate deferred headers, non-overlap resource exhaustion, promotion conflicts, decode failures and ownership failures remain errors. Focused scheduler verification covers delayed I publication, old-generation retirement, scratch release, atomic promotion and duplicate rejection; the cadence-profiler regression passes, Verilator lint has only standing testbench warnings, the canonical complete raster finishes all 291,641 bytes with 25 pictures and 71 swaps, and the real 72-picture dense-order run finishes all 243,306 bytes with 22 P pictures, 47 B pictures, 25 reference publications and no presentation or ownership error. The requested incremental Quartus 17.0.2 build completes in 12 minutes 15 seconds with zero errors and positive timing at plus 0.633 ns global setup, plus 1.133 ns decoder setup, plus 6.373 ns video setup, plus 0.240 ns hold, plus 3.761 ns recovery, plus 1.210 ns removal and plus 0.462 ns minimum pulse width. It uses 34,525 ALMs and 51,222 registers; the 4,394,724-byte RBF has SHA-256 `2761fa1edf0dff4edfd38b5c33ae191f2e62e5b242606b51c81dffef1e781ccf`. Hardware accepts the repair: the 48-picture clip consumes all 125,948 bytes and displays 48 pictures with 47 swaps at 25.045 fps, while the 72-picture clip consumes all 243,306 bytes and displays 72 pictures with 71 swaps at 24.957 fps; both reach sequence end with zero error flags and zero cadence outliers, eliminating the measured GOP-boundary stutters. The exact RBF is installed persistently as `/MediaPlayer.rbf`, verified byte-for-byte over FTP, and restored as the active core. The additional 250-picture run still does not publish terminal telemetry within 120 seconds, confirming that its previously deferred non-quiet terminal state remains separate from the now-fixed GOP stutters.
 
 #### Next Steps:
 
-Add focused early-B and delayed-I-publication coverage, including presentation retirement and scratch ownership races, then run the scheduler, cadence profiler and complete raster regressions. Build incrementally from the Entry 314 database, require positive timing, and hardware-run the 48- and 72-picture clips from the exact RBF. Accept and install the repair only if every byte and picture completes with zero errors and no GOP cadence outliers.
+Have the user visually confirm smooth playback on the installed core. Then treat the 250-picture non-quiet terminal state as a separate presentation-finalization task: capture or reproduce its terminal bank and scheduler ownership state without changing the accepted GOP repair, add a focused terminal regression, and continue to use incremental builds for every hardware candidate.
 
 #### Files Modified:
 
 - rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 - tools/streams/tb_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 314 COMMIT Unreleased 9367b7e 2026-08-21T21:33:01-07:00
