@@ -1,3 +1,32 @@
+## 329 COMMIT Unreleased ??? 2026-08-22T04:33:13-07:00
+
+#### Coming From:
+
+Unreleased b426ba4
+
+#### Purpose:
+
+Deliver wide MiSTer file transfers without per-word software stalls by replacing the serializer with a native 16-bit-write and 8-bit-read asynchronous FIFO.
+
+#### Outcome:
+
+Entry 328 proves the wide-transfer image is timing-clean at seed twelve but cannot finish a real file load because its serializer asserts `ioctl_wait` for the upper byte of every word. The upper byte retires after one FPGA clock, yet the host observes each wait through software and pays a stop/retry latency hundreds of thousands of times, preventing the cadence runner from obtaining even a screenshot within twenty seconds. Intel Quartus provides `dcfifo_mixed_widths` specifically for asymmetric dual-clock ports, allowing the existing 32 KiB reservoir to accept a full 16-bit host word per write and present ordered 8-bit bytes to the decoder while exposing full only when all storage is occupied.
+
+#### Next Steps:
+
+Replace the serializer and ordinary `dcfifo` with `dcfifo_mixed_widths`, preserving 32 KiB total capacity, synchronized asynchronous-clear release and show-ahead decoder reads. Rewrite the focused test to instantiate the actual Intel behavioral primitive and prove low-byte-first ordering, back-to-back word acceptance, read-side empty behavior and reset. Rerun transport, scheduler, profiler and the exact dense-stream replay, then compile incrementally at timing-clean seed twelve. Verify and install only a zero-error artifact with positive global, decoder, video, hold, recovery, removal and pulse-width timing, then rerun the five-second and 7:15-through-7:30 hardware captures before asking the user to inspect 7:22.
+
+#### Files Modified:
+
+- rtl/mpeg2_stream_fifo.sv
+- tools/streams/tb_mpeg2_stream_word_unpacker.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 328 COMMIT Unreleased b426ba4 2026-08-22T04:17:21-07:00
 
 #### Coming From:
