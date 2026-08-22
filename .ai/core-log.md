@@ -1,3 +1,31 @@
+## 345 COMMIT Unreleased ??? 2026-08-22T09:09:58-07:00
+
+#### Coming From:
+
+Unreleased ae51759
+
+#### Purpose:
+
+Perform the final v0.6.0 release audit and establish the exact commit for the annotated release tag as the fifth step of the approved plan.
+
+#### Outcome:
+
+The proposed audit will verify that local `master`, GitHub `origin/master`, release documentation, package metadata and artifact identity are synchronized; that no synthesized source differs from qualified baseline `b64ec6a`; that the protected README section remains exactly 5,540 bytes at its recorded checksum; that the changelog, release notes, README links, supported-format boundary and FFmpeg recipe agree; and that no local, remote or GitHub `v0.6.0` tag or release already exists. The resolved audit metadata commit will be the exact commit the user tags in step six.
+
+#### Next Steps:
+
+Run the complete read-only release audit, correct any inconsistency before proceeding, resolve this entry with the audit evidence, push the resulting metadata commit, and report its full SHA for the user's annotated `v0.6.0` tag and GitHub pre-release.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 344 COMMIT Unreleased ae51759 2026-08-22T09:04:12-07:00
 
 #### Coming From:
@@ -1150,38 +1178,6 @@ Characterise the presentation failure on the full clip by the same method, which
 
 - rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
 - tools/streams/tb_h262_live_raster_soak.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 305 COMMIT Unreleased a9cd69c 2026-08-21T17:08:54-07:00
-
-#### Coming From:
-
-Unreleased a9cd69c
-
-#### Purpose:
-
-Qualify the f_code widening with a fully clean Quartus build before any further work is layered on it.
-
-#### Outcome:
-
-The change builds cleanly and closes timing, so the Entry 304 commit is valid on hardware terms as well as in simulation. A fully clean Quartus 17.0.2 compile from wiped `db`, `incremental_db` and `output_files` completes in 11 minutes 38 seconds with zero errors, zero Critical Warnings and 132 standing warnings, four fewer than the 136 recorded for the Entry 289 build. The artifact is 4,350,372 bytes with SHA-256 `9cbbab880843376873869078d5898c66b489fe1a9f1737e6f018c9f3af04f7f6`. It was not uploaded to the MiSTer, since nothing here has been hardware-validated yet.
-
-Every timing corner is positive. Worst-case setup is plus 0.295 ns on the HDMI PLL clock, which is MiSTer framework logic rather than anything this change touches, and compares with plus 0.151 ns on the Entry 289 build. The decoder domain reads plus 1.099 ns against plus 1.172 ns, the video domain plus 7.107 ns against plus 7.689 ns, hold plus 0.248 ns against plus 0.246 ns, removal plus 0.903 ns against plus 0.915 ns and worst recovery plus 3.232 ns. The decoder and video domains therefore lose 0.073 ns and 0.582 ns respectively while retaining substantial margin, and the binding corner is not in the changed logic. One caveat is recorded rather than glossed: the entry preceding 289 documents a build that missed at minus 0.074 ns on a framework clock and was closed by changing only the fitter seed, so seed-to-seed variation on this design is of the same order as the worst-case margin. A positive result at plus 0.295 ns means this change did not break timing; it does not establish that the margin is comfortable, and the same caution applies to any future change of similar size.
-
-Resource growth is exactly what the change predicts and nothing more. Logic rises from 33,621 to 33,978 ALMs at 81 percent utilisation and registers from 49,362 to 49,993. Block memory rises from 4,027,379 to 4,040,879 bits, a difference of 13,500 bits, which is precisely the ten added bits of `motion_mem` multiplied by its 1,350 macroblock depth. RAM blocks rise by two to 506 of 553 at 92 percent and DSP blocks are unchanged at 65. The RAM block figure is the one to watch: at 92 percent occupancy a further widening of any macroblock-indexed memory has little headroom before the fitter is forced to spill.
-
-#### Next Steps:
-
-Return to the stall at byte 158,381 with the build qualification settled. Nothing about this result changes the plan recorded in Entry 304: identify which module raises which code before proposing a mechanism, and keep in view that the same clip encoded at motion search sixteen reaches byte 157,552 and raises prediction error source two detail eight, a different signature from the current codeless timeout that must not be assumed to be the same defect. Hardware validation of this commit is deliberately not attempted, because the clip it was written to support still does not decode to completion and a hardware run would prove nothing that simulation has not already shown. Treat 92 percent RAM block occupancy as a standing constraint when scoping any further datapath widening.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
