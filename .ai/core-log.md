@@ -1,5 +1,5 @@
 ---
-## 311 COMMIT Unreleased ??? 2026-08-21T20:05:37-07:00
+## 311 COMMIT Unreleased b777f30 2026-08-21T20:05:37-07:00
 
 #### Coming From:
 
@@ -11,11 +11,11 @@ Measure the GOP-correlated stutters and the unresolved 250-frame terminal presen
 
 #### Outcome:
 
-The approved commit will extend the cadence snapshot without changing decode, ownership, scheduling or display decisions. Schema version three will retain the existing aggregate counters, add the three largest inter-display-swap gaps with their displayed-picture ordinals and a count of gaps beyond the legal 25 fps cadence window, and identify whether the snapshot was taken from a normally quiet session or from a bounded post-sequence timeout. The terminal record will include completed and displayed bank identity, waiting and hold state, presentation completion and error state, and a packed observational snapshot of the scheduler's active, queued, scratch, future-reference and promotion flags. Successful clips will continue to snapshot when quiet; a stream such as the 250-frame case that sees sequence end but never drains will publish the same checksummed overlay after a bounded diagnostic delay instead of remaining opaque.
+Commit `b777f30` extends the cadence snapshot without changing decode, ownership, scheduling or display decisions. Schema version three retains the existing aggregates, ranks the three largest inter-display-swap gaps with displayed-picture ordinals, counts gaps beyond the 25 fps cadence window, tags quiet versus forced snapshots, and records terminal banks, holds and scheduler flags. Verilator and Icarus lint pass, the focused scheduler regression is unchanged, and the profiler bench proves both quiet and forced snapshot paths. A fully clean Quartus 17.0.2 build completes in 11 minutes 51 seconds with zero errors, zero Critical Warnings and 146 warnings. Every timing category is positive at plus 0.500 ns global setup, plus 1.145 ns decoder setup, plus 6.922 ns video setup, plus 0.247 ns hold, plus 4.331 ns recovery, plus 1.022 ns removal and plus 0.462 ns minimum pulse width. The fit uses 34,258 ALMs, 50,579 registers, 4,040,879 memory bits, 506 RAM blocks and 65 DSP blocks; the 4,394,640-byte RBF has SHA-256 `727ed77da160070fcfca5fb644060b3501f46f4546c0babd5a7f43c2a7451cca`. Hardware confirms the GOP correlation directly: the 48-frame clip completes with zero errors and one 82.896 ms outlier before displayed picture 25, while the 72-frame clip completes with zero errors and two outliers, 82.896 ms before picture 25 and 149.213 ms before picture 49. The full clip again holds the image matching frame 78 but publishes no forced snapshot, proving it stops before `sequence_end_seen` rather than merely failing to drain after sequence end. Hardware automation also exposed that current MiSTer MGL paths are resolved relative to `games/MediaPlayer` and that requesting screenshots during the MGL delay can prevent file injection; absolute paths and early polling produce the black screen independently on both this RBF and the previously proven seed-eight control.
 
 #### Next Steps:
 
-Implement and simulation-test the schema and decoder together, requiring all existing profiler fields and overlay checks to remain valid. Commit the diagnostic source, run the existing functional regressions, take a fully clean Quartus 17.0.2 build with every timing corner positive, and then run the 48-, 72- and 250-frame clips on the connected MiSTer. Use the measured outlier ordinals to confirm or reject the 24-frame GOP correlation and use the tagged terminal state to name why the 250-frame session does not become quiet before proposing any behavioural repair.
+Do not change scheduler behaviour. Obtain approval for one diagnostic correction: let the forced snapshot arm when accepted bytes and display swaps are both stagnant for a bounded interval while compressed input remains pending, without requiring `sequence_end_seen`, and update the hardware runner to use a games-folder-relative MGL path and defer its first screenshot until after file injection and playback. Rebuild and rerun the same three clips; the 48- and 72-frame results must remain exact enough to preserve the measured outlier ordinals, and the full clip must finally expose the byte count, display count, bank mismatch and scheduler flags at its frame-78 hold before any behavioural repair is proposed.
 
 #### Files Modified:
 
@@ -28,7 +28,7 @@ Implement and simulation-test the schema and decoder together, requiring all exi
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
