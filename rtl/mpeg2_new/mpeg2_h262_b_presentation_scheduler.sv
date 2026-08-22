@@ -52,6 +52,11 @@ reg future_frame_pending,future_reference_pending;reg[1:0] future_frame_bank;
 reg scratch_presented;
 reg [1:0] run_picture_count;
 reg overlap_decode_open,overlap_frame_pending;
+// Entry 315: one B header may arrive after an overlapping reference header
+// but before that reference publishes or an old scratch bank is released.
+// The classification byte is retained here while presentation backpressure
+// prevents any B payload from reaching the decoder without both resources.
+reg deferred_queued_b_start;
 
 // Entry 269: while one closed run is being presented, retain the following
 // run in a distinct logical generation.  Both generations still share the
@@ -155,9 +160,10 @@ assign debug_state = {
     reorder_active
 };
 assign presentation_hold=reorder_active&&run_closed&&
-                         !overlap_decode_open&&!queued_decode_inflight&&
-                         (promotion_pending||!queued_header_capacity)&&
-                         !presentation_complete&&!presentation_error;
+                         !presentation_complete&&!presentation_error&&
+                         (deferred_queued_b_start||
+                          (!overlap_decode_open&&!queued_decode_inflight&&
+                           (promotion_pending||!queued_header_capacity)));
 
 always @(posedge clk) begin
     if(reset) begin
@@ -170,6 +176,7 @@ always @(posedge clk) begin
         future_frame_pending<=0;future_frame_bank<=0;
         future_reference_pending<=0;scratch_presented<=0;
         overlap_decode_open<=0;overlap_frame_pending<=0;
+        deferred_queued_b_start<=0;
         queued_run_active<=0;queued_run_closed<=0;
         queued_decode_inflight<=0;
         queued_scratch0_pending<=0;queued_scratch1_pending<=0;
@@ -223,7 +230,8 @@ always @(posedge clk) begin
         // The publication produced by the one permitted overlap transaction
         // is the next reference candidate, not the retained future reference
         // owned by the B run that is still being displayed.
-        if(frame_waiting&&reorder_active&&run_closed&&overlap_decode_open)begin
+        if(frame_waiting&&reorder_active&&run_closed&&overlap_decode_open&&
+           !deferred_queued_b_start)begin
             pending_frame_valid<=1;
             pending_frame_bank<=completed_frame_bank;
             pending_frame_released<=0;
@@ -258,6 +266,45 @@ always @(posedge clk) begin
             last_bound_reference_count<=reference_promotion_count;
         end
 
+        // The deferred B already consumed its classification byte, so its
+        // overlapping reference publication must be retained even if the old
+        // generation presented its future frame and closed overlap_decode_open
+        // in the meantime.  Admission below consumes this pending identity as
+        // soon as a scratch destination is also safe.
+        if(frame_waiting&&deferred_queued_b_start)begin
+            pending_frame_valid<=1;
+            pending_frame_bank<=completed_frame_bank;
+            pending_frame_released<=0;
+            overlap_frame_pending<=1;
+            overlap_decode_open<=0;
+        end
+
+        if(deferred_queued_b_start&&!b_picture_start&&
+           (pending_frame_valid||frame_waiting)&&
+           queued_scratch_available)begin
+            queued_run_active<=1;queued_run_closed<=0;
+            queued_decode_inflight<=1;
+            decode_scratch_bank<=scratch0_available?1'b0:1'b1;
+            decode_generation_queued<=1;
+            queued_first_scratch_bank<=scratch0_available?1'b0:1'b1;
+            queued_run_picture_count<=1;
+            queued_scratch0_pending<=0;
+            queued_scratch1_pending<=0;
+            queued_future_frame_pending<=1;
+            queued_future_frame_bank<=frame_waiting?
+                completed_frame_bank:pending_frame_bank;
+            last_bound_reference_valid<=1;
+            last_bound_reference_bank<=frame_waiting?
+                completed_frame_bank:pending_frame_bank;
+            last_bound_reference_count<=reference_promotion_count;
+            queued_future_reference_pending<=0;
+            queued_overlap_decode_open<=0;
+            queued_overlap_frame_pending<=0;
+            pending_frame_valid<=0;pending_frame_released<=0;
+            overlap_frame_pending<=0;overlap_decode_open<=0;
+            deferred_queued_b_start<=0;
+        end
+
         if(b_picture_start)begin
             if(!reorder_active)begin
                 reorder_active<=1;run_closed<=0;decode_inflight<=1;
@@ -268,6 +315,7 @@ always @(posedge clk) begin
                 presentation_error<=0;pending_frame_valid<=0;
                 pending_frame_released<=0;
                 overlap_decode_open<=0;overlap_frame_pending<=0;
+                deferred_queued_b_start<=0;
                 decode_generation_queued<=0;
                 if(frame_waiting)begin
                     future_frame_bank<=completed_frame_bank;
@@ -315,10 +363,26 @@ always @(posedge clk) begin
                     run_picture_count<=run_picture_count+1'b1;
                 end
             end else if(!queued_run_active)begin
-                if(promotion_pending||
-                   !(pending_frame_valid||
-                     (frame_waiting&&overlap_decode_open))||
-                   !queued_scratch_available)begin
+                if(deferred_queued_b_start||promotion_pending)begin
+                    reorder_active<=0;run_closed<=0;decode_inflight<=0;
+                    scratch0_pending<=0;scratch1_pending<=0;
+                    future_frame_pending<=0;future_reference_pending<=0;
+                    queued_run_active<=0;queued_decode_inflight<=0;
+                    queued_scratch0_pending<=0;queued_scratch1_pending<=0;
+                    queued_future_frame_pending<=0;
+                    deferred_queued_b_start<=0;
+                    presentation_error<=1;
+                end else if(overlap_decode_open&&
+                            (!(pending_frame_valid||frame_waiting)||
+                             !queued_scratch_available))begin
+                    // Entry 315: the overlap transaction guarantees that its
+                    // reference is already decoding.  Retain this one early B
+                    // header and stop before payload until both its future
+                    // reference and a released scratch bank are available.
+                    deferred_queued_b_start<=1;
+                end else if(!(pending_frame_valid||
+                              (frame_waiting&&overlap_decode_open))||
+                            !queued_scratch_available)begin
                     reorder_active<=0;run_closed<=0;decode_inflight<=0;
                     scratch0_pending<=0;scratch1_pending<=0;
                     future_frame_pending<=0;future_reference_pending<=0;
@@ -479,7 +543,7 @@ always @(posedge clk) begin
             end else if(future_waiting)begin
                 future_frame_pending<=0;
                 future_reference_pending<=0;
-                if(queued_run_active)begin
+                if(queued_run_active||deferred_queued_b_start)begin
                     // Retire the visible generation first.  Promotion waits
                     // for any queued B completion edge so that ownership can
                     // never be lost on a coincident cadence window.
@@ -517,6 +581,7 @@ always @(posedge clk) begin
             queued_run_active<=0;queued_decode_inflight<=0;
             queued_scratch0_pending<=0;queued_scratch1_pending<=0;
             queued_future_frame_pending<=0;promotion_pending<=0;
+            deferred_queued_b_start<=0;
             presentation_error<=1;
         end else if(framebuffer_swap_reset_count!=0)
             framebuffer_swap_reset_count<=framebuffer_swap_reset_count-1'b1;
@@ -524,7 +589,8 @@ always @(posedge clk) begin
         // Promotion is deliberately a registered ownership handoff after the
         // old future frame becomes visible.  Waiting for queued B persistence
         // eliminates the only ambiguous same-edge completion case.
-        if(promotion_pending&&!queued_decode_inflight&&
+        if(promotion_pending&&!deferred_queued_b_start&&
+           !queued_decode_inflight&&
            !(frame_waiting&&queued_overlap_decode_open))begin
             if(!queued_run_active||!queued_future_frame_pending||
                queued_future_reference_pending)begin
@@ -556,6 +622,7 @@ always @(posedge clk) begin
                 queued_overlap_decode_open<=0;
                 queued_overlap_frame_pending<=0;
                 decode_generation_queued<=0;promotion_pending<=0;
+                deferred_queued_b_start<=0;
                 presentation_complete<=0;
             end
         end
@@ -571,9 +638,13 @@ always @(posedge clk) begin
             queued_future_frame_pending<=0;
             queued_future_reference_pending<=0;
             queued_overlap_decode_open<=0;
+            deferred_queued_b_start<=0;
             promotion_pending<=0;
             presentation_error<=1;
         end
+
+        if(presentation_error)
+            deferred_queued_b_start<=0;
     end
 end
 endmodule

@@ -237,9 +237,11 @@ module tb_h262_b_presentation_scheduler;
             $fatal(1,"following B did not claim overlapped future reference");
         reset_scheduler();
 
-        // Entry 313: the I reference at a GOP boundary must use the same
-        // bounded overlap as P.  Its delayed publication is retained in the
-        // third rotating reference bank and claimed by the following B run.
+        // Entry 315: the next B header may precede both the overlapping I
+        // publication and release of the old run's scratch banks.  Retain its
+        // classification, present the old generation normally, and admit B
+        // payload only after both the third-bank reference and scratch 0 are
+        // safe.
         reference_bank<=0;completed_bank<=1;
         @(negedge clk);b_start<=1;frame_waiting<=1;
         @(negedge clk);b_start<=0;frame_waiting<=0;reference_bank<=1;#1;
@@ -250,27 +252,62 @@ module tb_h262_b_presentation_scheduler;
         pulse_i_close();
         if(hold||!dut.overlap_decode_open)
             $fatal(1,"following I was not admitted during prior presentation");
+        pulse_start();
+        if(!hold||!dut.deferred_queued_b_start||dut.queued_run_active||error)
+            $fatal(1,"early B header was not deferred behind I publication");
+        pulse_swap();
+        if(!display_scratch||display_scratch_bank||!hold||error)
+            $fatal(1,"deferred B disturbed old scratch 0 presentation");
+        pulse_swap();
+        if(!display_scratch||!display_scratch_bank||!hold||error)
+            $fatal(1,"deferred B disturbed old scratch 1 presentation");
+        pulse_swap();
+        if(display_scratch||(display_bank!==2'd1)||
+           !dut.promotion_pending||!hold||error)
+            $fatal(1,"deferred B lost ownership when old future retired");
         completed_bank<=2;reference_bank<=2;
         @(negedge clk);frame_waiting<=1;
         @(negedge clk);frame_waiting<=0;#1;
-        if(!hold||!dut.pending_frame_valid||
-           (dut.pending_frame_bank!==2'd2)||!dut.overlap_frame_pending)
-            $fatal(1,"overlap I publication did not restore presentation hold");
+        if(hold||dut.deferred_queued_b_start||!dut.queued_run_active||
+           !dut.queued_decode_inflight||
+           (dut.queued_future_frame_bank!==2'd2)||error)
+            $fatal(1,"delayed I publication did not admit deferred B");
+        pulse_success();
+        @(posedge clk);#1;
+        if(dut.promotion_pending||dut.queued_run_active||
+           !dut.scratch0_pending||(dut.future_frame_bank!==2'd2)||
+           dut.run_closed||hold||error)
+            $fatal(1,"deferred B generation did not promote atomically");
+        pulse_start();
+        if(!decode_scratch_bank||error)
+            $fatal(1,"second deferred-generation B did not claim scratch 1");
+        pulse_success();
+        pulse_close();
         pulse_swap();
         if(!display_scratch||display_scratch_bank)
-            $fatal(1,"I-overlap run did not present scratch 0");
+            $fatal(1,"deferred generation did not present scratch 0");
         pulse_swap();
         if(!display_scratch||!display_scratch_bank)
-            $fatal(1,"I-overlap run did not present scratch 1");
+            $fatal(1,"deferred generation did not present scratch 1");
         pulse_swap();
-        if(display_scratch||!display_bank||!complete||hold||error||
-           !dut.pending_frame_valid||dut.pending_frame_released||
-           (dut.pending_frame_bank!==2'd2))
-            $fatal(1,"overlap I reference was not preserved after prior run");
+        if(display_scratch||(display_bank!==2'd2)||!complete||hold||error)
+            $fatal(1,"deferred generation did not present I future reference");
+        reset_scheduler();
+
+        // The deferred slot is singular.  A second classified B event before
+        // publication cannot be represented safely and must retain fail-open
+        // behavior rather than overwriting the first request.
+        reference_bank<=0;completed_bank<=1;
+        @(negedge clk);b_start<=1;frame_waiting<=1;
+        @(negedge clk);b_start<=0;frame_waiting<=0;reference_bank<=1;#1;
+        pulse_success();
+        pulse_i_close();
         pulse_start();
-        if(error||dut.future_reference_pending||
-           (dut.future_frame_bank!==2'd2)||dut.pending_frame_valid)
-            $fatal(1,"following B did not claim overlapped I reference");
+        if(!dut.deferred_queued_b_start||!hold||error)
+            $fatal(1,"duplicate test did not arm deferred B slot");
+        pulse_start();
+        if(!error||hold||dut.deferred_queued_b_start)
+            $fatal(1,"duplicate deferred B did not fail open");
         reset_scheduler();
 
         // Entry 269: the first B of the next run may occupy scratch 0 only
@@ -393,7 +430,7 @@ module tb_h262_b_presentation_scheduler;
         if(display_scratch||!display_bank)
             $fatal(1,"ordinary frame presentation did not recover after abort");
 
-        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=1,3,2 min_present_gap=%0d overlap_p=1 overlap_i=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=1 fail_open=1",min_present_gap);
+        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=1,3,2 min_present_gap=%0d overlap_p=1 overlap_i=1 deferred_b=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=1 fail_open=1",min_present_gap);
         $finish;
     end
 
