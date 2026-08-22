@@ -1,4 +1,33 @@
-## 319 COMMIT Unreleased ??? 2026-08-22T00:24:17-07:00
+## 320 COMMIT Unreleased ??? 2026-08-22T00:37:52-07:00
+
+#### Coming From:
+
+Unreleased 04a532c
+
+#### Purpose:
+
+Release a final reference publication retained during an overlapping B-picture drain when sequence end has already removed its classification barrier.
+
+#### Outcome:
+
+The planned scheduler correction will retain sequence end across an active reordered run and apply that terminal permission when the run preserves a concurrently decoded reference as ordinary pending display work. It will not change non-terminal classification, cadence, decoding, the loading bar or the accepted visible playback, and a focused regression will reproduce the hardware ordering in which sequence end precedes retirement of the last B run.
+
+#### Next Steps:
+
+Add the focused terminal-order regression first, implement the smallest release latch correction, and require the complete scheduler and real-content simulation suites to retain exact cadence and finish all 250 pictures. Build incrementally, require positive timing, then rerun the 48-, 72- and 250-picture hardware clips and install only an RBF that reports 250 pictures, 249 swaps, terminal quiet, zero errors and zero outliers while remaining visually smooth.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+## 319 COMMIT Unreleased 04a532c 2026-08-22T00:24:17-07:00
 
 #### Coming From:
 
@@ -10,11 +39,11 @@ Retry the unchanged terminal cadence snapshot qualification with fitter seed nin
 
 #### Outcome:
 
-The planned commit changes only the reproducible Quartus fitter seed from eight to nine. It does not alter decoder, scheduler, display, loading-bar or diagnostic logic, and follows the previously accepted seed retry procedure for the same placement-sensitive HDMI clock.
+Commit `04a532c` changes only the reproducible Quartus fitter seed from eight to nine. The incremental smart compile skips unchanged synthesis, finishes in 9 minutes 43 seconds with zero errors and closes the seed-sensitive HDMI framework path at plus 0.179 ns global setup; decoder and video setup are plus 1.270 ns and plus 6.459 ns, with hold plus 0.246 ns, recovery plus 4.295 ns, removal plus 0.586 ns and pulse width plus 0.462 ns. The fit uses 34,609 ALMs, 51,269 registers, 4,046,279 memory bits, 507 RAM blocks and 65 DSP blocks; its 4,366,308-byte RBF has SHA-256 `41bf2d21c121204e873b8a09b9b39014364e95b669381a8097ea69595e763587`. Hardware controls remain exact at 48 pictures and 47 swaps and at 72 pictures and 71 swaps, with both reporting terminal quiet, zero errors and zero cadence outliers. The full stream consumes all 1,178,034 bytes, decodes 250 pictures, reaches sequence end and is visually smooth through the authored black ending according to the user, but the corrected quiet snapshot proves one terminal reference remains behind the classification barrier: it reports 249 pictures, 248 swaps, `presentation_complete`, zero errors and zero outliers with `pending_frame_valid` still set.
 
 #### Next Steps:
 
-Build incrementally without clearing Quartus databases and accept the fit only with zero errors and positive slack in every reported timing category. If it closes timing, install its exact RBF and rerun the 48-, 72- and 250-picture hardware clips; require 250 pictures and 249 swaps from the corrected terminal snapshot, zero errors, zero cadence outliers and unchanged visible playback.
+Preserve the visually accepted seed-nine result but do not install it as final. Add a focused scheduler case for sequence end arriving before an overlapping final reference can leave the classification barrier, then release that already-decoded reference without changing ordinary GOP scheduling and repeat the incremental build and three hardware gates.
 
 #### Files Modified:
 
@@ -22,7 +51,7 @@ Build incrementally without clearing Quartus databases and accept the fit only w
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
