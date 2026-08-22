@@ -216,7 +216,10 @@ always @(posedge clk) begin
         // owns the future reference.  This also makes publication coincident
         // with a swap window safe: the just-published frame cannot win that
         // same swap before the B header arrives.
-        if(sequence_end&&!reorder_active&&!pending_frame_valid&&!frame_waiting)
+        // Entry 320: sequence end can precede publication of the overlapping
+        // final P while a reordered run is still draining.  Retain the
+        // boundary until that ordinary reference leaves the B generation.
+        if(sequence_end&&!pending_frame_valid)
             terminal_boundary_pending<=1;
 
         if(frame_waiting&&!reorder_active&&!b_picture_start&&!b_user_success_edge)begin
@@ -553,13 +556,16 @@ always @(posedge clk) begin
                 end else begin
                     reorder_active<=0;run_closed<=0;
                     overlap_decode_open<=0;
+                    terminal_boundary_pending<=0;
                     // Preserve a reference decoded during this presentation
                     // run.  It becomes the ordinary classification barrier
                     // for the following accepted header.
                     if(overlap_frame_pending||
                        (frame_waiting&&overlap_decode_open))begin
                         pending_frame_valid<=1;
-                        pending_frame_released<=0;
+                        pending_frame_released<=pending_frame_released||
+                                                sequence_end||
+                                                terminal_boundary_pending;
                     end else begin
                         pending_frame_valid<=0;
                         pending_frame_released<=0;

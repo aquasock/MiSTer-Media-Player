@@ -373,6 +373,33 @@ module tb_h262_b_presentation_scheduler;
             $fatal(1,"promoted run did not retire to its P6 future reference");
         reset_scheduler();
 
+        // Entry 320: hardware may accept sequence end while the final B run
+        // is still visible, before its overlapping last P publication.  The
+        // terminal boundary must survive that ordering and release the P
+        // after scratch, scratch and future-reference retirement.
+        reference_bank<=0;completed_bank<=1;
+        @(negedge clk);b_start<=1;frame_waiting<=1;
+        @(negedge clk);b_start<=0;frame_waiting<=0;reference_bank<=1;#1;
+        pulse_success();
+        pulse_start();
+        pulse_success();
+        pulse_p_close();
+        @(negedge clk);sequence_end<=1;
+        @(negedge clk);sequence_end<=0;#1;
+        completed_bank<=0;reference_bank<=0;
+        @(negedge clk);frame_waiting<=1;
+        @(negedge clk);frame_waiting<=0;#1;
+        pulse_swap();
+        pulse_swap();
+        pulse_swap();
+        if(!complete||error||!dut.pending_frame_valid||
+           !dut.pending_frame_released||(dut.pending_frame_bank!==1'b0))
+            $fatal(1,"active-run terminal boundary did not release final P");
+        pulse_swap();
+        if(display_scratch||display_bank||dut.pending_frame_valid||error)
+            $fatal(1,"active-run terminal P did not display");
+        reset_scheduler();
+
         // Starvation may make one presentation immediately eligible, but it
         // must not bank enough credit for a consecutive-refresh catch-up.
         repeat(5)pulse_window();
@@ -430,7 +457,7 @@ module tb_h262_b_presentation_scheduler;
         if(display_scratch||!display_bank)
             $fatal(1,"ordinary frame presentation did not recover after abort");
 
-        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=1,3,2 min_present_gap=%0d overlap_p=1 overlap_i=1 deferred_b=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=1 fail_open=1",min_present_gap);
+        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=1,3,2 min_present_gap=%0d overlap_p=1 overlap_i=1 deferred_b=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=early/active fail_open=1",min_present_gap);
         $finish;
     end
 
