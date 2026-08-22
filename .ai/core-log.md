@@ -1,3 +1,35 @@
+## 322 COMMIT Unreleased ??? 2026-08-22T01:52:41-07:00
+
+#### Coming From:
+
+Unreleased 74cff5b
+
+#### Purpose:
+
+Add exact 24 fps presentation cadence and generate Big Buck Bunny at its native frame rate without duplicated pictures.
+
+#### Outcome:
+
+The complete 14,911-picture 25 fps endurance stream consumes all 85,680,318 bytes, presents every picture and terminates quietly with zero error flags, while the user reports clean playback and sharp scene transitions. The user also identifies a small once-per-second hitch on smooth pans and credits plus stronger jerkiness from 7:20 through 7:25. Source analysis proves that the forced 24-to-25 conversion inserts one repeated picture at the same phase every second, including 7:22.48 inside the squirrel motion burst. The hardware snapshot's modulo picture ordinals place its three largest gaps at candidate times 7:20.88, 7:22.24 and 7:22.36 in the reported interval; the two largest capture an empty input FIFO while the decoder is ready, so the concentrated transport burst remains a separate issue from cadence conversion. The frontend already parses direct H.262 frame-rate code two and computes its 90 kHz duration exactly, but the presentation accumulator and cadence profiler currently recognize only code three.
+
+#### Next Steps:
+
+Extend the existing saturating presentation accumulator with exact 24 fps pixel-clock credit while preserving the accepted 25 fps constants and starvation behavior. Add focused regression coverage for both frame-rate codes, enable cadence outlier capture for code two, and change the Big Buck Bunny generator to retain the source's native 24 fps rather than inserting pictures. Prove the generated stream reports frame-rate code two, contains no adjacent repeated source pictures, decodes completely in software regression and preserves the existing 25 fps gates; then build incrementally with seed nine, require positive timing, install the exact RBF on the connected MiSTer and provide a full native-rate movie for visual comparison.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/generate_test_big_buck_bunny.py
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 321 COMMIT Unreleased 74cff5b 2026-08-22T01:02:36-07:00
 
 #### Coming From:
