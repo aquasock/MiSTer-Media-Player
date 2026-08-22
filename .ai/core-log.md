@@ -1,3 +1,31 @@
+## 328 COMMIT Unreleased ??? 2026-08-22T04:17:21-07:00
+
+#### Coming From:
+
+Unreleased 76326a1
+
+#### Purpose:
+
+Find a timing-clean placement for the proven wide-ingress design by retrying its incremental Quartus fit with seed twelve.
+
+#### Outcome:
+
+Commit `76326a1` passes its focused byte-order, backpressure, transport, scheduler and profiler tests plus the complete quality-six dense-stream raster replay, but the seed-eleven fit misses the placement-sensitive 60 MHz decoder setup requirement by 0.694 ns while every other timing category remains positive. The rejected artifact was not installed, so the connected MiSTer still runs the timing-clean narrow-ingress `a25d772` image. Changing only the fitter seed preserves all functional evidence and is the final bounded attempt to retain the 60 MHz headroom before reverting that empirically neutral clock increase.
+
+#### Next Steps:
+
+Change only the project fitter seed from eleven to twelve and compile incrementally. Accept the artifact only if the build has zero errors and positive global, decoder, video, hold, recovery, removal and pulse-width timing. If accepted, verify and install the exact RBF and rerun the five-second quality-six and full 7:15-through-7:30 hardware controls, requiring all bytes and pictures, zero errors, terminal quiet and no cadence outliers at the user's 7:22 interval. If timing still misses, restore the proven 54 MHz decoder rate while retaining the wide input transfer.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 327 COMMIT Unreleased 76326a1 2026-08-22T03:54:46-07:00
 
 #### Coming From:
