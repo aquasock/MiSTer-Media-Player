@@ -13,6 +13,7 @@ assign VGA_B = cadence_video_b;
 // diagnostic timeout.
 wire mpeg2_new_cadence_session_quiet =
     mpeg2_new_sequence_end_seen &&
+    mpeg2_new_b_presentation_complete &&
     mpeg2_stream_empty &&
     !mpeg2_new_decode_stream_valid &&
     !mpeg2_new_frame_waiting &&
