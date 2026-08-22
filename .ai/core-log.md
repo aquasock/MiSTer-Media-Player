@@ -1,4 +1,37 @@
 ---
+## 311 COMMIT Unreleased ??? 2026-08-21T20:05:37-07:00
+
+#### Coming From:
+
+Unreleased 95a0ab1
+
+#### Purpose:
+
+Measure the GOP-correlated stutters and the unresolved 250-frame terminal presentation state with diagnostic-only hardware telemetry.
+
+#### Outcome:
+
+The approved commit will extend the cadence snapshot without changing decode, ownership, scheduling or display decisions. Schema version three will retain the existing aggregate counters, add the three largest inter-display-swap gaps with their displayed-picture ordinals and a count of gaps beyond the legal 25 fps cadence window, and identify whether the snapshot was taken from a normally quiet session or from a bounded post-sequence timeout. The terminal record will include completed and displayed bank identity, waiting and hold state, presentation completion and error state, and a packed observational snapshot of the scheduler's active, queued, scratch, future-reference and promotion flags. Successful clips will continue to snapshot when quiet; a stream such as the 250-frame case that sees sequence end but never drains will publish the same checksummed overlay after a bounded diagnostic delay instead of remaining opaque.
+
+#### Next Steps:
+
+Implement and simulation-test the schema and decoder together, requiring all existing profiler fields and overlay checks to remain valid. Commit the diagnostic source, run the existing functional regressions, take a fully clean Quartus 17.0.2 build with every timing corner positive, and then run the 48-, 72- and 250-frame clips on the connected MiSTer. Use the measured outlier ordinals to confirm or reject the 24-frame GOP correlation and use the tagged terminal state to name why the 250-frame session does not become quiet before proposing any behavioural repair.
+
+#### Files Modified:
+
+- MediaPlayer_top_05.svh
+- MediaPlayer_top_07.svh
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 310 COMMIT Unreleased 95a0ab1 2026-08-21T19:55:45-07:00
 
 #### Coming From:
