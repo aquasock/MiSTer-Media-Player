@@ -1,3 +1,33 @@
+## 327 COMMIT Unreleased ??? 2026-08-22T03:54:46-07:00
+
+#### Coming From:
+
+Unreleased a25d772
+
+#### Purpose:
+
+Prevent host-transfer starvation in the 7:22 squirrel burst by carrying two compressed bytes per MiSTer file-I/O transaction while preserving the decoder's byte stream.
+
+#### Outcome:
+
+Entry 326's full 7:15-through-7:30 hardware capture localizes the visible defect to display ordinals 175, 176 and 178, exactly the user's 7:22 interval, with gaps of 149.213 ms, 66.317 ms and 82.896 ms. All 360 pictures decode and eventually present with zero errors, but the largest snapshots find the 32 KiB compressed FIFO empty while the decoder is ready, and raising the decoder clock from 54 MHz to 60 MHz does not materially change delivery. The local MiSTer `hps_io` implementation documents a standard `WIDE=1` file-transfer mode that carries 16 bits and advances the file address by two, while the core still uses its default eight-bit mode. A small write-domain unpacker can accept each little-endian word, emit its low and high bytes in order into the unchanged asynchronous FIFO and apply `ioctl_wait` while the second byte or FIFO backpressure is pending.
+
+#### Next Steps:
+
+Enable `WIDE=1` on `hps_io`, widen only the host-side data wire and add a reset-safe 16-to-8-bit unpacker ahead of the existing 32 KiB dual-clock FIFO. Add a focused simulation that proves byte order, consecutive words, reset and a stalled high byte without loss or duplication, then rerun transport, scheduler, profiler and exact dense-stream regressions. Compile incrementally with seed eleven and require zero errors and positive global, decoder, video, hold, recovery, removal and pulse-width timing before exact RBF verification and persistent installation. Finally rerun both the five-second quality-six control and full 7:15-through-7:30 hardware capture, requiring zero errors and no 7:22 cadence outliers before asking the user to inspect the scene.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- rtl/mpeg2_stream_fifo.sv
+- tools/streams/tb_mpeg2_stream_word_unpacker.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 326 COMMIT Unreleased a25d772 2026-08-22T03:35:21-07:00
 
 #### Coming From:
