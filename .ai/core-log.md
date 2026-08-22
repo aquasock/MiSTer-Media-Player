@@ -1,4 +1,4 @@
-## 340 COMMIT Unreleased ??? 2026-08-22T08:32:00-07:00
+## 340 COMMIT Unreleased a6e25b4 2026-08-22T08:32:00-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Update the public README with the current v0.6.0 release-candidate status while 
 
 #### Outcome:
 
-The proposed documentation change will distinguish v0.5.0 as the current published release from v0.6.0 as the hardware-qualified release candidate, summarize the candidate's 60 MHz decoder and mixed-width 32 KiB ingress, document paced frame-rate codes one through three and the unsupported higher codes, record clean-build timing and essential hardware qualification, and bring the release, diagnostic and roadmap sections forward to the accepted decoder baseline. The 5,540-byte `AI-assisted development in v0.6.0` section is locked before editing at SHA-256 `c86635095cfee8c36636802872e75932580309a3cb58d6513a44758b43d515b3` and will not be changed.
+Commit `a6e25b4` updates only README content outside the protected AI-assisted-development range. It distinguishes v0.5.0 as the current published release from v0.6.0 as the hardware-qualified release candidate, summarizes the candidate's 60 MHz decoder and mixed-width 32 KiB ingress, documents paced frame-rate codes one through three and the unsupported higher codes, records the byte-identical clean and incremental RBF, timing closure, focused hardware regressions and full-length visual qualification, and brings the release, architecture, build, diagnostic and roadmap text forward to the accepted decoder baseline. The protected section remains exactly 5,540 bytes and byte-for-byte identical at SHA-256 `c86635095cfee8c36636802872e75932580309a3cb58d6513a44758b43d515b3`, and the documentation commit was pushed to the online repository.
 
 #### Next Steps:
 
-Edit only README content outside the protected AI-assisted-development range, verify the protected range remains byte-for-byte identical, inspect the rendered Markdown structure, commit the documentation update and push it to the online repository.
+No build or hardware validation is required because this commit changes only Markdown documentation. Use the README as the current public v0.6.0 candidate-status summary, preserve the AI-assisted-development section verbatim, and update the changelog and release notes when the user approves final v0.6.0 publication.
 
 #### Files Modified:
 
