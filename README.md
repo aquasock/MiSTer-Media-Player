@@ -143,6 +143,129 @@ Video syntax and decoding behavior are developed against **ITU-T H.262 / ISO/IEC
 
 Implementation constraints, diagnostic-stream limits, synthetic elementary-stream timing, and temporary engineering shortcuts are implementation choices rather than MPEG-2 requirements.
 
+## AI-assisted development in v0.6.0
+
+I am also going to formally expose the **AI project-control system** I use to manage MiSTer-Media-Player as part of the upcoming v0.6.0 release, for anyone interested in experimenting with it.
+
+The `.ai` directory has actually been in the repository for quite a while and has been quietly driving most of the project's development. With v0.6.0, I want to start treating it as something contributors can experiment with rather than just my own internal workflow.
+
+The basic idea is simple:
+
+**AI agents are temporary. The repository is authoritative.**
+
+There is a plain-text bootstrap procedure in:
+
+`/.ai/core-bootstrap.md`
+
+I can give that bootstrap text to a fresh AI session on a supported platform and have it recover the project state from the repository. It reads the authoritative project-control files, the recent development history, the current source state and the latest validation results.
+
+From there I can usually just tell it:
+
+`continue`
+
+and development resumes from the latest recorded engineering state.
+
+The important part is that I do **not** rely on a long-running AI conversation to remember the project correctly.
+
+### Why the `.ai` directory exists
+
+FPGA development can consume an enormous amount of AI context very quickly. Build logs, Quartus reports, simulation results, timing failures, diagnostic experiments and source changes all add up.
+
+I found that keeping too much history in active context actually made the agents substantially worse.
+
+The main mechanism I currently use to control this is the ring-buffer history in `.ai/core-log.md`.
+
+I experimented with different sizes:
+
+- ~100 entries retained too much irrelevant history and sessions became unreliable.
+- ~20 entries forgot useful diagnostic history and sometimes repeated already-completed experiments.
+- ~40 entries has been a good balance so far.
+
+I may experiment with reducing that further.
+
+The goal is to keep the agent working inside a small, relevant engineering context while the permanent project history remains in Git.
+
+### Development philosophy
+
+The system is designed around a few rules:
+
+- **Agents are disposable.**
+- **The repository is authoritative.**
+- **The AI platform should not matter.**
+- **A new session should be able to recover the project without relying on conversational memory.**
+- **AI-generated changes are not trusted simply because an AI produced them.**
+- **Simulation, regression tests, Quartus fitting, TimeQuest timing and real MiSTer hardware remain the validation authority.**
+
+That last point is important.
+
+The AI can propose RTL all day long. If the regression fails, timing fails, Quartus fails, or the MiSTer hardware fails, then the change is wrong.
+
+### Contributing with an AI agent
+
+If you want to experiment with AI-assisted FPGA development on this project:
+
+1. Fork or clone:
+   
+   `https://github.com/aquasock/MiSTer-Media-Player`
+
+2. Configure your **local copies** of `.ai/core.md` and `.ai/core-bootstrap.md` for your own development environment.
+
+3. Make sure your workflow includes checking the upstream project's current `.ai/core-log.md` before making changes so your agent understands what has changed on the main project since your fork diverged.
+
+4. Work normally on your branch and retain your build/test history.
+
+5. If the work turns into something worth merging, open a normal contribution with both the source changes and the relevant `.ai/core-log.md` history.
+
+The log is useful because it gives the integration agent much more than just a diff. It explains:
+
+- what was attempted,
+- what failed,
+- what was measured,
+- what was hardware-tested,
+- and why the final implementation looks the way it does.
+
+I experimented with this concept separately in:
+
+`https://github.com/aquasock/MiSTer-Media-Player-Audio`
+
+That was an early dry run with an older core.md file and did well.
+
+### If you just want to experiment
+
+You do not need Quartus or even an FPGA development environment just to see how the recovery system behaves.
+
+You can copy the bootstrap text from `.ai/core-bootstrap.md` into a **fresh AI session** and let it initialize the project.
+
+Once recovery is complete, try:
+
+`continue`
+
+Obviously, without the required local tools, repository permissions and Quartus environment, it will not be able to perform the complete development workflow. But it should still be able to recover and reason about the current project state.
+
+### Security warning
+
+One very important warning:
+
+**Never give an unknown AI bootstrap prompt control of your development environment without reading it first.**
+
+Treat an AI bootstrap procedure the same way you would treat an unfamiliar shell script.
+
+Before using mine—or anyone else's—I strongly recommend:
+
+1. Read `core-bootstrap.md`.
+2. Read `core.md`.
+3. Understand what resources and permissions the agent is being instructed to use.
+4. Audit the rest of the `.ai` directory.
+5. If possible, have a separate sandboxed session inspect it for prompt-injection tricks, hidden instructions or unexpected external actions before running it with real repository credentials.
+
+The goal here is not “let AI loose on an FPGA project.”
+
+It is almost the opposite:
+
+**make the AI disposable, constrain what it is allowed to believe, preserve the engineering state outside the conversation, and require normal FPGA validation before anything becomes authoritative.**
+
+v0.6.0 will be the first release where I start treating this workflow itself as something the community can beta test.
+
 ## Contributing
 
 Contributions are welcome, but this is an FPGA-first project where synthesis, timing, CDC behavior, and hardware regression testing matter as much as functional RTL changes. Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request.
