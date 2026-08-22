@@ -1,5 +1,5 @@
 ---
-## 312 COMMIT Unreleased ??? 2026-08-21T20:45:10-07:00
+## 312 COMMIT Unreleased 242d151 2026-08-21T20:45:10-07:00
 
 #### Coming From:
 
@@ -11,11 +11,11 @@ Capture the exact scheduler and hold state at each GOP-correlated cadence outlie
 
 #### Outcome:
 
-The approved diagnostic commit will leave decoder and scheduler behaviour unchanged and extend the cadence overlay to associate each of the three ranked display gaps with the scheduler state sampled when that gap first exceeds the legal 25 fps window. The companion context will retain the upcoming displayed-picture ordinal and add the contemporaneous presentation hold, destination hold, FIFO, decoder-ready, scratch availability, promotion, frame-waiting, completion, error and bank signals. The hardware runner will load media through the current MiSTer games-folder-relative MGL contract and wait until file injection has completed before requesting screenshots, eliminating the independently reproduced black-screen automation race.
+Commit `242d151` leaves decoder and scheduler behaviour unchanged and adds schema-four threshold-crossing context to each ranked cadence gap, including the upcoming display ordinal, scheduler word, holds, FIFO, decoder readiness, scratch availability, frame publication and bank state. Focused Icarus and Verilator checks pass, the scheduler regression remains unchanged, and the overlay decoder proves that threshold state is retained even when signals change before the eventual swap. The fully clean Quartus 17.0.2 build completes with zero errors and positive timing at plus 0.577 ns global setup, plus 0.928 ns decoder setup, plus 6.520 ns video setup, plus 0.249 ns hold, plus 3.830 ns recovery, plus 0.694 ns removal and plus 0.462 ns minimum pulse width. It uses 34,571 ALMs, 51,255 registers, 4,040,879 memory bits, 506 RAM blocks and 65 DSP blocks; the 4,350,716-byte RBF has SHA-256 `af63bb9c8433247d4b5b54ab511efd12d9e2aaec8cf664e021e48c7b4fcb1b31`. MiSTer validation accepts every byte and picture with zero error flags: 48 frames has one 4,476,384-cycle or 82.896 ms gap before picture 25, while 72 frames has the same gap before picture 25 and an 8,057,491-cycle or 149.213 ms gap before picture 49. At all three threshold samples the decoder is ready but the FIFO is empty, presentation is complete, and the scheduler has no active or queued run, decode, frame, hold or promotion. Source correlation identifies the GOP-specific admission defect: the non-B header closes the prior B run, but `overlap_decode_open` is enabled only for a P-picture, so the I-picture beginning each new GOP cannot decode through the existing presentation overlap and the pipeline drains before it is admitted.
 
 #### Next Steps:
 
-Implement schema version four and simulation-test that an outlier retains its threshold-crossing state even if scheduler inputs change before the eventual display swap. Re-run the focused scheduler regression and profiler overlay and decoder tests, commit the diagnostic source, take a fully clean Quartus 17.0.2 build with every timing corner positive, and hardware-run the 48- and 72-frame clips. Use the captured states at pictures 25 and 49 to identify the exact blocking term and then propose the smallest behavioural repair; defer the 250-frame terminal trigger and any terminal repair until the stutters are settled.
+Propose a narrow scheduler change that allows an accepted I-picture header, as well as the existing P-picture header, to open the one-reference overlap transaction while a closed B run is presented. Prove in focused scheduler and complete raster regressions that the rotating third reference destination cannot overwrite the displayed or prediction-owned banks, then require a clean timing-qualified build and hardware replay with zero outliers at pictures 25 and 49. Keep the 250-frame terminal trigger and terminal repair deferred until the GOP stutters are eliminated.
 
 #### Files Modified:
 
@@ -26,8 +26,8 @@ Implement schema version four and simulation-test that an outlier retains its th
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 311 COMMIT Unreleased b777f30 2026-08-21T20:05:37-07:00
