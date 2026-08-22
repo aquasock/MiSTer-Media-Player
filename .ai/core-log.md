@@ -22,6 +22,7 @@ Change the decoder PLL output to 60 MHz, keep the independent 40 MHz pixel clock
 - rtl/pll.v
 - rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
 - tools/phase1p_timing.tcl
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
 
 #### Status:
 
