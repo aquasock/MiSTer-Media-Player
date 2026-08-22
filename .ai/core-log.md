@@ -7,19 +7,30 @@ Unreleased 3c80bef
 
 #### Purpose:
 
-Serialize an overlapping P payload behind the older B transaction that still owns the shared execution engine.
+Implement exact B-picture f_code five motion support so the 250-picture compatibility stream no longer leaves an unowned B transaction.
 
 #### Outcome:
 
-The accepted source reproduces the 250-picture stop at stream byte 310,629, inside picture 82's B header rather than at sequence end. Cycle tracing proves the causal loss begins in picture 81: its header is legally classified while picture 80's B decode is still inflight, but the mixed publication shell suppresses P parser backpressure whenever any B flag is set and then permits P payload to select the shared execution engine before that older B persists. The input advances through P slices 2 through 30 while the parser is still processing row 1, and the shared engine abandons the B transaction; honoring only the row hold reconstructs all 1,350 P macroblocks but cannot recover the displaced B completion. The proposed repair uses the existing monotonic P-header and P-publication counters to recognize the new reference immediately after classification, park its payload until `b_picture_inflight` clears, and continue honoring its parser backpressure thereafter. This preserves the intended header overlap while serializing the two users of the shared engine, without changing the accepted scheduler policy, loading-bar semantics or display cadence.
+The accepted source reproduces the 250-picture stop at stream byte 310,629, but the causal transaction is picture 80 rather than the following header. Complete syntax inventory shows picture 80 is the first B picture whose forward and backward horizontal and vertical f_codes are all five; the stream uses only one through five, while the B parser deliberately accepts only one through four and represents both motion vectors in packed signed 8-bit fields. The parser therefore declines picture 80 without an error, while the outer publication shell still counts its header and the scheduler waits permanently for an inflight B transaction that no decoder owns. P f_code support was already widened through nine with a dedicated vector channel, but the separate B parser and raster engine were not. The proposed repair extends only B f_code five with exact signed 9-bit reconstruction, carries forward and backward vectors on a dedicated channel rather than the 16-bit residual sideband, and widens the B raster motion store and address arithmetic accordingly; scheduler, loading-bar and cadence behavior remain unchanged.
 
 #### Next Steps:
 
-Use the already-proven pending-P counter relation to park the overlapping P payload until the older B persistence event and to honor every later P parser hold, rerun the focused parser and presentation regressions, and require the complete 250-picture Verilator stream to consume all bytes and reach quiet terminal presentation with zero decoder, ownership, scheduler or cadence errors. Then build incrementally as requested, install the candidate on the connected MiSTer, and require the 48-, 72- and 250-picture hardware clips to finish with every byte and picture, zero error flags and no regression of the accepted GOP cadence.
+Widen the B parser's predictor, residual reconstruction and motion outputs to signed 9-bit values, route those vectors independently of residual metadata, widen the B raster engine's motion store and coordinate arithmetic, and add an f_code-five focused gate alongside the existing one-through-four regression. Require the complete 250-picture Verilator stream to consume all bytes and reach quiet terminal presentation with zero decoder, ownership, scheduler or cadence errors. Then build incrementally as requested, install the candidate on the connected MiSTer, and require the 48-, 72- and 250-picture hardware clips to finish with every byte and picture, zero error flags and no regression of the accepted GOP cadence.
 
 #### Files Modified:
 
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
 - rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+- tools/streams/tb_h262_b_residual_streaming.sv
 
 #### Status:
 
