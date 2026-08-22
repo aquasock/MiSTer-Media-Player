@@ -1,3 +1,31 @@
+## 340 COMMIT Unreleased ??? 2026-08-22T08:32:00-07:00
+
+#### Coming From:
+
+Unreleased 036a717
+
+#### Purpose:
+
+Update the public README with the current v0.6.0 release-candidate status while preserving the newly published AI-assisted-development section verbatim.
+
+#### Outcome:
+
+The proposed documentation change will distinguish v0.5.0 as the current published release from v0.6.0 as the hardware-qualified release candidate, summarize the candidate's 60 MHz decoder and mixed-width 32 KiB ingress, document paced frame-rate codes one through three and the unsupported higher codes, record clean-build timing and essential hardware qualification, and bring the release, diagnostic and roadmap sections forward to the accepted decoder baseline. The 5,540-byte `AI-assisted development in v0.6.0` section is locked before editing at SHA-256 `c86635095cfee8c36636802872e75932580309a3cb58d6513a44758b43d515b3` and will not be changed.
+
+#### Next Steps:
+
+Edit only README content outside the protected AI-assisted-development range, verify the protected range remains byte-for-byte identical, inspect the rendered Markdown structure, commit the documentation update and push it to the online repository.
+
+#### Files Modified:
+
+- README.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 339 COMMIT Unreleased 036a717 2026-08-22T08:24:43-07:00
 
 #### Coming From:
@@ -1175,38 +1203,6 @@ The successor attempt keyed the latch on the engine's picture-level persistence 
 #### Next Steps:
 
 Route the P engine's own `mixed_persisted_edge` to the producer rather than the muxed `p_persistence_complete`, since it is measured at exactly one pulse per P picture and is the only uncontaminated picture-completion event available. Before wiring it, establish the cycle ordering that defeated the previous attempt by capturing the exact cycles on which `final_row_queued` rises, the persistence pulse occurs, and `row_produced` asserts across picture one's tail; a one-cycle pulse tested against a condition that also requires `!row_produced` has no second chance, and that is the most likely reason a present event failed to latch. Keep the dedicated `p_row_persisted` row-level source as part of the same change, since the row credit remains contaminated three to one and still drives backpressure. Four repairs have now failed. Do not write a fifth without first recording the ordering measurement, because every failure so far has come from assuming when a signal arrives rather than observing it.
-
-#### Files Modified:
-
-- tools/streams/tb_h262_live_raster_soak.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 300 COMMIT Unreleased dc7da26 2026-08-21T15:36:44-07:00
-
-#### Coming From:
-
-Unreleased 7daf716
-
-#### Purpose:
-
-Apply the three coupled corrections approved in Entry 299 and record what they did.
-
-#### Outcome:
-
-The approved change was written in full and does not work, so it is not committed. All three corrections were applied together: a dedicated `p_row_persisted` output carrying `mix_row_persisted` driving the producer's `row_retired`, a clear of `outstanding_rows` in the per-picture initialisation block so its zero point is defined, and a widening to three bits with saturating increment and decrement. The failure moved from byte 156,882 to byte 30,477, which is the same forward move both Entry 297 attempts produced, and the run ends in the bench's two hundred million cycle timeout rather than the watchdog.
-
-Instrumenting the corrected design settles what is actually wrong with the approved plan. Over picture one the counts are exactly balanced and correct: thirty rows produced, thirty retires delivered, thirty P engine persistence pulses, and thirty of those with `mixed_select` asserted. The pipeline then halts without processing a second picture. Balanced accounting and a defined zero point are therefore not sufficient, and the premise of Entry 299 was wrong. The completion latch's comparison of `outstanding_rows` against the literal one is the wrong mechanism irrespective of where the counter is zeroed, because it asks an absolute question of a running count whose value at the final retire depends on how far the engine's persistence lags the producer's parsing. It is satisfiable only by coincidence, which is precisely what the spurious B retires were supplying.
-
-Reverting restored the recorded signature exactly, and the stock run now quantifies the routing defect precisely. The producer emits 390 rows, the P engine persists 390 rows, and 390 of those carry `mixed_select`, yet the producer's retire input receives 1,171 events. The excess 781 are B-sourced. The P side of the accounting has never been in doubt at any point in this investigation; only the retire input and the completion latch are defective.
-
-#### Next Steps:
-
-Replace the completion condition with a differential test rather than an absolute one, and keep `outstanding_rows` for bank backpressure only. When the producer emits the picture's final row, latch the number of retires still owed at that instant, decrement that latched value on each P-sourced retire, and fire completion when it reaches zero. Expressed that way the latch cannot be affected by how far persistence lags parsing, by the counter's zero point, or by any constant offset, and it fires on the final row's own retire rather than on a coincidence. The dedicated `p_row_persisted` retire source from Entry 299 remains necessary and should be applied with it, since a differential count is still corrupted by 781 foreign decrements. Do not reuse `outstanding_rows` to carry completion semantics. Validate on the failing clip, the 48 frame prefix, and the corpus soak whose 6,589,996 cycle count must not move. Three repairs have now failed, all of them by substituting one signal or zero point while leaving the absolute comparison in place, so a candidate that does not remove that comparison should not be attempted.
 
 #### Files Modified:
 
