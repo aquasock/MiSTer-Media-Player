@@ -1,4 +1,34 @@
 ---
+## 315 COMMIT Unreleased ??? 2026-08-21T21:54:45-07:00
+
+#### Coming From:
+
+Unreleased 9367b7e
+
+#### Purpose:
+
+Defer a queued B-picture header until the already-admitted new-GOP I reference publishes instead of treating that transient ordering as a fatal presentation error.
+
+#### Outcome:
+
+The approved repair will add one bounded deferred queued-B transaction to the presentation scheduler. It will latch only when a B header reaches a closed run with the I/P overlap transaction still open, no overlap frame published yet, no promotion active and a scratch destination available; after consuming that classification byte it will assert presentation backpressure, preserve the B event and scratch choice, and complete normal queued admission atomically when the overlap publication arrives. Existing duplicate-header, scratch-exhaustion, promotion-conflict, decode and ownership failures will remain errors.
+
+#### Next Steps:
+
+Add focused early-B and delayed-I-publication coverage, including presentation retirement and scratch ownership races, then run the scheduler, cadence profiler and complete raster regressions. Build incrementally from the Entry 314 database, require positive timing, and hardware-run the 48- and 72-picture clips from the exact RBF. Accept and install the repair only if every byte and picture completes with zero errors and no GOP cadence outliers.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 314 COMMIT Unreleased 9367b7e 2026-08-21T21:33:01-07:00
 
 #### Coming From:
