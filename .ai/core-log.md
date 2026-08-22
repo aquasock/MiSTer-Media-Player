@@ -1,3 +1,31 @@
+## 324 COMMIT Unreleased ??? 2026-08-22T02:57:30-07:00
+
+#### Coming From:
+
+Unreleased 25f05dd
+
+#### Purpose:
+
+Prevent dense real-content pictures from starving presentation by replacing the 256-byte HPS-to-decoder FIFO with a practical compressed-stream reservoir.
+
+#### Outcome:
+
+The user confirms the native-rate ending credits are completely smooth, closing the deterministic cadence symptom, but identifies a clean apparent frame skip at 7:22 as the wooden spikes approach. An exact native-rate 7:20-to-7:25 hardware control reproduces the remaining defect with all 1,430,191 bytes accepted, all 120 pictures and 119 swaps eventually presented, no error flags and nine cadence outliers; its three largest display gaps are 182.371 ms, 165.792 ms and 132.634 ms. The two largest threshold snapshots show the decoder ready while the compressed-stream FIFO is empty, and the source around that point retains a normal I/B/B/P order while individual coded pictures abruptly grow to tens of kilobytes. Lowering encode density from quality six to quality ten reduces the stream from 1,430,191 to 948,786 bytes and improves delivered cadence from 20.993581 to 22.684969 fps, but still leaves four outliers as large as 116.054 ms, confirming buffering sensitivity without providing an acceptable conversion-only repair. The asynchronous HPS-to-decoder FIFO is only 256 bytes, so ordinary decoder backpressure forces excessively frequent MiSTer file-transfer stop and restart cycles and leaves no reservoir for this legal compressed-data burst.
+
+#### Next Steps:
+
+Increase only the existing asynchronous input FIFO to 32,768 bytes, which fits the remaining on-chip memory budget while providing enough transfer runway to decouple MiSTer restart latency from picture parsing. Preserve its clock-domain crossing and synchronized asynchronous-clear configuration, compile the existing focused and full decoder regressions, then build incrementally and require positive timing with the added RAM blocks. Install only the accepted RBF and rerun the exact quality-six 120-picture hardware control, requiring every byte, picture and swap, zero errors, terminal quiet and no cadence outliers before asking the user to rewatch 7:15 through 7:30.
+
+#### Files Modified:
+
+- rtl/mpeg2_stream_fifo.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 323 COMMIT Unreleased 25f05dd 2026-08-22T02:19:15-07:00
 
 #### Coming From:
