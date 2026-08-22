@@ -8,6 +8,26 @@ This project is still in active pre-release development. Published milestone rel
 
 No unreleased milestone changes yet.
 
+## [0.6.0] - 2026-08-22 — Real-stream MPEG-2 playback milestone
+
+Hardware-qualified sustained playback of progressive 720x480 4:2:0 MPEG-2 Video elementary streams, with native `24000/1001`, exact-24-fps, and 25-fps presentation cadence.
+
+- Reworked compressed-data ingress around a 16-bit MiSTer host path and a 32 KiB mixed-width asynchronous FIFO while retaining 8-bit decoder consumption and explicit backpressure.
+- Raised the decoder clock from 54 MHz to 60 MHz and pipelined the real-stream prediction, coefficient, cache, and DDR paths needed to maintain positive timing at the higher rate.
+- Extended picture-signaled P forward horizontal/vertical motion-vector `f_code` support from 1..4 to 1..9 with a 13-bit vector datapath, and extended independently signaled B forward/backward horizontal/vertical support from 1..4 to 1..5.
+- Corrected long-GOP parsing, reference ownership, pending-future-reference binding, repeated-GOP publication, queued-B presentation, P/B persistence accounting, and final-reference release so streams continue across former stutter points and terminate cleanly.
+- Overlapped reference-picture decoding with B-picture presentation while preserving retained-bank ownership, B scratch storage, display order, blanking-aligned publication, and protected DDR access.
+- Added native H.262 frame-rate-code 2 pacing for exact 24 fps and exact rational frame-rate-code 1 pacing for `24000/1001`, alongside the existing accepted frame-rate-code 3 / 25-fps path.
+- Added hardware cadence telemetry for accepted byte counts, decoded/reference/B picture counts, presentation swaps, measured frame rate, sequence-end state, decoder errors, and cadence-gap outliers.
+- Qualified a focused four-stream hardware gate covering P skip/motion, B prediction, repeated multi-slice pictures, and the high-motion large-picture/long-GOP scene that originally exposed compressed-input starvation.
+- Completed visual endurance qualification with the full native-rate Big Buck Bunny movie and a separate 642 MB real-world 720x480 progressive `24000/1001` stream. Both completed with smooth motion, no perceptible speed error, and no observed recurring stutter or frame-drop defect.
+- Release-candidate source baseline: `b64ec6a`. A preserved incremental Quartus build and an independent clean/from-scratch Quartus Prime 17.0.2 build produced byte-identical RBFs.
+- The clean build completed with zero errors and positive timing in every required category: +0.303 ns global setup, +0.386 ns decoder setup, +8.066 ns video setup, +0.244 ns hold, +3.706 ns recovery, +0.768 ns removal, and +1.122 ns minimum pulse width.
+- The qualified fit uses 34,565 ALMs, 50,960 registers, 4,306,375 block-memory bits, 538 RAM blocks, and 65 DSP blocks.
+- The qualified 4,455,376-byte RBF has SHA-256 `e95e9ec43cb11917d5a904fdd8016bcc23dcbe2d8f36f678544f42ad1a6d5f10`; its release asset name is `MediaPlayer_20260822.rbf`.
+- Current limits remain deliberate: raw `.m2v` elementary-stream input, progressive frame pictures, 4:2:0 chroma, the proven 720x480 envelope, synthetic rather than PES-derived timing, fixed 800x600 diagnostic output, and no audio, container/program-stream demux, real PTS, seeking, pause/resume, DVD navigation, or optical-drive integration.
+- H.262 frame-rate codes 4 through 8—29.97, 30, 50, 59.94, and 60 fps—remain unpaced and are not supported by this milestone.
+
 ## [0.5.0] - 2026-08-17 — 720x480 progressive P/B `f_code` milestone
 
 Hardware-qualified 720x480 progressive 4:2:0 I/P/B regression coverage with independently picture-signaled P/B motion-vector `f_code` handling from 1 through 4.
