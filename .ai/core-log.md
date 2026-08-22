@@ -1,4 +1,35 @@
 ---
+## 312 COMMIT Unreleased ??? 2026-08-21T20:45:10-07:00
+
+#### Coming From:
+
+Unreleased b777f30
+
+#### Purpose:
+
+Capture the exact scheduler and hold state at each GOP-correlated cadence outlier so the visible stutters can be fixed without conflating them with the separate 250-frame terminal failure.
+
+#### Outcome:
+
+The approved diagnostic commit will leave decoder and scheduler behaviour unchanged and extend the cadence overlay to associate each of the three ranked display gaps with the scheduler state sampled when that gap first exceeds the legal 25 fps window. The companion context will retain the upcoming displayed-picture ordinal and add the contemporaneous presentation hold, destination hold, FIFO, decoder-ready, scratch availability, promotion, frame-waiting, completion, error and bank signals. The hardware runner will load media through the current MiSTer games-folder-relative MGL contract and wait until file injection has completed before requesting screenshots, eliminating the independently reproduced black-screen automation race.
+
+#### Next Steps:
+
+Implement schema version four and simulation-test that an outlier retains its threshold-crossing state even if scheduler inputs change before the eventual display swap. Re-run the focused scheduler regression and profiler overlay and decoder tests, commit the diagnostic source, take a fully clean Quartus 17.0.2 build with every timing corner positive, and hardware-run the 48- and 72-frame clips. Use the captured states at pictures 25 and 49 to identify the exact blocking term and then propose the smallest behavioural repair; defer the 250-frame terminal trigger and any terminal repair until the stutters are settled.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/run_hardware_cadence.py
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 311 COMMIT Unreleased b777f30 2026-08-21T20:05:37-07:00
 
 #### Coming From:
