@@ -46,7 +46,7 @@ module tb_h262_dense_publication_order;
     reg [31:0] presentation_picture_window=0;
     reg presentation_header_capture=0;
     reg presentation_header_second_byte=0;
-    reg b_picture_start=0,non_b_picture_start=0,p_picture_start=0,sequence_end=0;
+    reg b_picture_start=0,non_b_picture_start=0,i_picture_start=0,p_picture_start=0,sequence_end=0;
     reg reference_ownership_arm=0;
     reg destination_ownership_hold=0;
     integer destination_hold_count=0;
@@ -116,6 +116,7 @@ module tb_h262_dense_publication_order;
         .reference_frame_bank(reference_bank),.b_picture_start(b_picture_start),
         .reference_promotion_count(reference_promotion_count),
         .non_b_picture_start(non_b_picture_start),
+        .i_picture_start(i_picture_start),
         .p_picture_start(p_picture_start),.sequence_end(sequence_end),
         .b_user_success(b_success),.b_decode_error(probe_error),
         .display_frame_bank(display_frame_bank),.display_scratch(display_scratch),
@@ -184,6 +185,7 @@ module tb_h262_dense_publication_order;
         swap_window_pulse<=0;
         b_picture_start<=0;
         non_b_picture_start<=0;
+        i_picture_start<=0;
         p_picture_start<=0;
         sequence_end<=0;
         b_success_d<=b_success;
@@ -208,6 +210,7 @@ module tb_h262_dense_publication_order;
                     if(stream_data[5:3]==3'b011)b_picture_start<=1;
                     else begin
                         non_b_picture_start<=1;
+                        if(stream_data[5:3]==3'b001)i_picture_start<=1;
                         if(stream_data[5:3]==3'b010)p_picture_start<=1;
                     end
                     if(reference_ownership_arm||reference_overlap_header)begin

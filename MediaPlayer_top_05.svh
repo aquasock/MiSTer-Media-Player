@@ -30,6 +30,9 @@ wire mpeg2_new_b_picture_start_now =
 wire mpeg2_new_non_b_picture_start_now =
     mpeg2_new_picture_header_classified_now &&
     (mpeg2_new_picture_header_type_now != 3'b011);
+wire mpeg2_new_i_picture_start_now =
+    mpeg2_new_picture_header_classified_now &&
+    (mpeg2_new_picture_header_type_now == 3'b001);
 wire mpeg2_new_p_picture_start_now =
     mpeg2_new_picture_header_classified_now &&
     (mpeg2_new_picture_header_type_now == 3'b010);
@@ -110,6 +113,7 @@ mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
     .reference_promotion_count   (mpeg2_new_reference_promotion_count),
     .b_picture_start             (mpeg2_new_b_picture_start_now),
     .non_b_picture_start         (mpeg2_new_non_b_picture_start_now),
+    .i_picture_start             (mpeg2_new_i_picture_start_now),
     .p_picture_start             (mpeg2_new_p_picture_start_now),
     .sequence_end                (mpeg2_new_sequence_end_now),
     .b_user_success              (mpeg2_new_b_user_success),

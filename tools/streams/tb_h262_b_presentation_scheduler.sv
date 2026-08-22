@@ -2,7 +2,7 @@
 
 module tb_h262_b_presentation_scheduler;
     reg clk=0,reset=1,swap=0,frame_waiting=0;reg[1:0] completed_bank=0,reference_bank=1;
-    reg b_start=0,non_b_start=0,p_start=0,sequence_end=0,b_success=0,b_error=0;
+    reg b_start=0,non_b_start=0,i_start=0,p_start=0,sequence_end=0,b_success=0,b_error=0;
     reg[7:0] reference_count=0;
     wire[1:0] display_bank;wire display_scratch,display_scratch_bank,decode_scratch_bank;
     wire [2:0] reset_count;
@@ -16,7 +16,8 @@ module tb_h262_b_presentation_scheduler;
         .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
         .reference_frame_bank(reference_bank),.b_picture_start(b_start),
         .reference_promotion_count(reference_count),
-        .non_b_picture_start(non_b_start),.p_picture_start(p_start),
+        .non_b_picture_start(non_b_start),.i_picture_start(i_start),
+        .p_picture_start(p_start),
         .sequence_end(sequence_end),
         .b_user_success(b_success),.b_decode_error(b_error),
         .display_frame_bank(display_bank),.display_scratch(display_scratch),
@@ -70,6 +71,12 @@ module tb_h262_b_presentation_scheduler;
             @(negedge clk);non_b_start<=0;p_start<=0;#1;
         end
     endtask
+    task automatic pulse_i_close;
+        begin
+            @(negedge clk);non_b_start<=1;i_start<=1;
+            @(negedge clk);non_b_start<=0;i_start<=0;#1;
+        end
+    endtask
     task automatic pulse_window;
         begin @(negedge clk);swap<=1;@(negedge clk);swap<=0;#1;end
     endtask
@@ -95,7 +102,7 @@ module tb_h262_b_presentation_scheduler;
     task automatic reset_scheduler;
         begin
             @(negedge clk);reset<=1;swap<=0;frame_waiting<=0;b_start<=0;
-            non_b_start<=0;p_start<=0;sequence_end<=0;b_success<=0;b_error<=0;
+            non_b_start<=0;i_start<=0;p_start<=0;sequence_end<=0;b_success<=0;b_error<=0;
             reference_count<=0;
             repeat(2)@(negedge clk);reset<=0;#1;
         end
@@ -230,6 +237,42 @@ module tb_h262_b_presentation_scheduler;
             $fatal(1,"following B did not claim overlapped future reference");
         reset_scheduler();
 
+        // Entry 313: the I reference at a GOP boundary must use the same
+        // bounded overlap as P.  Its delayed publication is retained in the
+        // third rotating reference bank and claimed by the following B run.
+        reference_bank<=0;completed_bank<=1;
+        @(negedge clk);b_start<=1;frame_waiting<=1;
+        @(negedge clk);b_start<=0;frame_waiting<=0;reference_bank<=1;#1;
+        pulse_success();
+        pulse_start();
+        pulse_success();
+        if(!overlap_header)$fatal(1,"closed-run I header was not overlap eligible");
+        pulse_i_close();
+        if(hold||!dut.overlap_decode_open)
+            $fatal(1,"following I was not admitted during prior presentation");
+        completed_bank<=2;reference_bank<=2;
+        @(negedge clk);frame_waiting<=1;
+        @(negedge clk);frame_waiting<=0;#1;
+        if(!hold||!dut.pending_frame_valid||
+           (dut.pending_frame_bank!==2'd2)||!dut.overlap_frame_pending)
+            $fatal(1,"overlap I publication did not restore presentation hold");
+        pulse_swap();
+        if(!display_scratch||display_scratch_bank)
+            $fatal(1,"I-overlap run did not present scratch 0");
+        pulse_swap();
+        if(!display_scratch||!display_scratch_bank)
+            $fatal(1,"I-overlap run did not present scratch 1");
+        pulse_swap();
+        if(display_scratch||!display_bank||!complete||hold||error||
+           !dut.pending_frame_valid||dut.pending_frame_released||
+           (dut.pending_frame_bank!==2'd2))
+            $fatal(1,"overlap I reference was not preserved after prior run");
+        pulse_start();
+        if(error||dut.future_reference_pending||
+           (dut.future_frame_bank!==2'd2)||dut.pending_frame_valid)
+            $fatal(1,"following B did not claim overlapped I reference");
+        reset_scheduler();
+
         // Entry 269: the first B of the next run may occupy scratch 0 only
         // after the old display leaves it for scratch 1.  It must remain in a
         // separate generation until the old future reference is visible;
@@ -350,7 +393,7 @@ module tb_h262_b_presentation_scheduler;
         if(display_scratch||!display_bank)
             $fatal(1,"ordinary frame presentation did not recover after abort");
 
-        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=1,3,2 min_present_gap=%0d overlap_p=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=1 fail_open=1",min_present_gap);
+        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=1,3,2 min_present_gap=%0d overlap_p=1 overlap_i=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=1 fail_open=1",min_present_gap);
         $finish;
     end
 

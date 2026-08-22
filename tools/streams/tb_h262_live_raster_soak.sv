@@ -257,7 +257,7 @@ module tb_h262_live_raster_soak #(
     wire [31:0] picture_window_next={picture_window[23:0],stream_data};
     reg picture_header_capture=0,picture_header_second_byte=0;
     reg [7:0] picture_trace_header_first=0;
-    reg b_picture_start=0,non_b_picture_start=0,p_picture_start=0,sequence_end=0;
+    reg b_picture_start=0,non_b_picture_start=0,i_picture_start=0,p_picture_start=0,sequence_end=0;
     reg reference_ownership_arm=0,destination_ownership_hold=0;
 
     reg pred_persisted_d=0;
@@ -390,6 +390,7 @@ module tb_h262_live_raster_soak #(
         .reference_frame_bank(reference_bank),.b_picture_start(b_picture_start),
         .reference_promotion_count(reference_promotion_count),
         .non_b_picture_start(non_b_picture_start),
+        .i_picture_start(i_picture_start),
         .p_picture_start(p_picture_start),.sequence_end(sequence_end),
         .b_user_success(b_success),.b_decode_error(probe_error||pred_error),
         .display_frame_bank(display_frame_bank),.display_scratch(display_scratch),
@@ -1147,6 +1148,7 @@ module tb_h262_live_raster_soak #(
         swap_window_pulse<=0;
         b_picture_start<=0;
         non_b_picture_start<=0;
+        i_picture_start<=0;
         p_picture_start<=0;
         sequence_end<=0;
         pred_persisted_d<=pred_persisted;
@@ -1229,6 +1231,7 @@ module tb_h262_live_raster_soak #(
                     if(stream_data[5:3]==3'b011)b_picture_start<=1;
                     else begin
                         non_b_picture_start<=1;
+                        if(stream_data[5:3]==3'b001)i_picture_start<=1;
                         if(stream_data[5:3]==3'b010)p_picture_start<=1;
                     end
                     if(reference_ownership_arm||reference_overlap_header)begin
@@ -1573,9 +1576,9 @@ module tb_h262_live_raster_soak #(
                profile_b_replay_coeff_writes!=262671||
                profile_b_replay_coeff_wait!=0||
                ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
-                (MEMORY_READ_LATENCY==1)&&(total_cycles!=6589996))||
+                (MEMORY_READ_LATENCY==1)&&(total_cycles!=6519997))||
                ((EXPECTED_DESCRIPTOR_DEPTH==4)&&
-                (MEMORY_READ_LATENCY==1)&&(total_cycles!=6589996))||
+                (MEMORY_READ_LATENCY==1)&&(total_cycles!=6519997))||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
                presentation_error)

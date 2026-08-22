@@ -19,6 +19,7 @@ module mpeg2_h262_b_presentation_scheduler
     input  wire [7:0] reference_promotion_count,
     input  wire b_picture_start,
     input  wire non_b_picture_start,
+    input  wire i_picture_start,
     input  wire p_picture_start,
     input  wire sequence_end,
     input  wire b_user_success,
@@ -435,10 +436,12 @@ always @(posedge clk) begin
                     presentation_error<=1;
                 end else begin
                     run_closed<=1;
-                    // A non-B close is overlap-eligible only when it is the P
-                    // header explicitly classified by the caller. sequence_end
-                    // retains the original immediate presentation hold.
-                    overlap_decode_open<=p_picture_start&&
+                    // Entry 313: either supported reference picture may use
+                    // the one-reference overlap transaction.  In particular,
+                    // admitting a new-GOP I here prevents the completed B run
+                    // from draining before that future reference is decoded.
+                    // sequence_end retains the immediate presentation hold.
+                    overlap_decode_open<=(i_picture_start||p_picture_start)&&
                                          reference_overlap_header;
                 end
             end else if(queued_run_active&&!queued_run_closed)begin
@@ -452,8 +455,9 @@ always @(posedge clk) begin
                     presentation_error<=1;
                 end else begin
                     queued_run_closed<=1;
-                    queued_overlap_decode_open<=p_picture_start&&
-                                                reference_overlap_header;
+                    queued_overlap_decode_open<=
+                        (i_picture_start||p_picture_start)&&
+                        reference_overlap_header;
                 end
             end
         end
