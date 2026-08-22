@@ -1,4 +1,4 @@
-## 341 COMMIT Unreleased ??? 2026-08-22T08:46:15-07:00
+## 341 COMMIT Unreleased fe0393d 2026-08-22T08:46:15-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Write the final v0.6.0 milestone entry in the public changelog as the first step
 
 #### Outcome:
 
-The proposed documentation change will replace the empty Unreleased placeholder with a dated v0.6.0 milestone that records the accepted real-stream decoder, corrected presentation and terminal behavior, expanded motion-vector range, 60 MHz decode and mixed-width 32 KiB ingress, native frame-rate codes one through three, clean-build timing and resources, focused and full-length hardware qualification, release artifact identity, and explicit implementation limits. The user's revised release plan drops the deferred Python conversion recipe and instead reserves a plain FFmpeg command for the later README step; this changelog commit will modify no README content.
+Commit `fe0393d` replaces the empty Unreleased placeholder with a dated v0.6.0 milestone recording the accepted real-stream decoder, corrected presentation and terminal behavior, expanded motion-vector range, 60 MHz decode and mixed-width 32 KiB ingress, native frame-rate codes one through three, clean-build timing and resources, focused and full-length hardware qualification, release artifact identity, and explicit implementation limits. The Unreleased heading remains available for later work, the documentation passes whitespace and structure checks, and the commit was pushed to the online repository. The user's revised release plan drops the deferred Python conversion recipe and instead reserves a plain FFmpeg command for the later README step; this commit changes no README content.
 
 #### Next Steps:
 
-Edit only `CHANGELOG.md`, verify that the new milestone agrees with the hardware-qualified seed-ten baseline and preserves the Keep-a-Changelog Unreleased section, then commit and push the documentation update before proceeding to v0.6.0 release notes.
+Proceed to step two by writing `docs/RELEASE_NOTES_v0.6.0.md` from the same qualified seed-ten evidence, including supported inputs, known limits, build and hardware results, and the exact release artifact identity. No build or additional hardware validation is required for this changelog-only commit.
 
 #### Files Modified:
 
