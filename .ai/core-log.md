@@ -1,4 +1,4 @@
-## 324 COMMIT Unreleased ??? 2026-08-22T02:57:30-07:00
+## 324 COMMIT Unreleased e5e7d86 2026-08-22T02:57:30-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Prevent dense real-content pictures from starving presentation by replacing the 
 
 #### Outcome:
 
-The user confirms the native-rate ending credits are completely smooth, closing the deterministic cadence symptom, but identifies a clean apparent frame skip at 7:22 as the wooden spikes approach. An exact native-rate 7:20-to-7:25 hardware control reproduces the remaining defect with all 1,430,191 bytes accepted, all 120 pictures and 119 swaps eventually presented, no error flags and nine cadence outliers; its three largest display gaps are 182.371 ms, 165.792 ms and 132.634 ms. The two largest threshold snapshots show the decoder ready while the compressed-stream FIFO is empty, and the source around that point retains a normal I/B/B/P order while individual coded pictures abruptly grow to tens of kilobytes. Lowering encode density from quality six to quality ten reduces the stream from 1,430,191 to 948,786 bytes and improves delivered cadence from 20.993581 to 22.684969 fps, but still leaves four outliers as large as 116.054 ms, confirming buffering sensitivity without providing an acceptable conversion-only repair. The asynchronous HPS-to-decoder FIFO is only 256 bytes, so ordinary decoder backpressure forces excessively frequent MiSTer file-transfer stop and restart cycles and leaves no reservoir for this legal compressed-data burst.
+The user confirms the native-rate ending credits are completely smooth, closing the deterministic cadence symptom, but identifies a clean apparent frame skip at 7:22 as the wooden spikes approach. An exact native-rate 7:20-to-7:25 hardware control reproduces the remaining defect with all 1,430,191 bytes accepted, all 120 pictures and 119 swaps eventually presented, no error flags and nine cadence outliers; its three largest display gaps are 182.371 ms, 165.792 ms and 132.634 ms. The two largest threshold snapshots show the decoder ready while the compressed-stream FIFO is empty, and the source around that point retains a normal I/B/B/P order while individual coded pictures abruptly grow to tens of kilobytes. Lowering encode density from quality six to quality ten reduces the stream from 1,430,191 to 948,786 bytes and improves delivered cadence from 20.993581 to 22.684969 fps, but still leaves four outliers as large as 116.054 ms, confirming buffering sensitivity without providing an acceptable conversion-only repair. Commit `e5e7d86` therefore enlarges the asynchronous HPS-to-decoder FIFO from 256 bytes to 32,768 bytes without changing its clock-domain crossing or reset configuration. The exact dense scene passes the full raster replay at 134,979,997 cycles with all 1,430,191 bytes, 36 P pictures, 79 B pictures, 41 reference publications, 119 swaps and zero errors. The incremental Quartus build completes in 12 minutes 33 seconds with zero errors and positive timing at plus 0.432 ns global setup, plus 1.672 ns decoder setup, plus 8.133 ns video setup, plus 0.243 ns hold, plus 3.551 ns recovery, plus 0.702 ns removal and plus 0.462 ns pulse width. It uses 34,685 ALMs, 51,232 registers, 4,306,375 memory bits, 538 of 553 RAM blocks and 65 DSP blocks. The accepted 4,454,764-byte RBF has SHA-256 `68274574806ce74331f32f90ea82084b67c40db0f43adea45a9910f0994a5e70` and verifies after persistent installation. Hardware proves the reservoir is beneficial but insufficient: outliers fall from nine to seven, the worst gap falls from 182.371 ms to 132.634 ms and delivered cadence improves from 20.993581 to 22.417636 fps, but the new largest snapshot has compressed data pending while the decoder is not ready, exposing decode throughput as the next binding limit.
 
 #### Next Steps:
 
-Increase only the existing asynchronous input FIFO to 32,768 bytes, which fits the remaining on-chip memory budget while providing enough transfer runway to decouple MiSTer restart latency from picture parsing. Preserve its clock-domain crossing and synchronized asynchronous-clear configuration, compile the existing focused and full decoder regressions, then build incrementally and require positive timing with the added RAM blocks. Install only the accepted RBF and rerun the exact quality-six 120-picture hardware control, requiring every byte, picture and swap, zero errors, terminal quiet and no cadence outliers before asking the user to rewatch 7:15 through 7:30.
+Keep the enlarged reservoir because its hardware improvement is measured, but do not treat the squirrel defect as passed. Raise only the decoder and DDR service clock from 54 MHz to the PLL-compatible 60 MHz while preserving the independent 40 MHz presentation raster and its exact native cadence. Update profiler clock units and timeout thresholds so the hardware evidence remains dimensionally correct, update the timing extraction to identify the new period, and require the focused and full regressions before another incremental build. The current fit has plus 1.672 ns decoder slack against the 18.518 ns period, so the 16.667 ns target is close enough to require real post-fit proof rather than assumption; accept and install only a zero-error, fully positive-timing artifact, then require the exact quality-six scene to reach all 120 pictures and 119 swaps with zero errors, terminal quiet and zero cadence outliers.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Increase only the existing asynchronous input FIFO to 32,768 bytes, which fits t
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
