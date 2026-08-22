@@ -1,4 +1,4 @@
-## 334 COMMIT Unreleased ??? 2026-08-22T06:30:47-07:00
+## 334 COMMIT Unreleased 04873f7 2026-08-22T06:30:47-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Add exact native `24000/1001` presentation cadence for H.262 frame-rate code one
 
 #### Outcome:
 
-The proposed change extends the presentation scheduler's existing refresh-window credit accumulator with the exact reduced ratio for a 40 MHz pixel clock and 663,168-pixel raster: step 22,608 over limit 56,875, mathematically identical to `663168 * 24000` over `40000000 * 1001`. A latched rate code will reseed credit whenever sequence metadata changes so the reduced code-one scale cannot inherit exact-24/25 credit. The hardware cadence profiler will recognize code one under the same legal three-refresh diagnostic window, and focused simulations will distinguish 23.976 from exact 24 over 1,206 raster windows while preserving the established no-consecutive-presentation invariant.
+The presentation scheduler now supports frame-rate code one with the exact reduced 22,608-over-56,875 refresh-window credit ratio, mathematically identical to `663168 * 24000` over `40000000 * 1001`, and reseeds only when entering or leaving that reduced scale so exact-24/25 behavior remains cycle-identical. The hardware cadence profiler now recognizes code one under the same legal three-refresh diagnostic window. Focused simulation delivered 479 presentations over 1,206 windows for 23.976 fps, 240 over 603 for exact 24, and 250 over 603 for 25 fps; the profiler, transport, mixed-width FIFO, and complete 72-picture live-raster soak all passed with zero decoder or presentation errors. An untouched `374ef38` comparison proved the soak's prior 6,519,997-clock assertion was already stale while both baseline and this commit complete identically at 6,519,996 clocks, so the test-only constant was corrected without changing decoder behavior.
 
 #### Next Steps:
 
-Implement the scheduler and profiler changes, extend both focused testbenches, then run the scheduler, profiler, transport and native-rate regressions. Commit only if those pass, build incrementally from the accepted clean seed-twelve database, require positive global, decoder, video, hold, recovery, removal and pulse-width timing, install only the timing-clean image, and validate this exact 23.976-fps Emperor stream at correct wall-clock speed with no dropped frames.
+Build `04873f7` incrementally from the accepted clean seed-twelve database, require positive global, decoder, video, hold, recovery, removal and pulse-width timing, install only the timing-clean image, and validate a bounded native-23.976 cadence stream plus the exact Emperor movie at correct wall-clock speed with no dropped frames.
 
 #### Files Modified:
 
@@ -22,6 +22,7 @@ Implement the scheduler and profiler changes, extend both focused testbenches, t
 - rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
 - tools/streams/tb_h262_b_presentation_scheduler.sv
 - tools/streams/tb_h262_hardware_cadence_profiler.sv
+- tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
