@@ -1,3 +1,31 @@
+## 338 COMMIT Unreleased b64ec6a 2026-08-22T08:15:10-07:00
+
+#### Coming From:
+
+Unreleased b64ec6a
+
+#### Purpose:
+
+Qualify the timing-clean seed-ten release candidate with a preserved incremental state, an independent clean build and the four-file essential hardware regression suite.
+
+#### Outcome:
+
+The complete accepted incremental build state was moved intact to `/run/media/vash/GIT/mmp_seed10_incremental.iRW65u`, including `db`, `incremental_db`, `output_files` and `phase1p_timing_reports`, and its RBF retained SHA-256 `e95e9ec43cb11917d5a904fdd8016bcc23dcbe2d8f36f678544f42ad1a6d5f10`. Quartus then rebuilt the identical seed-ten source completely from scratch in 12 minutes 36 seconds with zero errors. The clean result is byte-for-byte identical to the preserved incremental RBF and reproduces every implementation figure exactly: plus 0.303 ns global setup, plus 0.386 ns decoder setup, plus 8.066 ns video setup, plus 0.244 ns hold, plus 3.706 ns recovery, plus 0.768 ns removal and plus 1.122 ns pulse width, with 34,565 ALMs, 50,960 registers, 4,306,375 memory bits, 538 RAM blocks and 65 DSP blocks. The clean artifact then passes all four essential hardware regressions. The P-skip/motion case accepts all 180,948 bytes and completes both pictures; B-prediction accepts all 185,054 bytes and completes all five pictures; multi-slice completes all five pictures with zero errors while correctly accepting one transport pad byte for its odd 185,393-byte length; and the 15-second squirrel clip accepts all 2,603,570 bytes, completes 121 reference plus 239 B pictures, reaches sequence-end quiet at a corrected 23.991197 fps and reports zero errors and zero cadence outliers. Its eight-bit display and swap counters wrap from 360 and 359 to 104 and 103 as established. One initial screenshot was read before its PNG write completed, but a delayed retry passed and exposed no core failure.
+
+#### Next Steps:
+
+Use the current clean RBF or the preserved incremental RBF interchangeably for release because they are the exact same binary, and retain the preserved build directory until the release is tagged and packaged. Treat the four essential hardware regressions, the native-23.976 telemetry gate and the full Emperor visual run as the v0.6.0 decoder baseline. A later tooling cleanup may teach the generic cadence runner about 16-bit odd-byte padding, eight-bit counter wrap and partially written screenshots, but those automation limits do not block the core release.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 337 COMMIT Unreleased b64ec6a 2026-08-22T07:52:35-07:00
 
 #### Coming From:
@@ -1191,38 +1219,6 @@ Apply the three corrections together as one change, since they are only correct 
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-## 298 COMMIT Unreleased 7ba1184 2026-08-21T15:10:54-07:00
-
-#### Coming From:
-
-Unreleased 221db79
-
-#### Purpose:
-
-Settle the row-bank credit contract left open by Entry 297 by counting both engines' produce and retire events on one timebase.
-
-#### Outcome:
-
-The contract is settled and the defect is larger than Entry 297 described. `row_produced` is `wide_row_produced`, the P parser's own row-final marker, so it is genuinely P-side and fires once per P row. Counting confirms the P side is already correct: every P picture in the failing clip produces exactly thirty rows and receives exactly thirty P-sourced retires, fourteen pictures in a row without deviation. `outstanding_rows` is therefore meant to track P rows outstanding, and the roughly sixty B-sourced retires each picture also receives are unambiguously spurious, 897 of them against 450 legitimate ones across the run.
-
-The consequence is not merely a corrupted count. The picture-completion latch in the wide probe fires on `row_retired&&final_row_queued&&(outstanding_rows==1)&&!row_produced`, and that is the only path that sets `wide_complete_now` and `proof_done` and so the only path that lets the producer rearm for the next picture. Because `outstanding_rows` is two bits it wraps rather than saturates, and the stream of spurious B retires walks it three, two, one, zero, three continuously. Every picture's retire tail is B-sourced, and pictures one through fourteen pass through the value one sixteen times each, twenty-three times for picture eight. One of those spurious events eventually coincides with `final_row_queued` and completes the picture. Picture completion in this design is therefore triggered by B-engine retires arriving by luck, not by the P engine persisting its own final row. Picture fifteen receives only seven such passes before that GOP's B pictures are exhausted, the coincidence never occurs, picture fifteen never completes, the producer never rearms and emits nothing for picture sixteen, and the raster engine's watchdog raises error source 10 after its full `24'hffffff` wait.
-
-This also explains why both repairs attempted in Entry 297 failed earlier rather than later. Removing the B retires removes precisely the events that were completing pictures, so the failure moved forward to byte 30,477 instead of 156,882. The two defects are coupled: the routing error supplies the corruption, and the completion latch depends on that corruption to fire at all. Neither can be fixed alone.
-
-#### Next Steps:
-
-Replace the completion trigger rather than clean the counter, and obtain approval before writing it because this changes a contract rather than correcting a wire. Picture completion should latch when the P engine persists the row that the producer marked final, tracked explicitly as its own event, instead of being inferred from a shared count reaching a particular value. With that in place the retire input can be narrowed to P-sourced persistence and `outstanding_rows` can be widened or made to saturate, since it would then serve only as bank backpressure and no longer carry completion semantics. Validate any candidate on the failing clip, on the 48 frame prefix that already completes cleanly, and on the 128 by 96 corpus soak whose golden values must not move. Note also that the bench cannot currently express success for any geometry other than the corpus, so a clean 720 by 480 run still ends in a golden-value `$fatal` and that must be fixed before the clip can be certified as playing to completion.
-
-#### Files Modified:
-
-- tools/streams/tb_h262_live_raster_soak.sv
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
