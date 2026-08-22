@@ -1,4 +1,32 @@
 ---
+## 317 COMMIT Unreleased ??? 2026-08-21T22:52:35-07:00
+
+#### Coming From:
+
+Unreleased 3c80bef
+
+#### Purpose:
+
+Preserve generalized P-engine ownership while a final parsed row is still waiting for persistence across an already-classified following B header.
+
+#### Outcome:
+
+The accepted source reproduces the 250-picture stop at stream byte 310,629, inside picture 82's B header rather than at sequence end. Picture 81 has produced its first generalized P row and asserted the parser hold, but the following B classification clears `wide_candidate` before that row is persisted; `wide_mode` therefore falls, the row-end metadata is no longer forwarded to the shared raster engine, and the parser remains permanently held with internal detail 31. The proposed repair retains `wide_mode` while `wide_parse_hold` is asserted, using the existing parser ownership state to carry only the unfinished P transaction across the header handoff without changing accepted scheduler overlap, loading-bar backpressure or display cadence.
+
+#### Next Steps:
+
+Extend the generalized-mode ownership expression with `wide_parse_hold`, rerun the focused parser and presentation regressions, and require the complete 250-picture Verilator stream to consume all bytes and reach quiet terminal presentation with zero decoder, ownership, scheduler or cadence errors. Then build incrementally as requested, install the candidate on the connected MiSTer, and require the 48-, 72- and 250-picture hardware clips to finish with every byte and picture, zero error flags and no regression of the accepted GOP cadence.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 316 COMMIT Unreleased 3c80bef 2026-08-21T22:34:28-07:00
 
 #### Coming From:
