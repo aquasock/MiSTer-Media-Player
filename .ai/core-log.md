@@ -1,4 +1,36 @@
 ---
+## 313 COMMIT Unreleased ??? 2026-08-21T21:08:56-07:00
+
+#### Coming From:
+
+Unreleased 242d151
+
+#### Purpose:
+
+Allow the I-picture beginning a new GOP to decode through the existing reference-overlap window so the presentation pipeline does not drain at each GOP boundary.
+
+#### Outcome:
+
+The approved change will add an explicit accepted I-picture header event beside the existing P-picture event and will allow either supported reference type to open the scheduler's single overlap decode transaction when a B run closes. It will retain the current two-generation B ordering, two scratch banks, three rotating reference destinations, cadence gate, destination collision protection and fail-open behavior. No terminal snapshot or 250-frame completion behavior will change in this boundary.
+
+#### Next Steps:
+
+Strengthen the focused scheduler regression with I-reference overlap, delayed publication, bank ownership and ordered scratch-to-future presentation cases, and route the new event through the dense and complete raster benches. Require every existing regression to remain exact, then commit the source, take a fully clean Quartus 17.0.2 build with all timing categories positive, deploy the readback-verified RBF and hardware-run the 48- and 72-frame clips. Accept the change only if every byte and picture completes with zero errors and the outliers before pictures 25 and 49 disappear.
+
+#### Files Modified:
+
+- MediaPlayer_top_05.svh
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_dense_publication_order.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 312 COMMIT Unreleased 242d151 2026-08-21T20:45:10-07:00
 
 #### Coming From:
