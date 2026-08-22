@@ -1,4 +1,4 @@
-## 345 COMMIT Unreleased ??? 2026-08-22T09:09:58-07:00
+## 345 COMMIT Unreleased ae51759 2026-08-22T09:09:58-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Perform the final v0.6.0 release audit and establish the exact commit for the an
 
 #### Outcome:
 
-The proposed audit will verify that local `master`, GitHub `origin/master`, release documentation, package metadata and artifact identity are synchronized; that no synthesized source differs from qualified baseline `b64ec6a`; that the protected README section remains exactly 5,540 bytes at its recorded checksum; that the changelog, release notes, README links, supported-format boundary and FFmpeg recipe agree; and that no local, remote or GitHub `v0.6.0` tag or release already exists. The resolved audit metadata commit will be the exact commit the user tags in step six.
+The final audit passes at synchronized local, tracking, and GitHub commit `7e2e8811b5e22a37967c30d2e7d900a4a2508a8d` with a clean tracked worktree. Every change after synthesized baseline `b64ec6a91a6986a124b86765a9817b809c8948a1` is confined to `.ai/core-log.md`, `CHANGELOG.md`, `README.md`, and `docs/RELEASE_NOTES_v0.6.0.md`; no Quartus, RTL, top-level, QSF, QPF, QIP or framework source differs. The protected README section remains exactly 5,540 bytes at SHA-256 `c86635095cfee8c36636802872e75932580309a3cb58d6513a44758b43d515b3`. Changelog date and artifact identity, release-note baseline and qualification figures, README links, supported-format boundary and FFmpeg recipe all agree. The packaged RBF passes `SHA256SUMS`, retains its exact 4,455,376-byte size, and is byte-identical to both clean and incremental accepted outputs. No local tag, remote tag, or GitHub release named `v0.6.0` exists, so the name is available. The metadata commit resolving this audit is the exact tag target for step six.
 
 #### Next Steps:
 
-Run the complete read-only release audit, correct any inconsistency before proceeding, resolve this entry with the audit evidence, push the resulting metadata commit, and report its full SHA for the user's annotated `v0.6.0` tag and GitHub pre-release.
+Have the user create annotated tag `v0.6.0` at the exact post-audit metadata commit reported with this entry, push that tag, and publish the GitHub pre-release titled `MiSTer Media Player v0.6.0` using `docs/RELEASE_NOTES_v0.6.0.md`, attaching only the verified `MediaPlayer_20260822.rbf` binary. Make no repository commit between this audit and tag creation.
 
 #### Files Modified:
 
@@ -22,8 +22,8 @@ None.
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 344 COMMIT Unreleased ae51759 2026-08-22T09:04:12-07:00
