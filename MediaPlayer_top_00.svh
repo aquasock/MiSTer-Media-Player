@@ -96,7 +96,7 @@ wire        ioctl_download;
 wire [15:0] ioctl_index;
 wire        ioctl_wr;
 wire [26:0] ioctl_addr;
-wire  [7:0] ioctl_dout;
+wire [15:0] ioctl_dout;
 wire        mpeg2_stream_full;
 wire        mpeg2_stream_empty;
 wire [7:0]  mpeg2_stream_data;
@@ -108,7 +108,7 @@ wire        mpeg2_new_decoder_stream_ready;
 wire        mpeg2_new_b_presentation_hold;
 wire        mpeg2_new_p_destination_ownership_hold;
 
-hps_io #(.CONF_STR(CONF_STR)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -261,7 +261,7 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 	.reset    (reset_request),
 
 	.wr_clk   (clk_sys),
-	.wr_data  (mpeg2_stream_wr ? ioctl_dout : 8'd0),
+	.wr_data  (mpeg2_stream_wr ? ioctl_dout : 16'd0),
 	.wr_en    (mpeg2_stream_wr),
 	.wr_full  (mpeg2_stream_full),
 
