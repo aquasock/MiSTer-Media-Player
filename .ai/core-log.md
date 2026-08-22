@@ -1,4 +1,36 @@
 ---
+## 307 COMMIT Unreleased 6bea8f9 2026-08-21T18:39:00-07:00
+
+#### Coming From:
+
+Unreleased 6bea8f9
+
+#### Purpose:
+
+Qualify the Entry 306 gate fixes with a fully clean Quartus build and record that they do not close timing.
+
+#### Outcome:
+
+The commit compiles but fails timing, so it is not deployable as it stands and Entry 306's ticked Built box should be read as compiling and simulating cleanly rather than as closing timing. A fully clean Quartus 17.0.2 compile from wiped `db`, `incremental_db` and `output_files` completes in 11 minutes 40 seconds with zero errors and 132 warnings, but raises one Critical Warning, 332148, timing requirements not met. Worst-case setup slack is minus 0.105 ns with total negative slack of minus 0.816 ns. No artifact was uploaded.
+
+The violation is not in the changed logic. It falls on the HDMI PLL clock, which belongs to the MiSTer framework and is untouched by this work, while every domain this commit affects stays healthy: the decoder reads plus 1.030 ns against plus 1.099 ns at Entry 305, the HPS bridge plus 1.364 ns against plus 1.557 ns and the video domain plus 6.399 ns against plus 7.107 ns. The design also became smaller rather than larger, falling from 33,978 to 33,790 ALMs and from 49,993 to 49,832 registers, with block memory bits and RAM blocks unchanged at 4,040,879 and 506. The change itself was one comparison constant widened from four to nine and one additional term on a six-bit index compare, so a 0.4 ns swing on an untouched clock accompanied by a reduction in logic is not plausibly a direct consequence of it and is far more likely fitter placement variance. That remains an inference and is recorded as one: what is certain is only that the preceding commit built at plus 0.295 ns and this one builds at minus 0.105 ns under identical settings and seed.
+
+The relevant history is that this is the second time this class of miss has occurred. The entry preceding 289 records a build missing at minus 0.074 ns on a standing framework clock while the decoder and video clocks stayed clean, closed by changing the fitter seed alone with no source change. The seed is currently seven, which is already the value that closed that earlier miss. The margin on this clock has sat between roughly plus 0.15 and plus 0.30 ns for several builds and has now gone negative twice from unrelated changes, which means it is not a working margin but noise, and a build that passes only at a particular seed does not establish that the design closes timing.
+
+#### Next Steps:
+
+Obtain a decision before rebuilding, because the two available paths differ in what they prove. Trying a different fitter seed follows documented precedent and would unblock immediately at roughly twelve minutes per attempt, but a pass obtained that way must be recorded as closed by seed rather than by design, and with margin this thin it says little about the next change. The alternative is to treat the thin HDMI margin as the finding it appears to be and bring forward the timing half of the refactor the user has already planned for after the streaming work, rather than continuing to layer changes onto a design that fails on placement reshuffling. The functional position is unaffected either way and remains as Entry 306 recorded it: the 72 frame clip decodes to completion with no errors, both regression gates are byte identical, and the full 250 frame clip now reaches byte 310,630 and stops on `presentation_error` with probe, prediction and writer all clear. That presentation failure is still the next functional target and is untouched by this build result.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 306 COMMIT Unreleased 6bea8f9 2026-08-21T17:58:05-07:00
 
 #### Coming From:
