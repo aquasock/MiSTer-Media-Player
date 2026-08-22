@@ -1,4 +1,4 @@
-## 342 COMMIT Unreleased ??? 2026-08-22T08:50:43-07:00
+## 342 COMMIT Unreleased 5f09e92 2026-08-22T08:50:43-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Create the final v0.6.0 release-notes document as the second step of the approve
 
 #### Outcome:
 
-The proposed document will give release users a self-contained explanation of the v0.6.0 real-stream milestone, its qualified raw progressive 4:2:0 input boundary, native frame-rate codes one through three, decoder and compressed-ingress changes, corrected presentation behavior, exact clean-build timing and resource figures, focused and full-length MiSTer validation, known limitations, and the required `MediaPlayer_20260822.rbf` size and checksum. It will distinguish implementation limits from H.262 limits and identify `b64ec6a` as the synthesized source baseline while noting that later release-documentation commits do not alter the qualified RTL.
+Commit `5f09e92` adds a self-contained v0.6.0 release-notes document covering the real-stream milestone, its qualified raw progressive 4:2:0 input boundary, native frame-rate codes one through three, decoder and compressed-ingress changes, corrected presentation behavior, exact clean-build timing and resource figures, focused and full-length MiSTer validation, known limitations, and the required `MediaPlayer_20260822.rbf` size and checksum. It distinguishes implementation limits from H.262 limits, identifies `b64ec6a` as the synthesized source baseline, states that later documentation does not alter the qualified RTL, records the four focused stream checksums, and notes the formally exposed `.ai` workflow. All stated artifact, hardware and timing figures were checked against the accepted logs and current clean RBF before the documentation commit was pushed.
 
 #### Next Steps:
 
-Add `docs/RELEASE_NOTES_v0.6.0.md`, compare every stated build, hardware and artifact figure against the accepted log evidence and current RBF, run documentation checks, then commit and push the release notes before proceeding to the final README release-state and FFmpeg-command update.
+Proceed to step three by changing the README from release-candidate language to the final v0.6.0 published-milestone presentation, linking these release notes and adding the user-facing FFmpeg conversion command requested in place of a Python recipe. Preserve the 5,540-byte AI-assisted-development section byte-for-byte; no build or additional hardware validation is required for this release-notes-only commit.
 
 #### Files Modified:
 
