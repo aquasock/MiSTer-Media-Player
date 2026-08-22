@@ -43,6 +43,8 @@ module mpeg2_h262_b_core_probe
     output reg  sideband_valid,
     output reg  [5:0] sideband_index,
     output reg  signed [15:0] sideband_value,
+    output reg  signed [8:0] motion_vector_x,
+    output reg  signed [8:0] motion_vector_y,
     output reg  first_sample_valid,
     output reg  signed [15:0] first_sample_value,
     output wire probe_error
@@ -212,9 +214,9 @@ wire [7:0] mba_escape_min_target_q={2'b00,current_col}+mba_escape_accum_next_q;
 
 reg [5:0] mbtype_bits; reg [2:0] mbtype_len; reg [1:0] current_direction,last_direction;
 reg current_pattern,current_intra,current_quant;
-reg signed [7:0] fpx,fpy,bpx,bpy,cur_fx,cur_fy,cur_bx,cur_by;
+reg signed [8:0] fpx,fpy,bpx,bpy,cur_fx,cur_fy,cur_bx,cur_by;
 reg signed [5:0] motion_code_pending; reg [10:0] motion_bits; reg [3:0] motion_len;
-reg [2:0] motion_residual_shift; reg [1:0] motion_residual_count;
+reg [3:0] motion_residual_shift; reg [1:0] motion_residual_count;
 
 reg [8:0] cbp_bits; reg [3:0] cbp_len; reg [5:0] current_cbp; reg [2:0] current_block_index;
 reg [15:0] coeff_vlc_code; reg [4:0] coeff_vlc_len;

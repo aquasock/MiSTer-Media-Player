@@ -2,8 +2,8 @@
 // MiSTer Media Player - consolidated re-arm wrapper for P/B reference pipeline
 //
 // Generalized P raster replay is identified by ordered motion metadata at
-// sideband index 0x3e; intra macroblocks use index 0x3b. B uses an internal
-// sentinel vector plus B direction metadata.
+// sideband index 0x3e; intra macroblocks use index 0x3b. B uses an explicit
+// transport qualifier plus B direction metadata and a dedicated vector value.
 // P and B share the registered DDR request adapter and response-owner gating.
 // Phase 1V mixed-GOP work adds a one-cycle B-engine re-arm after each fully
 // persisted B picture so a later B transaction can reuse the same raster engine.
@@ -15,6 +15,7 @@ module mpeg2_h262_reference_read_probe
  input wire p_vector_proof_seen,input wire p_forward_vector_valid,input wire signed[12:0] p_forward_vector_x,input wire signed[12:0] p_forward_vector_y,
  input wire[3:0] forward_f_code_horizontal,input wire[3:0] forward_f_code_vertical,input wire p_implicit_reconstruct_request,
  input wire p_residual_sample_valid,input wire[5:0] p_residual_sample_index,input wire signed[15:0] p_residual_sample_value,
+ input wire b_motion_transport,
  input wire reference_frame_valid,input wire[1:0] reference_frame_bank,input wire[1:0] previous_reference_frame_bank,
  input wire[1:0] destination_frame_bank,input wire b_scratch_frame_bank,input wire p_store_block_stored,
  input wire ddram_busy,input wire[63:0] ddram_dout,input wire ddram_dout_ready,
@@ -63,8 +64,7 @@ always @(posedge clk)begin
 end
 
 wire b_direction_word=(p_residual_sample_index==6'h38)||(p_residual_sample_index==6'h39)||(p_residual_sample_index==6'h3a);
-wire b_detect_now=p_residual_sample_valid&&b_direction_word&&p_forward_vector_valid&&
- (p_forward_vector_x==13'sd2047)&&(p_forward_vector_y==-13'sd2048)&&
+wire b_detect_now=b_motion_transport&&p_residual_sample_valid&&b_direction_word&&p_forward_vector_valid&&
  general_p_f_code_supported&&
  general_geometry_supported&&!p_implicit_reconstruct_request;
 reg b_mode;
@@ -286,6 +286,7 @@ mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
 mpeg2_h262_b_bidirectional_raster_engine b_probe(
  .clk(clk),.reset(b_reset),.capture_enable(b_select),.request(b_select),
  .sideband_valid(p_residual_sample_valid&&b_select),.sideband_index(p_residual_sample_index),.sideband_value(p_residual_sample_value),
+ .motion_vector_x(p_forward_vector_x[8:0]),.motion_vector_y(p_forward_vector_y[8:0]),
  .residual_store_write(b_residual_store_write),
  .residual_store_write_address(b_residual_store_write_address),
  .residual_store_write_data(b_residual_store_write_data),

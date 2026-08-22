@@ -18,7 +18,7 @@
                     motion_code_pending<=$signed(motion_match[5:0]);motion_bits<=0;motion_len<=0;
                     if($signed(motion_match[5:0])==0)begin cur_bx<=bpx;state<=S_BY;end
                     else if(b_backward_f_code_horizontal==4'd1)begin
-                        cur_bx<=reconstruct_mv(bpx,motion_match[5:0],3'd0,b_backward_f_code_horizontal);state<=S_BY;
+                        cur_bx<=reconstruct_mv(bpx,motion_match[5:0],4'd0,b_backward_f_code_horizontal);state<=S_BY;
                     end else begin motion_residual_shift<=0;motion_residual_count<=0;state<=S_BX_RES;end
                 end
                 else if(motion_len_next==11)state<=S_ERROR;else begin motion_bits<=motion_bits_next;motion_len<=motion_len_next;end
@@ -41,7 +41,7 @@
                         cur_by<=bpy;
                         if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end else state<=S_MB_DONE;
                     end else if(b_backward_f_code_vertical==4'd1)begin
-                        cur_by<=reconstruct_mv(bpy,motion_match[5:0],3'd0,b_backward_f_code_vertical);
+                        cur_by<=reconstruct_mv(bpy,motion_match[5:0],4'd0,b_backward_f_code_vertical);
                         if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end else state<=S_MB_DONE;
                     end else begin motion_residual_shift<=0;motion_residual_count<=0;state<=S_BY_RES;end
                 end
@@ -165,14 +165,14 @@
                 end
             end
             S_MB_DONE: begin
-                sideband_valid<=1;sideband_index<=current_intra?6'h37:direction_index(current_direction);sideband_value<=$signed({cur_fx,cur_fy});
+                sideband_valid<=1;sideband_index<=current_intra?6'h37:direction_index(current_direction);sideband_value<=0;motion_vector_x<=cur_fx;motion_vector_y<=cur_fy;
                 if(!geometry_sent)state<=S_GEOMETRY;else state<=S_MB_B;
             end
             S_GEOMETRY: begin
                 sideband_valid<=1;sideband_index<=6'h3c;sideband_value<=$signed({4'd0,picture_mb_width,picture_mb_height});geometry_sent<=1;state<=S_MB_B;
             end
             S_MB_B: begin
-                sideband_valid<=1;sideband_index<=6'h3b;sideband_value<=$signed({cur_bx,cur_by});
+                sideband_valid<=1;sideband_index<=6'h3b;sideband_value<=0;motion_vector_x<=cur_bx;motion_vector_y<=cur_by;
                 if(current_direction[0])begin fpx<=cur_fx;fpy<=cur_fy;end
                 if(current_direction[1])begin bpx<=cur_bx;bpy<=cur_by;end
                 if(!current_intra)last_direction<=current_direction;row_has_coded_mb<=1;

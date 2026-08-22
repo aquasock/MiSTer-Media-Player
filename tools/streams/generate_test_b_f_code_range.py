@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate a 720x480 B-picture f_code 1..4 regression.
+"""Generate a 720x480 B-picture f_code 1..5 regression.
 
 Coded order is I/P/B/P/B.  B0 uses forward (1,2) and backward (3,4);
-B1 uses forward (4,3) and backward (2,1), so every admitted value appears
+B1 uses forward (5,3) and backward (2,1), so every admitted value appears
 in both B pictures across unequal horizontal/vertical and direction pairs.
 
 Three rows in each B picture prove distinct boundaries:
@@ -29,7 +29,7 @@ ROW_WRAP = 20
 # coded picture index -> (forward H/V, backward H/V)
 F_CODES = {
     2: ((1, 2), (3, 4)),
-    4: ((4, 3), (2, 1)),
+    4: ((5, 3), (2, 1)),
 }
 
 
@@ -63,10 +63,10 @@ def feature_vectors(pic_index: int):
         wrap_first = ((15, 31), (63, 127))
         wrap_second = ((-15, -31), (-63, -127))
     elif pic_index == 4:
-        signed_fwd, signed_bwd = (-6, 3), (2, -5)
-        independent_fwd, independent_bwd = (11, -9), (-13, 7)
-        wrap_first = ((-128, -64), (-32, -16))
-        wrap_second = ((127, 63), (31, 15))
+        signed_fwd, signed_bwd = (-130, 3), (2, -5)
+        independent_fwd, independent_bwd = (180, -9), (-13, 7)
+        wrap_first = ((-256, -64), (-32, -16))
+        wrap_second = ((255, 63), (31, 15))
     else:
         raise ValueError(pic_index)
     return signed_fwd, signed_bwd, independent_fwd, independent_bwd, wrap_first, wrap_second
@@ -167,8 +167,8 @@ def main() -> None:
     print(f"bytes: {out.stat().st_size}")
     print(f"sha256: {digest}")
     print("B0 f_code: forward=(1,2), backward=(3,4)")
-    print("B1 f_code: forward=(4,3), backward=(2,1)")
-    print("coverage: signed residuals, predictor reuse/independence, four-component wraparound")
+    print("B1 f_code: forward=(5,3), backward=(2,1)")
+    print("coverage: signed 9-bit residuals, predictor reuse/independence, four-component wraparound")
     print("verification: both B pictures pixel-exact against the shared reference model")
 
 

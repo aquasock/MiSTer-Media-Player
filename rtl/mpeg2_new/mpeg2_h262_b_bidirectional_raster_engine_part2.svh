@@ -10,10 +10,10 @@ wire signed [13:0] src_last_y=src_base_y+(half_y?14'sd1:14'sd0);
 wire source_bounds_ok=(src_base_x>=0)&&(src_base_y>=0)&&
     (src_last_x<$signed({2'b00,plane_width}))&&(src_last_y<$signed({2'b00,plane_height}));
 
-wire signed [8:0] block_forward_int_x=$signed(exec_fmvx)>>>1;
-wire signed [8:0] block_forward_int_y=$signed(exec_fmvy)>>>1;
-wire signed [8:0] block_backward_int_x=$signed(exec_bmvx)>>>1;
-wire signed [8:0] block_backward_int_y=$signed(exec_bmvy)>>>1;
+wire signed [9:0] block_forward_int_x=$signed(exec_fmvx)>>>1;
+wire signed [9:0] block_forward_int_y=$signed(exec_fmvy)>>>1;
+wire signed [9:0] block_backward_int_x=$signed(exec_bmvx)>>>1;
+wire signed [9:0] block_backward_int_y=$signed(exec_bmvy)>>>1;
 wire signed [13:0] block_forward_src_x=
     $signed({1'b0,dest_x})+$signed(block_forward_int_x);
 wire signed [13:0] block_forward_src_y=
@@ -78,18 +78,18 @@ wire [11:0] successor_plane_width=successor_luma?
     padded_luma_width:padded_chroma_width;
 wire [11:0] successor_plane_height=successor_luma?
     padded_luma_height:padded_chroma_height;
-wire signed [7:0] successor_fmvx=successor_luma?
+wire signed [8:0] successor_fmvx=successor_luma?
     mb_fmvx:chroma_half_vector(mb_fmvx);
-wire signed [7:0] successor_fmvy=successor_luma?
+wire signed [8:0] successor_fmvy=successor_luma?
     mb_fmvy:chroma_half_vector(mb_fmvy);
-wire signed [7:0] successor_bmvx=successor_luma?
+wire signed [8:0] successor_bmvx=successor_luma?
     mb_bmvx:chroma_half_vector(mb_bmvx);
-wire signed [7:0] successor_bmvy=successor_luma?
+wire signed [8:0] successor_bmvy=successor_luma?
     mb_bmvy:chroma_half_vector(mb_bmvy);
 wire successor_phase0_backward=(exec_direction==2'd2);
-wire signed [7:0] successor_phase0_mvx=successor_phase0_backward?
+wire signed [8:0] successor_phase0_mvx=successor_phase0_backward?
     successor_bmvx:successor_fmvx;
-wire signed [7:0] successor_phase0_mvy=successor_phase0_backward?
+wire signed [8:0] successor_phase0_mvy=successor_phase0_backward?
     successor_bmvy:successor_fmvy;
 wire signed [13:0] successor_phase0_src_x=
     $signed({1'b0,successor_dest_x})+
@@ -240,15 +240,15 @@ wire [2:0] precompute_current_el=precompute_current_ei[2:0];
 wire [2:0] precompute_next_er=precompute_next_ei[5:3];
 wire [2:0] precompute_next_el=precompute_next_ei[2:0];
 
-wire signed [8:0] backward_int_x=$signed(exec_bmvx)>>>1;
-wire signed [8:0] backward_int_y=$signed(exec_bmvy)>>>1;
+wire signed [9:0] backward_int_x=$signed(exec_bmvx)>>>1;
+wire signed [9:0] backward_int_y=$signed(exec_bmvy)>>>1;
 wire next_use_backward=(exec_direction==2'd2);
-wire signed [7:0] next_exec_mvx=
+wire signed [8:0] next_exec_mvx=
     next_use_backward?exec_bmvx:exec_fmvx;
-wire signed [7:0] next_exec_mvy=
+wire signed [8:0] next_exec_mvy=
     next_use_backward?exec_bmvy:exec_fmvy;
-wire signed [8:0] next_int_x=$signed(next_exec_mvx)>>>1;
-wire signed [8:0] next_int_y=$signed(next_exec_mvy)>>>1;
+wire signed [9:0] next_int_x=$signed(next_exec_mvx)>>>1;
+wire signed [9:0] next_int_y=$signed(next_exec_mvy)>>>1;
 
 wire [11:0] precompute_current_luma_x=
     ({6'd0,col}<<4)+{8'd0,blk[0],precompute_current_el};
@@ -488,9 +488,9 @@ wire [5:0] block_request_ei=next_pixel_lookup_candidate?
 wire [1:0] block_request_tap=lookup_advance?
     lookup_advance_tap_index:
     (bidir_lookup_candidate||next_pixel_lookup_candidate)?2'd0:tap_index;
-wire signed [7:0] block_request_mvx=block_lookup_phase?
+wire signed [8:0] block_request_mvx=block_lookup_phase?
     exec_bmvx:((exec_direction==2'd2)?exec_bmvx:exec_fmvx);
-wire signed [7:0] block_request_mvy=block_lookup_phase?
+wire signed [8:0] block_request_mvy=block_lookup_phase?
     exec_bmvy:((exec_direction==2'd2)?exec_bmvy:exec_fmvy);
 wire block_request_half_x=block_request_mvx[0];
 wire block_request_half_y=block_request_mvy[0];
@@ -593,7 +593,7 @@ always @(posedge clk) begin
             end else if(first_direction_word) begin
                 if(bank_ready[capture_bank]||motion_first_pending||
                    (motion_count>=MAX_MB)||(capture_desc_count!=0))begin error<=1;if(!error)error_source<=5'd2;end
-                else begin pending_direction<=direction_word;pending_fmvx<=sideband_value[15:8];pending_fmvy<=sideband_value[7:0];motion_first_pending<=1;end
+                else begin pending_direction<=direction_word;pending_fmvx<=motion_vector_x;pending_fmvy<=motion_vector_y;motion_first_pending<=1;end
             end else if(geometry_word) begin
                 if(bank_ready[capture_bank]||geometry_seen||!motion_first_pending||(motion_count!=0)||
                    (sideband_value[11:6]==0)||(sideband_value[11:6]>6'd45)||(sideband_value[5:0]==0)||(sideband_value[5:0]>6'd30))begin error<=1;if(!error)error_source<=5'd3;end
@@ -601,7 +601,7 @@ always @(posedge clk) begin
             end else if(sideband_index==6'h3b) begin
                 if(bank_ready[capture_bank]||!motion_first_pending||(motion_count>=MAX_MB)||!geometry_seen)begin error<=1;if(!error)error_source<=5'd4;end
                 else begin
-                    motion_mem[motion_count]<={pending_direction,pending_fmvx,pending_fmvy,sideband_value[15:8],sideband_value[7:0]};
+                    motion_mem[motion_count]<={pending_direction,pending_fmvx,pending_fmvy,motion_vector_x,motion_vector_y};
                     motion_count<=motion_count+1'b1;motion_first_pending<=0;
                 end
             end else if(descriptor_word) begin

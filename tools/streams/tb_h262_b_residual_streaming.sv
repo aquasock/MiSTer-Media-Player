@@ -27,6 +27,7 @@ module tb_h262_b_residual_streaming #(
     wire sideband_valid,first_valid,core_error;
     wire [5:0] sideband_index;
     wire signed [15:0] sideband_value,first_value;
+    wire signed [8:0] motion_vector_x,motion_vector_y;
 
     wire residual_store_write;
     wire [16:0] residual_store_write_address;
@@ -63,6 +64,7 @@ module tb_h262_b_residual_streaming #(
         .b_seen(b_seen),.b_complete_now(b_complete),.parse_hold(b_hold),
         .replay_active(b_replay),.sideband_valid(sideband_valid),
         .sideband_index(sideband_index),.sideband_value(sideband_value),
+        .motion_vector_x(motion_vector_x),.motion_vector_y(motion_vector_y),
         .first_sample_valid(first_valid),.first_sample_value(first_value),
         .probe_error(core_error)
     );
@@ -71,6 +73,7 @@ module tb_h262_b_residual_streaming #(
         .clk(clk),.reset(reset),.capture_enable(1'b1),.request(b_candidate),
         .sideband_valid(sideband_valid),.sideband_index(sideband_index),
         .sideband_value(sideband_value),
+        .motion_vector_x(motion_vector_x),.motion_vector_y(motion_vector_y),
         .residual_store_write(residual_store_write),
         .residual_store_write_address(residual_store_write_address),
         .residual_store_write_data(residual_store_write_data),

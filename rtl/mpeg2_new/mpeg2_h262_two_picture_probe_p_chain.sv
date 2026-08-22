@@ -23,6 +23,7 @@ module mpeg2_h262_two_picture_probe
     output wire signed[12:0] p_forward_vector_y,output wire p_residual_required,output wire p_residual_success,
     output wire p_first_residual_sample_valid,output wire signed[15:0] p_first_residual_sample_value,
     output wire p_residual_sample_valid,output wire[5:0] p_residual_sample_index,output wire signed[15:0] p_residual_sample_value,
+    output wire b_motion_transport,
     output wire probe_error,
     // kate - Commit 179 observability only.  Names which of the five terms in
     // the probe_error OR below fired.  probe_error itself is unchanged.
@@ -208,19 +209,22 @@ mpeg2_h262_p_diagnostic_controller p_controller(
 
 wire b_candidate,b_seen,b_complete_now,b_parse_hold,b_replay_active,b_sideband_valid,b_first_valid,b_error;
 wire[5:0] b_sideband_index;wire signed[15:0] b_sideband_value,b_first_value;
+wire signed[8:0] b_motion_vector_x,b_motion_vector_y;
 mpeg2_h262_b_core_probe b_controller(
  .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.row_retired(p_row_persistence_complete),.b_candidate(b_candidate),.b_seen(b_seen),
  .b_complete_now(b_complete_now),.parse_hold(b_parse_hold),.replay_active(b_replay_active),.sideband_valid(b_sideband_valid),
- .sideband_index(b_sideband_index),.sideband_value(b_sideband_value),.first_sample_valid(b_first_valid),
+ .sideband_index(b_sideband_index),.sideband_value(b_sideband_value),
+ .motion_vector_x(b_motion_vector_x),.motion_vector_y(b_motion_vector_y),.first_sample_valid(b_first_valid),
  .first_sample_value(b_first_value),.probe_error(b_error));
 
 wire b_all_observed_persisted=(b_header_count!=0)&&(b_persist_count==b_header_count);
 wire b_final_success=b_seen&&b_persistence_verified&&b_all_observed_persisted;
 wire b_transport=b_replay_active||b_sideband_valid;
+assign b_motion_transport=b_transport;
 assign p_macroblock_type_seen=b_final_success?1'b1:p_macroblock_type_seen_raw;
 assign p_forward_vector_valid=b_transport?1'b1:p_forward_vector_valid_raw;
-assign p_forward_vector_x=b_transport?13'sd2047:p_forward_vector_x_raw;
-assign p_forward_vector_y=b_transport?-13'sd2048:p_forward_vector_y_raw;
+assign p_forward_vector_x=b_transport?{{4{b_motion_vector_x[8]}},b_motion_vector_x}:p_forward_vector_x_raw;
+assign p_forward_vector_y=b_transport?{{4{b_motion_vector_y[8]}},b_motion_vector_y}:p_forward_vector_y_raw;
 assign p_residual_required=b_transport?b_first_valid:p_residual_required_raw;
 assign p_residual_success=b_transport?1'b1:p_residual_success_raw;
 assign p_first_residual_sample_valid=b_transport?b_first_valid:p_first_residual_sample_valid_raw;

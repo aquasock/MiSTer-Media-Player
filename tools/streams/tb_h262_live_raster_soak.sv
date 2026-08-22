@@ -18,7 +18,8 @@ module tb_h262_live_raster_soak #(
     parameter integer MEMORY_READ_LATENCY=1,
     parameter integer SWAP_WINDOW_CYCLES=10000,
     parameter integer STALL_TRACE_CYCLES=0,
-    parameter integer POST_INPUT_TRACE_CYCLES=0
+    parameter integer POST_INPUT_TRACE_CYCLES=0,
+    parameter integer MAX_SIM_CYCLES=300000000
 );
     localparam integer EXPECTED_DESCRIPTOR_DEPTH=
         `H262_PREDICTION_DESCRIPTOR_DEPTH;
@@ -32,6 +33,7 @@ module tb_h262_live_raster_soak #(
     localparam integer DDR_WORDS=327680;
 
     reg clk=0,reset=1,stream_valid=0;
+    reg generic_stream=0;
     reg [7:0] stream_data=0;
     reg [7:0] stream_mem[0:MAX_STREAM_BYTES-1];
     reg [7:0] pixel_oracle[0:442367];
@@ -160,6 +162,7 @@ module tb_h262_live_raster_soak #(
     wire sideband_valid;
     wire [5:0] sideband_index;
     wire signed [15:0] sideband_value;
+    wire b_motion_transport;
     wire probe_error,b_success;
     wire [3:0] probe_error_source,p_probe_error_source,p_progress_detail;
     wire [2:0] publication_error_detail;
@@ -315,6 +318,7 @@ module tb_h262_live_raster_soak #(
         .p_residual_sample_valid(sideband_valid),
         .p_residual_sample_index(sideband_index),
         .p_residual_sample_value(sideband_value),
+        .b_motion_transport(b_motion_transport),
         .probe_error(probe_error),.probe_error_source(probe_error_source),
         .p_probe_error_source(p_probe_error_source),
         .p_progress_detail(p_progress_detail),
@@ -334,6 +338,7 @@ module tb_h262_live_raster_soak #(
         .p_residual_sample_valid(sideband_valid),
         .p_residual_sample_index(sideband_index),
         .p_residual_sample_value(sideband_value),
+        .b_motion_transport(b_motion_transport),
         .reference_frame_valid(reference_valid),
         .reference_frame_bank(reference_bank),
         .previous_reference_frame_bank(previous_reference_bank),
@@ -426,6 +431,7 @@ module tb_h262_live_raster_soak #(
         for(i=0;i<DDR_WORDS;i=i+1)ddr_mem[i]=0;
         if(!$value$plusargs("HEX=%s",hex_path))$fatal(1,"missing +HEX");
         if(!$value$plusargs("LEN=%d",stream_len))$fatal(1,"missing +LEN");
+        generic_stream=$test$plusargs("GENERIC_STREAM");
         // A 720x480 replay runs for tens of minutes with no output until it
         // either completes or fails.  +PROGRESS=<cycles> makes that visible
         // without changing any functional timing.
@@ -1549,6 +1555,22 @@ module tb_h262_live_raster_soak #(
                 end
                 $finish;
             end
+            else if(generic_stream)begin
+                if(stream_index!=stream_len||
+                   p_rows!=(p_pictures*30)||b_rows!=(b_pictures*30)||
+                   publication.p_header_count!=p_pictures||
+                   publication.p_publication_count!=p_pictures||
+                   publication.b_header_count!=b_pictures||
+                   publication.b_persist_count!=b_pictures||
+                   picture_count!=published_references||
+                   reference_promotion_count!=published_references||
+                   (display_swaps+1)!=(published_references+b_pictures)||
+                   !writer_seen||!pred_read_observed||
+                   !pred_reconstructed_observed||!presentation_complete||
+                   probe_error||pred_error||writer_error||presentation_error)
+                    $fatal(1,"generic live raster soak failed");
+                $finish;
+            end
             else if(stream_index!=stream_len||p_rows!=132||p_pictures!=22||
                b_rows!=282||b_pictures!=47||published_references!=25||
                picture_count!=25||reference_promotion_count!=25||
@@ -1608,7 +1630,7 @@ module tb_h262_live_raster_soak #(
     end
 
     initial begin
-        repeat(200000000)@(posedge clk);
+        repeat(MAX_SIM_CYCLES)@(posedge clk);
         $fatal(1,"live raster soak timed out at byte %0d",stream_index);
     end
 

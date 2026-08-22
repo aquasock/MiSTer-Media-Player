@@ -72,6 +72,7 @@ wire signed [15:0] mpeg2_new_p_first_residual_sample_value;
 wire        mpeg2_new_p_residual_sample_valid;
 wire [5:0]  mpeg2_new_p_residual_sample_index;
 wire signed [15:0] mpeg2_new_p_residual_sample_value;
+wire        mpeg2_new_b_motion_transport;
 wire        mpeg2_new_slice_start;
 wire        mpeg2_new_luma_macroblock_start;
 wire        mpeg2_new_phase1_probe_error;

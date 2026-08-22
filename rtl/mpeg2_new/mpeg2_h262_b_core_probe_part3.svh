@@ -129,7 +129,7 @@ always @(posedge clk) begin
         residual_count<=0;residual_coeff_count<=0;pending_residual_mb<=0;pending_residual_block<=0;pending_residual_qscale<=0;pending_residual_intra<=0;q_scale_type<=0;alternate_scan<=0;b_intra_vlc_format<=0;b_intra_dc_precision<=0;
         dc_predictor_y<=11'd128;dc_predictor_cb<=11'd128;dc_predictor_cr<=11'd128;dc_vlc_code<=0;dc_vlc_len<=0;dc_size<=0;dc_diff_bit_count<=0;dc_diff_shift<=0;
         t_start<=0;t_we<=0;t_end<=0;t_intra<=0;t_widx<=0;t_wval<=0;t_qscale<=0;t_sample_count<=0;t_coeff_read_index<=0;block_coeff_end<=0;transform_slot<=0;transform_mb<=0;transform_block<=0;transform_intra<=0;
-        rstate<=R_IDLE;replay_active<=0;sideband_valid<=0;sideband_index<=0;sideband_value<=0;
+        rstate<=R_IDLE;replay_active<=0;sideband_valid<=0;sideband_index<=0;sideband_value<=0;motion_vector_x<=0;motion_vector_y<=0;
         first_sample_valid<=0;first_sample_value<=0;
     end else begin
         b_complete_now<=0;sideband_valid<=0;first_sample_valid<=0;t_start<=0;t_we<=0;t_end<=0;
@@ -223,10 +223,10 @@ always @(posedge clk) begin
             end
             S_SKIP_A: begin
                 if(last_direction==0)state<=S_ERROR;
-                else begin dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;sideband_valid<=1;sideband_index<=direction_index(last_direction);sideband_value<=$signed({fpx,fpy});state<=S_SKIP_B;end
+                else begin dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;sideband_valid<=1;sideband_index<=direction_index(last_direction);sideband_value<=0;motion_vector_x<=fpx;motion_vector_y<=fpy;state<=S_SKIP_B;end
             end
             S_SKIP_B: begin
-                sideband_valid<=1;sideband_index<=6'h3b;sideband_value<=$signed({bpx,bpy});current_col<=current_col+1'b1;
+                sideband_valid<=1;sideband_index<=6'h3b;sideband_value<=0;motion_vector_x<=bpx;motion_vector_y<=bpy;current_col<=current_col+1'b1;
                 if(skip_remaining==1)begin skip_remaining<=0;state<=S_MBTYPE;end
                 else begin skip_remaining<=skip_remaining-1'b1;state<=S_SKIP_A;end
             end
@@ -251,7 +251,7 @@ always @(posedge clk) begin
                     motion_code_pending<=$signed(motion_match[5:0]);motion_bits<=0;motion_len<=0;
                     if($signed(motion_match[5:0])==0)begin cur_fx<=fpx;state<=S_FY;end
                     else if(b_forward_f_code_horizontal==4'd1)begin
-                        cur_fx<=reconstruct_mv(fpx,motion_match[5:0],3'd0,b_forward_f_code_horizontal);state<=S_FY;
+                        cur_fx<=reconstruct_mv(fpx,motion_match[5:0],4'd0,b_forward_f_code_horizontal);state<=S_FY;
                     end else begin motion_residual_shift<=0;motion_residual_count<=0;state<=S_FX_RES;end
                 end
                 else if(motion_len_next==11)state<=S_ERROR;else begin motion_bits<=motion_bits_next;motion_len<=motion_len_next;end
@@ -276,7 +276,7 @@ always @(posedge clk) begin
                         else if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end
                         else state<=S_MB_DONE;
                     end else if(b_forward_f_code_vertical==4'd1)begin
-                        cur_fy<=reconstruct_mv(fpy,motion_match[5:0],3'd0,b_forward_f_code_vertical);
+                        cur_fy<=reconstruct_mv(fpy,motion_match[5:0],4'd0,b_forward_f_code_vertical);
                         if(current_direction==2'd3)state<=S_BX;
                         else if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end
                         else state<=S_MB_DONE;
