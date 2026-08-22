@@ -1,4 +1,32 @@
 ---
+## 308 COMMIT Unreleased ??? 2026-08-21T18:50:13-07:00
+
+#### Coming From:
+
+Unreleased 6bea8f9
+
+#### Purpose:
+
+Retry the unchanged Entry 306 design with fitter seed eight to determine whether the HDMI PLL timing miss is placement variance.
+
+#### Outcome:
+
+The approved experiment changes only the Quartus fitter seed from seven to eight and leaves all RTL and functional behaviour unchanged. It is deliberately a seed qualification rather than a design correction: a positive result can unblock hardware testing of `6bea8f9`, but must be recorded as timing closed by seed and will not establish robust margin on the HDMI framework clock.
+
+#### Next Steps:
+
+Commit the seed change as its own source commit, wipe `db`, `incremental_db` and `output_files`, and run a fully clean Quartus 17.0.2 build. Compare worst-case setup, the decoder, HPS bridge and video domains, all other timing checks, resource use, warning counts, artifact size and SHA-256 against Entries 305 and 307. If every timing corner is positive, retain seed eight and make the artifact available for hardware testing; if timing still fails, do not try further seeds without a new user decision.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 307 COMMIT Unreleased 6bea8f9 2026-08-21T18:39:00-07:00
 
 #### Coming From:
