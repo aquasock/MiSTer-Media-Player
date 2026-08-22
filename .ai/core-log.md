@@ -1,4 +1,32 @@
 ---
+## 309 COMMIT Unreleased 95a0ab1 2026-08-21T19:36:06-07:00
+
+#### Coming From:
+
+Unreleased 95a0ab1
+
+#### Purpose:
+
+Hardware-validate the seed-eight build against the 48-frame control, the 72-frame f_code target and the full 250-frame diagnostic clip.
+
+#### Outcome:
+
+The exact `output_files/MediaPlayer.rbf` artifact recorded in Entry 308, SHA-256 `ca2df257334be5f0a73218fbddd9da0f8c28fe9da237fc0f5754d81ab694448d`, passes the functional boundary on the connected MiSTer. The 48-frame control accepts all 125,948 bytes, displays 48 pictures with 47 swaps and 17 references, reports zero error flags and completes telemetry validation at 24.038869 fps. The 72-frame target accepts all 243,306 bytes, displays all 72 pictures with 71 swaps and 25 references, reports zero error flags and completes telemetry validation at 23.539979 fps. Both captured final frames are visually clean, so the Entry 306 selection-gate repair is accepted on hardware and seed eight is a valid deployable fit for it. The full 250-frame clip does not complete: after 35 seconds it has never published the telemetry prefix and permanently holds a visually clean displayed frame. Matching the HDMI capture against all encoded pictures identifies the held image as frame 78, about 3.08 seconds into the 25 fps stream, and a second capture five seconds later is byte identical. This reproduces the separate presentation-path failure already isolated in simulation rather than the old decode halt. A second issue is confirmed independently of that failure: even successful real-content clips deliver only 24.04 and 23.54 fps rather than the target 25 fps, with presentation hold dominating their telemetry.
+
+#### Next Steps:
+
+Characterise the 250-frame failure at the presentation layer by locating the exact module and error code that raise `presentation_error` at simulation byte 310,630, keeping probe, prediction and writer clear as already measured and using hardware frame 78 as the external reproduction boundary. Do not revisit the Entry 306 decode gates, which now pass both simulation and hardware. Once the presentation failure is fixed, rerun these same three hardware clips and then return to the measured sub-25-fps throughput and scratch-pool limit as the next performance boundary.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 308 COMMIT Unreleased 95a0ab1 2026-08-21T18:50:13-07:00
 
 #### Coming From:
