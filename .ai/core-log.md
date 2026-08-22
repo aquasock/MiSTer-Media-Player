@@ -1,3 +1,31 @@
+## 343 COMMIT Unreleased ??? 2026-08-22T08:55:25-07:00
+
+#### Coming From:
+
+Unreleased 5f09e92
+
+#### Purpose:
+
+Finalize the public README for v0.6.0 and add the accepted user-facing FFmpeg conversion command as the third step of the approved release plan.
+
+#### Outcome:
+
+The proposed documentation change will present v0.6.0 as the current published milestone, link the new release notes, remove remaining release-candidate wording where it describes publication state, and add the exact no-frame-counter FFmpeg command previously used for the accepted full Big Buck Bunny conversion. The command forces progressive 720x480 square-pixel 4:2:0 elementary video at exact 24 fps with two B pictures and a strict 24-picture GOP, preserves source aspect ratio with black padding, removes audio, and includes a shell guard that appends the required H.262 sequence-end code only when FFmpeg omits it. The 5,540-byte `AI-assisted development in v0.6.0` section is locked at SHA-256 `c86635095cfee8c36636802872e75932580309a3cb58d6513a44758b43d515b3` and will remain untouched.
+
+#### Next Steps:
+
+Edit only README content outside the protected AI-assisted-development range, verify the conversion command and release-notes link, prove the protected range remains byte-for-byte identical, then commit and push the README before packaging the qualified RBF in step four.
+
+#### Files Modified:
+
+- README.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 342 COMMIT Unreleased 5f09e92 2026-08-22T08:50:43-07:00
 
 #### Coming From:
@@ -1165,38 +1193,6 @@ Characterise the stall at byte 158,381 before assuming it belongs to this change
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
 - rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
 - rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 303 COMMIT Unreleased c5c5581 2026-08-21T16:16:12-07:00
-
-#### Coming From:
-
-Unreleased 003ed48
-
-#### Purpose:
-
-Name the term in the producer's picture-start condition that is not satisfied for P picture sixteen, as Entry 302 required.
-
-#### Outcome:
-
-The term is named and it is not in the producer at all. Error source ten has been misread throughout entries 296 to 302. The figure reported as `shell=10/10/0` is `probe_error_source` from the publication shell, not the raster engine's `error_source`, and in `mpeg2_h262_two_picture_probe_p_chain.sv` line 255 that code is `p_unsupported_raw`, an unsupported-feature rejection. It is not the row-execution watchdog. The watchdog was never involved: it is armed exactly 450 times, once per row, its last arm is at cycle 35,860,936 and would not expire until cycle 52,638,151, and the fatal occurs at cycle 39,800,139. The fatal also reports `pred=0/0`, meaning the prediction and raster path raises no error whatsoever. Every mechanism proposed in entries 297 through 301, and the five repairs written against them, addressed subsystems that were working correctly.
-
-Direct instrumentation of the rejection gives the cause in one line. At cycle 39,800,134 the wide probe evaluates P picture sixteen and reports it unsupported with a forward f_code of five in both axes, at a supported geometry of 45 by 30 macroblocks. The probe implements f_code up to four, the limit Entry 292 already recorded as a coverage gap, and the clip's motion becomes large enough at that picture for the encoder to select five. The producer then parks in `R_SUCCESS` with `proof_done` set and correctly emits nothing further, which is the behaviour that was misread as a deadlock. It also explains why the 48 frame prefix completes cleanly: it ends before any picture requires f_code five. The `--me-range` option found uncommitted in the working tree at the start of this work was evidently an earlier session reaching the same conclusion.
-
-Re-encoding the same 72 frames with the encoder's motion search capped at sixteen removes the rejection entirely and confirms the diagnosis: the publication error disappears, reported as `shell=0/0/0`, and picture sixteen is accepted. A different and deeper defect is then reached at byte 157,552, `pred=2/8`, in the prediction path at the same picture. Constraining f_code therefore moves the boundary rather than clearing it.
-
-#### Next Steps:
-
-Decide the scope question first, because the two paths differ in size and only the user can choose. Implementing forward f_code five and above in the wide motion probe is the real fix, since commercial content will use the full range and the project's stated goal is DVD playback, but it is a parser change of unknown size. Capping the encoder's motion search is not a fix at all, only a way to keep exercising the rest of the pipeline, and it should be treated as a diagnostic aid rather than as a passing result. Whichever is chosen, the next failure is already located and reproducible: with f_code constrained the decoder reaches prediction error source two, detail eight, at byte 157,552 on picture sixteen, and that should be characterised the same way this one finally was, by identifying which module raises the code and what the code means before proposing any mechanism. Note for that work that error codes in this design are per-module and are not interchangeable; reading one module's code against another module's table is what cost entries 296 through 302.
-
-#### Files Modified:
-
-- tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
