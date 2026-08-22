@@ -1,4 +1,33 @@
 ---
+## 314 COMMIT Unreleased ??? 2026-08-21T21:33:01-07:00
+
+#### Coming From:
+
+Unreleased f3f2395
+
+#### Purpose:
+
+Capture the rejected I-overlap build's hardware state when playback terminates before the MPEG sequence-end marker.
+
+#### Outcome:
+
+The diagnostic change will leave decode, scheduling, frame ownership and presentation behavior untouched while allowing the existing schema-four cadence profiler to snapshot after either a sticky fatal error or a bounded session no-progress interval. This closes the current observability gap in which the first-GOP freeze produces neither terminal telemetry nor a valid automated result because the sequence-end marker is never accepted.
+
+#### Next Steps:
+
+Add focused profiler cases proving fatal and no-progress capture retain the exact accepted-byte, picture, error, bank and scheduler state, then build and run the 48-picture clip on the connected MiSTer. Use the decoded terminal state to identify the failed I-overlap invariant, restore a known-working hardware image after evidence capture, and propose the next functional repair separately.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 313 COMMIT Unreleased f3f2395 2026-08-21T21:08:56-07:00
 
 #### Coming From:
