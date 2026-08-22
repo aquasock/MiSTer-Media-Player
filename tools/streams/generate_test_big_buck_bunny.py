@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
-"""Generate a 720x480 25 fps MPEG-2 elementary stream from Big Buck Bunny.
+"""Generate a native-rate 720x480 MPEG-2 stream from Big Buck Bunny.
 
 The synthetic corpus in generate_test_progressive_compatibility.py exercises
 structure; this case adds real photographic content, which stresses residual
 density and motion-vector range in ways testsrc2 does not.
 
-Two source properties must be corrected before the decoder will accept it.
 The 854-pel source exceeds the framebuffer's SRC_WIDTH of 720 and would be
 rejected outright by the horizontal_size guard in mpeg2_luma_framebuffer.sv,
-so it is scaled to 720x480.  The source is also 24 fps, which carries
-frame_rate_code 2; the presentation scheduler engages its 25 fps cadence
-accumulator only on frame_rate_code 3, so the stream is resampled to 25 fps
-to exercise the cadence path the project is actually targeting.
+so it is scaled to 720x480.  Its original 24 fps cadence is retained as H.262
+frame_rate_code 2 so no repeated pictures are inserted by rate conversion.
 
 The stream is a local regression artifact and is deliberately not committed.
 """
@@ -70,7 +67,7 @@ def main() -> int:
         "-ss", str(args.start), "-i", str(source),
         "-frames:v", str(args.frames),
         "-vf", "scale=720:480:flags=bicubic,setsar=1",
-        "-r", "25",
+        "-r", "24",
         "-an", "-c:v", "mpeg2video", "-pix_fmt", "yuv420p",
         "-threads", "1", "-flags", "+bitexact",
         "-g", str(args.gop), "-bf", str(args.bframes),
@@ -99,7 +96,7 @@ def main() -> int:
     print(f"stream  : {output}")
     print(f"bytes   : {len(payload)}")
     print(f"sha256  : {digest}")
-    print(f"frames  : {args.frames} at 25 fps, GOP {args.gop}, {args.bframes} B")
+    print(f"frames  : {args.frames} at 24 fps, GOP {args.gop}, {args.bframes} B")
     print(f"quality : q:v {args.quality}, me_range "
           f"{args.me_range if args.me_range is not None else 'encoder default'}")
     return 0

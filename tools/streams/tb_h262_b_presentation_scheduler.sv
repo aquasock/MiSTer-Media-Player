@@ -3,6 +3,7 @@
 module tb_h262_b_presentation_scheduler;
     reg clk=0,reset=1,swap=0,frame_waiting=0;reg[1:0] completed_bank=0,reference_bank=1;
     reg b_start=0,non_b_start=0,i_start=0,p_start=0,sequence_end=0,b_success=0,b_error=0;
+    reg [3:0] frame_rate_code=4'h3;
     reg[7:0] reference_count=0;
     wire[1:0] display_bank;wire display_scratch,display_scratch_bank,decode_scratch_bank;
     wire [2:0] reset_count;
@@ -12,7 +13,7 @@ module tb_h262_b_presentation_scheduler;
     always #5 clk=~clk;
     mpeg2_h262_b_presentation_scheduler dut(
         .clk(clk),.reset(reset),.swap_window_pulse(swap),
-        .frame_rate_code(4'h3),
+        .frame_rate_code(frame_rate_code),
         .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
         .reference_frame_bank(reference_bank),.b_picture_start(b_start),
         .reference_promotion_count(reference_count),
@@ -120,6 +121,39 @@ module tb_h262_b_presentation_scheduler;
             if(display_scratch||(display_bank!==expected_future_bank)||
                !complete||error||hold)
                 $fatal(1,"single-B future reference did not retire");
+        end
+    endtask
+
+    task automatic verify_cadence_rate;
+        input [3:0] rate_code;
+        input integer window_count;
+        input integer expected_presentations;
+        integer window_index;
+        integer presentation_count;
+        reg [1:0] display_before;
+        begin
+            frame_rate_code=rate_code;
+            reset_scheduler();
+            presentation_count=0;
+            for(window_index=0;window_index<window_count;
+                window_index=window_index+1)begin
+                if(!dut.pending_frame_valid)begin
+                    completed_bank=(display_bank==2'd0)?2'd1:2'd0;
+                    @(negedge clk);frame_waiting<=1;
+                    @(negedge clk);frame_waiting<=0;#1;
+                    pulse_close();
+                end
+                display_before=display_bank;
+                pulse_window();
+                if(display_bank!=display_before)
+                    presentation_count=presentation_count+1;
+            end
+            if(presentation_count!=expected_presentations)
+                $fatal(1,"frame_rate_code %0d presented %0d/%0d expected %0d",
+                       rate_code,presentation_count,window_count,
+                       expected_presentations);
+            $display("CADENCE_RATE_PASS code=%0d windows=%0d presentations=%0d",
+                     rate_code,window_count,presentation_count);
         end
     endtask
 
@@ -457,11 +491,17 @@ module tb_h262_b_presentation_scheduler;
         if(display_scratch||!display_bank)
             $fatal(1,"ordinary frame presentation did not recover after abort");
 
-        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=1,3,2 min_present_gap=%0d overlap_p=1 overlap_i=1 deferred_b=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=early/active fail_open=1",min_present_gap);
+        // 603 raster swap windows are just under ten seconds at 60.3165 Hz.
+        // Exact pixel-clock accumulation must therefore deliver 240 native
+        // 24 fps pictures and preserve the existing 250-picture 25 fps result.
+        verify_cadence_rate(4'h2,603,240);
+        verify_cadence_rate(4'h3,603,250);
+
+        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=24/25 min_present_gap=%0d overlap_p=1 overlap_i=1 deferred_b=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=early/active fail_open=1",min_present_gap);
         $finish;
     end
 
-    initial begin repeat(400)@(posedge clk);$fatal(1,"presentation test timed out");end
+    initial begin repeat(12000)@(posedge clk);$fatal(1,"presentation test timed out");end
 endmodule
 
 module tb_h262_double_scratch_tags;

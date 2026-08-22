@@ -74,11 +74,15 @@ reg last_bound_reference_valid;
 reg [1:0] last_bound_reference_bank;
 reg [7:0] last_bound_reference_count;
 
-// Entry 230: the fixed 40 MHz 800x600 raster produces one swap window every
-// 1056*628 pixels.  For the current 25 fps compatibility boundary, accumulate
-// source-picture credit in pixel-clock units.  Saturating at the next due slot
+// Entry 322: the fixed 40 MHz 800x600 raster produces one swap window every
+// 1056*628 pixels.  Accumulate source-picture credit in pixel-clock units for
+// the exact 24 and 25 fps Table 6-4 rates.  Saturating at the next due slot
 // prevents a decode stall from banking credit and replaying ready pictures on
 // consecutive refreshes.
+localparam [25:0] CADENCE_LIMIT_24FPS = 26'd40000000;
+localparam [25:0] CADENCE_STEP_24FPS  = 26'd15916032;
+localparam [25:0] CADENCE_DUE_24FPS =
+    CADENCE_LIMIT_24FPS-CADENCE_STEP_24FPS;
 localparam [25:0] CADENCE_LIMIT_25FPS = 26'd40000000;
 localparam [25:0] CADENCE_STEP_25FPS  = 26'd16579200;
 localparam [25:0] CADENCE_DUE_25FPS =
@@ -100,9 +104,14 @@ wire [1:0] scheduled_frame_bank=future_waiting?future_frame_bank:
 wire scheduled_frame_differs=scheduled_frame_scratch?
     (!display_scratch||(scheduled_scratch_bank!=display_scratch_bank)):
     (display_scratch||(scheduled_frame_bank!=display_frame_bank));
+wire cadence_24fps=(frame_rate_code==4'h2);
 wire cadence_25fps=(frame_rate_code==4'h3);
-wire cadence_slot=!cadence_25fps||
-                  (cadence_credit>=CADENCE_DUE_25FPS);
+wire cadence_supported=cadence_24fps||cadence_25fps;
+wire [25:0] cadence_step=cadence_24fps?CADENCE_STEP_24FPS:
+                                           CADENCE_STEP_25FPS;
+wire [25:0] cadence_due=cadence_24fps?CADENCE_DUE_24FPS:
+                                         CADENCE_DUE_25FPS;
+wire cadence_slot=!cadence_supported||(cadence_credit>=cadence_due);
 wire scratch0_available=!scratch0_pending&&!queued_scratch0_pending&&
     !(display_scratch&&!display_scratch_bank)&&
     !(decode_inflight&&!decode_scratch_bank)&&
@@ -189,7 +198,7 @@ always @(posedge clk) begin
         last_bound_reference_valid<=0;last_bound_reference_bank<=0;
         last_bound_reference_count<=0;
         run_picture_count<=0;presentation_complete<=0;presentation_error<=0;
-        cadence_credit<=CADENCE_DUE_25FPS;
+        cadence_credit<=CADENCE_DUE_24FPS;
     end else begin
         b_user_success_d<=b_user_success;
 
@@ -203,12 +212,12 @@ always @(posedge clk) begin
         end
 
         if(swap_window_pulse)begin
-            if(!cadence_25fps)
-                cadence_credit<=CADENCE_DUE_25FPS;
-            else if(cadence_credit<CADENCE_DUE_25FPS)
-                cadence_credit<=cadence_credit+CADENCE_STEP_25FPS;
+            if(!cadence_supported)
+                cadence_credit<=CADENCE_DUE_24FPS;
+            else if(cadence_credit<cadence_due)
+                cadence_credit<=cadence_credit+cadence_step;
             else
-                cadence_credit<=CADENCE_DUE_25FPS;
+                cadence_credit<=cadence_due;
         end
 
         // Entry 225: a reference publication is not display-order permission.
@@ -531,9 +540,9 @@ always @(posedge clk) begin
 
         if(swap_window_pulse&&cadence_slot&&scheduled_frame_valid&&
            scheduled_frame_differs)begin
-            if(cadence_25fps)
-                cadence_credit<=cadence_credit+CADENCE_STEP_25FPS-
-                                CADENCE_LIMIT_25FPS;
+            if(cadence_supported)
+                cadence_credit<=cadence_credit+cadence_step-
+                                CADENCE_LIMIT_24FPS;
             display_scratch<=scheduled_frame_scratch;
             if(scheduled_frame_scratch)display_scratch_bank<=scheduled_scratch_bank;
             else display_frame_bank<=scheduled_frame_bank;

@@ -108,6 +108,8 @@ wire session_progress=decoder_byte_accepted_q||reference_picture_complete_q||
     b_picture_complete_edge||display_swap_now||prediction_request_accepted||
     prediction_data_ready_q||writer_write_q;
 wire [31:0] display_gap_now=session_cycles-last_present_cycle;
+wire cadence_rate_supported=(frame_rate_code_q==4'h2)||
+                            (frame_rate_code_q==4'h3);
 wire [31:0] display_gap_meta_now={
     display_picture_count+1'b1,
     presentation_hold_q,destination_hold_q,fifo_pending_q,decoder_ready_q,
@@ -307,7 +309,7 @@ always @(posedge clk_mpeg2) begin
             // Capture the blocking state at threshold crossing, not at the
             // eventual swap where the scheduler may already have released it.
             if(first_present_valid&&!display_swap_now&&
-               !current_gap_context_valid&&(frame_rate_code_q==4'h3)&&
+               !current_gap_context_valid&&cadence_rate_supported&&
                (display_gap_now>OUTLIER_GAP_CYCLES))begin
                 current_gap_meta<=display_gap_meta_now;
                 current_gap_state<=scheduler_debug_state_q;
@@ -318,7 +320,8 @@ always @(posedge clk_mpeg2) begin
                 display_swap_count<=display_swap_count+1'b1;
                 display_picture_count<=display_picture_count+1'b1;
                 current_gap_context_valid<=0;
-                if((frame_rate_code_q==4'h3)&&(display_gap_now>OUTLIER_GAP_CYCLES)&&
+                if(cadence_rate_supported&&
+                   (display_gap_now>OUTLIER_GAP_CYCLES)&&
                    (gap_outlier_count!=16'hffff))
                     gap_outlier_count<=gap_outlier_count+1'b1;
                 if(display_gap_now>largest_gap_0)begin
