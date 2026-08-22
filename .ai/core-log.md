@@ -7,15 +7,15 @@ Unreleased 3c80bef
 
 #### Purpose:
 
-Honor generalized P-parser backpressure when a new reference header overlaps an older outstanding B transaction.
+Preserve generalized P parsing and publication ownership when a new reference overlaps an already-classified B transaction.
 
 #### Outcome:
 
-The accepted source reproduces the 250-picture stop at stream byte 310,629, inside picture 82's B header rather than at sequence end. Cycle tracing proves the causal loss begins in picture 81: a preceding B transaction is still outstanding when this P header is accepted, and the mixed publication shell's historical `!b_picture_inflight` gate suppresses every asserted P parser hold. The input therefore advances through P slices 2 through 30 while the parser is still processing row 1, discarding those rows; the following B header merely exposes the loss as internal detail 31 and a permanent scheduler wait for the reference that can no longer publish. The proposed repair uses the existing monotonic P-header and P-publication counters to recognize the pending reference and honor its parser hold even while the older B flag remains set, without changing the accepted B-only bypass, scheduler overlap, loading-bar semantics or display cadence.
+The accepted source reproduces the 250-picture stop at stream byte 310,629, inside picture 82's B header rather than at sequence end. Cycle tracing proves the causal loss begins in picture 81: the following B transaction is classified before the older P reference finishes, and the mixed publication shell's historical `!b_picture_inflight` gate suppresses every asserted P parser hold. The input therefore advances through P slices 2 through 30 while the parser is still processing row 1, discarding those rows; after the hold is corrected, all 1,350 macroblocks reconstruct cleanly but the same following-B flag misclassifies the shared P persistence edge as B, leaving the scheduler waiting for a reference that physically completed but never published. The proposed repair uses the existing monotonic P-header and P-publication counters to recognize the pending reference for both backpressure and persistence-edge ownership, without changing the accepted B-only bypass, scheduler overlap, loading-bar semantics or display cadence.
 
 #### Next Steps:
 
-Qualify the historical B hold bypass with the already-proven pending-P counter relation, rerun the focused parser and presentation regressions, and require the complete 250-picture Verilator stream to consume all bytes and reach quiet terminal presentation with zero decoder, ownership, scheduler or cadence errors. Then build incrementally as requested, install the candidate on the connected MiSTer, and require the 48-, 72- and 250-picture hardware clips to finish with every byte and picture, zero error flags and no regression of the accepted GOP cadence.
+Qualify the historical B hold bypass and shared persistence classification with the already-proven pending-P counter relation, rerun the focused parser and presentation regressions, and require the complete 250-picture Verilator stream to consume all bytes and reach quiet terminal presentation with zero decoder, ownership, scheduler or cadence errors. Then build incrementally as requested, install the candidate on the connected MiSTer, and require the 48-, 72- and 250-picture hardware clips to finish with every byte and picture, zero error flags and no regression of the accepted GOP cadence.
 
 #### Files Modified:
 
