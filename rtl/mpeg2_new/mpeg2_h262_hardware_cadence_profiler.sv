@@ -108,7 +108,8 @@ wire session_progress=decoder_byte_accepted_q||reference_picture_complete_q||
     b_picture_complete_edge||display_swap_now||prediction_request_accepted||
     prediction_data_ready_q||writer_write_q;
 wire [31:0] display_gap_now=session_cycles-last_present_cycle;
-wire cadence_rate_supported=(frame_rate_code_q==4'h2)||
+wire cadence_rate_supported=(frame_rate_code_q==4'h1)||
+                            (frame_rate_code_q==4'h2)||
                             (frame_rate_code_q==4'h3);
 wire [31:0] display_gap_meta_now={
     display_picture_count+1'b1,

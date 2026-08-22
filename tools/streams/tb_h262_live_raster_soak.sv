@@ -1598,9 +1598,9 @@ module tb_h262_live_raster_soak #(
                profile_b_replay_coeff_writes!=262671||
                profile_b_replay_coeff_wait!=0||
                ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
-                (MEMORY_READ_LATENCY==1)&&(total_cycles!=6519997))||
+                (MEMORY_READ_LATENCY==1)&&(total_cycles!=6519996))||
                ((EXPECTED_DESCRIPTOR_DEPTH==4)&&
-                (MEMORY_READ_LATENCY==1)&&(total_cycles!=6519997))||
+                (MEMORY_READ_LATENCY==1)&&(total_cycles!=6519996))||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
                presentation_error)
