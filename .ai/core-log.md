@@ -1,3 +1,31 @@
+## 326 COMMIT Unreleased ??? 2026-08-22T03:35:21-07:00
+
+#### Coming From:
+
+Unreleased a5a42f9
+
+#### Purpose:
+
+Find a timing-clean placement for the unchanged 60 MHz decoder design by retrying its incremental Quartus fit with seed eleven.
+
+#### Outcome:
+
+Commit `a5a42f9` passes its focused transport, native-rate scheduler and profiler regressions and builds with zero Quartus errors, but seed ten misses only the 60 MHz decoder setup requirement by 0.073 ns on two paths while hold, recovery, removal and pulse-width timing remain positive. The rejected artifact was not installed, so the MiSTer still runs the accepted 54 MHz decoder and 32 KiB input-reservoir core from `e5e7d86`. Because the setup deficit is narrow and placement-specific, changing only the fitter seed is the smallest justified next experiment before altering proven decoder logic.
+
+#### Next Steps:
+
+Change only the project fitter seed from ten to eleven and compile incrementally. Accept the artifact only if the build has zero errors and positive global, decoder, video, hold, recovery, removal and pulse-width timing. If accepted, verify and install the exact RBF, then rerun the quality-six 120-picture squirrel control and require all 1,430,191 bytes, 120 pictures and 119 swaps, zero errors, terminal quiet and zero cadence outliers before loading the 7:15-through-7:30 clip for the user's visual check at 7:22.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 325 COMMIT Unreleased a5a42f9 2026-08-22T03:17:24-07:00
 
 #### Coming From:
