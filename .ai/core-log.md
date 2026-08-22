@@ -1,4 +1,4 @@
-## 343 COMMIT Unreleased ??? 2026-08-22T08:55:25-07:00
+## 343 COMMIT Unreleased ae51759 2026-08-22T08:55:25-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Finalize the public README for v0.6.0 and add the accepted user-facing FFmpeg co
 
 #### Outcome:
 
-The proposed documentation change will present v0.6.0 as the current published milestone, link the new release notes, remove remaining release-candidate wording where it describes publication state, and add the exact no-frame-counter FFmpeg command previously used for the accepted full Big Buck Bunny conversion. The command forces progressive 720x480 square-pixel 4:2:0 elementary video at exact 24 fps with two B pictures and a strict 24-picture GOP, preserves source aspect ratio with black padding, removes audio, and includes a shell guard that appends the required H.262 sequence-end code only when FFmpeg omits it. The 5,540-byte `AI-assisted development in v0.6.0` section is locked at SHA-256 `c86635095cfee8c36636802872e75932580309a3cb58d6513a44758b43d515b3` and will remain untouched.
+Commit `ae51759` presents v0.6.0 as the current published milestone, links the new release notes, updates remaining qualification and diagnostic wording, and adds the exact no-frame-counter FFmpeg command previously used for the accepted full Big Buck Bunny conversion. The command forces 720x480 square-pixel 4:2:0 elementary video at exact 24 fps with two B pictures and a strict 24-picture GOP, preserves source aspect ratio with black padding, removes audio, and includes a shell guard that appends the required H.262 sequence-end code only when FFmpeg omits it. A short generated input verifies that the published command produces progressive 720x480 `yuv420p` MPEG-2 at exact 24 fps and terminates in `000001b7`. The protected AI-assisted-development section remains exactly 5,540 bytes and byte-for-byte identical at SHA-256 `c86635095cfee8c36636802872e75932580309a3cb58d6513a44758b43d515b3`, and the README commit was pushed.
 
 #### Next Steps:
 
-Edit only README content outside the protected AI-assisted-development range, verify the conversion command and release-notes link, prove the protected range remains byte-for-byte identical, then commit and push the README before packaging the qualified RBF in step four.
+Proceed to step four by copying the already qualified clean `MediaPlayer.rbf` to the date-coded release filename, verify its exact size and checksum against both accepted build states, and stage a release-package directory without committing the generated binary to the source tree. No build or hardware validation is required for this README-only commit.
 
 #### Files Modified:
 
