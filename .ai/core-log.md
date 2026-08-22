@@ -1,3 +1,31 @@
+## 335 COMMIT Unreleased 8517927 2026-08-22T07:13:52-07:00
+
+#### Coming From:
+
+Unreleased 04873f7
+
+#### Purpose:
+
+Find a timing-clean placement for the unchanged native-23.976-fps design by retrying its incremental Quartus fit with seed eleven.
+
+#### Outcome:
+
+Commit `04873f7` passes every focused and integrated simulation gate, but its incremental seed-twelve fit is not deployable. Quartus completes with zero errors and the affected 60 MHz decoder clock remains positive at plus 0.040 ns while the 40 MHz video clock remains positive at plus 7.414 ns, but a standing global framework path misses setup by 0.094 ns. Hold is plus 0.243 ns, recovery plus 3.050 ns, removal plus 0.697 ns and minimum pulse width plus 1.122 ns. The rejected 4,462,820-byte RBF has SHA-256 `1b3bbd125561b4c6d9787730db022b396ab3982009718741706b286254b5c7c1` and will not be installed. Commit `8517927` changes only the reproducible fitter seed from twelve to eleven because seed eleven has previously closed this placement-sensitive class of framework path while the decoder logic itself is already timing-clean.
+
+#### Next Steps:
+
+Change only `MediaPlayer.qsf` from seed twelve to seed eleven, rebuild incrementally without clearing Quartus databases, and require zero errors plus positive global, decoder, video, hold, recovery, removal and pulse-width slack. If timing closes, install and verify the exact RBF on the connected MiSTer, validate a bounded native-23.976 stream with complete telemetry, then launch the user's exact Emperor movie for visual confirmation at normal wall-clock speed.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 334 COMMIT Unreleased 04873f7 2026-08-22T06:30:47-07:00
 
 #### Coming From:
@@ -1208,50 +1236,6 @@ Instrument the row persistence handshake at the end of a picture and compare P p
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-## 295 COMMIT Unreleased 3992070 2026-08-21T13:04:45-07:00
-
-#### Coming From:
-
-Unreleased cba5371
-
-#### Purpose:
-
-Retarget the thirteen RTL standards citations that name the absent `core-standards.md` so they resolve against `core-reference.md`.
-
-#### Outcome:
-
-Entry 289 recorded that thirteen RTL files cite `core-standards.md` as their standards authority while that file is absent from the repository, leaving the conformance rationale for those modules unrecoverable. Its absence is confirmed, and this commit closes the gap by pointing the citations at `core-reference.md`, which `core.md` already names as the project's authoritative reference library.
-
-The retarget was checked before it was made rather than assumed to be a straight rename. `core-reference.md` declares `source_id: H262` in its controlled source catalog and carries atomic conformance records `H262-001` through `H262-026` in section 10.2, and every identifier the RTL headers cite resolves there to a real `record_id`: `H262-006`, `H262-010` and `H262-014` named in the B core probe, and the `H262-007` to `H262-022` range named in the wide motion syntax probe. The identifiers were therefore never wrong and no conformance claim needed re-deriving; only the filename was stale. That makes this a repair of a broken pointer rather than a change of authority, which matters because a citation that silently named a missing file was indistinguishable from one that had never been substantiated.
-
-The two filenames are the same length, so no header comment rewrapped and each file's diff is a single token on a single line. Every changed line was verified to be a `//` comment before committing, so the synthesized netlist cannot differ from `cba5371` and no Quartus build was run; the Built box is left unchecked rather than carrying a tick that no compile earned. One cosmetic inconsistency was left as found to keep the diff minimal: two of the thirteen headers write the path as `.ai/core-reference.md` while the other eleven name the file bare.
-
-#### Next Steps:
-
-Resume the Entry 294 line of work, which is unaffected by this commit and remains the v0.6.0 blocker. Entry 294 established that the raster engine consumes motion validity as a level and that the producer holds `wide_motion_valid` asserted across a picture boundary, multiplying one event into seven or more identical motion records and inflating `motion_count` past what the row-completion test can satisfy. The instruction there was to establish why the assertion is held before changing anything, and that remains the next action. The emission state machine is in the wide motion syntax probe, which sets `motion_event_valid` at two sites and clears it at two others, and it reaches the controller as `wide_motion_valid` through the `wide_general_probe` instance; trace its state across the duplicated run and determine whether the hold expresses a stall that should instead withhold validity, or a genuine repeat that a downstream handshake was expected to absorb. Prefer the producer-side fix if both are viable, since an accept handshake would change a contract the rest of the design already satisfies. Three gaps recorded earlier still stand and are not addressed here: the routine regression gate runs a 128 by 96 frame against a 720 by 480 target, no corpus stream exercises the queued admission path, and the artifact on the MiSTer has not been hardware-validated since Entry 289.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_syntax_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_syntax_probe_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_p_four_mb_two_row_copy_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_p_four_mb_two_row_syntax_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_p_macroblock_420_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_p_residual_parser_420.sv
-- rtl/mpeg2_new/mpeg2_h262_p_two_mb_copy_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_p_two_mb_syntax_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
