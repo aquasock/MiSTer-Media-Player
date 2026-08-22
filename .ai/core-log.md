@@ -1,4 +1,4 @@
-## 321 COMMIT Unreleased ??? 2026-08-22T01:02:36-07:00
+## 321 COMMIT Unreleased 74cff5b 2026-08-22T01:02:36-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Keep the development quiet snapshot open until the scheduler has presented its a
 
 #### Outcome:
 
-The planned observability correction adds the scheduler's existing `pending_frame_valid` state to the development-only quiet qualification. It changes no decoder, scheduler, cadence, display or loading-bar decision; it only prevents the snapshot from latching during the final cadence interval after Entry 320 has safely released the last reference.
+Commit `74cff5b` adds the scheduler's existing `pending_frame_valid` state to the development-only quiet qualification and changes no decoder, scheduler, cadence, display or loading-bar decision. The focused scheduler and profiler regressions pass. The incremental seed-nine Quartus build completes in 12 minutes 23 seconds with zero errors and positive timing at plus 0.053 ns global setup, plus 1.402 ns decoder setup, plus 7.570 ns video setup, plus 0.250 ns hold, plus 4.052 ns recovery, plus 0.537 ns removal and plus 0.462 ns pulse width. It uses 34,507 ALMs, 51,081 registers, 4,046,279 memory bits, 507 RAM blocks and 65 DSP blocks; the 4,416,296-byte RBF has SHA-256 `95862c4ecede2bb20316a24dabc87aaa16f89a94cc9d363ad47573db3f42571d`. Hardware controls finish exactly at 48/47 and 72/71 with zero errors and zero outliers. Two full-stream runs consume all 1,178,034 bytes and finally report the exact 250 pictures, 249 swaps, terminal quiet, no pending scheduler state and zero errors, proving the former early freeze and final-reference drain are fixed. Both full runs record one reproducible startup-only outlier before picture two while the decoder is not ready, 50.952 ms and 50.115 ms respectively; pictures three through 250 contain no outliers, and the user reports visually smooth playback and a safer-looking ending. The exact RBF is installed persistently as `/MediaPlayer.rbf` and verified byte-for-byte over FTP, but release acceptance remains open for the startup gap and the requested full-movie endurance observation. The complete 596.46-second AVI is converted outside the repository to a 720-by-480, 25 fps, 14,911-frame elementary stream with two B frames, 85,680,318 bytes, SHA-256 `10df778a6329b7ab6e3ebda98010b47e4f57ad77f74de3c1a454f95a514383e0` and a valid sequence-end marker; it is uploaded and launched on the MiSTer without screenshot polling for the user's direct baseline test.
 
 #### Next Steps:
 
-Add the one-bit quiet qualification, rerun the focused profiler regression, build incrementally with positive timing, and repeat the three hardware clips. Accept and install the exact RBF only if the full clip finally reports 250 pictures, 249 swaps, terminal quiet, no pending scheduler state, zero errors and zero outliers; then convert and load the user's complete 596.46-second Big Buck Bunny source as the no-screenshot pre-release endurance baseline.
+Have the user watch the complete 9-minute-56-second baseline and report any freeze, stutter, corruption, loading-bar stall or abnormal ending. Keep release acceptance open until that endurance result is known and the reproducible startup-only gap is either accepted explicitly or corrected. After the baseline, add the requested simple human-readable Python conversion recipe with plain FFmpeg arguments, no framework and clear actual-output validation, then expand release coverage across supported frame rates, aspect ratios, motion levels, GOP structures, sizes and malformed-input failure behavior.
 
 #### Files Modified:
 
