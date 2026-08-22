@@ -1,4 +1,4 @@
-## 323 COMMIT Unreleased ??? 2026-08-22T02:19:15-07:00
+## 323 COMMIT Unreleased 25f05dd 2026-08-22T02:19:15-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Retry the unchanged native-24-fps design with fitter seed ten after seed nine mi
 
 #### Outcome:
 
-The seed-nine incremental build of `cc39b46` compiles with zero errors but is rejected before deployment because its global setup slack is minus 0.180 ns on the HDMI PLL clock. The changed 40 MHz presentation logic remains at plus 6.621 ns and the 54 MHz decoder remains at plus 1.322 ns, with hold, recovery, removal and pulse width all positive, matching the project's documented seed-sensitive framework placement behavior rather than identifying a cadence-path violation. The rejected artifact is not installed on the MiSTer.
+Changing only the reproducible fitter seed from nine to ten closes the standing placement-sensitive HDMI path. The incremental smart-recompile build finishes in 9 minutes 46 seconds with zero errors and positive timing at plus 0.170 ns global setup, plus 1.045 ns decoder setup, plus 7.882 ns video setup, plus 0.248 ns hold, plus 3.441 ns recovery, plus 0.697 ns removal and plus 0.462 ns minimum pulse width. It uses 34,494 ALMs, 51,056 registers, 4,046,279 memory bits, 507 RAM blocks and 65 DSP blocks. The accepted 4,372,048-byte RBF has SHA-256 `ea31820acc9a8db2bc7cbe95fa1dfa4f1ebbfae79d8b0e4f03a95a4dad73d42d`, is installed persistently as `/media/fat/MediaPlayer.rbf` and verifies byte-for-byte over FTP. Hardware accepts all 1,070,782 bytes of the native-rate control and reports frame-rate code two, exactly 250 displayed pictures, 249 swaps, 85 reference pictures, 165 B pictures, terminal quiet, no error flags and no cadence-gap outliers; 249 measured display intervals span 10.384474 seconds for 23.978103 fps, the expected finite-sample result around the exact 24 fps accumulator. The complete 14,315-picture native stream also verifies after upload with SHA-256 `015c8811932ce8b324af6ccd9e235cd621307aa43fcaf62b413b93badba52de5` and is launched for the user's direct visual comparison.
 
 #### Next Steps:
 
-Change only the reproducible fitter seed from nine to ten and rebuild incrementally. Accept the candidate only with zero errors and positive global, decoder, video, hold, recovery, removal and pulse-width timing; then verify and install the exact RBF, upload the validated native 24 fps full-movie stream, and run short hardware cadence telemetry before handing the movie to the user for the once-per-second stutter comparison.
+Have the user judge smooth field pans and the rolling credits in the full native-rate movie, where the former once-per-second repeated-picture hitch should now be absent. Keep the squirrel sequence at 7:20 through 7:25 as a separately attributable transport and decode-throughput stress case, since removing the deterministic rate-conversion repeats does not remove that scene's measured input burst. Preserve both native and forced-rate movies for an immediate visual comparison if the residual cadence is ambiguous.
 
 #### Files Modified:
 
@@ -22,8 +22,8 @@ Change only the reproducible fitter seed from nine to ten and rebuild incrementa
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 322 COMMIT Unreleased cc39b46 2026-08-22T01:52:41-07:00
