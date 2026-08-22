@@ -1,3 +1,31 @@
+## 346 VERSION v0.6.0 26805e8 2026-08-22T09:18:14-07:00
+
+#### Coming From:
+
+Unreleased ae51759
+
+#### Purpose:
+
+Record the verified publication of the hardware-qualified real-stream MPEG-2 playback milestone as pre-release v0.6.0.
+
+#### Outcome:
+
+GitHub published `MiSTer Media Player v0.6.0` at 2026-08-22T09:18:14-07:00 as a non-draft pre-release at `https://github.com/aquasock/MiSTer-Media-Player/releases/tag/v0.6.0`. Annotated tag object `2f69a48d91815faae7a3cc14d837d431ee84dcd2` peels to the exact audited release commit `26805e8c93710189507330c339edcb1304991b9a`; synthesized source remains baseline `b64ec6a91a6986a124b86765a9817b809c8948a1`. The online release body is byte-for-byte identical to committed `docs/RELEASE_NOTES_v0.6.0.md` at SHA-256 `dbc49e9c5fdba0ddd00bd24cf6b6120b32ad03016d232829ed85301e36ba2b48`. The sole uploaded asset is `MediaPlayer_20260822.rbf`, reported uploaded as 4,455,376 bytes; an independent GitHub download reproduces SHA-256 `e95e9ec43cb11917d5a904fdd8016bcc23dcbe2d8f36f678544f42ad1a6d5f10` and is byte-identical to the packaged, clean-build and preserved incremental images. This closes the seven-step v0.6.0 release plan with the accepted 60 MHz decoder, mixed-width 32 KiB ingress, native frame-rate codes one through three, focused four-stream gate, and full-length visual qualification intact.
+
+#### Next Steps:
+
+Treat v0.6.0 as the immutable published baseline, retain the external release package and preserved seed-ten build until routine archival is explicitly approved, and resume future development under a fresh Unreleased boundary. Any new decoder, cadence, transport, audio, control or DVD work belongs after this version boundary and must not alter the `v0.6.0` tag or release asset.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 345 COMMIT Unreleased ae51759 2026-08-22T09:09:58-07:00
 
 #### Coming From:
@@ -1147,41 +1175,6 @@ None.
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-## 306 COMMIT Unreleased 6bea8f9 2026-08-21T17:58:05-07:00
-
-#### Coming From:
-
-Unreleased a9cd69c
-
-#### Purpose:
-
-Clear the byte 158,381 halt by making the engine selection gates agree with the widened f_code range and with the engine's own rearm.
-
-#### Outcome:
-
-Two further gates in `mpeg2_h262_reference_pipeline_probe_rearm.sv` were holding the pipeline, both of them duplicates of decisions taken correctly elsewhere, and with them corrected the 72 frame clip decodes to completion. The halt raised no error code at all, so a freeze detector was added to dump every stage's state at the instant progress stopped rather than waiting out the bench timeout. That snapshot showed the producer blocked on a row bank with two rows outstanding, the engine still parked on picture fifteen's completion, the scheduler idle with every resource free, and neither engine selected.
-
-The first gate was `general_p_f_code_supported`, which repeated the f_code range check that Entry 304 widened in the syntax probe and was missed there. The parser therefore accepted an f_code five picture and produced rows for it while this gate silently refused to select the engine that consumes them, which is exactly why the symptom was a codeless freeze rather than a reported rejection. Widening it to one through nine converted the freeze into a diagnosable error, prediction source two detail seven. Reading that against the right table, as Entry 303 requires, `probe_error_detail` for source two is the raster engine's own `error_source`, so this is engine error seven, the row-completion arithmetic.
-
-The second gate was `general_detect_now`, which selected the engine only on sideband index `6'h3e`. A motion record is `6'h3e` when inter and `6'h3b` when intra, and the engine's own `new_picture_metadata` rearm already accepted both, so the two disagreed. Picture sixteen is the first P picture after the GOP boundary I picture and opens with intra macroblocks, whose records never selected the engine and were dropped. The measurement is exact: 20,295 motion records presented across the run, 20,257 captured, 38 dropped, and those 38 are the only drops anywhere. The row that failed reported `motion_count` of seven against an `mb_width` of 45, and 45 less 38 is seven. Accepting `6'h3b` alongside `6'h3e` closes it.
-
-The 72 frame clip now consumes all 243,306 bytes with 22 P and 47 B pictures, 25 published references, presentation complete and no errors. Both regression gates are unchanged: the 128 by 96 corpus soak reproduces every golden value at 6,589,997 cycles and the 48 frame clip is byte identical at 37,649,997 cycles, both with no errors. On the full 250 frame clip the decode path is now clean well past the old failure, advancing from byte 156,882 to byte 310,630 with 24 P pictures and 720 P rows, where it stops on `presentation_error` with the probe, prediction and writer sources all clear. That is a different subsystem from anything addressed here.
-
-#### Next Steps:
-
-Characterise the presentation failure on the full clip by the same method, which means finding which module raises `presentation_error` and reading its code against that module's own table before proposing anything. The decode path being clear at that point is a useful boundary: probe, prediction and writer all report zero, so the fault is in presentation or scheduling rather than in parsing or reconstruction. Run a clean Quartus build against this commit before any hardware work, since the user's standing requirement is that timing stay positive, and the Entry 305 figures are the comparison, worst case setup plus 0.295 ns with RAM blocks already at 92 percent. Timing and RAM block recovery are deliberately deferred until the streaming halt is fully resolved, at which point a refactor to reclaim block memory is planned. Note also that the bench still cannot express success for any geometry other than the corpus, so a clean 720 by 480 completion ends in a golden value failure and must be read from `LIVE_RASTER_RESULT` instead.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- tools/streams/tb_h262_live_raster_soak.sv
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
