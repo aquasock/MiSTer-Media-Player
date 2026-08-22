@@ -1,4 +1,32 @@
-## 320 COMMIT Unreleased ??? 2026-08-22T00:37:52-07:00
+## 321 COMMIT Unreleased ??? 2026-08-22T01:02:36-07:00
+
+#### Coming From:
+
+Unreleased 985ac76
+
+#### Purpose:
+
+Keep the development quiet snapshot open until the scheduler has presented its already-released terminal pending frame.
+
+#### Outcome:
+
+The planned observability correction adds the scheduler's existing `pending_frame_valid` state to the development-only quiet qualification. It changes no decoder, scheduler, cadence, display or loading-bar decision; it only prevents the snapshot from latching during the final cadence interval after Entry 320 has safely released the last reference.
+
+#### Next Steps:
+
+Add the one-bit quiet qualification, rerun the focused profiler regression, build incrementally with positive timing, and repeat the three hardware clips. Accept and install the exact RBF only if the full clip finally reports 250 pictures, 249 swaps, terminal quiet, no pending scheduler state, zero errors and zero outliers; then convert and load the user's complete 596.46-second Big Buck Bunny source as the no-screenshot pre-release endurance baseline.
+
+#### Files Modified:
+
+- MediaPlayer_top_07.svh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+## 320 COMMIT Unreleased 985ac76 2026-08-22T00:37:52-07:00
 
 #### Coming From:
 
@@ -10,11 +38,11 @@ Release a final reference publication retained during an overlapping B-picture d
 
 #### Outcome:
 
-The planned scheduler correction will retain sequence end across an active reordered run and apply that terminal permission when the run preserves a concurrently decoded reference as ordinary pending display work. It will not change non-terminal classification, cadence, decoding, the loading bar or the accepted visible playback, and a focused regression will reproduce the hardware ordering in which sequence end precedes retirement of the last B run.
+Commit `985ac76` retains sequence end across an active reordered run and applies that terminal permission when the run preserves a concurrently decoded reference as ordinary pending display work. The new focused case fails before the fix and passes after it alongside all prior scheduler orders with a minimum presentation gap of two. Real 48-, 72- and 250-picture Verilator replays consume every byte and retain exact swap counts of 47, 71 and 249 with zero errors; the full stream finishes 1,178,034 bytes at 222,767,587 cycles. The incremental seed-nine Quartus build completes in 13 minutes 52 seconds with zero errors and positive timing at plus 0.330 ns global setup, plus 1.679 ns decoder setup, plus 6.688 ns video setup, plus 0.246 ns hold, plus 3.749 ns recovery, plus 0.697 ns removal and plus 0.462 ns pulse width. It uses 34,285 ALMs, 51,047 registers, 4,046,279 memory bits, 507 RAM blocks and 65 DSP blocks; the 4,400,432-byte RBF has SHA-256 `9b4a3e0ce83b8a145ac53ec915cf9ec1e2a0bb7bf1f7726ff4ec9e9d6fb38d7a`. Hardware controls again pass exactly at 48/47 and 72/71 with zero errors and zero outliers. The full stream remains visually smooth and the user describes its ending as safer; telemetry proves the behavioral fix by changing the final pending reference from unreleased to released, but the quiet snapshot still latches at 249/248 only 1,023 clocks after `presentation_complete`, before the released frame's next cadence window.
 
 #### Next Steps:
 
-Add the focused terminal-order regression first, implement the smallest release latch correction, and require the complete scheduler and real-content simulation suites to retain exact cadence and finish all 250 pictures. Build incrementally, require positive timing, then rerun the 48-, 72- and 250-picture hardware clips and install only an RBF that reports 250 pictures, 249 swaps, terminal quiet, zero errors and zero outliers while remaining visually smooth.
+Keep the accepted scheduler correction and extend only the development quiet qualification to require that no pending frame remains. Rebuild incrementally and repeat hardware validation so telemetry waits through the final cadence swap instead of sampling the correct release early.
 
 #### Files Modified:
 
@@ -23,7 +51,7 @@ Add the focused terminal-order regression first, implement the smallest release 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
