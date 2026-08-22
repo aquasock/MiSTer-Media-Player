@@ -1,4 +1,4 @@
-## 328 COMMIT Unreleased ??? 2026-08-22T04:17:21-07:00
+## 328 COMMIT Unreleased b426ba4 2026-08-22T04:17:21-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Find a timing-clean placement for the proven wide-ingress design by retrying its
 
 #### Outcome:
 
-Commit `76326a1` passes its focused byte-order, backpressure, transport, scheduler and profiler tests plus the complete quality-six dense-stream raster replay, but the seed-eleven fit misses the placement-sensitive 60 MHz decoder setup requirement by 0.694 ns while every other timing category remains positive. The rejected artifact was not installed, so the connected MiSTer still runs the timing-clean narrow-ingress `a25d772` image. Changing only the fitter seed preserves all functional evidence and is the final bounded attempt to retain the 60 MHz headroom before reverting that empirically neutral clock increase.
+Commit `b426ba4` changes only the fitter seed from eleven to twelve and reuses synthesis as intended. The incremental build completes in 11 minutes 58 seconds with zero errors and positive timing at plus 0.331 ns global setup, plus 0.350 ns decoder setup, plus 8.286 ns video setup, plus 0.252 ns hold, plus 3.950 ns recovery, plus 0.800 ns removal and plus 1.122 ns pulse width. It uses 34,883 ALMs, 51,966 registers, 4,306,375 memory bits, 538 of 553 RAM blocks and 65 DSP blocks. The accepted 4,449,372-byte RBF has SHA-256 `d4d31f23f9d4405c070acc589fcbf7fcb059164b6dabd51bf7b4d96aad1c31c5`, verifies after persistent installation and proves seed twelve is a timing-clean placement. Hardware then exposes a functional ingress flaw before telemetry can run: the word unpacker asserts host wait for every accepted 16-bit word while emitting its upper byte. Although that pause lasts only one 20 MHz FPGA clock, it forces the MiSTer file loader through a software wait/retry round trip for every two bytes, so the 1,430,191-byte control does not finish loading within the acquisition window and the screenshot command cannot execute. The artifact is therefore not passed despite clean timing.
 
 #### Next Steps:
 
-Change only the project fitter seed from eleven to twelve and compile incrementally. Accept the artifact only if the build has zero errors and positive global, decoder, video, hold, recovery, removal and pulse-width timing. If accepted, verify and install the exact RBF and rerun the five-second quality-six and full 7:15-through-7:30 hardware controls, requiring all bytes and pictures, zero errors, terminal quiet and no cadence outliers at the user's 7:22 interval. If timing still misses, restore the proven 54 MHz decoder rate while retaining the wide input transfer.
+Keep timing-clean seed twelve and replace the per-word serializer with the FPGA vendor's native mixed-width asynchronous FIFO, writing complete 16-bit host words and reading ordered 8-bit decoder bytes while asserting host wait only when the reservoir is genuinely full. Simulate the actual primitive model for byte order, consecutive words, full backpressure and reset, then rerun the focused and exact-stream regressions and build incrementally. Accept only positive timing and a real hardware load that consumes all bytes, reaches terminal quiet with zero errors and removes the 7:22 outliers.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Change only the project fitter seed from eleven to twelve and compile incrementa
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
