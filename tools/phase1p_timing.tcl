@@ -3,15 +3,15 @@
 #
 # kate - This script does not alter constraints or RTL.  It opens the fitted
 # MediaPlayer design, rebuilds the TimeQuest timing netlist from the project's
-# existing SDC files, identifies the 54 MHz decoder and 40 MHz video clocks by
+# existing SDC files, identifies the 60 MHz decoder and 40 MHz video clocks by
 # their periods, and writes detailed path reports for timing-closure work.
 #
 # kate - Phase 1P same-clock separation:
 #   The original reports filtered only by -to_clock.  After the inverse-quant
-#   pipeline removed the previous long 54 MHz datapath, the worst reported
+#   pipeline removed the previous long decoder datapath, the worst reported
 #   "decoder" paths became unrelated crossings from another PLL output into the
-#   54 MHz domain.  Explicit -from_clock/-to_clock reports are now generated so
-#   genuine 54->54 and 40->40 register-to-register timing can be evaluated
+#   60 MHz domain.  Explicit -from_clock/-to_clock reports are now generated so
+#   genuine 60->60 and 40->40 register-to-register timing can be evaluated
 #   independently of CDC paths.
 #
 # Run from the Quartus project root after a successful full compilation:
@@ -63,12 +63,12 @@ read_sdc
 update_timing_netlist
 
 # Current PLL configuration:
-#   decoder = 54.0 MHz = 18.518 ns
+#   decoder = 60.0 MHz = 16.667 ns
 #   video   = 40.0 MHz = 25.000 ns
 #
 # Select by period instead of hierarchy-generated PLL names so the reports
 # remain usable if Quartus changes generated-clock node naming.
-set decoder_clock [phase1p_find_clock_by_period 18.518 0.010 "54 MHz decoder"]
+set decoder_clock [phase1p_find_clock_by_period 16.667 0.010 "60 MHz decoder"]
 set video_clock   [phase1p_find_clock_by_period 25.000 0.010 "40 MHz video"]
 
 # Keep general summaries beside the detailed path reports.  These summaries
@@ -86,7 +86,7 @@ check_timing \
     -file "$output_dir/phase1p_check_timing.rpt"
 
 # ---------------------------------------------------------------------------
-# All paths ending in the 54 MHz decoder domain.
+# All paths ending in the 60 MHz decoder domain.
 #
 # These preserve the original Phase 1P reports because they remain useful for
 # finding cross-clock timing relationships and unconstrained/suspicious CDCs.
@@ -112,10 +112,10 @@ report_timing \
     -file "$output_dir/phase1p_decoder_setup_diverse.rpt"
 
 # ---------------------------------------------------------------------------
-# Genuine 54 MHz -> 54 MHz decoder datapath.
+# Genuine 60 MHz -> 60 MHz decoder datapath.
 #
 # kate - These are the authoritative reports for deciding whether normal
-# decoder register-to-register logic meets the 18.518 ns requirement.  CDC
+# decoder register-to-register logic meets the 16.667 ns requirement.  CDC
 # paths from other clock domains are excluded by the explicit -from_clock.
 # ---------------------------------------------------------------------------
 

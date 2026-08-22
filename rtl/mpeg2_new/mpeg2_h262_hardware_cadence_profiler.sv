@@ -7,9 +7,9 @@
 //============================================================================
 `timescale 1ns/1ps
 module mpeg2_h262_hardware_cadence_profiler #(
-    parameter [23:0] TERMINAL_SNAPSHOT_DELAY = 24'd13500000,
-    parameter [26:0] NO_PROGRESS_SNAPSHOT_DELAY = 27'd54000000,
-    parameter [31:0] OUTLIER_GAP_CYCLES = 32'd2700000
+    parameter [23:0] TERMINAL_SNAPSHOT_DELAY = 24'd15000000,
+    parameter [26:0] NO_PROGRESS_SNAPSHOT_DELAY = 27'd60000000,
+    parameter [31:0] OUTLIER_GAP_CYCLES = 32'd3000000
 )(
     input wire clk_mpeg2,input wire reset_mpeg2,
     input wire clk_video,input wire reset_video,
@@ -43,7 +43,7 @@ localparam [23:0] TERMINAL_SNAPSHOT_LIMIT=
 localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
-localparam [31:0] SNAPSHOT_FORMAT={8'd4,8'd38,16'd54000};
+localparam [31:0] SNAPSHOT_FORMAT={8'd4,8'd38,16'd60000};
 localparam [11:0] OVERLAY_X=12'd8,OVERLAY_Y=12'd444;
 localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd152;
 
