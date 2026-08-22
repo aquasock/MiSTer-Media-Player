@@ -16,11 +16,15 @@ module mpeg2_stream_fifo
 );
 
 dcfifo #(
-	.lpm_numwords         (256),
+	// Entry 324: a 256-byte reservoir made MiSTer's ioctl_wait stop/restart
+	// latency visible whenever dense pictures drained the FIFO in one burst.
+	// Keep the same CDC primitive but use 32 KiB so normal decoder stalls can
+	// prefetch enough compressed data to bridge those transfer turnarounds.
+	.lpm_numwords         (32768),
 	.lpm_showahead        ("ON"),
 	.lpm_type             ("dcfifo"),
 	.lpm_width            (8),
-	.lpm_widthu           (8),
+	.lpm_widthu           (15),
 	.overflow_checking    ("ON"),
 	.underflow_checking   ("ON"),
 	.use_eab              ("ON"),
