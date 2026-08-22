@@ -1,3 +1,31 @@
+## 336 COMMIT Unreleased ??? 2026-08-22T07:27:40-07:00
+
+#### Coming From:
+
+Unreleased 8517927
+
+#### Purpose:
+
+Find a timing-clean placement for the unchanged native-23.976-fps design by retrying its incremental Quartus fit with seed ten.
+
+#### Outcome:
+
+Seed twelve leaves the decoder positive but misses a standing global framework path by 0.094 ns, while seed eleven closes that placement differently but misses the 60 MHz decoder by 0.131 ns. Every functional regression is already green and neither rejected RBF was installed. The proposed follow-up changes only the reproducible fitter seed from eleven to ten and retains the exact synthesized netlist so the next result remains a placement-only comparison.
+
+#### Next Steps:
+
+Change only `MediaPlayer.qsf` from seed eleven to seed ten, rebuild incrementally without clearing Quartus databases, and require zero errors plus positive global, decoder, video, hold, recovery, removal and pulse-width slack. If seed ten closes timing, install and verify the exact RBF on the connected MiSTer, validate a bounded native-23.976 stream with complete telemetry, then launch the user's exact Emperor movie for visual confirmation at normal wall-clock speed.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 335 COMMIT Unreleased 8517927 2026-08-22T07:13:52-07:00
 
 #### Coming From:
@@ -10,11 +38,11 @@ Find a timing-clean placement for the unchanged native-23.976-fps design by retr
 
 #### Outcome:
 
-Commit `04873f7` passes every focused and integrated simulation gate, but its incremental seed-twelve fit is not deployable. Quartus completes with zero errors and the affected 60 MHz decoder clock remains positive at plus 0.040 ns while the 40 MHz video clock remains positive at plus 7.414 ns, but a standing global framework path misses setup by 0.094 ns. Hold is plus 0.243 ns, recovery plus 3.050 ns, removal plus 0.697 ns and minimum pulse width plus 1.122 ns. The rejected 4,462,820-byte RBF has SHA-256 `1b3bbd125561b4c6d9787730db022b396ab3982009718741706b286254b5c7c1` and will not be installed. Commit `8517927` changes only the reproducible fitter seed from twelve to eleven because seed eleven has previously closed this placement-sensitive class of framework path while the decoder logic itself is already timing-clean.
+Commit `04873f7` passes every focused and integrated simulation gate, but its incremental seed-twelve fit is not deployable. Quartus completes with zero errors and the affected 60 MHz decoder clock remains positive at plus 0.040 ns while the 40 MHz video clock remains positive at plus 7.414 ns, but a standing global framework path misses setup by 0.094 ns. Hold is plus 0.243 ns, recovery plus 3.050 ns, removal plus 0.697 ns and minimum pulse width plus 1.122 ns. The rejected 4,462,820-byte RBF has SHA-256 `1b3bbd125561b4c6d9787730db022b396ab3982009718741706b286254b5c7c1` and was not installed. Commit `8517927` changes only the reproducible fitter seed from twelve to eleven and reuses synthesis exactly as intended, but its incremental fit also fails timing: the global and decoder minimum becomes minus 0.131 ns with eleven same-clock decoder violations while video remains plus 7.069 ns. Hold is plus 0.260 ns, recovery plus 3.997 ns, removal plus 0.617 ns and pulse width plus 1.122 ns. The rejected seed-eleven fit uses 34,594 ALMs, 51,017 registers, 4,306,375 memory bits, 538 RAM blocks and 65 DSP blocks; its 4,458,208-byte RBF has SHA-256 `170c64ec789dfc3ef2d4e4d1e377db7728b70dc448e50038563ea48ea8d32341` and was not installed.
 
 #### Next Steps:
 
-Change only `MediaPlayer.qsf` from seed twelve to seed eleven, rebuild incrementally without clearing Quartus databases, and require zero errors plus positive global, decoder, video, hold, recovery, removal and pulse-width slack. If timing closes, install and verify the exact RBF on the connected MiSTer, validate a bounded native-23.976 stream with complete telemetry, then launch the user's exact Emperor movie for visual confirmation at normal wall-clock speed.
+Keep the validated cadence RTL unchanged and retry incrementally with seed ten, which is the next documented candidate and previously missed the 60 MHz decoder by only 0.073 ns before later ingress changes. Require every timing category positive and do not install either rejected seed-eleven or seed-twelve image.
 
 #### Files Modified:
 
@@ -22,7 +50,7 @@ Change only `MediaPlayer.qsf` from seed twelve to seed eleven, rebuild increment
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
@@ -1194,43 +1222,6 @@ Establish what the row-bank credit contract is meant to be before attempting a t
 
 #### Files Modified:
 
-- tools/streams/tb_h262_live_raster_soak.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 296 COMMIT Unreleased 489aa0d 2026-08-21T14:37:48-07:00
-
-#### Coming From:
-
-Unreleased 3992070
-
-#### Purpose:
-
-Retarget the regression loop onto a real 720 by 480 clip that must play to completion, and make that clip fast enough to iterate against.
-
-#### Outcome:
-
-The source is now `big_buck_bunny_480p_stereo_10s.avi`, encoded by the committed generator at 720 by 480, 25 fps, 250 frames, GOP 24 with two B pictures and encoder default quality, giving `test_bbb_10s_480p.m2v` at 1,178,034 bytes with sha256 `b392b65d`. The encode was validated against ffmpeg and the project analyzer before any simulation time was spent on it, so a bench failure is attributable to the decoder rather than to the stream. Note that the bench previously capped `MAX_STREAM_BYTES` at one mebibyte, which is why the preceding interrupted session was encoding at `q8` with `me_range 16` and landing just under that limit; that was shrinking the encode to fit the bench rather than testing the content, and the cap is now a define defaulting to four mebibytes.
-
-The decisive change is the simulator. Icarus interprets this design at roughly 21,300 cycles per second, which puts the 250 picture replay beyond two hours and makes a deadlock investigation impractical. The same bench and the same file list built under Verilator 5.032 completes in 45 seconds, a factor of about forty, and reproduces the failure bit for bit: identical `byte=156882`, identical `shell=10/10/0`, identical `p_rows=450` and `p_pictures=15`. That equivalence is what licenses using the faster build. Both drivers are committed so either can be run.
-
-A 48 frame prefix of the same clip decodes cleanly and completely, consuming all 125,948 bytes across 15 P and 31 B pictures with `error=0/0/0/0` and presentation complete. The `$fatal` that follows it is not a decode failure but the bench's hardcoded golden values for the 128 by 96 corpus, which cannot apply to a 720 by 480 stream; the bench currently has no way to express success for any other geometry. The full clip fails at P picture 16 with raster error source 10, which is the row execution watchdog rather than any parsing or accounting check, after waiting the full `24'hffffff` cycles for a persistence that never arrives. The stall state places the engine at `mbi=1349`, `col=44`, `mrow=29`, `blk=5` and `ei=63`, which is the final element of the final block of the final macroblock of the final row, with `motion_count` equal to `motion_end` at 1350 and capture already advanced to row 30. Nothing is pending or requested, the reference is valid and geometry is fine, so the picture is fully accounted for and only the completion handshake fails to fire.
-
-Entry 294 is superseded. Its duplicate detector keyed on the residual sideband index, which is the fixed class code `6'h3e` for non-intra and `6'h3b` for intra and is therefore constant across any run of skipped macroblocks by construction. Tracing the 11 bit `wide_motion_index` instead, which is the only field that can separate a repeat from a skip run, records zero true repeats across 13,501 emissions while finding 1,506 back to back emissions whose index advances by one, in 202 runs of which the longest is 43. The run length histogram contains eight runs of exactly seven, which are the events Entry 294 reported as seven or more identical intakes. The producer emits one record per macroblock as contracted, the held assertion described in entries 293 through 295 does not exist, and the producer side repair those entries queued up must not be written.
-
-#### Next Steps:
-
-Instrument the row persistence handshake at the end of a picture and compare P picture 16 against P picture 15, which persists correctly, rather than proposing a mechanism from the stall state. The scheduler reports `run_closed` with no decode in flight, a pending future frame on bank 2 and `scratch1_pending` set, which is consistent with bank rotation being involved, but that is a correlation and the recent history of this investigation is four mechanisms rejected by their own controls. Separately, give the bench a way to express completion for a geometry other than the corpus, since the current golden constants make a clean 720 by 480 run indistinguishable from a failure. The user has directed that compatibility with the existing MiSTer Media Player structure is no longer required and that this work should be shaped around what the SuperStation needs; that target is not yet described anywhere in the repository and must be defined before any rearchitecture is attempted.
-
-#### Files Modified:
-
-- tools/streams/generate_test_big_buck_bunny.py
-- tools/streams/run_live_raster_soak.sh
-- tools/streams/run_live_raster_soak_verilator.sh
 - tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
