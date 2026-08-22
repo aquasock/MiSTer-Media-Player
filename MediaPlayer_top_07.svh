@@ -9,7 +9,8 @@ assign VGA_B = cadence_video_b;
 
 // Entry 245: development-only hardware cadence snapshot. Every input is an
 // already registered top-level boundary. The profiler has no control output,
-// and its overlay is enabled only after the terminal presentation has drained.
+// and its overlay appears after either a quiet drain or the bounded terminal
+// diagnostic timeout.
 wire mpeg2_new_cadence_session_quiet =
     mpeg2_new_sequence_end_seen &&
     mpeg2_stream_empty &&
@@ -47,6 +48,11 @@ mpeg2_h262_hardware_cadence_profiler
     .destination_hold          (mpeg2_new_p_destination_ownership_hold),
     .scratch_available         (mpeg2_new_b_scratch_available),
     .promotion_active          (mpeg2_new_b_promotion_active),
+    .frame_waiting             (mpeg2_new_frame_waiting),
+    .completed_frame_bank      (mpeg2_new_completed_frame_bank),
+    .presentation_complete     (mpeg2_new_b_presentation_complete),
+    .presentation_error        (mpeg2_new_b_presentation_error),
+    .scheduler_debug_state     (mpeg2_new_b_scheduler_debug_state),
     .decoder_byte_accepted     (mpeg2_new_decode_stream_valid),
     .picture_coding_type       (mpeg2_new_picture_coding_type),
     .temporal_reference        (mpeg2_new_temporal_reference),

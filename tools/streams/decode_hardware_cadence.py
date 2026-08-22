@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Decode the Entry-245 machine-readable cadence overlay from a MiSTer PNG."""
+"""Decode the Entry-311 machine-readable cadence overlay from a MiSTer PNG."""
 
 from __future__ import annotations
 
@@ -12,9 +12,9 @@ from PIL import Image
 
 
 MAGIC = 0x4D4D5031
-WORDS = 26
+WORDS = 35
 X0 = 8
-Y0 = 492
+Y0 = 456
 CELL = 4
 ROW_PREFIX = (1, 0, 1, 0)
 
@@ -36,7 +36,7 @@ def _cell_bit(image: Image.Image, column: int, row: int) -> int:
 
 def decode_words(path: Path | str) -> list[int]:
     image = Image.open(path).convert("RGB")
-    if image.width < X0 + 42 * CELL or image.height < Y0 + WORDS * CELL:
+    if image.width < X0 + 43 * CELL or image.height < Y0 + WORDS * CELL:
         raise TelemetryDecodeError(
             f"image is {image.width}x{image.height}; an unscaled 800x600 "
             "MiSTer screenshot is required"
@@ -44,22 +44,22 @@ def decode_words(path: Path | str) -> list[int]:
 
     words: list[int] = []
     for row in range(WORDS):
-        bits = [_cell_bit(image, column, row) for column in range(42)]
+        bits = [_cell_bit(image, column, row) for column in range(43)]
         if tuple(bits[:4]) != ROW_PREFIX:
             raise TelemetryDecodeError(
                 f"row {row}: telemetry prefix absent ({bits[:4]})"
             )
         encoded_row = 0
-        for bit in bits[4:9]:
+        for bit in bits[4:10]:
             encoded_row = (encoded_row << 1) | bit
         if encoded_row != row:
             raise TelemetryDecodeError(
                 f"row {row}: encoded row index is {encoded_row}"
             )
         word = 0
-        for bit in bits[9:41]:
+        for bit in bits[10:42]:
             word = (word << 1) | bit
-        if bits[41] != (word.bit_count() & 1):
+        if bits[42] != (word.bit_count() & 1):
             raise TelemetryDecodeError(f"row {row}: parity mismatch")
         words.append(word)
 
@@ -90,6 +90,23 @@ def parse_words(words: list[int]) -> dict[str, Any]:
     delivered_fps = (
         display_swaps / cadence_seconds if cadence_seconds > 0.0 else 0.0
     )
+    snapshot_meta = words[25]
+    terminal = words[32]
+    scheduler = words[33]
+
+    def gap(rank: int, word_index: int) -> dict[str, Any]:
+        cycles = words[word_index]
+        metadata = words[word_index + 1]
+        return {
+            "rank": rank,
+            "cycles": cycles,
+            "seconds": cycles / clock_hz if clock_hz else 0.0,
+            "display_picture_ordinal": (metadata >> 24) & 0xFF,
+            "display_frame_bank": (metadata >> 2) & 0x3,
+            "display_scratch": bool((metadata >> 1) & 1),
+            "display_scratch_bank": metadata & 1,
+        }
+
     return {
         "schema_version": (format_word >> 24) & 0xFF,
         "snapshot_words": (format_word >> 16) & 0xFF,
@@ -128,7 +145,58 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "hold_overlap_cycles": words[22],
         "hold_scratch_available_cycles": words[23],
         "hold_promotion_pending_cycles": words[24],
-        "checksum": words[25],
+        "snapshot_reason_code": (snapshot_meta >> 30) & 0x3,
+        "snapshot_reason": {
+            1: "quiet",
+            2: "forced_terminal_timeout",
+        }.get((snapshot_meta >> 30) & 0x3, "unknown"),
+        "gap_outlier_count": snapshot_meta & 0xFFFF,
+        "largest_display_gaps": [gap(1, 26), gap(2, 28), gap(3, 30)],
+        "completed_frame_bank": (terminal >> 30) & 0x3,
+        "display_frame_bank": (terminal >> 28) & 0x3,
+        "display_scratch": bool((terminal >> 27) & 1),
+        "display_scratch_bank": (terminal >> 26) & 1,
+        "frame_waiting": bool((terminal >> 25) & 1),
+        "presentation_hold": bool((terminal >> 24) & 1),
+        "destination_hold": bool((terminal >> 23) & 1),
+        "session_quiet": bool((terminal >> 22) & 1),
+        "sequence_end_seen": bool((terminal >> 21) & 1),
+        "presentation_complete": bool((terminal >> 20) & 1),
+        "presentation_error": bool((terminal >> 19) & 1),
+        "scheduler_debug_word": scheduler,
+        "scheduler_flags": {
+            "reorder_active": bool(scheduler & (1 << 0)),
+            "run_closed": bool(scheduler & (1 << 1)),
+            "decode_inflight": bool(scheduler & (1 << 2)),
+            "scratch0_pending": bool(scheduler & (1 << 3)),
+            "scratch1_pending": bool(scheduler & (1 << 4)),
+            "next_present_scratch_bank": bool(scheduler & (1 << 5)),
+            "future_frame_pending": bool(scheduler & (1 << 6)),
+            "future_reference_pending": bool(scheduler & (1 << 7)),
+            "scratch_presented": bool(scheduler & (1 << 8)),
+            "run_picture_count": (scheduler >> 9) & 0x3,
+            "overlap_decode_open": bool(scheduler & (1 << 11)),
+            "overlap_frame_pending": bool(scheduler & (1 << 12)),
+            "queued_run_active": bool(scheduler & (1 << 13)),
+            "queued_run_closed": bool(scheduler & (1 << 14)),
+            "queued_decode_inflight": bool(scheduler & (1 << 15)),
+            "queued_scratch0_pending": bool(scheduler & (1 << 16)),
+            "queued_scratch1_pending": bool(scheduler & (1 << 17)),
+            "queued_future_frame_pending": bool(scheduler & (1 << 18)),
+            "queued_future_reference_pending": bool(scheduler & (1 << 19)),
+            "queued_run_picture_count": (scheduler >> 20) & 0x3,
+            "queued_overlap_decode_open": bool(scheduler & (1 << 22)),
+            "queued_overlap_frame_pending": bool(scheduler & (1 << 23)),
+            "decode_generation_queued": bool(scheduler & (1 << 24)),
+            "promotion_pending": bool(scheduler & (1 << 25)),
+            "pending_frame_valid": bool(scheduler & (1 << 26)),
+            "pending_frame_released": bool(scheduler & (1 << 27)),
+            "terminal_boundary_pending": bool(scheduler & (1 << 28)),
+            "queued_first_scratch_bank": bool(scheduler & (1 << 29)),
+            "last_bound_reference_valid": bool(scheduler & (1 << 30)),
+            "scheduler_presentation_complete": bool(scheduler & (1 << 31)),
+        },
+        "checksum": words[34],
     }
 
 
@@ -223,6 +291,23 @@ def main() -> int:
             "overlap={hold_overlap_cycles} "
             "scratch_free={hold_scratch_available_cycles} "
             "promotion={hold_promotion_pending_cycles}".format(**result)
+        )
+        print(
+            "snapshot: {snapshot_reason}; outlier_gaps={gap_outlier_count}; "
+            "terminal completed/display={completed_frame_bank}/{display_frame_bank} "
+            "waiting={frame_waiting} hold={presentation_hold} "
+            "complete={presentation_complete} error={presentation_error}".format(
+                **result
+            )
+        )
+        print(
+            "largest gaps: "
+            + ", ".join(
+                "#{display_picture_ordinal}={cycles}cy/{seconds:.6f}s".format(
+                    **gap
+                )
+                for gap in result["largest_display_gaps"]
+            )
         )
         for failure in failures:
             print(f"FAIL: {failure}")

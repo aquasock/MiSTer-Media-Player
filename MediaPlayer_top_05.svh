@@ -97,6 +97,7 @@ end
 // adjacent B headers cannot collapse into one coding-type level.  The scheduler
 // alternates two scratch frames and owns the complete B...B->future-reference
 // presentation transaction, including fail-open error retirement.
+wire [31:0] mpeg2_new_b_scheduler_debug_state;
 mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
 (
     .clk                         (clk_mpeg2),
@@ -123,5 +124,6 @@ mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
     .scratch_available           (mpeg2_new_b_scratch_available),
     .promotion_active            (mpeg2_new_b_promotion_active),
     .presentation_complete       (mpeg2_new_b_presentation_complete),
-    .presentation_error          (mpeg2_new_b_presentation_error)
+    .presentation_error          (mpeg2_new_b_presentation_error),
+    .debug_state                 (mpeg2_new_b_scheduler_debug_state)
 );

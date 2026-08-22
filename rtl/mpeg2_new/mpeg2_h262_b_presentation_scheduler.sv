@@ -36,7 +36,10 @@ module mpeg2_h262_b_presentation_scheduler
     output wire scratch_available,
     output wire promotion_active,
     output reg  presentation_complete,
-    output reg  presentation_error
+    output reg  presentation_error,
+    // Entry 311: passive state export for the development cadence snapshot.
+    // No bit feeds scheduler control or timing decisions.
+    output wire [31:0] debug_state
 );
 
 reg pending_frame_valid,pending_frame_released;reg[1:0] pending_frame_bank;
@@ -118,6 +121,38 @@ assign reference_overlap_header=(reorder_active&&!run_closed)||
                                 (queued_run_active&&!queued_run_closed);
 assign scratch_available=queued_scratch_available;
 assign promotion_active=promotion_pending;
+assign debug_state = {
+    presentation_complete,
+    last_bound_reference_valid,
+    queued_first_scratch_bank,
+    terminal_boundary_pending,
+    pending_frame_released,
+    pending_frame_valid,
+    promotion_pending,
+    decode_generation_queued,
+    queued_overlap_frame_pending,
+    queued_overlap_decode_open,
+    queued_run_picture_count,
+    queued_future_reference_pending,
+    queued_future_frame_pending,
+    queued_scratch1_pending,
+    queued_scratch0_pending,
+    queued_decode_inflight,
+    queued_run_closed,
+    queued_run_active,
+    overlap_frame_pending,
+    overlap_decode_open,
+    run_picture_count,
+    scratch_presented,
+    future_reference_pending,
+    future_frame_pending,
+    next_present_scratch_bank,
+    scratch1_pending,
+    scratch0_pending,
+    decode_inflight,
+    run_closed,
+    reorder_active
+};
 assign presentation_hold=reorder_active&&run_closed&&
                          !overlap_decode_open&&!queued_decode_inflight&&
                          (promotion_pending||!queued_header_capacity)&&
