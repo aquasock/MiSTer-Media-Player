@@ -1,3 +1,31 @@
+## 344 COMMIT Unreleased ??? 2026-08-22T09:04:12-07:00
+
+#### Coming From:
+
+Unreleased ae51759
+
+#### Purpose:
+
+Package and independently verify the qualified v0.6.0 RBF as the fourth step of the approved release plan.
+
+#### Outcome:
+
+The proposed packaging step will create a dedicated release directory outside the Git worktree, copy the clean seed-ten `MediaPlayer.rbf` to the required `MediaPlayer_20260822.rbf` name, and add human-readable SHA-256 metadata. Acceptance requires the package artifact to be exactly 4,455,376 bytes, byte-for-byte identical to both the current clean output and the preserved accepted incremental output, and to reproduce SHA-256 `e95e9ec43cb11917d5a904fdd8016bcc23dcbe2d8f36f678544f42ad1a6d5f10`. No generated binary or package metadata will be committed to the source repository.
+
+#### Next Steps:
+
+Create the external package directory, refuse to overwrite a conflicting pre-existing package, copy and verify the artifact through independent size, checksum and byte-comparison checks, then retain the package for the final release commit, tag and GitHub asset steps.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 343 COMMIT Unreleased ae51759 2026-08-22T08:55:25-07:00
 
 #### Coming From:
@@ -1154,45 +1182,6 @@ Return to the stall at byte 158,381 with the build qualification settled. Nothin
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 304 COMMIT Unreleased a9cd69c 2026-08-21T16:46:47-07:00
-
-#### Coming From:
-
-Unreleased c5c5581
-
-#### Purpose:
-
-Implement forward f_code five through nine in the wide motion path so the decoder stops rejecting real content.
-
-#### Outcome:
-
-The limit was never a validation rule to relax but a datapath width running from the parser to the raster engine, and all of it is now thirteen bits. H.262 sets the vector range at plus or minus sixteen shifted left by `f_code-1`, which reaches plus or minus 4,096 at f_code nine, so thirteen signed bits is the exact requirement. In the probe the residual accumulator was three bits, capping `r_size` at three and therefore f_code at four; it and its shift register are now eight bits, `reconstruct_mv` takes an eight-bit residual with an eighteen-bit internal reconstruction and returns thirteen bits, and the predictor, current vector and event outputs are thirteen bits. The picture coding extension gate that accepted only one through four now accepts one through nine, in both the acceptance term and the rejection announcement so the two cannot disagree.
-
-Carrying the wider vector to the raster engine needed a routing change rather than a wider sideband. The shared residual sideband value is sixteen bits and also carries coefficients, so it cannot hold two thirteen-bit components and widening it would have reached the whole residual path. The controller already produced thirteen-bit `p_forward_vector_x` and `p_forward_vector_y` for the prediction path and the reference probe already received them, so the engine now takes a dedicated motion vector channel from those same wires, combinationally aligned with the sideband, while the sideband index continues to identify a record as motion. The engine's motion memory widens from seventeen to twenty-seven bits to hold the intra flag and two thirteen-bit components, and the chroma half-vector function and the integer and half-pel splits widen with it. The packed sideband value for motion records is now a placeholder, since nothing reads it.
-
-Both regression gates pass. The 128 by 96 corpus soak reproduces every golden value exactly, including 132 P rows, 22 P and 47 B pictures, 25 published references, 50,688 reference writes and 372,696 DDR reads, with no errors. Its cycle count reads 6,589,997 rather than the recorded 6,589,996, but a control run of stock RTL under the same simulator reads 6,589,997 as well, so the difference belongs to Verilator rather than to this change. The 48 frame clip that already decoded cleanly is byte for byte unchanged at 37,649,997 cycles with no errors.
-
-On the failing clip the rejection is gone. Picture sixteen with f_code five is accepted, no unsupported-feature report is raised, and the decoder advances from byte 156,882 to byte 158,381 with fifteen P and thirty-three B pictures decoded and eighteen published. It then stalls and reaches the bench's two hundred million cycle limit, so this commit removes the capability limit without yet making the clip play to completion.
-
-#### Next Steps:
-
-Characterise the stall at byte 158,381 before assuming it belongs to this change, and characterise it by the method Entry 303 established rather than by inference: identify which module raises which code, read that code against that module's own table, and only then propose a mechanism. Two facts already bound the question. The same clip encoded with the motion search capped at sixteen, which keeps f_code at four or below, previously reached byte 157,552 and raised prediction error source two detail eight, so a defect exists just past this point that is reachable without f_code five at all and is therefore not introduced here. The current stall produces no error code at all, only a timeout, which is a different signature from that one and must not be assumed to be the same defect. A Quartus compile should also be run against this commit before any hardware work, since the motion memory grew from seventeen to twenty-seven bits per entry and the resulting M10K and timing cost has not been measured.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
 
 #### Status:
 
