@@ -2,13 +2,14 @@
 
 An experimental media-player core for [MiSTer FPGA](https://github.com/MiSTer-devel/Main_MiSTer), with a standards-driven MPEG-2 Video / ITU-T H.262 decoder implemented primarily in FPGA logic.
 
-> **Development status:** active, pre-release, developer-oriented. **v0.5.0 is the current published hardware-qualified milestone.** It extends the progressive 4:2:0 I/P/B path to the 720x480 regression geometry and independently applies picture-signaled P/B motion-vector `f_code` values from 1 through 4. Audio, program-stream demux, DVD support, and broader H.262 coverage remain future work.
+> **Development status:** active, pre-release, developer-oriented. **v0.5.0 remains the current published milestone; v0.6.0 is now a hardware-qualified release candidate.** The candidate sustains real-stream progressive 4:2:0 I/P/B decoding at 720x480, adds native 23.976/24/25 fps presentation cadence, and fixes the GOP-boundary stutters, large-picture starvation, and end-of-stream stalls found during full-length playback testing. Audio, container/program-stream demux, DVD support, playback controls, and broader H.262 coverage remain future work.
 
 ## Current status
 
-The active decoder is a clean H.262 implementation under `rtl/mpeg2_new/`. It currently provides:
+The active decoder is a clean H.262 implementation under `rtl/mpeg2_new/`. The v0.6.0 release candidate currently provides:
 
-- streaming MPEG-2 elementary-stream input with FIFO backpressure;
+- streaming raw MPEG-2 Video elementary-stream input through a 16-bit MiSTer host ingress and 32 KiB mixed-width asynchronous FIFO with backpressure;
+- a 60 MHz decoder clock domain, independently timed from the 40 MHz diagnostic video domain;
 - picture, slice, macroblock, block, and DCT VLC parsing for the supported paths;
 - inverse quantization and fixed-point two-pass 8x8 IDCT;
 - full 8-bit Y, Cb, and Cr intra reconstruction;
@@ -17,37 +18,67 @@ The active decoder is a clean H.262 implementation under `rtl/mpeg2_new/`. It cu
 - 4:2:0 chroma expansion and limited-range BT.601 YCbCr-to-RGB presentation;
 - continuous supported all-I picture decode using one re-armed parser;
 - P-picture reference ownership, publication, consecutive reconstructed-P reference promotion, and destination-ownership pacing;
-- syntax-derived per-macroblock P forward motion with independently signaled horizontal/vertical `f_code` values from 1 through 4, signed vectors, predictor reuse/reset, integer and half-sample interpolation, H.262 wraparound, and 4:2:0 chroma-vector scaling;
+- syntax-derived per-macroblock P forward motion with independently signaled horizontal/vertical `f_code` values from 1 through 9, signed vectors, predictor reuse/reset, integer and half-sample interpolation, H.262 wraparound, and 4:2:0 chroma-vector scaling;
 - syntax-derived 4:2:0 coded-block-pattern selection across Y0/Y1/Y2/Y3/Cb/Cr;
 - generalized non-intra P coefficient handling including ordinary run/level VLCs, non-zero runs, signs, EOB, Escape syntax, q_scale_type, alternate_scan, and quantiser-scale changes;
 - prediction-plus-residual reconstruction, clipping, DDR persistence/readback, and generalized P-picture re-arm;
-- bounded B-picture reconstruction with independently signaled forward/backward horizontal/vertical `f_code` values from 1 through 4, forward/backward/bidirectional prediction, internal macroblock skips, residual reconstruction, scratch persistence, and coded-order/display-order presentation handling;
-- a 33-bit / 90 kHz synthetic elementary-stream presentation-timing foundation derived from H.262 frame-rate information and `temporal_reference`.
+- bounded B-picture reconstruction with independently signaled forward/backward horizontal/vertical `f_code` values from 1 through 5, forward/backward/bidirectional prediction, internal macroblock skips, residual reconstruction, scratch persistence, and coded-order/display-order presentation handling;
+- overlapped reference decode and B-picture presentation with corrected ownership, publication, terminal-reference release, and blanking-aligned frame swaps;
+- native presentation pacing for H.262 frame-rate codes 1, 2, and 3: `24000/1001`, exact 24 fps, and 25 fps;
+- a 33-bit / 90 kHz synthetic elementary-stream timeline derived from H.262 frame-rate information and `temporal_reference`.
 
 The current implementation subset remains intentionally bounded while the decoder architecture is being proven. These are implementation limits, **not** limits of H.262.
 
 | Area | Current implementation |
 | --- | --- |
-| Input | MPEG-2 Video elementary stream |
+| Input | Raw MPEG-2 Video elementary stream (`.m2v`); no container, Program Stream, PES, audio, or PTS input yet |
 | Picture type | Continuous supported I pictures; generalized hardware-proven P regression path; bounded hardware-proven B regression/presentation path |
 | Picture structure | Progressive frame pictures on the proven paths |
 | Chroma format | 4:2:0 |
 | Proven geometry | Up to 720x480 / 45x30 macroblocks for the authoritative I, P, and B regression paths |
-| Generalized P motion envelope | Independently signaled horizontal/vertical `f_code` 1..4, signed vectors, predictor reuse/reset and wraparound, integer/H/V/bilinear half-sample prediction |
+| Presentation rates | H.262 frame-rate codes 1..3: `24000/1001`, exact 24 fps, and 25 fps |
+| Generalized P motion envelope | Independently signaled horizontal/vertical `f_code` 1..9, signed vectors, predictor reuse/reset and wraparound, integer/H/V/bilinear half-sample prediction |
 | Generalized P residual envelope | Up to 32 coded residual blocks and 64 non-zero coefficient events per picture; implementation caps |
-| B regression envelope | Independently signaled forward/backward H/V `f_code` 1..4, forward/backward/bidirectional prediction, internal skips, bounded residuals, B scratch storage, and display reordering |
+| B regression envelope | Independently signaled forward/backward H/V `f_code` 1..5, forward/backward/bidirectional prediction, internal skips, bounded residuals, B scratch storage, and display reordering; deterministic range regressions cover 1..4 |
 | Reconstruction precision | 8-bit Y/Cb/Cr |
 | Frame storage | Two retained planar MiSTer DDR3 I/P frame banks plus a distinct B scratch region |
+| Compressed-data buffering | 16-bit host ingress into a 32 KiB mixed-width asynchronous FIFO; 8-bit decoder consumption |
 | Timing metadata | Synthetic elementary-stream 33-bit / 90 kHz schedule; not PES-derived PTS |
 | Video output | Fixed 800x600 diagnostic timing |
 
 The frozen `rtl/mpeg2fpga/` tree remains only as a historical/reference implementation and is not part of the active Quartus build.
 
+### v0.6.0 release-candidate qualification
+
+The accepted candidate is source commit `b64ec6a`. A preserved incremental build and an independent clean/from-scratch Quartus 17.0.2 build produced the same 4,455,376-byte RBF, with SHA-256 `e95e9ec43cb11917d5a904fdd8016bcc23dcbe2d8f36f678544f42ad1a6d5f10`.
+
+The clean build completed with zero errors and positive timing in every required category: +0.303 ns global setup, +0.386 ns decoder setup, +8.066 ns video setup, +0.244 ns hold, +3.706 ns recovery, +0.768 ns removal, and +1.122 ns minimum pulse width. It uses 34,565 ALMs, 50,960 registers, 4,306,375 block-memory bits, 538 RAM blocks, and 65 DSP blocks.
+
+Hardware qualification includes:
+
+- deterministic P skip/motion, B prediction, multi-slice, and large-picture/long-GOP regression streams;
+- a 15-second native-23.976-fps stress clip spanning the high-motion Big Buck Bunny scene that originally exposed dropped frames;
+- the complete native-rate Big Buck Bunny movie, including pans, high-motion scenes, transitions, and rolling credits;
+- a complete 642 MB real-world 720x480 progressive `24000/1001` stream, manually selected through the normal MiSTer file menu.
+
+All four focused hardware regressions passed with complete byte and picture counts, sequence-end completion, zero decoder errors, and zero cadence outliers. Both full-length streams were accepted by human visual inspection with smooth motion and no perceptible speed error.
+
+### Current v0.6.0 boundaries
+
+- H.262 frame-rate codes 4 through 8 (29.97, 30, 50, 59.94, and 60 fps) are not cadence-paced and are not supported for this release candidate.
+- Interlaced picture structures, chroma formats other than 4:2:0, audio, multiplexed containers, Program Stream/PES transport, and real PTS are not implemented.
+- Seeking, scrubbing, pause/resume, and DVD navigation are not implemented.
+- Full-length files should be opened through the normal MiSTer file menu. Automatic MGL injection of a 642 MB test file did not enter the normal streaming path and is not a qualified loading method.
+
 ## Releases
 
 Milestone releases use semantic-version tags on GitHub. MiSTer RBF assets retain the normal date-coded core naming convention.
 
-Current published milestone release:
+Upcoming release candidate:
+
+- **v0.6.0** — sustained 720x480 progressive 4:2:0 real-stream I/P/B decoding, native `24000/1001`/24/25-fps cadence, 60 MHz decode, 32 KiB mixed-width compressed-data buffering, corrected GOP and terminal presentation behavior, and full-length hardware playback qualification.
+
+Current published milestone:
 
 - **v0.5.0** — 720x480 progressive 4:2:0 I/P/B regression coverage, generalized P/B motion-vector `f_code` 1-through-4 handling, full-width P parser/raster completion, and settled post-stream diagnostics; binary asset `MediaPlayer_20260817.rbf`.
 
@@ -89,7 +120,7 @@ intra reconstruction    P prediction + residual    B prediction + residual
                  blanking-aligned publication/reorder -> MiSTer video output
 ```
 
-A sideband timing path derives a 33-bit / 90 kHz elementary-stream presentation schedule from H.262 frame-rate metadata. It is deliberately not called PTS because the current `.m2v` input has no H.222.0 PES layer.
+A sideband timing path derives a 33-bit / 90 kHz elementary-stream presentation schedule from H.262 frame-rate metadata and cadence-paces frame-rate codes 1 through 3. It is deliberately not called PTS because the current `.m2v` input has no H.222.0 PES layer.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for architectural background and [`docs/MPEG2_NEW_DECODER.md`](docs/MPEG2_NEW_DECODER.md) for the decoder development record.
 
@@ -102,13 +133,15 @@ quartus_sh --flow compile MediaPlayer
 quartus_sta -t tools/phase1p_timing.tcl
 ```
 
-Release candidates are accepted only after a clean/from-scratch Quartus build, the standard Phase 1P timing reports, and the required MiSTer hardware regression tests all pass for the candidate RTL.
+Release candidates are accepted only after a clean/from-scratch Quartus build, the standard Phase 1P timing reports, and the required MiSTer hardware regression tests all pass for the candidate RTL. The v0.6.0 candidate also had to reproduce its previously accepted incremental RBF byte-for-byte before the clean image was treated as qualified.
 
 See [`docs/BUILDING.md`](docs/BUILDING.md) for the full workflow.
 
 ## Diagnostic streams
 
-Binary regression streams are generated locally from deterministic scripts under `tools/streams/`. The authoritative seven-stream hardware matrix is:
+Binary regression streams are generated locally from deterministic scripts under `tools/streams/`. The v0.6.0 candidate's focused four-test hardware gate covers P skip/motion, B prediction, repeated multi-slice pictures, and the native-rate high-motion scene that exposed large-picture starvation. The complete native-rate Big Buck Bunny movie and a separate full-length real-world `24000/1001` stream provide the visual endurance gate.
+
+The underlying authoritative seven-stream decoder matrix is:
 
 - `test_i_baseline.m2v` for continuous full-width all-I decoding;
 - `test_p_motion_residual.m2v` for P motion phases, coded-block patterns, residual reconstruction, and quantiser changes;
@@ -133,7 +166,7 @@ The USER LED is used as a positive completion diagnostic during development. Its
 
 ## Development roadmap
 
-After v0.5.0, decoder work can broaden the currently bounded P/B implementation toward a wider real-stream H.262 compatibility envelope, including broader picture structures and chroma formats. Later work includes presentation-quality chroma improvements, H.222.0 Program Stream/PES handling and real timestamps, audio integration, and DVD navigation/optical-drive integration.
+After v0.6.0, decoder work can broaden the qualified progressive 23.976/24/25-fps path toward more H.262 frame rates, interlaced picture structures, additional chroma formats, and a wider real-stream syntax envelope. Later work includes presentation-quality chroma improvements, H.222.0 Program Stream/PES handling and real timestamps, audio integration, playback controls, and DVD navigation/optical-drive integration.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for completed milestones.
 
