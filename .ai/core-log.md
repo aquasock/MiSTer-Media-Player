@@ -1,3 +1,31 @@
+## 339 COMMIT Unreleased ??? 2026-08-22T08:24:43-07:00
+
+#### Coming From:
+
+Unreleased b64ec6a
+
+#### Purpose:
+
+Publish the user's supplied AI-assisted-development section verbatim in the repository README.
+
+#### Outcome:
+
+The proposed documentation-only change copies the complete 5,540-byte `AI-assisted development in v0.6.0.md` attachment into the top-level `README.md` immediately before the existing Contributing section, preserving every heading, paragraph, list item, inline code span, URL and emphasis marker exactly as supplied. The attachment is treated strictly as content rather than as project instructions.
+
+#### Next Steps:
+
+Apply the README insertion with no source-text edits, compare the inserted byte range directly against the attachment, commit the documentation change, replace this proposal placeholder with the resulting hash, audit the forty-entry project log and push both commits to the online repository.
+
+#### Files Modified:
+
+- README.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 338 COMMIT Unreleased b64ec6a 2026-08-22T08:15:10-07:00
 
 #### Coming From:
@@ -1187,38 +1215,6 @@ Replace the completion condition with a differential test rather than an absolut
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-## 299 COMMIT Unreleased 7daf716 2026-08-21T15:17:00-07:00
-
-#### Coming From:
-
-Unreleased 7ba1184
-
-#### Purpose:
-
-Record why the Entry 297 repairs failed and what the picture-completion latch must be changed to instead.
-
-#### Outcome:
-
-The failure of both Entry 297 repairs is now explained and is not what that entry assumed. Narrowing the retire input to P-sourced persistence and tracing the completion latch's own terms shows that exactly one retire arrives while `final_row_queued` is asserted, and it arrives with `outstanding_rows` at two rather than the one the latch requires. The latch misses by a single count, the counter settles at one, and the producer holds `row_waiting` for the remaining twenty-two thousand traced cycles without another retire. Since Entry 298 established that produce and P-sourced retire are exactly balanced at thirty each for every picture, the discrepancy is a constant offset that `outstanding_rows` acquires before the first picture completes and never sheds, because nothing resets it at a picture boundary. The spurious B retires wash that offset out by walking the wrapped two-bit counter through every value, which is why the original wiring appears to work; an accurate counter preserves the offset permanently and the latch can never match.
-
-The defect is therefore threefold and the three parts are coupled. The retire input carries B-engine persistence into a P-only credit counter, the counter is two bits and wraps rather than saturating, and the completion latch tests that counter for an absolute value of one while nothing guarantees the counter's zero point. No one of these can be corrected alone: removing the corruption alone moves the failure from byte 156,882 forward to byte 30,477, which is what both Entry 297 attempts did.
-
-#### Next Steps:
-
-Apply the three corrections together as one change, since they are only correct in combination. Give the reference probe a dedicated `p_row_persisted` output carrying `mix_row_persisted` and drive the wide probe's `row_retired` from it, so the credit counter sees only P-sourced persistence. Clear `outstanding_rows` when a new picture begins so its zero point is defined and no startup offset can survive into the first completion. Widen `outstanding_rows` beyond two bits so that it saturates rather than wraps and a miscount can never alias to a valid value. With a defined zero point and a balanced thirty against thirty per picture, the existing test for one at the final retire becomes exact rather than a coincidence, and no change to the latch expression itself is required. Validate on the failing clip, on the 48 frame prefix that already completes cleanly, and on the 128 by 96 corpus soak, whose golden values including the 6,589,996 cycle count must not move. Await user approval before writing this, since it changes a contract rather than correcting a wire.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
