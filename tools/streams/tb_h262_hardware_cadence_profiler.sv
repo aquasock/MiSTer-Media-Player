@@ -34,6 +34,7 @@ reg [31:0] checksum;
 
 mpeg2_h262_hardware_cadence_profiler #(
     .TERMINAL_SNAPSHOT_DELAY(32),
+    .NO_PROGRESS_SNAPSHOT_DELAY(64),
     .OUTLIER_GAP_CYCLES(32'd10)
 ) dut(
     .clk_mpeg2(clk_mpeg2),.reset_mpeg2(reset_mpeg2),
@@ -95,7 +96,7 @@ begin
     scratch_available=0;promotion_active=0;
     completed_frame_bank=0;display_frame_bank=0;display_scratch=0;
     display_scratch_bank=0;presentation_complete=0;presentation_error=0;
-    scheduler_debug_state=0;decoder_byte_accepted=0;
+    scheduler_debug_state=0;decoder_byte_accepted=0;error_flags=0;
     repeat(5)@(posedge clk_mpeg2);reset_mpeg2=0;
     repeat(5)@(posedge clk_video);reset_video=0;
 end
@@ -188,12 +189,43 @@ initial begin
                dut.snapshot_sync_2[1183:1152]);
     verify_checksum();
 
+    // A sticky fatal result must snapshot even when no sequence end can be
+    // accepted after the transport enters fail-open drain.
+    reset_all();
+    activate_session();
+    error_flags=16'h0200;presentation_error=1;
+    completed_frame_bank=2;display_frame_bank=1;
+    scheduler_debug_state=32'h3140fade;
+    wait(snapshot_ready);repeat(4)@(posedge clk_video);
+    if(dut.snapshot_sync_2[831:830]!==2'd3)
+        $fatal(1,"fatal snapshot reason missing");
+    if(dut.snapshot_sync_2[639:624]!==16'h0200)
+        $fatal(1,"fatal error flags missing %h",dut.snapshot_sync_2[639:608]);
+    if(dut.snapshot_sync_2[1183:1152]!==32'h3140fade)
+        $fatal(1,"fatal scheduler state mismatch");
+    verify_checksum();
+
+    // With no fatal flag and no sequence end, a bounded lack of decoder,
+    // persistence, presentation, prediction or writer progress must also
+    // expose the live terminal state.
+    reset_all();
+    error_flags=0;presentation_error=0;
+    activate_session();
+    completed_frame_bank=1;display_frame_bank=2;frame_waiting=1;
+    scheduler_debug_state=32'h3140dead;
+    wait(snapshot_ready);repeat(4)@(posedge clk_video);
+    if(dut.snapshot_sync_2[831:830]!==2'd3)
+        $fatal(1,"no-progress snapshot reason missing");
+    if(dut.snapshot_sync_2[1183:1152]!==32'h3140dead)
+        $fatal(1,"no-progress scheduler state mismatch");
+    verify_checksum();
+
     @(negedge clk_video);h_pos=300;v_pos=300;
     @(posedge clk_video);#1;
     if({video_r,video_g,video_b}!==24'h123456)
         $fatal(1,"base video changed outside overlay");
 
-    $display("HARDWARE_CADENCE_PROFILER_PASS schema=4 gap-state+forced checksum=%h",
+    $display("HARDWARE_CADENCE_PROFILER_PASS schema=4 gap-state+forced+fatal+no-progress checksum=%h",
              checksum);
     $finish;
 end

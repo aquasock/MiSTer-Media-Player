@@ -8,6 +8,7 @@
 `timescale 1ns/1ps
 module mpeg2_h262_hardware_cadence_profiler #(
     parameter [23:0] TERMINAL_SNAPSHOT_DELAY = 24'd13500000,
+    parameter [26:0] NO_PROGRESS_SNAPSHOT_DELAY = 27'd54000000,
     parameter [31:0] OUTLIER_GAP_CYCLES = 32'd2700000
 )(
     input wire clk_mpeg2,input wire reset_mpeg2,
@@ -39,6 +40,8 @@ localparam integer SNAPSHOT_WORDS=38;
 localparam integer SNAPSHOT_BITS=SNAPSHOT_WORDS*32;
 localparam [23:0] TERMINAL_SNAPSHOT_LIMIT=
     TERMINAL_SNAPSHOT_DELAY-24'd1;
+localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
+    NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
 localparam [31:0] SNAPSHOT_FORMAT={8'd4,8'd38,16'd54000};
 localparam [11:0] OVERLAY_X=12'd8,OVERLAY_Y=12'd444;
@@ -90,6 +93,7 @@ reg current_gap_context_valid;
 reg [15:0] gap_outlier_count;
 reg [9:0] quiet_count;
 reg [23:0] terminal_wait_count;
+reg [26:0] no_progress_wait_count;
 reg [1:0] snapshot_reason;
 reg [SNAPSHOT_BITS-1:0] snapshot_mpeg2;
 reg snapshot_ready_mpeg2;
@@ -100,6 +104,9 @@ wire display_swap_now=first_present_valid&&
      (display_scratch_q!=display_scratch_d)||
      (display_scratch_q&&(display_scratch_bank_q!=display_scratch_bank_d)));
 wire prediction_request_accepted=prediction_read_q&&!prediction_busy_q;
+wire session_progress=decoder_byte_accepted_q||reference_picture_complete_q||
+    b_picture_complete_edge||display_swap_now||prediction_request_accepted||
+    prediction_data_ready_q||writer_write_q;
 wire [31:0] display_gap_now=session_cycles-last_present_cycle;
 wire [31:0] display_gap_meta_now={
     display_picture_count+1'b1,
@@ -217,6 +224,7 @@ always @(posedge clk_mpeg2) begin
         largest_gap_state_0<=0;largest_gap_state_1<=0;largest_gap_state_2<=0;
         current_gap_meta<=0;current_gap_state<=0;current_gap_context_valid<=0;
         gap_outlier_count<=0;quiet_count<=0;terminal_wait_count<=0;
+        no_progress_wait_count<=0;
         snapshot_reason<=0;snapshot_mpeg2<=0;snapshot_ready_mpeg2<=0;
     end else begin
         fifo_pending_q<=fifo_pending;decoder_ready_q<=decoder_ready;
@@ -338,17 +346,34 @@ always @(posedge clk_mpeg2) begin
             end
         end
 
-        if(!snapshot_ready_mpeg2&&session_active&&sequence_end_seen_q&&
+        // Entry 314: a fatal transport result can suppress all later decoder
+        // validity, including the sequence-end code that previously gated
+        // this snapshot.  Capture the first settled fatal state directly.
+        if(!snapshot_ready_mpeg2&&session_active&&(error_flags_q!=0))begin
+            snapshot_reason<=3;terminal_wait_count<=0;
+            no_progress_wait_count<=0;
+            if(quiet_count==10'd1)capture_snapshot();
+            else quiet_count<=quiet_count+1'b1;
+        end else if(!snapshot_ready_mpeg2&&session_active&&sequence_end_seen_q&&
            session_quiet_q)begin
-            snapshot_reason<=1;terminal_wait_count<=0;
+            snapshot_reason<=1;terminal_wait_count<=0;no_progress_wait_count<=0;
             if(quiet_count==10'd1023)capture_snapshot();
             else quiet_count<=quiet_count+1'b1;
         end else if(!snapshot_ready_mpeg2&&session_active&&sequence_end_seen_q)begin
-            snapshot_reason<=2;quiet_count<=0;
+            snapshot_reason<=2;quiet_count<=0;no_progress_wait_count<=0;
             if(terminal_wait_count==TERMINAL_SNAPSHOT_LIMIT)capture_snapshot();
             else terminal_wait_count<=terminal_wait_count+1'b1;
+        end else if(!snapshot_ready_mpeg2&&session_active)begin
+            snapshot_reason<=3;quiet_count<=0;terminal_wait_count<=0;
+            if(session_progress)
+                no_progress_wait_count<=0;
+            else if(no_progress_wait_count==NO_PROGRESS_SNAPSHOT_LIMIT)begin
+                no_progress_wait_count<=0;
+                capture_snapshot();
+            end else
+                no_progress_wait_count<=no_progress_wait_count+1'b1;
         end else begin
-            quiet_count<=0;terminal_wait_count<=0;
+            quiet_count<=0;terminal_wait_count<=0;no_progress_wait_count<=0;
         end
     end
 end

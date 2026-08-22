@@ -198,6 +198,7 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "snapshot_reason": {
             1: "quiet",
             2: "forced_terminal_timeout",
+            3: "fatal_or_no_progress",
         }.get((snapshot_meta >> 30) & 0x3, "unknown"),
         "gap_outlier_count": snapshot_meta & 0xFFFF,
         "largest_display_gaps": [gap(1, 26), gap(2, 29), gap(3, 32)],
