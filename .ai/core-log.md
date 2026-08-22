@@ -1,3 +1,31 @@
+## 342 COMMIT Unreleased ??? 2026-08-22T08:50:43-07:00
+
+#### Coming From:
+
+Unreleased fe0393d
+
+#### Purpose:
+
+Create the final v0.6.0 release-notes document as the second step of the approved seven-step release plan.
+
+#### Outcome:
+
+The proposed document will give release users a self-contained explanation of the v0.6.0 real-stream milestone, its qualified raw progressive 4:2:0 input boundary, native frame-rate codes one through three, decoder and compressed-ingress changes, corrected presentation behavior, exact clean-build timing and resource figures, focused and full-length MiSTer validation, known limitations, and the required `MediaPlayer_20260822.rbf` size and checksum. It will distinguish implementation limits from H.262 limits and identify `b64ec6a` as the synthesized source baseline while noting that later release-documentation commits do not alter the qualified RTL.
+
+#### Next Steps:
+
+Add `docs/RELEASE_NOTES_v0.6.0.md`, compare every stated build, hardware and artifact figure against the accepted log evidence and current RBF, run documentation checks, then commit and push the release notes before proceeding to the final README release-state and FFmpeg-command update.
+
+#### Files Modified:
+
+- docs/RELEASE_NOTES_v0.6.0.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 341 COMMIT Unreleased fe0393d 2026-08-22T08:46:15-07:00
 
 #### Coming From:
@@ -1165,40 +1193,6 @@ Re-encoding the same 72 frames with the encoder's motion search capped at sixtee
 #### Next Steps:
 
 Decide the scope question first, because the two paths differ in size and only the user can choose. Implementing forward f_code five and above in the wide motion probe is the real fix, since commercial content will use the full range and the project's stated goal is DVD playback, but it is a parser change of unknown size. Capping the encoder's motion search is not a fix at all, only a way to keep exercising the rest of the pipeline, and it should be treated as a diagnostic aid rather than as a passing result. Whichever is chosen, the next failure is already located and reproducible: with f_code constrained the decoder reaches prediction error source two, detail eight, at byte 157,552 on picture sixteen, and that should be characterised the same way this one finally was, by identifying which module raises the code and what the code means before proposing any mechanism. Note for that work that error codes in this design are per-module and are not interchangeable; reading one module's code against another module's table is what cost entries 296 through 302.
-
-#### Files Modified:
-
-- tools/streams/tb_h262_live_raster_soak.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 302 COMMIT Unreleased 003ed48 2026-08-21T16:07:24-07:00
-
-#### Coming From:
-
-Unreleased c792ca8
-
-#### Purpose:
-
-Measure the cycle ordering of the completion events, as Entry 301 required before any further repair.
-
-#### Outcome:
-
-The measurement invalidates the premise of entries 298 through 301 and none of the repairs those entries proposed should be pursued. The picture-completion latch is not defective. Capturing the exact cycles of every relevant event shows all fifteen pictures completing correctly and identically, fifteen completion pulses for fifteen pictures. Picture one is representative: `final_row_queued` rises at cycle 939,584 with two rows outstanding, the P engine's picture-persistence edge and the final P-sourced retire both arrive at cycle 976,999 with `b_select` low and `row_produced` low, and completion asserts at cycle 977,000 with the outstanding count at zero. Picture fifteen behaves the same way at cycle 35,883,918. Completion therefore fires on the genuine P event, not on a coincidence.
-
-Entry 298's central claim, that picture completion is triggered by spurious B retires arriving by luck, is wrong and is superseded. The B retires do reach the counter and do walk it down to the value the equality test reads, but the event that actually satisfies the latch is the P engine's own final-row persistence. This was verifiable at any point by recording when the events occur rather than inferring it from counts, which is what Entry 301 required and what should have been done before Entry 299 proposed a repair.
-
-Rewriting the latch to key directly on picture persistence, with the row retire source left as found, confirms this independently: the failure is byte-for-byte identical to the stock signature at byte 156,882, because the change is a no-op on behaviour that was already correct. The contamination measurements from Entry 301 stand as measurements, 727 row retires against 240 genuine and 24 picture-persistence pulses against 8, and every contaminated picture-persistence pulse is observed at `final_row_queued` low, outside the completion window. They are real defects in signal routing but they are not the cause of this deadlock.
-
-The defect lies in whatever should begin P picture sixteen after picture fifteen completes normally. Picture fifteen completes, four further B-sourced persistence pulses follow, the sixteenth P header is seen by the publication shell, and the producer then emits nothing at all. In this stream P picture sixteen is the first P picture of the third GOP and follows an I picture; P picture nine holds the same position in the second GOP and decodes correctly, so position within the GOP is not by itself the discriminator.
-
-#### Next Steps:
-
-Instrument the producer's picture-start path rather than anything downstream of it. Capture `picture_capture`, `picture_count`, `current_picture_is_p`, `wide_candidate`, `geometry_supported`, `producer_rearm_pending` and `proof_done` in the wide probe across the start of picture sixteen, and compare that trace against the start of picture fifteen, which succeeds, and picture nine, which occupies the equivalent position in the previous GOP and also succeeds. The question is narrow and factual: which term in the probe's picture-start condition is not satisfied for picture sixteen. Do not propose a repair until that term is named. Five repairs have now been attempted across entries 297 to 302 and every one addressed a subsystem that measurement later showed to be working correctly, so the standing instruction is to identify the failing term by observation first and to treat any hypothesis not grounded in a recorded cycle as unproven.
 
 #### Files Modified:
 
