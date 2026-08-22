@@ -1,3 +1,30 @@
+## 318 COMMIT Unreleased ??? 2026-08-22T00:09:56-07:00
+
+#### Coming From:
+
+Unreleased d95baa6
+
+#### Purpose:
+
+Require the development cadence snapshot to wait for terminal presentation completion so the full 250-picture hardware run is not sampled two cadence slots early.
+
+#### Outcome:
+
+The 48- and 72-picture hardware reruns consume every byte, display every picture and finish with zero errors and zero cadence outliers, while the full 250-picture run consumes all 1,178,034 bytes, decodes all 250 pictures, reaches sequence end and plays smoothly to the authored black ending according to direct user observation. Its telemetry snapshot nevertheless latches at 248 displayed pictures only 1,023 decoder clocks after the latest swap because the development `session_quiet` term describes transport and decoder inactivity but does not require `presentation_complete`; the scheduler state still contains a valid released frame and a closed two-picture run, so this is an observability race rather than the former playback failure.
+
+#### Next Steps:
+
+Add `presentation_complete` to the development-only quiet qualification while preserving the existing bounded terminal-timeout path for genuine non-completion, run focused profiler verification, rebuild incrementally without clearing Quartus databases, and rerun all three hardware clips. Accept the diagnostic correction only if the controls remain exact and the full stream reports 250 pictures, 249 swaps, terminal quiet, zero errors and zero cadence outliers without any change to visible playback or the loading bar.
+
+#### Files Modified:
+
+- MediaPlayer_top_07.svh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
 ---
 ## 317 COMMIT Unreleased d95baa6 2026-08-21T23:50:22-07:00
 
