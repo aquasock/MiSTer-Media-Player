@@ -1,3 +1,34 @@
+## 325 COMMIT Unreleased ??? 2026-08-22T03:17:24-07:00
+
+#### Coming From:
+
+Unreleased e5e7d86
+
+#### Purpose:
+
+Close the remaining dense-scene presentation deficit by raising the decoder and DDR service clock from 54 MHz to 60 MHz without changing video cadence.
+
+#### Outcome:
+
+Entry 324 proves that compressed-input restart latency was real but not the only bottleneck. Enlarging the FIFO improves the exact quality-six squirrel control from 20.993581 to 22.417636 fps and reduces its worst display gap from 182.371 ms to 132.634 ms, yet seven cadence outliers remain. The new largest threshold snapshot has FIFO data pending while the decoder is not ready, so further input buffering cannot close the deficit, and the fitted design already consumes 538 of 553 RAM blocks. The unchanged decoder completes every picture without errors, making clock throughput rather than correctness the remaining target. Scaling the measured 22.417636 fps from 54 MHz to the PLL-compatible 60 MHz projects 24.908485 fps, enough to cross native cadence without reducing encode quality, while Entry 324's plus 1.672 ns decoder slack places the new 16.667 ns period near the timing boundary and therefore requires an actual fit.
+
+#### Next Steps:
+
+Change the decoder PLL output to 60 MHz, keep the independent 40 MHz pixel clock and cadence accumulator untouched, and update generated wrapper documentation, profiler time units and timeout thresholds, and the same-clock timing extractor for the new period. Re-run transport, scheduler, profiler and full dense-scene regressions, then compile incrementally with the existing seed. Reject any artifact with non-positive global, decoder, video, hold, recovery, removal or pulse-width timing. If timing closes, verify and install the exact RBF, rerun the quality-six 120-picture hardware control, and require all bytes, pictures and swaps, zero errors, terminal quiet and zero cadence outliers before handing 7:15 through 7:30 back to the user.
+
+#### Files Modified:
+
+- rtl/pll/pll_0002.v
+- rtl/pll.v
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/phase1p_timing.tcl
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 324 COMMIT Unreleased e5e7d86 2026-08-22T02:57:30-07:00
 
 #### Coming From:
