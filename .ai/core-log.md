@@ -1,4 +1,4 @@
-## 326 COMMIT Unreleased ??? 2026-08-22T03:35:21-07:00
+## 326 COMMIT Unreleased a25d772 2026-08-22T03:35:21-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Find a timing-clean placement for the unchanged 60 MHz decoder design by retryin
 
 #### Outcome:
 
-Commit `a5a42f9` passes its focused transport, native-rate scheduler and profiler regressions and builds with zero Quartus errors, but seed ten misses only the 60 MHz decoder setup requirement by 0.073 ns on two paths while hold, recovery, removal and pulse-width timing remain positive. The rejected artifact was not installed, so the MiSTer still runs the accepted 54 MHz decoder and 32 KiB input-reservoir core from `e5e7d86`. Because the setup deficit is narrow and placement-specific, changing only the fitter seed is the smallest justified next experiment before altering proven decoder logic.
+Commit `a25d772` changes only the fitter seed from ten to eleven and reuses synthesis as intended. The incremental Quartus build completes in 13 minutes 10 seconds with zero errors and positive timing at plus 0.296 ns global setup, plus 0.355 ns decoder setup, plus 8.030 ns video setup, plus 0.258 ns hold, plus 2.688 ns recovery, plus 0.677 ns removal and plus 1.122 ns pulse width. It uses 35,065 ALMs, 51,820 registers, 4,306,375 memory bits, 538 of 553 RAM blocks and 65 DSP blocks. The accepted 4,461,836-byte RBF has SHA-256 `15d5b3144608dbe7148ea4c2a822a714f569413f70657e8f4c8e9f8b4ff373cd` and verifies after persistent installation. Hardware remains correct but does not close the visible defect: the exact quality-six five-second control accepts all 1,430,191 bytes and presents all 120 pictures and 119 swaps with zero errors and terminal quiet, yet retains five cadence outliers and essentially unchanged 22.445238 fps delivery. A full 7:15-through-7:30 capture accepts all 2,603,570 bytes, decodes 239 B and 121 reference pictures for all 360 pictures with zero errors and terminal quiet; its eight-bit display counters wrap to 104 pictures and 103 swaps, while the three largest outliers occur at ordinals 175, 176 and 178, exactly 7.3 seconds after the clip begins and therefore at the user's 7:22 scene. Those gaps last 149.213 ms, 66.317 ms and 82.896 ms, and the largest snapshots show an empty FIFO while the decoder is ready, confirming compressed-input starvation rather than picture loss or I-frame-only presentation.
 
 #### Next Steps:
 
-Change only the project fitter seed from ten to eleven and compile incrementally. Accept the artifact only if the build has zero errors and positive global, decoder, video, hold, recovery, removal and pulse-width timing. If accepted, verify and install the exact RBF, then rerun the quality-six 120-picture squirrel control and require all 1,430,191 bytes, 120 pictures and 119 swaps, zero errors, terminal quiet and zero cadence outliers before loading the 7:15-through-7:30 clip for the user's visual check at 7:22.
+Keep the timing-clean seed-eleven fit and 60 MHz decoder, but treat the squirrel defect as not passed. Enable the MiSTer `hps_io` interface's standard 16-bit file-transfer mode and serialize each accepted little-endian word into the existing 8-bit, 32 KiB asynchronous FIFO so each host transaction carries two compressed bytes without increasing the design's 97-percent RAM-block usage. Prove byte order, backpressure and consecutive-word handling in a focused simulation, rerun transport, scheduler, profiler and exact-stream regressions, build incrementally with seed eleven and require all timing categories positive, then rerun both the five-second quality-six control and the full 7:15-through-7:30 hardware capture before asking the user to inspect 7:22 again.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Change only the project fitter seed from ten to eleven and compile incrementally
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
