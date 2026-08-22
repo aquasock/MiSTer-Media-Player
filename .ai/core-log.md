@@ -1,4 +1,4 @@
-## 336 COMMIT Unreleased ??? 2026-08-22T07:27:40-07:00
+## 336 COMMIT Unreleased b64ec6a 2026-08-22T07:27:40-07:00
 
 #### Coming From:
 
@@ -10,7 +10,7 @@ Find a timing-clean placement for the unchanged native-23.976-fps design by retr
 
 #### Outcome:
 
-Seed twelve leaves the decoder positive but misses a standing global framework path by 0.094 ns, while seed eleven closes that placement differently but misses the 60 MHz decoder by 0.131 ns. Every functional regression is already green and neither rejected RBF was installed. The proposed follow-up changes only the reproducible fitter seed from eleven to ten and retains the exact synthesized netlist so the next result remains a placement-only comparison.
+Seed twelve leaves the decoder positive but misses a standing global framework path by 0.094 ns, while seed eleven closes that placement differently but misses the 60 MHz decoder by 0.131 ns. Every functional regression is already green and neither rejected RBF was installed. Commit `b64ec6a` changes only the reproducible fitter seed from eleven to ten and retains the exact synthesized netlist so the next result remains a placement-only comparison.
 
 #### Next Steps:
 
