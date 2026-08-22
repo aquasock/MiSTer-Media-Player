@@ -1,4 +1,32 @@
 ---
+## 316 COMMIT Unreleased 3c80bef 2026-08-21T22:34:28-07:00
+
+#### Coming From:
+
+Unreleased 3c80bef
+
+#### Purpose:
+
+Review the user's recorded 72-picture playback and classify the loading-bar rate changes observed after the GOP-stutter repair.
+
+#### Outcome:
+
+The 11.712-second 59.94-fps phone recording contains two complete plays of the 72-picture stream. The MiSTer loading overlay covers the principal motion and the uncovered opening content changes too little for the recording to provide frame-accurate cadence proof by itself, but both passes advance through all source content without an obvious prolonged freeze at the former 24-picture GOP boundaries; this supports the user's qualified visual assessment that the stutter is gone and agrees with Entry 315's stronger hardware telemetry of 72 pictures, 71 swaps and zero cadence outliers. The loading-bar acceleration and deceleration is explained by the current transport rather than by display cadence: the standard HPS file transfer is stopped through `ioctl_wait` whenever the core's 256-byte dual-clock input FIFO is full, while decoder, prediction, persistence and presentation work consume bytes at variable rates. The bar therefore represents accepted file-byte progress and naturally advances in bursts as the FIFO fills and drains, with GOP-correlated rate changes expected because reference and B-picture work impose different backpressure. It is not presently a functional bug because progress remains monotonic, all bytes are accepted and display cadence remains legal; reversal, failure to complete or a coincident display outlier would change that classification.
+
+#### Next Steps:
+
+Accept the Entry 315 GOP-stutter repair and retain the bursty loading bar as a documented transport and user-interface characteristic rather than changing the scheduler again. Proceed separately to the 250-picture non-quiet terminal presentation state, preserving incremental builds and the accepted 48- and 72-picture cadence gates for every candidate.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 315 COMMIT Unreleased 3c80bef 2026-08-21T21:54:45-07:00
 
 #### Coming From:
