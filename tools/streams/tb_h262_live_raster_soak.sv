@@ -1822,4 +1822,90 @@ module tb_h262_live_raster_soak #(
         end
     end
 
+    // Entry 306: the byte-158,381 halt raises no error code, so there is nothing
+    // to look up.  Detect the freeze directly and dump every stage's state at
+    // the instant progress stops, rather than waiting out the bench timeout.
+    integer freeze_cycles=0,freeze_last_index=0;
+    reg engerr_d=0;
+    integer mot_presented=0,mot_captured=0,mot_dropped=0;
+    always @(posedge clk) begin
+        if(reset)begin freeze_cycles<=0; freeze_last_index<=0; end
+        else begin
+            if(stream_index!=freeze_last_index)begin
+                freeze_last_index<=stream_index;
+                freeze_cycles<=0;
+            end else freeze_cycles<=freeze_cycles+1;
+            if(publication.p_controller.wide_motion_valid)begin
+                mot_presented<=mot_presented+1;
+                if(prediction.mixed_probe.capture_enable)
+                    mot_captured<=mot_captured+1;
+                else
+                    mot_dropped<=mot_dropped+1;
+            end
+            engerr_d<=prediction.mixed_probe.error;
+            if(prediction.mixed_probe.error&&!engerr_d)
+                $display("ENGERR src=%0d idx=%h val=%h motion_count=%0d base=%0d mb_width=%0d cap_row=%0d mb_height=%0d bank_ready=%0d desc_pending=%0d cap_bank=%0d",
+                    prediction.mixed_probe.error_source,
+                    prediction.mixed_probe.residual_index,
+                    prediction.mixed_probe.residual_value,
+                    prediction.mixed_probe.motion_count,
+                    prediction.mixed_probe.capture_motion_base,
+                    prediction.mixed_probe.mb_width,
+                    prediction.mixed_probe.capture_row,
+                    prediction.mixed_probe.mb_height,
+                    prediction.mixed_probe.bank_ready[prediction.mixed_probe.capture_bank],
+                    prediction.mixed_probe.wide_desc_pending,
+                    prediction.mixed_probe.capture_bank);
+            if(prediction.mixed_probe.error&&!engerr_d)
+                $display("ENGERR_MOT presented=%0d captured=%0d dropped=%0d bsel=%0d mixsel=%0d cap_en=%0d",
+                    mot_presented,mot_captured,mot_dropped,
+                    prediction.b_select,prediction.mixed_select,
+                    prediction.mixed_probe.capture_enable);
+            if(freeze_cycles==2000000)begin
+                $display("FREEZE byte=%0d cycles=%0d", stream_index, total_cycles);
+                $display("FREEZE_PROD state=%0d piccap=%0d cand=%0d proof=%0d waiting=%0d hold=%0d outstanding=%0d finalq=%0d blocked=%0d rearm=%0d err=%0d/%0d",
+                    publication.p_controller.wide_general_probe.parser_state,
+                    publication.p_controller.wide_general_probe.picture_capture,
+                    publication.p_controller.wide_general_probe.wide_candidate,
+                    publication.p_controller.wide_general_probe.proof_done,
+                    publication.p_controller.wide_general_probe.row_waiting,
+                    publication.p_controller.wide_general_probe.parse_hold,
+                    publication.p_controller.wide_general_probe.outstanding_rows,
+                    publication.p_controller.wide_general_probe.final_row_queued,
+                    publication.p_controller.wide_general_probe.bank_blocked,
+                    publication.p_controller.wide_general_probe.producer_rearm_pending,
+                    publication.p_controller.wide_general_probe.probe_error,
+                    publication.p_controller.wide_general_probe.probe_error_detail);
+                $display("FREEZE_ENG stage=%0d started=%0d active=%0d persisted=%0d mbi=%0d blk=%0d ei=%0d motion_count=%0d motion_end=%0d cap_row=%0d desc_active=%0d err=%0d/%0d",
+                    prediction.mixed_probe.progress_stage,
+                    prediction.mixed_probe.started,
+                    prediction.mixed_probe.active,
+                    prediction.mixed_probe.persisted_seen,
+                    prediction.mixed_probe.mbi,
+                    prediction.mixed_probe.blk,
+                    prediction.mixed_probe.ei,
+                    prediction.mixed_probe.motion_count,
+                    prediction.mixed_probe.exec_motion_end,
+                    prediction.mixed_probe.capture_row,
+                    prediction.mixed_probe.desc_active,
+                    prediction.mixed_probe.error,
+                    prediction.mixed_probe.error_source);
+                $display("FREEZE_SCHED reorder=%0d closed=%0d inflight=%0d runpics=%0d scratch=%0d%0d future=%0d/%0d promote=%0d pending=%0d hdr=%0d/%0d b=%0d/%0d",
+                    scheduler.reorder_active, scheduler.run_closed,
+                    scheduler.decode_inflight, scheduler.run_picture_count,
+                    scheduler.scratch0_pending, scheduler.scratch1_pending,
+                    scheduler.future_frame_pending, scheduler.future_frame_bank,
+                    scheduler.promotion_pending, scheduler.pending_frame_valid,
+                    publication.p_header_count, publication.p_publication_count,
+                    publication.b_header_count, publication.b_persist_count);
+                $display("FREEZE_MODE wide=%0d general=%0d bsel=%0d mixsel=%0d decoder_ready=%0d",
+                    publication.p_controller.wide_mode,
+                    publication.p_controller.general_mode,
+                    prediction.b_select, prediction.mixed_select,
+                    stream_ready);
+                $finish;
+            end
+        end
+    end
+
 endmodule

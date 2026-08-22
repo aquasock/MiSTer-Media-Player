@@ -33,10 +33,21 @@ module mpeg2_h262_reference_read_probe
 wire general_geometry_supported=
  (horizontal_size!=14'd0)&&(vertical_size!=14'd0)&&
  (horizontal_size<=14'd720)&&(vertical_size<=14'd480);
+// Entry 306: this gate duplicates the syntax probe's f_code range check and was
+// missed when Entry 304 widened that one, so the parser accepted an f_code five
+// picture and produced rows for it while this gate silently refused to select
+// the engine that consumes them.  The two must move together; the vector
+// datapath is thirteen bits and carries the full 1..9 range.
 wire general_p_f_code_supported=
- (forward_f_code_horizontal>=4'd1)&&(forward_f_code_horizontal<=4'd4)&&
- (forward_f_code_vertical>=4'd1)&&(forward_f_code_vertical<=4'd4);
-wire general_detect_now=p_residual_sample_valid&&(p_residual_sample_index==6'h3e)&&
+ (forward_f_code_horizontal>=4'd1)&&(forward_f_code_horizontal<=4'd9)&&
+ (forward_f_code_vertical>=4'd1)&&(forward_f_code_vertical<=4'd9);
+// Entry 306: a motion record is 3e when inter and 3b when intra, and the engine's
+// own new_picture_metadata rearm accepts both.  This gate accepted only 3e, so a
+// P picture opening with intra macroblocks presented records that never selected
+// the engine and were dropped: 38 of them on picture sixteen, exactly the count
+// by which its first row fell short of mb_width.  The two gates must agree.
+wire general_detect_now=p_residual_sample_valid&&
+ ((p_residual_sample_index==6'h3e)||(p_residual_sample_index==6'h3b))&&
  general_p_f_code_supported&&
  general_geometry_supported&&!p_implicit_reconstruct_request;
 reg general_mixed_mode;
