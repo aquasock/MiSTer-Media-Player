@@ -2,11 +2,11 @@
 
 An experimental media-player core for [MiSTer FPGA](https://github.com/MiSTer-devel/Main_MiSTer), with a standards-driven MPEG-2 Video / ITU-T H.262 decoder implemented primarily in FPGA logic.
 
-> **Development status:** active, pre-release, developer-oriented. **v0.5.0 remains the current published milestone; v0.6.0 is now a hardware-qualified release candidate.** The candidate sustains real-stream progressive 4:2:0 I/P/B decoding at 720x480, adds native 23.976/24/25 fps presentation cadence, and fixes the GOP-boundary stutters, large-picture starvation, and end-of-stream stalls found during full-length playback testing. Audio, container/program-stream demux, DVD support, playback controls, and broader H.262 coverage remain future work.
+> **Development status:** active, pre-release, developer-oriented. **v0.6.0 is the current published hardware-qualified milestone.** It sustains real-stream progressive 4:2:0 I/P/B decoding at 720x480, adds native 23.976/24/25 fps presentation cadence, and fixes the GOP-boundary stutters, large-picture starvation, and end-of-stream stalls found during full-length playback testing. Audio, container/program-stream demux, DVD support, playback controls, and broader H.262 coverage remain future work.
 
 ## Current status
 
-The active decoder is a clean H.262 implementation under `rtl/mpeg2_new/`. The v0.6.0 release candidate currently provides:
+The active decoder is a clean H.262 implementation under `rtl/mpeg2_new/`. v0.6.0 provides:
 
 - streaming raw MPEG-2 Video elementary-stream input through a 16-bit MiSTer host ingress and 32 KiB mixed-width asynchronous FIFO with backpressure;
 - a 60 MHz decoder clock domain, independently timed from the 40 MHz diagnostic video domain;
@@ -48,24 +48,24 @@ The current implementation subset remains intentionally bounded while the decode
 
 The frozen `rtl/mpeg2fpga/` tree remains only as a historical/reference implementation and is not part of the active Quartus build.
 
-### v0.6.0 release-candidate qualification
+### v0.6.0 qualification
 
-The accepted candidate is source commit `b64ec6a`. A preserved incremental build and an independent clean/from-scratch Quartus 17.0.2 build produced the same 4,455,376-byte RBF, with SHA-256 `e95e9ec43cb11917d5a904fdd8016bcc23dcbe2d8f36f678544f42ad1a6d5f10`.
+The accepted synthesized source baseline is commit `b64ec6a`. A preserved incremental build and an independent clean/from-scratch Quartus 17.0.2 build produced the same 4,455,376-byte RBF, with SHA-256 `e95e9ec43cb11917d5a904fdd8016bcc23dcbe2d8f36f678544f42ad1a6d5f10`.
 
 The clean build completed with zero errors and positive timing in every required category: +0.303 ns global setup, +0.386 ns decoder setup, +8.066 ns video setup, +0.244 ns hold, +3.706 ns recovery, +0.768 ns removal, and +1.122 ns minimum pulse width. It uses 34,565 ALMs, 50,960 registers, 4,306,375 block-memory bits, 538 RAM blocks, and 65 DSP blocks.
 
 Hardware qualification includes:
 
 - deterministic P skip/motion, B prediction, multi-slice, and large-picture/long-GOP regression streams;
-- a 15-second native-23.976-fps stress clip spanning the high-motion Big Buck Bunny scene that originally exposed dropped frames;
+- a 15-second native-24-fps stress clip spanning the high-motion Big Buck Bunny scene that originally exposed dropped frames;
 - the complete native-rate Big Buck Bunny movie, including pans, high-motion scenes, transitions, and rolling credits;
 - a complete 642 MB real-world 720x480 progressive `24000/1001` stream, manually selected through the normal MiSTer file menu.
 
-All four focused hardware regressions passed with complete byte and picture counts, sequence-end completion, zero decoder errors, and zero cadence outliers. Both full-length streams were accepted by human visual inspection with smooth motion and no perceptible speed error.
+All four focused hardware regressions passed with complete byte and picture counts, sequence-end completion, and zero decoder errors. The long cadence stress clip additionally reported zero cadence outliers. Both full-length streams were accepted by human visual inspection with smooth motion and no perceptible speed error.
 
 ### Current v0.6.0 boundaries
 
-- H.262 frame-rate codes 4 through 8 (29.97, 30, 50, 59.94, and 60 fps) are not cadence-paced and are not supported for this release candidate.
+- H.262 frame-rate codes 4 through 8 (29.97, 30, 50, 59.94, and 60 fps) are not cadence-paced and are not supported by this milestone.
 - Interlaced picture structures, chroma formats other than 4:2:0, audio, multiplexed containers, Program Stream/PES transport, and real PTS are not implemented.
 - Seeking, scrubbing, pause/resume, and DVD navigation are not implemented.
 - Full-length files should be opened through the normal MiSTer file menu. Automatic MGL injection of a 642 MB test file did not enter the normal streaming path and is not a qualified loading method.
@@ -74,17 +74,53 @@ All four focused hardware regressions passed with complete byte and picture coun
 
 Milestone releases use semantic-version tags on GitHub. MiSTer RBF assets retain the normal date-coded core naming convention.
 
-Upcoming release candidate:
-
-- **v0.6.0** — sustained 720x480 progressive 4:2:0 real-stream I/P/B decoding, native `24000/1001`/24/25-fps cadence, 60 MHz decode, 32 KiB mixed-width compressed-data buffering, corrected GOP and terminal presentation behavior, and full-length hardware playback qualification.
-
 Current published milestone:
+
+- **v0.6.0** — sustained 720x480 progressive 4:2:0 real-stream I/P/B decoding, native `24000/1001`/24/25-fps cadence, 60 MHz decode, 32 KiB mixed-width compressed-data buffering, corrected GOP and terminal presentation behavior, and full-length hardware playback qualification; binary asset `MediaPlayer_20260822.rbf`.
+
+Previous published milestone:
 
 - **v0.5.0** — 720x480 progressive 4:2:0 I/P/B regression coverage, generalized P/B motion-vector `f_code` 1-through-4 handling, full-width P parser/raster completion, and settled post-stream diagnostics; binary asset `MediaPlayer_20260817.rbf`.
 
 The v0.5.0 release qualification checkout is commit `424eec43b0d0b4f8085e6591a15543eafab394e7`, whose synthesized RTL baseline is `b1bde49df3831669b577a1ed78404e026f19382d`. It passed a fresh-clone Quartus Prime 17.0.2 build and the authoritative seven-stream MiSTer regression matrix before the documentation-only release commits were applied.
 
-See [`docs/RELEASE_NOTES_v0.5.0.md`](docs/RELEASE_NOTES_v0.5.0.md) for release notes and qualification details.
+See [`docs/RELEASE_NOTES_v0.6.0.md`](docs/RELEASE_NOTES_v0.6.0.md) for the current release notes and qualification details. The [v0.5.0 release notes](docs/RELEASE_NOTES_v0.5.0.md) remain available for the previous milestone.
+
+## Converting test media with FFmpeg
+
+v0.6.0 accepts raw progressive 720x480 4:2:0 MPEG-2 Video elementary streams. The following no-frame-counter command is the same encoding recipe used for the accepted full-length Big Buck Bunny test. Replace `input.mp4` and `output.m2v` with your own paths:
+
+```bash
+ffmpeg -hide_banner -y \
+  -i "input.mp4" \
+  -map 0:v:0 -an \
+  -vf "fps=24,scale=720:480:force_original_aspect_ratio=decrease:flags=bicubic,pad=720:480:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1" \
+  -c:v mpeg2video \
+  -pix_fmt yuv420p \
+  -threads 1 \
+  -flags +bitexact \
+  -g 24 \
+  -bf 2 \
+  -q:v 6 \
+  -qmin 2 \
+  -qmax 12 \
+  -sc_threshold 1000000000 \
+  -mpv_flags +strict_gop \
+  -f mpeg2video \
+  "output.m2v"
+```
+
+The `fps=24` filter deliberately produces an exact-24-fps stream, one of the three rates paced by v0.6.0. The scale and pad filters preserve the source aspect ratio inside the 720x480 frame, and `-an` removes audio because this core currently accepts video only. Use a progressive source; interlaced input must be deinterlaced before conversion.
+
+Some FFmpeg versions omit the H.262 sequence-end code required for the final reordered pictures to flush and for the core to settle cleanly. On Linux or macOS, run this after the encode; it appends the marker only when it is missing:
+
+```bash
+if [ "$(tail -c 4 "output.m2v" | od -An -tx1 | tr -d ' \n')" != "000001b7" ]; then
+  printf '\x00\x00\x01\xb7' >> "output.m2v"
+fi
+```
+
+Copy the resulting `.m2v` file to the MiSTer and open it through the normal Media Player file menu. Frame-rate codes 1 (`24000/1001`), 2 (exact 24), and 3 (25 fps) are paced; this recipe uses exact 24 fps for consistent user testing.
 
 ## Architecture
 
@@ -133,13 +169,13 @@ quartus_sh --flow compile MediaPlayer
 quartus_sta -t tools/phase1p_timing.tcl
 ```
 
-Release candidates are accepted only after a clean/from-scratch Quartus build, the standard Phase 1P timing reports, and the required MiSTer hardware regression tests all pass for the candidate RTL. The v0.6.0 candidate also had to reproduce its previously accepted incremental RBF byte-for-byte before the clean image was treated as qualified.
+Release candidates are accepted only after a clean/from-scratch Quartus build, the standard Phase 1P timing reports, and the required MiSTer hardware regression tests all pass for the candidate RTL. The v0.6.0 release also had to reproduce its previously accepted incremental RBF byte-for-byte before the clean image was treated as qualified.
 
 See [`docs/BUILDING.md`](docs/BUILDING.md) for the full workflow.
 
 ## Diagnostic streams
 
-Binary regression streams are generated locally from deterministic scripts under `tools/streams/`. The v0.6.0 candidate's focused four-test hardware gate covers P skip/motion, B prediction, repeated multi-slice pictures, and the native-rate high-motion scene that exposed large-picture starvation. The complete native-rate Big Buck Bunny movie and a separate full-length real-world `24000/1001` stream provide the visual endurance gate.
+Binary regression streams are generated locally from deterministic scripts under `tools/streams/`. The v0.6.0 focused four-test hardware gate covers P skip/motion, B prediction, repeated multi-slice pictures, and the native-rate high-motion scene that exposed large-picture starvation. The complete native-rate Big Buck Bunny movie and a separate full-length real-world `24000/1001` stream provide the visual endurance gate.
 
 The underlying authoritative seven-stream decoder matrix is:
 
