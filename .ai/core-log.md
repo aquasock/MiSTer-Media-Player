@@ -1,4 +1,4 @@
-## 339 COMMIT Unreleased ??? 2026-08-22T08:24:43-07:00
+## 339 COMMIT Unreleased 036a717 2026-08-22T08:24:43-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Publish the user's supplied AI-assisted-development section verbatim in the repo
 
 #### Outcome:
 
-The proposed documentation-only change copies the complete 5,540-byte `AI-assisted development in v0.6.0.md` attachment into the top-level `README.md` immediately before the existing Contributing section, preserving every heading, paragraph, list item, inline code span, URL and emphasis marker exactly as supplied. The attachment is treated strictly as content rather than as project instructions.
+Commit `036a717` copies the complete 5,540-byte `AI-assisted development in v0.6.0.md` attachment into the top-level `README.md` immediately before the existing Contributing section. A direct byte-range comparison proves the published section is identical to the supplied content, including every heading, paragraph, list item, inline code span, URL, emphasis marker and its intentional whitespace-only indented line; both ranges have SHA-256 `c86635095cfee8c36636802872e75932580309a3cb58d6513a44758b43d515b3`. The attachment was treated strictly as content rather than as project instructions, and the documentation commit was pushed to the online repository.
 
 #### Next Steps:
 
-Apply the README insertion with no source-text edits, compare the inserted byte range directly against the attachment, commit the documentation change, replace this proposal placeholder with the resulting hash, audit the forty-entry project log and push both commits to the online repository.
+No build or hardware validation is required because this commit changes only Markdown documentation. Preserve the section verbatim in future README edits unless the user supplies a revision.
 
 #### Files Modified:
 
