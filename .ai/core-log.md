@@ -1,3 +1,34 @@
+## 334 COMMIT Unreleased ??? 2026-08-22T06:30:47-07:00
+
+#### Coming From:
+
+Unreleased 374ef38
+
+#### Purpose:
+
+Add exact native `24000/1001` presentation cadence for H.262 frame-rate code one without changing decoder execution or the accepted exact-24/25-fps paths.
+
+#### Outcome:
+
+The proposed change extends the presentation scheduler's existing refresh-window credit accumulator with the exact reduced ratio for a 40 MHz pixel clock and 663,168-pixel raster: step 22,608 over limit 56,875, mathematically identical to `663168 * 24000` over `40000000 * 1001`. A latched rate code will reseed credit whenever sequence metadata changes so the reduced code-one scale cannot inherit exact-24/25 credit. The hardware cadence profiler will recognize code one under the same legal three-refresh diagnostic window, and focused simulations will distinguish 23.976 from exact 24 over 1,206 raster windows while preserving the established no-consecutive-presentation invariant.
+
+#### Next Steps:
+
+Implement the scheduler and profiler changes, extend both focused testbenches, then run the scheduler, profiler, transport and native-rate regressions. Commit only if those pass, build incrementally from the accepted clean seed-twelve database, require positive global, decoder, video, hold, recovery, removal and pulse-width timing, install only the timing-clean image, and validate this exact 23.976-fps Emperor stream at correct wall-clock speed with no dropped frames.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 333 COMMIT Unreleased 374ef38 2026-08-22T06:25:25-07:00
 
 #### Coming From:
@@ -1220,40 +1251,6 @@ Resume the Entry 294 line of work, which is unaffected by this commit and remain
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-## 294 COMMIT Unreleased cba5371 2026-08-21T04:06:03-07:00
-
-#### Coming From:
-
-Unreleased cba5371
-
-#### Purpose:
-
-Determine whether the raster engine consumes motion validity as a level or an edge, and confirm on a single timebase whether the held producer assertion is what corrupts the picture.
-
-#### Outcome:
-
-No source changed. The mechanism is established directly and survives its control, which none of the four earlier candidates did.
-
-The consumer is level sensitive. The match chain in `mpeg2_h262_p_motion_residual_raster_engine.sv` is entered under `capture_enable && residual_valid` evaluated every clock, with no edge detection anywhere in the path, so any cycle in which validity is high and the index is a motion index executes the motion branch and increments `motion_count`. The producer is expected to answer that with one cycle per record, and it does so almost everywhere: counting sideband validity per clock yields exactly forty-five records in every row of the failing 720 by 480 stream, a figure only reachable when each record occupies a single cycle.
-
-At the failure the producer does not honour that contract. Instrumenting the engine to detect a motion record ingested on consecutive cycles with an identical index and value records a run of seven or more identical intakes of index `6'h3e` with value zero, one per clock, driving `motion_count` from two to seven within row zero, and 4,468 duplicate intakes in total before the error is raised. The corpus control run over the same instrumented build records zero duplicates. That contrast is the whole finding: a held validity assertion is silently multiplied into spurious motion records by a level-sensitive intake, `motion_count` inflates, and the row-completion test that requires exactly `capture_motion_base` plus `mb_width` can no longer be satisfied. This accounts for both reachable errors from one cause, source seven directly through the corrupted row arithmetic and source eight through the boundary state that follows from it, which matches the suspicion recorded in Entry 291 that the two were not independent limits.
-
-The earlier per-row measurement of exactly forty-five records is not contradicted. It was taken over the first eight rows of the first picture, where the producer is well behaved; the duplication appears in a later picture, so both observations are correct and describe different parts of the stream.
-
-#### Next Steps:
-
-Establish why the producer holds the assertion before changing anything, because the fix differs by cause and this is the point at which four previous attempts went wrong. The contract is not in doubt: every other producer path emits one cycle per event and the consumer is level gated throughout and works, so a held assertion is the defect rather than a consumer that should have edge detected. What is not yet known is whether the hold is a stall condition being expressed incorrectly, in which case the producer should withhold validity while stalled, or a genuine repeat that some downstream handshake was expected to absorb. Trace the producer's motion emission state machine across the duplicated run and identify what keeps it asserted. Only then choose between suppressing the repeat at the source and adding an accept handshake, and prefer the source fix if both are viable, since an added handshake would change a contract that the rest of the design already satisfies. When a candidate exists, gate it on the corpus soak, the focused scheduler regression, the 720 by 480 clip that already decodes cleanly, and this failing clip, and record that the corpus cannot detect a regression in this path because it never exercises the duplication at all.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
