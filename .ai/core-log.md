@@ -1,3 +1,40 @@
+## 347 COMMIT Unreleased ??? 2026-08-22T17:03:11-07:00
+
+#### Coming From:
+
+v0.6.0 26805e8
+
+#### Purpose:
+
+Right-size the shared spatial-residual store while preserving the complete hardware-qualified v0.6.0 MPEG-2 decoding envelope.
+
+#### Outcome:
+
+The proposed standalone change halves each physical residual bank from 1,024 to 512 descriptor blocks, narrows each bank slot from ten to nine bits and the shared sample address from seventeen to sixteen bits, and reduces the inferred shared array from 131,072 by 16 bits to 65,536 by 16 bits. The qualified clean seed-ten v0.6.0 baseline uses 4,306,375 memory bits and 538 of 553 RAM blocks, while Quartus reports this array alone as 2,097,152 bits; the change should therefore recover exactly 1,048,576 bits and 128 M10Ks from the shared array, before any smaller descriptor-memory saving. This remains safely above the supported 720-pixel row proof of at most 45 macroblocks times six blocks, or 270 descriptors per bank. The implementation will keep the physical 512-block capacity distinct from that geometry-derived 270-block limit, reject a 271st row descriptor before any sample write, assert address, bank-separation and mutually exclusive P/B writer invariants in simulation, and leave an exact 270-block bank as a separate future optimization rather than combining it with this low-risk power-of-two step.
+
+#### Next Steps:
+
+Implement the narrowed P and B descriptor slots, address ports, descriptor tables and shared array together, then add a focused capacity regression that fills both banks to the 270-block supported maximum, checks the first and last sample addresses and proves an attempted 271st descriptor raises the expected error without writing. Run the existing P, B and live-raster regressions, commit the source only after they pass, and compile incrementally from the preserved accepted seed-ten v0.6.0 database. Accept the build only if Quartus infers the shared array at 65,536 by 16 bits, total RAM use falls by at least 128 blocks, every timing domain remains positive and the resulting RBF passes the established hardware playback regression.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- tools/streams/tb_h262_p_intra_macroblocks.sv
+- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_residual_store_capacity.sv
+- tools/streams/run_h262_residual_store_capacity.sh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 346 VERSION v0.6.0 26805e8 2026-08-22T09:18:14-07:00
 
 #### Coming From:
@@ -1143,38 +1180,6 @@ Hardware-test `output_files/MediaPlayer.rbf` as the seed-eight build of the Entr
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-## 307 COMMIT Unreleased 6bea8f9 2026-08-21T18:39:00-07:00
-
-#### Coming From:
-
-Unreleased 6bea8f9
-
-#### Purpose:
-
-Qualify the Entry 306 gate fixes with a fully clean Quartus build and record that they do not close timing.
-
-#### Outcome:
-
-The commit compiles but fails timing, so it is not deployable as it stands and Entry 306's ticked Built box should be read as compiling and simulating cleanly rather than as closing timing. A fully clean Quartus 17.0.2 compile from wiped `db`, `incremental_db` and `output_files` completes in 11 minutes 40 seconds with zero errors and 132 warnings, but raises one Critical Warning, 332148, timing requirements not met. Worst-case setup slack is minus 0.105 ns with total negative slack of minus 0.816 ns. No artifact was uploaded.
-
-The violation is not in the changed logic. It falls on the HDMI PLL clock, which belongs to the MiSTer framework and is untouched by this work, while every domain this commit affects stays healthy: the decoder reads plus 1.030 ns against plus 1.099 ns at Entry 305, the HPS bridge plus 1.364 ns against plus 1.557 ns and the video domain plus 6.399 ns against plus 7.107 ns. The design also became smaller rather than larger, falling from 33,978 to 33,790 ALMs and from 49,993 to 49,832 registers, with block memory bits and RAM blocks unchanged at 4,040,879 and 506. The change itself was one comparison constant widened from four to nine and one additional term on a six-bit index compare, so a 0.4 ns swing on an untouched clock accompanied by a reduction in logic is not plausibly a direct consequence of it and is far more likely fitter placement variance. That remains an inference and is recorded as one: what is certain is only that the preceding commit built at plus 0.295 ns and this one builds at minus 0.105 ns under identical settings and seed.
-
-The relevant history is that this is the second time this class of miss has occurred. The entry preceding 289 records a build missing at minus 0.074 ns on a standing framework clock while the decoder and video clocks stayed clean, closed by changing the fitter seed alone with no source change. The seed is currently seven, which is already the value that closed that earlier miss. The margin on this clock has sat between roughly plus 0.15 and plus 0.30 ns for several builds and has now gone negative twice from unrelated changes, which means it is not a working margin but noise, and a build that passes only at a particular seed does not establish that the design closes timing.
-
-#### Next Steps:
-
-Obtain a decision before rebuilding, because the two available paths differ in what they prove. Trying a different fitter seed follows documented precedent and would unblock immediately at roughly twelve minutes per attempt, but a pass obtained that way must be recorded as closed by seed rather than by design, and with margin this thin it says little about the next change. The alternative is to treat the thin HDMI margin as the finding it appears to be and bring forward the timing half of the refactor the user has already planned for after the streaming work, rather than continuing to layer changes onto a design that fails on placement reshuffling. The functional position is unaffected either way and remains as Entry 306 recorded it: the 72 frame clip decodes to completion with no errors, both regression gates are byte identical, and the full 250 frame clip now reaches byte 310,630 and stops on `presentation_error` with probe, prediction and writer all clear. That presentation failure is still the next functional target and is untouched by this build result.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
