@@ -1,3 +1,31 @@
+## 362 COMMIT Unreleased ebf372e 2026-08-23T04:07:40-07:00
+
+#### Coming From:
+
+Unreleased 4be2b8f
+
+#### Purpose:
+
+Break the route-dominated reference-word delivery path by registering it between the shared reference cache and the prediction block fetchers.
+
+#### Outcome:
+
+Commit `4be2b8f` first corrected an error in the preceding sweep: `mpeg2_h262_reference_pipeline_probe_plan.sv` is pulled in by an `include` directive rather than listed in `files.qip`, so absence from that file does not prove a source is dead, and synthesis rejected the tree in five seconds until it was restored. With that fixed the deletion is proven inert, because synthesis of `4be2b8f` reports 49,295 registers, 3,228,103 memory bits, 65 DSP blocks, 145 pins and one hundred thirty-five warnings, every figure identical to the tree before twenty-four files and all seven duplicate module definitions were removed. A classification pass then overturned this log's earlier assumption that diagnostics were a large share of the design. Tracing what each module's outputs actually reach, rather than trusting its name, shows `mpeg2_h262_luma4_probe` is the intra slice and macroblock parser driving `quantiser_scale_code`, `macroblock_address_increment` and coefficient data, `mpeg2_h262_reference_read_probe` instantiates three decode engines, and the `two_picture_probe` and `p_diagnostic_controller` group carries decode mode selection; only the cadence profiler and the final GOP progress probe are genuine telemetry, together about 588 lines of 12,514 live. Six further modules totalling 2,412 lines are compiled but instantiated nowhere, so they are already optimised away and cost no area. Gating diagnostics is therefore not a margin lever and has been abandoned as one. The failing path itself is not logic-deep: one logic level, 0.792 ns of cell delay and 15.253 ns of routing across fifty-eight elements, ninety-five percent wire, because a thirty-six by sixty-four word store cannot pack near the cache. Converting that store to inferred block RAM was attempted and reverted: Quartus inferred nothing and simply duplicated the array, raising registers to 53,903, because the read is conditional and the array shares a large always block with a reset branch. This commit instead registers the shared cache word together with both ownership-qualified ready strobes, so ownership is still resolved in the cycle the word is produced and only delivery moves by one clock, costing sixty-six registers for 49,361 total with memory and DSP unchanged and zero synthesis errors. The fetchers track outstanding requests through their descriptor queue rather than a fixed response latency, which the focused fetcher test already exercises in both its zero-latency and delayed cases.
+
+#### Next Steps:
+
+Build at seed nine and require decoder setup materially above the plus 0.572 ns that `2dc52d7` held, then repeat at a second seed, because the standing gate before any 0.7.0 feature work resumes is plus 1.2 ns on two consecutive fits at different seeds against a measured fit-to-fit spread near 0.6 ns. Confirm on MiSTer that every raw elementary-stream regression decodes exactly as before with unchanged picture and swap counts, zero decoder errors and clean terminal completion, since the extra delivery cycle touches the shared reference path used by both the mixed and bidirectional engines. If margin remains short, restructure the word store for genuine block RAM inference as its own scoped cycle, lifting the memory into an isolated always block and making the read unconditional, which is safe because consumers already gate on `block_lookup_valid`; that would remove 2,304 registers as well as the routing pressure. Separately and with no timing expectation, delete the six compiled but uninstantiated modules for navigability. Renaming the decode modules that carry probe names remains worthwhile after 0.7.0, since that naming has now produced two incorrect recommendations in one session.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 361 COMMIT Unreleased d7c5a8f 2026-08-23T03:25:34-07:00
 
 #### Coming From:
@@ -1166,37 +1194,5 @@ Have the user judge smooth field pans and the rolling credits in the full native
 
 - [x] Built
 - [x] Passed
-
----
-## 322 COMMIT Unreleased cc39b46 2026-08-22T01:52:41-07:00
-
-#### Coming From:
-
-Unreleased 74cff5b
-
-#### Purpose:
-
-Add exact 24 fps presentation cadence and generate Big Buck Bunny at its native frame rate without duplicated pictures.
-
-#### Outcome:
-
-Commit `cc39b46` adds exact frame-rate-code-two credit to the saturating pixel-clock presentation accumulator while preserving code three and extends cadence outlier capture to both rates. Focused tests deliver exactly 240 native-rate pictures and the existing 250 pictures across the same 603 raster windows with a minimum two-window gap, and profiler schema four retains checksum `e82b5cad` while capturing code-two outliers. The native 250-picture BBB encode has frame-rate code two, maps all 250 source pictures without inserted duplicates and completes all 1,070,782 bytes in the full Verilator raster at 225,134,082 cycles with 74 P pictures, 165 B pictures, 85 reference publications, 249 swaps and zero errors. The existing 25 fps corpus remains exact at 6,519,997 cycles. The complete native stream is 720 by 480, 14,315 pictures, 84,423,309 bytes, SHA-256 `015c8811932ce8b324af6ccd9e235cd621307aa43fcaf62b413b93badba52de5`, frame-rate code two and a valid sequence-end marker. The incremental seed-nine Quartus build finishes in 11 minutes 28 seconds with zero errors and 147 warnings, using 34,391 ALMs, 51,100 registers, 4,046,279 memory bits, 507 RAM blocks and 65 DSP blocks, but it is rejected because the standing HDMI framework path misses setup by 0.180 ns; decoder and video setup remain positive at plus 1.322 ns and plus 6.621 ns, with hold plus 0.246 ns, recovery plus 3.834 ns, removal plus 1.020 ns and pulse width plus 0.462 ns. The rejected 4,384,288-byte RBF has SHA-256 `e48f74cdab417336e434c81a2a8b6548a880f6f4099879bf8693cc2671bc5a02` and is not installed.
-
-#### Next Steps:
-
-Retry the unchanged design with a new documented fitter seed because seed nine misses only the standing placement-sensitive HDMI framework path. Require positive timing before installing any artifact, then run a short native 24 fps hardware cadence gate and the complete movie so the user can determine whether the exact once-per-second duplicate hitch is gone while keeping the separate 7:20-to-7:25 transport burst under observation.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/streams/generate_test_big_buck_bunny.py
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
 
 ---
