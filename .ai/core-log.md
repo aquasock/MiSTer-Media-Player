@@ -1,3 +1,31 @@
+## 360 COMMIT Unreleased ??? 2026-08-23T02:22:50-07:00
+
+#### Coming From:
+
+Unreleased 3771f19
+
+#### Purpose:
+
+Retry decoder setup closure with fitter seed ten after seed nine leaves two decoder paths marginally violated.
+
+#### Outcome:
+
+This commit changes only the reproducible Quartus fitter seed in `MediaPlayer.qsf` from nine to ten, altering no source, no constraint and no assignment other than that single value, so any change in the result is attributable entirely to fitter placement and routing rather than to design content. It follows the precedent set at entry 319, where moving from seed eight to seed nine closed a seed-sensitive boundary that no design change was required to fix. The condition being addressed is narrow: at seed nine the `3771f19` fit misses decoder setup by minus 0.060 ns with total negative slack of minus 0.061 ns across two violated paths of fifty, while every other timing category is comfortably positive, which is the signature of one marginal path rather than a congested or structurally slow design. Both violated paths run from `mpeg2_h262_reference_word_cache` into `mpeg2_h262_b_bidirectional_raster_engine`, and because those modules carry probe names while actually instantiating the decode pipeline, and the contributing `wide_seen` term selects decode mode rather than reporting telemetry, neither path would be removed by gating diagnostics. The fitter runtime baseline for this design is 25 minutes 16 seconds at eighty-five percent ALM occupancy, so a seed sweep is affordable in a way it was not at the one hour routes seen before the Program Stream demux was removed.
+
+#### Next Steps:
+
+Require all timing categories positive with decoder setup restored toward the plus 0.572 ns held at `2dc52d7`, and treat the violation as structural rather than seed-sensitive if two or three seeds fail in succession, in which case the reference cache to bidirectional engine path is registered properly instead of continuing to sample seeds. Once a seed closes, confirm on MiSTer that every raw elementary-stream regression decodes exactly as before with unchanged picture and swap counts, zero decoder errors and clean terminal completion, and record the accepted RBF hash, because that image becomes the byte-identical reference for the cycle that deletes the twenty-five source files Quartus never compiles and resolves all seven duplicate module definitions. A measured cycle then gates the live diagnostic modules behind a compile-time parameter and reports area, timing and fitter-runtime deltas against the 25 minute 16 second baseline, after which the 0.7.0 plan is re-baselined before presentation work resumes with the system time clock and the PCM sink.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 359 COMMIT Unreleased 3771f19 2026-08-23T01:44:52-07:00
 
 #### Coming From:
@@ -10,11 +38,11 @@ Return video ingress to an elementary-stream-only path by removing the hardware 
 
 #### Outcome:
 
-Following the complexity reevaluation, the user set the architectural boundary at elementary stream in and video out: the FPGA owns H.262 decode, presentation timing and the output path, while everything upstream of the elementary stream, meaning file and disc access, CSS, DVD navigation, demultiplexing and audio, moves to Linux. This commit reverts the hardware Program Stream path introduced by `c4d9631` and extended by `058f0a3`, deleting `mpeg2_h222_program_stream_demux.sv` and its two focused testbenches, removing the demux instantiation and wiring from the top level, dropping its `files.qip` entry, and reverting the cadence snapshot PTS association fields in the profiler, the top-level packing and `decode_hardware_cadence.py`, since those fields would read zero with no demux present and the presentation clock will define its own telemetry against HPS-supplied timestamps. The intervening commit `2dc52d7` is deliberately retained: it hardens `mpeg2_h262_stream_transport_gate.sv`, which first appeared in `a559d43` and belongs to the elementary-stream path rather than the Program Stream path, and it carries a plus 0.357 ns global setup improvement that would be lost for no benefit. The motivation is that real DVD media relies on navigation packs, multi-angle interleaving and seamless branching, which are ordinary software problems and unpleasant RTL, and that moving demultiplexing to Linux removes the unresolved missing `MPEG_program_end_code` truncation question entirely while narrowing the fabric toward the decoder that `core.md` names as the project thesis. The elementary-stream ingress path being restored is the original and better-tested one, already present in the top level and previously selected automatically. Commit `058f0a3` never produced a bitstream, because its clean compile reached synthesis in 2 minutes 5 seconds and was terminated by the user during routing at one hour thirteen minutes, so no hardware image or timing data exists for it. Commit `3771f19` performs that revert: the restored top level connects the stream FIFO directly to the transport gate and the decoder as it did before `c4d9631`, the file selector returns to accepting `M2V` only because the fabric no longer parses Program Streams, and the two clock and reset connections added by `2dc52d7` are re-applied to the retained transport gate. No dangling reference to the demux, its systems error codes or its PTS signals remains anywhere in the sources or in `files.qip`. The focused cadence profiler test passes at schema four with checksum `e82b643d` and the transport gate test retains its sixteen-byte sticky drain. Quartus Analysis and Synthesis succeeds in 1 minute 54 seconds with zero errors and one hundred thirty-five warnings, and register count falls from 49,784 to 49,295, returning 489 registers to the device.
+Following the complexity reevaluation, the user set the architectural boundary at elementary stream in and video out: the FPGA owns H.262 decode, presentation timing and the output path, while everything upstream of the elementary stream, meaning file and disc access, CSS, DVD navigation, demultiplexing and audio, moves to Linux. This commit reverts the hardware Program Stream path introduced by `c4d9631` and extended by `058f0a3`, deleting `mpeg2_h222_program_stream_demux.sv` and its two focused testbenches, removing the demux instantiation and wiring from the top level, dropping its `files.qip` entry, and reverting the cadence snapshot PTS association fields in the profiler, the top-level packing and `decode_hardware_cadence.py`, since those fields would read zero with no demux present and the presentation clock will define its own telemetry against HPS-supplied timestamps. The intervening commit `2dc52d7` is deliberately retained: it hardens `mpeg2_h262_stream_transport_gate.sv`, which first appeared in `a559d43` and belongs to the elementary-stream path rather than the Program Stream path, and it carries a plus 0.357 ns global setup improvement that would be lost for no benefit. The motivation is that real DVD media relies on navigation packs, multi-angle interleaving and seamless branching, which are ordinary software problems and unpleasant RTL, and that moving demultiplexing to Linux removes the unresolved missing `MPEG_program_end_code` truncation question entirely while narrowing the fabric toward the decoder that `core.md` names as the project thesis. The elementary-stream ingress path being restored is the original and better-tested one, already present in the top level and previously selected automatically. Commit `058f0a3` never produced a bitstream, because its clean compile reached synthesis in 2 minutes 5 seconds and was terminated by the user during routing at one hour thirteen minutes, so no hardware image or timing data exists for it. Commit `3771f19` performs that revert: the restored top level connects the stream FIFO directly to the transport gate and the decoder as it did before `c4d9631`, the file selector returns to accepting `M2V` only because the fabric no longer parses Program Streams, and the two clock and reset connections added by `2dc52d7` are re-applied to the retained transport gate. No dangling reference to the demux, its systems error codes or its PTS signals remains anywhere in the sources or in `files.qip`. The focused cadence profiler test passes at schema four with checksum `e82b643d` and the transport gate test retains its sixteen-byte sticky drain. Quartus Analysis and Synthesis succeeds in 1 minute 54 seconds with zero errors and one hundred thirty-five warnings, and register count falls from 49,784 to 49,295, returning 489 registers to the device. The full compile then succeeded with zero errors in 27 minutes 26 seconds, of which the fitter took 25 minutes 16 seconds, a decisive improvement over the abandoned `058f0a3` route that was still running at one hour thirteen minutes. It uses 35,495 ALMs of 41,910, down from 35,932 at `2dc52d7`, with 52,845 registers, 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks unchanged, and produced a 4,218,380-byte RBF with SHA-256 `983a8a286ad89f8ad7885b9cc5c9ccdc7b7a1005cc5722960d882456c930c798`. That image is not usable: the decoder clock misses setup at minus 0.060 ns with total negative slack of minus 0.061 ns across two violated paths of fifty, a regression from the plus 0.572 ns held at `2dc52d7` even though this build carries less logic, which is cold-route variance at eighty-five percent occupancy rather than an effect of the revert. Every other category is positive, including plus 0.244 ns HDMI setup, plus 0.620 ns host bridge setup, plus 6.959 ns video setup and positive hold, recovery, removal and pulse width throughout. Both violated paths run from `mpeg2_h262_reference_word_cache` into `mpeg2_h262_b_bidirectional_raster_engine` inside modules named as probes that in fact instantiate the decode pipeline, and the contributing `wide_seen` term is a mode-select control rather than telemetry, so gating diagnostics would not remove either path.
 
 #### Next Steps:
 
-Build this commit and confirm on MiSTer that every raw elementary-stream regression decodes exactly as before with unchanged picture and swap counts, zero decoder errors and clean terminal completion, and record its timing and RBF hash, because that image becomes the byte-identical reference for the following cycle. That next cycle deletes the twenty-five source files Quartus never compiles, which also resolves all seven duplicate module definitions, and is gated on producing an RBF whose SHA-256 matches this one exactly. A measured cycle then gates the remaining live diagnostic modules behind a compile-time parameter and reports the area, timing and fitter-runtime deltas, after which the 0.7.0 plan is re-baselined against lean numbers. Presentation work then resumes in its revised form: a 90 kHz system time clock in fabric as a fractional accumulator anchored to the 24.576 MHz audio domain that `sys/audio_out.sv` already uses, fed picture timestamps supplied by the HPS alongside the elementary stream rather than extracted in fabric, retaining free-running cadence for streams presented without timestamps, followed by the PCM sink with its elastic FIFO and underrun telemetry, then clean-build release qualification and the `v0.7.0` pre-release tag. Version 0.7.0 remains a single RBF containing no audio decoder.
+Retry closure with fitter seed ten, which is the established remedy in this log for a single marginal path and was used at entry 319 to close a seed-sensitive boundary by moving from seed eight to seed nine, and treat the violation as structural rather than seed-sensitive only if two or three seeds fail in succession, in which case the reference cache to bidirectional engine path is registered properly instead. Once a seed closes timing, confirm on MiSTer that every raw elementary-stream regression decodes exactly as before with unchanged picture and swap counts, zero decoder errors and clean terminal completion, and record the accepted RBF hash, because that image becomes the byte-identical reference for the following cycle. That next cycle deletes the twenty-five source files Quartus never compiles, which also resolves all seven duplicate module definitions, and is gated on producing an RBF whose SHA-256 matches the accepted one exactly. A measured cycle then gates the remaining live diagnostic modules behind a compile-time parameter and reports the area, timing and fitter-runtime deltas against the 25 minute 16 second baseline established here, after which the 0.7.0 plan is re-baselined. Presentation work then resumes: a 90 kHz system time clock in fabric as a fractional accumulator anchored to the 24.576 MHz audio domain that `sys/audio_out.sv` already uses, fed picture timestamps supplied by the HPS rather than extracted in fabric, retaining free-running cadence for streams presented without timestamps, followed by the PCM sink with its elastic FIFO and underrun telemetry, then clean-build release qualification and the `v0.7.0` pre-release tag. Both of those cycles require a small throwaway HPS-side harness to inject synthetic timestamps and a test tone, since no daemon exists to supply them. Version 0.7.0 remains a single RBF containing no audio decoder.
 
 #### Files Modified:
 
@@ -30,7 +58,7 @@ Build this commit and confirm on MiSTer that every raw elementary-stream regress
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
@@ -1144,35 +1172,6 @@ Have the user watch the complete 9-minute-56-second baseline and report any free
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-## 320 COMMIT Unreleased 985ac76 2026-08-22T00:37:52-07:00
-
-#### Coming From:
-
-Unreleased 04a532c
-
-#### Purpose:
-
-Release a final reference publication retained during an overlapping B-picture drain when sequence end has already removed its classification barrier.
-
-#### Outcome:
-
-Commit `985ac76` retains sequence end across an active reordered run and applies that terminal permission when the run preserves a concurrently decoded reference as ordinary pending display work. The new focused case fails before the fix and passes after it alongside all prior scheduler orders with a minimum presentation gap of two. Real 48-, 72- and 250-picture Verilator replays consume every byte and retain exact swap counts of 47, 71 and 249 with zero errors; the full stream finishes 1,178,034 bytes at 222,767,587 cycles. The incremental seed-nine Quartus build completes in 13 minutes 52 seconds with zero errors and positive timing at plus 0.330 ns global setup, plus 1.679 ns decoder setup, plus 6.688 ns video setup, plus 0.246 ns hold, plus 3.749 ns recovery, plus 0.697 ns removal and plus 0.462 ns pulse width. It uses 34,285 ALMs, 51,047 registers, 4,046,279 memory bits, 507 RAM blocks and 65 DSP blocks; the 4,400,432-byte RBF has SHA-256 `9b4a3e0ce83b8a145ac53ec915cf9ec1e2a0bb7bf1f7726ff4ec9e9d6fb38d7a`. Hardware controls again pass exactly at 48/47 and 72/71 with zero errors and zero outliers. The full stream remains visually smooth and the user describes its ending as safer; telemetry proves the behavioral fix by changing the final pending reference from unreleased to released, but the quiet snapshot still latches at 249/248 only 1,023 clocks after `presentation_complete`, before the released frame's next cadence window.
-
-#### Next Steps:
-
-Keep the accepted scheduler correction and extend only the development quiet qualification to require that no pending frame remains. Rebuild incrementally and repeat hardware validation so telemetry waits through the final cadence swap instead of sampling the correct release early.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
