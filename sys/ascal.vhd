@@ -522,6 +522,17 @@ ARCHITECTURE rtl OF ascal IS
 	-- o_vcpt_pre3 changes only once per line, hundreds of clocks apart, so
 	-- the registered value always reflects the current count at the boundary.
 	SIGNAL o_vcpt_pre3_at_last : std_logic;
+	-- MiSTer-Media-Player entry 368: the CYCLE 8 vertical pixel-queue select
+	-- compared to_integer(o_vacpt) against o_ivsize twice on the per-pixel
+	-- path, which became the worst HDMI path at plus 0.254 ns, four logic
+	-- levels and 5.790 ns.  These predicates are updated in lockstep with
+	-- o_vacpt itself rather than registered off it, so there is no one-pixel
+	-- skew at a line boundary; o_vacpt is read every pixel clock but changes
+	-- only once per line, so a plain registered copy would have been wrong
+	-- for the first pixel of each line.  They lag by one line only if
+	-- o_ivsize changes without o_vacpt advancing, which happens on a mode
+	-- change where the scaler output is transient regardless.
+	SIGNAL o_vacpt_gt_ivsize, o_vacpt_eq_ivsize : std_logic;
 	SIGNAL o_ihsize,o_ihsizem,o_ivsize : uint12;
 	SIGNAL o_ihsize_temp, o_ihsize_temp2 : natural RANGE 0 TO 32767;
 
@@ -2109,12 +2120,16 @@ BEGIN
 						o_vacc     <=o_vacc_ini;
 						o_vacc_next<=o_vacc_ini + 2*o_ivsize;
 						o_vacpt <=x"001";
+						o_vacpt_gt_ivsize<=to_std_logic(1>o_ivsize);
+						o_vacpt_eq_ivsize<=to_std_logic(1=o_ivsize);
 						o_vacptl<="01";
 						vcarry_v:=false;
 					END IF;
 
 					IF vcarry_v THEN
 						o_vacpt<=o_vacpt+1;
+						o_vacpt_gt_ivsize<=to_std_logic(to_integer(o_vacpt)+1>o_ivsize);
+						o_vacpt_eq_ivsize<=to_std_logic(to_integer(o_vacpt)+1=o_ivsize);
 					END IF;
 					IF vcarry_v AND o_prim THEN
 						o_vacptl<=o_vacptl+1;
@@ -2921,13 +2936,13 @@ BEGIN
 				o_vpix_inner(1 TO 5)<=o_vpix_inner(0 TO 4);
 
 				-- CYCLE 8
-				IF to_integer(o_vacpt)>o_ivsize THEN
+				IF o_vacpt_gt_ivsize='1' THEN
 					IF fracnn_v = '0' THEN
 						o_vpixq_pre<=(o_vpix_outer(0), o_vpix_inner(5), o_vpix_inner(5), o_vpix_inner(5));
 					ELSE
 						o_vpixq_pre<=(o_vpix_outer(0), o_vpix_outer(1), o_vpix_outer(1), o_vpix_outer(1));
 					END IF;
-				ELSIF to_integer(o_vacpt)=o_ivsize THEN
+				ELSIF o_vacpt_eq_ivsize='1' THEN
 					IF fracnn_v = '0' THEN
 						o_vpixq_pre<=(o_vpix_outer(0), o_vpix_inner(5), o_vpix_outer(1), o_vpix_outer(1));
 					ELSE
