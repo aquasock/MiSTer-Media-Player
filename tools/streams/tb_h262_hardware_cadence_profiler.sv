@@ -25,6 +25,8 @@ reg display_scratch=0,display_scratch_bank=0;
 reg sequence_end_seen=0,session_quiet=0;
 reg [15:0] error_flags=0;
 reg [13:0] stc_seconds=0;
+reg [7:0] inband_count=0;
+reg [32:0] inband_pts=0;
 reg top_field_first=0,repeat_first_field=0;
 reg [11:0] h_pos=0,v_pos=0;
 reg [7:0] base_r=8'h12,base_g=8'h34,base_b=8'h56;
@@ -60,7 +62,8 @@ mpeg2_h262_hardware_cadence_profiler #(
     .display_frame_bank(display_frame_bank),.display_scratch(display_scratch),
     .display_scratch_bank(display_scratch_bank),
     .sequence_end_seen(sequence_end_seen),.session_quiet(session_quiet),
-    .stc_seconds(stc_seconds),.top_field_first(top_field_first),
+    .stc_seconds(stc_seconds),.inband_count(inband_count),.inband_pts(inband_pts),
+    .top_field_first(top_field_first),
     .repeat_first_field(repeat_first_field),
     .error_flags(error_flags),.h_pos(h_pos),.v_pos(v_pos),
     .base_r(base_r),.base_g(base_g),.base_b(base_b),.base_de(base_de),
@@ -157,7 +160,7 @@ initial begin
 
     if(dut.snapshot_sync_2[31:0]!==32'h4d4d5031)
         $fatal(1,"bad magic %h",dut.snapshot_sync_2[31:0]);
-    if(dut.snapshot_sync_2[63:32]!==32'h0526ea60)
+    if(dut.snapshot_sync_2[63:32]!==32'h0626ea60)
         $fatal(1,"bad format %h",dut.snapshot_sync_2[63:32]);
     if(dut.snapshot_sync_2[831:830]!==2'd1)
         $fatal(1,"quiet snapshot reason missing");
@@ -298,7 +301,7 @@ initial begin
     if({video_r,video_g,video_b}!==24'h123456)
         $fatal(1,"base video changed outside overlay");
 
-    $display("HARDWARE_CADENCE_PROFILER_PASS schema=5 gap-state+forced+fatal+no-progress checksum=%h",
+    $display("HARDWARE_CADENCE_PROFILER_PASS schema=6 gap-state+forced+fatal+no-progress checksum=%h",
              checksum);
     $finish;
 end

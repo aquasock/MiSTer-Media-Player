@@ -57,6 +57,8 @@ mpeg2_h262_hardware_cadence_profiler
     .scheduler_debug_state     (mpeg2_new_b_scheduler_debug_state),
     .decoder_byte_accepted     (mpeg2_new_decode_stream_valid),
     .stc_seconds               (mpeg2_new_stc_seconds),
+    .inband_count              (mpeg2_new_inband_count),
+    .inband_pts                (mpeg2_new_inband_pts_90k),
     .top_field_first           (mpeg2_new_top_field_first),
     .repeat_first_field        (mpeg2_new_repeat_first_field),
     .picture_coding_type       (mpeg2_new_picture_coding_type),

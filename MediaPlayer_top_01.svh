@@ -42,6 +42,16 @@ wire        mpeg2_new_progressive_frame;
 // Entry 365: extracted for interlaced operation and 3:2 pulldown; carried
 // into the cadence snapshot only, not yet consumed by presentation.
 wire        mpeg2_new_top_field_first;
+// Entry 369: picture metadata supplied by the HPS in band with the
+// elementary stream.  Distinct from the frontend's parsed fields above:
+// these come from the container, those from the bitstream.
+wire [32:0] mpeg2_new_inband_pts_90k;
+wire [1:0]  mpeg2_new_inband_picture_structure;
+wire        mpeg2_new_inband_top_field_first;
+wire        mpeg2_new_inband_repeat_first_field;
+wire        mpeg2_new_inband_progressive_frame;
+wire        mpeg2_new_inband_valid;
+wire [7:0]  mpeg2_new_inband_count;
 wire        mpeg2_new_repeat_first_field;
 wire [3:0]  mpeg2_new_forward_f_code_horizontal;
 wire [3:0]  mpeg2_new_forward_f_code_vertical;

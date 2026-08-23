@@ -99,7 +99,10 @@ wire [26:0] ioctl_addr;
 wire [15:0] ioctl_dout;
 wire        mpeg2_stream_full;
 wire        mpeg2_stream_empty;
+wire [7:0]  mpeg2_fifo_data;
 wire [7:0]  mpeg2_stream_data;
+wire        mpeg2_new_system_input_ready;
+wire        mpeg2_new_system_input_valid;
 wire        mpeg2_stream_rd;
 wire        mpeg2_stream_wr;
 wire        mpeg2_new_decode_stream_valid;
@@ -234,6 +237,25 @@ assign mpeg2_new_stream_ready =
 // parser.  Drain the transport after any such fatal result without presenting
 // discarded bytes as valid decoder input.  This lets ioctl_download retire so
 // the existing post-load LED snapshot can report the first failure.
+// Entry 369: synchronise the file-transfer lifetime into the decoder domain
+// so the metadata extractor can flush its residual window.  Without this
+// the final three bytes of every stream would stay in the window and the
+// sequence_end_code would never reach the decoder.
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] mpeg2_download_active_sync;
+always @(posedge clk_mpeg2 or posedge reset_mpeg2_base) begin
+	if (reset_mpeg2_base)
+		mpeg2_download_active_sync <= 3'b000;
+	else
+		mpeg2_download_active_sync <=
+			{mpeg2_download_active_sync[1:0],ioctl_download};
+end
+
+wire mpeg2_new_system_input_end =
+	!mpeg2_download_active_sync[2] &&
+	!mpeg2_download_rearm_reset &&
+	mpeg2_stream_empty;
+
 wire mpeg2_new_transport_fatal_error =
 	mpeg2_new_syntax_error ||
 	mpeg2_new_phase1_probe_error ||
@@ -251,10 +273,30 @@ mpeg2_h262_stream_transport_gate mpeg2_h262_stream_transport_gate
 	.clk              (clk_mpeg2),
 	.reset            (reset_mpeg2),
 	.fifo_empty       (mpeg2_stream_empty),
-	.decoder_ready    (mpeg2_new_stream_ready),
+	.decoder_ready    (mpeg2_new_system_input_ready),
 	.fatal_error      (mpeg2_new_transport_fatal_error),
 	.fifo_read        (mpeg2_stream_rd),
-	.decoder_valid    (mpeg2_new_decode_stream_valid)
+	.decoder_valid    (mpeg2_new_system_input_valid)
+);
+
+mpeg2_h262_inband_metadata mpeg2_h262_inband_metadata
+(
+	.clk                (clk_mpeg2),
+	.reset              (reset_mpeg2),
+	.input_data         (mpeg2_fifo_data),
+	.input_valid        (mpeg2_new_system_input_valid),
+	.input_ready        (mpeg2_new_system_input_ready),
+	.input_end          (mpeg2_new_system_input_end),
+	.stream_data        (mpeg2_stream_data),
+	.stream_valid       (mpeg2_new_decode_stream_valid),
+	.stream_ready       (mpeg2_new_stream_ready),
+	.pts_90k            (mpeg2_new_inband_pts_90k),
+	.picture_structure  (mpeg2_new_inband_picture_structure),
+	.top_field_first    (mpeg2_new_inband_top_field_first),
+	.repeat_first_field (mpeg2_new_inband_repeat_first_field),
+	.progressive_frame  (mpeg2_new_inband_progressive_frame),
+	.metadata_valid     (mpeg2_new_inband_valid),
+	.metadata_count     (mpeg2_new_inband_count)
 );
 
 mpeg2_stream_fifo mpeg2_stream_fifo
@@ -269,7 +311,7 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 
 	.rd_clk   (clk_mpeg2),
 	.rd_en    (mpeg2_stream_rd),
-	.rd_data  (mpeg2_stream_data),
+	.rd_data  (mpeg2_fifo_data),
 	.rd_empty (mpeg2_stream_empty)
 );
 

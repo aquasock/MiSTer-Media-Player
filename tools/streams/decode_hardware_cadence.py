@@ -190,6 +190,11 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         # carries the presentation-clock seconds count and the two field
         # flags.  Neither flag is consumed by presentation yet.
         "stc_seconds": (words[19] >> 2) & 0x3FFF,
+        # Entry 369 (schema 6): word 35 spare bits carry in-band record
+        # telemetry -- how many metadata records the fabric extracted and
+        # the low bits of the most recent timestamp.
+        "inband_count": (words[35] >> 11) & 0xFF,
+        "inband_pts_low11": words[35] & 0x7FF,
         "top_field_first": (words[19] >> 1) & 0x1,
         "repeat_first_field": words[19] & 0x1,
         # Entry 282: unconditional hold attribution.  These are NOT mutually
