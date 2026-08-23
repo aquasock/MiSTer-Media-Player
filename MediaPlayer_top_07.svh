@@ -24,7 +24,8 @@ wire mpeg2_new_cadence_session_quiet =
     !mpeg2_new_ddr_wr_we;
 
 wire [15:0] mpeg2_new_cadence_error_flags = {
-    6'd0,
+    5'd0,
+    mpeg2_new_systems_error,
     mpeg2_new_b_presentation_error,
     mpeg2_new_ddr_cache_error,
     mpeg2_new_ddr_store_error,
@@ -148,6 +149,7 @@ wire mpeg2_new_normal_user_led =
 
     mpeg2_new_recon_macroblock_420_complete &&
     mpeg2_new_phase1n_frame_geometry_supported &&
+    !mpeg2_new_systems_error &&
     !mpeg2_new_syntax_error &&
     !mpeg2_new_phase1_probe_error &&
     !mpeg2_new_pred_error &&
@@ -182,10 +184,12 @@ wire mpeg2_new_normal_user_led =
 //   1 syntax          4 inverse_quant                   7 recon
 //   2 phase1_probe    5 inverse_quant_unsupported_matrix 8 ddr_store
 //   3 pred            6 idct                            9 ddr_cache
+//  10 H.222.0 systems ingress
 //
 // No decode, presentation, ownership or acceptance behavior is altered; the
 // acceptance term itself still drives the steady-ON state unchanged.
 wire [3:0] mpeg2_new_diag_error_code_live =
+    mpeg2_new_systems_error                    ? 4'd10 :
     mpeg2_new_syntax_error                     ? 4'd1 :
     mpeg2_new_phase1_probe_error               ? 4'd2 :
     mpeg2_new_pred_error                       ? 4'd3 :
@@ -274,6 +278,7 @@ reg [2:0] mpeg2_new_diag_publication_detail_first;
 reg [4:0] mpeg2_new_diag_p_wide_detail_first;
 reg [2:0] mpeg2_new_diag_pred_source_first;
 reg [4:0] mpeg2_new_diag_pred_detail_first;
+reg [3:0] mpeg2_new_diag_systems_detail_first;
 
 always @(posedge clk_mpeg2) begin
     if (reset_mpeg2) begin
@@ -286,6 +291,7 @@ always @(posedge clk_mpeg2) begin
         mpeg2_new_diag_p_wide_detail_first <= 5'd0;
         mpeg2_new_diag_pred_source_first     <= 3'd0;
         mpeg2_new_diag_pred_detail_first     <= 5'd0;
+        mpeg2_new_diag_systems_detail_first  <= 4'd0;
     end
     else if (!mpeg2_new_diag_first_error_valid &&
              (mpeg2_new_diag_error_code_live != 4'd0)) begin
@@ -298,6 +304,7 @@ always @(posedge clk_mpeg2) begin
         mpeg2_new_diag_p_wide_detail_first <= mpeg2_new_p_wide_probe_error_detail;
         mpeg2_new_diag_pred_source_first     <= mpeg2_new_pred_error_source;
         mpeg2_new_diag_pred_detail_first     <= mpeg2_new_pred_error_detail;
+        mpeg2_new_diag_systems_detail_first  <= mpeg2_new_systems_error_code;
     end
 end
 
@@ -371,6 +378,9 @@ mpeg2_h262_final_gop_progress_probe mpeg2_h262_final_gop_progress_probe
 );
 
 wire [4:0] mpeg2_new_diag_disk_code_live =
+    (mpeg2_new_diag_first_error_valid &&
+     (mpeg2_new_diag_error_code_first == 4'd10)) ?
+        {1'b0,mpeg2_new_diag_systems_detail_first} :
     (mpeg2_new_diag_first_error_valid &&
      (mpeg2_new_diag_error_code_first == 4'd1)) ?
         mpeg2_new_syntax_error_source :
