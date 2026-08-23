@@ -7,7 +7,7 @@ module tb_h262_picture_timestamp;
 
     reg clk=0, reset=1;
     reg metadata_valid=0; reg [32:0] metadata_pts=0;
-    reg picture_seen=0;
+    reg picture_start=0;
     reg [1:0] active_frame_bank=0, display_frame_bank=0;
     wire [32:0] display_pts; wire display_pts_valid; wire [7:0] associated_count;
 
@@ -15,7 +15,7 @@ module tb_h262_picture_timestamp;
 
     mpeg2_h262_picture_timestamp dut(.clk(clk),.reset(reset),
         .metadata_valid(metadata_valid),.metadata_pts(metadata_pts),
-        .picture_seen(picture_seen),.active_frame_bank(active_frame_bank),
+        .picture_start(picture_start),.active_frame_bank(active_frame_bank),
         .display_frame_bank(display_frame_bank),
         .display_pts(display_pts),.display_pts_valid(display_pts_valid),
         .associated_count(associated_count));
@@ -24,8 +24,8 @@ module tb_h262_picture_timestamp;
         begin @(negedge clk); metadata_pts=p; metadata_valid=1;
               @(negedge clk); metadata_valid=0; end
     endtask
-    task start_picture; begin @(negedge clk); picture_seen=1;
-              @(negedge clk); picture_seen=0; end endtask
+    task start_picture; begin @(negedge clk); picture_start=1;
+              @(negedge clk); picture_start=0; end endtask
     task complete;   // bookkeeper toggles the active bank on persistence
         begin @(negedge clk); active_frame_bank=active_frame_bank^2'd1;
               repeat(2) @(posedge clk); end
@@ -67,7 +67,18 @@ module tb_h262_picture_timestamp;
         if (associated_count !== 8'd3)
             $fatal(1,"associated %0d, expected 3",associated_count);
 
-        $display("H262_PICTURE_TIMESTAMP_PASS reorder=1 unannotated=1 delayed=1 count=%0d",
+        // A record arriving in the same cycle as its picture start must still
+        // associate.  This is the case the sticky-level bug silently lost.
+        @(negedge clk); metadata_pts=33'h0_0000_ABCD; metadata_valid=1; picture_start=1;
+        @(negedge clk); metadata_valid=0; picture_start=0;
+        complete();
+        @(negedge clk); display_frame_bank=2'd0; @(posedge clk);
+        if (display_pts !== 33'h0_0000_ABCD || !display_pts_valid)
+            $fatal(1,"coincident record lost: %h valid %b",display_pts,display_pts_valid);
+        if (associated_count !== 8'd4)
+            $fatal(1,"associated %0d, expected 4",associated_count);
+
+        $display("H262_PICTURE_TIMESTAMP_PASS reorder=1 unannotated=1 delayed=1 coincident=1 count=%0d",
                  associated_count);
         $finish;
     end

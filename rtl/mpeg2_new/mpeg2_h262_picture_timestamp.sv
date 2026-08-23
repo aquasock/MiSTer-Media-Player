@@ -31,8 +31,13 @@ module mpeg2_h262_picture_timestamp
     input  wire        metadata_valid,
     input  wire [32:0] metadata_pts,
 
-    // Picture start, from the frontend.
-    input  wire        picture_seen,
+    // A one-cycle pulse at each picture header.  This must NOT be the
+    // frontend's picture_seen, which is a sticky level set at the first
+    // picture and cleared only by reset: with a level here the pending
+    // timestamp is cleared in the same cycle it arrives and nothing is ever
+    // associated.  Hardware caught that; simulation did not, because the test
+    // modelled the assumption rather than the signal.
+    input  wire        picture_start,
 
     // Frame ownership.
     input  wire  [1:0] active_frame_bank,
@@ -78,18 +83,19 @@ always @(posedge clk) begin
     else begin
         active_frame_bank_q <= active_frame_bank;
 
-        if (metadata_valid) begin
-            pending_pts   <= metadata_pts;
-            pending_valid <= 1'b1;
-        end
-
         // The first picture start after a record claims it.  A picture with no
         // preceding record carries no timestamp rather than inheriting a stale
-        // one, which is what keeps mixed and unannotated streams honest.
-        if (picture_seen) begin
-            current_pts   <= pending_pts;
-            current_valid <= pending_valid;
+        // one, which is what keeps mixed and unannotated streams honest.  A
+        // record completing in the same cycle as a picture start belongs to
+        // that picture, so it is taken directly rather than through pending.
+        if (picture_start) begin
+            current_pts   <= metadata_valid ? metadata_pts : pending_pts;
+            current_valid <= metadata_valid | pending_valid;
             pending_valid <= 1'b0;
+        end
+        else if (metadata_valid) begin
+            pending_pts   <= metadata_pts;
+            pending_valid <= 1'b1;
         end
 
         if (picture_committed) begin

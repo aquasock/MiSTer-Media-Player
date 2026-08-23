@@ -107,7 +107,7 @@ mpeg2_h262_picture_timestamp mpeg2_h262_picture_timestamp
     .reset              (reset_mpeg2),
     .metadata_valid     (mpeg2_new_inband_valid),
     .metadata_pts       (mpeg2_new_inband_pts_90k),
-    .picture_seen       (mpeg2_new_picture_seen),
+    .picture_start      (mpeg2_new_picture_header_classified_now),
     .active_frame_bank  (mpeg2_new_active_frame_bank),
     .display_frame_bank (mpeg2_new_display_frame_bank),
     .display_pts        (mpeg2_new_display_pts),
