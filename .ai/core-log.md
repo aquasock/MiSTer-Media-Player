@@ -1,3 +1,31 @@
+## 366 COMMIT Unreleased cea1d62 2026-08-23T06:01:06-07:00
+
+#### Coming From:
+
+Unreleased 7c29f33
+
+#### Purpose:
+
+Duplicate the ASCAL polyphase select registers so the stage-eight mux stops driving the worst HDMI setup path.
+
+#### Outcome:
+
+Adding the presentation time base at `7c29f33` compiled cleanly but did not close: the HDMI framework clock missed setup at minus 0.202 ns while the decoder held plus 0.453 ns, one hundred eighteen extra registers having been enough to re-roll placement on a path whose margin was already below its variance. Every violated path lay inside `sys/ascal.vhd` rather than in decoder logic, the worst running from `o_v_poly_use_adaptive` to `o_h_poly_phase` at two logic levels, 6.481 ns of data delay and minus 0.253 ns of clock skew, almost all of it wire. The cause is structural rather than unlucky: both polyphase selects are produced at stage C3 and consumed by muxes at C3, C4 and C8, so one register drives consumers spread far enough apart that no placement serves them all. This commit adds a second copy of each select for the C8 consumer, driven from the identical expression in the identical process stage and marked `dont_merge` so Quartus cannot fold them back together. They are duplicates rather than delays, so behaviour is bit-identical and no skew appears at a mode change; the only thing that changes is that the fitter may place a copy beside the C8 mux. The precedent commit `a2debaa` pipelined an ASCAL predicate by realigning it across stages, which suits a value that changes per line, whereas these selects are static between mode changes and duplication is provably equivalent. Synthesis confirms the duplicates survive at exactly two additional registers. The result closes every timing category: HDMI setup recovers from minus 0.202 ns to plus 0.054 ns, and decoder setup reaches plus 0.911 ns, the highest this log has recorded and above the plus 0.572 ns that `2dc52d7` held, with host bridge plus 0.560 ns, video plus 8.191 ns, hold plus 0.211 ns, recovery plus 3.831 ns, removal plus 0.836 ns and pulse width plus 1.122 ns. The fit uses 34,754 ALMs of 41,910 and 51,734 registers in an 11 minute 42 second flow, and the 4,159,388-byte RBF has SHA-256 `c69a26ca1d3a099d93f93755f2bb9a22b8b2bfda22e29a994c6538f7aa29ac93`. Two structural fixes in this development run have now each held where seed selection did not: the registered reference delivery of `ebf372e` and this duplication. The honest qualification is that plus 0.054 ns of HDMI margin sits well below the roughly 0.4 ns seed variance measured on that path, so the design closes but the HDMI boundary is not yet robust to the next change.
+
+#### Next Steps:
+
+Confirm on MiSTer that every raw elementary-stream regression decodes exactly as before with unchanged picture and swap counts, zero decoder errors and clean terminal completion, since no image containing the presentation time base has yet run on hardware, and read the schema five snapshot after a ten minute run requiring the seconds field to report six hundred, which measures the clock rate directly. Then decide whether to spend one more cycle on the HDMI boundary before continuing, because plus 0.054 ns will not survive the next addition and the same duplication pattern very likely applies to whatever path is now worst inside ASCAL; identifying it costs one timing query rather than a build. Afterwards resume 0.7.0 with `EXT_BUS` brought up alongside the throwaway HPS-side harness that exercises it, defining the picture metadata wire protocol with the timestamp and the reserved `picture_structure`, `top_field_first`, `repeat_first_field` and `progressive_frame` fields, then presentation on timestamp against the proven clock, then the PCM sink. Before release qualification, complete the regression pack left unexercised, in particular long GOP, dense residual, full endurance and the truncation case with its no-reboot recovery.
+
+#### Files Modified:
+
+- sys/ascal.vhd
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 365 COMMIT Unreleased 7c29f33 2026-08-23T05:31:52-07:00
 
 #### Coming From:
@@ -32,7 +60,7 @@ Build at seed eleven, require every timing category positive, and confirm on MiS
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
@@ -1171,34 +1199,6 @@ Keep the functionally proven wide ingress unchanged and retry only the fitter wi
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-## 326 COMMIT Unreleased a25d772 2026-08-22T03:35:21-07:00
-
-#### Coming From:
-
-Unreleased a5a42f9
-
-#### Purpose:
-
-Find a timing-clean placement for the unchanged 60 MHz decoder design by retrying its incremental Quartus fit with seed eleven.
-
-#### Outcome:
-
-Commit `a25d772` changes only the fitter seed from ten to eleven and reuses synthesis as intended. The incremental Quartus build completes in 13 minutes 10 seconds with zero errors and positive timing at plus 0.296 ns global setup, plus 0.355 ns decoder setup, plus 8.030 ns video setup, plus 0.258 ns hold, plus 2.688 ns recovery, plus 0.677 ns removal and plus 1.122 ns pulse width. It uses 35,065 ALMs, 51,820 registers, 4,306,375 memory bits, 538 of 553 RAM blocks and 65 DSP blocks. The accepted 4,461,836-byte RBF has SHA-256 `15d5b3144608dbe7148ea4c2a822a714f569413f70657e8f4c8e9f8b4ff373cd` and verifies after persistent installation. Hardware remains correct but does not close the visible defect: the exact quality-six five-second control accepts all 1,430,191 bytes and presents all 120 pictures and 119 swaps with zero errors and terminal quiet, yet retains five cadence outliers and essentially unchanged 22.445238 fps delivery. A full 7:15-through-7:30 capture accepts all 2,603,570 bytes, decodes 239 B and 121 reference pictures for all 360 pictures with zero errors and terminal quiet; its eight-bit display counters wrap to 104 pictures and 103 swaps, while the three largest outliers occur at ordinals 175, 176 and 178, exactly 7.3 seconds after the clip begins and therefore at the user's 7:22 scene. Those gaps last 149.213 ms, 66.317 ms and 82.896 ms, and the largest snapshots show an empty FIFO while the decoder is ready, confirming compressed-input starvation rather than picture loss or I-frame-only presentation.
-
-#### Next Steps:
-
-Keep the timing-clean seed-eleven fit and 60 MHz decoder, but treat the squirrel defect as not passed. Enable the MiSTer `hps_io` interface's standard 16-bit file-transfer mode and serialize each accepted little-endian word into the existing 8-bit, 32 KiB asynchronous FIFO so each host transaction carries two compressed bytes without increasing the design's 97-percent RAM-block usage. Prove byte order, backpressure and consecutive-word handling in a focused simulation, rerun transport, scheduler, profiler and exact-stream regressions, build incrementally with seed eleven and require all timing categories positive, then rerun both the five-second quality-six control and the full 7:15-through-7:30 hardware capture before asking the user to inspect 7:22 again.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
