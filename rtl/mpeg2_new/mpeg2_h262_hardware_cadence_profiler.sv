@@ -29,6 +29,11 @@ module mpeg2_h262_hardware_cadence_profiler #(
     input wire writer_busy,input wire [1:0] display_frame_bank,
     input wire display_scratch,input wire display_scratch_bank,
     input wire sequence_end_seen,input wire session_quiet,
+    // Entry 365: presentation-clock bring-up observables.  stc_seconds is
+    // counted in this domain from a single-bit 1 Hz pulse crossed from the
+    // 24.576 MHz audio domain, so no multi-bit counter crosses domains.
+    input wire [13:0] stc_seconds,
+    input wire top_field_first,input wire repeat_first_field,
     input wire [15:0] error_flags,input wire [11:0] h_pos,
     input wire [11:0] v_pos,input wire [7:0] base_r,
     input wire [7:0] base_g,input wire [7:0] base_b,input wire base_de,
@@ -43,7 +48,7 @@ localparam [23:0] TERMINAL_SNAPSHOT_LIMIT=
 localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
-localparam [31:0] SNAPSHOT_FORMAT={8'd4,8'd38,16'd60000};
+localparam [31:0] SNAPSHOT_FORMAT={8'd5,8'd38,16'd60000};
 localparam [11:0] OVERLAY_X=12'd8,OVERLAY_Y=12'd444;
 localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd152;
 
@@ -65,6 +70,8 @@ reg [1:0] display_frame_bank_q;
 reg display_scratch_q,display_scratch_bank_q;
 reg sequence_end_seen_q,session_quiet_q;
 reg [15:0] error_flags_q;
+reg [13:0] stc_seconds_q;
+reg top_field_first_q,repeat_first_field_q;
 
 reg [31:0] session_cycles,accepted_bytes;
 reg [31:0] first_present_cycle,last_present_cycle;
@@ -148,7 +155,8 @@ wire [31:0] snapshot_word_17={reference_picture_count,b_picture_count,
     display_picture_count,display_swap_count};
 wire [31:0] snapshot_word_18={frame_rate_code_q,picture_coding_type_q,
     temporal_reference_q,picture_count_q,7'd0};
-wire [31:0] snapshot_word_19={error_flags_q,16'd0};
+wire [31:0] snapshot_word_19={error_flags_q,stc_seconds_q,
+    top_field_first_q,repeat_first_field_q};
 wire [31:0] snapshot_word_20=presentation_hold_total_cycles;
 wire [31:0] snapshot_word_21=destination_hold_total_cycles;
 wire [31:0] snapshot_word_22=hold_overlap_cycles;
@@ -211,6 +219,7 @@ always @(posedge clk_mpeg2) begin
         display_frame_bank_q<=0;display_scratch_q<=0;
         display_scratch_bank_q<=0;sequence_end_seen_q<=0;
         session_quiet_q<=0;error_flags_q<=0;
+        stc_seconds_q<=0;top_field_first_q<=0;repeat_first_field_q<=0;
         session_cycles<=0;accepted_bytes<=0;first_present_cycle<=0;
         last_present_cycle<=0;first_present_valid<=0;
         decoder_stall_cycles<=0;presentation_stall_cycles<=0;
@@ -253,6 +262,9 @@ always @(posedge clk_mpeg2) begin
         display_scratch_bank_q<=display_scratch_bank;
         sequence_end_seen_q<=sequence_end_seen;session_quiet_q<=session_quiet;
         error_flags_q<=error_flags;
+        stc_seconds_q<=stc_seconds;
+        top_field_first_q<=top_field_first;
+        repeat_first_field_q<=repeat_first_field;
         b_picture_complete_d<=b_picture_complete_q;
         display_frame_bank_d<=display_frame_bank_q;
         display_scratch_d<=display_scratch_q;

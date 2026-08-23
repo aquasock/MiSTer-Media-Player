@@ -67,6 +67,8 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.intra_vlc_format                 (mpeg2_new_intra_vlc_format),
 	.alternate_scan                   (mpeg2_new_alternate_scan),
 	.progressive_frame                (mpeg2_new_progressive_frame),
+	.top_field_first                  (mpeg2_new_top_field_first),
+	.repeat_first_field               (mpeg2_new_repeat_first_field),
 	.forward_f_code_horizontal        (mpeg2_new_forward_f_code_horizontal),
 	.forward_f_code_vertical          (mpeg2_new_forward_f_code_vertical),
 	.backward_f_code_horizontal       (mpeg2_new_backward_f_code_horizontal),

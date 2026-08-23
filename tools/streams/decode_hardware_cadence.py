@@ -186,6 +186,12 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "final_temporal_reference": (metadata >> 15) & 0x3FF,
         "reference_picture_count": (metadata >> 7) & 0xFF,
         "error_flags": (words[19] >> 16) & 0xFFFF,
+        # Entry 365 (schema 5): the formerly reserved low half of word 19
+        # carries the presentation-clock seconds count and the two field
+        # flags.  Neither flag is consumed by presentation yet.
+        "stc_seconds": (words[19] >> 2) & 0x3FFF,
+        "top_field_first": (words[19] >> 1) & 0x1,
+        "repeat_first_field": words[19] & 0x1,
         # Entry 282: unconditional hold attribution.  These are NOT mutually
         # exclusive with each other or with the stall counters above, so they
         # must not be summed against them.

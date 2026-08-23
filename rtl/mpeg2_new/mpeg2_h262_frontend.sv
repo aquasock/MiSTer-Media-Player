@@ -70,6 +70,11 @@ module mpeg2_h262_frontend
     output reg         intra_vlc_format,
     output reg         alternate_scan,
     output reg         progressive_frame,
+    // Entry 365: extracted for interlaced operation and 3:2 pulldown.
+    // Both already lie inside the five-byte picture_coding_extension
+    // window this parser captures; neither is consumed yet.
+    output reg         top_field_first,
+    output reg         repeat_first_field,
 
     // kate - Phase 1T-b exposes the four H.262 f_code controls needed by the
     // future motion-vector decoder.  Index mapping follows H.262 Table 7-7:
@@ -267,6 +272,8 @@ always @(posedge clk) begin
         intra_vlc_format                    <= 1'b0;
         alternate_scan                      <= 1'b0;
         progressive_frame                   <= 1'b0;
+        top_field_first                     <= 1'b0;
+        repeat_first_field                  <= 1'b0;
         forward_f_code_horizontal           <= 4'd0;
         forward_f_code_vertical             <= 4'd0;
         backward_f_code_horizontal          <= 4'd0;
@@ -533,6 +540,8 @@ always @(posedge clk) begin
                 q_scale_type                      <= payload_next[12];
                 intra_vlc_format                  <= payload_next[11];
                 alternate_scan                    <= payload_next[10];
+                top_field_first                   <= payload_next[15];
+                repeat_first_field                <= payload_next[9];
                 progressive_frame                 <= payload_next[7];
                 picture_coding_extension_seen     <= 1'b1;
                 expect_picture_coding_extension   <= 1'b0;
