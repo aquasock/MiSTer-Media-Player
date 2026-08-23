@@ -1,3 +1,31 @@
+## 349 COMMIT Unreleased ??? 2026-08-22T18:13:23-07:00
+
+#### Coming From:
+
+Unreleased fca45b3
+
+#### Purpose:
+
+Try one final fully clean fitter seed for the unchanged Stage 1 residual-store design.
+
+#### Outcome:
+
+This proposal changes only the Quartus fitter seed from eight to nine. Seed nine is the strongest remaining documented candidate because it repeatedly closed the same placement-sensitive HDMI framework path on the later v0.6.0 decoder topology, including plus 0.179 ns and plus 0.330 ns results, while the current reduced-store seed-ten and seed-eight fits miss that path by 0.083 ns and 0.127 ns respectively. The RTL, simulations and exact 408-block resource target remain unchanged.
+
+#### Next Steps:
+
+Commit the seed-only source change, preserve the current seed-eight build outputs externally, and compile seed nine from empty Quartus build directories. Require the shared array to remain exactly 65,536 by 16 bits, total memory use to remain 408 RAM blocks and every timing category to be positive. If timing fails, record the result and stop without deployment; if it closes, install only that exact verified RBF on the connected MiSTer and proceed to the four essential v0.6.0 playback checks.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 348 COMMIT Unreleased fca45b3 2026-08-22T17:55:50-07:00
 
 #### Coming From:
@@ -1153,33 +1181,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-## 309 COMMIT Unreleased 95a0ab1 2026-08-21T19:36:06-07:00
-
-#### Coming From:
-
-Unreleased 95a0ab1
-
-#### Purpose:
-
-Hardware-validate the seed-eight build against the 48-frame control, the 72-frame f_code target and the full 250-frame diagnostic clip.
-
-#### Outcome:
-
-The exact `output_files/MediaPlayer.rbf` artifact recorded in Entry 308, SHA-256 `ca2df257334be5f0a73218fbddd9da0f8c28fe9da237fc0f5754d81ab694448d`, passes the functional boundary on the connected MiSTer. The 48-frame control accepts all 125,948 bytes, displays 48 pictures with 47 swaps and 17 references, reports zero error flags and completes telemetry validation at 24.038869 fps. The 72-frame target accepts all 243,306 bytes, displays all 72 pictures with 71 swaps and 25 references, reports zero error flags and completes telemetry validation at 23.539979 fps. Both captured final frames are visually clean, so the Entry 306 selection-gate repair is accepted on hardware and seed eight is a valid deployable fit for it. The full 250-frame clip does not complete: after 35 seconds it has never published the telemetry prefix and permanently holds a visually clean displayed frame. Matching the HDMI capture against all encoded pictures identifies the held image as frame 78, about 3.08 seconds into the 25 fps stream, and a second capture five seconds later is byte identical. This reproduces the separate presentation-path failure already isolated in simulation rather than the old decode halt. A second issue is confirmed independently of that failure: even successful real-content clips deliver only 24.04 and 23.54 fps rather than the target 25 fps, with presentation hold dominating their telemetry.
-
-#### Next Steps:
-
-Characterise the 250-frame failure at the presentation layer by locating the exact module and error code that raise `presentation_error` at simulation byte 310,630, keeping probe, prediction and writer clear as already measured and using hardware frame 78 as the external reproduction boundary. Do not revisit the Entry 306 decode gates, which now pass both simulation and hardware. Once the presentation failure is fixed, rerun these same three hardware clips and then return to the measured sub-25-fps throughput and scratch-pool limit as the next performance boundary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
