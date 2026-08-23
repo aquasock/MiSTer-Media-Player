@@ -1,3 +1,31 @@
+## 348 COMMIT Unreleased ??? 2026-08-22T17:55:50-07:00
+
+#### Coming From:
+
+Unreleased 208d48e
+
+#### Purpose:
+
+Select fitter seed eight for the unchanged Stage 1 residual-store design and seek a timing-clean hardware-validation artifact.
+
+#### Outcome:
+
+This proposal changes only the Quartus fitter seed from ten to eight, the strongest documented candidate because it previously closed the same placement-sensitive HDMI path at plus 0.368 ns. It leaves the RTL, tests and expected 408-block memory topology unchanged and requires a fully clean compile from empty build directories. The result is acceptable only if the shared array remains exactly 65,536 by 16 bits, memory use remains 408 RAM blocks and every timing category is positive; a failure will stop this cycle without deployment.
+
+#### Next Steps:
+
+Commit the seed-only source change, remove the current failed build directories whose byte-identical incremental state is already preserved externally, and run a fully clean Quartus compile followed by the timing and resource checks. If every gate closes, hash and upload that exact RBF to the connected MiSTer and run the four essential v0.6.0 playback files; otherwise record the failure and stop without installing it.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 347 COMMIT Unreleased 208d48e 2026-08-22T17:40:04-07:00
 
 #### Coming From:
@@ -1153,33 +1181,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 308 COMMIT Unreleased 95a0ab1 2026-08-21T18:50:13-07:00
-
-#### Coming From:
-
-Unreleased 6bea8f9
-
-#### Purpose:
-
-Retry the unchanged Entry 306 design with fitter seed eight to determine whether the HDMI PLL timing miss is placement variance.
-
-#### Outcome:
-
-Seed eight closes timing with no RTL change, so `6bea8f9` is deployable for hardware testing through source commit `95a0ab1`, but timing is explicitly recorded as closed by seed rather than by design. A fully clean Quartus 17.0.2 compile from emptied `db`, `incremental_db` and `output_files` completes in 11 minutes 47 seconds with zero errors, zero Critical Warnings and 147 reported warnings. Worst-case setup is plus 0.368 ns on the HDMI PLL clock, recovering 0.473 ns from seed seven's minus 0.105 ns and exceeding seed seven's plus 0.295 ns on Entry 305 by 0.073 ns. Every domain remains positive: decoder setup is plus 1.513 ns against plus 1.030 ns on Entry 307, HPS bridge plus 1.744 ns against plus 1.364 ns and video plus 7.191 ns against plus 6.399 ns. Worst hold is plus 0.246 ns, recovery plus 3.107 ns, removal plus 0.692 ns and minimum pulse width plus 0.462 ns. Placement changes resource estimates without changing the implemented design. Seed eight uses 33,715 ALMs and 49,850 registers against 33,790 and 49,832 on seed seven, while block memory remains exactly 4,040,879 bits and 506 RAM blocks at 92 percent, with 65 DSP blocks. The RBF is 4,378,580 bytes with SHA-256 `ca2df257334be5f0a73218fbddd9da0f8c28fe9da237fc0f5754d81ab694448d`. It remains in `output_files/MediaPlayer.rbf` and was not uploaded automatically. This result confirms the Entry 307 inference that the miss was placement variance, while also confirming the larger warning: a 0.473 ns swing from a seed alone means the HDMI margin is placement-sensitive and is not robust design margin.
-
-#### Next Steps:
-
-Hardware-test `output_files/MediaPlayer.rbf` as the seed-eight build of the Entry 306 functional change. The software evidence remains Entry 306's completed 72-frame run and byte-identical corpus and 48-frame regressions; hardware acceptance is still required before Passed can be checked. After that result is recorded, return to the full 250-frame clip's presentation failure at byte 310,630 by locating the module and code that raise `presentation_error`, with probe, prediction and writer already measured clear, and keep the seed-sensitive HDMI margin as a standing constraint for the planned timing refactor.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
