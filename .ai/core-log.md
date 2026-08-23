@@ -22,7 +22,7 @@ Require every timing category positive at seed eleven. Two closing seeds out of 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
