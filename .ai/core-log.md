@@ -1,3 +1,31 @@
+## 351 COMMIT Unreleased ??? 2026-08-22T18:42:36-07:00
+
+#### Coming From:
+
+Unreleased 873a962
+
+#### Purpose:
+
+Test whether higher Quartus ALM register-packing effort can recover logic while preserving the accepted seed-nine decoder and its complete diagnostic architecture.
+
+#### Outcome:
+
+The proposed commit changes only `ALM_REGISTER_PACKING_EFFORT` from `MEDIUM` to `HIGH`. It leaves the fitter seed, RTL, residual-store topology, diagnostics, cadence profiler, display overlay and hardware probes unchanged so any resource or timing movement is attributable to packing effort alone.
+
+#### Next Steps:
+
+Commit the isolated QSF change and run an incremental Quartus 17.0.2 build from the accepted clean seed-nine state. Compare ALMs, registers, RAM blocks and all timing categories with Entry 349; retain the candidate only if it preserves the exact 408-block topology, closes every timing category and produces a worthwhile logic reduction, otherwise revert the setting without hardware deployment.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 350 COMMIT Unreleased 873a962 2026-08-22T18:31:11-07:00
 
 #### Coming From:
