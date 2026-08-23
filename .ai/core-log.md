@@ -1,4 +1,4 @@
-## 356 COMMIT Unreleased ??? 2026-08-22T20:42:22-07:00
+## 356 COMMIT Unreleased c4d9631 2026-08-22T20:42:22-07:00
 
 #### Coming From:
 
@@ -10,20 +10,25 @@ Add a bounded H.222.0 MPEG-2 Program Stream and video PES ingress layer while pr
 
 #### Outcome:
 
-Proposed: place a small ready-valid systems parser between the accepted 32 KiB compressed-input FIFO and the unchanged H.262 decoder. Auto-detect a standards-framed Program Stream from its initial pack start code, retain raw `.m2v` as an exact pass-through mode, parse MPEG-2 pack headers and their stuffing, honor system-header and bounded PES lengths, validate the normal MPEG-2 PES optional-header form, select one video stream ID in the `0xE0` through `0xEF` range, and skip all other declared packets without exposing their bytes to the video decoder. Treat MPEG program end distinctly and report malformed fixed bits, forbidden timestamp flags, illegal zero-length Program Stream PES, length underflow and truncation as systems-layer errors. Keep real PTS scheduling, audio decoding, MPEG-1 systems syntax, Program Stream Map interpretation and corruption resynchronization outside this first ingress boundary.
+Commit `c4d9631` places a bounded ready-valid H.222.0 parser between the accepted 32 KiB input FIFO and unchanged H.262 decoder, auto-detects MPEG-2 Program Streams from their initial pack start code, and otherwise replays the four probe bytes before exact raw `.m2v` pass-through. It validates MPEG-2 pack fixed fields and stuffing, skips declared system headers and non-selected packets, selects the first `0xE0` through `0xEF` video stream ID, validates bounded MPEG-2 PES optional headers and timestamp markers, emits only video payload, distinguishes program end, and reports malformed or truncated systems input without adding bulk storage. Focused Icarus tests prove raw replay, pack and PES extraction under backpressure and error codes two, five and ten; a real 1,423,364-byte FFmpeg Program Stream extracts and emits the exact 1,404,944-byte source payload in both software and RTL. Reusable Verilator runs retain exact B-prediction, multi-slice and five-second squirrel results. The incremental seed-nine Quartus 17.0.2 image reproduces byte-for-byte after a temporary diagnostic-counter experiment is reverted by `cf234d7`: it completes with zero errors at plus 0.018 ns global setup, plus 0.026 ns decoder setup, plus 7.114 ns video setup, plus 0.249 ns hold, plus 3.800 ns recovery, plus 0.488 ns removal and plus 1.122 ns pulse width, using 35,335 ALMs, 51,502 registers, 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks. The 4,221,088-byte RBF has SHA-256 `89f26ed3571e3bf03038025c25508857df54019e1113d0636bd33dfc79542041`. Matched raw and Program Stream MiSTer runs each deliver the same 1,404,944 decoder bytes, 41 reference pictures, 79 B pictures, 120 displayed pictures and 119 swaps with zero errors and clean terminal completion; the four established hardware regressions retain complete reference-plus-B counts and zero errors, including the known odd-byte transport pad and eight-bit display-counter wrap conventions. The exact RBF and visible `STEP2_SQUIRREL_PROGRAM_STREAM.mpg` test are installed and retrieved byte-identically, the full build state is preserved outside the repository, and documentation commit `15ede96` records the new v0.7.0 boundary without changing the protected AI-assisted-development section. Real PTS scheduling, audio decoding, MPEG-1 systems syntax, Program Stream Map interpretation and corruption resynchronization remain deferred.
 
 #### Next Steps:
 
-Implement the parser with bounded counters and no new bulk storage, add deterministic raw-pass-through, pack-stuffing, system-header, audio-skip, video-PES, split-payload, backpressure, program-end and malformed-input proofs, and expose `.mpg` selection through the normal MiSTer file menu. Require unchanged raw H.262 regression behavior, clean synthesis, the accepted 408-RAM-block topology where practical, positive timing and direct MiSTer playback of matched raw and Program Stream video before persistent installation.
+Preserve this timing-clean Program Stream image as the rollback boundary. As a separate timing-hardening cycle, replace the route-dominated shared P/B replay selection with a one-entry registered ready-valid work packet that carries its selector, motion and residual fields atomically; require randomized stall equivalence, every focused decoder regression, positive timing with materially improved 60 MHz margin and unchanged hardware playback before acceptance. After that boundary is stable, capture validated PES timestamps and connect real PTS-driven scheduling without adding audio or broadening the systems subset in the same change.
 
 #### Files Modified:
 
-None.
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_07.svh
+- files.qip
+- rtl/mpeg2_new/mpeg2_h222_program_stream_demux.sv
+- tools/streams/tb_h222_program_stream_demux.sv
+- tools/streams/tb_h222_program_stream_demux_file.sv
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 355 COMMIT Unreleased f5e3b83 2026-08-22T20:39:28-07:00
