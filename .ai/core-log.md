@@ -1,3 +1,31 @@
+## 353 COMMIT Unreleased ??? 2026-08-22T19:30:00-07:00
+
+#### Coming From:
+
+Unreleased 6cfad2c
+
+#### Purpose:
+
+Audit the controlled reference library for the immediate v0.7.0 cadence and MPEG-2 Program Stream, PES and timestamp work.
+
+#### Outcome:
+
+Proposed: reduce `core-reference.md` to material that directly supports the proven H.262 decoder and the approved v0.7.0 systems-layer scope. Preserve the established H.262 conclusions, add the missing frame-rate and H.222.0 Program Stream, PES, PTS/DTS and clock rules from official ITU sources, and retain only concise deferred boundaries for licensed or future DVD, filesystem, CSS and audio work.
+
+#### Next Steps:
+
+Rewrite the reference library, verify every retained and new record against the active milestone boundary, run the required `core-syntax.md` audit, and record the resulting reference commit here.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 352 COMMIT Unreleased 6cfad2c 2026-08-22T18:55:40-07:00
 
 #### Coming From:
@@ -1141,37 +1169,5 @@ Replace the queued-run fail-stop only for this proven transient. When a B header
 
 - [x] Built
 - [x] Passed
-
----
-## 313 COMMIT Unreleased f3f2395 2026-08-21T21:08:56-07:00
-
-#### Coming From:
-
-Unreleased 242d151
-
-#### Purpose:
-
-Allow the I-picture beginning a new GOP to decode through the existing reference-overlap window so the presentation pipeline does not drain at each GOP boundary.
-
-#### Outcome:
-
-Commit `f3f2395` adds an explicit accepted I-picture header event beside the existing P-picture event and allows either supported reference type to open the scheduler's single overlap decode transaction when a B run closes. Focused scheduler, dense publication-order and complete raster simulation pass with zero functional errors, including delayed I publication into the third reference bank, and the canonical 72-picture raster completes 69,999 cycles sooner at 6,519,997 cycles. A fully clean Quartus 17.0.2 build completes with zero errors; the required 54 MHz decoder and 40 MHz video paths have positive setup margins of 1.133 ns and 7.144 ns respectively, although the default whole-design report retains a minus 0.084 ns setup warning on a standing framework path. The 4,411,644-byte RBF has SHA-256 `482afd7eb6b9757408fccbb3ec6f525850d0438f4a17e79dbe2403cc5ba8481c`. Hardware rejects the repair: the 48-picture clip reaches the first GOP boundary near picture 24 and then freezes permanently on the retained frame. Because the stream never reaches its sequence-end marker, schema-four telemetry never snapshots and the automated run correctly reports no valid telemetry rather than a cadence result. The simulation abstraction therefore missed a hardware-only liveness or ownership condition in the new I-overlap path, and this RBF is not accepted or installed persistently.
-
-#### Next Steps:
-
-Capture the hardware failure before attempting another functional repair. Extend the development cadence snapshot so a fatal decoder result or a bounded no-progress timeout can publish telemetry without requiring the sequence-end marker, then reproduce the 48-picture freeze and decode the terminal error flags, scheduler ownership state, accepted-byte position and displayed-picture count. Use that evidence to distinguish a reference-bank collision, a fail-open diagnostic rejection and a true decoder deadlock, restore the known-working diagnostic RBF after capture if necessary, and do not accept or install `f3f2395`.
-
-#### Files Modified:
-
-- MediaPlayer_top_05.svh
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_dense_publication_order.sv
-- tools/streams/tb_h262_live_raster_soak.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
