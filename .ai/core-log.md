@@ -1,4 +1,4 @@
-## 349 COMMIT Unreleased ??? 2026-08-22T18:13:23-07:00
+## 349 COMMIT Unreleased 873a962 2026-08-22T18:13:23-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Try one final fully clean fitter seed for the unchanged Stage 1 residual-store d
 
 #### Outcome:
 
-This proposal changes only the Quartus fitter seed from eight to nine. Seed nine is the strongest remaining documented candidate because it repeatedly closed the same placement-sensitive HDMI framework path on the later v0.6.0 decoder topology, including plus 0.179 ns and plus 0.330 ns results, while the current reduced-store seed-ten and seed-eight fits miss that path by 0.083 ns and 0.127 ns respectively. The RTL, simulations and exact 408-block resource target remain unchanged.
+Commit `873a962` changes only the Quartus fitter seed from eight to nine and leaves the RTL and simulations unchanged. A fully clean Quartus 17.0.2 compile from empty build directories completes in 12 minutes 17 seconds with zero errors and 154 warnings. The shared array remains exactly 65,536 by 16 bits, both descriptor tables remain at 1,024 entries, and the Stage 1 resource result is preserved at 3,228,103 block-memory bits and 408 RAM blocks, with 34,861 ALMs, 51,835 registers and 65 DSP blocks. Seed nine closes every timing category: HDMI setup is plus 0.311 ns, decoder setup plus 0.160 ns, HPS setup plus 1.601 ns, video setup plus 6.729 ns, hold plus 0.242 ns, recovery plus 3.973 ns, removal plus 0.599 ns and pulse width plus 1.122 ns, all with zero total negative slack. The 4,212,728-byte RBF has SHA-256 `96c7e815ac2f5d47501184b2da07c7f1aef824ed4f689c2c70998cafc88adb0a` and is the first deployable artifact of the reduced-store cycle.
 
 #### Next Steps:
 
-Commit the seed-only source change, preserve the current seed-eight build outputs externally, and compile seed nine from empty Quartus build directories. Require the shared array to remain exactly 65,536 by 16 bits, total memory use to remain 408 RAM blocks and every timing category to be positive. If timing fails, record the result and stop without deployment; if it closes, install only that exact verified RBF on the connected MiSTer and proceed to the four essential v0.6.0 playback checks.
+Install only the exact seed-nine RBF identified above on the connected MiSTer, verify the persistent copy byte-for-byte, and run the four essential v0.6.0 playback files. Record hardware acceptance in a new entry because this build entry is now settled; mark the Stage 1 optimization passed only if all four streams retain the accepted playback behavior without decoder, cadence, presentation or terminal regressions.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Commit the seed-only source change, preserve the current seed-eight build output
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
