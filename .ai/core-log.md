@@ -22,7 +22,7 @@ Rebuild at seed eleven and confirm the restored netlist returns to approximately
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
