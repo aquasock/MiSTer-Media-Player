@@ -1,3 +1,31 @@
+## 352 COMMIT Unreleased ??? 2026-08-22T18:55:40-07:00
+
+#### Coming From:
+
+Unreleased 902f367
+
+#### Purpose:
+
+Restore the accepted seed-nine ALM packing setting after the isolated high-effort experiment increased logic and reduced decoder timing margin.
+
+#### Outcome:
+
+The proposed commit changes only `ALM_REGISTER_PACKING_EFFORT` from the rejected `HIGH` value back to the accepted `MEDIUM` value. This makes the QSF implementation settings byte-equivalent to source commit `873a962` while preserving seed nine, all decoder RTL and the complete diagnostic architecture.
+
+#### Next Steps:
+
+Commit the exact QSF restoration, confirm there is no QSF difference from `873a962`, and restore the exact hardware-qualified seed-nine RBF locally without uploading the rejected Entry 351 artifact. Continue logic-reduction work only under a separately approved boundary, with repeated MPEG lookup-table storage as the next candidate.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 351 COMMIT Unreleased 902f367 2026-08-22T18:42:36-07:00
 
 #### Coming From:
