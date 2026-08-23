@@ -250,6 +250,30 @@ wire shared_lookup_consume=b_engine_select?b_lookup_consume:mix_lookup_consume;
 wire mix_dout_ready_owned=shared_engine_dout_ready&&mixed_select&&!b_engine_select;
 wire b_dout_ready_owned=shared_engine_dout_ready&&b_engine_select;
 
+// Entry 362: the shared reference cache word reaches the prediction block
+// fetchers over a route-dominated path -- one logic level, 95% routing,
+// 15.253 ns across 58 routing elements -- because a 36x64 word store cannot
+// pack near the cache.  Register the word and both owned ready strobes
+// together so ownership is still decided in the cycle the cache produces the
+// word and only the delivery instant moves, by exactly one clock.  The
+// fetchers track outstanding requests through their descriptor queue rather
+// than assuming a fixed response latency, which the focused fetcher test
+// already exercises in both its zero-latency and delayed cases.
+reg [63:0] shared_engine_dout_q;
+reg        mix_dout_ready_owned_q;
+reg        b_dout_ready_owned_q;
+always @(posedge clk) begin
+    if(reset) begin
+        shared_engine_dout_q<=64'd0;
+        mix_dout_ready_owned_q<=1'b0;
+        b_dout_ready_owned_q<=1'b0;
+    end else begin
+        shared_engine_dout_q<=shared_engine_dout;
+        mix_dout_ready_owned_q<=mix_dout_ready_owned;
+        b_dout_ready_owned_q<=b_dout_ready_owned;
+    end
+end
+
 mpeg2_h262_reference_word_cache reference_cache(
  .clk(clk),.reset(reset),.active(shared_engine_active),
  .request_burstcnt(shared_bc_raw),.request_addr(shared_addr_raw),
@@ -279,7 +303,7 @@ mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
  .residual_store_read_address(mix_residual_store_read_address),
  .residual_store_read_data(shared_residual_store_read_data),
  .reference_valid(reference_frame_valid),.reference_bank(reference_frame_bank),.destination_bank(destination_frame_bank),.store_block_stored(p_store_block_stored),
- .ddram_busy(shared_engine_busy),.ddram_dout(shared_engine_dout),.ddram_dout_ready(mix_dout_ready_owned),
+ .ddram_busy(shared_engine_busy),.ddram_dout(shared_engine_dout_q),.ddram_dout_ready(mix_dout_ready_owned_q),
  .ddram_lookup_ready(shared_lookup_ready),.ddram_lookup_hit(shared_lookup_hit),
  .ddram_lookup_data(shared_lookup_data),
  .ddram_burstcnt(mix_bc_raw),.ddram_addr(mix_addr_raw),.ddram_rd(mix_rd_raw),
@@ -301,7 +325,7 @@ mpeg2_h262_b_bidirectional_raster_engine b_probe(
  .residual_store_read_data(shared_residual_store_read_data),
  .reference_valid(reference_frame_valid),.past_reference_bank(previous_reference_frame_bank),
  .future_reference_bank(reference_frame_bank),.scratch_frame_bank(b_scratch_frame_bank),.store_block_stored(p_store_block_stored),
- .ddram_busy(shared_engine_busy),.ddram_dout(shared_engine_dout),.ddram_dout_ready(b_dout_ready_owned),
+ .ddram_busy(shared_engine_busy),.ddram_dout(shared_engine_dout_q),.ddram_dout_ready(b_dout_ready_owned_q),
  .ddram_lookup_ready(shared_lookup_ready),.ddram_lookup_hit(shared_lookup_hit),
  .ddram_lookup_data(shared_lookup_data),
  .ddram_burstcnt(b_bc_raw),.ddram_addr(b_addr_raw),.ddram_rd(b_rd_raw),
