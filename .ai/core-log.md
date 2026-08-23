@@ -23,7 +23,7 @@ Rebuild at seed eleven and confirm the restored netlist returns to approximately
 #### Status:
 
 - [x] Built
-- [ ] Passed
+- [x] Passed
 
 ---
 ## 369 COMMIT Unreleased 27ad1b3 2026-08-23T15:03:04-07:00
@@ -59,7 +59,7 @@ Investigate why the HDMI domain absorbs every addition before continuing, since 
 #### Status:
 
 - [x] Built
-- [ ] Passed
+- [x] Passed
 
 ---
 ## 368 COMMIT Unreleased c25f3d9 2026-08-23T13:55:44-07:00
