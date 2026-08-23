@@ -2,7 +2,7 @@
 
 An experimental media-player core for [MiSTer FPGA](https://github.com/MiSTer-devel/Main_MiSTer), with a standards-driven MPEG-2 Video / ITU-T H.262 decoder implemented primarily in FPGA logic.
 
-> **Development status:** active, pre-release, developer-oriented. **v0.6.0 is the current published hardware-qualified milestone.** It sustains real-stream progressive 4:2:0 I/P/B decoding at 720x480, adds native 23.976/24/25 fps presentation cadence, and fixes the GOP-boundary stutters, large-picture starvation, and end-of-stream stalls found during full-length playback testing. Audio, container/program-stream demux, DVD support, playback controls, and broader H.262 coverage remain future work.
+> **Development status:** active, pre-release, developer-oriented. **v0.6.0 is the current published hardware-qualified milestone.** It sustains real-stream progressive 4:2:0 I/P/B decoding at 720x480, adds native 23.976/24/25 fps presentation cadence, and fixes the GOP-boundary stutters, large-picture starvation, and end-of-stream stalls found during full-length playback testing. Current v0.7.0 development additionally hardware-qualifies native 29.97 and 30 fps cadence. Audio, container/program-stream demux, DVD support, playback controls, and broader H.262 coverage remain future work.
 
 ## Current status
 
@@ -27,6 +27,8 @@ The active decoder is a clean H.262 implementation under `rtl/mpeg2_new/`. v0.6.
 - native presentation pacing for H.262 frame-rate codes 1, 2, and 3: `24000/1001`, exact 24 fps, and 25 fps;
 - a 33-bit / 90 kHz synthetic elementary-stream timeline derived from H.262 frame-rate information and `temporal_reference`.
 
+The current v0.7.0 development branch extends native presentation pacing to H.262 frame-rate codes 4 and 5: exact `30000/1001` (29.97 fps) and exact 30 fps. Both rates have passed focused scheduler proofs, timing-clean synthesis, direct MiSTer cadence measurements, and the established four-stream hardware regression gate.
+
 The current implementation subset remains intentionally bounded while the decoder architecture is being proven. These are implementation limits, **not** limits of H.262.
 
 | Area | Current implementation |
@@ -36,7 +38,7 @@ The current implementation subset remains intentionally bounded while the decode
 | Picture structure | Progressive frame pictures on the proven paths |
 | Chroma format | 4:2:0 |
 | Proven geometry | Up to 720x480 / 45x30 macroblocks for the authoritative I, P, and B regression paths |
-| Presentation rates | H.262 frame-rate codes 1..3: `24000/1001`, exact 24 fps, and 25 fps |
+| Presentation rates | H.262 frame-rate codes 1..5: `24000/1001`, exact 24 fps, 25 fps, `30000/1001`, and exact 30 fps |
 | Generalized P motion envelope | Independently signaled horizontal/vertical `f_code` 1..9, signed vectors, predictor reuse/reset and wraparound, integer/H/V/bilinear half-sample prediction |
 | Generalized P residual envelope | Up to 32 coded residual blocks and 64 non-zero coefficient events per picture; implementation caps |
 | B regression envelope | Independently signaled forward/backward H/V `f_code` 1..5, forward/backward/bidirectional prediction, internal skips, bounded residuals, B scratch storage, and display reordering; deterministic range regressions cover 1..4 |
@@ -69,6 +71,8 @@ All four focused hardware regressions passed with complete byte and picture coun
 - Interlaced picture structures, chroma formats other than 4:2:0, audio, multiplexed containers, Program Stream/PES transport, and real PTS are not implemented.
 - Seeking, scrubbing, pause/resume, and DVD navigation are not implemented.
 - Full-length files should be opened through the normal MiSTer file menu. Automatic MGL injection of a 642 MB test file did not enter the normal streaming path and is not a qualified loading method.
+
+For the active v0.7.0 development branch, frame-rate codes 4 and 5 have moved out of that v0.6.0 boundary. Codes 6 through 8 (50, 59.94, and 60 fps) remain unsupported.
 
 ## Releases
 
@@ -156,7 +160,7 @@ intra reconstruction    P prediction + residual    B prediction + residual
                  blanking-aligned publication/reorder -> MiSTer video output
 ```
 
-A sideband timing path derives a 33-bit / 90 kHz elementary-stream presentation schedule from H.262 frame-rate metadata and cadence-paces frame-rate codes 1 through 3. It is deliberately not called PTS because the current `.m2v` input has no H.222.0 PES layer.
+A sideband timing path derives a 33-bit / 90 kHz elementary-stream presentation schedule from H.262 frame-rate metadata and cadence-paces frame-rate codes 1 through 5. It is deliberately not called PTS because the current `.m2v` input has no H.222.0 PES layer.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for architectural background and [`docs/MPEG2_NEW_DECODER.md`](docs/MPEG2_NEW_DECODER.md) for the decoder development record.
 
@@ -202,7 +206,7 @@ The USER LED is used as a positive completion diagnostic during development. Its
 
 ## Development roadmap
 
-After v0.6.0, decoder work can broaden the qualified progressive 23.976/24/25-fps path toward more H.262 frame rates, interlaced picture structures, additional chroma formats, and a wider real-stream syntax envelope. Later work includes presentation-quality chroma improvements, H.222.0 Program Stream/PES handling and real timestamps, audio integration, playback controls, and DVD navigation/optical-drive integration.
+The active v0.7.0 branch broadens the qualified progressive cadence path through native 29.97 and 30 fps. Further decoder work can extend that path toward 50/59.94/60 fps, interlaced picture structures, additional chroma formats, and a wider real-stream syntax envelope. Later work includes presentation-quality chroma improvements, H.222.0 Program Stream/PES handling and real timestamps, audio integration, playback controls, and DVD navigation/optical-drive integration.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for completed milestones.
 
