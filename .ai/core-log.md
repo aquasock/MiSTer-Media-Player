@@ -1,3 +1,31 @@
+## 350 COMMIT Unreleased 873a962 2026-08-22T18:31:11-07:00
+
+#### Coming From:
+
+Unreleased 873a962
+
+#### Purpose:
+
+Hardware-qualify the timing-clean seed-nine residual-store optimization against the essential v0.6.0 playback gate.
+
+#### Outcome:
+
+The exact 4,212,728-byte seed-nine RBF from Entry 349, SHA-256 `96c7e815ac2f5d47501184b2da07c7f1aef824ed4f689c2c70998cafc88adb0a`, was installed persistently on the connected MiSTer and retrieved byte-for-byte identical before testing. The P-skip and motion stream accepts all 180,948 bytes, completes two reference pictures and one display swap with zero errors and zero cadence outliers. The B-prediction stream accepts all 185,054 bytes, completes three reference plus two B pictures, five displays and four swaps, reaches sequence-end quiet and reports zero errors and zero outliers. The repeated multi-slice stream completes the same three-reference plus two-B count, reaches sequence-end quiet with zero errors and zero outliers, and correctly accepts 185,394 transport bytes for its odd 185,393-byte file because the established 16-bit ingress supplies one pad byte. The squirrel stress clip accepts all 2,603,570 bytes, completes 121 reference plus 239 B pictures, reaches sequence-end quiet and presentation complete with zero errors and zero cadence outliers; its eight-bit display and swap counters wrap from 360 and 359 to 104 and 103 as established, and the corrected 359-interval rate is 23.991197 fps. The user watched the stress clip and reports that the squirrel sequence looked perfect. Seed nine therefore passes hardware without decoder, cadence, presentation or terminal regression, completing Stage 1 while recovering 130 RAM blocks from the v0.6.0 baseline.
+
+#### Next Steps:
+
+Treat source commit `873a962`, metadata commit following this entry and the currently installed seed-nine RBF as the accepted post-v0.6.0 residual-store baseline. Preserve the clean Quartus state and the rejected seed-eight state until routine archival is approved. Begin substantive v0.7.0 work only under a new approved boundary, retaining the four essential streams and the exact 408-block topology as regression gates.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 349 COMMIT Unreleased 873a962 2026-08-22T18:13:23-07:00
 
 #### Coming From:
@@ -1148,34 +1176,6 @@ Do not change scheduler behaviour. Obtain approval for one diagnostic correction
 - rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
 - tools/streams/decode_hardware_cadence.py
 - tools/streams/tb_h262_hardware_cadence_profiler.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 310 COMMIT Unreleased 95a0ab1 2026-08-21T19:55:45-07:00
-
-#### Coming From:
-
-Unreleased 95a0ab1
-
-#### Purpose:
-
-Correct Entry 309's hardware interpretation using the user's continuous observation and the settled LED diagnostic encoding.
-
-#### Outcome:
-
-Entry 309's claim that the 250-frame clip permanently freezes on frame 78 is superseded. The automated runner captured only post-playback still images and aggregate terminal telemetry, so it could not observe transient motion discontinuities or establish the instant at which playback stopped; matching the terminal image to encoded frame 78 identifies the content left in the displayed bank, not when that bank became visible. The user observes the same underlying symptom on all three clips: playback stutters and then continues, once in the 48-frame prefix and twice in the 72-frame prefix, at equal intervals and at the same content positions, with the 250-frame run similar. That count aligns exactly with the generator's 24-frame GOP structure, one internal GOP boundary in 48 frames and two in 72, making the GOP transition the leading correlation but not yet a proven mechanism. The LED reports narrow the terminal states. On 48 frames, USER and POWER steady on with DISK off is clean acceptance. On 72 frames, USER and POWER steady on with DISK blinking eleven is also clean acceptance; DISK eleven is the success-side final-GOP progress marker for future-reference presentation, not an error. On 250 frames, USER and DISK steady off with POWER blinking five means no decoder error latched but acceptance failed because `completed_frame_bank` differs from `display_frame_bank`. The missing 250-frame telemetry therefore reflects a terminal presentation state that never becomes quiet, not proof of a fatal midstream decode or presentation error. The reported 24.04 and 23.54 fps figures are whole-run averages that fold the discrete stutters into one rate and cannot distinguish otherwise normal cadence between them.
-
-#### Next Steps:
-
-Do not change decoder or scheduler behaviour until the discontinuity is measured directly. Extend the observational cadence profiler to record the largest inter-display-swap gaps, the displayed-picture ordinals on each outlier and a count of gaps exceeding the legal 25 fps cadence window, then make it publish a tagged terminal snapshot after a bounded post-sequence delay even when `session_quiet` never asserts. That single diagnostic build should prove whether the pauses occur at displayed pictures 24 and 48, distinguish decode starvation from cadence scheduling, and expose the 250-frame terminal bank and scheduler state. Obtain user approval for this revised diagnostic plan before modifying RTL.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
