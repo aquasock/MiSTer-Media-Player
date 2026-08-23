@@ -1,4 +1,4 @@
-## 359 COMMIT Unreleased ??? 2026-08-23T01:25:14-07:00
+## 359 COMMIT Unreleased ??? 2026-08-23T01:34:17-07:00
 
 #### Coming From:
 
@@ -6,26 +6,43 @@ Unreleased 058f0a3
 
 #### Purpose:
 
-Establish the FPGA-side timing foundation for Linux-side audio by carrying captured PTS through frame ownership, anchoring an FPGA-owned system time clock, and exposing that clock to the HPS.
+Restore navigability of the RTL tree by deleting every source file Quartus never compiles, which eliminates all duplicate module definitions as a consequence, without changing the bitstream.
 
 #### Outcome:
 
-The user has decided that audio decoding will run on the HPS rather than in fabric, so version 0.7.0 is defined as the complete FPGA-side foundation for external audio and deliberately contains no audio decoder, no HPS helper binary and no DVD navigation; the 0.7.0 release remains a single RBF. This commit carries the validated 33-bit PTS from `058f0a3` through frame ownership into the presentation scheduler and adds a 90 kHz system time clock implemented as a fractional accumulator anchored to the 24.576 MHz audio domain that `sys/audio_out.sv` already uses, rather than to the pixel clock, so that once external samples arrive they are consumed drift-free by construction and all correction falls on the video side where a full frame of tolerance exists. Reference swaps convert from free-running cadence to presentation when a picture's PTS reaches the clock, with the clock anchored from the first PTS observed in the stream. Raw elementary streams carry no timestamps and must retain the existing free-running cadence unchanged, selected per stream; every current regression stream is raw elementary, so a regression here fails the entire matrix at once and is the principal risk. The cadence snapshot gains the clock value and per-swap PTS error. Clock value, playback state and a seek discontinuity reset are exposed to the HPS, with the choice between the `hps_io` status path and the lightweight bridge settled by the 33-bit width requirement. This work depends on `058f0a3` completing its build and hardware gates first. The fit stands at 35,932 ALMs against 41,910 with plus 0.375 ns global setup, so added area and cross-domain logic may force diagnostic gating earlier than planned.
+A complexity reevaluation requested by the user, prompted by device and build-time constraints arriving before the video decoder is finished, measured the tree rather than estimating it and found the maintainability problem is navigational rather than architectural. Of fifty-eight SystemVerilog files under `rtl/mpeg2_new`, twenty-one totalling 7,489 lines are absent from `files.qip` and never compile, including `mpeg2_h262_p_residual_probe.sv` and `mpeg2_h262_slice_probe.sv`, two of the four largest files in the project. Seven module names are defined more than once, and in every one of the seven the base-named file is the dead copy while the compiled definition lives in a differently-named file, so `mpeg2_h262_ddram_store` is really `mpeg2_h262_ddram_store_420p.sv`, `mpeg2_h262_p_luma_macroblock_engine` is really `mpeg2_h262_p_macroblock_420_engine.sv`, and a reader opening the obvious file reads code with no effect on the bitstream. Four `mpeg2_h262_p_motion_plan_syntax_probe_part` include fragments are referenced by nothing. Removing all twenty-five files resolves every duplicate to exactly one definition and leaves thirty-seven live modules, of which thirteen are diagnostic and twenty-four are the decoder itself. Because none of these files appear in `files.qip`, the commit cannot alter synthesis: the validation gate is a rebuild whose RBF SHA-256 is byte-identical to the `058f0a3` reference, and any difference means a file believed dead was live and the cycle stops for investigation. Git history preserves every deleted file. This work depends on the `058f0a3` build completing to provide that reference image.
 
 #### Next Steps:
 
-Validate on MiSTer that the 120-picture Program Stream presents with bounded PTS error against the clock while every raw elementary stream retains its existing cadence, and that a userspace read of the clock advances at 90 kHz across a ten-minute observation and tracks observed presentation. The following cycle adds the PCM sink: an elastic FIFO fed by the HPS and drained at the sample rate into `sys/audio_out.sv`, sized near one hundred milliseconds of stereo 48 kHz audio at roughly fifteen memory blocks of the one hundred forty-five free, with fill level and underrun and overrun counters readable by the HPS as the drift error signal, and an explicit flush for seeks; its gate is a synthesized test tone playing cleanly for ten minutes with zero underruns and a deliberate starvation producing a counted recoverable underrun rather than a hang. A subsequent cycle addresses real media, resolving whether a missing `MPEG_program_end_code` should remain truncation error ten when real VOB and FFmpeg output omit it, and validating that non-video PES including AC-3, navigation packs and MPEG audio is skipped cleanly at scale on a real VOB. Release qualification then performs a clean from-scratch build and the full regression matrix, gating the twenty-seven diagnostic modules behind a compile-time parameter if timing margin has degraded, before tagging `v0.7.0` as a pre-release. Linux-side audio work begins only after that boundary.
+Follow this with a measured commit that gates the thirteen live diagnostic modules behind a compile-time parameter so a lean image can be built, reporting the area, timing and fitter-runtime deltas against the reference, since the one-hour cold route now costing more than any single change is the constraint most likely to make the project unworkable for a human or an agent. Re-baseline the 0.7.0 plan against those lean numbers before resuming feature work, because the device pressure that motivated moving audio to the HPS may be substantially bring-up debt rather than a real ceiling. The presentation cycle previously proposed in this entry then follows unchanged in substance: carry the validated PTS through frame ownership, add a 90 kHz system time clock as a fractional accumulator anchored to the 24.576 MHz audio domain that `sys/audio_out.sv` already uses rather than to the pixel clock, swap on PTS reaching that clock while retaining the existing free-running cadence for raw elementary streams that carry no timestamps, and expose clock value, playback state and a seek discontinuity reset to the HPS. After that comes the PCM sink with its elastic FIFO, fill level and underrun telemetry, then real-media Program Stream robustness including whether a missing `MPEG_program_end_code` should remain truncation error ten, then clean-build release qualification and the `v0.7.0` pre-release tag. Version 0.7.0 remains a single RBF containing no audio decoder, and Linux-side audio work begins only after that boundary.
 
 #### Files Modified:
 
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_07.svh
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- rtl/mpeg2_new/mpeg2_h262_system_time_clock.sv
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_system_time_clock.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_store.sv
+- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_syntax_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_syntax_probe_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller.sv
+- rtl/mpeg2_new/mpeg2_h262_p_luma_macroblock_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_syntax_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_p_residual_parser.sv
+- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline.sv
+- rtl/mpeg2_new/mpeg2_h262_p_residual_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_p_two_mb_copy_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_aligned.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_multimb.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_plan.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_read_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_slice_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_multimb.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_publish.sv
 
 #### Status:
 
