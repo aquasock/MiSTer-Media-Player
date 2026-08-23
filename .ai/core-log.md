@@ -1,3 +1,31 @@
+## 354 COMMIT Unreleased ??? 2026-08-22T19:44:58-07:00
+
+#### Coming From:
+
+Unreleased 6cfad2c
+
+#### Purpose:
+
+Add exact native 30000/1001 and 30-fps presentation cadence as the first substantive v0.7.0 milestone.
+
+#### Outcome:
+
+Proposed: extend the accepted 40 MHz presentation accumulator from H.262 frame-rate codes one through three to codes four and five without changing decode order, frame ownership, compressed ingress, the accepted 60 MHz decoder clock or diagnostic architecture. Use the exact Table 6-4 ratios from controlled record H262-027, add focused long-window counts that distinguish 30000/1001 from 30 fps, and make both rates visible to cadence-outlier telemetry.
+
+#### Next Steps:
+
+Implement the two cadence scales, re-seed safely when entering either fractional scale, extend scheduler and profiler regressions, and run the established decoder gates. If all source-level tests pass, commit and push the change, then perform an incremental seed-nine build and require the accepted 408-RAM-block topology plus positive timing before any MiSTer installation.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 353 COMMIT Unreleased 5ab290d 2026-08-22T19:30:00-07:00
 
 #### Coming From:
