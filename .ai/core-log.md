@@ -1,3 +1,32 @@
+## 371 COMMIT Unreleased 2d555f7 2026-08-23T16:00:17-07:00
+
+#### Coming From:
+
+Unreleased 3f279dd
+
+#### Purpose:
+
+Supply the harness that injects in-band metadata records and prove the extraction path end to end on hardware.
+
+#### Outcome:
+
+The restored `3f279dd` netlist rebuilt to RBF SHA-256 `6e075113416bf8bb891d2b00ee96a9748441bb42ce2a10dec81ef93b37a8fb13`, byte-identical to `27ad1b3`, with 35,055 ALMs, 51,819 registers, plus 0.138 ns HDMI setup and plus 0.933 ns decoder setup, confirming both that the revert restored ASCAL exactly and that determinism continues to hold. The user validated that image and every stream passed, accepting the metadata extractor as harmless to plain elementary streams, which was the property at risk because the four-byte detection window holds the `sequence_end_code` at end of transfer and a broken flush would have truncated every stream. This commit adds tools only and required no rebuild. `inject_inband_metadata.py` annotates an elementary stream by inserting a nine-byte record before each picture start, refusing outright to process a file that already contains `0x000001B0` so a stream cannot be annotated twice, and `tb_h262_inband_metadata_file.sv` replays an annotated stream and its unannotated source through the extractor, requiring the emitted bytes to equal the source exactly, with stream paths and lengths passed as plusargs so any file can be used. Annotating the four-picture `01_i_baseline` produced exactly four records and a file thirty-six bytes larger, and an independently written stripper reduced it to a byte-identical copy of the original. The file replay then drove all 726,739 annotated bytes through the RTL with backpressure applied every 977 bytes and reproduced all 726,703 source bytes exactly, extracting four records with a final timestamp of `0x7A223`. That predicted the hardware result before it was measured, which it matched exactly: the annotated stream reports four records and low timestamp bits `0x223` with zero error flags, while the unannotated control over the same core and the same picture content reports zero records and zero timestamp. Metadata therefore travels from a file, over the ordinary `ioctl_download` path, through the sliding-window detector, is stripped ahead of the decoder and unpacked with its timestamp intact, with no side channel, no daemon, no `Main_MiSTer` change and no kernel work. Two harness limitations were observed and are not defects in the core: `run_hardware_cadence.py` reports picture and byte counts that do not match the stream it was given, the same discrepancy the archived seed ten image reproduces, and its snapshots were taken before terminal quiet so `sequence_end_seen` reads false.
+
+#### Next Steps:
+
+Carry the extracted timestamp into frame ownership and present on it against the system time clock, anchoring from the first record in a stream and retaining free-running cadence for streams that carry none, which is the change that genuinely risks presentation regressions and now has both a proven clock and a proven metadata path beneath it. Extend the injector to derive timestamps from a real cadence rather than a fixed step once presentation consumes them, so the injected values describe the stream instead of merely exercising the path. The PCM sink follows with its elastic FIFO, fill level and underrun telemetry and explicit seek flush. Continue checking the weakest margin across all clocks after each addition, reseeding rather than restructuring when the HDMI domain is the category that fails. Before release qualification, complete the regression pack still unexercised, in particular long GOP, dense residual, full endurance and the truncation case with its no-reboot recovery, and delete the six compiled but uninstantiated modules for navigability.
+
+#### Files Modified:
+
+- tools/streams/inject_inband_metadata.py
+- tools/streams/tb_h262_inband_metadata_file.sv
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 370 COMMIT Unreleased 3f279dd 2026-08-23T15:32:17-07:00
 
 #### Coming From:
@@ -1175,35 +1204,5 @@ None. Generated regression artifacts are intentionally untracked.
 
 - [x] Built
 - [ ] Passed
-
----
-## 331 COMMIT Unreleased 374ef38 2026-08-22T05:43:51-07:00
-
-#### Coming From:
-
-Unreleased 374ef38
-
-#### Purpose:
-
-Qualify the accepted mixed-width MPEG-2 ingress image as an exact clean-build release candidate rather than relying on its incremental Quartus build.
-
-#### Outcome:
-
-The previous `db`, `incremental_db` and `output_files` directories were moved intact to `/tmp/mmp_clean_build.QMl28H`, and Quartus then rebuilt seed twelve completely from scratch. Full compilation completed in 13 minutes 44 seconds with zero errors. Every required timing category is positive: global and decoder setup are plus 0.049 ns, video setup is plus 7.752 ns, hold is plus 0.243 ns, recovery is plus 3.800 ns, removal is plus 0.613 ns and minimum pulse width is plus 1.122 ns. The clean fit uses 35,146 ALMs, 51,998 registers, 4,306,375 block-memory bits, 538 of 553 RAM blocks and 65 DSP blocks.
-
-The resulting 4,463,616-byte `MediaPlayer.rbf` has SHA-256 `566ecf44d65c9d483be247ae942280d23269b7100ce0d75ef3b8a5bc4bdf2dbc`, exactly matching the previously installed incremental image that passed the focused five-second and full fifteen-second squirrel tests and the user's repeated visual inspection. Because the images are bit-for-bit identical, the MiSTer already runs the clean release-candidate bits and was deliberately not interrupted while the user tests additional converted media.
-
-#### Next Steps:
-
-Continue broad hardware playback testing with user-selected files on the already installed, bit-identical clean release candidate. Record any reproducible decode artefact, cadence problem, freeze or terminal failure with its source properties and timestamp. Do not rebuild or replace the image unless a new defect requires a source change.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
