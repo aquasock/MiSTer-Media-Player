@@ -1,4 +1,4 @@
-## 353 COMMIT Unreleased ??? 2026-08-22T19:30:00-07:00
+## 353 COMMIT Unreleased 5ab290d 2026-08-22T19:30:00-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Audit the controlled reference library for the immediate v0.7.0 cadence and MPEG
 
 #### Outcome:
 
-Proposed: reduce `core-reference.md` to material that directly supports the proven H.262 decoder and the approved v0.7.0 systems-layer scope. Preserve the established H.262 conclusions, add the missing frame-rate and H.222.0 Program Stream, PES, PTS/DTS and clock rules from official ITU sources, and retain only concise deferred boundaries for licensed or future DVD, filesystem, CSS and audio work.
+Commit `5ab290d` reduces `core-reference.md` from 2,071 to 443 lines while preserving and indexing all 26 established H.262 decoder records. It removes the premature USB, optical-drive, HDMI, CD/VCD and broad future-format catalogs, and replaces the oversized DVD, filesystem, CSS and audio sections with concise deferred source boundaries. It adds H262-027 for exact 24000/1001, 24, 25, 30000/1001, 30, 50, 60000/1001 and 60 frame-rate signalling plus 11 H.222.0 records covering Program Stream packs and termination, SCR and pack stuffing, system headers, bounded Program Stream PES packets, stream IDs, optional-header flags, PTS/DTS units and wrap, H.262 timestamp association and reorder timing, Program Stream Maps and data alignment. The audit also identifies the official freely available H.222.0 (06/2021) text as the consulted baseline while retaining H.222.0 (04/2025) as the current paywalled edition whose delta must be checked before a v10 conformance claim. All eight YAML blocks parse, every active record has an explicit source identifier and exact clause/table reference, all 38 record IDs are unique and indexed, and the required `core-syntax.md` audit passes with no format or policy conflict.
 
 #### Next Steps:
 
-Rewrite the reference library, verify every retained and new record against the active milestone boundary, run the required `core-syntax.md` audit, and record the resulting reference commit here.
+Use H262-027 when extending cadence beyond the accepted native-24 path. Use H222-001 through H222-011 as the controlled starting point for Program Stream, PES and real timestamp work, and recheck the H.222.0 2025 edition delta before making a current-edition conformance claim. Restore detailed DVD, filesystem, CSS, audio or Transport Stream references only when one of those milestones is explicitly approved.
 
 #### Files Modified:
 
