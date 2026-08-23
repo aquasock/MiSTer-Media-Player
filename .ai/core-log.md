@@ -1,4 +1,4 @@
-## 352 COMMIT Unreleased ??? 2026-08-22T18:55:40-07:00
+## 352 COMMIT Unreleased 6cfad2c 2026-08-22T18:55:40-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Restore the accepted seed-nine ALM packing setting after the isolated high-effor
 
 #### Outcome:
 
-The proposed commit changes only `ALM_REGISTER_PACKING_EFFORT` from the rejected `HIGH` value back to the accepted `MEDIUM` value. This makes the QSF implementation settings byte-equivalent to source commit `873a962` while preserving seed nine, all decoder RTL and the complete diagnostic architecture.
+Commit `6cfad2c` changes only `ALM_REGISTER_PACKING_EFFORT` from the rejected `HIGH` value back to the accepted `MEDIUM` value. The resulting `MediaPlayer.qsf` is byte-equivalent to accepted source commit `873a962`, preserving seed nine, all decoder RTL and the complete diagnostic architecture. The connected MiSTer was never changed by the rejected experiment and still held the exact 4,212,728-byte accepted seed-nine RBF; retrieving it reproduced SHA-256 `96c7e815ac2f5d47501184b2da07c7f1aef824ed4f689c2c70998cafc88adb0a`, and that verified image has replaced the rejected build in local `output_files` without another upload.
 
 #### Next Steps:
 
-Commit the exact QSF restoration, confirm there is no QSF difference from `873a962`, and restore the exact hardware-qualified seed-nine RBF locally without uploading the rejected Entry 351 artifact. Continue logic-reduction work only under a separately approved boundary, with repeated MPEG lookup-table storage as the next candidate.
+Treat the accepted medium-packing seed-nine source and RBF as restored. Do not retry the global high-packing setting; continue logic-reduction work only under a separately approved boundary, with repeated MPEG lookup-table storage as the next candidate and the complete diagnostic architecture retained.
 
 #### Files Modified:
 
@@ -1168,70 +1168,6 @@ Capture the hardware failure before attempting another functional repair. Extend
 - tools/streams/tb_h262_b_presentation_scheduler.sv
 - tools/streams/tb_h262_dense_publication_order.sv
 - tools/streams/tb_h262_live_raster_soak.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 312 COMMIT Unreleased 242d151 2026-08-21T20:45:10-07:00
-
-#### Coming From:
-
-Unreleased b777f30
-
-#### Purpose:
-
-Capture the exact scheduler and hold state at each GOP-correlated cadence outlier so the visible stutters can be fixed without conflating them with the separate 250-frame terminal failure.
-
-#### Outcome:
-
-Commit `242d151` leaves decoder and scheduler behaviour unchanged and adds schema-four threshold-crossing context to each ranked cadence gap, including the upcoming display ordinal, scheduler word, holds, FIFO, decoder readiness, scratch availability, frame publication and bank state. Focused Icarus and Verilator checks pass, the scheduler regression remains unchanged, and the overlay decoder proves that threshold state is retained even when signals change before the eventual swap. The fully clean Quartus 17.0.2 build completes with zero errors and positive timing at plus 0.577 ns global setup, plus 0.928 ns decoder setup, plus 6.520 ns video setup, plus 0.249 ns hold, plus 3.830 ns recovery, plus 0.694 ns removal and plus 0.462 ns minimum pulse width. It uses 34,571 ALMs, 51,255 registers, 4,040,879 memory bits, 506 RAM blocks and 65 DSP blocks; the 4,350,716-byte RBF has SHA-256 `af63bb9c8433247d4b5b54ab511efd12d9e2aaec8cf664e021e48c7b4fcb1b31`. MiSTer validation accepts every byte and picture with zero error flags: 48 frames has one 4,476,384-cycle or 82.896 ms gap before picture 25, while 72 frames has the same gap before picture 25 and an 8,057,491-cycle or 149.213 ms gap before picture 49. At all three threshold samples the decoder is ready but the FIFO is empty, presentation is complete, and the scheduler has no active or queued run, decode, frame, hold or promotion. Source correlation identifies the GOP-specific admission defect: the non-B header closes the prior B run, but `overlap_decode_open` is enabled only for a P-picture, so the I-picture beginning each new GOP cannot decode through the existing presentation overlap and the pipeline drains before it is admitted.
-
-#### Next Steps:
-
-Propose a narrow scheduler change that allows an accepted I-picture header, as well as the existing P-picture header, to open the one-reference overlap transaction while a closed B run is presented. Prove in focused scheduler and complete raster regressions that the rotating third reference destination cannot overwrite the displayed or prediction-owned banks, then require a clean timing-qualified build and hardware replay with zero outliers at pictures 25 and 49. Keep the 250-frame terminal trigger and terminal repair deferred until the GOP stutters are eliminated.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/run_hardware_cadence.py
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 311 COMMIT Unreleased b777f30 2026-08-21T20:05:37-07:00
-
-#### Coming From:
-
-Unreleased 95a0ab1
-
-#### Purpose:
-
-Measure the GOP-correlated stutters and the unresolved 250-frame terminal presentation state with diagnostic-only hardware telemetry.
-
-#### Outcome:
-
-Commit `b777f30` extends the cadence snapshot without changing decode, ownership, scheduling or display decisions. Schema version three retains the existing aggregates, ranks the three largest inter-display-swap gaps with displayed-picture ordinals, counts gaps beyond the 25 fps cadence window, tags quiet versus forced snapshots, and records terminal banks, holds and scheduler flags. Verilator and Icarus lint pass, the focused scheduler regression is unchanged, and the profiler bench proves both quiet and forced snapshot paths. A fully clean Quartus 17.0.2 build completes in 11 minutes 51 seconds with zero errors, zero Critical Warnings and 146 warnings. Every timing category is positive at plus 0.500 ns global setup, plus 1.145 ns decoder setup, plus 6.922 ns video setup, plus 0.247 ns hold, plus 4.331 ns recovery, plus 1.022 ns removal and plus 0.462 ns minimum pulse width. The fit uses 34,258 ALMs, 50,579 registers, 4,040,879 memory bits, 506 RAM blocks and 65 DSP blocks; the 4,394,640-byte RBF has SHA-256 `727ed77da160070fcfca5fb644060b3501f46f4546c0babd5a7f43c2a7451cca`. Hardware confirms the GOP correlation directly: the 48-frame clip completes with zero errors and one 82.896 ms outlier before displayed picture 25, while the 72-frame clip completes with zero errors and two outliers, 82.896 ms before picture 25 and 149.213 ms before picture 49. The full clip again holds the image matching frame 78 but publishes no forced snapshot, proving it stops before `sequence_end_seen` rather than merely failing to drain after sequence end. Hardware automation also exposed that current MiSTer MGL paths are resolved relative to `games/MediaPlayer` and that requesting screenshots during the MGL delay can prevent file injection; absolute paths and early polling produce the black screen independently on both this RBF and the previously proven seed-eight control.
-
-#### Next Steps:
-
-Do not change scheduler behaviour. Obtain approval for one diagnostic correction: let the forced snapshot arm when accepted bytes and display swaps are both stagnant for a bounded interval while compressed input remains pending, without requiring `sequence_end_seen`, and update the hardware runner to use a games-folder-relative MGL path and defer its first screenshot until after file injection and playback. Rebuild and rerun the same three clips; the 48- and 72-frame results must remain exact enough to preserve the measured outlier ordinals, and the full clip must finally expose the byte count, display count, bank mismatch and scheduler flags at its frame-78 hold before any behavioural repair is proposed.
-
-#### Files Modified:
-
-- MediaPlayer_top_05.svh
-- MediaPlayer_top_07.svh
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
 
 #### Status:
 
