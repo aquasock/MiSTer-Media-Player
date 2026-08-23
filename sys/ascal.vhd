@@ -2566,6 +2566,10 @@ BEGIN
 	HSCAL:PROCESS(o_clk) IS
 		VARIABLE div_v : unsigned(20 DOWNTO 0);
 		VARIABLE dir_v : unsigned(11 DOWNTO 0);
+		-- MiSTer-Media-Player entry 370: speculative operands for the final
+		-- two non-restoring divide steps.  See the FRAC>6 block below.
+		VARIABLE d1_v : unsigned(20 DOWNTO 0);
+		VARIABLE s0_v,s1_v,s2_v,s3_v : unsigned(20 DOWNTO 0);
 	BEGIN
 		IF rising_edge(o_clk) THEN
 			-- Pipeline signals
@@ -2630,17 +2634,34 @@ BEGIN
 			div_v:=o_div(2);
 			dir_v:=o_dir(2);
 			IF FRAC>6 THEN
+				-- MiSTer-Media-Player entry 370: these last two non-restoring
+				-- divide steps ran back to back, the second waiting on the sign
+				-- of the first, which made o_div(2) -> o_hfrac(1) the worst HDMI
+				-- path at plus 0.138 ns over three logic levels.  Successive
+				-- add/subtracts on 21-bit unsigned are associative, so the four
+				-- possible second-step results are computed directly from div_v
+				-- in parallel and selected afterwards: one adder plus a mux
+				-- instead of two serial adders.  Values are bit-identical to the
+				-- sequential form, including wraparound, and no pipeline stage is
+				-- added -- the horizontal pipeline is depth-matched against
+				-- o_copyv, o_dcptv_clr, o_dcptv_inc and o_hpixq, so changing its
+				-- depth would require realigning all of them.
 				IF div_v(20)='0' THEN
-					div_v:=div_v-to_unsigned(o_hsize*4,21);
+					d1_v:=div_v-to_unsigned(o_hsize*4,21);
 				ELSE
-					div_v:=div_v+to_unsigned(o_hsize*4,21);
+					d1_v:=div_v+to_unsigned(o_hsize*4,21);
 				END IF;
-				dir_v(5):=NOT div_v(20);
+				dir_v(5):=NOT d1_v(20);
+
+				s0_v:=div_v-to_unsigned(o_hsize*6,21);  -- -4 then -2
+				s1_v:=div_v-to_unsigned(o_hsize*2,21);  -- -4 then +2
+				s2_v:=div_v+to_unsigned(o_hsize*2,21);  -- +4 then -2
+				s3_v:=div_v+to_unsigned(o_hsize*6,21);  -- +4 then +2
 
 				IF div_v(20)='0' THEN
-					div_v:=div_v-to_unsigned(o_hsize*2,21);
+					IF d1_v(20)='0' THEN div_v:=s0_v; ELSE div_v:=s1_v; END IF;
 				ELSE
-					div_v:=div_v+to_unsigned(o_hsize*2,21);
+					IF d1_v(20)='0' THEN div_v:=s2_v; ELSE div_v:=s3_v; END IF;
 				END IF;
 				dir_v(4):=NOT div_v(20);
 			END IF;
