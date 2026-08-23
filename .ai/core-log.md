@@ -1,3 +1,56 @@
+## 361 COMMIT Unreleased ??? 2026-08-23T03:25:34-07:00
+
+#### Coming From:
+
+Unreleased 9bfdb21
+
+#### Purpose:
+
+Restore fitter seed nine so the preserved `2dc52d7` placement can be reused, and delete the twenty-five source files Quartus never compiles.
+
+#### Outcome:
+
+Rebuilding `2dc52d7` from source at seed nine confirmed this project's builds are deterministic and regenerated the post-fit database that no backup contained. Every fit metric reproduced exactly: 35,932 ALMs, 52,421 registers, 3,228,103 memory bits, 408 RAM blocks, 65 DSP blocks, a 4,231,288-byte RBF, plus 0.375 ns global setup, plus 0.572 ns decoder setup, plus 7.280 ns video setup and plus 0.246 ns hold, with the fitter taking 10 minutes 33 seconds against 25 minutes 16 seconds for a cold fit of the post-revert tree. Its SHA-256 is `97762a5fe44faaca5b00c6954fc0e5a451d457683273ef21e3d7f28ce73734c3` rather than the recorded `d4f19c0d...` for one benign reason: `sys/build_id.tcl` writes `build_id.v` with a day-granularity `BUILD_DATE`, so an image built on a later calendar day differs by six characters and nothing else. That invalidates the byte-identical RBF gate written into entries 359 and 360, which is superseded here by a gate requiring identical ALM, register, memory, RAM and DSP counts together with every timing slack matching to three decimals. The rebuild also settled a more serious question. Fit-to-fit spread on this design is roughly 0.6 ns, established by `3771f19` reaching minus 0.060 ns decoder setup while carrying 437 fewer ALMs than `2dc52d7` at plus 0.572 ns, so the best margin ever recorded is smaller than the run-to-run variance and timing closure has been luck rather than engineering for several commits. Feature work is therefore suspended until decoder setup reaches plus 1.2 ns on two consecutive fits at different seeds. This commit accordingly abandons seed selection as a closure strategy and returns the seed from ten to nine so the preserved placement applies, and deletes the twenty-five files absent from `files.qip`, which resolves all seven duplicate module definitions because the base-named file is the dead copy in every case. Neither change alters the compiled netlist.
+
+#### Next Steps:
+
+Build warm from the restored database and determine whether the placement that held plus 0.572 ns survives removal of the Program Stream demux, since the cold seed-nine fit discarded that placement and found a worse one. Confirm at the same time that synthesis reports unchanged register and ALM counts, which proves the deleted files were genuinely inert. If margin remains below plus 1.2 ns, classify the diagnostic-named modules by tracing whether every output terminates in telemetry rather than by name, because `mpeg2_h262_reference_read_probe` instantiates the decode pipeline and `wide_seen` selects decode mode, then gate only what that trace proves is instrumentation, which also narrows placement variance by reducing total logic. If margin is still short after that, register the `mpeg2_h262_reference_word_cache` to `mpeg2_h262_b_bidirectional_raster_engine` path in the same manner `2dc52d7` registered the transport boundary for plus 0.357 ns. Only once two consecutive different-seed fits hold plus 1.2 ns does 0.7.0 resume with the system time clock and the PCM sink.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+- rtl/mpeg2_new/mpeg2_h262_ddram_store.sv
+- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_syntax_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_syntax_probe_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller.sv
+- rtl/mpeg2_new/mpeg2_h262_p_luma_macroblock_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_syntax_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_p_residual_parser.sv
+- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline.sv
+- rtl/mpeg2_new/mpeg2_h262_p_residual_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_p_two_mb_copy_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_aligned.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_multimb.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_plan.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_read_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_slice_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_multimb.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_publish.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 360 COMMIT Unreleased 9bfdb21 2026-08-23T02:22:50-07:00
 
 #### Coming From:
@@ -1140,34 +1193,6 @@ Retry the unchanged design with a new documented fitter seed because seed nine m
 - tools/streams/generate_test_big_buck_bunny.py
 - tools/streams/tb_h262_b_presentation_scheduler.sv
 - tools/streams/tb_h262_hardware_cadence_profiler.sv
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-## 321 COMMIT Unreleased 74cff5b 2026-08-22T01:02:36-07:00
-
-#### Coming From:
-
-Unreleased 985ac76
-
-#### Purpose:
-
-Keep the development quiet snapshot open until the scheduler has presented its already-released terminal pending frame.
-
-#### Outcome:
-
-Commit `74cff5b` adds the scheduler's existing `pending_frame_valid` state to the development-only quiet qualification and changes no decoder, scheduler, cadence, display or loading-bar decision. The focused scheduler and profiler regressions pass. The incremental seed-nine Quartus build completes in 12 minutes 23 seconds with zero errors and positive timing at plus 0.053 ns global setup, plus 1.402 ns decoder setup, plus 7.570 ns video setup, plus 0.250 ns hold, plus 4.052 ns recovery, plus 0.537 ns removal and plus 0.462 ns pulse width. It uses 34,507 ALMs, 51,081 registers, 4,046,279 memory bits, 507 RAM blocks and 65 DSP blocks; the 4,416,296-byte RBF has SHA-256 `95862c4ecede2bb20316a24dabc87aaa16f89a94cc9d363ad47573db3f42571d`. Hardware controls finish exactly at 48/47 and 72/71 with zero errors and zero outliers. Two full-stream runs consume all 1,178,034 bytes and finally report the exact 250 pictures, 249 swaps, terminal quiet, no pending scheduler state and zero errors, proving the former early freeze and final-reference drain are fixed. Both full runs record one reproducible startup-only outlier before picture two while the decoder is not ready, 50.952 ms and 50.115 ms respectively; pictures three through 250 contain no outliers, and the user reports visually smooth playback and a safer-looking ending. The exact RBF is installed persistently as `/MediaPlayer.rbf` and verified byte-for-byte over FTP, but release acceptance remains open for the startup gap and the requested full-movie endurance observation. The complete 596.46-second AVI is converted outside the repository to a 720-by-480, 25 fps, 14,911-frame elementary stream with two B frames, 85,680,318 bytes, SHA-256 `10df778a6329b7ab6e3ebda98010b47e4f57ad77f74de3c1a454f95a514383e0` and a valid sequence-end marker; it is uploaded and launched on the MiSTer without screenshot polling for the user's direct baseline test.
-
-#### Next Steps:
-
-Have the user watch the complete 9-minute-56-second baseline and report any freeze, stutter, corruption, loading-bar stall or abnormal ending. Keep release acceptance open until that endurance result is known and the reproducible startup-only gap is either accepted explicitly or corrected. After the baseline, add the requested simple human-readable Python conversion recipe with plain FFmpeg arguments, no framework and clear actual-output validation, then expand release coverage across supported frame rates, aspect ratios, motion levels, GOP structures, sizes and malformed-input failure behavior.
-
-#### Files Modified:
-
-- MediaPlayer_top_07.svh
 
 #### Status:
 
