@@ -1,4 +1,4 @@
-## 358 COMMIT Unreleased ??? 2026-08-22T22:22:14-07:00
+## 358 COMMIT Unreleased 058f0a3 2026-08-22T22:22:14-07:00
 
 #### Coming From:
 
@@ -10,15 +10,22 @@ Capture validated 33-bit video PTS values, associate them with the first H.262 p
 
 #### Outcome:
 
-Proposed: extend the bounded Program Stream demux to reconstruct the five-byte 90 kHz PTS after its existing prefix and marker validation, reset picture-start matching at every PES payload boundary so a prefix cannot be borrowed from the preceding packet, and emit one association only when the first complete `0x00000100` picture start begins within that packet. Raw elementary streams and selected PES packets without PTS retain their exact byte path. Reuse currently reserved zero bits in the existing 38-word cadence snapshot for an eight-bit association count and the complete latest 33-bit PTS, preserving the overlay dimensions, schema, checksum, scheduler state and every existing diagnostic field. This is a passive standards and hardware-observability boundary: PTS does not yet control frame swaps because safe use also requires timestamp ownership through B-picture reordering and a local 90 kHz or SCR-derived clock anchor.
+Commit `058f0a3` extends the bounded Program Stream demux to reconstruct the five-byte 90 kHz PTS after its existing prefix and marker validation, clears the picture-start match register at every PES payload boundary so a prefix cannot be borrowed from the preceding packet, and pulses a single-cycle association only when the first complete `0x00000100` picture start begins inside a packet that carried a PTS. Raw elementary streams and selected PES packets without PTS retain their exact byte path. The previously reserved zero bits of the existing 38-word cadence snapshot now carry an eight-bit saturating association count and the complete latest 33-bit PTS across words eighteen, nineteen and thirty-five, preserving the overlay dimensions, schema, checksum, scheduler state and every existing diagnostic field; the RTL packing and the `decode_hardware_cadence.py` unpacking were verified consistent field by field. Every focused simulation passes: the demux unit test proves raw replay, pack and PES extraction under backpressure and error codes two, five, nine and ten; the cadence profiler retains schema four and checksum `e82b643d`; and the transport gate retains its sixteen-byte sticky drain. A real 1,447,940-byte FFmpeg Program Stream was validated against an independently written H.222.0 clause 2.5 reference extractor that shares no code with the RTL, and the RTL reproduced it exactly at 1,430,191 payload bytes, byte-identical to the source elementary stream, with seventy-seven PTS associations and a latest PTS of `77ef2`. One apparent discrepancy was resolved rather than accepted: FFprobe reports seventy-nine frames carrying PTS, but only seventy-seven PES packets carry one in the actual bytes, the remaining two values being FFmpeg reorder interpolations rather than stream-carried timestamps. A separate pre-existing behaviour was identified and confirmed unchanged at `2dc52d7`, so it is not a regression of this commit: the demux raises truncation error ten for any Program Stream that ends without an `MPEG_program_end_code`, even when every pack and packet structure completes exactly at end of file, which the FFmpeg VOB muxer does not emit by default. No FPGA image exists for this commit. The local incremental database was deliberately wiped for a from-scratch compile, which reached synthesis success with zero errors and one hundred thirty-five warnings and then entered routing before being terminated by the user at forty minutes against a documented twelve to fourteen minute clean-build history; it reported zero Quartus errors at termination and was an abandoned run, not a build failure. The complete accepted `2dc52d7` build state remains preserved outside the repository.
 
 #### Next Steps:
 
-Add focused tests for PTS-only and PTS-plus-DTS reconstruction, marker rejection, PES-boundary isolation, mid-picture PES payloads, sparse timestamps, raw pass-through and telemetry packing. Prove a real FFmpeg Program Stream against independent packet timestamps, run the established decoder regressions, build incrementally from accepted `2dc52d7`, require all timing categories positive, and verify on MiSTer that the five-second Program Stream reports the independently expected PTS association count and latest value while retaining 120 pictures, 119 swaps, zero errors and clean terminal completion. If accepted, the following cycle will carry associated PTS through frame ownership and add an anchored presentation clock before enabling timestamp-driven swaps.
+Restore the preserved `2dc52d7` database and build `058f0a3` incrementally at seed nine, which is the cadence every accepted cycle in this log has used, since a clean from-scratch compile is required only at release qualification and its cost has grown sharply as the device passes eighty-six percent of available logic. Require all timing categories positive and compare decoder setup against the preserved plus 0.572 ns baseline, then verify on MiSTer that the five-second Program Stream reports the independently expected seventy-seven associations and latest PTS `77ef2` while retaining one hundred twenty pictures, one hundred nineteen swaps, zero errors and clean terminal completion. Treat the growing fitter runtime as evidence worth watching, because a fit this congested may not hold decoder setup margin. Decide separately, outside this cycle, whether the truncation error on a missing program end code should remain an error or become a tolerated clean end, since it rejects otherwise well-formed muxer output. If accepted, the following cycle will carry associated PTS through frame ownership and add an anchored presentation clock before enabling timestamp-driven swaps.
 
 #### Files Modified:
 
-None.
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_07.svh
+- rtl/mpeg2_new/mpeg2_h222_program_stream_demux.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/tb_h222_program_stream_demux.sv
+- tools/streams/tb_h222_program_stream_demux_file.sv
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
 
 #### Status:
 
