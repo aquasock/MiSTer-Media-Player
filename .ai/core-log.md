@@ -1,3 +1,39 @@
+## 369 COMMIT Unreleased 27ad1b3 2026-08-23T15:03:04-07:00
+
+#### Coming From:
+
+Unreleased c25f3d9
+
+#### Purpose:
+
+Carry picture metadata in band with the elementary stream so the HPS can supply timestamps without a side channel.
+
+#### Outcome:
+
+`EXT_BUS` was investigated as the metadata channel and rejected on a dependency rather than a technical obstacle. It is available to the core, unconnected at `MediaPlayer_top_00.svh`, and its wiring is straightforward, but it carries Main_MiSTer's `user_io` transactions, so something in that binary must issue them; cores that use it have matching support there. Building the metadata path on it would make this project depend on changes to software it does not own, the same class of external dependency as the kernel configuration needed for USB optical media, and nothing in this repository sets a precedent to follow. The ingress byte path needs no such permission and is already proven to 14,315 pictures with working backpressure, so records are framed in band instead. The marker is `0x000001B0`, a reserved H.262 start code that no encoder emits, and start-code emulation prevention guarantees the `0x000001` prefix cannot occur inside payload, so raw elementary streams contain no records and pass through untouched; compatibility is a property of the framing rather than a mode to select. Each record carries five payload bytes holding a 33-bit timestamp with `picture_structure`, `top_field_first`, `repeat_first_field` and `progressive_frame`, the fields interlaced operation will need, so the wire format will not require revision when field pictures are implemented. Detection uses a four-byte sliding window rather than a match counter, which makes overlapping prefixes correct without special cases because the window always holds the true last four bytes. An end-of-transfer flush was required and reinstated using the same download-active synchroniser `c4d9631` used, because without it the final three bytes of every stream would remain in the window and the `sequence_end_code` would never reach the decoder. The focused test proved five properties and caught two real defects in the process: markers were never detected in steady state because the window counter ran past the value the check compared against, and the byte immediately preceding every record was silently dropped, which would have corrupted the bitstream once per timestamp and presented as a decoder fault. It now passes byte-identical passthrough of a stream containing a real start code and an overlapping `00 00 00 01` run, record extraction with exact timestamp and flag decode, rejection of the near-miss `0x000001B1`, the overlapping-prefix record, and backpressure without loss or reordering. The cadence snapshot moves to schema six, word thirty-five's spare bits carrying the record count and the low eleven timestamp bits so an injected value can be matched exactly rather than merely seen to be non-zero. The build closes every category with HDMI setup plus 0.138 ns and decoder setup plus 0.933 ns, the highest recorded, using 35,055 ALMs, 51,819 registers and RBF SHA-256 `6e075113416bf8bb891d2b00ee96a9748441bb42ce2a10dec81ef93b37a8fb13`. The 159 added registers cost 0.257 ns on a clock they do not touch, which is the placement sensitivity this log has been tracking rather than anything specific to this change; average interconnect actually fell to 40.3 percent with peak flat at 69.6 percent, confirming the design is not becoming globally congested.
+
+#### Next Steps:
+
+Investigate why the HDMI domain absorbs every addition before continuing, since four ASCAL paths have now surfaced in sequence. Then supply the throwaway HPS-side harness that injects records so `inband_count` and the low timestamp bits can be confirmed on hardware, and check that the raw elementary-stream regression is unchanged, which it should be because every stream on the MiSTer is plain `.m2v` containing no records and the extractor is therefore invisible to them. Presentation on timestamp against the proven clock follows, anchoring from the first record and retaining free-running cadence for streams without them, then the PCM sink with its elastic FIFO, fill level and underrun telemetry and explicit seek flush.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_07.svh
+- files.qip
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+- tools/streams/tb_h262_inband_metadata.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 368 COMMIT Unreleased c25f3d9 2026-08-23T13:55:44-07:00
 
 #### Coming From:
@@ -1164,35 +1200,6 @@ Run the full ten-minute native-24-fps Big Buck Bunny baseline with the accepted 
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 329 COMMIT Unreleased 374ef38 2026-08-22T04:33:13-07:00
-
-#### Coming From:
-
-Unreleased b426ba4
-
-#### Purpose:
-
-Deliver wide MiSTer file transfers without per-word software stalls by replacing the serializer with a native 16-bit-write and 8-bit-read asynchronous FIFO.
-
-#### Outcome:
-
-Commit `374ef38` removes the per-word serializer and uses Intel's native `dcfifo_mixed_widths`, retaining exactly 32 KiB while accepting consecutive 16-bit MiSTer transfers and presenting ordered 8-bit decoder bytes. The actual Intel behavioral primitive test proves low-byte-first ordering, three back-to-back words, read-side empty and asynchronous reset; transport drains sixteen bytes, the scheduler preserves exact 24 and 25 fps cadence with a minimum two-window gap, and profiler schema four passes with checksum `e82b643d`. The exact quality-six dense stream passes the full raster replay at 134,979,997 cycles with all 1,430,191 source bytes, 36 P pictures, 79 B pictures, 41 reference publications, 119 swaps and zero errors. The incremental seed-twelve Quartus build completes in 12 minutes 55 seconds with zero errors and positive timing at plus 0.049 ns global and decoder setup, plus 7.752 ns video setup, plus 0.243 ns hold, plus 3.800 ns recovery, plus 0.613 ns removal and plus 1.122 ns pulse width. It uses 35,146 ALMs, 51,998 registers, 4,306,375 memory bits, 538 of 553 RAM blocks and 65 DSP blocks. The accepted 4,463,616-byte RBF has SHA-256 `566ecf44d65c9d483be247ae942280d23269b7100ce0d75ef3b8a5bc4bdf2dbc`, matches after persistent installation and needs no clean rebuild. After rebooting the MiSTer to clear Entry 328's wedged loader, the five-second hardware run presents all 120 pictures in 4.989397 seconds at 23.850578 fps with zero errors and zero gap outliers; its 1,430,192 accepted-byte count is the expected single padding byte for the odd-length source. The full 7:15-through-7:30 run accepts exactly 2,603,570 bytes, reaches sequence end and terminal quiet, decodes 121 reference plus 239 B pictures for all 360 pictures, and reports zero errors and zero gap outliers across the former 7:22 failure. Its eight-bit display and swap counters wrap to 104 and 103 as expected. The user watches the ordinary clip and reports that the issue appears fixed, pending repeated visual confirmation.
-
-#### Next Steps:
-
-Replay the ordinary 7:15-through-7:30 clip as often as the user needs to confirm the wooden-spike motion visually, then rerun the ten-minute Big Buck Bunny baseline with the accepted artifact. Preserve the cadence overlay as a diagnostic tool but treat its eight-bit display/swap counter wrapping and odd-length WIDE padding as acquisition-validator limitations rather than decoder failures. Investigate reducing the design's 538-of-553 RAM-block occupancy separately, without shrinking buffers whose capacity is now proven necessary for smooth dense MPEG-2 transfer.
-
-#### Files Modified:
-
-- rtl/mpeg2_stream_fifo.sv
-- tools/streams/tb_mpeg2_stream_word_unpacker.sv
 
 #### Status:
 
