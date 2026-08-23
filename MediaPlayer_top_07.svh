@@ -56,7 +56,8 @@ mpeg2_h262_hardware_cadence_profiler
     .presentation_complete     (mpeg2_new_b_presentation_complete),
     .presentation_error        (mpeg2_new_b_presentation_error),
     .scheduler_debug_state     (mpeg2_new_b_scheduler_debug_state),
-    .decoder_byte_accepted     (mpeg2_new_decode_stream_valid),
+    .decoder_byte_accepted     (mpeg2_new_decode_stream_valid &&
+                                mpeg2_new_stream_ready),
     .picture_coding_type       (mpeg2_new_picture_coding_type),
     .temporal_reference        (mpeg2_new_temporal_reference),
     .frame_rate_code           (mpeg2_new_frame_rate_code),
