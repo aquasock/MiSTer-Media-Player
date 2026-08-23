@@ -36,7 +36,11 @@ module mpeg2_h262_hardware_cadence_profiler #(
     // Entry 369: in-band record telemetry.  The low PTS bits are carried so
     // an injected timestamp can be matched exactly rather than merely seen
     // to be non-zero.
-    input wire [7:0] inband_count,input wire [32:0] inband_pts,
+    // Entry 372: the reported timestamp moves one stage downstream, from the
+    // most recently extracted record to the frame actually being displayed.
+    // Association implies extraction, so the extractor's own count is no
+    // longer carried; entry 371 records its validation.
+    input wire [7:0] associated_count,input wire [32:0] display_pts,
     input wire top_field_first,input wire repeat_first_field,
     input wire [15:0] error_flags,input wire [11:0] h_pos,
     input wire [11:0] v_pos,input wire [7:0] base_r,
@@ -52,7 +56,7 @@ localparam [23:0] TERMINAL_SNAPSHOT_LIMIT=
 localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
-localparam [31:0] SNAPSHOT_FORMAT={8'd6,8'd38,16'd60000};
+localparam [31:0] SNAPSHOT_FORMAT={8'd7,8'd38,16'd60000};
 localparam [11:0] OVERLAY_X=12'd8,OVERLAY_Y=12'd444;
 localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd152;
 
@@ -75,8 +79,8 @@ reg display_scratch_q,display_scratch_bank_q;
 reg sequence_end_seen_q,session_quiet_q;
 reg [15:0] error_flags_q;
 reg [13:0] stc_seconds_q;
-reg [7:0] inband_count_q;
-reg [32:0] inband_pts_q;
+reg [7:0] associated_count_q;
+reg [32:0] display_pts_q;
 reg top_field_first_q,repeat_first_field_q;
 
 reg [31:0] session_cycles,accepted_bytes;
@@ -182,7 +186,7 @@ wire [31:0] snapshot_word_35={completed_frame_bank_q,display_frame_bank_q,
     display_scratch_q,display_scratch_bank_q,frame_waiting_q,
     presentation_hold_q,destination_hold_q,session_quiet_q,
     sequence_end_seen_q,presentation_complete_q,presentation_error_q,
-    inband_count_q,inband_pts_q[10:0]};
+    associated_count_q,display_pts_q[10:0]};
 wire [31:0] snapshot_word_36=scheduler_debug_state_q;
 wire [31:0] snapshot_word_37=snapshot_word_00^snapshot_word_01^
     snapshot_word_02^snapshot_word_03^snapshot_word_04^snapshot_word_05^
@@ -227,7 +231,7 @@ always @(posedge clk_mpeg2) begin
         display_scratch_bank_q<=0;sequence_end_seen_q<=0;
         session_quiet_q<=0;error_flags_q<=0;
         stc_seconds_q<=0;top_field_first_q<=0;repeat_first_field_q<=0;
-        inband_count_q<=0;inband_pts_q<=0;
+        associated_count_q<=0;display_pts_q<=0;
         session_cycles<=0;accepted_bytes<=0;first_present_cycle<=0;
         last_present_cycle<=0;first_present_valid<=0;
         decoder_stall_cycles<=0;presentation_stall_cycles<=0;
@@ -271,8 +275,8 @@ always @(posedge clk_mpeg2) begin
         sequence_end_seen_q<=sequence_end_seen;session_quiet_q<=session_quiet;
         error_flags_q<=error_flags;
         stc_seconds_q<=stc_seconds;
-        inband_count_q<=inband_count;
-        inband_pts_q<=inband_pts;
+        associated_count_q<=associated_count;
+        display_pts_q<=display_pts;
         top_field_first_q<=top_field_first;
         repeat_first_field_q<=repeat_first_field;
         b_picture_complete_d<=b_picture_complete_q;

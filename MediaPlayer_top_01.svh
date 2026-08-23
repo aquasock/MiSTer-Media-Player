@@ -52,6 +52,10 @@ wire        mpeg2_new_inband_repeat_first_field;
 wire        mpeg2_new_inband_progressive_frame;
 wire        mpeg2_new_inband_valid;
 wire [7:0]  mpeg2_new_inband_count;
+// Entry 372: timestamps carried through frame ownership to the displayed frame.
+wire [32:0] mpeg2_new_display_pts;
+wire        mpeg2_new_display_pts_valid;
+wire [7:0]  mpeg2_new_associated_count;
 wire        mpeg2_new_repeat_first_field;
 wire [3:0]  mpeg2_new_forward_f_code_horizontal;
 wire [3:0]  mpeg2_new_forward_f_code_vertical;

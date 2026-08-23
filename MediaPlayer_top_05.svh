@@ -101,6 +101,20 @@ end
 // alternates two scratch frames and owns the complete B...B->future-reference
 // presentation transaction, including fail-open error retirement.
 wire [31:0] mpeg2_new_b_scheduler_debug_state;
+mpeg2_h262_picture_timestamp mpeg2_h262_picture_timestamp
+(
+    .clk                (clk_mpeg2),
+    .reset              (reset_mpeg2),
+    .metadata_valid     (mpeg2_new_inband_valid),
+    .metadata_pts       (mpeg2_new_inband_pts_90k),
+    .picture_seen       (mpeg2_new_picture_seen),
+    .active_frame_bank  (mpeg2_new_active_frame_bank),
+    .display_frame_bank (mpeg2_new_display_frame_bank),
+    .display_pts        (mpeg2_new_display_pts),
+    .display_pts_valid  (mpeg2_new_display_pts_valid),
+    .associated_count   (mpeg2_new_associated_count)
+);
+
 mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
 (
     .clk                         (clk_mpeg2),

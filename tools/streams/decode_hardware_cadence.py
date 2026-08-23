@@ -193,8 +193,11 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         # Entry 369 (schema 6): word 35 spare bits carry in-band record
         # telemetry -- how many metadata records the fabric extracted and
         # the low bits of the most recent timestamp.
-        "inband_count": (words[35] >> 11) & 0xFF,
-        "inband_pts_low11": words[35] & 0x7FF,
+        # Entry 372 (schema 7): the timestamp reported is now that of the
+        # frame being displayed, carried through reordering, not the last
+        # record extracted.
+        "associated_count": (words[35] >> 11) & 0xFF,
+        "display_pts_low11": words[35] & 0x7FF,
         "top_field_first": (words[19] >> 1) & 0x1,
         "repeat_first_field": words[19] & 0x1,
         # Entry 282: unconditional hold attribution.  These are NOT mutually
