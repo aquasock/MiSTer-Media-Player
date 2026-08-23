@@ -1,4 +1,4 @@
-## 348 COMMIT Unreleased ??? 2026-08-22T17:55:50-07:00
+## 348 COMMIT Unreleased fca45b3 2026-08-22T17:55:50-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Select fitter seed eight for the unchanged Stage 1 residual-store design and see
 
 #### Outcome:
 
-This proposal changes only the Quartus fitter seed from ten to eight, the strongest documented candidate because it previously closed the same placement-sensitive HDMI path at plus 0.368 ns. It leaves the RTL, tests and expected 408-block memory topology unchanged and requires a fully clean compile from empty build directories. The result is acceptable only if the shared array remains exactly 65,536 by 16 bits, memory use remains 408 RAM blocks and every timing category is positive; a failure will stop this cycle without deployment.
+Commit `fca45b3` changes only the Quartus fitter seed from ten to eight and leaves the RTL and tests unchanged. A fully clean Quartus 17.0.2 compile from empty build directories completes in 12 minutes 31 seconds with zero errors and 155 warnings, infers the shared array exactly at 65,536 by 16 bits and both descriptor tables at 1,024 entries, and preserves the Stage 1 resource target at 3,228,103 block-memory bits and 408 RAM blocks. The fit uses 34,780 ALMs, 51,821 registers and 65 DSP blocks. Decoder setup is plus 0.338 ns, video setup plus 7.515 ns and HPS setup plus 1.980 ns; hold is plus 0.249 ns, recovery plus 3.832 ns, removal plus 0.573 ns and pulse width plus 1.122 ns. The untouched HDMI PLL clock nevertheless misses setup by 0.127 ns with 1.429 ns total negative slack, so seed eight fails the all-positive gate. The 4,213,508-byte RBF has SHA-256 `71ce52da8c677f6ccc2087f1bbe4a6fd52cad4e155305443ec2b792c4d346026`; it was not uploaded and the connected MiSTer remains on its previously accepted build.
 
 #### Next Steps:
 
-Commit the seed-only source change, remove the current failed build directories whose byte-identical incremental state is already preserved externally, and run a fully clean Quartus compile followed by the timing and resource checks. If every gate closes, hash and upload that exact RBF to the connected MiSTer and run the four essential v0.6.0 playback files; otherwise record the failure and stop without installing it.
+Stop this attempt as agreed and do not hardware-test or distribute the seed-eight artifact. Preserve the reports as evidence that the reduced 408-block topology is stable across seeds ten and eight, while the framework HDMI path remains placement-sensitive. Before another build, obtain approval for a new commit boundary choosing either the next clean fitter-seed candidate or a targeted HDMI timing-closure change; keep the decoder RTL and already-passing functional regressions unchanged.
 
 #### Files Modified:
 
