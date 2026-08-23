@@ -1,3 +1,31 @@
+## 364 COMMIT Unreleased 9af69b4 2026-08-23T05:01:06-07:00
+
+#### Coming From:
+
+Unreleased 85b4c17
+
+#### Purpose:
+
+Confirm with a second fitter seed that this netlist closes timing repeatably rather than on one favourable placement.
+
+#### Outcome:
+
+Seed ten closed every timing category on `85b4c17`, the first fully closing fit since the Program Stream demux was removed. Decoder setup is plus 0.152 ns, the HDMI framework path plus 0.210 ns, host bridge plus 0.754 ns, video plus 7.556 ns, with hold plus 0.248 ns, recovery plus 4.021 ns, removal plus 0.759 ns and pulse width plus 1.122 ns, using 34,947 ALMs of 41,910, 51,833 registers and unchanged memory and DSP, built in a 12 minute 37 second flow with a 10 minute 26 second fitter. The 4,145,288-byte RBF with SHA-256 `c9bc2ef8061722c4b21803eef2464453be3be475474a290f766511485382af1f` was installed on the MiSTer together with seven regression streams, and the user reports every test passing, which clears the one unvalidated change of this development run: the extra delivery cycle that `ebf372e` introduced on the shared reference path feeding both the mixed and bidirectional prediction engines. The validated set was the prediction-focused subset, namely intra baseline, B bidirectional, B f-code range, P motion residual, P visual discriminator and the five and fifteen second dense-motion squirrel stresses; the multi-slice, dense residual, mixed macroblock, long GOP and full endurance files, the deliberate truncation case and its no-reboot recovery re-run were not exercised and remain outstanding before any release qualification. Comparing seed nine and seed ten on this identical netlist finally measures genuine seed-to-seed variance rather than inferring it: decoder setup moves from plus 0.460 ns to plus 0.152 ns and the HDMI path from minus 0.053 ns to plus 0.210 ns, a spread near 0.3 ns on both, which is roughly half the 0.6 ns figure entry 361 assumed and confirms that figure was measuring the removal of the demux rather than placement variance. That result is not comfortable. Decoder margin at seed ten is plus 0.152 ns against a 0.3 ns spread, so margin remains smaller than variance, and seed nine is a known non-closing seed on this exact netlist, meaning the design closes on some placements and not others. This commit changes only the fitter seed from ten to eleven.
+
+#### Next Steps:
+
+Require every timing category positive at seed eleven. Two closing seeds out of three attempted would establish that closure is reproducible enough to resume feature work, while a second failure would establish the opposite and force the margin question back open with the knowledge that block RAM conversion of the fetched-word store is unavailable in this toolchain. Record both seeds' decoder and HDMI slacks either way, since these are the first controlled variance measurements this project has. Before release qualification, complete the regression pack that tonight's run left unexercised, in particular the long GOP, dense residual and full endurance streams and the truncation case with its no-reboot recovery. Once closure is established, 0.7.0 resumes with the system time clock anchored to the 24.576 MHz audio domain and the PCM sink, both of which will need a small throwaway HPS-side harness to inject synthetic timestamps and a test tone because no daemon exists yet. The six compiled but uninstantiated modules remain worth deleting for navigability with no timing expectation attached, and renaming the decode modules that carry probe names remains worthwhile after 0.7.0.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 363 COMMIT Unreleased 85b4c17 2026-08-23T04:32:28-07:00
 
 #### Coming From:
@@ -22,8 +50,8 @@ Build at seed ten and require every timing category positive, then repeat at a t
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 362 COMMIT Unreleased ebf372e 2026-08-23T04:07:40-07:00
@@ -1165,34 +1193,6 @@ Retry the unchanged 60 MHz design with fitter seed eleven because the seed-ten m
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-## 324 COMMIT Unreleased e5e7d86 2026-08-22T02:57:30-07:00
-
-#### Coming From:
-
-Unreleased 25f05dd
-
-#### Purpose:
-
-Prevent dense real-content pictures from starving presentation by replacing the 256-byte HPS-to-decoder FIFO with a practical compressed-stream reservoir.
-
-#### Outcome:
-
-The user confirms the native-rate ending credits are completely smooth, closing the deterministic cadence symptom, but identifies a clean apparent frame skip at 7:22 as the wooden spikes approach. An exact native-rate 7:20-to-7:25 hardware control reproduces the remaining defect with all 1,430,191 bytes accepted, all 120 pictures and 119 swaps eventually presented, no error flags and nine cadence outliers; its three largest display gaps are 182.371 ms, 165.792 ms and 132.634 ms. The two largest threshold snapshots show the decoder ready while the compressed-stream FIFO is empty, and the source around that point retains a normal I/B/B/P order while individual coded pictures abruptly grow to tens of kilobytes. Lowering encode density from quality six to quality ten reduces the stream from 1,430,191 to 948,786 bytes and improves delivered cadence from 20.993581 to 22.684969 fps, but still leaves four outliers as large as 116.054 ms, confirming buffering sensitivity without providing an acceptable conversion-only repair. Commit `e5e7d86` therefore enlarges the asynchronous HPS-to-decoder FIFO from 256 bytes to 32,768 bytes without changing its clock-domain crossing or reset configuration. The exact dense scene passes the full raster replay at 134,979,997 cycles with all 1,430,191 bytes, 36 P pictures, 79 B pictures, 41 reference publications, 119 swaps and zero errors. The incremental Quartus build completes in 12 minutes 33 seconds with zero errors and positive timing at plus 0.432 ns global setup, plus 1.672 ns decoder setup, plus 8.133 ns video setup, plus 0.243 ns hold, plus 3.551 ns recovery, plus 0.702 ns removal and plus 0.462 ns pulse width. It uses 34,685 ALMs, 51,232 registers, 4,306,375 memory bits, 538 of 553 RAM blocks and 65 DSP blocks. The accepted 4,454,764-byte RBF has SHA-256 `68274574806ce74331f32f90ea82084b67c40db0f43adea45a9910f0994a5e70` and verifies after persistent installation. Hardware proves the reservoir is beneficial but insufficient: outliers fall from nine to seven, the worst gap falls from 182.371 ms to 132.634 ms and delivered cadence improves from 20.993581 to 22.417636 fps, but the new largest snapshot has compressed data pending while the decoder is not ready, exposing decode throughput as the next binding limit.
-
-#### Next Steps:
-
-Keep the enlarged reservoir because its hardware improvement is measured, but do not treat the squirrel defect as passed. Raise only the decoder and DDR service clock from 54 MHz to the PLL-compatible 60 MHz while preserving the independent 40 MHz presentation raster and its exact native cadence. Update profiler clock units and timeout thresholds so the hardware evidence remains dimensionally correct, update the timing extraction to identify the new period, and require the focused and full regressions before another incremental build. The current fit has plus 1.672 ns decoder slack against the 18.518 ns period, so the 16.667 ns target is close enough to require real post-fit proof rather than assumption; accept and install only a zero-error, fully positive-timing artifact, then require the exact quality-six scene to reach all 120 pictures and 119 swaps with zero errors, terminal quiet and zero cadence outliers.
-
-#### Files Modified:
-
-- rtl/mpeg2_stream_fifo.sv
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
