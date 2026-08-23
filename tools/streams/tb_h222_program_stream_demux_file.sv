@@ -8,11 +8,16 @@ wire input_ready;
 wire [7:0] video_data;
 wire video_valid;
 reg video_ready=1;
+wire video_pts_valid;
+wire [32:0] video_pts_90k;
 wire program_stream_detected,program_end_seen,systems_error;
 wire [3:0] systems_error_code;
 
 integer input_file,expected_file,input_byte,expected_byte;
 integer input_count=0,output_count=0,ready_divider=0;
+integer pts_count=0,expected_pts_count=0;
+reg [32:0] last_pts_90k=0,expected_last_pts_90k=0;
+reg check_pts_count=0,check_last_pts=0;
 reg [1023:0] input_path,expected_path;
 
 always #5 clk=~clk;
@@ -24,6 +29,7 @@ mpeg2_h222_program_stream_demux dut
     .input_ready(input_ready),.input_end(input_end),
     .video_data(video_data),.video_valid(video_valid),
     .video_ready(video_ready),
+    .video_pts_valid(video_pts_valid),.video_pts_90k(video_pts_90k),
     .program_stream_detected(program_stream_detected),
     .program_end_seen(program_end_seen),
     .systems_error(systems_error),
@@ -49,6 +55,10 @@ always @(posedge clk) begin
                    output_count,video_data,expected_byte[7:0]);
         output_count<=output_count+1;
     end
+    if(video_pts_valid)begin
+        pts_count<=pts_count+1;
+        last_pts_90k<=video_pts_90k;
+    end
 end
 
 initial begin
@@ -56,6 +66,8 @@ initial begin
         $fatal(1,"missing +INPUT=<path>");
     if(!$value$plusargs("EXPECTED=%s",expected_path))
         $fatal(1,"missing +EXPECTED=<path>");
+    check_pts_count=$value$plusargs("EXPECTED_PTS_COUNT=%d",expected_pts_count);
+    check_last_pts=$value$plusargs("EXPECTED_LAST_PTS=%h",expected_last_pts_90k);
     input_file=$fopen(input_path,"rb");
     expected_file=$fopen(expected_path,"rb");
     if(!input_file||!expected_file)$fatal(1,"could not open input/expected files");
@@ -80,8 +92,14 @@ initial begin
     if(expected_byte>=0)
         $fatal(1,"output ended early after %0d bytes, next expected %02x",
                output_count,expected_byte[7:0]);
-    $display("H222_PROGRAM_STREAM_FILE_PASS input=%0d output=%0d ps=%0d end=%0d",
-             input_count,output_count,program_stream_detected,program_end_seen);
+    if(check_pts_count&&(pts_count!=expected_pts_count))
+        $fatal(1,"PTS association count %0d expected %0d",
+               pts_count,expected_pts_count);
+    if(check_last_pts&&(last_pts_90k!=expected_last_pts_90k))
+        $fatal(1,"last PTS %h expected %h",last_pts_90k,expected_last_pts_90k);
+    $display("H222_PROGRAM_STREAM_FILE_PASS input=%0d output=%0d ps=%0d end=%0d pts=%0d last=%h",
+             input_count,output_count,program_stream_detected,program_end_seen,
+             pts_count,last_pts_90k);
     $finish;
 end
 endmodule

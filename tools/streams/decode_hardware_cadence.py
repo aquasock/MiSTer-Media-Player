@@ -93,6 +93,11 @@ def parse_words(words: list[int]) -> dict[str, Any]:
     snapshot_meta = words[25]
     terminal = words[35]
     scheduler = words[36]
+    latest_pts_90k = (
+        ((terminal & 0x7FF) << 22)
+        | (((metadata >> 1) & 0x3F) << 16)
+        | (words[19] & 0xFFFF)
+    )
 
     def scheduler_flags(state: int) -> dict[str, Any]:
         return {
@@ -186,6 +191,9 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "final_temporal_reference": (metadata >> 15) & 0x3FF,
         "reference_picture_count": (metadata >> 7) & 0xFF,
         "error_flags": (words[19] >> 16) & 0xFFFF,
+        "pts_association_count": (terminal >> 11) & 0xFF,
+        "latest_pts_90k": latest_pts_90k,
+        "latest_pts_seconds": latest_pts_90k / 90000.0,
         # Entry 282: unconditional hold attribution.  These are NOT mutually
         # exclusive with each other or with the stall counters above, so they
         # must not be summed against them.

@@ -112,6 +112,8 @@ wire        mpeg2_new_b_presentation_hold;
 wire        mpeg2_new_p_destination_ownership_hold;
 wire        mpeg2_new_program_stream_detected;
 wire        mpeg2_new_program_end_seen;
+wire        mpeg2_new_video_pts_valid;
+wire [32:0] mpeg2_new_video_pts_90k;
 wire        mpeg2_new_systems_error;
 wire [3:0]  mpeg2_new_systems_error_code;
 
@@ -295,6 +297,8 @@ mpeg2_h222_program_stream_demux mpeg2_h222_program_stream_demux
 	.video_data             (mpeg2_stream_data),
 	.video_valid            (mpeg2_new_decode_stream_valid),
 	.video_ready            (mpeg2_new_stream_ready),
+	.video_pts_valid        (mpeg2_new_video_pts_valid),
+	.video_pts_90k          (mpeg2_new_video_pts_90k),
 	.program_stream_detected(mpeg2_new_program_stream_detected),
 	.program_end_seen       (mpeg2_new_program_end_seen),
 	.systems_error          (mpeg2_new_systems_error),

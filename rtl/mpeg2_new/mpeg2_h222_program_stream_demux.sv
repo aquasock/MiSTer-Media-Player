@@ -5,6 +5,8 @@
 // otherwise replay the four probe bytes and remain an exact raw elementary-
 // stream pass-through.  Program Stream mode accepts MPEG-2 pack headers,
 // length-delimited system/PES packets and one selected video stream_id.  It
+// reconstructs validated PTS fields and associates each one only with the
+// first picture_start_code whose complete prefix begins in that PES payload.
 // deliberately does not implement MPEG-1 systems syntax, PTS scheduling,
 // Program Stream Map interpretation, audio decode or error resynchronization.
 //============================================================================
@@ -19,6 +21,8 @@ module mpeg2_h222_program_stream_demux
     output reg  [7:0] video_data,
     output reg        video_valid,
     input  wire       video_ready,
+    output reg        video_pts_valid,
+    output reg [32:0] video_pts_90k,
     output reg        program_stream_detected,
     output reg        program_end_seen,
     output reg        systems_error,
@@ -73,6 +77,10 @@ reg [7:0] selected_video_id;
 reg [1:0] pts_dts_flags;
 reg [7:0] header_remaining;
 reg [7:0] header_index;
+reg [32:0] pts_build;
+reg [32:0] pes_pts_90k;
+reg        pes_pts_pending;
+reg [23:0] payload_prefix;
 
 wire input_fire = input_valid && input_ready;
 
@@ -179,12 +187,19 @@ always @(posedge clk) begin
         pts_dts_flags           <= 2'd0;
         header_remaining        <= 8'd0;
         header_index            <= 8'd0;
+        pts_build               <= 33'd0;
+        pes_pts_90k             <= 33'd0;
+        pes_pts_pending         <= 1'b0;
+        payload_prefix          <= 24'hffffff;
+        video_pts_valid         <= 1'b0;
+        video_pts_90k           <= 33'd0;
         program_stream_detected <= 1'b0;
         program_end_seen        <= 1'b0;
         systems_error           <= 1'b0;
         systems_error_code      <= 4'd0;
     end
     else begin
+        video_pts_valid <= 1'b0;
         case (state)
             ST_DETECT: if (input_fire) begin
                 detect_shift <= {detect_shift[23:0], input_data};
@@ -379,6 +394,8 @@ always @(posedge clk) begin
                         selected_video_valid <= 1'b1;
                         selected_video_id <= packet_stream_id;
                     end
+                    pts_build <= 33'd0;
+                    pes_pts_pending <= 1'b0;
                     state <= ST_PES_FLAGS1;
                 end
                 else begin
@@ -441,8 +458,10 @@ always @(posedge clk) begin
                         boundary_index <= 2'd0;
                         state <= ST_BOUNDARY;
                     end
-                    else
+                    else begin
+                        payload_prefix <= 24'hffffff;
                         state <= ST_PES_PAYLOAD;
+                    end
                 end
             end
 
@@ -454,6 +473,20 @@ always @(posedge clk) begin
                     state <= ST_ERROR;
                 end
                 else begin
+                    if ((pts_dts_flags != 2'b00) && (header_index <= 4)) begin
+                        case (header_index)
+                            0: pts_build[32:30] <= input_data[3:1];
+                            1: pts_build[29:22] <= input_data;
+                            2: pts_build[21:15] <= input_data[7:1];
+                            3: pts_build[14:7]  <= input_data;
+                            4: begin
+                                pts_build[6:0] <= input_data[7:1];
+                                pes_pts_90k <= {pts_build[32:7],input_data[7:1]};
+                                pes_pts_pending <= 1'b1;
+                            end
+                            default: begin end
+                        endcase
+                    end
                     header_index <= header_index + 8'd1;
                     header_remaining <= header_remaining - 8'd1;
                     pes_remaining <= pes_remaining - 16'd1;
@@ -462,13 +495,22 @@ always @(posedge clk) begin
                             boundary_index <= 2'd0;
                             state <= ST_BOUNDARY;
                         end
-                        else
+                        else begin
+                            payload_prefix <= 24'hffffff;
                             state <= ST_PES_PAYLOAD;
+                        end
                     end
                 end
             end
 
             ST_PES_PAYLOAD: if (input_fire) begin
+                payload_prefix <= {payload_prefix[15:0],input_data};
+                if (pes_pts_pending &&
+                    ({payload_prefix,input_data} == 32'h00000100)) begin
+                    video_pts_valid <= 1'b1;
+                    video_pts_90k <= pes_pts_90k;
+                    pes_pts_pending <= 1'b0;
+                end
                 pes_remaining <= pes_remaining - 16'd1;
                 if (pes_remaining == 1) begin
                     boundary_index <= 2'd0;
