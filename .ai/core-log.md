@@ -1,4 +1,4 @@
-## 359 COMMIT Unreleased ??? 2026-08-23T01:34:17-07:00
+## 359 COMMIT Unreleased ??? 2026-08-23T01:44:52-07:00
 
 #### Coming From:
 
@@ -6,43 +6,27 @@ Unreleased 058f0a3
 
 #### Purpose:
 
-Restore navigability of the RTL tree by deleting every source file Quartus never compiles, which eliminates all duplicate module definitions as a consequence, without changing the bitstream.
+Return video ingress to an elementary-stream-only path by removing the hardware Program Stream demux, so demultiplexing, navigation and timestamp extraction can move to the HPS.
 
 #### Outcome:
 
-A complexity reevaluation requested by the user, prompted by device and build-time constraints arriving before the video decoder is finished, measured the tree rather than estimating it and found the maintainability problem is navigational rather than architectural. Of fifty-eight SystemVerilog files under `rtl/mpeg2_new`, twenty-one totalling 7,489 lines are absent from `files.qip` and never compile, including `mpeg2_h262_p_residual_probe.sv` and `mpeg2_h262_slice_probe.sv`, two of the four largest files in the project. Seven module names are defined more than once, and in every one of the seven the base-named file is the dead copy while the compiled definition lives in a differently-named file, so `mpeg2_h262_ddram_store` is really `mpeg2_h262_ddram_store_420p.sv`, `mpeg2_h262_p_luma_macroblock_engine` is really `mpeg2_h262_p_macroblock_420_engine.sv`, and a reader opening the obvious file reads code with no effect on the bitstream. Four `mpeg2_h262_p_motion_plan_syntax_probe_part` include fragments are referenced by nothing. Removing all twenty-five files resolves every duplicate to exactly one definition and leaves thirty-seven live modules, of which thirteen are diagnostic and twenty-four are the decoder itself. Because none of these files appear in `files.qip`, the commit cannot alter synthesis: the validation gate is a rebuild whose RBF SHA-256 is byte-identical to the `058f0a3` reference, and any difference means a file believed dead was live and the cycle stops for investigation. Git history preserves every deleted file. This work depends on the `058f0a3` build completing to provide that reference image.
+Following the complexity reevaluation, the user set the architectural boundary at elementary stream in and video out: the FPGA owns H.262 decode, presentation timing and the output path, while everything upstream of the elementary stream, meaning file and disc access, CSS, DVD navigation, demultiplexing and audio, moves to Linux. This commit reverts the hardware Program Stream path introduced by `c4d9631` and extended by `058f0a3`, deleting `mpeg2_h222_program_stream_demux.sv` and its two focused testbenches, removing the demux instantiation and wiring from the top level, dropping its `files.qip` entry, and reverting the cadence snapshot PTS association fields in the profiler, the top-level packing and `decode_hardware_cadence.py`, since those fields would read zero with no demux present and the presentation clock will define its own telemetry against HPS-supplied timestamps. The intervening commit `2dc52d7` is deliberately retained: it hardens `mpeg2_h262_stream_transport_gate.sv`, which first appeared in `a559d43` and belongs to the elementary-stream path rather than the Program Stream path, and it carries a plus 0.357 ns global setup improvement that would be lost for no benefit. The motivation is that real DVD media relies on navigation packs, multi-angle interleaving and seamless branching, which are ordinary software problems and unpleasant RTL, and that moving demultiplexing to Linux removes the unresolved missing `MPEG_program_end_code` truncation question entirely while narrowing the fabric toward the decoder that `core.md` names as the project thesis. The elementary-stream ingress path being restored is the original and better-tested one, already present in the top level and previously selected automatically. Commit `058f0a3` never produced a bitstream, because its clean compile reached synthesis in 2 minutes 5 seconds and was terminated by the user during routing at one hour thirteen minutes, so no hardware image or timing data exists for it.
 
 #### Next Steps:
 
-Follow this with a measured commit that gates the thirteen live diagnostic modules behind a compile-time parameter so a lean image can be built, reporting the area, timing and fitter-runtime deltas against the reference, since the one-hour cold route now costing more than any single change is the constraint most likely to make the project unworkable for a human or an agent. Re-baseline the 0.7.0 plan against those lean numbers before resuming feature work, because the device pressure that motivated moving audio to the HPS may be substantially bring-up debt rather than a real ceiling. The presentation cycle previously proposed in this entry then follows unchanged in substance: carry the validated PTS through frame ownership, add a 90 kHz system time clock as a fractional accumulator anchored to the 24.576 MHz audio domain that `sys/audio_out.sv` already uses rather than to the pixel clock, swap on PTS reaching that clock while retaining the existing free-running cadence for raw elementary streams that carry no timestamps, and expose clock value, playback state and a seek discontinuity reset to the HPS. After that comes the PCM sink with its elastic FIFO, fill level and underrun telemetry, then real-media Program Stream robustness including whether a missing `MPEG_program_end_code` should remain truncation error ten, then clean-build release qualification and the `v0.7.0` pre-release tag. Version 0.7.0 remains a single RBF containing no audio decoder, and Linux-side audio work begins only after that boundary.
+Build this commit and confirm on MiSTer that every raw elementary-stream regression decodes exactly as before with unchanged picture and swap counts, zero decoder errors and clean terminal completion, and record its timing and RBF hash, because that image becomes the byte-identical reference for the following cycle. That next cycle deletes the twenty-five source files Quartus never compiles, which also resolves all seven duplicate module definitions, and is gated on producing an RBF whose SHA-256 matches this one exactly. A measured cycle then gates the remaining live diagnostic modules behind a compile-time parameter and reports the area, timing and fitter-runtime deltas, after which the 0.7.0 plan is re-baselined against lean numbers. Presentation work then resumes in its revised form: a 90 kHz system time clock in fabric as a fractional accumulator anchored to the 24.576 MHz audio domain that `sys/audio_out.sv` already uses, fed picture timestamps supplied by the HPS alongside the elementary stream rather than extracted in fabric, retaining free-running cadence for streams presented without timestamps, followed by the PCM sink with its elastic FIFO and underrun telemetry, then clean-build release qualification and the `v0.7.0` pre-release tag. Version 0.7.0 remains a single RBF containing no audio decoder.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_ddram_store.sv
-- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_syntax_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_syntax_probe_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller.sv
-- rtl/mpeg2_new/mpeg2_h262_p_luma_macroblock_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_syntax_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_p_residual_parser.sv
-- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline.sv
-- rtl/mpeg2_new/mpeg2_h262_p_residual_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_p_two_mb_copy_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_aligned.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_multimb.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_plan.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_read_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_slice_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_multimb.sv
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_publish.sv
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_07.svh
+- files.qip
+- rtl/mpeg2_new/mpeg2_h222_program_stream_demux.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/tb_h222_program_stream_demux.sv
+- tools/streams/tb_h222_program_stream_demux_file.sv
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
 
 #### Status:
 
