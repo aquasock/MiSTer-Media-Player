@@ -1,4 +1,4 @@
-## 354 COMMIT Unreleased ??? 2026-08-22T19:44:58-07:00
+## 354 COMMIT Unreleased f5e3b83 2026-08-22T19:44:58-07:00
 
 #### Coming From:
 
@@ -10,20 +10,23 @@ Add exact native 30000/1001 and 30-fps presentation cadence as the first substan
 
 #### Outcome:
 
-Proposed: extend the accepted 40 MHz presentation accumulator from H.262 frame-rate codes one through three to codes four and five without changing decode order, frame ownership, compressed ingress, the accepted 60 MHz decoder clock or diagnostic architecture. Use the exact Table 6-4 ratios from controlled record H262-027, add focused long-window counts that distinguish 30000/1001 from 30 fps, and make both rates visible to cadence-outlier telemetry.
+Commit `f5e3b83` extends the accepted presentation accumulator and cadence profiler to H.262 frame-rate codes four and five using exact reduced `30000/1001` and exact 30-fps ratios, while leaving decode order, ownership, ingress, the 60 MHz decoder clock and diagnostic architecture unchanged. Focused scheduler proofs produce exactly 599 and 600 presentations across matching 1,206-window trials and verify safe fractional-scale reseeding; profiler verification, Verilator lint and the established raster regressions pass. The incremental seed-nine Quartus 17.0.2 build completes with zero errors and positive timing at plus 0.184 ns global setup, plus 0.279 ns decoder setup, plus 7.404 ns video setup, plus 0.241 ns hold, plus 3.666 ns recovery, plus 0.758 ns removal and plus 1.122 ns pulse width. It uses 34,975 ALMs, 52,068 registers, 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks; the 4,200,652-byte RBF has SHA-256 `98c73c1b23499e5461fa789b3b77fbf59d798e957b9f7e9357bf6d932009a615`. Direct MiSTer controls identify rate codes four and five correctly, present every picture, terminate cleanly and report zero decoder errors; the 29.97-fps control measures 29.912 fps, while the exact-30 control demonstrates the expected cadence after finite startup delay. The accepted P skip/motion, B prediction, repeated multi-slice and 15-second squirrel hardware gates all retain complete decode and presentation counts, zero decoder errors and zero cadence outliers, including the established odd-byte transport pad and eight-bit counter wrap cases. The exact RBF and both visual rate controls were installed and retrieved byte-for-byte identical, and documentation commit `3d3ce2c` records the active v0.7.0 status without changing the published v0.6.0 qualification.
 
 #### Next Steps:
 
-Implement the two cadence scales, re-seed safely when entering either fractional scale, extend scheduler and profiler regressions, and run the established decoder gates. If all source-level tests pass, commit and push the change, then perform an incremental seed-nine build and require the accepted 408-RAM-block topology plus positive timing before any MiSTer installation.
+Have the user visually compare the installed 29.97- and exact-30-fps controls. Preserve this timing-clean 408-RAM-block build as the first accepted v0.7.0 implementation boundary, then begin the approved H.222.0 Program Stream pack and PES ingress work as a separate cycle without disturbing raw elementary-stream playback.
 
 #### Files Modified:
 
-None.
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 353 COMMIT Unreleased 5ab290d 2026-08-22T19:30:00-07:00
@@ -1162,36 +1165,6 @@ Have the user visually confirm smooth playback on the installed core. Then treat
 
 - rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 - tools/streams/tb_h262_b_presentation_scheduler.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 314 COMMIT Unreleased 9367b7e 2026-08-21T21:33:01-07:00
-
-#### Coming From:
-
-Unreleased f3f2395
-
-#### Purpose:
-
-Capture the rejected I-overlap build's hardware state when playback terminates before the MPEG sequence-end marker.
-
-#### Outcome:
-
-Commit `9367b7e` leaves decode, scheduling, frame ownership and presentation behavior untouched while allowing the schema-four cadence profiler to snapshot after either a sticky fatal error or one decoder-clock second without byte, persistence, display, prediction or writer progress. Focused Icarus verification covers quiet, forced-terminal, fatal and no-progress capture with valid checksums, and Verilator lint passes with only standing testbench warnings. The incremental Quartus 17.0.2 build completes in 12 minutes 41 seconds with zero errors and positive timing at plus 0.253 ns global setup, plus 1.311 ns decoder setup, plus 7.273 ns video setup, plus 0.248 ns hold, plus 3.619 ns recovery, plus 0.880 ns removal and plus 0.462 ns minimum pulse width. It uses 34,520 ALMs and 51,206 registers; the 4,415,436-byte RBF has SHA-256 `a7e34a96d69a551aab24e042f53ac4bf152b6e3713000d0efc2f31ac52d8919b`. Hardware capture succeeds and proves the rejected Entry 313 behavior is a scheduler fail-stop, not a deadlock or reference corruption: only 84,756 of 125,948 bytes are accepted, 10 references and 15 B pictures complete, 23 pictures and 22 swaps are displayed, cadence remains legal at 24.787 fps with zero gap outliers, and error flags are exactly `0x0200`, the presentation-error bit. The terminal scheduler state retains `overlap_decode_open=1` and `pending_frame_valid=1` after clearing the active run, which identifies the queued B admission failure: the following B header arrived while the new-GOP I overlap was open but before its reference publication was visible, and the scheduler treated that transient absence as fatal. The known-working Entry 312 RBF with SHA-256 `af63bb9c8433247d4b5b54ab511efd12d9e2aaec8cf664e021e48c7b4fcb1b31` was restored on the MiSTer after capture.
-
-#### Next Steps:
-
-Replace the queued-run fail-stop only for this proven transient. When a B header reaches a closed run with `overlap_decode_open` set but no overlap publication yet, latch one deferred queued-B request and assert presentation backpressure after that header so the already accepted I picture may finish publishing without allowing B payload bytes to outrun scratch-bank ownership. Complete the ordinary queued admission atomically when `frame_waiting` or `pending_frame_valid` supplies the I reference, preserve scratch-exhaustion and duplicate-request cases as genuine errors, and add a focused case in which B classification precedes delayed I publication. Keep the Entry 313 I-overlap behavior otherwise unchanged, build incrementally as requested, and require the 48- and 72-picture hardware clips to finish with every byte and picture, zero errors and zero GOP outliers before persistent installation.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
 
 #### Status:
 
