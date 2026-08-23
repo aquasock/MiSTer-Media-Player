@@ -1,4 +1,4 @@
-## 357 COMMIT Unreleased ??? 2026-08-22T21:53:25-07:00
+## 357 COMMIT Unreleased 2dc52d7 2026-08-22T21:53:25-07:00
 
 #### Coming From:
 
@@ -10,20 +10,22 @@ Break the route-dominated fatal-error feedback through compressed ingress with a
 
 #### Outcome:
 
-Proposed: insert one decoder-clock register between the existing aggregate of sticky systems, syntax, reconstruction, DDR and presentation errors and the fail-open FIFO transport gate. The current timing-clean Program Stream image has only plus 0.026 ns decoder setup margin, and its routed worst path spends 15.900 ns across fourteen logic levels from B replay state through reference diagnostics, the fatal-error gate and raw/Program-Stream ingress back into the P parser; 10.764 ns, or 68 percent, is routing. Latching any fatal event before it controls transport removes that full-cycle combinational feedback without delaying motion vectors, residual samples, decoded video bytes, ordinary ready-valid backpressure or presentation. A newly detected failure may expose at most the already-current byte before the registered fail-open drain begins on the following clock, while the sticky decoder error state and first-error diagnostics remain authoritative.
+Commit `2dc52d7` adds one sticky decoder-clock fault register inside the existing stream transport gate, breaking the route-dominated combinational path from B replay diagnostics through compressed ingress into the P parser while leaving clean-stream bytes and ready-valid backpressure unchanged; a newly detected fatal event begins fail-open draining on the following clock and remains latched until reset. The focused transport-gate test proves clean combinational flow, one-cycle fault capture, sixteen-byte sticky drain and reset recovery; Program Stream unit and real-file extraction tests remain exact, and reusable B-prediction and multi-slice decoder soaks pass with zero errors. The incremental seed-nine Quartus 17.0.2 build completes with zero errors and improves global setup from plus 0.018 ns to plus 0.375 ns and decoder setup from plus 0.026 ns to plus 0.572 ns, with plus 7.280 ns video setup, plus 0.246 ns hold, plus 4.355 ns recovery, plus 0.573 ns removal and plus 1.122 ns pulse width. It uses 35,932 ALMs, 52,421 registers, 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks; the 4,231,288-byte RBF has SHA-256 `d4f19c0d35cf972b34cafdc41c51571f937974c1b05d10fa2cfa6af3fb5658ee`. Direct MiSTer qualification passes B prediction, repeated multi-slice, the 120-picture Program Stream and the 360-picture squirrel stress with zero decoder errors, sequence end, presentation completion and quiet terminal state, including the established odd-byte transport pad and eight-bit counter-wrap conventions. Because the strict decoder audit has no violated paths and gains plus 0.546 ns over the preserved baseline, the user-authorized clean fallback is unnecessary; the exact incremental build is preserved outside the repository, installed persistently and retrieved byte-for-byte from the MiSTer.
 
 #### Next Steps:
 
-Implement the fault latch as a small independently tested module, prove clean transport, one-cycle fault capture, sticky drain and reset behavior with the existing gate, then run the Program Stream demux proofs and established decoder regressions. Build incrementally from the preserved timing-clean Program Stream database and accept the change only if all required timing categories remain positive with materially better 60 MHz decoder margin, resources remain effectively unchanged and matched raw and Program Stream hardware playback retains exact picture counts, clean terminal completion and zero errors. If timing does not improve, revert this isolated boundary and retain the preserved `c4d9631` image before considering the more invasive registered P/B work path.
+Treat this exact image as the accepted timing-hardened Program Stream boundary and retain the preserved `c4d9631` build as a rollback point. The more invasive registered P/B work path is not justified while decoder setup remains comfortably positive; proceed with validated PES timestamp capture and PTS-driven presentation scheduling as a separate bounded cycle, retaining raw elementary-stream compatibility, the diagnostic architecture and the full timing and hardware gates.
 
 #### Files Modified:
 
-None.
+- MediaPlayer_top_00.svh
+- rtl/mpeg2_new/mpeg2_h262_stream_transport_gate.sv
+- tools/streams/tb_h262_stream_transport_gate.sv
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 356 COMMIT Unreleased c4d9631 2026-08-22T20:42:22-07:00
