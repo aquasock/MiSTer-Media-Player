@@ -74,14 +74,16 @@ reg last_bound_reference_valid;
 reg [1:0] last_bound_reference_bank;
 reg [7:0] last_bound_reference_count;
 
-// Entry 322: the fixed 40 MHz 800x600 raster produces one swap window every
+// Entry 354: the fixed 40 MHz 800x600 raster produces one swap window every
 // 1056*628 pixels.  Accumulate source-picture credit in pixel-clock units for
-// the 24000/1001, exact 24, and 25 fps Table 6-4 rates.  The fractional rate
-// uses the exact reduced ratio
+// the 24000/1001, exact 24, 25, 30000/1001, and exact 30 fps Table 6-4 rates.
+// The 24000/1001 fractional rate uses the exact reduced ratio
 //     (663168 * 24000) / (40000000 * 1001) = 22608 / 56875
-// so it does not drift or round to 24 fps.  Saturating at the next due slot
-// prevents a decode stall from banking credit and replaying ready pictures on
-// consecutive refreshes.
+// and the 30000/1001 rate uses
+//     (663168 * 30000) / (40000000 * 1001) = 5652 / 11375
+// so neither drifts or rounds to its neighboring integer rate.  Saturating at
+// the next due slot prevents a decode stall from banking credit and replaying
+// ready pictures on consecutive refreshes.
 localparam [25:0] CADENCE_LIMIT_24000_1001 = 26'd56875;
 localparam [25:0] CADENCE_STEP_24000_1001  = 26'd22608;
 localparam [25:0] CADENCE_DUE_24000_1001 =
@@ -94,6 +96,14 @@ localparam [25:0] CADENCE_LIMIT_25FPS = 26'd40000000;
 localparam [25:0] CADENCE_STEP_25FPS  = 26'd16579200;
 localparam [25:0] CADENCE_DUE_25FPS =
     CADENCE_LIMIT_25FPS-CADENCE_STEP_25FPS;
+localparam [25:0] CADENCE_LIMIT_30000_1001 = 26'd11375;
+localparam [25:0] CADENCE_STEP_30000_1001  = 26'd5652;
+localparam [25:0] CADENCE_DUE_30000_1001 =
+    CADENCE_LIMIT_30000_1001-CADENCE_STEP_30000_1001;
+localparam [25:0] CADENCE_LIMIT_30FPS = 26'd40000000;
+localparam [25:0] CADENCE_STEP_30FPS  = 26'd19895040;
+localparam [25:0] CADENCE_DUE_30FPS =
+    CADENCE_LIMIT_30FPS-CADENCE_STEP_30FPS;
 reg [25:0] cadence_credit;
 reg [3:0] cadence_rate_code_q;
 
@@ -115,17 +125,26 @@ wire scheduled_frame_differs=scheduled_frame_scratch?
 wire cadence_24000_1001=(frame_rate_code==4'h1);
 wire cadence_24fps=(frame_rate_code==4'h2);
 wire cadence_25fps=(frame_rate_code==4'h3);
-wire cadence_supported=cadence_24000_1001||cadence_24fps||cadence_25fps;
+wire cadence_30000_1001=(frame_rate_code==4'h4);
+wire cadence_30fps=(frame_rate_code==4'h5);
+wire cadence_supported=cadence_24000_1001||cadence_24fps||cadence_25fps||
+                       cadence_30000_1001||cadence_30fps;
 wire [25:0] cadence_limit=cadence_24000_1001?CADENCE_LIMIT_24000_1001:
+                          cadence_30000_1001?CADENCE_LIMIT_30000_1001:
                           CADENCE_LIMIT_24FPS;
 wire [25:0] cadence_step=cadence_24000_1001?CADENCE_STEP_24000_1001:
                          cadence_24fps?CADENCE_STEP_24FPS:
-                                       CADENCE_STEP_25FPS;
+                         cadence_25fps?CADENCE_STEP_25FPS:
+                         cadence_30000_1001?CADENCE_STEP_30000_1001:
+                                             CADENCE_STEP_30FPS;
 wire [25:0] cadence_due=cadence_24000_1001?CADENCE_DUE_24000_1001:
                         cadence_24fps?CADENCE_DUE_24FPS:
-                                      CADENCE_DUE_25FPS;
-wire cadence_scale_changed=cadence_24000_1001!=
-                           (cadence_rate_code_q==4'h1);
+                        cadence_25fps?CADENCE_DUE_25FPS:
+                        cadence_30000_1001?CADENCE_DUE_30000_1001:
+                                            CADENCE_DUE_30FPS;
+wire cadence_scale_changed=
+    (cadence_24000_1001!=(cadence_rate_code_q==4'h1))||
+    (cadence_30000_1001!=(cadence_rate_code_q==4'h4));
 wire cadence_slot=!cadence_scale_changed&&
                   (!cadence_supported||(cadence_credit>=cadence_due));
 wire scratch0_available=!scratch0_pending&&!queued_scratch0_pending&&

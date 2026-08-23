@@ -207,6 +207,39 @@ initial begin
         $fatal(1,"native 24000/1001 fps outlier was not captured");
     verify_checksum();
 
+    // NTSC video cadence (30000/1001) is a supported paced rate and must
+    // retain the same diagnostic coverage as the established lower rates.
+    reset_all();
+    frame_rate_code=4'd4;
+    fifo_pending=1;
+    activate_session();
+    picture_count=1;
+    pulse_reference();
+    repeat(12)@(posedge clk_mpeg2);swap_bank(1);
+    sequence_end_seen=1;fifo_pending=0;session_quiet=1;
+    wait(snapshot_ready);repeat(4)@(posedge clk_video);
+    if(dut.snapshot_sync_2[607:604]!==4'd4)
+        $fatal(1,"native 30000/1001 fps metadata missing");
+    if(dut.snapshot_sync_2[815:800]==0)
+        $fatal(1,"native 30000/1001 fps outlier was not captured");
+    verify_checksum();
+
+    // Exact 30 fps is independently signalled and supported.
+    reset_all();
+    frame_rate_code=4'd5;
+    fifo_pending=1;
+    activate_session();
+    picture_count=1;
+    pulse_reference();
+    repeat(12)@(posedge clk_mpeg2);swap_bank(1);
+    sequence_end_seen=1;fifo_pending=0;session_quiet=1;
+    wait(snapshot_ready);repeat(4)@(posedge clk_video);
+    if(dut.snapshot_sync_2[607:604]!==4'd5)
+        $fatal(1,"native 30 fps metadata missing");
+    if(dut.snapshot_sync_2[815:800]==0)
+        $fatal(1,"native 30 fps outlier was not captured");
+    verify_checksum();
+
     // A nonquiet sequence end must still expose the stuck terminal ownership.
     reset_all();
     activate_session();

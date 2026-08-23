@@ -493,11 +493,13 @@ module tb_h262_b_presentation_scheduler;
 
         // 1206 raster swap windows are just under twenty seconds at 60.3165
         // Hz.  Exact rational accumulation distinguishes 24000/1001 from 24
-        // fps there (479 versus 480 pictures), while the shorter established
-        // windows preserve the exact-24 and 25 fps results.
+        // fps (479 versus 480 pictures) and 30000/1001 from 30 fps (599 versus
+        // 600 pictures), while the shorter established window preserves 25.
         verify_cadence_rate(4'h1,1206,479);
         verify_cadence_rate(4'h2,603,240);
         verify_cadence_rate(4'h3,603,250);
+        verify_cadence_rate(4'h4,1206,599);
+        verify_cadence_rate(4'h5,1206,600);
 
         // A later sequence may legally enter the fractional direct rate.
         // Re-seed only when its accumulator scale changes so credit from the
@@ -513,7 +515,17 @@ module tb_h262_b_presentation_scheduler;
             $fatal(1,"24000/1001 rate change did not re-seed credit code=%0d credit=%0d",
                    dut.cadence_rate_code_q,dut.cadence_credit);
 
-        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=23.976/24/25 min_present_gap=%0d overlap_p=1 overlap_i=1 deferred_b=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=early/active fail_open=1",min_present_gap);
+        // The two fractional rates use different reduced scales.  Entering
+        // 30000/1001 from either the exact scale or the 24000/1001 scale must
+        // seed its own due point before a presentation can be admitted.
+        @(negedge clk);frame_rate_code=4'h4;
+        @(posedge clk);#1;
+        if((dut.cadence_rate_code_q!==4'h4)||
+           (dut.cadence_credit!==dut.CADENCE_DUE_30000_1001))
+            $fatal(1,"30000/1001 rate change did not re-seed credit code=%0d credit=%0d",
+                   dut.cadence_rate_code_q,dut.cadence_credit);
+
+        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=23.976/24/25/29.97/30 min_present_gap=%0d overlap_p=1 overlap_i=1 deferred_b=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=early/active fail_open=1",min_present_gap);
         $finish;
     end
 

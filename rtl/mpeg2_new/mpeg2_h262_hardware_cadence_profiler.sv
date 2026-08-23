@@ -110,7 +110,9 @@ wire session_progress=decoder_byte_accepted_q||reference_picture_complete_q||
 wire [31:0] display_gap_now=session_cycles-last_present_cycle;
 wire cadence_rate_supported=(frame_rate_code_q==4'h1)||
                             (frame_rate_code_q==4'h2)||
-                            (frame_rate_code_q==4'h3);
+                            (frame_rate_code_q==4'h3)||
+                            (frame_rate_code_q==4'h4)||
+                            (frame_rate_code_q==4'h5);
 wire [31:0] display_gap_meta_now={
     display_picture_count+1'b1,
     presentation_hold_q,destination_hold_q,fifo_pending_q,decoder_ready_q,
