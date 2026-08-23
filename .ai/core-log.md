@@ -1,3 +1,31 @@
+## 367 COMMIT Unreleased ed3310b 2026-08-23T13:17:21-07:00
+
+#### Coming From:
+
+Unreleased cea1d62
+
+#### Purpose:
+
+Remove the vertical-total comparison from the ASCAL sweep's cycle-critical wrap path so the HDMI boundary has margin the next change can survive.
+
+#### Outcome:
+
+Hardware validation of `cea1d62` passed every stream the user observed, which clears three things at once: the presentation time base introduced by `7c29f33` runs correctly on real hardware, the polyphase select duplication of `cea1d62` is proven in the video path rather than merely closing timing, and the schema five snapshot decodes with its new fields intact, having reported fifteen seconds for a fifteen second stream. A picture-count discrepancy raised by `run_hardware_cadence.py`, which reported one hundred four displayed pictures against an expected three hundred sixty, was investigated and is a harness artifact rather than a defect: the archived and independently validated seed ten image `c9bc2ef8` produces the identical complaint, so the expected count passed to that tool does not match what its MGL launch path actually plays. That image also decoded as schema four against the new build's schema five, confirming the decoder script handles both. The remaining concern was margin rather than correctness, because HDMI closed at only plus 0.054 ns against roughly 0.4 ns of measured seed variance on that path, meaning the next addition would break it. Querying the fit rather than guessing showed all five worst HDMI paths are the same one and are not the kind just fixed: `o_vcpt_pre3` bit zero to bit five, four logic levels and 6.352 ns, which is arithmetic depth inside a counter rather than distance between placements. The vertical sweep wrapped by evaluating `o_vcpt_pre3+1>=o_vtotal` inside the line-boundary branch, placing an increment, a twelve-bit comparison and a three-way mux on a single path. This commit precomputes that predicate into a register in the same process, exactly the technique commit 182 used for `o_vcpt_pre2_at_vmin` a few lines above, leaving only the increment and the mux in the critical cycle. Registering it is safe because `o_vcpt_pre3` advances once per line, hundreds of clocks apart, so the registered predicate always reflects the current count when the boundary arrives; only a mode change could make it lag by one clock, where output is transient regardless. Synthesis is clean at zero errors and an unchanged one hundred thirty-five warnings for exactly one additional register.
+
+#### Next Steps:
+
+Build at seed eleven and require every timing category positive with HDMI setup materially above the plus 0.054 ns it held, since the purpose of this change is margin rather than closure, and record whether the worst HDMI path relocates again. Confirm on MiSTer that every raw elementary-stream regression still passes, because this touches the vertical sweep that generates output timing and a defect would appear as wrong geometry or lost sync rather than as a decoder error. If HDMI margin is then comfortable, resume 0.7.0 by bringing up `EXT_BUS` together with the throwaway HPS-side harness that exercises it, defining the picture metadata wire protocol with the timestamp and the reserved `picture_structure`, `top_field_first`, `repeat_first_field` and `progressive_frame` fields, then presentation on timestamp against the proven clock, then the PCM sink. Before release qualification, complete the regression pack still unexercised, in particular long GOP, dense residual, full endurance and the truncation case with its no-reboot recovery.
+
+#### Files Modified:
+
+- sys/ascal.vhd
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 366 COMMIT Unreleased cea1d62 2026-08-23T06:01:06-07:00
 
 #### Coming From:
@@ -23,7 +51,7 @@ Confirm on MiSTer that every raw elementary-stream regression decodes exactly as
 #### Status:
 
 - [x] Built
-- [ ] Passed
+- [x] Passed
 
 ---
 ## 365 COMMIT Unreleased 7c29f33 2026-08-23T05:31:52-07:00
@@ -1169,36 +1197,6 @@ Keep timing-clean seed twelve and replace the per-word serializer with the FPGA 
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-## 327 COMMIT Unreleased 76326a1 2026-08-22T03:54:46-07:00
-
-#### Coming From:
-
-Unreleased a25d772
-
-#### Purpose:
-
-Prevent host-transfer starvation in the 7:22 squirrel burst by carrying two compressed bytes per MiSTer file-I/O transaction while preserving the decoder's byte stream.
-
-#### Outcome:
-
-Entry 326's full 7:15-through-7:30 hardware capture localizes the visible defect to display ordinals 175, 176 and 178, exactly the user's 7:22 interval, with gaps of 149.213 ms, 66.317 ms and 82.896 ms. Commit `76326a1` enables the local MiSTer framework's standard `WIDE=1` file-transfer mode and adds a write-domain unpacker that emits the lower-addressed byte before the upper byte into the unchanged 32 KiB asynchronous FIFO while applying host wait across the second byte and downstream backpressure. The focused unpacker test proves exact byte order, consecutive transfers, reset and a three-cycle stalled high byte; transport drains all sixteen control bytes, the scheduler retains exact 24 and 25 fps cadence with a minimum two-window gap, and profiler schema four passes with checksum `e82b643d`. The quality-six dense stream passes the full raster replay at 134,979,997 cycles with all 1,430,191 bytes, 36 P pictures, 79 B pictures, 41 reference publications, 119 swaps and zero errors. The incremental seed-eleven Quartus build then completes in 14 minutes with zero errors, using 34,827 ALMs, 51,970 registers, 4,306,375 memory bits, 538 of 553 RAM blocks and 65 DSP blocks, but is rejected because the 60 MHz decoder clock misses setup by 0.694 ns with total negative slack 12.266 ns. Video setup remains plus 8.184 ns, hold plus 0.260 ns, recovery plus 4.139 ns, removal plus 0.637 ns and pulse width plus 1.122 ns. The rejected 4,461,408-byte RBF has SHA-256 `0afac0e312bf7280932107c4210c9bce2c5b68ddcab898ffa6623c29c3a3d55b` and is not installed, so hardware behavior is not yet measured.
-
-#### Next Steps:
-
-Keep the functionally proven wide ingress unchanged and retry only the fitter with seed twelve because the source change disturbed the previously placement-sensitive 60 MHz decoder paths while every non-setup category remains positive. Rebuild incrementally and accept only zero errors with positive global, decoder, video, hold, recovery, removal and pulse-width timing. If seed twelve closes, verify and install the exact RBF, then rerun both the five-second quality-six control and full 7:15-through-7:30 hardware capture, requiring zero errors and no outliers at ordinals 175 through 178 before asking the user to inspect 7:22. If it does not close, return the decoder to its proven 54 MHz rate rather than repeatedly fitting a clock increase that hardware did not materially improve.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- rtl/mpeg2_stream_fifo.sv
-- tools/streams/tb_mpeg2_stream_word_unpacker.sv
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
