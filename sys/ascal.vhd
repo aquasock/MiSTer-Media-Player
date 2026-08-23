@@ -512,6 +512,16 @@ ARCHITECTURE rtl OF ascal IS
 	SIGNAL o_wr : unsigned(3 DOWNTO 0);
 	SIGNAL o_hcpt,o_vcpt,o_vcpt_pre,o_vcpt_pre2,o_vcpt_pre3,o_vcpt2 : uint12;
 	SIGNAL o_vcpt_pre2_at_vmin : std_logic;
+	-- MiSTer-Media-Player entry 367: the vertical sweep wrapped by evaluating
+	-- o_vcpt_pre3+1>=o_vtotal inside the line-boundary branch, putting an
+	-- increment, a 12-bit comparison and a three-way mux on one path.  That
+	-- was the worst HDMI setup path at plus 0.054 ns, four logic levels and
+	-- 6.352 ns.  Precomputing the predicate here removes the comparison from
+	-- the critical cycle, the same technique commit 182 used for
+	-- o_vcpt_pre2_at_vmin above.  The predicate is safe to register because
+	-- o_vcpt_pre3 changes only once per line, hundreds of clocks apart, so
+	-- the registered value always reflects the current count at the boundary.
+	SIGNAL o_vcpt_pre3_at_last : std_logic;
 	SIGNAL o_ihsize,o_ihsizem,o_ivsize : uint12;
 	SIGNAL o_ihsize_temp, o_ihsize_temp2 : natural RANGE 0 TO 32767;
 
@@ -2772,6 +2782,7 @@ BEGIN
 	BEGIN
 		IF rising_edge(o_clk) THEN
 			o_vcpt_pre2_at_vmin<=to_std_logic(o_vcpt_pre3=o_vmin);
+			o_vcpt_pre3_at_last<=to_std_logic(o_vcpt_pre3+1>=o_vtotal);
 
 			IF o_ce='1' THEN
 				-- Output pixels count
@@ -2784,7 +2795,7 @@ BEGIN
 						o_vcpt_sync <= o_vcpt_sync+1;
 					END IF;
 
-					IF o_vcpt_pre3+1>=o_vtotal THEN
+					IF o_vcpt_pre3_at_last='1' THEN
 						o_vcpt_pre3<=0;
 					ELSIF o_vrr_sync2 THEN
 						o_vcpt_pre3<=o_vsstart;
