@@ -2,7 +2,7 @@
 
 An experimental media-player core for [MiSTer FPGA](https://github.com/MiSTer-devel/Main_MiSTer), with a standards-driven MPEG-2 Video / ITU-T H.262 decoder implemented primarily in FPGA logic.
 
-> **Development status:** active, pre-release, developer-oriented. **v0.6.0 is the current published hardware-qualified milestone.** It sustains real-stream progressive 4:2:0 I/P/B decoding at 720x480, adds native 23.976/24/25 fps presentation cadence, and fixes the GOP-boundary stutters, large-picture starvation, and end-of-stream stalls found during full-length playback testing. Current v0.7.0 development additionally hardware-qualifies native 29.97 and 30 fps cadence. Audio, container/program-stream demux, DVD support, playback controls, and broader H.262 coverage remain future work.
+> **Development status:** active, pre-release, developer-oriented. **v0.6.0 is the current published hardware-qualified milestone.** It sustains real-stream progressive 4:2:0 I/P/B decoding at 720x480, adds native 23.976/24/25 fps presentation cadence, and fixes the GOP-boundary stutters, large-picture starvation, and end-of-stream stalls found during full-length playback testing. Current v0.7.0 development additionally hardware-qualifies native 29.97 and 30 fps cadence plus bounded MPEG-2 Program Stream / video PES input. Audio, real PTS scheduling, DVD support, playback controls, and broader H.262 coverage remain future work.
 
 ## Current status
 
@@ -29,11 +29,13 @@ The active decoder is a clean H.262 implementation under `rtl/mpeg2_new/`. v0.6.
 
 The current v0.7.0 development branch extends native presentation pacing to H.262 frame-rate codes 4 and 5: exact `30000/1001` (29.97 fps) and exact 30 fps. Both rates have passed focused scheduler proofs, timing-clean synthesis, direct MiSTer cadence measurements, and the established four-stream hardware regression gate.
 
+v0.7.0 development also adds a bounded H.222.0 MPEG-2 Program Stream ingress path. It auto-detects MPEG-2 pack headers, validates and removes bounded PES framing, selects one video stream ID, skips other declared packets, and feeds the extracted video bytes into the unchanged H.262 decoder. Matched raw `.m2v` and `.mpg` hardware controls complete the same 120 pictures with identical decoder-side byte and picture counts and zero errors. Raw elementary streams remain an exact pass-through mode.
+
 The current implementation subset remains intentionally bounded while the decoder architecture is being proven. These are implementation limits, **not** limits of H.262.
 
 | Area | Current implementation |
 | --- | --- |
-| Input | Raw MPEG-2 Video elementary stream (`.m2v`); no container, Program Stream, PES, audio, or PTS input yet |
+| Input | Raw MPEG-2 Video elementary stream (`.m2v`) or the bounded v0.7.0 MPEG-2 Program Stream / video PES subset (`.mpg`); no audio decode or timestamp-driven presentation yet |
 | Picture type | Continuous supported I pictures; generalized hardware-proven P regression path; bounded hardware-proven B regression/presentation path |
 | Picture structure | Progressive frame pictures on the proven paths |
 | Chroma format | 4:2:0 |
@@ -45,7 +47,7 @@ The current implementation subset remains intentionally bounded while the decode
 | Reconstruction precision | 8-bit Y/Cb/Cr |
 | Frame storage | Two retained planar MiSTer DDR3 I/P frame banks plus a distinct B scratch region |
 | Compressed-data buffering | 16-bit host ingress into a 32 KiB mixed-width asynchronous FIFO; 8-bit decoder consumption |
-| Timing metadata | Synthetic elementary-stream 33-bit / 90 kHz schedule; not PES-derived PTS |
+| Timing metadata | Synthetic elementary-stream 33-bit / 90 kHz schedule; Program Stream timestamp fields are validated but do not yet drive presentation |
 | Video output | Fixed 800x600 diagnostic timing |
 
 The frozen `rtl/mpeg2fpga/` tree remains only as a historical/reference implementation and is not part of the active Quartus build.
@@ -137,6 +139,9 @@ HPS / MiSTer file data
 async MPEG input FIFO
         |
         v
+raw pass-through or bounded Program Stream / video PES ingress
+        |
+        v
 H.262 parser / bitreader / VLC decode
         |
         +----------------------+----------------------+
@@ -160,7 +165,7 @@ intra reconstruction    P prediction + residual    B prediction + residual
                  blanking-aligned publication/reorder -> MiSTer video output
 ```
 
-A sideband timing path derives a 33-bit / 90 kHz elementary-stream presentation schedule from H.262 frame-rate metadata and cadence-paces frame-rate codes 1 through 5. It is deliberately not called PTS because the current `.m2v` input has no H.222.0 PES layer.
+A sideband timing path derives a 33-bit / 90 kHz presentation schedule from H.262 frame-rate metadata and cadence-paces frame-rate codes 1 through 5. Program Stream PES timestamp fields are structurally validated but do not yet drive this schedule, so it is deliberately not described as PTS timing.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for architectural background and [`docs/MPEG2_NEW_DECODER.md`](docs/MPEG2_NEW_DECODER.md) for the decoder development record.
 
@@ -206,7 +211,7 @@ The USER LED is used as a positive completion diagnostic during development. Its
 
 ## Development roadmap
 
-The active v0.7.0 branch broadens the qualified progressive cadence path through native 29.97 and 30 fps. Further decoder work can extend that path toward 50/59.94/60 fps, interlaced picture structures, additional chroma formats, and a wider real-stream syntax envelope. Later work includes presentation-quality chroma improvements, H.222.0 Program Stream/PES handling and real timestamps, audio integration, playback controls, and DVD navigation/optical-drive integration.
+The active v0.7.0 branch broadens the qualified progressive cadence path through native 29.97 and 30 fps and adds bounded H.222.0 MPEG-2 Program Stream / video PES ingress while preserving raw `.m2v` playback. Further decoder work can extend that path toward 50/59.94/60 fps, interlaced picture structures, additional chroma formats, and a wider real-stream syntax envelope. Later work includes presentation-quality chroma improvements, real PTS-driven timing, broader systems-stream handling, audio integration, playback controls, and DVD navigation/optical-drive integration.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for completed milestones.
 
