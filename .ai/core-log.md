@@ -1,3 +1,31 @@
+## 368 COMMIT Unreleased c25f3d9 2026-08-23T13:55:44-07:00
+
+#### Coming From:
+
+Unreleased ed3310b
+
+#### Purpose:
+
+Remove the per-pixel vertical size comparisons from the ASCAL pixel-queue select so the HDMI boundary reaches the seed variance it must survive.
+
+#### Outcome:
+
+Commit `ed3310b` built clean and delivered what it was for, moving HDMI setup from plus 0.054 ns to plus 0.254 ns while every other category stayed positive, using 34,458 ALMs, the lowest of this development run. Decoder setup fell from plus 0.911 ns to plus 0.448 ns in the same fit, which is placement variance within the roughly 0.5 ns spread already measured rather than an effect of a change that touched only ASCAL's vertical counter; the figure that matters is the weakest margin anywhere in the design, and that improved almost fivefold. The bottleneck then relocated to `o_vacpt` feeding `o_vpixq_pre` at four logic levels and 5.790 ns, where the CYCLE 8 pixel-queue select compared `to_integer(o_vacpt)` against `o_ivsize` twice. That call needed a different technique from the previous two fixes: unlike the line-boundary wrap, this block executes on every pixel clock while `o_vacpt` advances only once per line, so a plainly registered predicate would have been stale for the first pixel of every line and would have produced a genuine artifact at the bottom image boundary rather than a theoretical one. This commit therefore updates both predicates in lockstep with `o_vacpt` at each of its two mutually exclusive assignment sites, giving zero skew because predicate and counter change on the same clock. The one behavioural difference from the combinational original is recorded in the code rather than left implicit: the predicates lag by a single line if `o_ivsize` changes while `o_vacpt` does not advance, which occurs only at a mode change where scaler output is transient. Synthesis returned an unchanged register count rather than the expected two additional registers, which could not by itself confirm the predicates survived as registers, so the fit was allowed to settle the question and did: HDMI setup reaches plus 0.395 ns with decoder setup plus 0.473 ns, host bridge plus 1.393 ns, hold plus 0.259 ns, recovery plus 3.950 ns, removal plus 0.677 ns and pulse width plus 1.122 ns, using 34,980 ALMs and 52,123 registers, with RBF SHA-256 `f52f8859277eda230f0bd9b565ca906fdc85debaf8f5014b4659d959182f2ad6`. Across the three ASCAL fixes the weakest margin anywhere moved from plus 0.054 ns to plus 0.254 ns to plus 0.395 ns, a sevenfold improvement from three small and individually precedented changes. The user validated that image on hardware and every stream passed, which accepts all three together: the polyphase select duplication of `cea1d62`, the vertical wrap predicate of `ed3310b` and the pixel-queue selects here, all of which sit in the live video output path where a defect would appear as wrong geometry, unstable sync or bottom-edge artefacts rather than as a decoder error. This is a deliberate stopping point for HDMI work, because the worst remaining path runs from `o_v_poly_phase` to `o_v_poly_t` at 5.907 ns with zero logic levels, a pure register-to-register wire with nothing combinational left to precompute; improving it would require placement control or pipelining the scaler datapath, which is a materially larger change than any taken here.
+
+#### Next Steps:
+
+Resume 0.7.0 with the HDMI boundary no longer the constraint that breaks each addition. Bring up `EXT_BUS`, unconnected at `MediaPlayer_top_00.svh`, together with the throwaway HPS-side harness that exercises it, and define the picture metadata wire protocol carrying the 33-bit timestamp with reserved `picture_structure`, `top_field_first`, `repeat_first_field` and `progressive_frame` fields, keeping protocol and harness in one cycle because a protocol with nothing to talk to cannot be tested. Presentation on timestamp against the proven clock follows, anchoring from the first timestamp and retaining free-running cadence for streams without them, then the PCM sink with its elastic FIFO, fill level and underrun telemetry and explicit seek flush. Watch the weakest margin after each addition rather than the decoder alone, since the lesson of this run is that the binding path moves. Before release qualification, complete the regression pack still unexercised, in particular long GOP, dense residual, mixed macroblocks, multi-slice, full endurance and the truncation case with its no-reboot recovery, and delete the six compiled but uninstantiated modules for navigability with no timing expectation attached.
+
+#### Files Modified:
+
+- sys/ascal.vhd
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 367 COMMIT Unreleased ed3310b 2026-08-23T13:17:21-07:00
 
 #### Coming From:
@@ -22,8 +50,8 @@ Build at seed eleven and require every timing category positive with HDMI setup 
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 366 COMMIT Unreleased cea1d62 2026-08-23T06:01:06-07:00
@@ -1170,33 +1198,5 @@ Replay the ordinary 7:15-through-7:30 clip as often as the user needs to confirm
 
 - [x] Built
 - [x] Passed
-
----
-## 328 COMMIT Unreleased b426ba4 2026-08-22T04:17:21-07:00
-
-#### Coming From:
-
-Unreleased 76326a1
-
-#### Purpose:
-
-Find a timing-clean placement for the proven wide-ingress design by retrying its incremental Quartus fit with seed twelve.
-
-#### Outcome:
-
-Commit `b426ba4` changes only the fitter seed from eleven to twelve and reuses synthesis as intended. The incremental build completes in 11 minutes 58 seconds with zero errors and positive timing at plus 0.331 ns global setup, plus 0.350 ns decoder setup, plus 8.286 ns video setup, plus 0.252 ns hold, plus 3.950 ns recovery, plus 0.800 ns removal and plus 1.122 ns pulse width. It uses 34,883 ALMs, 51,966 registers, 4,306,375 memory bits, 538 of 553 RAM blocks and 65 DSP blocks. The accepted 4,449,372-byte RBF has SHA-256 `d4d31f23f9d4405c070acc589fcbf7fcb059164b6dabd51bf7b4d96aad1c31c5`, verifies after persistent installation and proves seed twelve is a timing-clean placement. Hardware then exposes a functional ingress flaw before telemetry can run: the word unpacker asserts host wait for every accepted 16-bit word while emitting its upper byte. Although that pause lasts only one 20 MHz FPGA clock, it forces the MiSTer file loader through a software wait/retry round trip for every two bytes, so the 1,430,191-byte control does not finish loading within the acquisition window and the screenshot command cannot execute. The artifact is therefore not passed despite clean timing.
-
-#### Next Steps:
-
-Keep timing-clean seed twelve and replace the per-word serializer with the FPGA vendor's native mixed-width asynchronous FIFO, writing complete 16-bit host words and reading ordered 8-bit decoder bytes while asserting host wait only when the reservoir is genuinely full. Simulate the actual primitive model for byte order, consecutive words, full backpressure and reset, then rerun the focused and exact-stream regressions and build incrementally. Accept only positive timing and a real hardware load that consumes all bytes, reaches terminal quiet with zero errors and removes the 7:22 outliers.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
