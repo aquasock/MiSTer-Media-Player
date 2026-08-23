@@ -1036,6 +1036,17 @@ ARCHITECTURE rtl OF ascal IS
 	SIGNAL o_h_poly_t,o_h_poly_t2,o_v_poly_t   : type_poly_t;
 
 	SIGNAL o_v_poly_adaptive, o_h_poly_adaptive, o_v_poly_use_adaptive, o_h_poly_use_adaptive : std_logic;
+	-- MiSTer-Media-Player entry 366: the C3 selects above feed muxes at C3,
+	-- C4 and C8.  One register driving consumers that far apart routes badly
+	-- and the C8 mux was the worst HDMI setup path at minus 0.202 ns, two
+	-- logic levels and 6.481 ns of which almost all was wire.  These are
+	-- duplicates, not delays: identical input, identical timing, so the only
+	-- change is that the fitter may place a copy beside the C8 mux.
+	-- dont_merge stops Quartus folding them back into one register.
+	SIGNAL o_v_poly_use_adaptive_c8, o_h_poly_use_adaptive_c8 : std_logic;
+	ATTRIBUTE dont_merge : boolean;
+	ATTRIBUTE dont_merge OF o_v_poly_use_adaptive_c8 : SIGNAL IS true;
+	ATTRIBUTE dont_merge OF o_h_poly_use_adaptive_c8 : SIGNAL IS true;
 	SIGNAL poly_wr_mode : std_logic_vector(2 DOWNTO 0);
 	SIGNAL poly_tdw : unsigned(39 DOWNTO 0);
 	SIGNAL poly_a2 : unsigned(FRAC-1 DOWNTO 0);
@@ -2380,6 +2391,8 @@ BEGIN
 
 			o_v_poly_use_adaptive <= to_std_logic((o_vmode(2 DOWNTO 0)/="000") AND (o_v_poly_adaptive = '1'));
 			o_h_poly_use_adaptive <= to_std_logic((o_hmode(2 DOWNTO 0)/="000") AND (o_h_poly_adaptive = '1'));
+			o_v_poly_use_adaptive_c8 <= to_std_logic((o_vmode(2 DOWNTO 0)/="000") AND (o_v_poly_adaptive = '1'));
+			o_h_poly_use_adaptive_c8 <= to_std_logic((o_hmode(2 DOWNTO 0)/="000") AND (o_h_poly_adaptive = '1'));
 			o_v_poly_addr<=to_integer(o_vfrac(11 DOWNTO 12-FRAC));
 
 			-- C3 / HC3 / VC4
@@ -2440,9 +2453,9 @@ BEGIN
 			o_v_poly_phase<=poly_cvt(o_v_poly_phase_a5);
 			o_h_poly_phase<=poly_cvt(o_h_poly_phase_a5);
 
-			IF o_v_poly_use_adaptive = '1' THEN
+			IF o_v_poly_use_adaptive_c8 = '1' THEN
 				o_v_poly_phase<=o_poly_phase1;
-			ELSIF o_h_poly_use_adaptive = '1' THEN
+			ELSIF o_h_poly_use_adaptive_c8 = '1' THEN
 				o_h_poly_phase<=o_poly_phase1;
 			END IF;
 
