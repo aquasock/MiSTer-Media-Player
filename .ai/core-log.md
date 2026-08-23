@@ -1,3 +1,31 @@
+## 357 COMMIT Unreleased ??? 2026-08-22T21:53:25-07:00
+
+#### Coming From:
+
+Unreleased c4d9631
+
+#### Purpose:
+
+Break the route-dominated fatal-error feedback through compressed ingress with a registered sticky transport-fault boundary while leaving clean-stream decode data unchanged.
+
+#### Outcome:
+
+Proposed: insert one decoder-clock register between the existing aggregate of sticky systems, syntax, reconstruction, DDR and presentation errors and the fail-open FIFO transport gate. The current timing-clean Program Stream image has only plus 0.026 ns decoder setup margin, and its routed worst path spends 15.900 ns across fourteen logic levels from B replay state through reference diagnostics, the fatal-error gate and raw/Program-Stream ingress back into the P parser; 10.764 ns, or 68 percent, is routing. Latching any fatal event before it controls transport removes that full-cycle combinational feedback without delaying motion vectors, residual samples, decoded video bytes, ordinary ready-valid backpressure or presentation. A newly detected failure may expose at most the already-current byte before the registered fail-open drain begins on the following clock, while the sticky decoder error state and first-error diagnostics remain authoritative.
+
+#### Next Steps:
+
+Implement the fault latch as a small independently tested module, prove clean transport, one-cycle fault capture, sticky drain and reset behavior with the existing gate, then run the Program Stream demux proofs and established decoder regressions. Build incrementally from the preserved timing-clean Program Stream database and accept the change only if all required timing categories remain positive with materially better 60 MHz decoder margin, resources remain effectively unchanged and matched raw and Program Stream hardware playback retains exact picture counts, clean terminal completion and zero errors. If timing does not improve, revert this isolated boundary and retain the preserved `c4d9631` image before considering the more invasive registered P/B work path.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 356 COMMIT Unreleased c4d9631 2026-08-22T20:42:22-07:00
 
 #### Coming From:
@@ -1124,51 +1152,6 @@ Retry the unchanged design incrementally with fitter seed nine, explicitly recor
 #### Files Modified:
 
 - MediaPlayer_top_07.svh
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-## 317 COMMIT Unreleased d95baa6 2026-08-21T23:50:22-07:00
-
-#### Coming From:
-
-Unreleased 3c80bef
-
-#### Purpose:
-
-Implement exact B-picture f_code five motion support so the 250-picture compatibility stream no longer leaves an unowned B transaction.
-
-#### Outcome:
-
-Commit `d95baa6` extends the B parser and raster path from f_code one through four to exact f_code five support. Predictors, residual reconstruction and emitted forward/backward vectors are signed 9-bit values, the raster motion record is widened from 34 to 38 bits, and an explicit B transport qualifier distinguishes direction records from ordinary P residual sample indices while the vectors travel independently of the 16-bit residual sideband. The deterministic range generator now exercises one through five, including signed 9-bit wraparound, and FFmpeg verifies both authored B pictures pixel-exact; the parser-window and residual-streaming regressions pass with zero errors and the latter retains its exact 1,286,071-cycle Icarus count. The canonical fixed-count 72-picture raster remains exactly 6,519,997 cycles, the scheduler cadence remains one, three and two with a minimum presentation gap of two, and real 48-, 72- and 250-picture Verilator runs consume every byte and terminate with zero decoder, raster, ownership or presentation errors. The 250-picture run finishes all 1,178,034 bytes with 74 P pictures, 165 B pictures, 85 reference publications and 249 display swaps, proving both the former picture-80 stop and the terminal non-quiet state are gone in simulation. The loading bar and scheduler behavior are unchanged.
-
-#### Next Steps:
-
-Build `d95baa6` incrementally as requested without clearing Quartus compilation databases, require zero errors and positive timing, install the exact RBF on the connected MiSTer, and run the 48-, 72- and 250-picture hardware clips. Accept the repair only if each consumes every byte, presents every picture through terminal quiet, reports zero error flags and preserves the accepted GOP cadence; retain the loading bar as the diagnostic requested by the user.
-
-#### Files Modified:
-
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_04.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
-- tools/streams/generate_test_b_f_code_range.py
-- tools/streams/h262common.py
-- tools/streams/tb_h262_b_residual_streaming.sv
-- tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
