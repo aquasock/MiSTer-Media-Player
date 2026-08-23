@@ -68,7 +68,7 @@ assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
 `include "build_id.v"
 localparam CONF_STR = {
 	"MediaPlayer;;",
-	"F1,M2VMPG,Open MPEG-2 Video / Program Stream;",
+	"F1,M2V,Open MPEG-2 Video;",
 	"-;",
 	"-;",
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
@@ -99,23 +99,14 @@ wire [26:0] ioctl_addr;
 wire [15:0] ioctl_dout;
 wire        mpeg2_stream_full;
 wire        mpeg2_stream_empty;
-wire [7:0]  mpeg2_fifo_data;
 wire [7:0]  mpeg2_stream_data;
 wire        mpeg2_stream_rd;
 wire        mpeg2_stream_wr;
-wire        mpeg2_new_system_input_ready;
-wire        mpeg2_new_system_input_valid;
 wire        mpeg2_new_decode_stream_valid;
 wire        mpeg2_new_stream_ready;
 wire        mpeg2_new_decoder_stream_ready;
 wire        mpeg2_new_b_presentation_hold;
 wire        mpeg2_new_p_destination_ownership_hold;
-wire        mpeg2_new_program_stream_detected;
-wire        mpeg2_new_program_end_seen;
-wire        mpeg2_new_video_pts_valid;
-wire [32:0] mpeg2_new_video_pts_90k;
-wire        mpeg2_new_systems_error;
-wire [3:0]  mpeg2_new_systems_error_code;
 
 hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 (
@@ -212,25 +203,6 @@ mpeg2_h262_download_rearm mpeg2_h262_download_rearm
 
 wire reset_mpeg2 = reset_mpeg2_base || mpeg2_download_rearm_reset;
 
-// Entry 356: synchronize the file-transfer lifetime into the decoder domain.
-// A Program Stream ending after the FIFO drains without MPEG_program_end_code
-// is a systems-layer truncation; raw elementary streams retain their existing
-// H.262 terminal handling.
-(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
-reg [2:0] mpeg2_download_active_sync;
-always @(posedge clk_mpeg2 or posedge reset_mpeg2_base) begin
-	if (reset_mpeg2_base)
-		mpeg2_download_active_sync <= 3'b000;
-	else
-		mpeg2_download_active_sync <=
-			{mpeg2_download_active_sync[1:0],ioctl_download};
-end
-
-wire mpeg2_new_system_input_end =
-	!mpeg2_download_active_sync[2] &&
-	!mpeg2_download_rearm_reset &&
-	mpeg2_stream_empty;
-
 // kate - Phase 1Ob: the streaming H.262 bitreader continues to own input
 // backpressure while picture_data() advances across every slice of the first
 // supported I-picture.  Slice boundaries remain inside the bitreader so no
@@ -263,7 +235,6 @@ assign mpeg2_new_stream_ready =
 // discarded bytes as valid decoder input.  This lets ioctl_download retire so
 // the existing post-load LED snapshot can report the first failure.
 wire mpeg2_new_transport_fatal_error =
-	mpeg2_new_systems_error ||
 	mpeg2_new_syntax_error ||
 	mpeg2_new_phase1_probe_error ||
 	mpeg2_new_pred_error ||
@@ -280,29 +251,10 @@ mpeg2_h262_stream_transport_gate mpeg2_h262_stream_transport_gate
 	.clk              (clk_mpeg2),
 	.reset            (reset_mpeg2),
 	.fifo_empty       (mpeg2_stream_empty),
-	.decoder_ready    (mpeg2_new_system_input_ready),
+	.decoder_ready    (mpeg2_new_stream_ready),
 	.fatal_error      (mpeg2_new_transport_fatal_error),
 	.fifo_read        (mpeg2_stream_rd),
-	.decoder_valid    (mpeg2_new_system_input_valid)
-);
-
-mpeg2_h222_program_stream_demux mpeg2_h222_program_stream_demux
-(
-	.clk                    (clk_mpeg2),
-	.reset                  (reset_mpeg2),
-	.input_data             (mpeg2_fifo_data),
-	.input_valid            (mpeg2_new_system_input_valid),
-	.input_ready            (mpeg2_new_system_input_ready),
-	.input_end              (mpeg2_new_system_input_end),
-	.video_data             (mpeg2_stream_data),
-	.video_valid            (mpeg2_new_decode_stream_valid),
-	.video_ready            (mpeg2_new_stream_ready),
-	.video_pts_valid        (mpeg2_new_video_pts_valid),
-	.video_pts_90k          (mpeg2_new_video_pts_90k),
-	.program_stream_detected(mpeg2_new_program_stream_detected),
-	.program_end_seen       (mpeg2_new_program_end_seen),
-	.systems_error          (mpeg2_new_systems_error),
-	.systems_error_code     (mpeg2_new_systems_error_code)
+	.decoder_valid    (mpeg2_new_decode_stream_valid)
 );
 
 mpeg2_stream_fifo mpeg2_stream_fifo
@@ -317,7 +269,7 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 
 	.rd_clk   (clk_mpeg2),
 	.rd_en    (mpeg2_stream_rd),
-	.rd_data  (mpeg2_fifo_data),
+	.rd_data  (mpeg2_stream_data),
 	.rd_empty (mpeg2_stream_empty)
 );
 

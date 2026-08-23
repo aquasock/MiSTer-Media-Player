@@ -13,8 +13,6 @@ reg [1:0] completed_frame_bank=0;
 reg presentation_complete=0,presentation_error=0;
 reg [31:0] scheduler_debug_state=0;
 reg decoder_byte_accepted=0;
-reg pts_associated=0;
-reg [32:0] pts_90k=0;
 reg [2:0] picture_coding_type=3'b001;
 reg [9:0] temporal_reference=0;
 reg [3:0] frame_rate_code=4'd3;
@@ -49,7 +47,6 @@ mpeg2_h262_hardware_cadence_profiler #(
     .presentation_error(presentation_error),
     .scheduler_debug_state(scheduler_debug_state),
     .decoder_byte_accepted(decoder_byte_accepted),
-    .pts_associated(pts_associated),.pts_90k(pts_90k),
     .picture_coding_type(picture_coding_type),
     .temporal_reference(temporal_reference),.frame_rate_code(frame_rate_code),
     .picture_count(picture_count),
@@ -83,15 +80,6 @@ begin
 end
 endtask
 
-task pulse_pts;
-    input [32:0] value;
-begin
-    @(negedge clk_mpeg2);pts_90k=value;pts_associated=1;
-    @(negedge clk_mpeg2);pts_associated=0;
-    repeat(2)@(posedge clk_mpeg2);
-end
-endtask
-
 task swap_bank;
     input [1:0] bank;
 begin
@@ -110,7 +98,6 @@ begin
     completed_frame_bank=0;display_frame_bank=0;display_scratch=0;
     display_scratch_bank=0;presentation_complete=0;presentation_error=0;
     scheduler_debug_state=0;decoder_byte_accepted=0;error_flags=0;
-    pts_associated=0;pts_90k=0;
     repeat(5)@(posedge clk_mpeg2);reset_mpeg2=0;
     repeat(5)@(posedge clk_video);reset_video=0;
 end
@@ -147,8 +134,6 @@ initial begin
     reset_all();
     fifo_pending=1;
     activate_session();
-    pulse_pts(33'h001234567);
-    pulse_pts(33'h1abcdef01);
     picture_count=1;
     pulse_reference();
 
@@ -184,11 +169,6 @@ initial begin
         $fatal(1,"outlier context mismatch %h",dut.snapshot_sync_2[895:864]);
     if(dut.snapshot_sync_2[815:800]==0)
         $fatal(1,"expected at least one outlier gap");
-    if(dut.snapshot_sync_2[1138:1131]!==8'd2)
-        $fatal(1,"PTS association count was not packed");
-    if({dut.snapshot_sync_2[1130:1120],dut.snapshot_sync_2[582:577],
-        dut.snapshot_sync_2[623:608]}!==33'h1abcdef01)
-        $fatal(1,"latest PTS was not packed exactly");
     verify_checksum();
     verify_overlay_prefix();
 

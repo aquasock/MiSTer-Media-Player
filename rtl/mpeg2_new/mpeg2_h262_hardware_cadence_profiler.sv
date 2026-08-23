@@ -3,9 +3,7 @@
 //
 // Entry 312: retain schema-v3 aggregates and capture the scheduler/hold state
 // when each ranked gap first exceeds the legal cadence window.
-// Entry 358 uses previously reserved snapshot bits for the latest associated
-// 33-bit PTS and a saturating association count.  All inputs are observational;
-// no output feeds decoder or presentation logic.
+// All inputs are observational; no output feeds decoder or presentation logic.
 //============================================================================
 `timescale 1ns/1ps
 module mpeg2_h262_hardware_cadence_profiler #(
@@ -22,7 +20,6 @@ module mpeg2_h262_hardware_cadence_profiler #(
     input wire presentation_complete,input wire presentation_error,
     input wire [31:0] scheduler_debug_state,
     input wire decoder_byte_accepted,
-    input wire pts_associated,input wire [32:0] pts_90k,
     input wire [2:0] picture_coding_type,
     input wire [9:0] temporal_reference,
     input wire [3:0] frame_rate_code,input wire [7:0] picture_count,
@@ -57,8 +54,6 @@ reg [1:0] completed_frame_bank_q;
 reg presentation_complete_q,presentation_error_q;
 reg [31:0] scheduler_debug_state_q;
 reg decoder_byte_accepted_q;
-reg pts_associated_q;
-reg [32:0] pts_90k_q;
 reg [2:0] picture_coding_type_q;
 reg [9:0] temporal_reference_q;
 reg [3:0] frame_rate_code_q;
@@ -86,8 +81,6 @@ reg prediction_outstanding;
 reg [31:0] writer_wait_cycles;
 reg [7:0] reference_picture_count,b_picture_count;
 reg [7:0] display_picture_count,display_swap_count;
-reg [7:0] pts_association_count;
-reg [32:0] latest_pts_90k;
 reg b_picture_complete_d;
 reg [1:0] display_frame_bank_d;
 reg display_scratch_d,display_scratch_bank_d;
@@ -154,8 +147,8 @@ wire [31:0] snapshot_word_16=writer_wait_cycles;
 wire [31:0] snapshot_word_17={reference_picture_count,b_picture_count,
     display_picture_count,display_swap_count};
 wire [31:0] snapshot_word_18={frame_rate_code_q,picture_coding_type_q,
-    temporal_reference_q,picture_count_q,latest_pts_90k[21:16],1'b0};
-wire [31:0] snapshot_word_19={error_flags_q,latest_pts_90k[15:0]};
+    temporal_reference_q,picture_count_q,7'd0};
+wire [31:0] snapshot_word_19={error_flags_q,16'd0};
 wire [31:0] snapshot_word_20=presentation_hold_total_cycles;
 wire [31:0] snapshot_word_21=destination_hold_total_cycles;
 wire [31:0] snapshot_word_22=hold_overlap_cycles;
@@ -174,8 +167,7 @@ wire [31:0] snapshot_word_34=largest_gap_state_2;
 wire [31:0] snapshot_word_35={completed_frame_bank_q,display_frame_bank_q,
     display_scratch_q,display_scratch_bank_q,frame_waiting_q,
     presentation_hold_q,destination_hold_q,session_quiet_q,
-    sequence_end_seen_q,presentation_complete_q,presentation_error_q,
-    pts_association_count,latest_pts_90k[32:22]};
+    sequence_end_seen_q,presentation_complete_q,presentation_error_q,19'd0};
 wire [31:0] snapshot_word_36=scheduler_debug_state_q;
 wire [31:0] snapshot_word_37=snapshot_word_00^snapshot_word_01^
     snapshot_word_02^snapshot_word_03^snapshot_word_04^snapshot_word_05^
@@ -211,8 +203,7 @@ always @(posedge clk_mpeg2) begin
         scratch_available_q<=0;promotion_active_q<=0;frame_waiting_q<=0;
         completed_frame_bank_q<=0;presentation_complete_q<=0;
         presentation_error_q<=0;scheduler_debug_state_q<=0;
-        decoder_byte_accepted_q<=0;pts_associated_q<=0;pts_90k_q<=0;
-        picture_coding_type_q<=0;
+        decoder_byte_accepted_q<=0;picture_coding_type_q<=0;
         temporal_reference_q<=0;frame_rate_code_q<=0;picture_count_q<=0;
         reference_picture_complete_q<=0;b_picture_complete_q<=0;
         prediction_read_q<=0;prediction_busy_q<=0;
@@ -231,7 +222,6 @@ always @(posedge clk_mpeg2) begin
         prediction_response_cycles<=0;prediction_outstanding<=0;
         writer_wait_cycles<=0;reference_picture_count<=0;b_picture_count<=0;
         display_picture_count<=0;display_swap_count<=0;
-        pts_association_count<=0;latest_pts_90k<=0;
         b_picture_complete_d<=0;display_frame_bank_d<=0;
         display_scratch_d<=0;display_scratch_bank_d<=0;
         largest_gap_0<=0;largest_gap_1<=0;largest_gap_2<=0;
@@ -251,7 +241,6 @@ always @(posedge clk_mpeg2) begin
         presentation_error_q<=presentation_error;
         scheduler_debug_state_q<=scheduler_debug_state;
         decoder_byte_accepted_q<=decoder_byte_accepted;
-        pts_associated_q<=pts_associated;pts_90k_q<=pts_90k;
         picture_coding_type_q<=picture_coding_type;
         temporal_reference_q<=temporal_reference;frame_rate_code_q<=frame_rate_code;
         picture_count_q<=picture_count;
@@ -273,11 +262,6 @@ always @(posedge clk_mpeg2) begin
         if(!snapshot_ready_mpeg2&&(session_active||decoder_byte_accepted_q))begin
             session_cycles<=session_cycles+1'b1;
             if(decoder_byte_accepted_q)accepted_bytes<=accepted_bytes+1'b1;
-            if(pts_associated_q)begin
-                latest_pts_90k<=pts_90k_q;
-                if(pts_association_count!=8'hff)
-                    pts_association_count<=pts_association_count+1'b1;
-            end
             if(fifo_pending_q)begin
                 if(!decoder_ready_q)begin
                     decoder_stall_cycles<=decoder_stall_cycles+1'b1;
