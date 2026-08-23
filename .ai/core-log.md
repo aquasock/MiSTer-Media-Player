@@ -1,3 +1,38 @@
+## 365 COMMIT Unreleased ??? 2026-08-23T05:16:23-07:00
+
+#### Coming From:
+
+Unreleased 9af69b4
+
+#### Purpose:
+
+Introduce an FPGA-owned 90 kHz system time clock with field-period presentation arithmetic and the picture metadata interlaced operation will need, without yet altering when frames are presented.
+
+#### Outcome:
+
+Seed eleven closes every timing category on the unchanged netlist with plus 0.676 ns decoder setup, plus 0.347 ns on the HDMI framework path, plus 1.539 ns host bridge, plus 7.283 ns video, plus 0.170 ns hold, plus 4.048 ns recovery, plus 0.744 ns removal and plus 1.122 ns pulse width, using 34,967 ALMs and 51,803 registers with a 9 minute 14 second fitter, and its 4,198,072-byte RBF has SHA-256 `3e5f4384c6a4fa263a53cb77de57f7b936bf7a8f214015e3820d868acb390a0a`. Two consecutive closing seeds satisfy the replacement gate from entry 363, though a third sample widens measured seed variance from the 0.3 ns two-point estimate to roughly 0.52 ns on the decoder across seeds nine, ten and eleven at plus 0.460, plus 0.152 and plus 0.676, so the worst observed margin remains smaller than the variance and seed nine still does not close. Seed eleven is adopted as the working seed on that basis. Hardware validation of `85b4c17` at seed ten passed the prediction-focused subset and cleared the registered reference delivery introduced by `ebf372e`; the seed eleven image has not been on hardware. This commit begins 0.7.0 under a constraint the user set, that interlaced operation is deferred but the pipeline must not have to be redesigned to accept it. It adds a 90 kHz system time clock as a fractional accumulator anchored to the 24.576 MHz audio domain that `sys/audio_out.sv` already uses rather than to the pixel clock, so that externally decoded audio samples are consumed drift-free by construction and correction falls on the video side where a full field of tolerance exists. Presentation intervals are expressed in field periods rather than frame periods from the outset, a frame picture costing two and a picture with `repeat_first_field` costing three, which is how film-sourced DVD content carries 3:2 pulldown; today every picture costs exactly two, so behaviour is unchanged, but adding pulldown later becomes a data change rather than a scheduler redesign. The frontend gains `top_field_first` from `payload_next[15]` and `repeat_first_field` from `payload_next[9]`, both already inside the five-byte `picture_coding_extension` window it captures and neither previously extracted anywhere in the tree. The clock value, playback state and a seek discontinuity reset are exposed to the HPS, and the picture metadata channel is defined with reserved fields for `picture_structure`, `top_field_first`, `repeat_first_field` and `progressive_frame` alongside the 33-bit timestamp, so that the wire protocol does not need revising once a daemon exists to speak it. Deliberately excluded, and a narrower boundary than the cycle the user approved because presentation timing is the riskiest change available: swaps remain free-running and are not yet driven by timestamps, no field picture is decoded, and the `picture_structure` rejection of anything other than a frame picture is untouched.
+
+#### Next Steps:
+
+Require every timing category positive at seed eleven and confirm on MiSTer that every raw elementary-stream regression decodes exactly as before with unchanged picture and swap counts, zero decoder errors and clean terminal completion, which should hold trivially because presentation behaviour is unchanged by construction. Verify from userspace that the clock advances at 90 kHz across a ten-minute observation and that the reserved metadata fields read back correctly. The following cycle switches swaps to presentation on timestamp against that clock, anchoring from the first timestamp in the stream and retaining free-running cadence for streams presented without timestamps, which is the cycle that genuinely risks presentation regressions and therefore wants the clock already proven. The PCM sink follows with its elastic FIFO sized near one hundred milliseconds of stereo 48 kHz audio, fill level and underrun and overrun counters readable by the HPS as the drift error signal, and an explicit flush for seeks. Both of those cycles need a small throwaway HPS-side harness to inject synthetic timestamps and a test tone, since no daemon exists. Before release qualification, complete the regression pack left unexercised, in particular long GOP, dense residual, full endurance and the truncation case with its no-reboot recovery.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_05.svh
+- MediaPlayer_top_07.svh
+- files.qip
+- rtl/mpeg2_new/mpeg2_h262_frontend.sv
+- rtl/mpeg2_new/mpeg2_h262_system_time_clock.sv
+- tools/streams/tb_h262_system_time_clock.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 364 COMMIT Unreleased 9af69b4 2026-08-23T05:01:06-07:00
 
 #### Coming From:
@@ -1161,38 +1196,6 @@ Keep the timing-clean seed-eleven fit and 60 MHz decoder, but treat the squirrel
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-## 325 COMMIT Unreleased a5a42f9 2026-08-22T03:17:24-07:00
-
-#### Coming From:
-
-Unreleased e5e7d86
-
-#### Purpose:
-
-Close the remaining dense-scene presentation deficit by raising the decoder and DDR service clock from 54 MHz to 60 MHz without changing video cadence.
-
-#### Outcome:
-
-Entry 324 proves that compressed-input restart latency was real but not the only bottleneck. Enlarging the FIFO improves the exact quality-six squirrel control from 20.993581 to 22.417636 fps and reduces its worst display gap from 182.371 ms to 132.634 ms, yet seven cadence outliers remain. The new largest threshold snapshot has FIFO data pending while the decoder is not ready, so further input buffering cannot close the deficit, and the fitted design already consumes 538 of 553 RAM blocks. Commit `a5a42f9` changes only the decoder and DDR service PLL output from 54 MHz to an exact 60 MHz while preserving the independent 40 MHz video clock, recalibrates profiler time units and thresholds from 54,000 to 60,000 kHz, and updates the timing extractor and profiler regression accordingly. Transport and native-rate scheduler tests remain exact, and profiler schema four passes with checksum `e82b643d`. The incremental seed-ten Quartus build finishes in 13 minutes 20 seconds with zero errors, using 34,990 ALMs, 51,852 registers, 4,306,375 memory bits, 538 of 553 RAM blocks and 65 DSP blocks. Hold is plus 0.262 ns, recovery plus 3.820 ns, removal plus 0.789 ns and pulse width plus 1.122 ns, but the 60 MHz decoder clock misses setup by 0.073 ns on two paths with total negative slack 0.114 ns. The rejected 4,457,632-byte RBF has SHA-256 `fcc971e39ea20399839070c13b31d34eba9dbdcde7a7e19685e862d21fad49aa` and is not installed.
-
-#### Next Steps:
-
-Retry the unchanged 60 MHz design with fitter seed eleven because the seed-ten miss is only 0.073 ns and all non-decoder categories are positive. Rebuild incrementally and accept only zero errors with positive global, decoder, video, hold, recovery, removal and pulse-width timing. If the fit closes, verify and install the exact RBF, rerun the quality-six 120-picture hardware control, and require all 1,430,191 bytes, 120 pictures and 119 swaps, zero errors, terminal quiet and zero cadence outliers before handing 7:15 through 7:30 back to the user. If seed eleven still misses, inspect whether the failing pair shares a narrow combinational source before choosing another seed or a pipeline repair.
-
-#### Files Modified:
-
-- rtl/pll/pll_0002.v
-- rtl/pll.v
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/phase1p_timing.tcl
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
