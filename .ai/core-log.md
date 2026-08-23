@@ -1,3 +1,38 @@
+## 359 COMMIT Unreleased ??? 2026-08-23T01:25:14-07:00
+
+#### Coming From:
+
+Unreleased 058f0a3
+
+#### Purpose:
+
+Establish the FPGA-side timing foundation for Linux-side audio by carrying captured PTS through frame ownership, anchoring an FPGA-owned system time clock, and exposing that clock to the HPS.
+
+#### Outcome:
+
+The user has decided that audio decoding will run on the HPS rather than in fabric, so version 0.7.0 is defined as the complete FPGA-side foundation for external audio and deliberately contains no audio decoder, no HPS helper binary and no DVD navigation; the 0.7.0 release remains a single RBF. This commit carries the validated 33-bit PTS from `058f0a3` through frame ownership into the presentation scheduler and adds a 90 kHz system time clock implemented as a fractional accumulator anchored to the 24.576 MHz audio domain that `sys/audio_out.sv` already uses, rather than to the pixel clock, so that once external samples arrive they are consumed drift-free by construction and all correction falls on the video side where a full frame of tolerance exists. Reference swaps convert from free-running cadence to presentation when a picture's PTS reaches the clock, with the clock anchored from the first PTS observed in the stream. Raw elementary streams carry no timestamps and must retain the existing free-running cadence unchanged, selected per stream; every current regression stream is raw elementary, so a regression here fails the entire matrix at once and is the principal risk. The cadence snapshot gains the clock value and per-swap PTS error. Clock value, playback state and a seek discontinuity reset are exposed to the HPS, with the choice between the `hps_io` status path and the lightweight bridge settled by the 33-bit width requirement. This work depends on `058f0a3` completing its build and hardware gates first. The fit stands at 35,932 ALMs against 41,910 with plus 0.375 ns global setup, so added area and cross-domain logic may force diagnostic gating earlier than planned.
+
+#### Next Steps:
+
+Validate on MiSTer that the 120-picture Program Stream presents with bounded PTS error against the clock while every raw elementary stream retains its existing cadence, and that a userspace read of the clock advances at 90 kHz across a ten-minute observation and tracks observed presentation. The following cycle adds the PCM sink: an elastic FIFO fed by the HPS and drained at the sample rate into `sys/audio_out.sv`, sized near one hundred milliseconds of stereo 48 kHz audio at roughly fifteen memory blocks of the one hundred forty-five free, with fill level and underrun and overrun counters readable by the HPS as the drift error signal, and an explicit flush for seeks; its gate is a synthesized test tone playing cleanly for ten minutes with zero underruns and a deliberate starvation producing a counted recoverable underrun rather than a hang. A subsequent cycle addresses real media, resolving whether a missing `MPEG_program_end_code` should remain truncation error ten when real VOB and FFmpeg output omit it, and validating that non-video PES including AC-3, navigation packs and MPEG audio is skipped cleanly at scale on a real VOB. Release qualification then performs a clean from-scratch build and the full regression matrix, gating the twenty-seven diagnostic modules behind a compile-time parameter if timing margin has degraded, before tagging `v0.7.0` as a pre-release. Linux-side audio work begins only after that boundary.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_07.svh
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- rtl/mpeg2_new/mpeg2_h262_system_time_clock.sv
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_system_time_clock.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 358 COMMIT Unreleased 058f0a3 2026-08-22T22:22:14-07:00
 
 #### Coming From:
@@ -1133,34 +1168,6 @@ Keep the accepted scheduler correction and extend only the development quiet qua
 
 - rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 - tools/streams/tb_h262_b_presentation_scheduler.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 319 COMMIT Unreleased 04a532c 2026-08-22T00:24:17-07:00
-
-#### Coming From:
-
-Unreleased 385ead5
-
-#### Purpose:
-
-Retry the unchanged terminal cadence snapshot qualification with fitter seed nine after seed eight misses timing only on the standing HDMI framework path.
-
-#### Outcome:
-
-Commit `04a532c` changes only the reproducible Quartus fitter seed from eight to nine. The incremental smart compile skips unchanged synthesis, finishes in 9 minutes 43 seconds with zero errors and closes the seed-sensitive HDMI framework path at plus 0.179 ns global setup; decoder and video setup are plus 1.270 ns and plus 6.459 ns, with hold plus 0.246 ns, recovery plus 4.295 ns, removal plus 0.586 ns and pulse width plus 0.462 ns. The fit uses 34,609 ALMs, 51,269 registers, 4,046,279 memory bits, 507 RAM blocks and 65 DSP blocks; its 4,366,308-byte RBF has SHA-256 `41bf2d21c121204e873b8a09b9b39014364e95b669381a8097ea69595e763587`. Hardware controls remain exact at 48 pictures and 47 swaps and at 72 pictures and 71 swaps, with both reporting terminal quiet, zero errors and zero cadence outliers. The full stream consumes all 1,178,034 bytes, decodes 250 pictures, reaches sequence end and is visually smooth through the authored black ending according to the user, but the corrected quiet snapshot proves one terminal reference remains behind the classification barrier: it reports 249 pictures, 248 swaps, `presentation_complete`, zero errors and zero outliers with `pending_frame_valid` still set.
-
-#### Next Steps:
-
-Preserve the visually accepted seed-nine result but do not install it as final. Add a focused scheduler case for sequence end arriving before an overlapping final reference can leave the classification barrier, then release that already-decoded reference without changing ordinary GOP scheduling and repeat the incremental build and three hardware gates.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
 
 #### Status:
 
