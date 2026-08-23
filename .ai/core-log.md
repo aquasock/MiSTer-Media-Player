@@ -1,3 +1,31 @@
+## 363 COMMIT Unreleased 85b4c17 2026-08-23T04:32:28-07:00
+
+#### Coming From:
+
+Unreleased ebf372e
+
+#### Purpose:
+
+Close the standing HDMI framework setup path with fitter seed ten now that the decoder reports no violated paths.
+
+#### Outcome:
+
+The registered reference-word delivery added by `ebf372e` worked as intended. Decoder setup moves from minus 0.060 ns with two violated paths to plus 0.460 ns with none of fifty violated, the targeted route disappears from the report entirely, and the worst remaining decoder path relocates to `tap_index` feeding `out_reg` inside `mpeg2_h262_b_bidirectional_raster_engine`. Area and iteration cost both improve sharply: 34,931 ALMs of 41,910 against 35,932 at `2dc52d7`, 51,895 registers, unchanged memory and DSP, a fitter time of 9 minutes 3 seconds and a total flow of 11 minutes 4 seconds, the fastest of this development run. The image is nonetheless unusable because a single path now misses on the `pll_hdmi` clock at minus 0.053 ns with total negative slack of minus 0.053 ns, which is the same standing HDMI framework path entry 319 recorded when seed eight missed and seed nine closed it. That path lies in the MiSTer framework under `sys/` rather than in decoder logic, so seed selection is the available remedy rather than an evasion of a design defect. Converting the thirty-six by sixty-four fetched-word store to inferred block RAM was attempted three ways and abandoned: duplicating the array in place, lifting each copy into an isolated always block with an unconditional registered read after confirming that consumers gate on `block_lookup_valid` and the focused test never inspects data on an invalid lookup, and finally an explicit `ramstyle` attribute. Every attempt produced 53,969 registers against 49,361 and no additional memory bits, because Quartus 17.0.2 Lite will not recognise a store only thirty-six entries deep, so the 2,304 registers that restructuring would have recovered are not available. The plus 1.2 ns decoder gate recorded in entry 361 is also withdrawn here as unsound: it was derived by doubling a 0.6 ns spread measured between `2dc52d7` and `3771f19`, two structurally different netlists, which measures the effect of removing the demux rather than seed-to-seed variance on a fixed design. It is replaced by requiring two consecutive fits at different seeds in which every timing category closes.
+
+#### Next Steps:
+
+Build at seed ten and require every timing category positive, then repeat at a third seed and require the same, because the replacement gate is two consecutive closing fits at different seeds on this netlist rather than a fixed slack target derived from an unsound spread. Record the decoder and HDMI slacks from both so that genuine seed-to-seed variance on this design is measured for the first time. Confirm on MiSTer that every raw elementary-stream regression decodes exactly as before with unchanged picture and swap counts, zero decoder errors and clean terminal completion, since the extra delivery cycle affects the shared reference path used by both the mixed and bidirectional engines and no hardware run has yet exercised it. Should seed ten also miss on the HDMI path, treat the framework path as structurally marginal at this occupancy rather than sampling further seeds, and revisit it against the area that gating the two genuine telemetry modules would return. Only once two seeds close does 0.7.0 resume with the system time clock and the PCM sink, and the six compiled but uninstantiated modules remain worth deleting for navigability with no timing expectation attached.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 362 COMMIT Unreleased ebf372e 2026-08-23T04:07:40-07:00
 
 #### Coming From:
@@ -22,7 +50,7 @@ Build at seed nine and require decoder setup materially above the plus 0.572 ns 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
@@ -1166,33 +1194,5 @@ Keep the enlarged reservoir because its hardware improvement is measured, but do
 
 - [x] Built
 - [ ] Passed
-
----
-## 323 COMMIT Unreleased 25f05dd 2026-08-22T02:19:15-07:00
-
-#### Coming From:
-
-Unreleased cc39b46
-
-#### Purpose:
-
-Retry the unchanged native-24-fps design with fitter seed ten after seed nine misses timing only on the standing HDMI framework path.
-
-#### Outcome:
-
-Changing only the reproducible fitter seed from nine to ten closes the standing placement-sensitive HDMI path. The incremental smart-recompile build finishes in 9 minutes 46 seconds with zero errors and positive timing at plus 0.170 ns global setup, plus 1.045 ns decoder setup, plus 7.882 ns video setup, plus 0.248 ns hold, plus 3.441 ns recovery, plus 0.697 ns removal and plus 0.462 ns minimum pulse width. It uses 34,494 ALMs, 51,056 registers, 4,046,279 memory bits, 507 RAM blocks and 65 DSP blocks. The accepted 4,372,048-byte RBF has SHA-256 `ea31820acc9a8db2bc7cbe95fa1dfa4f1ebbfae79d8b0e4f03a95a4dad73d42d`, is installed persistently as `/media/fat/MediaPlayer.rbf` and verifies byte-for-byte over FTP. Hardware accepts all 1,070,782 bytes of the native-rate control and reports frame-rate code two, exactly 250 displayed pictures, 249 swaps, 85 reference pictures, 165 B pictures, terminal quiet, no error flags and no cadence-gap outliers; 249 measured display intervals span 10.384474 seconds for 23.978103 fps, the expected finite-sample result around the exact 24 fps accumulator. The complete 14,315-picture native stream also verifies after upload with SHA-256 `015c8811932ce8b324af6ccd9e235cd621307aa43fcaf62b413b93badba52de5` and is launched for the user's direct visual comparison.
-
-#### Next Steps:
-
-Have the user judge smooth field pans and the rolling credits in the full native-rate movie, where the former once-per-second repeated-picture hitch should now be absent. Keep the squirrel sequence at 7:20 through 7:25 as a separately attributable transport and decode-throughput stress case, since removing the deterministic rate-conversion repeats does not remove that scene's measured input burst. Preserve both native and forced-rate movies for an immediate visual comparison if the residual cadence is ambiguous.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
