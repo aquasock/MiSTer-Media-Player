@@ -275,6 +275,8 @@ wire mpeg2_new_transport_fatal_error =
 
 mpeg2_h262_stream_transport_gate mpeg2_h262_stream_transport_gate
 (
+	.clk              (clk_mpeg2),
+	.reset            (reset_mpeg2),
 	.fifo_empty       (mpeg2_stream_empty),
 	.decoder_ready    (mpeg2_new_system_input_ready),
 	.fatal_error      (mpeg2_new_transport_fatal_error),

@@ -1,6 +1,8 @@
 `timescale 1ns/1ps
 
 module tb_h262_stream_transport_gate;
+    reg clk=0;
+    reg reset=1;
     reg fifo_empty=1;
     reg decoder_ready=0;
     reg fatal_error=0;
@@ -9,9 +11,12 @@ module tb_h262_stream_transport_gate;
     integer drained=0;
 
     mpeg2_h262_stream_transport_gate dut(
+        .clk(clk),.reset(reset),
         .fifo_empty(fifo_empty),.decoder_ready(decoder_ready),
         .fatal_error(fatal_error),.fifo_read(fifo_read),
         .decoder_valid(decoder_valid));
+
+    always #5 clk=~clk;
 
     task check_gate;
         input expected_read;
@@ -25,13 +30,21 @@ module tb_h262_stream_transport_gate;
     endtask
 
     initial begin
+        repeat(2)@(posedge clk);
+        @(negedge clk);reset=0;
         check_gate(0,0);
         fifo_empty=0;
         check_gate(0,0);
         decoder_ready=1;
         check_gate(1,1);
+
+        // The live fault no longer enters the combinational ingress path.
+        // It changes transport behavior only after the next decoder clock.
         fatal_error=1;
+        check_gate(1,1);
+        @(posedge clk);#1;
         check_gate(1,0);
+        fatal_error=0;
         decoder_ready=0;
         check_gate(1,0);
         fifo_empty=1;
@@ -54,7 +67,10 @@ module tb_h262_stream_transport_gate;
         check_gate(0,0);
         if(drained!=16)$fatal(1,"expected 16 drained bytes, got %0d",drained);
 
-        fatal_error=0;
+        // Sticky drain clears only at the session reset boundary.
+        reset=1;
+        @(posedge clk);#1;
+        reset=0;
         fifo_empty=0;
         decoder_ready=1;
         check_gate(1,1);
