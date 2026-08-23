@@ -197,19 +197,19 @@ wire[7:0] b_bc_raw;wire[28:0] b_addr_raw;wire b_rd_raw,b_cacheable_raw,b_lookup_
 wire b_store_sel;wire[7:0] b_store_val;wire[11:0] b_store_x,b_store_y;wire b_store_valid,b_store_start,b_store_complete;
 
 // Commit 203: P and B parsing/reconstruction are mutually exclusive, so both
-// raster engines reuse one 2048-block sparse residual store.  Port A accepts
+// raster engines reuse one two-bank sparse residual store. Port A accepts
 // transformed samples during metadata capture; port B serves synchronous
 // reconstruction reads from whichever engine owns the shared DDR path.
 wire mix_residual_store_write,b_residual_store_write;
-wire [16:0] mix_residual_store_write_address;
-wire [16:0] b_residual_store_write_address;
+wire [15:0] mix_residual_store_write_address;
+wire [15:0] b_residual_store_write_address;
 wire signed [15:0] mix_residual_store_write_data;
 wire signed [15:0] b_residual_store_write_data;
-wire [16:0] mix_residual_store_read_address;
-wire [16:0] b_residual_store_read_address;
+wire [15:0] mix_residual_store_read_address;
+wire [15:0] b_residual_store_read_address;
 reg signed [15:0] shared_residual_store_read_data;
 (* ramstyle = "M10K" *) reg signed [15:0]
-    shared_residual_store [0:131071];
+    shared_residual_store [0:65535];
 
 always @(posedge clk) begin
  if(mix_residual_store_write)
@@ -222,6 +222,13 @@ always @(posedge clk) begin
   b_engine_select?b_residual_store_read_address:
            mix_residual_store_read_address];
 end
+
+`ifndef SYNTHESIS
+always @(posedge clk) begin
+ if(!reset&&mix_residual_store_write&&b_residual_store_write)
+  $fatal(1,"P and B residual writers asserted simultaneously");
+end
+`endif
 
 wire shared_select=mixed_select||b_engine_select;
 wire[7:0] shared_bc_raw=b_engine_select?b_bc_raw:mix_bc_raw;

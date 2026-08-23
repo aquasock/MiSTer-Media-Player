@@ -30,11 +30,11 @@ module tb_h262_b_residual_streaming #(
     wire signed [8:0] motion_vector_x,motion_vector_y;
 
     wire residual_store_write;
-    wire [16:0] residual_store_write_address;
+    wire [15:0] residual_store_write_address;
     wire signed [15:0] residual_store_write_data;
-    wire [16:0] residual_store_read_address;
+    wire [15:0] residual_store_read_address;
     reg signed [15:0] residual_store_read_data=0;
-    reg signed [15:0] residual_store[0:131071];
+    reg signed [15:0] residual_store[0:65535];
     wire [7:0] burstcnt,store_value;
     wire [28:0] ddram_addr;
     wire ddram_rd,store_select,store_valid,store_start,store_complete;

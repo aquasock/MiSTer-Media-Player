@@ -404,15 +404,40 @@ wire residual_read_ahead=
 wire [5:0] residual_read_index=
     (fast_pixel_advance&&(ei<6'd62)) ? (ei+2'd2) :
     residual_read_ahead ? (ei+1'b1) : ei;
-wire [16:0] residual_mem_index=
-    {execute_bank,exec_desc_slot,6'b000000}+{11'd0,residual_read_index};
+wire [15:0] residual_mem_index=
+    {execute_bank,exec_desc_slot,6'b000000}+{10'd0,residual_read_index};
 reg signed [15:0] residual_pel;
 assign residual_store_write=capture_enable&&sideband_valid&&desc_active&&
     (sideband_index==sample_expected);
 assign residual_store_write_address=
-    {capture_bank,current_desc_slot,6'b000000}+{11'd0,sideband_index};
+    {capture_bank,current_desc_slot,6'b000000}+{10'd0,sideband_index};
 assign residual_store_write_data=sideband_value;
 assign residual_store_read_address=residual_mem_index;
+
+// Entry 347: preserve the distinct 512-slot physical-bank and 270-descriptor
+// supported-row bounds, and prove all shared-store accesses retain their bank.
+`ifndef SYNTHESIS
+initial begin
+    if(MAX_ROW_BLOCKS>MAX_BANK_BLOCKS)
+        $fatal(1,"B supported row exceeds its physical residual bank");
+end
+always @(posedge clk) begin
+    if(!reset) begin
+        if(capture_desc_count>MAX_ROW_BLOCKS)
+            $fatal(1,"B residual row exceeded 270 descriptors");
+        if(residual_store_write&&(current_desc_slot>=MAX_ROW_BLOCKS))
+            $fatal(1,"B residual write used an unsupported descriptor slot");
+        if(residual_store_write&&
+           (residual_store_write_address[15]!=capture_bank))
+            $fatal(1,"B residual write crossed its capture bank");
+        if(active&&
+           (residual_store_read_address[15]!=execute_bank))
+            $fatal(1,"B residual read crossed its execution bank");
+        if(residual_store_write&&active&&(capture_bank==execute_bank))
+            $fatal(1,"B residual capture overlapped its execution bank");
+    end
+end
+`endif
 // kate - Commit 182: byte select is the copy registered at request accept, not
 // the live combinational address.  Same value, captured a cycle earlier.
 wire [7:0] current_tap_sample=bat(ddram_dout,tap_byte_sel);
@@ -606,5 +631,5 @@ always @(posedge clk) begin
                 end
             end else if(descriptor_word) begin
                 if((motion_count==0)||motion_first_pending||bank_ready[capture_bank]||
-                   (capture_desc_count>=MAX_BANK_BLOCKS)||
+                   (capture_desc_count>=MAX_ROW_BLOCKS)||
                    (sideband_value[13:3]>=MAX_MB)||(sideband_value[2:0]>=6)||descriptor_order_error)begin error<=1;if(!error)error_source<=5'd5;end

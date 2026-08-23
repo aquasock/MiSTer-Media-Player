@@ -36,9 +36,9 @@ module mpeg2_h262_p_motion_residual_raster_engine
     input wire signed [12:0] motion_vector_x,
     input wire signed [12:0] motion_vector_y,
     output wire residual_store_write,
-    output wire [16:0] residual_store_write_address,
+    output wire [15:0] residual_store_write_address,
     output wire signed [15:0] residual_store_write_data,
-    output wire [16:0] residual_store_read_address,
+    output wire [15:0] residual_store_read_address,
     input wire signed [15:0] residual_store_read_data,
     input wire reference_valid,
     input wire [1:0] reference_bank,
@@ -85,7 +85,8 @@ localparam [28:0]
     BANK_OFF=29'h00010000;
 localparam integer MAX_MB=1350;
 localparam integer MAX_BLOCKS=2048;
-localparam integer MAX_BANK_BLOCKS=1024;
+localparam integer MAX_BANK_BLOCKS=512;
+localparam integer MAX_ROW_BLOCKS=270;
 
 wire [14:0] horizontal_rounded =
     {1'b0,horizontal_size}+15'd15;
@@ -198,7 +199,7 @@ wire mb_intra=motion_word[26];
 wire signed [12:0] mb_mvx=$signed(motion_word[25:13]);
 wire signed [12:0] mb_mvy=$signed(motion_word[12:0]);
 
-(* ramstyle = "M10K" *) reg [14:0] desc_mem [0:2047];
+(* ramstyle = "M10K" *) reg [14:0] desc_mem [0:1023];
 reg [14:0] desc_word;
 reg [10:0] bank_desc_count [0:1];
 reg [14:0] bank_last_desc_word [0:1];
@@ -215,12 +216,12 @@ wire execute_ready=bank_ready[execute_bank];
 // Preserve the established internal proof name used by focused regressions;
 // it now means that the oldest execution bank contains a complete row.
 wire metadata_done=execute_ready;
-reg [9:0] current_desc_slot;
+reg [8:0] current_desc_slot;
 reg desc_active;
 reg wide_desc_pending;
 reg [10:0] wide_desc_mb;
 reg [5:0] sample_expected;
-reg [9:0] exec_desc_slot;
+reg [8:0] exec_desc_slot;
 reg [10:0] exec_desc_count_latched;
 reg [10:0] exec_motion_end;
 reg row_final_latched;
@@ -405,17 +406,43 @@ wire residual_read_ahead=
 wire [5:0] residual_read_index=
     (fast_pixel_advance&&(ei<6'd62)) ? (ei+2'd2) :
     residual_read_ahead ? (ei+1'b1) : ei;
-wire [16:0] residual_mem_index=
-    {execute_bank,exec_desc_slot,6'b000000}+{11'd0,residual_read_index};
+wire [15:0] residual_mem_index=
+    {execute_bank,exec_desc_slot,6'b000000}+{10'd0,residual_read_index};
 reg signed [15:0] residual_pel_q;
 
 assign residual_store_write=
     capture_enable&&residual_valid&&desc_active&&
     (residual_index==sample_expected);
 assign residual_store_write_address=
-    {capture_bank,current_desc_slot,6'b000000}+{11'd0,residual_index};
+    {capture_bank,current_desc_slot,6'b000000}+{10'd0,residual_index};
 assign residual_store_write_data=residual_value;
 assign residual_store_read_address=residual_mem_index;
+
+// Entry 347: the physical bank has 512 slots, while the supported 45-MB row
+// can author at most 270 ordered descriptors. Keep both invariants explicit in
+// simulation so a future geometry change cannot silently wrap either bank.
+`ifndef SYNTHESIS
+initial begin
+    if(MAX_ROW_BLOCKS>MAX_BANK_BLOCKS)
+        $fatal(1,"P supported row exceeds its physical residual bank");
+end
+always @(posedge clk) begin
+    if(!reset) begin
+        if(capture_desc_count>MAX_ROW_BLOCKS)
+            $fatal(1,"P residual row exceeded 270 descriptors");
+        if(residual_store_write&&(current_desc_slot>=MAX_ROW_BLOCKS))
+            $fatal(1,"P residual write used an unsupported descriptor slot");
+        if(residual_store_write&&
+           (residual_store_write_address[15]!=capture_bank))
+            $fatal(1,"P residual write crossed its capture bank");
+        if(active&&
+           (residual_store_read_address[15]!=execute_bank))
+            $fatal(1,"P residual read crossed its execution bank");
+        if(residual_store_write&&active&&(capture_bank==execute_bank))
+            $fatal(1,"P residual capture overlapped its execution bank");
+    end
+end
+`endif
 
 wire [7:0] current_tap_sample=bat(ddram_dout,src_x_tap[2:0]);
 wire [10:0] pred_sum_with_current=
@@ -667,7 +694,7 @@ always @(posedge clk) begin
             end else if(residual_index==6'h3c) begin
                 if(bank_ready[capture_bank] ||
                    wide_desc_pending ||
-                   (capture_desc_count>=MAX_BANK_BLOCKS) ||
+                   (capture_desc_count>=MAX_ROW_BLOCKS) ||
                    (residual_value<0) ||
                    (residual_value>16'sd1349)) begin
                     error<=1;
@@ -679,7 +706,7 @@ always @(posedge clk) begin
             end else if(residual_index==6'h3d) begin
                 if(!wide_desc_pending ||
                    bank_ready[capture_bank] ||
-                   (capture_desc_count>=MAX_BANK_BLOCKS) ||
+                   (capture_desc_count>=MAX_ROW_BLOCKS) ||
                    (residual_value[15:4]!=0) ||
                    (residual_value[2:0]>=6)) begin
                     error<=1;
@@ -688,8 +715,8 @@ always @(posedge clk) begin
                     error<=1;
                     if(!error) error_source<=5'd5;
                 end else begin
-                    current_desc_slot<=capture_desc_count[9:0];
-                    desc_mem[{capture_bank,capture_desc_count[9:0]}]<=
+                    current_desc_slot<=capture_desc_count[8:0];
+                    desc_mem[{capture_bank,capture_desc_count[8:0]}]<=
                         {wide_desc_mb,residual_value[3:0]};
                     bank_last_desc_word[capture_bank]<=
                         {wide_desc_mb,residual_value[3:0]};
@@ -703,7 +730,7 @@ always @(posedge clk) begin
                 if((motion_count!=11'd48) ||
                    bank_ready[capture_bank] ||
                    wide_desc_pending ||
-                   (capture_desc_count>=MAX_BANK_BLOCKS) ||
+                   (capture_desc_count>=MAX_ROW_BLOCKS) ||
                    (residual_value[8:3]>=48) ||
                    (residual_value[2:0]>=6) ||
                    ((capture_desc_count!=0)&&
@@ -714,8 +741,8 @@ always @(posedge clk) begin
                     error<=1;
                     if(!error) error_source<=5'd6;
                 end else begin
-                    current_desc_slot<=capture_desc_count[9:0];
-                    desc_mem[{capture_bank,capture_desc_count[9:0]}]<=
+                    current_desc_slot<=capture_desc_count[8:0];
+                    desc_mem[{capture_bank,capture_desc_count[8:0]}]<=
                         {{5'd0,residual_value[8:3]},1'b0,
                          residual_value[2:0]};
                     bank_last_desc_word[capture_bank]<=

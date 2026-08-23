@@ -21,7 +21,7 @@ module tb_h262_p_intra_macroblocks #(
     wire candidate,seen,complete,row_complete,row_final,hold,parser_error;
     wire motion_valid,motion_intra;
     wire [10:0] motion_index;
-    wire signed [7:0] motion_x,motion_y;
+    wire signed [12:0] motion_x,motion_y;
     wire [5:0] mb_width,mb_height;
     wire [10:0] mb_count;
     wire [10:0] block_read_address;
@@ -48,7 +48,7 @@ module tb_h262_p_intra_macroblocks #(
     wire [5:0] engine_input_index=motion_valid ?
         (motion_intra?6'h3b:6'h3e) : replay_index;
     wire signed [15:0] engine_input_value=motion_valid ?
-        $signed({motion_x,motion_y}) : replay_value;
+        $signed({motion_x[7:0],motion_y[7:0]}) : replay_value;
     wire [7:0] engine_burstcnt,engine_store_value;
     wire [28:0] engine_addr;
     wire engine_rd,engine_store_select,engine_store_valid;
@@ -61,11 +61,11 @@ module tb_h262_p_intra_macroblocks #(
     wire [3:0] engine_progress;
     wire [4:0] engine_error_source;
     wire engine_residual_write;
-    wire [16:0] engine_residual_write_address;
+    wire [15:0] engine_residual_write_address;
     wire signed [15:0] engine_residual_write_data;
-    wire [16:0] engine_residual_read_address;
+    wire [15:0] engine_residual_read_address;
     reg signed [15:0] engine_residual_read_data=0;
-    reg signed [15:0] engine_residual_mem[0:131071];
+    reg signed [15:0] engine_residual_mem[0:65535];
     reg [63:0] engine_dout=0;
     reg engine_dout_ready=0,engine_block_stored=0,engine_lookup_ready=0;
     integer intra_store_samples=0;
@@ -165,13 +165,14 @@ module tb_h262_p_intra_macroblocks #(
         .vertical_size(14'd480),.shift_right_map(48'd0),
         .residual_valid(engine_input_valid),.residual_index(engine_input_index),
         .residual_value(engine_input_value),
+        .motion_vector_x(motion_x),.motion_vector_y(motion_y),
         .residual_store_write(engine_residual_write),
         .residual_store_write_address(engine_residual_write_address),
         .residual_store_write_data(engine_residual_write_data),
         .residual_store_read_address(engine_residual_read_address),
         .residual_store_read_data(engine_residual_read_data),
         .reference_valid(1'b1),
-        .reference_bank(1'b0),.destination_bank(1'b1),
+        .reference_bank(2'd0),.destination_bank(2'd1),
         .store_block_stored(engine_block_stored),.ddram_busy(1'b0),
         .ddram_dout(engine_dout),.ddram_dout_ready(engine_dout_ready),
         .ddram_lookup_ready(engine_lookup_ready),

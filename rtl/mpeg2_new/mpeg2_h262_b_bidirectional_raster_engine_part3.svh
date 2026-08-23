@@ -1,6 +1,6 @@
                 else begin
-                    current_desc_slot<=capture_desc_count[9:0];
-                    desc_mem[{capture_bank,capture_desc_count[9:0]}]<=sideband_value[13:0];
+                    current_desc_slot<=capture_desc_count[8:0];
+                    desc_mem[{capture_bank,capture_desc_count[8:0]}]<=sideband_value[13:0];
                     bank_last_desc_word[capture_bank]<=sideband_value[13:0];
                     bank_desc_count[capture_bank]<=capture_desc_count+1'b1;
                     desc_active<=1;sample_expected<=0;

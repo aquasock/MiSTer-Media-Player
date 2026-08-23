@@ -36,9 +36,9 @@ module mpeg2_h262_b_bidirectional_raster_engine
     input  wire signed [8:0] motion_vector_x,
     input  wire signed [8:0] motion_vector_y,
     output wire residual_store_write,
-    output wire [16:0] residual_store_write_address,
+    output wire [15:0] residual_store_write_address,
     output wire signed [15:0] residual_store_write_data,
-    output wire [16:0] residual_store_read_address,
+    output wire [15:0] residual_store_read_address,
     input  wire signed [15:0] residual_store_read_data,
     input  wire reference_valid,
     input  wire [1:0] past_reference_bank,
@@ -82,7 +82,8 @@ localparam [28:0]
     BANK_OFF    = 29'h00010000;
 localparam integer MAX_MB=1350;
 localparam integer MAX_BLOCKS=2048;
-localparam integer MAX_BANK_BLOCKS=1024;
+localparam integer MAX_BANK_BLOCKS=512;
+localparam integer MAX_ROW_BLOCKS=270;
 
 // Captured before any scratch address is issued.  Declare it ahead of the
 // address helpers so both simulation and Quartus resolve the selected bank

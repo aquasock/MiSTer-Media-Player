@@ -60,8 +60,8 @@ wire signed [8:0] mb_bmvy=$signed(motion_word[8:0]);
 (* preserve *) reg phase_bounds_ok;
 
 // Commit 203: descriptors use synchronous M10K storage while P and B share
-// the 2048-block sparse spatial-sample RAM in their parent wrapper.
-(* ramstyle = "M10K" *) reg [13:0] desc_mem [0:2047];
+// the two-bank sparse spatial-sample RAM in their parent wrapper.
+(* ramstyle = "M10K" *) reg [13:0] desc_mem [0:1023];
 reg [13:0] desc_word;
 reg [10:0] bank_desc_count [0:1];
 reg [13:0] bank_last_desc_word [0:1];
@@ -78,10 +78,10 @@ wire execute_ready=bank_ready[execute_bank];
 // Preserve the established internal proof name used by focused regressions;
 // it now means that the oldest execution bank contains a complete row.
 wire metadata_done=execute_ready;
-reg [9:0] current_desc_slot;
+reg [8:0] current_desc_slot;
 reg desc_active;
 reg [5:0] sample_expected;
-reg [9:0] exec_desc_slot;
+reg [8:0] exec_desc_slot;
 reg [10:0] exec_desc_count_latched;
 reg [10:0] exec_motion_end;
 reg row_final_latched;
