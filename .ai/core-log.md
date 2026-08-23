@@ -1,4 +1,4 @@
-## 351 COMMIT Unreleased ??? 2026-08-22T18:42:36-07:00
+## 351 COMMIT Unreleased 902f367 2026-08-22T18:42:36-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Test whether higher Quartus ALM register-packing effort can recover logic while 
 
 #### Outcome:
 
-The proposed commit changes only `ALM_REGISTER_PACKING_EFFORT` from `MEDIUM` to `HIGH`. It leaves the fitter seed, RTL, residual-store topology, diagnostics, cadence profiler, display overlay and hardware probes unchanged so any resource or timing movement is attributable to packing effort alone.
+Commit `902f367` changes only `ALM_REGISTER_PACKING_EFFORT` from `MEDIUM` to `HIGH` and leaves the seed-nine RTL, memory topology and complete diagnostic architecture unchanged. The incremental smart compile skips synthesis and completes in 10 minutes 28 seconds with zero errors and 19 warnings. It preserves 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks, but logic increases from 34,861 to 34,884 ALMs while registers decrease from 51,835 to 51,718. Every timing category remains positive, although decoder setup narrows from plus 0.160 ns to plus 0.113 ns; HDMI setup is plus 0.371 ns, HPS setup plus 1.313 ns, video setup plus 6.692 ns, hold plus 0.245 ns, recovery plus 3.959 ns, removal plus 0.649 ns and pulse width plus 1.122 ns. The 4,188,268-byte RBF has SHA-256 `c61b274a5b7c0cf783fcdc5cda8e33f7be61ca9e6c93b0bfbe18610fa6229dab`. Higher packing therefore costs 23 ALMs and 0.047 ns of the narrow decoder margin instead of recovering logic, so the artifact is rejected and was not uploaded.
 
 #### Next Steps:
 
-Commit the isolated QSF change and run an incremental Quartus 17.0.2 build from the accepted clean seed-nine state. Compare ALMs, registers, RAM blocks and all timing categories with Entry 349; retain the candidate only if it preserves the exact 408-block topology, closes every timing category and produces a worthwhile logic reduction, otherwise revert the setting without hardware deployment.
+Restore `ALM_REGISTER_PACKING_EFFORT` to the accepted `MEDIUM` value, keep seed nine and all RTL and diagnostics unchanged, and do not hardware-test the rejected high-packing artifact. Treat the result as evidence that Quartus's theoretical dense-packing recovery is not available through this global effort knob on the current design; investigate the repeated MPEG lookup tables as the next low-risk logic-reduction candidate only after a separate proposal is approved.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Commit the isolated QSF change and run an incremental Quartus 17.0.2 build from 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
