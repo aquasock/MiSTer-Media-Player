@@ -1,3 +1,31 @@
+## 355 COMMIT Unreleased f5e3b83 2026-08-22T20:39:28-07:00
+
+#### Coming From:
+
+Unreleased f5e3b83
+
+#### Purpose:
+
+Record final user visual acceptance of the native 30000/1001 and exact-30-fps v0.7.0 cadence controls.
+
+#### Outcome:
+
+The user watched the correctly installed `TEST_2997.m2v` and `TEST_30.m2v` controls on the connected MiSTer and reports that both look identical and perfect. The user cannot reliably perceive the approximately 0.1 percent difference between the two rates over these short samples and explicitly accepts the direct hardware cadence measurements as the authoritative distinction. This completes human visual acceptance alongside Entry 354's exact scheduler proofs, positive timing, complete picture counts, clean terminal state, zero decoder errors and established four-stream hardware regression pass. The earlier manual file-copy issue affected only curl's relative FTP destination under `/root`; the automated hardware runner used absolute FTP commands and its qualification evidence remains valid, while the visible SD-card RBF and test files are now checksum-verified under `/media/fat`.
+
+#### Next Steps:
+
+Treat native frame-rate codes one through five as the accepted progressive cadence baseline for v0.7.0 and begin the separately bounded H.222.0 Program Stream pack and PES ingress milestone without changing raw elementary-stream compatibility.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 354 COMMIT Unreleased f5e3b83 2026-08-22T19:44:58-07:00
 
 #### Coming From:
@@ -1136,35 +1164,6 @@ Accept the Entry 315 GOP-stutter repair and retain the bursty loading bar as a d
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 315 COMMIT Unreleased 3c80bef 2026-08-21T21:54:45-07:00
-
-#### Coming From:
-
-Unreleased 9367b7e
-
-#### Purpose:
-
-Defer a queued B-picture header until the already-admitted new-GOP I reference publishes instead of treating that transient ordering as a fatal presentation error.
-
-#### Outcome:
-
-Commit `3c80bef` adds one bounded deferred queued-B transaction to the presentation scheduler. When a B header reaches a closed run while the admitted I/P overlap is still open but either its reference publication or a scratch destination is temporarily unavailable, the scheduler consumes and retains that one classification event, asserts presentation backpressure before payload, and completes ordinary queued-generation admission atomically once both resources are safe. Duplicate deferred headers, non-overlap resource exhaustion, promotion conflicts, decode failures and ownership failures remain errors. Focused scheduler verification covers delayed I publication, old-generation retirement, scratch release, atomic promotion and duplicate rejection; the cadence-profiler regression passes, Verilator lint has only standing testbench warnings, the canonical complete raster finishes all 291,641 bytes with 25 pictures and 71 swaps, and the real 72-picture dense-order run finishes all 243,306 bytes with 22 P pictures, 47 B pictures, 25 reference publications and no presentation or ownership error. The requested incremental Quartus 17.0.2 build completes in 12 minutes 15 seconds with zero errors and positive timing at plus 0.633 ns global setup, plus 1.133 ns decoder setup, plus 6.373 ns video setup, plus 0.240 ns hold, plus 3.761 ns recovery, plus 1.210 ns removal and plus 0.462 ns minimum pulse width. It uses 34,525 ALMs and 51,222 registers; the 4,394,724-byte RBF has SHA-256 `2761fa1edf0dff4edfd38b5c33ae191f2e62e5b242606b51c81dffef1e781ccf`. Hardware accepts the repair: the 48-picture clip consumes all 125,948 bytes and displays 48 pictures with 47 swaps at 25.045 fps, while the 72-picture clip consumes all 243,306 bytes and displays 72 pictures with 71 swaps at 24.957 fps; both reach sequence end with zero error flags and zero cadence outliers, eliminating the measured GOP-boundary stutters. The exact RBF is installed persistently as `/MediaPlayer.rbf`, verified byte-for-byte over FTP, and restored as the active core. The additional 250-picture run still does not publish terminal telemetry within 120 seconds, confirming that its previously deferred non-quiet terminal state remains separate from the now-fixed GOP stutters.
-
-#### Next Steps:
-
-Have the user visually confirm smooth playback on the installed core. Then treat the 250-picture non-quiet terminal state as a separate presentation-finalization task: capture or reproduce its terminal bank and scheduler ownership state without changing the accepted GOP repair, add a focused terminal regression, and continue to use incremental builds for every hardware candidate.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_b_presentation_scheduler.sv
 
 #### Status:
 
