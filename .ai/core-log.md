@@ -1,3 +1,31 @@
+## 358 COMMIT Unreleased ??? 2026-08-22T22:22:14-07:00
+
+#### Coming From:
+
+Unreleased 2dc52d7
+
+#### Purpose:
+
+Capture validated 33-bit video PTS values, associate them with the first H.262 picture start that begins in each selected PES packet, and expose the result through passive hardware telemetry without changing presentation cadence.
+
+#### Outcome:
+
+Proposed: extend the bounded Program Stream demux to reconstruct the five-byte 90 kHz PTS after its existing prefix and marker validation, reset picture-start matching at every PES payload boundary so a prefix cannot be borrowed from the preceding packet, and emit one association only when the first complete `0x00000100` picture start begins within that packet. Raw elementary streams and selected PES packets without PTS retain their exact byte path. Reuse currently reserved zero bits in the existing 38-word cadence snapshot for an eight-bit association count and the complete latest 33-bit PTS, preserving the overlay dimensions, schema, checksum, scheduler state and every existing diagnostic field. This is a passive standards and hardware-observability boundary: PTS does not yet control frame swaps because safe use also requires timestamp ownership through B-picture reordering and a local 90 kHz or SCR-derived clock anchor.
+
+#### Next Steps:
+
+Add focused tests for PTS-only and PTS-plus-DTS reconstruction, marker rejection, PES-boundary isolation, mid-picture PES payloads, sparse timestamps, raw pass-through and telemetry packing. Prove a real FFmpeg Program Stream against independent packet timestamps, run the established decoder regressions, build incrementally from accepted `2dc52d7`, require all timing categories positive, and verify on MiSTer that the five-second Program Stream reports the independently expected PTS association count and latest value while retaining 120 pictures, 119 swaps, zero errors and clean terminal completion. If accepted, the following cycle will carry associated PTS through frame ownership and add an anchored presentation clock before enabling timestamp-driven swaps.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 357 COMMIT Unreleased 2dc52d7 2026-08-22T21:53:25-07:00
 
 #### Coming From:
@@ -1130,34 +1158,6 @@ Preserve the visually accepted seed-nine result but do not install it as final. 
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-## 318 COMMIT Unreleased 385ead5 2026-08-22T00:09:56-07:00
-
-#### Coming From:
-
-Unreleased d95baa6
-
-#### Purpose:
-
-Require the development cadence snapshot to wait for terminal presentation completion so the full 250-picture hardware run is not sampled two cadence slots early.
-
-#### Outcome:
-
-Commit `385ead5` adds `presentation_complete` to the development-only quiet qualification and leaves the bounded forced-terminal snapshot path intact. The focused cadence-profiler regression passes its quiet, forced, fatal and no-progress cases with schema-four checksum `e82b5cad`. The incremental Quartus 17.0.2 compile completes in 11 minutes 59 seconds with zero errors and 147 warnings, but the fit is rejected before hardware deployment because global setup is minus 0.105 ns on the standing seed-sensitive HDMI framework clock; decoder and video setup remain positive at plus 0.569 ns and plus 7.555 ns, with hold plus 0.245 ns, recovery plus 3.289 ns, removal plus 0.709 ns and minimum pulse width plus 0.462 ns. Seed eight uses 34,569 ALMs, 51,316 registers, 4,046,279 memory bits, 507 RAM blocks and 65 DSP blocks; its rejected 4,409,220-byte RBF has SHA-256 `502b306668c15f4ba0becdb34313737ccd6f8ccd5140e86885fe25a34bdfdb0c` and was not uploaded.
-
-#### Next Steps:
-
-Retry the unchanged design incrementally with fitter seed nine, explicitly recording that any timing closure is seed-dependent. Only a build with zero errors and positive global, decoder, video, hold, recovery, removal and pulse-width slack may proceed to the same three hardware clips.
-
-#### Files Modified:
-
-- MediaPlayer_top_07.svh
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
