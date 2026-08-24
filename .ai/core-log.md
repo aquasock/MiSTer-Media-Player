@@ -1,3 +1,31 @@
+## 442 COMMIT Unreleased 3814243 2026-08-24T06:36:19-07:00
+
+#### Coming From:
+
+Unreleased 3814243
+
+#### Purpose:
+
+Qualify recovery from the unsupported 32 kHz audio-rate envelope case through an immediate known-good replay.
+
+#### Outcome:
+
+The user reports that `11_bad_audio_rate.mpg` produces only a black screen, with the same all-LEDs-off responsive behavior as the preceding expected failure, and does not claim ordinary success. Immediate selection of `00_good_480p_48k.mpg` without reboot works and produces the normal pass indication. The launch-free recovered-control capture is 104,724 bytes at SHA-256 `c8306c2485c40c11dd0583238ed7e903bf7ff991d57c4255e2b8dbe2817d51b0`. Schema-eight telemetry again reports zero aggregate flags, audio underrun and PCM protocol error false, all decoder, presentation and destination errors clear, all 582,742 transport bytes accepted, 44 timestamps associated, seventeen reference plus 31 B pictures decoded and all 48 pictures displayed with 47 swaps. Sequence end, presentation complete and normal quiet reason one are true with every pending scheduler state clear and saturated healthy PCM activity. This accepts the second expected-failure recovery pair and proves that rejecting the unsupported sample rate leaves Main, the helper handoff and the next valid shared audio-video transport reusable without reset.
+
+#### Next Steps:
+
+Without rebooting, run `12_bad_geometry_720p.mpg` for no more than ten seconds, record its visible result and USER, DISK and POWER states, then immediately run `00_good_480p_48k.mpg` and record alignment, sound, picture and all three LEDs again. An explicit rejection or non-successful settlement followed by a clean control is a pass; stop and report an unavailable menu, ignored input or failed control before any reboot. Do not continue to `13_bad_geometry_pal.mpg` until this third pair is recorded.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 441 COMMIT Unreleased 3814243 2026-08-24T06:33:13-07:00
 
 #### Coming From:
@@ -1142,34 +1170,6 @@ After rebooting into the exact installed Main at SHA-256 `7f6ef2d299e9619250f300
 #### Next Steps:
 
 Instrument only Main's isolated MediaPlayer broker so the next replay of this same file records whether the helper was selected, the source string and index passed, every stdout read and cumulative SPI byte count, download assertion and release, child exit status and any stop reason in a temporary log retrievable without the console. Keep the accepted RBF, helper decoder, test stream and DVD untouched. Rebuild and install only Main, reboot, replay only `01_arm_mp2_audio.mpg`, capture the blank or completed frame and retrieve the log before choosing a transport fix; do not expand to another video until this handoff is understood.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 402 COMMIT Unreleased 55d06ce 2026-08-23T23:33:09-07:00
-
-#### Coming From:
-
-Unreleased 55d06ce
-
-#### Purpose:
-
-Install the source-neutral ARM helper boundary without touching the accepted RBF or connected development DVD.
-
-#### Outcome:
-
-The exact `55d06ce` artifacts were uploaded under temporary names, independently hash-checked, installed, synchronized and verified again. `/media/fat/MiSTer` now has SHA-256 `7f6ef2d299e9619250f300764836c8bf30409f7f452cd34248effda6e6536a39`, `/media/fat/linux/MediaPlayer_Helper` has SHA-256 `4f6ac001a4a0455c20e1148cedf7548768258abfafb2299a3f8b171a5383fa8e`, and the accepted RBF remains `ad04f9f73c0fb98309588f8c212c6ccad71c80b254a2a284f637672a73350d37`. The original official Main rollback remains byte-identical at `/media/fat/MiSTer.backup.pre-arm-c9e5aff.7ca3cd2f`. The user rebooted during the refactor, before this replacement, so the current PID 530 process maps the deleted earlier Main image at SHA-256 `51b4e122e6bb3f1f7c62bcfb176d32528b5d08f48b04682d74e59e53fef8c900`; the newly installed source-neutral build will not execute until one additional reboot. The connected `/dev/sr0` DVD remains unmounted and no disc content was read.
-
-#### Next Steps:
-
-Reboot once to start the installed `55d06ce` Main, then run only `01_arm_mp2_audio.mpg`. Confirm MPG visibility, immediate return without the Loading screen, normal five-picture video, correct 440 Hz left and 660 Hz right embedded tones and all LED states, then reset and replay the same file once and leave the final image loaded. Do not select, mount or inspect the connected DVD during this cycle.
 
 #### Files Modified:
 
