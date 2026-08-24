@@ -1,3 +1,31 @@
+## 434 COMMIT Unreleased 9afe2f0 2026-08-24T05:24:13-07:00
+
+#### Coming From:
+
+Unreleased 9afe2f0
+
+#### Purpose:
+
+Record the failed first user-media control and isolate its repeatable crackle and absent terminal diagnostics.
+
+#### Outcome:
+
+The user power-cycled and ran `00_good_480p_48k.mpg` with Audio Test Off. Audio began roughly one second after video by the user's estimate, cracked twice at repeatable points, and USER, DISK and POWER all remained off, so the first control fails and the remaining qualification sequence is stopped. Host comparison rules out damaged decoded audio: the installed-source helper produces all 96,768 stereo samples at byte-identical length to FFmpeg with maximum sample error two, RMS error 0.5040, correlation `0.999999969`, and MPEG-frame boundary jumps of 167 counts against 168 in the reference. The terminal failure is independent and deterministic: the video's last bytes contain no sequence-end code, yet `check_media_compatibility.py` reports PASS and only emits a note, so the core cannot reach the sequence-ended quiet state that publishes the LED diagnostic. Static transport evidence isolates the crackle to starvation rather than decoding. After startup the helper emits 34,560 consecutive samples and then a 147,748-byte span with no PCM record; the 4,096-sample FPGA FIFO covers only 85.3 milliseconds, while the accepted hardware's 185,149-byte first-picture path completed in 155 milliseconds, predicting about 124 milliseconds for this span before allowing for decode backpressure. `audio_pcm_output_adapter` drives both channels to zero when the FIFO empties and resumes on the next sample, producing two deterministic amplitude edges and setting underrun only after data returns, exactly matching a repeatable two-edge crackle. This is an inference because the missing sequence end prevented telemetry capture. The full soak is exposed to the same problem, with measured post-start PCM-free spans up to 137,625 bytes. FFmpeg mux-rate changes are not a sufficient repair: they reduce this short control's gap at selected rates but produce spans up to 180,106 bytes at 5 Mbit/s and 1,883,117 bytes at 2.4 Mbit/s on the full movie. The reported startup offset remains approximate and should be measured from a recording after terminal framing and underrun are corrected rather than conflated with either defect.
+
+#### Next Steps:
+
+Do not run `01` or any expected-failure case on the current media set. The revised boundary needs user approval because it changes the approved host-only plan: make sequence-end presence a required compatibility condition, generate both the sequence-end video PES and Program Stream end for every good control, and increase the PCM FIFO from 4,096 to 8,192 samples so the current conversion recipe has 170.7 milliseconds of reserve without changing the 2,048-sample startup threshold. Prove the widened dual-clock FIFO, unchanged startup timing, underrun behavior and termination in focused simulation, run the full host regression, perform one timing-clean Quartus build, replace the RBF and corrected media with exact rollback, and repeat only `00_good_480p_48k.mpg` before resuming qualification. If the predicted resource or timing cost is not acceptable, the alternative is a larger ARM-side demux scheduler that reorders PCM throughout long video PES runs rather than relying on FFmpeg mux settings.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 433 COMMIT Unreleased 9afe2f0 2026-08-24T05:10:12-07:00
 
 #### Coming From:
@@ -1157,33 +1185,5 @@ Build source `a57079f` once with Quartus and run the complete Phase-1P timing re
 
 - [ ] Built
 - [ ] Passed
-
----
-## 394 COMMIT Unreleased 9a7a982 2026-08-23T21:58:43-07:00
-
-#### Coming From:
-
-Unreleased 9a7a982
-
-#### Purpose:
-
-Close hardware qualification of timestamp presentation with the unannotated reordered-B fallback control.
-
-#### Outcome:
-
-After a reboot, unannotated `04_b_bidirectional.m2v` passes with USER steady on, DISK steady off and POWER steady on. The launch-free schema-seven snapshot accepts the exact 185,150 transport bytes including the odd-byte pad, finds zero timestamp associations and zero displayed timestamp bits, decodes three reference plus two B pictures, and displays all five pictures with four swaps. Its ranked intervals include two exact 0.049738-second free-running gaps and the expected 0.046910-second decode-limited B interval with zero cadence outliers. Sequence end, session quiet and presentation complete are true; decoder and presentation errors are zero; frame waiting and both holds are false; and the terminal scheduler has no active reorder, decode, queued generation, promotion, pending scratch or reference frame, or terminal boundary. Together with the accepted irregular ordinary and reordered-B timestamp controls and the unannotated P fallback control, this proves source `9a7a982` and the exact Entry-389 RBF preserve raw elementary-stream playback while presenting annotated pictures by their associated timestamps. The timestamp feature is hardware-passed.
-
-#### Next Steps:
-
-Treat source `9a7a982` and its installed RBF as the accepted timestamp-presentation boundary. Begin PCM audio as a separate controlled feature cycle, preserving the accepted elementary-stream and timestamp regression gates and proposing its exact ingress, buffering, clocking and output scope before changing source.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
