@@ -1,3 +1,31 @@
+## 438 COMMIT Unreleased 3814243 2026-08-24T06:23:08-07:00
+
+#### Coming From:
+
+Unreleased 3814243
+
+#### Purpose:
+
+Install the exact bounded-lookahead helper with byte-verified rollback while leaving the timing-clean FPGA and qualification media unchanged.
+
+#### Outcome:
+
+Read-only retrieval first confirmed the installed 361,452-byte helper at SHA-256 `2cf665c0153a9885e103a1da5038997efb9050c7fcbceb3d3340537cfb153d54`. Candidate `4c0f1d2c3e9c229ccad38b683701968feac7b9f1111de20ec6b4a3f0864b2576` was uploaded as `/media/fat/linux/MediaPlayer_Helper.stage.3814243`, retrieved and compared byte-for-byte before any active-name mutation. The prior helper was then atomically renamed to `/media/fat/linux/MediaPlayer_Helper.backup.pre-scheduler.9afe2f0`, the verified stage was promoted, and FTP metadata independently confirms active mode `0755`, owner and group root and size 361,452 bytes. Separate post-promotion retrievals reproduce the candidate hash for the active helper and `2cf665c0153a9885e103a1da5038997efb9050c7fcbceb3d3340537cfb153d54` for the rollback. The active 4,126,828-byte RBF remains unchanged at SHA-256 `1fe3f61a8286e42e38db4c50eef6a112f31106590e6cdbcc6715fff82544b4ea`, and active `00_good_480p_48k.mpg` remains unchanged at SHA-256 `1455af94803b1d9958a93fbdb978aa2a42c1d8045a9491f904ad1ad9b8ccdad5`. Main and every other media file were untouched, no reboot occurred and no playback was launched.
+
+#### Next Steps:
+
+Without rebooting, leave Audio Test Off and run only `00_good_480p_48k.mpg`. Report whether audio and video begin together, whether either former crackle/dropout occurs, whether the picture stutters at the former late point, whether audio still plays beyond the final picture, and the final USER, DISK and POWER states. Leave the final image loaded for a fresh schema-eight capture. Do not run the 44.1 kHz control, any expected-failure case or the full soak until this control has zero audio underrun, PCM protocol, presentation, decoder and aggregate error flags. If the helper fails to start or behavior regresses materially, restore `MediaPlayer_Helper.backup.pre-scheduler.9afe2f0`; the RBF requires no rollback.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 437 COMMIT Unreleased 3814243 2026-08-24T06:21:28-07:00
 
 #### Coming From:
@@ -1165,33 +1193,5 @@ Back up and hash the installed MiSTer executable, then install the exact `c9e5af
 
 - [x] Built
 - [ ] Passed
-
----
-## 398 COMMIT Unreleased a57079f 2026-08-23T22:30:17-07:00
-
-#### Coming From:
-
-Unreleased a57079f
-
-#### Purpose:
-
-Close focused MiSTer qualification of the codec-independent PCM output milestone under the one-video-per-build policy.
-
-#### Outcome:
-
-The user confirms that Audio Test Off is silent, all four 44.1 and 48 kHz mono and stereo proof modes sound correct, mode changes and core reset re-arm correctly, and the 48 kHz stereo tones continue while the sole authorized video control plays. `04_b_bidirectional.m2v` looks unchanged and finishes with USER steady on, DISK steady off and POWER steady on. The launch-free schema-seven capture accepts the exact 185,150 transport bytes including the odd-byte pad, finds zero timestamp associations, decodes three reference plus two B pictures, displays all five pictures with four swaps, and ends with sequence end, session quiet and presentation complete true. Decoder and presentation errors are zero, frame waiting and both holds are false, and no decode, reorder, queued generation, promotion, scratch, future-reference, pending-frame or terminal-boundary work remains. One 0.051002-second decode-limited interval is flagged as a cadence outlier while scratch is unavailable, 0.001264 seconds longer than the two 0.049738-second ranked intervals; it drops no picture, leaves no state and produces no visible change by the user's direct observation. This accepts source `a57079f` and RBF SHA-256 `ad04f9f73c0fb98309588f8c212c6ccad71c80b254a2a284f637672a73350d37` as the first hardware-passed codec-independent PCM boundary, with exactly one video file used in the build cycle.
-
-#### Next Steps:
-
-Preserve the accepted signed 16-bit 44.1 and 48 kHz PCM valid-ready contract, dual-clock FIFO, MiSTer output adapter and timing-closed restart mailboxes as the Audio integration boundary. Before implementing compressed audio, choose the first codec and application profile, activate its authoritative standards references in `core-reference.md`, and define one materially useful decode-to-PCM hardware target; continue using one focused video file per development build and reserve the full regression suite for release qualification.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
