@@ -156,23 +156,29 @@
                         // kate - Commit 173: while the current buffered slice is
                         // parsed, slice_capture retains whether the already-seen
                         // following slice remains on the same macroblock row.
-                        slice_capture<=(start_code_value=={2'd0,slice_row_number});parse_active<=1;parse_hold<=1;chunk_boundary_known<=1;boundary_final<=0;parse_byte_limit<=(row_byte_count<3)?9'd0:(row_byte_count-3'b011);parse_byte_index<=0;parse_bit_index<=7;
+                        slice_capture<=(start_code_value=={2'd0,slice_row_number});parse_cur_byte<=row_head0;parse_active<=1;parse_hold<=1;chunk_boundary_known<=1;boundary_final<=0;parse_byte_limit<=(row_byte_count<3)?9'd0:(row_byte_count-3'b011);parse_byte_index<=0;parse_bit_index<=7;
                         if(!slice_parser_started)begin
                             slice_parser_started<=1;state<=S_QSCALE;
                             field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;
                             cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
                         end
                     end else if((slice_row_number==picture_mb_height)&&post_b_boundary_now)begin
-                        slice_capture<=0;parse_active<=1;parse_hold<=1;chunk_boundary_known<=1;boundary_final<=1;parse_byte_limit<=(row_byte_count<3)?9'd0:(row_byte_count-3'b011);parse_byte_index<=0;parse_bit_index<=7;
+                        slice_capture<=0;parse_cur_byte<=row_head0;parse_active<=1;parse_hold<=1;chunk_boundary_known<=1;boundary_final<=1;parse_byte_limit<=(row_byte_count<3)?9'd0:(row_byte_count-3'b011);parse_byte_index<=0;parse_bit_index<=7;
                         if(!slice_parser_started)begin
                             slice_parser_started<=1;state<=S_QSCALE;
                             field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;
                             cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
                         end
                     end else begin slice_capture<=0;proof_done<=1;parser_error<=1;end
-                end else if(row_byte_count<(ROW_BUFFER_BYTES-1))begin row_bytes[row_byte_count]<=stream_data;row_byte_count<=row_byte_count+1'b1;end
+                end else if(row_byte_count<(ROW_BUFFER_BYTES-1))begin
+                    if(row_byte_count==9'd0)row_head0<=stream_data;
+                    else if(row_byte_count==9'd1)row_head1<=stream_data;
+                    else row_bytes[row_byte_count]<=stream_data;
+                    row_tail_prev<=row_tail_last;row_tail_last<=stream_data;
+                    row_byte_count<=row_byte_count+1'b1;
+                end
                 else begin
-                    row_bytes[row_byte_count]<=stream_data;slice_capture<=0;parse_active<=1;parse_hold<=1;chunk_boundary_known<=0;parse_byte_limit<=ROW_BUFFER_BYTES-2;parse_byte_index<=0;parse_bit_index<=7;
+                    row_bytes[row_byte_count]<=stream_data;row_tail_prev<=row_tail_last;row_tail_last<=stream_data;parse_cur_byte<=row_head0;slice_capture<=0;parse_active<=1;parse_hold<=1;chunk_boundary_known<=0;parse_byte_limit<=ROW_BUFFER_BYTES-2;parse_byte_index<=0;parse_bit_index<=7;
                     if(!slice_parser_started)begin
                         slice_parser_started<=1;state<=S_QSCALE;
                         field_bit_count<=0;qscale_shift<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;last_direction<=0;mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;fpx<=0;fpy<=0;bpx<=0;bpy<=0;skip_remaining<=0;dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;

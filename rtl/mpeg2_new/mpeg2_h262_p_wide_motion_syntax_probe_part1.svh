@@ -262,6 +262,7 @@ end
 task init_row_parser;
     begin
         parse_byte_index<=0;
+        parse_cur_byte<=row_head0;
         parse_bit_index<=3'd7;
         parser_state<=R_H_QSCALE;
         field_bit_count<=0;
@@ -301,7 +302,15 @@ task init_row_parser;
 endtask
 
 always @(posedge clk) begin
+    // Unconditional and outside reset so Quartus infers a block-memory read
+    // port; the address leads the bit pointer by one byte.
+    row_ram_q<=row_bytes[parse_byte_index+9'd1];
     if(reset) begin
+        parse_cur_byte<=0;
+        row_head0<=0;
+        row_head1<=0;
+        row_tail_last<=0;
+        row_tail_prev<=0;
         byte_window<=0;
         sequence_capture<=0;
         sequence_count<=0;

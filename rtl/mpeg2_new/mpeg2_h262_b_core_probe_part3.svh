@@ -109,7 +109,11 @@ always @(posedge clk) begin
 end
 
 always @(posedge clk) begin
+    // Unconditional and outside reset so Quartus infers a block-memory read
+    // port; the address leads the bit pointer by one byte.
+    row_ram_q<=row_bytes[parse_byte_index+9'd1];
     if(reset) begin
+        parse_cur_byte<=0;row_head0<=0;row_head1<=0;row_tail_last<=0;row_tail_prev<=0;
         byte_window<=0;sequence_capture<=0;sequence_count<=0;sequence_shift<=0;geometry_supported<=0;picture_mb_width<=0;picture_mb_height<=0;
         picture_capture<=0;picture_count<=0;picture_shift<=0;current_picture_is_b<=0;
         pce_capture<=0;pce_count<=0;pce_shift<=0;b_candidate<=0;b_seen<=0;b_complete_now<=0;
@@ -166,12 +170,13 @@ always @(posedge clk) begin
         if(parse_active) begin
             if(parser_at_end && !chunk_boundary_known) begin
                 parse_active<=0;parse_hold<=0;slice_capture<=1;
-                row_bytes[0]<=row_bytes[ROW_BUFFER_BYTES-2];
-                row_bytes[1]<=row_bytes[ROW_BUFFER_BYTES-1];
+                row_head0<=row_tail_prev;
+                row_head1<=row_tail_last;
+                parse_cur_byte<=row_tail_prev;
                 row_byte_count<=9'd2;parse_byte_index<=0;parse_bit_index<=7;
             end else begin
             if(consume_bit) begin
-                if(parse_bit_index==0)begin parse_bit_index<=7;parse_byte_index<=parse_byte_index+1'b1;end
+                if(parse_bit_index==0)begin parse_bit_index<=7;parse_byte_index<=parse_byte_index+1'b1;parse_cur_byte<=parse_next_byte;end
                 else parse_bit_index<=parse_bit_index-1'b1;
             end
             case(state)
