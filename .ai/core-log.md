@@ -1,3 +1,31 @@
+## 444 COMMIT Unreleased 3814243 2026-08-24T06:41:18-07:00
+
+#### Coming From:
+
+Unreleased 3814243
+
+#### Purpose:
+
+Qualify explicit decoder rejection and recovery for the out-of-envelope 720x576 PAL geometry case.
+
+#### Outcome:
+
+The user reports that `13_bad_geometry_pal.mpg` behaves exactly like the preceding geometry test: a black screen, USER blinking eight times, DISK solid off and POWER solid on, followed by an immediate successful `00_good_480p_48k.mpg` replay without reboot. The launch-free recovered-control capture is 104,787 bytes at SHA-256 `bac9bc0944d06035259c84abf05ff7bd5cffb683955b7fb9ca7d6127608f7fd7`. Schema-eight telemetry proves the PAL-height error was cleared: aggregate flags are zero, audio underrun and PCM protocol error are false, all decoder, presentation and destination errors are clear, all 582,742 transport bytes are accepted, 44 timestamps associate, seventeen reference plus 31 B pictures decode and all 48 pictures display with 47 swaps. Sequence end, presentation complete and normal quiet reason one are true with no pending scheduler state and saturated healthy PCM activity. This accepts the fourth recovery pair and independently confirms geometry diagnostic code eight and clean next-stream re-arm for both excessive width-height and excessive-height-only cases.
+
+#### Next Steps:
+
+Without rebooting, run `14_bad_rate_50.mpg` for no more than ten seconds, record its visible result and USER, DISK and POWER states, then immediately run `00_good_480p_48k.mpg` and record alignment, sound, picture and all three LEDs again. An explicit rejection or non-successful settlement followed by a clean control is a pass; stop and report an unavailable menu, ignored input or failed control before any reboot. Do not continue to `15_bad_truncated.mpg` until this fifth pair is recorded.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 443 COMMIT Unreleased 3814243 2026-08-24T06:39:27-07:00
 
 #### Coming From:
@@ -1146,34 +1174,6 @@ Keep the USB DVD drive disconnected, reboot once to start the installed diagnost
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 404 COMMIT Unreleased b357c51 2026-08-23T23:46:41-07:00
-
-#### Coming From:
-
-Unreleased 55d06ce
-
-#### Purpose:
-
-Add bounded persistent diagnostics to Main's MediaPlayer helper-to-SPI broker so one replay can identify the failed handoff stage.
-
-#### Outcome:
-
-Commit `b357c51` confines the change to the isolated Main patch and does not alter transfer ordering, buffering, the helper protocol, decoder output or FPGA behavior. The broker creates a fresh `/tmp/MediaPlayer_ARM.log` when a source starts and records the source, index, helper process identifier, download assertion, bounded would-block events, every positive pipe read, cumulative bytes submitted through `user_io_file_tx_data`, EOF or error, download release, child wait status and every explicit stop reason. Helper standard error is redirected into the same append-only descriptor, and log-open failures remain nonfatal. Ubuntu GCC 15.2 was tried only as a local build tool and failed in untouched upstream Main because its current ARM headers and stricter C++ handling are incompatible with this pinned 2025 source; no binary was produced or installed. The user then directed the project back to MiSTer's official Arm GNU 10.2-2020.11 toolchain. The verified official archive has SHA-256 `102825ae56c9e00142d06f35d2bdd3299edb6060e84a275a25b095e66fd3fc2a`, identifies as GCC 10.2.1, applies the patch cleanly to Main commit `0a8fb44` and produces two byte-identical 1,166,244-byte ARM EABI5 builds at SHA-256 `1ee8e337e8583fdf4ac585934734fcd7d6af1f8a7130f5e1adcb7ecaebf4a1e4`. The expected diagnostic strings are present in the stripped artifact.
-
-#### Next Steps:
-
-Install only the exact `1ee8e337e8583fdf4ac585934734fcd7d6af1f8a7130f5e1adcb7ecaebf4a1e4` diagnostic Main through staged upload and independent remote hash verification, retaining the official rollback and leaving `/media/fat/MediaPlayer.rbf`, `/media/fat/linux/MediaPlayer_Helper`, `01_arm_mp2_audio.mpg` and `/dev/sr0` untouched. Reboot once, replay only `01_arm_mp2_audio.mpg`, leave the resulting frame loaded and report the LEDs; then capture the frame and retrieve `/tmp/MediaPlayer_ARM.log` before proposing any transport correction.
-
-#### Files Modified:
-
-- host/main_mister/0001-mediaplayer-arm-loader.patch
 
 #### Status:
 
