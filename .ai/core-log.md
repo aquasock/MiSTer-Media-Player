@@ -1,3 +1,31 @@
+## 386 COMMIT Unreleased 2b1a170 2026-08-23T20:39:08-07:00
+
+#### Coming From:
+
+Unreleased 2b1a170
+
+#### Purpose:
+
+Hardware-qualify fifteen seconds of visually observed native-24 real-video stress across wrapped presentation counters and prepare the exact full endurance stream.
+
+#### Outcome:
+
+After a MiSTer power cycle, the authoritative even-length 2,603,570-byte `13_bbb_squirrel_15sec_native24_q6.m2v` passes with USER steady on, DISK eleven blinks and POWER steady on, and the user reports that playback looked good. The steady USER state again classifies the DISK indication as normal final GOP progress. The launch-free schema-seven capture freezes for quiet reason one with exactly 2,603,570 accepted bytes, 121 reference plus 239 B pictures, and the expected eight-bit wraps from 360 displays and 359 swaps to 104 and 103. Frame-rate code two, fifteen system-time seconds, sequence end, session quiet, presentation complete, zero decoder or presentation errors and zero cadence outliers are present; correcting the wrapped swap count gives 23.988 displayed swaps per second across the measured interval. The terminal scheduler has no frame waiting, active reorder, queued generation, promotion, pending frame or terminal boundary. The pre-existing 84,423,309-byte full file on the MiSTer did not match test fourteen and its temporary numbered alias was removed. Regenerating from the local 480p source with the documented deterministic recipe plus the required terminal sequence-end marker produced the authoritative 78,010,162-byte `14_bbb_full_native24_user_recipe.m2v`, SHA-256 `3b048a180dbe2bc98a6160e7103b0f5acfd41d6875c34154730ef1da75d64f1a`; it was installed under the numbered name and retrieved byte-for-byte identical. Its 14,315 pictures comprise 597 I, 4,176 P and 9,542 B pictures.
+
+#### Next Steps:
+
+Power-cycle the MiSTer and load `14_bbb_full_native24_user_recipe.m2v` through the normal file selector for the complete nine-minute-fifty-six-second endurance run. Watch smooth pans, the squirrel sequence, rolling credits and clean terminal behavior, then report all three LEDs and leave the completed image loaded for telemetry capture. Require 4,773 reference plus 9,542 B pictures, 14,315 displays and 14,314 swaps represented by eight-bit wraps to 165 references, 70 B pictures, 235 displays and 234 swaps, exactly 78,010,162 accepted bytes, sequence-end quiet, complete presentation retirement and zero errors before the expected-failure and no-reboot recovery test.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 385 COMMIT Unreleased 2b1a170 2026-08-23T20:36:08-07:00
 
 #### Coming From:
@@ -1185,33 +1213,5 @@ Obtain approval to add a fitter-seed change to this cycle and perform one fully 
 
 - [ ] Built
 - [ ] Passed
-
----
-## 346 VERSION v0.6.0 26805e8 2026-08-22T09:18:14-07:00
-
-#### Coming From:
-
-Unreleased ae51759
-
-#### Purpose:
-
-Record the verified publication of the hardware-qualified real-stream MPEG-2 playback milestone as pre-release v0.6.0.
-
-#### Outcome:
-
-GitHub published `MiSTer Media Player v0.6.0` at 2026-08-22T09:18:14-07:00 as a non-draft pre-release at `https://github.com/aquasock/MiSTer-Media-Player/releases/tag/v0.6.0`. Annotated tag object `2f69a48d91815faae7a3cc14d837d431ee84dcd2` peels to the exact audited release commit `26805e8c93710189507330c339edcb1304991b9a`; synthesized source remains baseline `b64ec6a91a6986a124b86765a9817b809c8948a1`. The online release body is byte-for-byte identical to committed `docs/RELEASE_NOTES_v0.6.0.md` at SHA-256 `dbc49e9c5fdba0ddd00bd24cf6b6120b32ad03016d232829ed85301e36ba2b48`. The sole uploaded asset is `MediaPlayer_20260822.rbf`, reported uploaded as 4,455,376 bytes; an independent GitHub download reproduces SHA-256 `e95e9ec43cb11917d5a904fdd8016bcc23dcbe2d8f36f678544f42ad1a6d5f10` and is byte-identical to the packaged, clean-build and preserved incremental images. This closes the seven-step v0.6.0 release plan with the accepted 60 MHz decoder, mixed-width 32 KiB ingress, native frame-rate codes one through three, focused four-stream gate, and full-length visual qualification intact.
-
-#### Next Steps:
-
-Treat v0.6.0 as the immutable published baseline, retain the external release package and preserved seed-ten build until routine archival is explicitly approved, and resume future development under a fresh Unreleased boundary. Any new decoder, cadence, transport, audio, control or DVD work belongs after this version boundary and must not alter the `v0.6.0` tag or release asset.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
