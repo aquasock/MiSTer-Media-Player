@@ -1,3 +1,32 @@
+## 472 COMMIT Unreleased acdbf8b 2026-08-24T13:12:04-07:00
+
+#### Coming From:
+
+Unreleased 9a5eea3
+
+#### Purpose:
+
+Make video-only MPEG Program Streams play silently while preserving bounded audio-video scheduling and explicit rejection of unsupported audio.
+
+#### Outcome:
+
+The baseline failure reproduced exactly: `good_video_only.mpg` emitted only the 28,672-byte startup lead, exited one and reported the 524,288-byte video lookahead limit. Commit `acdbf8b` distinguishes that silent stream from supported and unsupported audio without changing the transport format. Before MPEG Layer II appears, reaching the bounded video queue now releases the retained bytes byte-exactly and commits to silent video; a shorter silent stream takes the same path at end of input, while MPEG audio arriving after that bounded decision fails rather than starting permanently late. Private-stream-one packets are parsed far enough to reject the established AC-3, DTS and LPCM substream range explicitly, while a permanent synthetic subpicture case proves other private packets remain ignored. The 591,889-byte video-only corpus file now succeeds with all 582,741 demuxed H.262 bytes plus six ordered timestamp records for a 582,795-byte transport and no PCM or end record; `bad_audio_codec.mpg` fails with the intended MPEG Layer II requirement. All short and faded fixtures at 44.1 and 48 kHz pass under native and address-and-undefined-sanitized helpers with byte-identical video, exact audio lengths, maximum sample error two, correlation rounding to one and clean ends. Frame-rate codes one through five, codes six through eight rejection, split-PES rejection, raw M2V, protocol and source failures all retain their contracts, and the regenerated nine-case checker corpus remains three passes and six intended failures. The full soak is unchanged at 207,888,468 transport bytes with SHA-256 `d3ea5074ad9158ddde451151ed36f1ebad948cb19c8d8216ea97e8a67731eeb4`, 84,423,309 clean-video bytes, 598 timestamps, video-and-record SHA-256 `545075cdc22437cb994efde832e8f09c663ac569bf8e98d406025ef480d2cd81`, all 28,628,352 PCM frames at SHA-256 `337b1387b9324b6c391a3223ced8f7660bd5144267b29d3964b4ed6b282839af`, zero audio deficit, a 2,048-frame maximum steady batch and 4,052-byte maximum PCM-free video span. The official ARM GNU 10.2.1 archive verifies at its pinned SHA-256 `102825ae56c9e00142d06f35d2bdd3299edb6060e84a275a25b095e66fd3fc2a`, and two independent builds are byte-identical: the 361,452-byte static stripped ARM EABI5 helper has SHA-256 `c99237246416ecd8278d90ff6e15e7a00cd8ab1d49c960b8c77fbe00f4ba0483`. Installation used plain FTP with the default MiSTer login and no SSH keys. The prior active helper verified at SHA-256 `d61e69ea2240c23419abb9162a06159f9b6c527e838c9a6e52f0bd1855588d34` and is preserved byte-identically as `/media/fat/linux/MediaPlayer_Helper.backup.pre-video-only.6dece4c`; the staged and final active helper both verify at the new hash with mode 755. The accepted `9a5eea3` RBF remains byte-identical at SHA-256 `484328e51c6e764890bf2bdcd947448e2eaaaac2c603e93da28009475e44dafc`, Main and every pre-existing media file are unchanged, and the missing video-only control was added as `/media/fat/games/MediaPlayer/v0.7_qualification/02_good_video_only.mpg` at 591,889 bytes and SHA-256 `a3e675cad7b3142d2ea25d5b27d2e84e898572c0b6d080bbd2b0a3d01ac76a95` through staged roundtrip verification.
+
+#### Next Steps:
+
+Power-cycle once, set Audio Test to Off and run only `02_good_video_only.mpg`. It must present the complete two-second 720x480 video silently rather than returning at the former lookahead boundary, end with ordinary LEDs and settle to a clean schema-nine image with zero audio sample count, no audio underrun or PCM protocol error, all 582,741 clean-video bytes accepted, all 48 pictures displayed, sequence end and presentation completion. Leave that final image loaded for capture before running anything else. If it passes, replay `00_good_480p_48k.mpg` without reboot and require the established aligned, crackle-free 48 kHz control with all 48 pictures, audio present, zero errors and immediate recovery; then freeze `acdbf8b` with accepted FPGA source `9a5eea3` for the clean v0.7.0 release-qualification build. Any video-only failure calls for helper rollback to `/media/fat/linux/MediaPlayer_Helper.backup.pre-video-only.6dece4c` without changing the RBF.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- tools/streams/verify_arm_av_pipeline.py
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 471 COMMIT Unreleased 9a5eea3 2026-08-24T13:10:34-07:00
 
 #### Coming From:
@@ -1199,38 +1228,6 @@ Power-cycle once, set Audio Test to Off and run `00_good_480p_48k.mpg` followed 
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 432 COMMIT Unreleased 9afe2f0 2026-08-24T04:58:03-07:00
-
-#### Coming From:
-
-Unreleased 1102830
-
-#### Purpose:
-
-Make the user-converted playback boundary reproducible and prepare the hardware failure sweep and full-length audio-video soak.
-
-#### Outcome:
-
-Commit `9afe2f0` makes the user-media qualification boundary reproducible without changing FPGA RTL or MiSTer Main. The official MiSTer ARM GNU 10.2 archive verifies at its previously recorded SHA-256 `102825ae56c9e00142d06f35d2bdd3299edb6060e84a275a25b095e66fd3fc2a`, identifies as GCC 10.2.1, and produces two byte-identical 361,452-byte static ARM EABI5 helpers at SHA-256 `2cf665c0153a9885e103a1da5038997efb9050c7fcbceb3d3340537cfb153d54`. The helper's capabilities now advertise both 44.1 and 48 kHz, and the permanent generator and verifier exercise both short and faded profiles at each rate. Native and address-and-undefined-sanitized runs all preserve byte-identical video, one clean PCM end, maximum sample error two and correlation rounding to one; the 44.1 kHz paths carry mode byte one for 9,216 and 132,480 samples, while the 48 kHz paths carry mode byte three for 10,368 and 144,000 samples. Two independent generations reproduce the established 48 kHz fixture hash and the new 44.1 kHz fixture hash `8f522f8cc37be5e7a45f32599c5227946b6d1386cb93b452dfae0d37ef8987ff`, and the nine-case envelope corpus retains three passes and six expected failures. `generate_test_big_buck_bunny.py` preserves byte-identical video-only output and adds an opt-in Program Stream mode that verifies its demuxed video against the same sequence-ended elementary stream, carries source audio as stereo MPEG Layer II, writes the final sequence end in a bounded video PES and terminates with a Program Stream end code. The full local source at SHA-256 `4fc75fa403994e7c313da139d93a5aebdbda27cc951616aa4e480db6877c9850` generates a 100,059,153-byte, 14,315-picture, 596.458-second Program Stream at SHA-256 `fdc480e6b16bcbc7c143eb8f7e7edfe0d0bbd8e46a1035b728f07639e71b2357`. The helper strips 13,401 timestamp records to reproduce all 84,423,309 FFmpeg-demuxed video bytes exactly and decodes 28,628,352 stereo PCM frames byte-for-byte in length against FFmpeg, with maximum sample error two, RMS error 0.5037 and correlation `0.999999979`.
-
-#### Next Steps:
-
-Install the exact official-toolchain helper with rollback preserved, then place the generated 44.1 and 48 kHz good controls, six bad cases and full-length soak Program Stream on the MiSTer. Hardware acceptance requires both good controls to play, every bad case to avoid ordinary success and recover immediately through the 48 kHz control without a reboot, and the full movie to complete with stable audio-video alignment, clean audio, normal LEDs and zero PCM protocol, underrun, presentation, decoder or aggregate error telemetry. No Quartus build is required because this commit changes no FPGA source.
-
-#### Files Modified:
-
-- host/arm/media_player_protocol.h
-- tools/streams/generate_arm_av_test.py
-- tools/streams/generate_test_big_buck_bunny.py
-- tools/streams/verify_arm_av_pipeline.py
-- docs/TEST_INSTRUCTIONS.md
 
 #### Status:
 
