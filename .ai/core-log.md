@@ -1,3 +1,37 @@
+## 420 COMMIT Unreleased ??? 2026-08-24T02:34:47-07:00
+
+#### Coming From:
+
+Unreleased d70591c
+
+#### Purpose:
+
+Recover fitter headroom by moving the two 512-byte slice row buffers out of distributed registers into block memory without altering parser behavior.
+
+#### Outcome:
+
+Fitter evidence from `d70591c` records 36,103 of 41,910 ALMs at 86 percent against 427 of 553 RAM blocks and 65 of 112 DSP blocks, so ALMs are the only binding resource, and that build already required a seed retune to close. Entity accounting places 29,242 ALMs inside `emu`, of which `mpeg2_h262_two_picture_probe` holds 15,893 across the near-identical `b_core_probe` at 7,650 and `p_diagnostic_controller` at 7,619, while `mpeg2_h262_p_wide_motion_syntax_probe` alone holds 5,101 ALMs against 5,267 registers. Static inspection isolates the mechanism: `mpeg2_h262_b_core_probe_part0.svh` and `mpeg2_h262_p_wide_motion_syntax_probe_part0.svh` each declare a 512-entry byte array named `row_bytes` that is read combinationally as `row_bytes[parse_byte_index][parse_bit_index]`, which forces 4,096 flops and a 512-to-one byte multiplexer into distributed logic per instance and accounts for roughly seventy-eight percent of the wide probe's registers. This commit converts both arrays to inferred block memory with a registered read while preserving parser behavior exactly. The parser advances one bit per `consume_bit` assertion and therefore crosses a byte boundary at most once every eight cycles, which supplies the lead time a registered block-memory read requires, so the current and next bytes are prefetched into registers ahead of the bit pointer. Entries zero and one are held in discrete registers so that the two-byte rollover copy performed when a chunk boundary is unknown no longer requires a second simultaneous write port, and the two carried bytes are taken from shadow registers written alongside the array rather than read back combinationally from its final two entries. Writes remain single-port and sequential and the parse limit trails the write pointer by at least three bytes, so no read-during-write hazard is introduced. Equivalence is established by differential simulation rather than by inspection: a committed script generates the required fixtures and runs the Icarus testbenches that instantiate these probes against unmodified and modified RTL, and every result line must be byte-identical across the two runs before the change is built.
+
+#### Next Steps:
+
+Run the differential parser regression and require byte-identical results, then build under Quartus and record the resulting ALM, RAM block and DSP figures together with worst-case slack, expecting a recovery in the range of 2,500 to 4,000 ALMs and an increase of roughly two RAM blocks. If the recovery lands at or above the lower bound, gating the `mpeg2_h262_hardware_cadence_profiler` behind a compile-time parameter is deferred and its 1,938 ALMs remain available as a later reserve. Install the resulting RBF and run a single-file hardware validation with `02_arm_mp2_faded_tones.mpg` and Audio Test Off, requiring the accepted five-picture video, the same clean separated tones, normal LEDs and a schema-eight snapshot that still reports 185,149 accepted elementary-stream bytes, three reference plus two B pictures, five displays, four swaps, sequence end and presentation complete with zero aggregate error flags. Once the recovered headroom is confirmed on hardware, resume the deferred audio work by defining and proving the response to a prolonged ARM producer stall after playback has begun.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+- tools/streams/run_cycle_a_parser_equivalence.sh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 419 COMMIT Unreleased d70591c 2026-08-24T02:20:34-07:00
 
 #### Coming From:
@@ -1134,34 +1168,6 @@ After a MiSTer power cycle, the authoritative odd-length 185,393-byte `08_compat
 #### Next Steps:
 
 Power-cycle the MiSTer and load `09_compat_dense_residual.m2v` through the normal file selector, then report all three LEDs and leave the completed image loaded for telemetry capture. Require five reference plus seven B pictures, all twelve displays, eleven swaps, 2,875,986 accepted transport bytes including the expected odd-byte pad, sequence-end quiet, complete presentation retirement and zero errors before proceeding to test ten.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 380 COMMIT Unreleased 2b1a170 2026-08-23T20:21:34-07:00
-
-#### Coming From:
-
-Unreleased 2b1a170
-
-#### Purpose:
-
-Confirm that the accepted ordinary queue-capacity fix preserves complete B-picture decoding, reordering and presentation across independent forward and backward motion-vector ranges.
-
-#### Outcome:
-
-After a MiSTer power cycle, the authoritative 185,054-byte `07_b_f_code_range.m2v` passes with USER steady on, DISK steady off and POWER steady on. Its launch-free schema-seven capture freezes for quiet reason one with all 185,054 bytes accepted, three reference plus two B pictures decoded, all five pictures displayed, four swaps, sequence end, session quiet, presentation complete, zero decoder and presentation errors and zero cadence outliers. Ranked telemetry observes the active B-reorder path with scratch presentation, queued generation, promotion and presentation hold before the terminal fifth display, then confirms all reorder, queued, promotion, pending-frame and terminal-boundary state retired in the final snapshot. Test seven therefore preserves the established B ownership contract under the new ordinary-reference backpressure and passes the full hardware gate. The next authoritative 185,393-byte `08_compat_multi_slice.m2v`, SHA-256 `bcd25c393f42aa1ccb8dc076a87ad14560357db4613093c93472d49d13ec3be8`, was generated locally, installed in the MiSTer file directory and retrieved byte-for-byte identical.
-
-#### Next Steps:
-
-Power-cycle the MiSTer and load `08_compat_multi_slice.m2v` through the normal file selector, then report all three LEDs and leave the completed image loaded for telemetry capture. Require three reference plus two B pictures, all five displays, four swaps, 185,394 accepted transport bytes including the expected odd-byte pad, sequence-end quiet, complete presentation retirement and zero errors before proceeding to test nine.
 
 #### Files Modified:
 
