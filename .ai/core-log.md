@@ -1,4 +1,4 @@
-## 413 COMMIT Unreleased ??? 2026-08-24T01:08:05-07:00
+## 413 COMMIT Unreleased 22d2142 2026-08-24T01:08:05-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Create one longer faded embedded-audio fixture that isolates sustained PCM quali
 
 #### Outcome:
 
-The approved tooling-only cycle will retain the exact accepted five-picture video elementary stream and mux it with a three-second 48 kHz stereo MPEG Layer II track containing 250 milliseconds of silence, a 250-millisecond fade-in, two seconds of sustained 440 Hz left and 660 Hz right tones, a 250-millisecond fade-out and 250 milliseconds of trailing silence. The final video frame will remain displayed while audio continues, avoiding new video-decoder coverage. The existing generator will gain an explicit faded-quality profile while preserving the original short fixture byte-for-byte, and the verifier will accept the selected profile while continuing to require byte-identical video, strong independent FFmpeg PCM correlation, exact in-band sample framing and one clean end token. This cycle will generate and deploy only `02_arm_mp2_faded_tones.mpg`; the installed `8bbd55c` RBF, helper, Main and original test file will remain unchanged.
+Commit `22d2142` adds explicit short and faded profiles while retaining the exact accepted five-picture video. Two complete generations are deterministic, and the short Program Stream and both references remain byte-identical at their established hashes. The new 260,096-byte `02_arm_mp2_faded_tones.mpg` has SHA-256 `cb4f143d2d72af72bb03c7a7fbc4e2163ad780a35483bdb871ec661cf29ccc24`; it decodes to exactly 144,000 stereo samples across three seconds with zero-valued leading and trailing silence, rising and falling fade windows, sustained 440 Hz left and 660 Hz right tones and approximately 46 dB channel separation. Its demuxed video is byte-identical to the accepted reference. Extending the verifier to measure MPEG audio frame boundaries then converted the user's slight crackle into a deterministic defect: the current helper jumps by 4,080 counts left and 4,115 right to zero at some 1,152-sample boundaries in both the short and faded fixtures, while FFmpeg's continuous references remain at or below 234 left and 353 right. Static inspection isolates the mechanism: when an incremental buffer ends on a complete frame or incomplete next frame, minimp3 may clear its synthesis state while searching for an unverifiable next header, and the helper consumes or retains that call without restoring the decoder state. The quality file was deliberately not installed because asking the user to confirm a known discontinuity would add no evidence; the MiSTer and all installed artifacts remain unchanged.
 
 #### Next Steps:
 
-Regenerate both profiles twice and require deterministic hashes, confirm the original short fixture and references remain byte-identical, verify the faded fixture through the native helper and inspect its decoded channel spectrum and fade envelope, then upload only the new Program Stream through staged hash verification. On hardware, reboot once and run only `02_arm_mp2_faded_tones.mpg`, listening for clean silence, gradual onset, sustained separated tones and gradual release while requiring normal video and LEDs; leave the final image loaded for schema-eight capture.
+Open a helper-only repair cycle that snapshots and restores `mp3dec_t` whenever an incremental call cannot safely consume a frame, retains the last complete frame until a following header is available, and decodes the final exact-sized frame at end of input without synthetic padding. Require both profiles to retain exact sample counts, clean end framing and their existing correlations while reducing helper boundary jumps below the reference-derived limits. Build the static ARM helper twice with the official GCC 10.2 toolchain, install only that helper with rollback preserved, then upload the existing faded-quality file and run it as the sole hardware video for the cycle; no RBF or Main change is indicated.
 
 #### Files Modified:
 
@@ -23,7 +23,7 @@ Regenerate both profiles twice and require deterministic hashes, confirm the ori
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
