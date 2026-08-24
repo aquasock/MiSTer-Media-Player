@@ -1,3 +1,34 @@
+## 429 COMMIT Unreleased 3f4b272 2026-08-24T04:30:48-07:00
+
+#### Coming From:
+
+Unreleased 62e8ccf
+
+#### Purpose:
+
+Delay the in-band audio at startup by leading video ahead of it in the helper's emission order, and revert the presentation anchor that changed nothing.
+
+#### Outcome:
+
+Commit `dc862e1` reverts `62e8ccf`, so the functional RTL is byte-identical to accepted `047f5b2` again, and the MiSTer was returned to that image with `/media/fat/MediaPlayer.rbf` verifying at SHA-256 `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68`; the reverted build is retained as `MediaPlayer.reverted.62e8ccf.rbf`. Commit `3f4b272` implements the delay where it can work. The helper previously emitted each decoded sample as a nine-byte in-band record the moment it existed, so PCM records preceded the video bytes behind them and throttled those bytes to real time through the FPGA's `pcm_ready` gate. It now queues decoded PCM and writes video immediately, releasing the queue once the first picture is complete, detected by counting picture start codes in the emitted video, or once a bound of four seconds of audio is buffered, whichever comes first. The bound exists only to keep the buffer finite and had to be generous: an initial one-second bound ended the lead early and left the offset unchanged, because this fixture's intra frame is 97 percent of its video payload and sits behind 69,120 samples. Releasing on the first picture rather than on a fixed delay keeps the effect to startup, so steady-state interleaving is untouched and audio is not left permanently trailing video. Local measurement on `02_arm_mp2_faded_tones.mpg` shows the PCM emitted before the first picture completes falling from 69,120 samples to zero, so the modelled video delay falls from 1.440 seconds to zero against 1.372 seconds measured on hardware, a model error of five percent. The first PCM record now appears at emitted byte 185,158, after all video. Audio should therefore begin after its 2,048-sample reserve, about 43 milliseconds in, leaving video marginally ahead rather than a second behind. Three integrity checks hold: the in-band PCM payload reconstructed from the emitted records is byte-identical to the helper's own `--pcm-out` output, so the audio is delayed and not altered; that `--pcm-out` output is byte-identical to the unmodified helper, confirming the file path is untouched and that its long-standing difference from the FFmpeg reference is pre-existing and unrelated; and an elementary stream with no audio passes through byte-identical, since the queue never engages without PCM. The ARM helper was cross-compiled, verified byte-identical after upload and installed at SHA-256 `c6ce4ef0595beee5f1f231edeaebe360160becccad22e3e51d9f8d23b9c690b0` with mode 755, its predecessor preserved as `/media/fat/linux/MediaPlayer_Helper.backup.pre-video-lead.104c5ff`. One deviation must be recorded: the documented toolchain is MiSTer Main's ARM GNU 10.2 compiler, but only `arm-linux-gnueabihf-gcc` 15.2 was available, and with no qemu on the workstation the ARM binary could not be executed before installation. It is statically linked and stripped, but it is unproven until it runs.
+
+#### Next Steps:
+
+Power-cycle the MiSTer, since the wedged core from `d9022e6` and the reverted `62e8ccf` are both still resident until a cold start, then run `02_arm_mp2_faded_tones.mpg` with Audio Test Off. Require video to appear essentially at once rather than 1.37 seconds late, audio to follow within about 43 milliseconds, tones to stay clean and separated with smooth fades, and LEDs to remain normal. If the helper fails to start at all, suspect the toolchain deviation first and roll back to `MediaPlayer_Helper.backup.pre-video-lead.104c5ff` before suspecting the lead logic. Capture a schema-eight snapshot over FTP and require `first_present_cycle` to collapse from 82,301,563 to a small fraction while the decode evidence holds at 185,149 elementary-stream bytes, three reference plus two B pictures, five displays, four swaps, sequence end, presentation complete and zero error flags, with no audio underrun. Confirm separately that an older `.m2v` file is unaffected. Once accepted, delete `MediaPlayer.failed.d9022e6.rbf` and `MediaPlayer.reverted.62e8ccf.rbf`, obtain the documented ARM toolchain so helper builds are reproducible, and resume the deferred prolonged ARM producer stall work.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- MediaPlayer_top_05.svh
+- rtl/mpeg2_new/mpeg2_h262_pts_presentation_timeline.sv
+- tools/streams/tb_h262_pts_presentation_timeline.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 428 COMMIT Unreleased 62e8ccf 2026-08-24T04:19:35-07:00
 
 #### Coming From:
@@ -1143,45 +1174,6 @@ Reboot the MiSTer and run `15A_pts_irregular_ordinary_short.m2v`; require five a
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 389 COMMIT Unreleased 9a7a982 2026-08-23T21:08:18-07:00
-
-#### Coming From:
-
-Unreleased 2b1a170
-
-#### Purpose:
-
-Present timestamped pictures against the proven audio-derived 90 kHz system-time tick while preserving the accepted free-running cadence for pictures without timestamps.
-
-#### Outcome:
-
-Commit `9a7a982` synchronizes only the proven single-bit audio-derived 90 kHz tick into the decoder domain and advances a local 33-bit timeline anchored exactly once by the first in-band timestamp after each download reset. Modulo half-range comparison holds future candidates, admits equality and late candidates at the first safe swap, and leaves individually missing timestamps on the unchanged exact 23.976, 24, 25, 29.97 or 30 fps cadence; an early timestamped presentation clears partial cadence credit so fallback cannot burst on the next refresh. Timestamp ownership now retains separate values and validity for all reference and B-scratch banks, commits B timestamps on actual persistence and queries the scheduler's retained candidate identity. Focused simulation passes first-record anchor, reset re-anchor, modulo wrap, late, future, missing, reference and reordered scratch ownership, timestamp gating, no-burst fallback and every established cadence count. Full-pipeline P-only, B-reordered, repeated multi-slice, dense-residual, mixed-macroblock and long-GOP replays complete with exact publication and persistence counts and zero errors; mixed and long dense-publication tests retain zero overwrites. The explicit coded-picture-order timestamp-list injector mode passes normal and oversize-rejection controls. The seed-eleven Quartus 17.0.2 build completes in 12 minutes 34 seconds with zero errors and 154 warnings, using 35,666 ALMs, 52,202 registers, 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks. Every timing category is positive with zero endpoint TNS: global setup is plus 0.200 ns, decoder setup plus 0.773 ns, host setup plus 1.158 ns, video setup plus 7.769 ns, hold plus 0.253 ns, recovery plus 2.709 ns, removal plus 0.633 ns and pulse width plus 1.122 ns. The 4,196,032-byte RBF has SHA-256 `68be8a9d899a06b6861a9d9ceaf07e41747d1865133940aad39849f4b14c9211`; it is installed persistently and retrieved byte-for-byte identical. Irregular ordinary test `15_pts_irregular_ordinary.m2v`, SHA-256 `0003a68e9377ce30ce77bfd8f4bd9e70edf2937b227021f4219efcd12027891b`, and reordered-B test `16_pts_reordered_b.m2v`, SHA-256 `bde3a06fb5012667a548fec6de1730e96a1c15c3c548cda85e0982af0bd7a309`, are also installed and retrieved exactly.
-
-#### Next Steps:
-
-Reboot the MiSTer so the new persistent RBF loads, then run `15_pts_irregular_ordinary.m2v` and verify that all five pictures appear in order with intentionally uneven pauses and clean terminal completion; record all three LEDs and leave the final image loaded for telemetry. After that capture, reboot and run `16_pts_reordered_b.m2v`, requiring the display-order I, B, P, B, P sequence to retain its deliberately uneven timing without a dropped or prematurely exposed future reference. Finish with reboot-isolated unannotated `06_p_f_code_range.m2v` and `04_b_bidirectional.m2v` controls to prove unchanged cadence fallback before marking this source passed. PCM output remains the next feature boundary.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_05.svh
-- files.qip
-- rtl/mpeg2_new/mpeg2_h262_pts_presentation_timeline.sv
-- rtl/mpeg2_new/mpeg2_h262_picture_timestamp.sv
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- tools/streams/inject_inband_metadata.py
-- tools/streams/tb_h262_pts_presentation_timeline.sv
-- tools/streams/tb_h262_picture_timestamp.sv
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_dense_publication_order.sv
-- tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
