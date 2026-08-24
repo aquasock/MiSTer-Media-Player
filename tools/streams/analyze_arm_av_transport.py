@@ -15,6 +15,8 @@ PTS_MARKER = PREFIX + b"\xb0"
 PCM_MARKER = PREFIX + b"\xb1"
 PCM_END_MARKER = PREFIX + b"\xb6"
 RECORD_SIZE = 9
+MAX_PCM_FRAMES = 32
+MAX_RECORD_SIZE = 5 + 4 * MAX_PCM_FRAMES
 READ_SIZE = 1024 * 1024
 
 
@@ -49,7 +51,10 @@ def analyze_inband(stream, sample_rate: int) -> dict[str, int | str | list[int]]
     transport_hash = hashlib.sha256()
     buffer = bytearray()
     video_bytes = 0
+    transport_bytes = 0
     clean_video_bytes = 0
+    pcm_record_frames = 1
+    pcm_record_size = RECORD_SIZE
     pcm_frames = 0
     pts_values: list[int] = []
     origin_pts: int | None = None
@@ -82,13 +87,14 @@ def analyze_inband(stream, sample_rate: int) -> dict[str, int | str | list[int]]
         else:
             eof = True
         position = 0
-        safe_end = len(buffer) if eof else max(0, len(buffer) - (RECORD_SIZE - 1))
+        safe_end = len(buffer) if eof else max(0, len(buffer) - (MAX_RECORD_SIZE - 1))
         while position < safe_end:
             marker_position = buffer.find(PREFIX, position)
             if marker_position < 0 or marker_position >= safe_end:
                 data = buffer[position:safe_end]
                 video_hash.update(data)
                 transport_hash.update(data)
+                transport_bytes += len(data)
                 video_bytes += len(data)
                 clean_video_bytes += len(data)
                 position = safe_end
@@ -97,18 +103,29 @@ def analyze_inband(stream, sample_rate: int) -> dict[str, int | str | list[int]]
                 data = buffer[position:marker_position]
                 video_hash.update(data)
                 transport_hash.update(data)
+                transport_bytes += len(data)
                 video_bytes += len(data)
                 clean_video_bytes += len(data)
                 position = marker_position
             if len(buffer) - position < 4:
                 break
             marker = bytes(buffer[position:position + 4])
-            if marker in (PTS_MARKER, PCM_MARKER) and len(buffer) - position < RECORD_SIZE:
+            if marker == PTS_MARKER and len(buffer) - position < RECORD_SIZE:
                 break
+            if marker == PCM_MARKER:
+                if len(buffer) - position < 5:
+                    break
+                # Entry 462: the mode byte's upper six bits carry the frame
+                # count, and zero is the earlier encoding of a single frame.
+                pcm_record_frames = (buffer[position + 4] >> 2) or 1
+                pcm_record_size = 5 + 4 * pcm_record_frames
+                if len(buffer) - position < pcm_record_size:
+                    break
             if marker == PTS_MARKER:
                 record = bytes(buffer[position:position + RECORD_SIZE])
                 video_hash.update(record)
                 transport_hash.update(record)
+                transport_bytes += len(record)
                 video_bytes += RECORD_SIZE
                 pts = int.from_bytes(record[4:9], "big") >> 7
                 pts_values.append(pts)
@@ -129,15 +146,25 @@ def analyze_inband(stream, sample_rate: int) -> dict[str, int | str | list[int]]
                         max_deficit_pts = pts - origin_pts
                 position += RECORD_SIZE
             elif marker == PCM_MARKER:
-                record = bytes(buffer[position:position + RECORD_SIZE])
+                record = bytes(buffer[position:position + pcm_record_size])
                 expected_mode = 0x03 if sample_rate == 48000 else 0x01
-                if record[4] != expected_mode:
+                if record[4] & 0x03 != expected_mode:
                     raise RuntimeError(
                         f"PCM mode 0x{record[4]:02x} does not identify {sample_rate} Hz"
                     )
-                pcm_hash.update(record[5:7][::-1] + record[7:9][::-1])
+                if pcm_record_frames > MAX_PCM_FRAMES:
+                    raise RuntimeError(
+                        f"PCM record carries {pcm_record_frames} frames, above "
+                        f"the {MAX_PCM_FRAMES} the extractor supports"
+                    )
+                for index in range(pcm_record_frames):
+                    base = 5 + index * 4
+                    pcm_hash.update(
+                        record[base:base + 2][::-1] + record[base + 2:base + 4][::-1]
+                    )
                 transport_hash.update(record)
-                pcm_frames += 1
+                transport_bytes += len(record)
+                pcm_frames += pcm_record_frames
                 if first_pcm_position is None:
                     first_pcm_position = clean_video_bytes
                     # Audio that starts before any timestamp has crossed has no
@@ -148,17 +175,18 @@ def analyze_inband(stream, sample_rate: int) -> dict[str, int | str | list[int]]
                 if current_batch_position != clean_video_bytes:
                     close_batch()
                     current_batch_position = clean_video_bytes
-                current_batch += 1
+                current_batch += pcm_record_frames
                 if last_pcm_position is not None:
                     max_video_gap = max(
                         max_video_gap, clean_video_bytes - last_pcm_position
                     )
                 last_pcm_position = clean_video_bytes
-                position += RECORD_SIZE
+                position += pcm_record_size
             elif marker == PCM_END_MARKER:
                 close_batch()
                 end_count += 1
                 transport_hash.update(marker)
+                transport_bytes += len(marker)
                 position += 4
             else:
                 # A video payload can end in 00 00 01 immediately before a
@@ -167,6 +195,7 @@ def analyze_inband(stream, sample_rate: int) -> dict[str, int | str | list[int]]
                 data = bytes(buffer[position:position + 1])
                 video_hash.update(data)
                 transport_hash.update(data)
+                transport_bytes += len(data)
                 video_bytes += len(data)
                 clean_video_bytes += len(data)
                 position += len(data)
@@ -177,6 +206,7 @@ def analyze_inband(stream, sample_rate: int) -> dict[str, int | str | list[int]]
                 raise RuntimeError("truncated in-band record")
             video_hash.update(buffer)
             transport_hash.update(buffer)
+            transport_bytes += len(buffer)
             video_bytes += len(buffer)
             clean_video_bytes += len(buffer)
             buffer.clear()
@@ -193,7 +223,7 @@ def analyze_inband(stream, sample_rate: int) -> dict[str, int | str | list[int]]
         "video_sha256": video_hash.hexdigest(),
         "pcm_sha256": pcm_hash.hexdigest(),
         "transport_sha256": transport_hash.hexdigest(),
-        "transport_bytes": video_bytes + pcm_frames * RECORD_SIZE + end_count * 4,
+        "transport_bytes": transport_bytes,
         "video_bytes": video_bytes,
         "clean_video_bytes": clean_video_bytes,
         "pcm_frames": pcm_frames,

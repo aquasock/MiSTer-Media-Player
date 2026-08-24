@@ -32,8 +32,12 @@ def next_video_byte(transport: bytes, position: int) -> bytes | None:
     """The next byte that is video rather than the start of a record."""
     while position < len(transport):
         code = transport[position:position + 4]
-        if code in (PTS_MARKER, PCM_MARKER):
+        if code == PTS_MARKER:
             position += RECORD_SIZE
+            continue
+        if code == PCM_MARKER:
+            frames = (transport[position + 4] >> 2) or 1
+            position += 5 + 4 * frames
             continue
         if code == PCM_END_MARKER:
             position += 4
@@ -46,8 +50,12 @@ def skip_one_video_byte(transport: bytes, position: int) -> int:
     """Advance past the byte that next_video_byte() already emitted."""
     while position < len(transport):
         code = transport[position:position + 4]
-        if code in (PTS_MARKER, PCM_MARKER):
+        if code == PTS_MARKER:
             position += RECORD_SIZE
+            continue
+        if code == PCM_MARKER:
+            frames = (transport[position + 4] >> 2) or 1
+            position += 5 + 4 * frames
             continue
         if code == PCM_END_MARKER:
             position += 4
@@ -104,9 +112,10 @@ def split_records(transport: bytes, per_gop: bool = False,
             if deferred[0]:
                 deferred[0] = False
                 position = skip_one_video_byte(transport, position)
-        elif code == PCM_MARKER and marker + RECORD_SIZE <= len(transport):
-            pcm += 1
-            position = marker + RECORD_SIZE
+        elif code == PCM_MARKER and marker + 5 <= len(transport):
+            frames = (transport[marker + 4] >> 2) or 1
+            pcm += frames
+            position = marker + 5 + 4 * frames
         elif code == PCM_END_MARKER:
             position = marker + 4
         else:

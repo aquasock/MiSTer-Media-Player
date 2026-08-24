@@ -79,19 +79,25 @@ def strip_records(
             timestamps.append(value >> 7)
             position += RECORD_SIZE
         elif marker == PCM_MARKER:
-            if position + RECORD_SIZE > len(data):
+            if position + 5 > len(data):
                 raise RuntimeError("truncated PCM record")
             mode = data[position + 4]
             expected_mode = 0x03 if expected_sample_rate == 48000 else 0x01
-            if mode != expected_mode:
+            if mode & 0x03 != expected_mode:
                 raise RuntimeError(
                     f"PCM record mode 0x{mode:02x} does not identify "
                     f"{expected_sample_rate} Hz stereo (expected 0x{expected_mode:02x})"
                 )
-            left = data[position + 5:position + 7]
-            right = data[position + 7:position + 9]
-            pcm += left[::-1] + right[::-1]
-            position += RECORD_SIZE
+            # Entry 462: the mode byte's upper six bits carry the frame count,
+            # and zero is the earlier encoding of a single frame.
+            frames = (mode >> 2) or 1
+            size = 5 + 4 * frames
+            if position + size > len(data):
+                raise RuntimeError("truncated PCM record")
+            for index in range(frames):
+                base = position + 5 + index * 4
+                pcm += data[base:base + 2][::-1] + data[base + 2:base + 4][::-1]
+            position += size
         elif marker == PCM_END_MARKER:
             end_count += 1
             position += 4
@@ -386,7 +392,7 @@ def main() -> int:
         f"rms {rms:.4f}, correlation {correlation:.6f}"
     )
     print(
-        f"transport: {len(inband_pcm) // 4} PCM records at {args.sample_rate} Hz, "
+        f"transport: {len(inband_pcm) // 4} PCM frames at {args.sample_rate} Hz, "
         "one clean end, "
         f"correlation {inband_correlation:.6f}"
     )

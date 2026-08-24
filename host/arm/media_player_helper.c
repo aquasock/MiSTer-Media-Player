@@ -21,6 +21,8 @@
 #define PCM_REFILL_FRAMES           128u
 #define PCM_SINK_FIFO_FRAMES        8192u
 #define PTS_MAX_PICTURE_GAP         60u
+#define PCM_STARTUP_VIDEO_BYTES     28672u
+#define PCM_RECORD_FRAMES           16u
 #define VIDEO_SLICE_BYTES           256u
 
 /*
@@ -43,12 +45,13 @@
  * so that a batch never has to wait for room.
  */
 /*
- * Entry 455 ended this lead on a byte budget as well, to leave the decoder
- * most of the compressed FIFO to work from.  Entry 456 measured that it bought
- * almost nothing, moving 174 display outliers to 170, and entry 461 found the
- * cost: a full video FIFO blocks the shared path, so the PCM records queued
- * behind it wait and the audio sink can starve while the producer is ahead of
- * schedule.  The lead ends on the second picture again.
+ * Entry 455 ended this lead on a byte budget as well, to leave the decoder most
+ * of the compressed FIFO to work from, and entry 456 measured that it bought
+ * almost nothing for cadence.  Entry 461 removed it on the theory that a full
+ * video FIFO starves the audio sink; entry 462 measured the opposite, with the
+ * soak's underrun arriving at 39.3 seconds without the budget against 62.2 with
+ * it.  It is an audio-margin measure rather than the cadence measure it was
+ * introduced as, and it is kept for that.
  */
 /*
  * The lead is normally ended when the second picture start proves that the
@@ -250,28 +253,41 @@ static int emit_video_pts(struct output_state *output, uint64_t pts)
     return 0;
 }
 
-static int emit_pcm_sample(struct output_state *output,
-                           mp3d_sample_t left, mp3d_sample_t right,
-                           int rate_hz)
+static int emit_pcm_run(struct output_state *output,
+                        const int16_t *frames, unsigned count, int rate_hz)
 {
-    uint16_t left_bits = (uint16_t)left;
-    uint16_t right_bits = (uint16_t)right;
+    uint8_t record[4 + 1 + PCM_RECORD_FRAMES * 4u];
+    unsigned i;
+
     /*
      * Entry 431: the FPGA already selects between 48 kHz and 44.1 kHz from this
      * mode bit -- mpeg2_h262_inband_metadata extracts it and
      * audio_pcm_output_adapter switches its phase step on it -- so the rate
      * only ever needed carrying here.  Records are always emitted stereo; a
      * mono frame is duplicated into both channels by write_pcm.
+     *
+     * Entry 462: the mode byte's upper six bits carry how many frames follow,
+     * so one record delivers a run instead of a single sample.  At one frame
+     * per record the audio was three quarters of everything crossing the
+     * shared path, and hardware measured a cost per record in late
+     * presentations.
      */
-    uint8_t record[9] = {
-        0, 0, 1, MEDIA_PLAYER_PCM_MARKER_CODE,
-        (uint8_t)(MEDIA_PLAYER_PCM_MODE_STEREO |
-                  (rate_hz == 48000 ? MEDIA_PLAYER_PCM_MODE_48K : 0)),
-        (uint8_t)(left_bits >> 8), (uint8_t)left_bits,
-        (uint8_t)(right_bits >> 8), (uint8_t)right_bits
-    };
+    record[0] = 0;
+    record[1] = 0;
+    record[2] = 1;
+    record[3] = MEDIA_PLAYER_PCM_MARKER_CODE;
+    record[4] = (uint8_t)((count << 2) | MEDIA_PLAYER_PCM_MODE_STEREO |
+                          (rate_hz == 48000 ? MEDIA_PLAYER_PCM_MODE_48K : 0));
+    for (i = 0; i < count; ++i) {
+        uint16_t left_bits = (uint16_t)frames[i * 2u];
+        uint16_t right_bits = (uint16_t)frames[i * 2u + 1u];
 
-    if (write_all(output->video, record, sizeof(record), "in-band PCM") < 0)
+        record[5 + i * 4u] = (uint8_t)(left_bits >> 8);
+        record[6 + i * 4u] = (uint8_t)left_bits;
+        record[7 + i * 4u] = (uint8_t)(right_bits >> 8);
+        record[8 + i * 4u] = (uint8_t)right_bits;
+    }
+    if (write_all(output->video, record, 5u + count * 4u, "in-band PCM") < 0)
         return -1;
     output->video_bytes_since_pcm = 0;
     return 0;
@@ -380,12 +396,15 @@ static int hold_push(struct output_state *output,
 static int hold_flush(struct output_state *output, size_t keep)
 {
     while ((output->hold_count - output->hold_head) / 2u > keep) {
-        if (emit_pcm_sample(output, output->hold[output->hold_head],
-                            output->hold[output->hold_head + 1],
-                            output->hold_rate_hz) < 0)
+        size_t due = (output->hold_count - output->hold_head) / 2u - keep;
+        unsigned count = due < PCM_RECORD_FRAMES ?
+                         (unsigned)due : PCM_RECORD_FRAMES;
+
+        if (emit_pcm_run(output, output->hold + output->hold_head, count,
+                         output->hold_rate_hz) < 0)
             return -1;
-        output->hold_head += 2u;
-        output->pcm_emitted_frames++;
+        output->hold_head += (size_t)count * 2u;
+        output->pcm_emitted_frames += count;
     }
     if (output->hold_head && output->hold_head == output->hold_count) {
         output->hold_count = 0;
@@ -440,22 +459,30 @@ static void free_video_head(struct output_state *output)
 /* The startup lead ends only when both its bounds are satisfied. */
 static int startup_lead_complete(const struct output_state *output)
 {
-    return output->picture_marks >= 2;
+    return output->picture_marks >= 2 &&
+           output->video_bytes >= PCM_STARTUP_VIDEO_BYTES;
 }
 
 static size_t startup_video_size(const struct output_state *output,
                                  const struct video_chunk *chunk)
 {
+    size_t remaining = chunk->size - chunk->offset;
     uint32_t window = output->video_window;
     unsigned pictures = output->picture_marks;
+    uint64_t budget;
     size_t i;
 
-    for (i = chunk->offset; i < chunk->size; ++i) {
-        window = (window << 8) | chunk->data[i];
-        if ((window & 0xffffffffu) == 0x00000100u && ++pictures >= 2)
-            return i + 1u - chunk->offset;
+    if (pictures < 2) {
+        for (i = chunk->offset; i < chunk->size; ++i) {
+            window = (window << 8) | chunk->data[i];
+            if ((window & 0xffffffffu) == 0x00000100u && ++pictures >= 2)
+                return i + 1u - chunk->offset;
+        }
+        return remaining;
     }
-    return chunk->size - chunk->offset;
+    budget = output->video_bytes < PCM_STARTUP_VIDEO_BYTES ?
+             PCM_STARTUP_VIDEO_BYTES - output->video_bytes : 0;
+    return (uint64_t)remaining < budget ? remaining : (size_t)budget;
 }
 
 /*

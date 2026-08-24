@@ -201,14 +201,53 @@ module tb_h262_inband_metadata;
             $fatal(1,"PCM telemetry wrong count=%0d error=%0d",
                    pcm_sample_count,pcm_protocol_error);
 
-        // ---- 8. reserved mode bits are consumed but reported sticky ----
+        // ---- 8. a record carrying a run of frames yields one event each ----
+        got_n = 0; pcm_seen = 0; pcm_end_seen = 0;
+        send(8'hC3);
         send(8'h00); send(8'h00); send(8'h01); send(8'hB1);
-        send(8'h83); send(8'h00); send(8'h01); send(8'h00); send(8'h02);
+        send(8'h0F);                                   // 3 frames, 48k, stereo
+        send(8'h00); send(8'h11); send(8'h22); send(8'h33);
+        send(8'h44); send(8'h55); send(8'h66); send(8'h77);
+        send(8'h88); send(8'h99); send(8'hAA); send(8'hBB);
+        send(8'h3C);
         finish_stream();
-        if (!pcm_protocol_error || pcm_sample_count !== 14'd3)
-            $fatal(1,"malformed PCM mode was not reported");
+        if (got_n !== 2 || got[0] !== 8'hC3 || got[1] !== 8'h3C)
+            $fatal(1,"multi-frame PCM record altered video output");
+        if (pcm_seen !== 3 || last_pcm_left !== 16'h8899 ||
+            last_pcm_right !== 16'hAABB || !pcm_stereo || !pcm_rate_48k)
+            $fatal(1,"multi-frame PCM decode failed seen=%0d l=%h r=%h",
+                   pcm_seen, last_pcm_left, last_pcm_right);
+        if (pcm_sample_count !== 14'd5)
+            $fatal(1,"multi-frame PCM telemetry wrong count=%0d",pcm_sample_count);
 
-        $display("H262_INBAND_METADATA_PASS raw=15 pts=1 pcm=3 end=2 backpressure=1 pts=%h count=%0d",
+        // ---- 9. every frame of a run waits for the sink in turn ----
+        got_n = 0; pcm_seen = 0; pcm_ready = 0;
+        fork
+            begin
+                send(8'h00); send(8'h00); send(8'h01); send(8'hB1);
+                send(8'h09);                           // 2 frames, 44.1k, stereo
+                send(8'h01); send(8'h02); send(8'h03); send(8'h04);
+                send(8'h05); send(8'h06); send(8'h07); send(8'h08);
+            end
+            begin repeat(20) @(posedge clk); pcm_ready = 1; end
+        join
+        finish_stream();
+        if (pcm_seen !== 2 || last_pcm_left !== 16'h0506 ||
+            last_pcm_right !== 16'h0708 || pcm_stereo !== 1'b1 ||
+            pcm_rate_48k !== 1'b0)
+            $fatal(1,"run backpressure lost or duplicated a frame seen=%0d",pcm_seen);
+        if (pcm_sample_count !== 14'd7 || pcm_protocol_error)
+            $fatal(1,"run telemetry wrong count=%0d error=%0d",
+                   pcm_sample_count,pcm_protocol_error);
+
+        // ---- 10. a count past the supported run is consumed and reported ----
+        send(8'h00); send(8'h00); send(8'h01); send(8'hB1);
+        send(8'hFF); send(8'h00); send(8'h01); send(8'h00); send(8'h02);
+        finish_stream();
+        if (!pcm_protocol_error || pcm_sample_count !== 14'd8)
+            $fatal(1,"unsupported PCM frame count was not reported");
+
+        $display("H262_INBAND_METADATA_PASS raw=15 pts=1 pcm=8 end=2 backpressure=1 pts=%h count=%0d",
                  last_pts, pcm_sample_count);
         $finish;
     end

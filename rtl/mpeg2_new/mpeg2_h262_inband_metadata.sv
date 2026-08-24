@@ -13,10 +13,22 @@
 //  14,315-picture file with working backpressure.
 //
 //  Records use reserved H.262 start codes: B0 carries picture metadata, B1 a
-//  fixed five-byte PCM sample, and B6 a zero-payload PCM end token. No encoder
-//  emits these codes. Fixed payload lengths mean arbitrary signed PCM bytes are
-//  consumed as data rather than scanned for nested markers. A plain elementary
-//  stream contains no records and passes through unchanged.
+//  run of PCM frames, and B6 a zero-payload PCM end token. No encoder emits
+//  these codes. Payload lengths are declared rather than scanned, so arbitrary
+//  signed PCM bytes are consumed as data and can never be mistaken for a nested
+//  marker. A plain elementary stream contains no records and passes through
+//  unchanged.
+//
+//  Entry 462: one frame per record put 48,000 records and 422 KiB/s of audio on
+//  a path carrying 138 KiB/s of video, three quarters of everything crossing,
+//  and hardware measured a cost per record in late presentations.  The mode
+//  byte's six unused bits now carry a frame count, so one record can deliver a
+//  run of frames: {count[5:0],rate_48k,stereo} then count frames of
+//  {left[15:8],left[7:0],right[15:8],right[7:0]}.  A count of zero means one
+//  frame, which is exactly the encoding streams used before this change, so
+//  older transports decode unchanged.  Each frame's final byte still waits for
+//  the audio sink, so backpressure reaches the producer at frame granularity
+//  rather than record granularity.
 //
 //  Detection uses a four-byte sliding window.  A byte is only emitted once it
 //  has fallen out of the window without completing a marker, which costs three
@@ -66,6 +78,7 @@ localparam [31:0] PTS_MARKER     = 32'h000001B0;
 localparam [31:0] PCM_MARKER     = 32'h000001B1;
 localparam [31:0] PCM_END_MARKER = 32'h000001B6;
 localparam integer PAYLOAD_BYTES = 5;
+localparam [5:0]   MAX_PCM_FRAMES = 6'd32;
 
 localparam [2:0] S_FILL        = 3'd0,
                  S_STREAM      = 3'd1,
@@ -80,6 +93,10 @@ reg [2:0]  window_fill;
 reg [2:0]  payload_index;
 reg [39:0] payload;
 reg        stream_pending;
+reg [5:0]  pcm_frames_left;
+reg        pcm_mode_seen;
+reg [1:0]  pcm_byte_index;
+reg [23:0] pcm_frame;
 
 // The integrated decoder advances on stream_valid itself rather than on a
 // conventional valid-and-ready transfer.  Retain a pending output byte while
@@ -90,9 +107,10 @@ assign stream_valid = stream_pending && stream_ready;
 
 // Accept input whenever the pending output is free or will transfer in this
 // cycle, except while draining the window at end of transfer.
+// The last byte of every frame, not merely of every record, is the one the
+// sink must be ready for.
 wire pcm_payload_final =
-    (state == S_PCM_PAYLOAD) &&
-    (payload_index == PAYLOAD_BYTES[2:0] - 3'd1);
+    (state == S_PCM_PAYLOAD) && pcm_mode_seen && (pcm_byte_index == 2'd3);
 
 assign input_ready =
     (state != S_FLUSH) &&
@@ -134,6 +152,10 @@ always @(posedge clk) begin
         pcm_end            <= 1'b0;
         pcm_sample_count   <= 14'd0;
         pcm_protocol_error <= 1'b0;
+        pcm_frames_left    <= 6'd0;
+        pcm_mode_seen      <= 1'b0;
+        pcm_byte_index     <= 2'd0;
+        pcm_frame          <= 24'd0;
     end
     else begin
         metadata_valid <= 1'b0;
@@ -226,28 +248,51 @@ always @(posedge clk) begin
                     payload_index <= payload_index + 3'd1;
             end
 
-        // A PCM record is {mode,left[15:8],left[7:0],right[15:8],right[7:0]}.
-        // The final byte is not consumed until the audio FIFO can accept the
+        // A PCM record is {count,rate,stereo} followed by count frames of
+        // {left[15:8],left[7:0],right[15:8],right[7:0]}.  The final byte of
+        // each frame is not consumed until the audio FIFO can accept the
         // assembled sample, extending existing file-channel backpressure all
-        // the way to the FPGA-owned PCM sink.
+        // the way to the FPGA-owned PCM sink at frame granularity.
         S_PCM_PAYLOAD:
             if (input_valid && input_ready) begin
-                payload <= {payload[31:0], input_data};
-                if (payload_index == PAYLOAD_BYTES[2:0] - 3'd1) begin
-                    pcm_rate_48k <= payload_full[33];
-                    pcm_stereo   <= payload_full[32];
-                    pcm_left     <= payload_full[31:16];
-                    pcm_right    <= payload_full[15:0];
-                    pcm_valid    <= 1'b1;
-                    if (payload_full[39:34] != 6'd0)
+                if (!pcm_mode_seen) begin
+                    pcm_rate_48k   <= input_data[1];
+                    pcm_stereo     <= input_data[0];
+                    pcm_mode_seen  <= 1'b1;
+                    pcm_byte_index <= 2'd0;
+                    // A count of zero is the pre-entry-462 encoding of one
+                    // frame.  A count past the supported run is reported and
+                    // treated as one, which consumes the same five bytes a
+                    // malformed record consumed before.
+                    if (input_data[7:2] > MAX_PCM_FRAMES) begin
                         pcm_protocol_error <= 1'b1;
-                    if (pcm_sample_count != 14'h3FFF)
-                        pcm_sample_count <= pcm_sample_count + 14'd1;
-                    payload_index <= 3'd0;
-                    state         <= S_FILL;
+                        pcm_frames_left    <= 6'd1;
+                    end
+                    else if (input_data[7:2] == 6'd0)
+                        pcm_frames_left <= 6'd1;
+                    else
+                        pcm_frames_left <= input_data[7:2];
                 end
-                else
-                    payload_index <= payload_index + 3'd1;
+                else begin
+                    pcm_frame <= {pcm_frame[15:0], input_data};
+                    if (pcm_byte_index == 2'd3) begin
+                        pcm_left  <= {pcm_frame[23:16], pcm_frame[15:8]};
+                        pcm_right <= {pcm_frame[7:0], input_data};
+                        pcm_valid <= 1'b1;
+                        if (pcm_sample_count != 14'h3FFF)
+                            pcm_sample_count <= pcm_sample_count + 14'd1;
+                        pcm_byte_index <= 2'd0;
+                        if (pcm_frames_left == 6'd1) begin
+                            pcm_mode_seen <= 1'b0;
+                            payload_index <= 3'd0;
+                            state         <= S_FILL;
+                        end
+                        else
+                            pcm_frames_left <= pcm_frames_left - 6'd1;
+                    end
+                    else
+                        pcm_byte_index <= pcm_byte_index + 2'd1;
+                end
             end
 
         // The end token enters the same FIFO behind the final sample. The
