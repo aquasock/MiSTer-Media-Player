@@ -1,3 +1,31 @@
+## 383 COMMIT Unreleased 2b1a170 2026-08-23T20:29:33-07:00
+
+#### Coming From:
+
+Unreleased 2b1a170
+
+#### Purpose:
+
+Hardware-qualify mixed intra, predicted, skipped and residual macroblocks across repeated B-picture ownership sequences on the accepted queue-capacity fix.
+
+#### Outcome:
+
+After a MiSTer power cycle, the authoritative odd-length 366,071-byte `10_compat_mixed_macroblocks.m2v` passes with USER steady on, DISK steady off and POWER steady on. Its launch-free schema-seven capture freezes for quiet reason one after accepting 366,072 transport bytes including the expected pad, decoding nine reference plus fifteen B pictures and displaying all twenty-four pictures with twenty-three swaps. Sequence end, session quiet and presentation complete are true with zero decoder or presentation errors and zero cadence outliers at a measured 24.365 displayed swaps per second. Ranked telemetry observes scratch presentation, pending ordinary frames, active B reordering, queued generations, promotion and presentation hold during the repeated ownership sequence, while the terminal snapshot has no active reorder, queued generation, promotion, pending frame or terminal boundary. The exact even-length 791,528-byte `11_compat_long_gop.m2v`, SHA-256 `39dd3e889d1baa42e4d65fc2d6ca7a04c58c2ac38de0a5b1dba00e6585836d96`, was installed in the MiSTer file directory and retrieved byte-for-byte identical; its seventy-two pictures comprise three I, twenty-two P and forty-seven B pictures.
+
+#### Next Steps:
+
+Power-cycle the MiSTer and load `11_compat_long_gop.m2v` through the normal file selector, then report all three LEDs and leave the completed image loaded for telemetry capture. Require twenty-five reference plus forty-seven B pictures, all seventy-two displays, seventy-one swaps, exactly 791,528 accepted transport bytes, sequence-end quiet, complete presentation retirement and zero errors before proceeding to the five-second squirrel stress in test twelve.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 382 COMMIT Unreleased 2b1a170 2026-08-23T20:27:02-07:00
 
 #### Coming From:
@@ -1185,33 +1213,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 343 COMMIT Unreleased ae51759 2026-08-22T08:55:25-07:00
-
-#### Coming From:
-
-Unreleased 5f09e92
-
-#### Purpose:
-
-Finalize the public README for v0.6.0 and add the accepted user-facing FFmpeg conversion command as the third step of the approved release plan.
-
-#### Outcome:
-
-Commit `ae51759` presents v0.6.0 as the current published milestone, links the new release notes, updates remaining qualification and diagnostic wording, and adds the exact no-frame-counter FFmpeg command previously used for the accepted full Big Buck Bunny conversion. The command forces 720x480 square-pixel 4:2:0 elementary video at exact 24 fps with two B pictures and a strict 24-picture GOP, preserves source aspect ratio with black padding, removes audio, and includes a shell guard that appends the required H.262 sequence-end code only when FFmpeg omits it. A short generated input verifies that the published command produces progressive 720x480 `yuv420p` MPEG-2 at exact 24 fps and terminates in `000001b7`. The protected AI-assisted-development section remains exactly 5,540 bytes and byte-for-byte identical at SHA-256 `c86635095cfee8c36636802872e75932580309a3cb58d6513a44758b43d515b3`, and the README commit was pushed.
-
-#### Next Steps:
-
-Proceed to step four by copying the already qualified clean `MediaPlayer.rbf` to the date-coded release filename, verify its exact size and checksum against both accepted build states, and stage a release-package directory without committing the generated binary to the source tree. No build or hardware validation is required for this README-only commit.
-
-#### Files Modified:
-
-- README.md
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
 
 ---
