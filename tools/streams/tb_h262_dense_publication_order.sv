@@ -112,6 +112,8 @@ module tb_h262_dense_publication_order;
     mpeg2_h262_b_presentation_scheduler scheduler(
         .clk(clk),.reset(reset),.swap_window_pulse(swap_window_pulse),
         .frame_rate_code(4'h3),
+        .timestamp_candidate_active(1'b0),
+        .timestamp_candidate_due(1'b0),
         .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
         .reference_frame_bank(reference_bank),.b_picture_start(b_picture_start),
         .reference_promotion_count(reference_promotion_count),
@@ -122,6 +124,8 @@ module tb_h262_dense_publication_order;
         .display_frame_bank(display_frame_bank),.display_scratch(display_scratch),
         .display_scratch_bank(display_scratch_bank),
         .decode_scratch_bank(decode_scratch_bank),
+        .candidate_frame_valid(),.candidate_frame_scratch(),
+        .candidate_scratch_bank(),.candidate_frame_bank(),
         .framebuffer_swap_reset_count(framebuffer_swap_reset_count),
         .reference_overlap_header(reference_overlap_header),
         .presentation_hold(presentation_hold),

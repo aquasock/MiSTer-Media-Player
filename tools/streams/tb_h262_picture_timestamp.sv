@@ -7,17 +7,32 @@ module tb_h262_picture_timestamp;
 
     reg clk=0, reset=1;
     reg metadata_valid=0; reg [32:0] metadata_pts=0;
-    reg picture_start=0;
+    reg picture_start=0, picture_is_b=0, decode_scratch_bank=0;
+    reg b_picture_complete=0;
     reg [1:0] active_frame_bank=0, display_frame_bank=0;
+    reg display_scratch=0, display_scratch_bank=0;
+    reg candidate_frame_valid=0, candidate_frame_scratch=0;
+    reg candidate_scratch_bank=0; reg [1:0] candidate_frame_bank=0;
     wire [32:0] display_pts; wire display_pts_valid; wire [7:0] associated_count;
+    wire [32:0] candidate_pts; wire candidate_pts_valid;
 
     always #5 clk=~clk;
 
     mpeg2_h262_picture_timestamp dut(.clk(clk),.reset(reset),
         .metadata_valid(metadata_valid),.metadata_pts(metadata_pts),
-        .picture_start(picture_start),.active_frame_bank(active_frame_bank),
+        .picture_start(picture_start),.picture_is_b(picture_is_b),
+        .decode_scratch_bank(decode_scratch_bank),
+        .b_picture_complete(b_picture_complete),
+        .active_frame_bank(active_frame_bank),
         .display_frame_bank(display_frame_bank),
+        .display_scratch(display_scratch),
+        .display_scratch_bank(display_scratch_bank),
+        .candidate_frame_valid(candidate_frame_valid),
+        .candidate_frame_scratch(candidate_frame_scratch),
+        .candidate_scratch_bank(candidate_scratch_bank),
+        .candidate_frame_bank(candidate_frame_bank),
         .display_pts(display_pts),.display_pts_valid(display_pts_valid),
+        .candidate_pts(candidate_pts),.candidate_pts_valid(candidate_pts_valid),
         .associated_count(associated_count));
 
     task record(input [32:0] p);
@@ -26,6 +41,11 @@ module tb_h262_picture_timestamp;
     endtask
     task start_picture; begin @(negedge clk); picture_start=1;
               @(negedge clk); picture_start=0; end endtask
+    task complete_b;
+        begin @(negedge clk); b_picture_complete=1;
+              @(negedge clk); b_picture_complete=0;
+              repeat(2) @(posedge clk); end
+    endtask
     task complete;   // bookkeeper toggles the active bank on persistence
         begin @(negedge clk); active_frame_bank=active_frame_bank^2'd1;
               repeat(2) @(posedge clk); end
@@ -78,7 +98,53 @@ module tb_h262_picture_timestamp;
         if (associated_count !== 8'd4)
             $fatal(1,"associated %0d, expected 4",associated_count);
 
-        $display("H262_PICTURE_TIMESTAMP_PASS reorder=1 unannotated=1 delayed=1 coincident=1 count=%0d",
+        // Reordered B pictures persist into two scheduler-owned scratch banks.
+        // Their timestamps must follow those banks rather than the later
+        // reference decode order.
+        record(33'h0_0000_2000);
+        @(negedge clk); picture_is_b=1; decode_scratch_bank=0;
+        start_picture(); complete_b();
+        record(33'h0_0000_1000);
+        @(negedge clk); decode_scratch_bank=1;
+        start_picture(); complete_b();
+        @(negedge clk); picture_is_b=0;
+
+        @(negedge clk); display_scratch=1; display_scratch_bank=0;
+        @(posedge clk);
+        if (display_pts !== 33'h0_0000_2000 || !display_pts_valid)
+            $fatal(1,"scratch0 pts %h valid %b",display_pts,display_pts_valid);
+        @(negedge clk); display_scratch_bank=1; @(posedge clk);
+        if (display_pts !== 33'h0_0000_1000 || !display_pts_valid)
+            $fatal(1,"scratch1 pts %h valid %b",display_pts,display_pts_valid);
+
+        // Candidate order is independent of decode order: ask for scratch 1,
+        // then reference bank 1, and receive the exact retained timestamps.
+        @(negedge clk); candidate_frame_valid=1;
+        candidate_frame_scratch=1; candidate_scratch_bank=1;
+        @(posedge clk);
+        if (candidate_pts !== 33'h0_0000_1000 || !candidate_pts_valid)
+            $fatal(1,"scratch candidate query lost reordered timestamp");
+        @(negedge clk); candidate_frame_scratch=0; candidate_frame_bank=1;
+        @(posedge clk);
+        if (candidate_pts !== 33'h0_0000_1234 || !candidate_pts_valid)
+            $fatal(1,"reference candidate query returned %h/%b",
+                   candidate_pts,candidate_pts_valid);
+        if (associated_count !== 8'd6)
+            $fatal(1,"associated %0d, expected 6",associated_count);
+
+        // Reusing a scratch bank for an unannotated B explicitly clears its
+        // validity, preserving per-picture cadence fallback.
+        @(negedge clk); picture_is_b=1; decode_scratch_bank=0;
+        start_picture(); complete_b();
+        @(negedge clk); candidate_frame_scratch=1;
+        candidate_scratch_bank=0;
+        @(posedge clk);
+        if (candidate_pts_valid)
+            $fatal(1,"unannotated B inherited scratch timestamp");
+        if (associated_count !== 8'd6)
+            $fatal(1,"unannotated B changed association count");
+
+        $display("H262_PICTURE_TIMESTAMP_PASS reference=1 scratch=2 reorder=1 unannotated=reference/b delayed=1 coincident=1 candidate_query=1 count=%0d",
                  associated_count);
         $finish;
     end

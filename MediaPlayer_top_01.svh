@@ -56,6 +56,19 @@ wire [7:0]  mpeg2_new_inband_count;
 wire [32:0] mpeg2_new_display_pts;
 wire        mpeg2_new_display_pts_valid;
 wire [7:0]  mpeg2_new_associated_count;
+// Entry 389: timestamp-driven candidate presentation.  The scheduler exports
+// only its already-stable next identity; timestamp ownership supplies the
+// matching bank value and the local 90 kHz timeline decides when it is due.
+wire        mpeg2_new_candidate_frame_valid;
+wire        mpeg2_new_candidate_frame_scratch;
+wire        mpeg2_new_candidate_scratch_bank;
+wire [1:0]  mpeg2_new_candidate_frame_bank;
+wire [32:0] mpeg2_new_candidate_pts;
+wire        mpeg2_new_candidate_pts_valid;
+wire        mpeg2_new_timestamp_candidate_active;
+wire        mpeg2_new_timestamp_candidate_due;
+wire        mpeg2_new_pts_timeline_anchored;
+wire [32:0] mpeg2_new_pts_timeline_stc;
 wire        mpeg2_new_repeat_first_field;
 wire [3:0]  mpeg2_new_forward_f_code_horizontal;
 wire [3:0]  mpeg2_new_forward_f_code_vertical;

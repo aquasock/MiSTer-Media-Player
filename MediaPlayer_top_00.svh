@@ -353,7 +353,7 @@ wire [7:0]  cadence_video_b;
 wire        cadence_snapshot_ready;
 
 // ---------------------------------------------------------------------------
-// Entry 365: presentation time base.
+// Entry 389: presentation time base.
 //
 // The 90 kHz System Time Clock of H.222.0 is anchored to CLK_AUDIO (24.576
 // MHz), the same domain sys/audio_out.sv clocks samples out on, so externally
@@ -364,9 +364,10 @@ wire        cadence_snapshot_ready;
 // Only a single bit crosses domains.  A multi-bit counter synchronised into
 // clk_mpeg2 could tear across a carry, and a 33-bit gray decode would be a
 // 33-level XOR chain -- a new timing problem on a design that just spent this
-// development run recovering margin.  Instead the clock emits a 1 Hz pulse,
-// which crosses through an ordinary two-flop synchroniser, and the seconds are
-// counted on this side.
+// development run recovering margin.  Instead the clock emits single-bit
+// 90 kHz and 1 Hz pulses.  Each crosses through an ordinary synchroniser; the
+// former advances the decoder-domain presentation timeline and the latter
+// remains the cadence profiler's human-readable seconds counter.
 // ---------------------------------------------------------------------------
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [1:0] stc_audio_reset_sync;
@@ -377,6 +378,7 @@ end
 wire stc_audio_reset = stc_audio_reset_sync[1];
 
 wire        stc_pulse_1hz;
+wire        stc_tick_90k_audio;
 wire [32:0] stc_90k_value;
 
 mpeg2_h262_system_time_clock mpeg2_h262_system_time_clock
@@ -387,21 +389,27 @@ mpeg2_h262_system_time_clock mpeg2_h262_system_time_clock
 	.load_valid    (1'b0),
 	.load_value    (33'd0),
 	.stc_90k       (stc_90k_value),
-	.tick_90k      (),
+	.tick_90k      (stc_tick_90k_audio),
 	.stc_180k_half (),
 	.pulse_1hz     (stc_pulse_1hz)
 );
 
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] stc_pulse_sync;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] stc_tick_90k_sync;
 reg [13:0] mpeg2_new_stc_seconds;
+wire mpeg2_new_stc_tick_90k =
+	(stc_tick_90k_sync[2:1] == 2'b01);
 always @(posedge clk_mpeg2) begin
 	if (reset_mpeg2) begin
 		stc_pulse_sync        <= 3'b000;
+		stc_tick_90k_sync     <= 3'b000;
 		mpeg2_new_stc_seconds <= 14'd0;
 	end
 	else begin
 		stc_pulse_sync <= {stc_pulse_sync[1:0],stc_pulse_1hz};
+		stc_tick_90k_sync <= {stc_tick_90k_sync[1:0],stc_tick_90k_audio};
 		if (stc_pulse_sync[2:1] == 2'b01)
 			mpeg2_new_stc_seconds <= mpeg2_new_stc_seconds + 14'd1;
 	end

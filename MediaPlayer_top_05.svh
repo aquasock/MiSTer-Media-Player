@@ -103,16 +103,42 @@ end
 wire [31:0] mpeg2_new_b_scheduler_debug_state;
 mpeg2_h262_picture_timestamp mpeg2_h262_picture_timestamp
 (
-    .clk                (clk_mpeg2),
-    .reset              (reset_mpeg2),
-    .metadata_valid     (mpeg2_new_inband_valid),
-    .metadata_pts       (mpeg2_new_inband_pts_90k),
-    .picture_start      (mpeg2_new_picture_header_classified_now),
-    .active_frame_bank  (mpeg2_new_active_frame_bank),
-    .display_frame_bank (mpeg2_new_display_frame_bank),
-    .display_pts        (mpeg2_new_display_pts),
-    .display_pts_valid  (mpeg2_new_display_pts_valid),
-    .associated_count   (mpeg2_new_associated_count)
+    .clk                     (clk_mpeg2),
+    .reset                   (reset_mpeg2),
+    .metadata_valid          (mpeg2_new_inband_valid),
+    .metadata_pts            (mpeg2_new_inband_pts_90k),
+    .picture_start           (mpeg2_new_picture_header_classified_now),
+    .picture_is_b            (mpeg2_new_b_picture_start_now),
+    .decode_scratch_bank     (mpeg2_new_b_decode_scratch_bank),
+    .b_picture_complete      (mpeg2_new_b_user_success),
+    .active_frame_bank       (mpeg2_new_active_frame_bank),
+    .display_frame_bank      (mpeg2_new_display_frame_bank),
+    .display_scratch         (mpeg2_new_display_scratch),
+    .display_scratch_bank    (mpeg2_new_display_scratch_bank),
+    .candidate_frame_valid   (mpeg2_new_candidate_frame_valid),
+    .candidate_frame_scratch (mpeg2_new_candidate_frame_scratch),
+    .candidate_scratch_bank  (mpeg2_new_candidate_scratch_bank),
+    .candidate_frame_bank    (mpeg2_new_candidate_frame_bank),
+    .display_pts             (mpeg2_new_display_pts),
+    .display_pts_valid       (mpeg2_new_display_pts_valid),
+    .candidate_pts           (mpeg2_new_candidate_pts),
+    .candidate_pts_valid     (mpeg2_new_candidate_pts_valid),
+    .associated_count        (mpeg2_new_associated_count)
+);
+
+mpeg2_h262_pts_presentation_timeline mpeg2_h262_pts_presentation_timeline
+(
+    .clk              (clk_mpeg2),
+    .reset            (reset_mpeg2),
+    .tick_90k         (mpeg2_new_stc_tick_90k),
+    .metadata_valid   (mpeg2_new_inband_valid),
+    .metadata_pts     (mpeg2_new_inband_pts_90k),
+    .candidate_valid  (mpeg2_new_candidate_pts_valid),
+    .candidate_pts    (mpeg2_new_candidate_pts),
+    .anchored         (mpeg2_new_pts_timeline_anchored),
+    .stc_90k          (mpeg2_new_pts_timeline_stc),
+    .candidate_active (mpeg2_new_timestamp_candidate_active),
+    .candidate_due    (mpeg2_new_timestamp_candidate_due)
 );
 
 mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
@@ -121,6 +147,8 @@ mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
     .reset                       (reset_mpeg2),
     .swap_window_pulse           (mpeg2_new_swap_window_pulse),
     .frame_rate_code             (mpeg2_new_frame_rate_code),
+    .timestamp_candidate_active  (mpeg2_new_timestamp_candidate_active),
+    .timestamp_candidate_due     (mpeg2_new_timestamp_candidate_due),
     .frame_waiting               (mpeg2_new_frame_waiting),
     .completed_frame_bank        (mpeg2_new_completed_frame_bank),
     .reference_frame_bank        (mpeg2_new_reference_frame_bank),
@@ -136,6 +164,10 @@ mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
     .display_scratch             (mpeg2_new_display_scratch),
     .display_scratch_bank        (mpeg2_new_display_scratch_bank),
     .decode_scratch_bank         (mpeg2_new_b_decode_scratch_bank),
+    .candidate_frame_valid       (mpeg2_new_candidate_frame_valid),
+    .candidate_frame_scratch     (mpeg2_new_candidate_frame_scratch),
+    .candidate_scratch_bank      (mpeg2_new_candidate_scratch_bank),
+    .candidate_frame_bank        (mpeg2_new_candidate_frame_bank),
     .framebuffer_swap_reset_count(mpeg2_new_framebuffer_swap_reset_count),
     .reference_overlap_header    (mpeg2_new_b_reference_overlap_header),
     .presentation_hold           (mpeg2_new_b_presentation_hold),

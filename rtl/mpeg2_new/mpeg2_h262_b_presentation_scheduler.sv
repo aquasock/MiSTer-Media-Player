@@ -13,6 +13,11 @@ module mpeg2_h262_b_presentation_scheduler
     input  wire reset,
     input  wire swap_window_pulse,
     input  wire [3:0] frame_rate_code,
+    // Entry 389: when the next retained picture owns a timestamp, its modulo
+    // PTS comparison replaces only the cadence admission gate.  Untimestamped
+    // candidates continue through the established exact-rate accumulator.
+    input  wire timestamp_candidate_active,
+    input  wire timestamp_candidate_due,
     input  wire frame_waiting,
     input  wire [1:0] completed_frame_bank,
     input  wire [1:0] reference_frame_bank,
@@ -28,6 +33,10 @@ module mpeg2_h262_b_presentation_scheduler
     output reg  display_scratch,
     output reg  display_scratch_bank,
     output reg  decode_scratch_bank,
+    output wire candidate_frame_valid,
+    output wire candidate_frame_scratch,
+    output wire candidate_scratch_bank,
+    output wire [1:0] candidate_frame_bank,
     output reg [2:0] framebuffer_swap_reset_count,
     output wire reference_overlap_header,
     output wire presentation_hold,
@@ -149,6 +158,12 @@ wire cadence_scale_changed=
     (cadence_30000_1001!=(cadence_rate_code_q==4'h4));
 wire cadence_slot=!cadence_scale_changed&&
                   (!cadence_supported||(cadence_credit>=cadence_due));
+wire presentation_slot=timestamp_candidate_active?
+                       timestamp_candidate_due:cadence_slot;
+assign candidate_frame_valid=scheduled_frame_valid;
+assign candidate_frame_scratch=scheduled_frame_scratch;
+assign candidate_scratch_bank=scheduled_scratch_bank;
+assign candidate_frame_bank=scheduled_frame_bank;
 wire scratch0_available=!scratch0_pending&&!queued_scratch0_pending&&
     !(display_scratch&&!display_scratch_bank)&&
     !(decode_inflight&&!decode_scratch_bank)&&
@@ -587,11 +602,19 @@ always @(posedge clk) begin
             end
         end
 
-        if(swap_window_pulse&&cadence_slot&&scheduled_frame_valid&&
+        if(swap_window_pulse&&presentation_slot&&scheduled_frame_valid&&
            scheduled_frame_differs)begin
-            if(cadence_supported)
-                cadence_credit<=cadence_credit+cadence_step-
-                                cadence_limit;
+            // Timestamp admission may intentionally occur before the free
+            // cadence has accumulated a whole slot.  Clearing partial credit
+            // in that case consumes the presentation and prevents an
+            // annotated-to-unannotated transition from bursting next refresh.
+            if(cadence_supported) begin
+                if(cadence_slot)
+                    cadence_credit<=cadence_credit+cadence_step-
+                                    cadence_limit;
+                else
+                    cadence_credit<=26'd0;
+            end
             display_scratch<=scheduled_frame_scratch;
             if(scheduled_frame_scratch)display_scratch_bank<=scheduled_scratch_bank;
             else display_frame_bank<=scheduled_frame_bank;

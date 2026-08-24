@@ -14,8 +14,9 @@ A record is 0x000001B0 followed by five payload bytes:
 emulation prevention keeps 0x000001 out of payload data, so annotating a stream
 cannot collide with its contents, and an unannotated stream contains no records.
 
-Timestamps here are synthetic and evenly spaced.  This proves extraction, not
-presentation: nothing in the fabric consumes them yet.
+Timestamps may be evenly spaced or supplied explicitly in coded-picture order.
+The explicit form makes deterministic irregular and reordered-B presentation
+controls without changing the established evenly spaced default.
 """
 
 from __future__ import annotations
@@ -37,7 +38,8 @@ def build_record(pts: int, picture_structure: int, tff: int, rff: int,
     return RECORD_MARKER + value.to_bytes(5, "big")
 
 
-def annotate(data: bytes, pts_start: int, pts_step: int, limit: int | None,
+def annotate(data: bytes, pts_start: int, pts_step: int,
+             pts_list: list[int] | None, limit: int | None,
              picture_structure: int, tff: int, rff: int,
              progressive_frame: int) -> tuple[bytes, int, int]:
     out = bytearray()
@@ -51,6 +53,10 @@ def annotate(data: bytes, pts_start: int, pts_step: int, limit: int | None,
             break
         if limit is not None and count >= limit:
             break
+        if pts_list is not None and count >= len(pts_list):
+            break
+        if pts_list is not None:
+            pts = pts_list[count]
         out += data[pos:hit]
         out += build_record(pts, picture_structure, tff, rff, progressive_frame)
         last_pts = pts
@@ -71,6 +77,9 @@ def main() -> int:
     ap.add_argument("--pts-start", type=lambda s: int(s, 0), default=0x77EF2)
     ap.add_argument("--pts-step", type=int, default=3003,
                     help="90 kHz ticks between pictures; 3003 is 29.97 Hz")
+    ap.add_argument("--pts-list", default=None,
+                    help="comma-separated per-picture PTS values in coded "
+                         "order; each value accepts Python integer syntax")
     ap.add_argument("--limit", type=int, default=None,
                     help="annotate at most this many pictures")
     ap.add_argument("--picture-structure", type=int, default=3,
@@ -80,6 +89,20 @@ def main() -> int:
     ap.add_argument("--progressive-frame", type=int, default=1)
     args = ap.parse_args()
 
+    pts_list = None
+    if args.pts_list is not None:
+        try:
+            pts_list = [int(item.strip(), 0)
+                        for item in args.pts_list.split(",")
+                        if item.strip()]
+        except ValueError as exc:
+            ap.error(f"invalid --pts-list value: {exc}")
+        if not pts_list:
+            ap.error("--pts-list must contain at least one value")
+        for pts in pts_list:
+            if not 0 <= pts < (1 << 33):
+                ap.error(f"--pts-list value {pts} does not fit in 33 bits")
+
     data = args.source.read_bytes()
     if RECORD_MARKER in data:
         print(f"error: {args.source} already contains 0x000001B0; refusing to "
@@ -88,15 +111,25 @@ def main() -> int:
         return 2
 
     out, count, last_pts = annotate(
-        data, args.pts_start, args.pts_step, args.limit,
+        data, args.pts_start, args.pts_step, pts_list, args.limit,
         args.picture_structure, args.top_field_first,
         args.repeat_first_field, args.progressive_frame)
+    if pts_list is not None:
+        expected_count = len(pts_list)
+        if args.limit is not None:
+            expected_count = min(expected_count, args.limit)
+        if count != expected_count:
+            print(f"error: source contains only {count} picture starts for "
+                  f"{expected_count} requested --pts-list values",
+                  file=sys.stderr)
+            return 2
     args.dest.write_bytes(out)
 
     print(f"source        {args.source}  {len(data)} bytes")
     print(f"dest          {args.dest}  {len(out)} bytes")
     print(f"records       {count}")
-    print(f"first pts     0x{args.pts_start:09X}")
+    first_pts = pts_list[0] if pts_list is not None else args.pts_start
+    print(f"first pts     0x{first_pts:09X}")
     print(f"last pts      0x{last_pts:09X}   low11 = 0x{last_pts & 0x7FF:03X}")
     print(f"count field   {min(count, 255)}   (saturates at 255 in the snapshot)")
     return 0

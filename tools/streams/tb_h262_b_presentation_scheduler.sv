@@ -4,16 +4,21 @@ module tb_h262_b_presentation_scheduler;
     reg clk=0,reset=1,swap=0,frame_waiting=0;reg[1:0] completed_bank=0,reference_bank=1;
     reg b_start=0,non_b_start=0,i_start=0,p_start=0,sequence_end=0,b_success=0,b_error=0;
     reg [3:0] frame_rate_code=4'h3;
+    reg timestamp_candidate_active=0,timestamp_candidate_due=0;
     reg[7:0] reference_count=0;
     wire[1:0] display_bank;wire display_scratch,display_scratch_bank,decode_scratch_bank;
     wire [2:0] reset_count;
     wire overlap_header,hold,complete,error;
+    wire candidate_frame_valid,candidate_frame_scratch,candidate_scratch_bank;
+    wire [1:0] candidate_frame_bank;
     integer last_pulse_count=0;
 
     always #5 clk=~clk;
     mpeg2_h262_b_presentation_scheduler dut(
         .clk(clk),.reset(reset),.swap_window_pulse(swap),
         .frame_rate_code(frame_rate_code),
+        .timestamp_candidate_active(timestamp_candidate_active),
+        .timestamp_candidate_due(timestamp_candidate_due),
         .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
         .reference_frame_bank(reference_bank),.b_picture_start(b_start),
         .reference_promotion_count(reference_count),
@@ -24,6 +29,10 @@ module tb_h262_b_presentation_scheduler;
         .display_frame_bank(display_bank),.display_scratch(display_scratch),
         .display_scratch_bank(display_scratch_bank),
         .decode_scratch_bank(decode_scratch_bank),
+        .candidate_frame_valid(candidate_frame_valid),
+        .candidate_frame_scratch(candidate_frame_scratch),
+        .candidate_scratch_bank(candidate_scratch_bank),
+        .candidate_frame_bank(candidate_frame_bank),
         .framebuffer_swap_reset_count(reset_count),
         .reference_overlap_header(overlap_header),.presentation_hold(hold),
         .presentation_complete(complete),.presentation_error(error));
@@ -33,7 +42,8 @@ module tb_h262_b_presentation_scheduler;
     // below are refresh-specific; the invariant they exist to protect is that
     // a stalled decode may never bank credit and replay two presentations on
     // consecutive swap windows.  Assert that directly and at every window.
-    wire dut_presents = swap && dut.cadence_slot && dut.scheduled_frame_valid &&
+    wire dut_presents = swap && !timestamp_candidate_active &&
+                        dut.presentation_slot && dut.scheduled_frame_valid &&
                         dut.scheduled_frame_differs;
     integer swap_window_index=0;
     integer last_present_index=-10;
@@ -104,6 +114,7 @@ module tb_h262_b_presentation_scheduler;
         begin
             @(negedge clk);reset<=1;swap<=0;frame_waiting<=0;b_start<=0;
             non_b_start<=0;i_start<=0;p_start<=0;sequence_end<=0;b_success<=0;b_error<=0;
+            timestamp_candidate_active<=0;timestamp_candidate_due<=0;
             reference_count<=0;
             repeat(2)@(negedge clk);reset<=0;#1;
         end
@@ -554,6 +565,52 @@ module tb_h262_b_presentation_scheduler;
         if(display_scratch||!display_bank)
             $fatal(1,"ordinary frame presentation did not recover after abort");
 
+        // A timestamped ordinary candidate waits through any number of safe
+        // swap windows while its PTS is future, then presents on the first
+        // window after equality/late admission.  Candidate identity taps must
+        // describe that same retained bank.
+        reset_scheduler();
+        timestamp_candidate_active=1;
+        timestamp_candidate_due=0;
+        completed_bank=1;
+        @(negedge clk);frame_waiting<=1;
+        @(negedge clk);frame_waiting<=0;#1;
+        pulse_close();
+        if(!candidate_frame_valid||candidate_frame_scratch||
+           (candidate_frame_bank!==2'd1))
+            $fatal(1,"timestamp query identity did not expose ordinary bank 1");
+        repeat(5) pulse_window();
+        if(display_bank!==2'd0||!dut.pending_frame_valid)
+            $fatal(1,"future timestamp did not hold retained candidate");
+        timestamp_candidate_due=1;
+        pulse_window();
+        if(display_bank!==2'd1||dut.pending_frame_valid)
+            $fatal(1,"due timestamp did not present at first safe window");
+
+        // Timestamp admission is allowed before the cadence accumulator is
+        // due, but it must consume partial credit.  The following missing-PTS
+        // candidate therefore cannot burst on the very next refresh.
+        completed_bank=0;
+        @(negedge clk);frame_waiting<=1;
+        @(negedge clk);frame_waiting<=0;#1;
+        pulse_close();
+        pulse_window();
+        if(display_bank!==2'd0||(dut.cadence_credit!==26'd0))
+            $fatal(1,"early timestamp did not consume cadence credit %0d",
+                   dut.cadence_credit);
+        timestamp_candidate_active=0;
+        timestamp_candidate_due=0;
+        completed_bank=1;
+        @(negedge clk);frame_waiting<=1;
+        @(negedge clk);frame_waiting<=0;#1;
+        pulse_close();
+        pulse_window();
+        if(display_bank!==2'd0||!dut.pending_frame_valid)
+            $fatal(1,"missing-PTS fallback burst on next refresh");
+        pulse_swap();
+        if(display_bank!==2'd1)
+            $fatal(1,"missing-PTS candidate did not resume exact cadence");
+
         // 1206 raster swap windows are just under twenty seconds at 60.3165
         // Hz.  Exact rational accumulation distinguishes 24000/1001 from 24
         // fps (479 versus 480 pictures) and 30000/1001 from 30 fps (599 versus
@@ -588,7 +645,7 @@ module tb_h262_b_presentation_scheduler;
             $fatal(1,"30000/1001 rate change did not re-seed credit code=%0d credit=%0d",
                    dut.cadence_rate_code_q,dut.cadence_credit);
 
-        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=23.976/24/25/29.97/30 min_present_gap=%0d overlap_p=1 overlap_i=1 deferred_b=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=early/active fail_open=1",min_present_gap);
+        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=23.976/24/25/29.97/30 timestamp_wait_due=1 missing_fallback=1 no_burst=1 min_present_gap=%0d overlap_p=1 overlap_i=1 deferred_b=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=early/active fail_open=1",min_present_gap);
         $finish;
     end
 
