@@ -40,7 +40,7 @@ module mpeg2_h262_inband_metadata
     input  wire        input_end,
 
     output reg   [7:0] stream_data,
-    output reg         stream_valid,
+    output wire        stream_valid,
     input  wire        stream_ready,
 
     output reg  [32:0] pts_90k,
@@ -65,10 +65,19 @@ reg [31:0] window;
 reg [2:0]  window_fill;
 reg [2:0]  payload_index;
 reg [39:0] payload;
+reg        stream_pending;
 
-// Accept input whenever the output is free, except while draining the window
-// at end of transfer, when no further input is consumed.
-assign input_ready = (state != S_FLUSH) && (!stream_valid || stream_ready);
+// The integrated decoder advances on stream_valid itself rather than on a
+// conventional valid-and-ready transfer.  Retain a pending output byte while
+// it is stalled, but expose valid only in the cycle the decoder accepts it.
+// This preserves the pre-extractor pulse-valid contract and prevents a held
+// byte from being parsed repeatedly during picture-ownership backpressure.
+assign stream_valid = stream_pending && stream_ready;
+
+// Accept input whenever the pending output is free or will transfer in this
+// cycle, except while draining the window at end of transfer.
+assign input_ready =
+    (state != S_FLUSH) && (!stream_pending || stream_ready);
 
 wire [31:0] window_next = {window[23:0], input_data};
 // window_fill saturates at four; the window then always holds the true
@@ -84,7 +93,7 @@ always @(posedge clk) begin
         payload_index      <= 3'd0;
         payload            <= 40'd0;
         stream_data        <= 8'd0;
-        stream_valid       <= 1'b0;
+        stream_pending     <= 1'b0;
         pts_90k            <= 33'd0;
         picture_structure  <= 2'd0;
         top_field_first    <= 1'b0;
@@ -96,8 +105,8 @@ always @(posedge clk) begin
     else begin
         metadata_valid <= 1'b0;
 
-        if (stream_valid && stream_ready)
-            stream_valid <= 1'b0;
+        if (stream_pending && stream_ready)
+            stream_pending <= 1'b0;
 
         case (state)
 
@@ -138,7 +147,7 @@ always @(posedge clk) begin
                     // stream.  Dropping it here silently truncated the byte
                     // before every record.
                     stream_data   <= window[31:24];
-                    stream_valid  <= 1'b1;
+                    stream_pending <= 1'b1;
                     window        <= 32'd0;
                     window_fill   <= 3'd0;
                     payload_index <= 3'd0;
@@ -146,7 +155,7 @@ always @(posedge clk) begin
                 end
                 else begin
                     stream_data  <= window[31:24];
-                    stream_valid <= 1'b1;
+                    stream_pending <= 1'b1;
                 end
             end
             else if (input_end)
@@ -174,10 +183,10 @@ always @(posedge clk) begin
 
         // Emit the residual window at end of transfer, oldest byte first.
         S_FLUSH:
-            if (!stream_valid || stream_ready) begin
+            if (!stream_pending || stream_ready) begin
                 if (window_fill != 3'd0) begin
                     stream_data  <= window[31:24];
-                    stream_valid <= 1'b1;
+                    stream_pending <= 1'b1;
                     window       <= {window[23:0], 8'd0};
                     window_fill  <= window_fill - 3'd1;
                 end

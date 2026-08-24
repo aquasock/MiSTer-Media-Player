@@ -35,9 +35,17 @@ module tb_h262_inband_metadata;
     // captured output
     reg [7:0] got [0:1023];
     integer   got_n = 0;
+    integer   visible_n = 0;
     always @(posedge clk) if (!reset && stream_valid && stream_ready) begin
         got[got_n] = stream_data; got_n = got_n + 1;
     end
+    // The integrated decoder's byte-valid convention is a transfer pulse:
+    // frontend and parser consumers advance on stream_valid itself.  A held
+    // valid level during downstream ownership backpressure would therefore
+    // replay the same byte once per stalled cycle even though a conventional
+    // ready/valid monitor sees only one transfer.
+    always @(posedge clk) if (!reset && stream_valid)
+        visible_n = visible_n + 1;
 
     integer meta_seen = 0;
     reg [32:0] last_pts;
@@ -47,8 +55,10 @@ module tb_h262_inband_metadata;
 
     task send(input [7:0] b);
         begin
-            @(negedge clk); input_data = b; input_valid = 1;
-            @(posedge clk); while (!input_ready) @(posedge clk);
+            // Match the integrated transport gate: fifo_read and therefore
+            // input_valid are derived from downstream input_ready.
+            @(negedge clk); while (!input_ready) @(negedge clk);
+            input_data = b; input_valid = 1;
             @(negedge clk); input_valid = 0;
         end
     endtask
@@ -124,7 +134,7 @@ module tb_h262_inband_metadata;
             $fatal(1,"overlapping prefix emitted %0d bytes, expected the single leading 00",got_n);
 
         // ---- 5. backpressure must not corrupt or drop ----
-        got_n = 0; meta_seen = 0; stream_ready = 0;
+        got_n = 0; meta_seen = 0; visible_n = 0; stream_ready = 0;
         fork
             begin
                 send(8'h11); send(8'h22); send(8'h33); send(8'h44);
@@ -134,6 +144,8 @@ module tb_h262_inband_metadata;
         join
         finish_stream();
         if (got_n !== 6) $fatal(1,"backpressure lost bytes: %0d of 6",got_n);
+        if (visible_n !== 6)
+            $fatal(1,"pulse-valid consumer saw %0d byte cycles for 6 bytes",visible_n);
         if (got[0]!==8'h11||got[5]!==8'h66)
             $fatal(1,"backpressure reordered the stream");
 
