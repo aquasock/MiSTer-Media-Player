@@ -21,6 +21,7 @@
 #define PCM_REFILL_FRAMES           128u
 #define PCM_SINK_FIFO_FRAMES        8192u
 #define PCM_STARTUP_VIDEO_BYTES     28672u
+#define PTS_MAX_PICTURE_GAP         60u
 #define VIDEO_SLICE_BYTES           256u
 
 /*
@@ -72,7 +73,8 @@ struct video_chunk {
     uint8_t *data;
     size_t size;
     size_t offset;
-    int has_pts;
+    int has_pts;      /* carries a timeline the scheduler paces against  */
+    int has_record;   /* that timeline is also written into the stream   */
     uint64_t pts;
 };
 
@@ -105,7 +107,56 @@ struct output_state {
     int have_video_pts;
     int scheduler_enabled;
     int scheduler_started;
+    uint32_t pts_window;      /* start-code scanner across queued payloads */
+    unsigned pictures_since_pts;
+    int pts_boundary_seen;    /* sequence or group header since last record */
+    int pts_emitted;
 };
+
+/*
+ * Entry 459: every in-band record costs the presentation path something.
+ * Carrying one timestamp per timestamped PES packet measured 21 late
+ * presentations in 24 seconds on hardware, roughly one per second, while the
+ * same 577 pictures presented perfectly from 26 timestamps with the decoder's
+ * reservoir untouched in both cases.  Presentation reconstructs display order
+ * from each picture's own temporal reference, so a timestamp is only needed
+ * where that reconstruction restarts, at a sequence or group boundary, with a
+ * picture-count bound so a stream carrying neither still gets one periodically.
+ */
+static int pts_record_wanted(struct output_state *output)
+{
+    if (output->pts_emitted && !output->pts_boundary_seen &&
+        output->pictures_since_pts < PTS_MAX_PICTURE_GAP)
+        return 0;
+    output->pts_boundary_seen = 0;
+    output->pictures_since_pts = 0;
+    output->pts_emitted = 1;
+    return 1;
+}
+
+/* Track the boundaries and pictures that decide the next record. */
+static void pts_scan_payload(struct output_state *output, const uint8_t *data,
+                             size_t size)
+{
+    size_t i;
+
+    for (i = 0; i < size; ++i) {
+        output->pts_window = (output->pts_window << 8) | data[i];
+        if ((output->pts_window & 0xffffff00u) != 0x00000100u)
+            continue;
+        switch (output->pts_window & 0xffu) {
+        case 0x00:
+            output->pictures_since_pts++;
+            break;
+        case 0xb3:
+        case 0xb8:
+            output->pts_boundary_seen = 1;
+            break;
+        default:
+            break;
+        }
+    }
+}
 
 struct audio_state {
     mp3dec_t decoder;
@@ -261,10 +312,10 @@ static int write_video_immediate(struct output_state *output, const void *data,
 }
 
 static int queue_video(struct output_state *output, const uint8_t *data,
-                       size_t size, int has_pts, uint64_t pts)
+                       size_t size, int has_pts, int has_record, uint64_t pts)
 {
     struct video_chunk *chunk;
-    size_t prefix = has_pts ? 9u : 0u;
+    size_t prefix = has_record ? 9u : 0u;
 
     if (size > VIDEO_QUEUE_LIMIT - prefix ||
         output->video_queued_bytes > VIDEO_QUEUE_LIMIT - (size + prefix)) {
@@ -284,11 +335,12 @@ static int queue_video(struct output_state *output, const uint8_t *data,
         free(chunk);
         return -1;
     }
-    if (has_pts)
+    if (has_record)
         encode_video_pts(chunk->data, pts);
     memcpy(chunk->data + prefix, data, size);
     chunk->size = prefix + size;
     chunk->has_pts = has_pts;
+    chunk->has_record = has_record;
     chunk->pts = pts;
     if (output->video_tail)
         output->video_tail->next = chunk;
@@ -298,7 +350,7 @@ static int queue_video(struct output_state *output, const uint8_t *data,
     output->video_queued_bytes += chunk->size;
     if (output->video_queued_bytes > output->video_peak_bytes)
         output->video_peak_bytes = output->video_queued_bytes;
-    if (has_pts)
+    if (has_record)
         output->video_pts++;
     return 0;
 }
@@ -936,18 +988,23 @@ static int process_pes(struct media_source *input, uint8_t code,
         goto done;
     }
     if ((code & 0xf0) == 0xe0) {
+        int has_record = has_pts && pts_record_wanted(output);
+
         if (output->scheduler_enabled) {
             if (queue_video(output, packet + payload_offset,
-                            length - payload_offset, has_pts, pts) < 0 ||
+                            length - payload_offset, has_pts, has_record,
+                            pts) < 0 ||
                 scheduler_drain(output, 0) < 0)
                 goto done;
         } else {
-            if (has_pts && emit_video_pts(output, pts) < 0)
+            if (has_record && emit_video_pts(output, pts) < 0)
                 goto done;
             if (write_video_immediate(output, packet + payload_offset,
                                       length - payload_offset, "video") < 0)
                 goto done;
         }
+        pts_scan_payload(output, packet + payload_offset,
+                         length - payload_offset);
     } else if ((code & 0xe0) == 0xc0) {
         if (has_pts && !output->have_audio_pts) {
             output->first_audio_pts = pts;
