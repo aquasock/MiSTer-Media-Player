@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Report the H.262 structure relevant to the v0.6.0 compatibility work.
+"""Report the H.262 structure relevant to the active compatibility work.
 
 This is deliberately a syntax inventory, not a second decoder.  It identifies
-the admitted progressive 4:2:0 frontend envelope, picture order, slice layout,
-and payload pressure before a stream is placed on MiSTer hardware.  Macroblock
-semantics remain the responsibility of the RTL and the software reference
-decoder used by the individual deterministic generators.
+the admitted progressive 4:2:0 frontend envelope, the bounded native-interlaced
+I-frame candidate envelope, picture order, slice layout, and payload pressure
+before a stream is placed on MiSTer hardware.  Macroblock semantics remain the
+responsibility of the RTL and the software reference decoder used by the
+individual deterministic generators.
 """
 from __future__ import annotations
 
@@ -84,11 +85,14 @@ def parse_picture_coding_extension(payload: bytes) -> dict[str, int | bool]:
         "backward_vertical_f_code": read_bits(payload, 16, 4),
         "intra_dc_precision": read_bits(payload, 20, 2),
         "picture_structure": read_bits(payload, 22, 2),
+        "top_field_first": bool(read_bits(payload, 24, 1)),
         "frame_pred_frame_dct": bool(read_bits(payload, 25, 1)),
         "concealment_motion_vectors": bool(read_bits(payload, 26, 1)),
         "q_scale_type": bool(read_bits(payload, 27, 1)),
         "intra_vlc_format": bool(read_bits(payload, 28, 1)),
         "alternate_scan": bool(read_bits(payload, 29, 1)),
+        "repeat_first_field": bool(read_bits(payload, 30, 1)),
+        "chroma_420_type": bool(read_bits(payload, 31, 1)),
         "progressive_frame": bool(read_bits(payload, 32, 1)),
     }
 
@@ -98,9 +102,9 @@ def classify(sequence: dict[str, Any], pictures: list[dict[str, Any]]) -> tuple[
     extension = sequence.get("extension")
     if extension is None:
         reasons.append("missing sequence_extension")
+        progressive_sequence = True
     else:
-        if not extension["progressive_sequence"]:
-            reasons.append("interlaced sequence")
+        progressive_sequence = bool(extension["progressive_sequence"])
         if extension["chroma_format"] != 1:
             reasons.append(f"chroma_format={extension['chroma_format']}")
 
@@ -118,11 +122,32 @@ def classify(sequence: dict[str, Any], pictures: list[dict[str, Any]]) -> tuple[
             reasons.append(f"picture {number} requires frame DCT/motion_type parsing")
         if coding["concealment_motion_vectors"]:
             reasons.append(f"picture {number} uses concealment motion vectors")
-        if not coding["progressive_frame"]:
-            reasons.append(f"picture {number} is not progressive")
+
+        if progressive_sequence:
+            if not coding["progressive_frame"]:
+                reasons.append(f"picture {number} is not progressive")
+        else:
+            if picture["coding_type"] != 1:
+                reasons.append(f"picture {number} is not intra")
+            if coding["progressive_frame"]:
+                reasons.append(f"picture {number} is not an interlaced frame")
+            if coding["repeat_first_field"]:
+                reasons.append(f"picture {number} repeats its first field")
+            if coding["chroma_420_type"]:
+                reasons.append(f"picture {number} has progressive 4:2:0 chroma signalling")
 
     if reasons:
         return "outside_v0.5_frontend_envelope", sorted(set(reasons))
+    if not progressive_sequence:
+        if sequence.get("horizontal_size") != 720 or sequence.get("vertical_size") != 480:
+            return "outside_native_480i_i_frame_envelope", [
+                "native interlaced milestone requires 720x480 geometry"
+            ]
+        if sequence.get("frame_rate_code") != 4:
+            return "outside_native_480i_i_frame_envelope", [
+                "native interlaced milestone requires 30000/1001 frame rate"
+            ]
+        return "interlaced_420_i_frame_candidate_requires_macroblock_execution", []
     return "progressive_420_candidate_requires_macroblock_execution", []
 
 

@@ -216,6 +216,13 @@ def check(path: Path) -> dict[str, Any]:
     for reason in analysis.get("classification_reasons", []):
         problems.append(f"video: {reason}")
 
+    if analysis.get("classification") == (
+        "interlaced_420_i_frame_candidate_requires_macroblock_execution"
+    ):
+        problems.append(
+            "video: native interlaced I-frame candidate recognized, but decoder/output "
+            "support is not enabled in the current RTL yet")
+
     if SEQUENCE_END_CODE not in video[-64:]:
         problems.append(
             "no sequence_end_code near the end of the video stream; regenerate "

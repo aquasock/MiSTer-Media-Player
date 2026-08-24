@@ -51,6 +51,7 @@ response_timestamp.txt
 *.avi
 *.mp4
 tools/streams/generated_compatibility/
+tools/streams/generated_interlaced/
 host/arm/.deps/
 host/build/
 tools/streams/generated_arm_av/

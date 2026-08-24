@@ -1,10 +1,10 @@
 # CONTROLLED STANDARDS REFERENCE
 
 > **Project:** MiSTer-Media-Player  
-> **Purpose:** Fast, clause-level standards reference for the active MPEG-2 decoder and the approved v0.7.0 ARM media-pipeline work.
+> **Purpose:** Fast, clause-level standards reference for the active MPEG-2 decoder, the released v0.7.0 ARM media pipeline, and the approved native-interlaced milestone.
 > **Authority:** The cited controlled document always outranks this summary.
 
-This file contains external rules, not project history or implementation advice. It is deliberately limited to sources that support the current H.262 decoder or the next approved work: native frame cadence, MPEG-2 Program Stream framing, PES parsing, PTS/DTS timing, and ARM-side MPEG-1 Layer II audio decoding.
+This file contains external rules, not project history or implementation advice. It is deliberately limited to sources that support the current H.262 decoder or approved work: native frame and field cadence, interlaced frame presentation, MPEG-2 Program Stream framing, PES parsing, PTS/DTS timing, and ARM-side MPEG-1 Layer II audio decoding.
 
 ---
 
@@ -104,11 +104,12 @@ The 2021 H.222.0 edition is the controlled text consulted for the records below.
 
 ---
 
-## 3. Approved v0.7.0 routing
+## 3. Active routing
 
 | Question | Consult first | Fast records |
 |---|---|---|
 | Native 23.976/24/25/29.97/30 cadence | H.262 sequence header | H262-027 |
+| Native interlaced frame structure and field output | H.262 picture coding extension and output process | H262-028 through H262-035 |
 | Program Stream pack boundaries and clean termination | H.222.0 2.5.3 | H222-001 through H222-003 |
 | PES length, stream selection and optional headers | H.222.0 2.4.3.6–2.4.3.7 | H222-004 through H222-006 |
 | Picture presentation timestamps and reorder timing | H.222.0 2.4.3.7 | H222-007 and H222-011 |
@@ -175,6 +176,14 @@ H262-024: "Non-intra Escape coefficient"
 H262-025: "Slice endpoints, start address and coverage"
 H262-026: "B-picture intra macroblock types"
 H262-027: "Frame-rate code and extension"
+H262-028: "Interlaced sequences may contain frame pictures"
+H262-029: "Interlaced-sequence frame-picture macroblock height"
+H262-030: "Frame picture structure"
+H262-031: "Authored first-field order"
+H262-032: "Frame-DCT and frame-prediction subset"
+H262-033: "Interlaced-frame repeat and 4:2:0 signalling"
+H262-034: "Interlaced sequence field-period output"
+H262-035: "Interlaced 4:2:0 sample organization"
 H222-001: "Program Stream framing and end code"
 H222-002: "Pack header, SCR, mux rate and stuffing"
 H222-003: "System-header framing and length"
@@ -330,6 +339,54 @@ All records in this section are `VERIFIED`, `HIGH` confidence, and apply to the 
   source_reference: "6.3.3; Table 6-4"
   controlled_conclusion: "frame_rate_code values are 1=24000/1001, 2=24, 3=25, 4=30000/1001, 5=30, 6=50, 7=60000/1001 and 8=60 frames/s; 0 is forbidden and 9..15 reserved. The final rate is the table value times (frame_rate_extension_n+1)/(frame_rate_extension_d+1)."
   conformance_effect: "Cadence must distinguish fractional 24000/1001 and 30000/1001 rates from integer 24 and 30 rather than treating either pair as interchangeable."
+
+- record_id: H262-028
+  source_id: H262
+  source_reference: "6.3.5"
+  controlled_conclusion: "When progressive_sequence is zero, a coded sequence may contain frame pictures and field pictures, and a frame picture may represent either a progressive or an interlaced frame."
+  conformance_effect: "Do not reject a complete frame picture solely because the sequence is interlaced; apply the picture-level structure and progressive-frame rules."
+
+- record_id: H262-029
+  source_id: H262
+  source_reference: "6.3.3"
+  controlled_conclusion: "For a frame picture in a sequence with progressive_sequence equal to zero, encoded luminance macroblock height is 2*((vertical_size+31)/32); the displayable region is top-aligned."
+  conformance_effect: "A 480-line interlaced frame picture occupies 30 macroblock rows, matching the existing 720x480 full-frame storage geometry while retaining interlaced semantics."
+
+- record_id: H262-030
+  source_id: H262
+  source_reference: "6.3.10; Table 6-14"
+  controlled_conclusion: "picture_structure values 01 and 10 identify top- and bottom-field pictures respectively, while 11 identifies a complete frame picture; 00 is reserved."
+  conformance_effect: "The first native-interlaced subset admits only picture_structure 11 and must continue to reject separately coded field pictures."
+
+- record_id: H262-031
+  source_id: H262
+  source_reference: "6.3.10"
+  controlled_conclusion: "In an interlaced-sequence frame picture, top_field_first equal to one outputs the reconstructed top field first; zero outputs the reconstructed bottom field first."
+  conformance_effect: "Native presentation must preserve the authored TFF or BFF value rather than deriving field order from line parity or a fixed display preference."
+
+- record_id: H262-032
+  source_id: H262
+  source_reference: "6.3.10; 6.3.17.1"
+  controlled_conclusion: "frame_pred_frame_dct equal to one restricts a frame picture to frame DCT and frame prediction. frame_motion_type is then absent and prediction is decoded as frame-based."
+  conformance_effect: "This flag defines a bounded interlaced-frame subset that can reuse the existing frame-DCT macroblock raster and excludes field-DCT and field-motion syntax."
+
+- record_id: H262-033
+  source_id: H262
+  source_reference: "6.3.10"
+  controlled_conclusion: "For 4:2:0, chroma_420_type shall equal progressive_frame. When progressive_sequence and progressive_frame are both zero, repeat_first_field shall be zero and the reconstructed frame outputs as exactly two fields."
+  conformance_effect: "The first interlaced subset requires chroma_420_type=0, progressive_frame=0, and repeat_first_field=0; any other combination remains outside the milestone."
+
+- record_id: H262-034
+  source_id: H262
+  source_reference: "6.3.3; Table 6-4; 7.1"
+  controlled_conclusion: "For progressive_sequence equal to zero, reconstructed frames are broken into fields and output at regular field-period intervals; the field period is one half of the reciprocal of the signalled frame rate."
+  conformance_effect: "A frame_rate_code 4 stream is presented as 30000/1001 frames per second and 60000/1001 authored fields per second, with field rather than frame publication cadence."
+
+- record_id: H262-035
+  source_id: H262
+  source_reference: "6.1.1.8; Figures 6-1 through 6-3"
+  controlled_conclusion: "In 4:2:0 interlaced frames, chrominance has half the frame width and height; its samples retain the same spatial frame locations whether the interlaced frame is represented by one frame picture or two field pictures, and their vertical relation to field luminance differs from progressive-frame sampling."
+  conformance_effect: "Native field presentation must use interlaced 4:2:0 chroma expansion and cannot reuse progressive vertical chroma pairing without qualification."
 ```
 
 ---
