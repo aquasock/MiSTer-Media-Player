@@ -1,3 +1,31 @@
+## 397 COMMIT Unreleased a57079f 2026-08-23T22:23:18-07:00
+
+#### Coming From:
+
+Unreleased a57079f
+
+#### Purpose:
+
+Install and independently verify the exact first-PCM hardware candidate before its focused MiSTer test.
+
+#### Outcome:
+
+The 4,214,932-byte Entry-396 `MediaPlayer.rbf` is installed persistently as `/media/fat/MediaPlayer.rbf` on the connected MiSTer through the established non-interactive transfer. An independent FTP retrieval to `/tmp/MediaPlayer_a57079f_remote.rbf` is byte-identical to the local build and reproduces SHA-256 `ad04f9f73c0fb98309588f8c212c6ccad71c80b254a2a284f637672a73350d37`. The running core remains unchanged until the user reboots, so no unrequested launch or test occurred. This is the sole hardware image for the cycle and no second build is planned.
+
+#### Next Steps:
+
+Reboot the MiSTer to load the installed candidate. In the core menu, confirm Audio Test Off is silent, then select 44.1k Mono, 44.1k Stereo, 48k Mono and 48k Stereo in turn; report whether every mode is audible, whether mono is centered in both channels, whether stereo has the lower 440 Hz tone on the left and higher 660 Hz tone on the right, and whether returning to Off becomes silent. After the Audio modes pass, reset once, run only `04_b_bidirectional.m2v`, report all three LEDs and leave the final image loaded for capture; no other video file is required in this build cycle.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 396 COMMIT Unreleased a57079f 2026-08-23T22:22:07-07:00
 
 #### Coming From:
@@ -1182,35 +1210,5 @@ Restore the preserved `2dc52d7` database and build `058f0a3` incrementally at se
 
 - [ ] Built
 - [ ] Passed
-
----
-## 357 COMMIT Unreleased 2dc52d7 2026-08-22T21:53:25-07:00
-
-#### Coming From:
-
-Unreleased c4d9631
-
-#### Purpose:
-
-Break the route-dominated fatal-error feedback through compressed ingress with a registered sticky transport-fault boundary while leaving clean-stream decode data unchanged.
-
-#### Outcome:
-
-Commit `2dc52d7` adds one sticky decoder-clock fault register inside the existing stream transport gate, breaking the route-dominated combinational path from B replay diagnostics through compressed ingress into the P parser while leaving clean-stream bytes and ready-valid backpressure unchanged; a newly detected fatal event begins fail-open draining on the following clock and remains latched until reset. The focused transport-gate test proves clean combinational flow, one-cycle fault capture, sixteen-byte sticky drain and reset recovery; Program Stream unit and real-file extraction tests remain exact, and reusable B-prediction and multi-slice decoder soaks pass with zero errors. The incremental seed-nine Quartus 17.0.2 build completes with zero errors and improves global setup from plus 0.018 ns to plus 0.375 ns and decoder setup from plus 0.026 ns to plus 0.572 ns, with plus 7.280 ns video setup, plus 0.246 ns hold, plus 4.355 ns recovery, plus 0.573 ns removal and plus 1.122 ns pulse width. It uses 35,932 ALMs, 52,421 registers, 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks; the 4,231,288-byte RBF has SHA-256 `d4f19c0d35cf972b34cafdc41c51571f937974c1b05d10fa2cfa6af3fb5658ee`. Direct MiSTer qualification passes B prediction, repeated multi-slice, the 120-picture Program Stream and the 360-picture squirrel stress with zero decoder errors, sequence end, presentation completion and quiet terminal state, including the established odd-byte transport pad and eight-bit counter-wrap conventions. Because the strict decoder audit has no violated paths and gains plus 0.546 ns over the preserved baseline, the user-authorized clean fallback is unnecessary; the exact incremental build is preserved outside the repository, installed persistently and retrieved byte-for-byte from the MiSTer.
-
-#### Next Steps:
-
-Treat this exact image as the accepted timing-hardened Program Stream boundary and retain the preserved `c4d9631` build as a rollback point. The more invasive registered P/B work path is not justified while decoder setup remains comfortably positive; proceed with validated PES timestamp capture and PTS-driven presentation scheduling as a separate bounded cycle, retaining raw elementary-stream compatibility, the diagnostic architecture and the full timing and hardware gates.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- rtl/mpeg2_new/mpeg2_h262_stream_transport_gate.sv
-- tools/streams/tb_h262_stream_transport_gate.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
