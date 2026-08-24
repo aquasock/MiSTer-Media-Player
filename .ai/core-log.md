@@ -1,3 +1,35 @@
+## 461 COMMIT Unreleased ??? 2026-08-24T09:28:01-07:00
+
+#### Coming From:
+
+Unreleased 14e0629
+
+#### Purpose:
+
+Record that the soak clears the drift risk but returns an underrun at 62 seconds, and propose reverting the startup byte budget before committing to FPGA work.
+
+#### Outcome:
+
+The user played `20_bbb_full_48k.mpg` end to end on the `14e0629` helper and reports audio and video perfectly in sync throughout, confirmed by watching the credits, with a small once-per-second cadence still visible and ordinary terminal indication of USER solid on, DISK blinking eleven times and POWER solid on. That answers the question the soak was run for: coalescing timestamps to one per encoded group does not cost alignment over ten minutes, so extrapolation across a group is sound and `14e0629` stands on its drift risk. The capture is 8,108 bytes at SHA-256 `52a27c69794e4b1177f8377e1923b249943d6326eaef2a65919777fcf8817ba9`, small because the final raster is black, and it shows the profiler frozen rather than quiet: the snapshot reason is fatal or no progress and the sole aggregate flag is `0x0400`, a real `audio_pcm_underrun`, with PCM protocol, presentation and destination errors all clear. It froze at 35,705,169 accepted transport bytes of 342,083,863, which is 62.2 seconds into the movie, and had already counted 132 gap outliers by then.
+
+The underrun is therefore not fixed on long content, only moved. Entry 451 measured it at 21.74 seconds under `f2b2e02`; it now arrives at 62.2 seconds under a helper whose host analysis reports an audio deficit of zero across the entire movie. That contradiction is informative rather than a measurement error, because the host model asks whether audio crosses ahead of the video timeline and cannot see the other direction of the same coupling: when the compressed video FIFO is full, video bytes block the shared path and the PCM records queued behind them wait, so the sink can starve while the producer is comfortably ahead of schedule. The 24-second diagnostic never reaches that state and shows no underrun; the movie does, twice, at different points under two different helpers.
+
+That makes the startup byte budget from entry 455 a suspect rather than a neutral change. It exists to keep the compressed FIFO as full as possible, which is precisely the condition under which video blocks PCM, and entry 456 already measured that it bought no cadence improvement at all: outliers moved from 174 to 170 and presentation hold from 7,967,197 to 12,376,681 cycles, less than two percent of the distance to the raw control. It is a change that has not paid for itself and that plausibly makes the audio side worse. The cadence residue is unchanged in shape, with the largest gaps still 431.059 milliseconds at display ordinal fourteen and 82.896 at ordinals fifteen and seventeen, the same signature seen under every audio-video helper so far.
+
+#### Next Steps:
+
+Approval is required for one cheap helper revert before any Quartus work, because it is one soak rather than a build and timing cycle. Restore the two-picture startup boundary by removing `PCM_STARTUP_VIDEO_BYTES`, keeping the delivery-order bounds from `cf1d173` and the timestamp coalescing from `14e0629` intact, then rerun the full soak and compare where the underrun lands or whether it disappears. A later underrun or none confirms that keeping the video FIFO full starves the audio sink through the shared path, which is evidence the FPGA work needs anyway; an underrun at the same point exonerates the lead and it can stay reverted regardless, since it has never been shown to help. Host proofs are the usual set, with the startup lead expected to return to 5,301 bytes on the diagnostic and 1,280 on the controls and every payload hash unchanged. After that the dominant mechanism is FPGA-side and the candidates are unchanged in kind but now ordered by this evidence: carrying many samples per PCM record, which cuts both record count and path bandwidth and is the only candidate that addresses the cadence and the underrun together; buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate` so a full video FIFO cannot block audio; and deepening `audio_pcm_fifo`, which raises the starvation threshold without changing the coupling that causes it.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 460 COMMIT Unreleased 14e0629 2026-08-24T09:14:42-07:00
 
 #### Coming From:
@@ -1180,33 +1212,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 421 COMMIT Unreleased 047f5b2 2026-08-24T03:07:31-07:00
-
-#### Coming From:
-
-Unreleased 047f5b2
-
-#### Purpose:
-
-Install the headroom-recovery RBF through staged, hash-verified replacement while preserving exact rollback state.
-
-#### Outcome:
-
-Key-based SSH to the MiSTer failed for both `mister-media-player` and `mister-media-player-rsa`, each rejected as `Permission denied (publickey,password,keyboard-interactive)` while the stored host key still matched, so the device is the same machine but no longer accepts the recorded keys and its `authorized_keys` appears to have been cleared. The installation therefore used the FTP path already committed in `tools/build.sh` and substituted download-and-hash round trips for on-device hashing, which verifies the bytes actually stored rather than the bytes believed sent. Before installation the reachable MiSTer matched the accepted state exactly, with `/media/fat/MediaPlayer.rbf` at SHA-256 `b48d06e1b0f42e3465f48a1d89b10d0eb032edddcb4e02f8aab84c14854a75df`, the helper at `12f6305f35ef56d4e8de2369ecd41d2811bda9d787c885991a5ed0272cd2678a` and the faded fixture at `cb4f143d2d72af72bb03c7a7fbc4e2163ad780a35483bdb871ec661cf29ccc24`, and with both the staging and rollback names absent. The new RBF was uploaded as `MediaPlayer.upload.047f5b2.rbf`, downloaded back and confirmed byte-identical to the local build at SHA-256 `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68`, after which the displaced file was renamed to its rollback name and the staged file renamed into place. `/media/fat/MediaPlayer.rbf` now verifies at `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68` and its predecessor is preserved byte-identically as `/media/fat/MediaPlayer.backup.pre-row-ram.d70591c.rbf`. The helper and both audio fixtures remain unchanged and no playback was launched, so the currently loaded core remains the prior in-memory RBF until reboot. Two conditions are outstanding and were not present in earlier cycles: no `sync` could be issued because that requires a shell, so the writes rely on the server flushing before the next power cycle, and an undocumented `MediaPlayer_test.rbf` sits in `/media/fat` that no log entry accounts for.
-
-#### Next Steps:
-
-Restore key-based SSH access before the next installation cycle, since without a shell neither `sync` nor on-device verification is available and the FTP fallback cannot guarantee a flush. Reboot the MiSTer once, enter MediaPlayer with Audio Test Off and run only `02_arm_mp2_faded_tones.mpg`. Require the accepted five-picture video, the same clean lower left and higher right tones with smooth fades, USER steady on, DISK steady off, POWER steady on and no visible regression, then leave the completed image loaded for schema-eight capture before any replay or other file. The snapshot must still report 185,149 accepted elementary-stream bytes, one associated timestamp, three reference plus two B pictures, five displays, four swaps, sequence end and presentation complete, with zero PCM protocol, underrun and aggregate error flags and a quiet reason-one freeze with session quiet true. Because the parser change is behavior-preserving and was proven byte-identical in simulation, any deviation should be treated as evidence against the block-memory conversion rather than as an audio regression.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
