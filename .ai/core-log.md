@@ -1,3 +1,32 @@
+## 470 COMMIT Unreleased 9a5eea3 2026-08-24T12:38:50-07:00
+
+#### Coming From:
+
+Unreleased 8c59ddb
+
+#### Purpose:
+
+Prevent sparse presentation timestamps from advancing pictures ahead of the exact-rate cadence while retaining their ability to delay future pictures.
+
+#### Outcome:
+
+Commit `9a5eea3` makes the cadence accumulator a mandatory presentation floor: a timestamped candidate now presents only when both the exact-rate cadence slot and its PTS are due, while an untimestamped candidate continues using cadence alone. The old timestamp-only early-admission branch and its partial-credit reset are gone; picture ownership, B-picture reordering, scratch allocation, cadence constants, timestamp association, transport, profiler and audio logic are unchanged. The directed scheduler proof holds an already-due timestamp while cadence is early, admits it on the first cadence-due window, preserves a future timestamp's ability to delay through safe windows, prevents the following untimestamped candidate from bursting, includes timestamped swaps in the minimum-gap invariant, and retains exact counts of 479, 240, 250, 599 and 600 presentations for 23.976, 24, 25, 29.97 and 30 fps respectively. Picture timestamp, PTS timeline, transport gate, download rearm, system clock, in-band metadata, clean-video queue, PCM output, 8,192-frame PCM FIFO and schema-nine profiler regressions all pass. Quartus 17.0.2 completes in ten minutes 31 seconds with zero errors and 147 established warnings. Timing is met with global worst setup slack 0.311 nanoseconds, hold 0.238, recovery 3.365, removal 0.497 and minimum pulse width 1.122; Phase-1P reports find decoder same-clock setup slack 1.782 across 100 paths with none violated, decoder recovery 11.294 and video same-clock setup 8.284 across 80 paths with none violated. The fit uses 29,325 ALMs, 45,259 registers, 3,655,139 memory bits at 65 percent, 464 of 553 RAM blocks at 84 percent and 65 DSP blocks. The 4,184,380-byte RBF is SHA-256 `484328e51c6e764890bf2bdcd947448e2eaaaac2c603e93da28009475e44dafc`. Installation used plain FTP with the default MiSTer login and no SSH keys: the prior active `8c59ddb` image first verified at SHA-256 `c2ebbfa10935d43ff0d7e66ae0c6468b63385f29ff5a154f9a50b8725dfa5ea1`, its rollback copy verifies byte-identically as `/media/fat/MediaPlayer.backup.pre-pts-floor.8c59ddb.rbf`, the staged candidate and final active image both verified byte-identically at the new hash, and the temporary staged file was removed; helper, Main and media files are unchanged.
+
+#### Next Steps:
+
+Power-cycle once to load `9a5eea3`, set Audio Test to Off and run `20_bbb_full_48k.mpg` end to end without interruption, watching the credits specifically for the former approximately one-second beat and leaving the final diagnostic image loaded for capture. Require all 84,423,309 clean-video bytes and all 14,315 pictures to complete, sequence end and quiet reason one, aggregate errors zero, and both audio underrun and PCM protocol error clear. Schema nine's `timestamp_advance_conflicts` counter observes the PTS-due versus cadence-early opportunity rather than an actual swap, so it may still report approximately 97 after this correction; the scheduler now suppresses those opportunities by construction. If the user sees smooth credits and correctness remains clean, accept `9a5eea3`; if the cadence remains, preserve this result and investigate the separately measured 66.3168-millisecond scratch-unavailable reorder gaps rather than revisiting timestamp admission. Roll back to `/media/fat/MediaPlayer.backup.pre-pts-floor.8c59ddb.rbf` for any correctness, completion or audio regression.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 469 COMMIT Unreleased 8c59ddb 2026-08-24T12:33:55-07:00
 
 #### Coming From:
@@ -1209,33 +1238,5 @@ The 44.1 kHz helper cannot reach hardware yet. The user has directed that the of
 
 - [x] Built
 - [ ] Passed
-
----
-## 430 COMMIT Unreleased 3f4b272 2026-08-24T04:34:03-07:00
-
-#### Coming From:
-
-Unreleased 3f4b272
-
-#### Purpose:
-
-Record hardware acceptance of the helper's startup video lead and the collapse of the video startup offset.
-
-#### Outcome:
-
-The user power-cycled, ran `02_arm_mp2_faded_tones.mpg` with Audio Test Off and reports it working, with USER steady on, DISK steady off and POWER steady on. The schema-eight capture at SHA-256 `6daa2113e83baad9f0c9a5d90fa6b36d62e8b47243da1fda17b0bf5e3879cd26` reports `first_present_cycle` 9,307,288 at the 60 MHz decoder clock, so the first picture now presents 0.155 seconds into the session against 1.372 seconds on `047f5b2`, removing 1.217 seconds of black screen and reducing the offset by a factor of 8.8. All five pictures are displayed by 0.312 seconds. Audio follows its 2,048-sample reserve once PCM begins, so video now leads by a margin small enough to be imperceptible rather than trailing audio by a second, which is the alignment the user asked for. Every decode and audio invariant is unchanged: 185,149 accepted elementary-stream bytes, one associated timestamp, three reference plus two B pictures, five displays, four swaps, sequence end, presentation complete with no presentation error, saturated PCM sample count 16,383, saturated FIFO peak of 127 or greater, no audio underrun, no PCM protocol error and zero aggregate error flags, freezing for quiet reason one with session quiet true at system-time second three. Session length rises from 3.015 to 3.224 seconds, which is expected now that the video burst precedes the PCM drain instead of being interleaved through it. The residual 0.155 seconds is transfer and decode of the 185 kilobyte payload, whose intra frame is 97 percent of it, and is no longer the real-time PCM throttle; that is the floor for this fixture rather than a defect. The ARM binary built with the undocumented `arm-linux-gnueabihf-gcc` 15.2 toolchain ran correctly, so the deviation recorded in entry 429 is proven harmless in this instance, though it remains unreproducible until the documented ARM GNU 10.2 compiler is available. `047f5b2` therefore stands as the accepted FPGA image and `3f4b272` as the accepted helper.
-
-#### Next Steps:
-
-Resume the deferred FPGA work: define and prove the response to a prolonged ARM producer stall after playback has begun, coordinating any pause or recovery with video presentation, and note that entry 425 established the constraint any such design must respect, since holding the PCM sink stalls the shared byte path and starves video. Housekeeping remains outstanding on the MiSTer, where `MediaPlayer.failed.d9022e6.rbf`, `MediaPlayer.reverted.62e8ccf.rbf` and the undocumented `MediaPlayer_test.rbf` are all obsolete or unaccounted for and should be removed by the user, along with the superseded helper backups. Obtain the documented ARM toolchain so helper builds become reproducible. Consider separately whether the nine-byte-per-sample in-band record format should carry multiple samples per record, since it inflates the audio roughly sevenfold against its compressed source and is the reason the shared path throttles at all; that is now a bandwidth question rather than a startup one.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
