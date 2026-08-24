@@ -1,4 +1,4 @@
-## 459 COMMIT Unreleased ??? 2026-08-24T09:05:44-07:00
+## 459 COMMIT Unreleased 14e0629 2026-08-24T09:10:04-07:00
 
 #### Coming From:
 
@@ -6,7 +6,7 @@ Unreleased 1a6e6b4
 
 #### Purpose:
 
-Record that record placement is not the residual cadence cost, that record count is, and propose coalescing timestamps to the density hardware has already run cleanly.
+Coalesce the helper's timestamp records to the density hardware has already run cleanly, after record placement was ruled out and record count was not.
 
 #### Outcome:
 
@@ -16,13 +16,17 @@ That refutes the adjacency reading recorded in entry 458, and the accepted-byte 
 
 The helper's own record density is therefore a defect rather than a fixed cost. It emits one timestamp per video PES packet carrying a timestamp, which is 551 records for 24 seconds of this mux, while the FPGA presented the same 577 pictures perfectly from 26 timestamps and associated 24 of them. Nothing in presentation needed the other 525.
 
+Commit `14e0629` was approved and implements it. A timestamp is written when a sequence or group start code has passed since the last one, or after `PTS_MAX_PICTURE_GAP` pictures so a stream carrying neither boundary still receives one periodically; presentation reconstructs display order from each picture's own temporal reference in between. The timeline itself is untouched, because a chunk still carries its timestamp for the audio horizon whether or not a record is written for it, and both the scheduled and explicit output paths gate identically so the transport contract does not depend on which one produced it. Record counts fall from 551 to 26 on the diagnostic, from 48 to six on both controls, from one to one on the short and faded fixtures and from 13,401 to 598 on the full soak, which is one per encoded group rather than one per timestamped packet.
+
+The strongest host proof is an equality rather than a bound. Removing PCM from the new helper's transport for the diagnostic yields exactly `25_bbb_opening24_gop_pts.m2v` at SHA-256 `83930a92f9796b5c47a7719d4b635243eb84f8226c7f937465e31a68e13365f0`, the 26-record control that hardware has already presented with zero gap outliers and the same three largest display gaps as unannotated video. The helper now produces that record layout by construction rather than by filtering. Everything else holds: clean video is unchanged at 84,423,309 bytes for the soak and reduces to SHA-256 `100dcb7d536918263def73bc2b8e660fdb2e975221ccd9d548b0845bb853471a` on the diagnostic, PCM remains 28,628,352 frames at SHA-256 `337b1387b9324b6c391a3223ced8f7660bd5144267b29d3964b4ed6b282839af`, the startup lead stays at 28,654 bytes, steady batches within 2,048, PCM-free spans within 4,052 bytes and the audio deficit at zero. The soak transport shrinks from 342,199,090 to 342,083,863 bytes, exactly the 12,803 records no longer written, and its video and timestamp stream is now SHA-256 `545075cdc22437cb994efde832e8f09c663ac569bf8e98d406025ef480d2cd81`, which supersedes the long-established `db00682b` figure for that quantity while the video underneath it is unchanged. All fixtures at both sample rates, both controls and the diagnostic pass under native and address-and-undefined-sanitized helpers, the nine-case envelope retains three passes and six intended failures with identical statuses and messages, and two official GCC 10.2.1 builds are byte-identical at 361,452 bytes and SHA-256 `3a46ee0cba082e970948078c9f6675aca47c2cbe6b02262b90daca653e0a5333`. Only the helper was installed, with `9f83805` preserved exactly as `/media/fat/linux/MediaPlayer_Helper.backup.pre-timestamp-coalesce.9f83805`; no RBF, Main or media file changed.
+
 #### Next Steps:
 
-Approval is required to coalesce the helper's timestamp records so that a record is emitted only when presentation cannot extrapolate it, at a sequence or group boundary and whenever a timestamp departs from the extrapolated timeline by more than one frame interval, leaving RTL, RBF and Main unchanged. Host proofs must show the record count falling from 551 to roughly 26 on the diagnostic and proportionally on the full soak, every payload hash unchanged, PCM-free video spans still bounded at 4,096 bytes and no audio deficit above the sink FIFO, followed by the usual native and sanitized fixture runs at both sample rates, the nine-case checker and two byte-identical official GCC 10.2 helpers. The specific risk to prove on hardware is long-term drift: sparse timestamps mean presentation extrapolates for longer, so the 24-second diagnostic proves cadence but only the full `20_bbb_full_48k.mpg` soak proves that audio and video are still aligned after ten minutes, and that soak must be run before this is called good. The dominant mechanism remains untouched and architectural: with PCM present the shared byte path is paced by the audio sink and presentation hold collapses from roughly 780,000,000 cycles to 12,376,681. Two candidate corrections are now worth costing together rather than separately, deepening `audio_pcm_fifo` past any lead the helper can produce or buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate`, and carrying many samples per PCM record instead of one, which would cut both the audio path bandwidth and the per-record cost this cycle has just measured, at the price of a transport format change on both sides.
+Power-cycle, set Audio Test to Off and run `23_bbb_opening24_exact_av.mpg`, the audio-video diagnostic rather than a control, since the helper now produces the proven record layout itself. Require the once-per-second beat to be gone and report what remains, plus all three LEDs, leaving the final image loaded for a schema-eight capture; the expectation is the outlier count falling from 170 by the 21 that record density accounted for, with presentation hold still collapsed near 12,376,681 cycles because PCM gating is untouched. Then run `20_bbb_full_48k.mpg` end to end, because sparse timestamps mean presentation extrapolates for longer and only ten minutes can show whether audio and video are still aligned at the end; drift there, not cadence, is what would send this change back. After that the remaining work is the dominant mechanism and it is FPGA-side, with three candidates to cost against resources and timing: deepening `audio_pcm_fifo` past any lead the helper can produce, buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate` so compressed video keeps flowing, and carrying many samples per PCM record, which would cut audio path bandwidth and the per-record cost this cycle measured at the price of a transport format change on both sides.
 
 #### Files Modified:
 
-None.
+- host/arm/media_player_helper.c
 
 #### Status:
 
