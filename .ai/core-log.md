@@ -1,3 +1,33 @@
+## 475 COMMIT Unreleased eab57b7 2026-08-24T14:01:04-07:00
+
+#### Coming From:
+
+Unreleased acdbf8b
+
+#### Purpose:
+
+Qualify and package the reproducible v0.7.0 release candidate from the accepted FPGA and host baselines.
+
+#### Outcome:
+
+Commit `eab57b7` updates `README.md`, `CHANGELOG.md` and new `docs/RELEASE_NOTES_v0.7.0.md` for the matching RBF, patched Main and ARM helper release. A clean from-scratch Quartus Prime 17.0.2 build completes with zero errors and reproduces the accepted 4,184,380-byte RBF exactly at SHA-256 `484328e51c6e764890bf2bdcd947448e2eaaaac2c603e93da28009475e44dafc`; global setup, hold, recovery, removal and minimum-pulse-width slack are respectively +0.311, +0.238, +3.365, +0.497 and +1.122 ns, with +1.782 ns decoder setup, +11.294 ns decoder recovery and +8.284 ns video setup. The fit uses 29,325 ALMs, 45,259 registers, 3,655,139 block-memory bits, 464 RAM blocks, 65 DSP blocks and three PLLs. The focused RTL suites pass picture timestamps, PTS timeline, codes-one-through-five scheduling and cadence floor, transport gating, download re-arm, system clock, in-band metadata, clean-video queuing, audio output, the 8,192-frame FIFO and schema-nine telemetry. The optional legacy Cycle-A wrapper is not a current release gate: its three reported failures are stale fixture/inventory or fixed-cycle signature expectations, while the emitted functional result counters are complete and error-free. Native and sanitized helper qualification, the exact 14,315-picture transport soak, two byte-identical official-toolchain helper builds and two byte-identical patched-Main builds retain the accepted results. The assembled archive `host/build/MiSTer_Media_Player_v0.7.0.zip` is 2,749,946 bytes at SHA-256 `bae3c3c17d2381cb91e2baff98ec9cf22fed88b04d01bc1349574ae57b917377`; its internal `SHA256SUMS` verifies the date-coded RBF, Main, executable `linux/MediaPlayer_Helper`, installation guide, source provenance and both licenses. Generated regression media is excluded. Read-only plain-FTP verification with the default MiSTer login and no SSH keys already proves that the active RBF, helper and Main are the exact release bytes, so no installation mutation is needed before the final gate.
+
+#### Next Steps:
+
+Power-cycle the MiSTer and run exactly four files in order: `00_good_480p_48k.mpg`, `02_good_video_only.mpg`, `01_good_480p_44k.mpg` without reboot after the silent file, and `20_bbb_full_48k.mpg` after a fresh power cycle. Capture schema-nine telemetry and all three LED states for each, require correct video and audio behavior with zero aggregate, decoder, presentation, PCM protocol and underrun errors, then update the release notes to record the passed gate and have the user create the annotated `v0.7.0` tag and GitHub pre-release from the exact final commit.
+
+#### Files Modified:
+
+- README.md
+- CHANGELOG.md
+- docs/RELEASE_NOTES_v0.7.0.md
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 474 COMMIT Unreleased acdbf8b 2026-08-24T13:36:45-07:00
 
 #### Coming From:
@@ -1189,45 +1219,6 @@ Power-cycle the MiSTer once to load the installed candidate, set Audio Test to O
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 435 COMMIT Unreleased 091b150 2026-08-24T05:26:02-07:00
-
-#### Coming From:
-
-Unreleased 9afe2f0
-
-#### Purpose:
-
-Eliminate deterministic PCM starvation and require clean terminal framing for user-converted Program Streams.
-
-#### Outcome:
-
-Commit `091b150` makes the H.262 sequence-end code and MPEG Program Stream end code mandatory compatibility conditions, adds one shared idempotent finalizer to every Program Stream generator, and widens the asynchronous PCM FIFO from 4,096 to 8,192 stereo samples for 170.7 milliseconds of capacity at 48 kHz while retaining the exact 2,048-sample startup threshold. The focused FIFO simulation accepts and drains all 8,192 samples in order across independent clocks, explicitly remains non-full after the obsolete 4,096 boundary, and reaches the correct full and empty limits; the output-adapter simulation preserves below-threshold silence, short-stream release, sticky true underrun and false-underrun-free clean termination. The static PCM verifier preserves all four pinned proof-tone hashes and both sample schedulers. The nine-case envelope regenerates twice byte-identically with all three good cases passing and all six bad cases failing as intended; removing the final 17 bytes from the 48 kHz control now reports both missing terminal conditions, finalization reconstructs the exact file and a second finalization changes nothing. Corrected 48 and 44.1 kHz controls have SHA-256 `1455af94803b1d9958a93fbdb978aa2a42c1d8045a9491f904ad1ad9b8ccdad5` and `417db70be8cadc8ca829984d149cb0a5ccda82b0dfc065869578789290a1c83e`. All four short and faded ARM fixtures now carry Program Stream ends, regenerate byte-identically, pass the strict checker, and pass native plus address-and-undefined-sanitized helper verification at both sample rates with byte-identical video, exact PCM lengths, maximum sample error two, correlation rounding to one, one clean audio end and every failure path preserved. The full movie remains a strict pass and byte-identical at SHA-256 `fdc480e6b16bcbc7c143eb8f7e7edfe0d0bbd8e46a1035b728f07639e71b2357`. The sole Quartus 17.0.2 candidate completes in 10 minutes 4 seconds with zero errors and 146 warnings. It uses 28,918 ALMs, 44,607 registers, 3,523,027 memory bits, 446 RAM blocks, 65 DSP blocks and three PLLs: exactly 143,360 additional memory bits and 17 RAM blocks versus accepted `047f5b2`, with 270 fewer ALMs and 278 fewer registers from fitter variance. Every endpoint TNS is zero with positive setup slack of 0.090 nanoseconds HDMI, 1.613 host, 1.844 decoder, 2.976 SPI, 7.405 video, 8.530 FPGA clock one, 11.824 FPGA clock two, 14.127 audio and 18.893 main; worst hold is 0.247, recovery 4.227, removal 0.460 and minimum pulse width 1.122 nanoseconds. The dedicated Phase-1P reports find zero violations across 100 same-clock decoder paths, 80 same-clock video paths and 30 decoder recovery paths. The 4,126,828-byte RBF has SHA-256 `1fe3f61a8286e42e38db4c50eef6a112f31106590e6cdbcc6715fff82544b4ea`.
-
-#### Next Steps:
-
-Retrieve and verify the currently installed RBF and helper before mutation. Preserve the accepted `047f5b2` RBF under a new exact rollback name, upload candidate `1fe3f61a8286e42e38db4c50eef6a112f31106590e6cdbcc6715fff82544b4ea` through a staging name and retrieve it byte-identically before the rename, and replace the failed `9afe2f0` qualification directory with the corrected deterministic media while retaining its exact rollback directory. Leave Main and helper unchanged. Then power-cycle and run only corrected `00_good_480p_48k.mpg` with Audio Test Off, reporting audio-video alignment, any crackle or dropout and all three terminal LEDs; do not continue to `01` or any expected-failure case until that control is clean.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- rtl/audio/audio_pcm_fifo.sv
-- rtl/audio/audio_pcm_output_adapter.sv
-- tools/streams/tb_audio_pcm_output_adapter.sv
-- tools/streams/tb_audio_pcm_fifo.sv
-- tools/streams/verify_d2_pcm_path.py
-- tools/streams/check_media_compatibility.py
-- tools/streams/finalize_program_stream.py
-- tools/streams/generate_arm_av_test.py
-- tools/streams/generate_compatibility_corpus.sh
-- tools/streams/generate_test_big_buck_bunny.py
-- docs/TEST_INSTRUCTIONS.md
 
 #### Status:
 
