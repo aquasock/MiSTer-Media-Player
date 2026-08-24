@@ -101,6 +101,8 @@ struct output_state {
     uint64_t max_video_pts;
     int have_audio_pts;
     int have_video_pts;
+    int audio_pes_seen;
+    int silent_video_mode;
     int scheduler_enabled;
     int scheduler_started;
     uint32_t pts_window;      /* start-code scanner across queued payloads */
@@ -320,14 +322,22 @@ static int write_video_immediate(struct output_state *output, const void *data,
     return 0;
 }
 
+static int video_queue_would_overflow(const struct output_state *output,
+                                      size_t size, int has_record)
+{
+    size_t prefix = has_record ? 9u : 0u;
+
+    return size > VIDEO_QUEUE_LIMIT - prefix ||
+           output->video_queued_bytes > VIDEO_QUEUE_LIMIT - (size + prefix);
+}
+
 static int queue_video(struct output_state *output, const uint8_t *data,
                        size_t size, int has_pts, int has_record, uint64_t pts)
 {
     struct video_chunk *chunk;
     size_t prefix = has_record ? 9u : 0u;
 
-    if (size > VIDEO_QUEUE_LIMIT - prefix ||
-        output->video_queued_bytes > VIDEO_QUEUE_LIMIT - (size + prefix)) {
+    if (video_queue_would_overflow(output, size, has_record)) {
         fprintf(stderr,
                 "media_player_helper: video lookahead limit exceeded (%u bytes)\n",
                 (unsigned)VIDEO_QUEUE_LIMIT);
@@ -454,6 +464,37 @@ static void free_video_head(struct output_state *output)
     output->video_queued_bytes -= chunk->size - chunk->offset;
     free(chunk->data);
     free(chunk);
+}
+
+/*
+ * Entry 472: a Program Stream with no audio has no PCM horizon to satisfy.
+ * Release its bounded lookahead byte-exactly and continue as silent video.
+ * If MPEG audio appears after this decision, process_pes rejects that stream
+ * rather than starting it late and creating a permanent synchronization error.
+ */
+static int scheduler_release_silent_video(struct output_state *output)
+{
+    output->hold_active = 0;
+    output->scheduler_started = 1;
+    output->scheduler_enabled = 0;
+    output->silent_video_mode = 1;
+    while (output->video_head) {
+        struct video_chunk *chunk = output->video_head;
+        size_t remaining = chunk->size - chunk->offset;
+
+        if (write_video_immediate(output, chunk->data + chunk->offset,
+                                  remaining, "silent queued video") < 0)
+            return -1;
+        chunk->offset += remaining;
+        output->video_queued_bytes -= remaining;
+        if (chunk->has_pts &&
+            (!output->have_video_pts || chunk->pts > output->max_video_pts)) {
+            output->max_video_pts = chunk->pts;
+            output->have_video_pts = 1;
+        }
+        free_video_head(output);
+    }
+    return 0;
 }
 
 /* The startup lead ends only when both its bounds are satisfied. */
@@ -1001,11 +1042,16 @@ static int process_pes(struct media_source *input, uint8_t code,
     }
     if ((code & 0xf0) == 0xe0) {
         int has_record = has_pts && pts_record_wanted(output);
+        size_t video_size = length - payload_offset;
+
+        if (output->scheduler_enabled && !output->audio_pes_seen &&
+            video_queue_would_overflow(output, video_size, has_record) &&
+            scheduler_release_silent_video(output) < 0)
+            goto done;
 
         if (output->scheduler_enabled) {
             if (queue_video(output, packet + payload_offset,
-                            length - payload_offset, has_pts, has_record,
-                            pts) < 0 ||
+                            video_size, has_pts, has_record, pts) < 0 ||
                 scheduler_drain(output, 0) < 0)
                 goto done;
         } else {
@@ -1018,6 +1064,13 @@ static int process_pes(struct media_source *input, uint8_t code,
         pts_scan_payload(output, packet + payload_offset,
                          length - payload_offset);
     } else if ((code & 0xe0) == 0xc0) {
+        if (output->silent_video_mode) {
+            fprintf(stderr,
+                    "media_player_helper: MPEG Layer II audio begins beyond "
+                    "the bounded video lookahead\n");
+            goto done;
+        }
+        output->audio_pes_seen = 1;
         if (has_pts && !output->have_audio_pts) {
             output->first_audio_pts = pts;
             output->have_audio_pts = 1;
@@ -1026,6 +1079,51 @@ static int process_pes(struct media_source *input, uint8_t code,
                          length - payload_offset) < 0 ||
             (output->scheduler_enabled && scheduler_drain(output, 0) < 0))
             goto done;
+    }
+    result = 0;
+done:
+    free(packet);
+    return result;
+}
+
+static int process_private_pes(struct media_source *input)
+{
+    uint8_t length_bytes[2];
+    uint8_t *packet;
+    size_t length;
+    size_t payload_offset;
+    uint64_t pts;
+    int has_pts;
+    int result = -1;
+
+    if (read_exact(input, length_bytes, sizeof(length_bytes)) < 0)
+        return -1;
+    length = ((size_t)length_bytes[0] << 8) | length_bytes[1];
+    if (!length) {
+        fprintf(stderr,
+                "media_player_helper: unbounded private PES packet is not "
+                "supported\n");
+        return -1;
+    }
+    packet = malloc(length);
+    if (!packet) {
+        fprintf(stderr, "media_player_helper: out of memory\n");
+        return -1;
+    }
+    if (read_exact(input, packet, length) < 0) {
+        fprintf(stderr, "media_player_helper: truncated private PES packet\n");
+        goto done;
+    }
+    if (parse_pes_header(packet, length, &payload_offset, &pts, &has_pts) < 0) {
+        fprintf(stderr, "media_player_helper: invalid private PES header\n");
+        goto done;
+    }
+    if (payload_offset < length && packet[payload_offset] >= 0x80u &&
+        packet[payload_offset] <= 0xafu) {
+        fprintf(stderr,
+                "media_player_helper: unsupported Program Stream private "
+                "audio; MPEG Layer II is required\n");
+        goto done;
     }
     result = 0;
 done:
@@ -1069,6 +1167,11 @@ static int process_program_stream(struct media_source *input,
         if ((code & 0xf0) == 0xe0 || (code & 0xe0) == 0xc0) {
             if (process_pes(input, code, audio, output,
                             &video_code, &audio_code) < 0)
+                return -1;
+            continue;
+        }
+        if (code == 0xbd) {
+            if (process_private_pes(input) < 0)
                 return -1;
             continue;
         }
@@ -1213,10 +1316,16 @@ int main(int argc, char **argv)
         goto done;
     output.scheduler_enabled = is_program_stream && !output.pcm;
     if (is_program_stream) {
-        if (process_program_stream(&input, &audio, &output) < 0 ||
-            decode_audio_buffer(&audio, &output, 1) < 0 ||
-            scheduler_drain(&output, 1) < 0)
+        if (process_program_stream(&input, &audio, &output) < 0)
             goto done;
+        if (!output.audio_pes_seen) {
+            if (output.scheduler_enabled &&
+                scheduler_release_silent_video(&output) < 0)
+                goto done;
+        } else if (decode_audio_buffer(&audio, &output, 1) < 0 ||
+                   scheduler_drain(&output, 1) < 0) {
+            goto done;
+        }
     } else if (process_elementary_stream(&input, &output) < 0) {
         goto done;
     }
@@ -1224,7 +1333,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "media_player_helper: no H.262 video stream found\n");
         goto done;
     }
-    if (is_program_stream && !output.audio_frames) {
+    if (is_program_stream && output.audio_pes_seen && !output.audio_frames) {
         fprintf(stderr, "media_player_helper: no MPEG Layer II audio found\n");
         goto done;
     }

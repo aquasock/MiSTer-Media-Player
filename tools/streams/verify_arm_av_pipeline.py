@@ -10,6 +10,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import check_media_compatibility as compatibility
+
 PTS_MARKER = b"\x00\x00\x01\xb0"
 PCM_MARKER = b"\x00\x00\x01\xb1"
 PCM_END_MARKER = b"\x00\x00\x01\xb6"
@@ -42,6 +44,29 @@ def split_sequence_program(reference_program: bytes, frame_rate_code: int) -> by
         reference_program[:pack_size]
         + video_pes(header[:2])
         + video_pes(header[2:])
+        + b"\x00\x00\x01\xb9"
+    )
+
+
+def private_subpicture_program(reference_program: bytes) -> bytes:
+    """Build a tiny silent PS proving non-audio private packets stay ignored."""
+    if not reference_program.startswith(b"\x00\x00\x01\xba"):
+        raise RuntimeError("reference fixture has no MPEG Program Stream pack header")
+    first = reference_program[4]
+    if first & 0xc0 == 0x40:
+        pack_size = 14 + (reference_program[13] & 7)
+    elif first & 0xf0 == 0x20:
+        pack_size = 12
+    else:
+        raise RuntimeError("reference fixture has an invalid pack header")
+
+    video_body = b"\x80\x00\x00" + sequence_header(2)
+    private_body = b"\x80\x00\x00\x20subpicture"
+    return (
+        reference_program[:pack_size]
+        + b"\x00\x00\x01\xe0" + len(video_body).to_bytes(2, "big") + video_body
+        + b"\x00\x00\x01\xbd" + len(private_body).to_bytes(2, "big")
+        + private_body
         + b"\x00\x00\x01\xb9"
     )
 
@@ -348,6 +373,65 @@ def main() -> int:
             envelope_rejected, "compatibility bad_rate_50.mpg", (envelope_pcm,)
         )
 
+        envelope_dir = envelope_rate.parent
+        silent_program = envelope_dir / "good_video_only.mpg"
+        silent_reference, _, _ = compatibility.demux_program_stream(
+            silent_program.read_bytes()
+        )
+        silent = subprocess.run(
+            [str(args.helper), "--protocol", "1", "--source",
+             f"file:{silent_program}"],
+            capture_output=True,
+        )
+        if silent.returncode:
+            raise RuntimeError(
+                "video-only Program Stream failed: "
+                + silent.stderr.decode(errors="replace").strip()
+            )
+        silent_video, silent_timestamps, silent_pcm, silent_end = strip_records(
+            silent.stdout, 48000
+        )
+        if silent_video != silent_reference:
+            raise RuntimeError(
+                f"video-only payload differs: helper={len(silent_video)} "
+                f"reference={len(silent_reference)}"
+            )
+        if (not silent_timestamps or
+                silent_timestamps != sorted(silent_timestamps)):
+            raise RuntimeError(
+                f"video-only timestamps are invalid: {silent_timestamps}"
+            )
+        if silent_pcm or silent_end:
+            raise RuntimeError("video-only Program Stream emitted PCM transport")
+
+        unsupported_audio = envelope_dir / "bad_audio_codec.mpg"
+        unsupported = subprocess.run(
+            [str(args.helper), "--protocol", "1", "--source",
+             f"file:{unsupported_audio}"],
+            capture_output=True,
+        )
+        unsupported_message = unsupported.stderr.decode(errors="replace")
+        if (unsupported.returncode == 0 or
+                "unsupported Program Stream private audio" not in
+                unsupported_message):
+            raise RuntimeError(
+                "unsupported private audio did not fail explicitly: "
+                + unsupported_message.strip()
+            )
+
+        private_subpicture = temp / "private_subpicture.mpg"
+        private_subpicture.write_bytes(private_subpicture_program(source))
+        ignored_private = subprocess.run(
+            [str(args.helper), "--protocol", "1", "--source",
+             f"file:{private_subpicture}"],
+            capture_output=True,
+        )
+        if ignored_private.returncode or ignored_private.stdout != sequence_header(2):
+            raise RuntimeError(
+                "non-audio private Program Stream packet was not ignored: "
+                + ignored_private.stderr.decode(errors="replace").strip()
+            )
+
         raw_output = temp / "raw_copy.m2v"
         copied = subprocess.run(
             [str(args.helper), "--protocol", "1", "--source", f"file:{raw_video}",
@@ -399,6 +483,10 @@ def main() -> int:
     print("errors: truncated Program Stream rejected")
     print("rates: H.262 codes 1-5 accepted; 6-8 rejected before transport")
     print("rates: cross-PES and compatibility-envelope rejection passed")
+    print(
+        "program-stream audio: video-only silent pass; private audio rejected; "
+        "private subpicture ignored"
+    )
     print("compatibility: raw M2V copied byte-identically")
     print("protocol: capabilities stable; file URI equals legacy path")
     print("sources: missing/unknown rejected; dvd reserved without access")
