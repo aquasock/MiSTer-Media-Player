@@ -1,3 +1,42 @@
+## 389 COMMIT Unreleased ??? 2026-08-23T21:08:18-07:00
+
+#### Coming From:
+
+Unreleased 2b1a170
+
+#### Purpose:
+
+Present timestamped pictures against the proven audio-derived 90 kHz system-time tick while preserving the accepted free-running cadence for pictures without timestamps.
+
+#### Outcome:
+
+The approved implementation will synchronize only the proven single-bit 90 kHz tick from the 24.576 MHz audio domain into the 60 MHz decoder domain, avoiding a tearing multi-bit clock crossing, and use it to advance a local 33-bit presentation timeline anchored exactly once by the first in-band timestamp of each download session. Timestamp comparison will be modulo 2^33 with the H.222.0 half-range ordering rule, and the existing download rearm reset will clear the anchor and all timestamp ownership on new-file or seek-like reload boundaries. The frame timestamp owner will retain distinct values and validity for all three reference banks and both B scratch banks, commit B timestamps on actual B persistence, and expose the timestamp of both the current display and the scheduler's next candidate. A candidate with a timestamp and an active anchor will wait until its timestamp is due, then present on the first safe swap window; a late timestamp presents immediately, while an unannotated or individually missing-timestamp picture uses the existing exact 23.976, 24, 25, 29.97 or 30 fps cadence unchanged. Every presentation will still consume free-running cadence credit so a timestamped-to-untimestamped transition cannot create a next-refresh burst. The deterministic injector will gain an explicit per-picture timestamp-list mode for irregular ordinary and reordered-B hardware controls, without changing its existing evenly spaced default.
+
+#### Next Steps:
+
+Implement the tick synchronizer, local anchored timeline, five-bank timestamp association and timestamp-aware scheduler gate, then prove first-record anchor, modulo wrap, late and future timestamps, missing-timestamp fallback, session reset and re-anchor, ordinary and B-scratch ownership, reordered candidate order and unchanged unannotated cadence in focused simulation. Re-run dense publication and full-pipeline P, B, multi-slice, dense-residual, mixed-macroblock and long-GOP controls, lint the integrated top, build seed eleven with every timing category positive, install and retrieve the exact RBF, and hardware-test irregular annotated ordinary and B streams plus unannotated controls before acceptance. PCM output remains outside this source boundary.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_05.svh
+- files.qip
+- rtl/mpeg2_new/mpeg2_h262_pts_presentation_timeline.sv
+- rtl/mpeg2_new/mpeg2_h262_picture_timestamp.sv
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/streams/inject_inband_metadata.py
+- tools/streams/tb_h262_pts_presentation_timeline.sv
+- tools/streams/tb_h262_picture_timestamp.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_dense_publication_order.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 388 COMMIT Unreleased 2b1a170 2026-08-23T21:06:21-07:00
 
 #### Coming From:
@@ -1176,33 +1215,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 349 COMMIT Unreleased 873a962 2026-08-22T18:13:23-07:00
-
-#### Coming From:
-
-Unreleased fca45b3
-
-#### Purpose:
-
-Try one final fully clean fitter seed for the unchanged Stage 1 residual-store design.
-
-#### Outcome:
-
-Commit `873a962` changes only the Quartus fitter seed from eight to nine and leaves the RTL and simulations unchanged. A fully clean Quartus 17.0.2 compile from empty build directories completes in 12 minutes 17 seconds with zero errors and 154 warnings. The shared array remains exactly 65,536 by 16 bits, both descriptor tables remain at 1,024 entries, and the Stage 1 resource result is preserved at 3,228,103 block-memory bits and 408 RAM blocks, with 34,861 ALMs, 51,835 registers and 65 DSP blocks. Seed nine closes every timing category: HDMI setup is plus 0.311 ns, decoder setup plus 0.160 ns, HPS setup plus 1.601 ns, video setup plus 6.729 ns, hold plus 0.242 ns, recovery plus 3.973 ns, removal plus 0.599 ns and pulse width plus 1.122 ns, all with zero total negative slack. The 4,212,728-byte RBF has SHA-256 `96c7e815ac2f5d47501184b2da07c7f1aef824ed4f689c2c70998cafc88adb0a` and is the first deployable artifact of the reduced-store cycle.
-
-#### Next Steps:
-
-Install only the exact seed-nine RBF identified above on the connected MiSTer, verify the persistent copy byte-for-byte, and run the four essential v0.6.0 playback files. Record hardware acceptance in a new entry because this build entry is now settled; mark the Stage 1 optimization passed only if all four streams retain the accepted playback behavior without decoder, cadence, presentation or terminal regressions.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
