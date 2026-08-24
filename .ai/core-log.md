@@ -1,3 +1,31 @@
+## 450 COMMIT Unreleased f2b2e02 2026-08-24T07:11:14-07:00
+
+#### Coming From:
+
+Unreleased f2b2e02
+
+#### Purpose:
+
+Preserve the first in-progress full-soak cadence observation without disturbing playback or conflating it with audio-video drift.
+
+#### Outcome:
+
+During the uninterrupted `20_bbb_full_48k.mpg` run, the user reports suspected microstutters while audio remains synchronized, then confirms that brief repeated or late video frames accurately describe the visible behavior. No mid-run screenshot was triggered because host screenshot work could perturb the very cadence under observation. Read-only inspection proves the authored source is not timestamp-jittered: all 14,315 video pictures span 596.416666 seconds with every adjacent presentation timestamp separated uniformly by either 0.041666 or 0.041667 seconds at exact 24 fps. The compatibility checker also retains a strict pass at 720x480, frame-rate code two, 597 I, 4,176 P and 9,542 B pictures with 48 kHz stereo MPEG Layer II audio. The observation is consistent with the already captured two-second controls, whose three largest decoder-limited display intervals recur at GOP picture ordinals eleven, 23 and 35 and reach 5,968,512 decoder cycles or 99.475 milliseconds despite zero error flags and complete picture counts. Uniform source timing plus continuing audio sync therefore points to transient decoder/presentation lateness that repeats the prior frame, not accumulating timeline drift; the final long-run snapshot is still required to quantify its frequency and exclude a worse high-motion or terminal failure.
+
+#### Next Steps:
+
+Continue the current soak without pausing, replaying or triggering a screenshot. Note whether the repeated-frame effect becomes more obvious during the high-motion sequence near 7:22, smooth camera motion or rolling credits, and whether audio remains synchronized throughout. After the full 9:56 reaches its natural end, report crackle, dropout, drift, visible corruption, the repeated-frame behavior and USER, DISK and POWER, then leave the final image loaded for schema-eight capture before any other input.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 449 COMMIT Unreleased f2b2e02 2026-08-24T07:05:26-07:00
 
 #### Coming From:
@@ -1132,49 +1160,6 @@ Reboot the MiSTer once, enter MediaPlayer, ensure Audio Test is Off and run only
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 410 COMMIT Unreleased 8bbd55c 2026-08-24T00:27:49-07:00
-
-#### Coming From:
-
-Unreleased 8fc80ee
-
-#### Purpose:
-
-Transport ARM-decoded PCM in band to the FPGA-owned audio FIFO without expanding the MiSTer Main patch.
-
-#### Outcome:
-
-Commit `8bbd55c` replaces the helper's default dummy-ALSA sink with fixed in-band signed sixteen-bit stereo PCM records and a clean audio-end token on its existing standard-output stream while retaining explicit raw PCM files for host verification. The FPGA strips these reserved records before H.262 parsing, backpressures the last payload byte until the audio FIFO accepts it, and routes the recovered samples through the existing audio output; Audio Test modes retain their proven source, mode Off selects embedded PCM, and each download start flushes and re-arms the path. Analysis of the actual helper output showed runs of up to 4,608 samples separated by video data, so the proposed 256-sample FIFO was correctly expanded to 4,096 samples, or 85.3 milliseconds at 48 kHz, before building. Schema eight preserves the 38-word snapshot while adding sample count, saturated peak occupancy, protocol error and underrun telemetry. Native and sanitized verification recovered exactly 10,368 stereo samples with correlation `0.974933`, one clean end token, byte-identical raw M2V and correct malformed-record rejection; focused extractor, output-adapter, scheduler and telemetry simulations all pass, including terminal empty-before-end behavior without a false underrun. Two official GCC 10.2 ARM builds are byte-identical; the 357,356-byte static helper has SHA-256 `04f9683cf02c5ed2268743cb0ff28570e1a36c71ad3f362c80f1359c89a2af4d`. Quartus 17.0.2 completes in 12 minutes 48 seconds with zero errors, and every timing category is positive with zero endpoint TNS: plus 0.229 ns setup, plus 0.249 ns hold, plus 3.640 ns recovery, plus 0.619 ns removal and plus 1.122 ns pulse width; the focused decoder and video audits report plus 0.549 ns and plus 7.191 ns respectively. The build uses 35,970 ALMs, 52,897 registers, 3,371,475 memory bits, 427 RAM blocks and 65 DSP blocks; the 4,271,012-byte RBF has SHA-256 `414f7fae21e628e978ff331f701f0c1435f4742ef27d3928e3ad168cbbda9498`.
-
-#### Next Steps:
-
-Verify the MiSTer's currently installed Main, RBF, helper and sole test file, then install only the exact new RBF and helper through staged hash verification while retaining rollback copies and leaving Main unchanged. After reboot, run only `01_arm_mp2_audio.mpg` with Audio Test Off and require the accepted five-picture video plus the lower 440 Hz left tone and higher 660 Hz right tone, normal LEDs and zero audio error telemetry. This first hardware cycle proves audible embedded PCM transport; a subsequent cycle must add startup prefill and coordinated prolonged-starvation handling before claiming Linux scheduling cannot produce an audible gap or audio/video drift.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_07.svh
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- rtl/audio/audio_pcm_fifo.sv
-- rtl/audio/audio_pcm_output_adapter.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/read_hardware_cadence.py
-- tools/streams/tb_audio_pcm_output_adapter.sv
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-- tools/streams/tb_h262_inband_metadata.sv
-- tools/streams/verify_arm_av_pipeline.py
-- tools/streams/verify_d2_pcm_path.py
 
 #### Status:
 
