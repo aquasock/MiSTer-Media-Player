@@ -1,3 +1,36 @@
+## 395 COMMIT Unreleased ??? 2026-08-23T22:02:41-07:00
+
+#### Coming From:
+
+Unreleased 9a7a982
+
+#### Purpose:
+
+Integrate the first codec-independent signed PCM output milestone without changing the accepted video or timestamp paths.
+
+#### Outcome:
+
+The approved boundary adds a deterministic signed 16-bit PCM valid-ready source, mono and stereo modes at 44.1 and 48 kHz, a 256-sample dual-clock FIFO, and a MiSTer output adapter clocked by the existing 24.576 MHz audio domain. The OSD will expose four proof-tone modes while Off remains silent, and the source and output domains will receive atomic mode-change restart events through timing-closed asynchronous mailboxes rather than direct cross-clock ordinary-register resets. The implementation will reuse the companion Audio repository's hardware-proven PCM modules and its later timing-closed control-transfer correction, adapted onto current source `9a7a982` so the established audio-derived presentation clock, H.262 decoder, Program Stream ingress, framebuffer and diagnostics remain unchanged. This boundary establishes only a codec-independent PCM sink and proof source; it does not decode MPEG audio, AC-3 or any other compressed codec and therefore makes no compressed-audio standards claim. Per the user's updated validation policy, each development build will use exactly one focused video file, while the full regression set is reserved for release qualification.
+
+#### Next Steps:
+
+Implement the listed source boundary, run deterministic PCM proofs for all four modes, reset and backpressure behavior, 48 kHz exact scheduling and bounded 44.1 kHz scheduling, then run structural checks and one Quartus build with complete Phase-1P timing review. If the build is timing-clean, install the exact RBF and hardware-test Off plus all four proof-tone modes, mode changes and reset, while using only `04_b_bidirectional.m2v` as the single video non-regression file for this build cycle.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- files.qip
+- rtl/audio/audio_pcm_fifo.sv
+- rtl/audio/audio_pcm_output_adapter.sv
+- rtl/audio/audio_pcm_test_source.sv
+- tools/streams/verify_d2_pcm_path.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 394 COMMIT Unreleased 9a7a982 2026-08-23T21:58:43-07:00
 
 #### Coming From:
@@ -1179,34 +1212,6 @@ Preserve this timing-clean Program Stream image as the rollback boundary. As a s
 - rtl/mpeg2_new/mpeg2_h222_program_stream_demux.sv
 - tools/streams/tb_h222_program_stream_demux.sv
 - tools/streams/tb_h222_program_stream_demux_file.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 355 COMMIT Unreleased f5e3b83 2026-08-22T20:39:28-07:00
-
-#### Coming From:
-
-Unreleased f5e3b83
-
-#### Purpose:
-
-Record final user visual acceptance of the native 30000/1001 and exact-30-fps v0.7.0 cadence controls.
-
-#### Outcome:
-
-The user watched the correctly installed `TEST_2997.m2v` and `TEST_30.m2v` controls on the connected MiSTer and reports that both look identical and perfect. The user cannot reliably perceive the approximately 0.1 percent difference between the two rates over these short samples and explicitly accepts the direct hardware cadence measurements as the authoritative distinction. This completes human visual acceptance alongside Entry 354's exact scheduler proofs, positive timing, complete picture counts, clean terminal state, zero decoder errors and established four-stream hardware regression pass. The earlier manual file-copy issue affected only curl's relative FTP destination under `/root`; the automated hardware runner used absolute FTP commands and its qualification evidence remains valid, while the visible SD-card RBF and test files are now checksum-verified under `/media/fat`.
-
-#### Next Steps:
-
-Treat native frame-rate codes one through five as the accepted progressive cadence baseline for v0.7.0 and begin the separately bounded H.222.0 Program Stream pack and PES ingress milestone without changing raw elementary-stream compatibility.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
