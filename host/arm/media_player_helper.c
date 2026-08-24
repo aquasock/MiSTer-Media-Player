@@ -14,6 +14,24 @@
 
 #define AUDIO_BUFFER_LIMIT (256u * 1024u)
 
+/*
+ * Entry 429: the FPGA gates its whole in-band byte path on the PCM sink, so a
+ * decoded sample emitted the moment it exists throttles the video bytes behind
+ * it to real time.  Holding PCM here lets video run ahead instead; the held
+ * samples are emitted in order afterwards, so the audio is delayed rather than
+ * altered.  The lead is bounded so long files cannot grow this buffer without
+ * limit, and so video cannot run arbitrarily far ahead of its own audio.
+ */
+/*
+ * The lead is normally ended by the first picture completing, so this bound
+ * only exists to keep the buffer finite if that never happens.  It must be
+ * comfortably larger than the audio a first picture can sit behind, or it ends
+ * the lead early and defeats it: the faded-tones fixture needs 69,120 samples
+ * because its intra frame is 97% of the video payload.
+ */
+#define PCM_HOLD_DEFAULT_MS 4000u
+#define PCM_SAMPLE_RATE     48000u
+
 struct output_state {
     FILE *video;
     FILE *pcm;
@@ -21,6 +39,14 @@ struct output_state {
     uint64_t pcm_frames;
     unsigned video_pts;
     unsigned audio_frames;
+    int16_t *hold;            /* interleaved L,R awaiting emission */
+    size_t hold_count;        /* samples written into hold         */
+    size_t hold_head;         /* samples already emitted           */
+    size_t hold_capacity;
+    size_t hold_limit;        /* safety bound on the lead, frames  */
+    int hold_active;          /* cleared once the lead is released */
+    unsigned picture_marks;   /* picture_start_codes emitted       */
+    uint32_t video_window;    /* start-code scanner across writes  */
 };
 
 struct audio_state {
@@ -34,7 +60,7 @@ static void usage(const char *program)
 {
     fprintf(stderr,
             "usage: %s [--protocol 1] [--source SOURCE | INPUT] "
-            "[--pcm-out FILE] [--video-out FILE]\n"
+            "[--pcm-out FILE] [--video-out FILE] [--audio-delay-ms MS]\n"
             "       %s --capabilities\n",
             program,
             program);
@@ -134,6 +160,77 @@ static int emit_pcm_end(struct output_state *output)
     return write_all(output->video, record, sizeof(record), "PCM end marker");
 }
 
+/*
+ * The lead exists only to get the first picture across the throttled path.
+ * Releasing it as soon as that picture is complete keeps the delay to startup
+ * and leaves steady-state interleaving exactly as the multiplex had it, so
+ * audio is not left permanently trailing video.
+ */
+static int write_video(struct output_state *output, const void *data,
+                       size_t size, const char *what)
+{
+    const uint8_t *bytes = data;
+    size_t i;
+
+    if (write_all(output->video, bytes, size, what) < 0)
+        return -1;
+    output->video_bytes += size;
+    if (!output->hold_active)
+        return 0;
+    for (i = 0; i < size; ++i) {
+        output->video_window = (output->video_window << 8) | bytes[i];
+        if ((output->video_window & 0xffffffffu) == 0x00000100u)
+            output->picture_marks++;
+    }
+    return 0;
+}
+
+static int hold_push(struct output_state *output,
+                     const mp3d_sample_t *stereo, int frames)
+{
+    size_t needed = output->hold_count + (size_t)frames * 2u;
+
+    if (needed > output->hold_capacity) {
+        size_t capacity = output->hold_capacity ? output->hold_capacity : 8192u;
+        int16_t *replacement;
+
+        while (capacity < needed)
+            capacity *= 2u;
+        replacement = realloc(output->hold, capacity * sizeof(*replacement));
+        if (!replacement) {
+            fprintf(stderr, "media_player_helper: out of memory holding PCM\n");
+            return -1;
+        }
+        output->hold = replacement;
+        output->hold_capacity = capacity;
+    }
+    memcpy(output->hold + output->hold_count, stereo,
+           (size_t)frames * 2u * sizeof(*output->hold));
+    output->hold_count += (size_t)frames * 2u;
+    return 0;
+}
+
+/* Emit held samples until no more than `keep` sample frames remain. */
+static int hold_flush(struct output_state *output, size_t keep)
+{
+    while ((output->hold_count - output->hold_head) / 2u > keep) {
+        if (emit_pcm_sample(output, output->hold[output->hold_head],
+                            output->hold[output->hold_head + 1]) < 0)
+            return -1;
+        output->hold_head += 2u;
+    }
+    if (output->hold_head && output->hold_head == output->hold_count) {
+        output->hold_count = 0;
+        output->hold_head = 0;
+    } else if (output->hold_head >= 65536u) {
+        memmove(output->hold, output->hold + output->hold_head,
+                (output->hold_count - output->hold_head) * sizeof(*output->hold));
+        output->hold_count -= output->hold_head;
+        output->hold_head = 0;
+    }
+    return 0;
+}
+
 static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
                      int samples_per_channel, int channels)
 {
@@ -154,10 +251,14 @@ static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
         if (write_all(output->pcm, source, total * sizeof(*source), "PCM") < 0)
             return -1;
     } else {
-        for (i = 0; i < samples_per_channel; ++i) {
-            if (emit_pcm_sample(output, source[i * 2], source[i * 2 + 1]) < 0)
-                return -1;
-        }
+        if (hold_push(output, source, samples_per_channel) < 0)
+            return -1;
+        if (output->hold_active &&
+            (output->picture_marks >= 2 ||
+             (output->hold_count - output->hold_head) / 2u >= output->hold_limit))
+            output->hold_active = 0;
+        if (hold_flush(output, output->hold_active ? (size_t)-1 : 0) < 0)
+            return -1;
     }
     output->pcm_frames += (uint64_t)samples_per_channel;
     output->audio_frames++;
@@ -360,10 +461,9 @@ static int process_pes(struct media_source *input, uint8_t code,
     if ((code & 0xf0) == 0xe0) {
         if (has_pts && emit_video_pts(output, pts) < 0)
             goto done;
-        if (write_all(output->video, packet + payload_offset,
-                      length - payload_offset, "video") < 0)
+        if (write_video(output, packet + payload_offset,
+                        length - payload_offset, "video") < 0)
             goto done;
-        output->video_bytes += length - payload_offset;
     } else if ((code & 0xe0) == 0xc0) {
         if (append_audio(audio, output, packet + payload_offset,
                          length - payload_offset) < 0)
@@ -433,9 +533,8 @@ static int process_elementary_stream(struct media_source *input,
     size_t count;
 
     while ((count = media_source_read(input, buffer, sizeof(buffer))) != 0) {
-        if (write_all(output->video, buffer, count, "video") < 0)
+        if (write_video(output, buffer, count, "video") < 0)
             return -1;
-        output->video_bytes += count;
     }
     return media_source_error(input) ? -1 : 0;
 }
@@ -461,6 +560,7 @@ int main(int argc, char **argv)
     int protocol_requested = 0;
     int show_capabilities = 0;
     struct output_state output = {0};
+    unsigned audio_delay_ms = PCM_HOLD_DEFAULT_MS;
     struct audio_state audio = {0};
     struct media_source input = {0};
     char source_error[512];
@@ -470,7 +570,9 @@ int main(int argc, char **argv)
     int success = 0;
 
     for (i = 1; i < argc; ++i) {
-        if (!strcmp(argv[i], "--pcm-out") && i + 1 < argc) {
+        if (!strcmp(argv[i], "--audio-delay-ms") && i + 1 < argc) {
+            audio_delay_ms = (unsigned)strtoul(argv[++i], NULL, 10);
+        } else if (!strcmp(argv[i], "--pcm-out") && i + 1 < argc) {
             pcm_path = argv[++i];
         } else if (!strcmp(argv[i], "--video-out") && i + 1 < argc) {
             video_path = argv[++i];
@@ -538,6 +640,9 @@ int main(int argc, char **argv)
             goto done;
         }
     }
+    output.hold_limit =
+        (size_t)audio_delay_ms * (size_t)PCM_SAMPLE_RATE / 1000u;
+    output.hold_active = output.hold_limit != 0;
     mp3dec_init(&audio.decoder);
     if (read_exact(&input, signature, sizeof(signature)) < 0 ||
         media_source_rewind(&input) < 0) {
@@ -568,9 +673,14 @@ int main(int argc, char **argv)
 done:
     free(audio.data);
     media_source_close(&input);
+    output.hold_active = 0;
+    if (success && !output.pcm && hold_flush(&output, 0) < 0)
+        success = 0;
     if (success && output.audio_frames && !output.pcm &&
         emit_pcm_end(&output) < 0)
         success = 0;
+    free(output.hold);
+    output.hold = NULL;
     if (video_path && output.video) {
         fclose(output.video);
         output.video = NULL;
