@@ -1,3 +1,31 @@
+## 441 COMMIT Unreleased 3814243 2026-08-24T06:33:13-07:00
+
+#### Coming From:
+
+Unreleased 3814243
+
+#### Purpose:
+
+Qualify recovery from the unsupported-audio-codec envelope case through an immediate known-good replay without reboot.
+
+#### Outcome:
+
+The user ran `10_bad_audio_codec.mpg`; USER, DISK and POWER all remained off, the file did not claim ordinary success and the MiSTer remained responsive. The user immediately selected `00_good_480p_48k.mpg` without rebooting and reports pass-indicating LEDs. The launch-free recovered-control capture is 104,729 bytes at SHA-256 `32836080d2fcebd8d452e4165207072e9681f9adbbe83d7add863bfa8b79ed53`. Schema-eight telemetry proves that the rejected AC-3 stream leaves no sticky fault: aggregate error flags are zero, audio underrun and PCM protocol error are false, decoder, presentation and destination errors are clear, all 582,742 control transport bytes are accepted, 44 timestamps associate, all seventeen reference and 31 B pictures decode, all 48 pictures display with 47 swaps, sequence end is seen, presentation completes and the session freezes for normal quiet reason one with every pending scheduler state clear. PCM count and peak occupancy saturate their telemetry fields without starvation. This accepts the first expected-failure recovery pair and proves that helper rejection of an unsupported codec does not wedge Main, the shared in-band path or the next valid stream.
+
+#### Next Steps:
+
+Without rebooting, run `11_bad_audio_rate.mpg` for no more than ten seconds, record its visible result and USER, DISK and POWER states, then immediately run `00_good_480p_48k.mpg` and record alignment, sound, picture and all three LEDs again. An explicit rejection or non-successful settlement followed by a clean control is a pass; stop and report an unavailable menu, ignored input or failed control before any reboot. Do not continue to `12_bad_geometry_720p.mpg` until this second pair is recorded.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 440 COMMIT Unreleased 3814243 2026-08-24T06:29:29-07:00
 
 #### Coming From:
@@ -1146,41 +1174,6 @@ Reboot once to start the installed `55d06ce` Main, then run only `01_arm_mp2_aud
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 401 COMMIT Unreleased 55d06ce 2026-08-23T23:25:11-07:00
-
-#### Coming From:
-
-Unreleased c9e5aff
-
-#### Purpose:
-
-Make the ARM helper source-agnostic and versioned now so later USB DVD work extends the helper without expanding the MiSTer Main patch.
-
-#### Outcome:
-
-The connected development drive is detected by the existing MiSTer installation as USB optical device `/dev/sr0`, an HL-DT-ST DVDRAM GP63EX70, and the inserted UDF DVD is identified without mounting as `THE_BIG_LEBOWSKI`; kernel SCSI, optical block, USB storage, ISO9660 and UDF support are already present. Commit `55d06ce` does not mount, navigate, decrypt or decode that disc. It replaces the helper's direct `FILE` dependency with an operation-table media-source interface, implements `file:` plus transitional bare paths, reserves `dvd:` as a recognized but deliberately unsupported source, rejects unknown schemes and missing files, validates protocol version one, and publishes a stable machine-readable capabilities line. The architecture document fixes ownership for future source and navigation, container demux, timeline discontinuities, codec selection and outputs, while explicitly deferring every DVD feature. Main still owns SPI and its isolated broker now accepts an opaque source string; the file-selector wrapper alone constructs `file:`, so a later disc action can pass `dvd:` without changing process, pipe or FPGA-transfer ownership. Native and address-and-undefined-sanitized verification preserves byte-identical M2V, byte-identical Program Stream video after stripping one PTS record, all 10,368 PCM frames at 0.974933 correlation to FFmpeg, exact legacy-path and file-URI equivalence and clean malformed-source rejection. A clean official-toolchain build produces a stripped static ARM helper at SHA-256 `4f6ac001a4a0455c20e1148cedf7548768258abfafb2299a3f8b171a5383fa8e` and stripped patched Main at SHA-256 `7f6ef2d299e9619250f300764836c8bf30409f7f452cd34248effda6e6536a39`.
-
-#### Next Steps:
-
-Install the exact `55d06ce` helper and patched Main through staged, hash-verified replacement while retaining the existing pre-ARM Main backup and accepted RBF. Do not mount or inspect the connected DVD. After reboot, resume the same one-file `01_arm_mp2_audio.mpg` hardware test and require the no-Loading selection path, correct video, distinct left and right embedded tones, normal LEDs, clean exit and reset replay. DVD mounting, VIDEO_TS and IFO navigation, VOB program-chain assembly, CSS handling, chapters, menus, AC-3, LPCM, subpictures and interlace remain explicitly deferred until embedded file audio is accepted.
-
-#### Files Modified:
-
-- host/arm/ARCHITECTURE.md
-- host/arm/Makefile
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- host/arm/media_source.c
-- host/arm/media_source.h
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/streams/verify_arm_av_pipeline.py
 
 #### Status:
 
