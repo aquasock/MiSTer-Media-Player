@@ -83,7 +83,7 @@ TimeQuest retains the established incomplete external-I/O constraint warning cla
 
 ## Four-file MiSTer release gate
 
-Generated regression media is deliberately excluded from the release package. The final gate uses these exact local files:
+Generated regression media is deliberately excluded from the release package. The final gate passed with these exact local files:
 
 | Order | File | Size | SHA-256 | Purpose |
 | ---: | --- | ---: | --- | --- |
@@ -92,7 +92,12 @@ Generated regression media is deliberately excluded from the release package. Th
 | 3 | `01_good_480p_44k.mpg` | 690,193 | `417db70be8cadc8ca829984d149cb0a5ccda82b0dfc065869578789290a1c83e` | 44.1 kHz recovery immediately after silent playback |
 | 4 | `20_bbb_full_48k.mpg` | 100,059,153 | `fdc480e6b16bcbc7c143eb8f7e7edfe0d0bbd8e46a1035b728f07639e71b2357` | Complete 14,315-picture cadence, sync, credits, and endurance soak |
 
-Every run must complete with correct video and audio behavior, USER solid on, POWER solid on, no diagnostic error flags, and a captured schema-nine result. DISK may blink its final progress code when USER indicates success.
+All four runs completed with correct video and audio behavior, USER solid on, POWER solid on, DISK blinking its normal eleven-count progress code, and clean schema-nine telemetry:
+
+- The power-cycle 48 kHz control delivered all 48 pictures and 47 swaps with healthy PCM activity, zero gap outliers, and zero errors. Capture SHA-256: `f57df09f5f3da51e9eceec797e52fd5369fe5a35324566b382cd56c602bf7cd0`.
+- The immediately following video-only stream delivered all 48 pictures and 47 swaps with exactly zero PCM samples, zero gap outliers, and zero errors. Capture SHA-256: `9f9d3fccab5e20c6b0e932065b3960e5b4f80ff30ed0d13cc6bf50c7591df586`.
+- The immediately following 44.1 kHz control restarted audio cleanly, delivered all 48 pictures and 47 swaps, and retained zero gap outliers and zero errors. Capture SHA-256: `4220305dabf9759e02c8f6c573fffb7768a43a338055d8a27ea77058f5fc8b8f`.
+- The fresh-boot full soak accepted all 84,423,309 H.262 bytes and completed all 14,315 pictures and 14,314 swaps. PCM activity was healthy, audio underrun, PCM protocol, presentation, and aggregate errors were clear, sequence end and normal quiet completion were present at STC second 596, and zero credits-window cadence outliers were recorded. The three largest late-window gaps were each 49.7376 ms. The user reported smooth motion, synchronization, and credits with no remaining cadence jump. Capture SHA-256: `08b075111ee41b2621db28abfde247ca676764ef6d78f5ed79c144e173418d7d`.
 
 ## Packaging
 
@@ -107,4 +112,4 @@ The public archive contains:
 - `LICENSE`
 - `LICENSE.minimp3`
 
-The public regression `.mpg` files are not included. Source is available from the tagged repository state, and `SOURCE.txt` records the exact binary-producing baselines.
+The 2,749,946-byte archive is named `MiSTer_Media_Player_v0.7.0.zip` and has SHA-256 `bae3c3c17d2381cb91e2baff98ec9cf22fed88b04d01bc1349574ae57b917377`. The public regression `.mpg` files are not included. Source is available from the tagged repository state, and `SOURCE.txt` records the exact binary-producing baselines.

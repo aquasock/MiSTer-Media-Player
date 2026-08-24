@@ -71,12 +71,14 @@ Two independent ARM helper builds were byte-identical at 361,452 bytes with SHA-
 
 Native and sanitized host qualification covers exact video preservation, PTS placement, 44.1/48 kHz PCM output, video-only input, unsupported input rejection, clean terminal behavior, recovery without reboot, bounded batching, and the full 14,315-picture audio-video soak.
 
-The final four-file MiSTer release gate is:
+The final four-file MiSTer release gate passed on the exact release binaries:
 
 1. `00_good_480p_48k.mpg` — normal 48 kHz audio-video startup.
 2. `02_good_video_only.mpg` — video-only Program Stream.
 3. `01_good_480p_44k.mpg` — 44.1 kHz recovery immediately after silent playback.
 4. `20_bbb_full_48k.mpg` — complete audio-video cadence and endurance soak.
+
+All four runs ended with USER and POWER solid, DISK blinking its normal eleven-count progress code, sequence end, presentation completion, and zero aggregate, decoder, presentation, PCM protocol, or underrun errors. The complete soak delivered all 14,315 pictures and 14,314 swaps with zero credits-window cadence outliers; the user reported smooth playback and credits with no remaining jump.
 
 ## Releases
 

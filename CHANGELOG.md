@@ -20,6 +20,7 @@ Hardware-qualified bounded MPEG-2 Program Stream playback with MPEG Layer II aud
 - Extended native presentation pacing through H.262 frame-rate codes 4 and 5: exact `30000/1001` and exact 30 fps, alongside the existing `24000/1001`, exact 24, and 25 fps paths. Codes 6 through 8 are rejected before transport.
 - Added deterministic Program Stream finalization, compatibility checks, input-envelope generation, helper transport analysis, PCM comparison, protocol verification, and native/sanitized host regressions.
 - Qualified the full 14,315-picture Big Buck Bunny audio-video soak, including opening motion, high-motion scenes, transitions, and rolling credits. The final cadence-floor build completed without the recurring one-second credits jump.
+- Passed the final four-file release gate on the exact packaged binaries: power-cycle 48 kHz audio-video startup, no-reboot video-only playback, no-reboot 44.1 kHz audio recovery, and a fresh-boot full-movie soak. Every run completed with normal LEDs and zero aggregate, decoder, presentation, PCM protocol, or underrun errors; the soak recorded zero credits-window cadence outliers.
 - Preserved raw `.m2v` as a byte-exact path with synthetic H.262-derived presentation timing and clean terminal behavior.
 - Release FPGA source baseline: `9a5eea3`; host/helper source baseline: `acdbf8b`.
 - A clean Quartus Prime 17.0.2 build reproduced the accepted 4,184,380-byte RBF exactly, with SHA-256 `484328e51c6e764890bf2bdcd947448e2eaaaac2c603e93da28009475e44dafc`.
