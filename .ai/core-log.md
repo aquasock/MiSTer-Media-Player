@@ -1,3 +1,38 @@
+## 401 COMMIT Unreleased ??? 2026-08-23T23:25:11-07:00
+
+#### Coming From:
+
+Unreleased c9e5aff
+
+#### Purpose:
+
+Make the ARM helper source-agnostic and versioned now so later USB DVD work extends the helper without expanding the MiSTer Main patch.
+
+#### Outcome:
+
+The connected development drive is detected by the existing MiSTer installation as USB optical device `/dev/sr0`, an HL-DT-ST DVDRAM GP63EX70, and the inserted UDF DVD is identified without mounting as `THE_BIG_LEBOWSKI`; kernel SCSI, optical block, USB storage, ISO9660 and UDF support are already present. This boundary will not mount, navigate, decrypt or decode that disc. It will instead replace the helper's direct `FILE` dependency with a pull-based media-source interface, accept a versioned `file:` source specification while reserving `dvd:` as an explicitly unsupported future source kind, publish a stable capabilities response, and document the eventual division among source and navigation, Program Stream demux, codec selection, timeline discontinuities and FPGA-facing outputs. Main will continue to own SPI and will pass only a version plus opaque source specification, so it gains no DVD filesystem, navigation, encryption or codec knowledge. Bare file paths remain accepted during transition and all existing M2V and MPG behavior must remain identical.
+
+#### Next Steps:
+
+Implement only the source-neutral contract and file-source backend, update the isolated Main support module to invoke protocol version one with a `file:` specification, and leave `dvd:/dev/sr0` returning a clear unsupported-source result. Extend deterministic verification to cover capabilities, URI and legacy-path equivalence, reserved-DVD rejection, malformed sources, byte-identical video, the same 10,368 PCM frames and raw-M2V compatibility. Rebuild both ARM artifacts with the official toolchain, reinstall them under the existing rollback boundary, and only then resume the one-file embedded-audio hardware test. DVD mounting, VIDEO_TS and IFO navigation, VOB program-chain assembly, CSS handling, chapters, menus, AC-3, LPCM, subpictures and interlace remain explicitly deferred.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/Makefile
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- host/arm/media_source.c
+- host/arm/media_source.h
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/streams/verify_arm_av_pipeline.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 400 COMMIT Unreleased c9e5aff 2026-08-23T23:11:34-07:00
 
 #### Coming From:
@@ -1148,59 +1183,6 @@ Build at seed nine and require decoder setup materially above the plus 0.572 ns 
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-## 361 COMMIT Unreleased d7c5a8f 2026-08-23T03:25:34-07:00
-
-#### Coming From:
-
-Unreleased 9bfdb21
-
-#### Purpose:
-
-Restore fitter seed nine so the preserved `2dc52d7` placement can be reused, and delete the twenty-five source files Quartus never compiles.
-
-#### Outcome:
-
-Rebuilding `2dc52d7` from source at seed nine confirmed this project's builds are deterministic and regenerated the post-fit database that no backup contained. Every fit metric reproduced exactly: 35,932 ALMs, 52,421 registers, 3,228,103 memory bits, 408 RAM blocks, 65 DSP blocks, a 4,231,288-byte RBF, plus 0.375 ns global setup, plus 0.572 ns decoder setup, plus 7.280 ns video setup and plus 0.246 ns hold, with the fitter taking 10 minutes 33 seconds against 25 minutes 16 seconds for a cold fit of the post-revert tree. Its SHA-256 is `97762a5fe44faaca5b00c6954fc0e5a451d457683273ef21e3d7f28ce73734c3` rather than the recorded `d4f19c0d...` for one benign reason: `sys/build_id.tcl` writes `build_id.v` with a day-granularity `BUILD_DATE`, so an image built on a later calendar day differs by six characters and nothing else. That invalidates the byte-identical RBF gate written into entries 359 and 360, which is superseded here by a gate requiring identical ALM, register, memory, RAM and DSP counts together with every timing slack matching to three decimals. The rebuild also settled a more serious question. Fit-to-fit spread on this design is roughly 0.6 ns, established by `3771f19` reaching minus 0.060 ns decoder setup while carrying 437 fewer ALMs than `2dc52d7` at plus 0.572 ns, so the best margin ever recorded is smaller than the run-to-run variance and timing closure has been luck rather than engineering for several commits. Feature work is therefore suspended until decoder setup reaches plus 1.2 ns on two consecutive fits at different seeds. This commit accordingly abandons seed selection as a closure strategy and returns the seed from ten to nine so the preserved placement applies, and deletes the twenty-five files absent from `files.qip`, which resolves all seven duplicate module definitions because the base-named file is the dead copy in every case. Neither change alters the compiled netlist.
-
-#### Next Steps:
-
-Build warm from the restored database and determine whether the placement that held plus 0.572 ns survives removal of the Program Stream demux, since the cold seed-nine fit discarded that placement and found a worse one. Confirm at the same time that synthesis reports unchanged register and ALM counts, which proves the deleted files were genuinely inert. If margin remains below plus 1.2 ns, classify the diagnostic-named modules by tracing whether every output terminates in telemetry rather than by name, because `mpeg2_h262_reference_read_probe` instantiates the decode pipeline and `wide_seen` selects decode mode, then gate only what that trace proves is instrumentation, which also narrows placement variance by reducing total logic. If margin is still short after that, register the `mpeg2_h262_reference_word_cache` to `mpeg2_h262_b_bidirectional_raster_engine` path in the same manner `2dc52d7` registered the transport boundary for plus 0.357 ns. Only once two consecutive different-seed fits hold plus 1.2 ns does 0.7.0 resume with the system time clock and the PCM sink.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-- rtl/mpeg2_new/mpeg2_h262_ddram_store.sv
-- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_syntax_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_p_aligned_motion_syntax_probe_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller.sv
-- rtl/mpeg2_new/mpeg2_h262_p_luma_macroblock_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_p_motion_plan_syntax_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_syntax_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_p_residual_parser.sv
-- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline.sv
-- rtl/mpeg2_new/mpeg2_h262_p_residual_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_p_two_mb_copy_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_aligned.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_multimb.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_plan.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_read_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_slice_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_multimb.sv
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_publish.sv
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
