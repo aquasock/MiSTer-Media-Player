@@ -10,11 +10,11 @@ Restore the decoder's pulse-valid ingress contract across the in-band metadata e
 
 #### Outcome:
 
-The user reports USER one blink, DISK fifteen blinks and POWER steady on for plain `04_b_bidirectional` on the installed `27ad1b3` image. The LED hierarchy identifies the first failure as frontend syntax error source fifteen, while POWER zero is the expected absence of a nested source for a syntax error. Because `27ad1b3` differs from the earlier accepted image at the compressed-data boundary only by `mpeg2_h262_inband_metadata`, this completes the bisection. Static tracing finds the specific contract mismatch: the extractor retained `stream_valid` as a level while `mpeg2_new_stream_ready` was false, but the established frontend and parser advance on every cycle of `stream_valid`, so the ownership hold replayed one byte into syntax parsing. A focused regression using the real transport convention in which input valid is derived from readiness reproduces six accepted bytes as eight visible byte cycles on the pre-fix RTL. Commit `dea60bc` retains the pending byte internally while presenting output valid only on the actual decoder transfer; the regression then reports exactly six visible cycles. The extractor unit test, timestamp association test, transport-gate test and schema-seven cadence-profiler test all pass, and a 550,316-byte elementary-stream replay with five inserted records emits the source byte-identically with all five timestamps extracted.
+The user reports USER one blink, DISK fifteen blinks and POWER steady on for plain `04_b_bidirectional` on the installed `27ad1b3` image. The LED hierarchy identifies the first failure as frontend syntax error source fifteen, while POWER zero is the expected absence of a nested source for a syntax error. Because `27ad1b3` differs from the earlier accepted image at the compressed-data boundary only by `mpeg2_h262_inband_metadata`, this completes the bisection. Static tracing finds the specific contract mismatch: the extractor retained `stream_valid` as a level while `mpeg2_new_stream_ready` was false, but the established frontend and parser advance on every cycle of `stream_valid`, so the ownership hold replayed one byte into syntax parsing. A focused regression using the real transport convention in which input valid is derived from readiness reproduces six accepted bytes as eight visible byte cycles on the pre-fix RTL. Commit `dea60bc` retains the pending byte internally while presenting output valid only on the actual decoder transfer; the regression then reports exactly six visible cycles. The extractor unit test, timestamp association test, transport-gate test and schema-seven cadence-profiler test all pass, and a 550,316-byte elementary-stream replay with five inserted records emits the source byte-identically with all five timestamps extracted. The seed-eleven Quartus 17.0.2 build completes in 12 minutes 46 seconds with zero errors, 154 warnings and every timing category positive: plus 0.372 ns HDMI setup, plus 0.840 ns decoder setup, plus 0.928 ns host setup, plus 8.766 ns video setup, plus 0.251 ns hold, plus 4.400 ns recovery, plus 0.493 ns removal and plus 1.122 ns pulse width. It uses 34,968 ALMs, 51,912 registers, 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks; the 4,209,348-byte RBF has SHA-256 `6d86641ca5c9460c9025961ccff0403438f7034949f3046b8ee2c0592fde9afc`.
 
 #### Next Steps:
 
-Build `dea60bc` at seed eleven with every timing category positive. Hardware validation must begin with plain `04_b_bidirectional`, requiring USER steady on rather than the syntax error now measured, and must then exercise the unannotated control and annotated timestamp stream. Add explicit USER, POWER and DISK readings to the repository regression instructions as a subsequent tooling and documentation boundary so plausible still images can no longer count as a pass without LED evidence.
+Install only the exact RBF identified above. Hardware validation must begin with plain `04_b_bidirectional`, requiring USER steady on rather than the syntax error now measured, and must then exercise the unannotated control and annotated timestamp stream. Add explicit USER, POWER and DISK readings to the repository regression instructions as a subsequent tooling and documentation boundary so plausible still images can no longer count as a pass without LED evidence.
 
 #### Files Modified:
 
@@ -23,7 +23,7 @@ Build `dea60bc` at seed eleven with every timing category positive. Hardware val
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
