@@ -131,6 +131,8 @@ mpeg2_h262_pts_presentation_timeline mpeg2_h262_pts_presentation_timeline
     .clk              (clk_mpeg2),
     .reset            (reset_mpeg2),
     .tick_90k         (mpeg2_new_stc_tick_90k),
+    .metadata_valid   (mpeg2_new_inband_valid),
+    .metadata_pts     (mpeg2_new_inband_pts_90k),
     .candidate_valid  (mpeg2_new_candidate_pts_valid),
     .candidate_pts    (mpeg2_new_candidate_pts),
     .anchored         (mpeg2_new_pts_timeline_anchored),
