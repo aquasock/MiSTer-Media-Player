@@ -1,3 +1,31 @@
+## 392 COMMIT Unreleased 9a7a982 2026-08-23T21:51:18-07:00
+
+#### Coming From:
+
+Unreleased 9a7a982
+
+#### Purpose:
+
+Hardware-qualify timestamp association and presentation across reordered B-picture scratch and reference ownership.
+
+#### Outcome:
+
+After a reboot, `16A_pts_reordered_b_short.m2v` passes with USER steady on, DISK steady off and POWER steady on. The launch-free schema-seven snapshot accepts the exact 185,149 decoder bytes after stripping five metadata records, associates all five timestamps, decodes three reference and two B pictures, and displays all five pictures with four swaps. Sequence end, session quiet and presentation complete are true; decoder and presentation error flags are zero; frame waiting and both holds are false; and the terminal scheduler has no reorder, run-closed, decode-inflight, scratch, future-reference, queued, promotion, pending-frame or terminal-boundary work remaining. The final decoded picture is B type with temporal reference three while displayed PTS low bits are `0x110`, the final display-order future reference's timestamp, proving that presentation timestamps follow physical-bank ownership and display order rather than decode completion order. The irregular gaps include 0.040088 and 0.016579 seconds through B-picture reordering followed by the expected 0.215530-second wait for the final future reference. This closes the reordered-B timestamp gate on source `9a7a982` and the exact Entry-389 RBF without a source change.
+
+#### Next Steps:
+
+Reboot and run unannotated `06_p_f_code_range.m2v`, report all three LEDs and leave the final image loaded for capture, then repeat after another reboot with unannotated `04_b_bidirectional.m2v`. Require both files to preserve their accepted free-running fallback cadence and terminal state without in-band timestamp records; if both pass, mark source `9a7a982` hardware-passed and begin the PCM feature cycle.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 391 COMMIT Unreleased 9a7a982 2026-08-23T21:47:50-07:00
 
 #### Coming From:
@@ -1182,34 +1210,6 @@ Use H262-027 when extending cadence beyond the accepted native-24 path. Use H222
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-## 352 COMMIT Unreleased 6cfad2c 2026-08-22T18:55:40-07:00
-
-#### Coming From:
-
-Unreleased 902f367
-
-#### Purpose:
-
-Restore the accepted seed-nine ALM packing setting after the isolated high-effort experiment increased logic and reduced decoder timing margin.
-
-#### Outcome:
-
-Commit `6cfad2c` changes only `ALM_REGISTER_PACKING_EFFORT` from the rejected `HIGH` value back to the accepted `MEDIUM` value. The resulting `MediaPlayer.qsf` is byte-equivalent to accepted source commit `873a962`, preserving seed nine, all decoder RTL and the complete diagnostic architecture. The connected MiSTer was never changed by the rejected experiment and still held the exact 4,212,728-byte accepted seed-nine RBF; retrieving it reproduced SHA-256 `96c7e815ac2f5d47501184b2da07c7f1aef824ed4f689c2c70998cafc88adb0a`, and that verified image has replaced the rejected build in local `output_files` without another upload.
-
-#### Next Steps:
-
-Treat the accepted medium-packing seed-nine source and RBF as restored. Do not retry the global high-packing setting; continue logic-reduction work only under a separately approved boundary, with repeated MPEG lookup-table storage as the next candidate and the complete diagnostic architecture retained.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
 
 #### Status:
 
