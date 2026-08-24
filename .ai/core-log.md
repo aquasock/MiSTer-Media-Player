@@ -1,4 +1,4 @@
-## 401 COMMIT Unreleased ??? 2026-08-23T23:25:11-07:00
+## 401 COMMIT Unreleased 55d06ce 2026-08-23T23:25:11-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Make the ARM helper source-agnostic and versioned now so later USB DVD work exte
 
 #### Outcome:
 
-The connected development drive is detected by the existing MiSTer installation as USB optical device `/dev/sr0`, an HL-DT-ST DVDRAM GP63EX70, and the inserted UDF DVD is identified without mounting as `THE_BIG_LEBOWSKI`; kernel SCSI, optical block, USB storage, ISO9660 and UDF support are already present. This boundary will not mount, navigate, decrypt or decode that disc. It will instead replace the helper's direct `FILE` dependency with a pull-based media-source interface, accept a versioned `file:` source specification while reserving `dvd:` as an explicitly unsupported future source kind, publish a stable capabilities response, and document the eventual division among source and navigation, Program Stream demux, codec selection, timeline discontinuities and FPGA-facing outputs. Main will continue to own SPI and will pass only a version plus opaque source specification, so it gains no DVD filesystem, navigation, encryption or codec knowledge. Bare file paths remain accepted during transition and all existing M2V and MPG behavior must remain identical.
+The connected development drive is detected by the existing MiSTer installation as USB optical device `/dev/sr0`, an HL-DT-ST DVDRAM GP63EX70, and the inserted UDF DVD is identified without mounting as `THE_BIG_LEBOWSKI`; kernel SCSI, optical block, USB storage, ISO9660 and UDF support are already present. Commit `55d06ce` does not mount, navigate, decrypt or decode that disc. It replaces the helper's direct `FILE` dependency with an operation-table media-source interface, implements `file:` plus transitional bare paths, reserves `dvd:` as a recognized but deliberately unsupported source, rejects unknown schemes and missing files, validates protocol version one, and publishes a stable machine-readable capabilities line. The architecture document fixes ownership for future source and navigation, container demux, timeline discontinuities, codec selection and outputs, while explicitly deferring every DVD feature. Main still owns SPI and its isolated broker now accepts an opaque source string; the file-selector wrapper alone constructs `file:`, so a later disc action can pass `dvd:` without changing process, pipe or FPGA-transfer ownership. Native and address-and-undefined-sanitized verification preserves byte-identical M2V, byte-identical Program Stream video after stripping one PTS record, all 10,368 PCM frames at 0.974933 correlation to FFmpeg, exact legacy-path and file-URI equivalence and clean malformed-source rejection. A clean official-toolchain build produces a stripped static ARM helper at SHA-256 `4f6ac001a4a0455c20e1148cedf7548768258abfafb2299a3f8b171a5383fa8e` and stripped patched Main at SHA-256 `7f6ef2d299e9619250f300764836c8bf30409f7f452cd34248effda6e6536a39`.
 
 #### Next Steps:
 
-Implement only the source-neutral contract and file-source backend, update the isolated Main support module to invoke protocol version one with a `file:` specification, and leave `dvd:/dev/sr0` returning a clear unsupported-source result. Extend deterministic verification to cover capabilities, URI and legacy-path equivalence, reserved-DVD rejection, malformed sources, byte-identical video, the same 10,368 PCM frames and raw-M2V compatibility. Rebuild both ARM artifacts with the official toolchain, reinstall them under the existing rollback boundary, and only then resume the one-file embedded-audio hardware test. DVD mounting, VIDEO_TS and IFO navigation, VOB program-chain assembly, CSS handling, chapters, menus, AC-3, LPCM, subpictures and interlace remain explicitly deferred.
+Install the exact `55d06ce` helper and patched Main through staged, hash-verified replacement while retaining the existing pre-ARM Main backup and accepted RBF. Do not mount or inspect the connected DVD. After reboot, resume the same one-file `01_arm_mp2_audio.mpg` hardware test and require the no-Loading selection path, correct video, distinct left and right embedded tones, normal LEDs, clean exit and reset replay. DVD mounting, VIDEO_TS and IFO navigation, VOB program-chain assembly, CSS handling, chapters, menus, AC-3, LPCM, subpictures and interlace remain explicitly deferred until embedded file audio is accepted.
 
 #### Files Modified:
 
@@ -29,7 +29,7 @@ Implement only the source-neutral contract and file-source backend, update the i
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
