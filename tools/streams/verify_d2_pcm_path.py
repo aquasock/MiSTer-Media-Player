@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "rtl" / "audio" / "audio_pcm_test_source.sv"
 ADAPTER = ROOT / "rtl" / "audio" / "audio_pcm_output_adapter.sv"
+FIFO = ROOT / "rtl" / "audio" / "audio_pcm_fifo.sv"
 
 EXPECTED_HASHES = {
     1: "971301c0648c2239c0a31bc32c22f0c525fe8fa7e733939989f26aa16203284e",
@@ -93,6 +94,7 @@ def scheduler_gaps(audio_clk: int, rate: int, events: int) -> list[int]:
 def main() -> None:
     src_text = SRC.read_text()
     adapter_text = ADAPTER.read_text()
+    fifo_text = FIFO.read_text()
 
     actual_phase = parse_hex_localparams(src_text)
     if actual_phase != EXPECTED_PHASE:
@@ -105,6 +107,12 @@ def main() -> None:
         raise SystemExit("sample scheduler constants changed")
     if "fifo_end" not in adapter_text or "started          <= 1'b0" not in adapter_text:
         raise SystemExit("clean in-band PCM end handling is missing")
+    if "PREFILL_SAMPLES = 12'd2048" not in adapter_text:
+        raise SystemExit("2048-sample startup prefill is missing")
+    if "(fifo_used >= PREFILL_SAMPLES) || source_ended" not in adapter_text:
+        raise SystemExit("short-stream prefill release is missing")
+    if ".rdusedw (rd_used)" not in fifo_text:
+        raise SystemExit("read-domain FIFO occupancy is missing")
 
     patterns = {
         "continuous": lambda cycle: True,
@@ -145,7 +153,7 @@ def main() -> None:
     print("  valid/ready: accepted PCM invariant under 4 ready profiles")
     print("  re-arm: deterministic for all 4 modes")
     print("  scheduler: 48 kHz exact /512; 44.1 kHz gaps limited to 557/558 clocks")
-    print("  transport: FIFO end token returns the adapter to clean idle")
+    print("  transport: 2048-sample prefill with short-stream and clean-end release")
 
 
 if __name__ == "__main__":

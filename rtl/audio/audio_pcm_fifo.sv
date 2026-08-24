@@ -16,7 +16,8 @@ module audio_pcm_fifo
     input  wire        rd_clk,
     input  wire        rd_en,
     output wire [34:0] rd_data,
-    output wire        rd_empty
+    output wire        rd_empty,
+    output wire [11:0] rd_used
 );
 
 dcfifo #(
@@ -45,7 +46,8 @@ dcfifo #(
     .q       (rd_data),
     .rdclk   (rd_clk),
     .rdreq   (rd_en),
-    .rdempty (rd_empty)
+    .rdempty (rd_empty),
+    .rdusedw (rd_used)
 );
 
 endmodule

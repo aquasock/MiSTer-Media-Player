@@ -22,7 +22,7 @@ reg prediction_read=0,prediction_busy=0,prediction_data_ready=0;
 reg writer_write=0,writer_busy=0;
 reg [1:0] display_frame_bank=0;
 reg display_scratch=0,display_scratch_bank=0;
-reg sequence_end_seen=0,session_quiet=0;
+reg sequence_end_seen=0,session_quiet=0,terminal_defer=0;
 reg [15:0] error_flags=0;
 reg [13:0] stc_seconds=0;
 reg [7:0] associated_count=0;
@@ -64,6 +64,7 @@ mpeg2_h262_hardware_cadence_profiler #(
     .display_frame_bank(display_frame_bank),.display_scratch(display_scratch),
     .display_scratch_bank(display_scratch_bank),
     .sequence_end_seen(sequence_end_seen),.session_quiet(session_quiet),
+    .terminal_defer(terminal_defer),
     .stc_seconds(stc_seconds),.associated_count(associated_count),.display_pts(display_pts),
     .pcm_sample_count(pcm_sample_count),.pcm_fifo_peak(pcm_fifo_peak),
     .top_field_first(top_field_first),
@@ -102,7 +103,8 @@ task reset_all;
 begin
     reset_mpeg2=1;reset_video=1;
     frame_rate_code=4'd3;
-    sequence_end_seen=0;session_quiet=0;fifo_pending=0;decoder_ready=1;
+    sequence_end_seen=0;session_quiet=0;terminal_defer=0;
+    fifo_pending=0;decoder_ready=1;
     presentation_hold=0;destination_hold=0;frame_waiting=0;
     scratch_available=0;promotion_active=0;
     completed_frame_bank=0;display_frame_bank=0;display_scratch=0;
@@ -256,6 +258,20 @@ initial begin
         $fatal(1,"native 30 fps outlier was not captured");
     verify_checksum();
 
+    // An explicit audio tail pauses the forced terminal timer. Once the audio
+    // tail releases, a still-nonquiet video state retains the bounded snapshot.
+    reset_all();
+    activate_session();
+    sequence_end_seen=1;session_quiet=0;terminal_defer=1;
+    repeat(96)@(posedge clk_mpeg2);
+    if(snapshot_ready)
+        $fatal(1,"audio tail did not defer the forced snapshot");
+    terminal_defer=0;
+    wait(snapshot_ready);repeat(4)@(posedge clk_video);
+    if(dut.snapshot_sync_2[831:830]!==2'd2)
+        $fatal(1,"post-audio forced snapshot reason missing");
+    verify_checksum();
+
     // A nonquiet sequence end must still expose the stuck terminal ownership.
     reset_all();
     activate_session();
@@ -278,7 +294,7 @@ initial begin
     // accepted after the transport enters fail-open drain.
     reset_all();
     activate_session();
-    error_flags=16'h0200;presentation_error=1;
+    error_flags=16'h0200;presentation_error=1;terminal_defer=1;
     completed_frame_bank=2;display_frame_bank=1;
     scheduler_debug_state=32'h3140fade;
     wait(snapshot_ready);repeat(4)@(posedge clk_video);
@@ -310,7 +326,7 @@ initial begin
     if({video_r,video_g,video_b}!==24'h123456)
         $fatal(1,"base video changed outside overlay");
 
-    $display("HARDWARE_CADENCE_PROFILER_PASS schema=8 gap-state+forced+fatal+no-progress checksum=%h",
+    $display("HARDWARE_CADENCE_PROFILER_PASS schema=8 audio-defer+forced+fatal+no-progress checksum=%h",
              checksum);
     $finish;
 end

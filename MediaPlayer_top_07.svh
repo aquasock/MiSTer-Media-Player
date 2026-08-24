@@ -21,7 +21,8 @@ wire mpeg2_new_cadence_session_quiet =
     !mpeg2_new_b_presentation_hold &&
     !mpeg2_new_p_destination_ownership_hold &&
     !mpeg2_new_pred_rd &&
-    !mpeg2_new_ddr_wr_we;
+    !mpeg2_new_ddr_wr_we &&
+    !audio_pcm_terminal_pending;
 
 wire [15:0] mpeg2_new_cadence_error_flags = {
     4'd0,
@@ -81,6 +82,7 @@ mpeg2_h262_hardware_cadence_profiler
     .display_scratch_bank      (mpeg2_new_display_scratch_bank),
     .sequence_end_seen         (mpeg2_new_sequence_end_seen),
     .session_quiet             (mpeg2_new_cadence_session_quiet),
+    .terminal_defer            (audio_pcm_terminal_pending),
     .error_flags               (mpeg2_new_cadence_error_flags),
     .h_pos                     (display_h_pos),
     .v_pos                     (display_v_pos),

@@ -404,8 +404,10 @@ wire               audio_pcm_fifo_full;
 wire               audio_pcm_fifo_empty;
 wire [34:0]        audio_pcm_fifo_data;
 wire [11:0]        audio_pcm_fifo_used;
+wire [11:0]        audio_pcm_fifo_read_used;
 wire               audio_pcm_fifo_rd;
 wire               audio_pcm_underrun;
+wire               audio_pcm_playback_complete;
 
 wire               audio_test_valid;
 wire signed [15:0] audio_test_left;
@@ -423,6 +425,48 @@ wire [13:0]        mpeg2_new_inband_pcm_sample_count;
 wire               mpeg2_new_inband_pcm_protocol_error;
 
 wire audio_embedded_mode = (audio_mode_src == 3'd0);
+wire audio_pcm_accepted = audio_pcm_valid && audio_pcm_ready;
+
+reg audio_pcm_session_seen;
+reg audio_pcm_source_ended;
+
+always @(posedge clk_mpeg2) begin
+	if (reset_mpeg2 || reset_audio_src) begin
+		audio_pcm_session_seen <= 1'b0;
+		audio_pcm_source_ended <= 1'b0;
+	end
+	else if (audio_embedded_mode && audio_pcm_accepted) begin
+		audio_pcm_session_seen <= 1'b1;
+		if (audio_pcm_end)
+			audio_pcm_source_ended <= 1'b1;
+	end
+end
+
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [1:0] audio_pcm_source_ended_sync;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [1:0] audio_pcm_complete_sync;
+
+always @(posedge CLK_AUDIO) begin
+	if (reset_audio_out)
+		audio_pcm_source_ended_sync <= 2'b00;
+	else
+		audio_pcm_source_ended_sync <=
+			{audio_pcm_source_ended_sync[0], audio_pcm_source_ended};
+end
+
+always @(posedge clk_mpeg2) begin
+	if (reset_mpeg2 || reset_audio_src)
+		audio_pcm_complete_sync <= 2'b00;
+	else
+		audio_pcm_complete_sync <=
+			{audio_pcm_complete_sync[0], audio_pcm_playback_complete};
+end
+
+wire audio_pcm_terminal_pending =
+	audio_embedded_mode &&
+	audio_pcm_session_seen &&
+	!audio_pcm_complete_sync[1];
 
 assign audio_pcm_ready = !audio_pcm_fifo_full;
 assign mpeg2_new_inband_pcm_ready =
@@ -466,7 +510,8 @@ audio_pcm_fifo audio_pcm_fifo
 	.rd_clk   (CLK_AUDIO),
 	.rd_en    (audio_pcm_fifo_rd),
 	.rd_data  (audio_pcm_fifo_data),
-	.rd_empty (audio_pcm_fifo_empty)
+	.rd_empty (audio_pcm_fifo_empty),
+	.rd_used  (audio_pcm_fifo_read_used)
 );
 
 audio_pcm_output_adapter audio_pcm_output_adapter
@@ -475,10 +520,13 @@ audio_pcm_output_adapter audio_pcm_output_adapter
 	.reset      (reset_audio_out),
 	.fifo_data  (audio_pcm_fifo_data),
 	.fifo_empty (audio_pcm_fifo_empty),
+	.fifo_used  (audio_pcm_fifo_read_used),
+	.source_ended(audio_pcm_source_ended_sync[1]),
 	.fifo_rd    (audio_pcm_fifo_rd),
 	.audio_l    (audio_pcm_output_l),
 	.audio_r    (audio_pcm_output_r),
-	.underrun   (audio_pcm_underrun)
+	.underrun   (audio_pcm_underrun),
+	.playback_complete(audio_pcm_playback_complete)
 );
 
 reg [6:0] audio_pcm_fifo_peak;

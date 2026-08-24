@@ -4,18 +4,23 @@
 // 44.1 kHz uses an integer phase accumulator: its average rate is exact and
 // each sample event is scheduled with at most one CLK_AUDIO period of jitter.
 
-module audio_pcm_output_adapter
+module audio_pcm_output_adapter #(
+    parameter [11:0] PREFILL_SAMPLES = 12'd2048
+)
 (
     input  wire        clk,
     input  wire        reset,
 
     input  wire [34:0] fifo_data,
     input  wire        fifo_empty,
+    input  wire [11:0] fifo_used,
+    input  wire        source_ended,
     output reg         fifo_rd,
 
     output reg  [15:0] audio_l,
     output reg  [15:0] audio_r,
-    output reg         underrun
+    output reg         underrun,
+    output reg         playback_complete
 );
 
 localparam [25:0] AUDIO_CLK_HZ = 26'd24576000;
@@ -35,6 +40,7 @@ reg  [25:0] phase_accum;
 
 wire [25:0] rate_step = current_rate_48k ? RATE_48000 : RATE_44100;
 wire [26:0] phase_sum = {1'b0, phase_accum} + {1'b0, rate_step};
+wire prefill_ready = (fifo_used >= PREFILL_SAMPLES) || source_ended;
 
 always @(posedge clk) begin
     if (reset) begin
@@ -42,6 +48,7 @@ always @(posedge clk) begin
         audio_l          <= 16'd0;
         audio_r          <= 16'd0;
         underrun         <= 1'b0;
+        playback_complete <= 1'b0;
         started          <= 1'b0;
         starvation_waiting <= 1'b0;
         current_rate_48k <= 1'b0;
@@ -52,12 +59,13 @@ always @(posedge clk) begin
 
         if (!started) begin
             phase_accum <= 26'd0;
-            if (!fifo_empty) begin
+            if (!playback_complete && prefill_ready && !fifo_empty) begin
                 fifo_rd <= 1'b1;
                 if (fifo_end) begin
                     audio_l <= 16'd0;
                     audio_r <= 16'd0;
                     starvation_waiting <= 1'b0;
+                    playback_complete <= 1'b1;
                 end
                 else begin
                     audio_l          <= fifo_left;
@@ -77,6 +85,7 @@ always @(posedge clk) begin
                     audio_r  <= 16'd0;
                     started  <= 1'b0;
                     starvation_waiting <= 1'b0;
+                    playback_complete <= 1'b1;
                 end
                 else begin
                     audio_l          <= fifo_left;

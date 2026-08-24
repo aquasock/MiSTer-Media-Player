@@ -29,6 +29,7 @@ module mpeg2_h262_hardware_cadence_profiler #(
     input wire writer_busy,input wire [1:0] display_frame_bank,
     input wire display_scratch,input wire display_scratch_bank,
     input wire sequence_end_seen,input wire session_quiet,
+    input wire terminal_defer,
     // Entry 365: presentation-clock bring-up observables.  stc_seconds is
     // counted in this domain from a single-bit 1 Hz pulse crossed from the
     // 24.576 MHz audio domain, so no multi-bit counter crosses domains.
@@ -77,7 +78,7 @@ reg prediction_read_q,prediction_busy_q,prediction_data_ready_q;
 reg writer_write_q,writer_busy_q;
 reg [1:0] display_frame_bank_q;
 reg display_scratch_q,display_scratch_bank_q;
-reg sequence_end_seen_q,session_quiet_q;
+reg sequence_end_seen_q,session_quiet_q,terminal_defer_q;
 reg [15:0] error_flags_q;
 reg [13:0] stc_seconds_q;
 reg [7:0] associated_count_q;
@@ -233,7 +234,7 @@ always @(posedge clk_mpeg2) begin
         prediction_data_ready_q<=0;writer_write_q<=0;writer_busy_q<=0;
         display_frame_bank_q<=0;display_scratch_q<=0;
         display_scratch_bank_q<=0;sequence_end_seen_q<=0;
-        session_quiet_q<=0;error_flags_q<=0;
+        session_quiet_q<=0;terminal_defer_q<=0;error_flags_q<=0;
         stc_seconds_q<=0;top_field_first_q<=0;repeat_first_field_q<=0;
         associated_count_q<=0;display_pts_q<=0;
         pcm_sample_count_q<=0;pcm_fifo_peak_q<=0;
@@ -278,6 +279,7 @@ always @(posedge clk_mpeg2) begin
         display_frame_bank_q<=display_frame_bank;display_scratch_q<=display_scratch;
         display_scratch_bank_q<=display_scratch_bank;
         sequence_end_seen_q<=sequence_end_seen;session_quiet_q<=session_quiet;
+        terminal_defer_q<=terminal_defer;
         error_flags_q<=error_flags;
         stc_seconds_q<=stc_seconds;
         associated_count_q<=associated_count;
@@ -398,6 +400,10 @@ always @(posedge clk_mpeg2) begin
             snapshot_reason<=1;terminal_wait_count<=0;no_progress_wait_count<=0;
             if(quiet_count==10'd1023)capture_snapshot();
             else quiet_count<=quiet_count+1'b1;
+        end else if(!snapshot_ready_mpeg2&&session_active&&sequence_end_seen_q&&
+           terminal_defer_q)begin
+            snapshot_reason<=2;quiet_count<=0;terminal_wait_count<=0;
+            no_progress_wait_count<=0;
         end else if(!snapshot_ready_mpeg2&&session_active&&sequence_end_seen_q)begin
             snapshot_reason<=2;quiet_count<=0;no_progress_wait_count<=0;
             if(terminal_wait_count==TERMINAL_SNAPSHOT_LIMIT)capture_snapshot();
