@@ -1,3 +1,35 @@
+## 375 COMMIT Unreleased ??? 2026-08-23T18:47:02-07:00
+
+#### Coming From:
+
+Unreleased dea60bc
+
+#### Purpose:
+
+Make the hardware regression pack self-contained, checksum-verifiable and explicit about the three-LED acceptance evidence required for every stream.
+
+#### Outcome:
+
+The approved repository-only cycle will import the regression instructions, results template, checksum list and compatibility manifest from the downloaded v0.6.0 release-candidate pack into `docs/`, update their status and terminology for the current Unreleased boundary, require USER, POWER and DISK readings on every run, and replace host-specific absolute manifest paths with repository-relative paths. A committed verifier will check the pack's complete file set, stream hashes, manifest structure and manifest hash without committing generated binaries. The source-pack audit also changes one planned item materially: launch-free telemetry freezes early because the top-level cadence quiet gate requires the B-presentation completion signal for all-I and P-only streams, not because the Python reader captures too soon. Correcting that condition changes RTL, requires a new Quartus image and needs hardware validation, so it is split into the following approval boundary rather than folded into this no-RBF documentation cycle.
+
+#### Next Steps:
+
+Complete and verify the imported documentation and pack checker, prove every available stream and the normalized manifest against their recorded identities, and commit without rebuilding because this boundary changes no compiled source. Then propose the separate generic terminal-quiet telemetry correction with focused all-I, P-only and B-path simulation cases, a timing-clean build and hardware confirmation that the snapshot reason becomes quiet while existing LED acceptance remains unchanged.
+
+#### Files Modified:
+
+- docs/TEST_INSTRUCTIONS.md
+- docs/RESULTS_TEMPLATE.txt
+- docs/SHA256SUMS
+- docs/compatibility_manifest.json
+- tools/streams/verify_regression_pack.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 374 COMMIT Unreleased dea60bc 2026-08-23T18:40:19-07:00
 
 #### Coming From:
@@ -1176,33 +1208,5 @@ Have the user confirm that the full Emperor movie now runs at normal wall-clock 
 
 - [x] Built
 - [x] Passed
-
----
-## 335 COMMIT Unreleased 8517927 2026-08-22T07:13:52-07:00
-
-#### Coming From:
-
-Unreleased 04873f7
-
-#### Purpose:
-
-Find a timing-clean placement for the unchanged native-23.976-fps design by retrying its incremental Quartus fit with seed eleven.
-
-#### Outcome:
-
-Commit `04873f7` passes every focused and integrated simulation gate, but its incremental seed-twelve fit is not deployable. Quartus completes with zero errors and the affected 60 MHz decoder clock remains positive at plus 0.040 ns while the 40 MHz video clock remains positive at plus 7.414 ns, but a standing global framework path misses setup by 0.094 ns. Hold is plus 0.243 ns, recovery plus 3.050 ns, removal plus 0.697 ns and minimum pulse width plus 1.122 ns. The rejected 4,462,820-byte RBF has SHA-256 `1b3bbd125561b4c6d9787730db022b396ab3982009718741706b286254b5c7c1` and was not installed. Commit `8517927` changes only the reproducible fitter seed from twelve to eleven and reuses synthesis exactly as intended, but its incremental fit also fails timing: the global and decoder minimum becomes minus 0.131 ns with eleven same-clock decoder violations while video remains plus 7.069 ns. Hold is plus 0.260 ns, recovery plus 3.997 ns, removal plus 0.617 ns and pulse width plus 1.122 ns. The rejected seed-eleven fit uses 34,594 ALMs, 51,017 registers, 4,306,375 memory bits, 538 RAM blocks and 65 DSP blocks; its 4,458,208-byte RBF has SHA-256 `170c64ec789dfc3ef2d4e4d1e377db7728b70dc448e50038563ea48ea8d32341` and was not installed.
-
-#### Next Steps:
-
-Keep the validated cadence RTL unchanged and retry incrementally with seed ten, which is the next documented candidate and previously missed the 60 MHz decoder by only 0.073 ns before later ingress changes. Require every timing category positive and do not install either rejected seed-eleven or seed-twelve image.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
