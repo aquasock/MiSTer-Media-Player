@@ -1,3 +1,33 @@
+## 452 COMMIT Unreleased f2b2e02 2026-08-24T07:31:54-07:00
+
+#### Coming From:
+
+Unreleased f2b2e02
+
+#### Purpose:
+
+Isolate the failed Program Stream cadence from decoder throughput with an audio-free high-motion control, then prepare an exact-byte opening comparison before changing pacing code.
+
+#### Outcome:
+
+Before touching the MiSTer, the user recorded the completed full soak's ordinary terminal indication: USER and POWER solid on with DISK blinking eleven times. Without rebooting, the exact installed `13_bbb_squirrel_15sec_native24_q6.m2v` then played its 7:15–7:30 high-motion sequence perfectly with no visible stutter and no audio by design, ending with the same ordinary LEDs. The completed 800x600 capture is 508,980 bytes at SHA-256 `3cc49f8b2180b90f4ebce63f0875fd82eae7eb60c04f840ecb558713e9c40d20`; an initial 425,984-byte retrieval occurred before the screenshot finished writing and was discarded rather than analyzed. Schema-eight telemetry reports zero aggregate errors, no audio underrun or PCM protocol error, all 2,603,570 bytes accepted, 121 reference plus 239 B pictures decoded, sequence end, presentation completion and normal quiet reason one. The eight-bit display counters wrap exactly as expected for all 360 pictures and 359 swaps. Reconstructing that wrap gives 359 intervals over 14.960773 seconds, or 23.996 frames per second. No display gap crosses the 50-millisecond outlier threshold, and the three largest are all only 2,984,256 cycles or 49.738 milliseconds. This is a sharp contrast with the audio-video soak's 139 threshold crossings and 116.054-millisecond repeated-frame gaps within its first 21.74 seconds, and proves the current decoder and RBF can sustain demanding 24 fps content when PCM is absent.
+
+One encoding variable remains because the existing squirrel clip begins a fresh audio-free encode at 7:15 rather than reusing the failed Program Stream's exact bytes. A final bounded discriminator was therefore produced without source changes: `22_bbb_opening24_exact_video.m2v` is the first 577 pictures copied byte-for-byte from `20_bbb_full_48k.mpg`'s H.262 stream, followed only by a sequence-end code. The 3,138,618-byte file passes the 720x480 frame-rate-code-two envelope at 25 I, 169 P and 383 B pictures and has SHA-256 `100dcb7d536918263def73bc2b8e660fdb2e975221ccd9d548b0845bb853471a`. It was uploaded under a staging name, retrieved byte-identically, promoted only after verification and retrieved again at the same hash. Helper, RBF, Main and every existing media file remain unchanged, and no playback was launched during installation.
+
+#### Next Steps:
+
+Without rebooting, run only `22_bbb_opening24_exact_video.m2v`. Report whether its 24-second motion is continuous or shows the repeated-frame cadence seen during the opening of `20_bbb_full_48k.mpg`, plus USER, DISK and POWER at the end, then leave its final image loaded for schema-eight capture. A clean exact-byte raw run will conclusively place both the cadence regression and the soak's early underrun in shared in-band PCM/video pacing; matching stutter will instead identify the encoded opening's decoder workload. Do not replay the full Program Stream or run another file before capture.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 451 COMMIT Unreleased f2b2e02 2026-08-24T07:22:11-07:00
 
 #### Coming From:
@@ -1139,33 +1169,5 @@ Open a helper-only repair cycle that snapshots and restores `mp3dec_t` whenever 
 
 - [x] Built
 - [ ] Passed
-
----
-## 412 COMMIT Unreleased 8bbd55c 2026-08-24T01:06:03-07:00
-
-#### Coming From:
-
-Unreleased 8bbd55c
-
-#### Purpose:
-
-Hardware-qualify the first FPGA-owned playback of ARM-decoded embedded audio and preserve the brief onset-quality observation.
-
-#### Outcome:
-
-After rebooting into the installed `8bbd55c` RBF and helper, the user ran `01_arm_mp2_audio.mpg` several times to hear its deliberately short audio and reported both tones audible with correct channel separation, the lower tone on the left and higher tone on the right, while the video remained visually correct. The user heard a slight crackly onset that sounded attributable to hearing only the beginning of the approximately 0.2-second fixture, then left the final run loaded with USER steady on, DISK steady off and POWER steady on. The untouched 800-by-600 capture at SHA-256 `04840e9c76c0f0fa90df7200b4692eaa1041330977b6483b8941ba9927b2de4f` shows the accepted completed raster. Its schema-eight quiet snapshot reports all 10,368 PCM samples extracted, saturated peak FIFO telemetry of 127 or greater, no audio underrun, no PCM protocol error and zero aggregate error flags; video reports 185,149 accepted elementary-stream bytes, three reference plus two B pictures, five displayed pictures, four swaps, sequence end, session quiet and presentation complete. The captured run therefore proves the helper-to-FPGA PCM transport, left-right sample ordering and MiSTer audio output without Linux ALSA, and rules out FIFO starvation as the cause of its reported onset texture.
-
-#### Next Steps:
-
-Treat `8bbd55c` as the accepted embedded-PCM transport boundary. Before changing the playback path for the onset observation, generate one longer Program Stream with silence or a short fade before and after sustained channel-identity tones and run only that file on the current build; a clean sustained body would identify the crackle as the deliberately abrupt short fixture, while persistent crackle would justify inspecting sample continuity at record boundaries. After that diagnostic, add startup FIFO prefill and coordinated prolonged-starvation handling before claiming 0.7.0 audio is resilient to Linux scheduling delays, continuing the user's rule of one video file per development build cycle.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
