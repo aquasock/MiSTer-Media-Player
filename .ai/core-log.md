@@ -1,3 +1,31 @@
+## 464 COMMIT Unreleased 6dece4c 2026-08-24T10:58:31-07:00
+
+#### Coming From:
+
+Unreleased 6dece4c
+
+#### Purpose:
+
+Record that packed PCM materially improves the visible full-soak cadence but leaves the deterministic audio underrun and its surviving presentation-gap signature unresolved.
+
+#### Outcome:
+
+The user completed `20_bbb_full_48k.mpg` on the packed-record `6dece4c` image and reports that the roughly one-second cadence is now only slight in the credits and looks substantially better overall. A fresh schema-eight screenshot was triggered and retrieved exclusively through plain FTP with the default MiSTer `root` login, without SSH or keys. The 8,112-byte capture is SHA-256 `14226d6bd2b4e690786d9b560ef2f2673af4694ac4679679b7431b71e7b31e98`. It froze for fatal-or-no-progress reason three with aggregate flags exactly `0x0400`, a real `audio_pcm_underrun`; PCM protocol, presentation and destination errors remain clear. The freeze occurs at exactly 35,705,169 accepted clean-video bytes, the same boundary as the `14e0629` soak in entry 461, while gap outliers move only from 132 to 131 and the three largest gaps remain bit-identical at 431.059 milliseconds at display ordinal fourteen and 82.896 milliseconds at ordinals fifteen and seventeen. Packing therefore removed enough shared-path overhead to produce a clear visual improvement, but the exact repeated underrun boundary separates that fatal condition from aggregate record bandwidth and the unchanged gap signature leaves the presentation residue in place. The previously named `mpeg2_h262_stream_transport_gate` is not itself a valid PCM buffering location because its interface sees only the pre-extractor FIFO and decoder ready/valid state; PCM becomes visible only inside `mpeg2_h262_inband_metadata`.
+
+#### Next Steps:
+
+Stop before changing RTL and obtain approval for a revised isolation boundary. The proposed next cycle is to decouple record extraction from decoder backpressure at the actual split point by adding and testing a bounded post-extraction clean-video queue, allowing the extractor to continue reaching PCM records while the decoder temporarily refuses video; size and resource cost must be established before choosing a depth, and the existing pre-extractor clock-domain FIFO must remain sufficient for safe ingress. Deepening `audio_pcm_fifo` is secondary because the fit already uses 446 of 553 RAM blocks and a larger sink only extends the starvation threshold without removing the coupling. Acceptance remains a complete quiet soak with `audio_pcm_underrun` clear, sequence end and all 14,315 pictures accounted for, followed by the 24-second diagnostic and elementary-stream controls to prove that the queue changes neither video bytes nor presentation order; the user's residual credits cadence must also be compared separately because this capture proves it is no longer equivalent to the underrun.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 463 COMMIT Unreleased 6dece4c 2026-08-24T10:41:16-07:00
 
 #### Coming From:
@@ -1200,34 +1228,6 @@ The approved audio-delay approach cannot be implemented on the FPGA side without
 - MediaPlayer_top_05.svh
 - rtl/audio/audio_pcm_output_adapter.sv
 - tools/streams/tb_audio_pcm_output_adapter.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 424 COMMIT Unreleased d9022e6 2026-08-24T03:38:48-07:00
-
-#### Coming From:
-
-Unreleased d9022e6
-
-#### Purpose:
-
-Install the audio start gate through staged, hash-verified replacement while preserving exact rollback state.
-
-#### Outcome:
-
-Installation again used the FTP path with download-and-hash round trips in place of on-device hashing, since key-based SSH is still rejected. Before installation `/media/fat/MediaPlayer.rbf` verified at SHA-256 `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68`, matching accepted `047f5b2`, and both the staging and rollback names were absent. The new RBF was uploaded as `MediaPlayer.upload.d9022e6.rbf`, downloaded back and confirmed byte-identical to the local build at SHA-256 `b0f3a3125bf803dfaed0924b543760a45f439288b18b742cebbd4816c7b342f5`, after which the displaced file was renamed to its rollback name and the staged file renamed into place. `/media/fat/MediaPlayer.rbf` now verifies at `b0f3a3125bf803dfaed0924b543760a45f439288b18b742cebbd4816c7b342f5` and its predecessor is preserved byte-identically as `/media/fat/MediaPlayer.backup.pre-audio-gate.047f5b2.rbf`. The helper remains at `12f6305f35ef56d4e8de2369ecd41d2811bda9d787c885991a5ed0272cd2678a` and the faded fixture at `cb4f143d2d72af72bb03c7a7fbc4e2163ad780a35483bdb871ec661cf29ccc24`, both byte-identical. No playback was launched, so the currently loaded core remains the prior in-memory RBF until reboot. As in the previous installation no `sync` could be issued, so the writes depend on the server flushing before the next power cycle.
-
-#### Next Steps:
-
-Reboot the MiSTer once, enter MediaPlayer with Audio Test Off and run only `02_arm_mp2_faded_tones.mpg`. Require that audio and video now begin together rather than audio leading by roughly 1.4 seconds, that the tones stay clean and separated with smooth fades, that USER is steady on, DISK steady off and POWER steady on, and that no video artefact appears; then leave the completed image loaded so a schema-eight capture can be taken by writing a screenshot command to `/dev/MiSTer_cmd` over FTP. That capture must still report 185,149 accepted elementary-stream bytes, three reference plus two B pictures, five displays, four swaps, sequence end, presentation complete and zero aggregate error flags, and its `first_present_cycle` should be close to the 82,301,563 recorded for `047f5b2` since video timing is deliberately unchanged. Separately confirm an older `.m2v` file still starts immediately. Treat any video artefact as a candidate for a fitter seed retune before treating it as a functional defect, because `pll_hdmi` slack is 0.162 nanoseconds this build.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
