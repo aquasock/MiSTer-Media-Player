@@ -1,4 +1,4 @@
-## 399 COMMIT Unreleased ??? 2026-08-23T22:49:33-07:00
+## 399 COMMIT Unreleased c9e5aff 2026-08-23T22:49:33-07:00
 
 #### Coming From:
 
@@ -10,18 +10,18 @@ Implement the first ARM-side embedded-audio loader for MPEG Program Streams whil
 
 #### Outcome:
 
-The approved v0.7.0 boundary moves container demultiplexing and compressed-audio decoding to a small ARM helper while the FPGA remains the video and output-clock driver. The first profile is an MPEG Program Stream containing H.262 video and 48 kHz MPEG-1 Layer II audio. A helper built for the MiSTer ARM will parse Program Stream and PES framing, emit the video elementary stream with the established in-band picture timestamps, decode Layer II through the pinned CC0 `minimp3` implementation, and send signed 16-bit stereo PCM through the installed `aplay` command. MiSTer's existing `/dev/MrAudio`, `sys/alsa.sv`, reserved-DDR ring and 24.576 MHz output clock already implement the ARM-to-FPGA audio buffer, and the current RBF includes that path because `MISTER_DISABLE_ALSA` is not enabled. A pinned patch against official Main_MiSTer source `0a8fb44` will invoke the helper for MediaPlayer container selections, extend the visible file types without changing the RBF configuration string, stream the helper's video output over the existing backpressured file channel, and suppress the old Loading progress screen. The current accepted RBF remains the hardware target and no FPGA source or rebuild is authorized in this boundary.
+Commit `c9e5aff` implements the first ARM-side media pipeline without changing FPGA source or the accepted RBF. The helper incrementally parses MPEG-1 or MPEG-2 Program Stream and PES framing, selects the first H.262 and MPEG audio streams, emits H.262 through the existing file channel with the established in-band PTS record, decodes 48 kHz Layer II with pinned CC0 `minimp3`, and writes signed 16-bit stereo PCM through installed `aplay`; raw M2V input remains a byte-identical compatibility path. Dependencies are fetched at a pinned commit with exact SHA-256 checks instead of being vendored. The patch against official Main_MiSTer `0a8fb44` exposes M2V and MPG files only for the MediaPlayer core, starts the helper asynchronously, polls its nonblocking video pipe through Main as the sole FPGA SPI owner, terminates an old helper on replacement or reset, and removes the blocking Loading screen for both supported extensions. The deterministic generator produces the sole short H.262 plus stereo Layer II Program Stream for this cycle. Native and address-and-undefined-sanitized verification find byte-identical video after removing one PTS record, all 10,368 expected stereo PCM frames with 0.974933 correlation to FFmpeg's independent synthesis, byte-identical raw-M2V pass-through and clean rejection of a PES truncated through its first audio packet. The helper cross-compiles as a stripped static ARM EABI5 binary and patched Main cross-compiles as the expected stripped dynamic ARM EABI5 binary with the official MiSTer GCC 10.2 toolchain; the build script also reproduces a clean clone, patch application and both outputs.
 
 #### Next Steps:
 
-Implement the listed ARM helper, deterministic Program Stream generator and verifier, and the narrowly scoped Main_MiSTer loader patch. Cross-compile both ARM binaries with the official MiSTer GCC 10.2 toolchain, compare helper video output byte-for-byte with the source elementary stream after independently stripping timestamp records, compare decoded PCM byte-for-byte with FFmpeg, and exercise malformed, missing-audio, reset and backpressure paths. Back up the installed MiSTer executable before installing the candidate helper and loader. Hardware validation will use exactly one short Program Stream with embedded 48 kHz Layer II audio, requiring normal video completion, audible stereo content through MiSTer ALSA, no Loading screen, no decoder or presentation errors and clean return to file selection; the full video regression set remains deferred to release qualification.
+Back up and hash the installed MiSTer executable, then install the exact `c9e5aff` helper and patched Main together with `01_arm_mp2_audio.mpg`, retaining the accepted RBF unchanged. Restart Main safely and use only that one Program Stream for hardware validation, requiring immediate return from file selection without the Loading screen, normal five-picture video completion, the distinct 440 Hz left and 660 Hz right embedded tones through MiSTer ALSA, clean helper exit, zero decoder and presentation errors and a successful reset followed by replay of the same file. Leave the full video regression set deferred to release qualification. If initial A/V alignment is observably wrong, preserve this demux and decode boundary and make PTS-governed start alignment the next focused source cycle rather than changing the FPGA buffer.
 
 #### Files Modified:
 
+- .gitattributes
+- .gitignore
 - host/arm/Makefile
 - host/arm/media_player_helper.c
-- host/arm/third_party/LICENSE
-- host/arm/third_party/minimp3.h
 - host/build_arm_stack.sh
 - host/main_mister/0001-mediaplayer-arm-loader.patch
 - tools/streams/generate_arm_av_test.py
@@ -29,7 +29,7 @@ Implement the listed ARM helper, deterministic Program Stream generator and veri
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
