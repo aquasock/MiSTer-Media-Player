@@ -1,0 +1,243 @@
+# Applies to Main_MiSTer commit 0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f.
+diff --git a/menu.cpp b/menu.cpp
+index 0c74e21..292e70e 100644
+--- a/menu.cpp
++++ b/menu.cpp
+@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ #include "profiling.h"
+ #include "str_util.h"
+ #include "autofire.h"
++#include "support/mediaplayer/mediaplayer.h"
+ 
+ /*menu states*/
+ enum MENU
+@@ -2423,6 +2424,7 @@ void HandleUI(void)
+ 
+ 						if (p[idx] >= '0' && p[idx] <= '9') ioctl_index = p[idx] - '0';
+ 						substrcpy(ext, p, 1);
++						if (mediaplayer_is_core()) strcpy(ext, "M2VMPG");
+ 						if (is_gba() && FileExists(user_io_make_filepath(HomeDir(), "goomba.rom"))) strcat(ext, "GB GBC");
+ 						while (strlen(ext) % 3) strcat(ext, " ");
+ 
+@@ -2738,11 +2740,18 @@ void HandleUI(void)
+ 					}
+ 					else
+ 					{
+-						user_io_file_tx(selPath, idx, opensave, 0, 0, load_addr);
+-						if (!store_name)
++						if (mediaplayer_is_core() && mediaplayer_handles_file(selPath))
+ 						{
+-							game_docs_init(selPath, user_io_get_file_crc());
+-							if (user_io_use_cheats()) cheats_init(selPath, user_io_get_file_crc());
++							if (!mediaplayer_start(selPath, idx)) Info("MediaPlayer ARM helper failed to start");
++						}
++						else
++						{
++							user_io_file_tx(selPath, idx, opensave, 0, 0, load_addr);
++							if (!store_name)
++							{
++								game_docs_init(selPath, user_io_get_file_crc());
++								if (user_io_use_cheats()) cheats_init(selPath, user_io_get_file_crc());
++							}
+ 						}
+ 					}
+ 				}
+@@ -5811,6 +5820,7 @@ void HandleUI(void)
+             }
+ 			else
+ 			{
++				mediaplayer_stop();
+ 				user_io_status_reset();
+ 				char *filename = user_io_create_config_name(1);
+ 				printf("Saving config to %s\n", filename);
+diff --git a/user_io.cpp b/user_io.cpp
+index 511c7a4..168eb44 100644
+--- a/user_io.cpp
++++ b/user_io.cpp
+@@ -42,6 +42,7 @@
+ #include "frame_timer.h"
+ #include "scaler.h"
+ #include "support.h"
++#include "support/mediaplayer/mediaplayer.h"
+ 
+ static char core_path[1024] = {};
+ static char rbf_path[1024] = {};
+@@ -3160,6 +3161,7 @@ void user_io_poll()
+ 	// this is reduce risk of screenshot occurring while the scaler
+ 	// is being updated and getting a corrupted image.
+ 	add_frame_callback(screenshot_cb);
++	mediaplayer_poll();
+ 
+ 	if ((core_type != CORE_TYPE_SHARPMZ) &&
+ 		(core_type != CORE_TYPE_8BIT))
+diff --git a/support/mediaplayer/mediaplayer.h b/support/mediaplayer/mediaplayer.h
+new file mode 100644
+index 0000000..61afb89
+--- /dev/null
++++ b/support/mediaplayer/mediaplayer.h
+@@ -0,0 +1,10 @@
++#ifndef MEDIAPLAYER_ARM_LOADER_H
++#define MEDIAPLAYER_ARM_LOADER_H
++
++int mediaplayer_is_core();
++int mediaplayer_handles_file(const char *path);
++int mediaplayer_start(const char *path, unsigned char index);
++void mediaplayer_poll();
++void mediaplayer_stop();
++
++#endif
+diff --git a/support/mediaplayer/mediaplayer.cpp b/support/mediaplayer/mediaplayer.cpp
+new file mode 100644
+index 0000000..75c80ed
+--- /dev/null
++++ b/support/mediaplayer/mediaplayer.cpp
+@@ -0,0 +1,149 @@
++#include "mediaplayer.h"
++
++#include <errno.h>
++#include <fcntl.h>
++#include <signal.h>
++#include <stdio.h>
++#include <string.h>
++#include <strings.h>
++#include <sys/types.h>
++#include <sys/wait.h>
++#include <unistd.h>
++
++#include "user_io.h"
++
++static const char *helper_path = "/media/fat/linux/MediaPlayer_Helper";
++static int helper_fd = -1;
++static pid_t helper_pid = -1;
++static int download_active = 0;
++
++static int has_core_prefix(const char *name)
++{
++	return name && !strncasecmp(name, "MediaPlayer", 11);
++}
++
++int mediaplayer_is_core()
++{
++	return has_core_prefix(user_io_get_core_name()) ||
++	       has_core_prefix(user_io_get_core_name(1));
++}
++
++int mediaplayer_handles_file(const char *path)
++{
++	const char *extension = path ? strrchr(path, '.') : NULL;
++	return extension && (!strcasecmp(extension, ".m2v") ||
++	                     !strcasecmp(extension, ".mpg") ||
++	                     !strcasecmp(extension, ".mpeg"));
++}
++
++static void finish_download()
++{
++	if (helper_fd >= 0)
++	{
++		close(helper_fd);
++		helper_fd = -1;
++	}
++	if (download_active)
++	{
++		user_io_set_download(0);
++		download_active = 0;
++	}
++}
++
++void mediaplayer_stop()
++{
++	finish_download();
++	if (helper_pid > 0)
++	{
++		kill(-helper_pid, SIGTERM);
++		(void)waitpid(helper_pid, NULL, 0);
++		helper_pid = -1;
++	}
++}
++
++int mediaplayer_start(const char *path, unsigned char index)
++{
++	int pipefd[2];
++	pid_t pid;
++
++	if (!mediaplayer_is_core() || !mediaplayer_handles_file(path)) return 0;
++	mediaplayer_stop();
++	if (pipe(pipefd) < 0)
++	{
++		printf("MediaPlayer: pipe failed: %s\n", strerror(errno));
++		return 0;
++	}
++	pid = fork();
++	if (pid < 0)
++	{
++		printf("MediaPlayer: fork failed: %s\n", strerror(errno));
++		close(pipefd[0]);
++		close(pipefd[1]);
++		return 0;
++	}
++	if (pid == 0)
++	{
++		(void)setpgid(0, 0);
++		(void)dup2(pipefd[1], STDOUT_FILENO);
++		close(pipefd[0]);
++		close(pipefd[1]);
++		execl(helper_path, "MediaPlayer_Helper", path, (char *)NULL);
++		fprintf(stderr, "MediaPlayer: cannot start %s: %s\n", helper_path, strerror(errno));
++		_exit(127);
++	}
++
++	close(pipefd[1]);
++	(void)setpgid(pid, pid);
++	if (fcntl(pipefd[0], F_SETFL, fcntl(pipefd[0], F_GETFL) | O_NONBLOCK) < 0)
++	{
++		printf("MediaPlayer: nonblocking pipe failed: %s\n", strerror(errno));
++		close(pipefd[0]);
++		kill(-pid, SIGTERM);
++		(void)waitpid(pid, NULL, 0);
++		return 0;
++	}
++
++	helper_fd = pipefd[0];
++	helper_pid = pid;
++	user_io_set_index(index);
++	user_io_file_info(".M2V");
++	user_io_set_download(1);
++	download_active = 1;
++	printf("MediaPlayer: streaming %s through ARM helper\n", path);
++	return 1;
++}
++
++void mediaplayer_poll()
++{
++	uint8_t buffer[4096];
++	int chunks = 0;
++
++	if (helper_fd < 0) return;
++	if (!mediaplayer_is_core())
++	{
++		mediaplayer_stop();
++		return;
++	}
++	while (chunks++ < 4)
++	{
++		ssize_t count = read(helper_fd, buffer, sizeof(buffer));
++		if (count > 0)
++		{
++			user_io_file_tx_data(buffer, (uint32_t)count);
++			continue;
++		}
++		if (count < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return;
++		if (count < 0) printf("MediaPlayer: helper pipe failed: %s\n", strerror(errno));
++		finish_download();
++		if (helper_pid > 0)
++		{
++			int status = 0;
++			if (waitpid(helper_pid, &status, 0) == helper_pid &&
++			    (!WIFEXITED(status) || WEXITSTATUS(status)))
++				printf("MediaPlayer: ARM helper exited with an error\n");
++			helper_pid = -1;
++		}
++		printf("MediaPlayer: stream transfer finished\n");
++		return;
++	}
++}
