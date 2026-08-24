@@ -10,11 +10,11 @@ Make the user-converted playback boundary reproducible and prepare the hardware 
 
 #### Outcome:
 
-This cycle will bind the helper to the verified official MiSTer ARM GNU 10.2 toolchain, correct its published capabilities to include both accepted sample rates, exercise 44.1 and 48 kHz through the permanent host regression, and extend the existing Big Buck Bunny generator with an optional deterministic MPEG Program Stream carrying MPEG-1 Layer II audio while preserving its accepted raw-video mode. It will also document a bounded hardware sequence for the six deliberately unsupported corpus cases and the full-length audio-video soak. No FPGA RTL or MiSTer Main change is planned because the current FPGA image already accepts both PCM rate modes and the outstanding evidence concerns host production, recoverable rejection and long-duration alignment.
+Commit `9afe2f0` makes the user-media qualification boundary reproducible without changing FPGA RTL or MiSTer Main. The official MiSTer ARM GNU 10.2 archive verifies at its previously recorded SHA-256 `102825ae56c9e00142d06f35d2bdd3299edb6060e84a275a25b095e66fd3fc2a`, identifies as GCC 10.2.1, and produces two byte-identical 361,452-byte static ARM EABI5 helpers at SHA-256 `2cf665c0153a9885e103a1da5038997efb9050c7fcbceb3d3340537cfb153d54`. The helper's capabilities now advertise both 44.1 and 48 kHz, and the permanent generator and verifier exercise both short and faded profiles at each rate. Native and address-and-undefined-sanitized runs all preserve byte-identical video, one clean PCM end, maximum sample error two and correlation rounding to one; the 44.1 kHz paths carry mode byte one for 9,216 and 132,480 samples, while the 48 kHz paths carry mode byte three for 10,368 and 144,000 samples. Two independent generations reproduce the established 48 kHz fixture hash and the new 44.1 kHz fixture hash `8f522f8cc37be5e7a45f32599c5227946b6d1386cb93b452dfae0d37ef8987ff`, and the nine-case envelope corpus retains three passes and six expected failures. `generate_test_big_buck_bunny.py` preserves byte-identical video-only output and adds an opt-in Program Stream mode that verifies its demuxed video against the same sequence-ended elementary stream, carries source audio as stereo MPEG Layer II, writes the final sequence end in a bounded video PES and terminates with a Program Stream end code. The full local source at SHA-256 `4fc75fa403994e7c313da139d93a5aebdbda27cc951616aa4e480db6877c9850` generates a 100,059,153-byte, 14,315-picture, 596.458-second Program Stream at SHA-256 `fdc480e6b16bcbc7c143eb8f7e7edfe0d0bbd8e46a1035b728f07639e71b2357`. The helper strips 13,401 timestamp records to reproduce all 84,423,309 FFmpeg-demuxed video bytes exactly and decodes 28,628,352 stereo PCM frames byte-for-byte in length against FFmpeg, with maximum sample error two, RMS error 0.5037 and correlation `0.999999979`.
 
 #### Next Steps:
 
-Require two byte-identical static ARM EABI5 helper builds with the official compiler, clean native and compatibility-corpus regressions at both audio rates, deterministic short audio-video Program Stream generation, a checker PASS on that stream and successful helper demux and PCM transport before committing. Then generate the full-length Program Stream from the local Big Buck Bunny source and place it with the six failure cases for MiSTer validation; hardware acceptance requires every bad case to fail without wedging and immediate recovery through a known-good file, followed by complete full-movie playback with stable audio-video alignment and zero audio or aggregate error telemetry.
+Install the exact official-toolchain helper with rollback preserved, then place the generated 44.1 and 48 kHz good controls, six bad cases and full-length soak Program Stream on the MiSTer. Hardware acceptance requires both good controls to play, every bad case to avoid ordinary success and recover immediately through the 48 kHz control without a reboot, and the full movie to complete with stable audio-video alignment, clean audio, normal LEDs and zero PCM protocol, underrun, presentation, decoder or aggregate error telemetry. No Quartus build is required because this commit changes no FPGA source.
 
 #### Files Modified:
 
@@ -26,7 +26,7 @@ Require two byte-identical static ARM EABI5 helper builds with the official comp
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
