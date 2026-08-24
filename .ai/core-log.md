@@ -1,3 +1,31 @@
+## 409 COMMIT Unreleased 8fc80ee 2026-08-24T00:23:05-07:00
+
+#### Coming From:
+
+Unreleased 8fc80ee
+
+#### Purpose:
+
+Record the first complete ARM Program Stream hardware run and isolate its silent embedded audio after successful decode.
+
+#### Outcome:
+
+After rebooting into the installed `8fc80ee` Main, the user ran only `01_arm_mp2_audio.mpg` and reported video matching the accepted image, no embedded audio, a working FPGA sound test, USER steady on, DISK steady off and POWER steady on. The untouched 800-by-600 screenshot at SHA-256 `58c29e09dc3eae48075064314df863404434c7e881e68a6404107c303830c78a` shows the expected completed five-picture raster and its schema-seven telemetry decodes 185,149 accepted elementary-stream bytes, one timestamp association, three reference plus two B pictures, five displayed pictures, four swaps, sequence end seen, session quiet and presentation complete with zero decoder or presentation errors. Main's retained log confirms the absolute path `file:/media/fat/games/MediaPlayer/01_arm_mp2_audio.mpg`, 185,158 submitted annotated bytes over 46 reads, clean EOF and helper exit zero. The helper reports decoding all nine MPEG Layer II frames into 10,368 stereo PCM frames, so source, demux and audio decode succeeded. Read-only ALSA enumeration exposes only card zero `Dummy PCM`; `aplay` accepts the samples and exits successfully but sends them to that discard device. The working sound test uses the proven FPGA PCM output path and therefore does not validate Linux ALSA. This isolates silence to the temporary ALSA output choice rather than the video transport, decoder, test content or MiSTer audio hardware.
+
+#### Next Steps:
+
+Replace the temporary ALSA sink with the user-directed FPGA-owned PCM path while avoiding another Main change. Extend the existing in-band ingress protocol with a reserved PCM record type, have the helper place decoded signed 16-bit stereo samples into those records on its current standard-output stream, and extend the FPGA extractor to remove them from H.262 while applying audio-FIFO backpressure and feeding the already hardware-proven PCM output adapter. Preserve raw M2V passthrough, timestamp records, audio test modes, reset flush, bounded FIFO occupancy and underrun telemetry; build and install only the helper and RBF, then replay the same sole Program Stream and require the two embedded channel tones with the already accepted video result.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 408 COMMIT Unreleased 8fc80ee 2026-08-24T00:17:00-07:00
 
 #### Coming From:
@@ -1133,42 +1161,6 @@ Rebuild at seed eleven and confirm the restored netlist returns to approximately
 #### Files Modified:
 
 - sys/ascal.vhd
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 369 COMMIT Unreleased 27ad1b3 2026-08-23T15:03:04-07:00
-
-#### Coming From:
-
-Unreleased c25f3d9
-
-#### Purpose:
-
-Carry picture metadata in band with the elementary stream so the HPS can supply timestamps without a side channel.
-
-#### Outcome:
-
-`EXT_BUS` was investigated as the metadata channel and rejected on a dependency rather than a technical obstacle. It is available to the core, unconnected at `MediaPlayer_top_00.svh`, and its wiring is straightforward, but it carries Main_MiSTer's `user_io` transactions, so something in that binary must issue them; cores that use it have matching support there. Building the metadata path on it would make this project depend on changes to software it does not own, the same class of external dependency as the kernel configuration needed for USB optical media, and nothing in this repository sets a precedent to follow. The ingress byte path needs no such permission and is already proven to 14,315 pictures with working backpressure, so records are framed in band instead. The marker is `0x000001B0`, a reserved H.262 start code that no encoder emits, and start-code emulation prevention guarantees the `0x000001` prefix cannot occur inside payload, so raw elementary streams contain no records and pass through untouched; compatibility is a property of the framing rather than a mode to select. Each record carries five payload bytes holding a 33-bit timestamp with `picture_structure`, `top_field_first`, `repeat_first_field` and `progressive_frame`, the fields interlaced operation will need, so the wire format will not require revision when field pictures are implemented. Detection uses a four-byte sliding window rather than a match counter, which makes overlapping prefixes correct without special cases because the window always holds the true last four bytes. An end-of-transfer flush was required and reinstated using the same download-active synchroniser `c4d9631` used, because without it the final three bytes of every stream would remain in the window and the `sequence_end_code` would never reach the decoder. The focused test proved five properties and caught two real defects in the process: markers were never detected in steady state because the window counter ran past the value the check compared against, and the byte immediately preceding every record was silently dropped, which would have corrupted the bitstream once per timestamp and presented as a decoder fault. It now passes byte-identical passthrough of a stream containing a real start code and an overlapping `00 00 00 01` run, record extraction with exact timestamp and flag decode, rejection of the near-miss `0x000001B1`, the overlapping-prefix record, and backpressure without loss or reordering. The cadence snapshot moves to schema six, word thirty-five's spare bits carrying the record count and the low eleven timestamp bits so an injected value can be matched exactly rather than merely seen to be non-zero. The build closes every category with HDMI setup plus 0.138 ns and decoder setup plus 0.933 ns, the highest recorded, using 35,055 ALMs, 51,819 registers and RBF SHA-256 `6e075113416bf8bb891d2b00ee96a9748441bb42ce2a10dec81ef93b37a8fb13`. The 159 added registers cost 0.257 ns on a clock they do not touch, which is the placement sensitivity this log has been tracking rather than anything specific to this change; average interconnect actually fell to 40.3 percent with peak flat at 69.6 percent, confirming the design is not becoming globally congested.
-
-#### Next Steps:
-
-Investigate why the HDMI domain absorbs every addition before continuing, since four ASCAL paths have now surfaced in sequence. Then supply the throwaway HPS-side harness that injects records so `inband_count` and the low timestamp bits can be confirmed on hardware, and check that the raw elementary-stream regression is unchanged, which it should be because every stream on the MiSTer is plain `.m2v` containing no records and the extractor is therefore invisible to them. Presentation on timestamp against the proven clock follows, anchoring from the first record and retaining free-running cadence for streams without them, then the PCM sink with its elastic FIFO, fill level and underrun telemetry and explicit seek flush.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_07.svh
-- files.qip
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-- tools/streams/tb_h262_inband_metadata.sv
 
 #### Status:
 
