@@ -213,25 +213,29 @@ mpeg2_h262_download_rearm mpeg2_h262_download_rearm
 wire reset_mpeg2 = reset_mpeg2_base || mpeg2_download_rearm_reset;
 
 // Entry 395: atomic Audio mode changes cross from clk_sys to clk_mpeg2 and
-// CLK_AUDIO through dedicated DCFIFO mailboxes. Only the PCM data FIFO uses
-// the stretched cross-domain clear; ordinary source/output state resets
-// synchronously in its own clock domain. This retains the timing-closed control
-// structure proven by the companion Audio implementation and keeps video file
-// session resets completely independent from the Audio path.
+// CLK_AUDIO through dedicated DCFIFO mailboxes. Entry 410 sends the same reset
+// event on every new file download so embedded PCM replay cannot inherit FIFO,
+// source, scheduler or underrun state from the prior session.
 wire [2:0] audio_test_mode = status[3:1];
 reg  [2:0] audio_test_mode_prev;
+reg        audio_download_prev;
 reg  [4:0] audio_fifo_reset_stretch;
 
 wire audio_mode_change_sys = (audio_test_mode != audio_test_mode_prev);
+wire audio_download_start_sys = ioctl_download && !audio_download_prev;
+wire audio_control_event_sys =
+	audio_mode_change_sys || audio_download_start_sys;
 
 always @(posedge clk_sys or posedge reset_request) begin
 	if (reset_request) begin
 		audio_test_mode_prev   <= 3'd0;
+		audio_download_prev    <= 1'b0;
 		audio_fifo_reset_stretch <= 5'd0;
 	end
 	else begin
 		audio_test_mode_prev <= audio_test_mode;
-		if (audio_mode_change_sys)
+		audio_download_prev  <= ioctl_download;
+		if (audio_control_event_sys)
 			audio_fifo_reset_stretch <= 5'd31;
 		else if (audio_fifo_reset_stretch != 5'd0)
 			audio_fifo_reset_stretch <= audio_fifo_reset_stretch - 5'd1;
@@ -269,7 +273,7 @@ always @(posedge clk_sys or posedge reset_request) begin
 	end
 	else if (audio_mode_pending_valid) begin
 		if (audio_mode_send) begin
-			if (audio_mode_change_sys) begin
+			if (audio_control_event_sys) begin
 				audio_mode_pending_data  <= audio_test_mode;
 				audio_mode_pending_valid <= 1'b1;
 			end
@@ -277,11 +281,11 @@ always @(posedge clk_sys or posedge reset_request) begin
 				audio_mode_pending_valid <= 1'b0;
 			end
 		end
-		else if (audio_mode_change_sys) begin
+		else if (audio_control_event_sys) begin
 			audio_mode_pending_data <= audio_test_mode;
 		end
 	end
-	else if (audio_mode_change_sys) begin
+	else if (audio_control_event_sys) begin
 		audio_mode_pending_data  <= audio_test_mode;
 		audio_mode_pending_valid <= 1'b1;
 	end
@@ -395,34 +399,70 @@ wire signed [15:0] audio_pcm_left;
 wire signed [15:0] audio_pcm_right;
 wire               audio_pcm_stereo;
 wire               audio_pcm_rate_48k;
+wire               audio_pcm_end;
 wire               audio_pcm_fifo_full;
 wire               audio_pcm_fifo_empty;
-wire [33:0]        audio_pcm_fifo_data;
+wire [34:0]        audio_pcm_fifo_data;
+wire [11:0]        audio_pcm_fifo_used;
 wire               audio_pcm_fifo_rd;
 wire               audio_pcm_underrun;
 
+wire               audio_test_valid;
+wire signed [15:0] audio_test_left;
+wire signed [15:0] audio_test_right;
+wire               audio_test_stereo;
+wire               audio_test_rate_48k;
+wire               mpeg2_new_inband_pcm_valid;
+wire               mpeg2_new_inband_pcm_end;
+wire [15:0]        mpeg2_new_inband_pcm_left;
+wire [15:0]        mpeg2_new_inband_pcm_right;
+wire               mpeg2_new_inband_pcm_stereo;
+wire               mpeg2_new_inband_pcm_rate_48k;
+wire               mpeg2_new_inband_pcm_ready;
+wire [13:0]        mpeg2_new_inband_pcm_sample_count;
+wire               mpeg2_new_inband_pcm_protocol_error;
+
+wire audio_embedded_mode = (audio_mode_src == 3'd0);
+
 assign audio_pcm_ready = !audio_pcm_fifo_full;
+assign mpeg2_new_inband_pcm_ready =
+	audio_embedded_mode ? audio_pcm_ready : 1'b1;
+assign audio_pcm_valid = audio_embedded_mode ?
+	(mpeg2_new_inband_pcm_valid || mpeg2_new_inband_pcm_end) :
+	audio_test_valid;
+assign audio_pcm_end =
+	audio_embedded_mode && mpeg2_new_inband_pcm_end;
+assign audio_pcm_left = audio_embedded_mode ?
+	$signed(mpeg2_new_inband_pcm_left) : audio_test_left;
+assign audio_pcm_right = audio_embedded_mode ?
+	$signed(mpeg2_new_inband_pcm_right) : audio_test_right;
+assign audio_pcm_stereo = audio_embedded_mode ?
+	mpeg2_new_inband_pcm_stereo : audio_test_stereo;
+assign audio_pcm_rate_48k = audio_embedded_mode ?
+	mpeg2_new_inband_pcm_rate_48k : audio_test_rate_48k;
 
 audio_pcm_test_source audio_pcm_test_source
 (
 	.clk      (clk_mpeg2),
 	.reset    (reset_audio_src),
 	.mode     (audio_mode_src),
-	.ready    (audio_pcm_ready),
-	.valid    (audio_pcm_valid),
-	.left     (audio_pcm_left),
-	.right    (audio_pcm_right),
-	.stereo   (audio_pcm_stereo),
-	.rate_48k (audio_pcm_rate_48k)
+	.ready    (!audio_embedded_mode && audio_pcm_ready),
+	.valid    (audio_test_valid),
+	.left     (audio_test_left),
+	.right    (audio_test_right),
+	.stereo   (audio_test_stereo),
+	.rate_48k (audio_test_rate_48k)
 );
 
 audio_pcm_fifo audio_pcm_fifo
 (
 	.reset    (audio_fifo_reset_request),
 	.wr_clk   (clk_mpeg2),
-	.wr_data  ({audio_pcm_rate_48k, audio_pcm_stereo, audio_pcm_left, audio_pcm_right}),
+	.wr_data  ({audio_pcm_end, audio_pcm_rate_48k, audio_pcm_stereo,
+	            audio_pcm_left, audio_pcm_right}),
 	.wr_en    (audio_pcm_valid && audio_pcm_ready),
 	.wr_full  (audio_pcm_fifo_full),
+	.wr_used  (audio_pcm_fifo_used),
 	.rd_clk   (CLK_AUDIO),
 	.rd_en    (audio_pcm_fifo_rd),
 	.rd_data  (audio_pcm_fifo_data),
@@ -440,6 +480,24 @@ audio_pcm_output_adapter audio_pcm_output_adapter
 	.audio_r    (audio_pcm_output_r),
 	.underrun   (audio_pcm_underrun)
 );
+
+reg [6:0] audio_pcm_fifo_peak;
+reg [1:0] audio_pcm_underrun_sync;
+
+always @(posedge clk_mpeg2) begin
+	if (reset_mpeg2) begin
+		audio_pcm_fifo_peak      <= 7'd0;
+		audio_pcm_underrun_sync <= 2'b00;
+	end
+	else begin
+		audio_pcm_underrun_sync <=
+			{audio_pcm_underrun_sync[0], audio_pcm_underrun};
+		if (audio_pcm_fifo_full || |audio_pcm_fifo_used[11:7])
+			audio_pcm_fifo_peak <= 7'h7F;
+		else if (audio_pcm_fifo_used[6:0] > audio_pcm_fifo_peak)
+			audio_pcm_fifo_peak <= audio_pcm_fifo_used[6:0];
+	end
+end
 
 // kate - Phase 1Ob: the streaming H.262 bitreader continues to own input
 // backpressure while picture_data() advances across every slice of the first
@@ -531,7 +589,16 @@ mpeg2_h262_inband_metadata mpeg2_h262_inband_metadata
 	.repeat_first_field (mpeg2_new_inband_repeat_first_field),
 	.progressive_frame  (mpeg2_new_inband_progressive_frame),
 	.metadata_valid     (mpeg2_new_inband_valid),
-	.metadata_count     (mpeg2_new_inband_count)
+	.metadata_count     (mpeg2_new_inband_count),
+	.pcm_left           (mpeg2_new_inband_pcm_left),
+	.pcm_right          (mpeg2_new_inband_pcm_right),
+	.pcm_stereo         (mpeg2_new_inband_pcm_stereo),
+	.pcm_rate_48k       (mpeg2_new_inband_pcm_rate_48k),
+	.pcm_valid          (mpeg2_new_inband_pcm_valid),
+	.pcm_end            (mpeg2_new_inband_pcm_end),
+	.pcm_ready          (mpeg2_new_inband_pcm_ready),
+	.pcm_sample_count   (mpeg2_new_inband_pcm_sample_count),
+	.pcm_protocol_error (mpeg2_new_inband_pcm_protocol_error)
 );
 
 mpeg2_stream_fifo mpeg2_stream_fifo

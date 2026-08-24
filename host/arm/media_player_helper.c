@@ -7,23 +7,16 @@
 #include "media_source.h"
 
 #include <errno.h>
-#include <fcntl.h>
-#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
 
-#define VIDEO_MARKER_CODE 0xb0
 #define AUDIO_BUFFER_LIMIT (256u * 1024u)
 
 struct output_state {
     FILE *video;
     FILE *pcm;
-    pid_t aplay_pid;
     uint64_t video_bytes;
     uint64_t pcm_frames;
     unsigned video_pts;
@@ -105,7 +98,7 @@ static uint64_t decode_pts(const uint8_t *p)
 
 static int emit_video_pts(struct output_state *output, uint64_t pts)
 {
-    uint8_t record[9] = {0, 0, 1, VIDEO_MARKER_CODE};
+    uint8_t record[9] = {0, 0, 1, MEDIA_PLAYER_PTS_MARKER_CODE};
     uint64_t value = ((pts & 0x1ffffffffULL) << 7) | (3u << 5) | (1u << 2);
     int i;
 
@@ -120,51 +113,25 @@ static int emit_video_pts(struct output_state *output, uint64_t pts)
     return 0;
 }
 
-static int start_aplay(struct output_state *output)
+static int emit_pcm_sample(struct output_state *output,
+                           mp3d_sample_t left, mp3d_sample_t right)
 {
-    int pipefd[2];
-    pid_t pid;
+    uint16_t left_bits = (uint16_t)left;
+    uint16_t right_bits = (uint16_t)right;
+    uint8_t record[9] = {
+        0, 0, 1, MEDIA_PLAYER_PCM_MARKER_CODE,
+        MEDIA_PLAYER_PCM_MODE_48K_STEREO,
+        (uint8_t)(left_bits >> 8), (uint8_t)left_bits,
+        (uint8_t)(right_bits >> 8), (uint8_t)right_bits
+    };
 
-    if (pipe(pipefd) < 0) {
-        fprintf(stderr, "media_player_helper: pipe failed: %s\n",
-                strerror(errno));
-        return -1;
-    }
-    pid = fork();
-    if (pid < 0) {
-        fprintf(stderr, "media_player_helper: fork failed: %s\n",
-                strerror(errno));
-        close(pipefd[0]);
-        close(pipefd[1]);
-        return -1;
-    }
-    if (pid == 0) {
-        int nullfd = open("/dev/null", O_WRONLY);
-        (void)dup2(pipefd[0], STDIN_FILENO);
-        if (nullfd >= 0) {
-            (void)dup2(nullfd, STDOUT_FILENO);
-            close(nullfd);
-        }
-        close(pipefd[0]);
-        close(pipefd[1]);
-        execl("/usr/bin/aplay", "aplay", "-q", "-t", "raw", "-f",
-              "S16_LE", "-c", "2", "-r", "48000", (char *)NULL);
-        fprintf(stderr, "media_player_helper: cannot start /usr/bin/aplay: %s\n",
-                strerror(errno));
-        _exit(127);
-    }
-    close(pipefd[0]);
-    output->pcm = fdopen(pipefd[1], "wb");
-    if (!output->pcm) {
-        fprintf(stderr, "media_player_helper: fdopen failed: %s\n",
-                strerror(errno));
-        close(pipefd[1]);
-        kill(pid, SIGTERM);
-        (void)waitpid(pid, NULL, 0);
-        return -1;
-    }
-    output->aplay_pid = pid;
-    return 0;
+    return write_all(output->video, record, sizeof(record), "in-band PCM");
+}
+
+static int emit_pcm_end(struct output_state *output)
+{
+    const uint8_t record[4] = {0, 0, 1, MEDIA_PLAYER_PCM_END_MARKER_CODE};
+    return write_all(output->video, record, sizeof(record), "PCM end marker");
 }
 
 static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
@@ -172,11 +139,8 @@ static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
 {
     mp3d_sample_t stereo[MINIMP3_MAX_SAMPLES_PER_FRAME * 2];
     const mp3d_sample_t *source = samples;
-    size_t total;
     int i;
 
-    if (!output->pcm && start_aplay(output) < 0)
-        return -1;
     if (channels == 1) {
         for (i = 0; i < samples_per_channel; ++i) {
             stereo[i * 2] = samples[i];
@@ -185,9 +149,16 @@ static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
         source = stereo;
         channels = 2;
     }
-    total = (size_t)samples_per_channel * (size_t)channels;
-    if (write_all(output->pcm, source, total * sizeof(*source), "PCM") < 0)
-        return -1;
+    if (output->pcm) {
+        size_t total = (size_t)samples_per_channel * (size_t)channels;
+        if (write_all(output->pcm, source, total * sizeof(*source), "PCM") < 0)
+            return -1;
+    } else {
+        for (i = 0; i < samples_per_channel; ++i) {
+            if (emit_pcm_sample(output, source[i * 2], source[i * 2 + 1]) < 0)
+                return -1;
+        }
+    }
     output->pcm_frames += (uint64_t)samples_per_channel;
     output->audio_frames++;
     return 0;
@@ -474,21 +445,12 @@ static int process_elementary_stream(struct media_source *input,
 
 static int finish_output(struct output_state *output, int success)
 {
-    int status = 0;
-
     if (output->video && fflush(output->video) == EOF)
         success = 0;
     if (output->pcm) {
         if (fclose(output->pcm) == EOF)
             success = 0;
         output->pcm = NULL;
-    }
-    if (output->aplay_pid > 0) {
-        if (waitpid(output->aplay_pid, &status, 0) < 0 ||
-            !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-            fprintf(stderr, "media_player_helper: aplay failed\n");
-            success = 0;
-        }
     }
     return success ? 0 : 1;
 }
@@ -609,6 +571,9 @@ int main(int argc, char **argv)
 done:
     free(audio.data);
     media_source_close(&input);
+    if (success && output.audio_frames && !output.pcm &&
+        emit_pcm_end(&output) < 0)
+        success = 0;
     if (video_path && output.video) {
         fclose(output.video);
         output.video = NULL;

@@ -24,7 +24,9 @@ wire mpeg2_new_cadence_session_quiet =
     !mpeg2_new_ddr_wr_we;
 
 wire [15:0] mpeg2_new_cadence_error_flags = {
-    6'd0,
+    4'd0,
+    mpeg2_new_inband_pcm_protocol_error,
+    audio_pcm_underrun_sync[1],
     mpeg2_new_b_presentation_error,
     mpeg2_new_ddr_cache_error,
     mpeg2_new_ddr_store_error,
@@ -59,6 +61,8 @@ mpeg2_h262_hardware_cadence_profiler
     .stc_seconds               (mpeg2_new_stc_seconds),
     .associated_count          (mpeg2_new_associated_count),
     .display_pts               (mpeg2_new_display_pts),
+    .pcm_sample_count          (mpeg2_new_inband_pcm_sample_count),
+    .pcm_fifo_peak             (audio_pcm_fifo_peak),
     .top_field_first           (mpeg2_new_top_field_first),
     .repeat_first_field        (mpeg2_new_repeat_first_field),
     .picture_coding_type       (mpeg2_new_picture_coding_type),

@@ -185,7 +185,12 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "final_picture_type": (metadata >> 25) & 0x7,
         "final_temporal_reference": (metadata >> 15) & 0x3FF,
         "reference_picture_count": (metadata >> 7) & 0xFF,
+        # Entry 410 (schema 8): the previously reserved low seven bits of
+        # word 18 hold the saturated peak PCM FIFO occupancy.
+        "pcm_fifo_peak": metadata & 0x7F,
         "error_flags": (words[19] >> 16) & 0xFFFF,
+        "audio_underrun": bool((words[19] >> 26) & 1),
+        "pcm_protocol_error": bool((words[19] >> 27) & 1),
         # Entry 365 (schema 5): the formerly reserved low half of word 19
         # carries the presentation-clock seconds count and the two field
         # flags.  Neither flag is consumed by presentation yet.
@@ -214,6 +219,9 @@ def parse_words(words: list[int]) -> dict[str, Any]:
             2: "forced_terminal_timeout",
             3: "fatal_or_no_progress",
         }.get((snapshot_meta >> 30) & 0x3, "unknown"),
+        # Entry 410 (schema 8): the formerly reserved middle field carries
+        # the saturated count of PCM samples extracted into the FPGA path.
+        "pcm_sample_count": (snapshot_meta >> 16) & 0x3FFF,
         "gap_outlier_count": snapshot_meta & 0xFFFF,
         "largest_display_gaps": [gap(1, 26), gap(2, 29), gap(3, 32)],
         "completed_frame_bank": (terminal >> 30) & 0x3,

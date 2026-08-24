@@ -27,6 +27,8 @@ reg [15:0] error_flags=0;
 reg [13:0] stc_seconds=0;
 reg [7:0] associated_count=0;
 reg [32:0] display_pts=0;
+reg [13:0] pcm_sample_count=0;
+reg [6:0] pcm_fifo_peak=0;
 reg top_field_first=0,repeat_first_field=0;
 reg [11:0] h_pos=0,v_pos=0;
 reg [7:0] base_r=8'h12,base_g=8'h34,base_b=8'h56;
@@ -63,6 +65,7 @@ mpeg2_h262_hardware_cadence_profiler #(
     .display_scratch_bank(display_scratch_bank),
     .sequence_end_seen(sequence_end_seen),.session_quiet(session_quiet),
     .stc_seconds(stc_seconds),.associated_count(associated_count),.display_pts(display_pts),
+    .pcm_sample_count(pcm_sample_count),.pcm_fifo_peak(pcm_fifo_peak),
     .top_field_first(top_field_first),
     .repeat_first_field(repeat_first_field),
     .error_flags(error_flags),.h_pos(h_pos),.v_pos(v_pos),
@@ -105,6 +108,7 @@ begin
     completed_frame_bank=0;display_frame_bank=0;display_scratch=0;
     display_scratch_bank=0;presentation_complete=0;presentation_error=0;
     scheduler_debug_state=0;decoder_byte_accepted=0;error_flags=0;
+    pcm_sample_count=0;pcm_fifo_peak=0;
     repeat(5)@(posedge clk_mpeg2);reset_mpeg2=0;
     repeat(5)@(posedge clk_video);reset_video=0;
 end
@@ -149,6 +153,7 @@ initial begin
     repeat(6) @(posedge clk_mpeg2);swap_bank(2);
     presentation_hold=1;scratch_available=1;frame_waiting=1;
     completed_frame_bank=2;scheduler_debug_state=32'h13579bdf;
+    pcm_sample_count=14'd10368;pcm_fifo_peak=7'd127;
     repeat(12)@(posedge clk_mpeg2);
     // The ranked state must remain the threshold-crossing value even though
     // all observed inputs release before the display eventually swaps.
@@ -160,10 +165,14 @@ initial begin
 
     if(dut.snapshot_sync_2[31:0]!==32'h4d4d5031)
         $fatal(1,"bad magic %h",dut.snapshot_sync_2[31:0]);
-    if(dut.snapshot_sync_2[63:32]!==32'h0726ea60)
+    if(dut.snapshot_sync_2[63:32]!==32'h0826ea60)
         $fatal(1,"bad format %h",dut.snapshot_sync_2[63:32]);
     if(dut.snapshot_sync_2[831:830]!==2'd1)
         $fatal(1,"quiet snapshot reason missing");
+    if(dut.snapshot_sync_2[829:816]!==14'd10368)
+        $fatal(1,"PCM sample count missing");
+    if(dut.snapshot_sync_2[582:576]!==7'd127)
+        $fatal(1,"PCM FIFO peak missing");
     if(!(dut.snapshot_sync_2[863:832]>=dut.snapshot_sync_2[959:928]&&
          dut.snapshot_sync_2[959:928]>=dut.snapshot_sync_2[1055:1024]))
         $fatal(1,"gap ranking is not descending");
@@ -301,7 +310,7 @@ initial begin
     if({video_r,video_g,video_b}!==24'h123456)
         $fatal(1,"base video changed outside overlay");
 
-    $display("HARDWARE_CADENCE_PROFILER_PASS schema=7 gap-state+forced+fatal+no-progress checksum=%h",
+    $display("HARDWARE_CADENCE_PROFILER_PASS schema=8 gap-state+forced+fatal+no-progress checksum=%h",
              checksum);
     $finish;
 end

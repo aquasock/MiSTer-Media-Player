@@ -1,27 +1,30 @@
 // Entry 395: codec-independent PCM clock-domain FIFO.
-// Word layout: {rate_48k, stereo, left[15:0], right[15:0]}.
+// Word layout: {end, rate_48k, stereo, left[15:0], right[15:0]}.
+// 4096 samples provide 85.3 ms at 48 kHz, covering ordinary Program Stream
+// packet interleave while backpressure prevents producer overrun.
 
 module audio_pcm_fifo
 (
     input  wire        reset,
 
     input  wire        wr_clk,
-    input  wire [33:0] wr_data,
+    input  wire [34:0] wr_data,
     input  wire        wr_en,
     output wire        wr_full,
+    output wire [11:0] wr_used,
 
     input  wire        rd_clk,
     input  wire        rd_en,
-    output wire [33:0] rd_data,
+    output wire [34:0] rd_data,
     output wire        rd_empty
 );
 
 dcfifo #(
-    .lpm_numwords         (256),
+    .lpm_numwords         (4096),
     .lpm_showahead        ("ON"),
     .lpm_type             ("dcfifo"),
-    .lpm_width            (34),
-    .lpm_widthu           (8),
+    .lpm_width            (35),
+    .lpm_widthu           (12),
     .overflow_checking    ("ON"),
     .underflow_checking   ("ON"),
     .use_eab              ("ON"),
@@ -37,6 +40,7 @@ dcfifo #(
     .wrclk   (wr_clk),
     .wrreq   (wr_en),
     .wrfull  (wr_full),
+    .wrusedw (wr_used),
 
     .q       (rd_data),
     .rdclk   (rd_clk),

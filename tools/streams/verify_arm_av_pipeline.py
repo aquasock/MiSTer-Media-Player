@@ -10,26 +10,49 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-MARKER = b"\x00\x00\x01\xb0"
+PTS_MARKER = b"\x00\x00\x01\xb0"
+PCM_MARKER = b"\x00\x00\x01\xb1"
+PCM_END_MARKER = b"\x00\x00\x01\xb6"
 RECORD_SIZE = 9
 
 
-def strip_records(data: bytes) -> tuple[bytes, list[int]]:
+def strip_records(data: bytes) -> tuple[bytes, list[int], bytes, int]:
     clean = bytearray()
     timestamps: list[int] = []
+    pcm = bytearray()
+    end_count = 0
     position = 0
-    while True:
-        hit = data.find(MARKER, position)
-        if hit < 0:
-            clean += data[position:]
-            break
-        clean += data[position:hit]
-        if hit + RECORD_SIZE > len(data):
-            raise RuntimeError("truncated timestamp record")
-        value = int.from_bytes(data[hit + 4:hit + 9], "big")
-        timestamps.append(value >> 7)
-        position = hit + RECORD_SIZE
-    return bytes(clean), timestamps
+    while position < len(data):
+        marker = data[position:position + 4]
+        if marker == PTS_MARKER:
+            if position + RECORD_SIZE > len(data):
+                raise RuntimeError("truncated timestamp record")
+            value = int.from_bytes(data[position + 4:position + 9], "big")
+            timestamps.append(value >> 7)
+            position += RECORD_SIZE
+        elif marker == PCM_MARKER:
+            if position + RECORD_SIZE > len(data):
+                raise RuntimeError("truncated PCM record")
+            mode = data[position + 4]
+            if mode != 0x03:
+                raise RuntimeError(f"unsupported PCM record mode 0x{mode:02x}")
+            left = data[position + 5:position + 7]
+            right = data[position + 7:position + 9]
+            pcm += left[::-1] + right[::-1]
+            position += RECORD_SIZE
+        elif marker == PCM_END_MARKER:
+            end_count += 1
+            position += 4
+        else:
+            clean.append(data[position])
+            position += 1
+    if end_count > 1:
+        raise RuntimeError(f"multiple PCM end records: {end_count}")
+    if pcm and end_count != 1:
+        raise RuntimeError("PCM transport has no clean end record")
+    if end_count and not pcm:
+        raise RuntimeError("PCM end record has no samples")
+    return bytes(clean), timestamps, bytes(pcm), end_count
 
 
 def pcm_metrics(actual_path: Path, reference_path: Path) -> tuple[int, float, float]:
@@ -72,7 +95,8 @@ def main() -> int:
     )
     expected_capabilities = (
         "protocol=1 sources=file reserved_sources=dvd "
-        "containers=m2v,mpeg-ps video=h262 audio=mp2-s16le-48000"
+        "containers=m2v,mpeg-ps video=h262 audio=mp2-s16le-48000 "
+        "transport=inband-pcm-v1"
     )
     if capabilities.returncode or capabilities.stdout.strip() != expected_capabilities:
         raise RuntimeError(f"unexpected capabilities: {capabilities.stdout!r}")
@@ -81,6 +105,33 @@ def main() -> int:
         temp = Path(temporary)
         helper_video = temp / "helper_video.m2v"
         helper_pcm = temp / "helper_audio.s16le"
+        inband_pcm_path = temp / "inband_audio.s16le"
+        transported = subprocess.run(
+            [str(args.helper), "--protocol", "1", "--source", f"file:{program}"],
+            capture_output=True,
+        )
+        if transported.returncode:
+            raise RuntimeError(transported.stderr.decode(errors="replace").strip())
+        clean_transport, transport_timestamps, inband_pcm, end_count = strip_records(
+            transported.stdout
+        )
+        if clean_transport != reference_video:
+            raise RuntimeError(
+                f"in-band video differs: helper={len(clean_transport)} "
+                f"reference={len(reference_video)}"
+            )
+        if not transport_timestamps or transport_timestamps != sorted(transport_timestamps):
+            raise RuntimeError(f"invalid in-band timestamps: {transport_timestamps}")
+        inband_pcm_path.write_bytes(inband_pcm)
+        inband_maximum, inband_rms, inband_correlation = pcm_metrics(
+            inband_pcm_path, reference_pcm
+        )
+        if inband_correlation < 0.97 or end_count != 1:
+            raise RuntimeError(
+                f"in-band PCM mismatch: max={inband_maximum}, rms={inband_rms:.4f}, "
+                f"correlation={inband_correlation:.6f}, end={end_count}"
+            )
+
         completed = subprocess.run(
             [str(args.helper), "--protocol", "1", "--source", f"file:{program}",
              "--video-out", str(helper_video), "--pcm-out", str(helper_pcm)],
@@ -88,7 +139,11 @@ def main() -> int:
         )
         if completed.returncode:
             raise RuntimeError(completed.stderr.strip())
-        clean_video, timestamps = strip_records(helper_video.read_bytes())
+        clean_video, timestamps, explicit_pcm, explicit_end = strip_records(
+            helper_video.read_bytes()
+        )
+        if explicit_pcm or explicit_end:
+            raise RuntimeError("explicit --pcm-out also emitted in-band PCM")
         if clean_video != reference_video:
             raise RuntimeError(
                 f"video differs: helper={len(clean_video)} reference={len(reference_video)}"
@@ -172,6 +227,10 @@ def main() -> int:
     print(
         f"audio: {pcm_frame_count} stereo frames, max error {maximum}, "
         f"rms {rms:.4f}, correlation {correlation:.6f}"
+    )
+    print(
+        f"transport: {len(inband_pcm) // 4} PCM records, one clean end, "
+        f"correlation {inband_correlation:.6f}"
     )
     print("errors: truncated Program Stream rejected")
     print("compatibility: raw M2V copied byte-identically")

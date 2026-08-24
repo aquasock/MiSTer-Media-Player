@@ -41,6 +41,7 @@ module mpeg2_h262_hardware_cadence_profiler #(
     // Association implies extraction, so the extractor's own count is no
     // longer carried; entry 371 records its validation.
     input wire [7:0] associated_count,input wire [32:0] display_pts,
+    input wire [13:0] pcm_sample_count,input wire [6:0] pcm_fifo_peak,
     input wire top_field_first,input wire repeat_first_field,
     input wire [15:0] error_flags,input wire [11:0] h_pos,
     input wire [11:0] v_pos,input wire [7:0] base_r,
@@ -56,7 +57,7 @@ localparam [23:0] TERMINAL_SNAPSHOT_LIMIT=
 localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
-localparam [31:0] SNAPSHOT_FORMAT={8'd7,8'd38,16'd60000};
+localparam [31:0] SNAPSHOT_FORMAT={8'd8,8'd38,16'd60000};
 localparam [11:0] OVERLAY_X=12'd8,OVERLAY_Y=12'd444;
 localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd152;
 
@@ -81,6 +82,8 @@ reg [15:0] error_flags_q;
 reg [13:0] stc_seconds_q;
 reg [7:0] associated_count_q;
 reg [32:0] display_pts_q;
+reg [13:0] pcm_sample_count_q;
+reg [6:0] pcm_fifo_peak_q;
 reg top_field_first_q,repeat_first_field_q;
 
 reg [31:0] session_cycles,accepted_bytes;
@@ -164,7 +167,7 @@ wire [31:0] snapshot_word_16=writer_wait_cycles;
 wire [31:0] snapshot_word_17={reference_picture_count,b_picture_count,
     display_picture_count,display_swap_count};
 wire [31:0] snapshot_word_18={frame_rate_code_q,picture_coding_type_q,
-    temporal_reference_q,picture_count_q,7'd0};
+    temporal_reference_q,picture_count_q,pcm_fifo_peak_q};
 wire [31:0] snapshot_word_19={error_flags_q,stc_seconds_q,
     top_field_first_q,repeat_first_field_q};
 wire [31:0] snapshot_word_20=presentation_hold_total_cycles;
@@ -172,7 +175,8 @@ wire [31:0] snapshot_word_21=destination_hold_total_cycles;
 wire [31:0] snapshot_word_22=hold_overlap_cycles;
 wire [31:0] snapshot_word_23=hold_scratch_available_cycles;
 wire [31:0] snapshot_word_24=hold_promotion_pending_cycles;
-wire [31:0] snapshot_word_25={snapshot_reason,14'd0,gap_outlier_count};
+wire [31:0] snapshot_word_25={snapshot_reason,pcm_sample_count_q,
+    gap_outlier_count};
 wire [31:0] snapshot_word_26=largest_gap_0;
 wire [31:0] snapshot_word_27=largest_gap_meta_0;
 wire [31:0] snapshot_word_28=largest_gap_state_0;
@@ -232,6 +236,7 @@ always @(posedge clk_mpeg2) begin
         session_quiet_q<=0;error_flags_q<=0;
         stc_seconds_q<=0;top_field_first_q<=0;repeat_first_field_q<=0;
         associated_count_q<=0;display_pts_q<=0;
+        pcm_sample_count_q<=0;pcm_fifo_peak_q<=0;
         session_cycles<=0;accepted_bytes<=0;first_present_cycle<=0;
         last_present_cycle<=0;first_present_valid<=0;
         decoder_stall_cycles<=0;presentation_stall_cycles<=0;
@@ -277,6 +282,8 @@ always @(posedge clk_mpeg2) begin
         stc_seconds_q<=stc_seconds;
         associated_count_q<=associated_count;
         display_pts_q<=display_pts;
+        pcm_sample_count_q<=pcm_sample_count;
+        pcm_fifo_peak_q<=pcm_fifo_peak;
         top_field_first_q<=top_field_first;
         repeat_first_field_q<=repeat_first_field;
         b_picture_complete_d<=b_picture_complete_q;

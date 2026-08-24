@@ -9,7 +9,7 @@ module audio_pcm_output_adapter
     input  wire        clk,
     input  wire        reset,
 
-    input  wire [33:0] fifo_data,
+    input  wire [34:0] fifo_data,
     input  wire        fifo_empty,
     output reg         fifo_rd,
 
@@ -22,12 +22,14 @@ localparam [25:0] AUDIO_CLK_HZ = 26'd24576000;
 localparam [25:0] RATE_44100   = 26'd44100;
 localparam [25:0] RATE_48000   = 26'd48000;
 
+wire        fifo_end      = fifo_data[34];
 wire        fifo_rate_48k = fifo_data[33];
 wire        fifo_stereo   = fifo_data[32];
 wire [15:0] fifo_left     = fifo_data[31:16];
 wire [15:0] fifo_right    = fifo_data[15:0];
 
 reg         started;
+reg         starvation_waiting;
 reg         current_rate_48k;
 reg  [25:0] phase_accum;
 
@@ -41,6 +43,7 @@ always @(posedge clk) begin
         audio_r          <= 16'd0;
         underrun         <= 1'b0;
         started          <= 1'b0;
+        starvation_waiting <= 1'b0;
         current_rate_48k <= 1'b0;
         phase_accum      <= 26'd0;
     end
@@ -50,25 +53,44 @@ always @(posedge clk) begin
         if (!started) begin
             phase_accum <= 26'd0;
             if (!fifo_empty) begin
-                fifo_rd          <= 1'b1;
-                audio_l          <= fifo_left;
-                audio_r          <= fifo_stereo ? fifo_right : fifo_left;
-                current_rate_48k <= fifo_rate_48k;
-                started          <= 1'b1;
+                fifo_rd <= 1'b1;
+                if (fifo_end) begin
+                    audio_l <= 16'd0;
+                    audio_r <= 16'd0;
+                    starvation_waiting <= 1'b0;
+                end
+                else begin
+                    audio_l          <= fifo_left;
+                    audio_r          <= fifo_stereo ? fifo_right : fifo_left;
+                    current_rate_48k <= fifo_rate_48k;
+                    started          <= 1'b1;
+                    starvation_waiting <= 1'b0;
+                end
             end
         end
         else if (phase_sum >= {1'b0, AUDIO_CLK_HZ}) begin
             phase_accum <= phase_sum[25:0] - AUDIO_CLK_HZ;
             if (!fifo_empty) begin
-                fifo_rd          <= 1'b1;
-                audio_l          <= fifo_left;
-                audio_r          <= fifo_stereo ? fifo_right : fifo_left;
-                current_rate_48k <= fifo_rate_48k;
+                fifo_rd <= 1'b1;
+                if (fifo_end) begin
+                    audio_l  <= 16'd0;
+                    audio_r  <= 16'd0;
+                    started  <= 1'b0;
+                    starvation_waiting <= 1'b0;
+                end
+                else begin
+                    audio_l          <= fifo_left;
+                    audio_r          <= fifo_stereo ? fifo_right : fifo_left;
+                    current_rate_48k <= fifo_rate_48k;
+                    if (starvation_waiting)
+                        underrun <= 1'b1;
+                    starvation_waiting <= 1'b0;
+                end
             end
             else begin
                 audio_l  <= 16'd0;
                 audio_r  <= 16'd0;
-                underrun <= 1'b1;
+                starvation_waiting <= 1'b1;
             end
         end
         else begin

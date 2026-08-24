@@ -18,6 +18,11 @@ module tb_h262_inband_metadata;
     wire        top_field_first, repeat_first_field, progressive_frame;
     wire        metadata_valid;
     wire [7:0]  metadata_count;
+    wire [15:0] pcm_left,pcm_right;
+    wire pcm_stereo,pcm_rate_48k,pcm_valid,pcm_end;
+    reg pcm_ready = 1;
+    wire [13:0] pcm_sample_count;
+    wire pcm_protocol_error;
 
     always #5 clk = ~clk;
 
@@ -30,7 +35,11 @@ module tb_h262_inband_metadata;
         .pts_90k(pts_90k),.picture_structure(picture_structure),
         .top_field_first(top_field_first),.repeat_first_field(repeat_first_field),
         .progressive_frame(progressive_frame),
-        .metadata_valid(metadata_valid),.metadata_count(metadata_count));
+        .metadata_valid(metadata_valid),.metadata_count(metadata_count),
+        .pcm_left(pcm_left),.pcm_right(pcm_right),.pcm_stereo(pcm_stereo),
+        .pcm_rate_48k(pcm_rate_48k),.pcm_valid(pcm_valid),.pcm_end(pcm_end),
+        .pcm_ready(pcm_ready),.pcm_sample_count(pcm_sample_count),
+        .pcm_protocol_error(pcm_protocol_error));
 
     // captured output
     reg [7:0] got [0:1023];
@@ -52,6 +61,16 @@ module tb_h262_inband_metadata;
     always @(posedge clk) if (!reset && metadata_valid) begin
         meta_seen = meta_seen + 1; last_pts = pts_90k;
     end
+    integer pcm_seen = 0;
+    integer pcm_end_seen = 0;
+    reg [15:0] last_pcm_left,last_pcm_right;
+    always @(posedge clk) if (!reset && pcm_valid) begin
+        pcm_seen = pcm_seen + 1;
+        last_pcm_left = pcm_left;
+        last_pcm_right = pcm_right;
+    end
+    always @(posedge clk) if (!reset && pcm_end)
+        pcm_end_seen = pcm_end_seen + 1;
 
     task send(input [7:0] b);
         begin
@@ -114,13 +133,13 @@ module tb_h262_inband_metadata;
             $fatal(1,"flags decoded wrong ps=%b tff=%b rff=%b pf=%b",
                    picture_structure,top_field_first,repeat_first_field,progressive_frame);
 
-        // ---- 3. a near-miss marker (00 00 01 B1) must pass through whole ----
+        // ---- 3. a non-record start code must pass through whole ----
         got_n = 0; meta_seen = 0;
-        send(8'h00); send(8'h00); send(8'h01); send(8'hB1); send(8'h55);
+        send(8'h00); send(8'h00); send(8'h01); send(8'hB2); send(8'h55);
         finish_stream();
         if (meta_seen !== 0) $fatal(1,"reserved code B1 was mistaken for a record");
         if (got_n !== 5) $fatal(1,"near-miss lost bytes: %0d of 5",got_n);
-        if (got[0]!==8'h00||got[1]!==8'h00||got[2]!==8'h01||got[3]!==8'hB1||got[4]!==8'h55)
+        if (got[0]!==8'h00||got[1]!==8'h00||got[2]!==8'h01||got[3]!==8'hB2||got[4]!==8'h55)
             $fatal(1,"near-miss corrupted the stream");
 
         // ---- 4. overlapping prefix: 00 00 00 01 B0 is a real record ----
@@ -149,8 +168,48 @@ module tb_h262_inband_metadata;
         if (got[0]!==8'h11||got[5]!==8'h66)
             $fatal(1,"backpressure reordered the stream");
 
-        $display("H262_INBAND_METADATA_PASS raw=15 record=1 nearmiss=1 overlap=1 backpressure=1 pts=%h count=%0d",
-                 last_pts, metadata_count);
+        // ---- 6. PCM sample and end records are stripped into audio events ----
+        got_n = 0; pcm_seen = 0; pcm_end_seen = 0;
+        send(8'hA5);
+        send(8'h00); send(8'h00); send(8'h01); send(8'hB1);
+        send(8'h03); send(8'h12); send(8'h34); send(8'hFE); send(8'hDC);
+        send(8'h00); send(8'h00); send(8'h01); send(8'hB6);
+        send(8'h5A);
+        finish_stream();
+        if (got_n !== 2 || got[0] !== 8'hA5 || got[1] !== 8'h5A)
+            $fatal(1,"PCM records altered video output");
+        if (pcm_seen !== 1 || pcm_end_seen !== 1 ||
+            last_pcm_left !== 16'h1234 || last_pcm_right !== 16'hFEDC ||
+            !pcm_stereo || !pcm_rate_48k)
+            $fatal(1,"PCM record decode failed");
+
+        // ---- 7. final PCM byte waits for FIFO readiness without duplication ----
+        got_n = 0; pcm_seen = 0; pcm_end_seen = 0; pcm_ready = 0;
+        fork
+            begin
+                send(8'h00); send(8'h00); send(8'h01); send(8'hB1);
+                send(8'h03); send(8'h80); send(8'h00); send(8'h7F); send(8'hFF);
+                send(8'h00); send(8'h00); send(8'h01); send(8'hB6);
+            end
+            begin repeat(16) @(posedge clk); pcm_ready = 1; end
+        join
+        finish_stream();
+        if (pcm_seen !== 1 || pcm_end_seen !== 1 ||
+            last_pcm_left !== 16'h8000 || last_pcm_right !== 16'h7FFF)
+            $fatal(1,"PCM FIFO backpressure lost or duplicated a record");
+        if (pcm_sample_count !== 14'd2 || pcm_protocol_error)
+            $fatal(1,"PCM telemetry wrong count=%0d error=%0d",
+                   pcm_sample_count,pcm_protocol_error);
+
+        // ---- 8. reserved mode bits are consumed but reported sticky ----
+        send(8'h00); send(8'h00); send(8'h01); send(8'hB1);
+        send(8'h83); send(8'h00); send(8'h01); send(8'h00); send(8'h02);
+        finish_stream();
+        if (!pcm_protocol_error || pcm_sample_count !== 14'd3)
+            $fatal(1,"malformed PCM mode was not reported");
+
+        $display("H262_INBAND_METADATA_PASS raw=15 pts=1 pcm=3 end=2 backpressure=1 pts=%h count=%0d",
+                 last_pts, pcm_sample_count);
         $finish;
     end
 endmodule

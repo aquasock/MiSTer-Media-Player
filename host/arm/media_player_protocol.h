@@ -5,8 +5,17 @@
 #define MEDIA_PLAYER_FILE_PREFIX "file:"
 #define MEDIA_PLAYER_DVD_PREFIX "dvd:"
 
+#define MEDIA_PLAYER_PTS_MARKER_CODE 0xb0
+#define MEDIA_PLAYER_PCM_MARKER_CODE 0xb1
+#define MEDIA_PLAYER_PCM_END_MARKER_CODE 0xb6
+#define MEDIA_PLAYER_PCM_MODE_STEREO 0x01
+#define MEDIA_PLAYER_PCM_MODE_48K 0x02
+#define MEDIA_PLAYER_PCM_MODE_48K_STEREO \
+    (MEDIA_PLAYER_PCM_MODE_48K | MEDIA_PLAYER_PCM_MODE_STEREO)
+
 #define MEDIA_PLAYER_CAPABILITIES \
     "protocol=1 sources=file reserved_sources=dvd " \
-    "containers=m2v,mpeg-ps video=h262 audio=mp2-s16le-48000"
+    "containers=m2v,mpeg-ps video=h262 audio=mp2-s16le-48000 " \
+    "transport=inband-pcm-v1"
 
 #endif

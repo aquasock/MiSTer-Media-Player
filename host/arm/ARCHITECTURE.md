@@ -16,12 +16,16 @@ MediaPlayer_Helper --protocol 1 --source file:/absolute/path/movie.mpg
 remain accepted for transition and local verification, but Main uses the
 versioned form.
 
-The helper writes only annotated H.262 bytes to standard output. Diagnostics go
-to standard error. Decoded signed 16-bit stereo PCM goes to the installed ALSA
-path through `aplay`; Main never handles PCM and the helper never owns FPGA SPI.
-Main's isolated broker exposes a source-string launch function; its current
-file-selector wrapper constructs `file:` while a later disc-menu action can pass
-`dvd:` without changing process, pipe or FPGA-transfer ownership.
+The helper writes one annotated transport to standard output. Reserved H.262
+codes distinguish picture timestamps, fixed signed 16-bit PCM samples, and a
+clean audio-end token. Main brokers those bytes through its existing file path
+without parsing them and remains the sole FPGA SPI owner. The FPGA strips the
+records before H.262 decode, applies PCM FIFO backpressure, and owns final sample
+pacing and audio/video output. Diagnostics go to standard error. Explicit
+`--pcm-out` remains a host-verification path and does not change hardware
+ownership. Main's isolated broker exposes a source-string launch function; its
+current file-selector wrapper constructs `file:` while a later disc-menu action
+can pass `dvd:` without changing process, pipe or FPGA-transfer ownership.
 
 ## Source boundary
 
@@ -47,7 +51,8 @@ share a compilation unit:
    discontinuity events for title, cell and seek transitions.
 4. Audio codec: MPEG Layer II now; AC-3 and DVD LPCM later behind codec
    selection rather than source-specific decode paths.
-5. Outputs: annotated H.262 to Main and 48 kHz signed stereo PCM to ALSA.
+5. Outputs: one annotated H.262-plus-PCM transport to Main, with the FPGA owning
+   the separate video and PCM sinks after record extraction.
 
 Future play, pause, seek, title, chapter, angle, audio-track and subtitle-track
 commands require a versioned control channel. They are intentionally not

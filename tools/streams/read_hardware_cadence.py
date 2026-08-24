@@ -82,8 +82,9 @@ def main() -> int:
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
         for key in ("schema_version", "associated_count", "display_pts_low11",
-                    "stc_seconds", "error_flags", "sequence_end_seen",
-                    "session_quiet"):
+                    "pcm_sample_count", "pcm_fifo_peak", "audio_underrun",
+                    "pcm_protocol_error", "stc_seconds", "error_flags",
+                    "sequence_end_seen", "session_quiet"):
             if key in result:
                 print(f"{key:20} {result[key]}")
     return 0

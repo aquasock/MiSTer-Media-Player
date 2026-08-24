@@ -103,6 +103,8 @@ def main() -> None:
     rate_480 = parse_decimal_localparam(adapter_text, "RATE_48000")
     if (audio_clk, rate_441, rate_480) != (24_576_000, 44_100, 48_000):
         raise SystemExit("sample scheduler constants changed")
+    if "fifo_end" not in adapter_text or "started          <= 1'b0" not in adapter_text:
+        raise SystemExit("clean in-band PCM end handling is missing")
 
     patterns = {
         "continuous": lambda cycle: True,
@@ -143,6 +145,7 @@ def main() -> None:
     print("  valid/ready: accepted PCM invariant under 4 ready profiles")
     print("  re-arm: deterministic for all 4 modes")
     print("  scheduler: 48 kHz exact /512; 44.1 kHz gaps limited to 557/558 clocks")
+    print("  transport: FIFO end token returns the adapter to clean idle")
 
 
 if __name__ == "__main__":

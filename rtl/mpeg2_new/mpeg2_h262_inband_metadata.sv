@@ -12,11 +12,11 @@
 //  media.  The ingress byte path, by contrast, is already proven: it streams a
 //  14,315-picture file with working backpressure.
 //
-//  Records are framed with 0x000001B0.  That is a *reserved* H.262 start code,
-//  so no encoder emits it, and start-code emulation prevention guarantees the
-//  0x000001 prefix cannot occur inside payload data.  A plain elementary
-//  stream therefore contains no records and passes through unchanged; raw ES
-//  compatibility is a property of the framing rather than a mode to select.
+//  Records use reserved H.262 start codes: B0 carries picture metadata, B1 a
+//  fixed five-byte PCM sample, and B6 a zero-payload PCM end token. No encoder
+//  emits these codes. Fixed payload lengths mean arbitrary signed PCM bytes are
+//  consumed as data rather than scanned for nested markers. A plain elementary
+//  stream contains no records and passes through unchanged.
 //
 //  Detection uses a four-byte sliding window.  A byte is only emitted once it
 //  has fallen out of the window without completing a marker, which costs three
@@ -49,18 +49,32 @@ module mpeg2_h262_inband_metadata
     output reg         repeat_first_field,
     output reg         progressive_frame,
     output reg         metadata_valid,      // one-cycle pulse
-    output reg   [7:0] metadata_count
+    output reg   [7:0] metadata_count,
+
+    output reg  [15:0] pcm_left,
+    output reg  [15:0] pcm_right,
+    output reg         pcm_stereo,
+    output reg         pcm_rate_48k,
+    output reg         pcm_valid,           // one-cycle pulse
+    output reg         pcm_end,             // one-cycle pulse
+    input  wire        pcm_ready,
+    output reg  [13:0] pcm_sample_count,
+    output reg         pcm_protocol_error
 );
 
-localparam [31:0] RECORD_MARKER = 32'h000001B0;
+localparam [31:0] PTS_MARKER     = 32'h000001B0;
+localparam [31:0] PCM_MARKER     = 32'h000001B1;
+localparam [31:0] PCM_END_MARKER = 32'h000001B6;
 localparam integer PAYLOAD_BYTES = 5;
 
-localparam [1:0] S_FILL    = 2'd0,
-                 S_STREAM  = 2'd1,
-                 S_PAYLOAD = 2'd2,
-                 S_FLUSH   = 2'd3;
+localparam [2:0] S_FILL        = 3'd0,
+                 S_STREAM      = 3'd1,
+                 S_PTS_PAYLOAD = 3'd2,
+                 S_PCM_PAYLOAD = 3'd3,
+                 S_PCM_END     = 3'd4,
+                 S_FLUSH       = 3'd5;
 
-reg [1:0]  state;
+reg [2:0]  state;
 reg [31:0] window;
 reg [2:0]  window_fill;
 reg [2:0]  payload_index;
@@ -76,13 +90,24 @@ assign stream_valid = stream_pending && stream_ready;
 
 // Accept input whenever the pending output is free or will transfer in this
 // cycle, except while draining the window at end of transfer.
+wire pcm_payload_final =
+    (state == S_PCM_PAYLOAD) &&
+    (payload_index == PAYLOAD_BYTES[2:0] - 3'd1);
+
 assign input_ready =
-    (state != S_FLUSH) && (!stream_pending || stream_ready);
+    (state != S_FLUSH) &&
+    (state != S_PCM_END) &&
+    (!stream_pending || stream_ready) &&
+    (!pcm_payload_final || pcm_ready);
 
 wire [31:0] window_next = {window[23:0], input_data};
 // window_fill saturates at four; the window then always holds the true
 // last four bytes, so the marker test is simply on the shifted-in value.
-wire        marker_hit  = (window_fill == 3'd4) && (window_next == RECORD_MARKER);
+wire pts_marker_hit = (window_next == PTS_MARKER);
+wire pcm_marker_hit = (window_next == PCM_MARKER);
+wire pcm_end_marker_hit = (window_next == PCM_END_MARKER);
+wire marker_hit = (window_fill == 3'd4) &&
+    (pts_marker_hit || pcm_marker_hit || pcm_end_marker_hit);
 wire [39:0] payload_full = {payload[31:0], input_data};
 
 always @(posedge clk) begin
@@ -101,9 +126,19 @@ always @(posedge clk) begin
         progressive_frame  <= 1'b0;
         metadata_valid     <= 1'b0;
         metadata_count     <= 8'd0;
+        pcm_left           <= 16'd0;
+        pcm_right          <= 16'd0;
+        pcm_stereo         <= 1'b0;
+        pcm_rate_48k       <= 1'b0;
+        pcm_valid          <= 1'b0;
+        pcm_end            <= 1'b0;
+        pcm_sample_count   <= 14'd0;
+        pcm_protocol_error <= 1'b0;
     end
     else begin
         metadata_valid <= 1'b0;
+        pcm_valid      <= 1'b0;
+        pcm_end        <= 1'b0;
 
         if (stream_pending && stream_ready)
             stream_pending <= 1'b0;
@@ -117,11 +152,16 @@ always @(posedge clk) begin
                 window      <= window_next;
                 window_fill <= window_fill + 3'd1;
                 if (window_fill == 3'd3) begin
-                    if (window_next == RECORD_MARKER) begin
+                    if (pts_marker_hit || pcm_marker_hit || pcm_end_marker_hit) begin
                         window        <= 32'd0;
                         window_fill   <= 3'd0;
                         payload_index <= 3'd0;
-                        state         <= S_PAYLOAD;
+                        if (pts_marker_hit)
+                            state <= S_PTS_PAYLOAD;
+                        else if (pcm_marker_hit)
+                            state <= S_PCM_PAYLOAD;
+                        else
+                            state <= S_PCM_END;
                     end
                     else
                         state <= S_STREAM;
@@ -151,7 +191,12 @@ always @(posedge clk) begin
                     window        <= 32'd0;
                     window_fill   <= 3'd0;
                     payload_index <= 3'd0;
-                    state         <= S_PAYLOAD;
+                    if (pts_marker_hit)
+                        state <= S_PTS_PAYLOAD;
+                    else if (pcm_marker_hit)
+                        state <= S_PCM_PAYLOAD;
+                    else
+                        state <= S_PCM_END;
                 end
                 else begin
                     stream_data  <= window[31:24];
@@ -162,7 +207,7 @@ always @(posedge clk) begin
                 state <= S_FLUSH;
 
         // Collect the record payload.  These bytes never reach the decoder.
-        S_PAYLOAD:
+        S_PTS_PAYLOAD:
             if (input_valid && input_ready) begin
                 payload <= {payload[31:0], input_data};
                 if (payload_index == PAYLOAD_BYTES[2:0] - 3'd1) begin
@@ -179,6 +224,38 @@ always @(posedge clk) begin
                 end
                 else
                     payload_index <= payload_index + 3'd1;
+            end
+
+        // A PCM record is {mode,left[15:8],left[7:0],right[15:8],right[7:0]}.
+        // The final byte is not consumed until the audio FIFO can accept the
+        // assembled sample, extending existing file-channel backpressure all
+        // the way to the FPGA-owned PCM sink.
+        S_PCM_PAYLOAD:
+            if (input_valid && input_ready) begin
+                payload <= {payload[31:0], input_data};
+                if (payload_index == PAYLOAD_BYTES[2:0] - 3'd1) begin
+                    pcm_rate_48k <= payload_full[33];
+                    pcm_stereo   <= payload_full[32];
+                    pcm_left     <= payload_full[31:16];
+                    pcm_right    <= payload_full[15:0];
+                    pcm_valid    <= 1'b1;
+                    if (payload_full[39:34] != 6'd0)
+                        pcm_protocol_error <= 1'b1;
+                    if (pcm_sample_count != 14'h3FFF)
+                        pcm_sample_count <= pcm_sample_count + 14'd1;
+                    payload_index <= 3'd0;
+                    state         <= S_FILL;
+                end
+                else
+                    payload_index <= payload_index + 3'd1;
+            end
+
+        // The end token enters the same FIFO behind the final sample. The
+        // output adapter consumes it on a sample boundary and stops cleanly.
+        S_PCM_END:
+            if (pcm_ready) begin
+                pcm_end <= 1'b1;
+                state   <= S_FILL;
             end
 
         // Emit the residual window at end of transfer, oldest byte first.
