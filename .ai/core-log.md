@@ -1,3 +1,31 @@
+## 416 COMMIT Unreleased 104c5ff 2026-08-24T01:25:12-07:00
+
+#### Coming From:
+
+Unreleased 104c5ff
+
+#### Purpose:
+
+Hardware-accept continuous ARM-decoded embedded audio after the minimp3 incremental-state repair.
+
+#### Outcome:
+
+After rebooting with Audio Test Off, the user ran only `02_arm_mp2_faded_tones.mpg` and reported perfect sound, correct channel separation, perfect video, USER steady on, DISK steady off and POWER steady on. This reverses the audible crackly onset on the pre-fix helper and confirms that eliminating the measured MPEG audio frame-boundary discontinuities fixes real hardware playback. The untouched 800-by-600 capture at SHA-256 `53660f47bcd2412645f818e375deaea5b07ab002e0235f123e5a338767c89896` shows the accepted final raster. Its schema-eight snapshot reports the expected saturated PCM sample count of 16,383 for the 144,000-sample file, saturated FIFO peak telemetry of 127 or greater, no audio underrun, no PCM protocol error and zero aggregate error flags; video retains 185,149 accepted elementary-stream bytes, three reference plus two B pictures, five displayed pictures, four swaps, sequence end and presentation complete with no presentation error. The video-centric profiler froze by forced terminal timeout at system-time second two while audio data was still draining, so its frozen `session_quiet` is false; the user's clean three-second listening result and the live steady LEDs provide the later terminal acceptance evidence. Commit `104c5ff`, helper SHA-256 `12f6305f35ef56d4e8de2369ecd41d2811bda9d787c885991a5ed0272cd2678a` and the installed FPGA path are therefore the accepted continuous embedded-PCM boundary.
+
+#### Next Steps:
+
+The next FPGA cycle should add a defined startup prefill threshold and make terminal telemetry audio-aware so a long audio tail defers the forced video timeout until the clean audio-end token drains; prove both with the single faded Program Stream and retain zero underrun or protocol errors. A later isolated cycle should coordinate a genuinely prolonged producer starvation event with presentation timing rather than silently allowing audio and video to drift. Continue using one video file per development build cycle and reserve the full regression pack for release qualification.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 415 COMMIT Unreleased 104c5ff 2026-08-24T01:21:11-07:00
 
 #### Coming From:
@@ -1138,34 +1166,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 376 COMMIT Unreleased 292981f 2026-08-23T19:00:57-07:00
-
-#### Coming From:
-
-Unreleased 0f7edd5
-
-#### Purpose:
-
-Make terminal presentation completion generic so all-I and P-only streams reach the same quiet telemetry snapshot path as B-containing streams.
-
-#### Outcome:
-
-Commit `292981f` initializes the scheduler's presentation-complete state high while no B-reordering run exists, clears it on the first B header, and retains the established restoration only after scratch pictures and the future reference retire. This fixes all-I and P-only quiet telemetry without weakening the top-level drain predicate or changing B ownership and cadence behavior. The focused scheduler test explicitly proves I-only and P-only completion, B-header revocation, B-run restoration and all five supported cadence rates; the schema-seven cadence-profiler test retains quiet, forced, fatal and no-progress capture with checksum `eb2b643d`. Full-pipeline generic P, B and repeated-multi-slice replays retain exact row, picture, publication and presentation counts with zero errors; the all-I replay reaches four pictures, four publications, three swaps and generic presentation complete with zero errors, but its reusable generic bench remains inapplicable because that bench unconditionally requires prediction reads and reconstruction for every stream. The seed-eleven Quartus 17.0.2 build completes in 12 minutes 25 seconds with zero errors and 155 warnings. Every timing category is positive with zero endpoint TNS: plus 0.330 ns HDMI setup, plus 1.029 ns decoder setup, plus 1.246 ns host setup, plus 7.960 ns video setup, plus 0.252 ns hold, plus 4.145 ns recovery, plus 0.610 ns removal and plus 1.122 ns pulse width. It uses 34,549 ALMs, 51,860 registers, 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks. The 4,188,704-byte RBF has SHA-256 `1258735da72354789e0fddabc44ed0b06185c0e00919f1a23c40e983f3c69e31` and was installed persistently on the MiSTer, then retrieved byte-for-byte identical.
-
-#### Next Steps:
-
-Power-cycle the MiSTer, run `01_i_baseline`, `02_p_motion_residual` and `04_b_bidirectional` through the normal file selector, and record USER, DISK and POWER for every stream. Leave each completed video open long enough to read launch-free telemetry, requiring quiet snapshot reason one, sequence end, session quiet, presentation complete and zero error flags; the B stream must also retain its established complete presentation state. Do not accept the source commit until those hardware results pass.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
