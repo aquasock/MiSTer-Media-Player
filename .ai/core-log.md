@@ -1,3 +1,35 @@
+## 458 COMMIT Unreleased 1a6e6b4 2026-08-24T08:59:05-07:00
+
+#### Coming From:
+
+Unreleased 2054426
+
+#### Purpose:
+
+Record that the residual cadence cost tracks timestamp record placement rather than presentation, and build the control that separates the record from where it lands.
+
+#### Outcome:
+
+The user ran `25_bbb_opening24_gop_pts.m2v` and reports the stutter gone, with ordinary terminal indication of USER solid on, DISK blinking eleven times and POWER solid on. The capture is 545,920 bytes at SHA-256 `4cf3439106759505629e761981abfcc7ccdc05e3648df08586bb6ced939e3949` and the run is indistinguishable from the unannotated control: zero aggregate error flags, all 577 pictures displayed with 576 swaps, sequence end, presentation complete, normal quiet reason one, zero gap outliers, and the same three largest display gaps of 49,738 microseconds at display ordinals three, four and six that the raw control produced. Presentation hold is 778,283,682 cycles against the raw control's 781,845,922, and decoder stall 655,665,458 against 655,685,975. Twenty-six timestamps cost nothing measurable; 551 cost 21 outliers and a 116.054-millisecond worst gap. The residue therefore scales with record placement and is not a property of timestamp-driven presentation, because this control is timestamp-driven, associates 24 timestamps and still presents exactly as the unannotated video does.
+
+One counter separates the two candidate mechanisms more sharply than the outlier count does. Accepted transport bytes are 3,138,618 for the raw control and 3,138,618 for this one, both exactly the video's own length after extraction, but 3,138,619 for the 551-record control and for the audio-video file, which is one byte more than the video contains. The two streams that accept a spurious byte are precisely the two that carry a record immediately after video ending in `00 00 01`, and the two that accept the exact count are the two with no such adjacency. That is direct evidence that record extraction mishandles a record placed on a start-code prefix, injecting a byte into the elementary stream the decoder then has to absorb, rather than evidence that records cost pipeline time in proportion to their number.
+
+Commit `1a6e6b4` builds the control that decides between those two readings. `strip_inband_pcm.py` can now defer a record by one video byte when it would otherwise land on a start-code prefix, which preserves the record count at 551, the offsets of every other record, all 577 pictures and the exact video at SHA-256 `100dcb7d536918263def73bc2b8e660fdb2e975221ccd9d548b0845bb853471a`. The generated `26_bbb_opening24_pts_noprefix.m2v` is 3,143,577 bytes at SHA-256 `d94e9780fdb86680edd484ed5f1e68381abdd7ee18a24e8c3e9195c779a49cf0`, the same length as the dense control, and a scan before extraction now finds exactly 577 picture start codes rather than 579. The helper passes it through byte-identically under native and sanitized builds, and regenerating both earlier controls after the change reproduces the installed files exactly. Only that file was installed, by the same staged roundtrip, with the `9f83805` helper confirmed still resident and no RBF, Main or other media file touched.
+
+#### Next Steps:
+
+Power-cycle, set Audio Test to Off and run only `26_bbb_opening24_pts_noprefix.m2v`, then report visible stutter and all three LEDs and leave the final image loaded for a schema-eight capture. It carries the same 551 records as the control that produced 21 outliers, differing only in that none of them sits on a start-code prefix. A clean run with 3,138,618 accepted bytes proves the residue is the adjacency and makes the correction a helper-side one, never placing a record where the preceding bytes end in `00 00 01`, which also removes 66 such adjacencies from the audio-video transport and must then be retested there. A run that still produces about 21 outliers proves the cost is per-record and independent of placement, which leaves the spurious byte as a second and separate defect in extraction. Either result leaves the dominant mechanism untouched and architectural: with PCM present the shared byte path is paced by the audio sink, presentation hold collapses from roughly 780,000,000 cycles to 12,376,681, and correcting that means deepening `audio_pcm_fifo` past any lead the helper can produce or buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate`, both Quartus work to be chosen on resource and timing numbers.
+
+#### Files Modified:
+
+- tools/streams/strip_inband_pcm.py
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 457 COMMIT Unreleased 2054426 2026-08-24T08:53:01-07:00
 
 #### Coming From:
@@ -1170,33 +1202,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 418 COMMIT Unreleased d70591c 2026-08-24T02:17:00-07:00
-
-#### Coming From:
-
-Unreleased d70591c
-
-#### Purpose:
-
-Install the timing-clean PCM-prefill RBF while preserving all non-FPGA artifacts and exact rollback state.
-
-#### Outcome:
-
-Before installation the reachable MiSTer matched the accepted state exactly: Main SHA-256 `16517a9927c659616796b45c8e2488da2a26f0595c91418ed09dc0eb7a5787aa`, RBF `414f7fae21e628e978ff331f701f0c1435f4742ef27d3928e3ad168cbbda9498`, helper `12f6305f35ef56d4e8de2369ecd41d2811bda9d787c885991a5ed0272cd2678a`, short audio fixture `94a8ff0223dd1acba4d59fc1785741522c4361956f17848bf9ebbb8c0a503fe7` and faded fixture `cb4f143d2d72af72bb03c7a7fbc4e2163ad780a35483bdb871ec661cf29ccc24`; both staging and rollback names were absent. The new RBF was uploaded under its commit-specific temporary name, independently verified, atomically installed and synchronized. `/media/fat/MediaPlayer.rbf` now verifies at SHA-256 `b48d06e1b0f42e3465f48a1d89b10d0eb032edddcb4e02f8aab84c14854a75df`, and its displaced predecessor is preserved byte-identically as `/media/fat/MediaPlayer.backup.pre-pcm-prefill.d70591c.rbf`. Main, helper and both fixtures remain unchanged, no playback was launched, and the currently loaded core remains the prior in-memory RBF until reboot.
-
-#### Next Steps:
-
-Reboot the MiSTer once, enter MediaPlayer with Audio Test Off and run only `02_arm_mp2_faded_tones.mpg`. Require the same clean lower left and higher right tones with smooth fades, the same correct video, USER steady on, DISK steady off, POWER steady on and no visible regression; then leave the completed image loaded for schema-eight capture before any replay or other file. The snapshot should retain zero PCM protocol, underrun and aggregate errors while freezing for quiet reason one with session quiet true after the audio tail, rather than the prior forced reason two while audio was still active.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
