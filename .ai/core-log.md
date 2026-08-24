@@ -1,3 +1,31 @@
+## 380 COMMIT Unreleased 2b1a170 2026-08-23T20:21:34-07:00
+
+#### Coming From:
+
+Unreleased 2b1a170
+
+#### Purpose:
+
+Confirm that the accepted ordinary queue-capacity fix preserves complete B-picture decoding, reordering and presentation across independent forward and backward motion-vector ranges.
+
+#### Outcome:
+
+After a MiSTer power cycle, the authoritative 185,054-byte `07_b_f_code_range.m2v` passes with USER steady on, DISK steady off and POWER steady on. Its launch-free schema-seven capture freezes for quiet reason one with all 185,054 bytes accepted, three reference plus two B pictures decoded, all five pictures displayed, four swaps, sequence end, session quiet, presentation complete, zero decoder and presentation errors and zero cadence outliers. Ranked telemetry observes the active B-reorder path with scratch presentation, queued generation, promotion and presentation hold before the terminal fifth display, then confirms all reorder, queued, promotion, pending-frame and terminal-boundary state retired in the final snapshot. Test seven therefore preserves the established B ownership contract under the new ordinary-reference backpressure and passes the full hardware gate. The next authoritative 185,393-byte `08_compat_multi_slice.m2v`, SHA-256 `bcd25c393f42aa1ccb8dc076a87ad14560357db4613093c93472d49d13ec3be8`, was generated locally, installed in the MiSTer file directory and retrieved byte-for-byte identical.
+
+#### Next Steps:
+
+Power-cycle the MiSTer and load `08_compat_multi_slice.m2v` through the normal file selector, then report all three LEDs and leave the completed image loaded for telemetry capture. Require three reference plus two B pictures, all five displays, four swaps, 185,394 accepted transport bytes including the expected odd-byte pad, sequence-end quiet, complete presentation retirement and zero errors before proceeding to test nine.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 379 COMMIT Unreleased 2b1a170 2026-08-23T20:18:20-07:00
 
 #### Coming From:
@@ -1180,34 +1208,6 @@ Proceed to step two by writing `docs/RELEASE_NOTES_v0.6.0.md` from the same qual
 #### Files Modified:
 
 - CHANGELOG.md
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-## 340 COMMIT Unreleased a6e25b4 2026-08-22T08:32:00-07:00
-
-#### Coming From:
-
-Unreleased 036a717
-
-#### Purpose:
-
-Update the public README with the current v0.6.0 release-candidate status while preserving the newly published AI-assisted-development section verbatim.
-
-#### Outcome:
-
-Commit `a6e25b4` updates only README content outside the protected AI-assisted-development range. It distinguishes v0.5.0 as the current published release from v0.6.0 as the hardware-qualified release candidate, summarizes the candidate's 60 MHz decoder and mixed-width 32 KiB ingress, documents paced frame-rate codes one through three and the unsupported higher codes, records the byte-identical clean and incremental RBF, timing closure, focused hardware regressions and full-length visual qualification, and brings the release, architecture, build, diagnostic and roadmap text forward to the accepted decoder baseline. The protected section remains exactly 5,540 bytes and byte-for-byte identical at SHA-256 `c86635095cfee8c36636802872e75932580309a3cb58d6513a44758b43d515b3`, and the documentation commit was pushed to the online repository.
-
-#### Next Steps:
-
-No build or hardware validation is required because this commit changes only Markdown documentation. Use the README as the current public v0.6.0 candidate-status summary, preserve the AI-assisted-development section verbatim, and update the changelog and release notes when the user approves final v0.6.0 publication.
-
-#### Files Modified:
-
-- README.md
 
 #### Status:
 
