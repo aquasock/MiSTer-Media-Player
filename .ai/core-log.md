@@ -1,3 +1,31 @@
+## 443 COMMIT Unreleased 3814243 2026-08-24T06:39:27-07:00
+
+#### Coming From:
+
+Unreleased 3814243
+
+#### Purpose:
+
+Qualify explicit decoder rejection and recovery for the out-of-envelope 1280x720 geometry case.
+
+#### Outcome:
+
+Loading `12_bad_geometry_720p.mpg` produces a black screen with USER blinking eight times, DISK solid off and POWER solid on. This is an explicit non-success diagnostic for the unsupported geometry rather than a silent wedge. The user immediately returns to `00_good_480p_48k.mpg` without rebooting and reports the same successful behavior as the established controls. The launch-free recovered-control capture is 104,724 bytes at SHA-256 `bc2ceab2ea3eab4ed419a2c0f5349f9f45582ccf0e8e70ffc4a3a1ad39cf2935`. Its schema-eight telemetry proves complete re-arm: zero aggregate flags, audio underrun and PCM protocol error false, all decoder, presentation and destination errors clear, all 582,742 transport bytes accepted, 44 timestamps associated, seventeen reference plus 31 B pictures decoded and all 48 pictures displayed with 47 swaps. Sequence end, presentation complete and normal quiet reason one are true with every pending scheduler state clear and saturated healthy PCM activity. This accepts the third recovery pair and proves that geometry error code eight is confined to the invalid stream and cleared by the next download start.
+
+#### Next Steps:
+
+Without rebooting, run `13_bad_geometry_pal.mpg` for no more than ten seconds, record its visible result and USER, DISK and POWER states, then immediately run `00_good_480p_48k.mpg` and record alignment, sound, picture and all three LEDs again. An explicit rejection or non-successful settlement followed by a clean control is a pass; stop and report an unavailable menu, ignored input or failed control before any reboot. Do not continue to `14_bad_rate_50.mpg` until this fourth pair is recorded.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 442 COMMIT Unreleased 3814243 2026-08-24T06:36:19-07:00
 
 #### Coming From:
@@ -1146,34 +1174,6 @@ Install only the exact `1ee8e337e8583fdf4ac585934734fcd7d6af1f8a7130f5e1adcb7eca
 #### Files Modified:
 
 - host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 403 COMMIT Unreleased 55d06ce 2026-08-23T23:44:24-07:00
-
-#### Coming From:
-
-Unreleased 55d06ce
-
-#### Purpose:
-
-Record the first source-neutral ARM loader hardware failure and isolate it without changing or replaying the loaded state.
-
-#### Outcome:
-
-After rebooting into the exact installed Main at SHA-256 `7f6ef2d299e9619250f300764836c8bf30409f7f452cd34248effda6e6536a39`, the user selected only `01_arm_mp2_audio.mpg` and observed a split-second flash of white vertical bars followed by black video, with USER, DISK and POWER all steadily off while the MiSTer menu remained responsive. A screenshot captured from the untouched final state is uniformly blank within the active raster and contains no cadence telemetry, while all three LEDs off maps to no valid diagnostic snapshot, so the FPGA never reached a settled decoder session. The installed helper, Main, test stream and accepted RBF remain byte-identical to entry 402. Running that same installed helper independently on the MiSTer, without replaying into the FPGA, succeeds both with file outputs and with its normal `aplay` path: it emits all 185,158 video bytes, one timestamp record, nine MPEG Layer II frames and 10,368 stereo PCM frames with exit status zero. This rules out the file, Program Stream parser, MP2 decoder, ordinary MiSTer audio output and RBF identity, and confines the failure to Main's new asynchronous helper-to-SPI handoff or its lifecycle. The connected DVD remained unmounted and its boot-time protected-sector read warnings are unrelated.
-
-#### Next Steps:
-
-Instrument only Main's isolated MediaPlayer broker so the next replay of this same file records whether the helper was selected, the source string and index passed, every stdout read and cumulative SPI byte count, download assertion and release, child exit status and any stop reason in a temporary log retrievable without the console. Keep the accepted RBF, helper decoder, test stream and DVD untouched. Rebuild and install only Main, reboot, replay only `01_arm_mp2_audio.mpg`, capture the blank or completed frame and retrieve the log before choosing a transport fix; do not expand to another video until this handoff is understood.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
