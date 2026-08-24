@@ -29,7 +29,8 @@ module tb_h262_inband_metadata_file;
         .stream_ready(stream_ready),.pts_90k(pts_90k),
         .picture_structure(picture_structure),.top_field_first(tff),
         .repeat_first_field(rff),.progressive_frame(pf),
-        .metadata_valid(metadata_valid),.metadata_count(metadata_count));
+        .metadata_valid(metadata_valid),.metadata_ready(1'b1),
+        .metadata_count(metadata_count));
 
     integer out_n=0; integer recs=0; reg [32:0] last_pts=0;
     always @(posedge clk) if(!reset && stream_valid && stream_ready) begin

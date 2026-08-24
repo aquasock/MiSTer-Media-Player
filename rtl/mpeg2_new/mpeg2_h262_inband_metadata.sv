@@ -61,6 +61,7 @@ module mpeg2_h262_inband_metadata
     output reg         repeat_first_field,
     output reg         progressive_frame,
     output reg         metadata_valid,      // one-cycle pulse
+    input  wire        metadata_ready,
     output reg   [7:0] metadata_count,
 
     output reg  [15:0] pcm_left,
@@ -111,11 +112,15 @@ assign stream_valid = stream_pending && stream_ready;
 // sink must be ready for.
 wire pcm_payload_final =
     (state == S_PCM_PAYLOAD) && pcm_mode_seen && (pcm_byte_index == 2'd3);
+wire pts_payload_final =
+    (state == S_PTS_PAYLOAD) &&
+    (payload_index == PAYLOAD_BYTES[2:0] - 3'd1);
 
 assign input_ready =
     (state != S_FLUSH) &&
     (state != S_PCM_END) &&
     (!stream_pending || stream_ready) &&
+    (!pts_payload_final || metadata_ready) &&
     (!pcm_payload_final || pcm_ready);
 
 wire [31:0] window_next = {window[23:0], input_data};

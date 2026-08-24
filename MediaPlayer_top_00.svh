@@ -107,15 +107,21 @@ wire        mpeg2_stream_full;
 wire        mpeg2_stream_empty;
 wire [7:0]  mpeg2_fifo_data;
 wire [7:0]  mpeg2_stream_data;
+wire [7:0]  mpeg2_new_extracted_stream_data;
 wire        mpeg2_new_system_input_ready;
 wire        mpeg2_new_system_input_valid;
 wire        mpeg2_stream_rd;
 wire        mpeg2_stream_wr;
 wire        mpeg2_new_decode_stream_valid;
+wire        mpeg2_new_extracted_stream_valid;
+wire        mpeg2_new_clean_video_input_ready;
 wire        mpeg2_new_stream_ready;
 wire        mpeg2_new_decoder_stream_ready;
 wire        mpeg2_new_b_presentation_hold;
 wire        mpeg2_new_p_destination_ownership_hold;
+wire [32:0] mpeg2_new_extracted_pts_90k;
+wire        mpeg2_new_extracted_metadata_valid;
+wire        mpeg2_new_extracted_metadata_ready;
 
 hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 (
@@ -628,15 +634,16 @@ mpeg2_h262_inband_metadata mpeg2_h262_inband_metadata
 	.input_valid        (mpeg2_new_system_input_valid),
 	.input_ready        (mpeg2_new_system_input_ready),
 	.input_end          (mpeg2_new_system_input_end),
-	.stream_data        (mpeg2_stream_data),
-	.stream_valid       (mpeg2_new_decode_stream_valid),
-	.stream_ready       (mpeg2_new_stream_ready),
-	.pts_90k            (mpeg2_new_inband_pts_90k),
+	.stream_data        (mpeg2_new_extracted_stream_data),
+	.stream_valid       (mpeg2_new_extracted_stream_valid),
+	.stream_ready       (mpeg2_new_clean_video_input_ready),
+	.pts_90k            (mpeg2_new_extracted_pts_90k),
 	.picture_structure  (mpeg2_new_inband_picture_structure),
 	.top_field_first    (mpeg2_new_inband_top_field_first),
 	.repeat_first_field (mpeg2_new_inband_repeat_first_field),
 	.progressive_frame  (mpeg2_new_inband_progressive_frame),
-	.metadata_valid     (mpeg2_new_inband_valid),
+	.metadata_valid     (mpeg2_new_extracted_metadata_valid),
+	.metadata_ready     (mpeg2_new_extracted_metadata_ready),
 	.metadata_count     (mpeg2_new_inband_count),
 	.pcm_left           (mpeg2_new_inband_pcm_left),
 	.pcm_right          (mpeg2_new_inband_pcm_right),
@@ -647,6 +654,23 @@ mpeg2_h262_inband_metadata mpeg2_h262_inband_metadata
 	.pcm_ready          (mpeg2_new_inband_pcm_ready),
 	.pcm_sample_count   (mpeg2_new_inband_pcm_sample_count),
 	.pcm_protocol_error (mpeg2_new_inband_pcm_protocol_error)
+);
+
+mpeg2_h262_clean_video_queue mpeg2_h262_clean_video_queue
+(
+	.clk                   (clk_mpeg2),
+	.reset                 (reset_mpeg2),
+	.input_data            (mpeg2_new_extracted_stream_data),
+	.input_valid           (mpeg2_new_extracted_stream_valid),
+	.input_ready           (mpeg2_new_clean_video_input_ready),
+	.input_metadata_pts    (mpeg2_new_extracted_pts_90k),
+	.input_metadata_valid  (mpeg2_new_extracted_metadata_valid),
+	.input_metadata_ready  (mpeg2_new_extracted_metadata_ready),
+	.output_data           (mpeg2_stream_data),
+	.output_valid          (mpeg2_new_decode_stream_valid),
+	.output_ready          (mpeg2_new_stream_ready),
+	.output_metadata_pts   (mpeg2_new_inband_pts_90k),
+	.output_metadata_valid (mpeg2_new_inband_valid)
 );
 
 mpeg2_stream_fifo mpeg2_stream_fifo

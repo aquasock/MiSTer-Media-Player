@@ -17,6 +17,7 @@ module tb_h262_inband_metadata;
     wire [1:0]  picture_structure;
     wire        top_field_first, repeat_first_field, progressive_frame;
     wire        metadata_valid;
+    reg         metadata_ready = 1;
     wire [7:0]  metadata_count;
     wire [15:0] pcm_left,pcm_right;
     wire pcm_stereo,pcm_rate_48k,pcm_valid,pcm_end;
@@ -35,7 +36,8 @@ module tb_h262_inband_metadata;
         .pts_90k(pts_90k),.picture_structure(picture_structure),
         .top_field_first(top_field_first),.repeat_first_field(repeat_first_field),
         .progressive_frame(progressive_frame),
-        .metadata_valid(metadata_valid),.metadata_count(metadata_count),
+        .metadata_valid(metadata_valid),.metadata_ready(metadata_ready),
+        .metadata_count(metadata_count),
         .pcm_left(pcm_left),.pcm_right(pcm_right),.pcm_stereo(pcm_stereo),
         .pcm_rate_48k(pcm_rate_48k),.pcm_valid(pcm_valid),.pcm_end(pcm_end),
         .pcm_ready(pcm_ready),.pcm_sample_count(pcm_sample_count),
@@ -247,7 +249,27 @@ module tb_h262_inband_metadata;
         if (!pcm_protocol_error || pcm_sample_count !== 14'd8)
             $fatal(1,"unsupported PCM frame count was not reported");
 
-        $display("H262_INBAND_METADATA_PASS raw=15 pts=1 pcm=8 end=2 backpressure=1 pts=%h count=%0d",
+        // ---- 11. a full metadata queue holds the record's final byte ----
+        got_n = 0; meta_seen = 0; metadata_ready = 0;
+        fork
+            begin
+                send(8'h00); send(8'h00); send(8'h01); send(8'hB0);
+                send(8'h00); send(8'h00); send(8'h57); send(8'hE4); send(8'h00);
+                send(8'hA7);
+            end
+            begin
+                repeat(20) @(posedge clk);
+                if (meta_seen !== 0)
+                    $fatal(1,"metadata emitted while its queue was full");
+                metadata_ready = 1;
+            end
+        join
+        finish_stream();
+        if (meta_seen !== 1 || last_pts !== 33'd45000 ||
+            got_n !== 1 || got[0] !== 8'hA7)
+            $fatal(1,"metadata readiness lost record or following video");
+
+        $display("H262_INBAND_METADATA_PASS raw=15 pts=1 pcm=8 end=2 backpressure=2 pts=%h count=%0d",
                  last_pts, pcm_sample_count);
         $finish;
     end

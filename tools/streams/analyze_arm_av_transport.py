@@ -57,6 +57,7 @@ def analyze_inband(stream, sample_rate: int) -> dict[str, int | str | list[int]]
     pcm_record_size = RECORD_SIZE
     pcm_frames = 0
     pts_values: list[int] = []
+    pts_clean_positions: list[int] = []
     origin_pts: int | None = None
     origin_pending = False
     last_pts: int | None = None
@@ -129,6 +130,7 @@ def analyze_inband(stream, sample_rate: int) -> dict[str, int | str | list[int]]
                 video_bytes += RECORD_SIZE
                 pts = int.from_bytes(record[4:9], "big") >> 7
                 pts_values.append(pts)
+                pts_clean_positions.append(clean_video_bytes)
                 last_pts = pts
                 if origin_pending:
                     origin_pts = pts
@@ -219,6 +221,10 @@ def analyze_inband(stream, sample_rate: int) -> dict[str, int | str | list[int]]
     terminal_batch = batches[-1][1] if batches[-1][0] == clean_video_bytes else 0
     steady_batches = batches[1:-1] if terminal_batch else batches[1:]
     max_steady_batch = max((count for _, count in steady_batches), default=0)
+    pts_clean_gaps = [
+        current - previous
+        for previous, current in zip(pts_clean_positions, pts_clean_positions[1:])
+    ]
     return {
         "video_sha256": video_hash.hexdigest(),
         "pcm_sha256": pcm_hash.hexdigest(),
@@ -228,6 +234,8 @@ def analyze_inband(stream, sample_rate: int) -> dict[str, int | str | list[int]]
         "clean_video_bytes": clean_video_bytes,
         "pcm_frames": pcm_frames,
         "pts_count": len(pts_values),
+        "min_pts_clean_video_gap": min(pts_clean_gaps, default=0),
+        "max_pts_clean_video_gap": max(pts_clean_gaps, default=0),
         "first_pcm_clean_byte": first_pcm_position,
         "first_pcm_batch": first_batch,
         "max_steady_pcm_batch": max_steady_batch,
