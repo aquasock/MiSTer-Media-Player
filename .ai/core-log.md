@@ -1,3 +1,31 @@
+## 445 COMMIT Unreleased 3814243 2026-08-24T06:44:59-07:00
+
+#### Coming From:
+
+Unreleased 3814243
+
+#### Purpose:
+
+Record the unexpected ordinary success of the nominally unsupported 50 fps envelope case and stop qualification before changing its classification.
+
+#### Outcome:
+
+The user ran `14_bad_rate_50.mpg` and left its final image loaded because it appeared and sounded to play completely without issue; USER and POWER were solid on and DISK blinked eleven times, exactly the ordinary-success indication that this expected-failure case was intended not to claim. The untouched 800x600 schema-eight capture is 104,817 bytes at SHA-256 `39c966722977b69841d1913da05e5312ebdca2eda036730953a82f429d06b45d`. It confirms genuine successful playback rather than a misleading LED state: frame-rate code six is retained, all 1,071,430 accepted transport bytes arrive, 92 timestamps associate, 34 reference plus 66 B pictures decode, all 100 pictures display with 99 swaps, delivered cadence is 50.921 frames per second, audio underrun and PCM protocol error are false, aggregate, decoder, presentation and destination errors are zero, sequence end is seen and the session reaches normal quiet reason one with no pending state. The PTS presentation path explains the checker mismatch. Timestamped candidates use the 90 kHz audio-derived timeline instead of the scheduler's free-running cadence table, while `check_media_compatibility.py` still rejects codes six through eight solely because that fallback table implements only codes one through five. Hardware therefore proves this specific timestamped 50 fps file is functional, but the planned six-failure envelope has only four accepted failures so far and its policy cannot be changed from one two-second observation without a bounded decision and additional coverage.
+
+#### Next Steps:
+
+Do not run `15_bad_truncated.mpg` yet. Immediately replay `00_good_480p_48k.mpg` without rebooting and report alignment, sound, picture and all three LEDs so the fifth pair's recovery half is still recorded. After that control is captured, choose a new approved boundary: either keep the advertised 30 fps maximum and enforce it before ordinary hardware success, or qualify timestamped 50 fps as a separate supported Program Stream profile with sustained cadence, audio alignment and raw-M2V fallback distinctions. Do not infer support for 59.94 or 60 fps from this result.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 444 COMMIT Unreleased 3814243 2026-08-24T06:41:18-07:00
 
 #### Coming From:
@@ -1142,34 +1170,6 @@ After the requested reboot and single playback of `01_arm_mp2_audio.mpg`, the us
 #### Next Steps:
 
 For the next single-file development cycle, make Main resolve the selected menu path through its established `getFullPath` API before constructing the helper's `file:` source specification, then build a Main-only image with the official GCC 10 toolchain, install it with rollback preserved, reboot and replay only `01_arm_mp2_audio.mpg`. Do not change the RBF, helper, test stream or DVD support in this correction; using Main's existing storage resolver avoids hardcoding `/media/fat` and preserves future USB and network source handling.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 405 COMMIT Unreleased b357c51 2026-08-24T00:07:29-07:00
-
-#### Coming From:
-
-Unreleased b357c51
-
-#### Purpose:
-
-Install the reproducible Main-only handoff diagnostic while preserving exact rollback and leaving every media-path artifact unchanged.
-
-#### Outcome:
-
-The MiSTer recovered normally after the user disconnected the USB DVD drive, confirming that the interrupted reboot was external to this build cycle. Before installation it was reachable by network, sitting in the normal menu, and running the exact prior Main at SHA-256 `7f6ef2d299e9619250f300764836c8bf30409f7f452cd34248effda6e6536a39`; the accepted RBF, helper and test stream also matched their established hashes. The 1,166,244-byte `b357c51` diagnostic Main was uploaded under a temporary name, independently verified at SHA-256 `1ee8e337e8583fdf4ac585934734fcd7d6af1f8a7130f5e1adcb7ecaebf4a1e4`, made executable and atomically installed as `/media/fat/MiSTer`, then synchronized and verified again. The displaced source-neutral Main was preserved at `/media/fat/MiSTer.backup.pre-diagnostic.55d06ce` and verifies at its original SHA-256 `7f6ef2d299e9619250f300764836c8bf30409f7f452cd34248effda6e6536a39`; the original official Main rollback also remains present. `/media/fat/MediaPlayer.rbf`, `/media/fat/linux/MediaPlayer_Helper` and `/media/fat/games/MediaPlayer/01_arm_mp2_audio.mpg` remain byte-identical. The currently running menu process remains the prior in-memory Main until reboot, so no playback or hardware test occurred during installation.
-
-#### Next Steps:
-
-Keep the USB DVD drive disconnected, reboot once to start the installed diagnostic Main, enter MediaPlayer and run only `01_arm_mp2_audio.mpg`. Leave the resulting image loaded and report the USER, DISK and POWER LEDs. Do not replay, reset or launch another file until the frame and `/tmp/MediaPlayer_ARM.log` have been captured, because that single log is intended to decide whether the helper was selected, how many bytes reached SPI and why the transfer ended.
 
 #### Files Modified:
 
