@@ -11,10 +11,17 @@
 // presentation side has actually displayed a picture.  VIDEO_WAIT_LIMIT bounds
 // that hold so a stream whose video never presents is not silent forever; the
 // timeout reproduces the previous behaviour rather than adding a new one.
+//
+// Entry 423 sizing: hardware telemetry for 02_arm_mp2_faded_tones.mpg reports
+// first_present_cycle 82,301,563 at 60 MHz, so video presents 1.372 s in.  The
+// limit is set to 5 s rather than a value close to that measurement, because a
+// timeout that preempts a legitimate video start would silently restore the
+// very lead this gate exists to remove.  It bounds permanent silence; it is
+// not a synchronisation parameter.
 
 module audio_pcm_output_adapter #(
     parameter [11:0] PREFILL_SAMPLES  = 12'd2048,
-    parameter [25:0] VIDEO_WAIT_LIMIT = 26'd49152000
+    parameter [26:0] VIDEO_WAIT_LIMIT = 27'd122880000
 )
 (
     input  wire        clk,
@@ -52,7 +59,7 @@ wire [25:0] rate_step = current_rate_48k ? RATE_48000 : RATE_44100;
 wire [26:0] phase_sum = {1'b0, phase_accum} + {1'b0, rate_step};
 wire prefill_ready = (fifo_used >= PREFILL_SAMPLES) || source_ended;
 
-reg  [25:0] video_wait_count;
+reg  [26:0] video_wait_count;
 wire        video_wait_expired = (video_wait_count >= VIDEO_WAIT_LIMIT);
 wire        video_release      = video_started || video_wait_expired;
 
@@ -67,7 +74,7 @@ always @(posedge clk) begin
         starvation_waiting <= 1'b0;
         current_rate_48k <= 1'b0;
         phase_accum      <= 26'd0;
-        video_wait_count <= 26'd0;
+        video_wait_count <= 27'd0;
     end
     else begin
         fifo_rd <= 1'b0;

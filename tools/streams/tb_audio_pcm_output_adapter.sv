@@ -16,7 +16,7 @@ wire [15:0] audio_l,audio_r;
 wire underrun,playback_complete;
 
 audio_pcm_output_adapter #(.PREFILL_SAMPLES(12'd3),
-                           .VIDEO_WAIT_LIMIT(26'd1000)) dut(
+                           .VIDEO_WAIT_LIMIT(27'd1000)) dut(
     .clk(clk),.reset(reset),.fifo_data(fifo_data),
     .fifo_empty(fifo_empty),.fifo_used(fifo_used),
     .source_ended(source_ended),.video_started(video_started),
