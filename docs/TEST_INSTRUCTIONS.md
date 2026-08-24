@@ -10,6 +10,41 @@ python3 tools/streams/verify_regression_pack.py /path/to/regression-pack
 Hard-reboot the MiSTer before test `01`, then open every `.m2v` through the
 normal Media Player file selector. Do not use MGL injection for this gate.
 
+## v0.7 user-converted audio-video qualification
+
+Build the deterministic input-envelope corpus and the full-length audio-video
+soak file locally; generated binary media remains uncommitted:
+
+```bash
+tools/streams/generate_compatibility_corpus.sh
+python3 tools/streams/generate_test_big_buck_bunny.py \
+  --source /path/to/big_buck_bunny_480p_stereo.avi \
+  --output tools/streams/generated_compatibility/bbb_full_48k.mpg \
+  --start 0 --frames 14315 --with-audio --audio-rate 48000
+python3 tools/streams/check_media_compatibility.py \
+  tools/streams/generated_compatibility/envelope/good_480p_44k.mpg \
+  tools/streams/generated_compatibility/envelope/good_480p_48k.mpg \
+  tools/streams/generated_compatibility/bbb_full_48k.mpg
+```
+
+Use Audio Test `Off`. First run `good_480p_48k.mpg`, then
+`good_480p_44k.mpg`; both must complete with correct sound, video, and normal
+LEDs. Next run each `bad_*.mpg` case individually. Give a bad case no more
+than ten seconds to reject or settle, record the visible result and all three
+LEDs, and immediately select `good_480p_48k.mpg` without rebooting. A bad case
+passes only when it does not claim ordinary success and the known-good control
+then plays normally. An unavailable menu, ignored input, or failed control is
+a wedge and fails the case; power-cycle only after recording that failure so
+the remaining cases can be tested.
+
+After all six recovery pairs pass, power-cycle once and run
+`bbb_full_48k.mpg`. Watch the opening, scene transitions, the high-motion
+squirrel sequence near 7:22, and the rolling credits. Audio must remain aligned
+with video throughout the complete 9:56 run, without gaps, repeated sections,
+progressive drift, or a delayed tail. Record all LEDs and capture schema-eight
+telemetry after completion; PCM protocol, underrun, presentation, decoder, and
+aggregate error flags must all remain clear.
+
 ## Required evidence for every run
 
 Record the exact state of all three LEDs after each stream stops or completes:

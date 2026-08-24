@@ -31,6 +31,13 @@ def main() -> int:
         default="short",
         help="short transport fixture or longer faded audio-quality fixture",
     )
+    parser.add_argument(
+        "--sample-rate",
+        type=int,
+        choices=(44100, 48000),
+        default=48000,
+        help="MPEG Layer II and reference PCM sample rate",
+    )
     args = parser.parse_args()
 
     ffmpeg = shutil.which("ffmpeg")
@@ -40,21 +47,34 @@ def main() -> int:
         raise SystemExit(f"missing source stream: {args.source}")
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    rate_suffix = "" if args.sample_rate == 48000 else "_44k"
     if args.profile == "short":
-        program = args.output_dir / "01_arm_mp2_audio.mpg"
-        demuxed_video = args.output_dir / "reference_video.m2v"
-        reference_pcm = args.output_dir / "reference_audio.s16le"
+        program = args.output_dir / f"01_arm_mp2_audio{rate_suffix}.mpg"
+        demuxed_video = args.output_dir / f"reference_video{rate_suffix}.m2v"
+        reference_pcm = args.output_dir / f"reference_audio{rate_suffix}.s16le"
         duration = "0.20"
-        left_source = "sine=frequency=440:sample_rate=48000:duration=0.20"
-        right_source = "sine=frequency=660:sample_rate=48000:duration=0.20"
+        left_source = (
+            f"sine=frequency=440:sample_rate={args.sample_rate}:duration=0.20"
+        )
+        right_source = (
+            f"sine=frequency=660:sample_rate={args.sample_rate}:duration=0.20"
+        )
         audio_filter = "[1:a][2:a]amerge=inputs=2[a]"
     else:
-        program = args.output_dir / "02_arm_mp2_faded_tones.mpg"
-        demuxed_video = args.output_dir / "reference_video_faded.m2v"
-        reference_pcm = args.output_dir / "reference_audio_faded.s16le"
+        program = args.output_dir / f"02_arm_mp2_faded_tones{rate_suffix}.mpg"
+        demuxed_video = (
+            args.output_dir / f"reference_video_faded{rate_suffix}.m2v"
+        )
+        reference_pcm = (
+            args.output_dir / f"reference_audio_faded{rate_suffix}.s16le"
+        )
         duration = "3.00"
-        left_source = "sine=frequency=440:sample_rate=48000:duration=3.00"
-        right_source = "sine=frequency=660:sample_rate=48000:duration=3.00"
+        left_source = (
+            f"sine=frequency=440:sample_rate={args.sample_rate}:duration=3.00"
+        )
+        right_source = (
+            f"sine=frequency=660:sample_rate={args.sample_rate}:duration=3.00"
+        )
         envelope = "afade=t=in:st=0.25:d=0.25,afade=t=out:st=2.50:d=0.25"
         audio_filter = (
             f"[1:a]{envelope}[left];[2:a]{envelope}[right];"
@@ -68,7 +88,8 @@ def main() -> int:
         "-f", "lavfi", "-i", right_source,
         "-filter_complex", audio_filter,
         "-map", "0:v:0", "-map", "[a]", "-t", duration,
-        "-c:v", "copy", "-c:a", "mp2", "-b:a", "192k", "-ar", "48000",
+        "-c:v", "copy", "-c:a", "mp2", "-b:a", "192k",
+        "-ar", str(args.sample_rate),
         "-ac", "2", "-muxrate", "1200k", "-f", "mpeg", str(program),
     ])
     run([
@@ -78,9 +99,10 @@ def main() -> int:
     run([
         ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(program),
         "-map", "0:a:0", "-f", "s16le", "-acodec", "pcm_s16le",
-        "-ar", "48000", "-ac", "2", str(reference_pcm),
+        "-ar", str(args.sample_rate), "-ac", "2", str(reference_pcm),
     ])
     print(f"profile: {args.profile}")
+    print(f"rate: {args.sample_rate} Hz")
     print(program)
     return 0
 

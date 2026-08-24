@@ -16,7 +16,9 @@ PCM_END_MARKER = b"\x00\x00\x01\xb6"
 RECORD_SIZE = 9
 
 
-def strip_records(data: bytes) -> tuple[bytes, list[int], bytes, int]:
+def strip_records(
+    data: bytes, expected_sample_rate: int,
+) -> tuple[bytes, list[int], bytes, int]:
     clean = bytearray()
     timestamps: list[int] = []
     pcm = bytearray()
@@ -34,8 +36,12 @@ def strip_records(data: bytes) -> tuple[bytes, list[int], bytes, int]:
             if position + RECORD_SIZE > len(data):
                 raise RuntimeError("truncated PCM record")
             mode = data[position + 4]
-            if mode != 0x03:
-                raise RuntimeError(f"unsupported PCM record mode 0x{mode:02x}")
+            expected_mode = 0x03 if expected_sample_rate == 48000 else 0x01
+            if mode != expected_mode:
+                raise RuntimeError(
+                    f"PCM record mode 0x{mode:02x} does not identify "
+                    f"{expected_sample_rate} Hz stereo (expected 0x{expected_mode:02x})"
+                )
             left = data[position + 5:position + 7]
             right = data[position + 7:position + 9]
             pcm += left[::-1] + right[::-1]
@@ -104,16 +110,24 @@ def main() -> int:
         choices=("short", "faded"),
         default="short",
     )
+    parser.add_argument(
+        "--sample-rate", type=int, choices=(44100, 48000), default=48000,
+    )
     args = parser.parse_args()
     raw_video = Path(__file__).resolve().parent / "test_b_bidirectional.m2v"
+    rate_suffix = "" if args.sample_rate == 48000 else "_44k"
     if args.profile == "short":
-        program = args.test_dir / "01_arm_mp2_audio.mpg"
-        reference_video_path = args.test_dir / "reference_video.m2v"
-        reference_pcm = args.test_dir / "reference_audio.s16le"
+        program = args.test_dir / f"01_arm_mp2_audio{rate_suffix}.mpg"
+        reference_video_path = args.test_dir / f"reference_video{rate_suffix}.m2v"
+        reference_pcm = args.test_dir / f"reference_audio{rate_suffix}.s16le"
     else:
-        program = args.test_dir / "02_arm_mp2_faded_tones.mpg"
-        reference_video_path = args.test_dir / "reference_video_faded.m2v"
-        reference_pcm = args.test_dir / "reference_audio_faded.s16le"
+        program = args.test_dir / f"02_arm_mp2_faded_tones{rate_suffix}.mpg"
+        reference_video_path = (
+            args.test_dir / f"reference_video_faded{rate_suffix}.m2v"
+        )
+        reference_pcm = (
+            args.test_dir / f"reference_audio_faded{rate_suffix}.s16le"
+        )
     minimum_correlation = 0.97
     reference_video = reference_video_path.read_bytes()
 
@@ -122,7 +136,8 @@ def main() -> int:
     )
     expected_capabilities = (
         "protocol=1 sources=file reserved_sources=dvd "
-        "containers=m2v,mpeg-ps video=h262 audio=mp2-s16le-48000 "
+        "containers=m2v,mpeg-ps video=h262 "
+        "audio=mp2-s16le-44100,mp2-s16le-48000 "
         "transport=inband-pcm-v1"
     )
     if capabilities.returncode or capabilities.stdout.strip() != expected_capabilities:
@@ -140,7 +155,7 @@ def main() -> int:
         if transported.returncode:
             raise RuntimeError(transported.stderr.decode(errors="replace").strip())
         clean_transport, transport_timestamps, inband_pcm, end_count = strip_records(
-            transported.stdout
+            transported.stdout, args.sample_rate
         )
         if clean_transport != reference_video:
             raise RuntimeError(
@@ -176,7 +191,7 @@ def main() -> int:
         if completed.returncode:
             raise RuntimeError(completed.stderr.strip())
         clean_video, timestamps, explicit_pcm, explicit_end = strip_records(
-            helper_video.read_bytes()
+            helper_video.read_bytes(), args.sample_rate
         )
         if explicit_pcm or explicit_end:
             raise RuntimeError("explicit --pcm-out also emitted in-band PCM")
@@ -272,7 +287,8 @@ def main() -> int:
         f"rms {rms:.4f}, correlation {correlation:.6f}"
     )
     print(
-        f"transport: {len(inband_pcm) // 4} PCM records, one clean end, "
+        f"transport: {len(inband_pcm) // 4} PCM records at {args.sample_rate} Hz, "
+        "one clean end, "
         f"correlation {inband_correlation:.6f}"
     )
     print("errors: truncated Program Stream rejected")
