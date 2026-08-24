@@ -1,3 +1,31 @@
+## 478 COMMIT Unreleased eab57b7 2026-08-24T14:11:18-07:00
+
+#### Coming From:
+
+Unreleased eab57b7
+
+#### Purpose:
+
+Accept no-reboot 44.1 kHz audio recovery from the silent Program Stream as the third v0.7.0 release-gate test.
+
+#### Outcome:
+
+Without rebooting after the accepted zero-PCM session, the user reports that `01_good_480p_44k.mpg` passes with USER solid on, DISK blinking eleven times and POWER solid on. The final image was triggered and retrieved exclusively through plain FTP with the default MiSTer login and no SSH keys; `.ai/current_results/entry478_release_gate_44k_recovery.png` is 104,593 bytes with SHA-256 `4220305dabf9759e02c8f6c573fffb7768a43a338055d8a27ea77058f5fc8b8f`. Schema nine proves that audio delivery restarted: PCM sample count and FIFO high-water fields reach their healthy saturated telemetry values, while audio underrun, PCM protocol error and aggregate error flags remain clear. The core accepts the complete 582,741-byte H.262 payload, associates five timestamps, decodes seventeen reference and 31 B pictures, displays all 48 pictures with 47 swaps, records zero display-gap outliers, sees sequence end, completes presentation and freezes for normal quiet reason one at STC second two. Every decoder, destination, presentation, reorder, scratch, promotion, future-reference and terminal state is clear. This passes test three of the exact four-file v0.7.0 release gate and proves the required 48 kHz audio-video to silent to 44.1 kHz audio-video sequence without reboot.
+
+#### Next Steps:
+
+Power-cycle the MiSTer once, leave Audio Test Off and run only `20_bbb_full_48k.mpg` through its natural 9:56 end. Watch opening motion and sync, scene transitions, the high-motion squirrel sequence near 7:22 and the rolling credits, requiring no crackle, dropout, drift, repeated sections, corruption or recurring cadence jump. After completion, report audio-video behavior and all three LEDs, then leave the final image loaded for schema-nine capture. Do not replay or launch another file before the final evidence is retrieved.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 477 COMMIT Unreleased eab57b7 2026-08-24T14:08:55-07:00
 
 #### Coming From:
@@ -1194,33 +1222,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 438 COMMIT Unreleased 3814243 2026-08-24T06:23:08-07:00
-
-#### Coming From:
-
-Unreleased 3814243
-
-#### Purpose:
-
-Install the exact bounded-lookahead helper with byte-verified rollback while leaving the timing-clean FPGA and qualification media unchanged.
-
-#### Outcome:
-
-Read-only retrieval first confirmed the installed 361,452-byte helper at SHA-256 `2cf665c0153a9885e103a1da5038997efb9050c7fcbceb3d3340537cfb153d54`. Candidate `4c0f1d2c3e9c229ccad38b683701968feac7b9f1111de20ec6b4a3f0864b2576` was uploaded as `/media/fat/linux/MediaPlayer_Helper.stage.3814243`, retrieved and compared byte-for-byte before any active-name mutation. The prior helper was then atomically renamed to `/media/fat/linux/MediaPlayer_Helper.backup.pre-scheduler.9afe2f0`, the verified stage was promoted, and FTP metadata independently confirms active mode `0755`, owner and group root and size 361,452 bytes. Separate post-promotion retrievals reproduce the candidate hash for the active helper and `2cf665c0153a9885e103a1da5038997efb9050c7fcbceb3d3340537cfb153d54` for the rollback. The active 4,126,828-byte RBF remains unchanged at SHA-256 `1fe3f61a8286e42e38db4c50eef6a112f31106590e6cdbcc6715fff82544b4ea`, and active `00_good_480p_48k.mpg` remains unchanged at SHA-256 `1455af94803b1d9958a93fbdb978aa2a42c1d8045a9491f904ad1ad9b8ccdad5`. Main and every other media file were untouched, no reboot occurred and no playback was launched.
-
-#### Next Steps:
-
-Without rebooting, leave Audio Test Off and run only `00_good_480p_48k.mpg`. Report whether audio and video begin together, whether either former crackle/dropout occurs, whether the picture stutters at the former late point, whether audio still plays beyond the final picture, and the final USER, DISK and POWER states. Leave the final image loaded for a fresh schema-eight capture. Do not run the 44.1 kHz control, any expected-failure case or the full soak until this control has zero audio underrun, PCM protocol, presentation, decoder and aggregate error flags. If the helper fails to start or behavior regresses materially, restore `MediaPlayer_Helper.backup.pre-scheduler.9afe2f0`; the RBF requires no rollback.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
