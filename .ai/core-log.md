@@ -1,3 +1,35 @@
+## 454 COMMIT Unreleased f870d98 2026-08-24T08:12:56-07:00
+
+#### Coming From:
+
+Unreleased cf1d173
+
+#### Purpose:
+
+Build the exact-byte 24-second audio-video opening diagnostic and install it with the `cf1d173` helper under staged verification and preserved rollback.
+
+#### Outcome:
+
+`extract_program_stream_opening.py` cuts a Program Stream at a picture boundary without disturbing what it carries: packs and PES packets are copied verbatim, only the packet holding the first picture past the cut is rewritten to shorten its declared length to the payload retained, and the audio packets that follow are carried forward until the audio covers the picture kept, because a cut taken on video alone ends with less audio than picture and the sink would drain that shortfall as an underrun the source never had. Seven audio packets are appended for 1,155,456 samples against the 1,154,000 the 577 pictures require. The generated `23_bbb_opening24_exact_av.mpg` is 3,765,903 bytes at SHA-256 `d4b3ba1f02be1bd06a89e6f7b06f3ecf533ba0a09c8d7453056a501dadf0f585`, passes the compatibility checker at 720x480, frame-rate code two, 25 I plus 169 P plus 383 B pictures and 48 kHz stereo MPEG Layer II, and its demuxed video is byte-identical to the accepted raw control from entry 452 at SHA-256 `100dcb7d536918263def73bc2b8e660fdb2e975221ccd9d548b0845bb853471a`. The same H.262 bytes that played perfectly without audio are therefore now under test with their own audio and nothing else changed.
+
+That file is a direct discriminator between the two helpers rather than a general soak. Under the installed `f2b2e02` helper it reproduces the failure signature in 24 seconds: the audio deficit reaches 8,894 frames at 22.8 seconds, above the 8,192-frame sink FIFO, and the maximum PCM-free video span is 62,716 bytes. Under `cf1d173` the deficit never becomes positive at all, the maximum PCM-free video span is 4,052 bytes and steady batches stay within the accepted 2,048, with the transport carrying all 3,143,577 video and timestamp bytes and all 1,154,304 PCM frames and one clean end. The native and address-and-undefined-sanitized helpers agree.
+
+Installation was staged and verified at every step, and the FPGA image, MiSTer Main and every existing media file are untouched. The installed helper was first downloaded and confirmed to be exactly `4b496d9725dc520bd463a4e22e22430ebb575e778cf65cfd3f9c20a8e7479a58`, which a fresh official-toolchain rebuild of the `f2b2e02` source reproduces byte for byte, so the rollback path is proven rather than assumed. Those exact bytes were preserved as `/media/fat/linux/MediaPlayer_Helper.backup.pre-delivery-order.f2b2e02` and read back for comparison. The new helper was uploaded under a staging name, downloaded and confirmed byte-identical at SHA-256 `d40a3eeb8c5dfa1f41ee7a82ee7966b310ec458da789972ca7025f75866117f2`, then promoted, made executable and read back again at the same hash. The diagnostic was placed in `/media/fat/games/MediaPlayer/v0.7_qualification` by the same staged path and verified after promotion. No playback was launched.
+
+#### Next Steps:
+
+Power-cycle the MiSTer, set Audio Test to Off and run only `23_bbb_opening24_exact_av.mpg`. Acceptance is zero audible crackle or dropout, no repeated or late frames through the full 24 seconds, audio and video aligned at the end, and ordinary USER, DISK and POWER states; leave the final image loaded for a schema-eight capture and require zero aggregate, decoder, presentation, destination, PCM protocol and underrun flags with all 577 pictures displayed. If audio still underruns on this file, the delivery-order correction is insufficient and the next boundary is audio lookahead depth rather than interleaving, with the exact rollback available as `MediaPlayer_Helper.backup.pre-delivery-order.f2b2e02`. If it passes, run `20_bbb_full_48k.mpg` end to end and require completion without underrun or repeated-frame cadence, watching the high-motion sequence near 7:22 and the quiet stretch near 5:00, where host analysis still measures the deepest remaining audio excursion at 7,374 frames.
+
+#### Files Modified:
+
+- tools/streams/extract_program_stream_opening.py
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 453 COMMIT Unreleased cf1d173 2026-08-24T08:06:55-07:00
 
 #### Coming From:
@@ -1143,35 +1175,6 @@ Reboot the MiSTer once, enter MediaPlayer with Audio Test Off and run only `02_a
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 414 COMMIT Unreleased 104c5ff 2026-08-24T01:15:36-07:00
-
-#### Coming From:
-
-Unreleased 22d2142
-
-#### Purpose:
-
-Preserve minimp3 synthesis continuity across incrementally delivered MPEG Layer II frames without changing the established PCM transport or FPGA path.
-
-#### Outcome:
-
-Commit `104c5ff` makes each incremental minimp3 call transactional by snapshotting `mp3dec_t`, restoring it whenever the current bytes cannot safely commit a frame, and retaining the undecided bytes until following input proves the frame boundary. End-of-input decoding now uses the exact remaining bytes rather than synthetic zero padding, eliminating the failed next-header comparison that cleared synthesis history. The verifier's original strict correlation floor is restored because the prior faded-profile relaxation measured this defect rather than legitimate decoder variance. Both short and faded profiles pass with native and address-and-undefined sanitized helpers: video remains byte-identical, one clean end token is emitted, sample counts remain exactly 10,368 and 144,000 stereo frames, maximum difference from FFmpeg falls from more than 5,000 to 2 and correlation rounds to `1.000000`. The repaired faded decode's worst 1,152-sample boundary jumps are 234 left and 352 right, matching the reference at 234 and 353 with no jump over 1,024; the pre-fix values were 4,080 and 4,115. Two official GCC 10.2 builds are byte-identical; the 357,356-byte static ARM EABI5 helper has SHA-256 `12f6305f35ef56d4e8de2369ecd41d2811bda9d787c885991a5ed0272cd2678a`. PCM format, transport, FPGA source and Main are unchanged, so no Quartus or Main build is required.
-
-#### Next Steps:
-
-Verify the current MiSTer helper, RBF, Main and original test file, then stage and independently hash only the repaired helper and `02_arm_mp2_faded_tones.mpg`; preserve the current helper for rollback and leave the accepted RBF, Main and original file byte-identical. After reboot, run only the faded file and require clean leading silence, gradual onset, sustained separated tones without periodic crackle, gradual release, accepted video, normal LEDs and zero schema-eight errors, then leave the final image loaded for launch-free capture.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- tools/streams/verify_arm_av_pipeline.py
 
 #### Status:
 
