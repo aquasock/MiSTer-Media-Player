@@ -1,3 +1,33 @@
+## 453 COMMIT Unreleased ??? 2026-08-24T07:35:37-07:00
+
+#### Coming From:
+
+Unreleased f2b2e02
+
+#### Purpose:
+
+Close exact-byte cadence isolation and define a helper-only micro-interleaving correction for approval.
+
+#### Outcome:
+
+The user ran `22_bbb_opening24_exact_video.m2v` without rebooting and reports completely smooth motion, ending with USER and POWER solid on and DISK blinking eleven times. The completed 800x600 capture is 545,901 bytes at SHA-256 `50eb09fefb6f822bda693365ee2619ad4d24354205766ce40b25ce63fc7988b8`. Schema-eight telemetry accepts all 3,138,618 bytes with zero aggregate, presentation, destination, PCM protocol or underrun errors, sequence end, presentation completion and normal quiet reason one. The eight-bit counters reconstruct exactly to 25 I plus 169 P plus 383 B pictures, all 577 displays and 576 swaps. Those 576 intervals span 24.006454 seconds for 23.994 delivered frames per second. No gap exceeds the 3,000,000-cycle or 50-millisecond outlier threshold; the three largest are all 2,984,256 cycles or 49.738 milliseconds. Because this raw stream is copied from the failed Program Stream's exact H.262 opening, the paired result conclusively excludes encoded scene complexity, source timestamps, decoder throughput and the current FPGA image: the same bytes are smooth without PCM, while the audio-video form produces 139 outliers up to 116.054 milliseconds and an audio underrun within 21.74 seconds.
+
+The transport structure explains both defects. The full file carries 14,315 video packets averaging 5,898 bytes but 28,628,352 audio samples, nearly 2,000 samples per video packet. The current helper may therefore place as many as 2,048 consecutive PCM records before one whole video packet. Once the 8,192-sample FPGA FIFO fills, that batch backpressures the shared byte path for approximately 42.7 milliseconds before the compressed picture can advance, adding an audio-sized pause to a raw decoder interval already measured near 49.7 milliseconds. Conversely, the existing single-sample guard before as many as 65,535 video bytes cannot refill enough audio to survive a difficult picture, which accounts for the sticky underrun. This is ordering granularity in the helper rather than corrupt content or insufficient FIFO capacity.
+
+#### Next Steps:
+
+Approval is required for a helper-only pacing correction; leave RTL, RBF, Main and all installed files unchanged until host proofs pass. Preserve the accepted empty-FIFO startup release, raise the steady PTS audio reserve from 2,048 to 4,096 frames, divide queued video packets into at most 256-byte slices, cap each steady PCM admission at 128 frames and replace the one-sample 65,535-byte guard with a 128-frame refill after at most 4,096 PCM-free video bytes. This keeps any full-FIFO PCM stall near 2.67 milliseconds while retaining an 85.3-millisecond reserve over the measured 49.738-millisecond raw decoder gap. Extend the transport analyzer to prove exact video, PTS and PCM hashes, startup and terminal behavior, no steady PCM run above 128 frames and no PCM-free video span above 4,096 bytes. Rerun short and faded fixtures at both sample rates, rate preflight and malformed paths, native plus address-and-undefined sanitizers, the nine-case checker, both controls and the deterministic full transport; produce two byte-identical official GCC 10.2 helpers. Then build a copied-stream 24-second audio-video opening diagnostic, install only the helper and that file through staged roundtrip verification with an exact helper rollback, and require zero underrun, zero cadence outliers, clean sync and ordinary LEDs before another full soak. If host analysis cannot keep queue bounds or exact payload identity under these constants, stop before installation and revise the granularity rather than changing the FPGA.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 452 COMMIT Unreleased f2b2e02 2026-08-24T07:31:54-07:00
 
 #### Coming From:
@@ -1134,35 +1164,6 @@ Verify the current MiSTer helper, RBF, Main and original test file, then stage a
 #### Files Modified:
 
 - host/arm/media_player_helper.c
-- tools/streams/verify_arm_av_pipeline.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 413 COMMIT Unreleased 22d2142 2026-08-24T01:08:05-07:00
-
-#### Coming From:
-
-Unreleased 8bbd55c
-
-#### Purpose:
-
-Create one longer faded embedded-audio fixture that isolates sustained PCM quality on the accepted hardware without changing Main, the helper or FPGA source.
-
-#### Outcome:
-
-Commit `22d2142` adds explicit short and faded profiles while retaining the exact accepted five-picture video. Two complete generations are deterministic, and the short Program Stream and both references remain byte-identical at their established hashes. The new 260,096-byte `02_arm_mp2_faded_tones.mpg` has SHA-256 `cb4f143d2d72af72bb03c7a7fbc4e2163ad780a35483bdb871ec661cf29ccc24`; it decodes to exactly 144,000 stereo samples across three seconds with zero-valued leading and trailing silence, rising and falling fade windows, sustained 440 Hz left and 660 Hz right tones and approximately 46 dB channel separation. Its demuxed video is byte-identical to the accepted reference. Extending the verifier to measure MPEG audio frame boundaries then converted the user's slight crackle into a deterministic defect: the current helper jumps by 4,080 counts left and 4,115 right to zero at some 1,152-sample boundaries in both the short and faded fixtures, while FFmpeg's continuous references remain at or below 234 left and 353 right. Static inspection isolates the mechanism: when an incremental buffer ends on a complete frame or incomplete next frame, minimp3 may clear its synthesis state while searching for an unverifiable next header, and the helper consumes or retains that call without restoring the decoder state. The quality file was deliberately not installed because asking the user to confirm a known discontinuity would add no evidence; the MiSTer and all installed artifacts remain unchanged.
-
-#### Next Steps:
-
-Open a helper-only repair cycle that snapshots and restores `mp3dec_t` whenever an incremental call cannot safely consume a frame, retains the last complete frame until a following header is available, and decodes the final exact-sized frame at end of input without synthetic padding. Require both profiles to retain exact sample counts, clean end framing and their existing correlations while reducing helper boundary jumps below the reference-derived limits. Build the static ARM helper twice with the official GCC 10.2 toolchain, install only that helper with rollback preserved, then upload the existing faded-quality file and run it as the sole hardware video for the cycle; no RBF or Main change is indicated.
-
-#### Files Modified:
-
-- tools/streams/generate_arm_av_test.py
 - tools/streams/verify_arm_av_pipeline.py
 
 #### Status:
