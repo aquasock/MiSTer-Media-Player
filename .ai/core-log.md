@@ -1,3 +1,31 @@
+## 421 COMMIT Unreleased 047f5b2 2026-08-24T03:07:31-07:00
+
+#### Coming From:
+
+Unreleased 047f5b2
+
+#### Purpose:
+
+Install the headroom-recovery RBF through staged, hash-verified replacement while preserving exact rollback state.
+
+#### Outcome:
+
+Key-based SSH to the MiSTer failed for both `mister-media-player` and `mister-media-player-rsa`, each rejected as `Permission denied (publickey,password,keyboard-interactive)` while the stored host key still matched, so the device is the same machine but no longer accepts the recorded keys and its `authorized_keys` appears to have been cleared. The installation therefore used the FTP path already committed in `tools/build.sh` and substituted download-and-hash round trips for on-device hashing, which verifies the bytes actually stored rather than the bytes believed sent. Before installation the reachable MiSTer matched the accepted state exactly, with `/media/fat/MediaPlayer.rbf` at SHA-256 `b48d06e1b0f42e3465f48a1d89b10d0eb032edddcb4e02f8aab84c14854a75df`, the helper at `12f6305f35ef56d4e8de2369ecd41d2811bda9d787c885991a5ed0272cd2678a` and the faded fixture at `cb4f143d2d72af72bb03c7a7fbc4e2163ad780a35483bdb871ec661cf29ccc24`, and with both the staging and rollback names absent. The new RBF was uploaded as `MediaPlayer.upload.047f5b2.rbf`, downloaded back and confirmed byte-identical to the local build at SHA-256 `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68`, after which the displaced file was renamed to its rollback name and the staged file renamed into place. `/media/fat/MediaPlayer.rbf` now verifies at `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68` and its predecessor is preserved byte-identically as `/media/fat/MediaPlayer.backup.pre-row-ram.d70591c.rbf`. The helper and both audio fixtures remain unchanged and no playback was launched, so the currently loaded core remains the prior in-memory RBF until reboot. Two conditions are outstanding and were not present in earlier cycles: no `sync` could be issued because that requires a shell, so the writes rely on the server flushing before the next power cycle, and an undocumented `MediaPlayer_test.rbf` sits in `/media/fat` that no log entry accounts for.
+
+#### Next Steps:
+
+Restore key-based SSH access before the next installation cycle, since without a shell neither `sync` nor on-device verification is available and the FTP fallback cannot guarantee a flush. Reboot the MiSTer once, enter MediaPlayer with Audio Test Off and run only `02_arm_mp2_faded_tones.mpg`. Require the accepted five-picture video, the same clean lower left and higher right tones with smooth fades, USER steady on, DISK steady off, POWER steady on and no visible regression, then leave the completed image loaded for schema-eight capture before any replay or other file. The snapshot must still report 185,149 accepted elementary-stream bytes, one associated timestamp, three reference plus two B pictures, five displays, four swaps, sequence end and presentation complete, with zero PCM protocol, underrun and aggregate error flags and a quiet reason-one freeze with session quiet true. Because the parser change is behavior-preserving and was proven byte-identical in simulation, any deviation should be treated as evidence against the block-memory conversion rather than as an audio regression.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 420 COMMIT Unreleased 047f5b2 2026-08-24T02:34:47-07:00
 
 #### Coming From:
@@ -1140,34 +1168,6 @@ After a MiSTer power cycle, the authoritative odd-length 2,875,985-byte `09_comp
 #### Next Steps:
 
 Power-cycle the MiSTer and load `10_compat_mixed_macroblocks.m2v` through the normal file selector, then report all three LEDs and leave the completed image loaded for telemetry capture. Require nine reference plus fifteen B pictures, all twenty-four displays, twenty-three swaps, 366,072 accepted transport bytes including the expected odd-byte pad, sequence-end quiet, complete presentation retirement and zero errors before proceeding to test eleven; record cadence outliers as throughput evidence without conflating them with the exact completion gate.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 381 COMMIT Unreleased 2b1a170 2026-08-23T20:24:44-07:00
-
-#### Coming From:
-
-Unreleased 2b1a170
-
-#### Purpose:
-
-Hardware-qualify repeated multi-slice decoding and presentation on the accepted ordinary queue-capacity fix.
-
-#### Outcome:
-
-After a MiSTer power cycle, the authoritative odd-length 185,393-byte `08_compat_multi_slice.m2v` passes with USER steady on, DISK steady off and POWER steady on. Its launch-free schema-seven capture freezes for quiet reason one after accepting 185,394 transport bytes including the expected pad, decoding three reference plus two B pictures, displaying all five pictures with four swaps and reaching sequence end, session quiet and presentation complete with zero decoder or presentation errors and zero cadence outliers. Ranked telemetry observes the expected active reorder, scratch display, queued generation and promotion state before the terminal reference, while the final snapshot has no active reorder, queued generation, promotion, pending frame or terminal boundary. This preserves repeated-slice parsing, B ownership and complete presentation under the new ordinary-reference hold. The exact 2,875,985-byte `09_compat_dense_residual.m2v`, SHA-256 `f8e05f5cfd0c0385566bbc3e4133d9f42cb5547933d92e24b0d87eec3fa0a79e`, was installed in the MiSTer file directory and retrieved byte-for-byte identical; its twelve pictures comprise one I, four P and seven B pictures.
-
-#### Next Steps:
-
-Power-cycle the MiSTer and load `09_compat_dense_residual.m2v` through the normal file selector, then report all three LEDs and leave the completed image loaded for telemetry capture. Require five reference plus seven B pictures, all twelve displays, eleven swaps, 2,875,986 accepted transport bytes including the expected odd-byte pad, sequence-end quiet, complete presentation retirement and zero errors before proceeding to test ten.
 
 #### Files Modified:
 
