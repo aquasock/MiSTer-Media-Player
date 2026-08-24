@@ -1,3 +1,44 @@
+## 410 COMMIT Unreleased ??? 2026-08-24T00:27:49-07:00
+
+#### Coming From:
+
+Unreleased 8fc80ee
+
+#### Purpose:
+
+Transport ARM-decoded PCM in band to the FPGA-owned audio FIFO without expanding the MiSTer Main patch.
+
+#### Outcome:
+
+The approved cycle will replace default `aplay` output with fixed in-band PCM sample records on the helper's existing standard-output stream while retaining explicit raw PCM files for host verification. Reserved H.262 codes will distinguish timestamp, PCM sample and clean audio-end records; the FPGA extractor will consume each fixed payload without exposing it to the video decoder, stall the shared ingress only when the 256-sample PCM FIFO is full, and place a terminal token behind the last sample so the output adapter stops without a false underrun. Audio Test modes will retain their proven source, while mode Off selects embedded PCM. A download-start event will flush and re-arm the audio path for reset and replay. Existing telemetry will move to schema eight using previously reserved bits for extracted sample count, peak FIFO occupancy and audio protocol or underrun errors, avoiding a wider snapshot crossing. Raw M2V and timestamp-only streams will remain byte-identical through the extractor, and Main, the helper launch contract, DVD support and the sole hardware test file will not change.
+
+#### Next Steps:
+
+Prove native and sanitized helper output against the independent FFmpeg PCM reference, including exact extraction of 10,368 in-band stereo samples, clean end framing, raw M2V compatibility and malformed-record backpressure tests. Prove the expanded extractor, FIFO and output adapter in simulation, then build Quartus with every timing category positive and build the static ARM helper twice reproducibly. Install only the resulting RBF and helper through staged hash verification, reboot and run only `01_arm_mp2_audio.mpg`, requiring the accepted five-picture video plus the lower 440 Hz left tone and higher 660 Hz right tone with zero audio error telemetry.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_07.svh
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- rtl/audio/audio_pcm_fifo.sv
+- rtl/audio/audio_pcm_output_adapter.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+- tools/streams/tb_h262_inband_metadata.sv
+- tools/streams/verify_arm_av_pipeline.py
+- tools/streams/verify_d2_pcm_path.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 409 COMMIT Unreleased 8fc80ee 2026-08-24T00:23:05-07:00
 
 #### Coming From:
@@ -1133,34 +1174,6 @@ Carry the extracted timestamp into frame ownership and present on it against the
 
 - tools/streams/inject_inband_metadata.py
 - tools/streams/tb_h262_inband_metadata_file.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 370 COMMIT Unreleased 3f279dd 2026-08-23T15:32:17-07:00
-
-#### Coming From:
-
-Unreleased 19022d9
-
-#### Purpose:
-
-Restore the sequential ASCAL divide tail after speculation proved a net loss, and record that the HDMI domain is now a reseed rather than a restructure problem.
-
-#### Outcome:
-
-Investigating why the HDMI domain absorbs every addition produced the answer that reframes four cycles of work. That clock runs at 148.54 MHz against a measured Fmax of 151.65 MHz, two percent of headroom, on a `5CSEBA6U23I7` industrial speed-grade seven part, at a rate fixed by the 1080p pixel standard rather than chosen. `ascal` occupies 2,030 ALMs of 35,055, under six percent, against 28,163 for `emu`, so it is neither large nor crowding anything out; it fails first because it is the only clock with no room to absorb a placement shuffle. The decoder by contrast runs at 60 MHz against 63.56 MHz Fmax with 16.7 ns of budget and is healthy. Lowering the output clock would double every budget in that domain, but `video_mode` belongs to the user's `MiSTer.ini` and the core cannot force it; constraining the build to 720p would leave the bitstream unverified for anyone running 1080p, and would sacrifice the scanline and shadow-mask granularity that is much of why this community runs higher output resolutions. `19022d9` then attempted the fifth ASCAL fix by speculation, computing the four possible results of the final two non-restoring divide steps in parallel from `div_v` rather than serially, which is valid because successive add and subtract on 21-bit unsigned are associative including wraparound, and which avoided adding a pipeline stage the depth-matched horizontal pipeline could not have absorbed without realigning `o_copyv`, `o_dcptv_clr`, `o_dcptv_inc` and `o_hpixq`. It worked locally: the divider path left the worst five entirely. It failed globally: the three extra 21-bit adders cost 157 ALMs and raised peak interconnect from 69.6 to 72.4 percent, HDMI setup fell from plus 0.138 ns to minus 0.129 ns at seed eleven, and a second seed reached only plus 0.121 ns, still short of what the unmodified netlist already held. Trading area for logic depth stopped paying because depth is no longer what binds; the paths now surfacing are one and zero logic levels, register to wire to register, with nothing combinational left to precompute, duplicate or speculate. This commit therefore reverts `19022d9` and restores `27ad1b3`'s ASCAL exactly, confirmed by diff. The wider conclusion is recorded deliberately: four structural fixes held because their paths had depth to remove, and the fifth did not because its path did not. HDMI is from here a domain where seed selection is the appropriate tool rather than an evasion, because the seed acts on placement and placement is now the whole mechanism. That is a genuine reversal of the position taken at entry 363, and it applies only to this clock domain; the decoder remains one where a marginal path should be fixed rather than reseeded.
-
-#### Next Steps:
-
-Rebuild at seed eleven and confirm the restored netlist returns to approximately plus 0.138 ns HDMI setup and plus 0.933 ns decoder setup with every category positive. Then validate on MiSTer together with the metadata channel of `27ad1b3`, requiring every raw elementary-stream regression to decode exactly as before, which it should because those streams are plain `.m2v` containing no records and the extractor is invisible to them. Supply the throwaway HPS-side harness that injects records so `inband_count` and the low timestamp bits can be confirmed against an injected value in the schema six snapshot. Presentation on timestamp against the proven clock follows, anchoring from the first record and retaining free-running cadence for streams without them, then the PCM sink with its elastic FIFO, fill level and underrun telemetry and explicit seek flush. Check the weakest margin across all clocks after each addition rather than the decoder alone, and when HDMI is the category that fails, reseed rather than restructure.
-
-#### Files Modified:
-
-- sys/ascal.vhd
 
 #### Status:
 
