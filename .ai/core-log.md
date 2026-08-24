@@ -1,3 +1,31 @@
+## 430 COMMIT Unreleased 3f4b272 2026-08-24T04:34:03-07:00
+
+#### Coming From:
+
+Unreleased 3f4b272
+
+#### Purpose:
+
+Record hardware acceptance of the helper's startup video lead and the collapse of the video startup offset.
+
+#### Outcome:
+
+The user power-cycled, ran `02_arm_mp2_faded_tones.mpg` with Audio Test Off and reports it working, with USER steady on, DISK steady off and POWER steady on. The schema-eight capture at SHA-256 `6daa2113e83baad9f0c9a5d90fa6b36d62e8b47243da1fda17b0bf5e3879cd26` reports `first_present_cycle` 9,307,288 at the 60 MHz decoder clock, so the first picture now presents 0.155 seconds into the session against 1.372 seconds on `047f5b2`, removing 1.217 seconds of black screen and reducing the offset by a factor of 8.8. All five pictures are displayed by 0.312 seconds. Audio follows its 2,048-sample reserve once PCM begins, so video now leads by a margin small enough to be imperceptible rather than trailing audio by a second, which is the alignment the user asked for. Every decode and audio invariant is unchanged: 185,149 accepted elementary-stream bytes, one associated timestamp, three reference plus two B pictures, five displays, four swaps, sequence end, presentation complete with no presentation error, saturated PCM sample count 16,383, saturated FIFO peak of 127 or greater, no audio underrun, no PCM protocol error and zero aggregate error flags, freezing for quiet reason one with session quiet true at system-time second three. Session length rises from 3.015 to 3.224 seconds, which is expected now that the video burst precedes the PCM drain instead of being interleaved through it. The residual 0.155 seconds is transfer and decode of the 185 kilobyte payload, whose intra frame is 97 percent of it, and is no longer the real-time PCM throttle; that is the floor for this fixture rather than a defect. The ARM binary built with the undocumented `arm-linux-gnueabihf-gcc` 15.2 toolchain ran correctly, so the deviation recorded in entry 429 is proven harmless in this instance, though it remains unreproducible until the documented ARM GNU 10.2 compiler is available. `047f5b2` therefore stands as the accepted FPGA image and `3f4b272` as the accepted helper.
+
+#### Next Steps:
+
+Resume the deferred FPGA work: define and prove the response to a prolonged ARM producer stall after playback has begun, coordinating any pause or recovery with video presentation, and note that entry 425 established the constraint any such design must respect, since holding the PCM sink stalls the shared byte path and starves video. Housekeeping remains outstanding on the MiSTer, where `MediaPlayer.failed.d9022e6.rbf`, `MediaPlayer.reverted.62e8ccf.rbf` and the undocumented `MediaPlayer_test.rbf` are all obsolete or unaccounted for and should be removed by the user, along with the superseded helper backups. Obtain the documented ARM toolchain so helper builds become reproducible. Consider separately whether the nine-byte-per-sample in-band record format should carry multiple samples per record, since it inflates the audio roughly sevenfold against its compressed source and is the reason the shared path throttles at all; that is now a bandwidth question rather than a startup one.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 429 COMMIT Unreleased 3f4b272 2026-08-24T04:30:48-07:00
 
 #### Coming From:
@@ -1142,34 +1170,6 @@ After a reboot, `15A_pts_irregular_ordinary_short.m2v` passes with USER steady o
 #### Next Steps:
 
 Reboot the MiSTer and run `16A_pts_reordered_b_short.m2v`, then report all three LEDs and leave the final image loaded for capture. Require all five coded-order timestamps to associate with their physical reference or scratch banks, three reference plus two B pictures to display in I, B, P, B, P order with four swaps and irregular timing, and sequence-end quiet with complete scheduler retirement and zero errors before proceeding to unannotated fallback controls.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 390 COMMIT Unreleased 9a7a982 2026-08-23T21:44:51-07:00
-
-#### Coming From:
-
-Unreleased 9a7a982
-
-#### Purpose:
-
-Interpret the first irregular-PTS hardware run and replace timestamp controls whose final deadlines exceeded the cadence profiler's forced terminal-snapshot window.
-
-#### Outcome:
-
-After a reboot into the exact Entry-389 RBF, the user runs `15_pts_irregular_ordinary.m2v`, reports visible skips and USER steady on, DISK steady off and POWER steady on. The launch-free schema-seven capture proves that all five in-band records associate and all five reference pictures decode with zero decoder or presentation errors; accepted decoder bytes are the original 184,677-byte elementary stream because the 45 metadata bytes are correctly stripped before that counter. Timestamp presentation is visibly active: the captured gaps include 0.248688 seconds followed by 0.049738 seconds, matching the intended uneven schedule rather than the 25-fps fallback. This first control does not qualify terminal presentation because its final PTS is one second after the anchor, beyond the profiler's approximately 0.825-second forced terminal deadline; the frozen snapshot therefore contains four displays, three swaps, displayed PTS low bits `0x4fc`, session quiet false and the fifth timestamped reference retained in the released pending slot without any error flag. Two replacement controls retain irregular and coded-order-reordered timestamps but move the final deadlines inside that diagnostic window. Exact FTP retrieval verifies 184,722-byte `15A_pts_irregular_ordinary_short.m2v` at SHA-256 `d2b5d8305dc628d200f5be2bd947f7054498a0cd9dd41a3e8ad51589df116ab8` and 185,194-byte `16A_pts_reordered_b_short.m2v` at SHA-256 `3a9c50be14cbaeb3aa39491fb0330c5c7a3ac3c2a1964e0f760b751a7fe9dd04`. No source or RBF change is made.
-
-#### Next Steps:
-
-Reboot the MiSTer and run `15A_pts_irregular_ordinary_short.m2v`; require five associated records, five decoded and displayed reference pictures, four swaps, sequence-end quiet, presentation complete, zero errors and visibly uneven timing, then leave the final image loaded for capture. If it passes, reboot and run `16A_pts_reordered_b_short.m2v`, requiring display-order I, B, P, B, P timing with three reference plus two B completions, five displays, four swaps, clean B-generation retirement and zero errors before the unannotated controls.
 
 #### Files Modified:
 
