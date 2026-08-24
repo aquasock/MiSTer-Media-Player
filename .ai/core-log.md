@@ -1,3 +1,31 @@
+## 411 COMMIT Unreleased 8bbd55c 2026-08-24T00:58:17-07:00
+
+#### Coming From:
+
+Unreleased 8bbd55c
+
+#### Purpose:
+
+Install the timing-clean in-band PCM RBF and ARM helper while preserving the accepted Main, test video and exact rollback artifacts.
+
+#### Outcome:
+
+Before installation the reachable MiSTer matched the accepted state exactly: Main SHA-256 `16517a9927c659616796b45c8e2488da2a26f0595c91418ed09dc0eb7a5787aa`, RBF `ad04f9f73c0fb98309588f8c212c6ccad71c80b254a2a284f637672a73350d37`, helper `4f6ac001a4a0455c20e1148cedf7548768258abfafb2299a3f8b171a5383fa8e` and `01_arm_mp2_audio.mpg` `94a8ff0223dd1acba4d59fc1785741522c4361956f17848bf9ebbb8c0a503fe7`. The new RBF and helper were uploaded under commit-specific temporary names, independently verified on the MiSTer, and only then installed as a pair and synchronized. `/media/fat/MediaPlayer.rbf` now verifies at SHA-256 `414f7fae21e628e978ff331f701f0c1435f4742ef27d3928e3ad168cbbda9498`, and `/media/fat/linux/MediaPlayer_Helper` verifies at `04f9683cf02c5ed2268743cb0ff28570e1a36c71ad3f362c80f1359c89a2af4d`; Main and the sole test video remain byte-identical to their accepted hashes. Exact rollback copies of the displaced RBF and helper are preserved as `/media/fat/MediaPlayer.backup.pre-inband-pcm.8bbd55c.rbf` and `/media/fat/linux/MediaPlayer_Helper.backup.pre-inband-pcm.8bbd55c`. No playback was launched, and the currently loaded core remains the prior in-memory RBF until reboot.
+
+#### Next Steps:
+
+Reboot the MiSTer once, enter MediaPlayer, ensure Audio Test is Off and run only `01_arm_mp2_audio.mpg`. Listen for the lower 440 Hz tone in the left channel and the higher 660 Hz tone in the right channel while confirming the previously accepted five-picture video; report what is audible, whether either channel gaps or crackles, and the USER, DISK and POWER LEDs, then leave the final image loaded for schema-eight capture before any replay or additional file.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 410 COMMIT Unreleased 8bbd55c 2026-08-24T00:27:49-07:00
 
 #### Coming From:
@@ -1152,34 +1180,5 @@ Read the LEDs for plain `04_b_bidirectional` on the installed `27ad1b3` image. A
 
 - [x] Built
 - [ ] Passed
-
----
-## 371 COMMIT Unreleased 2d555f7 2026-08-23T16:00:17-07:00
-
-#### Coming From:
-
-Unreleased 3f279dd
-
-#### Purpose:
-
-Supply the harness that injects in-band metadata records and prove the extraction path end to end on hardware.
-
-#### Outcome:
-
-The restored `3f279dd` netlist rebuilt to RBF SHA-256 `6e075113416bf8bb891d2b00ee96a9748441bb42ce2a10dec81ef93b37a8fb13`, byte-identical to `27ad1b3`, with 35,055 ALMs, 51,819 registers, plus 0.138 ns HDMI setup and plus 0.933 ns decoder setup, confirming both that the revert restored ASCAL exactly and that determinism continues to hold. The user validated that image and every stream passed, accepting the metadata extractor as harmless to plain elementary streams, which was the property at risk because the four-byte detection window holds the `sequence_end_code` at end of transfer and a broken flush would have truncated every stream. This commit adds tools only and required no rebuild. `inject_inband_metadata.py` annotates an elementary stream by inserting a nine-byte record before each picture start, refusing outright to process a file that already contains `0x000001B0` so a stream cannot be annotated twice, and `tb_h262_inband_metadata_file.sv` replays an annotated stream and its unannotated source through the extractor, requiring the emitted bytes to equal the source exactly, with stream paths and lengths passed as plusargs so any file can be used. Annotating the four-picture `01_i_baseline` produced exactly four records and a file thirty-six bytes larger, and an independently written stripper reduced it to a byte-identical copy of the original. The file replay then drove all 726,739 annotated bytes through the RTL with backpressure applied every 977 bytes and reproduced all 726,703 source bytes exactly, extracting four records with a final timestamp of `0x7A223`. That predicted the hardware result before it was measured, which it matched exactly: the annotated stream reports four records and low timestamp bits `0x223` with zero error flags, while the unannotated control over the same core and the same picture content reports zero records and zero timestamp. Metadata therefore travels from a file, over the ordinary `ioctl_download` path, through the sliding-window detector, is stripped ahead of the decoder and unpacked with its timestamp intact, with no side channel, no daemon, no `Main_MiSTer` change and no kernel work. Two harness limitations were observed and are not defects in the core: `run_hardware_cadence.py` reports picture and byte counts that do not match the stream it was given, the same discrepancy the archived seed ten image reproduces, and its snapshots were taken before terminal quiet so `sequence_end_seen` reads false.
-
-#### Next Steps:
-
-Carry the extracted timestamp into frame ownership and present on it against the system time clock, anchoring from the first record in a stream and retaining free-running cadence for streams that carry none, which is the change that genuinely risks presentation regressions and now has both a proven clock and a proven metadata path beneath it. Extend the injector to derive timestamps from a real cadence rather than a fixed step once presentation consumes them, so the injected values describe the stream instead of merely exercising the path. The PCM sink follows with its elastic FIFO, fill level and underrun telemetry and explicit seek flush. Continue checking the weakest margin across all clocks after each addition, reseeding rather than restructuring when the HDMI domain is the category that fails. Before release qualification, complete the regression pack still unexercised, in particular long GOP, dense residual, full endurance and the truncation case with its no-reboot recovery, and delete the six compiled but uninstantiated modules for navigability.
-
-#### Files Modified:
-
-- tools/streams/inject_inband_metadata.py
-- tools/streams/tb_h262_inband_metadata_file.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
