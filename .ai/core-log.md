@@ -1,3 +1,35 @@
+## 459 COMMIT Unreleased ??? 2026-08-24T09:05:44-07:00
+
+#### Coming From:
+
+Unreleased 1a6e6b4
+
+#### Purpose:
+
+Record that record placement is not the residual cadence cost, that record count is, and propose coalescing timestamps to the density hardware has already run cleanly.
+
+#### Outcome:
+
+The user ran `26_bbb_opening24_pts_noprefix.m2v` and reports a stutter about once a second, resembling the cadence beat seen in earlier 24 and 25 frame-per-second work, with LEDs unchanged at USER solid on, DISK blinking eleven times and POWER solid on. The capture is 545,908 bytes at SHA-256 `e50bd5345423e36abec4895d9be9d5ca8e83a08e3a657996afa72e9cc5c11eaa`, and it reproduces the 551-record control rather than improving on it: 21 gap outliers again, the same three largest gaps of 116.054 milliseconds at display ordinal 65, 82.896 at ordinal 196 and 66.317 at ordinal 28, the same 3,138,619 accepted bytes and a bit-identical `hold_scratch_available_cycles` of 6,963,478. Forty-four decoded fields match exactly and the sixteen that differ do so in the fourth significant figure or below. Moving every record off a start-code prefix changed nothing.
+
+That refutes the adjacency reading recorded in entry 458, and the accepted-byte evidence with it: this control has no record on a prefix, presents 577 picture start codes to a pre-extraction scan and still accepts 3,138,619 bytes, so the spurious byte tracks record count rather than record placement and is not the mechanism it looked like. What survives is simpler and is now measured three times over. Zero records give zero outliers, 26 records give zero outliers, and 551 records give 21 outliers whether or not any of them sits on a prefix. The residual cost is per record, at roughly one late presentation for every 26 records carried, and at 551 records over 24 seconds that lands close enough to one per second to be exactly the beat the user describes. Presentation slack is not involved: presentation hold is 783,657,982 cycles against the raw control's 781,845,922, so the decoder has its full reservoir and still misses these deadlines.
+
+The helper's own record density is therefore a defect rather than a fixed cost. It emits one timestamp per video PES packet carrying a timestamp, which is 551 records for 24 seconds of this mux, while the FPGA presented the same 577 pictures perfectly from 26 timestamps and associated 24 of them. Nothing in presentation needed the other 525.
+
+#### Next Steps:
+
+Approval is required to coalesce the helper's timestamp records so that a record is emitted only when presentation cannot extrapolate it, at a sequence or group boundary and whenever a timestamp departs from the extrapolated timeline by more than one frame interval, leaving RTL, RBF and Main unchanged. Host proofs must show the record count falling from 551 to roughly 26 on the diagnostic and proportionally on the full soak, every payload hash unchanged, PCM-free video spans still bounded at 4,096 bytes and no audio deficit above the sink FIFO, followed by the usual native and sanitized fixture runs at both sample rates, the nine-case checker and two byte-identical official GCC 10.2 helpers. The specific risk to prove on hardware is long-term drift: sparse timestamps mean presentation extrapolates for longer, so the 24-second diagnostic proves cadence but only the full `20_bbb_full_48k.mpg` soak proves that audio and video are still aligned after ten minutes, and that soak must be run before this is called good. The dominant mechanism remains untouched and architectural: with PCM present the shared byte path is paced by the audio sink and presentation hold collapses from roughly 780,000,000 cycles to 12,376,681. Two candidate corrections are now worth costing together rather than separately, deepening `audio_pcm_fifo` past any lead the helper can produce or buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate`, and carrying many samples per PCM record instead of one, which would cut both the audio path bandwidth and the per-record cost this cycle has just measured, at the price of a transport format change on both sides.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 458 COMMIT Unreleased 1a6e6b4 2026-08-24T08:59:05-07:00
 
 #### Coming From:
@@ -1174,33 +1206,5 @@ Install the resulting RBF at SHA-256 `2f47c3e61b0892667fbf92e731f6cb2464267243aa
 
 - [x] Built
 - [ ] Passed
-
----
-## 419 COMMIT Unreleased d70591c 2026-08-24T02:20:34-07:00
-
-#### Coming From:
-
-Unreleased d70591c
-
-#### Purpose:
-
-Hardware-accept deterministic PCM startup reserve and audio-aware terminal completion with the sole faded Program Stream.
-
-#### Outcome:
-
-After rebooting with Audio Test Off, the user ran only `02_arm_mp2_faded_tones.mpg` and reported perfect sound, perfect video, USER steady on, DISK steady off and POWER steady on. The untouched 800-by-600 capture at SHA-256 `3062a977f2392a938f97604f2e3fe0f75ec3bc0d82deda273fa77d0af387b69b` shows the accepted final raster. Its schema-eight snapshot freezes for quiet reason one at system-time second three with session quiet true, directly reversing the prior reason-two timeout at second two while audio was active. It reports the expected saturated PCM sample count of 16,383 for the 144,000-sample file, saturated FIFO peak of 127 or greater, no audio underrun, no PCM protocol error and zero aggregate error flags. Video remains exact at 185,149 accepted elementary-stream bytes, one associated timestamp, three reference plus two B pictures, five displays, four swaps, sequence end and presentation complete with no presentation error or residual scheduler ownership. Source `d70591c` and RBF SHA-256 `b48d06e1b0f42e3465f48a1d89b10d0eb032edddcb4e02f8aab84c14854a75df` are therefore the hardware-accepted startup-prefill and audio-tail telemetry boundary.
-
-#### Next Steps:
-
-Keep `d70591c` installed as the accepted audio-reserve baseline. The next isolated FPGA cycle should define and prove the response to a genuinely prolonged ARM producer stall after playback has begun, coordinating any pause or recovery with video presentation so Linux delay cannot silently create permanent audio-video drift. Continue using one video file for that development build and reserve the complete regression set for release qualification.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
