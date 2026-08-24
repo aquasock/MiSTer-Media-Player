@@ -1,3 +1,31 @@
+## 374 COMMIT Unreleased dea60bc 2026-08-23T18:40:19-07:00
+
+#### Coming From:
+
+Unreleased dea60bc
+
+#### Purpose:
+
+Hardware-qualify the repaired in-band metadata boundary and displayed-frame timestamp association with explicit LED and launch-free telemetry evidence.
+
+#### Outcome:
+
+The exact 4,209,348-byte RBF for `dea60bc`, SHA-256 `6d86641ca5c9460c9025961ccff0403438f7034949f3046b8ee2c0592fde9afc`, was uploaded persistently and retrieved byte-for-byte identical. After a power cycle, plain `04_b_bidirectional` passed twice with USER steady on, POWER steady on and DISK steady off, reversing the reproducible USER one blink and DISK fifteen syntax failure on `27ad1b3` and proving the pulse-valid repair on the P-ownership hold that exposed it. After another power cycle, the unannotated 726,703-byte `01_i_baseline` passed with USER steady on, POWER steady on and DISK two blinks; schema-seven telemetry reports four displayed pictures, zero associations, zero displayed timestamp, zero error flags and sequence end. The deterministic 726,739-byte annotated companion was found already installed, reproduced byte-identically from the committed injector, and duplicated under the visible name `01A_ANNOTATED_4PTS.m2v`; after another power cycle it passed with the same successful LED state, four associations, displayed timestamp low bits `0x223`, four displayed pictures, zero error flags and sequence end. This proves records cross the ordinary file path, survive the repaired backpressure boundary, are stripped without changing decoded bytes, bind to all four pictures and follow frame ownership to the displayed frame. Both launch-free snapshots froze on the profiler's forced terminal timeout before `session_quiet` and `presentation_complete` became true, while the later LED acceptance snapshot was successful, so those frozen fields remain a profiler timing limitation rather than a decoder failure. The proposed `quartus_sh --write_settings_files=off` edit from Entry 372 must not be made as written: Quartus 17 rejects that shell option, and the normal flow output proves its map, fit and assembler children already run with settings writes disabled.
+
+#### Next Steps:
+
+Treat `dea60bc` and the installed RBF as the accepted timestamp-association boundary. The next repository-only cycle should place the regression instructions, result template, checksums and compatibility manifest under `docs/`, require USER, POWER and DISK observations for every hardware stream, regenerate the pack from committed generators, and correct the launch-free snapshot trigger so terminal fields are captured after quiet rather than by forced timeout. After that reproducibility boundary is accepted, resume timestamp-driven presentation against the proven system clock while retaining free-running cadence for unannotated streams.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 373 COMMIT Unreleased dea60bc 2026-08-23T18:08:10-07:00
 
 #### Coming From:
@@ -1175,38 +1203,6 @@ Keep the validated cadence RTL unchanged and retry incrementally with seed ten, 
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-## 334 COMMIT Unreleased 04873f7 2026-08-22T06:30:47-07:00
-
-#### Coming From:
-
-Unreleased 374ef38
-
-#### Purpose:
-
-Add exact native `24000/1001` presentation cadence for H.262 frame-rate code one without changing decoder execution or the accepted exact-24/25-fps paths.
-
-#### Outcome:
-
-The presentation scheduler now supports frame-rate code one with the exact reduced 22,608-over-56,875 refresh-window credit ratio, mathematically identical to `663168 * 24000` over `40000000 * 1001`, and reseeds only when entering or leaving that reduced scale so exact-24/25 behavior remains cycle-identical. The hardware cadence profiler now recognizes code one under the same legal three-refresh diagnostic window. Focused simulation delivered 479 presentations over 1,206 windows for 23.976 fps, 240 over 603 for exact 24, and 250 over 603 for 25 fps; the profiler, transport, mixed-width FIFO, and complete 72-picture live-raster soak all passed with zero decoder or presentation errors. An untouched `374ef38` comparison proved the soak's prior 6,519,997-clock assertion was already stale while both baseline and this commit complete identically at 6,519,996 clocks, so the test-only constant was corrected without changing decoder behavior.
-
-#### Next Steps:
-
-Build `04873f7` incrementally from the accepted clean seed-twelve database, require positive global, decoder, video, hold, recovery, removal and pulse-width timing, install only the timing-clean image, and validate a bounded native-23.976 cadence stream plus the exact Emperor movie at correct wall-clock speed with no dropped frames.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-- tools/streams/tb_h262_live_raster_soak.sv
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
