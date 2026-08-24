@@ -1,3 +1,62 @@
+## 423 COMMIT Unreleased ??? 2026-08-24T03:19:14-07:00
+
+#### Coming From:
+
+Unreleased 047f5b2
+
+#### Purpose:
+
+Hold the PCM output until the first picture is presented so audio and video begin together on timestamped streams.
+
+#### Outcome:
+
+Audio currently begins as soon as the startup reserve fills while video waits for the PTS-gated presentation timeline, so on a Program Stream audio leads video by the first picture's timestamp offset, measured by the user at one to two seconds. Rather than force video to present early, which would mean altering the presentation gate that Entry 389 established and spending logic and timing margin on a path the user has accepted as correct, this commit delays the audio instead. The top level gains a decoder-domain sticky flag that sets on the first genuine display swap, detected exactly as the cadence profiler detects it, from a change in the scheduler's `display_frame_bank`, `display_scratch` or `display_scratch_bank` outputs, but derived independently of the profiler so that gating the profiler out later cannot remove it. That single bit crosses into `CLK_AUDIO` through an ordinary two-flop synchronizer, consistent with the existing rule in this design that only single bits cross between the decoder and audio domains. `audio_pcm_output_adapter` gains a `video_started` input that qualifies only its initial transition out of the idle state and has no effect once playback is running, so mid-stream starvation, the accepted-end release for short clips and the audio-tail completion behavior are all unchanged. Because a stream whose video never presents would otherwise be silent forever, the hold is bounded by a parameterized counter in the audio domain that releases audio unconditionally after approximately two seconds, which restores exactly the present behavior as a floor rather than introducing a new failure mode. The System Time Clock is a free-running accumulator on `CLK_AUDIO` gated only by its `run` input, which is tied high, so it advances regardless of whether PCM samples are being consumed and holding audio cannot stall the timeline that video is waiting on.
+
+#### Next Steps:
+
+Prove the gate in simulation against `tb_audio_pcm_output_adapter`, requiring that a run with `video_started` held low starts only after the timeout, that a run with it asserted starts at the same sample as the current design once the reserve fills, and that the short-clip accepted-end release and the audio-tail completion are unchanged. Then build and record the ALM, RAM block and slack figures, which should be within a few dozen ALMs of `047f5b2` given that the change is a flag, a synchronizer and one counter. Install and run `02_arm_mp2_faded_tones.mpg` with Audio Test Off, requiring that audio and video now begin together, that the tones remain clean and separated with smooth fades, that LEDs stay normal and that an older `.m2v` file still starts immediately with no audio to wait for. Once accepted, resume the deferred prolonged ARM producer stall work.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_01.svh
+- rtl/audio/audio_pcm_output_adapter.sv
+- tools/streams/tb_audio_pcm_output_adapter.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+## 422 COMMIT Unreleased 047f5b2 2026-08-24T03:19:13-07:00
+
+#### Coming From:
+
+Unreleased 047f5b2
+
+#### Purpose:
+
+Record the hardware acceptance of the block-memory row buffers and the audio-leads-video startup offset it exposed.
+
+#### Outcome:
+
+The user rebooted with Audio Test Off, ran `02_arm_mp2_faded_tones.mpg` and reported that it works well, with audio sounding fine and starting correctly, USER steady on, DISK steady off and POWER steady on. The 7,082-ALM recovery in `047f5b2` therefore carries no audible or visible decode regression and the block-memory conversion is hardware-accepted. The run did expose a startup offset that the user states is new: video now begins one to two seconds after audio on the Program Stream, while older elementary-stream `.m2v` files still start their video immediately. No schema-eight snapshot could be captured because triggering a screenshot writes to `/dev/MiSTer_cmd` over SSH and key authentication to the MiSTer is failing, so this acceptance rests on the user's direct observation and the LED states rather than on decoded telemetry. Static tracing locates the mechanism in the presentation gate rather than in the parser: `mpeg2_h262_b_presentation_scheduler` selects `timestamp_candidate_due` in place of the free-running cadence slot whenever a picture owns a timestamp, and `mpeg2_h262_pts_presentation_timeline` drives that gate from a decoder-domain timeline anchored once by the first in-band timestamp and advanced by the 90 kHz tick synchronized out of `CLK_AUDIO`. An elementary stream carries no timestamps, so its pictures present on cadence with no wait, while a Program Stream holds each picture until the timeline reaches its presentation time. Audio is not gated at all, so it begins as soon as the startup reserve fills and leads video by the first picture's timestamp offset. A stale comment in `MediaPlayer_top_00.svh` still states that nothing consumes the presentation clock and that presentation remains free-running; that was true at Entry 389 but the timeline module is now wired in at `MediaPlayer_top_05.svh` and the comment should not be trusted. The user has decided that the video delay itself is acceptable and must not be closed at the cost of logic or timing, and that audio should instead be held back to match it.
+
+#### Next Steps:
+
+Hold the PCM output adapter's initial start until the presentation side has actually displayed its first picture, so audio and video begin together without touching the parser, the presentation gate or the timeline. Restore key-based SSH access to the MiSTer so that screenshot triggering, on-device hash verification and `sync` become available again, since without a shell no schema-eight telemetry can be decoded and every install depends on the FTP fallback flushing on its own. Correct the stale free-running presentation comment in `MediaPlayer_top_00.svh` when the next change touches that file.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 421 COMMIT Unreleased 047f5b2 2026-08-24T03:07:31-07:00
 
 #### Coming From:
@@ -1112,62 +1171,6 @@ After a MiSTer power cycle, the authoritative even-length 791,528-byte `11_compa
 #### Next Steps:
 
 Power-cycle the MiSTer and load `12_bbb_squirrel_5sec_native24_q6.m2v` through the normal file selector, watch the complete five-second dense-motion clip for continuity, then report all three LEDs and leave the completed image loaded for telemetry capture. Require forty-one reference plus seventy-nine B pictures, all 120 displays, 119 swaps, exactly 1,404,944 accepted transport bytes, sequence-end quiet, complete presentation retirement and zero errors before proceeding to the fifteen-second stress in test thirteen.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 383 COMMIT Unreleased 2b1a170 2026-08-23T20:29:33-07:00
-
-#### Coming From:
-
-Unreleased 2b1a170
-
-#### Purpose:
-
-Hardware-qualify mixed intra, predicted, skipped and residual macroblocks across repeated B-picture ownership sequences on the accepted queue-capacity fix.
-
-#### Outcome:
-
-After a MiSTer power cycle, the authoritative odd-length 366,071-byte `10_compat_mixed_macroblocks.m2v` passes with USER steady on, DISK steady off and POWER steady on. Its launch-free schema-seven capture freezes for quiet reason one after accepting 366,072 transport bytes including the expected pad, decoding nine reference plus fifteen B pictures and displaying all twenty-four pictures with twenty-three swaps. Sequence end, session quiet and presentation complete are true with zero decoder or presentation errors and zero cadence outliers at a measured 24.365 displayed swaps per second. Ranked telemetry observes scratch presentation, pending ordinary frames, active B reordering, queued generations, promotion and presentation hold during the repeated ownership sequence, while the terminal snapshot has no active reorder, queued generation, promotion, pending frame or terminal boundary. The exact even-length 791,528-byte `11_compat_long_gop.m2v`, SHA-256 `39dd3e889d1baa42e4d65fc2d6ca7a04c58c2ac38de0a5b1dba00e6585836d96`, was installed in the MiSTer file directory and retrieved byte-for-byte identical; its seventy-two pictures comprise three I, twenty-two P and forty-seven B pictures.
-
-#### Next Steps:
-
-Power-cycle the MiSTer and load `11_compat_long_gop.m2v` through the normal file selector, then report all three LEDs and leave the completed image loaded for telemetry capture. Require twenty-five reference plus forty-seven B pictures, all seventy-two displays, seventy-one swaps, exactly 791,528 accepted transport bytes, sequence-end quiet, complete presentation retirement and zero errors before proceeding to the five-second squirrel stress in test twelve.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 382 COMMIT Unreleased 2b1a170 2026-08-23T20:27:02-07:00
-
-#### Coming From:
-
-Unreleased 2b1a170
-
-#### Purpose:
-
-Hardware-qualify complete decoding and presentation under the compatibility pack's maximum coefficient and residual traffic.
-
-#### Outcome:
-
-After a MiSTer power cycle, the authoritative odd-length 2,875,985-byte `09_compat_dense_residual.m2v` passes with USER steady on, DISK steady off and POWER steady on. Its launch-free schema-seven capture freezes for quiet reason one after accepting 2,875,986 transport bytes including the expected pad, decoding five reference plus seven B pictures and displaying all twelve pictures with eleven swaps. Sequence end, session quiet and presentation complete are all true with zero decoder or presentation errors, no frame waiting and no reorder, queued, promotion, pending-frame or terminal-boundary work remaining. The maximum-residual stress records seven cadence outliers and a 4.940 displayed-swap rate across the measured interval, with the largest decode-limited gaps at approximately 0.414, 0.370 and 0.298 seconds; these are retained as throughput evidence rather than presentation loss because every picture and swap completes exactly once and terminal ownership is clean. The exact odd-length 366,071-byte `10_compat_mixed_macroblocks.m2v`, SHA-256 `ad1d9e81f0f7544ac16a1aaddb85ef9e1065333c1fdd305aa3cf275aa1ccc289`, was installed in the MiSTer file directory and retrieved byte-for-byte identical; its twenty-four pictures comprise two I, seven P and fifteen B pictures.
-
-#### Next Steps:
-
-Power-cycle the MiSTer and load `10_compat_mixed_macroblocks.m2v` through the normal file selector, then report all three LEDs and leave the completed image loaded for telemetry capture. Require nine reference plus fifteen B pictures, all twenty-four displays, twenty-three swaps, 366,072 accepted transport bytes including the expected odd-byte pad, sequence-end quiet, complete presentation retirement and zero errors before proceeding to test eleven; record cadence outliers as throughput evidence without conflating them with the exact completion gate.
 
 #### Files Modified:
 
