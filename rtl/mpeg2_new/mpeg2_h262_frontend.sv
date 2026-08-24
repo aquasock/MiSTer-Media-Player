@@ -70,9 +70,11 @@ module mpeg2_h262_frontend
     output reg         intra_vlc_format,
     output reg         alternate_scan,
     output reg         progressive_frame,
-    // Entry 365: extracted for interlaced operation and 3:2 pulldown.
-    // Both already lie inside the five-byte picture_coding_extension
-    // window this parser captures; neither is consumed yet.
+    output reg         chroma_420_type,
+    // Interlaced-output and pulldown signalling already lies inside the
+    // five-byte picture_coding_extension window.  The bounded capability gate
+    // consumes repeat/chroma state now; authored field order is carried onward
+    // for the following native-presentation milestone.
     output reg         top_field_first,
     output reg         repeat_first_field,
 
@@ -198,12 +200,11 @@ wire phase1_i_f_code_state_valid =
     (backward_f_code_horizontal == 4'hF) &&
     (backward_f_code_vertical   == 4'hF);
 
-// Phase 0 proves that we can identify the required H.262 hierarchy without
-// disturbing legacy playback.  Phase 1 will initially decode progressive,
-// 4:2:0, frame-picture I video; these are capability limits, not H.262 syntax
-// validity rules.  concealment_motion_vectors is also excluded until the
-// intra-macroblock motion-vector syntax is implemented; a value of one remains
-// valid H.262 and is therefore a capability restriction, not syntax_error.
+// These are capability limits, not H.262 syntax-validity rules.  The
+// native-interlaced I subset deliberately reuses only frame-DCT/frame-predicted
+// complete frame pictures; field pictures, field DCT/motion and repeated fields
+// remain outside the gate.  concealment_motion_vectors is likewise excluded
+// until the intra-macroblock motion-vector syntax is implemented.
 assign frontend_ready =
     sequence_seen &&
     sequence_extension_seen &&
@@ -212,16 +213,33 @@ assign frontend_ready =
     slice_seen &&
     !syntax_error;
 
+wire phase1_progressive_i_frame =
+    progressive_sequence &&
+    progressive_frame &&
+    chroma_420_type;
+
+// H262-028 through H262-034: a 30000/1001 interlaced sequence may carry a
+// complete interlaced frame picture.  With frame_pred_frame_dct set, the
+// existing frame raster remains the normative transform/prediction mapping;
+// TFF/BFF affects later field presentation, not reconstruction coordinates.
+wire phase1_native_480i_i_frame =
+    !progressive_sequence &&
+    !progressive_frame &&
+    !chroma_420_type &&
+    !repeat_first_field &&
+    (horizontal_size == 14'd720) &&
+    (vertical_size == 14'd480) &&
+    (frame_rate_code == 4'h4);
+
 assign phase1_supported =
     frontend_ready &&
     !sequence_scalable_extension_seen &&
-    progressive_sequence &&
     (chroma_format == 2'b01) &&
     (picture_coding_type == 3'b001) &&
     (picture_structure == 2'b11) &&
     frame_pred_frame_dct &&
     !concealment_motion_vectors &&
-    progressive_frame &&
+    (phase1_progressive_i_frame || phase1_native_480i_i_frame) &&
     phase1_i_f_code_state_valid &&
     !timing_unsupported &&
     !timing_error;
@@ -272,6 +290,7 @@ always @(posedge clk) begin
         intra_vlc_format                    <= 1'b0;
         alternate_scan                      <= 1'b0;
         progressive_frame                   <= 1'b0;
+        chroma_420_type                      <= 1'b0;
         top_field_first                     <= 1'b0;
         repeat_first_field                  <= 1'b0;
         forward_f_code_horizontal           <= 4'd0;
@@ -542,6 +561,7 @@ always @(posedge clk) begin
                 alternate_scan                    <= payload_next[10];
                 top_field_first                   <= payload_next[15];
                 repeat_first_field                <= payload_next[9];
+                chroma_420_type                   <= payload_next[8];
                 progressive_frame                 <= payload_next[7];
                 picture_coding_extension_seen     <= 1'b1;
                 expect_picture_coding_extension   <= 1'b0;

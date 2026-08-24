@@ -39,6 +39,7 @@ wire        mpeg2_new_q_scale_type;
 wire        mpeg2_new_intra_vlc_format;
 wire        mpeg2_new_alternate_scan;
 wire        mpeg2_new_progressive_frame;
+wire        mpeg2_new_chroma_420_type;
 // Entry 365: extracted for interlaced operation and 3:2 pulldown; carried
 // into the cadence snapshot only, not yet consumed by presentation.
 wire        mpeg2_new_top_field_first;
