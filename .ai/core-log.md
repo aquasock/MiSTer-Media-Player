@@ -1,3 +1,38 @@
+## 399 COMMIT Unreleased ??? 2026-08-23T22:49:33-07:00
+
+#### Coming From:
+
+Unreleased a57079f
+
+#### Purpose:
+
+Implement the first ARM-side embedded-audio loader for MPEG Program Streams while retaining the accepted FPGA video, timestamp and MiSTer ALSA paths unchanged.
+
+#### Outcome:
+
+The approved v0.7.0 boundary moves container demultiplexing and compressed-audio decoding to a small ARM helper while the FPGA remains the video and output-clock driver. The first profile is an MPEG Program Stream containing H.262 video and 48 kHz MPEG-1 Layer II audio. A helper built for the MiSTer ARM will parse Program Stream and PES framing, emit the video elementary stream with the established in-band picture timestamps, decode Layer II through the pinned CC0 `minimp3` implementation, and send signed 16-bit stereo PCM through the installed `aplay` command. MiSTer's existing `/dev/MrAudio`, `sys/alsa.sv`, reserved-DDR ring and 24.576 MHz output clock already implement the ARM-to-FPGA audio buffer, and the current RBF includes that path because `MISTER_DISABLE_ALSA` is not enabled. A pinned patch against official Main_MiSTer source `0a8fb44` will invoke the helper for MediaPlayer container selections, extend the visible file types without changing the RBF configuration string, stream the helper's video output over the existing backpressured file channel, and suppress the old Loading progress screen. The current accepted RBF remains the hardware target and no FPGA source or rebuild is authorized in this boundary.
+
+#### Next Steps:
+
+Implement the listed ARM helper, deterministic Program Stream generator and verifier, and the narrowly scoped Main_MiSTer loader patch. Cross-compile both ARM binaries with the official MiSTer GCC 10.2 toolchain, compare helper video output byte-for-byte with the source elementary stream after independently stripping timestamp records, compare decoded PCM byte-for-byte with FFmpeg, and exercise malformed, missing-audio, reset and backpressure paths. Back up the installed MiSTer executable before installing the candidate helper and loader. Hardware validation will use exactly one short Program Stream with embedded 48 kHz Layer II audio, requiring normal video completion, audible stereo content through MiSTer ALSA, no Loading screen, no decoder or presentation errors and clean return to file selection; the full video regression set remains deferred to release qualification.
+
+#### Files Modified:
+
+- host/arm/Makefile
+- host/arm/media_player_helper.c
+- host/arm/third_party/LICENSE
+- host/arm/third_party/minimp3.h
+- host/build_arm_stack.sh
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/streams/generate_arm_av_test.py
+- tools/streams/verify_arm_av_pipeline.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 398 COMMIT Unreleased a57079f 2026-08-23T22:30:17-07:00
 
 #### Coming From:
@@ -1166,42 +1201,6 @@ Require all timing categories positive with decoder setup restored toward the pl
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-## 359 COMMIT Unreleased 3771f19 2026-08-23T01:44:52-07:00
-
-#### Coming From:
-
-Unreleased 058f0a3
-
-#### Purpose:
-
-Return video ingress to an elementary-stream-only path by removing the hardware Program Stream demux, so demultiplexing, navigation and timestamp extraction can move to the HPS.
-
-#### Outcome:
-
-Following the complexity reevaluation, the user set the architectural boundary at elementary stream in and video out: the FPGA owns H.262 decode, presentation timing and the output path, while everything upstream of the elementary stream, meaning file and disc access, CSS, DVD navigation, demultiplexing and audio, moves to Linux. This commit reverts the hardware Program Stream path introduced by `c4d9631` and extended by `058f0a3`, deleting `mpeg2_h222_program_stream_demux.sv` and its two focused testbenches, removing the demux instantiation and wiring from the top level, dropping its `files.qip` entry, and reverting the cadence snapshot PTS association fields in the profiler, the top-level packing and `decode_hardware_cadence.py`, since those fields would read zero with no demux present and the presentation clock will define its own telemetry against HPS-supplied timestamps. The intervening commit `2dc52d7` is deliberately retained: it hardens `mpeg2_h262_stream_transport_gate.sv`, which first appeared in `a559d43` and belongs to the elementary-stream path rather than the Program Stream path, and it carries a plus 0.357 ns global setup improvement that would be lost for no benefit. The motivation is that real DVD media relies on navigation packs, multi-angle interleaving and seamless branching, which are ordinary software problems and unpleasant RTL, and that moving demultiplexing to Linux removes the unresolved missing `MPEG_program_end_code` truncation question entirely while narrowing the fabric toward the decoder that `core.md` names as the project thesis. The elementary-stream ingress path being restored is the original and better-tested one, already present in the top level and previously selected automatically. Commit `058f0a3` never produced a bitstream, because its clean compile reached synthesis in 2 minutes 5 seconds and was terminated by the user during routing at one hour thirteen minutes, so no hardware image or timing data exists for it. Commit `3771f19` performs that revert: the restored top level connects the stream FIFO directly to the transport gate and the decoder as it did before `c4d9631`, the file selector returns to accepting `M2V` only because the fabric no longer parses Program Streams, and the two clock and reset connections added by `2dc52d7` are re-applied to the retained transport gate. No dangling reference to the demux, its systems error codes or its PTS signals remains anywhere in the sources or in `files.qip`. The focused cadence profiler test passes at schema four with checksum `e82b643d` and the transport gate test retains its sixteen-byte sticky drain. Quartus Analysis and Synthesis succeeds in 1 minute 54 seconds with zero errors and one hundred thirty-five warnings, and register count falls from 49,784 to 49,295, returning 489 registers to the device. The full compile then succeeded with zero errors in 27 minutes 26 seconds, of which the fitter took 25 minutes 16 seconds, a decisive improvement over the abandoned `058f0a3` route that was still running at one hour thirteen minutes. It uses 35,495 ALMs of 41,910, down from 35,932 at `2dc52d7`, with 52,845 registers, 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks unchanged, and produced a 4,218,380-byte RBF with SHA-256 `983a8a286ad89f8ad7885b9cc5c9ccdc7b7a1005cc5722960d882456c930c798`. That image is not usable: the decoder clock misses setup at minus 0.060 ns with total negative slack of minus 0.061 ns across two violated paths of fifty, a regression from the plus 0.572 ns held at `2dc52d7` even though this build carries less logic, which is cold-route variance at eighty-five percent occupancy rather than an effect of the revert. Every other category is positive, including plus 0.244 ns HDMI setup, plus 0.620 ns host bridge setup, plus 6.959 ns video setup and positive hold, recovery, removal and pulse width throughout. Both violated paths run from `mpeg2_h262_reference_word_cache` into `mpeg2_h262_b_bidirectional_raster_engine` inside modules named as probes that in fact instantiate the decode pipeline, and the contributing `wide_seen` term is a mode-select control rather than telemetry, so gating diagnostics would not remove either path.
-
-#### Next Steps:
-
-Retry closure with fitter seed ten, which is the established remedy in this log for a single marginal path and was used at entry 319 to close a seed-sensitive boundary by moving from seed eight to seed nine, and treat the violation as structural rather than seed-sensitive only if two or three seeds fail in succession, in which case the reference cache to bidirectional engine path is registered properly instead. Once a seed closes timing, confirm on MiSTer that every raw elementary-stream regression decodes exactly as before with unchanged picture and swap counts, zero decoder errors and clean terminal completion, and record the accepted RBF hash, because that image becomes the byte-identical reference for the following cycle. That next cycle deletes the twenty-five source files Quartus never compiles, which also resolves all seven duplicate module definitions, and is gated on producing an RBF whose SHA-256 matches the accepted one exactly. A measured cycle then gates the remaining live diagnostic modules behind a compile-time parameter and reports the area, timing and fitter-runtime deltas against the 25 minute 16 second baseline established here, after which the 0.7.0 plan is re-baselined. Presentation work then resumes: a 90 kHz system time clock in fabric as a fractional accumulator anchored to the 24.576 MHz audio domain that `sys/audio_out.sv` already uses, fed picture timestamps supplied by the HPS rather than extracted in fabric, retaining free-running cadence for streams presented without timestamps, followed by the PCM sink with its elastic FIFO and underrun telemetry, then clean-build release qualification and the `v0.7.0` pre-release tag. Both of those cycles require a small throwaway HPS-side harness to inject synthetic timestamps and a test tone, since no daemon exists to supply them. Version 0.7.0 remains a single RBF containing no audio decoder.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_07.svh
-- files.qip
-- rtl/mpeg2_new/mpeg2_h222_program_stream_demux.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/tb_h222_program_stream_demux.sv
-- tools/streams/tb_h222_program_stream_demux_file.sv
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
