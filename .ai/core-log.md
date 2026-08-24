@@ -1,3 +1,35 @@
+## 432 COMMIT Unreleased ??? 2026-08-24T04:58:03-07:00
+
+#### Coming From:
+
+Unreleased 1102830
+
+#### Purpose:
+
+Make the user-converted playback boundary reproducible and prepare the hardware failure sweep and full-length audio-video soak.
+
+#### Outcome:
+
+This cycle will bind the helper to the verified official MiSTer ARM GNU 10.2 toolchain, correct its published capabilities to include both accepted sample rates, exercise 44.1 and 48 kHz through the permanent host regression, and extend the existing Big Buck Bunny generator with an optional deterministic MPEG Program Stream carrying MPEG-1 Layer II audio while preserving its accepted raw-video mode. It will also document a bounded hardware sequence for the six deliberately unsupported corpus cases and the full-length audio-video soak. No FPGA RTL or MiSTer Main change is planned because the current FPGA image already accepts both PCM rate modes and the outstanding evidence concerns host production, recoverable rejection and long-duration alignment.
+
+#### Next Steps:
+
+Require two byte-identical static ARM EABI5 helper builds with the official compiler, clean native and compatibility-corpus regressions at both audio rates, deterministic short audio-video Program Stream generation, a checker PASS on that stream and successful helper demux and PCM transport before committing. Then generate the full-length Program Stream from the local Big Buck Bunny source and place it with the six failure cases for MiSTer validation; hardware acceptance requires every bad case to fail without wedging and immediate recovery through a known-good file, followed by complete full-movie playback with stable audio-video alignment and zero audio or aggregate error telemetry.
+
+#### Files Modified:
+
+- host/arm/media_player_protocol.h
+- tools/streams/generate_arm_av_test.py
+- tools/streams/generate_test_big_buck_bunny.py
+- tools/streams/verify_arm_av_pipeline.py
+- docs/TEST_INSTRUCTIONS.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 431 COMMIT Unreleased 1102830 2026-08-24T04:50:33-07:00
 
 #### Coming From:
@@ -1144,34 +1176,6 @@ After a reboot, unannotated `06_p_f_code_range.m2v` passes with USER steady on, 
 #### Next Steps:
 
 Reboot and run unannotated `04_b_bidirectional.m2v`, report all three LEDs and leave the final image loaded for capture. Require zero timestamp associations, three reference plus two B pictures displayed with four swaps at normal free-running cadence, sequence-end quiet, presentation complete, zero errors and complete reorder-scheduler retirement; if it passes, mark source `9a7a982` hardware-passed and begin the PCM feature cycle.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 392 COMMIT Unreleased 9a7a982 2026-08-23T21:51:18-07:00
-
-#### Coming From:
-
-Unreleased 9a7a982
-
-#### Purpose:
-
-Hardware-qualify timestamp association and presentation across reordered B-picture scratch and reference ownership.
-
-#### Outcome:
-
-After a reboot, `16A_pts_reordered_b_short.m2v` passes with USER steady on, DISK steady off and POWER steady on. The launch-free schema-seven snapshot accepts the exact 185,149 decoder bytes after stripping five metadata records, associates all five timestamps, decodes three reference and two B pictures, and displays all five pictures with four swaps. Sequence end, session quiet and presentation complete are true; decoder and presentation error flags are zero; frame waiting and both holds are false; and the terminal scheduler has no reorder, run-closed, decode-inflight, scratch, future-reference, queued, promotion, pending-frame or terminal-boundary work remaining. The final decoded picture is B type with temporal reference three while displayed PTS low bits are `0x110`, the final display-order future reference's timestamp, proving that presentation timestamps follow physical-bank ownership and display order rather than decode completion order. The irregular gaps include 0.040088 and 0.016579 seconds through B-picture reordering followed by the expected 0.215530-second wait for the final future reference. This closes the reordered-B timestamp gate on source `9a7a982` and the exact Entry-389 RBF without a source change.
-
-#### Next Steps:
-
-Reboot and run unannotated `06_p_f_code_range.m2v`, report all three LEDs and leave the final image loaded for capture, then repeat after another reboot with unannotated `04_b_bidirectional.m2v`. Require both files to preserve their accepted free-running fallback cadence and terminal state without in-band timestamp records; if both pass, mark source `9a7a982` hardware-passed and begin the PCM feature cycle.
 
 #### Files Modified:
 
