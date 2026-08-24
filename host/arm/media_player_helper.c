@@ -648,6 +648,177 @@ static int parse_pes_header(const uint8_t *packet, size_t size,
     return 0;
 }
 
+struct h262_preflight {
+    uint32_t window;
+    uint8_t sequence_payload[4];
+    unsigned sequence_payload_size;
+    int accepted;
+};
+
+/*
+ * Validate the first sequence header before the normal demux path can emit
+ * either video or decoded PCM.  Keeping this scanner outside output_state is
+ * intentional: Program Stream preflight is a read-only pass followed by a
+ * rewind, so even explicit --video-out/--pcm-out operation remains atomic.
+ */
+static int h262_preflight_feed(struct h262_preflight *preflight,
+                               const uint8_t *data, size_t size)
+{
+    size_t i;
+
+    for (i = 0; i < size && !preflight->accepted; ++i) {
+        if (preflight->sequence_payload_size) {
+            unsigned offset = preflight->sequence_payload_size - 1;
+            unsigned frame_rate_code;
+
+            preflight->sequence_payload[offset] = data[i];
+            preflight->sequence_payload_size++;
+            if (preflight->sequence_payload_size != 5)
+                continue;
+            frame_rate_code = preflight->sequence_payload[3] & 0x0f;
+            if (frame_rate_code < 1 || frame_rate_code > 5) {
+                fprintf(stderr,
+                        "media_player_helper: unsupported H.262 frame rate "
+                        "code %u (supported: codes 1 through 5, at most 30 fps)\n",
+                        frame_rate_code);
+                return -1;
+            }
+            preflight->accepted = 1;
+            continue;
+        }
+        preflight->window = (preflight->window << 8) | data[i];
+        if (preflight->window == 0x000001b3u)
+            preflight->sequence_payload_size = 1;
+    }
+    return 0;
+}
+
+static int preflight_program_stream(struct media_source *input)
+{
+    struct h262_preflight preflight = {0};
+    int video_code = -1;
+
+    while (!preflight.accepted) {
+        uint8_t code;
+        int found = find_start_code(input, &code);
+
+        if (found <= 0)
+            break;
+        if (code == 0xb9)
+            break;
+        if (code == 0xba) {
+            uint8_t header[10];
+            if (read_exact(input, header, 1) < 0)
+                return -1;
+            if ((header[0] & 0xc0) == 0x40) {
+                if (read_exact(input, header + 1, 9) < 0 ||
+                    skip_bytes(input, header[9] & 7) < 0)
+                    return -1;
+            } else if ((header[0] & 0xf0) == 0x20) {
+                if (read_exact(input, header + 1, 7) < 0)
+                    return -1;
+            } else {
+                fprintf(stderr, "media_player_helper: invalid pack header\n");
+                return -1;
+            }
+            continue;
+        }
+        if ((code & 0xf0) == 0xe0) {
+            uint8_t length_bytes[2];
+            uint8_t *packet;
+            size_t length;
+            size_t payload_offset;
+            uint64_t pts;
+            int has_pts;
+            int result = 0;
+
+            if (read_exact(input, length_bytes, sizeof(length_bytes)) < 0)
+                return -1;
+            length = ((size_t)length_bytes[0] << 8) | length_bytes[1];
+            if (!length) {
+                fprintf(stderr,
+                        "media_player_helper: unbounded PES packets are not supported\n");
+                return -1;
+            }
+            packet = malloc(length);
+            if (!packet) {
+                fprintf(stderr, "media_player_helper: out of memory\n");
+                return -1;
+            }
+            if (read_exact(input, packet, length) < 0) {
+                fprintf(stderr, "media_player_helper: truncated PES packet\n");
+                free(packet);
+                return -1;
+            }
+            if (video_code < 0)
+                video_code = code;
+            if (video_code == code) {
+                if (parse_pes_header(packet, length, &payload_offset, &pts,
+                                     &has_pts) < 0) {
+                    fprintf(stderr,
+                            "media_player_helper: invalid PES header for stream 0x%02x\n",
+                            code);
+                    result = -1;
+                } else {
+                    result = h262_preflight_feed(&preflight,
+                                                 packet + payload_offset,
+                                                 length - payload_offset);
+                }
+            }
+            free(packet);
+            if (result < 0)
+                return -1;
+            continue;
+        }
+        {
+            uint8_t length_bytes[2];
+            size_t length;
+            if (read_exact(input, length_bytes, sizeof(length_bytes)) < 0)
+                return -1;
+            length = ((size_t)length_bytes[0] << 8) | length_bytes[1];
+            if (skip_bytes(input, length) < 0)
+                return -1;
+        }
+    }
+    if (preflight.accepted)
+        return 0;
+    fprintf(stderr, "media_player_helper: no H.262 sequence header found\n");
+    return -1;
+}
+
+static int preflight_elementary_stream(struct media_source *input)
+{
+    struct h262_preflight preflight = {0};
+    uint8_t buffer[16384];
+    size_t count;
+
+    while (!preflight.accepted &&
+           (count = media_source_read(input, buffer, sizeof(buffer))) != 0) {
+        if (h262_preflight_feed(&preflight, buffer, count) < 0)
+            return -1;
+    }
+    if (preflight.accepted)
+        return 0;
+    if (media_source_error(input))
+        return -1;
+    fprintf(stderr, "media_player_helper: no H.262 sequence header found\n");
+    return -1;
+}
+
+static int preflight_input(struct media_source *input, int is_program_stream)
+{
+    int result = is_program_stream ? preflight_program_stream(input) :
+                                     preflight_elementary_stream(input);
+
+    if (result < 0)
+        return -1;
+    if (media_source_rewind(input) < 0) {
+        fprintf(stderr, "media_player_helper: cannot rewind input after preflight\n");
+        return -1;
+    }
+    return 0;
+}
+
 static int process_pes(struct media_source *input, uint8_t code,
                        struct audio_state *audio,
                        struct output_state *output, int *video_code,
@@ -903,6 +1074,8 @@ int main(int argc, char **argv)
         goto done;
     }
     is_program_stream = !memcmp(signature, "\x00\x00\x01\xba", 4);
+    if (preflight_input(&input, is_program_stream) < 0)
+        goto done;
     output.scheduler_enabled = is_program_stream && !output.pcm;
     if (is_program_stream) {
         if (process_program_stream(&input, &audio, &output) < 0 ||

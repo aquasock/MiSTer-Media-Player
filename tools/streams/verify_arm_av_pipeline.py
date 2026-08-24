@@ -16,6 +16,52 @@ PCM_END_MARKER = b"\x00\x00\x01\xb6"
 RECORD_SIZE = 9
 
 
+def sequence_header(frame_rate_code: int) -> bytes:
+    """Return a minimal 720x480 H.262 sequence header for preflight tests."""
+    return b"\x00\x00\x01\xb3\x2d\x01\xe0" + bytes([0x20 | frame_rate_code])
+
+
+def split_sequence_program(reference_program: bytes, frame_rate_code: int) -> bytes:
+    """Build a tiny PS whose first sequence header crosses two video PES packets."""
+    if not reference_program.startswith(b"\x00\x00\x01\xba"):
+        raise RuntimeError("reference fixture has no MPEG Program Stream pack header")
+    first = reference_program[4]
+    if first & 0xc0 == 0x40:
+        pack_size = 14 + (reference_program[13] & 7)
+    elif first & 0xf0 == 0x20:
+        pack_size = 12
+    else:
+        raise RuntimeError("reference fixture has an invalid pack header")
+
+    def video_pes(payload: bytes) -> bytes:
+        body = b"\x80\x00\x00" + payload
+        return b"\x00\x00\x01\xe0" + len(body).to_bytes(2, "big") + body
+
+    header = sequence_header(frame_rate_code)
+    return (
+        reference_program[:pack_size]
+        + video_pes(header[:2])
+        + video_pes(header[2:])
+        + b"\x00\x00\x01\xb9"
+    )
+
+
+def require_rejected_without_output(
+    completed: subprocess.CompletedProcess[bytes], label: str,
+    output_paths: tuple[Path, ...] = (),
+) -> None:
+    stderr = completed.stderr.decode(errors="replace")
+    if completed.returncode == 0:
+        raise RuntimeError(f"{label} was accepted")
+    if completed.stdout:
+        raise RuntimeError(f"{label} emitted {len(completed.stdout)} transport bytes")
+    for path in output_paths:
+        if path.exists() and path.stat().st_size:
+            raise RuntimeError(f"{label} emitted {path.stat().st_size} bytes to {path}")
+    if "unsupported H.262 frame rate code" not in stderr:
+        raise RuntimeError(f"{label} did not report the frame-rate rejection: {stderr}")
+
+
 def strip_records(
     data: bytes, expected_sample_rate: int,
 ) -> tuple[bytes, list[int], bytes, int]:
@@ -243,6 +289,59 @@ def main() -> int:
         if failed.returncode == 0:
             raise RuntimeError("truncated Program Stream was accepted")
 
+        for frame_rate_code in range(1, 6):
+            supported_raw = temp / f"rate_code_{frame_rate_code}.m2v"
+            supported_copy = temp / f"rate_code_{frame_rate_code}.copy.m2v"
+            supported_raw.write_bytes(sequence_header(frame_rate_code))
+            supported = subprocess.run(
+                [str(args.helper), "--protocol", "1", "--source",
+                 f"file:{supported_raw}", "--video-out", str(supported_copy)],
+                capture_output=True,
+            )
+            if (supported.returncode or
+                    supported_copy.read_bytes() != supported_raw.read_bytes()):
+                raise RuntimeError(
+                    f"supported H.262 frame-rate code {frame_rate_code} failed"
+                )
+
+        for frame_rate_code in range(6, 9):
+            unsupported_raw = temp / f"rate_code_{frame_rate_code}.m2v"
+            unsupported_pcm = temp / f"rate_code_{frame_rate_code}.pcm"
+            unsupported_raw.write_bytes(sequence_header(frame_rate_code))
+            rejected = subprocess.run(
+                [str(args.helper), "--protocol", "1", "--source",
+                 f"file:{unsupported_raw}", "--pcm-out", str(unsupported_pcm)],
+                capture_output=True,
+            )
+            require_rejected_without_output(
+                rejected, f"raw H.262 frame-rate code {frame_rate_code}",
+                (unsupported_pcm,),
+            )
+
+        split_rate = temp / "split_rate_code_6.mpg"
+        split_rate.write_bytes(split_sequence_program(source, 6))
+        split_rejected = subprocess.run(
+            [str(args.helper), "--protocol", "1", "--source", f"file:{split_rate}"],
+            capture_output=True,
+        )
+        require_rejected_without_output(
+            split_rejected, "cross-PES H.262 frame-rate code 6"
+        )
+
+        envelope_rate = (
+            Path(__file__).resolve().parent
+            / "generated_compatibility" / "envelope" / "bad_rate_50.mpg"
+        )
+        envelope_pcm = temp / "bad_rate_50.pcm"
+        envelope_rejected = subprocess.run(
+            [str(args.helper), "--protocol", "1", "--source",
+             f"file:{envelope_rate}", "--pcm-out", str(envelope_pcm)],
+            capture_output=True,
+        )
+        require_rejected_without_output(
+            envelope_rejected, "compatibility bad_rate_50.mpg", (envelope_pcm,)
+        )
+
         raw_output = temp / "raw_copy.m2v"
         copied = subprocess.run(
             [str(args.helper), "--protocol", "1", "--source", f"file:{raw_video}",
@@ -292,6 +391,8 @@ def main() -> int:
         f"correlation {inband_correlation:.6f}"
     )
     print("errors: truncated Program Stream rejected")
+    print("rates: H.262 codes 1-5 accepted; 6-8 rejected before transport")
+    print("rates: cross-PES and compatibility-envelope rejection passed")
     print("compatibility: raw M2V copied byte-identically")
     print("protocol: capabilities stable; file URI equals legacy path")
     print("sources: missing/unknown rejected; dvd reserved without access")
