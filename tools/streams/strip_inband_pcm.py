@@ -24,16 +24,24 @@ PREFIX = b"\x00\x00\x01"
 PTS_MARKER = PREFIX + b"\xb0"
 PCM_MARKER = PREFIX + b"\xb1"
 PCM_END_MARKER = PREFIX + b"\xb6"
+GROUP_START_CODE = PREFIX + b"\xb8"
 RECORD_SIZE = 9
 
 
-def split_records(transport: bytes) -> tuple[bytes, bytes, int, int]:
-    """Return (video with timestamps, video alone, timestamp count, PCM count)."""
+def split_records(transport: bytes,
+                  per_gop: bool = False) -> tuple[bytes, bytes, int, int]:
+    """Return (video with timestamps, video alone, timestamp count, PCM count).
+
+    With *per_gop*, a timestamp is kept only when a group start code has been
+    passed since the last one was kept, which varies record density without
+    touching a single video byte.
+    """
     annotated = bytearray()
     plain = bytearray()
     timestamps = 0
     pcm = 0
     position = 0
+    group_open = True
     while position < len(transport):
         marker = transport.find(PREFIX, position)
         if marker < 0:
@@ -43,9 +51,13 @@ def split_records(transport: bytes) -> tuple[bytes, bytes, int, int]:
         annotated += transport[position:marker]
         plain += transport[position:marker]
         code = transport[marker:marker + 4]
+        if code == GROUP_START_CODE:
+            group_open = True
         if code == PTS_MARKER and marker + RECORD_SIZE <= len(transport):
-            annotated += transport[marker:marker + RECORD_SIZE]
-            timestamps += 1
+            if group_open or not per_gop:
+                annotated += transport[marker:marker + RECORD_SIZE]
+                timestamps += 1
+                group_open = False
             position = marker + RECORD_SIZE
         elif code == PCM_MARKER and marker + RECORD_SIZE <= len(transport):
             pcm += 1
@@ -65,6 +77,12 @@ def main() -> int:
     parser.add_argument("program", type=Path)
     parser.add_argument("target", type=Path)
     parser.add_argument(
+        "--timestamps",
+        choices=("all", "gop"),
+        default="all",
+        help="keep every timestamp record, or only the first of each group",
+    )
+    parser.add_argument(
         "--expect-video-sha256",
         default=None,
         help="hash the stream must reduce to once timestamps are removed too",
@@ -80,7 +98,9 @@ def main() -> int:
         sys.stderr.write(completed.stderr.decode(errors="replace"))
         raise SystemExit(f"helper failed ({completed.returncode})")
 
-    annotated, plain, timestamps, pcm = split_records(completed.stdout)
+    annotated, plain, timestamps, pcm = split_records(
+        completed.stdout, per_gop=args.timestamps == "gop"
+    )
     if not pcm:
         raise SystemExit("transport carries no PCM to remove")
     if not timestamps:
