@@ -76,6 +76,21 @@ def pcm_metrics(actual_path: Path, reference_path: Path) -> tuple[int, float, fl
     return maximum, rms, correlation
 
 
+def pcm_frame_boundary_jumps(path: Path) -> tuple[int, int]:
+    samples = array.array("h")
+    samples.frombytes(path.read_bytes())
+    if len(samples) % 2:
+        raise RuntimeError(f"odd stereo PCM sample count in {path}")
+    frames = len(samples) // 2
+    maximum = [0, 0]
+    for frame in range(1152, frames, 1152):
+        for channel in range(2):
+            before = samples[(frame - 1) * 2 + channel]
+            after = samples[frame * 2 + channel]
+            maximum[channel] = max(maximum[channel], abs(after - before))
+    return maximum[0], maximum[1]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("helper", type=Path)
@@ -84,11 +99,26 @@ def main() -> int:
         type=Path,
         default=Path(__file__).resolve().parent / "generated_arm_av",
     )
+    parser.add_argument(
+        "--profile",
+        choices=("short", "faded"),
+        default="short",
+    )
     args = parser.parse_args()
     raw_video = Path(__file__).resolve().parent / "test_b_bidirectional.m2v"
-    program = args.test_dir / "01_arm_mp2_audio.mpg"
-    reference_video = (args.test_dir / "reference_video.m2v").read_bytes()
-    reference_pcm = args.test_dir / "reference_audio.s16le"
+    if args.profile == "short":
+        program = args.test_dir / "01_arm_mp2_audio.mpg"
+        reference_video_path = args.test_dir / "reference_video.m2v"
+        reference_pcm = args.test_dir / "reference_audio.s16le"
+    else:
+        program = args.test_dir / "02_arm_mp2_faded_tones.mpg"
+        reference_video_path = args.test_dir / "reference_video_faded.m2v"
+        reference_pcm = args.test_dir / "reference_audio_faded.s16le"
+    # Near-silent fade regions magnify the small synthesis differences between
+    # minimp3 and FFmpeg, so retain the original limit for the short fixture and
+    # use a still-strong, profile-specific floor for the faded quality fixture.
+    minimum_correlation = 0.97 if args.profile == "short" else 0.965
+    reference_video = reference_video_path.read_bytes()
 
     capabilities = subprocess.run(
         [str(args.helper), "--capabilities"], text=True, capture_output=True,
@@ -126,10 +156,19 @@ def main() -> int:
         inband_maximum, inband_rms, inband_correlation = pcm_metrics(
             inband_pcm_path, reference_pcm
         )
-        if inband_correlation < 0.97 or end_count != 1:
+        inband_boundary_jumps = pcm_frame_boundary_jumps(inband_pcm_path)
+        reference_boundary_jumps = pcm_frame_boundary_jumps(reference_pcm)
+        boundary_limits = tuple(max(1024, jump * 3) for jump in reference_boundary_jumps)
+        if inband_correlation < minimum_correlation or end_count != 1:
             raise RuntimeError(
                 f"in-band PCM mismatch: max={inband_maximum}, rms={inband_rms:.4f}, "
                 f"correlation={inband_correlation:.6f}, end={end_count}"
+            )
+        if any(actual > limit for actual, limit in
+               zip(inband_boundary_jumps, boundary_limits)):
+            raise RuntimeError(
+                "in-band PCM discontinuity at MPEG audio frame boundary: "
+                f"actual={inband_boundary_jumps}, limits={boundary_limits}"
             )
 
         completed = subprocess.run(
@@ -151,13 +190,20 @@ def main() -> int:
         if not timestamps or timestamps != sorted(timestamps):
             raise RuntimeError(f"invalid video timestamps: {timestamps}")
         maximum, rms, correlation = pcm_metrics(helper_pcm, reference_pcm)
+        boundary_jumps = pcm_frame_boundary_jumps(helper_pcm)
         pcm_frame_count = helper_pcm.stat().st_size // 4
         # minimp3 and FFmpeg use different synthesis implementations, so their
         # integer samples are not bit-identical.  Strong waveform correlation,
         # equal length, and the channel-specific test tones prove useful decode.
-        if correlation < 0.97:
+        if correlation < minimum_correlation:
             raise RuntimeError(
                 f"PCM mismatch: max={maximum}, rms={rms:.4f}, correlation={correlation:.6f}"
+            )
+        if any(actual > limit for actual, limit in
+               zip(boundary_jumps, boundary_limits)):
+            raise RuntimeError(
+                "PCM discontinuity at MPEG audio frame boundary: "
+                f"actual={boundary_jumps}, limits={boundary_limits}"
             )
 
         legacy_video = temp / "legacy_video.m2v"
