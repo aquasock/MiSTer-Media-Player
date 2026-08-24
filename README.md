@@ -2,230 +2,213 @@
 
 An experimental media-player core for [MiSTer FPGA](https://github.com/MiSTer-devel/Main_MiSTer), with a standards-driven MPEG-2 Video / ITU-T H.262 decoder implemented primarily in FPGA logic.
 
-> **Development status:** active, pre-release, developer-oriented. **v0.6.0 is the current published hardware-qualified milestone.** It sustains real-stream progressive 4:2:0 I/P/B decoding at 720x480, adds native 23.976/24/25 fps presentation cadence, and fixes the GOP-boundary stutters, large-picture starvation, and end-of-stream stalls found during full-length playback testing. Current v0.7.0 development additionally hardware-qualifies native 29.97 and 30 fps cadence plus bounded MPEG-2 Program Stream / video PES input. Audio, real PTS scheduling, DVD support, playback controls, and broader H.262 coverage remain future work.
+> **Development status:** active, pre-release, developer-oriented. **v0.7.0 is the current hardware-qualified milestone.** It adds bounded MPEG-2 Program Stream input, MPEG Layer II audio, real Program Stream picture-PTS scheduling, native frame-rate codes 1 through 5, and a MiSTer ARM helper while preserving raw MPEG-2 Video elementary-stream playback.
 
 ## Current status
 
-The active decoder is a clean H.262 implementation under `rtl/mpeg2_new/`. v0.6.0 provides:
+The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`. v0.7.0 provides:
 
-- streaming raw MPEG-2 Video elementary-stream input through a 16-bit MiSTer host ingress and 32 KiB mixed-width asynchronous FIFO with backpressure;
-- a 60 MHz decoder clock domain, independently timed from the 40 MHz diagnostic video domain;
-- picture, slice, macroblock, block, and DCT VLC parsing for the supported paths;
-- inverse quantization and fixed-point two-pass 8x8 IDCT;
-- full 8-bit Y, Cb, and Cr intra reconstruction;
-- two retained planar MiSTer DDR3 frame banks for I/P ping-pong/reference ownership plus a separate B scratch region;
-- explicit DDR arbitration, DDR3 readback through small line caches, display-region write protection, and blanking-aligned frame publication;
-- 4:2:0 chroma expansion and limited-range BT.601 YCbCr-to-RGB presentation;
-- continuous supported all-I picture decode using one re-armed parser;
-- P-picture reference ownership, publication, consecutive reconstructed-P reference promotion, and destination-ownership pacing;
-- syntax-derived per-macroblock P forward motion with independently signaled horizontal/vertical `f_code` values from 1 through 9, signed vectors, predictor reuse/reset, integer and half-sample interpolation, H.262 wraparound, and 4:2:0 chroma-vector scaling;
-- syntax-derived 4:2:0 coded-block-pattern selection across Y0/Y1/Y2/Y3/Cb/Cr;
-- generalized non-intra P coefficient handling including ordinary run/level VLCs, non-zero runs, signs, EOB, Escape syntax, q_scale_type, alternate_scan, and quantiser-scale changes;
-- prediction-plus-residual reconstruction, clipping, DDR persistence/readback, and generalized P-picture re-arm;
-- bounded B-picture reconstruction with independently signaled forward/backward horizontal/vertical `f_code` values from 1 through 5, forward/backward/bidirectional prediction, internal macroblock skips, residual reconstruction, scratch persistence, and coded-order/display-order presentation handling;
-- overlapped reference decode and B-picture presentation with corrected ownership, publication, terminal-reference release, and blanking-aligned frame swaps;
-- native presentation pacing for H.262 frame-rate codes 1, 2, and 3: `24000/1001`, exact 24 fps, and 25 fps;
-- a 33-bit / 90 kHz synthetic elementary-stream timeline derived from H.262 frame-rate information and `temporal_reference`.
+- raw MPEG-2 Video elementary-stream playback and a bounded H.222.0 MPEG-2 Program Stream path for `.mpg` and `.mpeg` files;
+- a matching ARM helper that demultiplexes Program Streams, decodes MPEG Layer II audio to signed stereo PCM, and transports video, picture PTS, and PCM to the FPGA;
+- byte-exact raw `.m2v` pass-through with a synthetic 90 kHz fallback timeline;
+- Program Stream picture PTS driving the FPGA 90 kHz presentation timeline;
+- cadence as a mandatory floor: PTS may delay a picture but never presents it earlier than its encoded H.262 frame cadence;
+- hardware-qualified H.262 frame-rate codes 1 through 5: `24000/1001`, exact 24, 25, `30000/1001`, and exact 30 fps;
+- MPEG Layer II audio at 44.1 kHz and 48 kHz through an 8,192-frame stereo PCM FIFO;
+- a clean-video queue so decoder backpressure cannot prevent timely PCM delivery;
+- continuous progressive 4:2:0 I/P/B decoding, retained DDR3 reference banks, separate B scratch storage, and coded-order/display-order presentation;
+- full 8-bit Y, Cb, and Cr reconstruction with limited-range BT.601 presentation;
+- clean Program Stream and raw-stream terminal handling, including reordered-picture flush and one explicit PCM end marker.
 
-The current v0.7.0 development branch extends native presentation pacing to H.262 frame-rate codes 4 and 5: exact `30000/1001` (29.97 fps) and exact 30 fps. Both rates have passed focused scheduler proofs, timing-clean synthesis, direct MiSTer cadence measurements, and the established four-stream hardware regression gate.
+The supported subset is intentionally bounded while the architecture is being proven. These are implementation limits, not limits of H.262 or H.222.0.
 
-v0.7.0 development also adds a bounded H.222.0 MPEG-2 Program Stream ingress path. It auto-detects MPEG-2 pack headers, validates and removes bounded PES framing, selects one video stream ID, skips other declared packets, and feeds the extracted video bytes into the unchanged H.262 decoder. Matched raw `.m2v` and `.mpg` hardware controls complete the same 120 pictures with identical decoder-side byte and picture counts and zero errors. Raw elementary streams remain an exact pass-through mode.
-
-The current implementation subset remains intentionally bounded while the decoder architecture is being proven. These are implementation limits, **not** limits of H.262.
-
-| Area | Current implementation |
+| Area | v0.7.0 implementation |
 | --- | --- |
-| Input | Raw MPEG-2 Video elementary stream (`.m2v`) or the bounded v0.7.0 MPEG-2 Program Stream / video PES subset (`.mpg`); no audio decode or timestamp-driven presentation yet |
-| Picture type | Continuous supported I pictures; generalized hardware-proven P regression path; bounded hardware-proven B regression/presentation path |
-| Picture structure | Progressive frame pictures on the proven paths |
-| Chroma format | 4:2:0 |
-| Proven geometry | Up to 720x480 / 45x30 macroblocks for the authoritative I, P, and B regression paths |
-| Presentation rates | H.262 frame-rate codes 1..5: `24000/1001`, exact 24 fps, 25 fps, `30000/1001`, and exact 30 fps |
-| Generalized P motion envelope | Independently signaled horizontal/vertical `f_code` 1..9, signed vectors, predictor reuse/reset and wraparound, integer/H/V/bilinear half-sample prediction |
-| Generalized P residual envelope | Up to 32 coded residual blocks and 64 non-zero coefficient events per picture; implementation caps |
-| B regression envelope | Independently signaled forward/backward H/V `f_code` 1..5, forward/backward/bidirectional prediction, internal skips, bounded residuals, B scratch storage, and display reordering; deterministic range regressions cover 1..4 |
-| Reconstruction precision | 8-bit Y/Cb/Cr |
-| Frame storage | Two retained planar MiSTer DDR3 I/P frame banks plus a distinct B scratch region |
-| Compressed-data buffering | 16-bit host ingress into a 32 KiB mixed-width asynchronous FIFO; 8-bit decoder consumption |
-| Timing metadata | Synthetic elementary-stream 33-bit / 90 kHz schedule; Program Stream timestamp fields are validated but do not yet drive presentation |
+| Input | Raw MPEG-2 Video `.m2v`, or bounded MPEG-2 Program Stream `.mpg` / `.mpeg` through the ARM helper |
+| Video | Progressive frame pictures, 4:2:0 chroma, qualified through 720x480 / 45x30 macroblocks |
+| Picture types | Continuous supported I/P/B decode and coded-order/display-order presentation |
+| Presentation rates | H.262 frame-rate codes 1..5; codes 6..8 are rejected before transport |
+| Program Stream timing | Picture PTS on a 33-bit / 90 kHz FPGA timeline with cadence-floor enforcement |
+| Raw-stream timing | Synthetic 33-bit / 90 kHz cadence derived from H.262 frame-rate metadata |
+| Audio | MPEG Layer II decoded by the helper; 44.1 or 48 kHz; stereo hardware-qualified |
+| Audio buffering | Packed signed PCM records into an 8,192-frame stereo FPGA FIFO |
+| Frame storage | Two retained planar MiSTer DDR3 I/P banks plus a distinct B scratch region |
 | Video output | Fixed 800x600 diagnostic timing |
 
-The frozen `rtl/mpeg2fpga/` tree remains only as a historical/reference implementation and is not part of the active Quartus build.
+The frozen `rtl/mpeg2fpga/` tree remains historical reference material and is not part of the active Quartus build.
 
-### v0.6.0 qualification
+## Installation
 
-The accepted synthesized source baseline is commit `b64ec6a`. A preserved incremental build and an independent clean/from-scratch Quartus 17.0.2 build produced the same 4,455,376-byte RBF, with SHA-256 `e95e9ec43cb11917d5a904fdd8016bcc23dcbe2d8f36f678544f42ad1a6d5f10`.
+v0.7.0 requires three matching runtime files. Back up the existing files before replacing them.
 
-The clean build completed with zero errors and positive timing in every required category: +0.303 ns global setup, +0.386 ns decoder setup, +8.066 ns video setup, +0.244 ns hold, +3.706 ns recovery, +0.768 ns removal, and +1.122 ns minimum pulse width. It uses 34,565 ALMs, 50,960 registers, 4,306,375 block-memory bits, 538 RAM blocks, and 65 DSP blocks.
+| Release file | MiSTer destination |
+| --- | --- |
+| `MediaPlayer_20260824.rbf` | `/media/fat/MediaPlayer_20260824.rbf` |
+| `MiSTer` | `/media/fat/MiSTer` |
+| `linux/MediaPlayer_Helper` | `/media/fat/linux/MediaPlayer_Helper` |
 
-Hardware qualification includes:
+The helper must be executable. Reboot after installing the matching Main executable. Mixing v0.7.0 components with a different Main, helper, or RBF is unsupported.
 
-- deterministic P skip/motion, B prediction, multi-slice, and large-picture/long-GOP regression streams;
-- a 15-second native-24-fps stress clip spanning the high-motion Big Buck Bunny scene that originally exposed dropped frames;
-- the complete native-rate Big Buck Bunny movie, including pans, high-motion scenes, transitions, and rolling credits;
-- a complete 642 MB real-world 720x480 progressive `24000/1001` stream, manually selected through the normal MiSTer file menu.
+## Release qualification
 
-All four focused hardware regressions passed with complete byte and picture counts, sequence-end completion, and zero decoder errors. The long cadence stress clip additionally reported zero cadence outliers. Both full-length streams were accepted by human visual inspection with smooth motion and no perceptible speed error.
+The qualified FPGA source baseline is commit `9a5eea3`; the host/helper source baseline is commit `acdbf8b`. Later release-documentation commits do not alter those binaries.
 
-### Current v0.6.0 boundaries
+A clean Quartus Prime 17.0.2 build reproduced the already accepted RBF byte-for-byte:
 
-- H.262 frame-rate codes 4 through 8 (29.97, 30, 50, 59.94, and 60 fps) are not cadence-paced and are not supported by this milestone.
-- Interlaced picture structures, chroma formats other than 4:2:0, audio, multiplexed containers, Program Stream/PES transport, and real PTS are not implemented.
-- Seeking, scrubbing, pause/resume, and DVD navigation are not implemented.
-- Full-length files should be opened through the normal MiSTer file menu. Automatic MGL injection of a 642 MB test file did not enter the normal streaming path and is not a qualified loading method.
+- size: 4,184,380 bytes;
+- SHA-256: `484328e51c6e764890bf2bdcd947448e2eaaaac2c603e93da28009475e44dafc`;
+- Quartus errors: 0;
+- global setup: +0.311 ns;
+- global hold: +0.238 ns;
+- global recovery: +3.365 ns;
+- global removal: +0.497 ns;
+- minimum pulse width: +1.122 ns;
+- decoder setup: +1.782 ns with no violations;
+- decoder recovery: +11.294 ns with no violations;
+- video setup: +8.284 ns with no violations.
 
-For the active v0.7.0 development branch, frame-rate codes 4 and 5 have moved out of that v0.6.0 boundary. Codes 6 through 8 (50, 59.94, and 60 fps) remain unsupported.
+Two independent ARM helper builds were byte-identical at 361,452 bytes with SHA-256 `c99237246416ecd8278d90ff6e15e7a00cd8ab1d49c960b8c77fbe00f4ba0483`. Two independent patched-Main builds were byte-identical at 1,166,244 bytes with SHA-256 `16517a9927c659616796b45c8e2488da2a26f0595c91418ed09dc0eb7a5787aa`.
+
+Native and sanitized host qualification covers exact video preservation, PTS placement, 44.1/48 kHz PCM output, video-only input, unsupported input rejection, clean terminal behavior, recovery without reboot, bounded batching, and the full 14,315-picture audio-video soak.
+
+The final four-file MiSTer release gate is:
+
+1. `00_good_480p_48k.mpg` — normal 48 kHz audio-video startup.
+2. `02_good_video_only.mpg` — video-only Program Stream.
+3. `01_good_480p_44k.mpg` — 44.1 kHz recovery immediately after silent playback.
+4. `20_bbb_full_48k.mpg` — complete audio-video cadence and endurance soak.
 
 ## Releases
 
-Milestone releases use semantic-version tags on GitHub. MiSTer RBF assets retain the normal date-coded core naming convention.
+Milestone releases use semantic-version tags on GitHub. RBF assets retain the normal MiSTer date-coded naming convention.
 
-Current published milestone:
+Current milestone:
 
-- **v0.6.0** — sustained 720x480 progressive 4:2:0 real-stream I/P/B decoding, native `24000/1001`/24/25-fps cadence, 60 MHz decode, 32 KiB mixed-width compressed-data buffering, corrected GOP and terminal presentation behavior, and full-length hardware playback qualification; binary asset `MediaPlayer_20260822.rbf`.
+- **v0.7.0** — bounded Program Stream input, real picture PTS, MPEG Layer II audio through the ARM helper, native 23.976/24/25/29.97/30-fps cadence, clean video/PCM queuing, and full-length audio-video playback; binary `MediaPlayer_20260824.rbf`.
 
-Previous published milestone:
+Previous milestone:
 
-- **v0.5.0** — 720x480 progressive 4:2:0 I/P/B regression coverage, generalized P/B motion-vector `f_code` 1-through-4 handling, full-width P parser/raster completion, and settled post-stream diagnostics; binary asset `MediaPlayer_20260817.rbf`.
+- **v0.6.0** — sustained progressive 720x480 real-stream I/P/B playback with native 23.976/24/25-fps cadence; binary `MediaPlayer_20260822.rbf`.
 
-The v0.5.0 release qualification checkout is commit `424eec43b0d0b4f8085e6591a15543eafab394e7`, whose synthesized RTL baseline is `b1bde49df3831669b577a1ed78404e026f19382d`. It passed a fresh-clone Quartus Prime 17.0.2 build and the authoritative seven-stream MiSTer regression matrix before the documentation-only release commits were applied.
+See [the v0.7.0 release notes](docs/RELEASE_NOTES_v0.7.0.md) for asset hashes, qualification details, and known limits.
 
-See [`docs/RELEASE_NOTES_v0.6.0.md`](docs/RELEASE_NOTES_v0.6.0.md) for the current release notes and qualification details. The [v0.5.0 release notes](docs/RELEASE_NOTES_v0.5.0.md) remain available for the previous milestone.
+## Converting media with FFmpeg
 
-## Converting test media with FFmpeg
-
-v0.6.0 accepts raw progressive 720x480 4:2:0 MPEG-2 Video elementary streams. The following no-frame-counter command is the same encoding recipe used for the accepted full-length Big Buck Bunny test. Replace `input.mp4` and `output.m2v` with your own paths:
+The preferred v0.7.0 format is a bounded MPEG-2 Program Stream containing progressive 720x480 4:2:0 MPEG-2 Video and MPEG Layer II stereo audio. This exact-24-fps, 48 kHz recipe is a suitable starting point:
 
 ```bash
 ffmpeg -hide_banner -y \
   -i "input.mp4" \
-  -map 0:v:0 -an \
+  -map 0:v:0 -map 0:a:0 \
   -vf "fps=24,scale=720:480:force_original_aspect_ratio=decrease:flags=bicubic,pad=720:480:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1" \
-  -c:v mpeg2video \
-  -pix_fmt yuv420p \
-  -threads 1 \
-  -flags +bitexact \
-  -g 24 \
-  -bf 2 \
-  -q:v 6 \
-  -qmin 2 \
-  -qmax 12 \
-  -sc_threshold 1000000000 \
-  -mpv_flags +strict_gop \
-  -f mpeg2video \
-  "output.m2v"
+  -c:v mpeg2video -pix_fmt yuv420p -threads 1 -flags +bitexact \
+  -g 24 -bf 2 -q:v 6 -qmin 2 -qmax 12 \
+  -sc_threshold 1000000000 -mpv_flags +strict_gop \
+  -c:a mp2 -ar 48000 -ac 2 -b:a 192k \
+  -f vob "output.mpg"
+
+python3 tools/streams/finalize_program_stream.py "output.mpg"
+python3 tools/streams/check_media_compatibility.py "output.mpg"
 ```
 
-The `fps=24` filter deliberately produces an exact-24-fps stream, one of the three rates paced by v0.6.0. The scale and pad filters preserve the source aspect ratio inside the 720x480 frame, and `-an` removes audio because this core currently accepts video only. Use a progressive source; interlaced input must be deinterlaced before conversion.
-
-Some FFmpeg versions omit the H.262 sequence-end code required for the final reordered pictures to flush and for the core to settle cleanly. On Linux or macOS, run this after the encode; it appends the marker only when it is missing:
-
-```bash
-if [ "$(tail -c 4 "output.m2v" | od -An -tx1 | tr -d ' \n')" != "000001b7" ]; then
-  printf '\x00\x00\x01\xb7' >> "output.m2v"
-fi
-```
-
-Copy the resulting `.m2v` file to the MiSTer and open it through the normal Media Player file menu. Frame-rate codes 1 (`24000/1001`), 2 (exact 24), and 3 (25 fps) are paced; this recipe uses exact 24 fps for consistent user testing.
+Use `-an` and omit the audio codec options for a video-only Program Stream. Raw `.m2v` elementary streams remain supported. The finalizer supplies the required H.262 sequence-end and Program Stream end markers when absent; the compatibility checker must pass before copying a file to the MiSTer.
 
 ## Architecture
 
-The current data path is:
-
 ```text
-HPS / MiSTer file data
-        |
-        v
-async MPEG input FIFO
-        |
-        v
-raw pass-through or bounded Program Stream / video PES ingress
-        |
-        v
-H.262 parser / bitreader / VLC decode
-        |
-        +----------------------+----------------------+
-        |                      |                      |
-        v                      v                      v
-intra reconstruction    P prediction + residual    B prediction + residual
-        |                      |                      |
-        +----------+-----------+                      |
-                   |                                  v
-                   |                            B scratch DDR
-                   |                                  |
-                   +------------------+---------------+
-                                      |
-                                      v
-                  retained I/P DDR reference banks + presentation scheduler
-                                      |
-                                      v
-                 DDR arbitration -> line caches -> 4:2:0 expansion -> BT.601 RGB
-                                      |
-                                      v
-                 blanking-aligned publication/reorder -> MiSTer video output
+MiSTer Main file selection
+          |
+          v
+MediaPlayer_Helper
+Program Stream demux / MP2 decode / picture PTS
+          |
+          v
+packed video + PTS + PCM transport
+          |
+          +-----------------------+
+          |                       |
+          v                       v
+clean-video queue          8,192-frame PCM FIFO
+          |                       |
+          v                       v
+H.262 FPGA decoder       MiSTer stereo audio output
+          |
+          v
+DDR reference/B-scratch storage
+          |
+          v
+cadence floor + 90 kHz PTS scheduler
+          |
+          v
+blanking-aligned 800x600 video output
 ```
 
-A sideband timing path derives a 33-bit / 90 kHz presentation schedule from H.262 frame-rate metadata and cadence-paces frame-rate codes 1 through 5. Program Stream PES timestamp fields are structurally validated but do not yet drive this schedule, so it is deliberately not described as PTS timing.
+Raw `.m2v` files bypass Program Stream demux and audio decoding while retaining the same FPGA H.262 path.
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for architectural background and [`docs/MPEG2_NEW_DECODER.md`](docs/MPEG2_NEW_DECODER.md) for the decoder development record.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`host/arm/ARCHITECTURE.md`](host/arm/ARCHITECTURE.md) for design details.
 
 ## Building
 
-The Quartus project is `MediaPlayer.qpf` and targets Quartus Prime 17.0.x.
+The FPGA project targets Quartus Prime 17.0.x:
 
 ```bash
 quartus_sh --flow compile MediaPlayer
 quartus_sta -t tools/phase1p_timing.tcl
 ```
 
-Release candidates are accepted only after a clean/from-scratch Quartus build, the standard Phase 1P timing reports, and the required MiSTer hardware regression tests all pass for the candidate RTL. The v0.6.0 release also had to reproduce its previously accepted incremental RBF byte-for-byte before the clean image was treated as qualified.
+Build the ARM helper and matching patched Main with the ARM GNU 10.2 compiler used by MiSTer Main:
 
-See [`docs/BUILDING.md`](docs/BUILDING.md) for the full workflow.
+```bash
+ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc host/build_arm_stack.sh --arm
+ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc host/build_arm_stack.sh --main
+```
+
+The build script pins the minimp3 revision, MiSTer Main revision, dependency hashes, and Main patch. Release candidates require reproducible FPGA, helper, and Main binaries plus host and MiSTer regression evidence.
+
+## Known limitations
+
+- Program Stream support is bounded; MPEG Transport Stream, DVD/VOB navigation, private-stream audio, subpictures, and arbitrary systems-layer layouts are not supported.
+- Audio is MPEG Layer II only at 44.1 or 48 kHz. Other codecs and sample rates are rejected.
+- Progressive 4:2:0 video is qualified through 720x480. Interlaced pictures and other chroma formats are outside the release envelope.
+- H.262 frame-rate codes 6 through 8 (50, 59.94, and 60 fps) are rejected.
+- Seeking, scrubbing, pause/resume, DVD navigation, and optical-drive integration are not implemented.
+- Output remains the fixed 800x600 engineering presentation path rather than a consumer playback interface.
+- Files should be opened through the normal MiSTer file menu; MGL injection is not a qualified loading method.
 
 ## Diagnostic streams
 
-Binary regression streams are generated locally from deterministic scripts under `tools/streams/`. The v0.6.0 focused four-test hardware gate covers P skip/motion, B prediction, repeated multi-slice pictures, and the native-rate high-motion scene that exposed large-picture starvation. The complete native-rate Big Buck Bunny movie and a separate full-length real-world `24000/1001` stream provide the visual endurance gate.
+Generated binary media remains local and is not included in the public release. The four release-gate Program Streams are reproducible through the committed generators and are identified by SHA-256 in the release notes.
 
-The underlying authoritative seven-stream decoder matrix is:
-
-- `test_i_baseline.m2v` for continuous full-width all-I decoding;
-- `test_p_motion_residual.m2v` for P motion phases, coded-block patterns, residual reconstruction, and quantiser changes;
-- `test_p_mba_escape.m2v` for ordinary and escaped macroblock-address gaps, including leading skips;
-- `test_b_bidirectional.m2v` for mixed I/P/B coded/display order, forward/backward/bidirectional motion, residuals, and predictor independence;
-- `test_p_visual_discriminator.m2v` for visible P-frame publication, identified by four quadrants and two center seams;
-- `test_p_f_code_range.m2v` for independent P horizontal/vertical `f_code` values 1 through 4, residual bits, signs, reuse, and wraparound;
-- `test_b_f_code_range.m2v` for independent B forward/backward horizontal/vertical `f_code` values 1 through 4 across two B reference pairs.
-
-The USER LED is used as a positive completion diagnostic during development. Its exact gating is not a public player UI.
+The USER LED is the top-level completion diagnostic. For successful v0.7.0 runs, USER and POWER remain solid while DISK may report its final progress code. Exact schema-nine telemetry and all three LEDs are captured for every release-gate run.
 
 ## Project layout
 
-- `MediaPlayer.sv` and `MediaPlayer_top_*.svh` — MiSTer top-level glue, decoder integration, ownership, and presentation scheduling.
-- `rtl/mpeg2_new/` — active standards-driven H.262 decoder pipeline.
+- `MediaPlayer.sv` and `MediaPlayer_top_*.svh` — MiSTer top-level integration, transport, queues, audio, and presentation scheduling.
+- `rtl/mpeg2_new/` — active H.262 decoder pipeline.
 - `rtl/mpeg2_luma_framebuffer.sv` — DDR-backed frame readback and video-side line caching.
+- `host/arm/` — ARM helper, media source, and packed transport protocol.
+- `host/main_mister/` — pinned patch adding helper-based media loading to MiSTer Main.
+- `tools/streams/` — deterministic media generation, finalization, compatibility, and transport analysis.
 - `rtl/mpeg2fpga/` — frozen legacy reference; inactive in `files.qip`.
-- `sys/` — MiSTer framework.
-- `tools/` — timing scripts and deterministic diagnostic-stream generators.
-- `docs/` — architecture, building, decoder, and release documentation.
-- `files.qip` — authoritative active RTL source list for Quartus.
+- `docs/` — architecture, building, testing, and release documentation.
 
 ## Development roadmap
 
-The active v0.7.0 branch broadens the qualified progressive cadence path through native 29.97 and 30 fps and adds bounded H.222.0 MPEG-2 Program Stream / video PES ingress while preserving raw `.m2v` playback. Further decoder work can extend that path toward 50/59.94/60 fps, interlaced picture structures, additional chroma formats, and a wider real-stream syntax envelope. Later work includes presentation-quality chroma improvements, real PTS-driven timing, broader systems-stream handling, audio integration, playback controls, and DVD navigation/optical-drive integration.
+Future work can extend the qualified envelope toward 50/59.94/60 fps, interlaced structures, broader Program Stream handling, additional audio codecs, improved chroma presentation, playback controls, seeking, DVD navigation, and optical-drive integration.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for completed milestones.
 
 ## Standards and design policy
 
-Video syntax and decoding behavior are developed against **ITU-T H.262 / ISO/IEC 13818-2**. Systems/program-stream work uses **ITU-T H.222.0 / ISO/IEC 13818-1**.
+Video syntax and decoding behavior are developed against **ITU-T H.262 / ISO/IEC 13818-2**. Program Stream, PES, and timing work uses **ITU-T H.222.0 / ISO/IEC 13818-1**. MPEG Layer II decode is performed by the pinned minimp3 dependency.
 
-Implementation constraints, diagnostic-stream limits, synthetic elementary-stream timing, and temporary engineering shortcuts are implementation choices rather than MPEG-2 requirements.
+Implementation constraints, qualification limits, and engineering diagnostics are implementation choices rather than MPEG standard requirements.
 
-## AI-assisted development in v0.6.0
+## AI-assisted development
 
-I am also going to formally expose the **AI project-control system** I use to manage MiSTer-Media-Player as part of the upcoming v0.6.0 release, for anyone interested in experimenting with it.
+The **AI project-control system** used to manage MiSTer-Media-Player was formally exposed with the v0.6.0 milestone for contributors interested in experimenting with it.
 
-The `.ai` directory has actually been in the repository for quite a while and has been quietly driving most of the project's development. With v0.6.0, I want to start treating it as something contributors can experiment with rather than just my own internal workflow.
+The `.ai` directory had already been driving much of the project's development before v0.6.0 made it a documented contributor workflow.
 
 The basic idea is simple:
 
@@ -342,7 +325,7 @@ It is almost the opposite:
 
 **make the AI disposable, constrain what it is allowed to believe, preserve the engineering state outside the conversation, and require normal FPGA validation before anything becomes authoritative.**
 
-v0.6.0 will be the first release where I start treating this workflow itself as something the community can beta test.
+v0.6.0 was the first release to treat this workflow itself as something the community could beta test.
 
 ## Contributing
 

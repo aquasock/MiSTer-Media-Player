@@ -8,6 +8,28 @@ This project is still in active pre-release development. Published milestone rel
 
 No unreleased milestone changes yet.
 
+## [0.7.0] - 2026-08-24 — Program Stream audio and PTS milestone
+
+Hardware-qualified bounded MPEG-2 Program Stream playback with MPEG Layer II audio, real picture-PTS scheduling, and a matching MiSTer ARM helper.
+
+- Added a pinned, reproducible ARM helper that accepts raw MPEG-2 Video or bounded MPEG-2 Program Streams, preserves video bytes exactly, extracts picture PTS, decodes MPEG Layer II audio, and sends packed video/PTS/PCM records to the FPGA.
+- Added a matching pinned MiSTer Main patch that invokes `/media/fat/linux/MediaPlayer_Helper` for Media Player files while preserving the existing raw-file path.
+- Added 44.1 and 48 kHz signed stereo PCM playback through an 8,192-frame FPGA FIFO, with bounded startup and steady-state batching, explicit end markers, underrun/error telemetry, and clean no-reboot recovery between silent and audio-video files.
+- Added a clean-video queue so decoder backpressure cannot block PCM delivery and cause periodic audio/video disturbance.
+- Made Program Stream picture PTS drive the FPGA 33-bit / 90 kHz presentation timeline. Encoded H.262 cadence remains a mandatory floor, so PTS can delay a frame but cannot present it early.
+- Extended native presentation pacing through H.262 frame-rate codes 4 and 5: exact `30000/1001` and exact 30 fps, alongside the existing `24000/1001`, exact 24, and 25 fps paths. Codes 6 through 8 are rejected before transport.
+- Added deterministic Program Stream finalization, compatibility checks, input-envelope generation, helper transport analysis, PCM comparison, protocol verification, and native/sanitized host regressions.
+- Qualified the full 14,315-picture Big Buck Bunny audio-video soak, including opening motion, high-motion scenes, transitions, and rolling credits. The final cadence-floor build completed without the recurring one-second credits jump.
+- Preserved raw `.m2v` as a byte-exact path with synthetic H.262-derived presentation timing and clean terminal behavior.
+- Release FPGA source baseline: `9a5eea3`; host/helper source baseline: `acdbf8b`.
+- A clean Quartus Prime 17.0.2 build reproduced the accepted 4,184,380-byte RBF exactly, with SHA-256 `484328e51c6e764890bf2bdcd947448e2eaaaac2c603e93da28009475e44dafc`.
+- The clean fit uses 29,325 ALMs, 45,259 registers, 3,655,139 block-memory bits, 464 RAM blocks, 65 DSP blocks, and 3 PLLs.
+- Timing is positive in every required category: +0.311 ns global setup, +0.238 ns hold, +3.365 ns recovery, +0.497 ns removal, +1.122 ns minimum pulse width, +1.782 ns decoder setup, +11.294 ns decoder recovery, and +8.284 ns video setup.
+- Reproducible release helper: 361,452 bytes, SHA-256 `c99237246416ecd8278d90ff6e15e7a00cd8ab1d49c960b8c77fbe00f4ba0483`.
+- Reproducible matching Main: 1,166,244 bytes, SHA-256 `16517a9927c659616796b45c8e2488da2a26f0595c91418ed09dc0eb7a5787aa`.
+- The release package contains the date-coded RBF, matching Main, executable `linux/MediaPlayer_Helper`, checksums, source provenance, installation instructions, and applicable licenses. Generated regression media is not shipped.
+- Current limits remain deliberate: progressive 4:2:0 video through the qualified 720x480 envelope, MPEG Layer II audio at 44.1/48 kHz, bounded Program Stream structure, fixed 800x600 output, and no seeking, pause/resume, Transport Stream, DVD navigation, subpictures, or optical-disc integration.
+
 ## [0.6.0] - 2026-08-22 — Real-stream MPEG-2 playback milestone
 
 Hardware-qualified sustained playback of progressive 720x480 4:2:0 MPEG-2 Video elementary streams, with native `24000/1001`, exact-24-fps, and 25-fps presentation cadence.
