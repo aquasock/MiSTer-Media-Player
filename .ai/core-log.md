@@ -1,3 +1,37 @@
+## 468 COMMIT Unreleased ??? 2026-08-24T11:56:51-07:00
+
+#### Coming From:
+
+Unreleased cd8d78a
+
+#### Purpose:
+
+Add passive late-window cadence telemetry that distinguishes timestamp admission conflicts from scratch-scheduler stalls during the movie credits.
+
+#### Outcome:
+
+The user approved a diagnostic-only FPGA cycle after `cd8d78a` completed the full soak without audio underrun but left a tiny cadence visible in the credits. The existing schema-eight profiler cannot identify that event because it retains the three largest gaps across the whole session, all of which come from startup, and its fifty-millisecond outlier threshold does not describe a small legal-window phase disturbance. The planned schema-nine diagnostic will leave all playback decisions unchanged, begin ranking gaps only after STC second 500, retain timestamp-active, timestamp-due and free-cadence state with each ranked gap, and count two exact late-window conflicts at eligible raster swap windows: a timestamp delaying a candidate that the normal cadence would admit, and a timestamp advancing a candidate before normal cadence. The scheduler will export its existing cadence-slot term as an observation only, and the profiler will receive that term plus the already existing candidate, timestamp and swap-window signals. The fixed thirty-eight-word overlay will be preserved by using the prior promotion-hold word for the two conflict counts and by changing only the interpretation of the ranked-gap words in schema nine; aggregate completion, byte, picture, audio, error and terminal evidence remains intact. Simulation must prove the 500-second gate, both conflict directions, late-window-only ranking, retained scheduler context, checksum and decoder interpretation before a full Quartus build is allowed.
+
+#### Next Steps:
+
+Implement only the approved observational boundary, run the cadence-profiler and presentation-scheduler testbenches plus the focused parser, presentation, transport, PCM and queue regressions, then compile with Quartus 17.0.2 and require zero errors, timing met and no material resource increase. If those checks pass, replace the placeholder with the source commit, document the exact RBF hash and timing result, and install only that RBF through plain FTP with staged roundtrip verification while preserving `cd8d78a` as rollback. The hardware test is one uninterrupted run of `20_bbb_full_48k.mpg`; a nonzero timestamp-delay or timestamp-advance conflict count correlated with the ranked credits gaps selects the timestamp-to-cadence handoff for the next fix, while zero conflicts with scratch-unavailable scheduler state selects scratch ownership instead. Any playback, accepted-byte, picture-count, sequence-end, audio or error regression rejects the diagnostic image immediately.
+
+#### Files Modified:
+
+- MediaPlayer_top_05.svh
+- MediaPlayer_top_07.svh
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 467 COMMIT Unreleased cd8d78a 2026-08-24T11:44:23-07:00
 
 #### Coming From:
@@ -1201,34 +1235,6 @@ Power-cycle the MiSTer, since the wedged core from `d9022e6` and the reverted `6
 - MediaPlayer_top_05.svh
 - rtl/mpeg2_new/mpeg2_h262_pts_presentation_timeline.sv
 - tools/streams/tb_h262_pts_presentation_timeline.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 428 COMMIT Unreleased 62e8ccf 2026-08-24T04:19:35-07:00
-
-#### Coming From:
-
-Unreleased 62e8ccf
-
-#### Purpose:
-
-Record that the presentation anchor did not move the startup offset and identify the real cause as real-time PCM pacing of the shared byte path.
-
-#### Outcome:
-
-The user recorded the run at 120 frames per second. Frame analysis places the blackout at 1.117 seconds and the first picture at 2.483 seconds, so the black screen lasts 1.366 seconds, and Goertzel analysis of the 440 and 660 Hz tones places audio onset near 1.50 seconds, leaving audio about one second ahead of video. A schema-eight capture of `62e8ccf` reports `first_present_cycle` 82,322,655 against 82,301,563 for `047f5b2`, a difference of 21,092 cycles or 0.35 milliseconds, so the anchor change moved nothing measurable and the hypothesis behind entry 426 was wrong. The same capture contains the evidence that should have refuted it before the build: `presentation_hold_total_cycles` is 5,728,829, only 0.095 seconds, so the timestamp admission gate was never holding pictures for anything like 1.372 seconds. The first picture was simply not available yet, and the reason is byte delivery. The helper emits each decoded PCM sample as a nine-byte in-band record, expanding 36,756 compressed audio bytes into 1,296,000 bytes and making PCM roughly 88 percent of the emitted stream, while `mpeg2_h262_inband_metadata` gates `input_ready` on `pcm_ready` and `MediaPlayer_top_00.svh` derives that from the PCM FIFO not being full. The shared byte path is therefore throttled to real-time 48 kHz sample delivery once the FIFO fills, which also explains the session lasting 180,910,349 cycles, or 3.015 seconds, for a three-second clip. The fixture makes this severe because its first picture is an intra frame spanning video elementary-stream bytes 30 through 177,860, which is 97.1 percent of all 183,120 video bytes, so almost the entire video payload must cross that throttled path before anything can be displayed. Two independent predictions confirm the mechanism. Only 2,042 audio bytes, or 8,000 samples, remain after the first picture completes, predicting 0.1667 seconds for the remaining four pictures against 0.1657 seconds measured, an error of 0.6 percent. Untimestamped `.m2v` files carry no PCM records, are never throttled, and start immediately, exactly as the user observes. This also explains why the reverted `d9022e6` deadlocked rather than merely delaying: holding the PCM sink stops the only path video bytes have.
-
-#### Next Steps:
-
-Do not pursue further FPGA-side changes for this offset until the emission order is fixed, because the throttle is a real-time sample rate rather than a byte volume and no reachable FIFO depth can absorb it; buffering the 2.8 seconds of PCM that precede the first picture would need roughly 4.7 megabits against 2.28 megabits of free block memory. The correct fix belongs in the ARM helper, which has ample Linux memory and full control of emission order: it should keep video bytes ahead of PCM records rather than emitting each sample as soon as it is decoded, holding only enough PCM in flight to keep the FPGA's 2,048-sample reserve fed. That is a host-side change costing no FPGA logic or timing, consistent with the user's instruction not to spend either on this offset. Decide separately whether to keep or revert `62e8ccf`, which costs 35 ALMs, changed nothing measurable on this fixture, and is defensible only as a correctness improvement for streams whose first metadata timestamp differs from their first picture timestamp. Consider also reducing the nine-byte-per-sample in-band record format, which inflates the stream roughly sevenfold against the compressed audio it replaces, though that is a bandwidth question and not the cause of this offset.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
