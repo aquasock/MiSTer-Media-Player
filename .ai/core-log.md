@@ -1,3 +1,35 @@
+## 481 COMMIT Unreleased ??? 2026-08-24T15:22:14-07:00
+
+#### Coming From:
+
+VERSION v0.7.0 0064148
+
+#### Purpose:
+
+Establish the first standards-bounded native-interlaced milestone: reconstruct authored interlaced frame pictures and present their fields directly as 720x480i59.94 while preserving the proven progressive path and keeping this native-field path suitable for a later processing-bypass output.
+
+#### Outcome:
+
+Pending implementation and qualification. The approved scope is an H.262 4:2:0 interlaced sequence containing complete I-frame pictures with `picture_structure=Frame`, `frame_pred_frame_dct=1`, `progressive_frame=0`, `chroma_420_type=0`, `repeat_first_field=0`, and either authored top-field-first or bottom-field-first order. Add deterministic TFF and BFF regressions, extend compatibility analysis and the I-picture capability gate only for this subset, prove reconstructed frame samples against FFmpeg, then add standards-valid 480i59.94 half-line timing, authored field-row presentation, field-aware chroma expansion and MiSTer field signalling. Retain selectable 800x600 progressive output as the fallback. Preserve the exact four-file v0.7.0 regression suite and exclude P/B interlaced prediction, separate field pictures, repeated fields, 576i50, bob, weave and SDI from this first increment.
+
+#### Next Steps:
+
+First expand `.ai/core-reference.md` with the controlling H.262 interlaced clauses and add deterministic 720x480 TFF/BFF all-I fixtures plus analyzer expectations without changing playback. Commit and validate that foundation. Then implement and simulate the bounded I-frame decoder acceptance and pixel-exact reconstruction. Finally implement native 480i field timing/presentation, run clean simulation and FPGA builds with resource/timing review, qualify TFF and BFF on hardware, and rerun the established four-file progressive release regression before closing the milestone. Stop for approval if evidence requires widening or materially changing this scope.
+
+#### Files Modified:
+
+- .ai/core-reference.md
+- tools/streams interlaced generator, analyzer and regression artifacts
+- bounded H.262 frontend and I-picture reconstruction RTL
+- native interlaced timing, framebuffer presentation and top-level integration RTL
+- associated simulation, build and user documentation files
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 480 VERSION v0.7.0 0064148 2026-08-24T14:39:58-07:00
 
 #### Coming From:
@@ -1196,33 +1228,3 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 441 COMMIT Unreleased 3814243 2026-08-24T06:33:13-07:00
-
-#### Coming From:
-
-Unreleased 3814243
-
-#### Purpose:
-
-Qualify recovery from the unsupported-audio-codec envelope case through an immediate known-good replay without reboot.
-
-#### Outcome:
-
-The user ran `10_bad_audio_codec.mpg`; USER, DISK and POWER all remained off, the file did not claim ordinary success and the MiSTer remained responsive. The user immediately selected `00_good_480p_48k.mpg` without rebooting and reports pass-indicating LEDs. The launch-free recovered-control capture is 104,729 bytes at SHA-256 `32836080d2fcebd8d452e4165207072e9681f9adbbe83d7add863bfa8b79ed53`. Schema-eight telemetry proves that the rejected AC-3 stream leaves no sticky fault: aggregate error flags are zero, audio underrun and PCM protocol error are false, decoder, presentation and destination errors are clear, all 582,742 control transport bytes are accepted, 44 timestamps associate, all seventeen reference and 31 B pictures decode, all 48 pictures display with 47 swaps, sequence end is seen, presentation completes and the session freezes for normal quiet reason one with every pending scheduler state clear. PCM count and peak occupancy saturate their telemetry fields without starvation. This accepts the first expected-failure recovery pair and proves that helper rejection of an unsupported codec does not wedge Main, the shared in-band path or the next valid stream.
-
-#### Next Steps:
-
-Without rebooting, run `11_bad_audio_rate.mpg` for no more than ten seconds, record its visible result and USER, DISK and POWER states, then immediately run `00_good_480p_48k.mpg` and record alignment, sound, picture and all three LEDs again. An explicit rejection or non-successful settlement followed by a clean control is a pass; stop and report an unavailable menu, ignored input or failed control before any reboot. Do not continue to `12_bad_geometry_720p.mpg` until this second pair is recorded.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
