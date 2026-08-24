@@ -72,26 +72,27 @@ index 511c7a4..168eb44 100644
  		(core_type != CORE_TYPE_8BIT))
 diff --git a/support/mediaplayer/mediaplayer.h b/support/mediaplayer/mediaplayer.h
 new file mode 100644
-index 0000000..61afb89
+index 0000000..ca9fba0
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.h
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,11 @@
 +#ifndef MEDIAPLAYER_ARM_LOADER_H
 +#define MEDIAPLAYER_ARM_LOADER_H
 +
 +int mediaplayer_is_core();
 +int mediaplayer_handles_file(const char *path);
 +int mediaplayer_start(const char *path, unsigned char index);
++int mediaplayer_start_source(const char *source_spec, unsigned char index);
 +void mediaplayer_poll();
 +void mediaplayer_stop();
 +
 +#endif
 diff --git a/support/mediaplayer/mediaplayer.cpp b/support/mediaplayer/mediaplayer.cpp
 new file mode 100644
-index 0000000..75c80ed
+index 0000000..5ed0c50
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,149 @@
+@@ -0,0 +1,159 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -100,6 +101,7 @@ index 0000000..75c80ed
 +#include <stdio.h>
 +#include <string.h>
 +#include <strings.h>
++#include <string>
 +#include <sys/types.h>
 +#include <sys/wait.h>
 +#include <unistd.h>
@@ -157,10 +159,18 @@ index 0000000..75c80ed
 +
 +int mediaplayer_start(const char *path, unsigned char index)
 +{
++	std::string source_spec = "file:";
++	if (!mediaplayer_handles_file(path)) return 0;
++	source_spec += path;
++	return mediaplayer_start_source(source_spec.c_str(), index);
++}
++
++int mediaplayer_start_source(const char *source_spec, unsigned char index)
++{
 +	int pipefd[2];
 +	pid_t pid;
 +
-+	if (!mediaplayer_is_core() || !mediaplayer_handles_file(path)) return 0;
++	if (!mediaplayer_is_core() || !source_spec || !*source_spec) return 0;
 +	mediaplayer_stop();
 +	if (pipe(pipefd) < 0)
 +	{
@@ -181,7 +191,8 @@ index 0000000..75c80ed
 +		(void)dup2(pipefd[1], STDOUT_FILENO);
 +		close(pipefd[0]);
 +		close(pipefd[1]);
-+		execl(helper_path, "MediaPlayer_Helper", path, (char *)NULL);
++		execl(helper_path, "MediaPlayer_Helper", "--protocol", "1", "--source",
++		      source_spec, (char *)NULL);
 +		fprintf(stderr, "MediaPlayer: cannot start %s: %s\n", helper_path, strerror(errno));
 +		_exit(127);
 +	}
@@ -203,7 +214,7 @@ index 0000000..75c80ed
 +	user_io_file_info(".M2V");
 +	user_io_set_download(1);
 +	download_active = 1;
-+	printf("MediaPlayer: streaming %s through ARM helper\n", path);
++	printf("MediaPlayer: streaming %s through ARM helper\n", source_spec);
 +	return 1;
 +}
 +

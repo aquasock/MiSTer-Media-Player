@@ -67,13 +67,23 @@ def main() -> int:
     reference_video = (args.test_dir / "reference_video.m2v").read_bytes()
     reference_pcm = args.test_dir / "reference_audio.s16le"
 
+    capabilities = subprocess.run(
+        [str(args.helper), "--capabilities"], text=True, capture_output=True,
+    )
+    expected_capabilities = (
+        "protocol=1 sources=file reserved_sources=dvd "
+        "containers=m2v,mpeg-ps video=h262 audio=mp2-s16le-48000"
+    )
+    if capabilities.returncode or capabilities.stdout.strip() != expected_capabilities:
+        raise RuntimeError(f"unexpected capabilities: {capabilities.stdout!r}")
+
     with tempfile.TemporaryDirectory(prefix="mister_arm_av_verify_") as temporary:
         temp = Path(temporary)
         helper_video = temp / "helper_video.m2v"
         helper_pcm = temp / "helper_audio.s16le"
         completed = subprocess.run(
-            [str(args.helper), "--video-out", str(helper_video),
-             "--pcm-out", str(helper_pcm), str(program)],
+            [str(args.helper), "--protocol", "1", "--source", f"file:{program}",
+             "--video-out", str(helper_video), "--pcm-out", str(helper_pcm)],
             text=True, capture_output=True,
         )
         if completed.returncode:
@@ -95,14 +105,26 @@ def main() -> int:
                 f"PCM mismatch: max={maximum}, rms={rms:.4f}, correlation={correlation:.6f}"
             )
 
+        legacy_video = temp / "legacy_video.m2v"
+        legacy_pcm = temp / "legacy_audio.s16le"
+        legacy = subprocess.run(
+            [str(args.helper), "--video-out", str(legacy_video),
+             "--pcm-out", str(legacy_pcm), str(program)],
+            text=True, capture_output=True,
+        )
+        if (legacy.returncode or legacy_video.read_bytes() != helper_video.read_bytes()
+                or legacy_pcm.read_bytes() != helper_pcm.read_bytes()):
+            raise RuntimeError("legacy path and protocol-one file source differ")
+
         truncated = temp / "truncated.mpg"
         source = program.read_bytes()
         # Cut through the first audio PES packet, rather than at an arbitrary
         # mux-sector boundary that could also be a valid shortened stream.
         truncated.write_bytes(source[:3000])
         failed = subprocess.run(
-            [str(args.helper), "--video-out", str(temp / "bad.m2v"),
-             "--pcm-out", str(temp / "bad.pcm"), str(truncated)],
+            [str(args.helper), "--protocol", "1", "--source", f"file:{truncated}",
+             "--video-out", str(temp / "bad.m2v"),
+             "--pcm-out", str(temp / "bad.pcm")],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
         if failed.returncode == 0:
@@ -110,11 +132,41 @@ def main() -> int:
 
         raw_output = temp / "raw_copy.m2v"
         copied = subprocess.run(
-            [str(args.helper), "--video-out", str(raw_output), str(raw_video)],
+            [str(args.helper), "--protocol", "1", "--source", f"file:{raw_video}",
+             "--video-out", str(raw_output)],
             text=True, capture_output=True,
         )
         if copied.returncode or raw_output.read_bytes() != raw_video.read_bytes():
             raise RuntimeError("raw M2V compatibility path failed")
+
+        dvd = subprocess.run(
+            [str(args.helper), "--protocol", "1", "--source", "dvd:/dev/sr0"],
+            text=True, capture_output=True,
+        )
+        if dvd.returncode == 0 or "reserved for a later" not in dvd.stderr:
+            raise RuntimeError("reserved DVD source was not rejected clearly")
+
+        unknown_source = subprocess.run(
+            [str(args.helper), "--protocol", "1", "--source", "network:example"],
+            text=True, capture_output=True,
+        )
+        if unknown_source.returncode == 0 or "unsupported media source" not in unknown_source.stderr:
+            raise RuntimeError("unknown media source scheme was accepted")
+
+        missing_file = subprocess.run(
+            [str(args.helper), "--protocol", "1", "--source",
+             f"file:{temp / 'missing.mpg'}"],
+            text=True, capture_output=True,
+        )
+        if missing_file.returncode == 0 or "missing.mpg" not in missing_file.stderr:
+            raise RuntimeError("missing file source was not rejected")
+
+        future_protocol = subprocess.run(
+            [str(args.helper), "--protocol", "2", "--source", f"file:{program}"],
+            text=True, capture_output=True,
+        )
+        if future_protocol.returncode == 0 or "unsupported protocol" not in future_protocol.stderr:
+            raise RuntimeError("unknown helper protocol was accepted")
 
     print(f"video: byte-identical after removing {len(timestamps)} PTS records")
     print(
@@ -123,6 +175,8 @@ def main() -> int:
     )
     print("errors: truncated Program Stream rejected")
     print("compatibility: raw M2V copied byte-identically")
+    print("protocol: capabilities stable; file URI equals legacy path")
+    print("sources: missing/unknown rejected; dvd reserved without access")
     return 0
 
 

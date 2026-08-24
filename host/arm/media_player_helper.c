@@ -3,6 +3,8 @@
 #define MINIMP3_NO_SIMD
 
 #include "minimp3.h"
+#include "media_player_protocol.h"
+#include "media_source.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -38,7 +40,10 @@ struct audio_state {
 static void usage(const char *program)
 {
     fprintf(stderr,
-            "usage: %s [--pcm-out FILE] [--video-out FILE] INPUT.mpg\n",
+            "usage: %s [--protocol 1] [--source SOURCE | INPUT] "
+            "[--pcm-out FILE] [--video-out FILE]\n"
+            "       %s --capabilities\n",
+            program,
             program);
 }
 
@@ -53,40 +58,40 @@ static int write_all(FILE *stream, const void *data, size_t size,
     return 0;
 }
 
-static int read_exact(FILE *stream, void *data, size_t size)
+static int read_exact(struct media_source *source, void *data, size_t size)
 {
-    return fread(data, 1, size, stream) == size ? 0 : -1;
+    return media_source_read(source, data, size) == size ? 0 : -1;
 }
 
-static int skip_bytes(FILE *stream, size_t size)
+static int skip_bytes(struct media_source *source, size_t size)
 {
     uint8_t scratch[4096];
 
     while (size) {
         size_t chunk = size < sizeof(scratch) ? size : sizeof(scratch);
-        if (read_exact(stream, scratch, chunk) < 0)
+        if (read_exact(source, scratch, chunk) < 0)
             return -1;
         size -= chunk;
     }
     return 0;
 }
 
-static int find_start_code(FILE *stream, uint8_t *code)
+static int find_start_code(struct media_source *source, uint8_t *code)
 {
     unsigned state = 0xffffff;
     int value;
 
-    while ((value = fgetc(stream)) != EOF) {
+    while ((value = media_source_getc(source)) != EOF) {
         state = ((state << 8) | (unsigned)(uint8_t)value) & 0xffffff;
         if (state == 0x000001) {
-            value = fgetc(stream);
+            value = media_source_getc(source);
             if (value == EOF)
                 return -1;
             *code = (uint8_t)value;
             return 1;
         }
     }
-    return ferror(stream) ? -1 : 0;
+    return media_source_error(source) ? -1 : 0;
 }
 
 static uint64_t decode_pts(const uint8_t *p)
@@ -334,7 +339,8 @@ static int parse_pes_header(const uint8_t *packet, size_t size,
     return 0;
 }
 
-static int process_pes(FILE *input, uint8_t code, struct audio_state *audio,
+static int process_pes(struct media_source *input, uint8_t code,
+                       struct audio_state *audio,
                        struct output_state *output, int *video_code,
                        int *audio_code)
 {
@@ -401,7 +407,8 @@ done:
     return result;
 }
 
-static int process_program_stream(FILE *input, struct audio_state *audio,
+static int process_program_stream(struct media_source *input,
+                                  struct audio_state *audio,
                                   struct output_state *output)
 {
     int video_code = -1;
@@ -451,17 +458,18 @@ static int process_program_stream(FILE *input, struct audio_state *audio,
     }
 }
 
-static int process_elementary_stream(FILE *input, struct output_state *output)
+static int process_elementary_stream(struct media_source *input,
+                                     struct output_state *output)
 {
     uint8_t buffer[16384];
     size_t count;
 
-    while ((count = fread(buffer, 1, sizeof(buffer), input)) != 0) {
+    while ((count = media_source_read(input, buffer, sizeof(buffer))) != 0) {
         if (write_all(output->video, buffer, count, "video") < 0)
             return -1;
         output->video_bytes += count;
     }
-    return ferror(input) ? -1 : 0;
+    return media_source_error(input) ? -1 : 0;
 }
 
 static int finish_output(struct output_state *output, int success)
@@ -487,12 +495,16 @@ static int finish_output(struct output_state *output, int success)
 
 int main(int argc, char **argv)
 {
-    const char *input_path = NULL;
+    const char *source_specification = NULL;
     const char *pcm_path = NULL;
     const char *video_path = NULL;
+    int protocol_version = 0;
+    int protocol_requested = 0;
+    int show_capabilities = 0;
     struct output_state output = {0};
     struct audio_state audio = {0};
-    FILE *input = NULL;
+    struct media_source input = {0};
+    char source_error[512];
     uint8_t signature[4];
     int is_program_stream;
     int i;
@@ -503,28 +515,60 @@ int main(int argc, char **argv)
             pcm_path = argv[++i];
         } else if (!strcmp(argv[i], "--video-out") && i + 1 < argc) {
             video_path = argv[++i];
-        } else if (argv[i][0] == '-' || input_path) {
+        } else if (!strcmp(argv[i], "--protocol") && i + 1 < argc) {
+            char *end = NULL;
+            long parsed;
+            errno = 0;
+            parsed = strtol(argv[++i], &end, 10);
+            if (errno || !end || *end || parsed < 0 || parsed > INT32_MAX) {
+                fprintf(stderr, "media_player_helper: invalid protocol version\n");
+                return 2;
+            }
+            protocol_version = (int)parsed;
+            protocol_requested = 1;
+        } else if (!strcmp(argv[i], "--source") && i + 1 < argc) {
+            if (source_specification) {
+                usage(argv[0]);
+                return 2;
+            }
+            source_specification = argv[++i];
+        } else if (!strcmp(argv[i], "--capabilities")) {
+            show_capabilities = 1;
+        } else if (argv[i][0] == '-' || source_specification) {
             usage(argv[0]);
             return 2;
         } else {
-            input_path = argv[i];
+            source_specification = argv[i];
         }
     }
-    if (!input_path) {
+    if (protocol_requested &&
+        protocol_version != MEDIA_PLAYER_PROTOCOL_VERSION) {
+        fprintf(stderr, "media_player_helper: unsupported protocol version %d\n",
+                protocol_version);
+        return 2;
+    }
+    if (show_capabilities) {
+        if (source_specification || pcm_path || video_path) {
+            usage(argv[0]);
+            return 2;
+        }
+        puts(MEDIA_PLAYER_CAPABILITIES);
+        return 0;
+    }
+    if (!source_specification) {
         usage(argv[0]);
         return 2;
     }
-    input = fopen(input_path, "rb");
-    if (!input) {
-        fprintf(stderr, "media_player_helper: cannot open %s: %s\n",
-                input_path, strerror(errno));
+    if (media_source_open(&input, source_specification, source_error,
+                          sizeof(source_error)) != MEDIA_SOURCE_OK) {
+        fprintf(stderr, "media_player_helper: %s\n", source_error);
         return 1;
     }
     output.video = video_path ? fopen(video_path, "wb") : stdout;
     if (!output.video) {
         fprintf(stderr, "media_player_helper: cannot open video output: %s\n",
                 strerror(errno));
-        fclose(input);
+        media_source_close(&input);
         return 1;
     }
     if (pcm_path) {
@@ -536,17 +580,17 @@ int main(int argc, char **argv)
         }
     }
     mp3dec_init(&audio.decoder);
-    if (read_exact(input, signature, sizeof(signature)) < 0 ||
-        fseek(input, 0, SEEK_SET) < 0) {
+    if (read_exact(&input, signature, sizeof(signature)) < 0 ||
+        media_source_rewind(&input) < 0) {
         fprintf(stderr, "media_player_helper: input is too short\n");
         goto done;
     }
     is_program_stream = !memcmp(signature, "\x00\x00\x01\xba", 4);
     if (is_program_stream) {
-        if (process_program_stream(input, &audio, &output) < 0 ||
+        if (process_program_stream(&input, &audio, &output) < 0 ||
             decode_audio_buffer(&audio, &output, 1) < 0)
             goto done;
-    } else if (process_elementary_stream(input, &output) < 0) {
+    } else if (process_elementary_stream(&input, &output) < 0) {
         goto done;
     }
     if (!output.video_bytes) {
@@ -564,8 +608,7 @@ int main(int argc, char **argv)
             output.audio_frames, (unsigned long long)output.pcm_frames);
 done:
     free(audio.data);
-    if (input)
-        fclose(input);
+    media_source_close(&input);
     if (video_path && output.video) {
         fclose(output.video);
         output.video = NULL;
