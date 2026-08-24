@@ -1,3 +1,31 @@
+## 448 COMMIT Unreleased f2b2e02 2026-08-24T07:02:00-07:00
+
+#### Coming From:
+
+Unreleased f2b2e02
+
+#### Purpose:
+
+Hardware-qualify the corrected rejection of the 50 fps envelope case and immediate recovery to the known-good 48 kHz control.
+
+#### Outcome:
+
+With the exact `f2b2e02` helper active and without rebooting, the user ran `14_bad_rate_50.mpg`; it now behaves like the other helper-side failures, showing a black screen with no sound and USER, DISK and POWER all off rather than playing to ordinary success. The user immediately selected `00_good_480p_48k.mpg` without rebooting and reports perfect playback, with USER and POWER solid on and DISK blinking eleven times. The untouched 800x600 recovered-control capture is 104,786 bytes at SHA-256 `56bc682f106ff0b1b8363f4046d5b63299316d5fab4822b6332be63cf1174857`. Schema-eight telemetry proves clean re-arm after the new preflight rejection: all 582,742 transport bytes are accepted, 44 timestamps associate, seventeen reference plus 31 B pictures decode, all 48 pictures display with 47 swaps, sequence end is seen and presentation completes. Aggregate error flags are zero, audio underrun and PCM protocol error are false, every decoder, presentation and destination error is clear, and the quiet reason-one snapshot has no pending scheduler state. First presentation occurs after 2,431,574 decoder cycles, the final picture after 1.957 seconds and quiet completion after 2.057 seconds; delivered cadence is 24.530 frames per second. This passes the corrected fifth failure-and-recovery pair and hardware-accepts the conservative maximum-30-fps runtime boundary.
+
+#### Next Steps:
+
+Without rebooting, run only `15_bad_truncated.mpg` for no more than ten seconds and report the screen, sound and USER, DISK and POWER states. It must fail without claiming ordinary success or wedging the menu. Immediately select `00_good_480p_48k.mpg` again without rebooting and report alignment, sound, picture and all three LEDs, leaving the final image loaded for one last recovered-control capture. Do not start `20_bbb_full_48k.mpg` until this sixth and final failure pair passes.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 447 COMMIT Unreleased f2b2e02 2026-08-24T06:57:42-07:00
 
 #### Coming From:
@@ -1143,34 +1171,6 @@ After rebooting into the installed `8fc80ee` Main, the user ran only `01_arm_mp2
 #### Next Steps:
 
 Replace the temporary ALSA sink with the user-directed FPGA-owned PCM path while avoiding another Main change. Extend the existing in-band ingress protocol with a reserved PCM record type, have the helper place decoded signed 16-bit stereo samples into those records on its current standard-output stream, and extend the FPGA extractor to remove them from H.262 while applying audio-FIFO backpressure and feeding the already hardware-proven PCM output adapter. Preserve raw M2V passthrough, timestamp records, audio test modes, reset flush, bounded FIFO occupancy and underrun telemetry; build and install only the helper and RBF, then replay the same sole Program Stream and require the two embedded channel tones with the already accepted video result.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 408 COMMIT Unreleased 8fc80ee 2026-08-24T00:17:00-07:00
-
-#### Coming From:
-
-Unreleased 8fc80ee
-
-#### Purpose:
-
-Install the absolute-path Main correction while preserving the diagnostic build and every unchanged media artifact.
-
-#### Outcome:
-
-Before installation the MiSTer was reachable and `/media/fat/MiSTer` matched the running diagnostic build at SHA-256 `1ee8e337e8583fdf4ac585934734fcd7d6af1f8a7130f5e1adcb7ecaebf4a1e4`; the accepted RBF, helper and sole Program Stream also matched their established hashes. The 1,166,244-byte `8fc80ee` Main was uploaded under the exact staging name `/media/fat/MiSTer.upload.8fc80ee`, independently verified at SHA-256 `16517a9927c659616796b45c8e2488da2a26f0595c91418ed09dc0eb7a5787aa`, made executable and atomically installed on the FAT volume, then synchronized and verified again. The displaced diagnostic Main is preserved at `/media/fat/MiSTer.backup.pre-pathfix.b357c51` and verifies at its original SHA-256. `/media/fat/MediaPlayer.rbf`, `/media/fat/linux/MediaPlayer_Helper` and `/media/fat/games/MediaPlayer/01_arm_mp2_audio.mpg` remain byte-identical at SHA-256 `ad04f9f73c0fb98309588f8c212c6ccad71c80b254a2a284f637672a73350d37`, `4f6ac001a4a0455c20e1148cedf7548768258abfafb2299a3f8b171a5383fa8e` and `94a8ff0223dd1acba4d59fc1785741522c4361956f17848bf9ebbb8c0a503fe7` respectively. The old diagnostic Main remains in memory until reboot, and no playback was launched during installation.
-
-#### Next Steps:
-
-Keep the USB DVD drive disconnected, reboot once to start the installed `8fc80ee` Main, enter MediaPlayer and run only `01_arm_mp2_audio.mpg`. Confirm the five-picture video plays instead of remaining blank, the embedded 440 Hz left and 660 Hz right tones are audible in their correct channels, playback completes cleanly, and report USER, DISK and POWER LEDs; leave the final image loaded so the retained diagnostic log and frame can be captured before any replay or additional file.
 
 #### Files Modified:
 
