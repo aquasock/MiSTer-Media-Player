@@ -403,8 +403,8 @@ wire               audio_pcm_end;
 wire               audio_pcm_fifo_full;
 wire               audio_pcm_fifo_empty;
 wire [34:0]        audio_pcm_fifo_data;
-wire [11:0]        audio_pcm_fifo_used;
-wire [11:0]        audio_pcm_fifo_read_used;
+wire [12:0]        audio_pcm_fifo_used;
+wire [12:0]        audio_pcm_fifo_read_used;
 wire               audio_pcm_fifo_rd;
 wire               audio_pcm_underrun;
 wire               audio_pcm_playback_complete;
@@ -540,7 +540,7 @@ always @(posedge clk_mpeg2) begin
 	else begin
 		audio_pcm_underrun_sync <=
 			{audio_pcm_underrun_sync[0], audio_pcm_underrun};
-		if (audio_pcm_fifo_full || |audio_pcm_fifo_used[11:7])
+		if (audio_pcm_fifo_full || |audio_pcm_fifo_used[12:7])
 			audio_pcm_fifo_peak <= 7'h7F;
 		else if (audio_pcm_fifo_used[6:0] > audio_pcm_fifo_peak)
 			audio_pcm_fifo_peak <= audio_pcm_fifo_used[6:0];

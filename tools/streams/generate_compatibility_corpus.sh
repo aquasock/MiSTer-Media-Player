@@ -22,6 +22,7 @@ set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 OUT="${1:-$ROOT/tools/streams/generated_compatibility/envelope}"
 CHECK="$ROOT/tools/streams/check_media_compatibility.py"
+FINALIZE="$ROOT/tools/streams/finalize_program_stream.py"
 
 command -v ffmpeg >/dev/null || { echo "ffmpeg not found" >&2; exit 2; }
 mkdir -p "$OUT"
@@ -33,6 +34,7 @@ gen() {  # gen NAME EXPECTED_VERDICT FFMPEG_ARGS...
     echo "generate: $name (expect $expected)"
     # shellcheck disable=SC2086
     ffmpeg -v error -y "$@" "$OUT/$name.mpg"
+    python3 "$FINALIZE" "$OUT/$name.mpg"
     printf '%s\n' "$expected" > "$OUT/$name.expected"
 }
 

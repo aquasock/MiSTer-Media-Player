@@ -37,6 +37,7 @@ PACED_FRAME_RATE_CODES = {
 UNPACED_FRAME_RATE_CODES = {6: "50", 7: "59.94", 8: "60"}
 AUDIO_RATES = (44100, 48000)
 SEQUENCE_END_CODE = b"\x00\x00\x01\xb7"
+PROGRAM_END_CODE = b"\x00\x00\x01\xb9"
 
 
 def demux_program_stream(data: bytes) -> tuple[bytes, bytes, dict[str, Any]]:
@@ -45,6 +46,7 @@ def demux_program_stream(data: bytes) -> tuple[bytes, bytes, dict[str, Any]]:
     video, audio = bytearray(), bytearray()
     video_id = audio_id = None
     other_ids: set[int] = set()
+    program_end_offset: int | None = None
     i = 0
     while i + 4 <= len(data):
         if data[i:i + 3] != b"\x00\x00\x01":
@@ -61,6 +63,7 @@ def demux_program_stream(data: bytes) -> tuple[bytes, bytes, dict[str, Any]]:
                 i += 8
             continue
         if sid == 0xB9:
+            program_end_offset = i
             break
         if i + 6 > len(data):
             break
@@ -83,6 +86,8 @@ def demux_program_stream(data: bytes) -> tuple[bytes, bytes, dict[str, Any]]:
         "video_stream_id": video_id,
         "audio_stream_id": audio_id,
         "ignored_stream_ids": sorted(other_ids),
+        "program_end_seen": program_end_offset is not None,
+        "program_end_offset": program_end_offset,
     }
 
 
@@ -155,6 +160,9 @@ def check(path: Path) -> dict[str, Any]:
     if is_ps:
         video, audio_es, ids = demux_program_stream(data)
         report.update(ids)
+        if not ids["program_end_seen"]:
+            problems.append(
+                "no MPEG Program Stream end code; regenerate or finalize the file")
         if ids["ignored_stream_ids"]:
             notes.append(
                 "extra stream ids present and ignored: "
@@ -208,11 +216,10 @@ def check(path: Path) -> dict[str, Any]:
     for reason in analysis.get("classification_reasons", []):
         problems.append(f"video: {reason}")
 
-    if not video.rstrip(b"\x00").endswith(SEQUENCE_END_CODE[:4].rstrip(b"\x00")) \
-            and SEQUENCE_END_CODE not in video[-64:]:
-        notes.append(
-            "no sequence_end_code near the end of the video stream; the final "
-            "reordered pictures may not flush cleanly")
+    if SEQUENCE_END_CODE not in video[-64:]:
+        problems.append(
+            "no sequence_end_code near the end of the video stream; regenerate "
+            "or finalize the file so reordered pictures and diagnostics flush cleanly")
 
     # --- audio ------------------------------------------------------------
     if is_ps:

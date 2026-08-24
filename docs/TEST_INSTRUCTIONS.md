@@ -27,6 +27,19 @@ python3 tools/streams/check_media_compatibility.py \
   tools/streams/generated_compatibility/bbb_full_48k.mpg
 ```
 
+The generators finalize each Program Stream with a bounded video PES carrying
+the H.262 sequence-end code followed by the MPEG Program Stream end code. For a
+file produced directly by another FFmpeg command, finalize it before checking:
+
+```bash
+python3 tools/streams/finalize_program_stream.py /path/to/converted.mpg
+python3 tools/streams/check_media_compatibility.py /path/to/converted.mpg
+```
+
+Both terminal markers are required. The checker rejects a file missing either
+marker because the core cannot otherwise flush reordered pictures and publish
+its final diagnostic state reliably.
+
 Use Audio Test `Off`. First run `good_480p_48k.mpg`, then
 `good_480p_44k.mpg`; both must complete with correct sound, video, and normal
 LEDs. Next run each `bad_*.mpg` case individually. Give a bad case no more

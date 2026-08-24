@@ -8,6 +8,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import finalize_program_stream as ps
+
 
 def run(command: list[str]) -> None:
     subprocess.run(command, check=True)
@@ -92,6 +94,7 @@ def main() -> int:
         "-ar", str(args.sample_rate),
         "-ac", "2", "-muxrate", "1200k", "-f", "mpeg", str(program),
     ])
+    ps.finalize_program_stream(program)
     run([
         ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(program),
         "-map", "0:v:0", "-c", "copy", "-f", "mpeg2video", str(demuxed_video),

@@ -6,13 +6,13 @@ always #1 clk=~clk;
 
 reg [34:0] fifo_data=0;
 reg fifo_empty=1;
-reg [11:0] fifo_used=0;
+reg [12:0] fifo_used=0;
 reg source_ended=0;
 wire fifo_rd;
 wire [15:0] audio_l,audio_r;
 wire underrun,playback_complete;
 
-audio_pcm_output_adapter #(.PREFILL_SAMPLES(12'd3)) dut(
+audio_pcm_output_adapter #(.PREFILL_SAMPLES(13'd3)) dut(
     .clk(clk),.reset(reset),.fifo_data(fifo_data),
     .fifo_empty(fifo_empty),.fifo_used(fifo_used),
     .source_ended(source_ended),.fifo_rd(fifo_rd),

@@ -107,12 +107,16 @@ def main() -> None:
         raise SystemExit("sample scheduler constants changed")
     if "fifo_end" not in adapter_text or "started          <= 1'b0" not in adapter_text:
         raise SystemExit("clean in-band PCM end handling is missing")
-    if "PREFILL_SAMPLES = 12'd2048" not in adapter_text:
+    if "PREFILL_SAMPLES = 13'd2048" not in adapter_text:
         raise SystemExit("2048-sample startup prefill is missing")
     if "(fifo_used >= PREFILL_SAMPLES) || source_ended" not in adapter_text:
         raise SystemExit("short-stream prefill release is missing")
     if ".rdusedw (rd_used)" not in fifo_text:
         raise SystemExit("read-domain FIFO occupancy is missing")
+    if ".lpm_numwords         (8192)" not in fifo_text:
+        raise SystemExit("8192-sample PCM FIFO is missing")
+    if ".lpm_widthu           (13)" not in fifo_text:
+        raise SystemExit("13-bit PCM FIFO accounting is missing")
 
     patterns = {
         "continuous": lambda cycle: True,
@@ -153,7 +157,7 @@ def main() -> None:
     print("  valid/ready: accepted PCM invariant under 4 ready profiles")
     print("  re-arm: deterministic for all 4 modes")
     print("  scheduler: 48 kHz exact /512; 44.1 kHz gaps limited to 557/558 clocks")
-    print("  transport: 2048-sample prefill with short-stream and clean-end release")
+    print("  transport: 8192-sample FIFO, 2048-sample prefill, short and clean-end release")
 
 
 if __name__ == "__main__":

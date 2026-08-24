@@ -27,6 +27,7 @@ from fractions import Fraction
 from pathlib import Path
 
 import h262common as h
+import finalize_program_stream as ps
 
 DEFAULT_SOURCE = (
     Path(__file__).resolve().parent / "big_buck_bunny_480p_stereo.avi"
@@ -157,23 +158,8 @@ def main() -> int:
                     "Program Stream video differs from the video-only encode"
                 )
 
-            program = raw_program.read_bytes()
-            program_end = b"\x00\x00\x01\xb9"
-            end_offset = program.rfind(program_end)
-            if end_offset < 0:
-                end_offset = len(program)
-                terminator = program_end
-            else:
-                terminator = program[end_offset:]
-            # MPEG-2 PES header with no optional fields and a four-byte video
-            # payload.  PES_packet_length counts the three header bytes plus
-            # the sequence_end_code payload.
-            final_video_pes = (
-                b"\x00\x00\x01\xe0\x00\x07\x80\x00\x00" + sequence_end
-            )
-            output.write_bytes(
-                program[:end_offset] + final_video_pes + terminator
-            )
+            output.write_bytes(raw_program.read_bytes())
+            ps.finalize_program_stream(output)
             demuxed = demux_video(output)
             if demuxed != video_payload:
                 raise RuntimeError("sequence-ended Program Stream video differs")
