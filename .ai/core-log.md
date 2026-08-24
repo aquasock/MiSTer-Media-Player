@@ -1,3 +1,31 @@
+## 404 COMMIT Unreleased ??? 2026-08-23T23:46:41-07:00
+
+#### Coming From:
+
+Unreleased 55d06ce
+
+#### Purpose:
+
+Add bounded persistent diagnostics to Main's MediaPlayer helper-to-SPI broker so one replay can identify the failed handoff stage.
+
+#### Outcome:
+
+The change will remain confined to the isolated Main patch and will not alter transfer ordering, buffering, the helper protocol, decoder output or FPGA behavior. The broker will create a fresh temporary log when a MediaPlayer source starts and record the source, index, helper process identifier, download assertion, each pipe-read result, cumulative bytes submitted through `user_io_file_tx_data`, EOF or error, download release, child status and every explicit stop reason. Helper standard error will be redirected into the same log so launch, parsing, audio-output and child failures survive after the short process exits. Logging failures will remain nonfatal so diagnostic observability cannot itself prevent playback.
+
+#### Next Steps:
+
+Apply the instrumentation to `host/main_mister/0001-mediaplayer-arm-loader.patch`, exercise its event accounting with a host-side broker test if practical, then build Main with the official ARM toolchain. Install only the exact rebuilt `/media/fat/MiSTer` through staged hash verification, retaining the official rollback and leaving `/media/fat/MediaPlayer.rbf`, `/media/fat/linux/MediaPlayer_Helper`, `01_arm_mp2_audio.mpg` and `/dev/sr0` untouched. After reboot, replay only `01_arm_mp2_audio.mpg`, capture the result and retrieve the temporary broker log before proposing any transport correction.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 403 COMMIT Unreleased 55d06ce 2026-08-23T23:44:24-07:00
 
 #### Coming From:
@@ -1151,34 +1179,6 @@ Build at seed eleven, require every timing category positive, and confirm on MiS
 - tools/streams/decode_hardware_cadence.py
 - tools/streams/tb_h262_hardware_cadence_profiler.sv
 - tools/streams/tb_h262_system_time_clock.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 364 COMMIT Unreleased 9af69b4 2026-08-23T05:01:06-07:00
-
-#### Coming From:
-
-Unreleased 85b4c17
-
-#### Purpose:
-
-Confirm with a second fitter seed that this netlist closes timing repeatably rather than on one favourable placement.
-
-#### Outcome:
-
-Seed ten closed every timing category on `85b4c17`, the first fully closing fit since the Program Stream demux was removed. Decoder setup is plus 0.152 ns, the HDMI framework path plus 0.210 ns, host bridge plus 0.754 ns, video plus 7.556 ns, with hold plus 0.248 ns, recovery plus 4.021 ns, removal plus 0.759 ns and pulse width plus 1.122 ns, using 34,947 ALMs of 41,910, 51,833 registers and unchanged memory and DSP, built in a 12 minute 37 second flow with a 10 minute 26 second fitter. The 4,145,288-byte RBF with SHA-256 `c9bc2ef8061722c4b21803eef2464453be3be475474a290f766511485382af1f` was installed on the MiSTer together with seven regression streams, and the user reports every test passing, which clears the one unvalidated change of this development run: the extra delivery cycle that `ebf372e` introduced on the shared reference path feeding both the mixed and bidirectional prediction engines. The validated set was the prediction-focused subset, namely intra baseline, B bidirectional, B f-code range, P motion residual, P visual discriminator and the five and fifteen second dense-motion squirrel stresses; the multi-slice, dense residual, mixed macroblock, long GOP and full endurance files, the deliberate truncation case and its no-reboot recovery re-run were not exercised and remain outstanding before any release qualification. Comparing seed nine and seed ten on this identical netlist finally measures genuine seed-to-seed variance rather than inferring it: decoder setup moves from plus 0.460 ns to plus 0.152 ns and the HDMI path from minus 0.053 ns to plus 0.210 ns, a spread near 0.3 ns on both, which is roughly half the 0.6 ns figure entry 361 assumed and confirms that figure was measuring the removal of the demux rather than placement variance. That result is not comfortable. Decoder margin at seed ten is plus 0.152 ns against a 0.3 ns spread, so margin remains smaller than variance, and seed nine is a known non-closing seed on this exact netlist, meaning the design closes on some placements and not others. This commit changes only the fitter seed from ten to eleven.
-
-#### Next Steps:
-
-Require every timing category positive at seed eleven. Two closing seeds out of three attempted would establish that closure is reproducible enough to resume feature work, while a second failure would establish the opposite and force the margin question back open with the knowledge that block RAM conversion of the fetched-word store is unavailable in this toolchain. Record both seeds' decoder and HDMI slacks either way, since these are the first controlled variance measurements this project has. Before release qualification, complete the regression pack that tonight's run left unexercised, in particular the long GOP, dense residual and full endurance streams and the truncation case with its no-reboot recovery. Once closure is established, 0.7.0 resumes with the system time clock anchored to the 24.576 MHz audio domain and the PCM sink, both of which will need a small throwaway HPS-side harness to inject synthetic timestamps and a test tone because no daemon exists yet. The six compiled but uninstantiated modules remain worth deleting for navigability with no timing expectation attached, and renaming the decode modules that carry probe names remains worthwhile after 0.7.0.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
 
 #### Status:
 
