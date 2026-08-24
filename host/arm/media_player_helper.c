@@ -20,7 +20,6 @@
 #define PCM_MAX_FREE_VIDEO_BYTES    4096u
 #define PCM_REFILL_FRAMES           128u
 #define PCM_SINK_FIFO_FRAMES        8192u
-#define PCM_STARTUP_VIDEO_BYTES     28672u
 #define PTS_MAX_PICTURE_GAP         60u
 #define VIDEO_SLICE_BYTES           256u
 
@@ -44,18 +43,12 @@
  * so that a batch never has to wait for room.
  */
 /*
- * Entry 455: the second picture start proves the first picture is complete,
- * but on real content it arrives after only a few thousand bytes, so the
- * compressed FIFO in `rtl/mpeg2_stream_fifo.sv` settles near a sixth full and
- * the shared path then runs at real time with no reservoir for a picture whose
- * decode overruns its frame interval.  Paired captures of the same 577
- * pictures measured the cost: presentation hold, the time the display spends
- * waiting because decode is ahead, falls from 13.03 seconds without audio to
- * 0.13 seconds with it, and 174 display gaps cross the outlier threshold.  The
- * lead therefore ends on the second picture and a byte budget that leaves the
- * decoder most of that FIFO to work from.  A payload smaller than the budget
- * still ends its lead on the second picture, because the budget is only
- * reached once the whole first picture has crossed.
+ * Entry 455 ended this lead on a byte budget as well, to leave the decoder
+ * most of the compressed FIFO to work from.  Entry 456 measured that it bought
+ * almost nothing, moving 174 display outliers to 170, and entry 461 found the
+ * cost: a full video FIFO blocks the shared path, so the PCM records queued
+ * behind it wait and the audio sink can starve while the producer is ahead of
+ * schedule.  The lead ends on the second picture again.
  */
 /*
  * The lead is normally ended when the second picture start proves that the
@@ -447,30 +440,22 @@ static void free_video_head(struct output_state *output)
 /* The startup lead ends only when both its bounds are satisfied. */
 static int startup_lead_complete(const struct output_state *output)
 {
-    return output->picture_marks >= 2 &&
-           output->video_bytes >= PCM_STARTUP_VIDEO_BYTES;
+    return output->picture_marks >= 2;
 }
 
 static size_t startup_video_size(const struct output_state *output,
                                  const struct video_chunk *chunk)
 {
-    size_t remaining = chunk->size - chunk->offset;
     uint32_t window = output->video_window;
     unsigned pictures = output->picture_marks;
-    uint64_t budget;
     size_t i;
 
-    if (pictures < 2) {
-        for (i = chunk->offset; i < chunk->size; ++i) {
-            window = (window << 8) | chunk->data[i];
-            if ((window & 0xffffffffu) == 0x00000100u && ++pictures >= 2)
-                return i + 1u - chunk->offset;
-        }
-        return remaining;
+    for (i = chunk->offset; i < chunk->size; ++i) {
+        window = (window << 8) | chunk->data[i];
+        if ((window & 0xffffffffu) == 0x00000100u && ++pictures >= 2)
+            return i + 1u - chunk->offset;
     }
-    budget = output->video_bytes < PCM_STARTUP_VIDEO_BYTES ?
-             PCM_STARTUP_VIDEO_BYTES - output->video_bytes : 0;
-    return (uint64_t)remaining < budget ? remaining : (size_t)budget;
+    return chunk->size - chunk->offset;
 }
 
 /*
