@@ -37,6 +37,10 @@ module mpeg2_h262_b_presentation_scheduler
     output wire candidate_frame_scratch,
     output wire candidate_scratch_bank,
     output wire [1:0] candidate_frame_bank,
+    // Entry 468: passive admission telemetry. These outputs mirror terms
+    // already used below and never feed the scheduler back.
+    output wire cadence_slot_debug,
+    output wire candidate_presentable_debug,
     output reg [2:0] framebuffer_swap_reset_count,
     output wire reference_overlap_header,
     output wire presentation_hold,
@@ -164,6 +168,9 @@ assign candidate_frame_valid=scheduled_frame_valid;
 assign candidate_frame_scratch=scheduled_frame_scratch;
 assign candidate_scratch_bank=scheduled_scratch_bank;
 assign candidate_frame_bank=scheduled_frame_bank;
+assign cadence_slot_debug=cadence_slot;
+assign candidate_presentable_debug=scheduled_frame_valid&&
+                                   scheduled_frame_differs;
 wire scratch0_available=!scratch0_pending&&!queued_scratch0_pending&&
     !(display_scratch&&!display_scratch_bank)&&
     !(decode_inflight&&!decode_scratch_bank)&&

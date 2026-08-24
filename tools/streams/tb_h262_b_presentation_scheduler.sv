@@ -11,6 +11,7 @@ module tb_h262_b_presentation_scheduler;
     wire overlap_header,hold,complete,error;
     wire candidate_frame_valid,candidate_frame_scratch,candidate_scratch_bank;
     wire [1:0] candidate_frame_bank;
+    wire cadence_slot_debug,candidate_presentable_debug;
     integer last_pulse_count=0;
 
     always #5 clk=~clk;
@@ -33,6 +34,8 @@ module tb_h262_b_presentation_scheduler;
         .candidate_frame_scratch(candidate_frame_scratch),
         .candidate_scratch_bank(candidate_scratch_bank),
         .candidate_frame_bank(candidate_frame_bank),
+        .cadence_slot_debug(cadence_slot_debug),
+        .candidate_presentable_debug(candidate_presentable_debug),
         .framebuffer_swap_reset_count(reset_count),
         .reference_overlap_header(overlap_header),.presentation_hold(hold),
         .presentation_complete(complete),.presentation_error(error));
@@ -89,7 +92,15 @@ module tb_h262_b_presentation_scheduler;
         end
     endtask
     task automatic pulse_window;
-        begin @(negedge clk);swap<=1;@(negedge clk);swap<=0;#1;end
+        begin
+            @(negedge clk);swap<=1;#1;
+            if(cadence_slot_debug!==dut.cadence_slot)
+                $fatal(1,"cadence telemetry changed source term");
+            if(candidate_presentable_debug!==
+               (dut.scheduled_frame_valid&&dut.scheduled_frame_differs))
+                $fatal(1,"candidate telemetry changed source term");
+            @(negedge clk);swap<=0;#1;
+        end
     endtask
     task automatic pulse_swap;
         reg before_display_scratch;

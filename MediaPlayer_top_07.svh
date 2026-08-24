@@ -40,7 +40,9 @@ wire [15:0] mpeg2_new_cadence_error_flags = {
     mpeg2_new_syntax_error
 };
 
-mpeg2_h262_hardware_cadence_profiler
+mpeg2_h262_hardware_cadence_profiler #(
+    .PROFILE_START_STC_SECONDS(14'd500)
+)
 mpeg2_h262_hardware_cadence_profiler
 (
     .clk_mpeg2                 (clk_mpeg2),
@@ -58,6 +60,11 @@ mpeg2_h262_hardware_cadence_profiler
     .presentation_complete     (mpeg2_new_b_presentation_complete),
     .presentation_error        (mpeg2_new_b_presentation_error),
     .scheduler_debug_state     (mpeg2_new_b_scheduler_debug_state),
+    .swap_window_pulse         (mpeg2_new_swap_window_pulse),
+    .candidate_presentable     (mpeg2_new_b_candidate_presentable_debug),
+    .timestamp_candidate_active(mpeg2_new_timestamp_candidate_active),
+    .timestamp_candidate_due   (mpeg2_new_timestamp_candidate_due),
+    .cadence_slot              (mpeg2_new_b_cadence_slot_debug),
     .decoder_byte_accepted     (mpeg2_new_decode_stream_valid),
     .stc_seconds               (mpeg2_new_stc_seconds),
     .associated_count          (mpeg2_new_associated_count),

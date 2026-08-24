@@ -12,6 +12,8 @@ reg frame_waiting=0;
 reg [1:0] completed_frame_bank=0;
 reg presentation_complete=0,presentation_error=0;
 reg [31:0] scheduler_debug_state=0;
+reg swap_window_pulse=0,candidate_presentable=0;
+reg timestamp_candidate_active=0,timestamp_candidate_due=0,cadence_slot=0;
 reg decoder_byte_accepted=0;
 reg [2:0] picture_coding_type=3'b001;
 reg [9:0] temporal_reference=0;
@@ -41,7 +43,8 @@ reg [31:0] checksum;
 mpeg2_h262_hardware_cadence_profiler #(
     .TERMINAL_SNAPSHOT_DELAY(32),
     .NO_PROGRESS_SNAPSHOT_DELAY(64),
-    .OUTLIER_GAP_CYCLES(32'd10)
+    .OUTLIER_GAP_CYCLES(32'd10),
+    .PROFILE_START_STC_SECONDS(14'd5)
 ) dut(
     .clk_mpeg2(clk_mpeg2),.reset_mpeg2(reset_mpeg2),
     .clk_video(clk_video),.reset_video(reset_video),
@@ -52,6 +55,11 @@ mpeg2_h262_hardware_cadence_profiler #(
     .presentation_complete(presentation_complete),
     .presentation_error(presentation_error),
     .scheduler_debug_state(scheduler_debug_state),
+    .swap_window_pulse(swap_window_pulse),
+    .candidate_presentable(candidate_presentable),
+    .timestamp_candidate_active(timestamp_candidate_active),
+    .timestamp_candidate_due(timestamp_candidate_due),
+    .cadence_slot(cadence_slot),
     .decoder_byte_accepted(decoder_byte_accepted),
     .picture_coding_type(picture_coding_type),
     .temporal_reference(temporal_reference),.frame_rate_code(frame_rate_code),
@@ -99,6 +107,14 @@ begin
 end
 endtask
 
+task pulse_admission_window;
+begin
+    @(negedge clk_mpeg2);swap_window_pulse=1;
+    @(negedge clk_mpeg2);swap_window_pulse=0;
+    repeat(2)@(posedge clk_mpeg2);
+end
+endtask
+
 task reset_all;
 begin
     reset_mpeg2=1;reset_video=1;
@@ -107,10 +123,13 @@ begin
     fifo_pending=0;decoder_ready=1;
     presentation_hold=0;destination_hold=0;frame_waiting=0;
     scratch_available=0;promotion_active=0;
+    swap_window_pulse=0;candidate_presentable=0;
+    timestamp_candidate_active=0;timestamp_candidate_due=0;cadence_slot=0;
     completed_frame_bank=0;display_frame_bank=0;display_scratch=0;
     display_scratch_bank=0;presentation_complete=0;presentation_error=0;
     scheduler_debug_state=0;decoder_byte_accepted=0;error_flags=0;
     pcm_sample_count=0;pcm_fifo_peak=0;
+    stc_seconds=14'd5;
     repeat(5)@(posedge clk_mpeg2);reset_mpeg2=0;
     repeat(5)@(posedge clk_video);reset_video=0;
 end
@@ -144,6 +163,38 @@ end
 endtask
 
 initial begin
+    // Entry 468: neither direction may count before the late-window gate.
+    reset_all();
+    stc_seconds=0;
+    activate_session();
+    picture_count=1;
+    pulse_reference();
+    repeat(12)@(posedge clk_mpeg2);swap_bank(1);
+    repeat(12)@(posedge clk_mpeg2);swap_bank(2);
+    if(dut.largest_gap_0!=0||dut.gap_outlier_count!=0)
+        $fatal(1,"pre-window display gap was ranked");
+    candidate_presentable=1;timestamp_candidate_active=1;
+    cadence_slot=1;timestamp_candidate_due=0;
+    pulse_admission_window();
+    if(dut.timestamp_delay_conflict_count!=0)
+        $fatal(1,"pre-window timestamp delay was counted");
+
+    // At and after the gate, count the two mutually exclusive admission
+    // conflicts at eligible raster windows and preserve them in word 24.
+    stc_seconds=5;repeat(2)@(posedge clk_mpeg2);
+    pulse_admission_window();
+    cadence_slot=0;timestamp_candidate_due=1;
+    pulse_admission_window();
+    candidate_presentable=0;timestamp_candidate_active=0;
+    sequence_end_seen=1;session_quiet=1;
+    wait(snapshot_ready);repeat(4)@(posedge clk_video);
+    if(dut.snapshot_sync_2[799:768]!=={16'd1,16'd1})
+        $fatal(1,"timestamp conflict counts mismatch %h",
+               dut.snapshot_sync_2[799:768]);
+    if(dut.snapshot_sync_2[863:832]!==0)
+        $fatal(1,"pre-window gap contaminated late ranking");
+    verify_checksum();
+
     reset_all();
     fifo_pending=1;
     activate_session();
@@ -167,7 +218,7 @@ initial begin
 
     if(dut.snapshot_sync_2[31:0]!==32'h4d4d5031)
         $fatal(1,"bad magic %h",dut.snapshot_sync_2[31:0]);
-    if(dut.snapshot_sync_2[63:32]!==32'h0826ea60)
+    if(dut.snapshot_sync_2[63:32]!==32'h0926ea60)
         $fatal(1,"bad format %h",dut.snapshot_sync_2[63:32]);
     if(dut.snapshot_sync_2[831:830]!==2'd1)
         $fatal(1,"quiet snapshot reason missing");
@@ -198,7 +249,8 @@ initial begin
     activate_session();
     picture_count=1;
     pulse_reference();
-    repeat(12)@(posedge clk_mpeg2);swap_bank(1);
+    swap_bank(1);
+    repeat(12)@(posedge clk_mpeg2);swap_bank(2);
     sequence_end_seen=1;fifo_pending=0;session_quiet=1;
     wait(snapshot_ready);repeat(4)@(posedge clk_video);
     if(dut.snapshot_sync_2[607:604]!==4'd2)
@@ -216,7 +268,8 @@ initial begin
     activate_session();
     picture_count=1;
     pulse_reference();
-    repeat(12)@(posedge clk_mpeg2);swap_bank(1);
+    swap_bank(1);
+    repeat(12)@(posedge clk_mpeg2);swap_bank(2);
     sequence_end_seen=1;fifo_pending=0;session_quiet=1;
     wait(snapshot_ready);repeat(4)@(posedge clk_video);
     if(dut.snapshot_sync_2[607:604]!==4'd1)
@@ -233,7 +286,8 @@ initial begin
     activate_session();
     picture_count=1;
     pulse_reference();
-    repeat(12)@(posedge clk_mpeg2);swap_bank(1);
+    swap_bank(1);
+    repeat(12)@(posedge clk_mpeg2);swap_bank(2);
     sequence_end_seen=1;fifo_pending=0;session_quiet=1;
     wait(snapshot_ready);repeat(4)@(posedge clk_video);
     if(dut.snapshot_sync_2[607:604]!==4'd4)
@@ -249,7 +303,8 @@ initial begin
     activate_session();
     picture_count=1;
     pulse_reference();
-    repeat(12)@(posedge clk_mpeg2);swap_bank(1);
+    swap_bank(1);
+    repeat(12)@(posedge clk_mpeg2);swap_bank(2);
     sequence_end_seen=1;fifo_pending=0;session_quiet=1;
     wait(snapshot_ready);repeat(4)@(posedge clk_video);
     if(dut.snapshot_sync_2[607:604]!==4'd5)
@@ -326,7 +381,7 @@ initial begin
     if({video_r,video_g,video_b}!==24'h123456)
         $fatal(1,"base video changed outside overlay");
 
-    $display("HARDWARE_CADENCE_PROFILER_PASS schema=8 audio-defer+forced+fatal+no-progress checksum=%h",
+    $display("HARDWARE_CADENCE_PROFILER_PASS schema=9 late-window+timestamp-conflicts+audio-defer+forced+fatal+no-progress checksum=%h",
              checksum);
     $finish;
 end

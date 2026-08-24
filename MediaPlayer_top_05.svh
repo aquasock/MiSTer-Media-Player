@@ -101,6 +101,8 @@ end
 // alternates two scratch frames and owns the complete B...B->future-reference
 // presentation transaction, including fail-open error retirement.
 wire [31:0] mpeg2_new_b_scheduler_debug_state;
+wire mpeg2_new_b_cadence_slot_debug;
+wire mpeg2_new_b_candidate_presentable_debug;
 mpeg2_h262_picture_timestamp mpeg2_h262_picture_timestamp
 (
     .clk                     (clk_mpeg2),
@@ -168,6 +170,8 @@ mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
     .candidate_frame_scratch     (mpeg2_new_candidate_frame_scratch),
     .candidate_scratch_bank      (mpeg2_new_candidate_scratch_bank),
     .candidate_frame_bank        (mpeg2_new_candidate_frame_bank),
+    .cadence_slot_debug          (mpeg2_new_b_cadence_slot_debug),
+    .candidate_presentable_debug (mpeg2_new_b_candidate_presentable_debug),
     .framebuffer_swap_reset_count(mpeg2_new_framebuffer_swap_reset_count),
     .reference_overlap_header    (mpeg2_new_b_reference_overlap_header),
     .presentation_hold           (mpeg2_new_b_presentation_hold),

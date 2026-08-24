@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Decode the Entry-312 machine-readable cadence overlay from a MiSTer PNG."""
+"""Decode the machine-readable cadence overlay from a MiSTer PNG."""
 
 from __future__ import annotations
 
@@ -81,6 +81,7 @@ def decode_words(path: Path | str) -> list[int]:
 
 def parse_words(words: list[int]) -> dict[str, Any]:
     format_word = words[1]
+    schema_version = (format_word >> 24) & 0xFF
     clock_hz = (format_word & 0xFFFF) * 1000
     counts = words[17]
     metadata = words[18]
@@ -95,7 +96,7 @@ def parse_words(words: list[int]) -> dict[str, Any]:
     scheduler = words[36]
 
     def scheduler_flags(state: int) -> dict[str, Any]:
-        return {
+        result = {
             "reorder_active": bool(state & (1 << 0)),
             "run_closed": bool(state & (1 << 1)),
             "decode_inflight": bool(state & (1 << 2)),
@@ -127,12 +128,13 @@ def parse_words(words: list[int]) -> dict[str, Any]:
             "last_bound_reference_valid": bool(state & (1 << 30)),
             "scheduler_presentation_complete": bool(state & (1 << 31)),
         }
+        return result
 
     def gap(rank: int, word_index: int) -> dict[str, Any]:
         cycles = words[word_index]
         metadata = words[word_index + 1]
         state = words[word_index + 2]
-        return {
+        result = {
             "rank": rank,
             "cycles": cycles,
             "seconds": cycles / clock_hz if clock_hz else 0.0,
@@ -155,9 +157,20 @@ def parse_words(words: list[int]) -> dict[str, Any]:
             "scheduler_debug_word": state,
             "scheduler_flags": scheduler_flags(state),
         }
+        if schema_version >= 9:
+            result.update(
+                {
+                    "timestamp_candidate_active": bool((metadata >> 6) & 1),
+                    "timestamp_candidate_due": bool((metadata >> 5) & 1),
+                    "cadence_slot": bool((metadata >> 4) & 1),
+                    "candidate_presentable": bool((metadata >> 3) & 1),
+                    "swap_window_pulse": bool((metadata >> 2) & 1),
+                }
+            )
+        return result
 
     return {
-        "schema_version": (format_word >> 24) & 0xFF,
+        "schema_version": schema_version,
         "snapshot_words": (format_word >> 16) & 0xFF,
         "decoder_clock_hz": clock_hz,
         "accepted_bytes": words[2],
@@ -212,7 +225,19 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "destination_hold_total_cycles": words[21],
         "hold_overlap_cycles": words[22],
         "hold_scratch_available_cycles": words[23],
-        "hold_promotion_pending_cycles": words[24],
+        "hold_promotion_pending_cycles": (
+            None if schema_version >= 9 else words[24]
+        ),
+        # Entry 468 (schema 9): word 24 becomes two saturated late-window
+        # admission-conflict counts. The installed diagnostic starts at STC
+        # second 500; the fixed overlay remains 38 words.
+        "late_window_start_seconds": 500 if schema_version >= 9 else None,
+        "timestamp_delay_conflicts": (
+            (words[24] >> 16) & 0xFFFF if schema_version >= 9 else None
+        ),
+        "timestamp_advance_conflicts": (
+            words[24] & 0xFFFF if schema_version >= 9 else None
+        ),
         "snapshot_reason_code": (snapshot_meta >> 30) & 0x3,
         "snapshot_reason": {
             1: "quiet",
@@ -341,6 +366,14 @@ def main() -> int:
                 **result
             )
         )
+        if result["schema_version"] >= 9:
+            print(
+                "late-window: start={late_window_start_seconds}s "
+                "timestamp_delay={timestamp_delay_conflicts} "
+                "timestamp_advance={timestamp_advance_conflicts}".format(
+                    **result
+                )
+            )
         print(
             "largest gaps: "
             + ", ".join(
