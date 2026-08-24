@@ -1,3 +1,31 @@
+## 396 COMMIT Unreleased a57079f 2026-08-23T22:22:07-07:00
+
+#### Coming From:
+
+Unreleased a57079f
+
+#### Purpose:
+
+Bind the first PCM milestone to its single timing-clean Quartus candidate and exact hardware image.
+
+#### Outcome:
+
+Source `a57079f` completes the single authorized seed-eleven Quartus 17.0.2 build in 13 minutes 16 seconds with zero errors and 146 warnings. It uses 36,009 ALMs, 52,657 registers, 3,236,819 memory bits, 410 RAM blocks, 65 DSP blocks and three PLLs, a delta of 343 ALMs, 455 registers, 8,716 memory bits, two RAM blocks and zero DSP blocks from the accepted timestamp build. Every timing category is positive with zero endpoint TNS: plus 0.175 ns HDMI setup, plus 0.658 ns host setup, plus 0.857 ns decoder setup, plus 7.520 ns video setup, plus 13.183 ns audio setup, plus 0.248 ns hold, plus 4.293 ns global recovery, plus 10.425 ns decoder recovery, plus 37.782 ns audio recovery, plus 0.597 ns removal and plus 1.122 ns minimum pulse width. The dedicated Phase-1P reports find zero violations across 100 same-clock decoder paths, 80 same-clock video paths and 30 decoder recovery paths. This confirms that the timing-closed Audio control mailboxes avoid the recovery and cross-clock setup failures previously found in the companion implementation. The resulting 4,214,932-byte `MediaPlayer.rbf` has SHA-256 `ad04f9f73c0fb98309588f8c212c6ccad71c80b254a2a284f637672a73350d37`.
+
+#### Next Steps:
+
+Install the exact RBF persistently on the MiSTer and retrieve it byte-identically before testing. Verify Audio Test Off is silent, each 44.1 and 48 kHz mono mode is centered and duplicated to both channels, each stereo mode carries the 440 Hz left and 660 Hz right proof tones, mode changes and reset re-arm cleanly, and use only `04_b_bidirectional.m2v` as the one video regression for this build cycle with the normal LED and telemetry gate.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 395 COMMIT Unreleased a57079f 2026-08-23T22:02:41-07:00
 
 #### Coming From:
@@ -1179,39 +1207,6 @@ Treat this exact image as the accepted timing-hardened Program Stream boundary a
 - MediaPlayer_top_00.svh
 - rtl/mpeg2_new/mpeg2_h262_stream_transport_gate.sv
 - tools/streams/tb_h262_stream_transport_gate.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 356 COMMIT Unreleased c4d9631 2026-08-22T20:42:22-07:00
-
-#### Coming From:
-
-Unreleased f5e3b83
-
-#### Purpose:
-
-Add a bounded H.222.0 MPEG-2 Program Stream and video PES ingress layer while preserving raw elementary-stream playback.
-
-#### Outcome:
-
-Commit `c4d9631` places a bounded ready-valid H.222.0 parser between the accepted 32 KiB input FIFO and unchanged H.262 decoder, auto-detects MPEG-2 Program Streams from their initial pack start code, and otherwise replays the four probe bytes before exact raw `.m2v` pass-through. It validates MPEG-2 pack fixed fields and stuffing, skips declared system headers and non-selected packets, selects the first `0xE0` through `0xEF` video stream ID, validates bounded MPEG-2 PES optional headers and timestamp markers, emits only video payload, distinguishes program end, and reports malformed or truncated systems input without adding bulk storage. Focused Icarus tests prove raw replay, pack and PES extraction under backpressure and error codes two, five and ten; a real 1,423,364-byte FFmpeg Program Stream extracts and emits the exact 1,404,944-byte source payload in both software and RTL. Reusable Verilator runs retain exact B-prediction, multi-slice and five-second squirrel results. The incremental seed-nine Quartus 17.0.2 image reproduces byte-for-byte after a temporary diagnostic-counter experiment is reverted by `cf234d7`: it completes with zero errors at plus 0.018 ns global setup, plus 0.026 ns decoder setup, plus 7.114 ns video setup, plus 0.249 ns hold, plus 3.800 ns recovery, plus 0.488 ns removal and plus 1.122 ns pulse width, using 35,335 ALMs, 51,502 registers, 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks. The 4,221,088-byte RBF has SHA-256 `89f26ed3571e3bf03038025c25508857df54019e1113d0636bd33dfc79542041`. Matched raw and Program Stream MiSTer runs each deliver the same 1,404,944 decoder bytes, 41 reference pictures, 79 B pictures, 120 displayed pictures and 119 swaps with zero errors and clean terminal completion; the four established hardware regressions retain complete reference-plus-B counts and zero errors, including the known odd-byte transport pad and eight-bit display-counter wrap conventions. The exact RBF and visible `STEP2_SQUIRREL_PROGRAM_STREAM.mpg` test are installed and retrieved byte-identically, the full build state is preserved outside the repository, and documentation commit `15ede96` records the new v0.7.0 boundary without changing the protected AI-assisted-development section. Real PTS scheduling, audio decoding, MPEG-1 systems syntax, Program Stream Map interpretation and corruption resynchronization remain deferred.
-
-#### Next Steps:
-
-Preserve this timing-clean Program Stream image as the rollback boundary. As a separate timing-hardening cycle, replace the route-dominated shared P/B replay selection with a one-entry registered ready-valid work packet that carries its selector, motion and residual fields atomically; require randomized stall equivalence, every focused decoder regression, positive timing with materially improved 60 MHz margin and unchanged hardware playback before acceptance. After that boundary is stable, capture validated PES timestamps and connect real PTS-driven scheduling without adding audio or broadening the systems subset in the same change.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_07.svh
-- files.qip
-- rtl/mpeg2_new/mpeg2_h222_program_stream_demux.sv
-- tools/streams/tb_h222_program_stream_demux.sv
-- tools/streams/tb_h222_program_stream_demux_file.sv
 
 #### Status:
 
