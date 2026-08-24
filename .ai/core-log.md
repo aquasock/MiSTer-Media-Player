@@ -1,3 +1,31 @@
+## 447 COMMIT Unreleased f2b2e02 2026-08-24T06:57:42-07:00
+
+#### Coming From:
+
+Unreleased f2b2e02
+
+#### Purpose:
+
+Install the exact helper-side H.262 rate preflight with a byte-verified rollback while leaving the accepted FPGA image and qualification media unchanged.
+
+#### Outcome:
+
+Read-only retrieval first confirmed `/media/fat/linux/MediaPlayer_Helper` at the accepted 361,452-byte SHA-256 `4c0f1d2c3e9c229ccad38b683701968feac7b9f1111de20ec6b4a3f0864b2576` and `/media/fat/MediaPlayer.rbf` unchanged at 4,126,828-byte SHA-256 `1fe3f61a8286e42e38db4c50eef6a112f31106590e6cdbcc6715fff82544b4ea`. Candidate `f2b2e02` was uploaded as `/media/fat/linux/MediaPlayer_Helper.stage.f2b2e02`, marked executable, retrieved and compared byte-for-byte at SHA-256 `4b496d9725dc520bd463a4e22e22430ebb575e778cf65cfd3f9c20a8e7479a58` before any active-name mutation. The current helper was then preserved exactly as `/media/fat/linux/MediaPlayer_Helper.backup.pre-rate-gate.3814243` and the verified stage promoted. Independent post-promotion retrieval reproduces the candidate hash for the active mode-0755 helper and the predecessor hash for the rollback. The RBF remains byte-identical, as do `00_good_480p_48k.mpg` at SHA-256 `1455af94803b1d9958a93fbdb978aa2a42c1d8045a9491f904ad1ad9b8ccdad5` and `14_bad_rate_50.mpg` at SHA-256 `6a698ada56937d19a4b1215f3f79f9ee6a4f7a9e46a9305119b6956c07aa8fcb`. Main and every other media file were untouched, and no playback or reboot occurred during installation.
+
+#### Next Steps:
+
+Without rebooting, run only `14_bad_rate_50.mpg` and wait no more than ten seconds. It must return promptly without displaying the video or producing the ordinary successful USER-solid, DISK-eleven-blink and POWER-solid combination; report the screen, sound and all three LEDs. Then immediately select `00_good_480p_48k.mpg` without rebooting and report alignment, sound, picture and all three LEDs, leaving its final image loaded for launch-free capture. Do not run `15_bad_truncated.mpg` or `20_bbb_full_48k.mpg` until this corrected rejection-and-recovery pair passes.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 446 COMMIT Unreleased f2b2e02 2026-08-24T06:48:23-07:00
 
 #### Coming From:
@@ -1147,34 +1175,6 @@ Keep the USB DVD drive disconnected, reboot once to start the installed `8fc80ee
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 407 COMMIT Unreleased 8fc80ee 2026-08-24T00:12:57-07:00
-
-#### Coming From:
-
-Unreleased b357c51
-
-#### Purpose:
-
-Resolve MediaPlayer menu selections to Main's established absolute storage path before starting the ARM helper.
-
-#### Outcome:
-
-Commit `8fc80ee` confines the correction to the isolated Main patch. `mediaplayer_start` continues rejecting unsupported extensions, then immediately copies the path returned by Main's existing `getFullPath` resolver into the helper's `file:` source specification before the resolver's shared buffer can change. This corrects the demonstrated relative-path failure without hardcoding the SD-card mount, changing the helper protocol, altering transfer behavior or adding DVD work, and preserves the same resolution behavior Main already uses for SD, USB and network-backed menu selections. The patch applies cleanly to pinned official Main commit `0a8fb44`. Two clean builds with the verified official Arm GNU 10.2-2020.11 compiler produce byte-identical 1,166,244-byte ARM EABI5 executables at SHA-256 `16517a9927c659616796b45c8e2488da2a26f0595c91418ed09dc0eb7a5787aa`.
-
-#### Next Steps:
-
-Install only the exact Main at SHA-256 `16517a9927c659616796b45c8e2488da2a26f0595c91418ed09dc0eb7a5787aa` through staged upload and independent remote verification while preserving the current diagnostic Main for rollback. Keep the accepted RBF, helper, `01_arm_mp2_audio.mpg` and disconnected DVD untouched; after reboot, run only that Program Stream and require normal video, the embedded left and right tones, clean completion and normal LEDs before any further source cycle.
-
-#### Files Modified:
-
-- host/main_mister/0001-mediaplayer-arm-loader.patch
 
 #### Status:
 
