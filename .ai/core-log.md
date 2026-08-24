@@ -1,3 +1,38 @@
+## 465 COMMIT Unreleased cd8d78a 2026-08-24T11:25:18-07:00
+
+#### Coming From:
+
+Unreleased 6dece4c
+
+#### Purpose:
+
+Decouple clean video from in-band PCM after extraction with a bounded timing-clean queue while preserving timestamp-to-picture ordering.
+
+#### Outcome:
+
+The entry 464 boundary was approved and is commit `cd8d78a`. A 16 KiB clean-video FIFO now sits after `mpeg2_h262_inband_metadata`, so a decoder ownership stall can queue video while the extractor continues crossing later PCM records into the existing audio FIFO; at the full-soak video's measured 138 KiB/s elementary-stream rate this is 115.9 milliseconds, beyond the repeated 82.896-millisecond stalls that exhaust the helper's 4,096-frame or 85.3-millisecond audio reserve, without paying for the unrelated 431-millisecond startup transient. Timestamp ordering could not be assumed: permanent host analysis found only 4,017 clean video bytes between the closest two of the soak's 598 records. A sixteen-entry companion FIFO therefore carries each PTS with its absolute clean-byte position and releases it only when the decoder reaches that position, while a new metadata readiness handshake holds a record's final byte if that companion queue fills. The integrated simulation holds the decoder for the entire input burst, proves three PCM frames still cross, then drains all 160 clean bytes byte-identically and releases two timestamps at exact byte positions 32 and 96; the extractor separately proves metadata backpressure without loss, and the picture timestamp, presentation timeline, scheduler, transport gate, download rearm, system clock, cadence profiler, PCM output and 8,192-frame PCM FIFO regressions pass. The full helper analysis preserves 84,423,309 clean video bytes, 28,628,352 PCM frames at SHA-256 `337b1387b9324b6c391a3223ced8f7660bd5144267b29d3964b4ed6b282839af`, 598 timestamps, a 4,052-byte maximum PCM-free span, zero audio deficit and the established 207,888,468-byte transport. Quartus 17.0.2 completes in ten minutes 24 seconds with zero errors and timing met: worst setup slack is 0.512 nanoseconds, hold 0.248, recovery 3.805, removal 0.600 and minimum pulse width 1.122, while the Phase-1P reports show decoder setup 1.519 nanoseconds over 100 same-clock paths with none violated, decoder recovery 10.785 and video setup 7.124. The design uses 29,316 ALMs, 45,115 registers, 3,655,139 memory bits at 65 percent, 464 of 553 RAM blocks at 84 percent and 65 DSP blocks; the queue itself costs 132,112 bits and eighteen RAM blocks, exactly sixteen for video and two for timestamp positions. The 4,196,780-byte RBF is SHA-256 `39106371e9f26a5a0bc62e703bd5df33f9ea07882fc8d8002cb7e0bc6e9b55f3` and was installed through plain FTP after staged roundtrip verification, with the previous 4,110,808-byte `6dece4c` image preserved byte-identically as `/media/fat/MediaPlayer.backup.pre-clean-video-queue.6dece4c.rbf` at SHA-256 `ee7ff41b5cf76693f491d72999b0caa39abd36ff1a2ae7921a2ad7aabb58e940`; the helper, Main and every media file are unchanged.
+
+#### Next Steps:
+
+Power-cycle once to load `cd8d78a`, set Audio Test to Off and run `23_bbb_opening24_exact_av.mpg`, then leave its final image loaded for a schema-eight capture. Require intact audio, smooth video, zero aggregate, PCM protocol, decoder, presentation and destination errors, no audio underrun, all 577 pictures displayed with sequence end and presentation complete, and timestamp association unchanged; a picture-count or timestamp failure means the companion position queue is wrong and calls for immediate rollback to `MediaPlayer.backup.pre-clean-video-queue.6dece4c.rbf`. If that diagnostic is clean, run `20_bbb_full_48k.mpg` end to end and compare the slight credits cadence separately from the fatal condition: primary acceptance is a quiet completion with `audio_pcm_underrun` clear, sequence end and all 14,315 pictures accounted for, while the visual comparison decides whether the queue also affects the residual presentation beat.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- files.qip
+- rtl/mpeg2_new/mpeg2_h262_clean_video_queue.sv
+- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
+- tools/streams/analyze_arm_av_transport.py
+- tools/streams/tb_h262_clean_video_queue.sv
+- tools/streams/tb_h262_inband_metadata.sv
+- tools/streams/tb_h262_inband_metadata_file.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 464 COMMIT Unreleased 6dece4c 2026-08-24T10:58:31-07:00
 
 #### Coming From:
@@ -1196,38 +1231,6 @@ Install the resulting RBF at SHA-256 `74913cd13a7ecaa3748461da755041b32f47c61e9b
 - MediaPlayer_top_05.svh
 - rtl/mpeg2_new/mpeg2_h262_pts_presentation_timeline.sv
 - tools/streams/tb_h262_pts_presentation_timeline.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 425 COMMIT Unreleased 4220cdc 2026-08-24T03:45:41-07:00
-
-#### Coming From:
-
-Unreleased d9022e6
-
-#### Purpose:
-
-Record the hardware failure of the audio start gate, its root cause, and the rollback and revert that restore the accepted state.
-
-#### Outcome:
-
-Running `02_arm_mp2_faded_tones.mpg` on `d9022e6` hung the machine: the user reported a black screen with a short code in the corner and no playback. A screenshot command written to `/dev/MiSTer_cmd` over FTP was accepted but produced no file while ordinary FTP directory listing still worked, so MiSTer Main was wedged rather than Linux, and no schema-eight telemetry could be taken. Static tracing identifies a deadlock that the approved approach makes unavoidable in the current architecture, and the error is in the premise rather than in the implementation. The gate assumed audio and video are independently gated, but they share one back-pressured byte path. `MediaPlayer_top_00.svh` assigns `audio_pcm_ready` from `!audio_pcm_fifo_full` and forwards it to `mpeg2_new_inband_pcm_ready`, while `mpeg2_h262_inband_metadata.sv` includes `(!pcm_payload_final || pcm_ready)` in its `input_ready` term, so the in-band extractor stops accepting bytes from the HPS stream whenever the PCM sink is full. Holding the PCM output therefore fills the FIFO, deasserts `pcm_ready`, stalls the shared byte path, starves the video elementary stream, prevents any picture from decoding or presenting, and so prevents `video_started` from ever asserting, which holds the PCM output. The five-second bound does eventually release audio, but only after the decoder has been byte-starved for five seconds, by which point the core and Main are wedged. `tb_audio_pcm_output_adapter` could not have caught this because it drives the FIFO directly with no in-band extractor and no shared stream in the loop, so the adapter is correct in isolation and wrong in place. The MiSTer was rolled back over FTP: the failed image is retained as `/media/fat/MediaPlayer.failed.d9022e6.rbf`, and `/media/fat/MediaPlayer.rbf` verifies once more at SHA-256 `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68`, the accepted `047f5b2`. Commit `4220cdc` reverts both `946e81f` and `d9022e6` so that master's functional RTL is byte-identical to `047f5b2` again, retaining only the correction to the stale comment in `MediaPlayer_top_00.svh` that wrongly described presentation as free-running.
-
-#### Next Steps:
-
-The approved audio-delay approach cannot be implemented on the FPGA side without a buffer large enough to absorb the offset, because any hold on the PCM sink stalls video through the shared path; at 48 kHz stereo the measured 1.372-second offset is roughly 2.3 megabits in the current 35-bit sample format against about 2.28 megabits of free block memory, so it does not fit. Two viable directions remain and the user must choose before any further change. The first is to move the delay into the ARM helper, which has ample Linux memory and controls the byte stream directly, withholding PCM records for a lead while continuing to emit video bytes so the shared path never stalls. The second, and the cheaper and more standard of the two, is to remove the offset at its source: `mpeg2_h262_pts_presentation_timeline` anchors `stc_90k` to the first in-band metadata timestamp, so a picture whose own timestamp sits ahead of that anchor waits the difference, and anchoring instead to the first picture candidate would present the first picture immediately while preserving every subsequent interval, at a cost of roughly a mux and a condition rather than the logic and timing the user declined to spend. Take no further hardware action until that choice is made; the MiSTer needs a power cycle to load the restored `047f5b2`.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_05.svh
-- rtl/audio/audio_pcm_output_adapter.sv
-- tools/streams/tb_audio_pcm_output_adapter.sv
 
 #### Status:
 
