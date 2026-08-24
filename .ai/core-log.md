@@ -1,3 +1,50 @@
+## 483 COMMIT Unreleased ??? 2026-08-24T16:09:09-07:00
+
+#### Coming From:
+
+Unreleased 4c4d0e3
+
+#### Purpose:
+
+Implement and qualify the first native 720x480 interlaced presentation path for the already-proven stable-field-order, frame-DCT all-I subset, while retaining an explicit progressive diagnostic fallback and making no SDI or processing-bypass claim.
+
+#### Outcome:
+
+Pending implementation and qualification. Use CTA VIC 6/7 geometry as independently represented by the Linux DRM mode table: a 13.5 MHz logical sample clock, 720 active samples, horizontal positions 739/801/858, 480 active frame lines, vertical positions 488/494/525, negative sync polarity, interlace and double-clock semantics. Run the video domain at an exact four-times logical sample rate, generate two 262.5-line fields with continuous horizontal phase, expose top/bottom field identity through `VGA_F1`, and provide distinct every-field cadence and once-per-frame presentation windows so the existing 30000/1001 scheduler floor continues to accumulate at field rate while physical frame-bank swaps occur only before the authored first field. Associate `top_field_first` with physical frame ownership rather than sampling live parser state; bound native activation to a stable field order within the session and fall back diagnostically if it changes. Extend the DDR line cache so top and bottom fields read even and odd luma lines respectively, while interlaced 4:2:0 chroma rows are shared by pairs of same-field luma lines and refilled in presentation order. Preserve the existing progressive full-frame diagnostic reader as a selectable/non-interlaced fallback, and leave field pictures, field-DCT, repeat-first-field, interlaced P/B pictures, the user-facing compatibility claim and all external processing/SDI work unsupported.
+
+#### Next Steps:
+
+Add the exact timing generator and exhaustive field/frame geometry regression first. Then integrate the field-aware cache, physical frame metadata, separate cadence/presentation windows and MiSTer field output; update existing scheduler and progressive display regressions for the new interfaces. Run TFF, BFF, progressive-control and field-order-change negative simulations, check the compatibility boundary remains explicit, and complete a clean Quartus build plus focused timing analysis. Do not install an RBF until all host and RTL evidence passes; any candidate installation must use plain FTP with the default MiSTer username and password and no SSH keys, followed by separate TFF and BFF visual tests.
+
+#### Files Modified:
+
+- .ai/core-reference.md
+- rtl/pll/pll_0002.v
+- rtl/mpeg2_video_output_timing.sv
+- rtl/mpeg2_luma_framebuffer.sv
+- rtl/mpeg2_new/mpeg2_h262_frontend.sv
+- rtl/mpeg2_new/mpeg2_h262_picture_timestamp.sv
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_02.svh
+- MediaPlayer_top_04.svh
+- MediaPlayer_top_05.svh
+- MediaPlayer_top_06.svh
+- MediaPlayer_top_07.svh
+- MediaPlayer.sdc
+- tools/phase1p_timing.tcl
+- files.qip
+- tools/streams/tb_native_480i_timing.sv
+- tools/streams/run_native_480i_timing.sh
+- directly affected regression benches/scripts
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 482 COMMIT Unreleased 4c4d0e3 2026-08-24T15:29:53-07:00
 
 #### Coming From:
@@ -1195,34 +1242,6 @@ The user reports that `13_bad_geometry_pal.mpg` behaves exactly like the precedi
 #### Next Steps:
 
 Without rebooting, run `14_bad_rate_50.mpg` for no more than ten seconds, record its visible result and USER, DISK and POWER states, then immediately run `00_good_480p_48k.mpg` and record alignment, sound, picture and all three LEDs again. An explicit rejection or non-successful settlement followed by a clean control is a pass; stop and report an unavailable menu, ignored input or failed control before any reboot. Do not continue to `15_bad_truncated.mpg` until this fifth pair is recorded.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 443 COMMIT Unreleased 3814243 2026-08-24T06:39:27-07:00
-
-#### Coming From:
-
-Unreleased 3814243
-
-#### Purpose:
-
-Qualify explicit decoder rejection and recovery for the out-of-envelope 1280x720 geometry case.
-
-#### Outcome:
-
-Loading `12_bad_geometry_720p.mpg` produces a black screen with USER blinking eight times, DISK solid off and POWER solid on. This is an explicit non-success diagnostic for the unsupported geometry rather than a silent wedge. The user immediately returns to `00_good_480p_48k.mpg` without rebooting and reports the same successful behavior as the established controls. The launch-free recovered-control capture is 104,724 bytes at SHA-256 `bc2ceab2ea3eab4ed419a2c0f5349f9f45582ccf0e8e70ffc4a3a1ad39cf2935`. Its schema-eight telemetry proves complete re-arm: zero aggregate flags, audio underrun and PCM protocol error false, all decoder, presentation and destination errors clear, all 582,742 transport bytes accepted, 44 timestamps associated, seventeen reference plus 31 B pictures decoded and all 48 pictures displayed with 47 swaps. Sequence end, presentation complete and normal quiet reason one are true with every pending scheduler state clear and saturated healthy PCM activity. This accepts the third recovery pair and proves that geometry error code eight is confined to the invalid stream and cleared by the next download start.
-
-#### Next Steps:
-
-Without rebooting, run `13_bad_geometry_pal.mpg` for no more than ten seconds, record its visible result and USER, DISK and POWER states, then immediately run `00_good_480p_48k.mpg` and record alignment, sound, picture and all three LEDs again. An explicit rejection or non-successful settlement followed by a clean control is a pass; stop and report an unavailable menu, ignored input or failed control before any reboot. Do not continue to `14_bad_rate_50.mpg` until this fourth pair is recorded.
 
 #### Files Modified:
 
