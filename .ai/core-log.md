@@ -1,3 +1,35 @@
+## 460 COMMIT Unreleased 14e0629 2026-08-24T09:14:42-07:00
+
+#### Coming From:
+
+Unreleased 14e0629
+
+#### Purpose:
+
+Record that timestamp coalescing removed the per-second beat and most of the audio-video cadence defect, and hold the result until the ten-minute soak proves alignment.
+
+#### Outcome:
+
+The user ran `23_bbb_opening24_exact_av.mpg` on the `14e0629` helper and reports it running correctly with the beat gone, reserving judgement until the credits are seen, with all LEDs normal. The capture is 545,909 bytes at SHA-256 `840f9b69781815cea1ee38006d0f7346d97d9403c42389e7d2897c2e2b24fd9e`, and it carries the largest single improvement this investigation has produced. Gap outliers fall from 170 to 13 over 24 seconds, presentation hold rises from 12,376,681 to 266,426,934 cycles, presentation stall from 11,794,180 to 262,253,206 and `hold_scratch_available_cycles` from 582,616 to 2,984,466, which is within four cycles of the smooth raw control's 2,984,470. Correctness is unchanged and complete: zero aggregate error flags, no underrun, no PCM protocol error, all 577 pictures displayed with 576 swaps, sequence end, presentation complete and normal quiet reason one. Accepted transport bytes are 3,138,618, exactly the video's own length, so the spurious byte that both 551-record streams accepted is gone with the records that caused it.
+
+The improvement is larger than this cycle predicted and the prediction was wrong in an informative way. Entry 459 measured 21 outliers attributable to 551 records on a stream with no PCM and expected the audio-video file to fall from 170 to about 149. It fell to 13. A record therefore does not cost a fixed amount: on a path already saturated by real-time PCM gating each timestamp costs far more than it does on an idle one, so the two mechanisms compound rather than add. That also revises the accounting recorded in entry 457, where 149 of the 170 outliers were attributed to gating alone; the honest split is that gating remains the enabling condition, since presentation hold is still 266,426,934 against the raw control's 781,845,922, but record density was the larger lever on this content.
+
+Thirteen outliers remain and their shape is unchanged. The largest is 431.059 milliseconds at display ordinal fourteen with the decoder ready, input pending, scratch available and the scheduler reporting presentation complete, the same ordinal and the same signature as the worst gap under `9f83805`. The second and third are 82.896 milliseconds at ordinals fifteen and seventeen, one with both a reorder run and a decode in flight and no scratch available, one with the decoder not ready. Presentation slack at a third of the raw control's is consistent with a path still paced by the audio sink.
+
+#### Next Steps:
+
+Run `20_bbb_full_48k.mpg` end to end before this commit is called good. Cadence is not what the soak is for: sparse timestamps mean presentation extrapolates across a whole encoded group rather than a packet, so the question is whether audio and video are still aligned through the credits and at the final plate, and drift is what would send `14e0629` back to `MediaPlayer_Helper.backup.pre-timestamp-coalesce.9f83805`. Report alignment at the opening, at the high-motion sequence near 7:22, through the credits and at the closing sting, plus any crackle, dropout or visible corruption and all three LEDs, then leave the final image loaded for a schema-eight capture requiring zero aggregate, decoder, presentation, destination, underrun and PCM protocol errors with all 14,315 pictures accounted for after eight-bit wrap. If alignment holds, the remaining cadence work is the dominant mechanism and it is FPGA-side, with three candidates to cost against resource and timing numbers: deepening `audio_pcm_fifo` past any lead the helper can produce, buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate` so compressed video keeps flowing, and carrying many samples per PCM record, which after this result is the most attractive of the three because it reduces record count and path bandwidth at the same time.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 459 COMMIT Unreleased 14e0629 2026-08-24T09:10:04-07:00
 
 #### Coming From:
@@ -1171,40 +1203,6 @@ Restore key-based SSH access before the next installation cycle, since without a
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 420 COMMIT Unreleased 047f5b2 2026-08-24T02:34:47-07:00
-
-#### Coming From:
-
-Unreleased d70591c
-
-#### Purpose:
-
-Recover fitter headroom by moving the two 512-byte slice row buffers out of distributed registers into block memory without altering parser behavior.
-
-#### Outcome:
-
-Fitter evidence from `d70591c` recorded 36,103 of 41,910 ALMs at 86 percent, and that build had already required a seed retune to close, so ALMs were the only binding resource. Entity accounting placed 29,242 ALMs inside `emu`, of which `mpeg2_h262_two_picture_probe` held 15,893 across the near-identical `b_core_probe` at 7,650 and `p_diagnostic_controller` at 7,619, while `mpeg2_h262_p_wide_motion_syntax_probe` alone held 5,101 ALMs against 5,267 registers. Static inspection isolated the mechanism: `mpeg2_h262_b_core_probe_part0.svh` and `mpeg2_h262_p_wide_motion_syntax_probe_part0.svh` each declared a 512-entry byte array named `row_bytes` read combinationally as `row_bytes[parse_byte_index][parse_bit_index]`, forcing 4,096 flops and a 512-to-one byte multiplexer into distributed logic per instance. Commit `047f5b2` converts both arrays to inferred block memory with an unconditional registered read placed ahead of the reset branch and addressed one byte in front of the bit pointer, which is safe because `parse_byte_index` advances only when `parse_bit_index` reaches zero and is therefore stable throughout the cycle preceding every byte boundary regardless of gaps in bit consumption. Entries zero and one moved to discrete registers so the chunk rollover needs no second write port, and the two carried bytes now come from shadow registers written alongside the array instead of a combinational read of its final two entries. Analysis and Synthesis confirms both arrays inferred as `altsyncram` rather than falling back to registers. The build completed in 9 minutes 37 seconds with zero errors and 257 warnings and uses 29,021 ALMs, 44,622 registers, 3,379,667 memory bits, 429 RAM blocks, 65 DSP blocks and three PLLs, recovering 7,082 ALMs and dropping utilization from 86 to 69 percent for two additional RAM blocks, well beyond the 2,500 to 4,000 estimate. `mpeg2_h262_two_picture_probe` falls to 8,609, `b_core_probe` to 3,977, `p_diagnostic_controller` to 4,007 and `wide_general_probe` to 1,500 against 1,163 registers, while `emu` falls to 22,049. Worst-case setup slack improves from 0.476 to 0.500 nanoseconds with total negative slack of zero on every clock. Equivalence was established before the build by a committed differential script that replays fixed streams through the eight Icarus testbenches instantiating these probes: every result line is byte-identical between unmodified and modified RTL, including all cycle counts, so the registered read adds no parser latency. The rollover path is genuinely covered, with eight P and eight B window refills in `tb_h262_parser_windows` and 291,641 bytes across 25 pictures in `tb_h262_live_raster_soak`. The script deliberately excludes `tb_h262_row_streaming` because its Entry 204 assertions require a dense capacity fixture exceeding 1,526 blocks and 32,768 coefficient events at 1,350 macroblocks that no committed generator reproduces, leaving it without a clean baseline to differentiate against.
-
-#### Next Steps:
-
-Install the resulting RBF at SHA-256 `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68` through the usual staged, hash-verified replacement, preserving the displaced `b48d06e1b0f42e3465f48a1d89b10d0eb032edddcb4e02f8aab84c14854a75df` under a commit-specific rollback name and leaving Main, the helper and both audio fixtures byte-identical. After one reboot, run only `02_arm_mp2_faded_tones.mpg` with Audio Test Off and require the accepted five-picture video, the same clean separated tones with smooth fades, USER steady on, DISK steady off and POWER steady on, then leave the completed image loaded for a schema-eight capture that must still report 185,149 accepted elementary-stream bytes, three reference plus two B pictures, five displays, four swaps, sequence end and presentation complete with zero PCM protocol, underrun and aggregate error flags. Because the recovery landed at 69 percent, gating `mpeg2_h262_hardware_cadence_profiler` behind a compile-time parameter stays deferred and its 1,881 ALMs remain in reserve. Once the headroom is confirmed on hardware, resume the deferred audio work by defining and proving the response to a prolonged ARM producer stall after playback has begun, coordinating any pause or recovery with video presentation so Linux delay cannot silently create permanent audio-video drift.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
-- tools/streams/run_cycle_a_parser_equivalence.sh
 
 #### Status:
 
