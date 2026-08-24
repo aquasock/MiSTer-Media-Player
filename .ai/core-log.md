@@ -1,3 +1,31 @@
+## 449 COMMIT Unreleased f2b2e02 2026-08-24T07:05:26-07:00
+
+#### Coming From:
+
+Unreleased f2b2e02
+
+#### Purpose:
+
+Complete the six-case input-envelope failure sweep with explicit truncated-stream rejection and immediate known-good recovery.
+
+#### Outcome:
+
+Without rebooting after the corrected 50 fps pair, the user loaded `15_bad_truncated.mpg`; it settles on a blank screen with USER blinking eight times, DISK solid off and POWER solid on, the same explicit decoder-failure indication as the unsupported geometry cases rather than ordinary success or a wedge. Immediate return to `00_good_480p_48k.mpg` passes like the established controls. The untouched 800x600 recovered-control capture is 104,740 bytes at SHA-256 `cd77217789074dbe3273f773dbf6723e0e62014e065ea7894bb3ea4402578393`. Its schema-eight telemetry reports all 582,742 accepted transport bytes, 44 associated timestamps, seventeen reference plus 31 B pictures, all 48 pictures displayed and 47 swaps. Sequence end and presentation completion are true; aggregate errors are zero, audio underrun and PCM protocol error are false, all decoder, presentation and destination errors are clear, and no decode, reorder, scratch, promotion, future-reference or terminal-boundary work remains at the normal quiet reason-one snapshot. First presentation occurs at 2,430,404 cycles, the final picture at 1.961 seconds and quiet completion at 2.057 seconds, with delivered cadence 24.469 frames per second. All six intended failure cases have now failed visibly without wedging the MiSTer, and every one has recovered immediately to a telemetry-clean 48 kHz control without reboot.
+
+#### Next Steps:
+
+Power-cycle once, set Audio Test to Off and run only `20_bbb_full_48k.mpg` through its complete 9:56 duration. Check opening audio-video alignment, ordinary scene transitions, the high-motion sequence near 7:22, credits and the final audio tail; report any crackle, dropout, progressive drift, visible stutter or corruption and all three terminal LEDs. Leave the final image loaded for a schema-eight capture. Do not replay the soak or any other file before that capture.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 448 COMMIT Unreleased f2b2e02 2026-08-24T07:02:00-07:00
 
 #### Coming From:
@@ -1147,34 +1175,6 @@ Verify the MiSTer's currently installed Main, RBF, helper and sole test file, th
 - tools/streams/tb_h262_inband_metadata.sv
 - tools/streams/verify_arm_av_pipeline.py
 - tools/streams/verify_d2_pcm_path.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 409 COMMIT Unreleased 8fc80ee 2026-08-24T00:23:05-07:00
-
-#### Coming From:
-
-Unreleased 8fc80ee
-
-#### Purpose:
-
-Record the first complete ARM Program Stream hardware run and isolate its silent embedded audio after successful decode.
-
-#### Outcome:
-
-After rebooting into the installed `8fc80ee` Main, the user ran only `01_arm_mp2_audio.mpg` and reported video matching the accepted image, no embedded audio, a working FPGA sound test, USER steady on, DISK steady off and POWER steady on. The untouched 800-by-600 screenshot at SHA-256 `58c29e09dc3eae48075064314df863404434c7e881e68a6404107c303830c78a` shows the expected completed five-picture raster and its schema-seven telemetry decodes 185,149 accepted elementary-stream bytes, one timestamp association, three reference plus two B pictures, five displayed pictures, four swaps, sequence end seen, session quiet and presentation complete with zero decoder or presentation errors. Main's retained log confirms the absolute path `file:/media/fat/games/MediaPlayer/01_arm_mp2_audio.mpg`, 185,158 submitted annotated bytes over 46 reads, clean EOF and helper exit zero. The helper reports decoding all nine MPEG Layer II frames into 10,368 stereo PCM frames, so source, demux and audio decode succeeded. Read-only ALSA enumeration exposes only card zero `Dummy PCM`; `aplay` accepts the samples and exits successfully but sends them to that discard device. The working sound test uses the proven FPGA PCM output path and therefore does not validate Linux ALSA. This isolates silence to the temporary ALSA output choice rather than the video transport, decoder, test content or MiSTer audio hardware.
-
-#### Next Steps:
-
-Replace the temporary ALSA sink with the user-directed FPGA-owned PCM path while avoiding another Main change. Extend the existing in-band ingress protocol with a reserved PCM record type, have the helper place decoded signed 16-bit stereo samples into those records on its current standard-output stream, and extend the FPGA extractor to remove them from H.262 while applying audio-FIFO backpressure and feeding the already hardware-proven PCM output adapter. Preserve raw M2V passthrough, timestamp records, audio test modes, reset flush, bounded FIFO occupancy and underrun telemetry; build and install only the helper and RBF, then replay the same sole Program Stream and require the two embedded channel tones with the already accepted video result.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
