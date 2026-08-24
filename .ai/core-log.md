@@ -1,3 +1,37 @@
+## 455 COMMIT Unreleased ??? 2026-08-24T08:22:17-07:00
+
+#### Coming From:
+
+Unreleased f870d98
+
+#### Purpose:
+
+Record that the delivery-order correction removed the underrun but not the stutter, and propose the startup video lead the paired captures identify as the remaining cause.
+
+#### Outcome:
+
+The user ran `23_bbb_opening24_exact_av.mpg` on the `cf1d173` helper and reports the stutter still present, audio and video still aligned, and ordinary terminal indication with USER solid on, DISK blinking eleven times and POWER solid on. The capture is 545,898 bytes at SHA-256 `1e4aa14922109364934c65cddcc80030f03c27ec56fc2f31fa1ca207fe44cb4d`, taken over FTP because this workstation's SSH client can no longer authenticate to the MiSTer; the screenshot command was written to `/dev/MiSTer_cmd` through the FTP data path instead, which is a working substitute for the documented capture route. Half the acceptance criteria are met. Aggregate error flags are zero, `audio_pcm_underrun` and `pcm_protocol_error` are both false, all 3,138,619 transport bytes are accepted, 194 reference plus 383 B pictures decode, all 577 pictures display with 576 swaps after eight-bit wrap, sequence end is seen, presentation completes and the snapshot is the normal quiet reason one with the PCM count and FIFO peak saturated. The sticky underrun that entry 451 measured at 21.74 seconds is gone from a file that reproduces its exact opening bytes with audio.
+
+The cadence is not fixed and is worse in peak terms: 174 display gaps cross the outlier threshold in 24.044 seconds, against 139 in the first 21.74 seconds of the full soak, and the three largest are 10,942,272 cycles or 182.371 milliseconds at picture ordinal fifteen, 9,947,520 cycles or 165.792 milliseconds at ordinal 33, and 6,963,264 cycles or 116.054 milliseconds at ordinal five. Their signature has changed from entry 451, where the largest gaps recorded `decoder_ready` false with compressed input pending. Every large gap here records `decoder_ready` true with input pending, and the two largest add `scratch_available` false with a reorder run in flight, a decode in flight and a future frame pending. The decoder is neither starved of bytes nor unable to accept them.
+
+Retrieving the entry 453 raw capture from the MiSTer and decoding it beside this one settles the mechanism, because both runs present the same 577 pictures from byte-identical H.262 through the same FPGA image. Decode work is the same to within three percent: decoder stall 655,685,975 cycles raw against 644,013,299 with audio, intra stall 61,907,556 against 61,920,490, predicted stall 197,169,953 against 195,855,651, bidirectional stall 396,608,466 against 386,237,158, and prediction requests identical at 59,531,848. One pair of counters differs by two orders of magnitude: presentation hold falls from 781,845,922 cycles, 13.03 seconds or 54 percent of the raw session, to 7,967,197 cycles or 0.13 seconds, and presentation stall falls from 777,671,229 to 4,569,905. The raw run spends half its time waiting to present because the decoder is far ahead; the audio-video run never waits because the decoder is never ahead. Both deliver 577 pictures in about 24 seconds, so average throughput is identical and only the slack differs.
+
+That slack is the compressed video FIFO's fill, and it is set at startup rather than in steady state. `rtl/mpeg2_stream_fifo.sv` holds 32 KiB, about 0.25 seconds at this stream's 130,776 bytes per second. Without audio the helper writes video as fast as the FPGA accepts it, so that FIFO sits full and absorbs every picture whose decode exceeds one 41.667-millisecond frame interval; the raw run's largest gap is 49.738 milliseconds and it never crosses the threshold. With audio sharing the path, the accepted two-picture startup boundary releases audio after only 5,301 video bytes, so the FIFO stabilises near sixteen percent full and the shared path then runs at real time, leaving no reservoir for decode-time variance. Steady-state interleaving cannot recover a lead it never established, which is why bounding delivery order corrected the audio without touching the cadence.
+
+#### Next Steps:
+
+Approval is required to replace the two-picture startup boundary with a byte budget that fills the compressed FIFO before audio is released, leaving RTL, RBF and Main unchanged. The proposal is to hold PCM until either 28,672 video bytes have crossed, which is seven eighths of the 32 KiB FIFO and should not block on a full FIFO, or the existing two-picture and four-second bounds are both exceeded, so the accepted small-fixture behaviour is preserved where the whole payload is smaller than the budget. This costs roughly 0.22 seconds of additional startup latency before audio begins, which the FPGA's own pacing keeps aligned, and should raise presentation hold from 0.13 seconds back toward the raw run's 13 seconds. Host proofs must show the startup video lead reaching the budget on both controls and the full soak, no change to any payload hash, PCM-free video spans still bounded at 4,096 bytes and no audio deficit above the 8,192-frame sink FIFO, followed by native and sanitized fixture runs at both sample rates, the nine-case checker and two byte-identical official GCC 10.2 helpers. Reinstall only the helper with the `cf1d173` rollback preserved and rerun `23_bbb_opening24_exact_av.mpg`, requiring the outlier count to fall from 174 toward the raw run's zero with no return of the underrun, before the full soak is attempted again. If the outlier count does not fall, the remaining cause is the presentation scratch scheduler rather than delivery, and the next boundary is FPGA work on the reorder path with the `scratch_available` false evidence from ordinals fifteen and 33 as its starting point.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 454 COMMIT Unreleased f870d98 2026-08-24T08:12:56-07:00
 
 #### Coming From:
@@ -1152,33 +1186,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 415 COMMIT Unreleased 104c5ff 2026-08-24T01:21:11-07:00
-
-#### Coming From:
-
-Unreleased 104c5ff
-
-#### Purpose:
-
-Install the continuity-corrected helper and sole longer audio-quality fixture while preserving the accepted FPGA, Main and rollback state.
-
-#### Outcome:
-
-Before installation the reachable MiSTer matched every expected identity: Main SHA-256 `16517a9927c659616796b45c8e2488da2a26f0595c91418ed09dc0eb7a5787aa`, RBF `414f7fae21e628e978ff331f701f0c1435f4742ef27d3928e3ad168cbbda9498`, helper `04f9683cf02c5ed2268743cb0ff28570e1a36c71ad3f362c80f1359c89a2af4d` and original audio test `94a8ff0223dd1acba4d59fc1785741522c4361956f17848bf9ebbb8c0a503fe7`; all staging, target and rollback names for this cycle were absent. The repaired helper and faded test were uploaded under commit-specific temporary names, independently verified, atomically installed and synchronized. `/media/fat/linux/MediaPlayer_Helper` now verifies at SHA-256 `12f6305f35ef56d4e8de2369ecd41d2811bda9d787c885991a5ed0272cd2678a`, reports the unchanged protocol-one capabilities, and its displaced predecessor is preserved exactly as `/media/fat/linux/MediaPlayer_Helper.backup.pre-continuity.104c5ff`. `/media/fat/games/MediaPlayer/02_arm_mp2_faded_tones.mpg` verifies at SHA-256 `cb4f143d2d72af72bb03c7a7fbc4e2163ad780a35483bdb871ec661cf29ccc24`. Main, RBF and `01_arm_mp2_audio.mpg` remain byte-identical, and no playback was launched during installation.
-
-#### Next Steps:
-
-Reboot the MiSTer once, enter MediaPlayer with Audio Test Off and run only `02_arm_mp2_faded_tones.mpg`. Expect approximately 250 milliseconds of silence, a gentle onset, about two seconds of sustained lower 440 Hz left and higher 660 Hz right tones without periodic ticks or crackle, a gentle release and trailing silence while the accepted final video frame remains visible. Report sound quality, channel separation, video appearance and USER, DISK and POWER, then leave the final image loaded for schema-eight capture before any replay or other file.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
