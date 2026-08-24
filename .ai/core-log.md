@@ -1,3 +1,31 @@
+## 390 COMMIT Unreleased 9a7a982 2026-08-23T21:44:51-07:00
+
+#### Coming From:
+
+Unreleased 9a7a982
+
+#### Purpose:
+
+Interpret the first irregular-PTS hardware run and replace timestamp controls whose final deadlines exceeded the cadence profiler's forced terminal-snapshot window.
+
+#### Outcome:
+
+After a reboot into the exact Entry-389 RBF, the user runs `15_pts_irregular_ordinary.m2v`, reports visible skips and USER steady on, DISK steady off and POWER steady on. The launch-free schema-seven capture proves that all five in-band records associate and all five reference pictures decode with zero decoder or presentation errors; accepted decoder bytes are the original 184,677-byte elementary stream because the 45 metadata bytes are correctly stripped before that counter. Timestamp presentation is visibly active: the captured gaps include 0.248688 seconds followed by 0.049738 seconds, matching the intended uneven schedule rather than the 25-fps fallback. This first control does not qualify terminal presentation because its final PTS is one second after the anchor, beyond the profiler's approximately 0.825-second forced terminal deadline; the frozen snapshot therefore contains four displays, three swaps, displayed PTS low bits `0x4fc`, session quiet false and the fifth timestamped reference retained in the released pending slot without any error flag. Two replacement controls retain irregular and coded-order-reordered timestamps but move the final deadlines inside that diagnostic window. Exact FTP retrieval verifies 184,722-byte `15A_pts_irregular_ordinary_short.m2v` at SHA-256 `d2b5d8305dc628d200f5be2bd947f7054498a0cd9dd41a3e8ad51589df116ab8` and 185,194-byte `16A_pts_reordered_b_short.m2v` at SHA-256 `3a9c50be14cbaeb3aa39491fb0330c5c7a3ac3c2a1964e0f760b751a7fe9dd04`. No source or RBF change is made.
+
+#### Next Steps:
+
+Reboot the MiSTer and run `15A_pts_irregular_ordinary_short.m2v`; require five associated records, five decoded and displayed reference pictures, four swaps, sequence-end quiet, presentation complete, zero errors and visibly uneven timing, then leave the final image loaded for capture. If it passes, reboot and run `16A_pts_reordered_b_short.m2v`, requiring display-order I, B, P, B, P timing with three reference plus two B completions, five displays, four swaps, clean B-generation retirement and zero errors before the unannotated controls.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 389 COMMIT Unreleased 9a7a982 2026-08-23T21:08:18-07:00
 
 #### Coming From:
@@ -1187,33 +1215,5 @@ Restore `ALM_REGISTER_PACKING_EFFORT` to the accepted `MEDIUM` value, keep seed 
 
 - [x] Built
 - [ ] Passed
-
----
-## 350 COMMIT Unreleased 873a962 2026-08-22T18:31:11-07:00
-
-#### Coming From:
-
-Unreleased 873a962
-
-#### Purpose:
-
-Hardware-qualify the timing-clean seed-nine residual-store optimization against the essential v0.6.0 playback gate.
-
-#### Outcome:
-
-The exact 4,212,728-byte seed-nine RBF from Entry 349, SHA-256 `96c7e815ac2f5d47501184b2da07c7f1aef824ed4f689c2c70998cafc88adb0a`, was installed persistently on the connected MiSTer and retrieved byte-for-byte identical before testing. The P-skip and motion stream accepts all 180,948 bytes, completes two reference pictures and one display swap with zero errors and zero cadence outliers. The B-prediction stream accepts all 185,054 bytes, completes three reference plus two B pictures, five displays and four swaps, reaches sequence-end quiet and reports zero errors and zero outliers. The repeated multi-slice stream completes the same three-reference plus two-B count, reaches sequence-end quiet with zero errors and zero outliers, and correctly accepts 185,394 transport bytes for its odd 185,393-byte file because the established 16-bit ingress supplies one pad byte. The squirrel stress clip accepts all 2,603,570 bytes, completes 121 reference plus 239 B pictures, reaches sequence-end quiet and presentation complete with zero errors and zero cadence outliers; its eight-bit display and swap counters wrap from 360 and 359 to 104 and 103 as established, and the corrected 359-interval rate is 23.991197 fps. The user watched the stress clip and reports that the squirrel sequence looked perfect. Seed nine therefore passes hardware without decoder, cadence, presentation or terminal regression, completing Stage 1 while recovering 130 RAM blocks from the v0.6.0 baseline.
-
-#### Next Steps:
-
-Treat source commit `873a962`, metadata commit following this entry and the currently installed seed-nine RBF as the accepted post-v0.6.0 residual-store baseline. Preserve the clean Quartus state and the rejected seed-eight state until routine archival is approved. Begin substantive v0.7.0 work only under a new approved boundary, retaining the four essential streams and the exact 408-block topology as regression gates.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
