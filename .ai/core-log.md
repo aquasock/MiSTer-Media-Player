@@ -1,3 +1,31 @@
+## 377 COMMIT Unreleased 292981f 2026-08-23T19:32:29-07:00
+
+#### Coming From:
+
+Unreleased 292981f
+
+#### Purpose:
+
+Record isolated hardware acceptance of generic terminal completion across all-I, P-only and B-containing streams.
+
+#### Outcome:
+
+The exact 4,188,704-byte RBF for `292981f`, SHA-256 `1258735da72354789e0fddabc44ed0b06185c0e00919f1a23c40e983f3c69e31`, remained installed for three reboot-isolated normal-selector tests. `01_i_baseline.m2v` passed with USER steady on, DISK two blinks and POWER steady on; launch-free schema-seven telemetry froze for quiet reason one with sequence end, session quiet, presentation complete, zero errors, four reference pictures, four displayed pictures, three swaps and 726,704 accepted bytes including the expected odd-byte pad. `02_p_motion_residual.m2v` passed with USER steady on, DISK steady off and POWER steady on; its quiet snapshot reports sequence end, session quiet, presentation complete, zero errors, two reference pictures, two displayed pictures, one swap, 181,134 accepted bytes and final picture type P. `04_b_bidirectional.m2v` passed with USER steady on, DISK steady off and POWER steady on; its quiet snapshot reports sequence end, session quiet, presentation complete, zero errors, three reference plus two B pictures displayed, four swaps and 185,150 accepted bytes including the expected pad. Ranked-gap telemetry captured the B run with presentation completion false while reorder work remained, followed by a final gap with presentation completion true, reorder false and session quiet true, proving that the generic fix preserves B-path ownership and retirement behavior. The user rebooted between every file load. A dedicated local RSA key and non-interactive BatchMode SSH configuration were prepared outside the repository with password and keyboard-interactive authentication disabled; they were intentionally not tested after preparation because the user requested no further MiSTer contacts in this turn, so any failed future key-only connection will stop instead of prompting.
+
+#### Next Steps:
+
+Treat `292981f` and its installed RBF as the accepted generic terminal-telemetry boundary. On the next explicitly needed device contact, try only the prepared key-based connection and stop silently if it is unavailable. Resume timestamp-driven presentation against the proven system clock while retaining free-running cadence for unannotated streams, then implement the PCM sink as the subsequent feature boundary.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 376 COMMIT Unreleased 292981f 2026-08-23T19:00:57-07:00
 
 #### Coming From:
@@ -1173,34 +1201,6 @@ The complete accepted incremental build state was moved intact to `/run/media/va
 #### Next Steps:
 
 Use the current clean RBF or the preserved incremental RBF interchangeably for release because they are the exact same binary, and retain the preserved build directory until the release is tagged and packaged. Treat the four essential hardware regressions, the native-23.976 telemetry gate and the full Emperor visual run as the v0.6.0 decoder baseline. A later tooling cleanup may teach the generic cadence runner about 16-bit odd-byte padding, eight-bit counter wrap and partially written screenshots, but those automation limits do not block the core release.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 337 COMMIT Unreleased b64ec6a 2026-08-22T07:52:35-07:00
-
-#### Coming From:
-
-Unreleased b64ec6a
-
-#### Purpose:
-
-Record final human acceptance of native `24000/1001` playback on the exact full-length Emperor movie.
-
-#### Outcome:
-
-The user manually selects the existing 642,033,469-byte `40. 2000 - The Emperor's New Groove.m2v` on the MiSTer using the timing-clean seed-ten RBF from commit `b64ec6a` and reports that all tests pass, the video looks perfect, and any slowdown or speedup is imperceptible. Its motion quality is judged as good as the already accepted native-rate Big Buck Bunny baseline. This closes the original accelerated-playback defect with both the Entry 336 telemetry result of 120 pictures at 23.964000 fps and direct human observation of the exact affected movie. One tooling boundary is also established: automatic MGL injection of this 642 MB file remains on a black screen with a slowly advancing loading bar, while ordinary manual file selection uses the working streaming path and plays correctly; that MGL behavior is not a decoder or cadence failure.
-
-#### Next Steps:
-
-Treat direct frame-rate code one, exact 24 fps and 25 fps presentation as accepted for the v0.6.0 decoder boundary. Preserve manual file selection for full-length regression viewing, keep the deterministic short hardware telemetry gate for automation, and leave frame-rate codes four through eight for explicit future support rather than silently treating them as paced.
 
 #### Files Modified:
 
