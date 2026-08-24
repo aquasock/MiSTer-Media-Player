@@ -1,3 +1,31 @@
+## 480 VERSION v0.7.0 0064148 2026-08-24T14:39:58-07:00
+
+#### Coming From:
+
+Unreleased 37d913b
+
+#### Purpose:
+
+Record publication and independent verification of the v0.7.0 annotated tag, GitHub pre-release and matched runtime archive.
+
+#### Outcome:
+
+The annotated `v0.7.0` tag object is `3e6d994d588a027b7e9b5fcbb8b0ba2950ae3472` and resolves exactly to release commit `0064148502356b70bde7fc700ca3c81c3744576d`. GitHub reports a published, non-draft pre-release named `v0.7.0` at `https://github.com/aquasock/MiSTer-Media-Player/releases/tag/v0.7.0`, published 2026-08-24T21:36:33Z. The release asset was downloaded independently from GitHub: `MiSTer_Media_Player_v0.7.0.zip` is exactly 2,749,946 bytes with SHA-256 `bae3c3c17d2381cb91e2baff98ec9cf22fed88b04d01bc1349574ae57b917377`, matching the locally qualified archive. Its compressed-data test passes for all eight entries, and its internal `SHA256SUMS` identifies the qualified 4,184,380-byte `MediaPlayer_20260824.rbf` at `484328e51c6e764890bf2bdcd947448e2eaaaac2c603e93da28009475e44dafc`, 1,166,244-byte patched `MiSTer` at `16517a9927c659616796b45c8e2488da2a26f0595c91418ed09dc0eb7a5787aa`, and executable 361,452-byte `linux/MediaPlayer_Helper` at `c99237246416ecd8278d90ff6e15e7a00cd8ab1d49c960b8c77fbe00f4ba0483`, plus installation, provenance and license files. A separate loose RBF is deliberately unnecessary for this milestone because all three runtime components are a matched set; distributing the verified archive as the sole binary asset reduces partial-install mismatch risk while the tagged source archives remain available automatically. The four-file hardware gate, clean FPGA build, host qualification, tag target, release notes and published binary are consequently complete and mutually consistent.
+
+#### Next Steps:
+
+Treat v0.7.0 and its published archive as immutable. Begin any later work under a new Unreleased proposal, retain the exact `9a5eea3` FPGA and `acdbf8b` helper baselines for reproduction, and do not replace the tag or asset in place; publish a new semantic version if a released file ever needs to change.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 479 COMMIT Unreleased 37d913b 2026-08-24T14:24:41-07:00
 
 #### Coming From:
@@ -1187,34 +1215,6 @@ The user ran `10_bad_audio_codec.mpg`; USER, DISK and POWER all remained off, th
 #### Next Steps:
 
 Without rebooting, run `11_bad_audio_rate.mpg` for no more than ten seconds, record its visible result and USER, DISK and POWER states, then immediately run `00_good_480p_48k.mpg` and record alignment, sound, picture and all three LEDs again. An explicit rejection or non-successful settlement followed by a clean control is a pass; stop and report an unavailable menu, ignored input or failed control before any reboot. Do not continue to `12_bad_geometry_720p.mpg` until this second pair is recorded.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 440 COMMIT Unreleased 3814243 2026-08-24T06:29:29-07:00
-
-#### Coming From:
-
-Unreleased 3814243
-
-#### Purpose:
-
-Qualify the bounded-lookahead scheduler on the 44.1 kHz control and open the expected-failure recovery sweep only after both supported rates are clean.
-
-#### Outcome:
-
-The user reports that `01_good_480p_44k.mpg` begins perfectly synchronized and completes without crackle, with USER and POWER solid on and DISK blinking eleven times. The completed 800x600 schema-eight capture is 104,739 bytes at SHA-256 `d07a9dd27157107c7eb3aacd6bc054a226d9c54673a3c0870bcce6e3b6c4e945`. It reports zero aggregate error flags, `audio_underrun` false, `pcm_protocol_error` false and every decoder, presentation and destination error clear. All 582,742 transport bytes are accepted, 44 timestamps associate, seventeen reference plus 31 B pictures decode, all 48 pictures display with 47 swaps, sequence end is seen and presentation completes before the snapshot freezes for normal quiet reason one. PCM count saturates at 16,383 and FIFO peak at 127 or more without starvation; every pending decode, reorder, scratch, promotion, future-reference and terminal-boundary state is clear. First presentation is 2,515,058 cycles or 41.9 milliseconds, the final picture presents after 1.939 seconds and the session reaches quiet after 2.054 seconds. Delivered cadence is 24.769 frames per second; the nine recorded decode-limited outliers include 99.475-millisecond intervals at picture ordinals 23 and 35 and 82.896 milliseconds at ordinal eleven, but all pictures display, no error or state remains and no visible stutter was reported. Together with Entry 439, both supported sample rates now pass the same corrected user-media control boundary with perfect reported alignment and no crackle.
-
-#### Next Steps:
-
-Begin only the first expected-failure recovery pair without rebooting. Run `10_bad_audio_codec.mpg` for no more than ten seconds, record its visible result and USER, DISK and POWER states, then immediately run `00_good_480p_48k.mpg` and record alignment, sound, picture and all three LEDs again. An explicit rejection or non-successful settlement followed by a clean control is a pass; an unavailable menu, ignored input or failed control is a wedge and must be reported before any reboot. Do not continue to `11_bad_audio_rate.mpg` until this first pair is recorded.
 
 #### Files Modified:
 
