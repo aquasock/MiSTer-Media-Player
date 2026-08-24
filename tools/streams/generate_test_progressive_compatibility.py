@@ -23,6 +23,9 @@ import analyze_h262_compatibility as analyzer
 import h262common as h
 
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
 @dataclass(frozen=True)
 class Case:
     name: str
@@ -68,6 +71,28 @@ def run(command: list[str]) -> None:
     subprocess.run(command, check=True)
 
 
+def portable_path(path: Path) -> str:
+    """Use repository-relative paths when an artifact lives in this checkout."""
+    resolved = path.resolve()
+    try:
+        return str(resolved.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(resolved)
+
+
+def portable_command(command: list[str], ffmpeg: str) -> list[str]:
+    """Remove host-specific tool and checkout prefixes from recorded commands."""
+    result: list[str] = []
+    for argument in command:
+        if argument == ffmpeg:
+            result.append(Path(argument).name)
+        elif argument.startswith("/"):
+            result.append(portable_path(Path(argument)))
+        else:
+            result.append(argument)
+    return result
+
+
 def ensure_sequence_end(stream: Path) -> None:
     """Terminate raw encoder output so the streaming RTL can retire its last slice."""
     sequence_end_code = b"\x00\x00\x01\xb7"
@@ -93,30 +118,51 @@ def encoder_command(ffmpeg: str, case: Case, output: Path) -> list[str]:
     return command
 
 
-def macroblock_debug_counts(ffmpeg: str, stream: Path) -> dict[str, dict[str, int]]:
+def macroblock_debug_counts(
+    ffmpeg: str, stream: Path, picture_order: list[str]
+) -> dict[str, dict[str, int]]:
     """Inventory FFmpeg's decoded macroblock debug symbols by picture type."""
-    result = subprocess.run(
-        [ffmpeg, "-hide_banner", "-loglevel", "debug", "-debug", "mb_type",
-         "-i", str(stream), "-an", "-f", "null", "-"],
-        check=True, text=True, capture_output=True,
-    )
-    counts: dict[str, Counter[str]] = defaultdict(Counter)
-    current_type: str | None = None
-    for line in result.stderr.splitlines():
-        frame_match = re.search(r"New frame, type: ([IPB])", line)
-        if frame_match:
-            current_type = frame_match.group(1)
-            continue
-        row_match = re.search(r"\]\s+\d+\s+(.+)$", line)
-        if current_type is None or row_match is None:
-            continue
-        symbols = row_match.group(1).split()
-        if len(symbols) == h.MB_WIDTH and all(
-            symbol in {"i", "I", "S", ">", "<", "X", "d", "D"}
-            for symbol in symbols
+    expected = Counter(picture_order)
+    # FFmpeg's mb_type debug output does not print the terminal delayed P
+    # reference even though ffprobe and normal decode both publish it.
+    if picture_order and picture_order[-1] == "P":
+        expected["P"] -= 1
+    last_totals: dict[str, int] = {}
+    for _attempt in range(5):
+        result = subprocess.run(
+            [ffmpeg, "-hide_banner", "-loglevel", "debug", "-debug", "mb_type",
+             "-threads", "1", "-i", str(stream), "-an", "-f", "null", "-"],
+            check=True, text=True, capture_output=True,
+        )
+        counts: dict[str, Counter[str]] = defaultdict(Counter)
+        current_type: str | None = None
+        for line in result.stderr.splitlines():
+            frame_match = re.search(r"New frame, type: ([IPB])", line)
+            if frame_match:
+                current_type = frame_match.group(1)
+                continue
+            row_match = re.search(r"\]\s+\d+\s+(.+)$", line)
+            if current_type is None or row_match is None:
+                continue
+            symbols = row_match.group(1).split()
+            if len(symbols) == h.MB_WIDTH and all(
+                symbol in {"i", "I", "S", ">", "<", "X", "d", "D"}
+                for symbol in symbols
+            ):
+                counts[current_type].update(symbols)
+        last_totals = {picture: sum(symbols.values()) for picture, symbols in counts.items()}
+        if all(
+            last_totals.get(picture, 0) == count * h.MB_WIDTH * h.MB_HEIGHT
+            for picture, count in expected.items()
         ):
-            counts[current_type].update(symbols)
-    return {picture: dict(sorted(symbols.items())) for picture, symbols in sorted(counts.items())}
+            return {
+                picture: dict(sorted(symbols.items()))
+                for picture, symbols in sorted(counts.items())
+            }
+    raise RuntimeError(
+        "incomplete FFmpeg macroblock debug inventory after five attempts: "
+        f"expected={dict(expected)}, totals={last_totals}"
+    )
 
 
 def main() -> None:
@@ -146,6 +192,7 @@ def main() -> None:
     ]
     run(multi_slice_command)
     multi_slice_analysis = analyzer.analyze_file(multi_slice_output)
+    multi_slice_analysis["path"] = portable_path(multi_slice_output)
     if not any(
         picture["repeated_slice_rows"] for picture in multi_slice_analysis["pictures"]
     ):
@@ -157,7 +204,7 @@ def main() -> None:
             "non-unit leading macroblock addresses, motion, and residuals"
         ),
         "expected_current_boundary": "general slice streaming and arbitrary legal slice endpoints",
-        "generator_command": multi_slice_command,
+        "generator_command": portable_command(multi_slice_command, ffmpeg),
         "decoded_display_order": h.picture_types(ffprobe, multi_slice_output),
         "analysis": multi_slice_analysis,
     })
@@ -175,7 +222,8 @@ def main() -> None:
         ensure_sequence_end(output)
         picture_order = h.picture_types(ffprobe, output)
         analysis = analyzer.analyze_file(output)
-        macroblock_counts = macroblock_debug_counts(ffmpeg, output)
+        analysis["path"] = portable_path(output)
+        macroblock_counts = macroblock_debug_counts(ffmpeg, output, picture_order)
         if analysis["classification"] != "progressive_420_candidate_requires_macroblock_execution":
             raise SystemExit(
                 f"{case.name}: generated stream left the intended frontend envelope: "
@@ -198,7 +246,7 @@ def main() -> None:
             "name": case.name,
             "intended_stress": case.intended_stress,
             "expected_current_boundary": case.expected_current_boundary,
-            "encoder_command": command,
+            "encoder_command": portable_command(command, ffmpeg),
             "decoded_display_order": picture_order,
             "ffmpeg_macroblock_debug_counts": macroblock_counts,
             "analysis": analysis,
