@@ -1,3 +1,36 @@
+## 482 COMMIT Unreleased ??? 2026-08-24T15:29:53-07:00
+
+#### Coming From:
+
+Unreleased 46bf297
+
+#### Purpose:
+
+Admit and prove pixel reconstruction for the exact native-480i interlaced frame-DCT all-I subset established by the deterministic TFF/BFF fixtures, without yet changing video timing or claiming native output support.
+
+#### Outcome:
+
+Pending implementation and qualification. Extend the frontend capability gate only when sequence and picture state match 720x480, 30000/1001, 4:2:0, complete I-frame pictures, frame prediction/DCT, no concealment vectors, `progressive_sequence=0`, `progressive_frame=0`, `chroma_420_type=0` and `repeat_first_field=0`; preserve either authored `top_field_first` value. Carry `chroma_420_type` as explicit captured state rather than relying only on the existing syntax comparison. Reuse the current frame raster, inverse quantizer, IDCT, intra reconstruction and full-frame storage mapping because the approved subset does not introduce field-DCT or field-motion syntax. Add a dedicated end-to-end RTL regression for both generated streams that checks accepted headers, all four reconstructed pictures, component coordinates and decoded samples against the FFmpeg oracle. Keep the existing 800x600 progressive diagnostic presentation and keep the user-facing compatibility checker at an explicit unsupported boundary until native 480i timing/presentation is implemented.
+
+#### Next Steps:
+
+Implement the bounded common/progressive/interlaced I-picture capability predicates and explicit chroma field, then add and run the full reconstruction regression for TFF and BFF. Re-run the existing progressive I fixture and current parser/stream regressions to prove the original gate and reconstruction path are unchanged. Commit only if both field orders reconstruct successfully and unsupported interlaced syntax remains excluded. After this commit is proven, prepare the separate native 480i timing, field-aware chroma presentation and MiSTer field-signalling proposal; stop for approval if reconstruction evidence requires field-DCT, field pictures, repeat-first-field, P/B changes or another material scope expansion.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_frontend.sv
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_02.svh
+- tools/streams/tb_h262_interlaced_i_reconstruction.sv
+- tools/streams/run_interlaced_i_reconstruction.sh
+- supporting regression/oracle generation source if required
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 481 COMMIT Unreleased 46bf297 2026-08-24T15:22:14-07:00
 
 #### Coming From:
@@ -1191,34 +1224,6 @@ Loading `12_bad_geometry_720p.mpg` produces a black screen with USER blinking ei
 #### Next Steps:
 
 Without rebooting, run `13_bad_geometry_pal.mpg` for no more than ten seconds, record its visible result and USER, DISK and POWER states, then immediately run `00_good_480p_48k.mpg` and record alignment, sound, picture and all three LEDs again. An explicit rejection or non-successful settlement followed by a clean control is a pass; stop and report an unavailable menu, ignored input or failed control before any reboot. Do not continue to `14_bad_rate_50.mpg` until this fourth pair is recorded.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 442 COMMIT Unreleased 3814243 2026-08-24T06:36:19-07:00
-
-#### Coming From:
-
-Unreleased 3814243
-
-#### Purpose:
-
-Qualify recovery from the unsupported 32 kHz audio-rate envelope case through an immediate known-good replay.
-
-#### Outcome:
-
-The user reports that `11_bad_audio_rate.mpg` produces only a black screen, with the same all-LEDs-off responsive behavior as the preceding expected failure, and does not claim ordinary success. Immediate selection of `00_good_480p_48k.mpg` without reboot works and produces the normal pass indication. The launch-free recovered-control capture is 104,724 bytes at SHA-256 `c8306c2485c40c11dd0583238ed7e903bf7ff991d57c4255e2b8dbe2817d51b0`. Schema-eight telemetry again reports zero aggregate flags, audio underrun and PCM protocol error false, all decoder, presentation and destination errors clear, all 582,742 transport bytes accepted, 44 timestamps associated, seventeen reference plus 31 B pictures decoded and all 48 pictures displayed with 47 swaps. Sequence end, presentation complete and normal quiet reason one are true with every pending scheduler state clear and saturated healthy PCM activity. This accepts the second expected-failure recovery pair and proves that rejecting the unsupported sample rate leaves Main, the helper handoff and the next valid shared audio-video transport reusable without reset.
-
-#### Next Steps:
-
-Without rebooting, run `12_bad_geometry_720p.mpg` for no more than ten seconds, record its visible result and USER, DISK and POWER states, then immediately run `00_good_480p_48k.mpg` and record alignment, sound, picture and all three LEDs again. An explicit rejection or non-successful settlement followed by a clean control is a pass; stop and report an unavailable menu, ignored input or failed control before any reboot. Do not continue to `13_bad_geometry_pal.mpg` until this third pair is recorded.
 
 #### Files Modified:
 
