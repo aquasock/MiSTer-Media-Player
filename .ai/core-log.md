@@ -1,4 +1,4 @@
-## 410 COMMIT Unreleased ??? 2026-08-24T00:27:49-07:00
+## 410 COMMIT Unreleased 8bbd55c 2026-08-24T00:27:49-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Transport ARM-decoded PCM in band to the FPGA-owned audio FIFO without expanding
 
 #### Outcome:
 
-The approved cycle will replace default `aplay` output with fixed in-band PCM sample records on the helper's existing standard-output stream while retaining explicit raw PCM files for host verification. Reserved H.262 codes will distinguish timestamp, PCM sample and clean audio-end records; the FPGA extractor will consume each fixed payload without exposing it to the video decoder, stall the shared ingress only when the 256-sample PCM FIFO is full, and place a terminal token behind the last sample so the output adapter stops without a false underrun. Audio Test modes will retain their proven source, while mode Off selects embedded PCM. A download-start event will flush and re-arm the audio path for reset and replay. Existing telemetry will move to schema eight using previously reserved bits for extracted sample count, peak FIFO occupancy and audio protocol or underrun errors, avoiding a wider snapshot crossing. Raw M2V and timestamp-only streams will remain byte-identical through the extractor, and Main, the helper launch contract, DVD support and the sole hardware test file will not change.
+Commit `8bbd55c` replaces the helper's default dummy-ALSA sink with fixed in-band signed sixteen-bit stereo PCM records and a clean audio-end token on its existing standard-output stream while retaining explicit raw PCM files for host verification. The FPGA strips these reserved records before H.262 parsing, backpressures the last payload byte until the audio FIFO accepts it, and routes the recovered samples through the existing audio output; Audio Test modes retain their proven source, mode Off selects embedded PCM, and each download start flushes and re-arms the path. Analysis of the actual helper output showed runs of up to 4,608 samples separated by video data, so the proposed 256-sample FIFO was correctly expanded to 4,096 samples, or 85.3 milliseconds at 48 kHz, before building. Schema eight preserves the 38-word snapshot while adding sample count, saturated peak occupancy, protocol error and underrun telemetry. Native and sanitized verification recovered exactly 10,368 stereo samples with correlation `0.974933`, one clean end token, byte-identical raw M2V and correct malformed-record rejection; focused extractor, output-adapter, scheduler and telemetry simulations all pass, including terminal empty-before-end behavior without a false underrun. Two official GCC 10.2 ARM builds are byte-identical; the 357,356-byte static helper has SHA-256 `04f9683cf02c5ed2268743cb0ff28570e1a36c71ad3f362c80f1359c89a2af4d`. Quartus 17.0.2 completes in 12 minutes 48 seconds with zero errors, and every timing category is positive with zero endpoint TNS: plus 0.229 ns setup, plus 0.249 ns hold, plus 3.640 ns recovery, plus 0.619 ns removal and plus 1.122 ns pulse width; the focused decoder and video audits report plus 0.549 ns and plus 7.191 ns respectively. The build uses 35,970 ALMs, 52,897 registers, 3,371,475 memory bits, 427 RAM blocks and 65 DSP blocks; the 4,271,012-byte RBF has SHA-256 `414f7fae21e628e978ff331f701f0c1435f4742ef27d3928e3ad168cbbda9498`.
 
 #### Next Steps:
 
-Prove native and sanitized helper output against the independent FFmpeg PCM reference, including exact extraction of 10,368 in-band stereo samples, clean end framing, raw M2V compatibility and malformed-record backpressure tests. Prove the expanded extractor, FIFO and output adapter in simulation, then build Quartus with every timing category positive and build the static ARM helper twice reproducibly. Install only the resulting RBF and helper through staged hash verification, reboot and run only `01_arm_mp2_audio.mpg`, requiring the accepted five-picture video plus the lower 440 Hz left tone and higher 660 Hz right tone with zero audio error telemetry.
+Verify the MiSTer's currently installed Main, RBF, helper and sole test file, then install only the exact new RBF and helper through staged hash verification while retaining rollback copies and leaving Main unchanged. After reboot, run only `01_arm_mp2_audio.mpg` with Audio Test Off and require the accepted five-picture video plus the lower 440 Hz left tone and higher 660 Hz right tone, normal LEDs and zero audio error telemetry. This first hardware cycle proves audible embedded PCM transport; a subsequent cycle must add startup prefill and coordinated prolonged-starvation handling before claiming Linux scheduling cannot produce an audible gap or audio/video drift.
 
 #### Files Modified:
 
@@ -28,6 +28,8 @@ Prove native and sanitized helper output against the independent FFmpeg PCM refe
 - rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
 - rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
 - tools/streams/decode_hardware_cadence.py
+- tools/streams/read_hardware_cadence.py
+- tools/streams/tb_audio_pcm_output_adapter.sv
 - tools/streams/tb_h262_hardware_cadence_profiler.sv
 - tools/streams/tb_h262_inband_metadata.sv
 - tools/streams/verify_arm_av_pipeline.py
@@ -35,7 +37,7 @@ Prove native and sanitized helper output against the independent FFmpeg PCM refe
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
