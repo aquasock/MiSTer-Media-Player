@@ -1,3 +1,31 @@
+## 393 COMMIT Unreleased 9a7a982 2026-08-23T21:56:19-07:00
+
+#### Coming From:
+
+Unreleased 9a7a982
+
+#### Purpose:
+
+Hardware-qualify free-running cadence fallback on the unannotated P-picture range control after timestamp presentation was added.
+
+#### Outcome:
+
+After a reboot, unannotated `06_p_f_code_range.m2v` passes with USER steady on, DISK steady off and POWER steady on. The launch-free schema-seven snapshot accepts the exact 184,678 transport bytes including the odd-byte pad, finds zero timestamp associations and zero displayed timestamp bits, decodes and displays all five reference pictures with four swaps, and finishes on the expected final P picture with temporal reference four. Sequence end, session quiet and presentation complete are true; decoder and presentation errors are zero; frame waiting and both holds are false; and no decode, reorder, queued, promotion, pending-frame or terminal-boundary work remains. All three ranked gaps are ordinary frame-rate-code-three fallback intervals at 0.049738, 0.049738 and 0.033158 seconds, the delivered rate is 25.076 fps and the outlier count is zero. This proves that adding timestamp-driven presentation did not disturb unannotated P-picture cadence or terminal retirement on source `9a7a982` and the exact Entry-389 RBF.
+
+#### Next Steps:
+
+Reboot and run unannotated `04_b_bidirectional.m2v`, report all three LEDs and leave the final image loaded for capture. Require zero timestamp associations, three reference plus two B pictures displayed with four swaps at normal free-running cadence, sequence-end quiet, presentation complete, zero errors and complete reorder-scheduler retirement; if it passes, mark source `9a7a982` hardware-passed and begin the PCM feature cycle.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 392 COMMIT Unreleased 9a7a982 2026-08-23T21:51:18-07:00
 
 #### Coming From:
@@ -1187,33 +1215,5 @@ Have the user visually compare the installed 29.97- and exact-30-fps controls. P
 
 - [x] Built
 - [x] Passed
-
----
-## 353 COMMIT Unreleased 5ab290d 2026-08-22T19:30:00-07:00
-
-#### Coming From:
-
-Unreleased 6cfad2c
-
-#### Purpose:
-
-Audit the controlled reference library for the immediate v0.7.0 cadence and MPEG-2 Program Stream, PES and timestamp work.
-
-#### Outcome:
-
-Commit `5ab290d` reduces `core-reference.md` from 2,071 to 443 lines while preserving and indexing all 26 established H.262 decoder records. It removes the premature USB, optical-drive, HDMI, CD/VCD and broad future-format catalogs, and replaces the oversized DVD, filesystem, CSS and audio sections with concise deferred source boundaries. It adds H262-027 for exact 24000/1001, 24, 25, 30000/1001, 30, 50, 60000/1001 and 60 frame-rate signalling plus 11 H.222.0 records covering Program Stream packs and termination, SCR and pack stuffing, system headers, bounded Program Stream PES packets, stream IDs, optional-header flags, PTS/DTS units and wrap, H.262 timestamp association and reorder timing, Program Stream Maps and data alignment. The audit also identifies the official freely available H.222.0 (06/2021) text as the consulted baseline while retaining H.222.0 (04/2025) as the current paywalled edition whose delta must be checked before a v10 conformance claim. All eight YAML blocks parse, every active record has an explicit source identifier and exact clause/table reference, all 38 record IDs are unique and indexed, and the required `core-syntax.md` audit passes with no format or policy conflict.
-
-#### Next Steps:
-
-Use H262-027 when extending cadence beyond the accepted native-24 path. Use H222-001 through H222-011 as the controlled starting point for Program Stream, PES and real timestamp work, and recheck the H.222.0 2025 edition delta before making a current-edition conformance claim. Restore detailed DVD, filesystem, CSS, audio or Transport Stream references only when one of those milestones is explicitly approved.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
 
 ---
