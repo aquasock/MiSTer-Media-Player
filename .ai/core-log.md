@@ -1,3 +1,33 @@
+## 426 COMMIT Unreleased 62e8ccf 2026-08-24T04:06:21-07:00
+
+#### Coming From:
+
+Unreleased 4220cdc
+
+#### Purpose:
+
+Remove the video startup offset at its source by anchoring the presentation timeline to the first picture rather than the first metadata record.
+
+#### Outcome:
+
+`mpeg2_h262_pts_presentation_timeline` anchored `stc_90k` to the first in-band metadata timestamp, so the origin became whatever timestamp appeared first in the multiplex and any first picture whose own timestamp sat ahead of that origin waited the difference before the scheduler could admit it. Hardware telemetry measured that wait directly on `047f5b2` as `first_present_cycle` 82,301,563 at the 60 MHz decoder clock, or 1.372 seconds of black screen while ungated audio played. Commit `62e8ccf` anchors on the first candidate instead, taking `candidate_pts` as the origin, which makes the first picture due at once and leaves every later interval unchanged because intervals are differences in which the origin cancels. The `metadata_valid` and `metadata_pts` ports are removed; the in-band timestamp still feeds the association module that produces `candidate_pts`, so nothing upstream is pruned. This replaces the reverted audio-delay approach of `d9022e6`, which deadlocked, and costs roughly a mux and a condition rather than the buffer that approach would have required. The blast radius was checked before building rather than after: `anchored` and `stc_90k` are driven at `MediaPlayer_top_05.svh` and consumed nowhere else, so the only outputs reaching logic are `candidate_active` and `candidate_due` into the scheduler's admission gate, and because the timeline is a pure input to an admission decision with no back-pressure anywhere in its path it cannot create the circular stall that wedged `d9022e6`. A stream without timestamps never presents a valid candidate, never anchors and keeps the scheduler's free-running cadence exactly as before. The rewritten `tb_h262_pts_presentation_timeline` passes with the first candidate placed at 123,480 ticks, the measured hardware offset, requiring it to be due immediately and requiring the following picture to still wait its full 3,003 ticks; modulo two-to-the-33 wrap, late timestamps, individually missing timestamps and seek re-anchoring all still hold. The full eight-testbench parser and presentation regression is byte-identical to the accepted `047f5b2` baseline. The build completed in 9 minutes 28 seconds with zero errors and 257 warnings and uses 29,056 ALMs at 69 percent, 44,565 registers, 3,379,667 memory bits, 429 RAM blocks and 65 DSP blocks, a cost of 35 ALMs over `047f5b2` with 57 fewer registers where the metadata anchor path was removed. Worst-case setup slack recovers to 0.681 nanoseconds on `pll_hdmi` against 0.162 on `d9022e6` and 0.500 on `047f5b2`, with total negative slack of zero on every clock, which confirms that the tight path on the previous build was fitter placement variance in HDMI output logic rather than a consequence of either change.
+
+#### Next Steps:
+
+Install the resulting RBF at SHA-256 `74913cd13a7ecaa3748461da755041b32f47c61e9b3ec64643f7ae15e28c4336` and run `02_arm_mp2_faded_tones.mpg` with Audio Test Off, requiring that video now starts immediately instead of 1.372 seconds late, that audio and video begin together, that the tones stay clean and separated with smooth fades and that LEDs remain normal. Capture a schema-eight snapshot by writing a screenshot command to `/dev/MiSTer_cmd` over FTP and require `first_present_cycle` to fall to a small fraction of its previous 82,301,563 while the accepted decode evidence is unchanged at 185,149 elementary-stream bytes, three reference plus two B pictures, five displays, four swaps, sequence end, presentation complete and zero error flags. Confirm separately that an older `.m2v` file is unaffected. Any residual audio-ahead-of-video offset is now the PCM startup reserve fill time rather than the presentation gate, and should be measured before it is treated as a defect. Once accepted, resume the deferred prolonged ARM producer stall work.
+
+#### Files Modified:
+
+- MediaPlayer_top_05.svh
+- rtl/mpeg2_new/mpeg2_h262_pts_presentation_timeline.sv
+- tools/streams/tb_h262_pts_presentation_timeline.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 425 COMMIT Unreleased 4220cdc 2026-08-24T03:45:41-07:00
 
 #### Coming From:
@@ -1148,34 +1178,6 @@ After a MiSTer power cycle, the authoritative even-length 78,010,162-byte `14_bb
 #### Next Steps:
 
 Power-cycle the MiSTer and load `99_EXPECTED_FAILURE_truncated_stream.m2v` through the normal file selector. Wait until it stops making progress, record the terminal image and all three LEDs, leave it loaded and request telemetry capture; it must not report ordinary sequence-end quiet completion because the file ends inside a picture without a sequence-end marker. After that capture, do not reboot and immediately load `01_i_baseline.m2v`; recovery passes only if baseline completes normally with USER steady on, and all three recovery LEDs plus launch-free telemetry must be recorded before closing the regression pack.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 386 COMMIT Unreleased 2b1a170 2026-08-23T20:39:08-07:00
-
-#### Coming From:
-
-Unreleased 2b1a170
-
-#### Purpose:
-
-Hardware-qualify fifteen seconds of visually observed native-24 real-video stress across wrapped presentation counters and prepare the exact full endurance stream.
-
-#### Outcome:
-
-After a MiSTer power cycle, the authoritative even-length 2,603,570-byte `13_bbb_squirrel_15sec_native24_q6.m2v` passes with USER steady on, DISK eleven blinks and POWER steady on, and the user reports that playback looked good. The steady USER state again classifies the DISK indication as normal final GOP progress. The launch-free schema-seven capture freezes for quiet reason one with exactly 2,603,570 accepted bytes, 121 reference plus 239 B pictures, and the expected eight-bit wraps from 360 displays and 359 swaps to 104 and 103. Frame-rate code two, fifteen system-time seconds, sequence end, session quiet, presentation complete, zero decoder or presentation errors and zero cadence outliers are present; correcting the wrapped swap count gives 23.988 displayed swaps per second across the measured interval. The terminal scheduler has no frame waiting, active reorder, queued generation, promotion, pending frame or terminal boundary. The pre-existing 84,423,309-byte full file on the MiSTer did not match test fourteen and its temporary numbered alias was removed. Regenerating from the local 480p source with the documented deterministic recipe plus the required terminal sequence-end marker produced the authoritative 78,010,162-byte `14_bbb_full_native24_user_recipe.m2v`, SHA-256 `3b048a180dbe2bc98a6160e7103b0f5acfd41d6875c34154730ef1da75d64f1a`; it was installed under the numbered name and retrieved byte-for-byte identical. Its 14,315 pictures comprise 597 I, 4,176 P and 9,542 B pictures.
-
-#### Next Steps:
-
-Power-cycle the MiSTer and load `14_bbb_full_native24_user_recipe.m2v` through the normal file selector for the complete nine-minute-fifty-six-second endurance run. Watch smooth pans, the squirrel sequence, rolling credits and clean terminal behavior, then report all three LEDs and leave the completed image loaded for telemetry capture. Require 4,773 reference plus 9,542 B pictures, 14,315 displays and 14,314 swaps represented by eight-bit wraps to 165 references, 70 B pictures, 235 displays and 234 swaps, exactly 78,010,162 accepted bytes, sequence-end quiet, complete presentation retirement and zero errors before the expected-failure and no-reboot recovery test.
 
 #### Files Modified:
 
