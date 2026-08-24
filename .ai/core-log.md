@@ -1,3 +1,31 @@
+## 436 COMMIT Unreleased 091b150 2026-08-24T05:47:31-07:00
+
+#### Coming From:
+
+Unreleased 091b150
+
+#### Purpose:
+
+Install the exact timing-clean starvation correction and corrected media while preserving byte-verified rollback.
+
+#### Outcome:
+
+Read-only retrieval first confirmed that the MiSTer still held accepted RBF SHA-256 `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68` and unchanged helper SHA-256 `2cf665c0153a9885e103a1da5038997efb9050c7fcbceb3d3340537cfb153d54`. Candidate RBF `1fe3f61a8286e42e38db4c50eef6a112f31106590e6cdbcc6715fff82544b4ea` was uploaded under a staging name, retrieved and compared byte-for-byte before promotion. All nine corrected qualification files were independently uploaded to a staging directory, retrieved and compared byte-for-byte, including the full 100,059,153-byte soak. The prior failed media set is preserved without mutation as `/media/fat/games/MediaPlayer/v0.7_qualification.failed.9afe2f0`; the accepted RBF is preserved exactly as `/media/fat/MediaPlayer.backup.pre-pcm-depth.047f5b2.rbf`; and the verified staging names were promoted only after those rollbacks existed. Post-promotion retrieval confirms active `/media/fat/MediaPlayer.rbf` at `1fe3f61a8286e42e38db4c50eef6a112f31106590e6cdbcc6715fff82544b4ea`, its rollback at `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68`, the helper still at `2cf665c0153a9885e103a1da5038997efb9050c7fcbceb3d3340537cfb153d54`, and active `00_good_480p_48k.mpg` at corrected SHA-256 `1455af94803b1d9958a93fbdb978aa2a42c1d8045a9491f904ad1ad9b8ccdad5`. The remaining active media carry the exact Entry-435 hashes, including unchanged truncated-case hash `5ea02141a0be7846389b378f996f67e986bfef2a60dc289f9a7df6ab78f829ce` and full-soak hash `fdc480e6b16bcbc7c143eb8f7e7edfe0d0bbd8e46a1035b728f07639e71b2357`. Main is unchanged, the running core remains the previous image until reboot, and no playback was launched.
+
+#### Next Steps:
+
+Power-cycle the MiSTer once to load the installed candidate, set Audio Test to Off, and run only corrected `00_good_480p_48k.mpg`. Report whether audio starts aligned with the opening video, whether either of the two repeatable crackles or any dropout remains, and the final state of USER, DISK and POWER after the file reaches its clean end. Do not run `01`, any expected-failure case or the full soak yet. If this control fails, leave the final image loaded and do not reboot so schema-eight telemetry can be captured; the exact RBF rollback is `MediaPlayer.backup.pre-pcm-depth.047f5b2.rbf` and the failed prior media remain in `v0.7_qualification.failed.9afe2f0`.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 435 COMMIT Unreleased 091b150 2026-08-24T05:26:02-07:00
 
 #### Coming From:
@@ -1154,34 +1182,6 @@ The 4,214,932-byte Entry-396 `MediaPlayer.rbf` is installed persistently as `/me
 #### Next Steps:
 
 Reboot the MiSTer to load the installed candidate. In the core menu, confirm Audio Test Off is silent, then select 44.1k Mono, 44.1k Stereo, 48k Mono and 48k Stereo in turn; report whether every mode is audible, whether mono is centered in both channels, whether stereo has the lower 440 Hz tone on the left and higher 660 Hz tone on the right, and whether returning to Off becomes silent. After the Audio modes pass, reset once, run only `04_b_bidirectional.m2v`, report all three LEDs and leave the final image loaded for capture; no other video file is required in this build cycle.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 396 COMMIT Unreleased a57079f 2026-08-23T22:22:07-07:00
-
-#### Coming From:
-
-Unreleased a57079f
-
-#### Purpose:
-
-Bind the first PCM milestone to its single timing-clean Quartus candidate and exact hardware image.
-
-#### Outcome:
-
-Source `a57079f` completes the single authorized seed-eleven Quartus 17.0.2 build in 13 minutes 16 seconds with zero errors and 146 warnings. It uses 36,009 ALMs, 52,657 registers, 3,236,819 memory bits, 410 RAM blocks, 65 DSP blocks and three PLLs, a delta of 343 ALMs, 455 registers, 8,716 memory bits, two RAM blocks and zero DSP blocks from the accepted timestamp build. Every timing category is positive with zero endpoint TNS: plus 0.175 ns HDMI setup, plus 0.658 ns host setup, plus 0.857 ns decoder setup, plus 7.520 ns video setup, plus 13.183 ns audio setup, plus 0.248 ns hold, plus 4.293 ns global recovery, plus 10.425 ns decoder recovery, plus 37.782 ns audio recovery, plus 0.597 ns removal and plus 1.122 ns minimum pulse width. The dedicated Phase-1P reports find zero violations across 100 same-clock decoder paths, 80 same-clock video paths and 30 decoder recovery paths. This confirms that the timing-closed Audio control mailboxes avoid the recovery and cross-clock setup failures previously found in the companion implementation. The resulting 4,214,932-byte `MediaPlayer.rbf` has SHA-256 `ad04f9f73c0fb98309588f8c212c6ccad71c80b254a2a284f637672a73350d37`.
-
-#### Next Steps:
-
-Install the exact RBF persistently on the MiSTer and retrieve it byte-identically before testing. Verify Audio Test Off is silent, each 44.1 and 48 kHz mono mode is centered and duplicated to both channels, each stereo mode carries the 440 Hz left and 660 Hz right proof tones, mode changes and reset re-arm cleanly, and use only `04_b_bidirectional.m2v` as the one video regression for this build cycle with the normal LED and telemetry gate.
 
 #### Files Modified:
 
