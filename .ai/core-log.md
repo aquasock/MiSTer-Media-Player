@@ -1,3 +1,31 @@
+## 473 COMMIT Unreleased acdbf8b 2026-08-24T13:30:57-07:00
+
+#### Coming From:
+
+Unreleased acdbf8b
+
+#### Purpose:
+
+Accept silent video-only Program Stream playback in hardware and advance to the immediate audio-video recovery control.
+
+#### Outcome:
+
+The user reports that `02_good_video_only.mpg` played correctly, ending with USER and POWER solid on and DISK blinking eleven times. The final image was triggered and retrieved exclusively through plain FTP with the default MiSTer login and no SSH keys; `.ai/current_results/entry473_video_only_program_stream.png` is 104,593 bytes with SHA-256 `ce53ec3dde8cf964f09d7e80a497be4d516c6bfbf02cb767f1c43cdf1a96409c`. Schema nine reports zero aggregate errors, no audio underrun or PCM protocol error, zero PCM samples, all seventeen reference and 31 B pictures decoded, all 48 pictures displayed with 47 swaps, sequence end, presentation completion and ordinary quiet reason one at STC second two, with no pending decoder or scheduler work. The accepted-byte counter is 582,742 rather than Entry 472's stated 582,741: host demux proves the video-only, 48 kHz and 44.1 kHz controls contain the identical 582,741-byte H.262 payload at SHA-256 `079d7c7393ce2bb80fe716f927733c3aa5e492a4812922bc9b10b6dd9e25330a`, while every prior hardware capture of that payload also reports 582,742 accepted transfer bytes, so Entry 472 mixed the host payload size with the established MiSTer hardware count rather than identifying a regression. This hardware-accepts the bounded silent-stream fallback in helper source `acdbf8b` while retaining accepted FPGA source `9a5eea3`.
+
+#### Next Steps:
+
+Without rebooting, run only `00_good_480p_48k.mpg` with Audio Test Off and report audio-video alignment, any crackle or dropout and all three terminal LEDs, then leave its final image loaded for capture. Require the established 582,742 accepted transfer bytes, all 48 pictures and 47 swaps, audio present without underrun or PCM protocol error, zero aggregate errors, sequence end, presentation completion and normal quiet reason one. A clean result proves immediate recovery from the no-PCM session and freezes `acdbf8b` with `9a5eea3` for the clean v0.7.0 release-qualification build; any failure requires retaining this accepted video-only evidence and diagnosing session re-arm before release work.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 472 COMMIT Unreleased acdbf8b 2026-08-24T13:12:04-07:00
 
 #### Coming From:
@@ -1196,34 +1224,6 @@ The user power-cycled and ran `00_good_480p_48k.mpg` with Audio Test Off. Audio 
 #### Next Steps:
 
 Do not run `01` or any expected-failure case on the current media set. The revised boundary needs user approval because it changes the approved host-only plan: make sequence-end presence a required compatibility condition, generate both the sequence-end video PES and Program Stream end for every good control, and increase the PCM FIFO from 4,096 to 8,192 samples so the current conversion recipe has 170.7 milliseconds of reserve without changing the 2,048-sample startup threshold. Prove the widened dual-clock FIFO, unchanged startup timing, underrun behavior and termination in focused simulation, run the full host regression, perform one timing-clean Quartus build, replace the RBF and corrected media with exact rollback, and repeat only `00_good_480p_48k.mpg` before resuming qualification. If the predicted resource or timing cost is not acceptable, the alternative is a larger ARM-side demux scheduler that reorders PCM throughout long video PES runs rather than relying on FFmpeg mux settings.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 433 COMMIT Unreleased 9afe2f0 2026-08-24T05:10:12-07:00
-
-#### Coming From:
-
-Unreleased 9afe2f0
-
-#### Purpose:
-
-Install the reproducible helper and complete v0.7 qualification media set while preserving exact rollback state.
-
-#### Outcome:
-
-Read-only retrieval first confirmed the MiSTer remained on accepted RBF SHA-256 `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68` and helper SHA-256 `c6ce4ef0595beee5f1f231edeaebe360160becccad22e3e51d9f8d23b9c690b0`. The official-toolchain `9afe2f0` helper was uploaded under a staging name, downloaded and confirmed byte-identical at SHA-256 `2cf665c0153a9885e103a1da5038997efb9050c7fcbceb3d3340537cfb153d54`, marked executable through the FTP server and installed, with its predecessor preserved exactly as `/media/fat/linux/MediaPlayer_Helper.backup.pre-user-media.3f4b272`. A new `/media/fat/games/MediaPlayer/v0.7_qualification` directory contains the 48 kHz control at `b140c76c61da3c8ec46baf90548f290db7657661cc39b2cb0b3e80510531a2dd`, the 44.1 kHz control at `bd3935aa35100544ce4d5fe06b8d9de0e8f48f1a606cd2419f7abcc4c8891c50`, six expected-failure cases at `e4140672b46214b300b1ca558d0a8005dee035bb79ec44ec7c75d341714e89df`, `3f7f2df8eb0c16dedf10fa3059184aab17067cae61305c5994706842fef79f57`, `98965d3223b50258d2e673e5d58786ae1b4152df758f9e9decf10f90a68c48d0`, `ee485d5693caf90304ca348bdedbae5b9ac0559ed383d3e796f811428a6fccb6`, `c4f986798e64081f0128c167a30ab62226ed2f1aa9959cf4e99da49cd21d86cb` and `5ea02141a0be7846389b378f996f67e986bfef2a60dc289f9a7df6ab78f829ce`, and the full soak at `fdc480e6b16bcbc7c143eb8f7e7edfe0d0bbd8e46a1035b728f07639e71b2357`. Every remote file was retrieved and compared byte-for-byte before the staging area was discarded. Main and the accepted FPGA image are unchanged, no playback was launched, and the obsolete RBFs and older helper backups called out in Entry 430 remain untouched because their deletion was reserved for the user.
-
-#### Next Steps:
-
-Power-cycle once, set Audio Test to Off and run `00_good_480p_48k.mpg` followed by `01_good_480p_44k.mpg`. If both pass, run each numbered bad case for at most ten seconds and immediately replay `00_good_480p_48k.mpg` without rebooting; record the visible result and all three LEDs for both halves of every pair, treating an unavailable menu or failed control as a wedge. After all six pairs pass, power-cycle once and run `20_bbb_full_48k.mpg` through its complete 9:56 duration, checking opening alignment, scene transitions, the high-motion sequence near 7:22, credits and the audio tail, then leave the final image loaded for schema-eight capture. Roll back to `MediaPlayer_Helper.backup.pre-user-media.3f4b272` if the new helper itself fails to start.
 
 #### Files Modified:
 
