@@ -92,7 +92,7 @@ new file mode 100644
 index 0000000..5ed0c50
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,274 @@
+@@ -0,0 +1,275 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -108,6 +108,7 @@ index 0000000..5ed0c50
 +#include <sys/wait.h>
 +#include <unistd.h>
 +
++#include "file_io.h"
 +#include "user_io.h"
 +
 +static const char *helper_path = "/media/fat/linux/MediaPlayer_Helper";
@@ -226,9 +227,9 @@ index 0000000..5ed0c50
 +
 +int mediaplayer_start(const char *path, unsigned char index)
 +{
-+	std::string source_spec = "file:";
 +	if (!mediaplayer_handles_file(path)) return 0;
-+	source_spec += path;
++	std::string source_spec = "file:";
++	source_spec += getFullPath(path);
 +	return mediaplayer_start_source(source_spec.c_str(), index);
 +}
 +
