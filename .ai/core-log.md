@@ -1,3 +1,32 @@
+## 373 COMMIT Unreleased ??? 2026-08-23T18:08:10-07:00
+
+#### Coming From:
+
+Unreleased 3ae9885
+
+#### Purpose:
+
+Restore the decoder's pulse-valid ingress contract across the in-band metadata extractor after hardware bisection identifies repeated-byte parsing during a P-picture ownership hold.
+
+#### Outcome:
+
+The user reports USER one blink, DISK fifteen blinks and POWER steady on for plain `04_b_bidirectional` on the installed `27ad1b3` image. The LED hierarchy identifies the first failure as frontend syntax error source fifteen, while POWER zero is the expected absence of a nested source for a syntax error. Because `27ad1b3` differs from the earlier accepted image at the compressed-data boundary only by `mpeg2_h262_inband_metadata`, this completes the bisection. Static tracing finds the specific contract mismatch: the extractor retains `stream_valid` as a level while `mpeg2_new_stream_ready` is false, but the established frontend and parser advance on every cycle of `stream_valid`, so the ownership hold replays one byte into syntax parsing. A focused regression using the real transport convention in which input valid is derived from readiness reproduces six accepted bytes as eight visible byte cycles on the current RTL. The proposed repair retains the pending byte internally while presenting output valid only on the actual decoder transfer; the same regression must then report exactly six visible cycles, and real annotated-file replay must remain byte-identical.
+
+#### Next Steps:
+
+Commit the repaired pulse-valid boundary and its focused regression, run the extractor unit and real-file replays plus the established decoder simulations, then build at seed eleven with every timing category positive. Hardware validation must begin with plain `04_b_bidirectional`, requiring USER steady on rather than the syntax error now measured, and must then exercise the unannotated control and annotated timestamp stream. Add explicit USER, POWER and DISK readings to the repository regression instructions as a subsequent tooling and documentation boundary so plausible still images can no longer count as a pass without LED evidence.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
+- tools/streams/tb_h262_inband_metadata.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 372 COMMIT Unreleased 3ae9885 2026-08-23T17:44:42-07:00
 
 #### Coming From:
@@ -1174,36 +1203,6 @@ Build `04873f7` incrementally from the accepted clean seed-twelve database, requ
 - tools/streams/tb_h262_b_presentation_scheduler.sv
 - tools/streams/tb_h262_hardware_cadence_profiler.sv
 - tools/streams/tb_h262_live_raster_soak.sv
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-## 333 COMMIT Unreleased 374ef38 2026-08-22T06:25:25-07:00
-
-#### Coming From:
-
-Unreleased 374ef38
-
-#### Purpose:
-
-Determine whether the user's visibly accelerated playback of `40. 2000 - The Emperor's New Groove.m2v` is encoded into the file or caused by the current presentation scheduler.
-
-#### Outcome:
-
-No source changed. A read-only inspection of the 642,033,469-byte file on the MiSTer identifies 720-by-480 progressive Main Profile 4:2:0 video with 16:9 display aspect and direct frame rate `24000/1001`, which is H.262 `frame_rate_code` one. This is not a 29.97-fps stream, and its 0.1-percent difference from exact 24 fps cannot itself explain an obvious speedup.
-
-The cause is explicit in the current RTL. The frontend timeline correctly recognizes rate code one and assigns its exact 15,015 quarter-90-kHz-tick duration, but `mpeg2_h262_b_presentation_scheduler.sv` declares only rate codes two and three—exact 24 and 25 fps—as cadence-supported. For every other code, `cadence_slot` is unconditionally true and the scheduler reseeds its credit at each swap window, so decoded pictures publish as soon as they are ready instead of at their encoded cadence. The user's report that the film runs fast without visible frame drops is therefore consistent with unpaced presentation and provides encouraging evidence that the decoder sustains this stream's workload; it is not evidence of correct 23.976-fps timing.
-
-#### Next Steps:
-
-Add native `24000/1001` cadence support as the next narrowly scoped scheduler change, using an exact rational credit step rather than treating it as 24 fps. Extend the scheduler and cadence-profiler regressions for H.262 rate code one, build incrementally, require all timing categories positive, then replay this exact movie and compare its wall-clock duration and smooth motion. Keep direct 29.97, 30, 50, 59.94 and 60 fps as separately explicit support decisions rather than silently leaving them unpaced.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
