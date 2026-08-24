@@ -1,4 +1,4 @@
-## 414 COMMIT Unreleased ??? 2026-08-24T01:15:36-07:00
+## 414 COMMIT Unreleased 104c5ff 2026-08-24T01:15:36-07:00
 
 #### Coming From:
 
@@ -10,19 +10,20 @@ Preserve minimp3 synthesis continuity across incrementally delivered MPEG Layer 
 
 #### Outcome:
 
-The proposed helper-only correction will make every speculative incremental decode transactional with respect to `mp3dec_t`: if minimp3 cannot safely consume a frame because the current buffer ends on that complete frame or within the following frame, the helper will restore the decoder snapshot and retain all corresponding bytes until more input arrives. End-of-input handling will decode the remaining exact-sized frames without the synthetic zero padding that can force a failed next-header comparison and clear synthesis history. PCM sample format, channel order, 48 kHz constraint, in-band record layout, clean end token, Program Stream demux, Main protocol and FPGA source will remain unchanged. The existing short and faded profiles provide the regression: the pre-fix helper reproducibly jumps 4,080 counts left and 4,115 right at some 1,152-sample boundaries, while their FFmpeg references remain below the verifier's derived limits.
+Commit `104c5ff` makes each incremental minimp3 call transactional by snapshotting `mp3dec_t`, restoring it whenever the current bytes cannot safely commit a frame, and retaining the undecided bytes until following input proves the frame boundary. End-of-input decoding now uses the exact remaining bytes rather than synthetic zero padding, eliminating the failed next-header comparison that cleared synthesis history. The verifier's original strict correlation floor is restored because the prior faded-profile relaxation measured this defect rather than legitimate decoder variance. Both short and faded profiles pass with native and address-and-undefined sanitized helpers: video remains byte-identical, one clean end token is emitted, sample counts remain exactly 10,368 and 144,000 stereo frames, maximum difference from FFmpeg falls from more than 5,000 to 2 and correlation rounds to `1.000000`. The repaired faded decode's worst 1,152-sample boundary jumps are 234 left and 352 right, matching the reference at 234 and 353 with no jump over 1,024; the pre-fix values were 4,080 and 4,115. Two official GCC 10.2 builds are byte-identical; the 357,356-byte static ARM EABI5 helper has SHA-256 `12f6305f35ef56d4e8de2369ecd41d2811bda9d787c885991a5ed0272cd2678a`. PCM format, transport, FPGA source and Main are unchanged, so no Quartus or Main build is required.
 
 #### Next Steps:
 
-Prove the pre-fix failure and post-fix pass for both profiles with native and address-and-undefined sanitized helpers, retaining exact 10,368 and 144,000 stereo sample counts, byte-identical video, one clean audio-end token and strong waveform correlation while eliminating the boundary discontinuities. Build the static ARM helper twice reproducibly with the official GCC 10.2 toolchain, install only that helper through staged hash verification with the current helper preserved for rollback, and upload only `02_arm_mp2_faded_tones.mpg`. After reboot, run that sole file and require clean silence, gradual onset, sustained separated tones, gradual release, accepted video, normal LEDs and zero schema-eight errors; do not rebuild or replace the accepted RBF or Main.
+Verify the current MiSTer helper, RBF, Main and original test file, then stage and independently hash only the repaired helper and `02_arm_mp2_faded_tones.mpg`; preserve the current helper for rollback and leave the accepted RBF, Main and original file byte-identical. After reboot, run only the faded file and require clean leading silence, gradual onset, sustained separated tones without periodic crackle, gradual release, accepted video, normal LEDs and zero schema-eight errors, then leave the final image loaded for launch-free capture.
 
 #### Files Modified:
 
 - host/arm/media_player_helper.c
+- tools/streams/verify_arm_av_pipeline.py
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
