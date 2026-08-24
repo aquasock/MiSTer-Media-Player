@@ -1,4 +1,4 @@
-## 417 COMMIT Unreleased ??? 2026-08-24T01:30:00-07:00
+## 417 COMMIT Unreleased d70591c 2026-08-24T01:30:00-07:00
 
 #### Coming From:
 
@@ -10,16 +10,17 @@ Add deterministic PCM startup prefill and defer terminal telemetry until embedde
 
 #### Outcome:
 
-This commit will expose read-domain FIFO occupancy to the audio adapter and require a 2,048-sample reserve before normal playback starts, providing approximately 42.7 milliseconds of scheduling tolerance at 48 kHz. A synchronized accepted-end indication will release clips shorter than the threshold without deadlock, and a clean consumed-end indication will return to the decoder domain. Embedded-audio sessions will remain terminally pending until that end token is consumed, while raw video streams and FPGA audio-test modes will retain their existing completion behavior. The cadence profiler's forced nonquiet timeout will pause only for this explicit audio-tail condition, but fatal errors will remain immediately visible.
+Commit `d70591c` exposes the FIFO's read-domain occupancy and holds normal playback until 2,048 samples provide approximately 42.7 milliseconds of reserve at 48 kHz. A synchronized accepted-end level releases complete clips shorter than the threshold without deadlock, and a synchronized consumed-end result keeps embedded-audio sessions terminally pending until the clean end token drains; raw video and FPGA test modes retain their previous completion behavior. The profiler pauses only its forced nonquiet timeout for that explicit audio tail, while fatal errors still snapshot immediately. Focused proofs pass reserve gating, short-stream release, genuine post-start underrun detection, empty-before-end completion, audio-deferred telemetry, later forced telemetry and fatal priority. The first clean seed-eleven fit exposed an unrelated pre-existing decoder path at minus 0.109 ns, so the final boundary records deterministic fitter seed twelve without changing logic. The exact committed configuration then repeated a full Quartus 17.0.2 flow in 13 minutes 29 seconds with zero errors and zero endpoint TNS: global setup is plus 0.476 ns, decoder setup plus 0.683 ns, video setup plus 7.868 ns, hold plus 0.254 ns, recovery plus 4.420 ns, removal plus 0.653 ns and pulse width plus 1.122 ns. The build uses 36,103 ALMs, 52,687 registers, 3,371,475 memory bits, 427 RAM blocks and 65 DSP blocks; the 4,206,432-byte RBF has SHA-256 `b48d06e1b0f42e3465f48a1d89b10d0eb032edddcb4e02f8aab84c14854a75df`.
 
 #### Next Steps:
 
-Implement the read-side occupancy, source-ended, playback-complete and terminal-defer paths; extend focused simulations to prove reserve gating, short-stream release, clean terminal drain, true post-start starvation detection and deferred versus forced snapshots. Run the PCM static verifier, focused RTL tests and a clean Quartus build with timing analysis. If clean, install only the resulting RBF while preserving Main, helper and rollback state, then run only `02_arm_mp2_faded_tones.mpg` and require unchanged video and sound, normal LEDs, zero audio errors and a quiet rather than forced terminal snapshot after the three-second audio tail.
+Verify the MiSTer's current Main, RBF, helper and faded test identities, then stage and independently hash only the exact new RBF, preserve the displaced RBF under a commit-specific rollback name and leave Main, helper and both audio fixtures byte-identical. After reboot, run only `02_arm_mp2_faded_tones.mpg` with Audio Test Off and require unchanged clean separated sound and video, normal LEDs, zero audio errors and a quiet reason-one snapshot after the three-second audio tail rather than the prior forced reason-two snapshot.
 
 #### Files Modified:
 
 - MediaPlayer_top_00.svh
 - MediaPlayer_top_07.svh
+- MediaPlayer.qsf
 - rtl/audio/audio_pcm_fifo.sv
 - rtl/audio/audio_pcm_output_adapter.sv
 - rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
@@ -29,7 +30,7 @@ Implement the read-side occupancy, source-ended, playback-complete and terminal-
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
