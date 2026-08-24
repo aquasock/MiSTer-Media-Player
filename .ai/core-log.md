@@ -1,4 +1,4 @@
-## 375 COMMIT Unreleased ??? 2026-08-23T18:47:02-07:00
+## 375 COMMIT Unreleased 0f7edd5 2026-08-23T18:47:02-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Make the hardware regression pack self-contained, checksum-verifiable and explic
 
 #### Outcome:
 
-The approved repository-only cycle will import the regression instructions, results template, checksum list and compatibility manifest from the downloaded v0.6.0 release-candidate pack into `docs/`, update their status and terminology for the current Unreleased boundary, require USER, POWER and DISK readings on every run, and replace host-specific absolute manifest paths with repository-relative paths. A committed verifier will check the pack's complete file set, stream hashes, manifest structure and manifest hash without committing generated binaries. Regenerating the corpus exposed one additional reproducibility defect before source commit: all eleven deterministic stream payloads reproduce byte-identically, but the manifest's FFmpeg macroblock debug counts vary because that decode did not constrain threading, so the generator will make this analysis explicitly single-threaded and the canonical manifest will be regenerated from that stable result. The source-pack audit also changes one planned item materially: launch-free telemetry freezes early because the top-level cadence quiet gate requires the B-presentation completion signal for all-I and P-only streams, not because the Python reader captures too soon. Correcting that condition changes RTL, requires a new Quartus image and needs hardware validation, so it is split into the following approval boundary rather than folded into this no-RBF documentation cycle.
+Commit `0f7edd5` places the complete regression instructions, three-LED results template, fifteen stream checksums and canonical compatibility manifest under `docs/`, identifies the currently accepted `dea60bc` RBF exactly, requires USER, DISK and POWER readings for every normal and recovery run, and records the exact generation commands for the squirrel stresses and full-movie recipe. The new verifier accepts only the exact fifteen-file stream set, checks every payload digest, validates the canonical manifest hash, portable paths, four-case structure and per-case stream identities, accepts the original release-candidate manifest only by its exact known legacy digest, and rejects an incomplete pack. Regeneration proved tests `01` through `11` byte-identical to their recorded hashes; the five-second start-440, fifteen-second start-435 and no-frame-counter full-movie recipes reproduce their three hashes; and the first 100,000 bytes of test `11` reproduce test `99`. The compatibility generator now records repository-relative paths, constrains FFmpeg debug decoding to one thread, and retries until its macroblock inventory accounts for every expected 45-by-30 picture row, which removes the discovered manifest-only nondeterminism; two complete runs produced the same canonical manifest SHA-256 `ae0d767f9ee6e95cd68d4224b40ce4d45a246df435707a6f9afa8cb09b75c822`. Both Python files compile cleanly, whitespace checks pass and no Quartus build or new RBF is required because compiled FPGA source is unchanged. The launch-free telemetry fault remains separately scoped: the top-level quiet gate incorrectly requires B-path completion for all-I and P-only streams.
 
 #### Next Steps:
 
-Complete and verify the imported documentation and pack checker, prove every available stream and the normalized single-threaded manifest against their recorded identities, and commit without rebuilding because this boundary changes no compiled source. Then propose the separate generic terminal-quiet telemetry correction with focused all-I, P-only and B-path simulation cases, a timing-clean build and hardware confirmation that the snapshot reason becomes quiet while existing LED acceptance remains unchanged.
+Open a separate generic terminal-quiet telemetry cycle that derives presentation completion from the active stream path rather than requiring B-path completion unconditionally. Cover all-I, P-only and B-containing terminal cases in focused simulation, build a timing-clean RBF, install it byte-verifiably, and confirm on hardware that launch-free telemetry freezes for quiet completion while the accepted USER, DISK and POWER behavior remains unchanged.
 
 #### Files Modified:
 
@@ -27,7 +27,7 @@ Complete and verify the imported documentation and pack checker, prove every ava
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
