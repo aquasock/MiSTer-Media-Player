@@ -1,3 +1,31 @@
+## 385 COMMIT Unreleased 2b1a170 2026-08-23T20:36:08-07:00
+
+#### Coming From:
+
+Unreleased 2b1a170
+
+#### Purpose:
+
+Hardware-qualify five seconds of visually observed dense real-video motion with complete native-24 presentation telemetry on the accepted queue-capacity fix.
+
+#### Outcome:
+
+After a MiSTer power cycle, the authoritative even-length 1,404,944-byte `12_bbb_squirrel_5sec_native24_q6.m2v` passes with USER steady on, DISK eleven blinks and POWER steady on, and the user reports that playback looked good. The steady USER state classifies the DISK indication as the normal final GOP-progress code, which the launch-free schema-seven capture confirms: exactly 1,404,944 transport bytes are accepted, forty-one reference plus seventy-nine B pictures decode, and all 120 pictures display with 119 swaps. The snapshot freezes for quiet reason one with frame-rate code two, five system-time seconds, sequence end, session quiet, presentation complete, zero decoder or presentation errors and zero cadence outliers at a measured 23.902 displayed swaps per second. The terminal scheduler has no frame waiting, active reorder, queued generation, promotion, pending frame or terminal boundary. The exact even-length 2,603,570-byte `13_bbb_squirrel_15sec_native24_q6.m2v`, SHA-256 `9257ffadc24eb6696fc9760f3253764b396c993dfc3640e921c97611bad2edce`, was retrieved from the MiSTer byte-exact; its 360 pictures comprise fifteen I, 106 P and 239 B pictures.
+
+#### Next Steps:
+
+Power-cycle the MiSTer and load `13_bbb_squirrel_15sec_native24_q6.m2v` through the normal file selector, watch the complete fifteen-second squirrel and wooden-spike sequence for continuous motion without clean frame skips, then report all three LEDs and leave the completed image loaded for telemetry capture. Require 121 reference plus 239 B pictures, 360 displays and 359 swaps represented by the established eight-bit counter wraps to 104 and 103, exactly 2,603,570 accepted transport bytes, sequence-end quiet, complete presentation retirement and zero errors before deciding how to stage the full endurance test fourteen.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 384 COMMIT Unreleased 2b1a170 2026-08-23T20:33:01-07:00
 
 #### Coming From:
@@ -1176,34 +1204,6 @@ GitHub published `MiSTer Media Player v0.6.0` at 2026-08-22T09:18:14-07:00 as a 
 #### Next Steps:
 
 Treat v0.6.0 as the immutable published baseline, retain the external release package and preserved seed-ten build until routine archival is explicitly approved, and resume future development under a fresh Unreleased boundary. Any new decoder, cadence, transport, audio, control or DVD work belongs after this version boundary and must not alter the `v0.6.0` tag or release asset.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 345 COMMIT Unreleased ae51759 2026-08-22T09:09:58-07:00
-
-#### Coming From:
-
-Unreleased ae51759
-
-#### Purpose:
-
-Perform the final v0.6.0 release audit and establish the exact commit for the annotated release tag as the fifth step of the approved plan.
-
-#### Outcome:
-
-The final audit passes at synchronized local, tracking, and GitHub commit `7e2e8811b5e22a37967c30d2e7d900a4a2508a8d` with a clean tracked worktree. Every change after synthesized baseline `b64ec6a91a6986a124b86765a9817b809c8948a1` is confined to `.ai/core-log.md`, `CHANGELOG.md`, `README.md`, and `docs/RELEASE_NOTES_v0.6.0.md`; no Quartus, RTL, top-level, QSF, QPF, QIP or framework source differs. The protected README section remains exactly 5,540 bytes at SHA-256 `c86635095cfee8c36636802872e75932580309a3cb58d6513a44758b43d515b3`. Changelog date and artifact identity, release-note baseline and qualification figures, README links, supported-format boundary and FFmpeg recipe all agree. The packaged RBF passes `SHA256SUMS`, retains its exact 4,455,376-byte size, and is byte-identical to both clean and incremental accepted outputs. No local tag, remote tag, or GitHub release named `v0.6.0` exists, so the name is available. The metadata commit resolving this audit is the exact tag target for step six.
-
-#### Next Steps:
-
-Have the user create annotated tag `v0.6.0` at the exact post-audit metadata commit reported with this entry, push that tag, and publish the GitHub pre-release titled `MiSTer Media Player v0.6.0` using `docs/RELEASE_NOTES_v0.6.0.md`, attaching only the verified `MediaPlayer_20260822.rbf` binary. Make no repository commit between this audit and tag creation.
 
 #### Files Modified:
 
