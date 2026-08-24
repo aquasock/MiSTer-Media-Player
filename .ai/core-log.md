@@ -1,3 +1,31 @@
+## 477 COMMIT Unreleased eab57b7 2026-08-24T14:08:55-07:00
+
+#### Coming From:
+
+Unreleased eab57b7
+
+#### Purpose:
+
+Accept silent Program Stream playback as the second v0.7.0 release-gate test and advance to no-reboot 44.1 kHz recovery.
+
+#### Outcome:
+
+Without rebooting after the accepted 48 kHz control, the user reports that `02_good_video_only.mpg` passes with USER solid on, DISK blinking eleven times and POWER solid on. The final image was triggered and retrieved exclusively through plain FTP with the default MiSTer login and no SSH keys; `.ai/current_results/entry477_release_gate_video_only.png` is 104,561 bytes with SHA-256 `9f9d3fccab5e20c6b0e932065b3960e5b4f80ff30ed0d13cc6bf50c7591df586`. Schema nine reports exactly zero delivered PCM samples, no audio underrun or PCM protocol error, zero aggregate errors and no display-gap outlier. It accepts the established 582,742 MiSTer transfer-byte count for the 582,741-byte demultiplexed H.262 payload, associates five timestamps, decodes seventeen reference and 31 B pictures, displays all 48 pictures with 47 swaps over 1.959896 seconds at 23.980870 frames per second, sees sequence end, completes presentation and freezes for normal quiet reason one at STC second two. Every decoder, destination, presentation, reorder, scratch, promotion, future-reference and terminal state is clear. The FIFO high-water telemetry remains saturated from the preceding audio session because that top-level diagnostic is reset only with the core, but the session PCM counter is zero and the user heard the required silence. This passes test two of the exact four-file v0.7.0 release gate.
+
+#### Next Steps:
+
+Without rebooting, run only `01_good_480p_44k.mpg` with Audio Test Off. Require audio to restart immediately and remain aligned, crackle-free and dropout-free after the zero-PCM session, with all 48 pictures and 47 swaps, healthy PCM activity, zero aggregate, decoder, presentation, underrun and protocol errors, sequence end, presentation completion and normal quiet reason one. Report all three terminal LEDs and leave the final image loaded for capture. Do not begin the full soak until this recovery transition is accepted.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 476 COMMIT Unreleased eab57b7 2026-08-24T14:06:42-07:00
 
 #### Coming From:
@@ -1189,36 +1217,6 @@ Without rebooting, leave Audio Test Off and run only `00_good_480p_48k.mpg`. Rep
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 437 COMMIT Unreleased 3814243 2026-08-24T06:21:28-07:00
-
-#### Coming From:
-
-Unreleased 091b150
-
-#### Purpose:
-
-Record the failed widened-FIFO control, correlate its first repeatable crackle to an exact transport starvation boundary, and define the bounded ARM-side scheduling correction.
-
-#### Outcome:
-
-The user reports that corrected `00_good_480p_48k.mpg` now begins with audio and video apparently aligned, but audio still plays slightly past the final picture, both repeatable crackles/dropouts remain, and the picture stutters once with the final crackle. The terminal LEDs were USER solid on, DISK blinking eleven times and POWER solid on. A launch-free schema-eight screenshot captured the loaded final raster at displayed frame 47 while telemetry had frozen on the first error: aggregate error flags are exactly `0x0400`, meaning `audio_pcm_underrun` alone, with `pcm_protocol_error` and every video, presentation and destination error clear. The snapshot occurs at 3,516 accepted PCM samples and 218,405 clean video bytes. Exact native-helper correlation proves why the 8,192-sample FIFO cannot fix this stream: only 3,456 samples precede a 147,631-byte PCM-free video interval, and the frozen count is exactly those samples plus 60 from the resumed batch that makes starvation sticky. Commit `3814243` implements the approved bounded-lookahead correction entirely in the helper. It retains the two-picture startup boundary, queues at most 512 KiB of video, uses audio and monotonic video PTS to maintain a 2,048-sample horizon, caps the initial release at 4,096 samples, caps every steady batch at 2,048 samples and inserts a guard sample before any post-start PCM-free video span can exceed 65,535 bytes. The analyzer independently compares scheduled in-band output with an explicit-output helper pass and proves exact video, PTS and PCM preservation without retaining the full transport in memory. On the failed 48 kHz control, the initial batch is 3,200 samples, the maximum steady batch is 2,048, the maximum PCM-free video span falls to 38,446 bytes, the terminal audio batch is 238 samples, and peak lookahead is 242,876 video bytes plus 4,078 PCM samples. The 44.1 kHz control has the same span and batch bounds. The 596-second soak reproduces a deterministic 342,199,090-byte transport at SHA-256 `3364dac5631d266adfb726c0bd26751e66ad069dd06c5ca23433d9c28c3df93d`, with all 84,543,918 video/PTS bytes at SHA-256 `db00682bb603a5f575df5a1d5d0b7a580c46ca99eed028f024ac6bc37016f38f` and all 28,628,352 PCM frames at SHA-256 `337b1387b9324b6c391a3223ced8f7660bd5144267b29d3964b4ed6b282839af`; its initial batch is 5,504, steady batches are at most 2,048, maximum gap is 64,768 bytes and peak video lookahead is 370,338 bytes. Short and faded fixtures at both rates preserve exact sample counts, clean ends, maximum sample error two and correlation rounding to one under native and address-and-undefined sanitizers. The nine-case envelope retains exactly three passes and six intended failures, the full soak remains a strict pass, and two official GCC 10.2.1 builds are byte-identical. The 361,452-byte static stripped ARM EABI5 helper has SHA-256 `4c0f1d2c3e9c229ccad38b683701968feac7b9f1111de20ec6b4a3f0864b2576`. No RTL, RBF, Main or media changed.
-
-#### Next Steps:
-
-Retrieve and hash the currently installed helper before mutation. Preserve it under an exact new rollback name, upload candidate `4c0f1d2c3e9c229ccad38b683701968feac7b9f1111de20ec6b4a3f0864b2576` through a staging name, retrieve it byte-identically, mark it executable and promote it only after rollback exists. Leave the timing-clean `091b150` RBF, Main and every installed media file unchanged. Then run only `00_good_480p_48k.mpg` without rebooting, report alignment, both former crackle locations, any visible stutter, the final audio tail and all three LEDs, and leave the final image loaded for a fresh schema-eight capture. Do not continue to the 44.1 kHz control or any failure case until this control completes with no audio underrun or other telemetry error.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- tools/streams/analyze_arm_av_transport.py
-- docs/TEST_INSTRUCTIONS.md
 
 #### Status:
 
