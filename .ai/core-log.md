@@ -1,3 +1,31 @@
+## 415 COMMIT Unreleased 104c5ff 2026-08-24T01:21:11-07:00
+
+#### Coming From:
+
+Unreleased 104c5ff
+
+#### Purpose:
+
+Install the continuity-corrected helper and sole longer audio-quality fixture while preserving the accepted FPGA, Main and rollback state.
+
+#### Outcome:
+
+Before installation the reachable MiSTer matched every expected identity: Main SHA-256 `16517a9927c659616796b45c8e2488da2a26f0595c91418ed09dc0eb7a5787aa`, RBF `414f7fae21e628e978ff331f701f0c1435f4742ef27d3928e3ad168cbbda9498`, helper `04f9683cf02c5ed2268743cb0ff28570e1a36c71ad3f362c80f1359c89a2af4d` and original audio test `94a8ff0223dd1acba4d59fc1785741522c4361956f17848bf9ebbb8c0a503fe7`; all staging, target and rollback names for this cycle were absent. The repaired helper and faded test were uploaded under commit-specific temporary names, independently verified, atomically installed and synchronized. `/media/fat/linux/MediaPlayer_Helper` now verifies at SHA-256 `12f6305f35ef56d4e8de2369ecd41d2811bda9d787c885991a5ed0272cd2678a`, reports the unchanged protocol-one capabilities, and its displaced predecessor is preserved exactly as `/media/fat/linux/MediaPlayer_Helper.backup.pre-continuity.104c5ff`. `/media/fat/games/MediaPlayer/02_arm_mp2_faded_tones.mpg` verifies at SHA-256 `cb4f143d2d72af72bb03c7a7fbc4e2163ad780a35483bdb871ec661cf29ccc24`. Main, RBF and `01_arm_mp2_audio.mpg` remain byte-identical, and no playback was launched during installation.
+
+#### Next Steps:
+
+Reboot the MiSTer once, enter MediaPlayer with Audio Test Off and run only `02_arm_mp2_faded_tones.mpg`. Expect approximately 250 milliseconds of silence, a gentle onset, about two seconds of sustained lower 440 Hz left and higher 660 Hz right tones without periodic ticks or crackle, a gentle release and trailing silence while the accepted final video frame remains visible. Report sound quality, channel separation, video appearance and USER, DISK and POWER, then leave the final image loaded for schema-eight capture before any replay or other file.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 414 COMMIT Unreleased 104c5ff 2026-08-24T01:15:36-07:00
 
 #### Coming From:
@@ -1134,39 +1162,6 @@ Power-cycle the MiSTer, run `01_i_baseline`, `02_p_motion_residual` and `04_b_bi
 
 - rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 - tools/streams/tb_h262_b_presentation_scheduler.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 375 COMMIT Unreleased 0f7edd5 2026-08-23T18:47:02-07:00
-
-#### Coming From:
-
-Unreleased dea60bc
-
-#### Purpose:
-
-Make the hardware regression pack self-contained, checksum-verifiable and explicit about the three-LED acceptance evidence required for every stream.
-
-#### Outcome:
-
-Commit `0f7edd5` places the complete regression instructions, three-LED results template, fifteen stream checksums and canonical compatibility manifest under `docs/`, identifies the currently accepted `dea60bc` RBF exactly, requires USER, DISK and POWER readings for every normal and recovery run, and records the exact generation commands for the squirrel stresses and full-movie recipe. The new verifier accepts only the exact fifteen-file stream set, checks every payload digest, validates the canonical manifest hash, portable paths, four-case structure and per-case stream identities, accepts the original release-candidate manifest only by its exact known legacy digest, and rejects an incomplete pack. Regeneration proved tests `01` through `11` byte-identical to their recorded hashes; the five-second start-440, fifteen-second start-435 and no-frame-counter full-movie recipes reproduce their three hashes; and the first 100,000 bytes of test `11` reproduce test `99`. The compatibility generator now records repository-relative paths, constrains FFmpeg debug decoding to one thread, and retries until its macroblock inventory accounts for every expected 45-by-30 picture row, which removes the discovered manifest-only nondeterminism; two complete runs produced the same canonical manifest SHA-256 `ae0d767f9ee6e95cd68d4224b40ce4d45a246df435707a6f9afa8cb09b75c822`. Both Python files compile cleanly, whitespace checks pass and no Quartus build or new RBF is required because compiled FPGA source is unchanged. The launch-free telemetry fault remains separately scoped: the top-level quiet gate incorrectly requires B-path completion for all-I and P-only streams.
-
-#### Next Steps:
-
-Open a separate generic terminal-quiet telemetry cycle that derives presentation completion from the active stream path rather than requiring B-path completion unconditionally. Cover all-I, P-only and B-containing terminal cases in focused simulation, build a timing-clean RBF, install it byte-verifiably, and confirm on hardware that launch-free telemetry freezes for quiet completion while the accepted USER, DISK and POWER behavior remains unchanged.
-
-#### Files Modified:
-
-- docs/TEST_INSTRUCTIONS.md
-- docs/RESULTS_TEMPLATE.txt
-- docs/SHA256SUMS
-- docs/compatibility_manifest.json
-- tools/streams/generate_test_progressive_compatibility.py
-- tools/streams/verify_regression_pack.py
 
 #### Status:
 
