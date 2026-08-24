@@ -1,3 +1,31 @@
+## 433 COMMIT Unreleased 9afe2f0 2026-08-24T05:10:12-07:00
+
+#### Coming From:
+
+Unreleased 9afe2f0
+
+#### Purpose:
+
+Install the reproducible helper and complete v0.7 qualification media set while preserving exact rollback state.
+
+#### Outcome:
+
+Read-only retrieval first confirmed the MiSTer remained on accepted RBF SHA-256 `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68` and helper SHA-256 `c6ce4ef0595beee5f1f231edeaebe360160becccad22e3e51d9f8d23b9c690b0`. The official-toolchain `9afe2f0` helper was uploaded under a staging name, downloaded and confirmed byte-identical at SHA-256 `2cf665c0153a9885e103a1da5038997efb9050c7fcbceb3d3340537cfb153d54`, marked executable through the FTP server and installed, with its predecessor preserved exactly as `/media/fat/linux/MediaPlayer_Helper.backup.pre-user-media.3f4b272`. A new `/media/fat/games/MediaPlayer/v0.7_qualification` directory contains the 48 kHz control at `b140c76c61da3c8ec46baf90548f290db7657661cc39b2cb0b3e80510531a2dd`, the 44.1 kHz control at `bd3935aa35100544ce4d5fe06b8d9de0e8f48f1a606cd2419f7abcc4c8891c50`, six expected-failure cases at `e4140672b46214b300b1ca558d0a8005dee035bb79ec44ec7c75d341714e89df`, `3f7f2df8eb0c16dedf10fa3059184aab17067cae61305c5994706842fef79f57`, `98965d3223b50258d2e673e5d58786ae1b4152df758f9e9decf10f90a68c48d0`, `ee485d5693caf90304ca348bdedbae5b9ac0559ed383d3e796f811428a6fccb6`, `c4f986798e64081f0128c167a30ab62226ed2f1aa9959cf4e99da49cd21d86cb` and `5ea02141a0be7846389b378f996f67e986bfef2a60dc289f9a7df6ab78f829ce`, and the full soak at `fdc480e6b16bcbc7c143eb8f7e7edfe0d0bbd8e46a1035b728f07639e71b2357`. Every remote file was retrieved and compared byte-for-byte before the staging area was discarded. Main and the accepted FPGA image are unchanged, no playback was launched, and the obsolete RBFs and older helper backups called out in Entry 430 remain untouched because their deletion was reserved for the user.
+
+#### Next Steps:
+
+Power-cycle once, set Audio Test to Off and run `00_good_480p_48k.mpg` followed by `01_good_480p_44k.mpg`. If both pass, run each numbered bad case for at most ten seconds and immediately replay `00_good_480p_48k.mpg` without rebooting; record the visible result and all three LEDs for both halves of every pair, treating an unavailable menu or failed control as a wedge. After all six pairs pass, power-cycle once and run `20_bbb_full_48k.mpg` through its complete 9:56 duration, checking opening alignment, scene transitions, the high-motion sequence near 7:22, credits and the audio tail, then leave the final image loaded for schema-eight capture. Roll back to `MediaPlayer_Helper.backup.pre-user-media.3f4b272` if the new helper itself fails to start.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 432 COMMIT Unreleased 9afe2f0 2026-08-24T04:58:03-07:00
 
 #### Coming From:
@@ -1157,33 +1185,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 393 COMMIT Unreleased 9a7a982 2026-08-23T21:56:19-07:00
-
-#### Coming From:
-
-Unreleased 9a7a982
-
-#### Purpose:
-
-Hardware-qualify free-running cadence fallback on the unannotated P-picture range control after timestamp presentation was added.
-
-#### Outcome:
-
-After a reboot, unannotated `06_p_f_code_range.m2v` passes with USER steady on, DISK steady off and POWER steady on. The launch-free schema-seven snapshot accepts the exact 184,678 transport bytes including the odd-byte pad, finds zero timestamp associations and zero displayed timestamp bits, decodes and displays all five reference pictures with four swaps, and finishes on the expected final P picture with temporal reference four. Sequence end, session quiet and presentation complete are true; decoder and presentation errors are zero; frame waiting and both holds are false; and no decode, reorder, queued, promotion, pending-frame or terminal-boundary work remains. All three ranked gaps are ordinary frame-rate-code-three fallback intervals at 0.049738, 0.049738 and 0.033158 seconds, the delivered rate is 25.076 fps and the outlier count is zero. This proves that adding timestamp-driven presentation did not disturb unannotated P-picture cadence or terminal retirement on source `9a7a982` and the exact Entry-389 RBF.
-
-#### Next Steps:
-
-Reboot and run unannotated `04_b_bidirectional.m2v`, report all three LEDs and leave the final image loaded for capture. Require zero timestamp associations, three reference plus two B pictures displayed with four swaps at normal free-running cadence, sequence-end quiet, presentation complete, zero errors and complete reorder-scheduler retirement; if it passes, mark source `9a7a982` hardware-passed and begin the PCM feature cycle.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
