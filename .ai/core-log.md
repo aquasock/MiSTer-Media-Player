@@ -1,4 +1,4 @@
-## 481 COMMIT Unreleased ??? 2026-08-24T15:22:14-07:00
+## 481 COMMIT Unreleased 46bf297 2026-08-24T15:22:14-07:00
 
 #### Coming From:
 
@@ -6,28 +6,28 @@ VERSION v0.7.0 0064148
 
 #### Purpose:
 
-Establish the first standards-bounded native-interlaced milestone: reconstruct authored interlaced frame pictures and present their fields directly as 720x480i59.94 while preserving the proven progressive path and keeping this native-field path suitable for a later processing-bypass output.
+Establish the standards and deterministic-regression foundation for the first bounded native-interlaced I-frame milestone without changing current playback behavior.
 
 #### Outcome:
 
-Pending implementation and qualification. The approved scope is an H.262 4:2:0 interlaced sequence containing complete I-frame pictures with `picture_structure=Frame`, `frame_pred_frame_dct=1`, `progressive_frame=0`, `chroma_420_type=0`, `repeat_first_field=0`, and either authored top-field-first or bottom-field-first order. Add deterministic TFF and BFF regressions, extend compatibility analysis and the I-picture capability gate only for this subset, prove reconstructed frame samples against FFmpeg, then add standards-valid 480i59.94 half-line timing, authored field-row presentation, field-aware chroma expansion and MiSTer field signalling. Retain selectable 800x600 progressive output as the fallback. Preserve the exact four-file v0.7.0 regression suite and exclude P/B interlaced prediction, separate field pictures, repeated fields, 576i50, bob, weave and SDI from this first increment.
+Commit `46bf297` adds controlled H.262 records for interlaced sequence/frame semantics, macroblock height, picture structure, authored first-field order, frame-DCT/frame-prediction, repeat/chroma constraints, field-period output and interlaced 4:2:0 sample organization. The new deterministic generator produces four-picture 720x480 all-I elementary streams at 30000/1001 for both TFF and BFF. The TFF artifact is 157,688 bytes at SHA-256 `61ba1555df74e63fbfed83dbe674cd31a4886505193c6dcc7d4fe104d2cbe828`; FFprobe reports field order `tt`, and its decoded YCbCr planes hash to `3984cdfe2e8f98ac2b9734f7e484976c2200faf6363a380df1e21176161ae392`. The BFF artifact is 160,157 bytes at SHA-256 `6da990f80eb349928cd9ee843094bbb2faeedbd2d8bf9c1a874cb71ab89a69b6`; FFprobe reports `bb`, and its decoded planes hash to `2927bb2b3ce1327e8055cbb5516657cef9b7e7b9ae8869af094f47cca6933ae3`. In both cases the signalling-only patch leaves decoded YCbCr bytes identical to the unpatched frame-DCT source. The analyzer recognizes exactly the approved 4:2:0 interlaced all-I frame-picture envelope while continuing to classify ordinary progressive regressions unchanged. The user-facing compatibility checker deliberately reports both new streams unsupported until RTL playback is enabled, preventing a premature support claim. Python compilation, generator assertions, manifest assertions, independent FFmpeg decode, FFprobe field-order checks, current checker-boundary checks and regeneration of the existing progressive compatibility corpus all pass. Generated media remains ignored and reproducible from committed source.
 
 #### Next Steps:
 
-First expand `.ai/core-reference.md` with the controlling H.262 interlaced clauses and add deterministic 720x480 TFF/BFF all-I fixtures plus analyzer expectations without changing playback. Commit and validate that foundation. Then implement and simulate the bounded I-frame decoder acceptance and pixel-exact reconstruction. Finally implement native 480i field timing/presentation, run clean simulation and FPGA builds with resource/timing review, qualify TFF and BFF on hardware, and rerun the established four-file progressive release regression before closing the milestone. Stop for approval if evidence requires widening or materially changing this scope.
+Prepare the next Unreleased source proposal to open only the I-picture frontend capability gate for the proven 720x480 interlaced frame-DCT subset and add RTL regression coverage that reconstructs both generated fixtures against the recorded FFmpeg plane hashes while leaving field presentation on the existing progressive diagnostic display. Do not enable the compatibility checker or native output claim until that decoder proof passes. Native 480i timing, field-aware chroma presentation and MiSTer field signalling remain the following separately qualified commit.
 
 #### Files Modified:
 
 - .ai/core-reference.md
-- tools/streams interlaced generator, analyzer and regression artifacts
-- bounded H.262 frontend and I-picture reconstruction RTL
-- native interlaced timing, framebuffer presentation and top-level integration RTL
-- associated simulation, build and user documentation files
+- .gitignore
+- tools/streams/analyze_h262_compatibility.py
+- tools/streams/check_media_compatibility.py
+- tools/streams/generate_test_interlaced_i_frames.py
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 480 VERSION v0.7.0 0064148 2026-08-24T14:39:58-07:00
