@@ -1,4 +1,4 @@
-## 376 COMMIT Unreleased ??? 2026-08-23T19:00:57-07:00
+## 376 COMMIT Unreleased 292981f 2026-08-23T19:00:57-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Make terminal presentation completion generic so all-I and P-only streams reach 
 
 #### Outcome:
 
-The approved RTL cycle will correct the scheduler's completion-state initialization rather than weakening the top-level drain predicate: presentation is already complete when a session has not opened a B-reordering run, the first B header clears completion, and the existing scratch-plus-future-reference retirement restores it. This preserves every scheduler ownership and cadence condition while making the signal already consumed by the profiler and top-level quiet gate truthful for all-I and P-only streams. The focused scheduler test will explicitly cover an I-only terminal path, a P-only terminal path, the B-header transition to incomplete, and the existing B-run transition back to complete.
+Commit `292981f` initializes the scheduler's presentation-complete state high while no B-reordering run exists, clears it on the first B header, and retains the established restoration only after scratch pictures and the future reference retire. This fixes all-I and P-only quiet telemetry without weakening the top-level drain predicate or changing B ownership and cadence behavior. The focused scheduler test explicitly proves I-only and P-only completion, B-header revocation, B-run restoration and all five supported cadence rates; the schema-seven cadence-profiler test retains quiet, forced, fatal and no-progress capture with checksum `eb2b643d`. Full-pipeline generic P, B and repeated-multi-slice replays retain exact row, picture, publication and presentation counts with zero errors; the all-I replay reaches four pictures, four publications, three swaps and generic presentation complete with zero errors, but its reusable generic bench remains inapplicable because that bench unconditionally requires prediction reads and reconstruction for every stream. The seed-eleven Quartus 17.0.2 build completes in 12 minutes 25 seconds with zero errors and 155 warnings. Every timing category is positive with zero endpoint TNS: plus 0.330 ns HDMI setup, plus 1.029 ns decoder setup, plus 1.246 ns host setup, plus 7.960 ns video setup, plus 0.252 ns hold, plus 4.145 ns recovery, plus 0.610 ns removal and plus 1.122 ns pulse width. It uses 34,549 ALMs, 51,860 registers, 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks. The 4,188,704-byte RBF has SHA-256 `1258735da72354789e0fddabc44ed0b06185c0e00919f1a23c40e983f3c69e31` and was installed persistently on the MiSTer, then retrieved byte-for-byte identical.
 
 #### Next Steps:
 
-Run the focused scheduler and cadence-profiler simulations plus the reusable decoder regression set, commit and push the source, then build at seed eleven and require every timing category positive. Install the resulting RBF byte-verifiably and confirm launch-free quiet-reason telemetry with `01_i_baseline`, a P stream and `04_b_bidirectional`, recording USER, DISK and POWER for each so the telemetry correction cannot mask a playback regression.
+Power-cycle the MiSTer, run `01_i_baseline`, `02_p_motion_residual` and `04_b_bidirectional` through the normal file selector, and record USER, DISK and POWER for every stream. Leave each completed video open long enough to read launch-free telemetry, requiring quiet snapshot reason one, sequence end, session quiet, presentation complete and zero error flags; the B stream must also retain its established complete presentation state. Do not accept the source commit until those hardware results pass.
 
 #### Files Modified:
 
@@ -23,7 +23,7 @@ Run the focused scheduler and cadence-profiler simulations plus the reusable dec
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
