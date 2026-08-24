@@ -1,3 +1,31 @@
+## 403 COMMIT Unreleased 55d06ce 2026-08-23T23:44:24-07:00
+
+#### Coming From:
+
+Unreleased 55d06ce
+
+#### Purpose:
+
+Record the first source-neutral ARM loader hardware failure and isolate it without changing or replaying the loaded state.
+
+#### Outcome:
+
+After rebooting into the exact installed Main at SHA-256 `7f6ef2d299e9619250f300764836c8bf30409f7f452cd34248effda6e6536a39`, the user selected only `01_arm_mp2_audio.mpg` and observed a split-second flash of white vertical bars followed by black video, with USER, DISK and POWER all steadily off while the MiSTer menu remained responsive. A screenshot captured from the untouched final state is uniformly blank within the active raster and contains no cadence telemetry, while all three LEDs off maps to no valid diagnostic snapshot, so the FPGA never reached a settled decoder session. The installed helper, Main, test stream and accepted RBF remain byte-identical to entry 402. Running that same installed helper independently on the MiSTer, without replaying into the FPGA, succeeds both with file outputs and with its normal `aplay` path: it emits all 185,158 video bytes, one timestamp record, nine MPEG Layer II frames and 10,368 stereo PCM frames with exit status zero. This rules out the file, Program Stream parser, MP2 decoder, ordinary MiSTer audio output and RBF identity, and confines the failure to Main's new asynchronous helper-to-SPI handoff or its lifecycle. The connected DVD remained unmounted and its boot-time protected-sector read warnings are unrelated.
+
+#### Next Steps:
+
+Instrument only Main's isolated MediaPlayer broker so the next replay of this same file records whether the helper was selected, the source string and index passed, every stdout read and cumulative SPI byte count, download assertion and release, child exit status and any stop reason in a temporary log retrievable without the console. Keep the accepted RBF, helper decoder, test stream and DVD untouched. Rebuild and install only Main, reboot, replay only `01_arm_mp2_audio.mpg`, capture the blank or completed frame and retrieve the log before choosing a transport fix; do not expand to another video until this handoff is understood.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 402 COMMIT Unreleased 55d06ce 2026-08-23T23:33:09-07:00
 
 #### Coming From:
@@ -1156,33 +1184,5 @@ Require every timing category positive at seed eleven. Two closing seeds out of 
 
 - [x] Built
 - [ ] Passed
-
----
-## 363 COMMIT Unreleased 85b4c17 2026-08-23T04:32:28-07:00
-
-#### Coming From:
-
-Unreleased ebf372e
-
-#### Purpose:
-
-Close the standing HDMI framework setup path with fitter seed ten now that the decoder reports no violated paths.
-
-#### Outcome:
-
-The registered reference-word delivery added by `ebf372e` worked as intended. Decoder setup moves from minus 0.060 ns with two violated paths to plus 0.460 ns with none of fifty violated, the targeted route disappears from the report entirely, and the worst remaining decoder path relocates to `tap_index` feeding `out_reg` inside `mpeg2_h262_b_bidirectional_raster_engine`. Area and iteration cost both improve sharply: 34,931 ALMs of 41,910 against 35,932 at `2dc52d7`, 51,895 registers, unchanged memory and DSP, a fitter time of 9 minutes 3 seconds and a total flow of 11 minutes 4 seconds, the fastest of this development run. The image is nonetheless unusable because a single path now misses on the `pll_hdmi` clock at minus 0.053 ns with total negative slack of minus 0.053 ns, which is the same standing HDMI framework path entry 319 recorded when seed eight missed and seed nine closed it. That path lies in the MiSTer framework under `sys/` rather than in decoder logic, so seed selection is the available remedy rather than an evasion of a design defect. Converting the thirty-six by sixty-four fetched-word store to inferred block RAM was attempted three ways and abandoned: duplicating the array in place, lifting each copy into an isolated always block with an unconditional registered read after confirming that consumers gate on `block_lookup_valid` and the focused test never inspects data on an invalid lookup, and finally an explicit `ramstyle` attribute. Every attempt produced 53,969 registers against 49,361 and no additional memory bits, because Quartus 17.0.2 Lite will not recognise a store only thirty-six entries deep, so the 2,304 registers that restructuring would have recovered are not available. The plus 1.2 ns decoder gate recorded in entry 361 is also withdrawn here as unsound: it was derived by doubling a 0.6 ns spread measured between `2dc52d7` and `3771f19`, two structurally different netlists, which measures the effect of removing the demux rather than seed-to-seed variance on a fixed design. It is replaced by requiring two consecutive fits at different seeds in which every timing category closes.
-
-#### Next Steps:
-
-Build at seed ten and require every timing category positive, then repeat at a third seed and require the same, because the replacement gate is two consecutive closing fits at different seeds on this netlist rather than a fixed slack target derived from an unsound spread. Record the decoder and HDMI slacks from both so that genuine seed-to-seed variance on this design is measured for the first time. Confirm on MiSTer that every raw elementary-stream regression decodes exactly as before with unchanged picture and swap counts, zero decoder errors and clean terminal completion, since the extra delivery cycle affects the shared reference path used by both the mixed and bidirectional engines and no hardware run has yet exercised it. Should seed ten also miss on the HDMI path, treat the framework path as structurally marginal at this occupancy rather than sampling further seeds, and revisit it against the area that gating the two genuine telemetry modules would return. Only once two seeds close does 0.7.0 resume with the system time clock and the PCM sink, and the six compiled but uninstantiated modules remain worth deleting for navigability with no timing expectation attached.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
