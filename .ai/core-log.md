@@ -1,4 +1,4 @@
-## 482 COMMIT Unreleased ??? 2026-08-24T15:29:53-07:00
+## 482 COMMIT Unreleased 4c4d0e3 2026-08-24T15:29:53-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Admit and prove pixel reconstruction for the exact native-480i interlaced frame-
 
 #### Outcome:
 
-Pending implementation and qualification. Extend the frontend capability gate only when sequence and picture state match 720x480, 30000/1001, 4:2:0, complete I-frame pictures, frame prediction/DCT, no concealment vectors, `progressive_sequence=0`, `progressive_frame=0`, `chroma_420_type=0` and `repeat_first_field=0`; preserve either authored `top_field_first` value. Carry `chroma_420_type` as explicit captured state rather than relying only on the existing syntax comparison. Reuse the current frame raster, inverse quantizer, IDCT, intra reconstruction and full-frame storage mapping because the approved subset does not introduce field-DCT or field-motion syntax. Add a dedicated end-to-end RTL regression for both generated streams that checks accepted headers, all four reconstructed pictures, component coordinates and decoded samples against the FFmpeg oracle. Keep the existing 800x600 progressive diagnostic presentation and keep the user-facing compatibility checker at an explicit unsupported boundary until native 480i timing/presentation is implemented.
+Commit `4c4d0e3` admits only the approved 720x480, 30000/1001, 4:2:0, all-I, frame-picture/frame-DCT interlaced subset. The frontend now captures `chroma_420_type` explicitly and requires `progressive_sequence=0`, `progressive_frame=0`, `chroma_420_type=0`, `repeat_first_field=0`, frame prediction/DCT, valid I-picture syntax and no concealment vectors; either authored `top_field_first` value is preserved. Progressive acceptance remains under its original predicate, and field pictures, field-DCT pictures, repeat-first-field and unsupported motion syntax remain excluded. A new end-to-end RTL bench exercises the live frontend, I-picture parser/bookkeeper, inverse quantizer, IDCT and intra reconstruction against independent FFmpeg planar-YCbCr oracles. The TFF fixture reconstructs all 4 pictures and 2,073,600 component samples with 9,442 one-LSB differences, zero samples beyond the established one-LSB IDCT tolerance and maximum delta 1. The BFF fixture reconstructs all 4 pictures and 2,073,600 samples with 9,632 one-LSB differences, zero beyond tolerance and maximum delta 1. The released progressive all-I control reconstructs all 4 pictures and 2,073,600 samples with 69,671 one-LSB differences, zero beyond tolerance and maximum delta 1. A valid interlaced field-DCT negative control reaches the frontend but never asserts phase-one acceptance and reconstructs zero pictures. Current and exact pre-change `6636e8b` Cycle-A parser-equivalence runs produce byte-identical deterministic result lines across all eight cases; the same three legacy fixed-expectation wrapper exits occur on both revisions and remain outside the release gate. Quartus 17.0.2 synthesis, fitting, assembly and TimeQuest complete with zero errors. Focused timing reports zero violations with 1.748 ns decoder setup slack, 10.182 ns decoder recovery slack and 8.519 ns video setup slack; global endpoint TNS is zero. Fitter use is 29,134 ALMs, 45,135 registers, 3,655,139 block-memory bits, 464 RAM blocks and 65 DSP blocks. The resulting RBF is 4,186,320 bytes with SHA-256 `49ff363a6ab284f301ac30d96e3a976fafc0208317afd7fa486435ad6110b0fa`. Presentation deliberately remains the existing 800x600 progressive diagnostic path, and the user-facing compatibility checker still reports these streams unsupported until native 480i output is proven.
 
 #### Next Steps:
 
-Implement the bounded common/progressive/interlaced I-picture capability predicates and explicit chroma field, then add and run the full reconstruction regression for TFF and BFF. Re-run the existing progressive I fixture and current parser/stream regressions to prove the original gate and reconstruction path are unchanged. Commit only if both field orders reconstruct successfully and unsupported interlaced syntax remains excluded. After this commit is proven, prepare the separate native 480i timing, field-aware chroma presentation and MiSTer field-signalling proposal; stop for approval if reconstruction evidence requires field-DCT, field pictures, repeat-first-field, P/B changes or another material scope expansion.
+Prepare the separate native 480i timing and presentation proposal. Add standards-correct alternating field timing with the required half-line relationship, use authored `top_field_first` only to choose the first displayed field, map the reconstructed frame into field-aware luma and 4:2:0 chroma presentation, drive MiSTer field signalling, and retain the current progressive diagnostic path as a selectable fallback until hardware proof passes. Keep field pictures, field-DCT, repeat-first-field, P/B interlacing and the user-facing compatibility claim out of scope. Qualify timing in RTL before installing any candidate RBF by plain FTP for visual TFF/BFF hardware testing.
 
 #### Files Modified:
 
@@ -23,12 +23,11 @@ Implement the bounded common/progressive/interlaced I-picture capability predica
 - MediaPlayer_top_02.svh
 - tools/streams/tb_h262_interlaced_i_reconstruction.sv
 - tools/streams/run_interlaced_i_reconstruction.sh
-- supporting regression/oracle generation source if required
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 ## 481 COMMIT Unreleased 46bf297 2026-08-24T15:22:14-07:00
