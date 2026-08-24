@@ -1,3 +1,31 @@
+## 439 COMMIT Unreleased 3814243 2026-08-24T06:26:40-07:00
+
+#### Coming From:
+
+Unreleased 3814243
+
+#### Purpose:
+
+Close focused hardware qualification of the bounded-lookahead scheduler on the formerly repeatable 48 kHz starvation control.
+
+#### Outcome:
+
+The user reports that `00_good_480p_48k.mpg` now works with audio and video perfectly synchronized, neither repeatable crackle present and no reported picture stutter. USER and POWER are solid on and DISK blinks eleven times, the normal final-GOP progress state. The launch-free 800x600 schema-eight capture is 104,785 bytes at SHA-256 `4845b6ab2e9f858d3061371adf0479357da034b46bbe86dfc30f9870f7d5fa50`. It closes the static proof with zero aggregate error flags, `audio_underrun` false, `pcm_protocol_error` false and decoder, presentation and destination errors all clear. All 582,742 accepted transport bytes reach the core, 44 timestamps associate, seventeen reference plus 31 B pictures decode, all 48 pictures display with 47 swaps, sequence end is seen, presentation completes and the snapshot freezes for normal quiet reason one with no pending decode, reorder, promotion, scratch, future-reference or terminal-boundary work. PCM sample count saturates the telemetry field at 16,383 and FIFO peak saturates at 127 or more without starvation. First presentation occurs after 2,430,554 decoder cycles or 40.5 milliseconds, the final picture presents after 1.959 seconds and the session becomes quiet after 2.057 seconds. The cadence profiler records every picture with an aggregate 24.494 delivered frames per second; its three largest decode-limited intervals are 99.475 milliseconds at periodic picture ordinals eleven, 23 and 35, but they drop no picture, leave no state or error and produced no user-reported visible stutter. This accepts helper source `3814243` and active helper SHA-256 `4c0f1d2c3e9c229ccad38b683701968feac7b9f1111de20ec6b4a3f0864b2576` for the repaired 48 kHz control while retaining timing-clean RBF source `091b150`.
+
+#### Next Steps:
+
+Without rebooting, run only `01_good_480p_44k.mpg` with Audio Test Off. Report beginning audio-video alignment, any crackle or dropout, any visible picture stutter, whether audio extends beyond the final picture and all three final LEDs, then leave its final image loaded for schema-eight capture. Do not begin the six expected-failure recovery pairs until the 44.1 kHz control also has zero audio underrun, PCM protocol, presentation, decoder and aggregate error telemetry.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 438 COMMIT Unreleased 3814243 2026-08-24T06:23:08-07:00
 
 #### Coming From:
@@ -1153,41 +1181,6 @@ Reboot the MiSTer once so the patched Main starts, enter MediaPlayer and run onl
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 399 COMMIT Unreleased c9e5aff 2026-08-23T22:49:33-07:00
-
-#### Coming From:
-
-Unreleased a57079f
-
-#### Purpose:
-
-Implement the first ARM-side embedded-audio loader for MPEG Program Streams while retaining the accepted FPGA video, timestamp and MiSTer ALSA paths unchanged.
-
-#### Outcome:
-
-Commit `c9e5aff` implements the first ARM-side media pipeline without changing FPGA source or the accepted RBF. The helper incrementally parses MPEG-1 or MPEG-2 Program Stream and PES framing, selects the first H.262 and MPEG audio streams, emits H.262 through the existing file channel with the established in-band PTS record, decodes 48 kHz Layer II with pinned CC0 `minimp3`, and writes signed 16-bit stereo PCM through installed `aplay`; raw M2V input remains a byte-identical compatibility path. Dependencies are fetched at a pinned commit with exact SHA-256 checks instead of being vendored. The patch against official Main_MiSTer `0a8fb44` exposes M2V and MPG files only for the MediaPlayer core, starts the helper asynchronously, polls its nonblocking video pipe through Main as the sole FPGA SPI owner, terminates an old helper on replacement or reset, and removes the blocking Loading screen for both supported extensions. The deterministic generator produces the sole short H.262 plus stereo Layer II Program Stream for this cycle. Native and address-and-undefined-sanitized verification find byte-identical video after removing one PTS record, all 10,368 expected stereo PCM frames with 0.974933 correlation to FFmpeg's independent synthesis, byte-identical raw-M2V pass-through and clean rejection of a PES truncated through its first audio packet. The helper cross-compiles as a stripped static ARM EABI5 binary and patched Main cross-compiles as the expected stripped dynamic ARM EABI5 binary with the official MiSTer GCC 10.2 toolchain; the build script also reproduces a clean clone, patch application and both outputs.
-
-#### Next Steps:
-
-Back up and hash the installed MiSTer executable, then install the exact `c9e5aff` helper and patched Main together with `01_arm_mp2_audio.mpg`, retaining the accepted RBF unchanged. Restart Main safely and use only that one Program Stream for hardware validation, requiring immediate return from file selection without the Loading screen, normal five-picture video completion, the distinct 440 Hz left and 660 Hz right embedded tones through MiSTer ALSA, clean helper exit, zero decoder and presentation errors and a successful reset followed by replay of the same file. Leave the full video regression set deferred to release qualification. If initial A/V alignment is observably wrong, preserve this demux and decode boundary and make PTS-governed start alignment the next focused source cycle rather than changing the FPGA buffer.
-
-#### Files Modified:
-
-- .gitattributes
-- .gitignore
-- host/arm/Makefile
-- host/arm/media_player_helper.c
-- host/build_arm_stack.sh
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/streams/generate_arm_av_test.py
-- tools/streams/verify_arm_av_pipeline.py
 
 #### Status:
 
