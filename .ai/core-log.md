@@ -1,3 +1,31 @@
+## 408 COMMIT Unreleased 8fc80ee 2026-08-24T00:17:00-07:00
+
+#### Coming From:
+
+Unreleased 8fc80ee
+
+#### Purpose:
+
+Install the absolute-path Main correction while preserving the diagnostic build and every unchanged media artifact.
+
+#### Outcome:
+
+Before installation the MiSTer was reachable and `/media/fat/MiSTer` matched the running diagnostic build at SHA-256 `1ee8e337e8583fdf4ac585934734fcd7d6af1f8a7130f5e1adcb7ecaebf4a1e4`; the accepted RBF, helper and sole Program Stream also matched their established hashes. The 1,166,244-byte `8fc80ee` Main was uploaded under the exact staging name `/media/fat/MiSTer.upload.8fc80ee`, independently verified at SHA-256 `16517a9927c659616796b45c8e2488da2a26f0595c91418ed09dc0eb7a5787aa`, made executable and atomically installed on the FAT volume, then synchronized and verified again. The displaced diagnostic Main is preserved at `/media/fat/MiSTer.backup.pre-pathfix.b357c51` and verifies at its original SHA-256. `/media/fat/MediaPlayer.rbf`, `/media/fat/linux/MediaPlayer_Helper` and `/media/fat/games/MediaPlayer/01_arm_mp2_audio.mpg` remain byte-identical at SHA-256 `ad04f9f73c0fb98309588f8c212c6ccad71c80b254a2a284f637672a73350d37`, `4f6ac001a4a0455c20e1148cedf7548768258abfafb2299a3f8b171a5383fa8e` and `94a8ff0223dd1acba4d59fc1785741522c4361956f17848bf9ebbb8c0a503fe7` respectively. The old diagnostic Main remains in memory until reboot, and no playback was launched during installation.
+
+#### Next Steps:
+
+Keep the USB DVD drive disconnected, reboot once to start the installed `8fc80ee` Main, enter MediaPlayer and run only `01_arm_mp2_audio.mpg`. Confirm the five-picture video plays instead of remaining blank, the embedded 440 Hz left and 660 Hz right tones are audible in their correct channels, playback completes cleanly, and report USER, DISK and POWER LEDs; leave the final image loaded so the retained diagnostic log and frame can be captured before any replay or additional file.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 407 COMMIT Unreleased 8fc80ee 2026-08-24T00:12:57-07:00
 
 #### Coming From:
@@ -1141,34 +1169,6 @@ Investigate why the HDMI domain absorbs every addition before continuing, since 
 - tools/streams/decode_hardware_cadence.py
 - tools/streams/tb_h262_hardware_cadence_profiler.sv
 - tools/streams/tb_h262_inband_metadata.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 368 COMMIT Unreleased c25f3d9 2026-08-23T13:55:44-07:00
-
-#### Coming From:
-
-Unreleased ed3310b
-
-#### Purpose:
-
-Remove the per-pixel vertical size comparisons from the ASCAL pixel-queue select so the HDMI boundary reaches the seed variance it must survive.
-
-#### Outcome:
-
-Commit `ed3310b` built clean and delivered what it was for, moving HDMI setup from plus 0.054 ns to plus 0.254 ns while every other category stayed positive, using 34,458 ALMs, the lowest of this development run. Decoder setup fell from plus 0.911 ns to plus 0.448 ns in the same fit, which is placement variance within the roughly 0.5 ns spread already measured rather than an effect of a change that touched only ASCAL's vertical counter; the figure that matters is the weakest margin anywhere in the design, and that improved almost fivefold. The bottleneck then relocated to `o_vacpt` feeding `o_vpixq_pre` at four logic levels and 5.790 ns, where the CYCLE 8 pixel-queue select compared `to_integer(o_vacpt)` against `o_ivsize` twice. That call needed a different technique from the previous two fixes: unlike the line-boundary wrap, this block executes on every pixel clock while `o_vacpt` advances only once per line, so a plainly registered predicate would have been stale for the first pixel of every line and would have produced a genuine artifact at the bottom image boundary rather than a theoretical one. This commit therefore updates both predicates in lockstep with `o_vacpt` at each of its two mutually exclusive assignment sites, giving zero skew because predicate and counter change on the same clock. The one behavioural difference from the combinational original is recorded in the code rather than left implicit: the predicates lag by a single line if `o_ivsize` changes while `o_vacpt` does not advance, which occurs only at a mode change where scaler output is transient. Synthesis returned an unchanged register count rather than the expected two additional registers, which could not by itself confirm the predicates survived as registers, so the fit was allowed to settle the question and did: HDMI setup reaches plus 0.395 ns with decoder setup plus 0.473 ns, host bridge plus 1.393 ns, hold plus 0.259 ns, recovery plus 3.950 ns, removal plus 0.677 ns and pulse width plus 1.122 ns, using 34,980 ALMs and 52,123 registers, with RBF SHA-256 `f52f8859277eda230f0bd9b565ca906fdc85debaf8f5014b4659d959182f2ad6`. Across the three ASCAL fixes the weakest margin anywhere moved from plus 0.054 ns to plus 0.254 ns to plus 0.395 ns, a sevenfold improvement from three small and individually precedented changes. The user validated that image on hardware and every stream passed, which accepts all three together: the polyphase select duplication of `cea1d62`, the vertical wrap predicate of `ed3310b` and the pixel-queue selects here, all of which sit in the live video output path where a defect would appear as wrong geometry, unstable sync or bottom-edge artefacts rather than as a decoder error. This is a deliberate stopping point for HDMI work, because the worst remaining path runs from `o_v_poly_phase` to `o_v_poly_t` at 5.907 ns with zero logic levels, a pure register-to-register wire with nothing combinational left to precompute; improving it would require placement control or pipelining the scaler datapath, which is a materially larger change than any taken here.
-
-#### Next Steps:
-
-Resume 0.7.0 with the HDMI boundary no longer the constraint that breaks each addition. Bring up `EXT_BUS`, unconnected at `MediaPlayer_top_00.svh`, together with the throwaway HPS-side harness that exercises it, and define the picture metadata wire protocol carrying the 33-bit timestamp with reserved `picture_structure`, `top_field_first`, `repeat_first_field` and `progressive_frame` fields, keeping protocol and harness in one cycle because a protocol with nothing to talk to cannot be tested. Presentation on timestamp against the proven clock follows, anchoring from the first timestamp and retaining free-running cadence for streams without them, then the PCM sink with its elastic FIFO, fill level and underrun telemetry and explicit seek flush. Watch the weakest margin after each addition rather than the decoder alone, since the lesson of this run is that the binding path moves. Before release qualification, complete the regression pack still unexercised, in particular long GOP, dense residual, mixed macroblocks, multi-slice, full endurance and the truncation case with its no-reboot recovery, and delete the six compiled but uninstantiated modules for navigability with no timing expectation attached.
-
-#### Files Modified:
-
-- sys/ascal.vhd
 
 #### Status:
 
