@@ -1,3 +1,31 @@
+## 382 COMMIT Unreleased 2b1a170 2026-08-23T20:27:02-07:00
+
+#### Coming From:
+
+Unreleased 2b1a170
+
+#### Purpose:
+
+Hardware-qualify complete decoding and presentation under the compatibility pack's maximum coefficient and residual traffic.
+
+#### Outcome:
+
+After a MiSTer power cycle, the authoritative odd-length 2,875,985-byte `09_compat_dense_residual.m2v` passes with USER steady on, DISK steady off and POWER steady on. Its launch-free schema-seven capture freezes for quiet reason one after accepting 2,875,986 transport bytes including the expected pad, decoding five reference plus seven B pictures and displaying all twelve pictures with eleven swaps. Sequence end, session quiet and presentation complete are all true with zero decoder or presentation errors, no frame waiting and no reorder, queued, promotion, pending-frame or terminal-boundary work remaining. The maximum-residual stress records seven cadence outliers and a 4.940 displayed-swap rate across the measured interval, with the largest decode-limited gaps at approximately 0.414, 0.370 and 0.298 seconds; these are retained as throughput evidence rather than presentation loss because every picture and swap completes exactly once and terminal ownership is clean. The exact odd-length 366,071-byte `10_compat_mixed_macroblocks.m2v`, SHA-256 `ad1d9e81f0f7544ac16a1aaddb85ef9e1065333c1fdd305aa3cf275aa1ccc289`, was installed in the MiSTer file directory and retrieved byte-for-byte identical; its twenty-four pictures comprise two I, seven P and fifteen B pictures.
+
+#### Next Steps:
+
+Power-cycle the MiSTer and load `10_compat_mixed_macroblocks.m2v` through the normal file selector, then report all three LEDs and leave the completed image loaded for telemetry capture. Require nine reference plus fifteen B pictures, all twenty-four displays, twenty-three swaps, 366,072 accepted transport bytes including the expected odd-byte pad, sequence-end quiet, complete presentation retirement and zero errors before proceeding to test eleven; record cadence outliers as throughput evidence without conflating them with the exact completion gate.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 381 COMMIT Unreleased 2b1a170 2026-08-23T20:24:44-07:00
 
 #### Coming From:
@@ -1180,34 +1208,6 @@ Proceed to step four by copying the already qualified clean `MediaPlayer.rbf` to
 #### Files Modified:
 
 - README.md
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-## 342 COMMIT Unreleased 5f09e92 2026-08-22T08:50:43-07:00
-
-#### Coming From:
-
-Unreleased fe0393d
-
-#### Purpose:
-
-Create the final v0.6.0 release-notes document as the second step of the approved seven-step release plan.
-
-#### Outcome:
-
-Commit `5f09e92` adds a self-contained v0.6.0 release-notes document covering the real-stream milestone, its qualified raw progressive 4:2:0 input boundary, native frame-rate codes one through three, decoder and compressed-ingress changes, corrected presentation behavior, exact clean-build timing and resource figures, focused and full-length MiSTer validation, known limitations, and the required `MediaPlayer_20260822.rbf` size and checksum. It distinguishes implementation limits from H.262 limits, identifies `b64ec6a` as the synthesized source baseline, states that later documentation does not alter the qualified RTL, records the four focused stream checksums, and notes the formally exposed `.ai` workflow. All stated artifact, hardware and timing figures were checked against the accepted logs and current clean RBF before the documentation commit was pushed.
-
-#### Next Steps:
-
-Proceed to step three by changing the README from release-candidate language to the final v0.6.0 published-milestone presentation, linking these release notes and adding the user-facing FFmpeg conversion command requested in place of a Python recipe. Preserve the 5,540-byte AI-assisted-development section byte-for-byte; no build or additional hardware validation is required for this release-notes-only commit.
-
-#### Files Modified:
-
-- docs/RELEASE_NOTES_v0.6.0.md
 
 #### Status:
 
