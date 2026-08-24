@@ -1,10 +1,10 @@
 # CONTROLLED STANDARDS REFERENCE
 
 > **Project:** MiSTer-Media-Player  
-> **Purpose:** Fast, clause-level standards reference for the active MPEG-2 decoder and the approved v0.7.0 systems-layer work.
+> **Purpose:** Fast, clause-level standards reference for the active MPEG-2 decoder and the approved v0.7.0 ARM media-pipeline work.
 > **Authority:** The cited controlled document always outranks this summary.
 
-This file contains external rules, not project history or implementation advice. It is deliberately limited to sources that support the current H.262 decoder or the next approved work: native frame cadence, MPEG-2 Program Stream framing, PES parsing, and PTS/DTS timing.
+This file contains external rules, not project history or implementation advice. It is deliberately limited to sources that support the current H.262 decoder or the next approved work: native frame cadence, MPEG-2 Program Stream framing, PES parsing, PTS/DTS timing, and ARM-side MPEG-1 Layer II audio decoding.
 
 ---
 
@@ -75,6 +75,19 @@ rules:
     - "SCR, PTS, DTS and 90 kHz presentation timing"
     - "program stream maps"
 
+- source_id: MPEG1-AUDIO
+  priority: P0
+  authority: ISO/IEC
+  document: "ISO/IEC 11172-3:1993 — Coding of moving pictures and associated audio for digital storage media at up to about 1,5 Mbit/s — Part 3: Audio"
+  current_edition: "Edition 1, 1993, with Technical Corrigendum 1:1996"
+  status: "Published; current edition under systematic review"
+  access: PAID
+  official_url: "https://www.iso.org/standard/22412.html"
+  use_for:
+    - "MPEG-1 Audio Layer II frame syntax and decoding"
+    - "sampling-frequency and bitrate signalling"
+    - "ARM-side compressed-audio decoding for the first v0.7.0 embedded-audio profile"
+
 - source_id: MPEG2-CONFORMANCE
   priority: P1
   authority: ISO/IEC
@@ -103,6 +116,7 @@ The 2021 H.222.0 edition is the controlled text consulted for the records below.
 | Program Stream Map video identification | H.222.0 2.5.4 | H222-009 |
 | PES payload alignment assumptions | H.222.0 2.4.3.7 | H222-010 |
 | Existing video decode behavior | H.262 clauses and Annex B | H262-001 through H262-026 |
+| MPEG-1 Layer II audio decode | ISO/IEC 11172-3 | Re-open the controlled text for every syntax-level conclusion |
 
 ### Explicitly deferred
 
@@ -120,8 +134,9 @@ The following are not active v0.7.0 reference scope and should be expanded only 
   required_sources: "Authorized DVD CCA CSS material"
   note: "Do not substitute reverse-engineering notes for restricted normative material."
 
-- boundary: AUDIO
-  required_sources: "ISO/IEC 13818-3 for MPEG audio and ATSC A/52 for AC-3, constrained by the future application profile"
+- boundary: AUDIO_AFTER_MPEG1_LAYER_II
+  required_sources: "ISO/IEC 13818-3 for MPEG-2 audio extensions and ATSC A/52 for AC-3, constrained by the future application profile"
+  note: "The approved first ARM-audio profile activates MPEG-1 Layer II only; AC-3 and MPEG-2 audio extensions remain deferred."
 
 - boundary: TRANSPORT_STREAM
   required_sources: "H.222.0 transport-system clauses"
