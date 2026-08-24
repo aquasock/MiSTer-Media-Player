@@ -1,3 +1,31 @@
+## 428 COMMIT Unreleased 62e8ccf 2026-08-24T04:19:35-07:00
+
+#### Coming From:
+
+Unreleased 62e8ccf
+
+#### Purpose:
+
+Record that the presentation anchor did not move the startup offset and identify the real cause as real-time PCM pacing of the shared byte path.
+
+#### Outcome:
+
+The user recorded the run at 120 frames per second. Frame analysis places the blackout at 1.117 seconds and the first picture at 2.483 seconds, so the black screen lasts 1.366 seconds, and Goertzel analysis of the 440 and 660 Hz tones places audio onset near 1.50 seconds, leaving audio about one second ahead of video. A schema-eight capture of `62e8ccf` reports `first_present_cycle` 82,322,655 against 82,301,563 for `047f5b2`, a difference of 21,092 cycles or 0.35 milliseconds, so the anchor change moved nothing measurable and the hypothesis behind entry 426 was wrong. The same capture contains the evidence that should have refuted it before the build: `presentation_hold_total_cycles` is 5,728,829, only 0.095 seconds, so the timestamp admission gate was never holding pictures for anything like 1.372 seconds. The first picture was simply not available yet, and the reason is byte delivery. The helper emits each decoded PCM sample as a nine-byte in-band record, expanding 36,756 compressed audio bytes into 1,296,000 bytes and making PCM roughly 88 percent of the emitted stream, while `mpeg2_h262_inband_metadata` gates `input_ready` on `pcm_ready` and `MediaPlayer_top_00.svh` derives that from the PCM FIFO not being full. The shared byte path is therefore throttled to real-time 48 kHz sample delivery once the FIFO fills, which also explains the session lasting 180,910,349 cycles, or 3.015 seconds, for a three-second clip. The fixture makes this severe because its first picture is an intra frame spanning video elementary-stream bytes 30 through 177,860, which is 97.1 percent of all 183,120 video bytes, so almost the entire video payload must cross that throttled path before anything can be displayed. Two independent predictions confirm the mechanism. Only 2,042 audio bytes, or 8,000 samples, remain after the first picture completes, predicting 0.1667 seconds for the remaining four pictures against 0.1657 seconds measured, an error of 0.6 percent. Untimestamped `.m2v` files carry no PCM records, are never throttled, and start immediately, exactly as the user observes. This also explains why the reverted `d9022e6` deadlocked rather than merely delaying: holding the PCM sink stops the only path video bytes have.
+
+#### Next Steps:
+
+Do not pursue further FPGA-side changes for this offset until the emission order is fixed, because the throttle is a real-time sample rate rather than a byte volume and no reachable FIFO depth can absorb it; buffering the 2.8 seconds of PCM that precede the first picture would need roughly 4.7 megabits against 2.28 megabits of free block memory. The correct fix belongs in the ARM helper, which has ample Linux memory and full control of emission order: it should keep video bytes ahead of PCM records rather than emitting each sample as soon as it is decoded, holding only enough PCM in flight to keep the FPGA's 2,048-sample reserve fed. That is a host-side change costing no FPGA logic or timing, consistent with the user's instruction not to spend either on this offset. Decide separately whether to keep or revert `62e8ccf`, which costs 35 ALMs, changed nothing measurable on this fixture, and is defensible only as a correctness improvement for streams whose first metadata timestamp differs from their first picture timestamp. Consider also reducing the nine-byte-per-sample in-band record format, which inflates the stream roughly sevenfold against the compressed audio it replaces, though that is a bandwidth question and not the cause of this offset.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 427 COMMIT Unreleased 62e8ccf 2026-08-24T04:07:06-07:00
 
 #### Coming From:
@@ -1159,33 +1187,5 @@ Reboot the MiSTer so the new persistent RBF loads, then run `15_pts_irregular_or
 
 - [x] Built
 - [ ] Passed
-
----
-## 388 COMMIT Unreleased 2b1a170 2026-08-23T21:06:21-07:00
-
-#### Coming From:
-
-Unreleased 2b1a170
-
-#### Purpose:
-
-Qualify deliberate mid-picture truncation and immediate no-reboot baseline recovery, completing the full hardware regression pack for the queue-capacity fix.
-
-#### Outcome:
-
-After a MiSTer power cycle, the exact 100,000-byte `99_EXPECTED_FAILURE_truncated_stream.m2v` stops visibly on frame seven with USER, DISK and POWER all steady off rather than claiming normal completion. Its launch-free schema-seven snapshot accepts all 100,000 bytes, decodes four reference plus five B pictures, displays eight pictures with seven swaps and freezes for reason three, `fatal_or_no_progress`, with sequence end false, session quiet false, presentation complete false, an unfinished future reference and decode still in flight. Decoder and presentation error flags remain zero, correctly distinguishing deliberate source truncation from a syntax fault. Without rebooting, the user immediately loads the exact odd-length `01_i_baseline.m2v`; it passes with USER steady on, DISK two blinks and POWER steady on. The recovery snapshot accepts 726,704 transport bytes including the expected pad, decodes and displays all four references with three swaps, freezes for quiet reason one and reports sequence end, session quiet, presentation complete, zero errors, no frame waiting and no reorder, queued, promotion, pending-frame or terminal-boundary state. The three long all-I gaps are decode-throughput observations only and no picture is lost. This proves that the truncated transfer leaves no stale state across a normal selector reload and completes the regression pack: tests one through fourteen, the expected failure and its no-reboot recovery all meet their specified hardware, visual and telemetry gates on source `2b1a170` and RBF SHA-256 `b19010473eb8f414b85b9ae11d0b3f29abc26dae560c115a1da29754cd23f491`.
-
-#### Next Steps:
-
-Treat source `2b1a170` and its installed RBF as the accepted complete-regression boundary for ordinary and B-picture presentation. Prepare the next source-change proposal for timestamp-driven presentation against the proven system-time clock while retaining free-running cadence for unannotated streams, with focused association, wrap, missing-timestamp, seek-reset, B-reorder and full-pipeline controls; obtain user approval before changing source, and keep the PCM sink as the following feature boundary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
