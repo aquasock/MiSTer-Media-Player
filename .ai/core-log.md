@@ -1,3 +1,35 @@
+## 463 COMMIT Unreleased 6dece4c 2026-08-24T10:41:16-07:00
+
+#### Coming From:
+
+Unreleased 6dece4c
+
+#### Purpose:
+
+Record that the packed record format decodes correctly on hardware and leaves the 24-second diagnostic where it already was, so the soak decides it.
+
+#### Outcome:
+
+The user power-cycled onto the `6dece4c` image and reports `23_bbb_opening24_exact_av.mpg` looking perfect with no stutter at all and normal LEDs. The capture is 545,953 bytes at SHA-256 `706c546680d8f67053c5cd2f37fdefbd43d6deb354b2fca2bc7a94ccb0516fcd`. The format contract holds, which was the first thing this commit had to prove: `pcm_protocol_error` is false, so the extractor and the helper agree about the frame count, aggregate error flags are zero, there is no underrun, all 3,138,619 transport bytes are accepted, 194 reference plus 383 B pictures decode, all 577 pictures display with 576 swaps, sequence end is seen, presentation completes and the snapshot is the normal quiet reason one. A record carrying sixteen frames is decoded into sixteen sample events with the audio intact, on hardware, at a third of the previous path bandwidth.
+
+The cadence counters are unchanged rather than improved, and that should be stated plainly against the acceptance this commit was given. Gap outliers are 13, exactly what `14e0629` measured; presentation hold is 267,676,803 cycles against 266,426,934; decoder stall 646,658,859 against 644,608,100; `hold_scratch_available_cycles` is bit-identical at 2,984,466; and the three largest gaps are the same 431.059 milliseconds at display ordinal fourteen and 82.896 at ordinals fifteen and seventeen. The acceptance recorded in entry 462 was that the outlier count fall below 13 on this file, and it did not. What the user sees as perfect is consistent with the counters: the remaining gaps sit within the first second, where a single hitch during the opening fade is far less visible than the once-per-second beat that record density used to produce across the whole run.
+
+This file was therefore already at its floor before the format change, and cannot separate a bandwidth improvement from no improvement. The soak can, because that is where both surviving symptoms live: the once-per-second beat the user still saw in the credits under `14e0629`, and an underrun that has stood at 21.74, 62.2 and 39.3 seconds across three helpers without ever being attacked at its cause. A 39.2 percent smaller transport and 94 percent fewer records change the shared path's occupancy by more than any previous cycle, and ten minutes is the only measurement that reaches it.
+
+#### Next Steps:
+
+Run `20_bbb_full_48k.mpg` end to end without rebooting and report the cadence through the body and the credits, audio and video alignment at the opening, the high-motion sequence near 7:22 and the closing sting, any crackle or dropout, and all three LEDs, then leave the final image loaded for a schema-eight capture. Acceptance is a quiet snapshot rather than the fatal one the last two soaks produced, with `audio_pcm_underrun` clear, all 14,315 pictures accounted for after eight-bit wrap and sequence end seen. If the underrun is gone, `6dece4c` is the first commit to clear both hardware symptoms and the next question is release qualification rather than diagnosis. If it survives, the remaining candidates are buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate` so a full video FIFO cannot block audio, and deepening `audio_pcm_fifo`, which the fit report now shows would compete for RAM blocks already at 81 percent. If the credits still beat once a second while the underrun clears, the presentation scratch scheduler is the remaining target, measured against the `scratch_available` and `pending_frame_released` evidence at ordinals fourteen and fifteen.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 462 COMMIT Unreleased 6dece4c 2026-08-24T10:37:34-07:00
 
 #### Coming From:
@@ -1196,38 +1228,6 @@ Reboot the MiSTer once, enter MediaPlayer with Audio Test Off and run only `02_a
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 423 COMMIT Unreleased d9022e6 2026-08-24T03:19:14-07:00
-
-#### Coming From:
-
-Unreleased 047f5b2
-
-#### Purpose:
-
-Hold the PCM output until the first picture is presented so audio and video begin together on timestamped streams.
-
-#### Outcome:
-
-Audio began as soon as the startup reserve filled while video waited for the PTS-gated presentation timeline, so on a Program Stream audio led video by the first picture's timestamp offset. Rather than force video to present early, which would mean altering the presentation gate Entry 389 established and spending logic and timing margin on a path the user has accepted as correct, this cycle delays the audio instead. `MediaPlayer_top_05.svh` gains a decoder-domain sticky flag that sets on the first genuine display swap, detected from a change in the scheduler's `display_frame_bank`, `display_scratch` or `display_scratch_bank` outputs exactly as the cadence profiler detects one, but derived independently so that gating the profiler out later cannot silently remove it. That single bit crosses into `CLK_AUDIO` through a two-flop synchronizer in `MediaPlayer_top_00.svh`, consistent with the existing rule that only single bits cross between the decoder and audio domains. `audio_pcm_output_adapter` gains a `video_started` input qualifying only its initial transition out of idle, so mid-stream starvation, the accepted-end release for short clips and the audio-tail completion are unchanged. Holding audio cannot stall what video waits on, because the System Time Clock is a free-running accumulator on `CLK_AUDIO` whose `run` input is tied high and which therefore advances regardless of PCM consumption. Restoring telemetry proved decisive for sizing the bounded wait that prevents permanent silence when video never presents. Key-based SSH remains rejected, but `/dev/MiSTer_cmd` is writable over FTP, so uploading a one-line command file to it triggers a screenshot with no shell at all; the decoded schema-eight snapshot of the accepted `047f5b2` image reports 185,149 accepted elementary-stream bytes, one associated timestamp, three reference plus two B pictures, five displays, four swaps, sequence end, presentation complete, saturated PCM sample count 16,383, saturated FIFO peak 127, no underrun, no PCM protocol error, zero aggregate error flags and a quiet reason-one freeze with session quiet true. It also reports `first_present_cycle` 82,301,563 at the 60 MHz decoder clock, placing the first picture 1.372 seconds into the session and measuring the reported delay directly. The initial two-second bound was therefore only 0.63 seconds clear of a real video start and its 26-bit parameter capped at 2.73 seconds, so a file with a larger timestamp offset would have hit the timeout and silently restored the very lead the gate removes; commit `d9022e6` widens the parameter to 27 bits and sets the bound to five seconds, which bounds silence without ever approaching a legitimate presentation. All six `tb_audio_pcm_output_adapter` cases pass, including the four predating the gate, which confirms the accepted paths are unchanged. The build completed in 9 minutes 31 seconds with zero errors and uses 29,188 ALMs at 70 percent, 44,885 registers, 3,379,667 memory bits, 429 RAM blocks and 65 DSP blocks, a cost of 167 ALMs over `047f5b2` for a flag, a synchronizer and one counter. Worst-case setup slack falls to 0.162 nanoseconds on the 152.21 MHz `pll_hdmi` domain with total negative slack of zero, while the decoder domain improves from 1.562 to 1.938 nanoseconds and every other domain holds at or above 1.6; the tightened path is in HDMI output logic this cycle does not touch, so it is fitter placement variance rather than a consequence of the change, but it is thinner than the 0.476 and 0.500 of the two preceding accepted builds and should be watched.
-
-#### Next Steps:
-
-Install the resulting RBF at SHA-256 `b0f3a3125bf803dfaed0924b543760a45f439288b18b742cebbd4816c7b342f5` and run `02_arm_mp2_faded_tones.mpg` with Audio Test Off, requiring that audio and video now begin together rather than audio leading by roughly 1.4 seconds, that the tones stay clean and separated with smooth fades, that LEDs remain normal and that a schema-eight capture still reports five displays, four swaps, sequence end, presentation complete and zero error flags. Confirm separately that an older `.m2v` file still starts immediately, since it carries no timestamps and no audio for the gate to wait on, and that its video is not held by the bounded wait. If any video artefact appears, retune the fitter seed before treating it as a functional defect, because the `pll_hdmi` margin is the thinnest of the recent accepted builds. Once accepted, resume the deferred prolonged ARM producer stall work.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_05.svh
-- rtl/audio/audio_pcm_output_adapter.sv
-- tools/streams/tb_audio_pcm_output_adapter.sv
 
 #### Status:
 
