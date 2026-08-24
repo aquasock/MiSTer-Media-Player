@@ -1,3 +1,31 @@
+## 469 COMMIT Unreleased 8c59ddb 2026-08-24T12:33:55-07:00
+
+#### Coming From:
+
+Unreleased 8c59ddb
+
+#### Purpose:
+
+Capture the schema-nine full-soak credits window and identify the mechanism behind the remaining visible cadence.
+
+#### Outcome:
+
+The user again sees the slight credits cadence on the diagnostic image. The completed screenshot was captured exclusively through plain FTP with the default MiSTer login and no SSH keys; `.ai/current_results/entry469_full_soak_credits_window.png` is 8,102 bytes with SHA-256 `747774eafd35e0239072f090a3dc27492bf9628a86fe828a02f4388b8cc8381d`. Schema nine passes every correctness invariant: all 84,423,309 clean-video bytes were accepted, aggregate error flags are zero, audio underrun and PCM protocol error are clear, sequence end was seen, presentation completed, and the snapshot closed normally for quiet reason one at STC second 596. The late window begins at second 500 and records 97 timestamp-advance conflicts but zero timestamp-delay conflicts. That is one early-admission conflict per 0.990 seconds across the 96-second observation window, matching the approximately one-second beat the user sees and directly isolating it to the timestamp-to-cadence handoff. Each conflict is an eligible raster window where the sparse PTS says the candidate is due while the exact-rate cadence accumulator says it is not yet due. The current scheduler lets the timestamp replace the cadence gate, displays that picture early, and clears partial cadence credit, so each roughly one-second timestamp can perturb otherwise exact 24 fps pacing. The three largest late-window gaps are all 3,979,008 decoder cycles or 66.3168 milliseconds with a cadence slot ready but no presentable candidate and no scratch bank available; thirty late outliers therefore also preserve evidence of reorder pressure, but that signature cannot explain the one-second periodicity as closely as the 97 timestamp conflicts do. The observational `8c59ddb` image is consequently accepted: it leaves playback and all transport/audio completion invariants unchanged and distinguishes the residual mechanism as designed.
+
+#### Next Steps:
+
+Make the narrow timestamp-admission correction only after approval: retain the exact-rate cadence gate as a mandatory floor, allowing a timestamped candidate to wait when its PTS is not due but never allowing an already-due sparse PTS to advance the candidate before the next cadence slot. Preserve every ownership, reorder, scratch-bank, accumulator-rate and audio-path rule. Prove in scheduler simulation that the 97 advance-conflict class no longer causes an early swap, that a future timestamp can still delay presentation, and that all supported free-running cadence sequences remain bit-exact; then run the focused regressions, build, install through plain FTP with an exact rollback, and repeat the full movie. Hardware acceptance requires the credits beat to disappear without reintroducing audio underrun, completion errors, missing pictures or a new timestamp-delay stall.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 468 COMMIT Unreleased 8c59ddb 2026-08-24T12:18:50-07:00
 
 #### Coming From:
@@ -1209,36 +1237,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 429 COMMIT Unreleased 3f4b272 2026-08-24T04:30:48-07:00
-
-#### Coming From:
-
-Unreleased 62e8ccf
-
-#### Purpose:
-
-Delay the in-band audio at startup by leading video ahead of it in the helper's emission order, and revert the presentation anchor that changed nothing.
-
-#### Outcome:
-
-Commit `dc862e1` reverts `62e8ccf`, so the functional RTL is byte-identical to accepted `047f5b2` again, and the MiSTer was returned to that image with `/media/fat/MediaPlayer.rbf` verifying at SHA-256 `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68`; the reverted build is retained as `MediaPlayer.reverted.62e8ccf.rbf`. Commit `3f4b272` implements the delay where it can work. The helper previously emitted each decoded sample as a nine-byte in-band record the moment it existed, so PCM records preceded the video bytes behind them and throttled those bytes to real time through the FPGA's `pcm_ready` gate. It now queues decoded PCM and writes video immediately, releasing the queue once the first picture is complete, detected by counting picture start codes in the emitted video, or once a bound of four seconds of audio is buffered, whichever comes first. The bound exists only to keep the buffer finite and had to be generous: an initial one-second bound ended the lead early and left the offset unchanged, because this fixture's intra frame is 97 percent of its video payload and sits behind 69,120 samples. Releasing on the first picture rather than on a fixed delay keeps the effect to startup, so steady-state interleaving is untouched and audio is not left permanently trailing video. Local measurement on `02_arm_mp2_faded_tones.mpg` shows the PCM emitted before the first picture completes falling from 69,120 samples to zero, so the modelled video delay falls from 1.440 seconds to zero against 1.372 seconds measured on hardware, a model error of five percent. The first PCM record now appears at emitted byte 185,158, after all video. Audio should therefore begin after its 2,048-sample reserve, about 43 milliseconds in, leaving video marginally ahead rather than a second behind. Three integrity checks hold: the in-band PCM payload reconstructed from the emitted records is byte-identical to the helper's own `--pcm-out` output, so the audio is delayed and not altered; that `--pcm-out` output is byte-identical to the unmodified helper, confirming the file path is untouched and that its long-standing difference from the FFmpeg reference is pre-existing and unrelated; and an elementary stream with no audio passes through byte-identical, since the queue never engages without PCM. The ARM helper was cross-compiled, verified byte-identical after upload and installed at SHA-256 `c6ce4ef0595beee5f1f231edeaebe360160becccad22e3e51d9f8d23b9c690b0` with mode 755, its predecessor preserved as `/media/fat/linux/MediaPlayer_Helper.backup.pre-video-lead.104c5ff`. One deviation must be recorded: the documented toolchain is MiSTer Main's ARM GNU 10.2 compiler, but only `arm-linux-gnueabihf-gcc` 15.2 was available, and with no qemu on the workstation the ARM binary could not be executed before installation. It is statically linked and stripped, but it is unproven until it runs.
-
-#### Next Steps:
-
-Power-cycle the MiSTer, since the wedged core from `d9022e6` and the reverted `62e8ccf` are both still resident until a cold start, then run `02_arm_mp2_faded_tones.mpg` with Audio Test Off. Require video to appear essentially at once rather than 1.37 seconds late, audio to follow within about 43 milliseconds, tones to stay clean and separated with smooth fades, and LEDs to remain normal. If the helper fails to start at all, suspect the toolchain deviation first and roll back to `MediaPlayer_Helper.backup.pre-video-lead.104c5ff` before suspecting the lead logic. Capture a schema-eight snapshot over FTP and require `first_present_cycle` to collapse from 82,301,563 to a small fraction while the decode evidence holds at 185,149 elementary-stream bytes, three reference plus two B pictures, five displays, four swaps, sequence end, presentation complete and zero error flags, with no audio underrun. Confirm separately that an older `.m2v` file is unaffected. Once accepted, delete `MediaPlayer.failed.d9022e6.rbf` and `MediaPlayer.reverted.62e8ccf.rbf`, obtain the documented ARM toolchain so helper builds are reproducible, and resume the deferred prolonged ARM producer stall work.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- MediaPlayer_top_05.svh
-- rtl/mpeg2_new/mpeg2_h262_pts_presentation_timeline.sv
-- tools/streams/tb_h262_pts_presentation_timeline.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
