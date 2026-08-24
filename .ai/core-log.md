@@ -1,3 +1,35 @@
+## 457 COMMIT Unreleased ??? 2026-08-24T08:46:56-07:00
+
+#### Coming From:
+
+Unreleased 386d3c1
+
+#### Purpose:
+
+Record that the timestamp-only control splits the cadence defect into a dominant PCM-gating mechanism and a small record-carrying one, and propose the FPGA boundary that follows.
+
+#### Outcome:
+
+The user ran `24_bbb_opening24_pts_only.m2v` and reports the stutter mostly gone but still present, and still worse than the audio-free control played in the past, with ordinary terminal indication of USER solid on, DISK blinking eleven times and POWER solid on. The capture is 545,928 bytes at SHA-256 `46e4a18ef82db01fb8d275389deda76664df91ee94b8881de1fa53b8d011d15a`, with zero aggregate error flags, all 3,138,619 bytes accepted, all 577 pictures displayed with 576 swaps, sequence end, presentation complete and normal quiet reason one. The control answers the question it was built for, and the split is lopsided. Presentation hold returns to 783,626,293 cycles against the raw control's 781,845,922 and the audio-video file's 12,376,681, and presentation stall to 775,473,833 against 777,671,229 and 11,794,180. Decoder stall is 655,681,763 against the raw control's 655,685,975, a difference of four thousand cycles in six hundred and fifty million. Removing PCM from a stream that keeps the same video bytes, the same 551 timestamps at the same offsets and the same record extraction restores the decoder's slack completely.
+
+The outlier count falls from 170 to 21 while the raw control's is zero, so the two mechanisms are now separated and measured. Real-time PCM sink gating destroys the decoder's reservoir and accounts for roughly 149 of the 170 outliers: with PCM present the shared path advances only as fast as the 48 kHz sink drains, the decoder can never run ahead, and every picture whose decode overruns its frame interval is late. That is why bounding delivery order and filling the compressed FIFO both failed to help; neither can create slack on a path that is paced by an audio sink, and the helper has no way to reach it. The remaining 21 outliers belong to the records themselves, because this control has full slack and still misses deadlines the identical unannotated video never missed. Its largest gaps are 116.054 milliseconds at display ordinal 65 with no compressed input pending and the scheduler reporting a released pending frame, 82.896 milliseconds at ordinal 196 with both scratch banks pending during a closed reorder run, and 66.317 milliseconds at ordinal 28 with the decoder not ready. `hold_scratch_available_cycles` also rises to 6,963,478 against the raw control's 2,984,470, so the scratch pool is being held longer when records are present even though nothing is starved.
+
+The transport-level adjacency recorded in entry 456 is now a candidate mechanism for that residue rather than a curiosity. This control carries 551 timestamp records and two picture start codes that its video does not contain, and it produces 21 outliers; the audio-video transports carry the same timestamps plus more than a million PCM records, present 59 and 66 such adjacencies before extraction, and produce 139 and 170. The correlation is suggestive but not proof, because record count, adjacency count and PCM gating all rise together and only gating has been isolated so far.
+
+#### Next Steps:
+
+Approval is required for two pieces of work whose order matters. First, and cheaply, a host-side control that varies record density alone: regenerate the timestamp-only stream carrying one timestamp per GOP rather than one per PES packet, roughly 25 records instead of 551, with the same video bytes and the same extraction path. If the 21 outliers fall roughly with the record count, the residue is per-record cost in extraction or the decoder pipeline; if they do not move, the residue is in what the timestamps make the presentation scheduler decide, and the `pending_frame_released` and both-banks-pending evidence at ordinals 65 and 196 is where to look. That control changes no helper, no RBF and no video bytes, and it should be answered before any RTL is touched. Second, and this is the real boundary, the dominant mechanism is architectural and cannot be fixed from the helper: one byte path gated by the slower of two sinks means the audio FIFO paces video delivery, so the decoder is permanently just-in-time whenever audio is present. The candidate correction is to stop letting PCM backpressure reach the video path, either by deepening `audio_pcm_fifo` so the helper's bounded lead can never fill it, or by buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate` so compressed video continues to flow past it. Both are FPGA changes requiring a Quartus build and a timing review, and the first is only a resource question if the deeper FIFO fits, so the choice should be made on the resource and timing numbers rather than in advance. Do not change the helper again for cadence; its two corrections are sound, they removed the underrun and they are not what is limiting the picture.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 456 COMMIT Unreleased 386d3c1 2026-08-24T08:41:14-07:00
 
 #### Coming From:
@@ -1157,42 +1189,6 @@ Reboot the MiSTer once, enter MediaPlayer with Audio Test Off and run only `02_a
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 417 COMMIT Unreleased d70591c 2026-08-24T01:30:00-07:00
-
-#### Coming From:
-
-Unreleased 104c5ff
-
-#### Purpose:
-
-Add deterministic PCM startup prefill and defer terminal telemetry until embedded audio has drained cleanly.
-
-#### Outcome:
-
-Commit `d70591c` exposes the FIFO's read-domain occupancy and holds normal playback until 2,048 samples provide approximately 42.7 milliseconds of reserve at 48 kHz. A synchronized accepted-end level releases complete clips shorter than the threshold without deadlock, and a synchronized consumed-end result keeps embedded-audio sessions terminally pending until the clean end token drains; raw video and FPGA test modes retain their previous completion behavior. The profiler pauses only its forced nonquiet timeout for that explicit audio tail, while fatal errors still snapshot immediately. Focused proofs pass reserve gating, short-stream release, genuine post-start underrun detection, empty-before-end completion, audio-deferred telemetry, later forced telemetry and fatal priority. The first clean seed-eleven fit exposed an unrelated pre-existing decoder path at minus 0.109 ns, so the final boundary records deterministic fitter seed twelve without changing logic. The exact committed configuration then repeated a full Quartus 17.0.2 flow in 13 minutes 29 seconds with zero errors and zero endpoint TNS: global setup is plus 0.476 ns, decoder setup plus 0.683 ns, video setup plus 7.868 ns, hold plus 0.254 ns, recovery plus 4.420 ns, removal plus 0.653 ns and pulse width plus 1.122 ns. The build uses 36,103 ALMs, 52,687 registers, 3,371,475 memory bits, 427 RAM blocks and 65 DSP blocks; the 4,206,432-byte RBF has SHA-256 `b48d06e1b0f42e3465f48a1d89b10d0eb032edddcb4e02f8aab84c14854a75df`.
-
-#### Next Steps:
-
-Verify the MiSTer's current Main, RBF, helper and faded test identities, then stage and independently hash only the exact new RBF, preserve the displaced RBF under a commit-specific rollback name and leave Main, helper and both audio fixtures byte-identical. After reboot, run only `02_arm_mp2_faded_tones.mpg` with Audio Test Off and require unchanged clean separated sound and video, normal LEDs, zero audio errors and a quiet reason-one snapshot after the three-second audio tail rather than the prior forced reason-two snapshot.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_07.svh
-- MediaPlayer.qsf
-- rtl/audio/audio_pcm_fifo.sv
-- rtl/audio/audio_pcm_output_adapter.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/streams/tb_audio_pcm_output_adapter.sv
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-- tools/streams/verify_d2_pcm_path.py
 
 #### Status:
 
