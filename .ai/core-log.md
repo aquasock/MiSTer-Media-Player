@@ -1,3 +1,33 @@
+## 451 COMMIT Unreleased f2b2e02 2026-08-24T07:22:11-07:00
+
+#### Coming From:
+
+Unreleased f2b2e02
+
+#### Purpose:
+
+Close the full audio-video soak with quantified cadence and audio evidence, distinguish authored end-sting level from helper decode, and select the shortest isolating follow-up.
+
+#### Outcome:
+
+The user completed `20_bbb_full_48k.mpg` without replay. Audio stayed synchronized for the full 9:56 and had no crackle or audible stutter during the body, but video showed definite brief repeated or late frames roughly every quarter to half second, more frequently than once per second. At the closing iris immediately before the final plate, the audio sounded as if it blew out. The untouched terminal screenshot is 8,050 bytes at SHA-256 `4ad16a8fc108fe0935fd48651e688c35af97988612357cced397de6a8334290e` and correctly shows the final black raster, but schema-eight telemetry had frozen on the first fatal condition about 21.74 seconds into playback. Its sole aggregate flag is `0x0400`, a real `audio_pcm_underrun`; PCM protocol, presentation and destination errors remain clear. At that freeze 2,876,134 transport bytes had been accepted and 139 display gaps had already exceeded the profiler's 3,000,000-cycle or 50-millisecond outlier threshold. The three largest gaps are each 6,963,264 cycles or 116.054 milliseconds at picture ordinals nine, 57 and 81; all record `decoder_ready` false and compressed-input FIFO pending while scratch space is available and neither presentation nor destination holds. The eight-bit long-run picture counters wrap, but their states and the 16-bit outlier count prove frequent decoder-input lateness rather than source timestamp jitter or a presentation hold, matching the user's observation while the audio-owned timeline preserves long-term sync.
+
+Main's retained 3,972,939-byte log at SHA-256 `90ceb8a7ac772cf2822ad4311e3d6b08e111068ea5cef6ddcd7b8934c87ef810` proves complete host delivery despite that hardware freeze: helper exit is zero, all 342,199,090 deterministic transport bytes arrive over 83,545 reads with 667 transient would-block results, all 84,543,918 video and PTS bytes and all 28,628,352 PCM frames are emitted, and the established scheduler peaks remain 370,338 video bytes plus 6,654 samples. The final-sting decode is not invented by the helper. Helper and FFmpeg outputs are both exactly 28,628,352 stereo frames; across the entire movie and every measured tail window the helper differs by at most two signed sixteen-bit counts with approximately 0.504-count RMS error. At 579.946 seconds, 16.478 seconds before the end and coincident with the user's closing-iris marker, both decodes reach full scale on the same four samples. That loud transient is therefore present in the encoded source and the ARM decode preserves it, though the independent early hardware underrun means the overall playback path still fails the clean-audio requirement. The soak fails release acceptance on both frequent cadence outliers and sticky underrun even though it completes, stays synchronized and avoids audible body crackle.
+
+#### Next Steps:
+
+Before any source or installed-state change, record the soak's final USER, DISK and POWER states, then run only the already installed `13_bbb_squirrel_15sec_native24_q6.m2v` without rebooting. Its exact 2,603,570-byte SHA-256 is `9257ffadc24eb6696fc9760f3253764b396c993dfc3640e921c97611bad2edce`, it contains 360 audio-free pictures from the 7:15–7:30 high-motion sequence and it passes the same video envelope. Report whether its motion is continuous or shows the same repeated-frame cadence, especially at the wooden spikes near 7:22, plus all three final LEDs, then leave its final image loaded for schema-eight capture. A smooth raw clip isolates the defect to shared in-band PCM/video pacing; matching stutter instead isolates it to decoder throughput or a decoder-side regression. Do not replay the ten-minute Program Stream.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 450 COMMIT Unreleased f2b2e02 2026-08-24T07:11:14-07:00
 
 #### Coming From:
@@ -1137,33 +1167,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 411 COMMIT Unreleased 8bbd55c 2026-08-24T00:58:17-07:00
-
-#### Coming From:
-
-Unreleased 8bbd55c
-
-#### Purpose:
-
-Install the timing-clean in-band PCM RBF and ARM helper while preserving the accepted Main, test video and exact rollback artifacts.
-
-#### Outcome:
-
-Before installation the reachable MiSTer matched the accepted state exactly: Main SHA-256 `16517a9927c659616796b45c8e2488da2a26f0595c91418ed09dc0eb7a5787aa`, RBF `ad04f9f73c0fb98309588f8c212c6ccad71c80b254a2a284f637672a73350d37`, helper `4f6ac001a4a0455c20e1148cedf7548768258abfafb2299a3f8b171a5383fa8e` and `01_arm_mp2_audio.mpg` `94a8ff0223dd1acba4d59fc1785741522c4361956f17848bf9ebbb8c0a503fe7`. The new RBF and helper were uploaded under commit-specific temporary names, independently verified on the MiSTer, and only then installed as a pair and synchronized. `/media/fat/MediaPlayer.rbf` now verifies at SHA-256 `414f7fae21e628e978ff331f701f0c1435f4742ef27d3928e3ad168cbbda9498`, and `/media/fat/linux/MediaPlayer_Helper` verifies at `04f9683cf02c5ed2268743cb0ff28570e1a36c71ad3f362c80f1359c89a2af4d`; Main and the sole test video remain byte-identical to their accepted hashes. Exact rollback copies of the displaced RBF and helper are preserved as `/media/fat/MediaPlayer.backup.pre-inband-pcm.8bbd55c.rbf` and `/media/fat/linux/MediaPlayer_Helper.backup.pre-inband-pcm.8bbd55c`. No playback was launched, and the currently loaded core remains the prior in-memory RBF until reboot.
-
-#### Next Steps:
-
-Reboot the MiSTer once, enter MediaPlayer, ensure Audio Test is Off and run only `01_arm_mp2_audio.mpg`. Listen for the lower 440 Hz tone in the left channel and the higher 660 Hz tone in the right channel while confirming the previously accepted five-picture video; report what is audible, whether either channel gaps or crackles, and the USER, DISK and POWER LEDs, then leave the final image loaded for schema-eight capture before any replay or additional file.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
