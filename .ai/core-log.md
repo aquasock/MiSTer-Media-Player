@@ -1,3 +1,31 @@
+## 391 COMMIT Unreleased 9a7a982 2026-08-23T21:47:50-07:00
+
+#### Coming From:
+
+Unreleased 9a7a982
+
+#### Purpose:
+
+Hardware-qualify complete irregular timestamp presentation on the corrected ordinary I/P control.
+
+#### Outcome:
+
+After a reboot, `15A_pts_irregular_ordinary_short.m2v` passes with USER steady on, DISK steady off and POWER steady on. The launch-free schema-seven snapshot accepts the exact 184,677 decoder bytes after stripping five metadata records, associates all five timestamps, decodes and displays all five reference pictures with four swaps, and ends for quiet reason one with sequence end, session quiet and presentation complete true. Decoder and presentation error flags are zero, frame waiting and both holds are false, the pending scheduler slot is empty and no reorder, queued or promotion state remains. Displayed PTS low bits are the final record's expected `0x4fc`. The irregular schedule is proven by a 0.198950-second final interval and two 0.049738-second intervals rather than uniform 25-fps fallback cadence. This closes the ordinary timestamp gate on source `9a7a982` and the exact Entry-389 RBF without a source change.
+
+#### Next Steps:
+
+Reboot the MiSTer and run `16A_pts_reordered_b_short.m2v`, then report all three LEDs and leave the final image loaded for capture. Require all five coded-order timestamps to associate with their physical reference or scratch banks, three reference plus two B pictures to display in I, B, P, B, P order with four swaps and irregular timing, and sequence-end quiet with complete scheduler retirement and zero errors before proceeding to unannotated fallback controls.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 390 COMMIT Unreleased 9a7a982 2026-08-23T21:44:51-07:00
 
 #### Coming From:
@@ -1186,34 +1214,6 @@ Treat the accepted medium-packing seed-nine source and RBF as restored. Do not r
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-## 351 COMMIT Unreleased 902f367 2026-08-22T18:42:36-07:00
-
-#### Coming From:
-
-Unreleased 873a962
-
-#### Purpose:
-
-Test whether higher Quartus ALM register-packing effort can recover logic while preserving the accepted seed-nine decoder and its complete diagnostic architecture.
-
-#### Outcome:
-
-Commit `902f367` changes only `ALM_REGISTER_PACKING_EFFORT` from `MEDIUM` to `HIGH` and leaves the seed-nine RTL, memory topology and complete diagnostic architecture unchanged. The incremental smart compile skips synthesis and completes in 10 minutes 28 seconds with zero errors and 19 warnings. It preserves 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks, but logic increases from 34,861 to 34,884 ALMs while registers decrease from 51,835 to 51,718. Every timing category remains positive, although decoder setup narrows from plus 0.160 ns to plus 0.113 ns; HDMI setup is plus 0.371 ns, HPS setup plus 1.313 ns, video setup plus 6.692 ns, hold plus 0.245 ns, recovery plus 3.959 ns, removal plus 0.649 ns and pulse width plus 1.122 ns. The 4,188,268-byte RBF has SHA-256 `c61b274a5b7c0cf783fcdc5cda8e33f7be61ca9e6c93b0bfbe18610fa6229dab`. Higher packing therefore costs 23 ALMs and 0.047 ns of the narrow decoder margin instead of recovering logic, so the artifact is rejected and was not uploaded.
-
-#### Next Steps:
-
-Restore `ALM_REGISTER_PACKING_EFFORT` to the accepted `MEDIUM` value, keep seed nine and all RTL and diagnostics unchanged, and do not hardware-test the rejected high-packing artifact. Treat the result as evidence that Quartus's theoretical dense-packing recovery is not available through this global effort knob on the current design; investigate the repeated MPEG lookup tables as the next low-risk logic-reduction candidate only after a separate proposal is approved.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
