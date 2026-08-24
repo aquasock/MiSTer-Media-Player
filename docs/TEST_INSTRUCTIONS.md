@@ -40,6 +40,29 @@ Both terminal markers are required. The checker rejects a file missing either
 marker because the core cannot otherwise flush reordered pictures and publish
 its final diagnostic state reliably.
 
+Before installation, build the native helper and prove that scheduling changes
+only record placement, never elementary-stream content. The analyzer performs
+an independent explicit-output pass, compares the exact video/PTS and decoded
+PCM hashes, requires one PCM end marker, caps the initial batch below the FPGA
+FIFO, caps every steady-state batch at 2,048 samples, and requires a PCM record
+at least every 65,535 video bytes after startup:
+
+```bash
+host/build_arm_stack.sh --native
+python3 tools/streams/analyze_arm_av_transport.py \
+  host/build/media_player_helper.native \
+  tools/streams/generated_compatibility/envelope/good_480p_48k.mpg \
+  --sample-rate 48000
+python3 tools/streams/analyze_arm_av_transport.py \
+  host/build/media_player_helper.native \
+  tools/streams/generated_compatibility/envelope/good_480p_44k.mpg \
+  --sample-rate 44100
+python3 tools/streams/analyze_arm_av_transport.py \
+  host/build/media_player_helper.native \
+  tools/streams/generated_compatibility/bbb_full_48k.mpg \
+  --sample-rate 48000
+```
+
 Use Audio Test `Off`. First run `good_480p_48k.mpg`, then
 `good_480p_44k.mpg`; both must complete with correct sound, video, and normal
 LEDs. Next run each `bad_*.mpg` case individually. Give a bad case no more

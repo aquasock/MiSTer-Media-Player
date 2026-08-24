@@ -13,24 +13,39 @@
 #include <string.h>
 
 #define AUDIO_BUFFER_LIMIT (256u * 1024u)
+#define VIDEO_QUEUE_LIMIT  (512u * 1024u)
+#define PCM_SCHEDULE_RESERVE_FRAMES 2048u
+#define PCM_SCHEDULE_BATCH_FRAMES   2048u
+#define PCM_INITIAL_RELEASE_FRAMES  4096u
+#define PCM_MAX_FREE_VIDEO_BYTES    65535u
 
 /*
  * Entry 429: the FPGA gates its whole in-band byte path on the PCM sink, so a
  * decoded sample emitted the moment it exists throttles the video bytes behind
- * it to real time.  Holding PCM here lets video run ahead instead; the held
- * samples are emitted in order afterwards, so the audio is delayed rather than
- * altered.  The lead is bounded so long files cannot grow this buffer without
- * limit, and so video cannot run arbitrarily far ahead of its own audio.
+ * it to real time.  A short initial PCM hold lets the first picture cross that
+ * path before audio starts.  Steady state then uses bounded lookahead and PTS
+ * horizons, because preserving Program Stream PES order can starve audio
+ * whenever the mux places several pictures between audio packets.
  */
 /*
- * The lead is normally ended by the first picture completing, so this bound
- * only exists to keep the buffer finite if that never happens.  It must be
+ * The lead is normally ended when the second picture start proves that the
+ * first picture is complete, so this bound only exists to keep the buffer
+ * finite if that never happens.  It must be
  * comfortably larger than the audio a first picture can sit behind, or it ends
  * the lead early and defeats it: the faded-tones fixture needs 69,120 samples
  * because its intra frame is 97% of the video payload.
  */
 #define PCM_HOLD_DEFAULT_MS 4000u
 #define PCM_SAMPLE_RATE     48000u
+
+struct video_chunk {
+    struct video_chunk *next;
+    uint8_t *data;
+    size_t size;
+    size_t offset;
+    int has_pts;
+    uint64_t pts;
+};
 
 struct output_state {
     FILE *video;
@@ -48,6 +63,19 @@ struct output_state {
     unsigned picture_marks;   /* picture_start_codes emitted       */
     int hold_rate_hz;         /* sample rate of the held records   */
     uint32_t video_window;    /* start-code scanner across writes  */
+    struct video_chunk *video_head;
+    struct video_chunk *video_tail;
+    size_t video_queued_bytes;
+    size_t video_peak_bytes;
+    size_t pcm_peak_frames;
+    uint64_t pcm_emitted_frames;
+    size_t video_bytes_since_pcm;
+    uint64_t first_audio_pts;
+    uint64_t max_video_pts;
+    int have_audio_pts;
+    int have_video_pts;
+    int scheduler_enabled;
+    int scheduler_started;
 };
 
 struct audio_state {
@@ -123,16 +151,25 @@ static uint64_t decode_pts(const uint8_t *p)
            ((uint64_t)p[4] >> 1);
 }
 
-static int emit_video_pts(struct output_state *output, uint64_t pts)
+static void encode_video_pts(uint8_t record[9], uint64_t pts)
 {
-    uint8_t record[9] = {0, 0, 1, MEDIA_PLAYER_PTS_MARKER_CODE};
     uint64_t value = ((pts & 0x1ffffffffULL) << 7) | (3u << 5) | (1u << 2);
     int i;
 
+    memset(record, 0, 9);
+    record[2] = 1;
+    record[3] = MEDIA_PLAYER_PTS_MARKER_CODE;
     for (i = 8; i >= 4; --i) {
         record[i] = (uint8_t)value;
         value >>= 8;
     }
+}
+
+static int emit_video_pts(struct output_state *output, uint64_t pts)
+{
+    uint8_t record[9];
+
+    encode_video_pts(record, pts);
     if (write_all(output->video, record, sizeof(record), "video timestamp") < 0)
         return -1;
     output->video_bytes += sizeof(record);
@@ -161,7 +198,10 @@ static int emit_pcm_sample(struct output_state *output,
         (uint8_t)(right_bits >> 8), (uint8_t)right_bits
     };
 
-    return write_all(output->video, record, sizeof(record), "in-band PCM");
+    if (write_all(output->video, record, sizeof(record), "in-band PCM") < 0)
+        return -1;
+    output->video_bytes_since_pcm = 0;
+    return 0;
 }
 
 static int emit_pcm_end(struct output_state *output)
@@ -170,14 +210,9 @@ static int emit_pcm_end(struct output_state *output)
     return write_all(output->video, record, sizeof(record), "PCM end marker");
 }
 
-/*
- * The lead exists only to get the first picture across the throttled path.
- * Releasing it as soon as that picture is complete keeps the delay to startup
- * and leaves steady-state interleaving exactly as the multiplex had it, so
- * audio is not left permanently trailing video.
- */
-static int write_video(struct output_state *output, const void *data,
-                       size_t size, const char *what)
+/* Write bytes that the scheduler has admitted to the shared FPGA path. */
+static int write_video_immediate(struct output_state *output, const void *data,
+                                 size_t size, const char *what)
 {
     const uint8_t *bytes = data;
     size_t i;
@@ -185,6 +220,7 @@ static int write_video(struct output_state *output, const void *data,
     if (write_all(output->video, bytes, size, what) < 0)
         return -1;
     output->video_bytes += size;
+    output->video_bytes_since_pcm += size;
     if (!output->hold_active)
         return 0;
     for (i = 0; i < size; ++i) {
@@ -192,6 +228,49 @@ static int write_video(struct output_state *output, const void *data,
         if ((output->video_window & 0xffffffffu) == 0x00000100u)
             output->picture_marks++;
     }
+    return 0;
+}
+
+static int queue_video(struct output_state *output, const uint8_t *data,
+                       size_t size, int has_pts, uint64_t pts)
+{
+    struct video_chunk *chunk;
+    size_t prefix = has_pts ? 9u : 0u;
+
+    if (size > VIDEO_QUEUE_LIMIT - prefix ||
+        output->video_queued_bytes > VIDEO_QUEUE_LIMIT - (size + prefix)) {
+        fprintf(stderr,
+                "media_player_helper: video lookahead limit exceeded (%u bytes)\n",
+                (unsigned)VIDEO_QUEUE_LIMIT);
+        return -1;
+    }
+    chunk = calloc(1, sizeof(*chunk));
+    if (!chunk) {
+        fprintf(stderr, "media_player_helper: out of memory queuing video\n");
+        return -1;
+    }
+    chunk->data = malloc(prefix + size);
+    if (!chunk->data) {
+        fprintf(stderr, "media_player_helper: out of memory queuing video\n");
+        free(chunk);
+        return -1;
+    }
+    if (has_pts)
+        encode_video_pts(chunk->data, pts);
+    memcpy(chunk->data + prefix, data, size);
+    chunk->size = prefix + size;
+    chunk->has_pts = has_pts;
+    chunk->pts = pts;
+    if (output->video_tail)
+        output->video_tail->next = chunk;
+    else
+        output->video_head = chunk;
+    output->video_tail = chunk;
+    output->video_queued_bytes += chunk->size;
+    if (output->video_queued_bytes > output->video_peak_bytes)
+        output->video_peak_bytes = output->video_queued_bytes;
+    if (has_pts)
+        output->video_pts++;
     return 0;
 }
 
@@ -217,6 +296,9 @@ static int hold_push(struct output_state *output,
     memcpy(output->hold + output->hold_count, stereo,
            (size_t)frames * 2u * sizeof(*output->hold));
     output->hold_count += (size_t)frames * 2u;
+    if ((output->hold_count - output->hold_head) / 2u > output->pcm_peak_frames)
+        output->pcm_peak_frames =
+            (output->hold_count - output->hold_head) / 2u;
     return 0;
 }
 
@@ -229,6 +311,7 @@ static int hold_flush(struct output_state *output, size_t keep)
                             output->hold_rate_hz) < 0)
             return -1;
         output->hold_head += 2u;
+        output->pcm_emitted_frames++;
     }
     if (output->hold_head && output->hold_head == output->hold_count) {
         output->hold_count = 0;
@@ -238,6 +321,139 @@ static int hold_flush(struct output_state *output, size_t keep)
                 (output->hold_count - output->hold_head) * sizeof(*output->hold));
         output->hold_count -= output->hold_head;
         output->hold_head = 0;
+    }
+    return 0;
+}
+
+static size_t hold_available(const struct output_state *output)
+{
+    return (output->hold_count - output->hold_head) / 2u;
+}
+
+static int hold_emit_frames(struct output_state *output, uint64_t frames)
+{
+    size_t available = hold_available(output);
+    size_t emit = frames < (uint64_t)available ? (size_t)frames : available;
+
+    return hold_flush(output, available - emit);
+}
+
+static uint64_t scheduler_pcm_target(const struct output_state *output,
+                                     uint64_t video_pts)
+{
+    uint64_t elapsed;
+
+    if (!output->have_audio_pts || !output->hold_rate_hz ||
+        video_pts <= output->first_audio_pts)
+        return PCM_SCHEDULE_RESERVE_FRAMES;
+    elapsed = ((video_pts - output->first_audio_pts) *
+               (uint64_t)output->hold_rate_hz + 89999u) / 90000u;
+    return elapsed + PCM_SCHEDULE_RESERVE_FRAMES;
+}
+
+static void free_video_head(struct output_state *output)
+{
+    struct video_chunk *chunk = output->video_head;
+
+    output->video_head = chunk->next;
+    if (!output->video_head)
+        output->video_tail = NULL;
+    output->video_queued_bytes -= chunk->size - chunk->offset;
+    free(chunk->data);
+    free(chunk);
+}
+
+static size_t startup_video_size(const struct output_state *output,
+                                 const struct video_chunk *chunk)
+{
+    uint32_t window = output->video_window;
+    unsigned pictures = output->picture_marks;
+    size_t i;
+
+    for (i = chunk->offset; i < chunk->size; ++i) {
+        window = (window << 8) | chunk->data[i];
+        if ((window & 0xffffffffu) == 0x00000100u && ++pictures >= 2)
+            return i + 1u - chunk->offset;
+    }
+    return chunk->size - chunk->offset;
+}
+
+/*
+ * Program Stream packet order is not a delivery schedule: a mux may place
+ * several pictures between audio PES packets.  Once startup is released, keep
+ * video in a bounded lookahead queue and admit each timestamped chunk only
+ * after its corresponding PCM horizon plus one FPGA startup reserve is ready.
+ * This preserves both elementary streams exactly while removing mux-burst
+ * starvation from the shared in-band path.
+ */
+static int scheduler_drain(struct output_state *output, int at_eof)
+{
+    while (output->video_head) {
+        struct video_chunk *chunk = output->video_head;
+        uint64_t prospective_pts = output->max_video_pts;
+        uint64_t target;
+        uint64_t due;
+        uint64_t available_total;
+        size_t remaining = chunk->size - chunk->offset;
+
+        if (chunk->has_pts &&
+            (!output->have_video_pts || chunk->pts > prospective_pts)) {
+            prospective_pts = chunk->pts;
+        }
+
+        if (output->hold_active) {
+            size_t startup_size;
+
+            if (output->picture_marks >= 2)
+                break;
+            startup_size = startup_video_size(output, chunk);
+            if (write_video_immediate(output, chunk->data + chunk->offset,
+                                      startup_size,
+                                      "queued video") < 0)
+                return -1;
+            chunk->offset += startup_size;
+            output->video_queued_bytes -= startup_size;
+            if (chunk->has_pts &&
+                (!output->have_video_pts || chunk->pts > output->max_video_pts)) {
+                output->max_video_pts = chunk->pts;
+                output->have_video_pts = 1;
+            }
+            if (chunk->offset == chunk->size)
+                free_video_head(output);
+            if (output->picture_marks >= 2 && hold_available(output)) {
+                output->hold_active = 0;
+                output->scheduler_started = 1;
+                if (hold_emit_frames(output, PCM_INITIAL_RELEASE_FRAMES) < 0)
+                    return -1;
+            }
+            continue;
+        }
+
+        if (!output->scheduler_started)
+            break;
+        target = scheduler_pcm_target(output, prospective_pts);
+        due = target > output->pcm_emitted_frames ?
+              target - output->pcm_emitted_frames : 0;
+        if (due > PCM_SCHEDULE_BATCH_FRAMES)
+            due = PCM_SCHEDULE_BATCH_FRAMES;
+        if (!due && output->video_bytes_since_pcm + remaining >
+                    PCM_MAX_FREE_VIDEO_BYTES)
+            due = 1;
+        available_total = output->pcm_emitted_frames +
+                          (uint64_t)hold_available(output);
+        if (!at_eof && available_total < output->pcm_emitted_frames + due)
+            break;
+        if (due && hold_emit_frames(output, due) < 0)
+            return -1;
+        if (write_video_immediate(output, chunk->data + chunk->offset, remaining,
+                                  "scheduled video") < 0)
+            return -1;
+        if (chunk->has_pts &&
+            (!output->have_video_pts || chunk->pts > output->max_video_pts)) {
+            output->max_video_pts = chunk->pts;
+            output->have_video_pts = 1;
+        }
+        free_video_head(output);
     }
     return 0;
 }
@@ -274,10 +490,13 @@ static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
             return -1;
         if (output->hold_active &&
             (output->picture_marks >= 2 ||
-             (output->hold_count - output->hold_head) / 2u >= output->hold_limit))
+             hold_available(output) >= output->hold_limit)) {
             output->hold_active = 0;
-        if (hold_flush(output, output->hold_active ? (size_t)-1 : 0) < 0)
-            return -1;
+            output->scheduler_started = 1;
+            /* Preserve the accepted two-picture startup boundary. */
+            if (hold_emit_frames(output, PCM_INITIAL_RELEASE_FRAMES) < 0)
+                return -1;
+        }
     }
     output->pcm_frames += (uint64_t)samples_per_channel;
     output->audio_frames++;
@@ -480,14 +699,26 @@ static int process_pes(struct media_source *input, uint8_t code,
         goto done;
     }
     if ((code & 0xf0) == 0xe0) {
-        if (has_pts && emit_video_pts(output, pts) < 0)
-            goto done;
-        if (write_video(output, packet + payload_offset,
-                        length - payload_offset, "video") < 0)
-            goto done;
+        if (output->scheduler_enabled) {
+            if (queue_video(output, packet + payload_offset,
+                            length - payload_offset, has_pts, pts) < 0 ||
+                scheduler_drain(output, 0) < 0)
+                goto done;
+        } else {
+            if (has_pts && emit_video_pts(output, pts) < 0)
+                goto done;
+            if (write_video_immediate(output, packet + payload_offset,
+                                      length - payload_offset, "video") < 0)
+                goto done;
+        }
     } else if ((code & 0xe0) == 0xc0) {
+        if (has_pts && !output->have_audio_pts) {
+            output->first_audio_pts = pts;
+            output->have_audio_pts = 1;
+        }
         if (append_audio(audio, output, packet + payload_offset,
-                         length - payload_offset) < 0)
+                         length - payload_offset) < 0 ||
+            (output->scheduler_enabled && scheduler_drain(output, 0) < 0))
             goto done;
     }
     result = 0;
@@ -554,7 +785,7 @@ static int process_elementary_stream(struct media_source *input,
     size_t count;
 
     while ((count = media_source_read(input, buffer, sizeof(buffer))) != 0) {
-        if (write_video(output, buffer, count, "video") < 0)
+        if (write_video_immediate(output, buffer, count, "video") < 0)
             return -1;
     }
     return media_source_error(input) ? -1 : 0;
@@ -664,6 +895,7 @@ int main(int argc, char **argv)
     output.hold_limit =
         (size_t)audio_delay_ms * (size_t)PCM_SAMPLE_RATE / 1000u;
     output.hold_active = output.hold_limit != 0;
+    output.scheduler_started = !output.hold_active;
     mp3dec_init(&audio.decoder);
     if (read_exact(&input, signature, sizeof(signature)) < 0 ||
         media_source_rewind(&input) < 0) {
@@ -671,9 +903,11 @@ int main(int argc, char **argv)
         goto done;
     }
     is_program_stream = !memcmp(signature, "\x00\x00\x01\xba", 4);
+    output.scheduler_enabled = is_program_stream && !output.pcm;
     if (is_program_stream) {
         if (process_program_stream(&input, &audio, &output) < 0 ||
-            decode_audio_buffer(&audio, &output, 1) < 0)
+            decode_audio_buffer(&audio, &output, 1) < 0 ||
+            scheduler_drain(&output, 1) < 0)
             goto done;
     } else if (process_elementary_stream(&input, &output) < 0) {
         goto done;
@@ -691,6 +925,12 @@ int main(int argc, char **argv)
             "media_player_helper: video=%llu bytes, pts=%u, audio=%u frames/%llu samples\n",
             (unsigned long long)output.video_bytes, output.video_pts,
             output.audio_frames, (unsigned long long)output.pcm_frames);
+    if (output.scheduler_enabled)
+        fprintf(stderr,
+                "media_player_helper: scheduler video_peak=%zu bytes, "
+                "pcm_peak=%zu samples, pcm_emitted=%llu samples\n",
+                output.video_peak_bytes, output.pcm_peak_frames,
+                (unsigned long long)output.pcm_emitted_frames);
 done:
     free(audio.data);
     media_source_close(&input);
@@ -702,6 +942,8 @@ done:
         success = 0;
     free(output.hold);
     output.hold = NULL;
+    while (output.video_head)
+        free_video_head(&output);
     if (video_path && output.video) {
         fclose(output.video);
         output.video = NULL;
