@@ -14,10 +14,13 @@
 
 #define AUDIO_BUFFER_LIMIT (256u * 1024u)
 #define VIDEO_QUEUE_LIMIT  (512u * 1024u)
-#define PCM_SCHEDULE_RESERVE_FRAMES 2048u
+#define PCM_SCHEDULE_RESERVE_FRAMES 4096u
 #define PCM_SCHEDULE_BATCH_FRAMES   2048u
 #define PCM_INITIAL_RELEASE_FRAMES  4096u
-#define PCM_MAX_FREE_VIDEO_BYTES    65535u
+#define PCM_MAX_FREE_VIDEO_BYTES    4096u
+#define PCM_REFILL_FRAMES           128u
+#define PCM_SINK_FIFO_FRAMES        8192u
+#define VIDEO_SLICE_BYTES           256u
 
 /*
  * Entry 429: the FPGA gates its whole in-band byte path on the PCM sink, so a
@@ -26,6 +29,17 @@
  * path before audio starts.  Steady state then uses bounded lookahead and PTS
  * horizons, because preserving Program Stream PES order can starve audio
  * whenever the mux places several pictures between audio packets.
+ */
+/*
+ * Entry 453: the horizon alone does not bound delivery order.  A whole audio
+ * packet ahead of a whole video packet, or a picture-sized video run behind a
+ * single guard sample, both let the sink's audio backlog swing by more than
+ * PCM_SINK_FIFO_FRAMES, which is an underrun however exact the payload is.
+ * Video is therefore admitted in VIDEO_SLICE_BYTES slices, no video run
+ * exceeds PCM_MAX_FREE_VIDEO_BYTES without a PCM_REFILL_FRAMES refill, and the
+ * horizon is served whether or not video is queued, so a low-bitrate scene
+ * cannot throttle audio.  The reserve plus one batch stays below the sink FIFO
+ * so that a batch never has to wait for room.
  */
 /*
  * The lead is normally ended when the second picture start proves that the
@@ -383,8 +397,9 @@ static size_t startup_video_size(const struct output_state *output,
  * several pictures between audio PES packets.  Once startup is released, keep
  * video in a bounded lookahead queue and admit each timestamped chunk only
  * after its corresponding PCM horizon plus one FPGA startup reserve is ready.
- * This preserves both elementary streams exactly while removing mux-burst
- * starvation from the shared in-band path.
+ * Admission is sliced so that neither stream can hold the shared path for
+ * longer than the other's sink can survive.  This preserves both elementary
+ * streams exactly while removing mux-burst starvation and mux-burst stalling.
  */
 static int scheduler_drain(struct output_state *output, int at_eof)
 {
@@ -395,6 +410,7 @@ static int scheduler_drain(struct output_state *output, int at_eof)
         uint64_t due;
         uint64_t available_total;
         size_t remaining = chunk->size - chunk->offset;
+        size_t slice;
 
         if (chunk->has_pts &&
             (!output->have_video_pts || chunk->pts > prospective_pts)) {
@@ -431,29 +447,50 @@ static int scheduler_drain(struct output_state *output, int at_eof)
 
         if (!output->scheduler_started)
             break;
+        slice = remaining > VIDEO_SLICE_BYTES ? VIDEO_SLICE_BYTES : remaining;
         target = scheduler_pcm_target(output, prospective_pts);
         due = target > output->pcm_emitted_frames ?
               target - output->pcm_emitted_frames : 0;
         if (due > PCM_SCHEDULE_BATCH_FRAMES)
             due = PCM_SCHEDULE_BATCH_FRAMES;
-        if (!due && output->video_bytes_since_pcm + remaining >
+        if (!due && output->video_bytes_since_pcm + slice >
                     PCM_MAX_FREE_VIDEO_BYTES)
-            due = 1;
+            due = PCM_REFILL_FRAMES;
         available_total = output->pcm_emitted_frames +
                           (uint64_t)hold_available(output);
         if (!at_eof && available_total < output->pcm_emitted_frames + due)
             break;
         if (due && hold_emit_frames(output, due) < 0)
             return -1;
-        if (write_video_immediate(output, chunk->data + chunk->offset, remaining,
+        if (write_video_immediate(output, chunk->data + chunk->offset, slice,
                                   "scheduled video") < 0)
             return -1;
+        chunk->offset += slice;
+        output->video_queued_bytes -= slice;
+        if (chunk->offset < chunk->size)
+            continue;
         if (chunk->has_pts &&
             (!output->have_video_pts || chunk->pts > output->max_video_pts)) {
             output->max_video_pts = chunk->pts;
             output->have_video_pts = 1;
         }
         free_video_head(output);
+    }
+    /*
+     * The horizon belongs to the sink, not to the video queue: a scene whose
+     * pictures are small delivers few video bytes per second, and pacing audio
+     * against those bytes would starve the sink exactly where the source is
+     * quietest.  Serve the horizon once the queue is drained as well.
+     */
+    if (output->scheduler_started && !output->hold_active && !output->video_head) {
+        uint64_t target = scheduler_pcm_target(output, output->max_video_pts);
+        uint64_t due = target > output->pcm_emitted_frames ?
+                       target - output->pcm_emitted_frames : 0;
+
+        if (due > PCM_SCHEDULE_BATCH_FRAMES)
+            due = PCM_SCHEDULE_BATCH_FRAMES;
+        if (due && hold_emit_frames(output, due) < 0)
+            return -1;
     }
     return 0;
 }

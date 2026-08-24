@@ -52,6 +52,12 @@ def analyze_inband(stream, sample_rate: int) -> dict[str, int | str | list[int]]
     clean_video_bytes = 0
     pcm_frames = 0
     pts_values: list[int] = []
+    origin_pts: int | None = None
+    origin_pending = False
+    last_pts: int | None = None
+    max_deficit = 0
+    max_deficit_pts = 0
+    final_deficit = 0
     end_count = 0
     first_pcm_position: int | None = None
     last_pcm_position: int | None = None
@@ -104,7 +110,23 @@ def analyze_inband(stream, sample_rate: int) -> dict[str, int | str | list[int]]
                 video_hash.update(record)
                 transport_hash.update(record)
                 video_bytes += RECORD_SIZE
-                pts_values.append(int.from_bytes(record[4:9], "big") >> 7)
+                pts = int.from_bytes(record[4:9], "big") >> 7
+                pts_values.append(pts)
+                last_pts = pts
+                if origin_pending:
+                    origin_pts = pts
+                    origin_pending = False
+                elif origin_pts is not None:
+                    # The sink drains PCM at a fixed rate while it presents the
+                    # pictures crossing beside it, so audio that has not
+                    # crossed by the time its picture does is audio the sink
+                    # cannot have.  Measured in coded order, so a reorder lead
+                    # counts against the schedule rather than for it.
+                    expected = (pts - origin_pts) * sample_rate // 90000
+                    final_deficit = expected - pcm_frames
+                    if final_deficit > max_deficit:
+                        max_deficit = final_deficit
+                        max_deficit_pts = pts - origin_pts
                 position += RECORD_SIZE
             elif marker == PCM_MARKER:
                 record = bytes(buffer[position:position + RECORD_SIZE])
@@ -118,6 +140,11 @@ def analyze_inband(stream, sample_rate: int) -> dict[str, int | str | list[int]]
                 pcm_frames += 1
                 if first_pcm_position is None:
                     first_pcm_position = clean_video_bytes
+                    # Audio that starts before any timestamp has crossed has no
+                    # timeline to be measured against yet; take the first one
+                    # that follows as the origin instead.
+                    origin_pts = last_pts
+                    origin_pending = last_pts is None
                 if current_batch_position != clean_video_bytes:
                     close_batch()
                     current_batch_position = clean_video_bytes
@@ -176,6 +203,9 @@ def analyze_inband(stream, sample_rate: int) -> dict[str, int | str | list[int]]
         "max_steady_pcm_batch": max_steady_batch,
         "terminal_pcm_batch": terminal_batch,
         "max_pcm_free_video_bytes": max_video_gap,
+        "max_audio_deficit_frames": max_deficit,
+        "max_audio_deficit_at_seconds": round(max_deficit_pts / 90000.0, 3),
+        "final_audio_deficit_frames": final_deficit,
         "tail_pcm_free_video_bytes": clean_video_bytes - last_pcm_position,
         "pcm_end_count": end_count,
     }
@@ -188,7 +218,8 @@ def main() -> int:
     parser.add_argument("--sample-rate", type=int, choices=(44100, 48000), required=True)
     parser.add_argument("--max-initial-batch", type=int, default=8192)
     parser.add_argument("--max-steady-batch", type=int, default=2048)
-    parser.add_argument("--max-video-gap", type=int, default=65535)
+    parser.add_argument("--max-video-gap", type=int, default=4096)
+    parser.add_argument("--max-audio-deficit", type=int, default=8192)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
@@ -235,6 +266,12 @@ def main() -> int:
             f"PCM-free video gap {result['max_pcm_free_video_bytes']} exceeds "
             f"{args.max_video_gap}"
         )
+    if result["max_audio_deficit_frames"] > args.max_audio_deficit:
+        raise RuntimeError(
+            f"audio deficit {result['max_audio_deficit_frames']} frames at "
+            f"{result['max_audio_deficit_at_seconds']} s exceeds "
+            f"{args.max_audio_deficit}"
+        )
     result["scheduler_stderr"] = scheduler_stderr.strip().splitlines()
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))
@@ -249,6 +286,12 @@ def main() -> int:
             f"{result['max_steady_pcm_batch']}, terminal batch "
             f"{result['terminal_pcm_batch']}, PCM-free video <= "
             f"{result['max_pcm_free_video_bytes']} bytes"
+        )
+        print(
+            "timeline: audio deficit <= "
+            f"{result['max_audio_deficit_frames']} frames at "
+            f"{result['max_audio_deficit_at_seconds']} s, final "
+            f"{result['final_audio_deficit_frames']} frames"
         )
         print(
             "terminal: one PCM end, trailing video gap "
