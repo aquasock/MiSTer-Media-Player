@@ -1,3 +1,35 @@
+## 462 COMMIT Unreleased ??? 2026-08-24T09:45:33-07:00
+
+#### Coming From:
+
+Unreleased fccb003
+
+#### Purpose:
+
+Record that removing the startup lead brought the underrun forward rather than back, and propose restoring it alongside the FPGA record-format change the evidence now points at.
+
+#### Outcome:
+
+The user played `20_bbb_full_48k.mpg` end to end on the `fccb003` helper and reports the once-per-second cadence unchanged with everything else looking and sounding good. The capture is 8,106 bytes at SHA-256 `e12d519815f2474752442c8a6247bdf978f437fd966cf6eb42ed90d285467f45` and the profiler again froze on a fatal condition whose sole aggregate flag is `0x0400`, a real `audio_pcm_underrun`, with PCM protocol, presentation and destination errors clear. It froze at 22,570,377 accepted bytes of 342,083,863, which is 39.3 seconds into the movie against 62.2 seconds under `14e0629` and 21.74 seconds under `f2b2e02`. Removing the startup byte budget brought the underrun forward by 23 seconds, so entry 461's hypothesis is refuted: keeping the compressed FIFO full does not starve the audio sink, and the lead was helping the audio margin even though entry 456 measured it doing nothing for cadence. Every helper change so far has pushed the underrun later, and this one pushed it back.
+
+The arithmetic explains why no helper setting can close this, and it should have been derived earlier. The steady horizon keeps audio at most `PCM_SCHEDULE_RESERVE_FRAMES` ahead, which is 4,096 frames or 85 milliseconds, so the sink's 8,192-frame FIFO is by construction never more than half full. The display gaps this investigation has been chasing are 82.896 milliseconds at their most common and 431.059 at their worst. A path stall longer than the cushion drains the sink, and the cushion cannot exceed the FIFO's 170 milliseconds even if the reserve were raised to fill it, which would reintroduce the full-FIFO blocking that entry 453 set out to remove. The underrun and the cadence are therefore the same defect measured at two sinks: while the shared path is stalled, video misses its deadline and audio drains, and the only reason the underrun moves at all is that each helper change alters how often the path stalls.
+
+Path occupancy explains where the stalls come from. At nine bytes per stereo frame the audio records carry 422 KiB/s while the video they share the path with carries 138 KiB/s, so audio is three quarters of everything crossing, and 48,000 records per second cross a boundary that entries 459 and 460 measured as costing presentation time per record. Packing many frames into one record attacks both: four frames per record cuts the audio to 234 KiB/s and 12,000 records per second, sixteen frames to 199 KiB/s and 3,000 records per second, against a floor of 192 KiB/s for the samples themselves. Sixteen frames per record removes 94 percent of the records and 53 percent of the audio bandwidth.
+
+#### Next Steps:
+
+Approval is required for two changes, the first trivial and the second the first FPGA work of this line. Restore `PCM_STARTUP_VIDEO_BYTES` at 28,672 bytes, since the soak now measures it buying 23 seconds of audio margin, and record it as an audio-margin measure rather than the cadence measure entry 455 believed it was. Then extend the in-band PCM record to carry a bounded run of frames rather than one, which requires a coordinated change on both sides: the reserved marker gains a frame count, the FPGA extractor in `mpeg2_h262_stream_transport_gate` reads that count and writes that many words into `audio_pcm_fifo`, and the helper packs its held samples to the same bound. Sixteen frames per record is the proposed bound, being the point where the bandwidth curve flattens toward its 192 KiB/s floor. Acceptance is a Verilator run over the existing PCM path tests, a clean Quartus build with timing met, byte-exact PCM through the analyzer at the new record size, an unchanged video and timestamp stream, and then the 24-second diagnostic requiring the outlier count to fall below the 13 measured under `14e0629`, followed by the full soak requiring a quiet snapshot rather than a fatal one. Keep `dbcbd74a84cb7cb57583c5ac0d4dfb0b5e695148c350551295bb4f4b299338cb` and the accepted RBF as the rollback pair, and do not change the presentation or reorder logic in the same commit, because the residual gaps at ordinals fourteen and fifteen must be measured again once the path is no longer carrying 48,000 records a second.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 461 COMMIT Unreleased fccb003 2026-08-24T09:31:39-07:00
 
 #### Coming From:
@@ -1188,33 +1220,5 @@ Install the resulting RBF at SHA-256 `b0f3a3125bf803dfaed0924b543760a45f439288b1
 
 - [x] Built
 - [ ] Passed
-
----
-## 422 COMMIT Unreleased 047f5b2 2026-08-24T03:19:13-07:00
-
-#### Coming From:
-
-Unreleased 047f5b2
-
-#### Purpose:
-
-Record the hardware acceptance of the block-memory row buffers and the audio-leads-video startup offset it exposed.
-
-#### Outcome:
-
-The user rebooted with Audio Test Off, ran `02_arm_mp2_faded_tones.mpg` and reported that it works well, with audio sounding fine and starting correctly, USER steady on, DISK steady off and POWER steady on. The 7,082-ALM recovery in `047f5b2` therefore carries no audible or visible decode regression and the block-memory conversion is hardware-accepted. The run did expose a startup offset that the user states is new: video now begins one to two seconds after audio on the Program Stream, while older elementary-stream `.m2v` files still start their video immediately. No schema-eight snapshot could be captured because triggering a screenshot writes to `/dev/MiSTer_cmd` over SSH and key authentication to the MiSTer is failing, so this acceptance rests on the user's direct observation and the LED states rather than on decoded telemetry. Static tracing locates the mechanism in the presentation gate rather than in the parser: `mpeg2_h262_b_presentation_scheduler` selects `timestamp_candidate_due` in place of the free-running cadence slot whenever a picture owns a timestamp, and `mpeg2_h262_pts_presentation_timeline` drives that gate from a decoder-domain timeline anchored once by the first in-band timestamp and advanced by the 90 kHz tick synchronized out of `CLK_AUDIO`. An elementary stream carries no timestamps, so its pictures present on cadence with no wait, while a Program Stream holds each picture until the timeline reaches its presentation time. Audio is not gated at all, so it begins as soon as the startup reserve fills and leads video by the first picture's timestamp offset. A stale comment in `MediaPlayer_top_00.svh` still states that nothing consumes the presentation clock and that presentation remains free-running; that was true at Entry 389 but the timeline module is now wired in at `MediaPlayer_top_05.svh` and the comment should not be trusted. The user has decided that the video delay itself is acceptable and must not be closed at the cost of logic or timing, and that audio should instead be held back to match it.
-
-#### Next Steps:
-
-Hold the PCM output adapter's initial start until the presentation side has actually displayed its first picture, so audio and video begin together without touching the parser, the presentation gate or the timeline. Restore key-based SSH access to the MiSTer so that screenshot triggering, on-device hash verification and `sync` become available again, since without a shell no schema-eight telemetry can be decoded and every install depends on the FTP fallback flushing on its own. Correct the stale free-running presentation comment in `MediaPlayer_top_00.svh` when the next change touches that file.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
