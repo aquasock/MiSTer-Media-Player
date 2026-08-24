@@ -10,11 +10,11 @@ Make the hardware regression pack self-contained, checksum-verifiable and explic
 
 #### Outcome:
 
-The approved repository-only cycle will import the regression instructions, results template, checksum list and compatibility manifest from the downloaded v0.6.0 release-candidate pack into `docs/`, update their status and terminology for the current Unreleased boundary, require USER, POWER and DISK readings on every run, and replace host-specific absolute manifest paths with repository-relative paths. A committed verifier will check the pack's complete file set, stream hashes, manifest structure and manifest hash without committing generated binaries. The source-pack audit also changes one planned item materially: launch-free telemetry freezes early because the top-level cadence quiet gate requires the B-presentation completion signal for all-I and P-only streams, not because the Python reader captures too soon. Correcting that condition changes RTL, requires a new Quartus image and needs hardware validation, so it is split into the following approval boundary rather than folded into this no-RBF documentation cycle.
+The approved repository-only cycle will import the regression instructions, results template, checksum list and compatibility manifest from the downloaded v0.6.0 release-candidate pack into `docs/`, update their status and terminology for the current Unreleased boundary, require USER, POWER and DISK readings on every run, and replace host-specific absolute manifest paths with repository-relative paths. A committed verifier will check the pack's complete file set, stream hashes, manifest structure and manifest hash without committing generated binaries. Regenerating the corpus exposed one additional reproducibility defect before source commit: all eleven deterministic stream payloads reproduce byte-identically, but the manifest's FFmpeg macroblock debug counts vary because that decode did not constrain threading, so the generator will make this analysis explicitly single-threaded and the canonical manifest will be regenerated from that stable result. The source-pack audit also changes one planned item materially: launch-free telemetry freezes early because the top-level cadence quiet gate requires the B-presentation completion signal for all-I and P-only streams, not because the Python reader captures too soon. Correcting that condition changes RTL, requires a new Quartus image and needs hardware validation, so it is split into the following approval boundary rather than folded into this no-RBF documentation cycle.
 
 #### Next Steps:
 
-Complete and verify the imported documentation and pack checker, prove every available stream and the normalized manifest against their recorded identities, and commit without rebuilding because this boundary changes no compiled source. Then propose the separate generic terminal-quiet telemetry correction with focused all-I, P-only and B-path simulation cases, a timing-clean build and hardware confirmation that the snapshot reason becomes quiet while existing LED acceptance remains unchanged.
+Complete and verify the imported documentation and pack checker, prove every available stream and the normalized single-threaded manifest against their recorded identities, and commit without rebuilding because this boundary changes no compiled source. Then propose the separate generic terminal-quiet telemetry correction with focused all-I, P-only and B-path simulation cases, a timing-clean build and hardware confirmation that the snapshot reason becomes quiet while existing LED acceptance remains unchanged.
 
 #### Files Modified:
 
@@ -22,6 +22,7 @@ Complete and verify the imported documentation and pack checker, prove every ava
 - docs/RESULTS_TEMPLATE.txt
 - docs/SHA256SUMS
 - docs/compatibility_manifest.json
+- tools/streams/generate_test_progressive_compatibility.py
 - tools/streams/verify_regression_pack.py
 
 #### Status:
