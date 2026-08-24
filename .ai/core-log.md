@@ -1,4 +1,4 @@
-## 378 COMMIT Unreleased ??? 2026-08-23T19:55:34-07:00
+## 378 COMMIT Unreleased 2b1a170 2026-08-23T19:55:34-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Prevent rapid ordinary I/P publications from overwriting an undisplayed queued r
 
 #### Outcome:
 
-The exact authoritative `06_p_f_code_range.m2v` passed its LED diagnostic twice after isolated reboots but produced the same schema-seven failure both times: all 184,678 transport bytes were accepted with five reference pictures, zero decoder errors, sequence-end quiet and presentation complete, while only four pictures and three swaps reached display instead of five and four. The nearly identical cadence gaps prove deterministic behavior rather than stale device state. Full-pipeline Verilator replay passes with the bench's accelerated ten-thousand-cycle display windows but fails its complete-presentation invariant under queue pressure, independently confirming that the scheduler's single ordinary pending slot can be overwritten when lightweight P pictures publish faster than cadence consumes them. The approved change will extend presentation backpressure after a non-B header releases an ordinary pending frame whose identity differs from the current display, retain the same-bank initial-reference and B-reorder behavior, add a rapid three-bank ordinary-publication proof, and make the reusable full-pipeline runner able to exercise the real MiSTer display-window interval without tripping its diagnostic-only freeze threshold.
+The exact authoritative `06_p_f_code_range.m2v` exposed the same deterministic hardware failure after two isolated reboots: 184,678 accepted transport bytes, five reference pictures, zero decoder errors, sequence-end quiet and presentation complete, but only four displayed pictures and three swaps. Commit `2b1a170` prevents ordinary pending-slot overwrite by holding input after a released non-B reference differs from the current display; the initial same-bank reference remains exempt to avoid startup deadlock and the established B-reorder hold remains unchanged. The focused scheduler regression passes rapid three-bank publication and retirement at all five supported cadence rates. Full-pipeline replay of test six at the hardware-equivalent 994,752-cycle display interval now completes five publications, five displayed identities and four swaps with 184,677 file bytes and zero errors; the established ordinary-P, B-containing and repeated-multi-slice controls also pass, and the schema-seven cadence-profiler checksum remains `eb2b643d`. The seed-eleven Quartus 17.0.2 build completed in 11 minutes 50 seconds with zero errors and 154 warnings, using 34,673 ALMs, 51,930 registers, 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks. Every timing category is positive with zero endpoint TNS: plus 0.293 ns HDMI setup, plus 0.713 ns host setup, plus 1.005 ns decoder setup, plus 8.399 ns video setup, plus 0.261 ns hold, plus 3.533 ns recovery, plus 0.605 ns removal and plus 1.122 ns pulse width. The 4,173,788-byte RBF has SHA-256 `b19010473eb8f414b85b9ae11d0b3f29abc26dae560c115a1da29754cd23f491`; it was installed persistently on the MiSTer and retrieved byte-for-byte identical through the automatic non-interactive connection.
 
 #### Next Steps:
 
-Implement the ordinary queue-capacity hold and its focused regression, then require the exact test-six stream to complete five publications, five presentations and four swaps under hardware-equivalent cadence in full-pipeline simulation. Re-run the established ordinary P, B and multi-slice regressions, build seed eleven with positive timing in every category, install and retrieve the exact RBF, and repeat test six twice on reboot-isolated hardware before continuing to test seven.
+Power-cycle the MiSTer and run `06_p_f_code_range.m2v` twice, rebooting between runs and leaving each completed video loaded for telemetry capture. Require USER steady on, DISK steady off and POWER steady on together with a quiet schema-seven snapshot containing 184,678 accepted transport bytes including the odd-byte pad, five reference pictures, five displayed identities, four swaps, sequence end, session quiet, presentation complete and zero error flags. Do not proceed to test seven until both isolated runs pass.
 
 #### Files Modified:
 
@@ -25,7 +25,7 @@ Implement the ordinary queue-capacity hold and its focused regression, then requ
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
