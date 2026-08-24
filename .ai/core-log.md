@@ -1,3 +1,31 @@
+## 427 COMMIT Unreleased 62e8ccf 2026-08-24T04:07:06-07:00
+
+#### Coming From:
+
+Unreleased 62e8ccf
+
+#### Purpose:
+
+Install the first-picture presentation anchor through staged, hash-verified replacement while preserving exact rollback state.
+
+#### Outcome:
+
+Installation used the FTP path with download-and-hash round trips in place of on-device hashing. Before installation `/media/fat/MediaPlayer.rbf` verified at SHA-256 `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68`, the accepted `047f5b2` restored after the `d9022e6` rollback, and both the staging and rollback names for this cycle were absent. The new RBF was uploaded as `MediaPlayer.upload.62e8ccf.rbf`, downloaded back and confirmed byte-identical to the local build, after which the displaced file was renamed to its rollback name and the staged file renamed into place. `/media/fat/MediaPlayer.rbf` now verifies at SHA-256 `74913cd13a7ecaa3748461da755041b32f47c61e9b3ec64643f7ae15e28c4336` and its predecessor is preserved byte-identically as `/media/fat/MediaPlayer.backup.pre-anchor.047f5b2.rbf`. The helper remains at `12f6305f35ef56d4e8de2369ecd41d2811bda9d787c885991a5ed0272cd2678a`. The failed `d9022e6` image remains set aside as `/media/fat/MediaPlayer.failed.d9022e6.rbf` and should be deleted once this cycle is accepted. No playback was launched and no `sync` could be issued, so the currently loaded core remains the prior in-memory RBF until reboot and the writes depend on the server flushing before the next power cycle.
+
+#### Next Steps:
+
+Reboot the MiSTer once, enter MediaPlayer with Audio Test Off and run only `02_arm_mp2_faded_tones.mpg`. Require that video now starts immediately rather than 1.372 seconds late, that audio and video begin together, that the tones stay clean and separated with smooth fades, and that USER is steady on, DISK steady off and POWER steady on; then leave the completed image loaded for a schema-eight capture triggered over FTP. That capture must show `first_present_cycle` collapse from 82,301,563 to a small fraction of it while the accepted decode evidence is unchanged at 185,149 elementary-stream bytes, three reference plus two B pictures, five displays, four swaps, sequence end, presentation complete and zero error flags. Confirm separately that an older `.m2v` file still behaves exactly as before, since it never anchors the timeline. If any residual offset remains it is now the PCM startup reserve fill rather than the presentation gate, and should be measured before being treated as a defect.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 426 COMMIT Unreleased 62e8ccf 2026-08-24T04:06:21-07:00
 
 #### Coming From:
@@ -1150,34 +1178,6 @@ After a MiSTer power cycle, the exact 100,000-byte `99_EXPECTED_FAILURE_truncate
 #### Next Steps:
 
 Treat source `2b1a170` and its installed RBF as the accepted complete-regression boundary for ordinary and B-picture presentation. Prepare the next source-change proposal for timestamp-driven presentation against the proven system-time clock while retaining free-running cadence for unannotated streams, with focused association, wrap, missing-timestamp, seek-reset, B-reorder and full-pipeline controls; obtain user approval before changing source, and keep the PCM sink as the following feature boundary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 387 COMMIT Unreleased 2b1a170 2026-08-23T21:00:19-07:00
-
-#### Coming From:
-
-Unreleased 2b1a170
-
-#### Purpose:
-
-Hardware-qualify the complete 14,315-picture native-24 endurance stream and prepare the final expected-failure recovery gate.
-
-#### Outcome:
-
-After a MiSTer power cycle, the authoritative even-length 78,010,162-byte `14_bbb_full_native24_user_recipe.m2v` passes with USER steady on, DISK eleven blinks and POWER steady on, and the user reports that the full playback looked good. The steady USER state again classifies the DISK indication as normal final GOP progress. The launch-free schema-seven capture freezes for quiet reason one with exactly 78,010,162 accepted bytes and the expected eight-bit wraps from 4,773 reference pictures, 9,542 B pictures, 14,315 displays and 14,314 swaps to 165, 70, 235 and 234. Frame-rate code two, 596 system-time seconds, sequence end, session quiet, presentation complete, zero decoder or presentation errors and zero cadence outliers are present. Correcting the 32-bit cadence-cycle counter by its eight expected wraps yields 596.428 measured seconds and 23.999549 displayed swaps per second. The terminal scheduler has no frame waiting, active reorder, queued generation, promotion, pending frame or terminal boundary. The exact 100,000-byte `99_EXPECTED_FAILURE_truncated_stream.m2v`, SHA-256 `0375c1d73625fdeb80f995c194ba8220f25894aa093012a67f325d390aae536a`, was reproduced as the documented prefix of test eleven, installed in the MiSTer file directory and retrieved byte-for-byte identical.
-
-#### Next Steps:
-
-Power-cycle the MiSTer and load `99_EXPECTED_FAILURE_truncated_stream.m2v` through the normal file selector. Wait until it stops making progress, record the terminal image and all three LEDs, leave it loaded and request telemetry capture; it must not report ordinary sequence-end quiet completion because the file ends inside a picture without a sequence-end marker. After that capture, do not reboot and immediately load `01_i_baseline.m2v`; recovery passes only if baseline completes normally with USER steady on, and all three recovery LEDs plus launch-free telemetry must be recorded before closing the regression pack.
 
 #### Files Modified:
 
