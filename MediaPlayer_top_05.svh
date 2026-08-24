@@ -141,34 +141,6 @@ mpeg2_h262_pts_presentation_timeline mpeg2_h262_pts_presentation_timeline
     .candidate_due    (mpeg2_new_timestamp_candidate_due)
 );
 
-// Entry 423: first-presentation detector.  The terms match how the cadence
-// profiler recognises a display swap, but the flag is derived here so that
-// gating the profiler out later cannot silently remove the audio start gate.
-reg [1:0] mpeg2_new_display_bank_hold;
-reg       mpeg2_new_display_scratch_hold;
-reg       mpeg2_new_display_scratch_bank_hold;
-reg       mpeg2_new_video_presenting_q;
-assign    mpeg2_new_video_presenting = mpeg2_new_video_presenting_q;
-always @(posedge clk_mpeg2) begin
-    if (reset_mpeg2) begin
-        mpeg2_new_display_bank_hold         <= 2'd0;
-        mpeg2_new_display_scratch_hold      <= 1'b0;
-        mpeg2_new_display_scratch_bank_hold <= 1'b0;
-        mpeg2_new_video_presenting_q        <= 1'b0;
-    end
-    else begin
-        mpeg2_new_display_bank_hold         <= mpeg2_new_display_frame_bank;
-        mpeg2_new_display_scratch_hold      <= mpeg2_new_display_scratch;
-        mpeg2_new_display_scratch_bank_hold <= mpeg2_new_display_scratch_bank;
-        if ((mpeg2_new_display_frame_bank != mpeg2_new_display_bank_hold) ||
-            (mpeg2_new_display_scratch    != mpeg2_new_display_scratch_hold) ||
-            (mpeg2_new_display_scratch &&
-             (mpeg2_new_display_scratch_bank !=
-              mpeg2_new_display_scratch_bank_hold)))
-            mpeg2_new_video_presenting_q <= 1'b1;
-    end
-end
-
 mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
 (
     .clk                         (clk_mpeg2),

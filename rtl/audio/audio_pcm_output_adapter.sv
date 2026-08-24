@@ -4,24 +4,8 @@
 // 44.1 kHz uses an integer phase accumulator: its average rate is exact and
 // each sample event is scheduled with at most one CLK_AUDIO period of jitter.
 
-// Entry 423: on a timestamped Program Stream the presentation timeline holds
-// each picture until the 90 kHz clock reaches its PTS, while audio is not
-// gated at all, so audio led video by the first picture's timestamp offset.
-// video_started qualifies only the initial start, holding PCM until the
-// presentation side has actually displayed a picture.  VIDEO_WAIT_LIMIT bounds
-// that hold so a stream whose video never presents is not silent forever; the
-// timeout reproduces the previous behaviour rather than adding a new one.
-//
-// Entry 423 sizing: hardware telemetry for 02_arm_mp2_faded_tones.mpg reports
-// first_present_cycle 82,301,563 at 60 MHz, so video presents 1.372 s in.  The
-// limit is set to 5 s rather than a value close to that measurement, because a
-// timeout that preempts a legitimate video start would silently restore the
-// very lead this gate exists to remove.  It bounds permanent silence; it is
-// not a synchronisation parameter.
-
 module audio_pcm_output_adapter #(
-    parameter [11:0] PREFILL_SAMPLES  = 12'd2048,
-    parameter [26:0] VIDEO_WAIT_LIMIT = 27'd122880000
+    parameter [11:0] PREFILL_SAMPLES = 12'd2048
 )
 (
     input  wire        clk,
@@ -31,7 +15,6 @@ module audio_pcm_output_adapter #(
     input  wire        fifo_empty,
     input  wire [11:0] fifo_used,
     input  wire        source_ended,
-    input  wire        video_started,
     output reg         fifo_rd,
 
     output reg  [15:0] audio_l,
@@ -59,10 +42,6 @@ wire [25:0] rate_step = current_rate_48k ? RATE_48000 : RATE_44100;
 wire [26:0] phase_sum = {1'b0, phase_accum} + {1'b0, rate_step};
 wire prefill_ready = (fifo_used >= PREFILL_SAMPLES) || source_ended;
 
-reg  [26:0] video_wait_count;
-wire        video_wait_expired = (video_wait_count >= VIDEO_WAIT_LIMIT);
-wire        video_release      = video_started || video_wait_expired;
-
 always @(posedge clk) begin
     if (reset) begin
         fifo_rd          <= 1'b0;
@@ -74,18 +53,13 @@ always @(posedge clk) begin
         starvation_waiting <= 1'b0;
         current_rate_48k <= 1'b0;
         phase_accum      <= 26'd0;
-        video_wait_count <= 27'd0;
     end
     else begin
         fifo_rd <= 1'b0;
 
         if (!started) begin
             phase_accum <= 26'd0;
-            if (!playback_complete && prefill_ready && !fifo_empty &&
-                !video_release)
-                video_wait_count <= video_wait_count + 1'b1;
-            if (!playback_complete && prefill_ready && !fifo_empty &&
-                video_release) begin
+            if (!playback_complete && prefill_ready && !fifo_empty) begin
                 fifo_rd <= 1'b1;
                 if (fifo_end) begin
                     audio_l <= 16'd0;

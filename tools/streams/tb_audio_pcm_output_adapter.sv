@@ -8,19 +8,14 @@ reg [34:0] fifo_data=0;
 reg fifo_empty=1;
 reg [11:0] fifo_used=0;
 reg source_ended=0;
-// Entry 423: the existing cases all predate the video gate and assume audio
-// starts as soon as the reserve fills, so video_started defaults high.
-reg video_started=1;
 wire fifo_rd;
 wire [15:0] audio_l,audio_r;
 wire underrun,playback_complete;
 
-audio_pcm_output_adapter #(.PREFILL_SAMPLES(12'd3),
-                           .VIDEO_WAIT_LIMIT(27'd1000)) dut(
+audio_pcm_output_adapter #(.PREFILL_SAMPLES(12'd3)) dut(
     .clk(clk),.reset(reset),.fifo_data(fifo_data),
     .fifo_empty(fifo_empty),.fifo_used(fifo_used),
-    .source_ended(source_ended),.video_started(video_started),
-    .fifo_rd(fifo_rd),
+    .source_ended(source_ended),.fifo_rd(fifo_rd),
     .audio_l(audio_l),.audio_r(audio_r),.underrun(underrun),
     .playback_complete(playback_complete));
 
@@ -88,36 +83,7 @@ initial begin
     if(underrun)
         $fatal(1,"idle after a clean end reported underrun");
 
-    // Entry 423: with the reserve satisfied but no picture presented yet, the
-    // start is held rather than running ahead of video.
-    reset=1;fifo_empty=1;fifo_used=0;source_ended=0;video_started=0;
-    repeat(4) @(posedge clk);reset=0;
-    @(negedge clk);fifo_data={1'b0,1'b1,1'b1,16'h0F0F,16'hA5A5};
-    fifo_empty=0;fifo_used=8;
-    repeat(200) @(posedge clk);
-    if(fifo_rd||dut.started||audio_l!==16'd0||audio_r!==16'd0)
-        $fatal(1,"PCM started before video presented");
-
-    // Presentation releases it, and the first sample is the one that was held.
-    @(negedge clk);video_started=1;
-    wait(fifo_rd);@(negedge clk);
-    if(audio_l!==16'h0F0F||audio_r!==16'hA5A5||underrun)
-        $fatal(1,"video release did not start PCM cleanly");
-
-    // A stream whose video never presents must not be silent forever: the
-    // bounded wait reproduces the pre-gate behaviour as a floor.
-    reset=1;fifo_empty=1;fifo_used=0;video_started=0;
-    repeat(4) @(posedge clk);reset=0;
-    @(negedge clk);fifo_data={1'b0,1'b1,1'b1,16'h7788,16'h99AA};
-    fifo_empty=0;fifo_used=8;
-    repeat(900) @(posedge clk);
-    if(fifo_rd||dut.started)
-        $fatal(1,"bounded video wait released too early");
-    repeat(400) @(posedge clk);
-    if(!dut.started||audio_l!==16'h7788||audio_r!==16'h99AA||underrun)
-        $fatal(1,"bounded video wait did not release PCM");
-
-    $display("AUDIO_PCM_OUTPUT_ADAPTER_PASS prefill=3 short=1 true_underrun=1 clean_end=1 video_gate=1 video_timeout=1");
+    $display("AUDIO_PCM_OUTPUT_ADAPTER_PASS prefill=3 short=1 true_underrun=1 clean_end=1");
     $finish;
 end
 endmodule
