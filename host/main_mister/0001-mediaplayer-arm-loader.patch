@@ -92,13 +92,15 @@ new file mode 100644
 index 0000000..5ed0c50
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,159 @@
+@@ -0,0 +1,274 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
 +#include <fcntl.h>
 +#include <signal.h>
++#include <stdarg.h>
 +#include <stdio.h>
++#include <stdint.h>
 +#include <string.h>
 +#include <strings.h>
 +#include <string>
@@ -109,9 +111,54 @@ index 0000000..5ed0c50
 +#include "user_io.h"
 +
 +static const char *helper_path = "/media/fat/linux/MediaPlayer_Helper";
++static const char *diagnostic_path = "/tmp/MediaPlayer_ARM.log";
 +static int helper_fd = -1;
++static int diagnostic_fd = -1;
 +static pid_t helper_pid = -1;
 +static int download_active = 0;
++static uint64_t submitted_bytes = 0;
++static unsigned read_events = 0;
++static unsigned would_block_events = 0;
++
++static void diagnostic_write(const char *format, ...)
++{
++	char message[1024];
++	va_list arguments;
++	int length;
++
++	if (diagnostic_fd < 0) return;
++	va_start(arguments, format);
++	length = vsnprintf(message, sizeof(message), format, arguments);
++	va_end(arguments);
++	if (length < 0) return;
++	if ((size_t)length >= sizeof(message)) length = sizeof(message) - 1;
++	(void)write(diagnostic_fd, message, (size_t)length);
++}
++
++static void diagnostic_close()
++{
++	if (diagnostic_fd >= 0)
++	{
++		(void)fsync(diagnostic_fd);
++		close(diagnostic_fd);
++		diagnostic_fd = -1;
++	}
++}
++
++static void diagnostic_open(const char *source_spec, unsigned char index)
++{
++	diagnostic_close();
++	diagnostic_fd = open(diagnostic_path,
++	                     O_WRONLY | O_CREAT | O_TRUNC | O_APPEND | O_CLOEXEC,
++	                     0644);
++	if (diagnostic_fd < 0) return;
++	submitted_bytes = 0;
++	read_events = 0;
++	would_block_events = 0;
++	diagnostic_write("start source=%s index=%u core=%s alternate=%s\n",
++	                 source_spec, (unsigned)index,
++	                 user_io_get_core_name(), user_io_get_core_name(1));
++}
 +
 +static int has_core_prefix(const char *name)
 +{
@@ -132,8 +179,12 @@ index 0000000..5ed0c50
 +	                     !strcasecmp(extension, ".mpeg"));
 +}
 +
-+static void finish_download()
++static void finish_download(const char *reason)
 +{
++	diagnostic_write("finish reason=%s fd=%d download=%d submitted=%llu reads=%u would_block=%u\n",
++	                 reason, helper_fd, download_active,
++	                 (unsigned long long)submitted_bytes, read_events,
++	                 would_block_events);
 +	if (helper_fd >= 0)
 +	{
 +		close(helper_fd);
@@ -143,18 +194,34 @@ index 0000000..5ed0c50
 +	{
 +		user_io_set_download(0);
 +		download_active = 0;
++		diagnostic_write("download released\n");
 +	}
++}
++
++static void stop_with_reason(const char *reason)
++{
++	int status = 0;
++	pid_t result;
++
++	if (helper_fd >= 0 || helper_pid > 0 || download_active)
++		diagnostic_write("stop reason=%s pid=%d\n", reason, (int)helper_pid);
++	finish_download(reason);
++	if (helper_pid > 0)
++	{
++		int killed = kill(-helper_pid, SIGTERM);
++		int saved_errno = errno;
++		result = waitpid(helper_pid, &status, 0);
++		diagnostic_write("stop child kill=%d kill_errno=%d wait=%d status=0x%x wait_errno=%d\n",
++		                 killed, killed < 0 ? saved_errno : 0, (int)result,
++		                 status, result < 0 ? errno : 0);
++		helper_pid = -1;
++	}
++	diagnostic_close();
 +}
 +
 +void mediaplayer_stop()
 +{
-+	finish_download();
-+	if (helper_pid > 0)
-+	{
-+		kill(-helper_pid, SIGTERM);
-+		(void)waitpid(helper_pid, NULL, 0);
-+		helper_pid = -1;
-+	}
++	stop_with_reason("external");
 +}
 +
 +int mediaplayer_start(const char *path, unsigned char index)
@@ -172,25 +239,33 @@ index 0000000..5ed0c50
 +
 +	if (!mediaplayer_is_core() || !source_spec || !*source_spec) return 0;
 +	mediaplayer_stop();
++	diagnostic_open(source_spec, index);
 +	if (pipe(pipefd) < 0)
 +	{
++		diagnostic_write("pipe failed errno=%d message=%s\n", errno, strerror(errno));
 +		printf("MediaPlayer: pipe failed: %s\n", strerror(errno));
++		diagnostic_close();
 +		return 0;
 +	}
 +	pid = fork();
 +	if (pid < 0)
 +	{
++		diagnostic_write("fork failed errno=%d message=%s\n", errno, strerror(errno));
 +		printf("MediaPlayer: fork failed: %s\n", strerror(errno));
 +		close(pipefd[0]);
 +		close(pipefd[1]);
++		diagnostic_close();
 +		return 0;
 +	}
 +	if (pid == 0)
 +	{
 +		(void)setpgid(0, 0);
 +		(void)dup2(pipefd[1], STDOUT_FILENO);
++		if (diagnostic_fd >= 0) (void)dup2(diagnostic_fd, STDERR_FILENO);
 +		close(pipefd[0]);
 +		close(pipefd[1]);
++		if (diagnostic_fd >= 0 && diagnostic_fd != STDERR_FILENO)
++			close(diagnostic_fd);
 +		execl(helper_path, "MediaPlayer_Helper", "--protocol", "1", "--source",
 +		      source_spec, (char *)NULL);
 +		fprintf(stderr, "MediaPlayer: cannot start %s: %s\n", helper_path, strerror(errno));
@@ -199,12 +274,15 @@ index 0000000..5ed0c50
 +
 +	close(pipefd[1]);
 +	(void)setpgid(pid, pid);
++	diagnostic_write("helper forked pid=%d read_fd=%d\n", (int)pid, pipefd[0]);
 +	if (fcntl(pipefd[0], F_SETFL, fcntl(pipefd[0], F_GETFL) | O_NONBLOCK) < 0)
 +	{
++		diagnostic_write("nonblocking failed errno=%d message=%s\n", errno, strerror(errno));
 +		printf("MediaPlayer: nonblocking pipe failed: %s\n", strerror(errno));
 +		close(pipefd[0]);
 +		kill(-pid, SIGTERM);
 +		(void)waitpid(pid, NULL, 0);
++		diagnostic_close();
 +		return 0;
 +	}
 +
@@ -214,6 +292,8 @@ index 0000000..5ed0c50
 +	user_io_file_info(".M2V");
 +	user_io_set_download(1);
 +	download_active = 1;
++	diagnostic_write("download asserted index=%u pid=%d\n",
++	                 (unsigned)index, (int)helper_pid);
 +	printf("MediaPlayer: streaming %s through ARM helper\n", source_spec);
 +	return 1;
 +}
@@ -226,7 +306,7 @@ index 0000000..5ed0c50
 +	if (helper_fd < 0) return;
 +	if (!mediaplayer_is_core())
 +	{
-+		mediaplayer_stop();
++		stop_with_reason("core-changed");
 +		return;
 +	}
 +	while (chunks++ < 4)
@@ -235,19 +315,54 @@ index 0000000..5ed0c50
 +		if (count > 0)
 +		{
 +			user_io_file_tx_data(buffer, (uint32_t)count);
++			submitted_bytes += (uint64_t)count;
++			read_events++;
++			diagnostic_write("read event=%u count=%d submitted=%llu\n",
++			                 read_events, (int)count,
++			                 (unsigned long long)submitted_bytes);
 +			continue;
 +		}
-+		if (count < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return;
-+		if (count < 0) printf("MediaPlayer: helper pipe failed: %s\n", strerror(errno));
-+		finish_download();
++		if (count < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
++		{
++			would_block_events++;
++			if (would_block_events <= 4 ||
++			    !(would_block_events & (would_block_events - 1)))
++				diagnostic_write("would_block count=%u submitted=%llu\n",
++				                 would_block_events,
++				                 (unsigned long long)submitted_bytes);
++			return;
++		}
++		int read_errno = count < 0 ? errno : 0;
++		if (count < 0)
++		{
++			diagnostic_write("read failed errno=%d message=%s\n",
++			                 read_errno, strerror(read_errno));
++			printf("MediaPlayer: helper pipe failed: %s\n", strerror(read_errno));
++		}
++		else
++		{
++			diagnostic_write("helper stdout eof\n");
++		}
++		finish_download(count < 0 ? "read-error" : "eof");
 +		if (helper_pid > 0)
 +		{
 +			int status = 0;
-+			if (waitpid(helper_pid, &status, 0) == helper_pid &&
++			pid_t result = waitpid(helper_pid, &status, 0);
++			int wait_errno = result < 0 ? errno : 0;
++			diagnostic_write("child wait=%d status=0x%x wait_errno=%d exited=%d exit_code=%d signaled=%d signal=%d\n",
++			                 (int)result, status, wait_errno,
++			                 WIFEXITED(status),
++			                 WIFEXITED(status) ? WEXITSTATUS(status) : -1,
++			                 WIFSIGNALED(status),
++			                 WIFSIGNALED(status) ? WTERMSIG(status) : 0);
++			if (result == helper_pid &&
 +			    (!WIFEXITED(status) || WEXITSTATUS(status)))
 +				printf("MediaPlayer: ARM helper exited with an error\n");
 +			helper_pid = -1;
 +		}
++		diagnostic_write("transfer complete submitted=%llu reads=%u\n",
++		                 (unsigned long long)submitted_bytes, read_events);
++		diagnostic_close();
 +		printf("MediaPlayer: stream transfer finished\n");
 +		return;
 +	}
