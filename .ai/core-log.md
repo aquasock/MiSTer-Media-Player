@@ -1,3 +1,31 @@
+## 400 COMMIT Unreleased c9e5aff 2026-08-23T23:11:34-07:00
+
+#### Coming From:
+
+Unreleased c9e5aff
+
+#### Purpose:
+
+Install the first ARM embedded-audio candidate while preserving an exact rollback path and the accepted FPGA image.
+
+#### Outcome:
+
+The running MiSTer Main at SHA-256 `7ca3cd2f224b9264d0889f593a0d77aafa5adda61910baba92c5ae401e26fcce` was copied unchanged to `/media/fat/MiSTer.backup.pre-arm-c9e5aff.7ca3cd2f` before replacement. The cross-compiled Main from official source `0a8fb44` plus the `c9e5aff` loader patch was installed as `/media/fat/MiSTer` and independently verifies at SHA-256 `51b4e122e6bb3f1f7c62bcfb176d32528b5d08f48b04682d74e59e53fef8c900`. The stripped static helper was installed executable as `/media/fat/linux/MediaPlayer_Helper` and verifies at SHA-256 `0d259064658af419ae92a838a69cc9100a33684e2b7ff132471dd9e6d46a2a7f`. The sole test file `/media/fat/games/MediaPlayer/01_arm_mp2_audio.mpg` verifies at SHA-256 `94a8ff0223dd1acba4d59fc1785741522c4361956f17848bf9ebbb8c0a503fe7`. All transfers were staged under temporary names, verified before replacement, installed, synchronized and verified again. `/media/fat/MediaPlayer.rbf` remains byte-identical to the accepted first-PCM image at SHA-256 `ad04f9f73c0fb98309588f8c212c6ccad71c80b254a2a284f637672a73350d37`. The old Main process remains in memory until reboot, so no unrequested launch or hardware test occurred during installation.
+
+#### Next Steps:
+
+Reboot the MiSTer once so the patched Main starts, enter MediaPlayer and run only `01_arm_mp2_audio.mpg`. Confirm that MPG is visible, selection returns immediately without the Loading screen, the five-picture video completes normally, the 440 Hz left and 660 Hz right embedded tones are audible in their correct channels, and report USER, DISK and POWER LED states. Then reset and replay that same file once to exercise helper termination and re-arm without expanding the one-video build cycle; leave the final image loaded for capture. If the file is absent from the selector after reboot, inspect Main's runtime core-name match and extension override before changing the RBF.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 399 COMMIT Unreleased c9e5aff 2026-08-23T22:49:33-07:00
 
 #### Coming From:
@@ -1169,34 +1197,6 @@ Build warm from the restored database and determine whether the placement that h
 - rtl/mpeg2_new/mpeg2_h262_two_picture_probe.sv
 - rtl/mpeg2_new/mpeg2_h262_two_picture_probe_multimb.sv
 - rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_publish.sv
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-## 360 COMMIT Unreleased 9bfdb21 2026-08-23T02:22:50-07:00
-
-#### Coming From:
-
-Unreleased 3771f19
-
-#### Purpose:
-
-Retry decoder setup closure with fitter seed ten after seed nine leaves two decoder paths marginally violated.
-
-#### Outcome:
-
-This commit changes only the reproducible Quartus fitter seed in `MediaPlayer.qsf` from nine to ten, altering no source, no constraint and no assignment other than that single value, so any change in the result is attributable entirely to fitter placement and routing rather than to design content. It follows the precedent set at entry 319, where moving from seed eight to seed nine closed a seed-sensitive boundary that no design change was required to fix. The condition being addressed is narrow: at seed nine the `3771f19` fit misses decoder setup by minus 0.060 ns with total negative slack of minus 0.061 ns across two violated paths of fifty, while every other timing category is comfortably positive, which is the signature of one marginal path rather than a congested or structurally slow design. Both violated paths run from `mpeg2_h262_reference_word_cache` into `mpeg2_h262_b_bidirectional_raster_engine`, and because those modules carry probe names while actually instantiating the decode pipeline, and the contributing `wide_seen` term selects decode mode rather than reporting telemetry, neither path would be removed by gating diagnostics. The fitter runtime baseline for this design is 25 minutes 16 seconds at eighty-five percent ALM occupancy, so a seed sweep is affordable in a way it was not at the one hour routes seen before the Program Stream demux was removed.
-
-#### Next Steps:
-
-Require all timing categories positive with decoder setup restored toward the plus 0.572 ns held at `2dc52d7`, and treat the violation as structural rather than seed-sensitive if two or three seeds fail in succession, in which case the reference cache to bidirectional engine path is registered properly instead of continuing to sample seeds. Once a seed closes, confirm on MiSTer that every raw elementary-stream regression decodes exactly as before with unchanged picture and swap counts, zero decoder errors and clean terminal completion, and record the accepted RBF hash, because that image becomes the byte-identical reference for the cycle that deletes the twenty-five source files Quartus never compiles and resolves all seven duplicate module definitions. A measured cycle then gates the live diagnostic modules behind a compile-time parameter and reports area, timing and fitter-runtime deltas against the 25 minute 16 second baseline, after which the 0.7.0 plan is re-baselined before presentation work resumes with the system time clock and the PCM sink.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
 
 #### Status:
 
