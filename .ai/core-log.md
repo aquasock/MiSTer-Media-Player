@@ -1,3 +1,38 @@
+## 417 COMMIT Unreleased ??? 2026-08-24T01:30:00-07:00
+
+#### Coming From:
+
+Unreleased 104c5ff
+
+#### Purpose:
+
+Add deterministic PCM startup prefill and defer terminal telemetry until embedded audio has drained cleanly.
+
+#### Outcome:
+
+This commit will expose read-domain FIFO occupancy to the audio adapter and require a 2,048-sample reserve before normal playback starts, providing approximately 42.7 milliseconds of scheduling tolerance at 48 kHz. A synchronized accepted-end indication will release clips shorter than the threshold without deadlock, and a clean consumed-end indication will return to the decoder domain. Embedded-audio sessions will remain terminally pending until that end token is consumed, while raw video streams and FPGA audio-test modes will retain their existing completion behavior. The cadence profiler's forced nonquiet timeout will pause only for this explicit audio-tail condition, but fatal errors will remain immediately visible.
+
+#### Next Steps:
+
+Implement the read-side occupancy, source-ended, playback-complete and terminal-defer paths; extend focused simulations to prove reserve gating, short-stream release, clean terminal drain, true post-start starvation detection and deferred versus forced snapshots. Run the PCM static verifier, focused RTL tests and a clean Quartus build with timing analysis. If clean, install only the resulting RBF while preserving Main, helper and rollback state, then run only `02_arm_mp2_faded_tones.mpg` and require unchanged video and sound, normal LEDs, zero audio errors and a quiet rather than forced terminal snapshot after the three-second audio tail.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_07.svh
+- rtl/audio/audio_pcm_fifo.sv
+- rtl/audio/audio_pcm_output_adapter.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/tb_audio_pcm_output_adapter.sv
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+- tools/streams/verify_d2_pcm_path.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 416 COMMIT Unreleased 104c5ff 2026-08-24T01:25:12-07:00
 
 #### Coming From:
@@ -1138,33 +1173,5 @@ Power-cycle the MiSTer and run `06_p_f_code_range.m2v` twice, rebooting between 
 
 - [x] Built
 - [ ] Passed
-
----
-## 377 COMMIT Unreleased 292981f 2026-08-23T19:32:29-07:00
-
-#### Coming From:
-
-Unreleased 292981f
-
-#### Purpose:
-
-Record isolated hardware acceptance of generic terminal completion across all-I, P-only and B-containing streams.
-
-#### Outcome:
-
-The exact 4,188,704-byte RBF for `292981f`, SHA-256 `1258735da72354789e0fddabc44ed0b06185c0e00919f1a23c40e983f3c69e31`, remained installed for three reboot-isolated normal-selector tests. `01_i_baseline.m2v` passed with USER steady on, DISK two blinks and POWER steady on; launch-free schema-seven telemetry froze for quiet reason one with sequence end, session quiet, presentation complete, zero errors, four reference pictures, four displayed pictures, three swaps and 726,704 accepted bytes including the expected odd-byte pad. `02_p_motion_residual.m2v` passed with USER steady on, DISK steady off and POWER steady on; its quiet snapshot reports sequence end, session quiet, presentation complete, zero errors, two reference pictures, two displayed pictures, one swap, 181,134 accepted bytes and final picture type P. `04_b_bidirectional.m2v` passed with USER steady on, DISK steady off and POWER steady on; its quiet snapshot reports sequence end, session quiet, presentation complete, zero errors, three reference plus two B pictures displayed, four swaps and 185,150 accepted bytes including the expected pad. Ranked-gap telemetry captured the B run with presentation completion false while reorder work remained, followed by a final gap with presentation completion true, reorder false and session quiet true, proving that the generic fix preserves B-path ownership and retirement behavior. The user rebooted between every file load. A dedicated local RSA key and non-interactive BatchMode SSH configuration were prepared outside the repository with password and keyboard-interactive authentication disabled; they were intentionally not tested after preparation because the user requested no further MiSTer contacts in this turn, so any failed future key-only connection will stop instead of prompting.
-
-#### Next Steps:
-
-Treat `292981f` and its installed RBF as the accepted generic terminal-telemetry boundary. On the next explicitly needed device contact, try only the prepared key-based connection and stop silently if it is unavailable. Resume timestamp-driven presentation against the proven system clock while retaining free-running cadence for unannotated streams, then implement the PCM sink as the subsequent feature boundary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
