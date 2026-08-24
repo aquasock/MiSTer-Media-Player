@@ -1,3 +1,31 @@
+## 394 COMMIT Unreleased 9a7a982 2026-08-23T21:58:43-07:00
+
+#### Coming From:
+
+Unreleased 9a7a982
+
+#### Purpose:
+
+Close hardware qualification of timestamp presentation with the unannotated reordered-B fallback control.
+
+#### Outcome:
+
+After a reboot, unannotated `04_b_bidirectional.m2v` passes with USER steady on, DISK steady off and POWER steady on. The launch-free schema-seven snapshot accepts the exact 185,150 transport bytes including the odd-byte pad, finds zero timestamp associations and zero displayed timestamp bits, decodes three reference plus two B pictures, and displays all five pictures with four swaps. Its ranked intervals include two exact 0.049738-second free-running gaps and the expected 0.046910-second decode-limited B interval with zero cadence outliers. Sequence end, session quiet and presentation complete are true; decoder and presentation errors are zero; frame waiting and both holds are false; and the terminal scheduler has no active reorder, decode, queued generation, promotion, pending scratch or reference frame, or terminal boundary. Together with the accepted irregular ordinary and reordered-B timestamp controls and the unannotated P fallback control, this proves source `9a7a982` and the exact Entry-389 RBF preserve raw elementary-stream playback while presenting annotated pictures by their associated timestamps. The timestamp feature is hardware-passed.
+
+#### Next Steps:
+
+Treat source `9a7a982` and its installed RBF as the accepted timestamp-presentation boundary. Begin PCM audio as a separate controlled feature cycle, preserving the accepted elementary-stream and timestamp regression gates and proposing its exact ingress, buffering, clocking and output scope before changing source.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 393 COMMIT Unreleased 9a7a982 2026-08-23T21:56:19-07:00
 
 #### Coming From:
@@ -1179,37 +1207,6 @@ Treat native frame-rate codes one through five as the accepted progressive caden
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 354 COMMIT Unreleased f5e3b83 2026-08-22T19:44:58-07:00
-
-#### Coming From:
-
-Unreleased 6cfad2c
-
-#### Purpose:
-
-Add exact native 30000/1001 and 30-fps presentation cadence as the first substantive v0.7.0 milestone.
-
-#### Outcome:
-
-Commit `f5e3b83` extends the accepted presentation accumulator and cadence profiler to H.262 frame-rate codes four and five using exact reduced `30000/1001` and exact 30-fps ratios, while leaving decode order, ownership, ingress, the 60 MHz decoder clock and diagnostic architecture unchanged. Focused scheduler proofs produce exactly 599 and 600 presentations across matching 1,206-window trials and verify safe fractional-scale reseeding; profiler verification, Verilator lint and the established raster regressions pass. The incremental seed-nine Quartus 17.0.2 build completes with zero errors and positive timing at plus 0.184 ns global setup, plus 0.279 ns decoder setup, plus 7.404 ns video setup, plus 0.241 ns hold, plus 3.666 ns recovery, plus 0.758 ns removal and plus 1.122 ns pulse width. It uses 34,975 ALMs, 52,068 registers, 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks; the 4,200,652-byte RBF has SHA-256 `98c73c1b23499e5461fa789b3b77fbf59d798e957b9f7e9357bf6d932009a615`. Direct MiSTer controls identify rate codes four and five correctly, present every picture, terminate cleanly and report zero decoder errors; the 29.97-fps control measures 29.912 fps, while the exact-30 control demonstrates the expected cadence after finite startup delay. The accepted P skip/motion, B prediction, repeated multi-slice and 15-second squirrel hardware gates all retain complete decode and presentation counts, zero decoder errors and zero cadence outliers, including the established odd-byte transport pad and eight-bit counter wrap cases. The exact RBF and both visual rate controls were installed and retrieved byte-for-byte identical, and documentation commit `3d3ce2c` records the active v0.7.0 status without changing the published v0.6.0 qualification.
-
-#### Next Steps:
-
-Have the user visually compare the installed 29.97- and exact-30-fps controls. Preserve this timing-clean 408-RAM-block build as the first accepted v0.7.0 implementation boundary, then begin the approved H.222.0 Program Stream pack and PES ingress work as a separate cycle without disturbing raw elementary-stream playback.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
 
 #### Status:
 
