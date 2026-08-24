@@ -1,4 +1,4 @@
-## 461 COMMIT Unreleased ??? 2026-08-24T09:28:01-07:00
+## 461 COMMIT Unreleased fccb003 2026-08-24T09:31:39-07:00
 
 #### Coming From:
 
@@ -6,7 +6,7 @@ Unreleased 14e0629
 
 #### Purpose:
 
-Record that the soak clears the drift risk but returns an underrun at 62 seconds, and propose reverting the startup byte budget before committing to FPGA work.
+Revert the startup byte budget after the soak cleared the drift risk and returned an underrun at 62 seconds.
 
 #### Outcome:
 
@@ -16,13 +16,17 @@ The underrun is therefore not fixed on long content, only moved. Entry 451 measu
 
 That makes the startup byte budget from entry 455 a suspect rather than a neutral change. It exists to keep the compressed FIFO as full as possible, which is precisely the condition under which video blocks PCM, and entry 456 already measured that it bought no cadence improvement at all: outliers moved from 174 to 170 and presentation hold from 7,967,197 to 12,376,681 cycles, less than two percent of the distance to the raw control. It is a change that has not paid for itself and that plausibly makes the audio side worse. The cadence residue is unchanged in shape, with the largest gaps still 431.059 milliseconds at display ordinal fourteen and 82.896 at ordinals fifteen and seventeen, the same signature seen under every audio-video helper so far.
 
+The revert was approved and is commit `fccb003`, which removes `PCM_STARTUP_VIDEO_BYTES` and ends the lead on the second picture again while leaving the delivery-order bounds from `cf1d173` and the timestamp coalescing from `14e0629` untouched. The startup lead returns to 5,301 bytes on the diagnostic and 20,564 on both controls, and each of those is exactly four bytes past that stream's second picture start code, which sits at 5,297 and 20,560 respectively. That corrects entry 455, which reported the controls' lead rising from 1,280 bytes: 1,280 was their initial PCM batch, not their lead, and their lead under the two-picture boundary has always been 20,564. The diagnostic figure of 5,301 in that entry was right.
+
+Everything else is unchanged, which is the point of a revert. Removing PCM from the new helper's transport still yields exactly `25_bbb_opening24_gop_pts.m2v` at SHA-256 `83930a92f9796b5c47a7719d4b635243eb84f8226c7f937465e31a68e13365f0`, the 26-record layout hardware presented with zero outliers, so the lead never touched record placement. The soak keeps 598 timestamps, 84,423,309 clean video bytes, 28,628,352 PCM frames at SHA-256 `337b1387b9324b6c391a3223ced8f7660bd5144267b29d3964b4ed6b282839af`, video and timestamps at SHA-256 `545075cdc22437cb994efde832e8f09c663ac569bf8e98d406025ef480d2cd81`, a 342,083,863-byte transport, steady batches within 2,048, PCM-free spans within 4,052 bytes and an audio deficit of zero. All fixtures at both sample rates, both controls and the diagnostic pass under native and address-and-undefined-sanitized helpers, the nine-case envelope retains three passes and six intended failures with identical statuses and messages, and two official GCC 10.2.1 builds are byte-identical at 361,452 bytes and SHA-256 `dbcbd74a84cb7cb57583c5ac0d4dfb0b5e695148c350551295bb4f4b299338cb`. Only the helper was installed, with `14e0629` preserved exactly as `/media/fat/linux/MediaPlayer_Helper.backup.pre-lead-revert.14e0629`; no RBF, Main or media file changed.
+
 #### Next Steps:
 
-Approval is required for one cheap helper revert before any Quartus work, because it is one soak rather than a build and timing cycle. Restore the two-picture startup boundary by removing `PCM_STARTUP_VIDEO_BYTES`, keeping the delivery-order bounds from `cf1d173` and the timestamp coalescing from `14e0629` intact, then rerun the full soak and compare where the underrun lands or whether it disappears. A later underrun or none confirms that keeping the video FIFO full starves the audio sink through the shared path, which is evidence the FPGA work needs anyway; an underrun at the same point exonerates the lead and it can stay reverted regardless, since it has never been shown to help. Host proofs are the usual set, with the startup lead expected to return to 5,301 bytes on the diagnostic and 1,280 on the controls and every payload hash unchanged. After that the dominant mechanism is FPGA-side and the candidates are unchanged in kind but now ordered by this evidence: carrying many samples per PCM record, which cuts both record count and path bandwidth and is the only candidate that addresses the cadence and the underrun together; buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate` so a full video FIFO cannot block audio; and deepening `audio_pcm_fifo`, which raises the starvation threshold without changing the coupling that causes it.
+Run `20_bbb_full_48k.mpg` end to end and report where the underrun lands, which is the only question this commit asks. The comparison is the 62.2-second freeze under `14e0629` and the 21.74-second freeze under `f2b2e02`; a later freeze or a clean quiet snapshot confirms that keeping the compressed FIFO full starves the audio sink through the shared path, while an underrun at the same point exonerates the lead, which stays reverted either way because it was never measured to help. Report audio and video alignment through the credits again, any crackle or dropout, the visible cadence and all three LEDs, then leave the final image loaded for a schema-eight capture. Whatever the result, the dominant cadence mechanism is unchanged and FPGA-side, ordered by the evidence in entry 461: carrying many samples per PCM record, which cuts record count and path bandwidth together and is the only candidate that addresses cadence and underrun at once; buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate` so a full video FIFO cannot block audio; and deepening `audio_pcm_fifo`, which raises the starvation threshold without changing the coupling that causes it.
 
 #### Files Modified:
 
-None.
+- host/arm/media_player_helper.c
 
 #### Status:
 
