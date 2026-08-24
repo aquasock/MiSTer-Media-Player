@@ -1,4 +1,4 @@
-## 456 COMMIT Unreleased ??? 2026-08-24T08:34:33-07:00
+## 456 COMMIT Unreleased 386d3c1 2026-08-24T08:41:14-07:00
 
 #### Coming From:
 
@@ -6,7 +6,7 @@ Unreleased 9f83805
 
 #### Purpose:
 
-Record that the startup byte budget did not reduce the stutter and propose the timestamp-only control that separates in-band records from real-time PCM gating before any FPGA work begins.
+Separate in-band records from real-time PCM gating with a timestamp-only control derived from the helper's own transport, before any FPGA work begins.
 
 #### Outcome:
 
@@ -16,13 +16,17 @@ Presentation hold rises from 7,967,197 to 12,376,681 cycles, a 55 percent improv
 
 The remaining evidence points inside the FPGA. The two largest reordered gaps at picture ordinals fifteen and 33 repeat their `cf1d173` signature exactly, at 198.950 milliseconds each with `decoder_ready` true, compressed input pending, `scratch_available` false, a reorder run active, a decode in flight and a future frame pending, which is scratch exhaustion during reorder rather than any shortage of bytes. The new largest gap at ordinal fourteen has the opposite signature, 431.059 milliseconds with scratch available, the decoder ready and the scheduler reporting presentation complete, so it is a scheduler state question rather than a resource one. `hold_scratch_available_cycles` also falls from 3,397,412 to 582,616 while the lead grew, which is consistent with the scratch pool, not the byte path, being what the audio-video case runs out of.
 
+That control was approved and is built by `strip_inband_pcm.py` in commit `386d3c1`, which removes only the PCM records from the helper's own output rather than rebuilding the stream, so the timestamps land at exactly the elementary-stream offsets hardware saw. The generated `24_bbb_opening24_pts_only.m2v` is 3,143,577 bytes at SHA-256 `2a58632d3efbb4581d1cf3434d3dbe1d39f4f1ee2f4561cfdc2f47b7d0c13d39`, matching the video and timestamp byte count the analyzer measured for the audio-video transport, and carries all 551 timestamp records with 1,154,304 PCM records removed. Removing the timestamps as well reduces it to the accepted raw control at SHA-256 `100dcb7d536918263def73bc2b8e660fdb2e975221ccd9d548b0845bb853471a`, so the video is provably the same 577 pictures that already played smoothly. The helper passes the file through byte-identically under both native and sanitized builds, since an elementary stream takes no scheduling. Only that file was installed, by the same staged roundtrip; the `9f83805` helper was confirmed still resident and unchanged, and no RBF, Main or existing media file was touched.
+
+Validating the control surfaced a transport property worth recording on its own. The compatibility checker reads the annotated file as 579 pictures with two of them missing a coding extension, against 577 in the unannotated control, and the two extra picture start codes sit exactly where a record follows video whose last three bytes are `00 00 01`: the record's own leading zero completes a picture start code that the video did not contain. The same adjacency exists in the shipped audio-video transports, where a scan taken before record extraction sees 636 picture start codes under `f2b2e02` and 643 under `9f83805` rather than 577, because PCM records are inserted at far more points than timestamps are. Stripping records restores the exact video in every case, so a byte-serial extractor that strips before parsing is unaffected, and the hardware displayed exactly 577 pictures in both audio-video runs, which argues that picture counting happens after extraction. It nonetheless means the record insertion point is not neutral to a parser reading the stream ahead of extraction, and that the count of such adjacencies rose with each of the two transport corrections while the outlier count did not fall. Whether that is coincidence or mechanism is precisely what the installed control now separates.
+
 #### Next Steps:
 
-Approval is required for one host-side control before any RTL work, because the case against the FPGA is still circumstantial: every audio-video run differs from the smooth raw control in three ways at once, carrying in-band timestamp records, carrying in-band PCM records, and being paced in real time by the PCM sink. `inject_inband_metadata.py` already annotates an elementary stream with the same reserved timestamp records the helper emits, so annotating the accepted `22_bbb_opening24_exact_video.m2v` with the exact 577 timestamps demuxed from `20_bbb_full_48k.mpg` produces a file that is timestamp-driven and record-carrying but has no audio and no real-time gating. If that file plays as smoothly as the unannotated control, the cadence defect belongs to PCM sink gating and its interaction with the presentation scheduler, and the next work is FPGA-side on how a stalled shared path reaches the reorder and scratch logic. If it stutters, the defect belongs to timestamp-driven presentation itself, is reproducible without audio at all, and can be isolated with far cheaper diagnostics than a Program Stream. Generate that control deterministically, verify it against the source timestamps and picture count before installation, install only that file with no helper or RBF change, and require a schema-eight capture with its outlier count and presentation hold reported beside the 0 and 781,845,922 of the raw control and the 170 and 12,376,681 measured now.
+Power-cycle, set Audio Test to Off and run only `24_bbb_opening24_pts_only.m2v`, which has no audio by construction, then report visible stutter and all three LEDs and leave the final image loaded for a schema-eight capture. The comparison is against the raw control's zero outliers and 781,845,922 cycles of presentation hold, and against the 170 outliers and 12,376,681 cycles measured on the audio-video file whose video bytes and timestamps this control reproduces exactly. A smooth run places the defect in PCM sink gating and its interaction with the reorder and scratch logic, and the next work is FPGA-side. A stuttering run places it in timestamp-driven presentation or in record extraction itself, reproducible with no audio at all, and the immediate follow-up is then a second control with the timestamps removed to separate the records from the presentation timeline they carry. Either way, do not change the helper again until this control has answered, because two transport corrections have now been spent on a mechanism that has not been isolated.
 
 #### Files Modified:
 
-None.
+- tools/streams/strip_inband_pcm.py
 
 #### Status:
 
