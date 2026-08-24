@@ -46,6 +46,7 @@ struct output_state {
     size_t hold_limit;        /* safety bound on the lead, frames  */
     int hold_active;          /* cleared once the lead is released */
     unsigned picture_marks;   /* picture_start_codes emitted       */
+    int hold_rate_hz;         /* sample rate of the held records   */
     uint32_t video_window;    /* start-code scanner across writes  */
 };
 
@@ -140,13 +141,22 @@ static int emit_video_pts(struct output_state *output, uint64_t pts)
 }
 
 static int emit_pcm_sample(struct output_state *output,
-                           mp3d_sample_t left, mp3d_sample_t right)
+                           mp3d_sample_t left, mp3d_sample_t right,
+                           int rate_hz)
 {
     uint16_t left_bits = (uint16_t)left;
     uint16_t right_bits = (uint16_t)right;
+    /*
+     * Entry 431: the FPGA already selects between 48 kHz and 44.1 kHz from this
+     * mode bit -- mpeg2_h262_inband_metadata extracts it and
+     * audio_pcm_output_adapter switches its phase step on it -- so the rate
+     * only ever needed carrying here.  Records are always emitted stereo; a
+     * mono frame is duplicated into both channels by write_pcm.
+     */
     uint8_t record[9] = {
         0, 0, 1, MEDIA_PLAYER_PCM_MARKER_CODE,
-        MEDIA_PLAYER_PCM_MODE_48K_STEREO,
+        (uint8_t)(MEDIA_PLAYER_PCM_MODE_STEREO |
+                  (rate_hz == 48000 ? MEDIA_PLAYER_PCM_MODE_48K : 0)),
         (uint8_t)(left_bits >> 8), (uint8_t)left_bits,
         (uint8_t)(right_bits >> 8), (uint8_t)right_bits
     };
@@ -215,7 +225,8 @@ static int hold_flush(struct output_state *output, size_t keep)
 {
     while ((output->hold_count - output->hold_head) / 2u > keep) {
         if (emit_pcm_sample(output, output->hold[output->hold_head],
-                            output->hold[output->hold_head + 1]) < 0)
+                            output->hold[output->hold_head + 1],
+                            output->hold_rate_hz) < 0)
             return -1;
         output->hold_head += 2u;
     }
@@ -232,7 +243,7 @@ static int hold_flush(struct output_state *output, size_t keep)
 }
 
 static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
-                     int samples_per_channel, int channels)
+                     int samples_per_channel, int channels, int rate_hz)
 {
     mp3d_sample_t stereo[MINIMP3_MAX_SAMPLES_PER_FRAME * 2];
     const mp3d_sample_t *source = samples;
@@ -251,6 +262,14 @@ static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
         if (write_all(output->pcm, source, total * sizeof(*source), "PCM") < 0)
             return -1;
     } else {
+        /*
+         * A rate change mid-stream would mislabel anything still held, so
+         * drain the queue at the old rate before adopting the new one.
+         */
+        if (output->hold_rate_hz && output->hold_rate_hz != rate_hz &&
+            hold_flush(output, 0) < 0)
+            return -1;
+        output->hold_rate_hz = rate_hz;
         if (hold_push(output, source, samples_per_channel) < 0)
             return -1;
         if (output->hold_active &&
@@ -306,13 +325,15 @@ static int decode_audio_buffer(struct audio_state *audio,
                     info.layer);
             return -1;
         }
-        if (info.hz != 48000 || (info.channels != 1 && info.channels != 2)) {
+        if ((info.hz != 48000 && info.hz != 44100) ||
+            (info.channels != 1 && info.channels != 2)) {
             fprintf(stderr,
-                    "media_player_helper: unsupported audio format: %d Hz, %d channels\n",
+                    "media_player_helper: unsupported audio format: %d Hz, %d channels "
+                    "(supported: 44100 or 48000 Hz, 1 or 2 channels)\n",
                     info.hz, info.channels);
             return -1;
         }
-        if (write_pcm(output, pcm, samples, info.channels) < 0)
+        if (write_pcm(output, pcm, samples, info.channels, info.hz) < 0)
             return -1;
     }
     if (offset) {
