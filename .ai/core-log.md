@@ -1,3 +1,31 @@
+## 467 COMMIT Unreleased cd8d78a 2026-08-24T11:44:23-07:00
+
+#### Coming From:
+
+Unreleased cd8d78a
+
+#### Purpose:
+
+Record the clean-video queue's complete hardware soak and separate the eliminated audio failure from the remaining slight credits cadence.
+
+#### Outcome:
+
+The user watched `20_bbb_full_48k.mpg` end to end on `cd8d78a` and reports only a tiny cadence in the credits, with USER and POWER solid on and DISK blinking eleven times. The final screenshot was captured exclusively through plain FTP with the default MiSTer `root` login and no SSH keys; the 8,093-byte file is SHA-256 `f25b0935d55afd3caaa5dfd15dfeb3d249e1942cf6eedd39e2992bac17c6d4ad`. This is the first successful full soak: all 84,423,309 clean-video bytes were accepted instead of freezing at the repeated 35,705,169-byte boundary, aggregate error flags are zero instead of `0x0400`, `audio_pcm_underrun` and PCM protocol error are clear, sequence end was seen, presentation completed and the snapshot closed normally for quiet reason one at an STC of 596 seconds. The eight-bit display counters wrap exactly as expected for all 14,315 pictures and 14,314 swaps, to 235 and 234 respectively, while the timestamp and reference-picture counters saturate or wrap without an error. The largest recorded display gap is now 116.054 milliseconds at ordinal fourteen instead of 431.059 milliseconds, while the next two remain 82.896 milliseconds at ordinals fifteen and seventeen; gap outliers total 224 over the completed movie. The post-extraction queue therefore passes its hardware objective and removes the deterministic audio starvation without removing the residual visual cadence, confirming those were separate faults rather than two observations of one event.
+
+#### Next Steps:
+
+Retain `cd8d78a` as the accepted audio-path baseline and stop before another RTL change. Analyze the remaining presentation cadence against the completed soak's 224 gap outliers, scheduler ownership and scratch-bank availability, using the unchanged 82.896-millisecond ordinal-fifteen and ordinal-seventeen events as the stable signature; propose a narrowly bounded presentation-scheduler change and obtain approval before implementation. Preserve `/media/fat/MediaPlayer.backup.pre-clean-video-queue.6dece4c.rbf` until that follow-on is independently accepted, and keep the current helper, Main and media files unchanged so the next comparison remains controlled.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 466 COMMIT Unreleased cd8d78a 2026-08-24T11:31:01-07:00
 
 #### Coming From:
@@ -1197,34 +1225,6 @@ The user recorded the run at 120 frames per second. Frame analysis places the bl
 #### Next Steps:
 
 Do not pursue further FPGA-side changes for this offset until the emission order is fixed, because the throttle is a real-time sample rate rather than a byte volume and no reachable FIFO depth can absorb it; buffering the 2.8 seconds of PCM that precede the first picture would need roughly 4.7 megabits against 2.28 megabits of free block memory. The correct fix belongs in the ARM helper, which has ample Linux memory and full control of emission order: it should keep video bytes ahead of PCM records rather than emitting each sample as soon as it is decoded, holding only enough PCM in flight to keep the FPGA's 2,048-sample reserve fed. That is a host-side change costing no FPGA logic or timing, consistent with the user's instruction not to spend either on this offset. Decide separately whether to keep or revert `62e8ccf`, which costs 35 ALMs, changed nothing measurable on this fixture, and is defensible only as a correctness improvement for streams whose first metadata timestamp differs from their first picture timestamp. Consider also reducing the nine-byte-per-sample in-band record format, which inflates the stream roughly sevenfold against the compressed audio it replaces, though that is a bandwidth question and not the cause of this offset.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 427 COMMIT Unreleased 62e8ccf 2026-08-24T04:07:06-07:00
-
-#### Coming From:
-
-Unreleased 62e8ccf
-
-#### Purpose:
-
-Install the first-picture presentation anchor through staged, hash-verified replacement while preserving exact rollback state.
-
-#### Outcome:
-
-Installation used the FTP path with download-and-hash round trips in place of on-device hashing. Before installation `/media/fat/MediaPlayer.rbf` verified at SHA-256 `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68`, the accepted `047f5b2` restored after the `d9022e6` rollback, and both the staging and rollback names for this cycle were absent. The new RBF was uploaded as `MediaPlayer.upload.62e8ccf.rbf`, downloaded back and confirmed byte-identical to the local build, after which the displaced file was renamed to its rollback name and the staged file renamed into place. `/media/fat/MediaPlayer.rbf` now verifies at SHA-256 `74913cd13a7ecaa3748461da755041b32f47c61e9b3ec64643f7ae15e28c4336` and its predecessor is preserved byte-identically as `/media/fat/MediaPlayer.backup.pre-anchor.047f5b2.rbf`. The helper remains at `12f6305f35ef56d4e8de2369ecd41d2811bda9d787c885991a5ed0272cd2678a`. The failed `d9022e6` image remains set aside as `/media/fat/MediaPlayer.failed.d9022e6.rbf` and should be deleted once this cycle is accepted. No playback was launched and no `sync` could be issued, so the currently loaded core remains the prior in-memory RBF until reboot and the writes depend on the server flushing before the next power cycle.
-
-#### Next Steps:
-
-Reboot the MiSTer once, enter MediaPlayer with Audio Test Off and run only `02_arm_mp2_faded_tones.mpg`. Require that video now starts immediately rather than 1.372 seconds late, that audio and video begin together, that the tones stay clean and separated with smooth fades, and that USER is steady on, DISK steady off and POWER steady on; then leave the completed image loaded for a schema-eight capture triggered over FTP. That capture must show `first_present_cycle` collapse from 82,301,563 to a small fraction of it while the accepted decode evidence is unchanged at 185,149 elementary-stream bytes, three reference plus two B pictures, five displays, four swaps, sequence end, presentation complete and zero error flags. Confirm separately that an older `.m2v` file still behaves exactly as before, since it never anchors the timeline. If any residual offset remains it is now the PCM startup reserve fill rather than the presentation gate, and should be measured before being treated as a defect.
 
 #### Files Modified:
 
