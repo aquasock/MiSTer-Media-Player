@@ -1,3 +1,31 @@
+## 446 COMMIT Unreleased ??? 2026-08-24T06:48:23-07:00
+
+#### Coming From:
+
+Unreleased 3814243
+
+#### Purpose:
+
+Close the recovered-control half of the unexpected 50 fps success and define the conservative release-boundary correction.
+
+#### Outcome:
+
+The user immediately replayed `00_good_480p_48k.mpg` after the unexpectedly successful rate-code-six stream and reports normal playback with USER and POWER solid on and DISK blinking eleven times. The launch-free recovered-control capture is 104,769 bytes at SHA-256 `c96ccf4db6e5f39434e12d881aca4241e6ef8510cc662ee07a0800f867577006`. Schema-eight telemetry reports zero aggregate flags, audio underrun and PCM protocol error false, all decoder, presentation and destination errors clear, all 582,742 bytes accepted, 44 timestamps associated, seventeen reference plus 31 B pictures decoded and all 48 pictures displayed with 47 swaps. Sequence end, presentation complete and normal quiet reason one are true with no pending scheduler state. The fifth pair therefore recovers cleanly but does not pass its expected-failure classification. The captured 50 fps stream consumed 94,545,187 decoder-stall cycles in a 123,494,421-cycle session, versus approximately 46.2 million in the same-length 24 fps controls, and more than doubled prediction requests to 7,042,776. Its two-second success proves the PTS path can present this synthetic stream but does not establish sustainable support for dense user content, and it cannot justify inferring support for rate codes seven or eight. The safest v0.7 boundary is therefore to retain the already documented maximum of 30 fps and make runtime behavior agree with the offline checker rather than advertising an accidentally permissive high-rate path.
+
+#### Next Steps:
+
+Approval is required for a helper-only preflight correction. Before emitting any video or PCM from either Program Stream or raw-M2V input, incrementally locate the first H.262 sequence header and reject frame-rate codes six, seven and eight with a clear error while preserving codes one through five and every existing malformed-input failure. Add focused cross-PES-boundary and raw-elementary tests plus the permanent verifier expectation that `14_bad_rate_50.mpg` returns nonzero and emits no transport; rerun short and faded fixtures at both audio rates, the nine-case checker, deterministic bounded transport analysis and native plus address-and-undefined sanitizers; produce two byte-identical official GCC 10.2 ARM helpers. Do not change RTL, RBF, Main, media generation or the installed files until all host proofs pass. Then install only the helper with exact rollback and repeat `14_bad_rate_50.mpg` followed immediately by `00_good_480p_48k.mpg`; leave `15_bad_truncated.mpg` and the full soak deferred until that corrected fifth pair passes.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 445 COMMIT Unreleased 3814243 2026-08-24T06:44:59-07:00
 
 #### Coming From:
@@ -1146,34 +1174,6 @@ Install only the exact Main at SHA-256 `16517a9927c659616796b45c8e2488da2a26f059
 #### Files Modified:
 
 - host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 406 COMMIT Unreleased b357c51 2026-08-24T00:11:44-07:00
-
-#### Coming From:
-
-Unreleased b357c51
-
-#### Purpose:
-
-Record the diagnostic hardware result that isolated blank playback to an unresolved relative source path.
-
-#### Outcome:
-
-After the requested reboot and single playback of `01_arm_mp2_audio.mpg`, the user observed a blank image with USER, DISK and POWER all off, and the untouched capture confirmed a uniformly blank active frame. The installed diagnostic Main, accepted RBF, helper and test stream retained their established SHA-256 identities. `/tmp/MediaPlayer_ARM.log` proves that Main selected the helper for menu index 65 and asserted download, but passed `file:games/MediaPlayer/01_arm_mp2_audio.mpg`; because the helper starts with `/` as its working directory, it could not open that relative name and exited with code one after reporting `No such file or directory`. Main consequently recorded 633 nonblocking waits, zero successful reads and zero submitted bytes before releasing download. This result isolates the failure before SPI, FPGA decode or audio presentation and explains both the blank frame and inactive LEDs without indicating a new hardware lockup.
-
-#### Next Steps:
-
-For the next single-file development cycle, make Main resolve the selected menu path through its established `getFullPath` API before constructing the helper's `file:` source specification, then build a Main-only image with the official GCC 10 toolchain, install it with rollback preserved, reboot and replay only `01_arm_mp2_audio.mpg`. Do not change the RBF, helper, test stream or DVD support in this correction; using Main's existing storage resolver avoids hardcoding `/media/fat` and preserves future USB and network source handling.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
