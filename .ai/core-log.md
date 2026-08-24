@@ -1,4 +1,4 @@
-## 435 COMMIT Unreleased ??? 2026-08-24T05:26:02-07:00
+## 435 COMMIT Unreleased 091b150 2026-08-24T05:26:02-07:00
 
 #### Coming From:
 
@@ -22,11 +22,14 @@ Implement and validate terminal Program Stream finalization and strict compatibi
 - rtl/audio/audio_pcm_fifo.sv
 - rtl/audio/audio_pcm_output_adapter.sv
 - tools/streams/tb_audio_pcm_output_adapter.sv
+- tools/streams/tb_audio_pcm_fifo.sv
 - tools/streams/verify_d2_pcm_path.py
 - tools/streams/check_media_compatibility.py
 - tools/streams/finalize_program_stream.py
+- tools/streams/generate_arm_av_test.py
 - tools/streams/generate_compatibility_corpus.sh
 - tools/streams/generate_test_big_buck_bunny.py
+- docs/TEST_INSTRUCTIONS.md
 
 #### Status:
 
