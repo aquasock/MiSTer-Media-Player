@@ -1,3 +1,35 @@
+## 456 COMMIT Unreleased ??? 2026-08-24T08:34:33-07:00
+
+#### Coming From:
+
+Unreleased 9f83805
+
+#### Purpose:
+
+Record that the startup byte budget did not reduce the stutter and propose the timestamp-only control that separates in-band records from real-time PCM gating before any FPGA work begins.
+
+#### Outcome:
+
+The user reran `23_bbb_opening24_exact_av.mpg` on the `9f83805` helper and reports audio synchronization still good, the stutter slightly worse, and ordinary terminal indication with USER solid on, DISK blinking eleven times and POWER solid on. The capture is 545,938 bytes at SHA-256 `99b09546a25c7c104bd5e0c304b68170487620f8d403140392dd4bdf6e065ba4`. Correctness is unchanged and complete: zero aggregate error flags, no underrun, no PCM protocol error, all 3,138,619 bytes accepted, all 577 pictures displayed with 576 swaps, sequence end, presentation complete and normal quiet reason one. The startup budget did what it was measured to do on the host and did not do what it was predicted to do on hardware. First presentation returns to 2,275,519 cycles against the raw control's 2,275,460, so the fuller lead costs nothing at startup and the user confirms synchronization is unaffected, which settles the one risk that bounded the budget. But the outlier count falls only from 174 to 170, the largest gap grows from 182.371 to 431.059 milliseconds, and the session lengthens from 24.044 to 24.369 seconds.
+
+Presentation hold rises from 7,967,197 to 12,376,681 cycles, a 55 percent improvement on a quantity that must reach roughly 781,845,922 to match the smooth raw control. Tripling the compressed-FIFO lead moved the deficit by less than two percent of the distance, so the missing slack is not the lead and cannot be bought with more of it. Decode work remains identical across all three runs, with decoder stall at 655,685,975 raw, 644,013,299 on `cf1d173` and 643,974,167 now, and intra, predicted and bidirectional stalls matching to within three percent throughout. The hypothesis recorded in entry 455 is therefore refuted by its own acceptance test, and delivery ordering is exonerated as the cause of the cadence: two independent transport corrections, one bounding delivery order and one filling the sink FIFO, both leave the outlier count essentially where it was while decode work never changes.
+
+The remaining evidence points inside the FPGA. The two largest reordered gaps at picture ordinals fifteen and 33 repeat their `cf1d173` signature exactly, at 198.950 milliseconds each with `decoder_ready` true, compressed input pending, `scratch_available` false, a reorder run active, a decode in flight and a future frame pending, which is scratch exhaustion during reorder rather than any shortage of bytes. The new largest gap at ordinal fourteen has the opposite signature, 431.059 milliseconds with scratch available, the decoder ready and the scheduler reporting presentation complete, so it is a scheduler state question rather than a resource one. `hold_scratch_available_cycles` also falls from 3,397,412 to 582,616 while the lead grew, which is consistent with the scratch pool, not the byte path, being what the audio-video case runs out of.
+
+#### Next Steps:
+
+Approval is required for one host-side control before any RTL work, because the case against the FPGA is still circumstantial: every audio-video run differs from the smooth raw control in three ways at once, carrying in-band timestamp records, carrying in-band PCM records, and being paced in real time by the PCM sink. `inject_inband_metadata.py` already annotates an elementary stream with the same reserved timestamp records the helper emits, so annotating the accepted `22_bbb_opening24_exact_video.m2v` with the exact 577 timestamps demuxed from `20_bbb_full_48k.mpg` produces a file that is timestamp-driven and record-carrying but has no audio and no real-time gating. If that file plays as smoothly as the unannotated control, the cadence defect belongs to PCM sink gating and its interaction with the presentation scheduler, and the next work is FPGA-side on how a stalled shared path reaches the reorder and scratch logic. If it stutters, the defect belongs to timestamp-driven presentation itself, is reproducible without audio at all, and can be isolated with far cheaper diagnostics than a Program Stream. Generate that control deterministically, verify it against the source timestamps and picture count before installation, install only that file with no helper or RBF change, and require a schema-eight capture with its outlier count and presentation hold reported beside the 0 and 781,845,922 of the raw control and the 170 and 12,376,681 measured now.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 455 COMMIT Unreleased 9f83805 2026-08-24T08:26:32-07:00
 
 #### Coming From:
@@ -1162,33 +1194,5 @@ Verify the MiSTer's current Main, RBF, helper and faded test identities, then st
 
 - [x] Built
 - [ ] Passed
-
----
-## 416 COMMIT Unreleased 104c5ff 2026-08-24T01:25:12-07:00
-
-#### Coming From:
-
-Unreleased 104c5ff
-
-#### Purpose:
-
-Hardware-accept continuous ARM-decoded embedded audio after the minimp3 incremental-state repair.
-
-#### Outcome:
-
-After rebooting with Audio Test Off, the user ran only `02_arm_mp2_faded_tones.mpg` and reported perfect sound, correct channel separation, perfect video, USER steady on, DISK steady off and POWER steady on. This reverses the audible crackly onset on the pre-fix helper and confirms that eliminating the measured MPEG audio frame-boundary discontinuities fixes real hardware playback. The untouched 800-by-600 capture at SHA-256 `53660f47bcd2412645f818e375deaea5b07ab002e0235f123e5a338767c89896` shows the accepted final raster. Its schema-eight snapshot reports the expected saturated PCM sample count of 16,383 for the 144,000-sample file, saturated FIFO peak telemetry of 127 or greater, no audio underrun, no PCM protocol error and zero aggregate error flags; video retains 185,149 accepted elementary-stream bytes, three reference plus two B pictures, five displayed pictures, four swaps, sequence end and presentation complete with no presentation error. The video-centric profiler froze by forced terminal timeout at system-time second two while audio data was still draining, so its frozen `session_quiet` is false; the user's clean three-second listening result and the live steady LEDs provide the later terminal acceptance evidence. Commit `104c5ff`, helper SHA-256 `12f6305f35ef56d4e8de2369ecd41d2811bda9d787c885991a5ed0272cd2678a` and the installed FPGA path are therefore the accepted continuous embedded-PCM boundary.
-
-#### Next Steps:
-
-The next FPGA cycle should add a defined startup prefill threshold and make terminal telemetry audio-aware so a long audio tail defers the forced video timeout until the clean audio-end token drains; prove both with the single faded Program Stream and retain zero underrun or protocol errors. A later isolated cycle should coordinate a genuinely prolonged producer starvation event with presentation timing rather than silently allowing audio and video to drift. Continue using one video file per development build cycle and reserve the full regression pack for release qualification.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
