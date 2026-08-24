@@ -1,3 +1,31 @@
+## 387 COMMIT Unreleased 2b1a170 2026-08-23T21:00:19-07:00
+
+#### Coming From:
+
+Unreleased 2b1a170
+
+#### Purpose:
+
+Hardware-qualify the complete 14,315-picture native-24 endurance stream and prepare the final expected-failure recovery gate.
+
+#### Outcome:
+
+After a MiSTer power cycle, the authoritative even-length 78,010,162-byte `14_bbb_full_native24_user_recipe.m2v` passes with USER steady on, DISK eleven blinks and POWER steady on, and the user reports that the full playback looked good. The steady USER state again classifies the DISK indication as normal final GOP progress. The launch-free schema-seven capture freezes for quiet reason one with exactly 78,010,162 accepted bytes and the expected eight-bit wraps from 4,773 reference pictures, 9,542 B pictures, 14,315 displays and 14,314 swaps to 165, 70, 235 and 234. Frame-rate code two, 596 system-time seconds, sequence end, session quiet, presentation complete, zero decoder or presentation errors and zero cadence outliers are present. Correcting the 32-bit cadence-cycle counter by its eight expected wraps yields 596.428 measured seconds and 23.999549 displayed swaps per second. The terminal scheduler has no frame waiting, active reorder, queued generation, promotion, pending frame or terminal boundary. The exact 100,000-byte `99_EXPECTED_FAILURE_truncated_stream.m2v`, SHA-256 `0375c1d73625fdeb80f995c194ba8220f25894aa093012a67f325d390aae536a`, was reproduced as the documented prefix of test eleven, installed in the MiSTer file directory and retrieved byte-for-byte identical.
+
+#### Next Steps:
+
+Power-cycle the MiSTer and load `99_EXPECTED_FAILURE_truncated_stream.m2v` through the normal file selector. Wait until it stops making progress, record the terminal image and all three LEDs, leave it loaded and request telemetry capture; it must not report ordinary sequence-end quiet completion because the file ends inside a picture without a sequence-end marker. After that capture, do not reboot and immediately load `01_i_baseline.m2v`; recovery passes only if baseline completes normally with USER steady on, and all three recovery LEDs plus launch-free telemetry must be recorded before closing the regression pack.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 386 COMMIT Unreleased 2b1a170 2026-08-23T20:39:08-07:00
 
 #### Coming From:
@@ -1171,43 +1199,6 @@ Stop this attempt as agreed and do not hardware-test or distribute the seed-eigh
 #### Files Modified:
 
 - MediaPlayer.qsf
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-## 347 COMMIT Unreleased 208d48e 2026-08-22T17:40:04-07:00
-
-#### Coming From:
-
-v0.6.0 26805e8
-
-#### Purpose:
-
-Right-size the shared spatial-residual store while preserving the complete hardware-qualified v0.6.0 MPEG-2 decoding envelope.
-
-#### Outcome:
-
-Commit `208d48e` halves each physical residual bank from 1,024 to 512 descriptor blocks, narrows each bank slot from ten to nine bits and the shared sample address from seventeen to sixteen bits, halves both descriptor tables to 1,024 entries, and adds simulation-only row-capacity, address-bank, capture-versus-execution and mutually exclusive P/B writer checks. A deterministic focused regression fills both banks to the complete supported maximum of 270 ordered descriptors, verifies all 34,560 sample writes and the four bank-boundary samples, then proves descriptor 271 raises the expected error without writing. The focused P and B regressions retain exact Icarus cycle and sample counts with zero errors, and the generic live B-picture soak completes with exact publication, persistence and swap counts and zero decoder, prediction, writer or presentation errors. Quartus infers the shared array exactly at 65,536 by 16 bits and both descriptor tables at 1,024 entries. Compared with the qualified v0.6.0 baseline, block-memory use falls from 4,306,375 to 3,228,103 bits and from 538 to 408 RAM blocks, recovering 1,078,272 bits and 130 M10Ks: 128 from the shared array and two from the descriptor tables. The first incremental seed-ten compile and a preserved fully clean seed-ten retry are byte-identical at RBF SHA-256 `1094210440467c558a88e1788d50229256a437a83ae5fb7e234bcdd6da8e5ee6` and reproduce the same fit. Decoder setup is plus 0.184 ns, video setup plus 8.598 ns, HPS setup plus 0.732 ns, hold plus 0.257 ns, recovery plus 3.659 ns, removal plus 0.533 ns and pulse width plus 1.122 ns, but the untouched placement-sensitive HDMI framework clock misses setup by 0.083 ns with 1.315 ns total negative slack. The artifact is therefore not deployable and was not installed even though the functional and resource objectives pass.
-
-#### Next Steps:
-
-Obtain approval to add a fitter-seed change to this cycle and perform one fully clean seed-eight build, which is the strongest documented next candidate because it previously closed the same HDMI path at plus 0.368 ns. Preserve commit `208d48e` and all functional tests unchanged, require the exact 408-block memory topology and positive timing in every category, and stop without hardware deployment if seed eight fails. If it closes, resolve the seed setting in source and metadata, upload only that exact timing-clean RBF to the connected MiSTer, then run the four essential v0.6.0 playback files before marking this pre-v0.7.0 optimization passed.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- tools/streams/tb_h262_p_intra_macroblocks.sv
-- tools/streams/tb_h262_b_residual_streaming.sv
-- tools/streams/tb_h262_residual_store_capacity.sv
-- tools/streams/run_h262_residual_store_capacity.sh
 
 #### Status:
 
