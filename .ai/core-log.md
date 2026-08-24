@@ -1,4 +1,4 @@
-## 455 COMMIT Unreleased ??? 2026-08-24T08:22:17-07:00
+## 455 COMMIT Unreleased 9f83805 2026-08-24T08:26:32-07:00
 
 #### Coming From:
 
@@ -6,7 +6,7 @@ Unreleased f870d98
 
 #### Purpose:
 
-Record that the delivery-order correction removed the underrun but not the stutter, and propose the startup video lead the paired captures identify as the remaining cause.
+Give the decoder its compressed-FIFO reservoir back by ending the startup video lead on a byte budget, after paired captures showed the stutter is lost presentation slack rather than delivery.
 
 #### Outcome:
 
@@ -18,13 +18,17 @@ Retrieving the entry 453 raw capture from the MiSTer and decoding it beside this
 
 That slack is the compressed video FIFO's fill, and it is set at startup rather than in steady state. `rtl/mpeg2_stream_fifo.sv` holds 32 KiB, about 0.25 seconds at this stream's 130,776 bytes per second. Without audio the helper writes video as fast as the FPGA accepts it, so that FIFO sits full and absorbs every picture whose decode exceeds one 41.667-millisecond frame interval; the raw run's largest gap is 49.738 milliseconds and it never crosses the threshold. With audio sharing the path, the accepted two-picture startup boundary releases audio after only 5,301 video bytes, so the FIFO stabilises near sixteen percent full and the shared path then runs at real time, leaving no reservoir for decode-time variance. Steady-state interleaving cannot recover a lead it never established, which is why bounding delivery order corrected the audio without touching the cadence.
 
+Commit `9f83805` was approved and implements exactly that. The lead now ends only when the second picture start has been seen and 28,672 video bytes have crossed, so a payload smaller than the budget keeps its existing boundary and real content gets the reservoir. Measured on the transports, the startup video lead rises from 5,301 to 28,609 clean bytes on the diagnostic and from 1,280 to 28,654 on both controls, while the short and faded fixtures are unchanged at 179,893 because their intra picture is larger than the budget and their second picture start still ends the lead. The full soak reproduces every established payload figure exactly: 342,199,090 transport bytes, video and timestamps at SHA-256 `db00682bb603a5f575df5a1d5d0b7a580c46ca99eed028f024ac6bc37016f38f`, PCM at SHA-256 `337b1387b9324b6c391a3223ced8f7660bd5144267b29d3964b4ed6b282839af`, steady batches within 2,048 and PCM-free video spans within 4,052 bytes. The audio margin improved rather than regressed: the deepest audio deficit over the whole movie falls from 7,374 frames to zero, because the lead leaves audio permanently further ahead of the sink than it was. All four fixtures at both sample rates, both controls and the diagnostic pass under native and address-and-undefined-sanitized helpers, the nine-case envelope corpus is unchanged at three passes and six intended failures with identical exit statuses and messages, and two official GCC 10.2.1 builds are byte-identical at 361,452 bytes and SHA-256 `9c20dc699cf1c2fd8e28aa78ba9d4c754def62fe0ff0df51b32df21614a7dde6`. Only the helper was installed, through the same staged roundtrip verification, with the previous helper preserved exactly as `/media/fat/linux/MediaPlayer_Helper.backup.pre-startup-lead.cf1d173`; RTL, RBF, Main and every media file are untouched and no playback was launched.
+
+One consequence has to be watched on hardware rather than asserted from the host. The lead is 0.22 seconds of video at this stream's rate, so if the core presents pictures as they arrive rather than against its own timeline, audio will begin that much after video and the offset will persist. The raw control presented 577 pictures in 24.006 seconds and the audio-video run in 24.044, which is the source cadence in both cases and indicates timeline-paced presentation, so the expectation is a fuller FIFO and unchanged synchronization. A perceptible lag of audio behind video is therefore the specific failure this budget can introduce, and it bounds how large the budget may grow.
+
 #### Next Steps:
 
-Approval is required to replace the two-picture startup boundary with a byte budget that fills the compressed FIFO before audio is released, leaving RTL, RBF and Main unchanged. The proposal is to hold PCM until either 28,672 video bytes have crossed, which is seven eighths of the 32 KiB FIFO and should not block on a full FIFO, or the existing two-picture and four-second bounds are both exceeded, so the accepted small-fixture behaviour is preserved where the whole payload is smaller than the budget. This costs roughly 0.22 seconds of additional startup latency before audio begins, which the FPGA's own pacing keeps aligned, and should raise presentation hold from 0.13 seconds back toward the raw run's 13 seconds. Host proofs must show the startup video lead reaching the budget on both controls and the full soak, no change to any payload hash, PCM-free video spans still bounded at 4,096 bytes and no audio deficit above the 8,192-frame sink FIFO, followed by native and sanitized fixture runs at both sample rates, the nine-case checker and two byte-identical official GCC 10.2 helpers. Reinstall only the helper with the `cf1d173` rollback preserved and rerun `23_bbb_opening24_exact_av.mpg`, requiring the outlier count to fall from 174 toward the raw run's zero with no return of the underrun, before the full soak is attempted again. If the outlier count does not fall, the remaining cause is the presentation scratch scheduler rather than delivery, and the next boundary is FPGA work on the reorder path with the `scratch_available` false evidence from ordinals fifteen and 33 as its starting point.
+Power-cycle, set Audio Test to Off and run only `23_bbb_opening24_exact_av.mpg` again. The acceptance question is whether the outlier count falls from 174 toward the raw control's zero, so report visible stutter, whether audio still starts with the picture rather than noticeably behind it, and all three LEDs, then leave the final image loaded for a schema-eight capture. The capture must keep aggregate errors, underrun and PCM protocol errors clear with all 577 pictures displayed, and presentation hold should rise from 7,967,197 cycles toward the raw control's 781,845,922. If the outlier count falls but audio now trails the picture, reduce the budget rather than abandoning it. If the outlier count does not fall at all, delivery is exonerated and the remaining cause is the presentation scratch scheduler, with the `scratch_available` false evidence at ordinals fifteen and 33 as the starting point for FPGA work. If it passes, rerun `20_bbb_full_48k.mpg` end to end before any release consideration.
 
 #### Files Modified:
 
-None.
+- host/arm/media_player_helper.c
 
 #### Status:
 
