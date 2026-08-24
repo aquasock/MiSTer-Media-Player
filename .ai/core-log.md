@@ -1,3 +1,31 @@
+## 476 COMMIT Unreleased eab57b7 2026-08-24T14:06:42-07:00
+
+#### Coming From:
+
+Unreleased eab57b7
+
+#### Purpose:
+
+Accept the v0.7.0 release gate's power-cycle 48 kHz audio-video control and advance to silent Program Stream playback.
+
+#### Outcome:
+
+After the required power cycle, the user reports that `00_good_480p_48k.mpg` passes with USER solid on, DISK blinking eleven times and POWER solid on. The final image was triggered and retrieved exclusively through plain FTP with the default MiSTer login and no SSH keys; `.ai/current_results/entry476_release_gate_48k.png` is 104,559 bytes with SHA-256 `f57df09f5f3da51e9eceec797e52fd5369fe5a35324566b382cd56c602bf7cd0`. Schema nine accepts the complete 582,741-byte H.262 payload, associates five timestamps, decodes seventeen reference and 31 B pictures, and displays all 48 pictures with 47 swaps. PCM sample count and FIFO peak saturate their healthy telemetry fields, while aggregate error flags are zero, audio underrun and PCM protocol error are clear, no display-gap outlier is recorded, sequence end is seen, presentation completes and the session freezes for normal quiet reason one at STC second two. Decoder, presentation, destination, reorder, scratch, promotion, future-reference and terminal state are clean. This passes test one of the exact four-file v0.7.0 release gate on the reproducible release binaries.
+
+#### Next Steps:
+
+Without rebooting, run only `02_good_video_only.mpg` with Audio Test Off. Require the complete picture to play silently, USER and POWER solid on, no audio output, all 48 pictures and 47 swaps, zero PCM samples, zero aggregate, decoder, presentation, underrun and protocol errors, sequence end, presentation completion and normal quiet reason one. Report all three terminal LEDs and leave the final image loaded for capture. Do not run the 44.1 kHz recovery control until this silent session is captured.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 475 COMMIT Unreleased eab57b7 2026-08-24T14:01:04-07:00
 
 #### Coming From:
@@ -1191,34 +1219,6 @@ Retrieve and hash the currently installed helper before mutation. Preserve it un
 - host/arm/media_player_helper.c
 - tools/streams/analyze_arm_av_transport.py
 - docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 436 COMMIT Unreleased 091b150 2026-08-24T05:47:31-07:00
-
-#### Coming From:
-
-Unreleased 091b150
-
-#### Purpose:
-
-Install the exact timing-clean starvation correction and corrected media while preserving byte-verified rollback.
-
-#### Outcome:
-
-Read-only retrieval first confirmed that the MiSTer still held accepted RBF SHA-256 `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68` and unchanged helper SHA-256 `2cf665c0153a9885e103a1da5038997efb9050c7fcbceb3d3340537cfb153d54`. Candidate RBF `1fe3f61a8286e42e38db4c50eef6a112f31106590e6cdbcc6715fff82544b4ea` was uploaded under a staging name, retrieved and compared byte-for-byte before promotion. All nine corrected qualification files were independently uploaded to a staging directory, retrieved and compared byte-for-byte, including the full 100,059,153-byte soak. The prior failed media set is preserved without mutation as `/media/fat/games/MediaPlayer/v0.7_qualification.failed.9afe2f0`; the accepted RBF is preserved exactly as `/media/fat/MediaPlayer.backup.pre-pcm-depth.047f5b2.rbf`; and the verified staging names were promoted only after those rollbacks existed. Post-promotion retrieval confirms active `/media/fat/MediaPlayer.rbf` at `1fe3f61a8286e42e38db4c50eef6a112f31106590e6cdbcc6715fff82544b4ea`, its rollback at `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68`, the helper still at `2cf665c0153a9885e103a1da5038997efb9050c7fcbceb3d3340537cfb153d54`, and active `00_good_480p_48k.mpg` at corrected SHA-256 `1455af94803b1d9958a93fbdb978aa2a42c1d8045a9491f904ad1ad9b8ccdad5`. The remaining active media carry the exact Entry-435 hashes, including unchanged truncated-case hash `5ea02141a0be7846389b378f996f67e986bfef2a60dc289f9a7df6ab78f829ce` and full-soak hash `fdc480e6b16bcbc7c143eb8f7e7edfe0d0bbd8e46a1035b728f07639e71b2357`. Main is unchanged, the running core remains the previous image until reboot, and no playback was launched.
-
-#### Next Steps:
-
-Power-cycle the MiSTer once to load the installed candidate, set Audio Test to Off, and run only corrected `00_good_480p_48k.mpg`. Report whether audio starts aligned with the opening video, whether either of the two repeatable crackles or any dropout remains, and the final state of USER, DISK and POWER after the file reaches its clean end. Do not run `01`, any expected-failure case or the full soak yet. If this control fails, leave the final image loaded and do not reboot so schema-eight telemetry can be captured; the exact RBF rollback is `MediaPlayer.backup.pre-pcm-depth.047f5b2.rbf` and the failed prior media remain in `v0.7_qualification.failed.9afe2f0`.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
