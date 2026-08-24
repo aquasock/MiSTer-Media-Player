@@ -1,3 +1,31 @@
+## 440 COMMIT Unreleased 3814243 2026-08-24T06:29:29-07:00
+
+#### Coming From:
+
+Unreleased 3814243
+
+#### Purpose:
+
+Qualify the bounded-lookahead scheduler on the 44.1 kHz control and open the expected-failure recovery sweep only after both supported rates are clean.
+
+#### Outcome:
+
+The user reports that `01_good_480p_44k.mpg` begins perfectly synchronized and completes without crackle, with USER and POWER solid on and DISK blinking eleven times. The completed 800x600 schema-eight capture is 104,739 bytes at SHA-256 `d07a9dd27157107c7eb3aacd6bc054a226d9c54673a3c0870bcce6e3b6c4e945`. It reports zero aggregate error flags, `audio_underrun` false, `pcm_protocol_error` false and every decoder, presentation and destination error clear. All 582,742 transport bytes are accepted, 44 timestamps associate, seventeen reference plus 31 B pictures decode, all 48 pictures display with 47 swaps, sequence end is seen and presentation completes before the snapshot freezes for normal quiet reason one. PCM count saturates at 16,383 and FIFO peak at 127 or more without starvation; every pending decode, reorder, scratch, promotion, future-reference and terminal-boundary state is clear. First presentation is 2,515,058 cycles or 41.9 milliseconds, the final picture presents after 1.939 seconds and the session reaches quiet after 2.054 seconds. Delivered cadence is 24.769 frames per second; the nine recorded decode-limited outliers include 99.475-millisecond intervals at picture ordinals 23 and 35 and 82.896 milliseconds at ordinal eleven, but all pictures display, no error or state remains and no visible stutter was reported. Together with Entry 439, both supported sample rates now pass the same corrected user-media control boundary with perfect reported alignment and no crackle.
+
+#### Next Steps:
+
+Begin only the first expected-failure recovery pair without rebooting. Run `10_bad_audio_codec.mpg` for no more than ten seconds, record its visible result and USER, DISK and POWER states, then immediately run `00_good_480p_48k.mpg` and record alignment, sound, picture and all three LEDs again. An explicit rejection or non-successful settlement followed by a clean control is a pass; an unavailable menu, ignored input or failed control is a wedge and must be reported before any reboot. Do not continue to `11_bad_audio_rate.mpg` until this first pair is recorded.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 439 COMMIT Unreleased 3814243 2026-08-24T06:26:40-07:00
 
 #### Coming From:
@@ -1153,34 +1181,6 @@ Install the exact `55d06ce` helper and patched Main through staged, hash-verifie
 - host/arm/media_source.h
 - host/main_mister/0001-mediaplayer-arm-loader.patch
 - tools/streams/verify_arm_av_pipeline.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 400 COMMIT Unreleased c9e5aff 2026-08-23T23:11:34-07:00
-
-#### Coming From:
-
-Unreleased c9e5aff
-
-#### Purpose:
-
-Install the first ARM embedded-audio candidate while preserving an exact rollback path and the accepted FPGA image.
-
-#### Outcome:
-
-The running MiSTer Main at SHA-256 `7ca3cd2f224b9264d0889f593a0d77aafa5adda61910baba92c5ae401e26fcce` was copied unchanged to `/media/fat/MiSTer.backup.pre-arm-c9e5aff.7ca3cd2f` before replacement. The cross-compiled Main from official source `0a8fb44` plus the `c9e5aff` loader patch was installed as `/media/fat/MiSTer` and independently verifies at SHA-256 `51b4e122e6bb3f1f7c62bcfb176d32528b5d08f48b04682d74e59e53fef8c900`. The stripped static helper was installed executable as `/media/fat/linux/MediaPlayer_Helper` and verifies at SHA-256 `0d259064658af419ae92a838a69cc9100a33684e2b7ff132471dd9e6d46a2a7f`. The sole test file `/media/fat/games/MediaPlayer/01_arm_mp2_audio.mpg` verifies at SHA-256 `94a8ff0223dd1acba4d59fc1785741522c4361956f17848bf9ebbb8c0a503fe7`. All transfers were staged under temporary names, verified before replacement, installed, synchronized and verified again. `/media/fat/MediaPlayer.rbf` remains byte-identical to the accepted first-PCM image at SHA-256 `ad04f9f73c0fb98309588f8c212c6ccad71c80b254a2a284f637672a73350d37`. The old Main process remains in memory until reboot, so no unrequested launch or hardware test occurred during installation.
-
-#### Next Steps:
-
-Reboot the MiSTer once so the patched Main starts, enter MediaPlayer and run only `01_arm_mp2_audio.mpg`. Confirm that MPG is visible, selection returns immediately without the Loading screen, the five-picture video completes normally, the 440 Hz left and 660 Hz right embedded tones are audible in their correct channels, and report USER, DISK and POWER LED states. Then reset and replay that same file once to exercise helper termination and re-arm without expanding the one-video build cycle; leave the final image loaded for capture. If the file is absent from the selector after reboot, inspect Main's runtime core-name match and extension override before changing the RBF.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
