@@ -46,10 +46,15 @@ assign HDMI_BOB_DEINT = 0;
 // Prefer serialized/time-multiplexed arithmetic: the integrated core values DSP
 // headroom more than parallel per-codec datapaths.  AUDIO_S/MIX policy belongs
 // here or in a sibling output adapter, not inside the H.262 video decoder.
-assign AUDIO_S = 0;
-assign AUDIO_L = 0;
-assign AUDIO_R = 0;
-assign AUDIO_MIX = 0;
+// Entry 395: route the codec-independent PCM proof path into MiSTer's signed
+// 16-bit audio ports. Mono duplication and sample-rate scheduling remain in
+// the output adapter; future codecs will see only the valid/ready contract.
+wire [15:0] audio_pcm_output_l;
+wire [15:0] audio_pcm_output_r;
+assign AUDIO_S = 1'b1;
+assign AUDIO_L = audio_pcm_output_l;
+assign AUDIO_R = audio_pcm_output_r;
+assign AUDIO_MIX = 2'd0;
 
 // kate - Commit 180 displaces the LED_DISK file-load indicator again so it can
 // blink the progress_error conjunct sub-code, exactly as Commit 176 did and
@@ -72,6 +77,7 @@ localparam CONF_STR = {
 	"-;",
 	"-;",
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"O[3:1],Audio test,Off,44.1k Mono,44.1k Stereo,48k Mono,48k Stereo;",
 	"-;",
 	"T[0],Reset;",
 	"R[0],Reset and close OSD;",
@@ -205,6 +211,235 @@ mpeg2_h262_download_rearm mpeg2_h262_download_rearm
 );
 
 wire reset_mpeg2 = reset_mpeg2_base || mpeg2_download_rearm_reset;
+
+// Entry 395: atomic Audio mode changes cross from clk_sys to clk_mpeg2 and
+// CLK_AUDIO through dedicated DCFIFO mailboxes. Only the PCM data FIFO uses
+// the stretched cross-domain clear; ordinary source/output state resets
+// synchronously in its own clock domain. This retains the timing-closed control
+// structure proven by the companion Audio implementation and keeps video file
+// session resets completely independent from the Audio path.
+wire [2:0] audio_test_mode = status[3:1];
+reg  [2:0] audio_test_mode_prev;
+reg  [4:0] audio_fifo_reset_stretch;
+
+wire audio_mode_change_sys = (audio_test_mode != audio_test_mode_prev);
+
+always @(posedge clk_sys or posedge reset_request) begin
+	if (reset_request) begin
+		audio_test_mode_prev   <= 3'd0;
+		audio_fifo_reset_stretch <= 5'd0;
+	end
+	else begin
+		audio_test_mode_prev <= audio_test_mode;
+		if (audio_mode_change_sys)
+			audio_fifo_reset_stretch <= 5'd31;
+		else if (audio_fifo_reset_stretch != 5'd0)
+			audio_fifo_reset_stretch <= audio_fifo_reset_stretch - 5'd1;
+	end
+end
+
+wire audio_fifo_reset_request =
+	reset_request || (audio_fifo_reset_stretch != 5'd0);
+
+reg  [2:0] audio_mode_pending_data;
+reg        audio_mode_pending_valid;
+wire       audio_mode_src_full;
+wire       audio_mode_src_empty;
+wire [2:0] audio_mode_src_data;
+wire       audio_mode_src_wr;
+wire       audio_mode_src_rd;
+wire       audio_restart_out_full;
+wire       audio_restart_out_empty;
+wire       audio_restart_out_data;
+wire       audio_restart_out_wr;
+wire       audio_restart_out_rd;
+
+wire audio_mode_send =
+	audio_mode_pending_valid &&
+	!audio_mode_src_full &&
+	!audio_restart_out_full;
+
+assign audio_mode_src_wr = audio_mode_send;
+assign audio_restart_out_wr = audio_mode_send;
+
+always @(posedge clk_sys or posedge reset_request) begin
+	if (reset_request) begin
+		audio_mode_pending_data  <= 3'd0;
+		audio_mode_pending_valid <= 1'b0;
+	end
+	else if (audio_mode_pending_valid) begin
+		if (audio_mode_send) begin
+			if (audio_mode_change_sys) begin
+				audio_mode_pending_data  <= audio_test_mode;
+				audio_mode_pending_valid <= 1'b1;
+			end
+			else begin
+				audio_mode_pending_valid <= 1'b0;
+			end
+		end
+		else if (audio_mode_change_sys) begin
+			audio_mode_pending_data <= audio_test_mode;
+		end
+	end
+	else if (audio_mode_change_sys) begin
+		audio_mode_pending_data  <= audio_test_mode;
+		audio_mode_pending_valid <= 1'b1;
+	end
+end
+
+dcfifo #(
+	.lpm_numwords         (4),
+	.lpm_showahead        ("ON"),
+	.lpm_type             ("dcfifo"),
+	.lpm_width            (3),
+	.lpm_widthu           (2),
+	.overflow_checking    ("ON"),
+	.underflow_checking   ("ON"),
+	.use_eab              ("ON"),
+	.rdsync_delaypipe     (4),
+	.wrsync_delaypipe     (4),
+	.write_aclr_synch     ("ON"),
+	.read_aclr_synch      ("ON")
+) audio_mode_src_fifo
+(
+	.aclr    (reset_request),
+	.data    (audio_mode_pending_data),
+	.wrclk   (clk_sys),
+	.wrreq   (audio_mode_src_wr),
+	.wrfull  (audio_mode_src_full),
+	.q       (audio_mode_src_data),
+	.rdclk   (clk_mpeg2),
+	.rdreq   (audio_mode_src_rd),
+	.rdempty (audio_mode_src_empty)
+);
+
+dcfifo #(
+	.lpm_numwords         (4),
+	.lpm_showahead        ("ON"),
+	.lpm_type             ("dcfifo"),
+	.lpm_width            (1),
+	.lpm_widthu           (2),
+	.overflow_checking    ("ON"),
+	.underflow_checking   ("ON"),
+	.use_eab              ("OFF"),
+	.rdsync_delaypipe     (4),
+	.wrsync_delaypipe     (4),
+	.write_aclr_synch     ("ON"),
+	.read_aclr_synch      ("ON")
+) audio_restart_out_fifo
+(
+	.aclr    (reset_request),
+	.data    (1'b1),
+	.wrclk   (clk_sys),
+	.wrreq   (audio_restart_out_wr),
+	.wrfull  (audio_restart_out_full),
+	.q       (audio_restart_out_data),
+	.rdclk   (CLK_AUDIO),
+	.rdreq   (audio_restart_out_rd),
+	.rdempty (audio_restart_out_empty)
+);
+
+assign audio_mode_src_rd = !audio_mode_src_empty;
+assign audio_restart_out_rd = !audio_restart_out_empty;
+
+reg [6:0] audio_src_reset_count;
+reg [2:0] audio_mode_src;
+
+always @(posedge clk_mpeg2) begin
+	if (reset_mpeg2_base) begin
+		audio_src_reset_count <= 7'd127;
+		audio_mode_src        <= 3'd0;
+	end
+	else begin
+		if (audio_src_reset_count != 7'd0)
+			audio_src_reset_count <= audio_src_reset_count - 7'd1;
+
+		if (!audio_mode_src_empty) begin
+			audio_src_reset_count <= 7'd127;
+			audio_mode_src        <= audio_mode_src_data;
+		end
+	end
+end
+
+wire reset_audio_src =
+	reset_mpeg2_base || (audio_src_reset_count != 7'd0);
+
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] reset_audio_out_sync;
+reg [6:0] audio_out_reset_count;
+
+always @(posedge CLK_AUDIO or posedge reset_request) begin
+	if (reset_request)
+		reset_audio_out_sync <= 3'b111;
+	else
+		reset_audio_out_sync <= {reset_audio_out_sync[1:0], 1'b0};
+end
+
+wire reset_audio_out_system = reset_audio_out_sync[2];
+
+always @(posedge CLK_AUDIO) begin
+	if (reset_audio_out_system)
+		audio_out_reset_count <= 7'd127;
+	else if (!audio_restart_out_empty)
+		audio_out_reset_count <= 7'd127;
+	else if (audio_out_reset_count != 7'd0)
+		audio_out_reset_count <= audio_out_reset_count - 7'd1;
+end
+
+wire reset_audio_out =
+	reset_audio_out_system || (audio_out_reset_count != 7'd0);
+
+wire               audio_pcm_valid;
+wire               audio_pcm_ready;
+wire signed [15:0] audio_pcm_left;
+wire signed [15:0] audio_pcm_right;
+wire               audio_pcm_stereo;
+wire               audio_pcm_rate_48k;
+wire               audio_pcm_fifo_full;
+wire               audio_pcm_fifo_empty;
+wire [33:0]        audio_pcm_fifo_data;
+wire               audio_pcm_fifo_rd;
+wire               audio_pcm_underrun;
+
+assign audio_pcm_ready = !audio_pcm_fifo_full;
+
+audio_pcm_test_source audio_pcm_test_source
+(
+	.clk      (clk_mpeg2),
+	.reset    (reset_audio_src),
+	.mode     (audio_mode_src),
+	.ready    (audio_pcm_ready),
+	.valid    (audio_pcm_valid),
+	.left     (audio_pcm_left),
+	.right    (audio_pcm_right),
+	.stereo   (audio_pcm_stereo),
+	.rate_48k (audio_pcm_rate_48k)
+);
+
+audio_pcm_fifo audio_pcm_fifo
+(
+	.reset    (audio_fifo_reset_request),
+	.wr_clk   (clk_mpeg2),
+	.wr_data  ({audio_pcm_rate_48k, audio_pcm_stereo, audio_pcm_left, audio_pcm_right}),
+	.wr_en    (audio_pcm_valid && audio_pcm_ready),
+	.wr_full  (audio_pcm_fifo_full),
+	.rd_clk   (CLK_AUDIO),
+	.rd_en    (audio_pcm_fifo_rd),
+	.rd_data  (audio_pcm_fifo_data),
+	.rd_empty (audio_pcm_fifo_empty)
+);
+
+audio_pcm_output_adapter audio_pcm_output_adapter
+(
+	.clk        (CLK_AUDIO),
+	.reset      (reset_audio_out),
+	.fifo_data  (audio_pcm_fifo_data),
+	.fifo_empty (audio_pcm_fifo_empty),
+	.fifo_rd    (audio_pcm_fifo_rd),
+	.audio_l    (audio_pcm_output_l),
+	.audio_r    (audio_pcm_output_r),
+	.underrun   (audio_pcm_underrun)
+);
 
 // kate - Phase 1Ob: the streaming H.262 bitreader continues to own input
 // backpressure while picture_data() advances across every slice of the first
