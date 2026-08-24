@@ -45,8 +45,7 @@ module tb_h262_b_presentation_scheduler;
     // below are refresh-specific; the invariant they exist to protect is that
     // a stalled decode may never bank credit and replay two presentations on
     // consecutive swap windows.  Assert that directly and at every window.
-    wire dut_presents = swap && !timestamp_candidate_active &&
-                        dut.presentation_slot && dut.scheduled_frame_valid &&
+    wire dut_presents = swap && dut.presentation_slot && dut.scheduled_frame_valid &&
                         dut.scheduled_frame_differs;
     integer swap_window_index=0;
     integer last_present_index=-10;
@@ -598,17 +597,22 @@ module tb_h262_b_presentation_scheduler;
         if(display_bank!==2'd1||dut.pending_frame_valid)
             $fatal(1,"due timestamp did not present at first safe window");
 
-        // Timestamp admission is allowed before the cadence accumulator is
-        // due, but it must consume partial credit.  The following missing-PTS
-        // candidate therefore cannot burst on the very next refresh.
+        // An already-due timestamp may not advance its candidate before the
+        // exact-rate accumulator.  It presents on the first cadence slot and
+        // consumes the same credit as an untimestamped picture.
         completed_bank=0;
         @(negedge clk);frame_waiting<=1;
         @(negedge clk);frame_waiting<=0;#1;
         pulse_close();
+        if(cadence_slot_debug)
+            $fatal(1,"timestamp floor setup unexpectedly cadence-due");
         pulse_window();
-        if(display_bank!==2'd0||(dut.cadence_credit!==26'd0))
-            $fatal(1,"early timestamp did not consume cadence credit %0d",
-                   dut.cadence_credit);
+        if(display_bank!==2'd1||!dut.pending_frame_valid)
+            $fatal(1,"due timestamp advanced before cadence slot");
+        while(!cadence_slot_debug) pulse_window();
+        pulse_window();
+        if(display_bank!==2'd0||dut.pending_frame_valid)
+            $fatal(1,"due timestamp did not present on first cadence slot");
         timestamp_candidate_active=0;
         timestamp_candidate_due=0;
         completed_bank=1;
@@ -656,7 +660,7 @@ module tb_h262_b_presentation_scheduler;
             $fatal(1,"30000/1001 rate change did not re-seed credit code=%0d credit=%0d",
                    dut.cadence_rate_code_q,dut.cadence_credit);
 
-        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=23.976/24/25/29.97/30 timestamp_wait_due=1 missing_fallback=1 no_burst=1 min_present_gap=%0d overlap_p=1 overlap_i=1 deferred_b=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=early/active fail_open=1",min_present_gap);
+        $display("B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=23.976/24/25/29.97/30 timestamp_wait_due=1 timestamp_cadence_floor=1 missing_fallback=1 no_burst=1 min_present_gap=%0d overlap_p=1 overlap_i=1 deferred_b=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=early/active fail_open=1",min_present_gap);
         $finish;
     end
 

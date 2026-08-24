@@ -13,9 +13,9 @@ module mpeg2_h262_b_presentation_scheduler
     input  wire reset,
     input  wire swap_window_pulse,
     input  wire [3:0] frame_rate_code,
-    // Entry 389: when the next retained picture owns a timestamp, its modulo
-    // PTS comparison replaces only the cadence admission gate.  Untimestamped
-    // candidates continue through the established exact-rate accumulator.
+    // Entry 470: cadence is the mandatory floor for every retained picture.
+    // A timestamp may hold its candidate beyond that slot but may never admit
+    // it early; untimestamped candidates use the exact-rate cadence alone.
     input  wire timestamp_candidate_active,
     input  wire timestamp_candidate_due,
     input  wire frame_waiting,
@@ -162,8 +162,8 @@ wire cadence_scale_changed=
     (cadence_30000_1001!=(cadence_rate_code_q==4'h4));
 wire cadence_slot=!cadence_scale_changed&&
                   (!cadence_supported||(cadence_credit>=cadence_due));
-wire presentation_slot=timestamp_candidate_active?
-                       timestamp_candidate_due:cadence_slot;
+wire presentation_slot=cadence_slot&&
+                       (!timestamp_candidate_active||timestamp_candidate_due);
 assign candidate_frame_valid=scheduled_frame_valid;
 assign candidate_frame_scratch=scheduled_frame_scratch;
 assign candidate_scratch_bank=scheduled_scratch_bank;
@@ -611,17 +611,11 @@ always @(posedge clk) begin
 
         if(swap_window_pulse&&presentation_slot&&scheduled_frame_valid&&
            scheduled_frame_differs)begin
-            // Timestamp admission may intentionally occur before the free
-            // cadence has accumulated a whole slot.  Clearing partial credit
-            // in that case consumes the presentation and prevents an
-            // annotated-to-unannotated transition from bursting next refresh.
-            if(cadence_supported) begin
-                if(cadence_slot)
-                    cadence_credit<=cadence_credit+cadence_step-
-                                    cadence_limit;
-                else
-                    cadence_credit<=26'd0;
-            end
+            // Entry 470: presentation_slot guarantees cadence_slot here, so a
+            // timestamped presentation consumes exactly the same accumulated
+            // cadence credit as an untimestamped presentation.
+            if(cadence_supported)
+                cadence_credit<=cadence_credit+cadence_step-cadence_limit;
             display_scratch<=scheduled_frame_scratch;
             if(scheduled_frame_scratch)display_scratch_bank<=scheduled_scratch_bank;
             else display_frame_bank<=scheduled_frame_bank;
