@@ -1,3 +1,31 @@
+## 424 COMMIT Unreleased d9022e6 2026-08-24T03:38:48-07:00
+
+#### Coming From:
+
+Unreleased d9022e6
+
+#### Purpose:
+
+Install the audio start gate through staged, hash-verified replacement while preserving exact rollback state.
+
+#### Outcome:
+
+Installation again used the FTP path with download-and-hash round trips in place of on-device hashing, since key-based SSH is still rejected. Before installation `/media/fat/MediaPlayer.rbf` verified at SHA-256 `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68`, matching accepted `047f5b2`, and both the staging and rollback names were absent. The new RBF was uploaded as `MediaPlayer.upload.d9022e6.rbf`, downloaded back and confirmed byte-identical to the local build at SHA-256 `b0f3a3125bf803dfaed0924b543760a45f439288b18b742cebbd4816c7b342f5`, after which the displaced file was renamed to its rollback name and the staged file renamed into place. `/media/fat/MediaPlayer.rbf` now verifies at `b0f3a3125bf803dfaed0924b543760a45f439288b18b742cebbd4816c7b342f5` and its predecessor is preserved byte-identically as `/media/fat/MediaPlayer.backup.pre-audio-gate.047f5b2.rbf`. The helper remains at `12f6305f35ef56d4e8de2369ecd41d2811bda9d787c885991a5ed0272cd2678a` and the faded fixture at `cb4f143d2d72af72bb03c7a7fbc4e2163ad780a35483bdb871ec661cf29ccc24`, both byte-identical. No playback was launched, so the currently loaded core remains the prior in-memory RBF until reboot. As in the previous installation no `sync` could be issued, so the writes depend on the server flushing before the next power cycle.
+
+#### Next Steps:
+
+Reboot the MiSTer once, enter MediaPlayer with Audio Test Off and run only `02_arm_mp2_faded_tones.mpg`. Require that audio and video now begin together rather than audio leading by roughly 1.4 seconds, that the tones stay clean and separated with smooth fades, that USER is steady on, DISK steady off and POWER steady on, and that no video artefact appears; then leave the completed image loaded so a schema-eight capture can be taken by writing a screenshot command to `/dev/MiSTer_cmd` over FTP. That capture must still report 185,149 accepted elementary-stream bytes, three reference plus two B pictures, five displays, four swaps, sequence end, presentation complete and zero aggregate error flags, and its `first_present_cycle` should be close to the 82,301,563 recorded for `047f5b2` since video timing is deliberately unchanged. Separately confirm an older `.m2v` file still starts immediately. Treat any video artefact as a candidate for a fitter seed retune before treating it as a functional defect, because `pll_hdmi` slack is 0.162 nanoseconds this build.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 423 COMMIT Unreleased d9022e6 2026-08-24T03:19:14-07:00
 
 #### Coming From:
@@ -1144,34 +1172,6 @@ After a MiSTer power cycle, the authoritative even-length 1,404,944-byte `12_bbb
 #### Next Steps:
 
 Power-cycle the MiSTer and load `13_bbb_squirrel_15sec_native24_q6.m2v` through the normal file selector, watch the complete fifteen-second squirrel and wooden-spike sequence for continuous motion without clean frame skips, then report all three LEDs and leave the completed image loaded for telemetry capture. Require 121 reference plus 239 B pictures, 360 displays and 359 swaps represented by the established eight-bit counter wraps to 104 and 103, exactly 2,603,570 accepted transport bytes, sequence-end quiet, complete presentation retirement and zero errors before deciding how to stage the full endurance test fourteen.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 384 COMMIT Unreleased 2b1a170 2026-08-23T20:33:01-07:00
-
-#### Coming From:
-
-Unreleased 2b1a170
-
-#### Purpose:
-
-Hardware-qualify the seventy-two-picture long-GOP ownership, reordering and publication sequence on the accepted queue-capacity fix.
-
-#### Outcome:
-
-After a MiSTer power cycle, the authoritative even-length 791,528-byte `11_compat_long_gop.m2v` passes with USER steady on, DISK eleven blinks and POWER steady on. Because USER remains steady, the DISK indication is the normal final GOP-progress code rather than an error sub-code, which the launch-free schema-seven capture confirms: exactly 791,528 transport bytes are accepted, twenty-five reference plus forty-seven B pictures decode, and all seventy-two pictures display with seventy-one swaps. The snapshot freezes for quiet reason one with sequence end, session quiet, presentation complete, zero decoder or presentation errors and zero cadence outliers at a measured 25.026 displayed swaps per second. Ranked telemetry observes the repeated scratch, pending-frame, reorder, queued-generation, promotion and presentation-hold states, while the terminal snapshot has no frame waiting, active reorder, queued generation, promotion, pending frame or terminal boundary. The exact even-length 1,404,944-byte `12_bbb_squirrel_5sec_native24_q6.m2v`, SHA-256 `dea6b42228158ec4fe43a3cacde71876a21b1fdf3ec9eb37c0c23bf72be2cc84`, was retrieved from the MiSTer byte-exact; its 120 pictures comprise five I, thirty-six P and seventy-nine B pictures.
-
-#### Next Steps:
-
-Power-cycle the MiSTer and load `12_bbb_squirrel_5sec_native24_q6.m2v` through the normal file selector, watch the complete five-second dense-motion clip for continuity, then report all three LEDs and leave the completed image loaded for telemetry capture. Require forty-one reference plus seventy-nine B pictures, all 120 displays, 119 swaps, exactly 1,404,944 accepted transport bytes, sequence-end quiet, complete presentation retirement and zero errors before proceeding to the fifteen-second stress in test thirteen.
 
 #### Files Modified:
 
