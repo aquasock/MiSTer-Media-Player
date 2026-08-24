@@ -1,3 +1,33 @@
+## 479 COMMIT Unreleased 37d913b 2026-08-24T14:24:41-07:00
+
+#### Coming From:
+
+Unreleased eab57b7
+
+#### Purpose:
+
+Accept the completed four-file v0.7.0 hardware release gate and finalize the public qualification record.
+
+#### Outcome:
+
+After a fresh power cycle, the user watched `20_bbb_full_48k.mpg` through its natural end and reports that everything passes, including the opening, transitions, high-motion sequence and rolling credits, with USER solid on, DISK blinking eleven times and POWER solid on. The final image was triggered and retrieved exclusively through plain FTP with the default MiSTer login and no SSH keys; `.ai/current_results/entry479_release_gate_full_soak.png` is 8,156 bytes with SHA-256 `08b075111ee41b2621db28abfde247ca676764ef6d78f5ed79c144e173418d7d`. Schema nine accepts all 84,423,309 H.262 bytes, and its wrapped counters correspond exactly to all 4,773 reference plus 9,542 B pictures, all 14,315 displayed pictures and 14,314 swaps. PCM sample and FIFO-peak telemetry saturate normally, aggregate error flags are zero, audio underrun and PCM protocol error are clear, sequence end is seen, presentation completes and the session freezes for normal quiet reason one at STC second 596. The credits window records zero gap outliers; its three largest gaps are each 2,984,256 decoder cycles or 49.7376 milliseconds, with 147 passive timestamp-advance opportunities and zero delay conflicts. Every terminal decoder, destination, presentation, reorder, scratch, promotion and future-reference state is clear. Together with the accepted power-cycle 48 kHz control, no-reboot video-only stream and no-reboot 44.1 kHz recovery control, this completes the exact four-file release gate on the reproducible RBF, helper and Main. Commit `37d913b` updates `README.md`, `CHANGELOG.md` and `docs/RELEASE_NOTES_v0.7.0.md` with the passed results and capture hashes. The internal package checksums still pass, and the unchanged 2,749,946-byte `MiSTer_Media_Player_v0.7.0.zip` retains SHA-256 `bae3c3c17d2381cb91e2baff98ec9cf22fed88b04d01bc1349574ae57b917377`.
+
+#### Next Steps:
+
+After this metadata commit is pushed, have the user create the annotated `v0.7.0` tag at the exact resulting `origin/master` commit and publish a GitHub pre-release using `docs/RELEASE_NOTES_v0.7.0.md`. Attach `host/build/MiSTer_Media_Player_v0.7.0.zip` and the loose `host/build/release-v0.7.0/MediaPlayer_20260824.rbf`; do not attach the generated regression media. After the tag and pre-release exist, verify their target and asset hashes, add the required VERSION record and leave `Unreleased` empty for the next milestone.
+
+#### Files Modified:
+
+- README.md
+- CHANGELOG.md
+- docs/RELEASE_NOTES_v0.7.0.md
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 478 COMMIT Unreleased eab57b7 2026-08-24T14:11:18-07:00
 
 #### Coming From:
@@ -1185,34 +1215,6 @@ The user reports that `01_good_480p_44k.mpg` begins perfectly synchronized and c
 #### Next Steps:
 
 Begin only the first expected-failure recovery pair without rebooting. Run `10_bad_audio_codec.mpg` for no more than ten seconds, record its visible result and USER, DISK and POWER states, then immediately run `00_good_480p_48k.mpg` and record alignment, sound, picture and all three LEDs again. An explicit rejection or non-successful settlement followed by a clean control is a pass; an unavailable menu, ignored input or failed control is a wedge and must be reported before any reboot. Do not continue to `11_bad_audio_rate.mpg` until this first pair is recorded.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 439 COMMIT Unreleased 3814243 2026-08-24T06:26:40-07:00
-
-#### Coming From:
-
-Unreleased 3814243
-
-#### Purpose:
-
-Close focused hardware qualification of the bounded-lookahead scheduler on the formerly repeatable 48 kHz starvation control.
-
-#### Outcome:
-
-The user reports that `00_good_480p_48k.mpg` now works with audio and video perfectly synchronized, neither repeatable crackle present and no reported picture stutter. USER and POWER are solid on and DISK blinks eleven times, the normal final-GOP progress state. The launch-free 800x600 schema-eight capture is 104,785 bytes at SHA-256 `4845b6ab2e9f858d3061371adf0479357da034b46bbe86dfc30f9870f7d5fa50`. It closes the static proof with zero aggregate error flags, `audio_underrun` false, `pcm_protocol_error` false and decoder, presentation and destination errors all clear. All 582,742 accepted transport bytes reach the core, 44 timestamps associate, seventeen reference plus 31 B pictures decode, all 48 pictures display with 47 swaps, sequence end is seen, presentation completes and the snapshot freezes for normal quiet reason one with no pending decode, reorder, promotion, scratch, future-reference or terminal-boundary work. PCM sample count saturates the telemetry field at 16,383 and FIFO peak saturates at 127 or more without starvation. First presentation occurs after 2,430,554 decoder cycles or 40.5 milliseconds, the final picture presents after 1.959 seconds and the session becomes quiet after 2.057 seconds. The cadence profiler records every picture with an aggregate 24.494 delivered frames per second; its three largest decode-limited intervals are 99.475 milliseconds at periodic picture ordinals eleven, 23 and 35, but they drop no picture, leave no state or error and produced no user-reported visible stutter. This accepts helper source `3814243` and active helper SHA-256 `4c0f1d2c3e9c229ccad38b683701968feac7b9f1111de20ec6b4a3f0864b2576` for the repaired 48 kHz control while retaining timing-clean RBF source `091b150`.
-
-#### Next Steps:
-
-Without rebooting, run only `01_good_480p_44k.mpg` with Audio Test Off. Report beginning audio-video alignment, any crackle or dropout, any visible picture stutter, whether audio extends beyond the final picture and all three final LEDs, then leave its final image loaded for schema-eight capture. Do not begin the six expected-failure recovery pairs until the 44.1 kHz control also has zero audio underrun, PCM protocol, presentation, decoder and aggregate error telemetry.
 
 #### Files Modified:
 
