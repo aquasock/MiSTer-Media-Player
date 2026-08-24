@@ -1,3 +1,31 @@
+## 379 COMMIT Unreleased 2b1a170 2026-08-23T20:18:20-07:00
+
+#### Coming From:
+
+Unreleased 2b1a170
+
+#### Purpose:
+
+Hardware-qualify the ordinary presentation queue-capacity fix with two reboot-isolated executions of the stream that exposed the deterministic dropped display.
+
+#### Outcome:
+
+The exact installed 4,173,788-byte RBF for `2b1a170`, SHA-256 `b19010473eb8f414b85b9ae11d0b3f29abc26dae560c115a1da29754cd23f491`, passes `06_p_f_code_range.m2v` twice after separate MiSTer power cycles. The user reports USER steady on, DISK steady off and POWER steady on for both runs. Both launch-free schema-seven captures freeze for quiet reason one with exactly 184,678 accepted transport bytes including the odd-byte pad, five reference pictures, five displayed pictures, four swaps, sequence end, session quiet, presentation complete, zero presentation errors, zero decoder error flags and zero cadence outliers. Both finish on reference bank one with no frame waiting, input or destination hold, pending scheduler work or active reorder state; their three ranked cadence gaps also agree at 2,984,256, 2,984,256 and 1,989,504 decoder cycles despite normal variation in decode and host-transfer stalls. This reverses the prior repeatable four-display and three-swap hardware failure and proves that the ordinary queue-capacity hold prevents publication overwrite without disturbing terminal retirement. Telemetry capture is now non-interactive by bypassing the stale local key-only SSH stanza with an isolated SSH configuration and retrieving the screenshot through the established automatic FTP connection. The exact 185,054-byte test-seven stream already on the MiSTer was independently retrieved at the authoritative SHA-256 `d0aad59a546114c7fe36680902c2bb912c7bcc2a43201ae9d0fd790d6f877725`.
+
+#### Next Steps:
+
+Continue the numeric hardware regression with `07_b_f_code_range.m2v`, which exercises independent forward and backward B-picture motion-vector ranges. Power-cycle before loading it through the normal file selector, record all three LEDs, leave the completed image loaded for launch-free telemetry, and require all five pictures to display with four swaps, sequence-end quiet, complete B-path retirement and zero errors before proceeding to test eight.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 378 COMMIT Unreleased 2b1a170 2026-08-23T19:55:34-07:00
 
 #### Coming From:
@@ -1176,34 +1204,6 @@ Commit `a6e25b4` updates only README content outside the protected AI-assisted-d
 #### Next Steps:
 
 No build or hardware validation is required because this commit changes only Markdown documentation. Use the README as the current public v0.6.0 candidate-status summary, preserve the AI-assisted-development section verbatim, and update the changelog and release notes when the user approves final v0.6.0 publication.
-
-#### Files Modified:
-
-- README.md
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-## 339 COMMIT Unreleased 036a717 2026-08-22T08:24:43-07:00
-
-#### Coming From:
-
-Unreleased b64ec6a
-
-#### Purpose:
-
-Publish the user's supplied AI-assisted-development section verbatim in the repository README.
-
-#### Outcome:
-
-Commit `036a717` copies the complete 5,540-byte `AI-assisted development in v0.6.0.md` attachment into the top-level `README.md` immediately before the existing Contributing section. A direct byte-range comparison proves the published section is identical to the supplied content, including every heading, paragraph, list item, inline code span, URL, emphasis marker and its intentional whitespace-only indented line; both ranges have SHA-256 `c86635095cfee8c36636802872e75932580309a3cb58d6513a44758b43d515b3`. The attachment was treated strictly as content rather than as project instructions, and the documentation commit was pushed to the online repository.
-
-#### Next Steps:
-
-No build or hardware validation is required because this commit changes only Markdown documentation. Preserve the section verbatim in future README edits unless the user supplies a revision.
 
 #### Files Modified:
 
