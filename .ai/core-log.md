@@ -1,3 +1,31 @@
+## 381 COMMIT Unreleased 2b1a170 2026-08-23T20:24:44-07:00
+
+#### Coming From:
+
+Unreleased 2b1a170
+
+#### Purpose:
+
+Hardware-qualify repeated multi-slice decoding and presentation on the accepted ordinary queue-capacity fix.
+
+#### Outcome:
+
+After a MiSTer power cycle, the authoritative odd-length 185,393-byte `08_compat_multi_slice.m2v` passes with USER steady on, DISK steady off and POWER steady on. Its launch-free schema-seven capture freezes for quiet reason one after accepting 185,394 transport bytes including the expected pad, decoding three reference plus two B pictures, displaying all five pictures with four swaps and reaching sequence end, session quiet and presentation complete with zero decoder or presentation errors and zero cadence outliers. Ranked telemetry observes the expected active reorder, scratch display, queued generation and promotion state before the terminal reference, while the final snapshot has no active reorder, queued generation, promotion, pending frame or terminal boundary. This preserves repeated-slice parsing, B ownership and complete presentation under the new ordinary-reference hold. The exact 2,875,985-byte `09_compat_dense_residual.m2v`, SHA-256 `f8e05f5cfd0c0385566bbc3e4133d9f42cb5547933d92e24b0d87eec3fa0a79e`, was installed in the MiSTer file directory and retrieved byte-for-byte identical; its twelve pictures comprise one I, four P and seven B pictures.
+
+#### Next Steps:
+
+Power-cycle the MiSTer and load `09_compat_dense_residual.m2v` through the normal file selector, then report all three LEDs and leave the completed image loaded for telemetry capture. Require five reference plus seven B pictures, all twelve displays, eleven swaps, 2,875,986 accepted transport bytes including the expected odd-byte pad, sequence-end quiet, complete presentation retirement and zero errors before proceeding to test ten.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 380 COMMIT Unreleased 2b1a170 2026-08-23T20:21:34-07:00
 
 #### Coming From:
@@ -1180,34 +1208,6 @@ Proceed to step three by changing the README from release-candidate language to 
 #### Files Modified:
 
 - docs/RELEASE_NOTES_v0.6.0.md
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-## 341 COMMIT Unreleased fe0393d 2026-08-22T08:46:15-07:00
-
-#### Coming From:
-
-Unreleased a6e25b4
-
-#### Purpose:
-
-Write the final v0.6.0 milestone entry in the public changelog as the first step of the approved seven-step release plan.
-
-#### Outcome:
-
-Commit `fe0393d` replaces the empty Unreleased placeholder with a dated v0.6.0 milestone recording the accepted real-stream decoder, corrected presentation and terminal behavior, expanded motion-vector range, 60 MHz decode and mixed-width 32 KiB ingress, native frame-rate codes one through three, clean-build timing and resources, focused and full-length hardware qualification, release artifact identity, and explicit implementation limits. The Unreleased heading remains available for later work, the documentation passes whitespace and structure checks, and the commit was pushed to the online repository. The user's revised release plan drops the deferred Python conversion recipe and instead reserves a plain FFmpeg command for the later README step; this commit changes no README content.
-
-#### Next Steps:
-
-Proceed to step two by writing `docs/RELEASE_NOTES_v0.6.0.md` from the same qualified seed-ten evidence, including supported inputs, known limits, build and hardware results, and the exact release artifact identity. No build or additional hardware validation is required for this changelog-only commit.
-
-#### Files Modified:
-
-- CHANGELOG.md
 
 #### Status:
 
