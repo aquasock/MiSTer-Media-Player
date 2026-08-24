@@ -1,4 +1,4 @@
-## 457 COMMIT Unreleased ??? 2026-08-24T08:46:56-07:00
+## 457 COMMIT Unreleased 2054426 2026-08-24T08:53:01-07:00
 
 #### Coming From:
 
@@ -6,7 +6,7 @@ Unreleased 386d3c1
 
 #### Purpose:
 
-Record that the timestamp-only control splits the cadence defect into a dominant PCM-gating mechanism and a small record-carrying one, and propose the FPGA boundary that follows.
+Measure the residual record-carrying cadence cost against record density, after the timestamp-only control isolated PCM gating as the dominant mechanism.
 
 #### Outcome:
 
@@ -16,13 +16,17 @@ The outlier count falls from 170 to 21 while the raw control's is zero, so the t
 
 The transport-level adjacency recorded in entry 456 is now a candidate mechanism for that residue rather than a curiosity. This control carries 551 timestamp records and two picture start codes that its video does not contain, and it produces 21 outliers; the audio-video transports carry the same timestamps plus more than a million PCM records, present 59 and 66 such adjacencies before extraction, and produce 139 and 170. The correlation is suggestive but not proof, because record count, adjacency count and PCM gating all rise together and only gating has been isolated so far.
 
+The density control was approved and built. Commit `2054426` teaches `strip_inband_pcm.py` to keep only the first timestamp of each group, which changes record count without touching a single video byte: `25_bbb_opening24_gop_pts.m2v` is 3,138,852 bytes at SHA-256 `83930a92f9796b5c47a7719d4b635243eb84f8226c7f937465e31a68e13365f0` and carries 26 timestamps against the 551 of `24_bbb_opening24_pts_only.m2v`. Removing its timestamps reduces it to the same accepted video at SHA-256 `100dcb7d536918263def73bc2b8e660fdb2e975221ccd9d548b0845bb853471a`, the helper passes it through byte-identically under native and sanitized builds, and regenerating the dense control after the change reproduces the installed file exactly, so the tool's existing behaviour is unchanged. Only that file was installed, by the same staged roundtrip, with the `9f83805` helper confirmed still resident; no RBF, Main or other media file was touched.
+
+One confound has to be stated rather than discovered later. The sparse control carries 577 picture start codes before extraction, exactly what its video contains, because both of the entry 456 adjacencies happened to belong to dropped records. It therefore varies record count and adjacency count together, from 551 and two to 26 and zero. A fall in outliers is consistent with either a per-record cost or the adjacency, and separating those two would need a third control that keeps 551 records while avoiding the adjacency; no change in outliers rules out both and leaves the presentation timeline itself, which is the more valuable answer and the reason to run this control first.
+
 #### Next Steps:
 
-Approval is required for two pieces of work whose order matters. First, and cheaply, a host-side control that varies record density alone: regenerate the timestamp-only stream carrying one timestamp per GOP rather than one per PES packet, roughly 25 records instead of 551, with the same video bytes and the same extraction path. If the 21 outliers fall roughly with the record count, the residue is per-record cost in extraction or the decoder pipeline; if they do not move, the residue is in what the timestamps make the presentation scheduler decide, and the `pending_frame_released` and both-banks-pending evidence at ordinals 65 and 196 is where to look. That control changes no helper, no RBF and no video bytes, and it should be answered before any RTL is touched. Second, and this is the real boundary, the dominant mechanism is architectural and cannot be fixed from the helper: one byte path gated by the slower of two sinks means the audio FIFO paces video delivery, so the decoder is permanently just-in-time whenever audio is present. The candidate correction is to stop letting PCM backpressure reach the video path, either by deepening `audio_pcm_fifo` so the helper's bounded lead can never fill it, or by buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate` so compressed video continues to flow past it. Both are FPGA changes requiring a Quartus build and a timing review, and the first is only a resource question if the deeper FIFO fits, so the choice should be made on the resource and timing numbers rather than in advance. Do not change the helper again for cadence; its two corrections are sound, they removed the underrun and they are not what is limiting the picture.
+Power-cycle, set Audio Test to Off and run only `25_bbb_opening24_gop_pts.m2v`, then report visible stutter and all three LEDs and leave the final image loaded for a schema-eight capture. The measurement is the outlier count against 21 for 551 records, zero for no records and 170 for the audio-video file, with presentation hold expected to stay near the raw control's 781,845,922 cycles because this control has no PCM and therefore no gating. An outlier count falling roughly with record count makes the residue a per-record cost in extraction or the decoder pipeline, and the follow-up is a 551-record control built to avoid the two adjacencies, which separates the record from where it lands. An unchanged count of about 21 makes the residue a property of timestamp-driven presentation, and the follow-up is FPGA-side at the `pending_frame_released` state seen at ordinal 65 and the both-banks-pending reorder state at ordinal 196. Either way the dominant mechanism is unchanged and still architectural: the shared byte path is paced by the audio sink whenever PCM is present, and correcting it means either deepening `audio_pcm_fifo` beyond any lead the helper can produce or buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate` so compressed video keeps flowing, both of which are Quartus work to be chosen on resource and timing numbers.
 
 #### Files Modified:
 
-None.
+- tools/streams/strip_inband_pcm.py
 
 #### Status:
 
