@@ -1,3 +1,31 @@
+## 405 COMMIT Unreleased b357c51 2026-08-24T00:07:29-07:00
+
+#### Coming From:
+
+Unreleased b357c51
+
+#### Purpose:
+
+Install the reproducible Main-only handoff diagnostic while preserving exact rollback and leaving every media-path artifact unchanged.
+
+#### Outcome:
+
+The MiSTer recovered normally after the user disconnected the USB DVD drive, confirming that the interrupted reboot was external to this build cycle. Before installation it was reachable by network, sitting in the normal menu, and running the exact prior Main at SHA-256 `7f6ef2d299e9619250f300764836c8bf30409f7f452cd34248effda6e6536a39`; the accepted RBF, helper and test stream also matched their established hashes. The 1,166,244-byte `b357c51` diagnostic Main was uploaded under a temporary name, independently verified at SHA-256 `1ee8e337e8583fdf4ac585934734fcd7d6af1f8a7130f5e1adcb7ecaebf4a1e4`, made executable and atomically installed as `/media/fat/MiSTer`, then synchronized and verified again. The displaced source-neutral Main was preserved at `/media/fat/MiSTer.backup.pre-diagnostic.55d06ce` and verifies at its original SHA-256 `7f6ef2d299e9619250f300764836c8bf30409f7f452cd34248effda6e6536a39`; the original official Main rollback also remains present. `/media/fat/MediaPlayer.rbf`, `/media/fat/linux/MediaPlayer_Helper` and `/media/fat/games/MediaPlayer/01_arm_mp2_audio.mpg` remain byte-identical. The currently running menu process remains the prior in-memory Main until reboot, so no playback or hardware test occurred during installation.
+
+#### Next Steps:
+
+Keep the USB DVD drive disconnected, reboot once to start the installed diagnostic Main, enter MediaPlayer and run only `01_arm_mp2_audio.mpg`. Leave the resulting image loaded and report the USER, DISK and POWER LEDs. Do not replay, reset or launch another file until the frame and `/tmp/MediaPlayer_ARM.log` have been captured, because that single log is intended to decide whether the helper was selected, how many bytes reached SPI and why the transfer ended.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 404 COMMIT Unreleased b357c51 2026-08-23T23:46:41-07:00
 
 #### Coming From:
@@ -1146,43 +1174,5 @@ Confirm on MiSTer that every raw elementary-stream regression decodes exactly as
 
 - [x] Built
 - [x] Passed
-
----
-## 365 COMMIT Unreleased 7c29f33 2026-08-23T05:31:52-07:00
-
-#### Coming From:
-
-Unreleased 9af69b4
-
-#### Purpose:
-
-Introduce the FPGA-owned 90 kHz presentation time base and extract the picture metadata interlaced operation will need, without altering when frames are presented.
-
-#### Outcome:
-
-Seed eleven closes every timing category at plus 0.676 ns decoder setup, plus 0.347 ns on the HDMI framework path, plus 1.539 ns host bridge and plus 7.283 ns video, with a 9 minute 14 second fitter and RBF SHA-256 `3e5f4384c6a4fa263a53cb77de57f7b936bf7a8f214015e3820d868acb390a0a`, satisfying the two-closing-seed gate from entry 363 and becoming the working seed. A third sample widens measured decoder variance to roughly 0.52 ns across seeds nine, ten and eleven at plus 0.460, plus 0.152 and plus 0.676, so the worst observed margin remains below the variance and seed nine still does not close. Hardware validation of seed ten passed the prediction-focused subset and cleared the registered reference delivery of `ebf372e`. This commit opens 0.7.0 under the user's constraint that interlaced operation is deferred while the pipeline must not need redesigning to accept it. It adds `mpeg2_h262_system_time_clock`, anchored to the 24.576 MHz `CLK_AUDIO` domain that `sys/audio_out.sv` clocks samples out on rather than to the pixel clock, so externally decoded audio will be consumed drift-free by construction once the PCM sink exists and every correction falls on the video side where a field of tolerance exists. The counter runs natively at 180 kHz rather than 90 kHz because a field period is not an integral number of 90 kHz ticks: at 29.97 Hz a frame is 3003 and a field 1501.5, whereas in half-ticks a field is 3003, a frame 6006 and a `repeat_first_field` frame 9009, all exact, which is what makes 3:2 pulldown expressible later without reworking the arithmetic. The divide is exact rather than approximate because 180000/24576000 reduces to 15/2048, so an eleven-bit accumulator incremented by fifteen overflows exactly 180000 times per second, and the 90 kHz view is that counter shifted right so the two cannot disagree. Simulation measures rather than restates this: one simulated second yields exactly 180000 half-ticks, exactly 90000 ticks and exactly one seconds pulse, the anchor load lands exactly and restarts the accumulator phase, and a paused clock does not advance. The frontend now extracts `top_field_first` from `payload_next[15]` and `repeat_first_field` from `payload_next[9]`, both already inside the five-byte `picture_coding_extension` window it captures and neither previously present anywhere in the tree. Only a single bit crosses clock domains: the clock emits a 1 Hz pulse that crosses into `clk_mpeg2` through a two-flop synchroniser and is counted there, because synchronising a multi-bit counter risks tearing across a carry and a thirty-three bit gray decode would be a thirty-three level XOR chain, a new timing problem on a design that spent this run recovering margin. The cadence snapshot moves to schema five, the formerly reserved low half of word nineteen carrying the seconds count and both field flags, with checksum moving from `e82b643d` to `e92b643d` exactly as the single changed format byte predicts. Two scope reductions were taken against the approved plan and both are recorded rather than absorbed: presentation swaps remain free-running because changing presentation timing is the riskiest available change and wants a proven clock beneath it, and the HPS-readable clock and picture metadata wire protocol are deferred because `EXT_BUS` is unconnected at `MediaPlayer_top_00.svh` and no HPS-side code exists to read either, so neither could be verified this cycle. Synthesis is clean at zero errors and an unchanged one hundred thirty-five warnings for 49,479 registers against 49,361.
-
-#### Next Steps:
-
-Build at seed eleven, require every timing category positive, and confirm on MiSTer that every raw elementary-stream regression decodes exactly as before with unchanged picture and swap counts, zero decoder errors and clean terminal completion, which should hold by construction because no presentation behaviour changed. Read the schema five snapshot after a ten minute run and require the seconds field to report six hundred, which measures the presentation clock rate directly on hardware; the field flags should read whatever the stream carries and are not yet consumed. The following cycle brings up `EXT_BUS` together with the throwaway HPS-side harness that exercises it, defining the picture metadata wire protocol with the 33-bit timestamp and reserved `picture_structure`, `top_field_first`, `repeat_first_field` and `progressive_frame` fields, because a protocol with nothing to talk to cannot be tested and designing it blind invites revising it later. Presentation on timestamp against the proven clock follows, anchoring from the first timestamp and retaining free-running cadence for streams without them, then the PCM sink with its elastic FIFO, fill level and underrun telemetry and explicit seek flush. Before release qualification, complete the regression pack left unexercised, in particular long GOP, dense residual, full endurance and the truncation case with its no-reboot recovery.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_07.svh
-- files.qip
-- rtl/mpeg2_new/mpeg2_h262_frontend.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- rtl/mpeg2_new/mpeg2_h262_system_time_clock.sv
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-- tools/streams/tb_h262_system_time_clock.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
