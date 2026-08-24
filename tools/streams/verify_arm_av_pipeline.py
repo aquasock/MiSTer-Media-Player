@@ -114,10 +114,7 @@ def main() -> int:
         program = args.test_dir / "02_arm_mp2_faded_tones.mpg"
         reference_video_path = args.test_dir / "reference_video_faded.m2v"
         reference_pcm = args.test_dir / "reference_audio_faded.s16le"
-    # Near-silent fade regions magnify the small synthesis differences between
-    # minimp3 and FFmpeg, so retain the original limit for the short fixture and
-    # use a still-strong, profile-specific floor for the faded quality fixture.
-    minimum_correlation = 0.97 if args.profile == "short" else 0.965
+    minimum_correlation = 0.97
     reference_video = reference_video_path.read_bytes()
 
     capabilities = subprocess.run(

@@ -167,33 +167,34 @@ static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
 static int decode_audio_buffer(struct audio_state *audio,
                                struct output_state *output, int at_eof)
 {
-    uint8_t *padded = NULL;
-    const uint8_t *decode_data = audio->data;
-    size_t decode_size = audio->size;
     size_t original_size = audio->size;
     size_t offset = 0;
 
-    if (at_eof && audio->size) {
-        decode_size += 4096;
-        padded = calloc(1, decode_size);
-        if (!padded) {
-            fprintf(stderr, "media_player_helper: out of memory\n");
-            return -1;
-        }
-        memcpy(padded, audio->data, audio->size);
-        decode_data = padded;
-    }
     while (offset < original_size) {
+        mp3dec_t decoder_before = audio->decoder;
         mp3dec_frame_info_t info;
         mp3d_sample_t pcm[MINIMP3_MAX_SAMPLES_PER_FRAME];
-        int samples = mp3dec_decode_frame(&audio->decoder, decode_data + offset,
-                                          (int)(decode_size - offset), pcm,
-                                          &info);
-        if (!info.frame_bytes)
+        int samples = mp3dec_decode_frame(&audio->decoder,
+                                          audio->data + offset,
+                                          (int)(original_size - offset),
+                                          pcm, &info);
+        if (!info.frame_bytes) {
+            if (!at_eof)
+                audio->decoder = decoder_before;
             break;
-        if (!samples && !at_eof &&
-            offset + (size_t)info.frame_bytes >= original_size)
+        }
+        /*
+         * minimp3 accepts an exact-sized final frame without a following
+         * header, but a later incremental call can then fail its next-header
+         * comparison and clear the synthesis history.  Do not commit either
+         * the bytes or speculative decoder state until following input proves
+         * that the frame was not merely the current end of the stream.
+         */
+        if (!at_eof &&
+            offset + (size_t)info.frame_bytes >= original_size) {
+            audio->decoder = decoder_before;
             break;
+        }
         offset += (size_t)info.frame_bytes;
         if (offset > original_size)
             offset = original_size;
@@ -211,9 +212,8 @@ static int decode_audio_buffer(struct audio_state *audio,
             return -1;
         }
         if (write_pcm(output, pcm, samples, info.channels) < 0)
-            goto fail;
+            return -1;
     }
-    free(padded);
     if (offset) {
         memmove(audio->data, audio->data + offset, audio->size - offset);
         audio->size -= offset;
@@ -225,9 +225,6 @@ static int decode_audio_buffer(struct audio_state *audio,
         return -1;
     }
     return 0;
-fail:
-    free(padded);
-    return -1;
 }
 
 static int append_audio(struct audio_state *audio, struct output_state *output,
