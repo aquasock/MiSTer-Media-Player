@@ -1,3 +1,31 @@
+## 384 COMMIT Unreleased 2b1a170 2026-08-23T20:33:01-07:00
+
+#### Coming From:
+
+Unreleased 2b1a170
+
+#### Purpose:
+
+Hardware-qualify the seventy-two-picture long-GOP ownership, reordering and publication sequence on the accepted queue-capacity fix.
+
+#### Outcome:
+
+After a MiSTer power cycle, the authoritative even-length 791,528-byte `11_compat_long_gop.m2v` passes with USER steady on, DISK eleven blinks and POWER steady on. Because USER remains steady, the DISK indication is the normal final GOP-progress code rather than an error sub-code, which the launch-free schema-seven capture confirms: exactly 791,528 transport bytes are accepted, twenty-five reference plus forty-seven B pictures decode, and all seventy-two pictures display with seventy-one swaps. The snapshot freezes for quiet reason one with sequence end, session quiet, presentation complete, zero decoder or presentation errors and zero cadence outliers at a measured 25.026 displayed swaps per second. Ranked telemetry observes the repeated scratch, pending-frame, reorder, queued-generation, promotion and presentation-hold states, while the terminal snapshot has no frame waiting, active reorder, queued generation, promotion, pending frame or terminal boundary. The exact even-length 1,404,944-byte `12_bbb_squirrel_5sec_native24_q6.m2v`, SHA-256 `dea6b42228158ec4fe43a3cacde71876a21b1fdf3ec9eb37c0c23bf72be2cc84`, was retrieved from the MiSTer byte-exact; its 120 pictures comprise five I, thirty-six P and seventy-nine B pictures.
+
+#### Next Steps:
+
+Power-cycle the MiSTer and load `12_bbb_squirrel_5sec_native24_q6.m2v` through the normal file selector, watch the complete five-second dense-motion clip for continuity, then report all three LEDs and leave the completed image loaded for telemetry capture. Require forty-one reference plus seventy-nine B pictures, all 120 displays, 119 swaps, exactly 1,404,944 accepted transport bytes, sequence-end quiet, complete presentation retirement and zero errors before proceeding to the fifteen-second stress in test thirteen.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 383 COMMIT Unreleased 2b1a170 2026-08-23T20:29:33-07:00
 
 #### Coming From:
@@ -1176,34 +1204,6 @@ The final audit passes at synchronized local, tracking, and GitHub commit `7e2e8
 #### Next Steps:
 
 Have the user create annotated tag `v0.6.0` at the exact post-audit metadata commit reported with this entry, push that tag, and publish the GitHub pre-release titled `MiSTer Media Player v0.6.0` using `docs/RELEASE_NOTES_v0.6.0.md`, attaching only the verified `MediaPlayer_20260822.rbf` binary. Make no repository commit between this audit and tag creation.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 344 COMMIT Unreleased ae51759 2026-08-22T09:04:12-07:00
-
-#### Coming From:
-
-Unreleased ae51759
-
-#### Purpose:
-
-Package and independently verify the qualified v0.6.0 RBF as the fourth step of the approved release plan.
-
-#### Outcome:
-
-The external directory `/run/media/vash/GIT/MiSTer-Media-Player-v0.6.0-release-20260822` now contains `MediaPlayer_20260822.rbf`, `SHA256SUMS`, and local human-readable `RELEASE_INFO.txt` metadata. The date-coded RBF is exactly 4,455,376 bytes, passes its checksum file at SHA-256 `e95e9ec43cb11917d5a904fdd8016bcc23dcbe2d8f36f678544f42ad1a6d5f10`, and is byte-for-byte identical to both the current clean `output_files/MediaPlayer.rbf` and the preserved accepted incremental image. The metadata identifies the required `v0.6.0` annotated tag, `MiSTer Media Player v0.6.0` pre-release title, synthesized baseline `b64ec6a`, and the sole binary asset that must be uploaded. The package remains outside the Git worktree and no generated artifact was committed.
-
-#### Next Steps:
-
-Proceed to step five by auditing the complete online release documentation, protected README section, repository synchronization, absence of a `v0.6.0` tag or release, and packaged asset one final time, then identify the exact commit the user should tag in step six. No rebuild is necessary because packaging preserved the already built and hardware-accepted binary exactly.
 
 #### Files Modified:
 
