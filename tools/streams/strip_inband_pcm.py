@@ -28,13 +28,47 @@ GROUP_START_CODE = PREFIX + b"\xb8"
 RECORD_SIZE = 9
 
 
-def split_records(transport: bytes,
-                  per_gop: bool = False) -> tuple[bytes, bytes, int, int]:
+def next_video_byte(transport: bytes, position: int) -> bytes | None:
+    """The next byte that is video rather than the start of a record."""
+    while position < len(transport):
+        code = transport[position:position + 4]
+        if code in (PTS_MARKER, PCM_MARKER):
+            position += RECORD_SIZE
+            continue
+        if code == PCM_END_MARKER:
+            position += 4
+            continue
+        return transport[position:position + 1]
+    return None
+
+
+def skip_one_video_byte(transport: bytes, position: int) -> int:
+    """Advance past the byte that next_video_byte() already emitted."""
+    while position < len(transport):
+        code = transport[position:position + 4]
+        if code in (PTS_MARKER, PCM_MARKER):
+            position += RECORD_SIZE
+            continue
+        if code == PCM_END_MARKER:
+            position += 4
+            continue
+        return position + 1
+    return position
+
+
+def split_records(transport: bytes, per_gop: bool = False,
+                  avoid_prefix: bool = False) -> tuple[bytes, bytes, int, int]:
     """Return (video with timestamps, video alone, timestamp count, PCM count).
 
     With *per_gop*, a timestamp is kept only when a group start code has been
     passed since the last one was kept, which varies record density without
     touching a single video byte.
+
+    With *avoid_prefix*, a timestamp that would land immediately after video
+    ending in a start-code prefix is moved one byte later, so the record's own
+    leading zero can no longer complete a start code the video does not
+    contain.  Record count and video bytes are both unchanged; only the
+    insertion point moves.
     """
     annotated = bytearray()
     plain = bytearray()
@@ -42,6 +76,7 @@ def split_records(transport: bytes,
     pcm = 0
     position = 0
     group_open = True
+    deferred = [False]
     while position < len(transport):
         marker = transport.find(PREFIX, position)
         if marker < 0:
@@ -55,10 +90,20 @@ def split_records(transport: bytes,
             group_open = True
         if code == PTS_MARKER and marker + RECORD_SIZE <= len(transport):
             if group_open or not per_gop:
-                annotated += transport[marker:marker + RECORD_SIZE]
+                record = transport[marker:marker + RECORD_SIZE]
+                if avoid_prefix and bytes(annotated[-3:]) == PREFIX:
+                    carried = next_video_byte(transport, marker + RECORD_SIZE)
+                    if carried is not None:
+                        annotated += carried
+                        plain += carried
+                        deferred[0] = True
+                annotated += record
                 timestamps += 1
                 group_open = False
             position = marker + RECORD_SIZE
+            if deferred[0]:
+                deferred[0] = False
+                position = skip_one_video_byte(transport, position)
         elif code == PCM_MARKER and marker + RECORD_SIZE <= len(transport):
             pcm += 1
             position = marker + RECORD_SIZE
@@ -83,6 +128,11 @@ def main() -> int:
         help="keep every timestamp record, or only the first of each group",
     )
     parser.add_argument(
+        "--avoid-start-code-prefix",
+        action="store_true",
+        help="move a record that would land after 00 00 01 one byte later",
+    )
+    parser.add_argument(
         "--expect-video-sha256",
         default=None,
         help="hash the stream must reduce to once timestamps are removed too",
@@ -99,7 +149,8 @@ def main() -> int:
         raise SystemExit(f"helper failed ({completed.returncode})")
 
     annotated, plain, timestamps, pcm = split_records(
-        completed.stdout, per_gop=args.timestamps == "gop"
+        completed.stdout, per_gop=args.timestamps == "gop",
+        avoid_prefix=args.avoid_start_code_prefix,
     )
     if not pcm:
         raise SystemExit("transport carries no PCM to remove")
