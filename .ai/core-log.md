@@ -1,4 +1,4 @@
-## 407 COMMIT Unreleased ??? 2026-08-24T00:12:57-07:00
+## 407 COMMIT Unreleased 8fc80ee 2026-08-24T00:12:57-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Resolve MediaPlayer menu selections to Main's established absolute storage path 
 
 #### Outcome:
 
-The approved change will remain confined to the isolated Main patch. `mediaplayer_start` will continue rejecting unsupported extensions, then copy the path returned by Main's existing `getFullPath` resolver into the helper's `file:` source specification before the resolver's shared buffer can change. This corrects the demonstrated relative-path failure without hardcoding the SD-card mount, changing the helper protocol, altering transfer behavior or adding DVD work, and preserves the same resolution behavior Main already uses for SD, USB and network-backed menu selections.
+Commit `8fc80ee` confines the correction to the isolated Main patch. `mediaplayer_start` continues rejecting unsupported extensions, then immediately copies the path returned by Main's existing `getFullPath` resolver into the helper's `file:` source specification before the resolver's shared buffer can change. This corrects the demonstrated relative-path failure without hardcoding the SD-card mount, changing the helper protocol, altering transfer behavior or adding DVD work, and preserves the same resolution behavior Main already uses for SD, USB and network-backed menu selections. The patch applies cleanly to pinned official Main commit `0a8fb44`. Two clean builds with the verified official Arm GNU 10.2-2020.11 compiler produce byte-identical 1,166,244-byte ARM EABI5 executables at SHA-256 `16517a9927c659616796b45c8e2488da2a26f0595c91418ed09dc0eb7a5787aa`.
 
 #### Next Steps:
 
-Apply the patch cleanly to the pinned official Main source, compile twice with the verified official Arm GNU 10.2-2020.11 toolchain and require byte-identical artifacts, then install only the resulting Main through staged hash verification while preserving rollback. Keep the accepted RBF, helper, `01_arm_mp2_audio.mpg` and disconnected DVD untouched; after reboot, run only that Program Stream and require normal video, the embedded left and right tones, clean completion and normal LEDs before any further source cycle.
+Install only the exact Main at SHA-256 `16517a9927c659616796b45c8e2488da2a26f0595c91418ed09dc0eb7a5787aa` through staged upload and independent remote verification while preserving the current diagnostic Main for rollback. Keep the accepted RBF, helper, `01_arm_mp2_audio.mpg` and disconnected DVD untouched; after reboot, run only that Program Stream and require normal video, the embedded left and right tones, clean completion and normal LEDs before any further source cycle.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Apply the patch cleanly to the pinned official Main source, compile twice with t
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
