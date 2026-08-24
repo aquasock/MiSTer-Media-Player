@@ -160,6 +160,22 @@ module tb_h262_b_presentation_scheduler;
     initial begin
         repeat(4)@(posedge clk);@(negedge clk);reset<=0;
 
+        // With no B-reordering run, ordinary I and P paths are already
+        // presentation-complete. The first B header must revoke that state
+        // until the existing scratch/future retirement path restores it.
+        pulse_i_close();
+        if(!complete||error)
+            $fatal(1,"all-I path did not remain presentation complete");
+        pulse_p_close();
+        if(!complete||error)
+            $fatal(1,"P-only path did not remain presentation complete");
+        pulse_start();
+        if(complete||error)
+            $fatal(1,"B header did not clear presentation completion");
+        reset_scheduler();
+        if(!complete||error)
+            $fatal(1,"reset did not restore non-B presentation completion");
+
         // Header before publication: P47 is still both the displayed and
         // registered reference.  Do not reject B48; wait for I50 publication.
         reference_bank<=0;completed_bank<=1;

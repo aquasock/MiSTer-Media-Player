@@ -36,6 +36,8 @@ module mpeg2_h262_b_presentation_scheduler
     // they drive no scheduler logic and change no ownership rule.
     output wire scratch_available,
     output wire promotion_active,
+    // Completion is high while no B-reordering run is active. A B header
+    // clears it until that run's scratch pictures and future reference retire.
     output reg  presentation_complete,
     output reg  presentation_error,
     // Entry 311: passive state export for the development cadence snapshot.
@@ -232,7 +234,7 @@ always @(posedge clk) begin
         decode_generation_queued<=0;promotion_pending<=0;
         last_bound_reference_valid<=0;last_bound_reference_bank<=0;
         last_bound_reference_count<=0;
-        run_picture_count<=0;presentation_complete<=0;presentation_error<=0;
+        run_picture_count<=0;presentation_complete<=1;presentation_error<=0;
         cadence_credit<=CADENCE_DUE_24FPS;cadence_rate_code_q<=0;
     end else begin
         b_user_success_d<=b_user_success;
