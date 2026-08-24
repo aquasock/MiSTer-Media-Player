@@ -1,3 +1,39 @@
+## 435 COMMIT Unreleased ??? 2026-08-24T05:26:02-07:00
+
+#### Coming From:
+
+Unreleased 9afe2f0
+
+#### Purpose:
+
+Eliminate deterministic PCM starvation and require clean terminal framing for user-converted Program Streams.
+
+#### Outcome:
+
+The user approved the revised correction boundary after the first 48 kHz control produced two repeatable crackles and no terminal LED diagnostic. The implementation will make both the H.262 sequence-end code and MPEG Program Stream end code mandatory compatibility conditions, add deterministic finalization to the generated qualification media, and widen the asynchronous PCM FIFO from 4,096 to 8,192 stereo samples for 170.7 milliseconds of reserve at 48 kHz while retaining the established 2,048-sample startup threshold. Focused verification will prove the widened dual-clock FIFO, unchanged startup behavior, underrun behavior and clean termination before the full host regression. This boundary does not authorize an ARM scheduler redesign, any MiSTer Main change or more than one Quartus candidate; the installed helper is expected to remain byte-identical.
+
+#### Next Steps:
+
+Implement and validate terminal Program Stream finalization and strict compatibility checking, widen the PCM FIFO and its accounting paths, then run focused simulation and the full native and sanitized host suites. Commit the source only after those checks pass, perform one Quartus build with full timing review, and install the exact RBF and corrected qualification media with byte-verified rollback. Hardware qualification resumes with only the corrected `00_good_480p_48k.mpg`; do not continue to `01` or any expected-failure case until that control is clean and publishes normal terminal diagnostics.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- rtl/audio/audio_pcm_fifo.sv
+- rtl/audio/audio_pcm_output_adapter.sv
+- tools/streams/tb_audio_pcm_output_adapter.sv
+- tools/streams/verify_d2_pcm_path.py
+- tools/streams/check_media_compatibility.py
+- tools/streams/finalize_program_stream.py
+- tools/streams/generate_compatibility_corpus.sh
+- tools/streams/generate_test_big_buck_bunny.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 434 COMMIT Unreleased 9afe2f0 2026-08-24T05:24:13-07:00
 
 #### Coming From:
@@ -1151,39 +1187,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-## 395 COMMIT Unreleased a57079f 2026-08-23T22:02:41-07:00
-
-#### Coming From:
-
-Unreleased 9a7a982
-
-#### Purpose:
-
-Integrate the first codec-independent signed PCM output milestone without changing the accepted video or timestamp paths.
-
-#### Outcome:
-
-Commit `a57079f` adds a deterministic signed 16-bit PCM valid-ready source, mono and stereo modes at 44.1 and 48 kHz, a 256-sample dual-clock FIFO, and a MiSTer output adapter clocked by the existing 24.576 MHz audio domain. The OSD exposes four proof-tone modes while Off is silent. Atomic mode-change tokens cross from the HPS control clock to the source and output clocks through dedicated asynchronous mailboxes, while the data FIFO alone receives a synchronized asynchronous clear and all ordinary Audio state resets locally; the restart duration is extended beyond the FIFO-clear window and video file-session reset remains independent. This reuses the companion Audio repository's hardware-proven PCM modules and its later timing-closed control-transfer structure, adapted onto accepted source `9a7a982` without changing the audio-derived presentation clock, H.262 decoder, Program Stream ingress, framebuffer or diagnostics. The deterministic verifier passes all four pinned 8,192-sample hashes under continuous, periodic, bursty and pseudorandom-like readiness, exact reset re-arm, exact 48 kHz division and the bounded 557-or-558-clock 44.1 kHz schedule; both synthesizable arithmetic modules are warning-free under focused Verilator lint. This boundary establishes only a codec-independent PCM sink and proof source and makes no compressed-audio standards claim. Per the user's updated validation policy, each development build uses exactly one focused video file, while the full regression set is reserved for release qualification.
-
-#### Next Steps:
-
-Build source `a57079f` once with Quartus and run the complete Phase-1P timing review, requiring nonnegative global, decoder, host, video, hold, recovery, removal and pulse-width results with zero endpoint TNS. If the build is clean, install and retrieve the exact RBF, then hardware-test Off plus all four proof-tone modes, mode changes and reset while using only `04_b_bidirectional.m2v` as the single video non-regression file for this build cycle.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- files.qip
-- rtl/audio/audio_pcm_fifo.sv
-- rtl/audio/audio_pcm_output_adapter.sv
-- rtl/audio/audio_pcm_test_source.sv
-- tools/streams/verify_d2_pcm_path.py
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
