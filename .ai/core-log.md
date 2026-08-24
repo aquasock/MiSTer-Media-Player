@@ -1,3 +1,35 @@
+## 425 COMMIT Unreleased 4220cdc 2026-08-24T03:45:41-07:00
+
+#### Coming From:
+
+Unreleased d9022e6
+
+#### Purpose:
+
+Record the hardware failure of the audio start gate, its root cause, and the rollback and revert that restore the accepted state.
+
+#### Outcome:
+
+Running `02_arm_mp2_faded_tones.mpg` on `d9022e6` hung the machine: the user reported a black screen with a short code in the corner and no playback. A screenshot command written to `/dev/MiSTer_cmd` over FTP was accepted but produced no file while ordinary FTP directory listing still worked, so MiSTer Main was wedged rather than Linux, and no schema-eight telemetry could be taken. Static tracing identifies a deadlock that the approved approach makes unavoidable in the current architecture, and the error is in the premise rather than in the implementation. The gate assumed audio and video are independently gated, but they share one back-pressured byte path. `MediaPlayer_top_00.svh` assigns `audio_pcm_ready` from `!audio_pcm_fifo_full` and forwards it to `mpeg2_new_inband_pcm_ready`, while `mpeg2_h262_inband_metadata.sv` includes `(!pcm_payload_final || pcm_ready)` in its `input_ready` term, so the in-band extractor stops accepting bytes from the HPS stream whenever the PCM sink is full. Holding the PCM output therefore fills the FIFO, deasserts `pcm_ready`, stalls the shared byte path, starves the video elementary stream, prevents any picture from decoding or presenting, and so prevents `video_started` from ever asserting, which holds the PCM output. The five-second bound does eventually release audio, but only after the decoder has been byte-starved for five seconds, by which point the core and Main are wedged. `tb_audio_pcm_output_adapter` could not have caught this because it drives the FIFO directly with no in-band extractor and no shared stream in the loop, so the adapter is correct in isolation and wrong in place. The MiSTer was rolled back over FTP: the failed image is retained as `/media/fat/MediaPlayer.failed.d9022e6.rbf`, and `/media/fat/MediaPlayer.rbf` verifies once more at SHA-256 `2f47c3e61b0892667fbf92e731f6cb2464267243aa5a9b726000f66fde5a2e68`, the accepted `047f5b2`. Commit `4220cdc` reverts both `946e81f` and `d9022e6` so that master's functional RTL is byte-identical to `047f5b2` again, retaining only the correction to the stale comment in `MediaPlayer_top_00.svh` that wrongly described presentation as free-running.
+
+#### Next Steps:
+
+The approved audio-delay approach cannot be implemented on the FPGA side without a buffer large enough to absorb the offset, because any hold on the PCM sink stalls video through the shared path; at 48 kHz stereo the measured 1.372-second offset is roughly 2.3 megabits in the current 35-bit sample format against about 2.28 megabits of free block memory, so it does not fit. Two viable directions remain and the user must choose before any further change. The first is to move the delay into the ARM helper, which has ample Linux memory and controls the byte stream directly, withholding PCM records for a lead while continuing to emit video bytes so the shared path never stalls. The second, and the cheaper and more standard of the two, is to remove the offset at its source: `mpeg2_h262_pts_presentation_timeline` anchors `stc_90k` to the first in-band metadata timestamp, so a picture whose own timestamp sits ahead of that anchor waits the difference, and anchoring instead to the first picture candidate would present the first picture immediately while preserving every subsequent interval, at a cost of roughly a mux and a condition rather than the logic and timing the user declined to spend. Take no further hardware action until that choice is made; the MiSTer needs a power cycle to load the restored `047f5b2`.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_05.svh
+- rtl/audio/audio_pcm_output_adapter.sv
+- tools/streams/tb_audio_pcm_output_adapter.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 424 COMMIT Unreleased d9022e6 2026-08-24T03:38:48-07:00
 
 #### Coming From:
@@ -1144,34 +1176,6 @@ After a MiSTer power cycle, the authoritative even-length 2,603,570-byte `13_bbb
 #### Next Steps:
 
 Power-cycle the MiSTer and load `14_bbb_full_native24_user_recipe.m2v` through the normal file selector for the complete nine-minute-fifty-six-second endurance run. Watch smooth pans, the squirrel sequence, rolling credits and clean terminal behavior, then report all three LEDs and leave the completed image loaded for telemetry capture. Require 4,773 reference plus 9,542 B pictures, 14,315 displays and 14,314 swaps represented by eight-bit wraps to 165 references, 70 B pictures, 235 displays and 234 swaps, exactly 78,010,162 accepted bytes, sequence-end quiet, complete presentation retirement and zero errors before the expected-failure and no-reboot recovery test.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 385 COMMIT Unreleased 2b1a170 2026-08-23T20:36:08-07:00
-
-#### Coming From:
-
-Unreleased 2b1a170
-
-#### Purpose:
-
-Hardware-qualify five seconds of visually observed dense real-video motion with complete native-24 presentation telemetry on the accepted queue-capacity fix.
-
-#### Outcome:
-
-After a MiSTer power cycle, the authoritative even-length 1,404,944-byte `12_bbb_squirrel_5sec_native24_q6.m2v` passes with USER steady on, DISK eleven blinks and POWER steady on, and the user reports that playback looked good. The steady USER state classifies the DISK indication as the normal final GOP-progress code, which the launch-free schema-seven capture confirms: exactly 1,404,944 transport bytes are accepted, forty-one reference plus seventy-nine B pictures decode, and all 120 pictures display with 119 swaps. The snapshot freezes for quiet reason one with frame-rate code two, five system-time seconds, sequence end, session quiet, presentation complete, zero decoder or presentation errors and zero cadence outliers at a measured 23.902 displayed swaps per second. The terminal scheduler has no frame waiting, active reorder, queued generation, promotion, pending frame or terminal boundary. The exact even-length 2,603,570-byte `13_bbb_squirrel_15sec_native24_q6.m2v`, SHA-256 `9257ffadc24eb6696fc9760f3253764b396c993dfc3640e921c97611bad2edce`, was retrieved from the MiSTer byte-exact; its 360 pictures comprise fifteen I, 106 P and 239 B pictures.
-
-#### Next Steps:
-
-Power-cycle the MiSTer and load `13_bbb_squirrel_15sec_native24_q6.m2v` through the normal file selector, watch the complete fifteen-second squirrel and wooden-spike sequence for continuous motion without clean frame skips, then report all three LEDs and leave the completed image loaded for telemetry capture. Require 121 reference plus 239 B pictures, 360 displays and 359 swaps represented by the established eight-bit counter wraps to 104 and 103, exactly 2,603,570 accepted transport bytes, sequence-end quiet, complete presentation retirement and zero errors before deciding how to stage the full endurance test fourteen.
 
 #### Files Modified:
 
