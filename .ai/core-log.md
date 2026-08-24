@@ -1,3 +1,31 @@
+## 418 COMMIT Unreleased d70591c 2026-08-24T02:17:00-07:00
+
+#### Coming From:
+
+Unreleased d70591c
+
+#### Purpose:
+
+Install the timing-clean PCM-prefill RBF while preserving all non-FPGA artifacts and exact rollback state.
+
+#### Outcome:
+
+Before installation the reachable MiSTer matched the accepted state exactly: Main SHA-256 `16517a9927c659616796b45c8e2488da2a26f0595c91418ed09dc0eb7a5787aa`, RBF `414f7fae21e628e978ff331f701f0c1435f4742ef27d3928e3ad168cbbda9498`, helper `12f6305f35ef56d4e8de2369ecd41d2811bda9d787c885991a5ed0272cd2678a`, short audio fixture `94a8ff0223dd1acba4d59fc1785741522c4361956f17848bf9ebbb8c0a503fe7` and faded fixture `cb4f143d2d72af72bb03c7a7fbc4e2163ad780a35483bdb871ec661cf29ccc24`; both staging and rollback names were absent. The new RBF was uploaded under its commit-specific temporary name, independently verified, atomically installed and synchronized. `/media/fat/MediaPlayer.rbf` now verifies at SHA-256 `b48d06e1b0f42e3465f48a1d89b10d0eb032edddcb4e02f8aab84c14854a75df`, and its displaced predecessor is preserved byte-identically as `/media/fat/MediaPlayer.backup.pre-pcm-prefill.d70591c.rbf`. Main, helper and both fixtures remain unchanged, no playback was launched, and the currently loaded core remains the prior in-memory RBF until reboot.
+
+#### Next Steps:
+
+Reboot the MiSTer once, enter MediaPlayer with Audio Test Off and run only `02_arm_mp2_faded_tones.mpg`. Require the same clean lower left and higher right tones with smooth fades, the same correct video, USER steady on, DISK steady off, POWER steady on and no visible regression; then leave the completed image loaded for schema-eight capture before any replay or other file. The snapshot should retain zero PCM protocol, underrun and aggregate errors while freezing for quiet reason one with session quiet true after the audio tail, rather than the prior forced reason two while audio was still active.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 417 COMMIT Unreleased d70591c 2026-08-24T01:30:00-07:00
 
 #### Coming From:
@@ -1143,36 +1171,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 378 COMMIT Unreleased 2b1a170 2026-08-23T19:55:34-07:00
-
-#### Coming From:
-
-Unreleased 292981f
-
-#### Purpose:
-
-Prevent rapid ordinary I/P publications from overwriting an undisplayed queued reference before its cadence slot.
-
-#### Outcome:
-
-The exact authoritative `06_p_f_code_range.m2v` exposed the same deterministic hardware failure after two isolated reboots: 184,678 accepted transport bytes, five reference pictures, zero decoder errors, sequence-end quiet and presentation complete, but only four displayed pictures and three swaps. Commit `2b1a170` prevents ordinary pending-slot overwrite by holding input after a released non-B reference differs from the current display; the initial same-bank reference remains exempt to avoid startup deadlock and the established B-reorder hold remains unchanged. The focused scheduler regression passes rapid three-bank publication and retirement at all five supported cadence rates. Full-pipeline replay of test six at the hardware-equivalent 994,752-cycle display interval now completes five publications, five displayed identities and four swaps with 184,677 file bytes and zero errors; the established ordinary-P, B-containing and repeated-multi-slice controls also pass, and the schema-seven cadence-profiler checksum remains `eb2b643d`. The seed-eleven Quartus 17.0.2 build completed in 11 minutes 50 seconds with zero errors and 154 warnings, using 34,673 ALMs, 51,930 registers, 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks. Every timing category is positive with zero endpoint TNS: plus 0.293 ns HDMI setup, plus 0.713 ns host setup, plus 1.005 ns decoder setup, plus 8.399 ns video setup, plus 0.261 ns hold, plus 3.533 ns recovery, plus 0.605 ns removal and plus 1.122 ns pulse width. The 4,173,788-byte RBF has SHA-256 `b19010473eb8f414b85b9ae11d0b3f29abc26dae560c115a1da29754cd23f491`; it was installed persistently on the MiSTer and retrieved byte-for-byte identical through the automatic non-interactive connection.
-
-#### Next Steps:
-
-Power-cycle the MiSTer and run `06_p_f_code_range.m2v` twice, rebooting between runs and leaving each completed video loaded for telemetry capture. Require USER steady on, DISK steady off and POWER steady on together with a quiet schema-seven snapshot containing 184,678 accepted transport bytes including the odd-byte pad, five reference pictures, five displayed identities, four swaps, sequence end, session quiet, presentation complete and zero error flags. Do not proceed to test seven until both isolated runs pass.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/streams/run_live_raster_soak_verilator.sh
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
