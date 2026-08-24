@@ -514,6 +514,17 @@ audio_pcm_fifo audio_pcm_fifo
 	.rd_used  (audio_pcm_fifo_read_used)
 );
 
+// Entry 423: hold the PCM start until video actually presents, so audio does
+// not lead video by the first picture's PTS offset on a Program Stream.
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [1:0] mpeg2_new_video_started_sync;
+always @(posedge CLK_AUDIO) begin
+	if (reset_audio_out) mpeg2_new_video_started_sync <= 2'b00;
+	else                 mpeg2_new_video_started_sync <=
+		{mpeg2_new_video_started_sync[0], mpeg2_new_video_presenting};
+end
+wire mpeg2_new_video_started_audio = mpeg2_new_video_started_sync[1];
+
 audio_pcm_output_adapter audio_pcm_output_adapter
 (
 	.clk        (CLK_AUDIO),
@@ -522,6 +533,7 @@ audio_pcm_output_adapter audio_pcm_output_adapter
 	.fifo_empty (audio_pcm_fifo_empty),
 	.fifo_used  (audio_pcm_fifo_read_used),
 	.source_ended(audio_pcm_source_ended_sync[1]),
+	.video_started(mpeg2_new_video_started_audio),
 	.fifo_rd    (audio_pcm_fifo_rd),
 	.audio_l    (audio_pcm_output_l),
 	.audio_r    (audio_pcm_output_r),
@@ -708,8 +720,10 @@ wire        cadence_snapshot_ready;
 // The 90 kHz System Time Clock of H.222.0 is anchored to CLK_AUDIO (24.576
 // MHz), the same domain sys/audio_out.sv clocks samples out on, so externally
 // decoded audio will be consumed drift-free by construction once the PCM sink
-// exists.  Nothing consumes the clock yet: presentation remains free-running
-// and this cycle only proves the clock runs at the right rate on hardware.
+// exists.  Entry 423 correction: this is no longer true.  Since the PTS
+// timeline was wired in at MediaPlayer_top_05.svh, presentation is not
+// free-running -- mpeg2_h262_pts_presentation_timeline drives the scheduler's
+// timestamp admission gate, so timestamped pictures wait for this clock.
 //
 // Only a single bit crosses domains.  A multi-bit counter synchronised into
 // clk_mpeg2 could tear across a carry, and a 33-bit gray decode would be a

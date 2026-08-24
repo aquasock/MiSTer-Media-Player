@@ -68,6 +68,9 @@ wire        mpeg2_new_candidate_pts_valid;
 wire        mpeg2_new_timestamp_candidate_active;
 wire        mpeg2_new_timestamp_candidate_due;
 wire        mpeg2_new_pts_timeline_anchored;
+// Entry 423: sticky once the presentation side has displayed its first
+// picture.  Crosses into CLK_AUDIO as a single bit to gate the PCM start.
+wire        mpeg2_new_video_presenting;
 wire [32:0] mpeg2_new_pts_timeline_stc;
 wire        mpeg2_new_repeat_first_field;
 wire [3:0]  mpeg2_new_forward_f_code_horizontal;
