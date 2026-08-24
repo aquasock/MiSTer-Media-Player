@@ -1,3 +1,34 @@
+## 378 COMMIT Unreleased ??? 2026-08-23T19:55:34-07:00
+
+#### Coming From:
+
+Unreleased 292981f
+
+#### Purpose:
+
+Prevent rapid ordinary I/P publications from overwriting an undisplayed queued reference before its cadence slot.
+
+#### Outcome:
+
+The exact authoritative `06_p_f_code_range.m2v` passed its LED diagnostic twice after isolated reboots but produced the same schema-seven failure both times: all 184,678 transport bytes were accepted with five reference pictures, zero decoder errors, sequence-end quiet and presentation complete, while only four pictures and three swaps reached display instead of five and four. The nearly identical cadence gaps prove deterministic behavior rather than stale device state. Full-pipeline Verilator replay passes with the bench's accelerated ten-thousand-cycle display windows but fails its complete-presentation invariant under queue pressure, independently confirming that the scheduler's single ordinary pending slot can be overwritten when lightweight P pictures publish faster than cadence consumes them. The approved change will extend presentation backpressure after a non-B header releases an ordinary pending frame whose identity differs from the current display, retain the same-bank initial-reference and B-reorder behavior, add a rapid three-bank ordinary-publication proof, and make the reusable full-pipeline runner able to exercise the real MiSTer display-window interval without tripping its diagnostic-only freeze threshold.
+
+#### Next Steps:
+
+Implement the ordinary queue-capacity hold and its focused regression, then require the exact test-six stream to complete five publications, five presentations and four swaps under hardware-equivalent cadence in full-pipeline simulation. Re-run the established ordinary P, B and multi-slice regressions, build seed eleven with positive timing in every category, install and retrieve the exact RBF, and repeat test six twice on reboot-isolated hardware before continuing to test seven.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/run_live_raster_soak_verilator.sh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 377 COMMIT Unreleased 292981f 2026-08-23T19:32:29-07:00
 
 #### Coming From:
@@ -1182,33 +1213,5 @@ No build or hardware validation is required because this commit changes only Mar
 
 - [ ] Built
 - [ ] Passed
-
----
-## 338 COMMIT Unreleased b64ec6a 2026-08-22T08:15:10-07:00
-
-#### Coming From:
-
-Unreleased b64ec6a
-
-#### Purpose:
-
-Qualify the timing-clean seed-ten release candidate with a preserved incremental state, an independent clean build and the four-file essential hardware regression suite.
-
-#### Outcome:
-
-The complete accepted incremental build state was moved intact to `/run/media/vash/GIT/mmp_seed10_incremental.iRW65u`, including `db`, `incremental_db`, `output_files` and `phase1p_timing_reports`, and its RBF retained SHA-256 `e95e9ec43cb11917d5a904fdd8016bcc23dcbe2d8f36f678544f42ad1a6d5f10`. Quartus then rebuilt the identical seed-ten source completely from scratch in 12 minutes 36 seconds with zero errors. The clean result is byte-for-byte identical to the preserved incremental RBF and reproduces every implementation figure exactly: plus 0.303 ns global setup, plus 0.386 ns decoder setup, plus 8.066 ns video setup, plus 0.244 ns hold, plus 3.706 ns recovery, plus 0.768 ns removal and plus 1.122 ns pulse width, with 34,565 ALMs, 50,960 registers, 4,306,375 memory bits, 538 RAM blocks and 65 DSP blocks. The clean artifact then passes all four essential hardware regressions. The P-skip/motion case accepts all 180,948 bytes and completes both pictures; B-prediction accepts all 185,054 bytes and completes all five pictures; multi-slice completes all five pictures with zero errors while correctly accepting one transport pad byte for its odd 185,393-byte length; and the 15-second squirrel clip accepts all 2,603,570 bytes, completes 121 reference plus 239 B pictures, reaches sequence-end quiet at a corrected 23.991197 fps and reports zero errors and zero cadence outliers. Its eight-bit display and swap counters wrap from 360 and 359 to 104 and 103 as established. One initial screenshot was read before its PNG write completed, but a delayed retry passed and exposed no core failure.
-
-#### Next Steps:
-
-Use the current clean RBF or the preserved incremental RBF interchangeably for release because they are the exact same binary, and retain the preserved build directory until the release is tagged and packaged. Treat the four essential hardware regressions, the native-23.976 telemetry gate and the full Emperor visual run as the v0.6.0 decoder baseline. A later tooling cleanup may teach the generic cadence runner about 16-bit odd-byte padding, eight-bit counter wrap and partially written screenshots, but those automation limits do not block the core release.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
