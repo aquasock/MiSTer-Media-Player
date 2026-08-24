@@ -1,3 +1,31 @@
+## 407 COMMIT Unreleased ??? 2026-08-24T00:12:57-07:00
+
+#### Coming From:
+
+Unreleased b357c51
+
+#### Purpose:
+
+Resolve MediaPlayer menu selections to Main's established absolute storage path before starting the ARM helper.
+
+#### Outcome:
+
+The approved change will remain confined to the isolated Main patch. `mediaplayer_start` will continue rejecting unsupported extensions, then copy the path returned by Main's existing `getFullPath` resolver into the helper's `file:` source specification before the resolver's shared buffer can change. This corrects the demonstrated relative-path failure without hardcoding the SD-card mount, changing the helper protocol, altering transfer behavior or adding DVD work, and preserves the same resolution behavior Main already uses for SD, USB and network-backed menu selections.
+
+#### Next Steps:
+
+Apply the patch cleanly to the pinned official Main source, compile twice with the verified official Arm GNU 10.2-2020.11 toolchain and require byte-identical artifacts, then install only the resulting Main through staged hash verification while preserving rollback. Keep the accepted RBF, helper, `01_arm_mp2_audio.mpg` and disconnected DVD untouched; after reboot, run only that Program Stream and require normal video, the embedded left and right tones, clean completion and normal LEDs before any further source cycle.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 406 COMMIT Unreleased b357c51 2026-08-24T00:11:44-07:00
 
 #### Coming From:
@@ -1137,34 +1165,6 @@ Commit `ed3310b` built clean and delivered what it was for, moving HDMI setup fr
 #### Next Steps:
 
 Resume 0.7.0 with the HDMI boundary no longer the constraint that breaks each addition. Bring up `EXT_BUS`, unconnected at `MediaPlayer_top_00.svh`, together with the throwaway HPS-side harness that exercises it, and define the picture metadata wire protocol carrying the 33-bit timestamp with reserved `picture_structure`, `top_field_first`, `repeat_first_field` and `progressive_frame` fields, keeping protocol and harness in one cycle because a protocol with nothing to talk to cannot be tested. Presentation on timestamp against the proven clock follows, anchoring from the first timestamp and retaining free-running cadence for streams without them, then the PCM sink with its elastic FIFO, fill level and underrun telemetry and explicit seek flush. Watch the weakest margin after each addition rather than the decoder alone, since the lesson of this run is that the binding path moves. Before release qualification, complete the regression pack still unexercised, in particular long GOP, dense residual, mixed macroblocks, multi-slice, full endurance and the truncation case with its no-reboot recovery, and delete the six compiled but uninstantiated modules for navigability with no timing expectation attached.
-
-#### Files Modified:
-
-- sys/ascal.vhd
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 367 COMMIT Unreleased ed3310b 2026-08-23T13:17:21-07:00
-
-#### Coming From:
-
-Unreleased cea1d62
-
-#### Purpose:
-
-Remove the vertical-total comparison from the ASCAL sweep's cycle-critical wrap path so the HDMI boundary has margin the next change can survive.
-
-#### Outcome:
-
-Hardware validation of `cea1d62` passed every stream the user observed, which clears three things at once: the presentation time base introduced by `7c29f33` runs correctly on real hardware, the polyphase select duplication of `cea1d62` is proven in the video path rather than merely closing timing, and the schema five snapshot decodes with its new fields intact, having reported fifteen seconds for a fifteen second stream. A picture-count discrepancy raised by `run_hardware_cadence.py`, which reported one hundred four displayed pictures against an expected three hundred sixty, was investigated and is a harness artifact rather than a defect: the archived and independently validated seed ten image `c9bc2ef8` produces the identical complaint, so the expected count passed to that tool does not match what its MGL launch path actually plays. That image also decoded as schema four against the new build's schema five, confirming the decoder script handles both. The remaining concern was margin rather than correctness, because HDMI closed at only plus 0.054 ns against roughly 0.4 ns of measured seed variance on that path, meaning the next addition would break it. Querying the fit rather than guessing showed all five worst HDMI paths are the same one and are not the kind just fixed: `o_vcpt_pre3` bit zero to bit five, four logic levels and 6.352 ns, which is arithmetic depth inside a counter rather than distance between placements. The vertical sweep wrapped by evaluating `o_vcpt_pre3+1>=o_vtotal` inside the line-boundary branch, placing an increment, a twelve-bit comparison and a three-way mux on a single path. This commit precomputes that predicate into a register in the same process, exactly the technique commit 182 used for `o_vcpt_pre2_at_vmin` a few lines above, leaving only the increment and the mux in the critical cycle. Registering it is safe because `o_vcpt_pre3` advances once per line, hundreds of clocks apart, so the registered predicate always reflects the current count when the boundary arrives; only a mode change could make it lag by one clock, where output is transient regardless. Synthesis is clean at zero errors and an unchanged one hundred thirty-five warnings for exactly one additional register.
-
-#### Next Steps:
-
-Build at seed eleven and require every timing category positive with HDMI setup materially above the plus 0.054 ns it held, since the purpose of this change is margin rather than closure, and record whether the worst HDMI path relocates again. Confirm on MiSTer that every raw elementary-stream regression still passes, because this touches the vertical sweep that generates output timing and a defect would appear as wrong geometry or lost sync rather than as a decoder error. If HDMI margin is then comfortable, resume 0.7.0 by bringing up `EXT_BUS` together with the throwaway HPS-side harness that exercises it, defining the picture metadata wire protocol with the timestamp and the reserved `picture_structure`, `top_field_first`, `repeat_first_field` and `progressive_frame` fields, then presentation on timestamp against the proven clock, then the PCM sink. Before release qualification, complete the regression pack still unexercised, in particular long GOP, dense residual, full endurance and the truncation case with its no-reboot recovery.
 
 #### Files Modified:
 
