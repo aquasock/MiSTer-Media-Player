@@ -17,6 +17,7 @@ module tb_h262_live_raster_soak #(
     parameter integer MIXED_PIXEL_MODE=0,
     parameter integer MEMORY_READ_LATENCY=1,
     parameter integer SWAP_WINDOW_CYCLES=10000,
+    parameter integer FREEZE_TRACE_CYCLES=2000000,
     parameter integer STALL_TRACE_CYCLES=0,
     parameter integer POST_INPUT_TRACE_CYCLES=0,
     parameter integer MAX_SIM_CYCLES=300000000
@@ -1886,7 +1887,8 @@ module tb_h262_live_raster_soak #(
                     mot_presented,mot_captured,mot_dropped,
                     prediction.b_select,prediction.mixed_select,
                     prediction.mixed_probe.capture_enable);
-            if(freeze_cycles==2000000)begin
+            if((FREEZE_TRACE_CYCLES!=0)&&
+               (freeze_cycles==FREEZE_TRACE_CYCLES))begin
                 $display("FREEZE byte=%0d cycles=%0d", stream_index, total_cycles);
                 $display("FREEZE_PROD state=%0d piccap=%0d cand=%0d proof=%0d waiting=%0d hold=%0d outstanding=%0d finalq=%0d blocked=%0d rearm=%0d err=%0d/%0d",
                     publication.p_controller.wide_general_probe.parser_state,

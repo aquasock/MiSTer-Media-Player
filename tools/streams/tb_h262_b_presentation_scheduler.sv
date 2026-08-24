@@ -176,6 +176,53 @@ module tb_h262_b_presentation_scheduler;
         if(!complete||error)
             $fatal(1,"reset did not restore non-B presentation completion");
 
+        // A fast ordinary P chain must not replace the scheduler's single
+        // pending identity before cadence presents it.  The first reference is
+        // already visible in reset bank zero, but each later bank must hold the
+        // next picture immediately after its classifying P header.
+        completed_bank<=0;
+        @(negedge clk);frame_waiting<=1;
+        @(negedge clk);frame_waiting<=0;#1;
+        pulse_p_close();
+        if(hold||!dut.pending_frame_valid||
+           (dut.pending_frame_bank!==2'd0))
+            $fatal(1,"already-visible initial reference incorrectly held");
+
+        completed_bank<=1;
+        @(negedge clk);frame_waiting<=1;
+        @(negedge clk);frame_waiting<=0;#1;
+        pulse_p_close();
+        if(!hold||!dut.pending_frame_valid||
+           (dut.pending_frame_bank!==2'd1))
+            $fatal(1,"ordinary bank one did not reserve pending capacity");
+        pulse_swap();
+        if(hold||dut.pending_frame_valid||(display_bank!==2'd1))
+            $fatal(1,"ordinary bank one did not retire through cadence");
+
+        completed_bank<=2;
+        @(negedge clk);frame_waiting<=1;
+        @(negedge clk);frame_waiting<=0;#1;
+        pulse_p_close();
+        if(!hold||!dut.pending_frame_valid||
+           (dut.pending_frame_bank!==2'd2))
+            $fatal(1,"ordinary bank two did not reserve pending capacity");
+        pulse_swap();
+        if(hold||dut.pending_frame_valid||(display_bank!==2'd2))
+            $fatal(1,"ordinary bank two did not retire through cadence");
+
+        completed_bank<=0;
+        @(negedge clk);frame_waiting<=1;
+        @(negedge clk);frame_waiting<=0;#1;
+        @(negedge clk);sequence_end<=1;
+        @(negedge clk);sequence_end<=0;#1;
+        if(!hold||!dut.pending_frame_valid||
+           (dut.pending_frame_bank!==2'd0))
+            $fatal(1,"terminal ordinary bank did not reserve pending capacity");
+        pulse_swap();
+        if(hold||dut.pending_frame_valid||(display_bank!==2'd0)||error)
+            $fatal(1,"terminal ordinary bank did not retire through cadence");
+        reset_scheduler();
+
         // Header before publication: P47 is still both the displayed and
         // registered reference.  Do not reject B48; wait for I50 publication.
         reference_bank<=0;completed_bank<=1;

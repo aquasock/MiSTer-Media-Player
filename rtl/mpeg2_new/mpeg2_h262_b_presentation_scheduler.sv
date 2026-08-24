@@ -205,11 +205,20 @@ assign debug_state = {
     run_closed,
     reorder_active
 };
-assign presentation_hold=reorder_active&&run_closed&&
-                         !presentation_complete&&!presentation_error&&
-                         (deferred_queued_b_start||
-                          (!overlap_decode_open&&!queued_decode_inflight&&
-                           (promotion_pending||!queued_header_capacity)));
+// A released ordinary reference occupies the scheduler's sole pending slot.
+// Stop after its classifying header until cadence consumes it, otherwise a
+// lightweight following P can publish and overwrite that undisplayed bank.
+// The initial reference is already visible in the reset display bank and does
+// not need a synthetic bank change before decode may continue.
+wire ordinary_reference_waiting=!reorder_active&&pending_frame_valid&&
+    pending_frame_released&&
+    (display_scratch||(pending_frame_bank!=display_frame_bank));
+assign presentation_hold=ordinary_reference_waiting||
+                         (reorder_active&&run_closed&&
+                          !presentation_complete&&!presentation_error&&
+                          (deferred_queued_b_start||
+                           (!overlap_decode_open&&!queued_decode_inflight&&
+                            (promotion_pending||!queued_header_capacity))));
 
 always @(posedge clk) begin
     if(reset) begin
