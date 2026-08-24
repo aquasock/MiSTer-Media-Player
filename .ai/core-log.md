@@ -1,3 +1,33 @@
+## 431 COMMIT Unreleased 1102830 2026-08-24T04:50:33-07:00
+
+#### Coming From:
+
+Unreleased 3f4b272
+
+#### Purpose:
+
+Accept 44.1 kHz audio and add a host-side input envelope checker with a deterministic corpus, as the first step toward user-converted playback.
+
+#### Outcome:
+
+The v0.7.0 goal is that users convert their own media with FFmpeg and test it, so the likely failure is an unsupported input rather than a decoder defect. Commit `1102830` addresses the two host-side halves of that. Adding 44.1 kHz proved to be a host-only change: `mpeg2_h262_inband_metadata` already extracts the rate bit from the record's mode byte, the top level already routes it, and `audio_pcm_output_adapter` already selects its phase step between `RATE_48000` and `RATE_44100`, so the entire FPGA path supported 44.1 kHz and only the helper rejected it. The helper now accepts 44,100 as well as 48,000 Hz and sets the mode bit from the decoded rate rather than hardcoding 48 kHz stereo, drains the pending queue before adopting a changed rate so held samples cannot be mislabelled, and reports the supported set when it refuses. Verification on a generated 44.1 kHz Program Stream shows 132,480 records all carrying mode byte one, while the accepted 48 kHz fixture still emits 144,000 records carrying mode byte three and its emitted stream is byte-identical to the previous build, so no 48 kHz behaviour changed. No FPGA rebuild is required. `check_media_compatibility.py` reports, before a file reaches hardware, whether it lies inside the implementation envelope, naming the FFmpeg option that fixes each problem: geometry against 720 by 480 and 45 by 30 macroblocks, frame-rate codes against the paced set one through five with codes six through eight named as unpaced, the progressive 4:2:0 frontend conditions delegated to the existing `analyze_h262_compatibility` so there is one video parser, and audio codec, sample rate and channel count. `generate_compatibility_corpus.sh` builds nine deterministic cases and asserts each verdict, and all nine agree: three good cases pass and six bad ones fail. Building that corpus immediately found a defect in the checker rather than in the core. Its Program Stream demultiplexer implemented only the MPEG-1 PES header form, so on the MPEG-2 PES packets FFmpeg actually emits it mis-stripped every packet and reported a valid video-only file as failing on picture 45. A checker that rejects good files is worse than none, since it sends users chasing a defect that does not exist. The demultiplexer now mirrors `parse_pes_header` in the helper exactly, and its output is byte-identical to FFmpeg's own demux of the same file. That defect also affected the analysis recorded in entry 428, which is corrected here: the fixture's video elementary stream is 185,149 bytes and its first picture spans 179,859 of them, not the 183,120 and 177,830 recorded there. The conclusion is unchanged at 97.1 percent, and the corrected total now matches the decoder's own reported `accepted_bytes` of 185,149 exactly, which the earlier figure did not.
+
+#### Next Steps:
+
+The 44.1 kHz helper cannot reach hardware yet. The user has directed that the official MiSTer ARM GNU 10.2 compiler be used from now on, and only the distribution's `arm-linux-gnueabihf-gcc` is present on the workstation, so no ARM binary was built or installed this cycle and the installed helper remains `3f4b272` at SHA-256 `c6ce4ef0595beee5f1f231edeaebe360160becccad22e3e51d9f8d23b9c690b0`. Obtain that toolchain before the next helper installation. The remaining v0.7.0 work is the hardware half of the failure sweep and the long-duration audio-video soak. For the sweep, place the corpus's six bad cases on the MiSTer and require each to fail visibly and recoverably rather than wedging the core, which is the specific risk entry 425 demonstrated is real. For the soak, the acceptance target is full Big Buck Bunny playback with audio, which needs a source carrying audio; `generate_test_big_buck_bunny.py` expects `big_buck_bunny_480p_stereo.avi` beside it and does not fetch it, so the user must supply that file, and the generator must then be extended to mux MPEG Layer II audio into a Program Stream rather than emitting a silent elementary stream. That soak is the first test of audio-video drift beyond three seconds and of the startup lead on content whose first picture is small.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- tools/streams/check_media_compatibility.py
+- tools/streams/generate_compatibility_corpus.sh
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 430 COMMIT Unreleased 3f4b272 2026-08-24T04:34:03-07:00
 
 #### Coming From:
@@ -1142,34 +1172,6 @@ After a reboot, `16A_pts_reordered_b_short.m2v` passes with USER steady on, DISK
 #### Next Steps:
 
 Reboot and run unannotated `06_p_f_code_range.m2v`, report all three LEDs and leave the final image loaded for capture, then repeat after another reboot with unannotated `04_b_bidirectional.m2v`. Require both files to preserve their accepted free-running fallback cadence and terminal state without in-band timestamp records; if both pass, mark source `9a7a982` hardware-passed and begin the PCM feature cycle.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 391 COMMIT Unreleased 9a7a982 2026-08-23T21:47:50-07:00
-
-#### Coming From:
-
-Unreleased 9a7a982
-
-#### Purpose:
-
-Hardware-qualify complete irregular timestamp presentation on the corrected ordinary I/P control.
-
-#### Outcome:
-
-After a reboot, `15A_pts_irregular_ordinary_short.m2v` passes with USER steady on, DISK steady off and POWER steady on. The launch-free schema-seven snapshot accepts the exact 184,677 decoder bytes after stripping five metadata records, associates all five timestamps, decodes and displays all five reference pictures with four swaps, and ends for quiet reason one with sequence end, session quiet and presentation complete true. Decoder and presentation error flags are zero, frame waiting and both holds are false, the pending scheduler slot is empty and no reorder, queued or promotion state remains. Displayed PTS low bits are the final record's expected `0x4fc`. The irregular schedule is proven by a 0.198950-second final interval and two 0.049738-second intervals rather than uniform 25-fps fallback cadence. This closes the ordinary timestamp gate on source `9a7a982` and the exact Entry-389 RBF without a source change.
-
-#### Next Steps:
-
-Reboot the MiSTer and run `16A_pts_reordered_b_short.m2v`, then report all three LEDs and leave the final image loaded for capture. Require all five coded-order timestamps to associate with their physical reference or scratch banks, three reference plus two B pictures to display in I, B, P, B, P order with four swaps and irregular timing, and sequence-end quiet with complete scheduler retirement and zero errors before proceeding to unannotated fallback controls.
 
 #### Files Modified:
 
