@@ -1,3 +1,31 @@
+## 388 COMMIT Unreleased 2b1a170 2026-08-23T21:06:21-07:00
+
+#### Coming From:
+
+Unreleased 2b1a170
+
+#### Purpose:
+
+Qualify deliberate mid-picture truncation and immediate no-reboot baseline recovery, completing the full hardware regression pack for the queue-capacity fix.
+
+#### Outcome:
+
+After a MiSTer power cycle, the exact 100,000-byte `99_EXPECTED_FAILURE_truncated_stream.m2v` stops visibly on frame seven with USER, DISK and POWER all steady off rather than claiming normal completion. Its launch-free schema-seven snapshot accepts all 100,000 bytes, decodes four reference plus five B pictures, displays eight pictures with seven swaps and freezes for reason three, `fatal_or_no_progress`, with sequence end false, session quiet false, presentation complete false, an unfinished future reference and decode still in flight. Decoder and presentation error flags remain zero, correctly distinguishing deliberate source truncation from a syntax fault. Without rebooting, the user immediately loads the exact odd-length `01_i_baseline.m2v`; it passes with USER steady on, DISK two blinks and POWER steady on. The recovery snapshot accepts 726,704 transport bytes including the expected pad, decodes and displays all four references with three swaps, freezes for quiet reason one and reports sequence end, session quiet, presentation complete, zero errors, no frame waiting and no reorder, queued, promotion, pending-frame or terminal-boundary state. The three long all-I gaps are decode-throughput observations only and no picture is lost. This proves that the truncated transfer leaves no stale state across a normal selector reload and completes the regression pack: tests one through fourteen, the expected failure and its no-reboot recovery all meet their specified hardware, visual and telemetry gates on source `2b1a170` and RBF SHA-256 `b19010473eb8f414b85b9ae11d0b3f29abc26dae560c115a1da29754cd23f491`.
+
+#### Next Steps:
+
+Treat source `2b1a170` and its installed RBF as the accepted complete-regression boundary for ordinary and B-picture presentation. Prepare the next source-change proposal for timestamp-driven presentation against the proven system-time clock while retaining free-running cadence for unannotated streams, with focused association, wrap, missing-timestamp, seek-reset, B-reorder and full-pipeline controls; obtain user approval before changing source, and keep the PCM sink as the following feature boundary.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 387 COMMIT Unreleased 2b1a170 2026-08-23T21:00:19-07:00
 
 #### Coming From:
@@ -1175,34 +1203,6 @@ Install only the exact seed-nine RBF identified above on the connected MiSTer, v
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-## 348 COMMIT Unreleased fca45b3 2026-08-22T17:55:50-07:00
-
-#### Coming From:
-
-Unreleased 208d48e
-
-#### Purpose:
-
-Select fitter seed eight for the unchanged Stage 1 residual-store design and seek a timing-clean hardware-validation artifact.
-
-#### Outcome:
-
-Commit `fca45b3` changes only the Quartus fitter seed from ten to eight and leaves the RTL and tests unchanged. A fully clean Quartus 17.0.2 compile from empty build directories completes in 12 minutes 31 seconds with zero errors and 155 warnings, infers the shared array exactly at 65,536 by 16 bits and both descriptor tables at 1,024 entries, and preserves the Stage 1 resource target at 3,228,103 block-memory bits and 408 RAM blocks. The fit uses 34,780 ALMs, 51,821 registers and 65 DSP blocks. Decoder setup is plus 0.338 ns, video setup plus 7.515 ns and HPS setup plus 1.980 ns; hold is plus 0.249 ns, recovery plus 3.832 ns, removal plus 0.573 ns and pulse width plus 1.122 ns. The untouched HDMI PLL clock nevertheless misses setup by 0.127 ns with 1.429 ns total negative slack, so seed eight fails the all-positive gate. The 4,213,508-byte RBF has SHA-256 `71ce52da8c677f6ccc2087f1bbe4a6fd52cad4e155305443ec2b792c4d346026`; it was not uploaded and the connected MiSTer remains on its previously accepted build.
-
-#### Next Steps:
-
-Stop this attempt as agreed and do not hardware-test or distribute the seed-eight artifact. Preserve the reports as evidence that the reduced 408-block topology is stable across seeds ten and eight, while the framework HDMI path remains placement-sensitive. Before another build, obtain approval for a new commit boundary choosing either the next clean fitter-seed candidate or a targeted HDMI timing-closure change; keep the decoder RTL and already-passing functional regressions unchanged.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
