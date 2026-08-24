@@ -1,3 +1,32 @@
+## 413 COMMIT Unreleased ??? 2026-08-24T01:08:05-07:00
+
+#### Coming From:
+
+Unreleased 8bbd55c
+
+#### Purpose:
+
+Create one longer faded embedded-audio fixture that isolates sustained PCM quality on the accepted hardware without changing Main, the helper or FPGA source.
+
+#### Outcome:
+
+The approved tooling-only cycle will retain the exact accepted five-picture video elementary stream and mux it with a three-second 48 kHz stereo MPEG Layer II track containing 250 milliseconds of silence, a 250-millisecond fade-in, two seconds of sustained 440 Hz left and 660 Hz right tones, a 250-millisecond fade-out and 250 milliseconds of trailing silence. The final video frame will remain displayed while audio continues, avoiding new video-decoder coverage. The existing generator will gain an explicit faded-quality profile while preserving the original short fixture byte-for-byte, and the verifier will accept the selected profile while continuing to require byte-identical video, strong independent FFmpeg PCM correlation, exact in-band sample framing and one clean end token. This cycle will generate and deploy only `02_arm_mp2_faded_tones.mpg`; the installed `8bbd55c` RBF, helper, Main and original test file will remain unchanged.
+
+#### Next Steps:
+
+Regenerate both profiles twice and require deterministic hashes, confirm the original short fixture and references remain byte-identical, verify the faded fixture through the native helper and inspect its decoded channel spectrum and fade envelope, then upload only the new Program Stream through staged hash verification. On hardware, reboot once and run only `02_arm_mp2_faded_tones.mpg`, listening for clean silence, gradual onset, sustained separated tones and gradual release while requiring normal video and LEDs; leave the final image loaded for schema-eight capture.
+
+#### Files Modified:
+
+- tools/streams/generate_arm_av_test.py
+- tools/streams/verify_arm_av_pipeline.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 412 COMMIT Unreleased 8bbd55c 2026-08-24T01:06:03-07:00
 
 #### Coming From:
@@ -1142,34 +1171,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 373 COMMIT Unreleased dea60bc 2026-08-23T18:08:10-07:00
-
-#### Coming From:
-
-Unreleased 3ae9885
-
-#### Purpose:
-
-Restore the decoder's pulse-valid ingress contract across the in-band metadata extractor after hardware bisection identifies repeated-byte parsing during a P-picture ownership hold.
-
-#### Outcome:
-
-The user reports USER one blink, DISK fifteen blinks and POWER steady on for plain `04_b_bidirectional` on the installed `27ad1b3` image. The LED hierarchy identifies the first failure as frontend syntax error source fifteen, while POWER zero is the expected absence of a nested source for a syntax error. Because `27ad1b3` differs from the earlier accepted image at the compressed-data boundary only by `mpeg2_h262_inband_metadata`, this completes the bisection. Static tracing finds the specific contract mismatch: the extractor retained `stream_valid` as a level while `mpeg2_new_stream_ready` was false, but the established frontend and parser advance on every cycle of `stream_valid`, so the ownership hold replayed one byte into syntax parsing. A focused regression using the real transport convention in which input valid is derived from readiness reproduces six accepted bytes as eight visible byte cycles on the pre-fix RTL. Commit `dea60bc` retains the pending byte internally while presenting output valid only on the actual decoder transfer; the regression then reports exactly six visible cycles. The extractor unit test, timestamp association test, transport-gate test and schema-seven cadence-profiler test all pass, and a 550,316-byte elementary-stream replay with five inserted records emits the source byte-identically with all five timestamps extracted. The seed-eleven Quartus 17.0.2 build completes in 12 minutes 46 seconds with zero errors, 154 warnings and every timing category positive: plus 0.372 ns HDMI setup, plus 0.840 ns decoder setup, plus 0.928 ns host setup, plus 8.766 ns video setup, plus 0.251 ns hold, plus 4.400 ns recovery, plus 0.493 ns removal and plus 1.122 ns pulse width. It uses 34,968 ALMs, 51,912 registers, 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks; the 4,209,348-byte RBF has SHA-256 `6d86641ca5c9460c9025961ccff0403438f7034949f3046b8ee2c0592fde9afc`.
-
-#### Next Steps:
-
-Install only the exact RBF identified above. Hardware validation must begin with plain `04_b_bidirectional`, requiring USER steady on rather than the syntax error now measured, and must then exercise the unannotated control and annotated timestamp stream. Add explicit USER, POWER and DISK readings to the repository regression instructions as a subsequent tooling and documentation boundary so plausible still images can no longer count as a pass without LED evidence.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
-- tools/streams/tb_h262_inband_metadata.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
