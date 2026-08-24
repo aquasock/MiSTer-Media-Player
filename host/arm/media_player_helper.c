@@ -20,6 +20,7 @@
 #define PCM_MAX_FREE_VIDEO_BYTES    4096u
 #define PCM_REFILL_FRAMES           128u
 #define PCM_SINK_FIFO_FRAMES        8192u
+#define PCM_STARTUP_VIDEO_BYTES     28672u
 #define VIDEO_SLICE_BYTES           256u
 
 /*
@@ -40,6 +41,20 @@
  * horizon is served whether or not video is queued, so a low-bitrate scene
  * cannot throttle audio.  The reserve plus one batch stays below the sink FIFO
  * so that a batch never has to wait for room.
+ */
+/*
+ * Entry 455: the second picture start proves the first picture is complete,
+ * but on real content it arrives after only a few thousand bytes, so the
+ * compressed FIFO in `rtl/mpeg2_stream_fifo.sv` settles near a sixth full and
+ * the shared path then runs at real time with no reservoir for a picture whose
+ * decode overruns its frame interval.  Paired captures of the same 577
+ * pictures measured the cost: presentation hold, the time the display spends
+ * waiting because decode is ahead, falls from 13.03 seconds without audio to
+ * 0.13 seconds with it, and 174 display gaps cross the outlier threshold.  The
+ * lead therefore ends on the second picture and a byte budget that leaves the
+ * decoder most of that FIFO to work from.  A payload smaller than the budget
+ * still ends its lead on the second picture, because the budget is only
+ * reached once the whole first picture has crossed.
  */
 /*
  * The lead is normally ended when the second picture start proves that the
@@ -377,19 +392,33 @@ static void free_video_head(struct output_state *output)
     free(chunk);
 }
 
+/* The startup lead ends only when both its bounds are satisfied. */
+static int startup_lead_complete(const struct output_state *output)
+{
+    return output->picture_marks >= 2 &&
+           output->video_bytes >= PCM_STARTUP_VIDEO_BYTES;
+}
+
 static size_t startup_video_size(const struct output_state *output,
                                  const struct video_chunk *chunk)
 {
+    size_t remaining = chunk->size - chunk->offset;
     uint32_t window = output->video_window;
     unsigned pictures = output->picture_marks;
+    uint64_t budget;
     size_t i;
 
-    for (i = chunk->offset; i < chunk->size; ++i) {
-        window = (window << 8) | chunk->data[i];
-        if ((window & 0xffffffffu) == 0x00000100u && ++pictures >= 2)
-            return i + 1u - chunk->offset;
+    if (pictures < 2) {
+        for (i = chunk->offset; i < chunk->size; ++i) {
+            window = (window << 8) | chunk->data[i];
+            if ((window & 0xffffffffu) == 0x00000100u && ++pictures >= 2)
+                return i + 1u - chunk->offset;
+        }
+        return remaining;
     }
-    return chunk->size - chunk->offset;
+    budget = output->video_bytes < PCM_STARTUP_VIDEO_BYTES ?
+             PCM_STARTUP_VIDEO_BYTES - output->video_bytes : 0;
+    return (uint64_t)remaining < budget ? remaining : (size_t)budget;
 }
 
 /*
@@ -420,7 +449,7 @@ static int scheduler_drain(struct output_state *output, int at_eof)
         if (output->hold_active) {
             size_t startup_size;
 
-            if (output->picture_marks >= 2)
+            if (startup_lead_complete(output))
                 break;
             startup_size = startup_video_size(output, chunk);
             if (write_video_immediate(output, chunk->data + chunk->offset,
@@ -436,7 +465,7 @@ static int scheduler_drain(struct output_state *output, int at_eof)
             }
             if (chunk->offset == chunk->size)
                 free_video_head(output);
-            if (output->picture_marks >= 2 && hold_available(output)) {
+            if (startup_lead_complete(output) && hold_available(output)) {
                 output->hold_active = 0;
                 output->scheduler_started = 1;
                 if (hold_emit_frames(output, PCM_INITIAL_RELEASE_FRAMES) < 0)
@@ -526,7 +555,7 @@ static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
         if (hold_push(output, source, samples_per_channel) < 0)
             return -1;
         if (output->hold_active &&
-            (output->picture_marks >= 2 ||
+            (startup_lead_complete(output) ||
              hold_available(output) >= output->hold_limit)) {
             output->hold_active = 0;
             output->scheduler_started = 1;
