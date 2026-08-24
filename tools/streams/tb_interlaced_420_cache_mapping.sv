@@ -1,0 +1,89 @@
+`timescale 1ns/1ps
+
+module altsyncram #(
+    parameter operation_mode="",width_a=1,widthad_a=1,numwords_a=1,
+    width_b=1,widthad_b=1,numwords_b=1,outdata_reg_b="",address_reg_b="",
+    read_during_write_mode_mixed_ports="",ram_block_type="",
+    intended_device_family=""
+)(input clock0,input clock1,input [widthad_a-1:0] address_a,
+  input [width_a-1:0] data_a,input wren_a,
+  input [widthad_b-1:0] address_b,output [width_b-1:0] q_b,
+  input aclr0,input aclr1,input addressstall_a,input addressstall_b,
+  input byteena_a,input byteena_b,input [width_b-1:0] data_b,input wren_b,
+  output [width_a-1:0] q_a);
+assign q_b={width_b{1'b0}};
+assign q_a={width_a{1'b0}};
+endmodule
+
+module tb_interlaced_420_cache_mapping;
+reg clk=0;
+reg [11:0] h_pos=0,v_pos=0;
+wire [7:0] burst;wire [28:0] addr;wire rd;
+wire ready,seen,error;wire [7:0] r,g,b;wire de,hs,vs;
+integer i;
+
+always #5 clk=~clk;
+
+mpeg2_luma_framebuffer dut(
+ .reset(1'b1),.mem_clk(clk),.picture_complete(1'b0),
+ .horizontal_size(14'd720),.vertical_size(14'd480),
+ .native_interlaced(1'b1),.top_field_first(1'b1),
+ .ddram_busy(1'b0),.ddram_dout(64'd0),.ddram_dout_ready(1'b0),
+ .ddram_burstcnt(burst),.ddram_addr(addr),.ddram_rd(rd),
+ .cache_ready(ready),.read_seen(seen),.cache_error(error),
+ .rd_clk(clk),.h_pos(h_pos),.v_pos(v_pos),.pixel_ce(1'b1),
+ .pixel_en(1'b0),.h_sync(1'b1),.v_sync(1'b1),
+ .video_r(r),.video_g(g),.video_b(b),.video_de(de),.video_hs(hs),.video_vs(vs));
+
+task check_luma(input first_field,input integer seq,input integer expected);
+begin
+ if(dut.interlaced_luma_row(seq[8:0],first_field)!==expected[10:0])
+   $fatal(1,"luma first=%0d seq=%0d got=%0d expected=%0d",first_field,seq,
+          dut.interlaced_luma_row(seq[8:0],first_field),expected);
+end endtask
+
+task check_chroma(input first_field,input integer pair,input integer expected);
+begin
+ if(dut.interlaced_chroma_row(pair[7:0],first_field)!==expected[10:0])
+   $fatal(1,"chroma first=%0d pair=%0d got=%0d expected=%0d",first_field,pair,
+          dut.interlaced_chroma_row(pair[7:0],first_field),expected);
+end endtask
+
+initial begin
+ for(i=0;i<240;i=i+1)begin
+   check_luma(0,i,2*i);
+   check_luma(0,i+240,2*i+1);
+   check_luma(1,i,2*i+1);
+   check_luma(1,i+240,2*i);
+ end
+ for(i=0;i<120;i=i+1)begin
+   check_chroma(0,i,2*i);
+   check_chroma(0,i+120,2*i+1);
+   check_chroma(1,i,2*i+1);
+   check_chroma(1,i+120,2*i);
+ end
+
+ force dut.native_interlaced_mem=1'b1;
+ force dut.first_field_mem=1'b0;
+ force dut.refill_event_line=11'd0;#1;
+ if(dut.y_refill_line!==11'd4||dut.y_refill_bank!==1'b0)
+   $fatal(1,"TFF Y refill after seq0 wrong");
+ force dut.refill_event_line=11'd1;#1;
+ if(dut.y_refill_line!==11'd6||dut.y_refill_bank!==1'b1||
+    dut.c_refill_line!==11'd4||dut.c_refill_bank!==1'b0)
+   $fatal(1,"TFF refill after seq1 wrong");
+ force dut.refill_event_line=11'd479;#1;
+ if(dut.y_refill_line!==11'd2||dut.y_refill_bank!==1'b1||
+    dut.c_refill_line!==11'd2||dut.c_refill_bank!==1'b1)
+   $fatal(1,"TFF frame-wrap refill wrong");
+
+ force dut.first_field_mem=1'b1;
+ force dut.refill_event_line=11'd479;#1;
+ if(dut.y_refill_line!==11'd3||dut.c_refill_line!==11'd3)
+   $fatal(1,"BFF frame-wrap refill wrong");
+
+ $display({"RESULT luma_sequences=960 chroma_sequences=480 ",
+           "tff_refill=PASS bff_refill=PASS PASS"});
+ $finish;
+end
+endmodule

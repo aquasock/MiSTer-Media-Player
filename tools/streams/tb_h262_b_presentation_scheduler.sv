@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 
 module tb_h262_b_presentation_scheduler;
-    reg clk=0,reset=1,swap=0,frame_waiting=0;reg[1:0] completed_bank=0,reference_bank=1;
+    reg clk=0,reset=1,swap=0,cadence_tick=0,frame_waiting=0;reg[1:0] completed_bank=0,reference_bank=1;
     reg b_start=0,non_b_start=0,i_start=0,p_start=0,sequence_end=0,b_success=0,b_error=0;
     reg [3:0] frame_rate_code=4'h3;
     reg timestamp_candidate_active=0,timestamp_candidate_due=0;
@@ -13,10 +13,12 @@ module tb_h262_b_presentation_scheduler;
     wire [1:0] candidate_frame_bank;
     wire cadence_slot_debug,candidate_presentable_debug;
     integer last_pulse_count=0;
+    reg native_test_mode=0;
 
     always #5 clk=~clk;
     mpeg2_h262_b_presentation_scheduler dut(
         .clk(clk),.reset(reset),.swap_window_pulse(swap),
+        .cadence_tick_pulse(cadence_tick),
         .frame_rate_code(frame_rate_code),
         .timestamp_candidate_active(timestamp_candidate_active),
         .timestamp_candidate_due(timestamp_candidate_due),
@@ -58,9 +60,11 @@ module tb_h262_b_presentation_scheduler;
             swap_window_index = swap_window_index+1;
             if(dut_presents) begin
                 if(last_present_index>=0) begin
-                    if(swap_window_index-last_present_index<min_present_gap)
+                    if(!native_test_mode&&
+                       (swap_window_index-last_present_index<min_present_gap))
                         min_present_gap = swap_window_index-last_present_index;
-                    if(swap_window_index-last_present_index<2)
+                    if(!native_test_mode&&
+                       (swap_window_index-last_present_index<2))
                         $fatal(1,"presentations on consecutive swap windows %0d and %0d",
                                last_present_index,swap_window_index);
                 end
@@ -92,14 +96,20 @@ module tb_h262_b_presentation_scheduler;
     endtask
     task automatic pulse_window;
         begin
-            @(negedge clk);swap<=1;#1;
+            @(negedge clk);swap<=1;cadence_tick<=1;#1;
             if(cadence_slot_debug!==dut.cadence_slot)
                 $fatal(1,"cadence telemetry changed source term");
             if(candidate_presentable_debug!==
                (dut.scheduled_frame_valid&&dut.scheduled_frame_differs))
                 $fatal(1,"candidate telemetry changed source term");
-            @(negedge clk);swap<=0;#1;
+            @(negedge clk);swap<=0;cadence_tick<=0;#1;
         end
+    endtask
+    task automatic pulse_field_tick;
+        begin @(negedge clk);cadence_tick<=1;@(negedge clk);cadence_tick<=0;#1;end
+    endtask
+    task automatic pulse_frame_window;
+        begin @(negedge clk);swap<=1;@(negedge clk);swap<=0;#1;end
     endtask
     task automatic pulse_swap;
         reg before_display_scratch;
@@ -122,7 +132,7 @@ module tb_h262_b_presentation_scheduler;
     endtask
     task automatic reset_scheduler;
         begin
-            @(negedge clk);reset<=1;swap<=0;frame_waiting<=0;b_start<=0;
+            @(negedge clk);reset<=1;swap<=0;cadence_tick<=0;frame_waiting<=0;b_start<=0;
             non_b_start<=0;i_start<=0;p_start<=0;sequence_end<=0;b_success<=0;b_error<=0;
             timestamp_candidate_active<=0;timestamp_candidate_due<=0;
             reference_count<=0;
@@ -287,8 +297,8 @@ module tb_h262_b_presentation_scheduler;
         // A reference publication on the swap edge must remain hidden until
         // the later B header classifies it and takes future-frame ownership.
         @(negedge clk);completed_bank<=1;reference_bank<=1;
-        frame_waiting<=1;swap<=1;
-        @(negedge clk);frame_waiting<=0;swap<=0;#1;
+        frame_waiting<=1;swap<=1;cadence_tick<=1;
+        @(negedge clk);frame_waiting<=0;swap<=0;cadence_tick<=0;#1;
         if(display_bank||display_scratch||error||!dut.pending_frame_valid||
            dut.pending_frame_released)
             $fatal(1,"publication/vblank race exposed future reference");
@@ -527,8 +537,8 @@ module tb_h262_b_presentation_scheduler;
         // With no B owner, the following non-B header releases the queued
         // reference for the next swap rather than the publication swap.
         completed_bank<=1;reference_bank<=1;
-        @(negedge clk);frame_waiting<=1;swap<=1;
-        @(negedge clk);frame_waiting<=0;swap<=0;#1;
+        @(negedge clk);frame_waiting<=1;swap<=1;cadence_tick<=1;
+        @(negedge clk);frame_waiting<=0;swap<=0;cadence_tick<=0;#1;
         if(display_bank||!dut.pending_frame_valid||dut.pending_frame_released)
             $fatal(1,"ordinary reference bypassed classification barrier");
         pulse_close();
@@ -543,8 +553,8 @@ module tb_h262_b_presentation_scheduler;
         // the final reference.  Retain that boundary and release on publish.
         @(negedge clk);sequence_end<=1;@(negedge clk);sequence_end<=0;#1;
         completed_bank<=0;reference_bank<=0;
-        @(negedge clk);frame_waiting<=1;swap<=1;
-        @(negedge clk);frame_waiting<=0;swap<=0;#1;
+        @(negedge clk);frame_waiting<=1;swap<=1;cadence_tick<=1;
+        @(negedge clk);frame_waiting<=0;swap<=0;cadence_tick<=0;#1;
         if(!display_bank||!dut.pending_frame_valid||!dut.pending_frame_released)
             $fatal(1,"terminal boundary did not release final reference");
         pulse_swap();
@@ -635,6 +645,36 @@ module tb_h262_b_presentation_scheduler;
         verify_cadence_rate(4'h3,603,250);
         verify_cadence_rate(4'h4,1206,599);
         verify_cadence_rate(4'h5,1206,600);
+
+        // Native 480i supplies cadence at 60000/1001 field rate but permits a
+        // physical frame-bank change only before the authored first field.
+        // Two field ticks must therefore make every 30000/1001 frame window
+        // due without allowing a mid-frame presentation.
+        frame_rate_code=4'h4;
+        native_test_mode=1;
+        reset_scheduler();
+        begin : native_field_cadence
+            integer native_frame;
+            reg [1:0] native_before;
+            for(native_frame=0;native_frame<10;native_frame=native_frame+1)begin
+                completed_bank=(display_bank==2'd0)?2'd1:2'd0;
+                @(negedge clk);frame_waiting<=1;
+                @(negedge clk);frame_waiting<=0;#1;
+                pulse_close();
+                native_before=display_bank;
+                pulse_field_tick();
+                if(display_bank!=native_before)
+                    $fatal(1,"native presentation changed at first field tick");
+                pulse_field_tick();
+                if(display_bank!=native_before)
+                    $fatal(1,"native presentation changed without frame window");
+                pulse_frame_window();
+                if(display_bank==native_before)
+                    $fatal(1,"native frame %0d was not due after two fields",native_frame);
+            end
+        end
+        native_test_mode=0;
+        $display("NATIVE_FIELD_CADENCE_PASS fields=20 frame_windows=10 presentations=10");
 
         // A later sequence may legally enter the fractional direct rate.
         // Re-seed only when its accumulator scale changes so credit from the

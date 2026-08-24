@@ -111,6 +111,7 @@ module tb_h262_dense_publication_order;
 
     mpeg2_h262_b_presentation_scheduler scheduler(
         .clk(clk),.reset(reset),.swap_window_pulse(swap_window_pulse),
+        .cadence_tick_pulse(swap_window_pulse),
         .frame_rate_code(4'h3),
         .timestamp_candidate_active(1'b0),
         .timestamp_candidate_due(1'b0),

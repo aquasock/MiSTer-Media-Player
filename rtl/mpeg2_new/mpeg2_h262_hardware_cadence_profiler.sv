@@ -15,7 +15,7 @@ module mpeg2_h262_hardware_cadence_profiler #(
     parameter [13:0] PROFILE_START_STC_SECONDS = 14'd0
 )(
     input wire clk_mpeg2,input wire reset_mpeg2,
-    input wire clk_video,input wire reset_video,
+    input wire clk_video,input wire reset_video,input wire pixel_ce,
     input wire fifo_pending,input wire decoder_ready,
     input wire presentation_hold,input wire destination_hold,
     input wire scratch_available,input wire promotion_active,
@@ -537,12 +537,12 @@ always @* begin
 end
 always @(posedge clk_video)begin
     if(reset_video)overlay_shift<=0;
-    else if(h_pos==0)begin
+    else if(pixel_ce&&h_pos==0)begin
         if(snapshot_ready&&(v_pos>=OVERLAY_Y)&&(v_pos<OVERLAY_Y+OVERLAY_HEIGHT))
             overlay_shift<={4'b1010,overlay_row_index,overlay_row_word,
                            ^overlay_row_word};
         else overlay_shift<=0;
-    end else if((h_pos>=OVERLAY_X)&&(h_pos<OVERLAY_X+OVERLAY_WIDTH)&&
+    end else if(pixel_ce&&(h_pos>=OVERLAY_X)&&(h_pos<OVERLAY_X+OVERLAY_WIDTH)&&
                 (h_pos[1:0]==2'b11))
         overlay_shift<={overlay_shift[41:0],1'b0};
 end

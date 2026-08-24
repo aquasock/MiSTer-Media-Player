@@ -14,6 +14,8 @@ module mpeg2_h262_picture_timestamp
 
     input  wire        metadata_valid,
     input  wire [32:0] metadata_pts,
+    input  wire        picture_coding_extension_valid,
+    input  wire        picture_top_field_first,
 
     // Classified picture-header event and its destination class.
     input  wire        picture_start,
@@ -38,6 +40,7 @@ module mpeg2_h262_picture_timestamp
 
     output wire [32:0] display_pts,
     output wire        display_pts_valid,
+    output wire        display_top_field_first,
     output wire [32:0] candidate_pts,
     output wire        candidate_pts_valid,
     output reg   [7:0] associated_count
@@ -51,11 +54,14 @@ reg        pending_valid;
 reg [32:0] current_pts;
 reg        current_valid;
 reg        current_is_b;
+reg        current_top_field_first;
 
 reg [32:0] frame_bank_pts [0:3];
 reg  [3:0] frame_bank_valid;
+reg  [3:0] frame_bank_top_field_first;
 reg [32:0] scratch_bank_pts [0:1];
 reg  [1:0] scratch_bank_valid;
+reg  [1:0] scratch_bank_top_field_first;
 
 reg [1:0] active_frame_bank_q;
 reg       b_picture_complete_q;
@@ -71,6 +77,9 @@ assign display_pts = display_scratch ?
 assign display_pts_valid = display_scratch ?
     scratch_bank_valid[display_scratch_bank] :
     frame_bank_valid[display_frame_bank];
+assign display_top_field_first = display_scratch ?
+    scratch_bank_top_field_first[display_scratch_bank] :
+    frame_bank_top_field_first[display_frame_bank];
 
 assign candidate_pts = candidate_frame_scratch ?
     scratch_bank_pts[candidate_scratch_bank] :
@@ -89,8 +98,11 @@ always @(posedge clk) begin
         current_pts          <= 33'd0;
         current_valid        <= 1'b0;
         current_is_b         <= 1'b0;
+        current_top_field_first <= 1'b1;
         frame_bank_valid     <= 4'd0;
+        frame_bank_top_field_first <= 4'hF;
         scratch_bank_valid   <= 2'd0;
+        scratch_bank_top_field_first <= 2'b11;
         active_frame_bank_q  <= 2'd0;
         b_picture_complete_q <= 1'b0;
         associated_count     <= 8'd0;
@@ -102,6 +114,9 @@ always @(posedge clk) begin
     else begin
         active_frame_bank_q  <= active_frame_bank;
         b_picture_complete_q <= b_picture_complete;
+
+        if (picture_coding_extension_valid)
+            current_top_field_first <= picture_top_field_first;
 
         // A same-cycle record belongs directly to this picture.  Otherwise
         // consume the one pending record, or explicitly mark the picture as
@@ -120,6 +135,8 @@ always @(posedge clk) begin
         if (reference_picture_committed) begin
             frame_bank_pts[active_frame_bank_q]   <= current_pts;
             frame_bank_valid[active_frame_bank_q] <= current_valid;
+            frame_bank_top_field_first[active_frame_bank_q] <=
+                current_top_field_first;
             if (current_valid && (associated_count != 8'hFF))
                 associated_count <= associated_count + 8'd1;
         end
@@ -130,6 +147,8 @@ always @(posedge clk) begin
             // physical destination (including queued-generation admission).
             scratch_bank_pts[decode_scratch_bank]   <= current_pts;
             scratch_bank_valid[decode_scratch_bank] <= current_valid;
+            scratch_bank_top_field_first[decode_scratch_bank] <=
+                current_top_field_first;
             if (current_valid && (associated_count != 8'hFF))
                 associated_count <= associated_count + 8'd1;
         end

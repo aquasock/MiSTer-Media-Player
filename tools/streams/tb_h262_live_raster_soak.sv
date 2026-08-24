@@ -391,6 +391,7 @@ module tb_h262_live_raster_soak #(
 
     mpeg2_h262_b_presentation_scheduler scheduler(
         .clk(clk),.reset(reset),.swap_window_pulse(swap_window_pulse),
+        .cadence_tick_pulse(swap_window_pulse),
         .frame_rate_code(4'h3),
         .timestamp_candidate_active(1'b0),
         .timestamp_candidate_due(1'b0),
@@ -1603,9 +1604,9 @@ module tb_h262_live_raster_soak #(
                profile_b_replay_coeff_writes!=262671||
                profile_b_replay_coeff_wait!=0||
                ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
-                (MEMORY_READ_LATENCY==1)&&(total_cycles!=6519996))||
+                (MEMORY_READ_LATENCY==1)&&(total_cycles!=6529997))||
                ((EXPECTED_DESCRIPTOR_DEPTH==4)&&
-                (MEMORY_READ_LATENCY==1)&&(total_cycles!=6519996))||
+                (MEMORY_READ_LATENCY==1)&&(total_cycles!=6529997))||
                !writer_seen||!pred_read_observed||!pred_reconstructed_observed||
                !presentation_complete||probe_error||pred_error||writer_error||
                presentation_error)

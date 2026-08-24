@@ -47,6 +47,8 @@ module mpeg2_h262_frontend
     output reg         sequence_scalable_extension_seen,
     output reg         picture_seen,
     output reg         picture_coding_extension_seen,
+    output wire        picture_coding_extension_valid,
+    output wire        picture_coding_extension_top_field_first,
     output reg         slice_seen,
     output reg         sequence_end_seen,
 
@@ -187,6 +189,17 @@ wire [31:0] byte_window_next = {byte_window[23:0], stream_data};
 wire        start_code_now   = (byte_window_next[31:8] == 24'h000001);
 wire [7:0]  start_code_value = byte_window_next[7:0];
 wire [63:0] payload_next     = {payload_shift[55:0], stream_data};
+
+// Exact per-picture field-order event for presentation ownership. The sticky
+// *_seen output remains a diagnostic; this pulse and its payload identify the
+// picture-coding-extension byte before registered parser state changes.
+assign picture_coding_extension_valid =
+    stream_valid &&
+    (active_start_code == EXTENSION_START_CODE) &&
+    active_extension_id_valid &&
+    (active_extension_id == EXT_PICTURE_CODING) &&
+    (payload_byte_index == 4);
+assign picture_coding_extension_top_field_first = payload_next[15];
 
 // kate - Phase 1T-b keeps the registered motion-vector control fields in the
 // active I-picture support gate so the existing hardware regression proves that

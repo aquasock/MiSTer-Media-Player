@@ -47,7 +47,7 @@ mpeg2_h262_hardware_cadence_profiler #(
     .PROFILE_START_STC_SECONDS(14'd5)
 ) dut(
     .clk_mpeg2(clk_mpeg2),.reset_mpeg2(reset_mpeg2),
-    .clk_video(clk_video),.reset_video(reset_video),
+    .clk_video(clk_video),.reset_video(reset_video),.pixel_ce(1'b1),
     .fifo_pending(fifo_pending),.decoder_ready(decoder_ready),
     .presentation_hold(presentation_hold),.destination_hold(destination_hold),
     .scratch_available(scratch_available),.promotion_active(promotion_active),

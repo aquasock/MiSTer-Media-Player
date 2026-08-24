@@ -1,5 +1,6 @@
 assign CLK_VIDEO = clk_video;
-assign CE_PIXEL  = 1'b1;
+assign CE_PIXEL  = display_pixel_ce;
+assign VGA_F1 = display_field;
 assign VGA_DE = fb_video_de;
 assign VGA_HS = fb_video_hs;
 assign VGA_VS = fb_video_vs;
@@ -49,6 +50,7 @@ mpeg2_h262_hardware_cadence_profiler
     .reset_mpeg2               (reset_mpeg2),
     .clk_video                 (clk_video),
     .reset_video               (reset_video),
+    .pixel_ce                  (display_pixel_ce),
     .fifo_pending              (!mpeg2_stream_empty),
     .decoder_ready             (mpeg2_new_decoder_stream_ready),
     .presentation_hold         (mpeg2_new_b_presentation_hold),

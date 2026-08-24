@@ -32,7 +32,6 @@ assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE,
         SDRAM_nRAS, SDRAM_nCS} = 'Z;
 
 assign VGA_SL = 0;
-assign VGA_F1 = 0;
 assign VGA_SCALER  = 0;
 assign VGA_DISABLE = 0;
 assign HDMI_FREEZE = 0;
@@ -77,6 +76,7 @@ localparam CONF_STR = {
 	"-;",
 	"-;",
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"O[120],Interlaced output,Native 480i,800x600 Diagnostic;",
 	"O[3:1],Audio test,Off,44.1k Mono,44.1k Stereo,48k Mono,48k Stereo;",
 	"-;",
 	"T[0],Reset;",
@@ -711,9 +711,14 @@ assign DDRAM_CLK = clk_mpeg2;
 // directly stalling either codec's internal parser for normal synchronization.
 wire [11:0] display_h_pos;
 wire [11:0] display_v_pos;
+wire        display_pixel_ce;
 wire        display_pixel_en;
 wire        display_h_sync;
 wire        display_v_sync;
+wire        display_field;
+wire        display_field_window;
+wire        display_frame_window;
+wire        display_native_interlaced;
 
 wire [7:0]  fb_video_r;
 wire [7:0]  fb_video_g;

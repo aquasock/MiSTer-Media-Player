@@ -31,6 +31,8 @@ module mpeg2_luma_framebuffer
     input  wire        picture_complete,
     input  wire [13:0] horizontal_size,
     input  wire [13:0] vertical_size,
+    input  wire        native_interlaced,
+    input  wire        top_field_first,
 
     input  wire        ddram_busy,
     input  wire [63:0] ddram_dout,
@@ -48,6 +50,7 @@ module mpeg2_luma_framebuffer
     input  wire        rd_clk,
     input  wire [11:0] h_pos,
     input  wire [11:0] v_pos,
+    input  wire        pixel_ce,
     input  wire        pixel_en,
     input  wire        h_sync,
     input  wire        v_sync,
@@ -106,6 +109,8 @@ reg        picture_started;
 reg [10:0] picture_height_mem;
 reg [10:0] chroma_height_mem;
 reg [11:0] picture_width_mem;
+reg        native_interlaced_mem;
+reg        first_field_mem;
 
 reg [1:0]  mem_state;
 reg [1:0]  fetch_kind;
@@ -115,6 +120,7 @@ reg [7:0]  fetch_word_offset;
 reg [7:0]  fetch_segment_words;
 reg [7:0]  recv_word_index;
 reg [28:0] fetch_address;
+reg        fetch_cache_bank;
 
 assign ddram_burstcnt = (mem_state == MEM_ISSUE) ? fetch_segment_words : 8'd0;
 assign ddram_addr     = (mem_state == MEM_ISSUE) ? fetch_address : 29'd0;
@@ -158,30 +164,96 @@ reg [63:0] cr_cache_wr_data;
 reg        cr_cache_wr_en;
 
 wire [7:0] y_fetch_cache_base =
-    fetch_line[0] ? 8'd90 : 8'd0;
+    fetch_cache_bank ? 8'd90 : 8'd0;
 wire [6:0] c_fetch_cache_base =
-    fetch_line[0] ? 7'd45 : 7'd0;
+    fetch_cache_bank ? 7'd45 : 7'd0;
 
-// A still picture is displayed repeatedly.  Refill targets therefore wrap at
-// the bottom of the decoded picture so the next video frame finds Y0/Y1 and
-// Cb/Cr0/1 back in their expected parity banks.
-wire [11:0] y_refill_raw =
+// Interlaced display sequence 0..479 is presentation order, not frame-raster
+// order. Sequence 0..239 belongs to the authored first field and 240..479 to
+// the other. The physical DDR frame remains ordinary frame order.
+function automatic [10:0] interlaced_luma_row;
+    input [8:0] sequence_line;
+    input       first_field;
+    reg [8:0] field_line;
+    reg       field_parity;
+    begin
+        if (sequence_line < 9'd240) begin
+            field_line = sequence_line;
+            field_parity = first_field;
+        end
+        else begin
+            field_line = sequence_line - 9'd240;
+            field_parity = ~first_field;
+        end
+        interlaced_luma_row = {1'b0, field_line, 1'b0} + field_parity;
+    end
+endfunction
+
+function automatic [10:0] interlaced_chroma_row;
+    input [7:0] sequence_pair;
+    input       first_field;
+    reg [6:0] field_pair;
+    reg       field_parity;
+    begin
+        if (sequence_pair < 8'd120) begin
+            field_pair = sequence_pair[6:0];
+            field_parity = first_field;
+        end
+        else begin
+            field_pair = sequence_pair[6:0] - 7'd120;
+            field_parity = ~first_field;
+        end
+        interlaced_chroma_row = {3'd0, field_pair, 1'b0} + field_parity;
+    end
+endfunction
+
+wire [8:0] interlaced_future_y_sequence =
+    (refill_event_line[8:0] >= 9'd478) ?
+        (refill_event_line[8:0] - 9'd478) :
+        (refill_event_line[8:0] + 9'd2);
+wire [7:0] interlaced_current_pair = refill_event_line[8:1];
+wire [7:0] interlaced_future_c_pair =
+    (interlaced_current_pair >= 8'd238) ?
+        (interlaced_current_pair - 8'd238) :
+        (interlaced_current_pair + 8'd2);
+
+wire [11:0] progressive_y_refill_raw =
     {1'b0, refill_event_line} + 12'd2;
-wire [10:0] y_refill_line =
-    (y_refill_raw >= {1'b0, picture_height_mem}) ?
-        (y_refill_raw - {1'b0, picture_height_mem}) :
-        y_refill_raw[10:0];
-
-wire [11:0] c_refill_raw =
+wire [10:0] progressive_y_refill_line =
+    (progressive_y_refill_raw >= {1'b0, picture_height_mem}) ?
+        (progressive_y_refill_raw[10:0] - picture_height_mem) :
+        progressive_y_refill_raw[10:0];
+wire [11:0] progressive_c_refill_raw =
     {2'b00, refill_event_line[10:1]} + 12'd2;
-wire [10:0] c_refill_line =
-    (c_refill_raw >= {1'b0, chroma_height_mem}) ?
-        (c_refill_raw - {1'b0, chroma_height_mem}) :
-        c_refill_raw[10:0];
+wire [10:0] progressive_c_refill_line =
+    (progressive_c_refill_raw >= {1'b0, chroma_height_mem}) ?
+        (progressive_c_refill_raw[10:0] - chroma_height_mem) :
+        progressive_c_refill_raw[10:0];
+
+wire [10:0] y_refill_line = native_interlaced_mem ?
+    interlaced_luma_row(interlaced_future_y_sequence, first_field_mem) :
+    progressive_y_refill_line;
+wire [10:0] c_refill_line = native_interlaced_mem ?
+    interlaced_chroma_row(interlaced_future_c_pair, first_field_mem) :
+    progressive_c_refill_line;
+wire y_refill_bank = native_interlaced_mem ?
+    interlaced_future_y_sequence[0] : y_refill_line[0];
+wire c_refill_bank = native_interlaced_mem ?
+    interlaced_future_c_pair[0] : c_refill_line[0];
+
+wire [10:0] prefill_y0 = native_interlaced_mem ?
+    interlaced_luma_row(9'd0, first_field_mem) : 11'd0;
+wire [10:0] prefill_y1 = native_interlaced_mem ?
+    interlaced_luma_row(9'd1, first_field_mem) : 11'd1;
+wire [10:0] prefill_c0 = native_interlaced_mem ?
+    interlaced_chroma_row(8'd0, first_field_mem) : 11'd0;
+wire [10:0] prefill_c1 = native_interlaced_mem ?
+    interlaced_chroma_row(8'd1, first_field_mem) : 11'd1;
 
 task automatic launch_fetch;
     input [1:0]  kind;
     input [10:0] line_number;
+    input        cache_bank;
     begin
         fetch_kind         <= kind;
         fetch_line         <= line_number;
@@ -192,6 +264,7 @@ task automatic launch_fetch;
         // burst.  This is a service-interface implementation choice.
         fetch_segment_words <= (kind == FETCH_Y) ? 8'd64 : 8'd45;
         recv_word_index    <= 8'd0;
+        fetch_cache_bank   <= cache_bank;
 
         if (kind == FETCH_Y)
             fetch_address <= DDR_Y_BASE + row_times_90(line_number);
@@ -210,6 +283,8 @@ always @(posedge mem_clk) begin
         picture_height_mem    <= 11'd0;
         chroma_height_mem     <= 11'd0;
         picture_width_mem     <= 12'd0;
+        native_interlaced_mem <= 1'b0;
+        first_field_mem       <= 1'b0;
 
         mem_state             <= MEM_IDLE;
         fetch_kind            <= FETCH_Y;
@@ -219,6 +294,7 @@ always @(posedge mem_clk) begin
         fetch_segment_words   <= 8'd0;
         recv_word_index       <= 8'd0;
         fetch_address         <= 29'd0;
+        fetch_cache_bank      <= 1'b0;
 
         prefill_step          <= 3'd0;
         prefill_done          <= 1'b0;
@@ -273,12 +349,16 @@ always @(posedge mem_clk) begin
                 pending_event_line <= line_done_sequence_mem;
             end
 
-            // Each synchronized toggle represents exactly one consumed source
-            // line.  Wrap at the decoded picture height so repeated display
-            // frames remain aligned to source line 0 without crossing a bus.
+            // In native mode this is a 480-entry presentation-order sequence:
+            // all lines of the authored first field, then all lines of the
+            // other field. Progressive mode retains ordinary raster order.
             if (picture_height_mem == 11'd0)
                 line_done_sequence_mem <= 11'd0;
-            else if (line_done_sequence_mem == (picture_height_mem - 11'd1))
+            else if (native_interlaced_mem &&
+                     (line_done_sequence_mem == 11'd479))
+                line_done_sequence_mem <= 11'd0;
+            else if (!native_interlaced_mem &&
+                     (line_done_sequence_mem == (picture_height_mem - 11'd1)))
                 line_done_sequence_mem <= 11'd0;
             else
                 line_done_sequence_mem <= line_done_sequence_mem + 11'd1;
@@ -299,6 +379,8 @@ always @(posedge mem_clk) begin
                 picture_width_mem     <= horizontal_size[11:0];
                 picture_height_mem    <= vertical_size[10:0];
                 chroma_height_mem     <= (vertical_size[10:0] + 11'd1) >> 1;
+                native_interlaced_mem <= native_interlaced;
+                first_field_mem       <= ~top_field_first;
                 prefill_step          <= 3'd0;
                 prefill_done          <= 1'b0;
                 line_done_sequence_mem <= 11'd0;
@@ -410,29 +492,29 @@ always @(posedge mem_clk) begin
                 if (picture_started && !prefill_done) begin
                     case (prefill_step)
                         3'd0:
-                            launch_fetch(FETCH_Y, 11'd0);
+                            launch_fetch(FETCH_Y, prefill_y0, 1'b0);
 
                         3'd1:
                             if (picture_height_mem > 11'd1)
-                                launch_fetch(FETCH_Y, 11'd1);
+                                launch_fetch(FETCH_Y, prefill_y1, 1'b1);
                             else
                                 prefill_step <= 3'd2;
 
                         3'd2:
-                            launch_fetch(FETCH_CB, 11'd0);
+                            launch_fetch(FETCH_CB, prefill_c0, 1'b0);
 
                         3'd3:
-                            launch_fetch(FETCH_CR, 11'd0);
+                            launch_fetch(FETCH_CR, prefill_c0, 1'b0);
 
                         3'd4:
                             if (chroma_height_mem > 11'd1)
-                                launch_fetch(FETCH_CB, 11'd1);
+                                launch_fetch(FETCH_CB, prefill_c1, 1'b1);
                             else
                                 prefill_step <= 3'd5;
 
                         3'd5:
                             if (chroma_height_mem > 11'd1)
-                                launch_fetch(FETCH_CR, 11'd1);
+                                launch_fetch(FETCH_CR, prefill_c1, 1'b1);
                             else begin
                                 prefill_done <= 1'b1;
                                 cache_ready  <= 1'b1;
@@ -451,13 +533,13 @@ always @(posedge mem_clk) begin
                     end
                     else if (refill_active) begin
                         if (refill_phase == 2'd0) begin
-                            launch_fetch(FETCH_Y, y_refill_line);
+                            launch_fetch(FETCH_Y, y_refill_line, y_refill_bank);
                         end
                         else if (refill_phase == 2'd1) begin
-                            launch_fetch(FETCH_CB, c_refill_line);
+                            launch_fetch(FETCH_CB, c_refill_line, c_refill_bank);
                         end
                         else begin
-                            launch_fetch(FETCH_CR, c_refill_line);
+                            launch_fetch(FETCH_CR, c_refill_line, c_refill_bank);
                         end
                     end
                 end
@@ -582,7 +664,12 @@ reg [11:0] picture_width_r1;
 reg [11:0] picture_width_r2;
 reg [10:0] picture_height_r1;
 reg [10:0] picture_height_r2;
+reg        native_interlaced_r1;
+reg        native_interlaced_r2;
+reg        first_field_r1;
+reg        first_field_r2;
 reg        picture_present_rd;
+reg        line_done_pending_rd;
 
 // kate - Phase 1P: the module reset input is synchronized to mem_clk by the
 // top level.  It still crosses into the independent 40 MHz rd_clk domain, so
@@ -607,8 +694,13 @@ always @(posedge rd_clk) begin
         picture_width_r2     <= 12'd0;
         picture_height_r1    <= 11'd0;
         picture_height_r2    <= 11'd0;
+        native_interlaced_r1  <= 1'b0;
+        native_interlaced_r2  <= 1'b0;
+        first_field_r1        <= 1'b0;
+        first_field_r2        <= 1'b0;
         picture_present_rd   <= 1'b0;
         line_done_toggle_rd  <= 1'b0;
+        line_done_pending_rd <= 1'b0;
     end
     else begin
         cache_ready_r1    <= cache_ready;
@@ -617,21 +709,38 @@ always @(posedge rd_clk) begin
         picture_width_r2  <= picture_width_r1;
         picture_height_r1 <= picture_height_mem;
         picture_height_r2 <= picture_height_r1;
+        native_interlaced_r1 <= native_interlaced_mem;
+        native_interlaced_r2 <= native_interlaced_r1;
+        first_field_r1       <= first_field_mem;
+        first_field_r2       <= first_field_r1;
 
-        // Publish only at a display-frame boundary after all initial line
-        // caches are filled, so source line 0 always starts from a known bank.
-        if (!picture_present_rd && cache_ready_r2 &&
-            (h_pos == 12'd0) && (v_pos == 12'd0))
-            picture_present_rd <= 1'b1;
+        if (pixel_ce) begin
+            // Publish at the first active line of the authored first field, or
+            // at the legacy progressive frame origin.
+            if (!picture_present_rd && cache_ready_r2 &&
+                ((!native_interlaced_r2 &&
+                  (h_pos == 12'd0) && (v_pos == 12'd0)) ||
+                 (native_interlaced_r2 && pixel_en &&
+                  (h_pos == 12'd0) &&
+                  (v_pos[8:1] == 8'd0) &&
+                  (v_pos[0] == first_field_r2))))
+                picture_present_rd <= 1'b1;
 
-        // Mark a source line free one pixel after its final cache read request.
-        // Only the event toggle crosses to mem_clk; the memory-side sequence
-        // counter supplies the source-line identity.
-        if (picture_present_rd && pixel_en &&
-            (h_pos == 12'd760) &&
-            (v_pos >= 12'd60) &&
-            (v_pos < (12'd60 + {1'b0, picture_height_r2}))) begin
-            line_done_toggle_rd <= ~line_done_toggle_rd;
+            // The event is emitted on the logical sample after the last DDR
+            // cache request for this displayed source line.
+            if (line_done_pending_rd) begin
+                line_done_pending_rd <= 1'b0;
+                line_done_toggle_rd <= ~line_done_toggle_rd;
+            end
+
+            if (picture_present_rd &&
+                ((native_interlaced_r2 && pixel_en &&
+                  (h_pos == 12'd719)) ||
+                 (!native_interlaced_r2 && pixel_en &&
+                  (h_pos == 12'd759) &&
+                  (v_pos >= 12'd60) &&
+                  (v_pos < (12'd60 + {1'b0, picture_height_r2})))))
+                line_done_pending_rd <= 1'b1;
         end
     end
 end
@@ -640,13 +749,14 @@ end
 // Video-side cache addressing and full-precision 4:2:0 expansion.
 // -------------------------------------------------------------------------
 
-wire source_window =
-    pixel_en &&
-    (h_pos >= 12'd40)  && (h_pos < 12'd760) &&
-    (v_pos >= 12'd60)  && (v_pos < 12'd540);
+wire source_window = native_interlaced_r2 ?
+    pixel_en :
+    (pixel_en &&
+     (h_pos >= 12'd40)  && (h_pos < 12'd760) &&
+     (v_pos >= 12'd60)  && (v_pos < 12'd540));
 
-wire [11:0] source_x = h_pos - 12'd40;
-wire [11:0] source_y = v_pos - 12'd60;
+wire [11:0] source_x = native_interlaced_r2 ? h_pos : (h_pos - 12'd40);
+wire [11:0] source_y = native_interlaced_r2 ? v_pos : (v_pos - 12'd60);
 
 wire decoded_picture_window =
     source_window &&
@@ -654,14 +764,16 @@ wire decoded_picture_window =
     (source_x < picture_width_r2) &&
     (source_y < {1'b0, picture_height_r2});
 
-wire [6:0] y_word_index = source_x[11:3];
-wire [5:0] c_word_index = source_x[11:4];
+wire [6:0] y_word_index = source_x[9:3];
+wire [5:0] c_word_index = source_x[9:4];
 
 assign y_cache_rd_addr =
-    (source_y[0] ? 8'd90 : 8'd0) + {1'b0, y_word_index};
+    ((native_interlaced_r2 ? source_y[1] : source_y[0]) ?
+        8'd90 : 8'd0) + {1'b0, y_word_index};
 
 assign c_cache_rd_addr =
-    (source_y[1] ? 7'd45 : 7'd0) + {1'b0, c_word_index};
+    ((native_interlaced_r2 ? source_y[2] : source_y[1]) ?
+        7'd45 : 7'd0) + {1'b0, c_word_index};
 
 wire [2:0] y_byte_lane = source_x[2:0];
 wire [2:0] c_byte_lane = source_x[3:1];
@@ -750,7 +862,7 @@ always @(posedge rd_clk) begin
         video_hs                  <= 1'b0;
         video_vs                  <= 1'b0;
     end
-    else begin
+    else if (pixel_ce) begin
         y_byte_lane_d            <= y_byte_lane;
         c_byte_lane_d            <= c_byte_lane;
         source_window_d          <= source_window;

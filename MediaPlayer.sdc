@@ -15,18 +15,18 @@ set_false_path \
 
 # kate - Phase 1P CDC/reset timing closure.
 #
-# The 40 MHz video and 54 MHz MPEG clocks are both PLL-derived, but the
+# The 54 MHz video and 60 MHz MPEG clocks are both PLL-derived, but the
 # framebuffer deliberately transfers a few control/descriptor values through
 # explicit synchronizer stages.  Do not mark the entire clock domains
 # asynchronous: that would hide accidental future crossings.  Cut only the
 # proven first-stage CDC paths; stage 2 and all ordinary same-clock logic remain
 # timed normally.
 
-# 54 MHz memory/decoder -> 40 MHz presentation descriptor handshake.
+# 60 MHz memory/decoder -> 54 MHz presentation descriptor handshake.
 # picture_width_mem / picture_height_mem are captured before cache_ready is
 # asserted and remain stable for the displayed picture.  cache_ready itself is
 # synchronized separately.  These exceptions therefore cover only the first
-# sampling registers in the 40 MHz domain.
+# sampling registers in the 54 MHz domain.
 set_false_path \
     -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|picture_height_mem[*]}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|picture_height_r1[*]}]
@@ -36,8 +36,14 @@ set_false_path \
 set_false_path \
     -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|cache_ready}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|cache_ready_r1}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|native_interlaced_mem}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|native_interlaced_r1}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|first_field_mem}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|first_field_r1}]
 
-# 40 MHz presentation -> 54 MHz memory/decoder line-consumed handshake.
+# 54 MHz presentation -> 60 MHz memory/decoder line-consumed handshake.
 # kate - Phase 1S removed the old asynchronous 11-bit line-number bus.  Only the
 # event toggle now crosses domains; the 54 MHz side derives source-line identity
 # from a local sequential counter.  Cut only the first toggle synchronizer stage.
@@ -46,13 +52,36 @@ set_false_path \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|line_done_toggle_m1}]
 
 # kate - Phase 1S publication scheduling adds one single-bit video-domain
-# blanking-window level.  It is registered in the 40 MHz domain, then sampled by
-# an explicit three-stage synchronizer in the 54 MHz decoder/DDRAM domain.  Cut
+# blanking-window level. It is registered in the 54 MHz domain, then sampled by
+# an explicit three-stage synchronizer in the 60 MHz decoder/DDRAM domain. Cut
 # only the asynchronous source -> first synchronizer stage; later stages and the
 # scheduler remain fully timed.
 set_false_path \
     -from [get_keepers {*|mpeg2_new_swap_window_video}] \
     -to   [get_keepers {*|mpeg2_new_swap_window_sync[0]}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_new_cadence_window_video}] \
+    -to   [get_keepers {*|mpeg2_new_cadence_window_sync[0]}]
+
+# Native presentation mode is requested from the 60 MHz decoder domain and
+# acknowledged back from the 54 MHz timing domain through explicit two/three
+# stage synchronizers. Cut only the asynchronous inputs to their first stages.
+set_false_path \
+    -to [get_keepers {*|mpeg2_video_output_timing:*|native_request_sync[0]}]
+set_false_path \
+    -to [get_keepers {*|mpeg2_video_output_timing:*|top_field_first_sync[0]}]
+set_false_path \
+    -to [get_keepers {*|mpeg2_new_native_active_sync[0]}]
+
+# MiSTer's framework treats the 20 MHz system controls and raster pipeline as
+# separate functional clock domains. The old harmonic 20/40 MHz pair happened
+# to offer a wide related edge; 20/54 MHz exposes the OSD, scaler and HDMI
+# configuration crossings at a 1.852 ns closest edge. Group only this framework
+# pair asynchronously. The 54 MHz video / 60 MHz MPEG relationship remains
+# fully timed except for the explicit synchronizers documented above.
+set_clock_groups -asynchronous \
+    -group [get_clocks {*|general[0].gpll*|divclk}] \
+    -group [get_clocks {*|general[1].gpll*|divclk}]
 
 # Entry 238: ioctl_download is registered in clk_sys and sampled only by the
 # first stage of an explicit three-register clk_mpeg2 synchronizer.  Cut that
@@ -120,6 +149,13 @@ set_false_path \
 # or any other 54 MHz -> 40 MHz logic.
 set_false_path \
     -from [get_keepers {*|mpeg2_h262_b_presentation_scheduler:*|framebuffer_swap_reset_count[*]}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|rd_reset_sync[*]}]
+
+# Native-mode changes synchronously reset the 60 MHz framebuffer memory side
+# and intentionally assert the same 54 MHz reset-release chain asynchronously.
+# Cut only that assertion boundary; release still traverses rd_reset_sync.
+set_false_path \
+    -from [get_keepers {*|mpeg2_new_native_active_sync[*]}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|rd_reset_sync[*]}]
 
 # Entry 238: a new download resets the framebuffer memory side synchronously

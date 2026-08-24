@@ -12,6 +12,7 @@ module mpeg2_h262_b_presentation_scheduler
     input  wire clk,
     input  wire reset,
     input  wire swap_window_pulse,
+    input  wire cadence_tick_pulse,
     input  wire [3:0] frame_rate_code,
     // Entry 470: cadence is the mandatory floor for every retained picture.
     // A timestamp may hold its candidate beyond that slot but may never admit
@@ -282,7 +283,7 @@ always @(posedge clk) begin
 
         if(cadence_scale_changed)
             cadence_credit<=cadence_due;
-        else if(swap_window_pulse)begin
+        else if(cadence_tick_pulse)begin
             if(!cadence_supported)
                 cadence_credit<=CADENCE_DUE_24FPS;
             else if(cadence_credit<cadence_due)

@@ -48,6 +48,8 @@ mpeg2_h262_frontend mpeg2_h262_frontend
 	.sequence_scalable_extension_seen (mpeg2_new_sequence_scalable_extension_seen),
 	.picture_seen                     (mpeg2_new_picture_seen),
 	.picture_coding_extension_seen    (mpeg2_new_picture_coding_extension_seen),
+	.picture_coding_extension_valid   (mpeg2_new_picture_coding_extension_valid),
+	.picture_coding_extension_top_field_first(mpeg2_new_picture_coding_extension_top_field_first),
 	.slice_seen                       (mpeg2_new_slice_seen),
 	.sequence_end_seen                (mpeg2_new_sequence_end_seen),
 	.horizontal_size                  (mpeg2_new_horizontal_size),

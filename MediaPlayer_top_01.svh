@@ -1,12 +1,19 @@
-mpeg2_video_svga_800x600 mpeg2_video_svga_800x600
+mpeg2_video_output_timing mpeg2_video_output_timing
 (
-	.clk      (clk_video),
-	.reset    (reset_video),
-	.h_pos    (display_h_pos),
-	.v_pos    (display_v_pos),
-	.pixel_en (display_pixel_en),
-	.h_sync   (display_h_sync),
-	.v_sync   (display_v_sync)
+	.clk                     (clk_video),
+	.reset                   (reset_video),
+	.native_request_async    (mpeg2_new_native_480i_request),
+	.top_field_first_async   (mpeg2_new_native_top_field_first),
+	.native_active           (display_native_interlaced),
+	.ce_pixel                (display_pixel_ce),
+	.h_pos                   (display_h_pos),
+	.v_pos                   (display_v_pos),
+	.pixel_en                (display_pixel_en),
+	.h_sync                  (display_h_sync),
+	.v_sync                  (display_v_sync),
+	.field                   (display_field),
+	.field_window            (display_field_window),
+	.frame_window            (display_frame_window)
 );
 
 ///////////////////////   NEW H.262 DECODER   ////////////////////
@@ -20,6 +27,8 @@ wire        mpeg2_new_sequence_extension_seen;
 wire        mpeg2_new_sequence_scalable_extension_seen;
 wire        mpeg2_new_picture_seen;
 wire        mpeg2_new_picture_coding_extension_seen;
+wire        mpeg2_new_picture_coding_extension_valid;
+wire        mpeg2_new_picture_coding_extension_top_field_first;
 wire        mpeg2_new_slice_seen;
 wire        mpeg2_new_sequence_end_seen;
 wire [13:0] mpeg2_new_horizontal_size;
@@ -43,6 +52,28 @@ wire        mpeg2_new_chroma_420_type;
 // Entry 365: extracted for interlaced operation and 3:2 pulldown; carried
 // into the cadence snapshot only, not yet consumed by presentation.
 wire        mpeg2_new_top_field_first;
+wire        mpeg2_new_native_field_order_locked;
+wire        mpeg2_new_native_top_field_first;
+wire        mpeg2_new_native_field_order_mismatch;
+
+mpeg2_h262_native_field_order mpeg2_h262_native_field_order
+(
+	.clk                            (clk_mpeg2),
+	.reset                          (reset_mpeg2),
+	.picture_coding_extension_valid (mpeg2_new_picture_coding_extension_valid),
+	.progressive_sequence           (mpeg2_new_progressive_sequence),
+	.picture_top_field_first        (mpeg2_new_picture_coding_extension_top_field_first),
+	.locked                         (mpeg2_new_native_field_order_locked),
+	.top_field_first                (mpeg2_new_native_top_field_first),
+	.mismatch                       (mpeg2_new_native_field_order_mismatch)
+);
+
+wire mpeg2_new_native_480i_request =
+	!status[120] &&
+	mpeg2_new_phase1_supported &&
+	!mpeg2_new_progressive_sequence &&
+	mpeg2_new_native_field_order_locked &&
+	!mpeg2_new_native_field_order_mismatch;
 // Entry 369: picture metadata supplied by the HPS in band with the
 // elementary stream.  Distinct from the frontend's parsed fields above:
 // these come from the container, those from the bitstream.
@@ -56,6 +87,7 @@ wire [7:0]  mpeg2_new_inband_count;
 // Entry 372: timestamps carried through frame ownership to the displayed frame.
 wire [32:0] mpeg2_new_display_pts;
 wire        mpeg2_new_display_pts_valid;
+wire        mpeg2_new_display_top_field_first;
 wire [7:0]  mpeg2_new_associated_count;
 // Entry 389: timestamp-driven candidate presentation.  The scheduler exports
 // only its already-stable next identity; timestamp ownership supplies the

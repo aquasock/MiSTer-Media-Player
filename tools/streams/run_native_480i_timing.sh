@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+build_dir="$(mktemp -d)"
+trap 'rm -rf "${build_dir}"' EXIT
+
+iverilog -g2012 \
+  -s tb_native_field_order \
+  -o "${build_dir}/tb_native_field_order" \
+  "${repo_root}/rtl/mpeg2_new/mpeg2_h262_native_field_order.sv" \
+  "${repo_root}/tools/streams/tb_native_field_order.sv"
+vvp "${build_dir}/tb_native_field_order"
+
+iverilog -g2012 \
+  -s tb_interlaced_420_cache_mapping \
+  -o "${build_dir}/tb_interlaced_420_cache_mapping" \
+  "${repo_root}/rtl/mpeg2_new/mpeg2_ycbcr_to_rgb_bt601.sv" \
+  "${repo_root}/rtl/mpeg2_luma_framebuffer.sv" \
+  "${repo_root}/tools/streams/tb_interlaced_420_cache_mapping.sv"
+vvp "${build_dir}/tb_interlaced_420_cache_mapping"
+
+iverilog -g2012 \
+  -s tb_native_480i_timing \
+  -o "${build_dir}/tb_native_480i_timing" \
+  "${repo_root}/rtl/mpeg2_video_output_timing.sv" \
+  "${repo_root}/tools/streams/tb_native_480i_timing.sv"
+
+vvp "${build_dir}/tb_native_480i_timing"
+vvp "${build_dir}/tb_native_480i_timing" +BFF

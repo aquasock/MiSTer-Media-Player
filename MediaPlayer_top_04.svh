@@ -88,6 +88,7 @@ wire      mpeg2_new_display_scratch;
 wire      mpeg2_new_display_scratch_bank;
 wire [2:0] mpeg2_new_framebuffer_swap_reset_count;
 reg       mpeg2_new_swap_window_video;
+reg       mpeg2_new_cadence_window_video;
 wire      mpeg2_new_b_presentation_complete;
 // Entry 282: scheduler observability taps consumed only by the cadence
 // profiler's unconditional hold-attribution counters.
@@ -96,12 +97,19 @@ wire      mpeg2_new_b_promotion_active;
 wire      mpeg2_new_b_presentation_error;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] mpeg2_new_swap_window_sync;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] mpeg2_new_cadence_window_sync;
 
 always @(posedge clk_video) begin
     if (reset_video)
         mpeg2_new_swap_window_video <= 1'b0;
     else
-        mpeg2_new_swap_window_video <= (display_v_pos >= 12'd600);
+        mpeg2_new_swap_window_video <= display_frame_window;
+
+    if (reset_video)
+        mpeg2_new_cadence_window_video <= 1'b0;
+    else
+        mpeg2_new_cadence_window_video <= display_field_window;
 end
 
 always @(posedge clk_mpeg2) begin
@@ -110,10 +118,20 @@ always @(posedge clk_mpeg2) begin
     else
         mpeg2_new_swap_window_sync <=
             {mpeg2_new_swap_window_sync[1:0], mpeg2_new_swap_window_video};
+
+    if (reset_mpeg2)
+        mpeg2_new_cadence_window_sync <= 3'b000;
+    else
+        mpeg2_new_cadence_window_sync <=
+            {mpeg2_new_cadence_window_sync[1:0],
+             mpeg2_new_cadence_window_video};
 end
 
 wire mpeg2_new_swap_window_pulse =
     mpeg2_new_swap_window_sync[1] && !mpeg2_new_swap_window_sync[2];
+wire mpeg2_new_cadence_window_pulse =
+    mpeg2_new_cadence_window_sync[1] &&
+    !mpeg2_new_cadence_window_sync[2];
 
 wire mpeg2_new_frame_waiting =
     mpeg2_new_picture_420_complete &&

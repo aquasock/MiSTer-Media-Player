@@ -1,5 +1,20 @@
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] mpeg2_new_native_active_sync;
+
+always @(posedge clk_mpeg2) begin
+    if (reset_mpeg2)
+        mpeg2_new_native_active_sync <= 3'b000;
+    else
+        mpeg2_new_native_active_sync <=
+            {mpeg2_new_native_active_sync[1:0], display_native_interlaced};
+end
+
+wire mpeg2_new_native_mode_change =
+    mpeg2_new_native_active_sync[1] ^ mpeg2_new_native_active_sync[2];
 wire mpeg2_new_framebuffer_reset =
-    reset_mpeg2 || (mpeg2_new_framebuffer_swap_reset_count != 3'd0);
+    reset_mpeg2 ||
+    (mpeg2_new_framebuffer_swap_reset_count != 3'd0) ||
+    mpeg2_new_native_mode_change;
 
 localparam [28:0] MPEG2_NEW_DDR_FRAME_BANK_WORDS     = 29'h00010000;
 localparam [28:0] MPEG2_NEW_DDR_FRAME_SCRATCH0_WORDS = 29'h00020000;
@@ -23,6 +38,11 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
     .picture_complete(mpeg2_new_first_picture_420_parsed),
     .horizontal_size(mpeg2_new_horizontal_size),
     .vertical_size  (mpeg2_new_vertical_size),
+    // Use the fully synchronized presentation-mode level on the memory side.
+    // The framebuffer carries this descriptor back through its existing
+    // video-domain descriptor synchronizers with the published picture.
+    .native_interlaced(mpeg2_new_native_active_sync[2]),
+    .top_field_first(mpeg2_new_native_top_field_first),
     .ddram_busy     (mpeg2_new_ddr_reader_busy),
     .ddram_dout     (DDRAM_DOUT),
     .ddram_dout_ready(mpeg2_new_ddr_reader_dout_ready),
@@ -35,6 +55,7 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
     .rd_clk         (clk_video),
     .h_pos          (display_h_pos),
     .v_pos          (display_v_pos),
+    .pixel_ce       (display_pixel_ce),
     .pixel_en       (display_pixel_en),
     .h_sync         (display_h_sync),
     .v_sync         (display_v_sync),
