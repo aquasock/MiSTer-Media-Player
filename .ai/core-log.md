@@ -1,3 +1,32 @@
+## 376 COMMIT Unreleased ??? 2026-08-23T19:00:57-07:00
+
+#### Coming From:
+
+Unreleased 0f7edd5
+
+#### Purpose:
+
+Make terminal presentation completion generic so all-I and P-only streams reach the same quiet telemetry snapshot path as B-containing streams.
+
+#### Outcome:
+
+The approved RTL cycle will correct the scheduler's completion-state initialization rather than weakening the top-level drain predicate: presentation is already complete when a session has not opened a B-reordering run, the first B header clears completion, and the existing scratch-plus-future-reference retirement restores it. This preserves every scheduler ownership and cadence condition while making the signal already consumed by the profiler and top-level quiet gate truthful for all-I and P-only streams. The focused scheduler test will explicitly cover an I-only terminal path, a P-only terminal path, the B-header transition to incomplete, and the existing B-run transition back to complete.
+
+#### Next Steps:
+
+Run the focused scheduler and cadence-profiler simulations plus the reusable decoder regression set, commit and push the source, then build at seed eleven and require every timing category positive. Install the resulting RBF byte-verifiably and confirm launch-free quiet-reason telemetry with `01_i_baseline`, a P stream and `04_b_bidirectional`, recording USER, DISK and POWER for each so the telemetry correction cannot mask a playback regression.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 375 COMMIT Unreleased 0f7edd5 2026-08-23T18:47:02-07:00
 
 #### Coming From:
@@ -1176,34 +1205,6 @@ Treat direct frame-rate code one, exact 24 fps and 25 fps presentation as accept
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 336 COMMIT Unreleased b64ec6a 2026-08-22T07:27:40-07:00
-
-#### Coming From:
-
-Unreleased 8517927
-
-#### Purpose:
-
-Find a timing-clean placement for the unchanged native-23.976-fps design by retrying its incremental Quartus fit with seed ten.
-
-#### Outcome:
-
-Seed twelve leaves the decoder positive but misses a standing global framework path by 0.094 ns, while seed eleven closes that placement differently but misses the 60 MHz decoder by 0.131 ns. Commit `b64ec6a` changes only the reproducible fitter seed from eleven to ten and reuses synthesis exactly as intended. The incremental fit completes in 10 minutes 27 seconds with zero errors and positive timing at plus 0.303 ns global setup, plus 0.386 ns decoder setup, plus 8.066 ns video setup, plus 0.244 ns hold, plus 3.706 ns recovery, plus 0.768 ns removal and plus 1.122 ns pulse width. It uses 34,565 ALMs, 50,960 registers, 4,306,375 memory bits, 538 of 553 RAM blocks and 65 DSP blocks. The accepted 4,455,376-byte RBF has SHA-256 `e95e9ec43cb11917d5a904fdd8016bcc23dcbe2d8f36f678544f42ad1a6d5f10`, matches after persistent installation, and is the only image from this cadence cycle installed on the MiSTer. A temporary 720-by-480 native-23.976 control initially demonstrated that raw FFmpeg output requires the standard sequence-end marker to flush its final reorder state; after the marker was appended, hardware accepted all 1,488,156 bytes, recognized frame-rate code one, completed all 120 pictures and 119 swaps in 4.965782 seconds at 23.964000 fps, reached sequence-end quiet and reported zero errors and zero cadence-gap outliers. The user's exact Emperor movie was then launched from its existing MiSTer path with the verified core.
-
-#### Next Steps:
-
-Have the user confirm that the full Emperor movie now runs at normal wall-clock speed and remains visually smooth during motion and credits. Keep frame-rate codes four through eight as explicit future support decisions; this commit deliberately adds only native `24000/1001` alongside the already accepted exact-24 and 25-fps paths.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
 
 #### Status:
 
