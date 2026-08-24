@@ -1,3 +1,31 @@
+## 437 COMMIT Unreleased ??? 2026-08-24T05:59:33-07:00
+
+#### Coming From:
+
+Unreleased 091b150
+
+#### Purpose:
+
+Record the failed widened-FIFO control, correlate its first repeatable crackle to an exact transport starvation boundary, and define the bounded ARM-side scheduling correction.
+
+#### Outcome:
+
+The user reports that corrected `00_good_480p_48k.mpg` now begins with audio and video apparently aligned, but audio still plays slightly past the final picture, both repeatable crackles/dropouts remain, and the picture stutters once with the final crackle. The terminal LEDs were USER solid on, DISK blinking eleven times and POWER solid on. A launch-free schema-eight screenshot captured the loaded final raster at displayed frame 47 while telemetry had frozen on the first error: aggregate error flags are exactly `0x0400`, meaning `audio_pcm_underrun` alone, with `pcm_protocol_error` and every video, presentation and destination error clear. The snapshot occurs at 3,516 accepted PCM samples, 218,405 clean video bytes, sixteen displayed pictures and fifteen swaps; it records 17,716,103 decoder-stall cycles and 19,540,054 presentation-hold cycles before the error. Exact native-helper transport correlation proves why the 8,192-sample FIFO cannot fix this stream. The helper emits only 3,456 samples before a 147,631-byte clean-video interval with no PCM, and the frozen count of 3,516 is precisely those first 3,456 samples plus 60 samples from the resumed batch on which the adapter makes starvation sticky. The FIFO therefore never receives enough early audio to use its added capacity. The screenshot SHA-256 is `a3c5d5bb48a075b5b35fb66d4b427e552648dd3d29392d546661503a20caafca`. USER does not encode audio faults in this implementation, and DISK stage eleven means the future reference was presented, so the reported LEDs are consistent with video reaching its final GOP while the separately captured audio underrun remains set. The first crackle is proven; the second crackle and coincident visible stutter remain repeatable user observations because the first-error snapshot intentionally freezes before them.
+
+#### Next Steps:
+
+Approval is required for the previously identified alternative boundary. Keep source `091b150`, its timing-clean 8,192-sample RBF, Main and all installed media unchanged while implementing a helper-only bounded-lookahead scheduler in `host/arm/media_player_helper.c`. Preserve the existing two-picture startup alignment, exact decoded PCM sequence, exact video byte sequence and PTS order, but queue demultiplexed video and PCM in bounded host memory and emit small PCM batches throughout long video runs instead of preserving Program Stream PES order. Add deterministic transport analysis that proves a fixed post-start PCM-free bound without materializing the full movie, exact-output regressions for short, faded, 44.1 and 48 kHz controls plus the full soak, native and address-and-undefined-sanitized runs, and two byte-identical official GCC 10.2 ARM builds. No RTL edit or Quartus build is authorized. If all host proofs pass, install only the staged, retrieved and byte-verified helper with an exact rollback, then repeat only `00_good_480p_48k.mpg` and capture schema-eight telemetry before resuming qualification.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 436 COMMIT Unreleased 091b150 2026-08-24T05:47:31-07:00
 
 #### Coming From:
@@ -1163,33 +1191,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 397 COMMIT Unreleased a57079f 2026-08-23T22:23:18-07:00
-
-#### Coming From:
-
-Unreleased a57079f
-
-#### Purpose:
-
-Install and independently verify the exact first-PCM hardware candidate before its focused MiSTer test.
-
-#### Outcome:
-
-The 4,214,932-byte Entry-396 `MediaPlayer.rbf` is installed persistently as `/media/fat/MediaPlayer.rbf` on the connected MiSTer through the established non-interactive transfer. An independent FTP retrieval to `/tmp/MediaPlayer_a57079f_remote.rbf` is byte-identical to the local build and reproduces SHA-256 `ad04f9f73c0fb98309588f8c212c6ccad71c80b254a2a284f637672a73350d37`. The running core remains unchanged until the user reboots, so no unrequested launch or test occurred. This is the sole hardware image for the cycle and no second build is planned.
-
-#### Next Steps:
-
-Reboot the MiSTer to load the installed candidate. In the core menu, confirm Audio Test Off is silent, then select 44.1k Mono, 44.1k Stereo, 48k Mono and 48k Stereo in turn; report whether every mode is audible, whether mono is centered in both channels, whether stereo has the lower 440 Hz tone on the left and higher 660 Hz tone on the right, and whether returning to Off becomes silent. After the Audio modes pass, reset once, run only `04_b_bidirectional.m2v`, report all three LEDs and leave the final image loaded for capture; no other video file is required in this build cycle.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
