@@ -1,4 +1,4 @@
-## 389 COMMIT Unreleased ??? 2026-08-23T21:08:18-07:00
+## 389 COMMIT Unreleased 9a7a982 2026-08-23T21:08:18-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Present timestamped pictures against the proven audio-derived 90 kHz system-time
 
 #### Outcome:
 
-The approved implementation will synchronize only the proven single-bit 90 kHz tick from the 24.576 MHz audio domain into the 60 MHz decoder domain, avoiding a tearing multi-bit clock crossing, and use it to advance a local 33-bit presentation timeline anchored exactly once by the first in-band timestamp of each download session. Timestamp comparison will be modulo 2^33 with the H.222.0 half-range ordering rule, and the existing download rearm reset will clear the anchor and all timestamp ownership on new-file or seek-like reload boundaries. The frame timestamp owner will retain distinct values and validity for all three reference banks and both B scratch banks, commit B timestamps on actual B persistence, and expose the timestamp of both the current display and the scheduler's next candidate. A candidate with a timestamp and an active anchor will wait until its timestamp is due, then present on the first safe swap window; a late timestamp presents immediately, while an unannotated or individually missing-timestamp picture uses the existing exact 23.976, 24, 25, 29.97 or 30 fps cadence unchanged. Every presentation will still consume free-running cadence credit so a timestamped-to-untimestamped transition cannot create a next-refresh burst. The deterministic injector will gain an explicit per-picture timestamp-list mode for irregular ordinary and reordered-B hardware controls, without changing its existing evenly spaced default.
+Commit `9a7a982` synchronizes only the proven single-bit audio-derived 90 kHz tick into the decoder domain and advances a local 33-bit timeline anchored exactly once by the first in-band timestamp after each download reset. Modulo half-range comparison holds future candidates, admits equality and late candidates at the first safe swap, and leaves individually missing timestamps on the unchanged exact 23.976, 24, 25, 29.97 or 30 fps cadence; an early timestamped presentation clears partial cadence credit so fallback cannot burst on the next refresh. Timestamp ownership now retains separate values and validity for all reference and B-scratch banks, commits B timestamps on actual persistence and queries the scheduler's retained candidate identity. Focused simulation passes first-record anchor, reset re-anchor, modulo wrap, late, future, missing, reference and reordered scratch ownership, timestamp gating, no-burst fallback and every established cadence count. Full-pipeline P-only, B-reordered, repeated multi-slice, dense-residual, mixed-macroblock and long-GOP replays complete with exact publication and persistence counts and zero errors; mixed and long dense-publication tests retain zero overwrites. The explicit coded-picture-order timestamp-list injector mode passes normal and oversize-rejection controls. The seed-eleven Quartus 17.0.2 build completes in 12 minutes 34 seconds with zero errors and 154 warnings, using 35,666 ALMs, 52,202 registers, 3,228,103 memory bits, 408 RAM blocks and 65 DSP blocks. Every timing category is positive with zero endpoint TNS: global setup is plus 0.200 ns, decoder setup plus 0.773 ns, host setup plus 1.158 ns, video setup plus 7.769 ns, hold plus 0.253 ns, recovery plus 2.709 ns, removal plus 0.633 ns and pulse width plus 1.122 ns. The 4,196,032-byte RBF has SHA-256 `68be8a9d899a06b6861a9d9ceaf07e41747d1865133940aad39849f4b14c9211`; it is installed persistently and retrieved byte-for-byte identical. Irregular ordinary test `15_pts_irregular_ordinary.m2v`, SHA-256 `0003a68e9377ce30ce77bfd8f4bd9e70edf2937b227021f4219efcd12027891b`, and reordered-B test `16_pts_reordered_b.m2v`, SHA-256 `bde3a06fb5012667a548fec6de1730e96a1c15c3c548cda85e0982af0bd7a309`, are also installed and retrieved exactly.
 
 #### Next Steps:
 
-Implement the tick synchronizer, local anchored timeline, five-bank timestamp association and timestamp-aware scheduler gate, then prove first-record anchor, modulo wrap, late and future timestamps, missing-timestamp fallback, session reset and re-anchor, ordinary and B-scratch ownership, reordered candidate order and unchanged unannotated cadence in focused simulation. Re-run dense publication and full-pipeline P, B, multi-slice, dense-residual, mixed-macroblock and long-GOP controls, lint the integrated top, build seed eleven with every timing category positive, install and retrieve the exact RBF, and hardware-test irregular annotated ordinary and B streams plus unannotated controls before acceptance. PCM output remains outside this source boundary.
+Reboot the MiSTer so the new persistent RBF loads, then run `15_pts_irregular_ordinary.m2v` and verify that all five pictures appear in order with intentionally uneven pauses and clean terminal completion; record all three LEDs and leave the final image loaded for telemetry. After that capture, reboot and run `16_pts_reordered_b.m2v`, requiring the display-order I, B, P, B, P sequence to retain its deliberately uneven timing without a dropped or prematurely exposed future reference. Finish with reboot-isolated unannotated `06_p_f_code_range.m2v` and `04_b_bidirectional.m2v` controls to prove unchanged cadence fallback before marking this source passed. PCM output remains the next feature boundary.
 
 #### Files Modified:
 
@@ -33,7 +33,7 @@ Implement the tick synchronizer, local anchored timeline, five-bank timestamp as
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
