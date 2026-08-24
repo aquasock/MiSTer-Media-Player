@@ -1,3 +1,31 @@
+## 414 COMMIT Unreleased ??? 2026-08-24T01:15:36-07:00
+
+#### Coming From:
+
+Unreleased 22d2142
+
+#### Purpose:
+
+Preserve minimp3 synthesis continuity across incrementally delivered MPEG Layer II frames without changing the established PCM transport or FPGA path.
+
+#### Outcome:
+
+The proposed helper-only correction will make every speculative incremental decode transactional with respect to `mp3dec_t`: if minimp3 cannot safely consume a frame because the current buffer ends on that complete frame or within the following frame, the helper will restore the decoder snapshot and retain all corresponding bytes until more input arrives. End-of-input handling will decode the remaining exact-sized frames without the synthetic zero padding that can force a failed next-header comparison and clear synthesis history. PCM sample format, channel order, 48 kHz constraint, in-band record layout, clean end token, Program Stream demux, Main protocol and FPGA source will remain unchanged. The existing short and faded profiles provide the regression: the pre-fix helper reproducibly jumps 4,080 counts left and 4,115 right at some 1,152-sample boundaries, while their FFmpeg references remain below the verifier's derived limits.
+
+#### Next Steps:
+
+Prove the pre-fix failure and post-fix pass for both profiles with native and address-and-undefined sanitized helpers, retaining exact 10,368 and 144,000 stereo sample counts, byte-identical video, one clean audio-end token and strong waveform correlation while eliminating the boundary discontinuities. Build the static ARM helper twice reproducibly with the official GCC 10.2 toolchain, install only that helper through staged hash verification with the current helper preserved for rollback, and upload only `02_arm_mp2_faded_tones.mpg`. After reboot, run that sole file and require clean silence, gradual onset, sustained separated tones, gradual release, accepted video, normal LEDs and zero schema-eight errors; do not rebuild or replace the accepted RBF or Main.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 413 COMMIT Unreleased 22d2142 2026-08-24T01:08:05-07:00
 
 #### Coming From:
@@ -1143,33 +1171,5 @@ Open a separate generic terminal-quiet telemetry cycle that derives presentation
 
 - [x] Built
 - [ ] Passed
-
----
-## 374 COMMIT Unreleased dea60bc 2026-08-23T18:40:19-07:00
-
-#### Coming From:
-
-Unreleased dea60bc
-
-#### Purpose:
-
-Hardware-qualify the repaired in-band metadata boundary and displayed-frame timestamp association with explicit LED and launch-free telemetry evidence.
-
-#### Outcome:
-
-The exact 4,209,348-byte RBF for `dea60bc`, SHA-256 `6d86641ca5c9460c9025961ccff0403438f7034949f3046b8ee2c0592fde9afc`, was uploaded persistently and retrieved byte-for-byte identical. After a power cycle, plain `04_b_bidirectional` passed twice with USER steady on, POWER steady on and DISK steady off, reversing the reproducible USER one blink and DISK fifteen syntax failure on `27ad1b3` and proving the pulse-valid repair on the P-ownership hold that exposed it. After another power cycle, the unannotated 726,703-byte `01_i_baseline` passed with USER steady on, POWER steady on and DISK two blinks; schema-seven telemetry reports four displayed pictures, zero associations, zero displayed timestamp, zero error flags and sequence end. The deterministic 726,739-byte annotated companion was found already installed, reproduced byte-identically from the committed injector, and duplicated under the visible name `01A_ANNOTATED_4PTS.m2v`; after another power cycle it passed with the same successful LED state, four associations, displayed timestamp low bits `0x223`, four displayed pictures, zero error flags and sequence end. This proves records cross the ordinary file path, survive the repaired backpressure boundary, are stripped without changing decoded bytes, bind to all four pictures and follow frame ownership to the displayed frame. Both launch-free snapshots froze on the profiler's forced terminal timeout before `session_quiet` and `presentation_complete` became true, while the later LED acceptance snapshot was successful, so those frozen fields remain a profiler timing limitation rather than a decoder failure. The proposed `quartus_sh --write_settings_files=off` edit from Entry 372 must not be made as written: Quartus 17 rejects that shell option, and the normal flow output proves its map, fit and assembler children already run with settings writes disabled.
-
-#### Next Steps:
-
-Treat `dea60bc` and the installed RBF as the accepted timestamp-association boundary. The next repository-only cycle should place the regression instructions, result template, checksums and compatibility manifest under `docs/`, require USER, POWER and DISK observations for every hardware stream, regenerate the pack from committed generators, and correct the launch-free snapshot trigger so terminal fields are captured after quiet rather than by forced timeout. After that reproducibility boundary is accepted, resume timestamp-driven presentation against the proven system clock while retaining free-running cadence for unannotated streams.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
