@@ -1,3 +1,31 @@
+## 419 COMMIT Unreleased d70591c 2026-08-24T02:20:34-07:00
+
+#### Coming From:
+
+Unreleased d70591c
+
+#### Purpose:
+
+Hardware-accept deterministic PCM startup reserve and audio-aware terminal completion with the sole faded Program Stream.
+
+#### Outcome:
+
+After rebooting with Audio Test Off, the user ran only `02_arm_mp2_faded_tones.mpg` and reported perfect sound, perfect video, USER steady on, DISK steady off and POWER steady on. The untouched 800-by-600 capture at SHA-256 `3062a977f2392a938f97604f2e3fe0f75ec3bc0d82deda273fa77d0af387b69b` shows the accepted final raster. Its schema-eight snapshot freezes for quiet reason one at system-time second three with session quiet true, directly reversing the prior reason-two timeout at second two while audio was active. It reports the expected saturated PCM sample count of 16,383 for the 144,000-sample file, saturated FIFO peak of 127 or greater, no audio underrun, no PCM protocol error and zero aggregate error flags. Video remains exact at 185,149 accepted elementary-stream bytes, one associated timestamp, three reference plus two B pictures, five displays, four swaps, sequence end and presentation complete with no presentation error or residual scheduler ownership. Source `d70591c` and RBF SHA-256 `b48d06e1b0f42e3465f48a1d89b10d0eb032edddcb4e02f8aab84c14854a75df` are therefore the hardware-accepted startup-prefill and audio-tail telemetry boundary.
+
+#### Next Steps:
+
+Keep `d70591c` installed as the accepted audio-reserve baseline. The next isolated FPGA cycle should define and prove the response to a genuinely prolonged ARM producer stall after playback has begun, coordinating any pause or recovery with video presentation so Linux delay cannot silently create permanent audio-video drift. Continue using one video file for that development build and reserve the complete regression set for release qualification.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 418 COMMIT Unreleased d70591c 2026-08-24T02:17:00-07:00
 
 #### Coming From:
@@ -1134,34 +1162,6 @@ After a MiSTer power cycle, the authoritative 185,054-byte `07_b_f_code_range.m2
 #### Next Steps:
 
 Power-cycle the MiSTer and load `08_compat_multi_slice.m2v` through the normal file selector, then report all three LEDs and leave the completed image loaded for telemetry capture. Require three reference plus two B pictures, all five displays, four swaps, 185,394 accepted transport bytes including the expected odd-byte pad, sequence-end quiet, complete presentation retirement and zero errors before proceeding to test nine.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 379 COMMIT Unreleased 2b1a170 2026-08-23T20:18:20-07:00
-
-#### Coming From:
-
-Unreleased 2b1a170
-
-#### Purpose:
-
-Hardware-qualify the ordinary presentation queue-capacity fix with two reboot-isolated executions of the stream that exposed the deterministic dropped display.
-
-#### Outcome:
-
-The exact installed 4,173,788-byte RBF for `2b1a170`, SHA-256 `b19010473eb8f414b85b9ae11d0b3f29abc26dae560c115a1da29754cd23f491`, passes `06_p_f_code_range.m2v` twice after separate MiSTer power cycles. The user reports USER steady on, DISK steady off and POWER steady on for both runs. Both launch-free schema-seven captures freeze for quiet reason one with exactly 184,678 accepted transport bytes including the odd-byte pad, five reference pictures, five displayed pictures, four swaps, sequence end, session quiet, presentation complete, zero presentation errors, zero decoder error flags and zero cadence outliers. Both finish on reference bank one with no frame waiting, input or destination hold, pending scheduler work or active reorder state; their three ranked cadence gaps also agree at 2,984,256, 2,984,256 and 1,989,504 decoder cycles despite normal variation in decode and host-transfer stalls. This reverses the prior repeatable four-display and three-swap hardware failure and proves that the ordinary queue-capacity hold prevents publication overwrite without disturbing terminal retirement. Telemetry capture is now non-interactive by bypassing the stale local key-only SSH stanza with an isolated SSH configuration and retrieving the screenshot through the established automatic FTP connection. The exact 185,054-byte test-seven stream already on the MiSTer was independently retrieved at the authoritative SHA-256 `d0aad59a546114c7fe36680902c2bb912c7bcc2a43201ae9d0fd790d6f877725`.
-
-#### Next Steps:
-
-Continue the numeric hardware regression with `07_b_f_code_range.m2v`, which exercises independent forward and backward B-picture motion-vector ranges. Power-cycle before loading it through the normal file selector, record all three LEDs, leave the completed image loaded for launch-free telemetry, and require all five pictures to display with four swaps, sequence-end quiet, complete B-path retirement and zero errors before proceeding to test eight.
 
 #### Files Modified:
 
