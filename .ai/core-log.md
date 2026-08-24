@@ -1,3 +1,31 @@
+## 398 COMMIT Unreleased a57079f 2026-08-23T22:30:17-07:00
+
+#### Coming From:
+
+Unreleased a57079f
+
+#### Purpose:
+
+Close focused MiSTer qualification of the codec-independent PCM output milestone under the one-video-per-build policy.
+
+#### Outcome:
+
+The user confirms that Audio Test Off is silent, all four 44.1 and 48 kHz mono and stereo proof modes sound correct, mode changes and core reset re-arm correctly, and the 48 kHz stereo tones continue while the sole authorized video control plays. `04_b_bidirectional.m2v` looks unchanged and finishes with USER steady on, DISK steady off and POWER steady on. The launch-free schema-seven capture accepts the exact 185,150 transport bytes including the odd-byte pad, finds zero timestamp associations, decodes three reference plus two B pictures, displays all five pictures with four swaps, and ends with sequence end, session quiet and presentation complete true. Decoder and presentation errors are zero, frame waiting and both holds are false, and no decode, reorder, queued generation, promotion, scratch, future-reference, pending-frame or terminal-boundary work remains. One 0.051002-second decode-limited interval is flagged as a cadence outlier while scratch is unavailable, 0.001264 seconds longer than the two 0.049738-second ranked intervals; it drops no picture, leaves no state and produces no visible change by the user's direct observation. This accepts source `a57079f` and RBF SHA-256 `ad04f9f73c0fb98309588f8c212c6ccad71c80b254a2a284f637672a73350d37` as the first hardware-passed codec-independent PCM boundary, with exactly one video file used in the build cycle.
+
+#### Next Steps:
+
+Preserve the accepted signed 16-bit 44.1 and 48 kHz PCM valid-ready contract, dual-clock FIFO, MiSTer output adapter and timing-closed restart mailboxes as the Audio integration boundary. Before implementing compressed audio, choose the first codec and application profile, activate its authoritative standards references in `core-reference.md`, and define one materially useful decode-to-PCM hardware target; continue using one focused video file per development build and reserve the full regression suite for release qualification.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 397 COMMIT Unreleased a57079f 2026-08-23T22:23:18-07:00
 
 #### Coming From:
@@ -1174,41 +1202,6 @@ Retry closure with fitter seed ten, which is the established remedy in this log 
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-## 358 COMMIT Unreleased 058f0a3 2026-08-22T22:22:14-07:00
-
-#### Coming From:
-
-Unreleased 2dc52d7
-
-#### Purpose:
-
-Capture validated 33-bit video PTS values, associate them with the first H.262 picture start that begins in each selected PES packet, and expose the result through passive hardware telemetry without changing presentation cadence.
-
-#### Outcome:
-
-Commit `058f0a3` extends the bounded Program Stream demux to reconstruct the five-byte 90 kHz PTS after its existing prefix and marker validation, clears the picture-start match register at every PES payload boundary so a prefix cannot be borrowed from the preceding packet, and pulses a single-cycle association only when the first complete `0x00000100` picture start begins inside a packet that carried a PTS. Raw elementary streams and selected PES packets without PTS retain their exact byte path. The previously reserved zero bits of the existing 38-word cadence snapshot now carry an eight-bit saturating association count and the complete latest 33-bit PTS across words eighteen, nineteen and thirty-five, preserving the overlay dimensions, schema, checksum, scheduler state and every existing diagnostic field; the RTL packing and the `decode_hardware_cadence.py` unpacking were verified consistent field by field. Every focused simulation passes: the demux unit test proves raw replay, pack and PES extraction under backpressure and error codes two, five, nine and ten; the cadence profiler retains schema four and checksum `e82b643d`; and the transport gate retains its sixteen-byte sticky drain. A real 1,447,940-byte FFmpeg Program Stream was validated against an independently written H.222.0 clause 2.5 reference extractor that shares no code with the RTL, and the RTL reproduced it exactly at 1,430,191 payload bytes, byte-identical to the source elementary stream, with seventy-seven PTS associations and a latest PTS of `77ef2`. One apparent discrepancy was resolved rather than accepted: FFprobe reports seventy-nine frames carrying PTS, but only seventy-seven PES packets carry one in the actual bytes, the remaining two values being FFmpeg reorder interpolations rather than stream-carried timestamps. A separate pre-existing behaviour was identified and confirmed unchanged at `2dc52d7`, so it is not a regression of this commit: the demux raises truncation error ten for any Program Stream that ends without an `MPEG_program_end_code`, even when every pack and packet structure completes exactly at end of file, which the FFmpeg VOB muxer does not emit by default. No FPGA image exists for this commit. The local incremental database was deliberately wiped for a from-scratch compile, which reached synthesis success with zero errors and one hundred thirty-five warnings and then entered routing before being terminated by the user at forty minutes against a documented twelve to fourteen minute clean-build history; it reported zero Quartus errors at termination and was an abandoned run, not a build failure. The complete accepted `2dc52d7` build state remains preserved outside the repository.
-
-#### Next Steps:
-
-Restore the preserved `2dc52d7` database and build `058f0a3` incrementally at seed nine, which is the cadence every accepted cycle in this log has used, since a clean from-scratch compile is required only at release qualification and its cost has grown sharply as the device passes eighty-six percent of available logic. Require all timing categories positive and compare decoder setup against the preserved plus 0.572 ns baseline, then verify on MiSTer that the five-second Program Stream reports the independently expected seventy-seven associations and latest PTS `77ef2` while retaining one hundred twenty pictures, one hundred nineteen swaps, zero errors and clean terminal completion. Treat the growing fitter runtime as evidence worth watching, because a fit this congested may not hold decoder setup margin. Decide separately, outside this cycle, whether the truncation error on a missing program end code should remain an error or become a tolerated clean end, since it rejects otherwise well-formed muxer output. If accepted, the following cycle will carry associated PTS through frame ownership and add an anchored presentation clock before enabling timestamp-driven swaps.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_07.svh
-- rtl/mpeg2_new/mpeg2_h222_program_stream_demux.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/tb_h222_program_stream_demux.sv
-- tools/streams/tb_h222_program_stream_demux_file.sv
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
