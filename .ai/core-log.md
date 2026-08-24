@@ -1,3 +1,31 @@
+## 412 COMMIT Unreleased 8bbd55c 2026-08-24T01:06:03-07:00
+
+#### Coming From:
+
+Unreleased 8bbd55c
+
+#### Purpose:
+
+Hardware-qualify the first FPGA-owned playback of ARM-decoded embedded audio and preserve the brief onset-quality observation.
+
+#### Outcome:
+
+After rebooting into the installed `8bbd55c` RBF and helper, the user ran `01_arm_mp2_audio.mpg` several times to hear its deliberately short audio and reported both tones audible with correct channel separation, the lower tone on the left and higher tone on the right, while the video remained visually correct. The user heard a slight crackly onset that sounded attributable to hearing only the beginning of the approximately 0.2-second fixture, then left the final run loaded with USER steady on, DISK steady off and POWER steady on. The untouched 800-by-600 capture at SHA-256 `04840e9c76c0f0fa90df7200b4692eaa1041330977b6483b8941ba9927b2de4f` shows the accepted completed raster. Its schema-eight quiet snapshot reports all 10,368 PCM samples extracted, saturated peak FIFO telemetry of 127 or greater, no audio underrun, no PCM protocol error and zero aggregate error flags; video reports 185,149 accepted elementary-stream bytes, three reference plus two B pictures, five displayed pictures, four swaps, sequence end, session quiet and presentation complete. The captured run therefore proves the helper-to-FPGA PCM transport, left-right sample ordering and MiSTer audio output without Linux ALSA, and rules out FIFO starvation as the cause of its reported onset texture.
+
+#### Next Steps:
+
+Treat `8bbd55c` as the accepted embedded-PCM transport boundary. Before changing the playback path for the onset observation, generate one longer Program Stream with silence or a short fade before and after sustained channel-identity tones and run only that file on the current build; a clean sustained body would identify the crackle as the deliberately abrupt short fixture, while persistent crackle would justify inspecting sample continuity at record boundaries. After that diagnostic, add startup FIFO prefill and coordinated prolonged-starvation handling before claiming 0.7.0 audio is resilient to Linux scheduling delays, continuing the user's rule of one video file per development build cycle.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 411 COMMIT Unreleased 8bbd55c 2026-08-24T00:58:17-07:00
 
 #### Coming From:
@@ -1138,43 +1166,6 @@ Install only the exact RBF identified above. Hardware validation must begin with
 
 - rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
 - tools/streams/tb_h262_inband_metadata.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 372 COMMIT Unreleased 3ae9885 2026-08-23T17:44:42-07:00
-
-#### Coming From:
-
-Unreleased 2d555f7
-
-#### Purpose:
-
-Carry in-band timestamps through frame ownership to the displayed frame, and record the regression and procedural gaps that validating it exposed.
-
-#### Outcome:
-
-`09765db` added `mpeg2_h262_picture_timestamp`, which captures a timestamp at the picture start following its record, holds it while that picture decodes and commits it to the frame bank the picture lands in, so reading by `display_frame_bank` yields the timestamp of the displayed frame despite decode reordering; completion is detected as a toggle of `active_frame_bank`, which the bookkeeper inverts only on persistence. `0a6baf3` then corrected a real defect: the module had been bound to the frontend's `picture_seen`, which is a sticky level set at the first picture and cleared only by reset rather than a per-picture pulse, so the pending timestamp was cleared in the same cycle it arrived and nothing was ever associated. Simulation passed that broken design because the test drove `picture_seen` as a pulse, testing the assumption rather than the signal; binding moved to `mpeg2_new_picture_header_classified_now`, a genuine one-cycle header pulse, with explicit handling for a record completing in the same cycle as its picture start. `3ae9885` added `read_hardware_cadence.py`, which triggers a screenshot and decodes it without launching anything, because `run_hardware_cadence.py` drives MGL and the command FIFO and its captures have repeatedly disagreed with normal operation. Telemetry moved to schema seven, word thirty-five reporting the associated count and the displayed frame's low timestamp bits, checksum `eb2b643d`. The build closed at plus 0.256 ns HDMI and plus 0.753 ns decoder. Hardware validation then produced three findings that matter more than the feature. First, device state silently invalidated an hour of measurement: the archived `c9bc2ef8` image, bit-identical to one validated earlier the same day, began failing streams it had previously passed, and a power cycle restored it completely; every result taken in that window, including a syntax error and a `fatal_or_no_progress` snapshot on the annotated stream, measured nothing about the design. Second, with a rebooted machine and two repetitions, plain `04_b_bidirectional` fails on `0a6baf3` reporting syntax error source fifteen and passes on `c9bc2ef8`, so a genuine regression exists in this development run and is not caused by annotation: the injector places records at all five true picture starts, the RTL file replay reproduces the source byte for byte, and the stream's I picture carries conformant `FFFF` f_codes, so source fifteen indicates a misparse rather than a bad file. Third, this defect has been invisible because every prior validation was visual and no cycle in this log has ever read the diagnostic LEDs; `04` is five pictures, so a fault after the first still presents a plausible still image. The LED encoding, read from RTL rather than assumed, is that `LED_USER` steady on means no error latched and the stream accepted, N blinks means error flag N with one being syntax, and `LED_DISK` reports the error sub-code when USER blinks but the final GOP progress stage when USER is steady, so the disk indication cannot be interpreted without the user indication. Bisection is under way: `7c29f33` cannot serve as a midpoint because it misses timing at minus 0.202 ns and a violation could itself corrupt parsing, so `27ad1b3` was rebuilt, reproduced byte-identically at `6e075113...`, and is installed to determine whether the ingress extractor or the later timestamp work introduced the fault.
-
-#### Next Steps:
-
-Read the LEDs for plain `04_b_bidirectional` on the installed `27ad1b3` image. A failure implicates the in-band extractor, which is the only change between that image and the archived one touching the data path, and which inserted a three-byte pipeline between the FIFO and the decoder where `mpeg2_new_stream_ready` carries a P-ownership hold written when FIFO position and decoder position were the same instant. A pass implicates the timestamp module of `09765db` and `0a6baf3`, which is supposed to be observational and would therefore not be. Whichever it is, reproduce it in simulation before repairing it, driving the real handshake in which valid is derived from ready and the ownership hold stalls mid-stream, because both defects found in this cycle were hidden by tests that modelled assumptions about signals rather than the signals themselves. Add the LED reading to the regression procedure as a required per-stream observation with the encoding recorded, since the procedure already names the USER LED as the positive completion diagnostic and never said to look at it. Move `TEST_INSTRUCTIONS.md`, `RESULTS_TEMPLATE.txt`, `SHA256SUMS` and `compatibility_manifest.json` into `docs/`, because the regression procedure currently exists only in an untracked Desktop directory and a fresh clone cannot reproduce the validation inputs, which is the third instance this session of the workflow depending on something outside the repository. Regenerate the regression streams from the committed generators in `tools/streams/` and compare them against the pack's `SHA256SUMS` to confirm the pack is reproducible. Add `--write_settings_files=off` to the compile command in `tools/build.sh`, because a crashed flow wrote 298 lines of generated pin assignments into the tracked `MediaPlayer.qsf`.
-
-#### Files Modified:
-
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_05.svh
-- MediaPlayer_top_07.svh
-- files.qip
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- rtl/mpeg2_new/mpeg2_h262_picture_timestamp.sv
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/read_hardware_cadence.py
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-- tools/streams/tb_h262_picture_timestamp.sv
 
 #### Status:
 
