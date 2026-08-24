@@ -1,3 +1,31 @@
+## 402 COMMIT Unreleased 55d06ce 2026-08-23T23:33:09-07:00
+
+#### Coming From:
+
+Unreleased 55d06ce
+
+#### Purpose:
+
+Install the source-neutral ARM helper boundary without touching the accepted RBF or connected development DVD.
+
+#### Outcome:
+
+The exact `55d06ce` artifacts were uploaded under temporary names, independently hash-checked, installed, synchronized and verified again. `/media/fat/MiSTer` now has SHA-256 `7f6ef2d299e9619250f300764836c8bf30409f7f452cd34248effda6e6536a39`, `/media/fat/linux/MediaPlayer_Helper` has SHA-256 `4f6ac001a4a0455c20e1148cedf7548768258abfafb2299a3f8b171a5383fa8e`, and the accepted RBF remains `ad04f9f73c0fb98309588f8c212c6ccad71c80b254a2a284f637672a73350d37`. The original official Main rollback remains byte-identical at `/media/fat/MiSTer.backup.pre-arm-c9e5aff.7ca3cd2f`. The user rebooted during the refactor, before this replacement, so the current PID 530 process maps the deleted earlier Main image at SHA-256 `51b4e122e6bb3f1f7c62bcfb176d32528b5d08f48b04682d74e59e53fef8c900`; the newly installed source-neutral build will not execute until one additional reboot. The connected `/dev/sr0` DVD remains unmounted and no disc content was read.
+
+#### Next Steps:
+
+Reboot once to start the installed `55d06ce` Main, then run only `01_arm_mp2_audio.mpg`. Confirm MPG visibility, immediate return without the Loading screen, normal five-picture video, correct 440 Hz left and 660 Hz right embedded tones and all LED states, then reset and replay the same file once and leave the final image loaded. Do not select, mount or inspect the connected DVD during this cycle.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 401 COMMIT Unreleased 55d06ce 2026-08-23T23:25:11-07:00
 
 #### Coming From:
@@ -1156,33 +1184,5 @@ Build at seed ten and require every timing category positive, then repeat at a t
 
 - [x] Built
 - [x] Passed
-
----
-## 362 COMMIT Unreleased ebf372e 2026-08-23T04:07:40-07:00
-
-#### Coming From:
-
-Unreleased 4be2b8f
-
-#### Purpose:
-
-Break the route-dominated reference-word delivery path by registering it between the shared reference cache and the prediction block fetchers.
-
-#### Outcome:
-
-Commit `4be2b8f` first corrected an error in the preceding sweep: `mpeg2_h262_reference_pipeline_probe_plan.sv` is pulled in by an `include` directive rather than listed in `files.qip`, so absence from that file does not prove a source is dead, and synthesis rejected the tree in five seconds until it was restored. With that fixed the deletion is proven inert, because synthesis of `4be2b8f` reports 49,295 registers, 3,228,103 memory bits, 65 DSP blocks, 145 pins and one hundred thirty-five warnings, every figure identical to the tree before twenty-four files and all seven duplicate module definitions were removed. A classification pass then overturned this log's earlier assumption that diagnostics were a large share of the design. Tracing what each module's outputs actually reach, rather than trusting its name, shows `mpeg2_h262_luma4_probe` is the intra slice and macroblock parser driving `quantiser_scale_code`, `macroblock_address_increment` and coefficient data, `mpeg2_h262_reference_read_probe` instantiates three decode engines, and the `two_picture_probe` and `p_diagnostic_controller` group carries decode mode selection; only the cadence profiler and the final GOP progress probe are genuine telemetry, together about 588 lines of 12,514 live. Six further modules totalling 2,412 lines are compiled but instantiated nowhere, so they are already optimised away and cost no area. Gating diagnostics is therefore not a margin lever and has been abandoned as one. The failing path itself is not logic-deep: one logic level, 0.792 ns of cell delay and 15.253 ns of routing across fifty-eight elements, ninety-five percent wire, because a thirty-six by sixty-four word store cannot pack near the cache. Converting that store to inferred block RAM was attempted and reverted: Quartus inferred nothing and simply duplicated the array, raising registers to 53,903, because the read is conditional and the array shares a large always block with a reset branch. This commit instead registers the shared cache word together with both ownership-qualified ready strobes, so ownership is still resolved in the cycle the word is produced and only delivery moves by one clock, costing sixty-six registers for 49,361 total with memory and DSP unchanged and zero synthesis errors. The fetchers track outstanding requests through their descriptor queue rather than a fixed response latency, which the focused fetcher test already exercises in both its zero-latency and delayed cases.
-
-#### Next Steps:
-
-Build at seed nine and require decoder setup materially above the plus 0.572 ns that `2dc52d7` held, then repeat at a second seed, because the standing gate before any 0.7.0 feature work resumes is plus 1.2 ns on two consecutive fits at different seeds against a measured fit-to-fit spread near 0.6 ns. Confirm on MiSTer that every raw elementary-stream regression decodes exactly as before with unchanged picture and swap counts, zero decoder errors and clean terminal completion, since the extra delivery cycle touches the shared reference path used by both the mixed and bidirectional engines. If margin remains short, restructure the word store for genuine block RAM inference as its own scoped cycle, lifting the memory into an isolated always block and making the read unconditional, which is safe because consumers already gate on `block_lookup_valid`; that would remove 2,304 registers as well as the routing pressure. Separately and with no timing expectation, delete the six compiled but uninstantiated modules for navigability. Renaming the decode modules that carry probe names remains worthwhile after 0.7.0, since that naming has now produced two incorrect recommendations in one session.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
