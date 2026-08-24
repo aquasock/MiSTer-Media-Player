@@ -1,4 +1,4 @@
-## 404 COMMIT Unreleased ??? 2026-08-23T23:46:41-07:00
+## 404 COMMIT Unreleased b357c51 2026-08-23T23:46:41-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Add bounded persistent diagnostics to Main's MediaPlayer helper-to-SPI broker so
 
 #### Outcome:
 
-The change will remain confined to the isolated Main patch and will not alter transfer ordering, buffering, the helper protocol, decoder output or FPGA behavior. The broker will create a fresh temporary log when a MediaPlayer source starts and record the source, index, helper process identifier, download assertion, each pipe-read result, cumulative bytes submitted through `user_io_file_tx_data`, EOF or error, download release, child status and every explicit stop reason. Helper standard error will be redirected into the same log so launch, parsing, audio-output and child failures survive after the short process exits. Logging failures will remain nonfatal so diagnostic observability cannot itself prevent playback. Ubuntu GCC 15.2 was tried only as a local build tool and failed in untouched upstream Main because its current ARM headers and stricter C++ handling are incompatible with this pinned 2025 source; no binary was produced or installed. The user then withdrew that diagnostic exception and directed the project back to MiSTer's official Arm GNU 10.2-2020.11 toolchain.
+Commit `b357c51` confines the change to the isolated Main patch and does not alter transfer ordering, buffering, the helper protocol, decoder output or FPGA behavior. The broker creates a fresh `/tmp/MediaPlayer_ARM.log` when a source starts and records the source, index, helper process identifier, download assertion, bounded would-block events, every positive pipe read, cumulative bytes submitted through `user_io_file_tx_data`, EOF or error, download release, child wait status and every explicit stop reason. Helper standard error is redirected into the same append-only descriptor, and log-open failures remain nonfatal. Ubuntu GCC 15.2 was tried only as a local build tool and failed in untouched upstream Main because its current ARM headers and stricter C++ handling are incompatible with this pinned 2025 source; no binary was produced or installed. The user then directed the project back to MiSTer's official Arm GNU 10.2-2020.11 toolchain. The verified official archive has SHA-256 `102825ae56c9e00142d06f35d2bdd3299edb6060e84a275a25b095e66fd3fc2a`, identifies as GCC 10.2.1, applies the patch cleanly to Main commit `0a8fb44` and produces two byte-identical 1,166,244-byte ARM EABI5 builds at SHA-256 `1ee8e337e8583fdf4ac585934734fcd7d6af1f8a7130f5e1adcb7ecaebf4a1e4`. The expected diagnostic strings are present in the stripped artifact.
 
 #### Next Steps:
 
-Apply the instrumentation to `host/main_mister/0001-mediaplayer-arm-loader.patch`, exercise its event accounting with a host-side broker test if practical, then build Main with MiSTer's official Arm GNU 10.2-2020.11 toolchain and record the exact resulting hash. Install only that rebuilt `/media/fat/MiSTer` through staged hash verification, retaining the official rollback and leaving `/media/fat/MediaPlayer.rbf`, `/media/fat/linux/MediaPlayer_Helper`, `01_arm_mp2_audio.mpg` and `/dev/sr0` untouched. After reboot, replay only `01_arm_mp2_audio.mpg`, capture the result and retrieve the temporary broker log before proposing any transport correction.
+Install only the exact `1ee8e337e8583fdf4ac585934734fcd7d6af1f8a7130f5e1adcb7ecaebf4a1e4` diagnostic Main through staged upload and independent remote hash verification, retaining the official rollback and leaving `/media/fat/MediaPlayer.rbf`, `/media/fat/linux/MediaPlayer_Helper`, `01_arm_mp2_audio.mpg` and `/dev/sr0` untouched. Reboot once, replay only `01_arm_mp2_audio.mpg`, leave the resulting frame loaded and report the LEDs; then capture the frame and retrieve `/tmp/MediaPlayer_ARM.log` before proposing any transport correction.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Apply the instrumentation to `host/main_mister/0001-mediaplayer-arm-loader.patch
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
