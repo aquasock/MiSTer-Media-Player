@@ -1,3 +1,31 @@
+## 471 COMMIT Unreleased 9a5eea3 2026-08-24T13:10:34-07:00
+
+#### Coming From:
+
+Unreleased 9a5eea3
+
+#### Purpose:
+
+Accept the timestamp cadence floor on a complete hardware soak and establish the release-candidate presentation baseline.
+
+#### Outcome:
+
+The user watched `20_bbb_full_48k.mpg` end to end on `9a5eea3` and reports perfectly smooth motion with no jumps even in the credits, followed by USER and POWER solid on and DISK blinking eleven times. The final screenshot was captured exclusively through plain FTP with the default MiSTer login and no SSH keys; `.ai/current_results/entry471_full_soak_pts_cadence_floor.png` is 8,145 bytes with SHA-256 `5648ae703647ba1996a0615e6770b40c30ea9175df5e43bc798a694682a41f01`. Schema nine accepts all 84,423,309 clean-video bytes, reports zero aggregate errors, no audio underrun or PCM protocol error, sequence end, presentation completion and normal quiet reason one at STC second 597; the eight-bit display counters wrap exactly as expected for all 14,315 pictures and 14,314 swaps to 235 and 234. The credits-window result is stronger than the visual observation alone: gap outliers fall from thirty on `8c59ddb` to zero, and all three largest gaps are now 2,984,256 decoder cycles or 49.7376 milliseconds rather than 3,979,008 cycles or 66.3168 milliseconds. The profiler records 149 timestamp-advance opportunities and zero delay opportunities because it observes the PTS-due versus cadence-early condition rather than a completed swap; after the correction a retained timestamp may remain in that condition across more than one raster window while the mandatory cadence floor blocks it, so this larger passive count does not represent early presentation. The absence of late-window outliers, clean terminal evidence and user's smooth-credits report together accept `9a5eea3` and confirm that the former approximately one-second cadence was caused by sparse timestamps replacing the exact-rate admission gate.
+
+#### Next Steps:
+
+Freeze `9a5eea3` as the accepted FPGA functional baseline and preserve `/media/fat/MediaPlayer.backup.pre-pts-floor.8c59ddb.rbf` until release qualification is complete. Before starting broader decoder features, close or explicitly document the remaining host-side video-only Program Stream boundary, where `good_video_only.mpg` currently reaches the helper's 512 KiB lookahead error instead of playing or reporting the intended missing-audio condition. Then qualify v0.7.0 from an exact release-candidate commit with a clean from-scratch Quartus 17.0.2 build, Phase-1P timing reports, the complete hardware regression pack, supported 44.1 and 48 kHz controls, expected-failure recovery sweep and final audio-video soak; update README, changelog and release notes to describe the now-proven Program Stream, audio and PTS behavior, package the date-coded RBF and matching helper, and have the user create the annotated `v0.7.0` tag and GitHub pre-release from that exact commit.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
 ## 470 COMMIT Unreleased 9a5eea3 2026-08-24T12:38:50-07:00
 
 #### Coming From:
@@ -1203,36 +1231,6 @@ Install the exact official-toolchain helper with rollback preserved, then place 
 - tools/streams/generate_test_big_buck_bunny.py
 - tools/streams/verify_arm_av_pipeline.py
 - docs/TEST_INSTRUCTIONS.md
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 431 COMMIT Unreleased 1102830 2026-08-24T04:50:33-07:00
-
-#### Coming From:
-
-Unreleased 3f4b272
-
-#### Purpose:
-
-Accept 44.1 kHz audio and add a host-side input envelope checker with a deterministic corpus, as the first step toward user-converted playback.
-
-#### Outcome:
-
-The v0.7.0 goal is that users convert their own media with FFmpeg and test it, so the likely failure is an unsupported input rather than a decoder defect. Commit `1102830` addresses the two host-side halves of that. Adding 44.1 kHz proved to be a host-only change: `mpeg2_h262_inband_metadata` already extracts the rate bit from the record's mode byte, the top level already routes it, and `audio_pcm_output_adapter` already selects its phase step between `RATE_48000` and `RATE_44100`, so the entire FPGA path supported 44.1 kHz and only the helper rejected it. The helper now accepts 44,100 as well as 48,000 Hz and sets the mode bit from the decoded rate rather than hardcoding 48 kHz stereo, drains the pending queue before adopting a changed rate so held samples cannot be mislabelled, and reports the supported set when it refuses. Verification on a generated 44.1 kHz Program Stream shows 132,480 records all carrying mode byte one, while the accepted 48 kHz fixture still emits 144,000 records carrying mode byte three and its emitted stream is byte-identical to the previous build, so no 48 kHz behaviour changed. No FPGA rebuild is required. `check_media_compatibility.py` reports, before a file reaches hardware, whether it lies inside the implementation envelope, naming the FFmpeg option that fixes each problem: geometry against 720 by 480 and 45 by 30 macroblocks, frame-rate codes against the paced set one through five with codes six through eight named as unpaced, the progressive 4:2:0 frontend conditions delegated to the existing `analyze_h262_compatibility` so there is one video parser, and audio codec, sample rate and channel count. `generate_compatibility_corpus.sh` builds nine deterministic cases and asserts each verdict, and all nine agree: three good cases pass and six bad ones fail. Building that corpus immediately found a defect in the checker rather than in the core. Its Program Stream demultiplexer implemented only the MPEG-1 PES header form, so on the MPEG-2 PES packets FFmpeg actually emits it mis-stripped every packet and reported a valid video-only file as failing on picture 45. A checker that rejects good files is worse than none, since it sends users chasing a defect that does not exist. The demultiplexer now mirrors `parse_pes_header` in the helper exactly, and its output is byte-identical to FFmpeg's own demux of the same file. That defect also affected the analysis recorded in entry 428, which is corrected here: the fixture's video elementary stream is 185,149 bytes and its first picture spans 179,859 of them, not the 183,120 and 177,830 recorded there. The conclusion is unchanged at 97.1 percent, and the corrected total now matches the decoder's own reported `accepted_bytes` of 185,149 exactly, which the earlier figure did not.
-
-#### Next Steps:
-
-The 44.1 kHz helper cannot reach hardware yet. The user has directed that the official MiSTer ARM GNU 10.2 compiler be used from now on, and only the distribution's `arm-linux-gnueabihf-gcc` is present on the workstation, so no ARM binary was built or installed this cycle and the installed helper remains `3f4b272` at SHA-256 `c6ce4ef0595beee5f1f231edeaebe360160becccad22e3e51d9f8d23b9c690b0`. Obtain that toolchain before the next helper installation. The remaining v0.7.0 work is the hardware half of the failure sweep and the long-duration audio-video soak. For the sweep, place the corpus's six bad cases on the MiSTer and require each to fail visibly and recoverably rather than wedging the core, which is the specific risk entry 425 demonstrated is real. For the soak, the acceptance target is full Big Buck Bunny playback with audio, which needs a source carrying audio; `generate_test_big_buck_bunny.py` expects `big_buck_bunny_480p_stereo.avi` beside it and does not fetch it, so the user must supply that file, and the generator must then be extended to mux MPEG Layer II audio into a Program Stream rather than emitting a silent elementary stream. That soak is the first test of audio-video drift beyond three seconds and of the startup lead on content whose first picture is small.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- tools/streams/check_media_compatibility.py
-- tools/streams/generate_compatibility_corpus.sh
 
 #### Status:
 
