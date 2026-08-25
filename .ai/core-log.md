@@ -1,3 +1,31 @@
+## 495 COMMIT Unreleased baf5d2c 2026-08-25T01:30:20-07:00
+
+#### Coming From:
+
+Unreleased 2601573
+
+#### Purpose:
+
+Create and install the pair-identical step-hold TFF fixture that distinguishes stale framebuffer pixels from authored temporal interlace and downstream display persistence.
+
+#### Outcome:
+
+Commit `baf5d2c` adds `--step-hold-visual-seconds` to the deterministic interlaced all-I generator without changing its established default, sustained-motion or low-complexity-motion outputs. The new source authors an eight-pixel bright bar identically in both fields, holds each position for sixty 60000/1001 source fields or thirty 30000/1001 output pictures, then jumps ninety-six pixels; two stationary horizontal references remain while alternating field markers are deliberately absent. A permanent decoded-plane validator checks every frame, proves the current bar bright in both adjacent field rows, checks every previous non-current position remains background after each jump and records zero maximum difference between representative adjacent field rows. Independent generations reproduce byte-identical TFF and BFF outputs, retain the exact four-picture baseline hashes, preserve patched-versus-unpatched decoded-plane equality, contain 300 all-I pictures with the intended field order and remain deliberately rejected by the public compatibility checker. The 3,483,304-byte TFF fixture is SHA-256 `71f00b8f8c919857fe8c92bec9f0dfd440493650573ef0ae4bc0ac4b7754f4df`; its decoded YUV420 plane hash is `cf629eaefc50ffb89d83450332cd312828390bcdc94454d45e823139edfe8544`, and nine decoded jumps contain no prior-position residue. Its byte-identical regeneration was uploaded under a staging name and retrieved at the local hash, promoted as `/media/fat/_cadence/native_480i_tff_step_hold_10s.m2v`, retrieved again at the same hash and only then had the stage removed, entirely through ordinary FTP with the default MiSTer login and no SSH. The BFF counterpart remains local and deferred. The installed RBF was independently retrieved unchanged at the exact `2601573` hash `67bd360b0efa1864ca5184049ad6dfd9fc2edc006421871309c2c0be9de70969`; helper and Main were not touched.
+
+#### Next Steps:
+
+Turn `Native timing pattern` Off, keep `Interlaced output` at `Native 480i` and run only `_cadence/native_480i_tff_step_hold_10s.m2v`. The narrow white bar should remain fixed for about one authored second and then jump ninety-six pixels nine times; after each jump judge whether the old position disappears immediately or within one field or frame, or remains visibly stuck for a material fraction of the next hold, and note any comb, flicker or horizontal dashes. Report USER, DISK and POWER and leave the final image loaded for an FTP-only schema-nine capture. Immediate clean disappearance places the earlier continuous-motion shadow in ordinary interlaced temporal presentation or downstream display processing, while persistence into the hold proves stale framebuffer, cache or frame-bank content and requires a targeted field/cache identity RTL diagnostic. Continue to defer BFF, throughput optimization and any public native-interlace compatibility claim.
+
+#### Files Modified:
+
+- tools/streams/generate_test_interlaced_i_frames.py
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 494 COMMIT Unreleased 2601573 2026-08-25T01:26:01-07:00
 
 #### Coming From:
@@ -1234,44 +1262,6 @@ Power-cycle, set Audio Test to Off and run only `24_bbb_opening24_pts_only.m2v`,
 #### Files Modified:
 
 - tools/streams/strip_inband_pcm.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 455 COMMIT Unreleased 9f83805 2026-08-24T08:26:32-07:00
-
-#### Coming From:
-
-Unreleased f870d98
-
-#### Purpose:
-
-Give the decoder its compressed-FIFO reservoir back by ending the startup video lead on a byte budget, after paired captures showed the stutter is lost presentation slack rather than delivery.
-
-#### Outcome:
-
-The user ran `23_bbb_opening24_exact_av.mpg` on the `cf1d173` helper and reports the stutter still present, audio and video still aligned, and ordinary terminal indication with USER solid on, DISK blinking eleven times and POWER solid on. The capture is 545,898 bytes at SHA-256 `1e4aa14922109364934c65cddcc80030f03c27ec56fc2f31fa1ca207fe44cb4d`, taken over FTP because this workstation's SSH client can no longer authenticate to the MiSTer; the screenshot command was written to `/dev/MiSTer_cmd` through the FTP data path instead, which is a working substitute for the documented capture route. Half the acceptance criteria are met. Aggregate error flags are zero, `audio_pcm_underrun` and `pcm_protocol_error` are both false, all 3,138,619 transport bytes are accepted, 194 reference plus 383 B pictures decode, all 577 pictures display with 576 swaps after eight-bit wrap, sequence end is seen, presentation completes and the snapshot is the normal quiet reason one with the PCM count and FIFO peak saturated. The sticky underrun that entry 451 measured at 21.74 seconds is gone from a file that reproduces its exact opening bytes with audio.
-
-The cadence is not fixed and is worse in peak terms: 174 display gaps cross the outlier threshold in 24.044 seconds, against 139 in the first 21.74 seconds of the full soak, and the three largest are 10,942,272 cycles or 182.371 milliseconds at picture ordinal fifteen, 9,947,520 cycles or 165.792 milliseconds at ordinal 33, and 6,963,264 cycles or 116.054 milliseconds at ordinal five. Their signature has changed from entry 451, where the largest gaps recorded `decoder_ready` false with compressed input pending. Every large gap here records `decoder_ready` true with input pending, and the two largest add `scratch_available` false with a reorder run in flight, a decode in flight and a future frame pending. The decoder is neither starved of bytes nor unable to accept them.
-
-Retrieving the entry 453 raw capture from the MiSTer and decoding it beside this one settles the mechanism, because both runs present the same 577 pictures from byte-identical H.262 through the same FPGA image. Decode work is the same to within three percent: decoder stall 655,685,975 cycles raw against 644,013,299 with audio, intra stall 61,907,556 against 61,920,490, predicted stall 197,169,953 against 195,855,651, bidirectional stall 396,608,466 against 386,237,158, and prediction requests identical at 59,531,848. One pair of counters differs by two orders of magnitude: presentation hold falls from 781,845,922 cycles, 13.03 seconds or 54 percent of the raw session, to 7,967,197 cycles or 0.13 seconds, and presentation stall falls from 777,671,229 to 4,569,905. The raw run spends half its time waiting to present because the decoder is far ahead; the audio-video run never waits because the decoder is never ahead. Both deliver 577 pictures in about 24 seconds, so average throughput is identical and only the slack differs.
-
-That slack is the compressed video FIFO's fill, and it is set at startup rather than in steady state. `rtl/mpeg2_stream_fifo.sv` holds 32 KiB, about 0.25 seconds at this stream's 130,776 bytes per second. Without audio the helper writes video as fast as the FPGA accepts it, so that FIFO sits full and absorbs every picture whose decode exceeds one 41.667-millisecond frame interval; the raw run's largest gap is 49.738 milliseconds and it never crosses the threshold. With audio sharing the path, the accepted two-picture startup boundary releases audio after only 5,301 video bytes, so the FIFO stabilises near sixteen percent full and the shared path then runs at real time, leaving no reservoir for decode-time variance. Steady-state interleaving cannot recover a lead it never established, which is why bounding delivery order corrected the audio without touching the cadence.
-
-Commit `9f83805` was approved and implements exactly that. The lead now ends only when the second picture start has been seen and 28,672 video bytes have crossed, so a payload smaller than the budget keeps its existing boundary and real content gets the reservoir. Measured on the transports, the startup video lead rises from 5,301 to 28,609 clean bytes on the diagnostic and from 1,280 to 28,654 on both controls, while the short and faded fixtures are unchanged at 179,893 because their intra picture is larger than the budget and their second picture start still ends the lead. The full soak reproduces every established payload figure exactly: 342,199,090 transport bytes, video and timestamps at SHA-256 `db00682bb603a5f575df5a1d5d0b7a580c46ca99eed028f024ac6bc37016f38f`, PCM at SHA-256 `337b1387b9324b6c391a3223ced8f7660bd5144267b29d3964b4ed6b282839af`, steady batches within 2,048 and PCM-free video spans within 4,052 bytes. The audio margin improved rather than regressed: the deepest audio deficit over the whole movie falls from 7,374 frames to zero, because the lead leaves audio permanently further ahead of the sink than it was. All four fixtures at both sample rates, both controls and the diagnostic pass under native and address-and-undefined-sanitized helpers, the nine-case envelope corpus is unchanged at three passes and six intended failures with identical exit statuses and messages, and two official GCC 10.2.1 builds are byte-identical at 361,452 bytes and SHA-256 `9c20dc699cf1c2fd8e28aa78ba9d4c754def62fe0ff0df51b32df21614a7dde6`. Only the helper was installed, through the same staged roundtrip verification, with the previous helper preserved exactly as `/media/fat/linux/MediaPlayer_Helper.backup.pre-startup-lead.cf1d173`; RTL, RBF, Main and every media file are untouched and no playback was launched.
-
-One consequence has to be watched on hardware rather than asserted from the host. The lead is 0.22 seconds of video at this stream's rate, so if the core presents pictures as they arrive rather than against its own timeline, audio will begin that much after video and the offset will persist. The raw control presented 577 pictures in 24.006 seconds and the audio-video run in 24.044, which is the source cadence in both cases and indicates timeline-paced presentation, so the expectation is a fuller FIFO and unchanged synchronization. A perceptible lag of audio behind video is therefore the specific failure this budget can introduce, and it bounds how large the budget may grow.
-
-#### Next Steps:
-
-Power-cycle, set Audio Test to Off and run only `23_bbb_opening24_exact_av.mpg` again. The acceptance question is whether the outlier count falls from 174 toward the raw control's zero, so report visible stutter, whether audio still starts with the picture rather than noticeably behind it, and all three LEDs, then leave the final image loaded for a schema-eight capture. The capture must keep aggregate errors, underrun and PCM protocol errors clear with all 577 pictures displayed, and presentation hold should rise from 7,967,197 cycles toward the raw control's 781,845,922. If the outlier count falls but audio now trails the picture, reduce the budget rather than abandoning it. If the outlier count does not fall at all, delivery is exonerated and the remaining cause is the presentation scratch scheduler, with the `scratch_available` false evidence at ordinals fifteen and 33 as the starting point for FPGA work. If it passes, rerun `20_bbb_full_48k.mpg` end to end before any release consideration.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
 
 #### Status:
 
