@@ -1,12 +1,43 @@
 assign CLK_VIDEO = clk_video;
 assign CE_PIXEL  = display_pixel_ce;
 assign VGA_F1 = display_field;
-assign VGA_DE = fb_video_de;
-assign VGA_HS = fb_video_hs;
-assign VGA_VS = fb_video_vs;
+assign VGA_DE = presentation_base_de;
+assign VGA_HS = presentation_base_hs;
+assign VGA_VS = presentation_base_vs;
 assign VGA_R = cadence_video_r;
 assign VGA_G = cadence_video_g;
 assign VGA_B = cadence_video_b;
+
+// Field-invariant vertical bars exercise the complete native sync/timing path
+// without reading a framebuffer pixel or line cache.  Since the MPEG pipeline
+// remains active, comparing this view with normal video isolates visible
+// artifacts to output timing versus framebuffer/DDRAM data delivery.
+mpeg2_native_timing_pattern mpeg2_native_timing_pattern
+(
+    .h_pos      (display_h_pos),
+    .pixel_en   (display_pixel_en),
+    .h_sync     (display_h_sync),
+    .v_sync     (display_v_sync),
+    .video_r    (native_pattern_r),
+    .video_g    (native_pattern_g),
+    .video_b    (native_pattern_b),
+    .video_de   (native_pattern_de),
+    .video_hs   (native_pattern_hs),
+    .video_vs   (native_pattern_vs)
+);
+
+assign presentation_base_r = display_native_timing_pattern ?
+                             native_pattern_r : fb_video_r;
+assign presentation_base_g = display_native_timing_pattern ?
+                             native_pattern_g : fb_video_g;
+assign presentation_base_b = display_native_timing_pattern ?
+                             native_pattern_b : fb_video_b;
+assign presentation_base_de = display_native_timing_pattern ?
+                              native_pattern_de : fb_video_de;
+assign presentation_base_hs = display_native_timing_pattern ?
+                              native_pattern_hs : fb_video_hs;
+assign presentation_base_vs = display_native_timing_pattern ?
+                              native_pattern_vs : fb_video_vs;
 
 // Entry 245: development-only hardware cadence snapshot. Every input is an
 // already registered top-level boundary. The profiler has no control output,
@@ -97,10 +128,10 @@ mpeg2_h262_hardware_cadence_profiler
     .error_flags               (mpeg2_new_cadence_error_flags),
     .h_pos                     (display_h_pos),
     .v_pos                     (display_v_pos),
-    .base_r                    (fb_video_r),
-    .base_g                    (fb_video_g),
-    .base_b                    (fb_video_b),
-    .base_de                   (fb_video_de),
+    .base_r                    (presentation_base_r),
+    .base_g                    (presentation_base_g),
+    .base_b                    (presentation_base_b),
+    .base_de                   (presentation_base_de),
     .video_r                   (cadence_video_r),
     .video_g                   (cadence_video_g),
     .video_b                   (cadence_video_b),

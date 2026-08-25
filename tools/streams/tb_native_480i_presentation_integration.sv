@@ -1,180 +1,196 @@
 `timescale 1ns/1ps
 
-module tb_native_480i_presentation_integration;
+// A decoder model takes three native fields (about 50 ms) per all-I picture.
+// This matches the measured hardware latency closely enough to reproduce the
+// old 15 fps decode/present serialization and prove that the third ordinary
+// bank removes only the avoidable full-frame wait.
+module native_all_i_feeder
+(
+    input  wire       clk,
+    input  wire       reset,
+    input  wire       cadence_tick,
+    input  wire       presentation_hold,
+    output reg        frame_waiting,
+    output reg [1:0]  completed_bank,
+    output reg [1:0]  active_bank,
+    output reg        i_picture_start,
+    output reg        non_b_picture_start,
+    output reg [15:0] decoded_count
+);
+reg decoding;
+reg [2:0] fields_remaining;
 
+function automatic [1:0] next_bank(input [1:0] bank);
+begin
+    next_bank = (bank == 2'd2) ? 2'd0 : bank + 1'b1;
+end
+endfunction
+
+always @(posedge clk) begin
+    frame_waiting <= 1'b0;
+    i_picture_start <= 1'b0;
+    non_b_picture_start <= 1'b0;
+    if (reset) begin
+        frame_waiting <= 1'b0;
+        completed_bank <= 2'd0;
+        active_bank <= 2'd1;
+        i_picture_start <= 1'b0;
+        non_b_picture_start <= 1'b0;
+        decoding <= 1'b1;
+        fields_remaining <= 3'd3;
+        decoded_count <= 16'd0;
+    end else begin
+        if (!decoding && !presentation_hold) begin
+            i_picture_start <= 1'b1;
+            non_b_picture_start <= 1'b1;
+            decoding <= 1'b1;
+            fields_remaining <= 3'd3;
+        end
+        if (cadence_tick && decoding && !presentation_hold) begin
+            if (fields_remaining == 3'd1) begin
+                frame_waiting <= 1'b1;
+                completed_bank <= active_bank;
+                active_bank <= next_bank(active_bank);
+                decoded_count <= decoded_count + 1'b1;
+                decoding <= 1'b0;
+                fields_remaining <= 3'd0;
+            end else
+                fields_remaining <= fields_remaining - 1'b1;
+        end
+    end
+end
+endmodule
+
+module tb_native_480i_presentation_integration;
 reg clk_video = 1'b0;
 reg clk_mpeg2 = 1'b0;
 reg reset_video = 1'b1;
 reg reset_mpeg2 = 1'b1;
 reg native_request = 1'b0;
-
 always #9.259 clk_video = ~clk_video;
 always #8.333 clk_mpeg2 = ~clk_mpeg2;
 
-wire native_active;
-wire ce_pixel;
-wire [11:0] h_pos;
-wire [11:0] v_pos;
-wire pixel_en;
-wire h_sync;
-wire v_sync;
-wire field;
-wire field_window;
-wire frame_window;
-
+wire native_active,ce_pixel,pixel_en,h_sync,v_sync,field;
+wire field_window,frame_window;
+wire [11:0] h_pos,v_pos;
 mpeg2_video_output_timing timing
 (
-    .clk                   (clk_video),
-    .reset                 (reset_video),
-    .native_request_async  (native_request),
-    .top_field_first_async (1'b1),
-    .native_active         (native_active),
-    .ce_pixel              (ce_pixel),
-    .h_pos                 (h_pos),
-    .v_pos                 (v_pos),
-    .pixel_en              (pixel_en),
-    .h_sync                (h_sync),
-    .v_sync                (v_sync),
-    .field                 (field),
-    .field_window          (field_window),
-    .frame_window          (frame_window)
+    .clk(clk_video),.reset(reset_video),
+    .native_request_async(native_request),
+    .top_field_first_async(1'b1),.native_active(native_active),
+    .ce_pixel(ce_pixel),.h_pos(h_pos),.v_pos(v_pos),.pixel_en(pixel_en),
+    .h_sync(h_sync),.v_sync(v_sync),.field(field),
+    .field_window(field_window),.frame_window(frame_window)
 );
 
 reg cadence_window_video = 1'b0;
 reg swap_window_video = 1'b0;
 reg [2:0] cadence_window_sync = 3'b000;
 reg [2:0] swap_window_sync = 3'b000;
-
 always @(posedge clk_video) begin
     if (reset_video) begin
         cadence_window_video <= 1'b0;
         swap_window_video <= 1'b0;
-    end
-    else begin
+    end else begin
         cadence_window_video <= field_window;
         swap_window_video <= frame_window;
     end
 end
-
 always @(posedge clk_mpeg2) begin
     if (reset_mpeg2) begin
         cadence_window_sync <= 3'b000;
         swap_window_sync <= 3'b000;
-    end
-    else begin
-        cadence_window_sync <=
-            {cadence_window_sync[1:0], cadence_window_video};
-        swap_window_sync <= {swap_window_sync[1:0], swap_window_video};
+    end else begin
+        cadence_window_sync <= {cadence_window_sync[1:0],cadence_window_video};
+        swap_window_sync <= {swap_window_sync[1:0],swap_window_video};
     end
 end
+wire cadence_tick_pulse = cadence_window_sync[1]&&!cadence_window_sync[2];
+wire swap_window_pulse = swap_window_sync[1]&&!swap_window_sync[2];
 
-wire cadence_tick_pulse =
-    cadence_window_sync[1] && !cadence_window_sync[2];
-wire swap_window_pulse = swap_window_sync[1] && !swap_window_sync[2];
+wire base_waiting,base_i_start,base_non_b_start;
+wire [1:0] base_completed_bank,base_active_bank,base_display_bank;
+wire base_hold,base_error;
+wire [15:0] base_decoded_count;
+wire overlap_waiting,overlap_i_start,overlap_non_b_start;
+wire [1:0] overlap_completed_bank,overlap_active_bank,overlap_display_bank;
+wire overlap_hold,overlap_error;
+wire [15:0] overlap_decoded_count;
 
-reg frame_waiting = 1'b0;
-reg non_b_picture_start = 1'b0;
-reg [1:0] completed_frame_bank = 2'd1;
-reg [1:0] next_frame_bank = 2'd1;
-reg [1:0] feeder_state = 2'd0;
-
-wire [1:0] display_frame_bank;
-wire display_scratch;
-wire display_scratch_bank;
-wire decode_scratch_bank;
-wire [2:0] framebuffer_swap_reset_count;
-wire presentation_complete;
-wire presentation_error;
-
-mpeg2_h262_b_presentation_scheduler scheduler
+native_all_i_feeder baseline_feeder
 (
-    .clk                         (clk_mpeg2),
-    .reset                       (reset_mpeg2),
-    .swap_window_pulse           (swap_window_pulse),
-    .cadence_tick_pulse          (cadence_tick_pulse),
-    .frame_rate_code             (4'h4),
-    .timestamp_candidate_active  (1'b0),
-    .timestamp_candidate_due     (1'b0),
-    .frame_waiting               (frame_waiting),
-    .completed_frame_bank        (completed_frame_bank),
-    .reference_frame_bank        (2'd0),
-    .reference_promotion_count   (8'd0),
-    .b_picture_start             (1'b0),
-    .non_b_picture_start         (non_b_picture_start),
-    .i_picture_start             (1'b0),
-    .p_picture_start             (1'b0),
-    .sequence_end                (1'b0),
-    .b_user_success              (1'b0),
-    .b_decode_error              (1'b0),
-    .display_frame_bank          (display_frame_bank),
-    .display_scratch             (display_scratch),
-    .display_scratch_bank        (display_scratch_bank),
-    .decode_scratch_bank         (decode_scratch_bank),
-    .framebuffer_swap_reset_count(framebuffer_swap_reset_count),
-    .presentation_complete       (presentation_complete),
-    .presentation_error          (presentation_error)
+    .clk(clk_mpeg2),.reset(reset_mpeg2),.cadence_tick(cadence_tick_pulse),
+    .presentation_hold(base_hold),.frame_waiting(base_waiting),
+    .completed_bank(base_completed_bank),.active_bank(base_active_bank),
+    .i_picture_start(base_i_start),
+    .non_b_picture_start(base_non_b_start),.decoded_count(base_decoded_count)
+);
+native_all_i_feeder overlap_feeder
+(
+    .clk(clk_mpeg2),.reset(reset_mpeg2),.cadence_tick(cadence_tick_pulse),
+    .presentation_hold(overlap_hold),.frame_waiting(overlap_waiting),
+    .completed_bank(overlap_completed_bank),.active_bank(overlap_active_bank),
+    .i_picture_start(overlap_i_start),
+    .non_b_picture_start(overlap_non_b_start),
+    .decoded_count(overlap_decoded_count)
+);
+
+mpeg2_h262_b_presentation_scheduler baseline_scheduler
+(
+    .clk(clk_mpeg2),.reset(reset_mpeg2),
+    .swap_window_pulse(swap_window_pulse),
+    .cadence_tick_pulse(cadence_tick_pulse),.frame_rate_code(4'h4),
+    .timestamp_candidate_active(1'b0),.timestamp_candidate_due(1'b0),
+    .native_ordinary_overlap_enable(1'b0),
+    .active_frame_bank(base_active_bank),.frame_waiting(base_waiting),
+    .completed_frame_bank(base_completed_bank),.reference_frame_bank(2'd0),
+    .reference_promotion_count(8'd0),.b_picture_start(1'b0),
+    .non_b_picture_start(base_non_b_start),.i_picture_start(base_i_start),
+    .p_picture_start(1'b0),.sequence_end(1'b0),.b_user_success(1'b0),
+    .b_decode_error(1'b0),.display_frame_bank(base_display_bank),
+    .presentation_hold(base_hold),.presentation_error(base_error)
+);
+mpeg2_h262_b_presentation_scheduler overlap_scheduler
+(
+    .clk(clk_mpeg2),.reset(reset_mpeg2),
+    .swap_window_pulse(swap_window_pulse),
+    .cadence_tick_pulse(cadence_tick_pulse),.frame_rate_code(4'h4),
+    .timestamp_candidate_active(1'b0),.timestamp_candidate_due(1'b0),
+    .native_ordinary_overlap_enable(1'b1),
+    .active_frame_bank(overlap_active_bank),.frame_waiting(overlap_waiting),
+    .completed_frame_bank(overlap_completed_bank),.reference_frame_bank(2'd0),
+    .reference_promotion_count(8'd0),.b_picture_start(1'b0),
+    .non_b_picture_start(overlap_non_b_start),.i_picture_start(overlap_i_start),
+    .p_picture_start(1'b0),.sequence_end(1'b0),.b_user_success(1'b0),
+    .b_decode_error(1'b0),.display_frame_bank(overlap_display_bank),
+    .presentation_hold(overlap_hold),.presentation_error(overlap_error)
 );
 
 integer cadence_ticks = 0;
 integer frame_windows = 0;
-integer presentations = 0;
-integer pulse_gap = 1000;
-reg [1:0] display_frame_bank_d = 2'd0;
-
+integer base_presentations = 0;
+integer overlap_presentations = 0;
+reg [1:0] base_display_q = 2'd0;
+reg [1:0] overlap_display_q = 2'd0;
 always @(posedge clk_mpeg2) begin
-    frame_waiting <= 1'b0;
-    non_b_picture_start <= 1'b0;
-
     if (reset_mpeg2) begin
-        feeder_state <= 2'd0;
-        completed_frame_bank <= 2'd1;
-        next_frame_bank <= 2'd1;
         cadence_ticks <= 0;
         frame_windows <= 0;
-        presentations <= 0;
-        pulse_gap <= 1000;
-        display_frame_bank_d <= 2'd0;
-    end
-    else begin
-        if (cadence_tick_pulse) begin
-            cadence_ticks <= cadence_ticks + 1;
-            pulse_gap <= 0;
+        base_presentations <= 0;
+        overlap_presentations <= 0;
+        base_display_q <= 2'd0;
+        overlap_display_q <= 2'd0;
+    end else begin
+        if (cadence_tick_pulse) cadence_ticks <= cadence_ticks + 1;
+        if (swap_window_pulse) frame_windows <= frame_windows + 1;
+        if (base_display_bank != base_display_q) begin
+            base_presentations <= base_presentations + 1;
+            base_display_q <= base_display_bank;
         end
-        else if (pulse_gap < 1000)
-            pulse_gap <= pulse_gap + 1;
-
-        if (swap_window_pulse) begin
-            frame_windows <= frame_windows + 1;
-            if (cadence_tick_pulse)
-                $fatal(1, "native cadence and swap pulses remained coincident");
-            if (pulse_gap < 2)
-                $fatal(1, "native cadence-to-swap CDC gap=%0d", pulse_gap);
+        if (overlap_display_bank != overlap_display_q) begin
+            overlap_presentations <= overlap_presentations + 1;
+            overlap_display_q <= overlap_display_bank;
         end
-
-        if (display_frame_bank != display_frame_bank_d) begin
-            presentations <= presentations + 1;
-            display_frame_bank_d <= display_frame_bank;
-        end
-
-        case (feeder_state)
-            2'd0: begin
-                if (!scheduler.pending_frame_valid) begin
-                    completed_frame_bank <= next_frame_bank;
-                    next_frame_bank <=
-                        (next_frame_bank == 2'd1) ? 2'd2 : 2'd1;
-                    frame_waiting <= 1'b1;
-                    feeder_state <= 2'd1;
-                end
-            end
-            2'd1: begin
-                non_b_picture_start <= 1'b1;
-                feeder_state <= 2'd2;
-            end
-            default: begin
-                if (scheduler.pending_frame_valid)
-                    feeder_state <= 2'd0;
-            end
-        endcase
     end
 end
 
@@ -182,28 +198,31 @@ initial begin
     repeat (8) @(posedge clk_video);
     reset_video = 1'b0;
     native_request = 1'b1;
-
     wait (native_active);
     repeat (4) @(posedge clk_mpeg2);
     reset_mpeg2 = 1'b0;
-    wait (frame_windows == 6);
+    wait (frame_windows == 20);
     repeat (12) @(posedge clk_mpeg2);
-
-    if (cadence_ticks != 12)
-        $fatal(1, "cadence ticks=%0d expected=12", cadence_ticks);
-    if (presentations != 6)
-        $fatal(1, "presentations=%0d expected=6", presentations);
-    if (presentation_error)
-        $fatal(1, "scheduler reported presentation error");
-
-    $display({"NATIVE_PRESENTATION_INTEGRATION_PASS fields=12 ",
-              "frame_windows=6 presentations=6 rate=30000/1001"});
+    if (cadence_ticks != 40)
+        $fatal(1,"cadence ticks=%0d expected=40",cadence_ticks);
+    if (base_error || overlap_error)
+        $fatal(1,"presentation error baseline=%0d overlap=%0d",
+               base_error,overlap_error);
+    if (base_decoded_count != 16'd10)
+        $fatal(1,"serialized decoded=%0d expected=10",base_decoded_count);
+    if (overlap_decoded_count != 16'd13)
+        $fatal(1,"overlap decoded=%0d expected=13",overlap_decoded_count);
+    if (base_presentations != 10)
+        $fatal(1,"serialized presentations=%0d expected=10",base_presentations);
+    if (overlap_presentations != 13)
+        $fatal(1,"overlap presentations=%0d expected=13",overlap_presentations);
+    $display({"NATIVE_PRESENTATION_LATENCY_PASS windows=20 fields=40 ",
+              "serialized_decoded=10 overlap_decoded=13 ",
+              "serialized_presented=10 overlap_presented=13"});
     $finish;
 end
-
 initial begin
-    #300000000;
-    $fatal(1, "timeout");
+    #1000000000;
+    $fatal(1,"timeout");
 end
-
 endmodule

@@ -19,6 +19,13 @@ module mpeg2_h262_b_presentation_scheduler
     // it early; untimestamped candidates use the exact-rate cadence alone.
     input  wire timestamp_candidate_active,
     input  wire timestamp_candidate_due,
+    // Native full-frame presentation has one safe swap boundary every two
+    // fields.  The ordinary-reference overlap below may decode one I picture
+    // into the already existing third frame region while its predecessor
+    // waits for that boundary.  Other modes and picture types retain the
+    // established serialized ownership path.
+    input  wire native_ordinary_overlap_enable,
+    input  wire [1:0] active_frame_bank,
     input  wire frame_waiting,
     input  wire [1:0] completed_frame_bank,
     input  wire [1:0] reference_frame_bank,
@@ -89,6 +96,8 @@ reg decode_generation_queued,promotion_pending;
 reg last_bound_reference_valid;
 reg [1:0] last_bound_reference_bank;
 reg [7:0] last_bound_reference_count;
+reg ordinary_reference_decode_open;
+reg [1:0] ordinary_reference_decode_bank;
 
 // Entry 354: the fixed 40 MHz 800x600 raster produces one swap window every
 // 1056*628 pixels.  Accumulate source-picture credit in pixel-clock units for
@@ -228,15 +237,29 @@ assign debug_state = {
     run_closed,
     reorder_active
 };
-// A released ordinary reference occupies the scheduler's sole pending slot.
-// Stop after its classifying header until cadence consumes it, otherwise a
-// lightweight following P can publish and overwrite that undisplayed bank.
-// The initial reference is already visible in the reset display bank and does
-// not need a synthetic bank change before decode may continue.
+// A released ordinary reference normally occupies the scheduler's sole
+// pending slot.  Native untimestamped 30000/1001 all-I playback has three
+// ordinary frame regions, so one proven I transaction may instead use the
+// third region while cadence consumes its predecessor.  Every other class
+// retains the serialized ownership rule.
 wire ordinary_reference_waiting=!reorder_active&&pending_frame_valid&&
     pending_frame_released&&
     (display_scratch||(pending_frame_bank!=display_frame_bank));
-assign presentation_hold=ordinary_reference_waiting||
+wire ordinary_reference_overlap_safe=
+    native_ordinary_overlap_enable&&
+    !timestamp_candidate_active&&
+    (frame_rate_code==4'h4)&&
+    !display_scratch&&
+    pending_frame_valid&&
+    (pending_frame_released||non_b_picture_start)&&
+    (pending_frame_bank!=display_frame_bank)&&
+    (active_frame_bank!=display_frame_bank)&&
+    (active_frame_bank!=pending_frame_bank);
+wire ordinary_reference_present_now=
+    swap_window_pulse&&presentation_slot&&scheduled_frame_valid&&
+    scheduled_frame_differs&&!scheduled_frame_scratch&&!future_waiting;
+assign presentation_hold=(ordinary_reference_waiting&&
+                          !ordinary_reference_decode_open)||
                          (reorder_active&&run_closed&&
                           !presentation_complete&&!presentation_error&&
                           (deferred_queued_b_start||
@@ -266,6 +289,8 @@ always @(posedge clk) begin
         decode_generation_queued<=0;promotion_pending<=0;
         last_bound_reference_valid<=0;last_bound_reference_bank<=0;
         last_bound_reference_count<=0;
+        ordinary_reference_decode_open<=0;
+        ordinary_reference_decode_bank<=0;
         run_picture_count<=0;presentation_complete<=1;presentation_error<=0;
         cadence_credit<=CADENCE_DUE_24FPS;cadence_rate_code_q<=0;
     end else begin
@@ -303,7 +328,10 @@ always @(posedge clk) begin
         if(sequence_end&&!pending_frame_valid)
             terminal_boundary_pending<=1;
 
-        if(frame_waiting&&!reorder_active&&!b_picture_start&&!b_user_success_edge)begin
+        if(frame_waiting&&!reorder_active&&!b_picture_start&&
+           !b_user_success_edge&&
+           !(ordinary_reference_decode_open&&pending_frame_valid&&
+             !ordinary_reference_present_now))begin
             pending_frame_valid<=1;
             pending_frame_bank<=completed_frame_bank;
             pending_frame_released<=sequence_end||terminal_boundary_pending||
@@ -337,6 +365,33 @@ always @(posedge clk) begin
 
         if(pending_frame_valid&&(non_b_picture_start||sequence_end))
             pending_frame_released<=1;
+
+        // A native all-I stream may use the third ordinary frame region while
+        // the preceding completed reference waits for its full-frame boundary.
+        // The header which releases that predecessor also fixes the new decode
+        // class, so no P/B path is admitted through this exception.
+        if(i_picture_start&&ordinary_reference_overlap_safe&&
+           !ordinary_reference_decode_open)begin
+            ordinary_reference_decode_open<=1;
+            ordinary_reference_decode_bank<=active_frame_bank;
+        end
+
+        // Ownership must remain fixed for the complete overlapped decode.  A
+        // violated invariant is fatal to presentation but never permits the
+        // displayed or waiting bank to be overwritten silently.
+        if(ordinary_reference_decode_open&&!frame_waiting&&
+           ((active_frame_bank!=ordinary_reference_decode_bank)||
+            (active_frame_bank==display_frame_bank)))begin
+            ordinary_reference_decode_open<=0;
+            presentation_error<=1;
+        end
+
+        if(frame_waiting&&ordinary_reference_decode_open)begin
+            ordinary_reference_decode_open<=0;
+            if((completed_frame_bank!=ordinary_reference_decode_bank)||
+               (pending_frame_valid&&!ordinary_reference_present_now))
+                presentation_error<=1;
+        end
 
         // Entry 227: the B header can be accepted in the same registered
         // handoff that publishes its future reference.  If the header arrived
@@ -659,8 +714,21 @@ always @(posedge clk) begin
                     else presentation_error<=1;
                 end
             end else begin
-                pending_frame_valid<=0;
-                pending_frame_released<=0;
+                // A just-completed native overlap can coincide exactly with
+                // presentation of its predecessor.  Preserve the completed
+                // bank as the new (unreleased) candidate rather than letting
+                // the predecessor's retirement clear it on this same edge.
+                if(frame_waiting&&ordinary_reference_decode_open)begin
+                    pending_frame_valid<=1;
+                    pending_frame_bank<=completed_frame_bank;
+                    pending_frame_released<=sequence_end||
+                                            terminal_boundary_pending||
+                                            non_b_picture_start;
+                    terminal_boundary_pending<=0;
+                end else begin
+                    pending_frame_valid<=0;
+                    pending_frame_released<=0;
+                end
             end
         end else if(swap_window_pulse&&future_waiting&&!scheduled_frame_differs)begin
             future_frame_pending<=0;reorder_active<=0;run_closed<=0;
@@ -732,8 +800,10 @@ always @(posedge clk) begin
             presentation_error<=1;
         end
 
-        if(presentation_error)
+        if(presentation_error)begin
             deferred_queued_b_start<=0;
+            ordinary_reference_decode_open<=0;
+        end
     end
 end
 endmodule

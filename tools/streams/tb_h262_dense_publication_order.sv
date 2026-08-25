@@ -115,6 +115,8 @@ module tb_h262_dense_publication_order;
         .frame_rate_code(4'h3),
         .timestamp_candidate_active(1'b0),
         .timestamp_candidate_due(1'b0),
+        .native_ordinary_overlap_enable(1'b0),
+        .active_frame_bank(active_bank),
         .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
         .reference_frame_bank(reference_bank),.b_picture_start(b_picture_start),
         .reference_promotion_count(reference_promotion_count),

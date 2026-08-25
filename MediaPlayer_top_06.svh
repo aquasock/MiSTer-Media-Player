@@ -11,6 +11,7 @@ end
 
 wire mpeg2_new_native_mode_change =
     mpeg2_new_native_active_sync[1] ^ mpeg2_new_native_active_sync[2];
+assign mpeg2_new_native_active_mpeg2 = mpeg2_new_native_active_sync[2];
 wire mpeg2_new_framebuffer_reset =
     reset_mpeg2 ||
     (mpeg2_new_framebuffer_swap_reset_count != 3'd0) ||

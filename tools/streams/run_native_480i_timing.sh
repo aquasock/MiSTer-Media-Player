@@ -30,6 +30,20 @@ vvp "${build_dir}/tb_native_480i_timing"
 vvp "${build_dir}/tb_native_480i_timing" +BFF
 
 iverilog -g2012 \
+  -s tb_native_480i_timing_pattern \
+  -o "${build_dir}/tb_native_480i_timing_pattern" \
+  "${repo_root}/rtl/mpeg2_native_timing_pattern.sv" \
+  "${repo_root}/tools/streams/tb_native_480i_timing_pattern.sv"
+vvp "${build_dir}/tb_native_480i_timing_pattern"
+
+iverilog -g2012 \
+  -s tb_native_ordinary_overlap_ownership \
+  -o "${build_dir}/tb_native_ordinary_overlap_ownership" \
+  "${repo_root}/rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv" \
+  "${repo_root}/tools/streams/tb_native_ordinary_overlap_ownership.sv"
+vvp "${build_dir}/tb_native_ordinary_overlap_ownership"
+
+iverilog -g2012 \
   -s tb_native_480i_presentation_integration \
   -o "${build_dir}/tb_native_480i_presentation_integration" \
   "${repo_root}/rtl/mpeg2_video_output_timing.sv" \

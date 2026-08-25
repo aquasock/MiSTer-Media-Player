@@ -155,6 +155,8 @@ mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
     .frame_rate_code             (mpeg2_new_frame_rate_code),
     .timestamp_candidate_active  (mpeg2_new_timestamp_candidate_active),
     .timestamp_candidate_due     (mpeg2_new_timestamp_candidate_due),
+    .native_ordinary_overlap_enable(mpeg2_new_native_active_mpeg2),
+    .active_frame_bank           (mpeg2_new_active_frame_bank),
     .frame_waiting               (mpeg2_new_frame_waiting),
     .completed_frame_bank        (mpeg2_new_completed_frame_bank),
     .reference_frame_bank        (mpeg2_new_reference_frame_bank),

@@ -76,6 +76,7 @@ localparam CONF_STR = {
 	"-;",
 	"-;",
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"O[123],Native timing pattern,Off,On;",
 	"O[120],Interlaced output,Native 480i,800x600 Diagnostic;",
 	"O[3:1],Audio test,Off,44.1k Mono,44.1k Stereo,48k Mono,48k Stereo;",
 	"-;",
@@ -719,6 +720,8 @@ wire        display_field;
 wire        display_field_window;
 wire        display_frame_window;
 wire        display_native_interlaced;
+wire        display_native_timing_pattern;
+wire        mpeg2_new_native_active_mpeg2;
 
 wire [7:0]  fb_video_r;
 wire [7:0]  fb_video_g;
@@ -726,6 +729,18 @@ wire [7:0]  fb_video_b;
 wire        fb_video_de;
 wire        fb_video_hs;
 wire        fb_video_vs;
+wire [7:0]  native_pattern_r;
+wire [7:0]  native_pattern_g;
+wire [7:0]  native_pattern_b;
+wire        native_pattern_de;
+wire        native_pattern_hs;
+wire        native_pattern_vs;
+wire [7:0]  presentation_base_r;
+wire [7:0]  presentation_base_g;
+wire [7:0]  presentation_base_b;
+wire        presentation_base_de;
+wire        presentation_base_hs;
+wire        presentation_base_vs;
 wire [7:0]  cadence_video_r;
 wire [7:0]  cadence_video_g;
 wire [7:0]  cadence_video_b;

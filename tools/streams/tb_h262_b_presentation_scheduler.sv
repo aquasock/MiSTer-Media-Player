@@ -22,6 +22,8 @@ module tb_h262_b_presentation_scheduler;
         .frame_rate_code(frame_rate_code),
         .timestamp_candidate_active(timestamp_candidate_active),
         .timestamp_candidate_due(timestamp_candidate_due),
+        .native_ordinary_overlap_enable(1'b0),
+        .active_frame_bank(2'd0),
         .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
         .reference_frame_bank(reference_bank),.b_picture_start(b_start),
         .reference_promotion_count(reference_count),
