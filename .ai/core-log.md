@@ -1,3 +1,37 @@
+## 485 COMMIT Unreleased ??? 2026-08-24T22:41:28-07:00
+
+#### Coming From:
+
+Unreleased 2bb8def
+
+#### Purpose:
+
+Create a diagnostic-only native-480i qualification boundary with sustained deterministic motion, fully visible telemetry and FTP-only capture while leaving presentation behavior unchanged.
+
+#### Outcome:
+
+Pending implementation and qualification. Extend the deterministic interlaced all-I generator with an explicit visual-duration option that retains the exact four-picture reconstruction fixtures by default but can produce separate ten-second TFF and BFF motion clips with the same bounded syntax and independently verified signalling. Give the cadence profiler a synchronized native-mode observation only for choosing between the established line-444 overlay origin and a line-324 origin that fits all 38 four-pixel telemetry rows within 720x480; do not feed this observation into decode, scheduling, cache or presentation control. Teach the telemetry decoder to select and validate the correct origin from the captured raster size, preserve all schema-nine meanings and add regression coverage for both layouts. Replace the screenshot helper's SSH command path with authenticated FTP writes to `/dev/MiSTer_cmd`, using the default MiSTer login and the same FTP retrieval path. Keep native timing, field order, framebuffer mapping, cadence scheduling and compatibility classification unchanged.
+
+#### Next Steps:
+
+Implement the generator option, dual-position overlay, decoder auto-selection and FTP-only helper, then prove that the original short-fixture hashes and reconstruction results remain unchanged. Generate and independently inspect both ten-second visual clips, run profiler overlay tests at 800x600 and 720x480, exercise an actual FTP-only capture against the current MiSTer and run the focused native timing plus affected scheduler, profiler and progressive-control regressions. Complete a clean Quartus build and focused timing analysis before installing the candidate RBF and longer clips by ordinary FTP. Test only the longer TFF clip first; use its complete schema-nine capture and the user's live observation to decide whether presentation logic needs correction before attempting BFF.
+
+#### Files Modified:
+
+- MediaPlayer_top_07.svh
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/generate_test_interlaced_i_frames.py
+- tools/streams/read_hardware_cadence.py
+- tools/streams/run_native_480i_timing.sh
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
 ## 484 COMMIT Unreleased 2bb8def 2026-08-24T22:33:38-07:00
 
 #### Coming From:
@@ -1232,31 +1266,5 @@ Retrieve and verify the currently installed helper before mutation, preserve it 
 - [ ] Passed
 
 ---
-## 445 COMMIT Unreleased 3814243 2026-08-24T06:44:59-07:00
-
-#### Coming From:
-
-Unreleased 3814243
-
-#### Purpose:
-
-Record the unexpected ordinary success of the nominally unsupported 50 fps envelope case and stop qualification before changing its classification.
-
-#### Outcome:
-
-The user ran `14_bad_rate_50.mpg` and left its final image loaded because it appeared and sounded to play completely without issue; USER and POWER were solid on and DISK blinked eleven times, exactly the ordinary-success indication that this expected-failure case was intended not to claim. The untouched 800x600 schema-eight capture is 104,817 bytes at SHA-256 `39c966722977b69841d1913da05e5312ebdca2eda036730953a82f429d06b45d`. It confirms genuine successful playback rather than a misleading LED state: frame-rate code six is retained, all 1,071,430 accepted transport bytes arrive, 92 timestamps associate, 34 reference plus 66 B pictures decode, all 100 pictures display with 99 swaps, delivered cadence is 50.921 frames per second, audio underrun and PCM protocol error are false, aggregate, decoder, presentation and destination errors are zero, sequence end is seen and the session reaches normal quiet reason one with no pending state. The PTS presentation path explains the checker mismatch. Timestamped candidates use the 90 kHz audio-derived timeline instead of the scheduler's free-running cadence table, while `check_media_compatibility.py` still rejects codes six through eight solely because that fallback table implements only codes one through five. Hardware therefore proves this specific timestamped 50 fps file is functional, but the planned six-failure envelope has only four accepted failures so far and its policy cannot be changed from one two-second observation without a bounded decision and additional coverage.
-
-#### Next Steps:
-
-Do not run `15_bad_truncated.mpg` yet. Immediately replay `00_good_480p_48k.mpg` without rebooting and report alignment, sound, picture and all three LEDs so the fifth pair's recovery half is still recorded. After that control is captured, choose a new approved boundary: either keep the advertised 30 fps maximum and enforce it before ordinary hardware success, or qualify timestamped 50 fps as a separate supported Program Stream profile with sustained cadence, audio alignment and raw-M2V fallback distinctions. Do not infer support for 59.94 or 60 fps from this result.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
