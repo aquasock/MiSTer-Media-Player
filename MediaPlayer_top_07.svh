@@ -51,6 +51,7 @@ mpeg2_h262_hardware_cadence_profiler
     .clk_video                 (clk_video),
     .reset_video               (reset_video),
     .pixel_ce                  (display_pixel_ce),
+    .native_active             (display_native_interlaced),
     .fifo_pending              (!mpeg2_stream_empty),
     .decoder_ready             (mpeg2_new_decoder_stream_ready),
     .presentation_hold         (mpeg2_new_b_presentation_hold),

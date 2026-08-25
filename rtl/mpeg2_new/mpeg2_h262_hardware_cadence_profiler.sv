@@ -16,6 +16,7 @@ module mpeg2_h262_hardware_cadence_profiler #(
 )(
     input wire clk_mpeg2,input wire reset_mpeg2,
     input wire clk_video,input wire reset_video,input wire pixel_ce,
+    input wire native_active,
     input wire fifo_pending,input wire decoder_ready,
     input wire presentation_hold,input wire destination_hold,
     input wire scratch_available,input wire promotion_active,
@@ -65,7 +66,11 @@ localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
 localparam [31:0] SNAPSHOT_FORMAT={8'd9,8'd38,16'd60000};
-localparam [11:0] OVERLAY_X=12'd8,OVERLAY_Y=12'd444;
+// Entry 485: keep all 38 rows visible without changing their encoding. The
+// mode observation is already in clk_video and affects overlay placement only.
+localparam [11:0] OVERLAY_X=12'd8;
+localparam [11:0] OVERLAY_DIAG_Y=12'd444;
+localparam [11:0] OVERLAY_NATIVE_Y=12'd324;
 localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd152;
 
 reg session_active;
@@ -490,7 +495,8 @@ assign snapshot_ready=snapshot_ready_sync[2];
 
 reg [42:0] overlay_shift;
 reg [31:0] overlay_row_word;
-wire [11:0] overlay_row_offset=(v_pos-OVERLAY_Y)>>2;
+wire [11:0] overlay_y=native_active?OVERLAY_NATIVE_Y:OVERLAY_DIAG_Y;
+wire [11:0] overlay_row_offset=(v_pos-overlay_y)>>2;
 wire [5:0] overlay_row_index=overlay_row_offset[5:0];
 always @* begin
     case(overlay_row_index)
@@ -538,7 +544,7 @@ end
 always @(posedge clk_video)begin
     if(reset_video)overlay_shift<=0;
     else if(pixel_ce&&h_pos==0)begin
-        if(snapshot_ready&&(v_pos>=OVERLAY_Y)&&(v_pos<OVERLAY_Y+OVERLAY_HEIGHT))
+        if(snapshot_ready&&(v_pos>=overlay_y)&&(v_pos<overlay_y+OVERLAY_HEIGHT))
             overlay_shift<={4'b1010,overlay_row_index,overlay_row_word,
                            ^overlay_row_word};
         else overlay_shift<=0;
@@ -549,8 +555,8 @@ end
 always @* begin
     video_r=base_r;video_g=base_g;video_b=base_b;
     if(snapshot_ready&&base_de&&(h_pos>=OVERLAY_X)&&
-       (h_pos<OVERLAY_X+OVERLAY_WIDTH)&&(v_pos>=OVERLAY_Y)&&
-       (v_pos<OVERLAY_Y+OVERLAY_HEIGHT))begin
+       (h_pos<OVERLAY_X+OVERLAY_WIDTH)&&(v_pos>=overlay_y)&&
+       (v_pos<overlay_y+OVERLAY_HEIGHT))begin
         video_r=overlay_shift[42]?8'hff:8'h00;
         video_g=overlay_shift[42]?8'hff:8'h00;
         video_b=overlay_shift[42]?8'hff:8'h00;

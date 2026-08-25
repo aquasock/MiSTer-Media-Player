@@ -14,7 +14,8 @@ from PIL import Image
 MAGIC = 0x4D4D5031
 WORDS = 38
 X0 = 8
-Y0 = 444
+DIAGNOSTIC_Y0 = 444
+NATIVE_480I_Y0 = 324
 CELL = 4
 ROW_PREFIX = (1, 0, 1, 0)
 
@@ -23,9 +24,9 @@ class TelemetryDecodeError(RuntimeError):
     pass
 
 
-def _cell_bit(image: Image.Image, column: int, row: int) -> int:
+def _cell_bit(image: Image.Image, y_origin: int, column: int, row: int) -> int:
     x0 = X0 + column * CELL + 1
-    y0 = Y0 + row * CELL + 1
+    y0 = y_origin + row * CELL + 1
     pixels = []
     for y in range(y0, y0 + 2):
         for x in range(x0, x0 + 2):
@@ -36,15 +37,26 @@ def _cell_bit(image: Image.Image, column: int, row: int) -> int:
 
 def decode_words(path: Path | str) -> list[int]:
     image = Image.open(path).convert("RGB")
-    if image.width < X0 + 43 * CELL or image.height < Y0 + WORDS * CELL:
+    minimum_width = X0 + 43 * CELL
+    if image.width < minimum_width:
         raise TelemetryDecodeError(
-            f"image is {image.width}x{image.height}; an unscaled 800x600 "
-            "MiSTer screenshot is required"
+            f"image is {image.width}x{image.height}; telemetry requires at "
+            f"least {minimum_width} horizontal pixels"
+        )
+
+    if image.height >= DIAGNOSTIC_Y0 + WORDS * CELL:
+        y_origin = DIAGNOSTIC_Y0
+    elif image.height >= NATIVE_480I_Y0 + WORDS * CELL:
+        y_origin = NATIVE_480I_Y0
+    else:
+        raise TelemetryDecodeError(
+            f"image is {image.width}x{image.height}; neither the 800x600 "
+            "diagnostic nor 720x480 native telemetry layout fits"
         )
 
     words: list[int] = []
     for row in range(WORDS):
-        bits = [_cell_bit(image, column, row) for column in range(43)]
+        bits = [_cell_bit(image, y_origin, column, row) for column in range(43)]
         if tuple(bits[:4]) != ROW_PREFIX:
             raise TelemetryDecodeError(
                 f"row {row}: telemetry prefix absent ({bits[:4]})"

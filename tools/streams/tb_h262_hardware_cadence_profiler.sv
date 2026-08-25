@@ -32,6 +32,7 @@ reg [32:0] display_pts=0;
 reg [13:0] pcm_sample_count=0;
 reg [6:0] pcm_fifo_peak=0;
 reg top_field_first=0,repeat_first_field=0;
+reg native_active=0;
 reg [11:0] h_pos=0,v_pos=0;
 reg [7:0] base_r=8'h12,base_g=8'h34,base_b=8'h56;
 reg base_de=1;
@@ -48,6 +49,7 @@ mpeg2_h262_hardware_cadence_profiler #(
 ) dut(
     .clk_mpeg2(clk_mpeg2),.reset_mpeg2(reset_mpeg2),
     .clk_video(clk_video),.reset_video(reset_video),.pixel_ce(1'b1),
+    .native_active(native_active),
     .fifo_pending(fifo_pending),.decoder_ready(decoder_ready),
     .presentation_hold(presentation_hold),.destination_hold(destination_hold),
     .scratch_available(scratch_available),.promotion_active(promotion_active),
@@ -129,6 +131,7 @@ begin
     display_scratch_bank=0;presentation_complete=0;presentation_error=0;
     scheduler_debug_state=0;decoder_byte_accepted=0;error_flags=0;
     pcm_sample_count=0;pcm_fifo_peak=0;
+    native_active=0;
     stc_seconds=14'd5;
     repeat(5)@(posedge clk_mpeg2);reset_mpeg2=0;
     repeat(5)@(posedge clk_video);reset_video=0;
@@ -147,9 +150,11 @@ end
 endtask
 
 task verify_overlay_prefix;
+    input native_mode;
     integer x;
 begin
-    v_pos=12'd445;
+    native_active=native_mode;
+    v_pos=native_mode?12'd325:12'd445;
     for(x=0;x<=29;x=x+1)begin
         @(negedge clk_video);h_pos=x;
         @(posedge clk_video);#1;
@@ -239,7 +244,8 @@ initial begin
     if(dut.snapshot_sync_2[815:800]==0)
         $fatal(1,"expected at least one outlier gap");
     verify_checksum();
-    verify_overlay_prefix();
+    verify_overlay_prefix(1'b0);
+    verify_overlay_prefix(1'b1);
 
     // Native 24 fps uses the same legal three-refresh maximum gap and must
     // retain the same ranked outlier telemetry as the established 25 fps path.

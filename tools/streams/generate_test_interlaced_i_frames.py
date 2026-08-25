@@ -54,7 +54,9 @@ def set_payload_bit(data: bytearray, payload_offset: int, bit: int, value: bool)
         data[byte_offset] &= ~mask
 
 
-def patch_interlaced_signalling(payload: bytes, top_field_first: bool) -> bytes:
+def patch_interlaced_signalling(
+    payload: bytes, top_field_first: bool, frame_count: int
+) -> bytes:
     data = bytearray(payload)
     codes = analyzer.start_codes(payload)
     sequence_extensions = 0
@@ -76,27 +78,29 @@ def patch_interlaced_signalling(payload: bytes, top_field_first: bool) -> bytes:
             picture_extensions += 1
     if sequence_extensions < 1:
         raise RuntimeError("expected at least one sequence extension")
-    if picture_extensions != FRAME_COUNT:
+    if picture_extensions != frame_count:
         raise RuntimeError(
-            f"expected {FRAME_COUNT} picture coding extensions, found {picture_extensions}"
+            f"expected {frame_count} picture coding extensions, found {picture_extensions}"
         )
     return bytes(data)
 
 
-def decode_raw(ffmpeg: str, path: Path) -> bytes:
+def decode_raw(ffmpeg: str, path: Path, frame_count: int) -> bytes:
     result = subprocess.run(
         [ffmpeg, "-hide_banner", "-loglevel", "error", "-threads", "1",
-         "-i", str(path), "-frames:v", str(FRAME_COUNT), "-an",
+         "-i", str(path), "-frames:v", str(frame_count), "-an",
          "-f", "rawvideo", "-pix_fmt", "yuv420p", "-"],
         check=True, capture_output=True,
     )
-    expected = FRAME_COUNT * 720 * 480 * 3 // 2
+    expected = frame_count * 720 * 480 * 3 // 2
     if len(result.stdout) != expected:
         raise RuntimeError(f"decoded {len(result.stdout)} bytes, expected {expected}")
     return result.stdout
 
 
-def encoder_command(ffmpeg: str, case: Case, output: Path) -> list[str]:
+def encoder_command(
+    ffmpeg: str, case: Case, output: Path, frame_count: int
+) -> list[str]:
     source = (
         f"testsrc2=size=720x480:rate={SOURCE_RATE},"
         f"tinterlace=mode={case.filter_mode}"
@@ -104,7 +108,7 @@ def encoder_command(ffmpeg: str, case: Case, output: Path) -> list[str]:
     return [
         ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
         "-f", "lavfi", "-i", source,
-        "-frames:v", str(FRAME_COUNT), "-an", "-c:v", "mpeg2video",
+        "-frames:v", str(frame_count), "-an", "-c:v", "mpeg2video",
         "-pix_fmt", "yuv420p", "-threads", "1", "-flags", "+bitexact",
         "-g", "1", "-bf", "0", "-q:v", "2", "-qmin", "2", "-qmax", "12",
         "-sc_threshold", "1000000000", "-f", "mpeg2video", str(output),
@@ -118,13 +122,99 @@ def portable_command(command: list[str], ffmpeg: str, output: Path) -> list[str]
     ]
 
 
+def generate_artifact(
+    ffmpeg: str,
+    ffprobe: str,
+    temp: Path,
+    output_dir: Path,
+    case: Case,
+    frame_count: int,
+    output_name: str,
+    artifact_name: str,
+) -> dict[str, Any]:
+    progressive = temp / f"{artifact_name}_frame_dct_progressive.m2v"
+    output = output_dir / output_name
+    command = encoder_command(ffmpeg, case, progressive, frame_count)
+    subprocess.run(command, check=True)
+    original = progressive.read_bytes()
+    if not original.endswith(SEQUENCE_END):
+        original += SEQUENCE_END
+        progressive.write_bytes(original)
+    patched = patch_interlaced_signalling(
+        original, case.top_field_first, frame_count
+    )
+    output.write_bytes(patched)
+
+    progressive_raw = decode_raw(ffmpeg, progressive, frame_count)
+    interlaced_raw = decode_raw(ffmpeg, output, frame_count)
+    if progressive_raw != interlaced_raw:
+        raise SystemExit(
+            f"{artifact_name}: signalling patch changed decoded YCbCr planes"
+        )
+
+    picture_types = h.picture_types(ffprobe, output)
+    if picture_types != ["I"] * frame_count:
+        raise SystemExit(
+            f"{artifact_name}: expected {frame_count} I pictures: {picture_types}"
+        )
+    analysis = analyzer.analyze_file(output)
+    if analysis["classification"] != (
+        "interlaced_420_i_frame_candidate_requires_macroblock_execution"
+    ):
+        raise SystemExit(
+            f"{artifact_name}: generated stream left the approved envelope: "
+            f"{analysis['classification_reasons']}"
+        )
+    coding = [picture["coding_extension"] for picture in analysis["pictures"]]
+    if not all(
+        entry["top_field_first"] == case.top_field_first for entry in coding
+    ):
+        raise SystemExit(f"{artifact_name}: first-field order was not preserved")
+
+    decoded_sha = hashlib.sha256(interlaced_raw).hexdigest()
+    analysis["path"] = output.name
+    result = {
+        "name": artifact_name,
+        "field_order": "top-first" if case.top_field_first else "bottom-first",
+        "source_rate": SOURCE_RATE,
+        "frame_rate": FRAME_RATE,
+        "frame_count": frame_count,
+        "encoded_duration_seconds": frame_count * 1001 / 30000,
+        "encoder_command": portable_command(command, ffmpeg, progressive),
+        "signalling_patch": {
+            "progressive_sequence": 0,
+            "picture_structure": 3,
+            "top_field_first": int(case.top_field_first),
+            "frame_pred_frame_dct": 1,
+            "repeat_first_field": 0,
+            "chroma_420_type": 0,
+            "progressive_frame": 0,
+        },
+        "decoded_yuv420p_sha256": decoded_sha,
+        "patched_vs_unpatched_decoded_planes_equal": True,
+        "analysis": analysis,
+    }
+    print(
+        f"generated {output.name}: order={result['field_order']} "
+        f"frames={frame_count} bytes={output.stat().st_size} "
+        f"sha256={analysis['sha256']} decoded_sha256={decoded_sha}"
+    )
+    return result
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--output-dir", type=Path,
         default=Path(__file__).resolve().parent / "generated_interlaced",
     )
+    parser.add_argument(
+        "--visual-seconds", type=int, default=0,
+        help="also generate sustained TFF/BFF visual fixtures of this duration",
+    )
     args = parser.parse_args()
+    if args.visual_seconds < 0:
+        parser.error("--visual-seconds must be zero or greater")
 
     ffmpeg = h.require_tool("ffmpeg")
     ffprobe = h.require_tool("ffprobe")
@@ -134,74 +224,35 @@ def main() -> None:
         [ffmpeg, "-version"], check=True, text=True, capture_output=True
     ).stdout.splitlines()[0]
     manifest_cases: list[dict[str, Any]] = []
+    visual_cases: list[dict[str, Any]] = []
 
     with tempfile.TemporaryDirectory(prefix="mister_h262_interlaced_") as temp_name:
         temp = Path(temp_name)
         for case in CASES:
-            progressive = temp / f"{case.name}_frame_dct_progressive.m2v"
-            output = output_dir / f"test_interlaced_i_{case.name}.m2v"
-            command = encoder_command(ffmpeg, case, progressive)
-            subprocess.run(command, check=True)
-            original = progressive.read_bytes()
-            if not original.endswith(SEQUENCE_END):
-                original += SEQUENCE_END
-                progressive.write_bytes(original)
-            patched = patch_interlaced_signalling(original, case.top_field_first)
-            output.write_bytes(patched)
+            manifest_cases.append(generate_artifact(
+                ffmpeg, ffprobe, temp, output_dir, case, FRAME_COUNT,
+                f"test_interlaced_i_{case.name}.m2v", case.name,
+            ))
 
-            progressive_raw = decode_raw(ffmpeg, progressive)
-            interlaced_raw = decode_raw(ffmpeg, output)
-            if progressive_raw != interlaced_raw:
-                raise SystemExit(f"{case.name}: signalling patch changed decoded YCbCr planes")
-
-            picture_types = h.picture_types(ffprobe, output)
-            if picture_types != ["I"] * FRAME_COUNT:
-                raise SystemExit(f"{case.name}: expected {FRAME_COUNT} I pictures: {picture_types}")
-            analysis = analyzer.analyze_file(output)
-            if analysis["classification"] != (
-                "interlaced_420_i_frame_candidate_requires_macroblock_execution"
-            ):
-                raise SystemExit(
-                    f"{case.name}: generated stream left the approved envelope: "
-                    f"{analysis['classification_reasons']}"
-                )
-            coding = [picture["coding_extension"] for picture in analysis["pictures"]]
-            if not all(entry["top_field_first"] == case.top_field_first for entry in coding):
-                raise SystemExit(f"{case.name}: first-field order was not preserved")
-
-            decoded_sha = hashlib.sha256(interlaced_raw).hexdigest()
-            analysis["path"] = output.name
-            manifest_cases.append({
-                "name": case.name,
-                "field_order": "top-first" if case.top_field_first else "bottom-first",
-                "source_rate": SOURCE_RATE,
-                "frame_rate": FRAME_RATE,
-                "frame_count": FRAME_COUNT,
-                "encoder_command": portable_command(command, ffmpeg, progressive),
-                "signalling_patch": {
-                    "progressive_sequence": 0,
-                    "picture_structure": 3,
-                    "top_field_first": int(case.top_field_first),
-                    "frame_pred_frame_dct": 1,
-                    "repeat_first_field": 0,
-                    "chroma_420_type": 0,
-                    "progressive_frame": 0,
-                },
-                "decoded_yuv420p_sha256": decoded_sha,
-                "patched_vs_unpatched_decoded_planes_equal": True,
-                "analysis": analysis,
-            })
-            print(
-                f"generated {output.name}: order={manifest_cases[-1]['field_order']} "
-                f"bytes={output.stat().st_size} sha256={analysis['sha256']} "
-                f"decoded_sha256={decoded_sha}"
-            )
+        if args.visual_seconds:
+            visual_frame_count = (
+                args.visual_seconds * 30000 + 500
+            ) // 1001
+            for case in CASES:
+                visual_name = f"visual_{case.name}_{args.visual_seconds}s"
+                visual_cases.append(generate_artifact(
+                    ffmpeg, ffprobe, temp, output_dir, case,
+                    visual_frame_count,
+                    f"visual_interlaced_i_{case.name}_{args.visual_seconds}s.m2v",
+                    visual_name,
+                ))
 
     manifest = {
         "purpose": "native 720x480i59.94 frame-DCT all-I decoder and field-order regressions",
         "ffmpeg_version": version,
         "generated_media_committed": False,
         "cases": manifest_cases,
+        "visual_cases": visual_cases,
     }
     manifest_path = output_dir / "interlaced_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")

@@ -8,9 +8,10 @@ error flags on streams that pass when launched from the core's own file
 selector.  Those artefacts reproduce on an archived, independently validated
 image, so they are properties of that harness rather than of the core.
 
-This reads telemetry without launching anything: trigger a screenshot on the
-MiSTer, fetch it, decode it.  Start the stream however you normally would,
-leave it on screen, then run this.
+This reads telemetry without launching anything: trigger a screenshot through
+the MiSTer's authenticated FTP view of /dev/MiSTer_cmd, fetch it through FTP,
+and decode it. Start the stream however you normally would, leave it on screen,
+then run this. No SSH transport or key is used.
 """
 
 from __future__ import annotations
@@ -23,25 +24,19 @@ from pathlib import Path
 import sys
 import time
 
-import pexpect
-
 from decode_hardware_cadence import TelemetryDecodeError, decode
 
 REMOTE_SHOT = "/media/fat/screenshots/cadence_probe.png"
+REMOTE_COMMAND = "/dev/MiSTer_cmd"
 
 
 def trigger_screenshot(host: str, user: str, password: str) -> None:
-    child = pexpect.spawn(
-        f"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
-        f"{user}@{host}", timeout=20, encoding="utf-8")
-    index = child.expect(["[Pp]assword:", r"[#$] $"])
-    if index == 0:
-        child.sendline(password)
-        child.expect(r"[#$] $")
-    child.sendline("echo screenshot cadence_probe.png > /dev/MiSTer_cmd")
-    child.expect(r"[#$] $")
-    child.sendline("exit")
-    child.close()
+    ftp = FTP()
+    ftp.connect(host, 21, timeout=20)
+    ftp.login(user, password)
+    command = BytesIO(b"screenshot cadence_probe.png\n")
+    ftp.storbinary(f"STOR {REMOTE_COMMAND}", command)
+    ftp.quit()
 
 
 def fetch(host: str, user: str, password: str, dest: Path) -> None:
