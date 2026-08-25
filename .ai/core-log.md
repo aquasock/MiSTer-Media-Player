@@ -1,3 +1,34 @@
+## 507 COMMIT Unreleased ??? 2026-08-25T03:43:42-07:00
+
+#### Coming From:
+
+Unreleased f866ce2
+
+#### Purpose:
+
+Retain two pending native all-I frames safely when optimized decode momentarily outruns the 29.97-fps presentation boundary.
+
+#### Outcome:
+
+The user approved a bounded correction for entry 506's `presentation_error` while retaining commit `f866ce2`'s direct inverse-quantization-to-IDCT handoff. The three ordinary DDR frame banks can physically hold exactly one displayed frame, one primary pending frame and one newly completed secondary pending frame. The scheduler currently tracks only the first pending identity and deliberately faults if the overlap decode completes before that predecessor presents, an invariant based on the former approximately 50-millisecond decode latency. The new hardware result proves that the optimized light all-I path reaches this boundary after seventeen decoded and fifteen displayed pictures while delivering 29.868349 pictures per second. The approved change will add only the missing secondary ordinary identity and classification state for native, untimestamped, frame-rate-code-four all-I playback; every progressive, timestamped, P, B, scratch and non-native ownership path remains unchanged.
+
+#### Next Steps:
+
+Add an accelerated native integration case whose decoder latency is slightly shorter than one 30000/1001 frame and which reproduces the current early-completion fatal guard. When all three banks are owned, retain the completed bank in a secondary slot, admit only the following I classification boundary needed to release it, block payload before the rotated active bank can overwrite the display or either pending bank, promote the secondary identity when the predecessor presents and resume the already-classified decode into the newly freed bank. Prove sustained ordered 29.97-fps presentation under bounded backpressure and extend negative ownership tests for duplicate banks, displayed-bank reuse, P/B, timestamps and non-native operation. Then run the full native-output, TFF/BFF/progressive reconstruction and canonical mixed I/P/B live-raster suites, commit only a clean result, clean-build and time the design, install by staged ordinary FTP with `f866ce2` preserved as rollback and restart hardware validation at `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` in Weave.
+
+#### Files Modified:
+
+- `rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv`
+- `tools/streams/tb_native_ordinary_overlap_ownership.sv`
+- `tools/streams/tb_native_480i_presentation_integration.sv`
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 506 COMMIT Unreleased f866ce2 2026-08-25T03:40:25-07:00
 
 #### Coming From:
@@ -1203,33 +1234,5 @@ Power-cycle once to load `8c59ddb`, set Audio Test to Off and run `20_bbb_full_4
 
 - [x] Built
 - [ ] Passed
-
----
-## 467 COMMIT Unreleased cd8d78a 2026-08-24T11:44:23-07:00
-
-#### Coming From:
-
-Unreleased cd8d78a
-
-#### Purpose:
-
-Record the clean-video queue's complete hardware soak and separate the eliminated audio failure from the remaining slight credits cadence.
-
-#### Outcome:
-
-The user watched `20_bbb_full_48k.mpg` end to end on `cd8d78a` and reports only a tiny cadence in the credits, with USER and POWER solid on and DISK blinking eleven times. The final screenshot was captured exclusively through plain FTP with the default MiSTer `root` login and no SSH keys; the 8,093-byte file is SHA-256 `f25b0935d55afd3caaa5dfd15dfeb3d249e1942cf6eedd39e2992bac17c6d4ad`. This is the first successful full soak: all 84,423,309 clean-video bytes were accepted instead of freezing at the repeated 35,705,169-byte boundary, aggregate error flags are zero instead of `0x0400`, `audio_pcm_underrun` and PCM protocol error are clear, sequence end was seen, presentation completed and the snapshot closed normally for quiet reason one at an STC of 596 seconds. The eight-bit display counters wrap exactly as expected for all 14,315 pictures and 14,314 swaps, to 235 and 234 respectively, while the timestamp and reference-picture counters saturate or wrap without an error. The largest recorded display gap is now 116.054 milliseconds at ordinal fourteen instead of 431.059 milliseconds, while the next two remain 82.896 milliseconds at ordinals fifteen and seventeen; gap outliers total 224 over the completed movie. The post-extraction queue therefore passes its hardware objective and removes the deterministic audio starvation without removing the residual visual cadence, confirming those were separate faults rather than two observations of one event.
-
-#### Next Steps:
-
-Retain `cd8d78a` as the accepted audio-path baseline and stop before another RTL change. Analyze the remaining presentation cadence against the completed soak's 224 gap outliers, scheduler ownership and scratch-bank availability, using the unchanged 82.896-millisecond ordinal-fifteen and ordinal-seventeen events as the stable signature; propose a narrowly bounded presentation-scheduler change and obtain approval before implementation. Preserve `/media/fat/MediaPlayer.backup.pre-clean-video-queue.6dece4c.rbf` until that follow-on is independently accepted, and keep the current helper, Main and media files unchanged so the next comparison remains controlled.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
