@@ -2,7 +2,9 @@
 """Generate deterministic native-480i H.262 all-I candidate streams.
 
 FFmpeg first weaves 60000/1001 source pictures into 30000/1001 TFF or BFF
-frames and encodes ordinary frame-DCT all-I MPEG-2.  The generator then changes
+frames and encodes ordinary frame-DCT all-I MPEG-2.  Sustained visual fixtures
+can use either the original high-detail test pattern or a low-complexity pattern
+with a moving bar and alternating field markers.  The generator then changes
 only the sequence/picture signalling bits required by the approved subset:
 interlaced sequence, interlaced frame, matching 4:2:0 chroma type, no repeat,
 and the authored first-field order.  Patched and unpatched streams must decode
@@ -30,6 +32,17 @@ FRAME_COUNT = 4
 SOURCE_RATE = "60000/1001"
 FRAME_RATE = "30000/1001"
 SEQUENCE_END = b"\x00\x00\x01\xb7"
+DETAILED_SOURCE = f"testsrc2=size=720x480:rate={SOURCE_RATE}"
+LIGHT_SOURCE = (
+    f"nullsrc=size=720x480:rate={SOURCE_RATE},"
+    "geq="
+    "lum='if(between(Y,64,415)*between(X,40+mod(N*4,640),"
+    "71+mod(N*4,640)),235,"
+    "if(eq(mod(N,2),0)*between(X,16,79)*between(Y,16,63),200,"
+    "if(eq(mod(N,2),1)*between(X,16,79)*between(Y,416,463),200,"
+    "if(between(Y,119,122)+between(Y,357,360),112,32))))':"
+    "cb='128':cr='128'"
+)
 
 
 @dataclass(frozen=True)
@@ -99,15 +112,12 @@ def decode_raw(ffmpeg: str, path: Path, frame_count: int) -> bytes:
 
 
 def encoder_command(
-    ffmpeg: str, case: Case, output: Path, frame_count: int
+    ffmpeg: str, case: Case, output: Path, frame_count: int, source: str
 ) -> list[str]:
-    source = (
-        f"testsrc2=size=720x480:rate={SOURCE_RATE},"
-        f"tinterlace=mode={case.filter_mode}"
-    )
+    source_filter = f"{source},tinterlace=mode={case.filter_mode}"
     return [
         ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
-        "-f", "lavfi", "-i", source,
+        "-f", "lavfi", "-i", source_filter,
         "-frames:v", str(frame_count), "-an", "-c:v", "mpeg2video",
         "-pix_fmt", "yuv420p", "-threads", "1", "-flags", "+bitexact",
         "-g", "1", "-bf", "0", "-q:v", "2", "-qmin", "2", "-qmax", "12",
@@ -131,10 +141,12 @@ def generate_artifact(
     frame_count: int,
     output_name: str,
     artifact_name: str,
+    source: str = DETAILED_SOURCE,
+    source_profile: str = "detailed",
 ) -> dict[str, Any]:
     progressive = temp / f"{artifact_name}_frame_dct_progressive.m2v"
     output = output_dir / output_name
-    command = encoder_command(ffmpeg, case, progressive, frame_count)
+    command = encoder_command(ffmpeg, case, progressive, frame_count, source)
     subprocess.run(command, check=True)
     original = progressive.read_bytes()
     if not original.endswith(SEQUENCE_END):
@@ -180,6 +192,7 @@ def generate_artifact(
         "frame_rate": FRAME_RATE,
         "frame_count": frame_count,
         "encoded_duration_seconds": frame_count * 1001 / 30000,
+        "source_profile": source_profile,
         "encoder_command": portable_command(command, ffmpeg, progressive),
         "signalling_patch": {
             "progressive_sequence": 0,
@@ -212,9 +225,18 @@ def main() -> None:
         "--visual-seconds", type=int, default=0,
         help="also generate sustained TFF/BFF visual fixtures of this duration",
     )
+    parser.add_argument(
+        "--light-visual-seconds", type=int, default=0,
+        help=(
+            "also generate low-complexity TFF/BFF motion fixtures of this "
+            "duration"
+        ),
+    )
     args = parser.parse_args()
     if args.visual_seconds < 0:
         parser.error("--visual-seconds must be zero or greater")
+    if args.light_visual_seconds < 0:
+        parser.error("--light-visual-seconds must be zero or greater")
 
     ffmpeg = h.require_tool("ffmpeg")
     ffprobe = h.require_tool("ffprobe")
@@ -225,6 +247,7 @@ def main() -> None:
     ).stdout.splitlines()[0]
     manifest_cases: list[dict[str, Any]] = []
     visual_cases: list[dict[str, Any]] = []
+    light_visual_cases: list[dict[str, Any]] = []
 
     with tempfile.TemporaryDirectory(prefix="mister_h262_interlaced_") as temp_name:
         temp = Path(temp_name)
@@ -247,12 +270,31 @@ def main() -> None:
                     visual_name,
                 ))
 
+        if args.light_visual_seconds:
+            light_frame_count = (
+                args.light_visual_seconds * 30000 + 500
+            ) // 1001
+            for case in CASES:
+                light_name = (
+                    f"light_visual_{case.name}_{args.light_visual_seconds}s"
+                )
+                light_visual_cases.append(generate_artifact(
+                    ffmpeg, ffprobe, temp, output_dir, case,
+                    light_frame_count,
+                    f"light_interlaced_i_{case.name}_"
+                    f"{args.light_visual_seconds}s.m2v",
+                    light_name,
+                    source=LIGHT_SOURCE,
+                    source_profile="low-complexity-field-motion",
+                ))
+
     manifest = {
         "purpose": "native 720x480i59.94 frame-DCT all-I decoder and field-order regressions",
         "ffmpeg_version": version,
         "generated_media_committed": False,
         "cases": manifest_cases,
         "visual_cases": visual_cases,
+        "light_visual_cases": light_visual_cases,
     }
     manifest_path = output_dir / "interlaced_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
