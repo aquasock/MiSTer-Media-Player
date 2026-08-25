@@ -1,3 +1,31 @@
+## 487 COMMIT Unreleased 8d9043a 2026-08-24T23:14:45-07:00
+
+#### Coming From:
+
+Unreleased 5568aa9
+
+#### Purpose:
+
+Create and install a deterministic low-complexity interlaced motion fixture that can separate decoder throughput from progressive-versus-native presentation quality.
+
+#### Outcome:
+
+Commit `8d9043a` extends the existing interlaced all-I generator with an optional low-complexity 720x480 source while preserving the established detailed and four-picture defaults. The source runs at 60000/1001 pictures per second and contains broad flat regions, two stationary horizontal sharpness references, a high-contrast vertical bar moving four pixels per source field and alternating upper/lower field markers; FFmpeg weaves pairs into 30000/1001 frame-DCT all-I TFF or BFF pictures before the established signalling-only patch. `--light-visual-seconds 10` deterministically reproduces a 300-picture, 5,007,304-byte TFF stream with encoded SHA-256 `f45995d8786ffd229baaf8085e68f33a7866771d7038525fe0b6accdc7a0a2d7`, decoded-plane SHA-256 `2fbaaafa949092fd2025633390258989b6bb931ee0b0f3ae48bd125ab431ccb1` and `tt` signalling. Its 5,007,154-byte BFF companion has encoded SHA-256 `b26d0d4090ec8c39346782918e97eb0721ba0da5670b42ef14435e385f822271`, decoded-plane SHA-256 `554fbf879319392629bb1d3ac7a041358929e0ee2e8fed6a7a05862f9efa65eb` and `bb` signalling. A second independent generation reproduces both streams and the complete manifest byte-for-byte; patched and unpatched decoded YCbCr planes are identical, every picture is I coded, authored field order is stable and the analyzer retains the intentional candidate classification. Native field-order locking and rejection, exhaustive interlaced 4:2:0 cache mapping, exact TFF/BFF field timing, schema-nine cadence profiling and dual-layout telemetry decoding all pass. No RTL or RBF changed, so the already installed exact `5568aa9` image remains the applicable hardware. Only the TFF fixture was uploaded through ordinary FTP with the default `root` / `1` login as `/media/fat/_cadence/native_480i_tff_light_10s.m2v`; independent FTP retrieval is byte-identical at 5,007,304 bytes and SHA-256 `f45995d8786ffd229baaf8085e68f33a7866771d7038525fe0b6accdc7a0a2d7`. The BFF artifact remains local and deferred.
+
+#### Next Steps:
+
+Set `Interlaced output` to `800x600 Diagnostic` and run only `_cadence/native_480i_tff_light_10s.m2v`. Observe whether the clip lasts approximately ten seconds, whether the bar traverses smoothly without jumps or pauses, and whether the bar edge and two horizontal reference lines look sharp; report softness, flicker and USER, DISK and POWER at completion, then leave the final image loaded for an FTP-only schema-nine capture. Do not switch to Native 480i or run BFF until the progressive baseline is captured and proves approximately 29.97 pictures per second with zero errors.
+
+#### Files Modified:
+
+- tools/streams/generate_test_interlaced_i_frames.py
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 486 COMMIT Unreleased 5568aa9 2026-08-24T23:08:41-07:00
 
 #### Coming From:
@@ -1236,33 +1264,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 447 COMMIT Unreleased f2b2e02 2026-08-24T06:57:42-07:00
-
-#### Coming From:
-
-Unreleased f2b2e02
-
-#### Purpose:
-
-Install the exact helper-side H.262 rate preflight with a byte-verified rollback while leaving the accepted FPGA image and qualification media unchanged.
-
-#### Outcome:
-
-Read-only retrieval first confirmed `/media/fat/linux/MediaPlayer_Helper` at the accepted 361,452-byte SHA-256 `4c0f1d2c3e9c229ccad38b683701968feac7b9f1111de20ec6b4a3f0864b2576` and `/media/fat/MediaPlayer.rbf` unchanged at 4,126,828-byte SHA-256 `1fe3f61a8286e42e38db4c50eef6a112f31106590e6cdbcc6715fff82544b4ea`. Candidate `f2b2e02` was uploaded as `/media/fat/linux/MediaPlayer_Helper.stage.f2b2e02`, marked executable, retrieved and compared byte-for-byte at SHA-256 `4b496d9725dc520bd463a4e22e22430ebb575e778cf65cfd3f9c20a8e7479a58` before any active-name mutation. The current helper was then preserved exactly as `/media/fat/linux/MediaPlayer_Helper.backup.pre-rate-gate.3814243` and the verified stage promoted. Independent post-promotion retrieval reproduces the candidate hash for the active mode-0755 helper and the predecessor hash for the rollback. The RBF remains byte-identical, as do `00_good_480p_48k.mpg` at SHA-256 `1455af94803b1d9958a93fbdb978aa2a42c1d8045a9491f904ad1ad9b8ccdad5` and `14_bad_rate_50.mpg` at SHA-256 `6a698ada56937d19a4b1215f3f79f9ee6a4f7a9e46a9305119b6956c07aa8fcb`. Main and every other media file were untouched, and no playback or reboot occurred during installation.
-
-#### Next Steps:
-
-Without rebooting, run only `14_bad_rate_50.mpg` and wait no more than ten seconds. It must return promptly without displaying the video or producing the ordinary successful USER-solid, DISK-eleven-blink and POWER-solid combination; report the screen, sound and all three LEDs. Then immediately select `00_good_480p_48k.mpg` without rebooting and report alignment, sound, picture and all three LEDs, leaving its final image loaded for launch-free capture. Do not run `15_bad_truncated.mpg` or `20_bbb_full_48k.mpg` until this corrected rejection-and-recovery pair passes.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
