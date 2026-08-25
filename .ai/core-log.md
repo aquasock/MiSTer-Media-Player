@@ -1,3 +1,50 @@
+## 492 COMMIT Unreleased 2601573 2026-08-25T01:09:18-07:00
+
+#### Coming From:
+
+Unreleased f6f2fe4
+
+#### Purpose:
+
+Remove the avoidable native all-I decode/presentation serialization and add a framebuffer-independent native timing pattern for the remaining flicker and short-line isolation.
+
+#### Outcome:
+
+Commit `2601573` implements the approved bounded native correction and diagnostic. The presentation scheduler permits exactly one native, untimestamped, frame-rate-code-four I picture to decode into the existing third ordinary frame region while its released predecessor waits for a complete-frame native swap boundary. Admission requires the decode bank to differ from both the visible and pending banks, retains the completed-bank identity for the whole transaction, rejects any destination change into the visible bank, rejects completion before the predecessor presents and leaves timestamped, progressive, P, B and scratch-frame behavior on the established serialized paths. A measured-latency integration regression models the hardware's approximately 50-millisecond all-I decode time across twenty real native frame windows: the old path reproduces ten decoded and ten displayed pictures, or approximately 15 fps, while the overlap path produces thirteen decoded and thirteen displayed pictures, or the decoder-limited approximately 20 fps, with no presentation error. Separate negative cases prove that a P header cannot enter the exception, a displayed-bank destination is fatal and premature completion cannot overwrite the pending predecessor.
+
+The new `Native timing pattern` menu option selects eight field-invariant vertical bars only when native output is active. It replaces the final framebuffer RGB, data-enable and sync source while the decoder, DDRAM, cache refill, scheduler and cadence profiler continue running underneath, so playback with the pattern enabled distinguishes native timing/output artifacts from framebuffer and line-cache pixel delivery without changing the 480i raster. The pattern contains no horizontal one-line detail and its RTL regression proves blanking, sync passthrough, all eight bar boundaries and structural field invariance. Exact TFF and BFF timing, field order, exhaustive interlaced 4:2:0 mapping, measured presentation latency, safe/unsafe ordinary ownership, ordinary and delayed cache refill, schema-nine cadence profiling and decoding, scheduler rate codes one through five, timestamp cadence floor, dense three-bank publication, the progressive live-raster DDR soak and TFF/BFF/progressive reconstruction all pass. The legacy Cycle-A wrapper retains its established three fixed-expectation nonzero cases, while every emitted functional result remains complete and error-free.
+
+The clean from-scratch Quartus Prime 17.0.2 build finishes in 11:07 with zero errors and 144 established warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively +0.386, +0.245, +4.208, +0.566 and +0.925 nanoseconds. Focused decoder setup and recovery margins are +0.881 and +11.444 nanoseconds, and video setup is +2.076 nanoseconds, with zero violated paths. The fit uses 29,554 of 41,910 ALMs, 45,539 registers, 3,655,139 block-memory bits, 464 RAM blocks, 65 DSP blocks and three PLLs. The 4,195,444-byte RBF has SHA-256 `67bd360b0efa1864ca5184049ad6dfd9fc2edc006421871309c2c0be9de70969`. Installation used only ordinary FTP with the default `root` / `1` login and no SSH keys. The prior active 4,192,152-byte RBF was independently retrieved at SHA-256 `9f60f116d145fde30e93de7db17bfc525168db0e5781f7d167f04ee2b5c01904` and preserved byte-identically as `/media/fat/MediaPlayer.rbf.rollback-pre-2601573`. The new image was uploaded under a staging name, retrieved at its local hash, promoted, retrieved again from `/media/fat/MediaPlayer.rbf` at the same hash and only then had the temporary stage removed. Helper, Main and media files were not changed.
+
+#### Next Steps:
+
+Reload the Media Player core, leave `Native timing pattern` Off, set `Interlaced output` to `Native 480i` and run only `_cadence/native_480i_tff_light_10s.m2v`. Observe the apparent duration, motion continuity, approximately 60 Hz flicker and transient one-pixel-high short dashes, report USER, DISK and POWER and leave the final image loaded for an FTP-only schema-nine capture. Acceptance is all 300 pictures and 299 swaps with zero aggregate and ownership errors, and a presentation span near the established approximately 14.87-second decoder-limited progressive result rather than the previous approximately 19.93-second serialized native result. After that normal-video capture, enable `Native timing pattern`, replay the same file and report whether the bars themselves flicker or acquire transient short lines; do not run that second isolation view before the normal telemetry is captured. Continue to defer BFF and any public native-interlace compatibility claim.
+
+#### Files Modified:
+
+- MediaPlayer.sdc
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_05.svh
+- MediaPlayer_top_06.svh
+- MediaPlayer_top_07.svh
+- files.qip
+- rtl/mpeg2_native_timing_pattern.sv
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/streams/run_native_480i_timing.sh
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_dense_publication_order.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/tb_native_480i_presentation_integration.sv
+- tools/streams/tb_native_480i_timing_pattern.sv
+- tools/streams/tb_native_ordinary_overlap_ownership.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 491 COMMIT Unreleased f6f2fe4 2026-08-25T00:24:32-07:00
 
 #### Coming From:
@@ -1238,36 +1285,6 @@ Build the copied-stream 24-second audio-video opening diagnostic from `20_bbb_fu
 
 - host/arm/media_player_helper.c
 - tools/streams/analyze_arm_av_transport.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 452 COMMIT Unreleased f2b2e02 2026-08-24T07:31:54-07:00
-
-#### Coming From:
-
-Unreleased f2b2e02
-
-#### Purpose:
-
-Isolate the failed Program Stream cadence from decoder throughput with an audio-free high-motion control, then prepare an exact-byte opening comparison before changing pacing code.
-
-#### Outcome:
-
-Before touching the MiSTer, the user recorded the completed full soak's ordinary terminal indication: USER and POWER solid on with DISK blinking eleven times. Without rebooting, the exact installed `13_bbb_squirrel_15sec_native24_q6.m2v` then played its 7:15–7:30 high-motion sequence perfectly with no visible stutter and no audio by design, ending with the same ordinary LEDs. The completed 800x600 capture is 508,980 bytes at SHA-256 `3cc49f8b2180b90f4ebce63f0875fd82eae7eb60c04f840ecb558713e9c40d20`; an initial 425,984-byte retrieval occurred before the screenshot finished writing and was discarded rather than analyzed. Schema-eight telemetry reports zero aggregate errors, no audio underrun or PCM protocol error, all 2,603,570 bytes accepted, 121 reference plus 239 B pictures decoded, sequence end, presentation completion and normal quiet reason one. The eight-bit display counters wrap exactly as expected for all 360 pictures and 359 swaps. Reconstructing that wrap gives 359 intervals over 14.960773 seconds, or 23.996 frames per second. No display gap crosses the 50-millisecond outlier threshold, and the three largest are all only 2,984,256 cycles or 49.738 milliseconds. This is a sharp contrast with the audio-video soak's 139 threshold crossings and 116.054-millisecond repeated-frame gaps within its first 21.74 seconds, and proves the current decoder and RBF can sustain demanding 24 fps content when PCM is absent.
-
-One encoding variable remains because the existing squirrel clip begins a fresh audio-free encode at 7:15 rather than reusing the failed Program Stream's exact bytes. A final bounded discriminator was therefore produced without source changes: `22_bbb_opening24_exact_video.m2v` is the first 577 pictures copied byte-for-byte from `20_bbb_full_48k.mpg`'s H.262 stream, followed only by a sequence-end code. The 3,138,618-byte file passes the 720x480 frame-rate-code-two envelope at 25 I, 169 P and 383 B pictures and has SHA-256 `100dcb7d536918263def73bc2b8e660fdb2e975221ccd9d548b0845bb853471a`. It was uploaded under a staging name, retrieved byte-identically, promoted only after verification and retrieved again at the same hash. Helper, RBF, Main and every existing media file remain unchanged, and no playback was launched during installation.
-
-#### Next Steps:
-
-Without rebooting, run only `22_bbb_opening24_exact_video.m2v`. Report whether its 24-second motion is continuous or shows the repeated-frame cadence seen during the opening of `20_bbb_full_48k.mpg`, plus USER, DISK and POWER at the end, then leave its final image loaded for schema-eight capture. A clean exact-byte raw run will conclusively place both the cadence regression and the soak's early underrun in shared in-band PCM/video pacing; matching stutter will instead identify the encoded opening's decoder workload. Do not replay the full Program Stream or run another file before capture.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
