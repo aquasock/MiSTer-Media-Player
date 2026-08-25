@@ -43,6 +43,23 @@ LIGHT_SOURCE = (
     "if(between(Y,119,122)+between(Y,357,360),112,32))))':"
     "cb='128':cr='128'"
 )
+STEP_HOLD_SOURCE_FIELDS = 60
+STEP_HOLD_BAR_X = 48
+STEP_HOLD_BAR_WIDTH = 8
+STEP_HOLD_BAR_STEP = 96
+STEP_HOLD_BAR_SPAN = 576
+STEP_HOLD_SOURCE = (
+    f"nullsrc=size=720x480:rate={SOURCE_RATE},"
+    "geq="
+    "lum='if(between(Y,64,415)*between(X,"
+    f"{STEP_HOLD_BAR_X}+mod(floor(N/{STEP_HOLD_SOURCE_FIELDS})*"
+    f"{STEP_HOLD_BAR_STEP},{STEP_HOLD_BAR_SPAN}),"
+    f"{STEP_HOLD_BAR_X + STEP_HOLD_BAR_WIDTH - 1}+"
+    f"mod(floor(N/{STEP_HOLD_SOURCE_FIELDS})*{STEP_HOLD_BAR_STEP},"
+    f"{STEP_HOLD_BAR_SPAN})),235,"
+    "if(between(Y,119,122)+between(Y,357,360),112,32))':"
+    "cb='128':cr='128'"
+)
 
 
 @dataclass(frozen=True)
@@ -109,6 +126,54 @@ def decode_raw(ffmpeg: str, path: Path, frame_count: int) -> bytes:
     if len(result.stdout) != expected:
         raise RuntimeError(f"decoded {len(result.stdout)} bytes, expected {expected}")
     return result.stdout
+
+
+def validate_step_hold_decoded(raw: bytes, frame_count: int) -> dict[str, Any]:
+    """Prove the encoded fixture itself contains no stale bar position."""
+    luma_size = 720 * 480
+    frame_size = luma_size * 3 // 2
+    hold_frames = STEP_HOLD_SOURCE_FIELDS // 2
+    max_adjacent_field_delta = 0
+    previous_position: int | None = None
+    prior_positions: set[int] = set()
+    step_count = 0
+    for frame_index in range(frame_count):
+        frame = raw[frame_index * frame_size:(frame_index + 1) * frame_size]
+        position = STEP_HOLD_BAR_X + (
+            (frame_index // hold_frames) * STEP_HOLD_BAR_STEP
+        ) % STEP_HOLD_BAR_SPAN
+        sample_x = position + STEP_HOLD_BAR_WIDTH // 2
+        even_row = frame[200 * 720:201 * 720]
+        odd_row = frame[201 * 720:202 * 720]
+        if even_row[sample_x] < 180 or odd_row[sample_x] < 180:
+            raise SystemExit(
+                f"step-hold frame {frame_index}: current bar is not bright"
+            )
+        max_adjacent_field_delta = max(
+            max_adjacent_field_delta,
+            max(abs(a - b) for a, b in zip(even_row, odd_row)),
+        )
+        if previous_position is not None and position != previous_position:
+            prior_positions.add(previous_position)
+            step_count += 1
+        for prior_position in prior_positions:
+            if prior_position == position:
+                continue
+            old_x = prior_position + STEP_HOLD_BAR_WIDTH // 2
+            if even_row[old_x] > 80 or odd_row[old_x] > 80:
+                raise SystemExit(
+                    f"step-hold frame {frame_index}: old bar remains encoded"
+                )
+        previous_position = position
+    return {
+        "bar_width_pixels": STEP_HOLD_BAR_WIDTH,
+        "hold_source_fields": STEP_HOLD_SOURCE_FIELDS,
+        "hold_output_frames": hold_frames,
+        "bar_step_pixels": STEP_HOLD_BAR_STEP,
+        "observed_steps": step_count,
+        "decoded_prior_position_clear": True,
+        "max_adjacent_field_row_delta": max_adjacent_field_delta,
+    }
 
 
 def encoder_command(
@@ -207,6 +272,10 @@ def generate_artifact(
         "patched_vs_unpatched_decoded_planes_equal": True,
         "analysis": analysis,
     }
+    if source_profile == "step-hold-field-identical":
+        result["step_hold_validation"] = validate_step_hold_decoded(
+            interlaced_raw, frame_count
+        )
     print(
         f"generated {output.name}: order={result['field_order']} "
         f"frames={frame_count} bytes={output.stat().st_size} "
@@ -232,11 +301,20 @@ def main() -> None:
             "duration"
         ),
     )
+    parser.add_argument(
+        "--step-hold-visual-seconds", type=int, default=0,
+        help=(
+            "also generate TFF/BFF fixtures with pair-identical fields and "
+            "a narrow bar that steps after one-second stationary holds"
+        ),
+    )
     args = parser.parse_args()
     if args.visual_seconds < 0:
         parser.error("--visual-seconds must be zero or greater")
     if args.light_visual_seconds < 0:
         parser.error("--light-visual-seconds must be zero or greater")
+    if args.step_hold_visual_seconds < 0:
+        parser.error("--step-hold-visual-seconds must be zero or greater")
 
     ffmpeg = h.require_tool("ffmpeg")
     ffprobe = h.require_tool("ffprobe")
@@ -248,6 +326,7 @@ def main() -> None:
     manifest_cases: list[dict[str, Any]] = []
     visual_cases: list[dict[str, Any]] = []
     light_visual_cases: list[dict[str, Any]] = []
+    step_hold_visual_cases: list[dict[str, Any]] = []
 
     with tempfile.TemporaryDirectory(prefix="mister_h262_interlaced_") as temp_name:
         temp = Path(temp_name)
@@ -288,6 +367,25 @@ def main() -> None:
                     source_profile="low-complexity-field-motion",
                 ))
 
+        if args.step_hold_visual_seconds:
+            step_hold_frame_count = (
+                args.step_hold_visual_seconds * 30000 + 500
+            ) // 1001
+            for case in CASES:
+                step_hold_name = (
+                    f"step_hold_visual_{case.name}_"
+                    f"{args.step_hold_visual_seconds}s"
+                )
+                step_hold_visual_cases.append(generate_artifact(
+                    ffmpeg, ffprobe, temp, output_dir, case,
+                    step_hold_frame_count,
+                    f"step_hold_interlaced_i_{case.name}_"
+                    f"{args.step_hold_visual_seconds}s.m2v",
+                    step_hold_name,
+                    source=STEP_HOLD_SOURCE,
+                    source_profile="step-hold-field-identical",
+                ))
+
     manifest = {
         "purpose": "native 720x480i59.94 frame-DCT all-I decoder and field-order regressions",
         "ffmpeg_version": version,
@@ -295,6 +393,7 @@ def main() -> None:
         "cases": manifest_cases,
         "visual_cases": visual_cases,
         "light_visual_cases": light_visual_cases,
+        "step_hold_visual_cases": step_hold_visual_cases,
     }
     manifest_path = output_dir / "interlaced_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
