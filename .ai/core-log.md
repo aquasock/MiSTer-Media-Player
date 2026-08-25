@@ -1,4 +1,4 @@
-## 483 COMMIT Unreleased ??? 2026-08-24T16:09:09-07:00
+## 483 COMMIT Unreleased 2bb8def 2026-08-24T16:09:09-07:00
 
 #### Coming From:
 
@@ -10,21 +10,15 @@ Implement and qualify the first native 720x480 interlaced presentation path for 
 
 #### Outcome:
 
-Pending implementation and qualification. Use CTA VIC 6/7 geometry as independently represented by the Linux DRM mode table: a 13.5 MHz logical sample clock, 720 active samples, horizontal positions 739/801/858, 480 active frame lines, vertical positions 488/494/525, negative sync polarity, interlace and double-clock semantics. Run the video domain at an exact four-times logical sample rate, generate two 262.5-line fields with continuous horizontal phase, expose top/bottom field identity through `VGA_F1`, and provide distinct every-field cadence and once-per-frame presentation windows so the existing 30000/1001 scheduler floor continues to accumulate at field rate while physical frame-bank swaps occur only before the authored first field. Associate `top_field_first` with physical frame ownership rather than sampling live parser state; bound native activation to a stable field order within the session and fall back diagnostically if it changes. Extend the DDR line cache so top and bottom fields read even and odd luma lines respectively, while interlaced 4:2:0 chroma rows are shared by pairs of same-field luma lines and refilled in presentation order. Preserve the existing progressive full-frame diagnostic reader as a selectable/non-interlaced fallback, and leave field pictures, field-DCT, repeat-first-field, interlaced P/B pictures, the user-facing compatibility claim and all external processing/SDI work unsupported.
+Commit `2bb8def` adds a selectable native 720x480 interlaced presentation path for the bounded frame-DCT all-I subset. A 54 MHz video domain provides an exact divide-by-four 13.5 MHz logical sample cadence, 858-sample lines, two 262.5-line fields with continuous half-line phase, 720x480 active video, negative sync and field identity on `VGA_F1`; the existing 800x600 progressive diagnostic path remains selectable. The frontend publishes an exact accepted-picture field-order event, physical frame banks retain their own `top_field_first` metadata, a session lock rejects an unexpected field-order change, and the scheduler now advances cadence every field while allowing physical frame-bank swaps only at the authored first-field frame boundary. The DDR presentation cache maps even/odd luma lines by displayed field and shares each interlaced 4:2:0 chroma row across the corresponding two same-field luma lines. Focused RTL regressions pass stable TFF, stable BFF, field-order-change rejection and reset cases; both field orders each produce four fields with 225,225 logical field ticks, 172,800 active samples, 2,574 sync samples and a 429-sample half-line, while exhaustive cache tests cover 960 luma and 480 chroma line sequences. Scheduler, picture-timestamp, cadence-profiler, dense-publication and progressive live-raster regressions pass. End-to-end reconstruction remains within the established one-LSB IDCT tolerance for all 2,073,600 component samples in each four-picture fixture: TFF has 9,442 one-LSB differences and BFF has 9,632, with zero larger differences; the progressive control likewise has zero differences beyond one LSB. The compatibility checker deliberately continues to report the new streams unsupported pending hardware proof. A clean Quartus 17.0.2 synthesis, fit, assembly and TimeQuest build completes with zero errors; global endpoint TNS is zero, focused decoder setup/recovery slack is 1.506/10.530 ns and video setup slack is 2.503 ns. Fitter use is 29,361 ALMs, 45,247 registers, 3,655,139 block-memory bits, 464 RAM blocks, 65 DSP blocks and 3 PLLs. The 4,209,032-byte RBF has SHA-256 `71462f2ded90f4d40c7502cd58d07e99620d51a3e00f5b58ccfcd38d24e1833e`. Field pictures, field-DCT, repeat-first-field, interlaced P/B pictures, the public compatibility claim and all external processing/SDI work remain unsupported.
 
 #### Next Steps:
 
-Add the exact timing generator and exhaustive field/frame geometry regression first. Then integrate the field-aware cache, physical frame metadata, separate cadence/presentation windows and MiSTer field output; update existing scheduler and progressive display regressions for the new interfaces. Run TFF, BFF, progressive-control and field-order-change negative simulations, check the compatibility boundary remains explicit, and complete a clean Quartus build plus focused timing analysis. Do not install an RBF until all host and RTL evidence passes; any candidate installation must use plain FTP with the default MiSTer username and password and no SSH keys, followed by separate TFF and BFF visual tests.
+Install the exact RBF and deterministic TFF/BFF fixtures by plain FTP using the default MiSTer username and password, with no SSH keys. Reload the core and test TFF first in Native 480i mode, checking display lock, field order, combing or judder, crop and LED state, then capture the final image. Test BFF separately only after the TFF capture using the same observations. Keep the public compatibility claim disabled until both field orders pass on hardware; retain the 800x600 diagnostic mode for isolation and do not claim SDI or processing bypass. Field pictures, field-DCT, repeat-first-field and interlaced P/B pictures remain later milestones.
 
 #### Files Modified:
 
-- .ai/core-reference.md
-- rtl/pll/pll_0002.v
-- rtl/mpeg2_video_output_timing.sv
-- rtl/mpeg2_luma_framebuffer.sv
-- rtl/mpeg2_new/mpeg2_h262_frontend.sv
-- rtl/mpeg2_new/mpeg2_h262_picture_timestamp.sv
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- MediaPlayer.sdc
 - MediaPlayer_top_00.svh
 - MediaPlayer_top_01.svh
 - MediaPlayer_top_02.svh
@@ -32,16 +26,29 @@ Add the exact timing generator and exhaustive field/frame geometry regression fi
 - MediaPlayer_top_05.svh
 - MediaPlayer_top_06.svh
 - MediaPlayer_top_07.svh
-- MediaPlayer.sdc
-- tools/phase1p_timing.tcl
 - files.qip
-- tools/streams/tb_native_480i_timing.sv
+- rtl/mpeg2_luma_framebuffer.sv
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- rtl/mpeg2_new/mpeg2_h262_frontend.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- rtl/mpeg2_new/mpeg2_h262_native_field_order.sv
+- rtl/mpeg2_new/mpeg2_h262_picture_timestamp.sv
+- rtl/mpeg2_video_output_timing.sv
+- rtl/pll/pll_0002.v
+- tools/phase1p_timing.tcl
 - tools/streams/run_native_480i_timing.sh
-- directly affected regression benches/scripts
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_dense_publication_order.sv
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/tb_h262_picture_timestamp.sv
+- tools/streams/tb_interlaced_420_cache_mapping.sv
+- tools/streams/tb_native_480i_timing.sv
+- tools/streams/tb_native_field_order.sv
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
