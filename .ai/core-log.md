@@ -1,3 +1,31 @@
+## 488 COMMIT Unreleased 8d9043a 2026-08-24T23:22:04-07:00
+
+#### Coming From:
+
+Unreleased 8d9043a
+
+#### Purpose:
+
+Record the low-complexity TFF progressive-baseline result and separate expected temporal weave combing from the measured full-D1 all-I throughput ceiling.
+
+#### Outcome:
+
+The user ran `_cadence/native_480i_tff_light_10s.m2v` with `Interlaced output` set to `800x600 Diagnostic` and reports that it looked good for interlaced material, the prior flicker disappeared, motion looked good, the duration seemed close to ten seconds and USER and POWER remained solid while DISK blinked twice. The user also saw dot crawl on vertical edges and the apparent non-alignment or comb of the two fields, which limited fine motion judgment. The final 800x600 screenshot was triggered and retrieved entirely through ordinary FTP using the default MiSTer login and no SSH; `.ai/current_results/entry487_tff_light_diagnostic.png` is 19,667 bytes with SHA-256 `fbf4dca1fcf6bd87280888fbeaba24905bac1c53d3e0fb76f939dc024ae6edc8`. The visible schema-nine record accepts all 5,007,304 source bytes, reports 300 reference and displayed pictures and 299 swaps after interpreting the eight-bit picture and swap counters modulo 256, preserves stable `top_field_first=1`, sees sequence end and presentation completion and reaches normal quiet reason one. Aggregate, decoder, presentation, destination, audio-underrun and PCM-protocol errors are all clear, and no scheduler work remains. First presentation occurs at 2,378,246 cycles and the last at 894,849,788 cycles, so 299 swap intervals occupy 892,471,542 cycles, or 14.874526 seconds at 60 MHz. The actual sustained rate is 20.101 pictures per second, not 29.97; the helper's direct 2.891-fps value is invalid after the display counter wraps. This improves materially over the detailed fixture's 14.992 pictures per second but still fails the intended real-time baseline. The screenshot shows the authored four-pixel temporal separation between the top and bottom scanlines of the moving vertical bar. Because the diagnostic output deliberately weaves fields captured at successive 60000/1001 source times into one progressive frame, that comb is expected and does not by itself indicate reversed field order or misplaced cache lines. The no-flicker result provides a useful progressive-output comparison, but full-D1 all-I decode throughput remains a confounder and native interlace is not yet passed.
+
+#### Next Steps:
+
+Revise the isolation sequence rather than generating another nominally real-time full-D1 all-I stream. With explicit user approval, run the same `_cadence/native_480i_tff_light_10s.m2v` once in `Native 480i` mode and compare its live bar edge, comb or dot crawl, flicker and motion directly against this captured progressive weave baseline; leave the final image loaded for an FTP-only capture. Treat that run only as a presentation-quality comparison at the measured approximately 20.1-picture decode rate, not as a 29.97-fps cadence qualification. If native presentation removes or materially reduces the weave comb, keep native timing unchanged and plan decoder-throughput or interlaced predictive-picture work separately. If it does not, add a decoder-independent native field-rate raster diagnostic before changing presentation timing. Continue to defer BFF and the public interlaced compatibility claim.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 487 COMMIT Unreleased 8d9043a 2026-08-24T23:14:45-07:00
 
 #### Coming From:
@@ -1227,34 +1255,6 @@ Without rebooting after the corrected 50 fps pair, the user loaded `15_bad_trunc
 #### Next Steps:
 
 Power-cycle once, set Audio Test to Off and run only `20_bbb_full_48k.mpg` through its complete 9:56 duration. Check opening audio-video alignment, ordinary scene transitions, the high-motion sequence near 7:22, credits and the final audio tail; report any crackle, dropout, progressive drift, visible stutter or corruption and all three terminal LEDs. Leave the final image loaded for a schema-eight capture. Do not replay the soak or any other file before that capture.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 448 COMMIT Unreleased f2b2e02 2026-08-24T07:02:00-07:00
-
-#### Coming From:
-
-Unreleased f2b2e02
-
-#### Purpose:
-
-Hardware-qualify the corrected rejection of the 50 fps envelope case and immediate recovery to the known-good 48 kHz control.
-
-#### Outcome:
-
-With the exact `f2b2e02` helper active and without rebooting, the user ran `14_bad_rate_50.mpg`; it now behaves like the other helper-side failures, showing a black screen with no sound and USER, DISK and POWER all off rather than playing to ordinary success. The user immediately selected `00_good_480p_48k.mpg` without rebooting and reports perfect playback, with USER and POWER solid on and DISK blinking eleven times. The untouched 800x600 recovered-control capture is 104,786 bytes at SHA-256 `56bc682f106ff0b1b8363f4046d5b63299316d5fab4822b6332be63cf1174857`. Schema-eight telemetry proves clean re-arm after the new preflight rejection: all 582,742 transport bytes are accepted, 44 timestamps associate, seventeen reference plus 31 B pictures decode, all 48 pictures display with 47 swaps, sequence end is seen and presentation completes. Aggregate error flags are zero, audio underrun and PCM protocol error are false, every decoder, presentation and destination error is clear, and the quiet reason-one snapshot has no pending scheduler state. First presentation occurs after 2,431,574 decoder cycles, the final picture after 1.957 seconds and quiet completion after 2.057 seconds; delivered cadence is 24.530 frames per second. This passes the corrected fifth failure-and-recovery pair and hardware-accepts the conservative maximum-30-fps runtime boundary.
-
-#### Next Steps:
-
-Without rebooting, run only `15_bad_truncated.mpg` for no more than ten seconds and report the screen, sound and USER, DISK and POWER states. It must fail without claiming ordinary success or wedging the menu. Immediately select `00_good_480p_48k.mpg` again without rebooting and report alignment, sound, picture and all three LEDs, leaving the final image loaded for one last recovered-control capture. Do not start `20_bbb_full_48k.mpg` until this sixth and final failure pair passes.
 
 #### Files Modified:
 
