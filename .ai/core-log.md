@@ -1,3 +1,42 @@
+## 490 COMMIT Unreleased f6f2fe4 2026-08-25T00:16:30-07:00
+
+#### Coming From:
+
+Unreleased 8d9043a
+
+#### Purpose:
+
+Correct native 480i frame admission to one presentation per authored frame and add a passive diagnostic for line-cache refill overlap.
+
+#### Outcome:
+
+Commits `6f4e1aa` and `f6f2fe4` implement and close the approved native TFF correction. Native timing now raises the cadence window at logical sample zero of the vertical-blanking tail and raises the frame-admission window one complete logical 13.5 MHz sample later, so the synchronized scheduler applies the second-field credit before testing the physical bank swap. The integrated 54 MHz timing to 60 MHz scheduler regression observes twelve fields, six frame windows and six presentations at 30000/1001 with no coincident cadence and admission pulses; the established synthetic scheduler rates remain unchanged for all five supported rate codes. The framebuffer now passively synchronizes active scan and selected Y/C cache-bank levels into the memory domain and latches a telemetry-only overlap error if a completed DDR refill writes the bank currently being scanned. The ordinary-latency live-raster test remains clear at latency 64 while the forced-delay case deterministically latches overlap at latency 3400, and the schema-nine decoder exposes the new flag. Exact TFF and BFF field timing, exhaustive interlaced cache mapping, stable field-order controls, scheduler rates, cadence profiling, telemetry decoding and fixture generation all pass. The first full compile exposed only the three intentional first-stage 54-to-60 MHz diagnostic synchronizer paths; `f6f2fe4` adds narrowly scoped timing exceptions for those destinations, leaving all second stages and functional logic timed. The exact `f6f2fe4` rebuild completes with zero errors and 144 warnings, 29,434 of 41,910 ALMs, 3,655,139 of 5,662,720 memory bits and 65 of 112 DSP blocks. Worst-case global setup, hold, recovery and removal margins are respectively 0.593, 0.243, 3.336 and 0.531 ns; the decoder and video setup margins are 1.453 and 2.848 ns. The 4,192,152-byte RBF has SHA-256 `9f60f116d145fde30e93de7db17bfc525168db0e5781f7d167f04ee2b5c01904`. It was uploaded, retrieved byte-identically under a staging name and promoted entirely through ordinary FTP with the default MiSTer login and no SSH. `/media/fat/MediaPlayer.rbf` retrieves at the exact new hash, while the known prior 4,210,740-byte image is preserved as `/media/fat/MediaPlayer.rbf.rollback-20260825T0015` at SHA-256 `5544bb48bea6d0f066b01f09f63087d46e7a52438ca60b6872b9f452ef213c09`.
+
+#### Next Steps:
+
+Reload the Media Player core, set `Interlaced output` to `Native 480i` and run only `_cadence/native_480i_tff_light_10s.m2v`. Judge whether playback is materially closer to the progressive diagnostic duration rather than the prior approximately twenty-second half-rate native run, whether the approximately 60 Hz flicker and transient one-pixel-high short dashes are gone or changed, and whether motion and field combing remain orderly. Report USER, DISK and POWER after completion and leave the final image loaded for an FTP-only schema-nine capture. Acceptance requires approximately 20.10 displayed pictures per second for this decoder-limited fixture, all 300 pictures and 299 swaps, zero aggregate errors and a clear new cache-bank-overlap flag. Continue to defer BFF and any public native-interlace compatibility claim until this TFF result passes.
+
+#### Files Modified:
+
+- MediaPlayer.sdc
+- MediaPlayer_top_02.svh
+- MediaPlayer_top_06.svh
+- MediaPlayer_top_07.svh
+- rtl/mpeg2_luma_framebuffer.sv
+- rtl/mpeg2_video_output_timing.sv
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/run_native_480i_timing.sh
+- tools/streams/tb_native_480i_cache_refill.sv
+- tools/streams/tb_native_480i_presentation_integration.sv
+- tools/streams/tb_native_480i_timing.sv
+- tools/streams/test_decode_hardware_cadence.py
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 489 COMMIT Unreleased 8d9043a 2026-08-24T23:35:44-07:00
 
 #### Coming From:
@@ -1227,34 +1266,6 @@ Main's retained 3,972,939-byte log at SHA-256 `90ceb8a7ac772cf2822ad4311e3d6b08e
 #### Next Steps:
 
 Before any source or installed-state change, record the soak's final USER, DISK and POWER states, then run only the already installed `13_bbb_squirrel_15sec_native24_q6.m2v` without rebooting. Its exact 2,603,570-byte SHA-256 is `9257ffadc24eb6696fc9760f3253764b396c993dfc3640e921c97611bad2edce`, it contains 360 audio-free pictures from the 7:15–7:30 high-motion sequence and it passes the same video envelope. Report whether its motion is continuous or shows the same repeated-frame cadence, especially at the wooden spikes near 7:22, plus all three final LEDs, then leave its final image loaded for schema-eight capture. A smooth raw clip isolates the defect to shared in-band PCM/video pacing; matching stutter instead isolates it to decoder throughput or a decoder-side regression. Do not replay the ten-minute Program Stream.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 450 COMMIT Unreleased f2b2e02 2026-08-24T07:11:14-07:00
-
-#### Coming From:
-
-Unreleased f2b2e02
-
-#### Purpose:
-
-Preserve the first in-progress full-soak cadence observation without disturbing playback or conflating it with audio-video drift.
-
-#### Outcome:
-
-During the uninterrupted `20_bbb_full_48k.mpg` run, the user reports suspected microstutters while audio remains synchronized, then confirms that brief repeated or late video frames accurately describe the visible behavior. No mid-run screenshot was triggered because host screenshot work could perturb the very cadence under observation. Read-only inspection proves the authored source is not timestamp-jittered: all 14,315 video pictures span 596.416666 seconds with every adjacent presentation timestamp separated uniformly by either 0.041666 or 0.041667 seconds at exact 24 fps. The compatibility checker also retains a strict pass at 720x480, frame-rate code two, 597 I, 4,176 P and 9,542 B pictures with 48 kHz stereo MPEG Layer II audio. The observation is consistent with the already captured two-second controls, whose three largest decoder-limited display intervals recur at GOP picture ordinals eleven, 23 and 35 and reach 5,968,512 decoder cycles or 99.475 milliseconds despite zero error flags and complete picture counts. Uniform source timing plus continuing audio sync therefore points to transient decoder/presentation lateness that repeats the prior frame, not accumulating timeline drift; the final long-run snapshot is still required to quantify its frequency and exclude a worse high-motion or terminal failure.
-
-#### Next Steps:
-
-Continue the current soak without pausing, replaying or triggering a screenshot. Note whether the repeated-frame effect becomes more obvious during the high-motion sequence near 7:22, smooth camera motion or rolling credits, and whether audio remains synchronized throughout. After the full 9:56 reaches its natural end, report crackle, dropout, drift, visible corruption, the repeated-frame behavior and USER, DISK and POWER, then leave the final image loaded for schema-eight capture before any other input.
 
 #### Files Modified:
 
