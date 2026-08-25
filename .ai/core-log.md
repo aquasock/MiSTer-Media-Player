@@ -1,3 +1,31 @@
+## 494 COMMIT Unreleased 2601573 2026-08-25T01:26:01-07:00
+
+#### Coming From:
+
+Unreleased 2601573
+
+#### Purpose:
+
+Record the native timing-pattern hardware discriminator and relocate the remaining motion artifacts to framebuffer or field-content presentation.
+
+#### Outcome:
+
+The user enabled `Native timing pattern`, kept native 480i active and replayed `_cadence/native_480i_tff_light_10s.m2v`; the eight static vertical bars remained absolutely unchanged throughout playback and looked as if no file had been launched, while USER and POWER stayed solid and DISK blinked twice. The untouched terminal pattern was captured entirely through ordinary FTP with the default MiSTer login and no SSH; `.ai/current_results/entry493_native_timing_pattern.png` is 7,336 bytes with SHA-256 `8a34c6f8bd0de81cc8f6bd9f02a165626e7a629c547f7d294f26da16140a61da`. The image shows eight clean full-height bars with stable vertical boundaries and no short horizontal dashes or changing ghost edge. Schema nine proves the apparently static view concealed a complete active decode: all 5,007,304 bytes were accepted, the wrapped counters represent 300 reference and displayed pictures and 299 swaps, top-field-first stayed stable, sequence end and presentation completion occurred and the snapshot closed normally for quiet reason one. Aggregate, decoder, presentation, destination, cache-bank-overlap, audio-underrun and PCM-protocol errors are all clear. The 299 presentation intervals span 716,738,843 cycles from cycle 2,378,246 to 719,117,089, or 11.945647 seconds and 25.030037 pictures per second, materially identical to the normal-video run's 25.044486 pictures per second. Decoder and DDRAM traffic therefore continued without perturbing the video-domain pattern, decisively excluding the native sync clock, field cadence and final output mux as the cause of playback-induced flicker, transient dashes or moving ghost content. Earlier progressive and native terminal stills also show the same completed 32-pixel-wide authored bar with bright interior and combed boundaries, so a still cannot distinguish the user's live persistence report from normal temporal field separation; the remaining diagnostic boundary is dynamic framebuffer and field-content presentation, while the independent approximately 25-picture decoder ceiling remains below the 29.97-picture source.
+
+#### Next Steps:
+
+Stop before changing RTL and obtain approval for one content-only framebuffer discriminator. Extend the deterministic interlaced generator with a narrow bar whose two authored fields are identical and whose position holds for approximately one second before a large discrete step, then generate and upload only the TFF fixture through ordinary FTP without changing the accepted RBF. Long static holds remove continuous-motion and bar-width ambiguity: if the old position disappears within the next field or frame and each held position is clean, the original comb and apparent shadow are authored temporal interlace or downstream display processing; if the old position persists materially into the hold, the framebuffer cache or frame-bank handoff is retaining stale pixels and the next RTL cycle should instrument field and cache identity. Keep `Native timing pattern` Off for that fixture, continue to defer BFF and do not make a public native-interlace compatibility claim. Treat the separate 25-picture-per-second decoder throughput ceiling as a later optimization rather than mixing it into this artifact discriminator.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 493 COMMIT Unreleased 2601573 2026-08-25T01:20:24-07:00
 
 #### Coming From:
@@ -1244,38 +1272,6 @@ Power-cycle, set Audio Test to Off and run only `23_bbb_opening24_exact_av.mpg` 
 #### Files Modified:
 
 - host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 454 COMMIT Unreleased f870d98 2026-08-24T08:12:56-07:00
-
-#### Coming From:
-
-Unreleased cf1d173
-
-#### Purpose:
-
-Build the exact-byte 24-second audio-video opening diagnostic and install it with the `cf1d173` helper under staged verification and preserved rollback.
-
-#### Outcome:
-
-`extract_program_stream_opening.py` cuts a Program Stream at a picture boundary without disturbing what it carries: packs and PES packets are copied verbatim, only the packet holding the first picture past the cut is rewritten to shorten its declared length to the payload retained, and the audio packets that follow are carried forward until the audio covers the picture kept, because a cut taken on video alone ends with less audio than picture and the sink would drain that shortfall as an underrun the source never had. Seven audio packets are appended for 1,155,456 samples against the 1,154,000 the 577 pictures require. The generated `23_bbb_opening24_exact_av.mpg` is 3,765,903 bytes at SHA-256 `d4b3ba1f02be1bd06a89e6f7b06f3ecf533ba0a09c8d7453056a501dadf0f585`, passes the compatibility checker at 720x480, frame-rate code two, 25 I plus 169 P plus 383 B pictures and 48 kHz stereo MPEG Layer II, and its demuxed video is byte-identical to the accepted raw control from entry 452 at SHA-256 `100dcb7d536918263def73bc2b8e660fdb2e975221ccd9d548b0845bb853471a`. The same H.262 bytes that played perfectly without audio are therefore now under test with their own audio and nothing else changed.
-
-That file is a direct discriminator between the two helpers rather than a general soak. Under the installed `f2b2e02` helper it reproduces the failure signature in 24 seconds: the audio deficit reaches 8,894 frames at 22.8 seconds, above the 8,192-frame sink FIFO, and the maximum PCM-free video span is 62,716 bytes. Under `cf1d173` the deficit never becomes positive at all, the maximum PCM-free video span is 4,052 bytes and steady batches stay within the accepted 2,048, with the transport carrying all 3,143,577 video and timestamp bytes and all 1,154,304 PCM frames and one clean end. The native and address-and-undefined-sanitized helpers agree.
-
-Installation was staged and verified at every step, and the FPGA image, MiSTer Main and every existing media file are untouched. The installed helper was first downloaded and confirmed to be exactly `4b496d9725dc520bd463a4e22e22430ebb575e778cf65cfd3f9c20a8e7479a58`, which a fresh official-toolchain rebuild of the `f2b2e02` source reproduces byte for byte, so the rollback path is proven rather than assumed. Those exact bytes were preserved as `/media/fat/linux/MediaPlayer_Helper.backup.pre-delivery-order.f2b2e02` and read back for comparison. The new helper was uploaded under a staging name, downloaded and confirmed byte-identical at SHA-256 `d40a3eeb8c5dfa1f41ee7a82ee7966b310ec458da789972ca7025f75866117f2`, then promoted, made executable and read back again at the same hash. The diagnostic was placed in `/media/fat/games/MediaPlayer/v0.7_qualification` by the same staged path and verified after promotion. No playback was launched.
-
-#### Next Steps:
-
-Power-cycle the MiSTer, set Audio Test to Off and run only `23_bbb_opening24_exact_av.mpg`. Acceptance is zero audible crackle or dropout, no repeated or late frames through the full 24 seconds, audio and video aligned at the end, and ordinary USER, DISK and POWER states; leave the final image loaded for a schema-eight capture and require zero aggregate, decoder, presentation, destination, PCM protocol and underrun flags with all 577 pictures displayed. If audio still underruns on this file, the delivery-order correction is insufficient and the next boundary is audio lookahead depth rather than interleaving, with the exact rollback available as `MediaPlayer_Helper.backup.pre-delivery-order.f2b2e02`. If it passes, run `20_bbb_full_48k.mpg` end to end and require completion without underrun or repeated-frame cadence, watching the high-motion sequence near 7:22 and the quiet stretch near 5:00, where host analysis still measures the deepest remaining audio excursion at 7,374 frames.
-
-#### Files Modified:
-
-- tools/streams/extract_program_stream_opening.py
 
 #### Status:
 
