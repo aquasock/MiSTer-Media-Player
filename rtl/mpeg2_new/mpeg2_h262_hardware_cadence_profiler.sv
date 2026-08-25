@@ -84,7 +84,7 @@ localparam [11:0] OVERLAY_X=12'd8;
 // to keep the final row inside the diagnostic and native rasters alike.
 localparam [11:0] OVERLAY_DIAG_Y=12'd424;
 localparam [11:0] OVERLAY_NATIVE_Y=12'd304;
-localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd164;
+localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd176;
 
 reg session_active;
 reg fifo_pending_q,decoder_ready_q,presentation_hold_q,destination_hold_q;
@@ -697,6 +697,9 @@ always @* begin
     38:overlay_row_word=snapshot_sync_2[1247:1216];
     39:overlay_row_word=snapshot_sync_2[1279:1248];
     40:overlay_row_word=snapshot_sync_2[1311:1280];
+    41:overlay_row_word=snapshot_sync_2[1343:1312];
+    42:overlay_row_word=snapshot_sync_2[1375:1344];
+    43:overlay_row_word=snapshot_sync_2[1407:1376];
     default:overlay_row_word=0;
     endcase
 end

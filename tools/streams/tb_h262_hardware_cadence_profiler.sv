@@ -236,12 +236,40 @@ begin
 end
 endtask
 
+// Entry 516: every snapshot word must actually reach the raster.  Checking
+// snapshot_sync_2 alone cannot see a missing overlay case branch or a short
+// OVERLAY_HEIGHT, both of which silently drop the appended words and let
+// synthesis optimize their source logic away.
+task verify_overlay_row_coverage;
+    input native_mode;
+    integer row;
+    reg [11:0] y0;
+begin
+    native_active=native_mode;
+    y0=native_mode?12'd304:12'd424;
+    for(row=0;row<44;row=row+1)begin
+        v_pos=y0+row[11:0]*12'd4;
+        @(negedge clk_video);h_pos=0;
+        @(posedge clk_video);#1;
+        if(dut.overlay_row_index!==row[5:0])
+            $fatal(1,"overlay row %0d decoded index %0d",row,
+                   dut.overlay_row_index);
+        if(dut.overlay_row_word!==dut.snapshot_sync_2[row*32+:32])
+            $fatal(1,"overlay row %0d word mismatch %h/%h",row,
+                   dut.overlay_row_word,
+                   dut.snapshot_sync_2[row*32+:32]);
+        if(!((v_pos>=y0)&&(v_pos<(y0+dut.OVERLAY_HEIGHT))))
+            $fatal(1,"overlay row %0d lies outside OVERLAY_HEIGHT",row);
+    end
+end
+endtask
+
 task verify_overlay_prefix;
     input native_mode;
     integer x;
 begin
     native_active=native_mode;
-    v_pos=native_mode?12'd317:12'd437;
+    v_pos=native_mode?12'd305:12'd425;
     for(x=0;x<=29;x=x+1)begin
         @(negedge clk_video);h_pos=x;
         @(posedge clk_video);#1;
@@ -373,6 +401,8 @@ initial begin
     verify_checksum();
     verify_overlay_prefix(1'b0);
     verify_overlay_prefix(1'b1);
+    verify_overlay_row_coverage(1'b0);
+    verify_overlay_row_coverage(1'b1);
 
     // Native 24 fps uses the same legal three-refresh maximum gap and must
     // retain the same ranked outlier telemetry as the established 25 fps path.
