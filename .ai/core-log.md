@@ -1,4 +1,4 @@
-## 485 COMMIT Unreleased ??? 2026-08-24T22:41:28-07:00
+## 485 COMMIT Unreleased 5568aa9 2026-08-24T22:41:28-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Create a diagnostic-only native-480i qualification boundary with sustained deter
 
 #### Outcome:
 
-Pending implementation and qualification. Extend the deterministic interlaced all-I generator with an explicit visual-duration option that retains the exact four-picture reconstruction fixtures by default but can produce separate ten-second TFF and BFF motion clips with the same bounded syntax and independently verified signalling. Give the cadence profiler a synchronized native-mode observation only for choosing between the established line-444 overlay origin and a line-324 origin that fits all 38 four-pixel telemetry rows within 720x480; do not feed this observation into decode, scheduling, cache or presentation control. Teach the telemetry decoder to select and validate the correct origin from the captured raster size, preserve all schema-nine meanings and add regression coverage for both layouts. Replace the screenshot helper's SSH command path with authenticated FTP writes to `/dev/MiSTer_cmd`, using the default MiSTer login and the same FTP retrieval path. Keep native timing, field order, framebuffer mapping, cadence scheduling and compatibility classification unchanged.
+Commit `5568aa9` adds diagnostic-only native-480i qualification support without changing native timing, field order, framebuffer mapping, cadence scheduling or compatibility classification. The deterministic generator retains the exact four-picture TFF and BFF artifacts and their established encoded and decoded hashes by default, while `--visual-seconds 10` produces separate 300-picture all-I motion clips. The 13,145,581-byte TFF visual stream has SHA-256 `4d7c14225ac6b12d37e74f5d682edbe6c6be649096db558d01629f4920f51b95`, decoded-plane SHA-256 `8847d3ea81ed81b9a14f0affb87b3751d7539957934563f9b15dc874708a31bc` and `tt` signalling. The 13,168,691-byte BFF stream has SHA-256 `1c53638979aef7a60f3a4c343d8229935c336035c637bc6cf94073675c165fe5`, decoded-plane SHA-256 `d46058ca79418905f41d50c225b12d4750a84015e7050adde9136cb211266228` and `bb` signalling. Each signalling patch is independently proven not to alter decoded YCbCr planes, and the public checker deliberately continues to reject both streams. The cadence profiler now uses the already-video-domain native-mode observation only to place its unchanged 38-row schema-nine overlay at line 324 instead of line 444; permanent RTL and Python tests prove the full record at both 720x480 and 800x600. The screenshot helper now writes its command directly to `/dev/MiSTer_cmd` through authenticated FTP and retrieves the result through FTP, with no SSH dependency; a live trigger and retrieval against the installed MiSTer succeeds. Native TFF/BFF geometry, exhaustive interlaced cache mapping, field-order locking, profiler, dual-layout decoder, scheduler rates and field/frame cadence, picture timestamps, end-to-end TFF/BFF/progressive reconstruction, field-DCT rejection and the 72-picture progressive live-raster soak all pass with their established deterministic results. A clean Quartus 17.0.2 build completes in 10:50 with zero errors and 144 established warnings. Global TNS is zero; focused decoder setup/recovery slack is 1.808/11.798 ns and video setup slack is 2.446 ns. Fitter use is 29,641 ALMs, 45,683 registers, 3,655,139 block-memory bits, 464 RAM blocks, 65 DSP blocks and 3 PLLs. The 4,210,740-byte RBF has SHA-256 `5544bb48bea6d0f066b01f09f63087d46e7a52438ca60b6872b9f452ef213c09`.
 
 #### Next Steps:
 
-Implement the generator option, dual-position overlay, decoder auto-selection and FTP-only helper, then prove that the original short-fixture hashes and reconstruction results remain unchanged. Generate and independently inspect both ten-second visual clips, run profiler overlay tests at 800x600 and 720x480, exercise an actual FTP-only capture against the current MiSTer and run the focused native timing plus affected scheduler, profiler and progressive-control regressions. Complete a clean Quartus build and focused timing analysis before installing the candidate RBF and longer clips by ordinary FTP. Test only the longer TFF clip first; use its complete schema-nine capture and the user's live observation to decide whether presentation logic needs correction before attempting BFF.
+Push the exact source and metadata commits, then install the exact RBF plus both generated ten-second clips through ordinary FTP using the default MiSTer login and verify all remote hashes. Reload the core and run only the longer TFF clip in Native 480i mode. Observe the full motion interval for display lock, field combing, direction-dependent judder, repeated or missing motion, crop and terminal LEDs, then leave the final image loaded. Trigger and retrieve the native schema-nine capture entirely through FTP and use its complete terminal record together with the live observation to decide whether presentation behavior needs correction. Do not run BFF until the TFF result is captured and understood, and keep the public interlaced compatibility claim disabled.
 
 #### Files Modified:
 
@@ -25,10 +25,11 @@ Implement the generator option, dual-position overlay, decoder auto-selection an
 - tools/streams/read_hardware_cadence.py
 - tools/streams/run_native_480i_timing.sh
 - tools/streams/tb_h262_hardware_cadence_profiler.sv
+- tools/streams/test_decode_hardware_cadence.py
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
