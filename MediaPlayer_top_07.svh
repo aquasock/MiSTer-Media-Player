@@ -8,22 +8,28 @@ assign VGA_R = cadence_video_r;
 assign VGA_G = cadence_video_g;
 assign VGA_B = cadence_video_b;
 
-// Field-invariant vertical bars exercise the complete native sync/timing path
-// without reading a framebuffer pixel or line cache.  Since the MPEG pipeline
-// remains active, comparing this view with normal video isolates visible
-// artifacts to output timing versus framebuffer/DDRAM data delivery.
+// Static field-invariant bars and a frame-stepped field-invariant moving bar
+// exercise the complete native sync/timing and processed-HDMI scaler path
+// without reading a framebuffer pixel or line cache. Since the MPEG pipeline
+// remains active, the moving mode distinguishes retained content after the
+// final FPGA mux from retained framebuffer/DDRAM data delivery.
 mpeg2_native_timing_pattern mpeg2_native_timing_pattern
 (
-    .h_pos      (display_h_pos),
-    .pixel_en   (display_pixel_en),
-    .h_sync     (display_h_sync),
-    .v_sync     (display_v_sync),
-    .video_r    (native_pattern_r),
-    .video_g    (native_pattern_g),
-    .video_b    (native_pattern_b),
-    .video_de   (native_pattern_de),
-    .video_hs   (native_pattern_hs),
-    .video_vs   (native_pattern_vs)
+    .clk          (clk_video),
+    .reset        (reset_video),
+    .moving       (display_native_timing_pattern_moving),
+    .frame_window (display_frame_window),
+    .h_pos        (display_h_pos),
+    .v_pos        (display_v_pos),
+    .pixel_en     (display_pixel_en),
+    .h_sync       (display_h_sync),
+    .v_sync       (display_v_sync),
+    .video_r      (native_pattern_r),
+    .video_g      (native_pattern_g),
+    .video_b      (native_pattern_b),
+    .video_de     (native_pattern_de),
+    .video_hs     (native_pattern_hs),
+    .video_vs     (native_pattern_vs)
 );
 
 assign presentation_base_r = display_native_timing_pattern ?

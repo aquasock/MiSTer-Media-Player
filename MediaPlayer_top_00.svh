@@ -77,6 +77,7 @@ localparam CONF_STR = {
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"O[124],HDMI scaler deinterlacer,Weave,Bob;",
 	"O[123],Native timing pattern,Off,On;",
+	"O[125],Native pattern motion,Static,Moving;",
 	"O[120],Interlaced output,Native 480i,800x600 Diagnostic;",
 	"O[3:1],Audio test,Off,44.1k Mono,44.1k Stereo,48k Mono,48k Stereo;",
 	"-;",
@@ -721,6 +722,7 @@ wire        display_field_window;
 wire        display_frame_window;
 wire        display_native_interlaced;
 wire        display_native_timing_pattern;
+wire        display_native_timing_pattern_moving;
 wire        display_hdmi_bob_deinterlace;
 wire        mpeg2_new_native_active_mpeg2;
 

@@ -30,15 +30,24 @@ mpeg2_hdmi_deinterlace_control mpeg2_hdmi_deinterlace_control
 // decoder, DDRAM, cadence, and diagnostics continue running underneath it.
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [1:0] native_timing_pattern_sync;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [1:0] native_timing_pattern_motion_sync;
 always @(posedge clk_video) begin
-	if (reset_video)
+	if (reset_video) begin
 		native_timing_pattern_sync <= 2'b00;
-	else
+		native_timing_pattern_motion_sync <= 2'b00;
+	end
+	else begin
 		native_timing_pattern_sync <=
 			{native_timing_pattern_sync[0], status[123]};
+		native_timing_pattern_motion_sync <=
+			{native_timing_pattern_motion_sync[0], status[125]};
+	end
 end
 assign display_native_timing_pattern =
 	display_native_interlaced && native_timing_pattern_sync[1];
+assign display_native_timing_pattern_moving =
+	display_native_timing_pattern && native_timing_pattern_motion_sync[1];
 
 ///////////////////////   NEW H.262 DECODER   ////////////////////
 
