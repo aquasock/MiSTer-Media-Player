@@ -1,3 +1,32 @@
+## 502 COMMIT Unreleased 4e4da3a 2026-08-25T02:55:54-07:00
+
+#### Coming From:
+
+Unreleased 4e4da3a
+
+#### Purpose:
+
+Capture the BFF processed-HDMI Bob result and separate decoder cadence from the scaler's deinterlacing tradeoff.
+
+#### Outcome:
+
+The user ran only `_cadence/native_480i_bff_light_10s.m2v` with native 480i active and Bob selected. The menu disappears normally, motion now appears to run at the right field rate, the historical shadow lags for less time but jumps more frequently and the final image is slightly unstable; USER and POWER remain solid and DISK blinks twice. The untouched terminal image was triggered and retrieved entirely through ordinary FTP with the default `root` and `1` login and no SSH; `.ai/current_results/entry502_bff_light_hdmi_bob.png` is 11,860 bytes with SHA-256 `3970ae3eedcc91b6fa75d2fca0fad253d6aef63d849d4708c9328bfadfabd5b0`. Schema nine accepts all 5,007,154 bytes, preserves bottom-field-first, reaches sequence end and presentation completion, closes normally for quiet reason one and reports zero aggregate, presentation, destination, cache-bank-overlap, audio-underrun and PCM-protocol errors. The eight-bit picture and swap counters wrap to 44 and 43 exactly as expected for 300 pictures and 299 swaps. First presentation remains cycle 2,378,235 and last presentation is cycle 719,009,081, so the 299 intervals span 716,630,846 cycles or 11.943847 seconds and deliver 25.033809 pictures per second. The prior Weave run delivered 25.037584 pictures per second and finished only 108,033 decoder cycles or 1.80055 milliseconds earlier across the entire fixture, proving Bob did not materially change decoder throughput or source presentation cadence. The shorter history, more visible steps and live final-image instability instead characterize MiSTer's Bob reconstruction: it removes most long field history by expanding individual fields, at the expected cost of greater vertical jitter and reduced stable vertical detail. BFF core logic passes, while processed-HDMI Bob remains a user-selectable motion-versus-stability tradeoff rather than a universal replacement for Weave.
+
+#### Next Steps:
+
+Keep `Native timing pattern` Off, `HDMI deinterlacer` Bob and `Interlaced output` Native 480i, then run only `_cadence/native_480i_tff_light_10s.m2v`. Compare shadow duration, step frequency and final-image instability directly with this BFF Bob result, report all three LEDs and leave the terminal image loaded for an ordinary-FTP schema-nine capture. Matching clean telemetry and materially similar Bob artifacts will show the residual is field-order-independent scaler behavior and complete the current Bob/Weave control validation; a strong TFF/BFF visual asymmetry would instead require checking how the framework's Bob path interprets field polarity before refining the two-tier menu. Do not change MiSTer configuration or run the native direct-video/SDI tier yet.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 501 COMMIT Unreleased 4e4da3a 2026-08-25T02:50:47-07:00
 
 #### Coming From:
@@ -1194,51 +1223,6 @@ Run `20_bbb_full_48k.mpg` end to end without rebooting and report the cadence th
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 462 COMMIT Unreleased 6dece4c 2026-08-24T10:37:34-07:00
-
-#### Coming From:
-
-Unreleased fccb003
-
-#### Purpose:
-
-Carry a run of PCM frames per in-band record, and restore the startup lead the soak measured as an audio-margin gain.
-
-#### Outcome:
-
-The user played `20_bbb_full_48k.mpg` end to end on the `fccb003` helper and reports the once-per-second cadence unchanged with everything else looking and sounding good. The capture is 8,106 bytes at SHA-256 `e12d519815f2474752442c8a6247bdf978f437fd966cf6eb42ed90d285467f45` and the profiler again froze on a fatal condition whose sole aggregate flag is `0x0400`, a real `audio_pcm_underrun`, with PCM protocol, presentation and destination errors clear. It froze at 22,570,377 accepted bytes of 342,083,863, which is 39.3 seconds into the movie against 62.2 seconds under `14e0629` and 21.74 seconds under `f2b2e02`. Removing the startup byte budget brought the underrun forward by 23 seconds, so entry 461's hypothesis is refuted: keeping the compressed FIFO full does not starve the audio sink, and the lead was helping the audio margin even though entry 456 measured it doing nothing for cadence. Every helper change so far has pushed the underrun later, and this one pushed it back.
-
-The arithmetic explains why no helper setting can close this, and it should have been derived earlier. The steady horizon keeps audio at most `PCM_SCHEDULE_RESERVE_FRAMES` ahead, which is 4,096 frames or 85 milliseconds, so the sink's 8,192-frame FIFO is by construction never more than half full. The display gaps this investigation has been chasing are 82.896 milliseconds at their most common and 431.059 at their worst. A path stall longer than the cushion drains the sink, and the cushion cannot exceed the FIFO's 170 milliseconds even if the reserve were raised to fill it, which would reintroduce the full-FIFO blocking that entry 453 set out to remove. The underrun and the cadence are therefore the same defect measured at two sinks: while the shared path is stalled, video misses its deadline and audio drains, and the only reason the underrun moves at all is that each helper change alters how often the path stalls.
-
-Path occupancy explains where the stalls come from. At nine bytes per stereo frame the audio records carry 422 KiB/s while the video they share the path with carries 138 KiB/s, so audio is three quarters of everything crossing, and 48,000 records per second cross a boundary that entries 459 and 460 measured as costing presentation time per record. Packing many frames into one record attacks both: four frames per record cuts the audio to 234 KiB/s and 12,000 records per second, sixteen frames to 199 KiB/s and 3,000 records per second, against a floor of 192 KiB/s for the samples themselves. Sixteen frames per record removes 94 percent of the records and 53 percent of the audio bandwidth.
-
-Both were approved and are commit `6dece4c`, the first FPGA change of this line. The PCM mode byte's six unused bits now carry a frame count, so one record delivers `{count,rate,stereo}` and then that many frames of `{left,right}`; a count of zero is exactly the earlier single-frame encoding, so a transport produced before this change decodes unchanged. `mpeg2_h262_inband_metadata` reads the count, emits one sample event per frame and still holds each frame's final byte until the sink can accept it, so backpressure reaches the producer at frame granularity rather than record granularity; a count above the supported 32 is reported sticky and consumed as one frame, which is what a malformed record did before. The helper packs sixteen frames per record and `PCM_STARTUP_VIDEO_BYTES` is restored at 28,672 bytes, recorded now as the audio-margin measure entry 462 measured rather than the cadence measure entry 455 introduced it as.
-
-The extended `tb_h262_inband_metadata` simulation passes: a three-frame record yields three sample events and leaves the video either side of it untouched, every frame of a two-frame run waits for the sink in turn under held readiness without loss or duplication and with the correct rate and stereo bits, and a count past the supported run is consumed and reported. The Quartus compile is clean at nine minutes 57 seconds with zero errors, and timing is met with worst-case setup slack 0.435 nanoseconds, hold 0.242 and recovery 4.416, while the Phase-1P extraction reports decoder setup worst slack 1.627 nanoseconds over 100 paths with none violated, decoder recovery 11.225 and video setup 7.833. The design fits at 44,722 registers, 3,523,027 memory bits at 62 percent and 446 of 553 RAM blocks at 81 percent.
-
-The transport shrinks without changing what it carries. The soak falls from 342,083,863 to 207,888,468 bytes, 39.2 percent smaller, with roughly 1,789,000 records where there were 28,628,352, while PCM remains 28,628,352 frames at SHA-256 `337b1387b9324b6c391a3223ced8f7660bd5144267b29d3964b4ed6b282839af`, video and timestamps at SHA-256 `545075cdc22437cb994efde832e8f09c663ac569bf8e98d406025ef480d2cd81` and clean video at 84,423,309 bytes. Every bound holds: steady batches within 2,048, PCM-free video spans within 4,052 bytes, audio deficit zero and the startup lead back at 28,654 bytes. The permanent verifier passes at both profiles and both sample rates with maximum sample error two and correlation rounding to one, all fixtures and controls pass under native and address-and-undefined-sanitized helpers, the nine-case envelope retains three passes and six intended failures, and two official GCC 10.2.1 builds are byte-identical at SHA-256 `d61e69ea2240c23419abb9162a06159f9b6c527e838c9a6e52f0bd1855588d34`.
-
-The RBF and the helper were installed together because the frame count is a contract between them, each staged, verified by download, promoted and verified again. The FPGA image is 4,110,808 bytes at SHA-256 `ee7ff41b5cf76693f491d72999b0caa39abd36ff1a2ae7921a2ad7aabb58e940` with its predecessor preserved as `/media/fat/MediaPlayer.backup.pre-pcm-run.091b150.rbf` at SHA-256 `1fe3f61a8286e42e38db4c50eef6a112f31106590e6cdbcc6715fff82544b4ea`, and the helper's predecessor as `/media/fat/linux/MediaPlayer_Helper.backup.pre-pcm-run.fccb003`. Main and every media file are unchanged.
-
-#### Next Steps:
-
-Power-cycle so the new FPGA image loads, set Audio Test to Off and run `23_bbb_opening24_exact_av.mpg`, then leave the final image loaded for a schema-eight capture. Acceptance is the outlier count falling below the 13 measured under `14e0629` with no audio underrun, no PCM protocol error and all 577 pictures displayed; a PCM protocol error would mean the two sides disagree about the frame count and calls for rolling both files back together rather than either alone. Then run `20_bbb_full_48k.mpg` end to end, where the acceptance is a quiet snapshot rather than a fatal one, since the underrun has stood at 21.74, 62.2 and 39.3 seconds across three helpers and this is the first change to attack the bandwidth causing it. If the underrun survives, the remaining candidates are buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate` so a full video FIFO cannot block audio, and deepening `audio_pcm_fifo`, which the fit now shows would cost RAM blocks already at 81 percent. If the cadence residue survives, the presentation scratch scheduler is next, measured against the `scratch_available` and `pending_frame_released` evidence at display ordinals fourteen and fifteen.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
-- tools/streams/analyze_arm_av_transport.py
-- tools/streams/strip_inband_pcm.py
-- tools/streams/tb_h262_inband_metadata.sv
-- tools/streams/verify_arm_av_pipeline.py
 
 #### Status:
 
