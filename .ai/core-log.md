@@ -1,3 +1,34 @@
+## 508 COMMIT Unreleased ??? 2026-08-25T04:26:41-07:00
+
+#### Coming From:
+
+Unreleased c78bd15
+
+#### Purpose:
+
+Guarantee that native all-I sequence end releases and presents the final queued picture across every completion, promotion and swap race.
+
+#### Outcome:
+
+The user approved a bounded terminal-drain correction after entry 507 materially improved playback but ended with USER and DISK off and POWER blinking once. The two Pixel 8 Pro recordings `.ai/current_results/PXL_20260825_111447318.mp4` and `.ai/current_results/PXL_20260825_111514313.mp4` are respectively 52,996,175 bytes over 12.844311 seconds at 59.715153 captured frames per second with SHA-256 `7beb985475df4639fb4606302445a24ac2b6ed558553c57b16d8744e84a3fa02`, and 56,185,455 bytes over 13.629356 seconds at 59.503914 captured frames per second with SHA-256 `cf15f7d59e07356dcd0fd92c74d790ebd18b42c6c5f63dc2b89caf9d41e598e1`. Both show the bright bar advancing and wrapping at the corrected rate while retaining the already classified downstream Weave/display-history ghosts. The untouched ordinary-FTP schema-nine capture `.ai/current_results/entry507_tff_light_secondary_queue.png` is 11,841 bytes with SHA-256 `d029cdd623391ff27611b014456e8bbcc2406b860a71f7d392d22408d7de503d`. It accepts all 5,007,304 bytes, decodes all 300 reference pictures as the wrapped count 44, but displays only 299 with 298 swaps as wrapped counts 43 and 42. Those 298 intervals span 597,055,088 decoder cycles and deliver 29.946985 pictures per second with zero aggregate or presentation error and sequence end seen, but terminal quiet remains false because one pending ordinary identity is valid and unreleased. Pixel inspection independently finds the penultimate authored field positions at x=504 and approximately x=508 rather than the final x=512 and x=516 positions. The approved fix will make native ordinary terminal release sticky until the primary and secondary slots drain instead of relying on the one-cycle sequence-end event surviving a coincident ownership handoff.
+
+#### Next Steps:
+
+Add a native-all-I-only terminal-drain latch that captures sequence end while an ordinary primary, secondary or resumed decode identity exists, forces every retained ordinary candidate released, survives same-edge completion, promotion and swap assignments, and clears only after the final pending and secondary identities retire. Preserve the existing progressive, timestamped, P, B, scratch and non-native rules. Extend the focused ownership test across sequence end before, coincident with and after secondary promotion, add a finite accelerated integration case that requires decoded count to equal presented count with empty terminal ownership and quiet-compatible state, then rerun native timing, TFF/BFF/progressive reconstruction and canonical mixed I/P/B regressions. Commit only a clean result, build and time it, preserve `c78bd15` as rollback through ordinary FTP, install the verified image and repeat `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` in Weave; acceptance requires all 300 pictures and 299 swaps, normal quiet completion, no error and passing LEDs.
+
+#### Files Modified:
+
+- `rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv`
+- `tools/streams/tb_native_ordinary_overlap_ownership.sv`
+- `tools/streams/tb_native_480i_presentation_integration.sv`
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 507 COMMIT Unreleased c78bd15 2026-08-25T03:43:42-07:00
 
 #### Coming From:
@@ -1200,39 +1231,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 468 COMMIT Unreleased 8c59ddb 2026-08-24T12:18:50-07:00
-
-#### Coming From:
-
-Unreleased cd8d78a
-
-#### Purpose:
-
-Add passive late-window cadence telemetry that distinguishes timestamp admission conflicts from scratch-scheduler stalls during the movie credits.
-
-#### Outcome:
-
-Commit `8c59ddb` implements the approved diagnostic without changing a presentation or transport decision. The schema-nine profiler begins a distinct gap timeline at the first display after STC second 500, ranks only later gaps, retains timestamp-active, timestamp-due, free-cadence, candidate-presentable and swap-window state in the previously reserved gap metadata bits, and uses the former promotion-hold word for saturated counts of exact timestamp-delay and timestamp-advance conflicts at eligible raster windows. The scheduler exports its existing cadence-slot and presentable-candidate terms through combinational observation outputs only. The fixed thirty-eight-word overlay, aggregate completion, byte, picture, audio, error and terminal fields remain intact, and the decoder remains backward-compatible with schema eight while interpreting the new fields in schema nine. Simulation proves that large pre-window gaps are excluded, both conflict directions are counted only at or after the gate, ranked threshold-crossing state and checksum survive, the exported scheduler terms are exact mirrors and every supported cadence remains unchanged; the picture timestamp, PTS timeline, scheduler, transport gate, download rearm, system clock, extractor, clean-video queue, PCM output and 8,192-frame PCM FIFO regressions pass. Quartus 17.0.2 completes in nine minutes 58 seconds with zero errors and 147 warnings. Timing is met with global worst setup slack 0.467 nanoseconds, hold 0.249, recovery 3.992, removal 0.515 and minimum pulse width 1.122; Phase-1P reports find decoder same-clock setup slack 1.249 across 100 paths with none violated, decoder recovery 11.433 and video same-clock setup 6.940. The fit uses 29,174 ALMs, 45,103 registers, 3,655,139 memory bits at 65 percent, 464 of 553 RAM blocks at 84 percent and 65 DSP blocks, so the observational change adds no RAM and the small ALM and register decreases from `cd8d78a` are fitter variance. The 4,169,564-byte RBF is SHA-256 `c2ebbfa10935d43ff0d7e66ae0c6468b63385f29ff5a154f9a50b8725dfa5ea1`. Installation used plain FTP with the default MiSTer login and no SSH keys: the active `cd8d78a` image first verified at SHA-256 `39106371e9f26a5a0bc62e703bd5df33f9ea07882fc8d8002cb7e0bc6e9b55f3`, the staged diagnostic roundtrip verified byte-identically, the new active image verifies at the candidate hash, and `cd8d78a` is preserved exactly as `/media/fat/MediaPlayer.backup.pre-credits-window.cd8d78a.rbf`; helper, Main and media files are unchanged.
-
-#### Next Steps:
-
-Power-cycle once to load `8c59ddb`, set Audio Test to Off and run `20_bbb_full_48k.mpg` once without interruption, watching the credits for the same tiny cadence and leaving the final image loaded for a schema-nine capture. Require playback to remain otherwise unchanged, all 84,423,309 clean-video bytes and 14,315 pictures to complete, sequence end and quiet reason one, aggregate errors zero, and both audio underrun and PCM protocol error clear. A nonzero timestamp-delay or timestamp-advance count correlated with the ranked post-500-second gaps selects the timestamp-to-cadence handoff for the next fix; zero conflicts with scratch-unavailable or reorder scheduler state selects scratch ownership. Any correctness or audio regression rejects the diagnostic immediately and should be rolled back to `/media/fat/MediaPlayer.backup.pre-credits-window.cd8d78a.rbf` before further work.
-
-#### Files Modified:
-
-- MediaPlayer_top_05.svh
-- MediaPlayer_top_07.svh
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
