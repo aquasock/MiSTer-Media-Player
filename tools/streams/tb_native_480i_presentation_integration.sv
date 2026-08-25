@@ -4,7 +4,9 @@
 // This matches the measured hardware latency closely enough to reproduce the
 // old 15 fps decode/present serialization and prove that the third ordinary
 // bank removes only the avoidable full-frame wait.
-module native_all_i_feeder
+module native_all_i_feeder #(
+    parameter integer DECODE_FIELDS = 3
+)
 (
     input  wire       clk,
     input  wire       reset,
@@ -37,14 +39,14 @@ always @(posedge clk) begin
         i_picture_start <= 1'b0;
         non_b_picture_start <= 1'b0;
         decoding <= 1'b1;
-        fields_remaining <= 3'd3;
+        fields_remaining <= DECODE_FIELDS;
         decoded_count <= 16'd0;
     end else begin
         if (!decoding && !presentation_hold) begin
             i_picture_start <= 1'b1;
             non_b_picture_start <= 1'b1;
             decoding <= 1'b1;
-            fields_remaining <= 3'd3;
+            fields_remaining <= DECODE_FIELDS;
         end
         if (cadence_tick && decoding && !presentation_hold) begin
             if (fields_remaining == 3'd1) begin
@@ -116,6 +118,11 @@ wire overlap_waiting,overlap_i_start,overlap_non_b_start;
 wire [1:0] overlap_completed_bank,overlap_active_bank,overlap_display_bank;
 wire overlap_hold,overlap_error;
 wire [15:0] overlap_decoded_count;
+wire accelerated_waiting,accelerated_i_start,accelerated_non_b_start;
+wire [1:0] accelerated_completed_bank,accelerated_active_bank;
+wire [1:0] accelerated_display_bank;
+wire accelerated_hold,accelerated_error;
+wire [15:0] accelerated_decoded_count;
 
 native_all_i_feeder baseline_feeder
 (
@@ -133,6 +140,16 @@ native_all_i_feeder overlap_feeder
     .i_picture_start(overlap_i_start),
     .non_b_picture_start(overlap_non_b_start),
     .decoded_count(overlap_decoded_count)
+);
+native_all_i_feeder #(.DECODE_FIELDS(1)) accelerated_feeder
+(
+    .clk(clk_mpeg2),.reset(reset_mpeg2),.cadence_tick(cadence_tick_pulse),
+    .presentation_hold(accelerated_hold),.frame_waiting(accelerated_waiting),
+    .completed_bank(accelerated_completed_bank),
+    .active_bank(accelerated_active_bank),
+    .i_picture_start(accelerated_i_start),
+    .non_b_picture_start(accelerated_non_b_start),
+    .decoded_count(accelerated_decoded_count)
 );
 
 mpeg2_h262_b_presentation_scheduler baseline_scheduler
@@ -165,21 +182,48 @@ mpeg2_h262_b_presentation_scheduler overlap_scheduler
     .b_decode_error(1'b0),.display_frame_bank(overlap_display_bank),
     .presentation_hold(overlap_hold),.presentation_error(overlap_error)
 );
+mpeg2_h262_b_presentation_scheduler accelerated_scheduler
+(
+    .clk(clk_mpeg2),.reset(reset_mpeg2),
+    .swap_window_pulse(swap_window_pulse),
+    .cadence_tick_pulse(cadence_tick_pulse),.frame_rate_code(4'h4),
+    .timestamp_candidate_active(1'b0),.timestamp_candidate_due(1'b0),
+    .native_ordinary_overlap_enable(1'b1),
+    .active_frame_bank(accelerated_active_bank),
+    .frame_waiting(accelerated_waiting),
+    .completed_frame_bank(accelerated_completed_bank),
+    .reference_frame_bank(2'd0),.reference_promotion_count(8'd0),
+    .b_picture_start(1'b0),
+    .non_b_picture_start(accelerated_non_b_start),
+    .i_picture_start(accelerated_i_start),.p_picture_start(1'b0),
+    .sequence_end(1'b0),.b_user_success(1'b0),.b_decode_error(1'b0),
+    .display_frame_bank(accelerated_display_bank),
+    .presentation_hold(accelerated_hold),
+    .presentation_error(accelerated_error)
+);
 
 integer cadence_ticks = 0;
 integer frame_windows = 0;
 integer base_presentations = 0;
 integer overlap_presentations = 0;
+integer accelerated_presentations = 0;
 reg [1:0] base_display_q = 2'd0;
 reg [1:0] overlap_display_q = 2'd0;
+reg [1:0] accelerated_display_q = 2'd0;
+reg accelerated_secondary_seen = 1'b0;
+reg accelerated_backpressure_seen = 1'b0;
 always @(posedge clk_mpeg2) begin
     if (reset_mpeg2) begin
         cadence_ticks <= 0;
         frame_windows <= 0;
         base_presentations <= 0;
         overlap_presentations <= 0;
+        accelerated_presentations <= 0;
         base_display_q <= 2'd0;
         overlap_display_q <= 2'd0;
+        accelerated_display_q <= 2'd0;
+        accelerated_secondary_seen <= 1'b0;
+        accelerated_backpressure_seen <= 1'b0;
     end else begin
         if (cadence_tick_pulse) cadence_ticks <= cadence_ticks + 1;
         if (swap_window_pulse) frame_windows <= frame_windows + 1;
@@ -191,6 +235,15 @@ always @(posedge clk_mpeg2) begin
             overlap_presentations <= overlap_presentations + 1;
             overlap_display_q <= overlap_display_bank;
         end
+        if (accelerated_display_bank != accelerated_display_q) begin
+            accelerated_presentations <= accelerated_presentations + 1;
+            accelerated_display_q <= accelerated_display_bank;
+        end
+        if (accelerated_scheduler.ordinary_secondary_valid)
+            accelerated_secondary_seen <= 1'b1;
+        if (accelerated_scheduler.ordinary_secondary_valid &&
+            accelerated_hold)
+            accelerated_backpressure_seen <= 1'b1;
     end
 end
 
@@ -205,9 +258,9 @@ initial begin
     repeat (12) @(posedge clk_mpeg2);
     if (cadence_ticks != 40)
         $fatal(1,"cadence ticks=%0d expected=40",cadence_ticks);
-    if (base_error || overlap_error)
-        $fatal(1,"presentation error baseline=%0d overlap=%0d",
-               base_error,overlap_error);
+    if (base_error || overlap_error || accelerated_error)
+        $fatal(1,"presentation error baseline=%0d overlap=%0d accelerated=%0d",
+               base_error,overlap_error,accelerated_error);
     if (base_decoded_count != 16'd10)
         $fatal(1,"serialized decoded=%0d expected=10",base_decoded_count);
     if (overlap_decoded_count != 16'd13)
@@ -216,9 +269,20 @@ initial begin
         $fatal(1,"serialized presentations=%0d expected=10",base_presentations);
     if (overlap_presentations != 13)
         $fatal(1,"overlap presentations=%0d expected=13",overlap_presentations);
+    if (!accelerated_secondary_seen || !accelerated_backpressure_seen)
+        $fatal(1,"accelerated queue was not exercised secondary=%0d hold=%0d",
+               accelerated_secondary_seen,accelerated_backpressure_seen);
+    if (accelerated_decoded_count != 16'd21)
+        $fatal(1,"accelerated decoded=%0d expected=21",
+               accelerated_decoded_count);
+    if (accelerated_presentations != 20)
+        $fatal(1,"accelerated presentations=%0d expected=20",
+               accelerated_presentations);
     $display({"NATIVE_PRESENTATION_LATENCY_PASS windows=20 fields=40 ",
               "serialized_decoded=10 overlap_decoded=13 ",
-              "serialized_presented=10 overlap_presented=13"});
+              "serialized_presented=10 overlap_presented=13 ",
+              "accelerated_decoded=21 accelerated_presented=20 ",
+              "accelerated_queue=1"});
     $finish;
 end
 initial begin

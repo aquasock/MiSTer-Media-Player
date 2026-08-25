@@ -98,6 +98,13 @@ reg [1:0] last_bound_reference_bank;
 reg [7:0] last_bound_reference_count;
 reg ordinary_reference_decode_open;
 reg [1:0] ordinary_reference_decode_bank;
+// Native all-I decode can now finish slightly ahead of its 30000/1001
+// presentation slot.  With three ordinary DDR regions, retain the completed
+// third bank here while pending_frame_* continues to own its predecessor.
+reg ordinary_secondary_valid;
+reg [1:0] ordinary_secondary_bank;
+reg ordinary_secondary_released;
+reg ordinary_resume_pending;
 
 // Entry 354: the fixed 40 MHz 800x600 raster produces one swap window every
 // 1056*628 pixels.  Accumulate source-picture credit in pixel-clock units for
@@ -250,6 +257,8 @@ wire ordinary_reference_overlap_safe=
     !timestamp_candidate_active&&
     (frame_rate_code==4'h4)&&
     !display_scratch&&
+    !ordinary_secondary_valid&&
+    !ordinary_resume_pending&&
     pending_frame_valid&&
     (pending_frame_released||non_b_picture_start)&&
     (pending_frame_bank!=display_frame_bank)&&
@@ -258,8 +267,21 @@ wire ordinary_reference_overlap_safe=
 wire ordinary_reference_present_now=
     swap_window_pulse&&presentation_slot&&scheduled_frame_valid&&
     scheduled_frame_differs&&!scheduled_frame_scratch&&!future_waiting;
+wire ordinary_secondary_mode_safe=
+    native_ordinary_overlap_enable&&!timestamp_candidate_active&&
+    (frame_rate_code==4'h4)&&!display_scratch&&!reorder_active;
+wire ordinary_secondary_release_now=
+    ordinary_secondary_valid&&!ordinary_secondary_released&&
+    (sequence_end||(i_picture_start&&ordinary_secondary_mode_safe));
+wire ordinary_secondary_resume_now=
+    ordinary_secondary_valid&&!ordinary_secondary_released&&
+    i_picture_start&&ordinary_secondary_mode_safe;
 assign presentation_hold=(ordinary_reference_waiting&&
-                          !ordinary_reference_decode_open)||
+                          !ordinary_reference_decode_open&&
+                          !(ordinary_secondary_valid&&
+                            !ordinary_secondary_released))||
+                         (ordinary_secondary_valid&&
+                          ordinary_secondary_released)||
                          (reorder_active&&run_closed&&
                           !presentation_complete&&!presentation_error&&
                           (deferred_queued_b_start||
@@ -291,6 +313,10 @@ always @(posedge clk) begin
         last_bound_reference_count<=0;
         ordinary_reference_decode_open<=0;
         ordinary_reference_decode_bank<=0;
+        ordinary_secondary_valid<=0;
+        ordinary_secondary_bank<=0;
+        ordinary_secondary_released<=0;
+        ordinary_resume_pending<=0;
         run_picture_count<=0;presentation_complete<=1;presentation_error<=0;
         cadence_credit<=CADENCE_DUE_24FPS;cadence_rate_code_q<=0;
     end else begin
@@ -376,6 +402,16 @@ always @(posedge clk) begin
             ordinary_reference_decode_bank<=active_frame_bank;
         end
 
+        // When all three ordinary banks are owned, admit exactly the next I
+        // classification boundary but hold its payload.  That header releases
+        // the completed secondary frame; decode resumes only after the primary
+        // pending frame presents and frees its old display bank.
+        if(ordinary_secondary_release_now)begin
+            ordinary_secondary_released<=1;
+            if(ordinary_secondary_resume_now)
+                ordinary_resume_pending<=1;
+        end
+
         // Ownership must remain fixed for the complete overlapped decode.  A
         // violated invariant is fatal to presentation but never permits the
         // displayed or waiting bank to be overwritten silently.
@@ -388,9 +424,20 @@ always @(posedge clk) begin
 
         if(frame_waiting&&ordinary_reference_decode_open)begin
             ordinary_reference_decode_open<=0;
-            if((completed_frame_bank!=ordinary_reference_decode_bank)||
-               (pending_frame_valid&&!ordinary_reference_present_now))
+            if(completed_frame_bank!=ordinary_reference_decode_bank)
                 presentation_error<=1;
+            else if(pending_frame_valid&&!ordinary_reference_present_now)begin
+                if(ordinary_secondary_valid||
+                   (completed_frame_bank==pending_frame_bank)||
+                   (completed_frame_bank==display_frame_bank))
+                    presentation_error<=1;
+                else begin
+                    ordinary_secondary_valid<=1;
+                    ordinary_secondary_bank<=completed_frame_bank;
+                    ordinary_secondary_released<=sequence_end;
+                    ordinary_resume_pending<=0;
+                end
+            end
         end
 
         // Entry 227: the B header can be accepted in the same registered
@@ -718,7 +765,25 @@ always @(posedge clk) begin
                 // presentation of its predecessor.  Preserve the completed
                 // bank as the new (unreleased) candidate rather than letting
                 // the predecessor's retirement clear it on this same edge.
-                if(frame_waiting&&ordinary_reference_decode_open)begin
+                if(ordinary_secondary_valid)begin
+                    pending_frame_valid<=1;
+                    pending_frame_bank<=ordinary_secondary_bank;
+                    pending_frame_released<=ordinary_secondary_released||
+                                            ordinary_secondary_release_now;
+                    ordinary_secondary_valid<=0;
+                    ordinary_secondary_released<=0;
+                    if((ordinary_resume_pending||
+                        ordinary_secondary_resume_now)&&
+                       (active_frame_bank!=scheduled_frame_bank)&&
+                       (active_frame_bank!=ordinary_secondary_bank))begin
+                        ordinary_reference_decode_open<=1;
+                        ordinary_reference_decode_bank<=active_frame_bank;
+                    end else if(ordinary_resume_pending||
+                                ordinary_secondary_resume_now)
+                        presentation_error<=1;
+                    ordinary_resume_pending<=0;
+                    terminal_boundary_pending<=0;
+                end else if(frame_waiting&&ordinary_reference_decode_open)begin
                     pending_frame_valid<=1;
                     pending_frame_bank<=completed_frame_bank;
                     pending_frame_released<=sequence_end||
@@ -800,9 +865,24 @@ always @(posedge clk) begin
             presentation_error<=1;
         end
 
+        // The secondary ordinary slot is deliberately unavailable to every
+        // other picture class and timing mode.  Any such transition is an
+        // ownership violation rather than an invitation to reuse a bank.
+        if((ordinary_secondary_valid||ordinary_resume_pending)&&
+           (b_picture_start||p_picture_start||timestamp_candidate_active||
+            !native_ordinary_overlap_enable||(frame_rate_code!=4'h4)||
+            display_scratch))
+            presentation_error<=1;
+        if(ordinary_secondary_valid&&frame_waiting&&
+           !ordinary_reference_decode_open)
+            presentation_error<=1;
+
         if(presentation_error)begin
             deferred_queued_b_start<=0;
             ordinary_reference_decode_open<=0;
+            ordinary_secondary_valid<=0;
+            ordinary_secondary_released<=0;
+            ordinary_resume_pending<=0;
         end
     end
 end
