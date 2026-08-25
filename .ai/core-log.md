@@ -1,3 +1,32 @@
+## 514 COMMIT Unreleased 9573923 2026-08-25T11:06:08-07:00
+
+#### Coming From:
+
+Unreleased 9573923
+
+#### Purpose:
+
+Determine whether the intermittent native ghost and the grey dash artefact originate upstream or downstream of the FPGA final mux.
+
+#### Outcome:
+
+The first ordinary-FTP capture of this cycle was taken while `Native timing pattern` was still Off and was initially misread as pattern output. `.ai/current_results/entry514_moving_pattern_retention.png` is 12,192 bytes with SHA-256 `146d3f343bf9c5a8607eee944a0d71ab59b6372bc9a07d1d4b30922ba4de6ac0`. Measured against entries 508 and 509 it is structurally identical to them, with background `(19,19,19)`, full-width reference rows 119 through 122 and 357 through 360 and the authored terminal weave whose even rows span x=512 through x=543 and odd rows x=516 through x=547, so it recorded decoded video rather than the diagnostic. That reading and the downstream conclusion drawn from it are withdrawn. The installed image was then verified over ordinary FTP with the default `root` and `1` login at exactly 4,220,300 bytes and SHA-256 `03bb6a504538fd7e62b2877a428e2e570841ccb3d2d834674f163dd580d76642`, confirming `9573923` was the running core and that the Moving submode existed but had not been selected. The user then set Native timing pattern On, Native pattern motion Moving, HDMI scaler deinterlacer Bob and Interlaced output Native 480i and reran `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v`. The resulting `.ai/current_results/entry514_moving_pattern_on.png` is 7,676 bytes with SHA-256 `76e71cd567acd63e29049a078502de80cac2822c45c35e710370f1d79d58ab6c` and its raster is pixel-exact against the authored source: background exactly `(16,16,16)`, reference lines exactly `(80,80,80)` at rows 120, 121, 360 and 361 and one `(191,191,191)` bar occupying columns 432 through 447, exactly sixteen pixels wide and all 480 rows tall at authored position 432. A sweep for any intermediate level outside the reference rows and the telemetry overlay returned no pixel at all, so no second bar, partial bar or dash exists anywhere in the emitted frame. The user independently reports one bar only throughout live playback, correct holds, ninety-six-pixel jumps and wrap, and no grey dashes at any point in this mode. Schema ten accepted the complete 5,007,304-byte stream and represented 300 decoded pictures, 300 displayed pictures and 299 swaps across 599,436,793 cycles or 9.990613 seconds, with 300 framebuffer resets, 299 publications, zero superseded unpublished generations, zero prefill misses, a maximum 2,002,004-cycle publication latency, zero gap outliers, top-field-first, sequence end seen, presentation complete, quiet reason one and every error clear. Commit `9573923` therefore passes its diagnostic objective. Because the final mux, cadence overlay, native sync generation, MiSTer's processed-HDMI Bob path and the display together rendered a moving object with no retention whatsoever, the decoded-video ghost originates upstream of the final mux in framebuffer cache or field readout, which is the conclusion entry 513 assigned to this outcome. That inference is bounded rather than absolute because the pattern bar is pair-identical between fields and holds each position thirty frame windows, so it exercises neither inter-field difference nor per-frame motion and cannot fully exonerate downstream processing for field-differing content; entries 502, 503, 509 and 510 weaken the downstream account independently because the ghost survives both Weave and Bob. Separately, `decode_hardware_cadence.py` derives `delivered_fps` from the wrapped eight-bit swap counter rather than the reconstructed count and printed 4.303 where the true rate is 29.928 pictures per second, a reporting trap every prior entry avoided by computing the rate by hand.
+
+#### Next Steps:
+
+Close the remaining gap with direct evidence rather than inference by capturing the core's own raster while the ghost is live, since every capture in this investigation so far has been a terminal capture taken after playback ended. With Native timing pattern Off, Interlaced output Native 480i and whichever deinterlacer ghosts most readily, the user launches `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` and the agent bursts sixteen screenshot triggers at approximately 0.8-second intervals through the MiSTer's ordinary-FTP view of `/dev/MiSTer_cmd` into `/media/fat/screenshots`, retrieves each one and measures every raster for a second bar group, a faint column group or dash rows against the established thirty-seven-pixel authored weave baseline. A ghost present in any core-side raster places the fault upstream and justifies a following commit instrumenting framebuffer field readout, while a ghost absent from every raster during a run the user sees ghosting on the panel proves the fault is downstream and justifies extending the timing pattern with per-frame motion and a field-differing submode matching the fixture's four-pixel inter-field offset. No RTL, menu, scheduler or MiSTer configuration changes belong in this step, and the retrieved screenshots stay on the SD card unless the user asks for their removal.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 513 COMMIT Unreleased 9573923 2026-08-25T09:58:18-07:00
 
 #### Coming From:
@@ -1219,33 +1248,5 @@ Power-cycle the MiSTer and run exactly four files in order: `00_good_480p_48k.mp
 
 - [x] Built
 - [ ] Passed
-
----
-## 474 COMMIT Unreleased acdbf8b 2026-08-24T13:36:45-07:00
-
-#### Coming From:
-
-Unreleased acdbf8b
-
-#### Purpose:
-
-Accept immediate audio-video recovery after the silent Program Stream and establish the v0.7.0 release-qualification boundary.
-
-#### Outcome:
-
-Without rebooting after the accepted video-only session, the user ran `00_good_480p_48k.mpg` and reports that everything looked and sounded good, followed by USER and POWER solid on and DISK blinking eleven times. The final image was triggered and retrieved exclusively through plain FTP with the default MiSTer login and no SSH keys; `.ai/current_results/entry474_av_recovery_after_video_only.png` is 104,628 bytes with SHA-256 `a12f6a89eecf177e1c1a345a2c2f346abb13c0fa5c58f1843a482725205a334f`. Schema nine accepts the complete 582,741-byte H.262 payload, associates five timestamps, decodes all seventeen reference and 31 B pictures, displays all 48 pictures with 47 swaps, saturates the healthy PCM sample and FIFO-peak telemetry fields, and reports zero aggregate errors, no audio underrun or PCM protocol error, sequence end, presentation completion and normal quiet reason one at STC second two. No decode, reorder, scratch, promotion, future-reference or terminal work remains. This passes the required no-reboot transition from a zero-PCM session to ordinary 48 kHz audio-video playback and completes functional hardware acceptance of helper source `acdbf8b` with FPGA source `9a5eea3`.
-
-#### Next Steps:
-
-After approval, qualify v0.7.0 from the exact accepted source boundary with a clean from-scratch Quartus 17.0.2 build, the standard Phase-1P timing reports, the complete focused and host regression suites, and a reproducible official-toolchain helper build. Verify the release RBF and helper hashes, then update `README.md`, `CHANGELOG.md` and new v0.7.0 release notes to describe bounded Program Stream input, MPEG Layer II audio, real PTS scheduling, the exact-cadence correction, supported limits, hardware validation and timing/resource results. Package the date-coded RBF and matching helper from the final documentation commit, install the exact candidate through plain FTP with rollback preserved, run the release hardware gate, and only after it passes have the user create the annotated `v0.7.0` tag and GitHub pre-release from that exact commit.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
