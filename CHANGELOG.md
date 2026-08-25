@@ -6,7 +6,9 @@ This project is still in active pre-release development. Published milestone rel
 
 ## Unreleased
 
-No unreleased milestone changes yet.
+- Added a bounded 720x480 4:2:0 interlaced all-I frame-picture path with frame DCT, consistent TFF/BFF preservation, and native 480i timing.
+- Added two explicit interlaced presentation tiers: MiSTer scaler processing with selectable Weave/Bob, and untouched native 480i for `direct_video`, external processing, and eventual HDMI-to-SDI conversion.
+- Removed a redundant 64-clock inverse-quantization block replay by streaming finalized coefficients directly into the idle IDCT, restoring full-D1 all-I throughput headroom for 29.97-fps material without changing decoded pixels.
 
 ## [0.7.0] - 2026-08-24 — Program Stream audio and PTS milestone
 

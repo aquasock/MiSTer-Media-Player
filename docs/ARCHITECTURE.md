@@ -23,7 +23,7 @@ The active FPGA pipeline performs:
 9. DDR3 readback through small ping-pong line caches;
 10. 4:2:0 chroma expansion;
 11. limited-range BT.601 YCbCr-to-RGB conversion;
-12. fixed diagnostic video timing and MiSTer presentation.
+12. selectable 800x600 diagnostic or native 480i timing and MiSTer presentation.
 
 ## Active decoder
 
@@ -33,9 +33,7 @@ The older `rtl/mpeg2fpga/` implementation is retained only as a frozen reference
 
 ## Current supported implementation path
 
-The present hardware-proven diagnostic path covers consecutive progressive 4:2:0 I frame pictures up to the current 720x480 diagnostic geometry.
-
-Picture 1 is fully decoded, reconstructed, written to DDR3, read back, and displayed. The same parser is then locally re-armed and reused for picture 2, which is proven through reconstruction but is not yet stored or displayed.
+The released path covers continuous progressive 4:2:0 I/P/B frame pictures through 720x480. The unreleased interlaced path accepts a deliberately bounded 720x480 4:2:0 all-I subset: frame pictures, frame DCT, no repeat-first-field, and a consistent authored top- or bottom-field-first order.
 
 These limits describe the current implementation only. They are not restrictions imposed by H.262.
 
@@ -66,12 +64,18 @@ This architecture reduced on-chip memory pressure dramatically and restored full
 
 Chroma expansion is currently nearest-neighbor 4:2:0 replication. This is sufficient for decoder validation but is known to produce visible color fringing on fine anti-aliased text. Better chroma positioning/interpolation is planned as a presentation-quality improvement.
 
+### Two interlaced output tiers
+
+Supported interlaced input is kept as two correctly ordered fields in a native 480i raster. On normal HDMI, MiSTer's scaler processes that raster and the core's `HDMI scaler deinterlacer` menu requests either Weave or Bob. Weave prioritizes stable vertical detail; Bob prioritizes motion handling at the expected cost of reduced vertical stability.
+
+The second tier preserves native 480i for an external processor and eventual HDMI-to-SDI conversion. The core does not deinterlace or scale this tier. Raw, unscaled HDMI also requires MiSTer's global `direct_video` configuration: that framework input arrives as `cfg[10]` and cannot be changed by a core status-menu option. Native 480i therefore describes the core's output format, not an automatic promise that direct video is enabled.
+
 ## Clocking and CDC
 
 The principal active clocks are:
 
-- 54 MHz decoder/memory-side logic;
-- 40 MHz diagnostic video timing.
+- 60 MHz decoder/memory-side logic;
+- 40 MHz 800x600 diagnostic timing, or the native 480i video clock path.
 
 Phase 1P established the project's current timing/CDC discipline:
 

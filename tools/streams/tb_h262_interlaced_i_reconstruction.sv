@@ -12,6 +12,9 @@ module tb_h262_interlaced_i_reconstruction;
     localparam integer FRAME_BYTES = LUMA_BYTES + 2*CHROMA_BYTES;
     localparam integer ORACLE_BYTES = FRAME_COUNT*FRAME_BYTES;
     localparam integer MAX_CYCLES = 300000000;
+    // Four 30000/1001 pictures have 8,008,000 decoder clocks available at
+    // 60 MHz.  This is an implementation-throughput gate, not an H.262 limit.
+    localparam integer REALTIME_2997_FOUR_FRAME_CYCLES = 8008000;
 
     reg clk=0,reset=1,stream_valid=0;
     reg [7:0] stream_data=0;
@@ -259,6 +262,10 @@ module tb_h262_interlaced_i_reconstruction;
                reconstructed_picture!=FRAME_COUNT||pixel_samples!=ORACLE_BYTES||
                pixel_mismatches!=0||max_pixel_delta>1)
                 $fatal(1,"I reconstruction regression failed");
+            if(!expect_progressive&&
+               total_cycles>REALTIME_2997_FOUR_FRAME_CYCLES)
+                $fatal(1,"interlaced all-I throughput missed 29.97 fps: %0d cycles",
+                    total_cycles);
             $display("PASS tb_h262_interlaced_i_reconstruction accept");
             $finish;
         end

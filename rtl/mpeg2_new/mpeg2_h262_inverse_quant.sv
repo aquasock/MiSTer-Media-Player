@@ -64,15 +64,12 @@ module mpeg2_h262_inverse_quant
 // A streaming/block RAM implementation can replace it when the full decoder
 // begins processing every block continuously.
 reg signed [12:0] qfs [0:63];
-reg signed [11:0] reconstructed [0:63];
 integer i;
 
 reg       busy;
 reg       issue_active;
 reg [5:0] physical_index;
 reg       parity_lsb;
-reg       emit_active;
-reg [5:0] emit_index;
 
 reg [7:0] latched_quantiser_scale_value;
 reg [3:0] latched_dc_multiplier;
@@ -358,8 +355,6 @@ always @(posedge clk) begin
         first_luma_f00                 <= 12'sd0;
         first_luma_f77                 <= 12'sd0;
 
-        emit_active                    <= 1'b0;
-        emit_index                     <= 6'd0;
         coeff_out_block_start          <= 1'b0;
         coeff_out_valid                <= 1'b0;
         coeff_out_index                <= 6'd0;
@@ -367,8 +362,7 @@ always @(posedge clk) begin
         coeff_out_block_end            <= 1'b0;
 
         for (i = 0; i < 64; i = i + 1) begin
-            qfs[i]           <= 13'sd0;
-            reconstructed[i] <= 12'sd0;
+            qfs[i] <= 13'sd0;
         end
     end
     else begin
@@ -384,7 +378,7 @@ always @(posedge clk) begin
         iq_s3_valid <= iq_s2_valid;
 
         if (block_start) begin
-            if (busy || emit_active) begin
+            if (busy) begin
                 iq_error <= 1'b1;
             end
             else begin
@@ -394,21 +388,20 @@ always @(posedge clk) begin
                 first_luma_f77     <= 12'sd0;
 
                 for (i = 0; i < 64; i = i + 1) begin
-                    qfs[i]           <= 13'sd0;
-                    reconstructed[i] <= 12'sd0;
+                    qfs[i] <= 13'sd0;
                 end
             end
         end
 
         if (coeff_write_en) begin
-            if (busy || emit_active)
+            if (busy)
                 iq_error <= 1'b1;
             else
                 qfs[coeff_write_index] <= coeff_write_value;
         end
 
         if (block_end) begin
-            if (busy || emit_active || (quantiser_scale_code == 5'd0)) begin
+            if (busy || (quantiser_scale_code == 5'd0)) begin
                 iq_error <= 1'b1;
             end
             else if (!intra_quant_matrix_default) begin
@@ -486,45 +479,34 @@ always @(posedge clk) begin
                 iq_s3_product <= iq_s2_product * iq_s2_qscale_ext;
         end
 
-        // Registered-product saturation/writeback and mismatch control.
+        // Registered-product saturation/mismatch control and direct IDCT
+        // handoff.  The parser does not admit the next block until the prior
+        // reconstruction completes, so the IDCT is idle throughout inverse
+        // quantisation.  Streaming the finalized values here removes the old
+        // 64-clock reconstructed[] replay without overlapping block ownership.
         if (iq_s3_valid) begin
+            coeff_out_valid <= 1'b1;
+            coeff_out_index <= iq_s3_index;
+
+            if (iq_s3_index == 6'd0)
+                coeff_out_block_start <= 1'b1;
+
             if (iq_s3_index == 6'd63) begin
                 // H.262 7.4.4: if the sum of saturated coefficients is even,
                 // toggle the LSB of F[7][7].  The standard notes that parity
                 // alone is sufficient to determine this condition.
-                reconstructed[63] <= iq_mismatch_corrected_last;
+                coeff_out_value    <= iq_mismatch_corrected_last;
+                coeff_out_block_end <= 1'b1;
                 first_luma_f77     <= iq_mismatch_corrected_last;
                 busy               <= 1'b0;
                 block_complete     <= 1'b1;
-                emit_active        <= 1'b1;
-                emit_index         <= 6'd0;
             end
             else begin
-                reconstructed[iq_s3_index] <= iq_s3_saturated;
+                coeff_out_value <= iq_s3_saturated;
                 parity_lsb <= parity_lsb ^ iq_s3_saturated[0];
 
                 if (iq_s3_index == 6'd0)
                     first_luma_f00 <= iq_s3_saturated;
-            end
-        end
-
-        // kate - Emit the completed 8x8 transform-domain block only after
-        // mismatch control has finalized F[7][7].  The explicit stream keeps
-        // the IDCT independent of the inverse-quantiser's internal storage.
-        if (emit_active) begin
-            coeff_out_valid <= 1'b1;
-            coeff_out_index <= emit_index;
-            coeff_out_value <= reconstructed[emit_index];
-
-            if (emit_index == 6'd0)
-                coeff_out_block_start <= 1'b1;
-
-            if (emit_index == 6'd63) begin
-                coeff_out_block_end <= 1'b1;
-                emit_active         <= 1'b0;
-            end
-            else begin
-                emit_index <= emit_index + 1'b1;
             end
         end
     end

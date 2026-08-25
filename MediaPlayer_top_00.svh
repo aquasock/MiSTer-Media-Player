@@ -75,7 +75,7 @@ localparam CONF_STR = {
 	"-;",
 	"-;",
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
-	"O[124],HDMI deinterlacer,Weave,Bob;",
+	"O[124],HDMI scaler deinterlacer,Weave,Bob;",
 	"O[123],Native timing pattern,Off,On;",
 	"O[120],Interlaced output,Native 480i,800x600 Diagnostic;",
 	"O[3:1],Audio test,Off,44.1k Mono,44.1k Stereo,48k Mono,48k Stereo;",

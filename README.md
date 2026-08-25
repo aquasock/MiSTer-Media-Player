@@ -2,7 +2,7 @@
 
 An experimental media-player core for [MiSTer FPGA](https://github.com/MiSTer-devel/Main_MiSTer), with a standards-driven MPEG-2 Video / ITU-T H.262 decoder implemented primarily in FPGA logic.
 
-> **Development status:** active, pre-release, developer-oriented. **v0.7.0 is the current hardware-qualified milestone.** It adds bounded MPEG-2 Program Stream input, MPEG Layer II audio, real Program Stream picture-PTS scheduling, native frame-rate codes 1 through 5, and a MiSTer ARM helper while preserving raw MPEG-2 Video elementary-stream playback.
+> **Development status:** active, pre-release, developer-oriented. **v0.7.0 is the current released milestone.** Unreleased work adds a bounded 720x480 interlaced frame-DCT all-I path and native 480i presentation while retaining the v0.7.0 Program Stream, audio, PTS, and ARM-helper foundation.
 
 ## Current status
 
@@ -19,13 +19,14 @@ The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`. v0.
 - continuous progressive 4:2:0 I/P/B decoding, retained DDR3 reference banks, separate B scratch storage, and coded-order/display-order presentation;
 - full 8-bit Y, Cb, and Cr reconstruction with limited-range BT.601 presentation;
 - clean Program Stream and raw-stream terminal handling, including reordered-picture flush and one explicit PCM end marker.
+- an unreleased 720x480 interlaced frame-picture, frame-DCT, all-I subset with preserved top- or bottom-field-first order and native 480i timing.
 
 The supported subset is intentionally bounded while the architecture is being proven. These are implementation limits, not limits of H.262 or H.222.0.
 
-| Area | v0.7.0 implementation |
+| Area | Current implementation |
 | --- | --- |
 | Input | Raw MPEG-2 Video `.m2v`, or bounded MPEG-2 Program Stream `.mpg` / `.mpeg` through the ARM helper |
-| Video | Progressive frame pictures, 4:2:0 chroma, qualified through 720x480 / 45x30 macroblocks |
+| Video | Progressive 4:2:0 I/P/B through 720x480; unreleased bounded 720x480 interlaced frame-DCT all-I path |
 | Picture types | Continuous supported I/P/B decode and coded-order/display-order presentation |
 | Presentation rates | H.262 frame-rate codes 1..5; codes 6..8 are rejected before transport |
 | Program Stream timing | Picture PTS on a 33-bit / 90 kHz FPGA timeline with cadence-floor enforcement |
@@ -33,7 +34,7 @@ The supported subset is intentionally bounded while the architecture is being pr
 | Audio | MPEG Layer II decoded by the helper; 44.1 or 48 kHz; stereo hardware-qualified |
 | Audio buffering | Packed signed PCM records into an 8,192-frame stereo FPGA FIFO |
 | Frame storage | Two retained planar MiSTer DDR3 I/P banks plus a distinct B scratch region |
-| Video output | Fixed 800x600 diagnostic timing |
+| Video output | 800x600 progressive diagnostic output, or native 480i for supported interlaced input |
 
 The frozen `rtl/mpeg2fpga/` tree remains historical reference material and is not part of the active Quartus build.
 
@@ -142,7 +143,7 @@ DDR reference/B-scratch storage
 cadence floor + 90 kHz PTS scheduler
           |
           v
-blanking-aligned 800x600 video output
+800x600 diagnostic or native 480i video output
 ```
 
 Raw `.m2v` files bypass Program Stream demux and audio decoding while retaining the same FPGA H.262 path.
@@ -171,10 +172,10 @@ The build script pins the minimp3 revision, MiSTer Main revision, dependency has
 
 - Program Stream support is bounded; MPEG Transport Stream, DVD/VOB navigation, private-stream audio, subpictures, and arbitrary systems-layer layouts are not supported.
 - Audio is MPEG Layer II only at 44.1 or 48 kHz. Other codecs and sample rates are rejected.
-- Progressive 4:2:0 video is qualified through 720x480. Interlaced pictures and other chroma formats are outside the release envelope.
+- Progressive 4:2:0 video is released through 720x480. The unreleased interlaced path is deliberately limited to 720x480 4:2:0 frame pictures using frame DCT and all-I coding; field pictures and interlaced P/B pictures remain outside its envelope.
 - H.262 frame-rate codes 6 through 8 (50, 59.94, and 60 fps) are rejected.
 - Seeking, scrubbing, pause/resume, DVD navigation, and optical-drive integration are not implemented.
-- Output remains the fixed 800x600 engineering presentation path rather than a consumer playback interface.
+- Output offers two interlaced tiers. Normal processed HDMI sends native 480i timing into MiSTer's scaler and lets the `HDMI scaler deinterlacer` menu choose Weave or Bob. The external-processing tier preserves native 480i fields; truly unscaled HDMI additionally requires MiSTer's separate `direct_video` setting, which the core menu cannot enable.
 - Files should be opened through the normal MiSTer file menu; MGL injection is not a qualified loading method.
 
 ## Diagnostic streams
@@ -196,7 +197,7 @@ The USER LED is the top-level completion diagnostic. For successful v0.7.0 runs,
 
 ## Development roadmap
 
-Future work can extend the qualified envelope toward 50/59.94/60 fps, interlaced structures, broader Program Stream handling, additional audio codecs, improved chroma presentation, playback controls, seeking, DVD navigation, and optical-drive integration.
+Future work can extend the qualified envelope toward 50/59.94/60 fps, interlaced P/B and field-picture structures, broader Program Stream handling, additional audio codecs, improved chroma presentation, playback controls, seeking, DVD navigation, optical-drive integration, and qualification of native 480i through external HDMI-to-SDI hardware.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for completed milestones.
 

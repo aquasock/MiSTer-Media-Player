@@ -229,9 +229,10 @@ mismatch control again leaves the final `F[7][7] = 1`.
 
 #### Phase 1E — 8x8 inverse discrete cosine transform
 
-Still passive beside MPEG2FPGA.  After Phase 1D finishes MPEG-2 mismatch
-control, the inverse quantiser now emits all 64 physical `F[v][u]` coefficients
-in row-major order into `mpeg2_h262_idct.sv`.
+Still passive beside MPEG2FPGA.  After each Phase 1D coefficient reaches its
+final saturated value, the inverse quantiser emits the physical `F[v][u]`
+coefficient in row-major order into `mpeg2_h262_idct.sv`.  The final coefficient
+is emitted only after MPEG-2 mismatch control has finalized `F[7][7]`.
 
 The normative basis is the consolidated ITU-T H.262 text (02/2012):
 
@@ -247,10 +248,11 @@ dimensional normalized basis is represented in Q14, the first pass is retained
 as Q10, and the second pass is rounded to integer.  This is an implementation
 choice, not an H.262 requirement.  Eight products are evaluated per clock, so
 each 8x8 transform consumes 64 clocks per pass (128 transform clocks/block).
-At the present 54 MHz MPEG clock, the transform itself has theoretical block-
-rate headroom over 720x576 4:2:0 at 30 frames/s.  The current diagnostic
-coefficient handoff is not yet throughput-optimized and will later be overlapped
-with transform processing.
+At the present 60 MHz MPEG clock, the transform itself has theoretical block-
+rate headroom over 720x576 4:2:0 at 30 frames/s.  Finalized inverse-quantized
+coefficients stream directly into the idle IDCT capture bank; eliminating the
+former 64-clock completed-block replay saves 518,400 clocks for each 720x480
+4:2:0 picture without changing normative arithmetic or transform results.
 
 The current consolidated H.262 Annex A does **not** define the IDCT by clipping
 its mathematical integer result to an 8-bit signed range.  Therefore Phase 1E
@@ -353,8 +355,11 @@ Add second reference frame, bidirectional prediction and coded/display ordering.
 
 ### Phase 5 — complete Main-Profile/Main-Level relevant H.262 behaviour
 
-Add interlaced frame/field pictures and remaining standard tools required by the
-target media.  Scope is determined from H.262 profile/level rules, not guessed.
+The first bounded interlaced path accepts 720x480 4:2:0 all-I frame pictures
+using frame DCT, preserves authored field order, and presents native 480i.
+Future work adds field pictures, interlaced prediction and the remaining tools
+required by target media. Scope is determined from H.262 profile/level rules,
+not guessed.
 
 ### Phase 6 — MPEG-2 Systems
 
