@@ -1,3 +1,31 @@
+## 493 COMMIT Unreleased 2601573 2026-08-25T01:20:24-07:00
+
+#### Coming From:
+
+Unreleased 2601573
+
+#### Purpose:
+
+Record the three-bank native TFF hardware result and advance to the framebuffer-independent timing-pattern discriminator.
+
+#### Outcome:
+
+The user reloaded the exact `2601573` image, left `Native timing pattern` Off and ran `_cadence/native_480i_tff_light_10s.m2v` in `Native 480i` mode. Playback feels faster but still lags the nominal source, flicker is reduced but remains, the transient one-pixel-high short dashes are gone, combing remains and the moving vertical bar can leave a temporarily stationary shadow while it continues rightward. USER and POWER are solid and DISK blinks twice. The untouched terminal screenshot was triggered and retrieved entirely through ordinary FTP with the default MiSTer login and no SSH; `.ai/current_results/entry492_tff_native480i_overlap.png` is 11,867 bytes with SHA-256 `2d8a9ae24dc9d5ffc7d38d1707a197694c29f239a808c18bcb3e3d4a58985d84`. Schema nine accepts all 5,007,304 bytes and its wrapped counters represent all 300 reference and displayed pictures and 299 swaps, with stable top-field-first signalling, sequence end, presentation completion and normal quiet reason one. Aggregate, decoder, presentation, destination, cache-bank-overlap, audio-underrun and PCM-protocol errors are all clear. The first presentation is at cycle 2,378,291 and the last at 718,703,629, so the 299 intervals span 716,325,338 cycles, 11.938756 seconds or 25.044486 pictures per second. The overlap therefore removes the prior deterministic 15.004885-picture serialization and exceeds the predicted approximately 20.10-picture baseline because that earlier progressive measurement also included ordinary presentation waiting; the remaining approximately 40-millisecond decoder throughput is still below the 29.97-picture source and explains the residual lag. Presentation hold collapses from the prior run's hundreds of millions of cycles to 108,513 cycles, while the disappearance of the short dashes and reduced flicker show that their severity was coupled to the old stop-and-resume schedule even though the clear cache-overlap flag still rules out only the monitored same-bank refill collision. The still preserves the authored interlaced edge structure but cannot determine whether the reported temporary moving shadow is an intended field-time separation or stale pixel delivery; the static timing pattern is now the required discriminator.
+
+#### Next Steps:
+
+Without changing the RBF, enable `Native timing pattern`, keep `Interlaced output` at `Native 480i` and replay only `_cadence/native_480i_tff_light_10s.m2v`. The moving source will be hidden behind eight static vertical color bars while decoder and DDRAM activity continue, so judge whether the bars flicker, acquire transient horizontal dashes, shimmer at their vertical boundaries or leave any changing ghost edge; report USER, DISK and POWER and leave the terminal pattern image loaded for a second FTP-only capture. Stable bars with ordinary telemetry will place the remaining comb and moving shadow in framebuffer or field-content presentation rather than native sync timing, while flickering or changing bars will retain the timing/output path as the cause. Continue to defer BFF and any public native-interlace compatibility claim.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 492 COMMIT Unreleased 2601573 2026-08-25T01:09:18-07:00
 
 #### Coming From:
@@ -1248,43 +1276,6 @@ Power-cycle the MiSTer, set Audio Test to Off and run only `23_bbb_opening24_exa
 #### Files Modified:
 
 - tools/streams/extract_program_stream_opening.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 453 COMMIT Unreleased cf1d173 2026-08-24T08:06:55-07:00
-
-#### Coming From:
-
-Unreleased f2b2e02
-
-#### Purpose:
-
-Bound in-band delivery order to the sink FIFO after exact-byte isolation placed both the cadence regression and the sticky underrun in helper pacing.
-
-#### Outcome:
-
-The user ran `22_bbb_opening24_exact_video.m2v` without rebooting and reports completely smooth motion, ending with USER and POWER solid on and DISK blinking eleven times. The completed 800x600 capture is 545,901 bytes at SHA-256 `50eb09fefb6f822bda693365ee2619ad4d24354205766ce40b25ce63fc7988b8`. Schema-eight telemetry accepts all 3,138,618 bytes with zero aggregate, presentation, destination, PCM protocol or underrun errors, sequence end, presentation completion and normal quiet reason one. The eight-bit counters reconstruct exactly to 25 I plus 169 P plus 383 B pictures, all 577 displays and 576 swaps. Those 576 intervals span 24.006454 seconds for 23.994 delivered frames per second. No gap exceeds the 3,000,000-cycle or 50-millisecond outlier threshold; the three largest are all 2,984,256 cycles or 49.738 milliseconds. Because this raw stream is copied from the failed Program Stream's exact H.262 opening, the paired result conclusively excludes encoded scene complexity, source timestamps, decoder throughput and the current FPGA image: the same bytes are smooth without PCM, while the audio-video form produces 139 outliers up to 116.054 milliseconds and an audio underrun within 21.74 seconds.
-
-The transport structure explains both defects. The full file carries 14,315 video packets averaging 5,898 bytes but 28,628,352 audio samples, nearly 2,000 samples per video packet. The current helper may therefore place as many as 2,048 consecutive PCM records before one whole video packet. Once the 8,192-sample FPGA FIFO fills, that batch backpressures the shared byte path for approximately 42.7 milliseconds before the compressed picture can advance, adding an audio-sized pause to a raw decoder interval already measured near 49.7 milliseconds. Conversely, the existing single-sample guard before as many as 65,535 video bytes cannot refill enough audio to survive a difficult picture, which accounts for the sticky underrun. This is ordering granularity in the helper rather than corrupt content or insufficient FIFO capacity.
-
-Commit `cf1d173` implements the approved correction with two constants revised on measured evidence, and the revision was approved before anything was committed or installed. The startup release, the 256-byte video slicing, the 4,096-frame steady reserve and the 128-frame refill after at most 4,096 PCM-free video bytes are all as approved. The approved 128-frame steady batch cap is not, because it makes audio admission a function of the video byte rate: 128 frames per 256-byte slice is half a frame per byte, while the movie needs an average of 0.34 and as much as 5.99 during the near-static second at 300 seconds, where video falls to 8,018 bytes per second over a full second and 4,608 over half a second. Built exactly as approved, the helper ended the soak 317,982 frames behind and delivered only 28,319,234 of 28,628,352 samples before the final video byte, a deeper starvation than the one being corrected. The cap therefore stays at the accepted 2,048 frames, which with the 4,096-frame reserve keeps peak occupancy at 6,144 against an 8,192-frame sink FIFO so a batch never waits for room, and the horizon is now served when the video queue is empty as well, so a quiet scene cannot throttle audio through its own byte rate.
-
-The analyzer gained the measurement that decides this class of defect: at every timestamp record it compares the audio that has crossed against what the sink has consumed by then, and fails above the 8,192-frame FIFO depth documented in `rtl/audio/audio_pcm_fifo.sv`. Applied to the installed `f2b2e02` helper it reproduces the hardware failure rather than describing it: the deficit holds at 4,578 frames of surplus for the whole movie, then spikes to 8,750 frames at 21.7 seconds and 8,894 at 21.9 seconds, which exceeds the 8,192-frame FIFO exactly where entry 451's telemetry froze on `audio_pcm_underrun`. Under `cf1d173` the worst deficit anywhere in the movie is 7,374 frames at 461.3 seconds, and at 21.7 seconds the sink is 2,626 frames ahead instead of behind. The maximum PCM-free video span falls from 64,768 to 4,052 bytes and no admitted video run exceeds 256 bytes, while the transport remains 342,199,090 bytes with video and timestamps at SHA-256 `db00682bb603a5f575df5a1d5d0b7a580c46ca99eed028f024ac6bc37016f38f` and PCM at SHA-256 `337b1387b9324b6c391a3223ced8f7660bd5144267b29d3964b4ed6b282839af`, both unchanged.
-
-Host qualification is complete and no installed file has been touched. Short and faded fixtures at 48 and 44.1 kHz and both controls pass under native and address-and-undefined-sanitized helpers, and a helper built from `f2b2e02` produces byte-identical video, timestamp and PCM payloads on all six, so only the interleaving changed. The nine-case envelope corpus retains three passes and six intended failures, and every failure case returns the same exit status and message as the baseline helper. Two official GCC 10.2.1 builds are byte-identical; the 361,452-byte static stripped ARM EABI5 helper has SHA-256 `d40a3eeb8c5dfa1f41ee7a82ee7966b310ec458da789972ca7025f75866117f2`. One pre-existing defect was observed and not changed: a Program Stream carrying no decodable MPEG Layer II audio, including `good_video_only.mpg` and `bad_audio_codec.mpg`, fails on the 512 KiB video lookahead limit rather than the intended missing-audio message, identically on both helpers.
-
-#### Next Steps:
-
-Build the copied-stream 24-second audio-video opening diagnostic from `20_bbb_full_48k.mpg`, then install only the `cf1d173` helper and that file through staged roundtrip verification with the exact `f2b2e02` helper preserved for rollback, leaving RTL, RBF, Main and every existing media file unchanged. Require zero audio underrun, zero cadence outliers above the 3,000,000-cycle threshold, clean synchronization and ordinary LEDs on that diagnostic before the full soak is repeated. If the diagnostic passes, rerun `20_bbb_full_48k.mpg` end to end and require completion with no underrun, no repeated-frame cadence, stable alignment through the high-motion sequence near 7:22 and the credits, and a schema-eight capture with zero aggregate, decoder, presentation and destination errors. The residual host measurement to watch is the 7,374-frame deficit at 461.3 seconds, which is within the FIFO but is the deepest remaining excursion; if hardware shows an underrun there rather than at 21.7 seconds, the next boundary is audio lookahead depth rather than delivery order. Separately, the missing-audio Program Stream path should report its own error instead of the lookahead limit.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- tools/streams/analyze_arm_av_transport.py
 
 #### Status:
 
