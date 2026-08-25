@@ -30,6 +30,13 @@ vvp "${build_dir}/tb_native_480i_timing"
 vvp "${build_dir}/tb_native_480i_timing" +BFF
 
 iverilog -g2012 \
+  -s tb_hdmi_deinterlace_control \
+  -o "${build_dir}/tb_hdmi_deinterlace_control" \
+  "${repo_root}/rtl/mpeg2_hdmi_deinterlace_control.sv" \
+  "${repo_root}/tools/streams/tb_hdmi_deinterlace_control.sv"
+vvp "${build_dir}/tb_hdmi_deinterlace_control"
+
+iverilog -g2012 \
   -s tb_native_480i_timing_pattern \
   -o "${build_dir}/tb_native_480i_timing_pattern" \
   "${repo_root}/rtl/mpeg2_native_timing_pattern.sv" \

@@ -36,7 +36,6 @@ assign VGA_SCALER  = 0;
 assign VGA_DISABLE = 0;
 assign HDMI_FREEZE = 0;
 assign HDMI_BLACKOUT = 0;
-assign HDMI_BOB_DEINT = 0;
 
 // AUDIO_FORK_POINT[PCM_OUT]: advisory v0.5.0 handoff, not a permanent ABI.
 // Replace these zeroes only at the top-level PCM/output boundary.  Keep codec
@@ -76,6 +75,7 @@ localparam CONF_STR = {
 	"-;",
 	"-;",
 	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
+	"O[124],HDMI deinterlacer,Weave,Bob;",
 	"O[123],Native timing pattern,Off,On;",
 	"O[120],Interlaced output,Native 480i,800x600 Diagnostic;",
 	"O[3:1],Audio test,Off,44.1k Mono,44.1k Stereo,48k Mono,48k Stereo;",
@@ -721,7 +721,12 @@ wire        display_field_window;
 wire        display_frame_window;
 wire        display_native_interlaced;
 wire        display_native_timing_pattern;
+wire        display_hdmi_bob_deinterlace;
 wire        mpeg2_new_native_active_mpeg2;
+
+// MiSTer's scaler consumes this request only on its processed HDMI path.
+// Direct video continues to carry the core's native interlaced timing.
+assign HDMI_BOB_DEINT = display_hdmi_bob_deinterlace;
 
 wire [7:0]  fb_video_r;
 wire [7:0]  fb_video_g;

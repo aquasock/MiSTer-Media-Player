@@ -16,6 +16,15 @@ mpeg2_video_output_timing mpeg2_video_output_timing
 	.frame_window            (display_frame_window)
 );
 
+mpeg2_hdmi_deinterlace_control mpeg2_hdmi_deinterlace_control
+(
+	.clk                     (clk_video),
+	.reset                   (reset_video),
+	.native_interlaced       (display_native_interlaced),
+	.bob_selected_async      (status[124]),
+	.hdmi_bob_deint          (display_hdmi_bob_deinterlace)
+);
+
 // The development timing pattern is deliberately synchronized independently
 // of the native-mode request.  It replaces only the final native pixel source;
 // decoder, DDRAM, cadence, and diagnostics continue running underneath it.

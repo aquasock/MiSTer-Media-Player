@@ -1,6 +1,7 @@
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/media_player.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_video_svga_800x600.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_video_output_timing.sv
+set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_hdmi_deinterlace_control.sv
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/mpeg2_stream_fifo.sv
 # Entry 395: codec-independent signed PCM proof path.
 set_global_assignment -name SYSTEMVERILOG_FILE rtl/audio/audio_pcm_test_source.sv
