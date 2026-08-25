@@ -1,3 +1,32 @@
+## 505 COMMIT Unreleased f866ce2 2026-08-25T03:34:13-07:00
+
+#### Coming From:
+
+Unreleased f866ce2
+
+#### Purpose:
+
+Place the native-interlace cadence fixtures under the MiSTer MediaPlayer directory for convenient hardware validation.
+
+#### Outcome:
+
+The existing `/media/fat/_cadence` directory was copied, not moved, to `/media/fat/MediaPlayer/_cadence` using only ordinary FTP with the default MiSTer `root` and `1` login and no SSH. All eighteen files were downloaded from the original folder, uploaded into the new folder and downloaded again; every source and destination SHA-256 pair matched. The copied set includes the TFF and BFF light-motion fixtures required for commit `f866ce2`, the longer interlaced fixtures, the step-hold diagnostic, the preserved cadence RBF and the existing MGL controls. The original `/media/fat/_cadence` contents remain intact, and no RBF, Main, helper, configuration or media outside the new copy was changed.
+
+#### Next Steps:
+
+Reload the installed `f866ce2` core, leave `Native timing pattern` Off, choose `HDMI scaler deinterlacer` Weave and `Interlaced output` Native 480i, then open `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v`. Report motion smoothness, ghosting or flicker and all three LED states, and leave the terminal image displayed for an ordinary-FTP schema-nine capture. Follow with TFF Bob, BFF Weave and BFF Bob only after each preceding result is captured.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 504 COMMIT Unreleased f866ce2 2026-08-25T03:04:24-07:00
 
 #### Coming From:
@@ -1194,41 +1223,6 @@ Without changing or rebooting the installed image, run `20_bbb_full_48k.mpg` end
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 465 COMMIT Unreleased cd8d78a 2026-08-24T11:25:18-07:00
-
-#### Coming From:
-
-Unreleased 6dece4c
-
-#### Purpose:
-
-Decouple clean video from in-band PCM after extraction with a bounded timing-clean queue while preserving timestamp-to-picture ordering.
-
-#### Outcome:
-
-The entry 464 boundary was approved and is commit `cd8d78a`. A 16 KiB clean-video FIFO now sits after `mpeg2_h262_inband_metadata`, so a decoder ownership stall can queue video while the extractor continues crossing later PCM records into the existing audio FIFO; at the full-soak video's measured 138 KiB/s elementary-stream rate this is 115.9 milliseconds, beyond the repeated 82.896-millisecond stalls that exhaust the helper's 4,096-frame or 85.3-millisecond audio reserve, without paying for the unrelated 431-millisecond startup transient. Timestamp ordering could not be assumed: permanent host analysis found only 4,017 clean video bytes between the closest two of the soak's 598 records. A sixteen-entry companion FIFO therefore carries each PTS with its absolute clean-byte position and releases it only when the decoder reaches that position, while a new metadata readiness handshake holds a record's final byte if that companion queue fills. The integrated simulation holds the decoder for the entire input burst, proves three PCM frames still cross, then drains all 160 clean bytes byte-identically and releases two timestamps at exact byte positions 32 and 96; the extractor separately proves metadata backpressure without loss, and the picture timestamp, presentation timeline, scheduler, transport gate, download rearm, system clock, cadence profiler, PCM output and 8,192-frame PCM FIFO regressions pass. The full helper analysis preserves 84,423,309 clean video bytes, 28,628,352 PCM frames at SHA-256 `337b1387b9324b6c391a3223ced8f7660bd5144267b29d3964b4ed6b282839af`, 598 timestamps, a 4,052-byte maximum PCM-free span, zero audio deficit and the established 207,888,468-byte transport. Quartus 17.0.2 completes in ten minutes 24 seconds with zero errors and timing met: worst setup slack is 0.512 nanoseconds, hold 0.248, recovery 3.805, removal 0.600 and minimum pulse width 1.122, while the Phase-1P reports show decoder setup 1.519 nanoseconds over 100 same-clock paths with none violated, decoder recovery 10.785 and video setup 7.124. The design uses 29,316 ALMs, 45,115 registers, 3,655,139 memory bits at 65 percent, 464 of 553 RAM blocks at 84 percent and 65 DSP blocks; the queue itself costs 132,112 bits and eighteen RAM blocks, exactly sixteen for video and two for timestamp positions. The 4,196,780-byte RBF is SHA-256 `39106371e9f26a5a0bc62e703bd5df33f9ea07882fc8d8002cb7e0bc6e9b55f3` and was installed through plain FTP after staged roundtrip verification, with the previous 4,110,808-byte `6dece4c` image preserved byte-identically as `/media/fat/MediaPlayer.backup.pre-clean-video-queue.6dece4c.rbf` at SHA-256 `ee7ff41b5cf76693f491d72999b0caa39abd36ff1a2ae7921a2ad7aabb58e940`; the helper, Main and every media file are unchanged.
-
-#### Next Steps:
-
-Power-cycle once to load `cd8d78a`, set Audio Test to Off and run `23_bbb_opening24_exact_av.mpg`, then leave its final image loaded for a schema-eight capture. Require intact audio, smooth video, zero aggregate, PCM protocol, decoder, presentation and destination errors, no audio underrun, all 577 pictures displayed with sequence end and presentation complete, and timestamp association unchanged; a picture-count or timestamp failure means the companion position queue is wrong and calls for immediate rollback to `MediaPlayer.backup.pre-clean-video-queue.6dece4c.rbf`. If that diagnostic is clean, run `20_bbb_full_48k.mpg` end to end and compare the slight credits cadence separately from the fatal condition: primary acceptance is a quiet completion with `audio_pcm_underrun` clear, sequence end and all 14,315 pictures accounted for, while the visual comparison decides whether the queue also affects the residual presentation beat.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- files.qip
-- rtl/mpeg2_new/mpeg2_h262_clean_video_queue.sv
-- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
-- tools/streams/analyze_arm_av_transport.py
-- tools/streams/tb_h262_clean_video_queue.sv
-- tools/streams/tb_h262_inband_metadata.sv
-- tools/streams/tb_h262_inband_metadata_file.sv
 
 #### Status:
 
