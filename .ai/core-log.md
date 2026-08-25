@@ -1,3 +1,32 @@
+## 515 COMMIT Unreleased 9573923 2026-08-25T11:32:46-07:00
+
+#### Coming From:
+
+Unreleased 9573923
+
+#### Purpose:
+
+Locate the native ghost by capturing the core's own raster during live playback instead of only after it ends.
+
+#### Outcome:
+
+Every prior capture in this investigation was terminal, so the intermittent ghost had never been measured while visible. Bursts of screenshot triggers issued through the MiSTer's ordinary-FTP view of `/dev/MiSTer_cmd` with the default `root` and `1` login now sample the live raster at roughly 2.4 hertz. The decisive fixture burst returned twenty-four distinct live frames of `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i. Decomposed by field, the bottom field advances its bar every single frame across the full sweep while the top field holds one position for 4.2 seconds at x=512 through x=543, jumps once and then holds the next for 4.6 seconds at x=632 through x=663. Each frozen top-field bar measures exactly thirty-two columns by one hundred seventy-six rows, the exact authored field-bar geometry, so it is a cleanly retained picture rather than a smear. An earlier burst independently caught the same asymmetry with content instead of position: at playback start the top field carried the entire previous screen at background level 24 while the bottom field carried live video at level 19, and two frames 0.8 seconds apart both showed it, which excludes the ordinary sixteen-millisecond inter-field sampling offset of an interlaced screenshot. That evidence is `.ai/current_results/entry515_live_ghost_two_bars.png` at 13,565 bytes with SHA-256 `4c6ad022c14e55a586270072a1807b5d02a2b4d5e2e1d6153dc35e975ca26c82`, `.ai/current_results/entry515_field_freeze_early.png` at 13,233 bytes with SHA-256 `d0387b6c4c423ff737ee3eff426b79759a27bde5b936392667f6252c252baaed` and `.ai/current_results/entry515_field_freeze_midrun.png` at 10,864 bytes with SHA-256 `69ac1b3517d343d8de3683c79d1596f08a6288fe17b0187af00d59586a0eefe1`. The pattern control settles the boundary. With Native timing pattern On and motion Moving the same burst returned fifty-five distinct frames over forty-six seconds at background exactly `(16,16,16)`, reference rows 120, 121, 360 and 361 and sixteen-pixel bars at the authored positions; forty-eight of them place both fields at the identical x with 3,840 bright pixels each, and the seven that differ are jump instants between adjacent authored positions which resolve to a united bar by the next sample 0.42 seconds later. The pattern therefore proves the capture path, final mux, native sync, MiSTer's processed-HDMI Bob path and the display all track a moving object within one field time, while decoded video retains a stale field for over two hundred forty field times through the same chain. Its evidence is `.ai/current_results/entry515_pattern_control_locked.png` at 7,721 bytes with SHA-256 `71ac91a908a494bce09f7ecbf32c0b8c3ca617e44e4fc8b001a13df52adc05e6` and `.ai/current_results/entry515_pattern_control_transition.png` at 9,850 bytes with SHA-256 `ac115389e3cc3ea33df5d552903f09c5f4fd77477511eda8fff294ed3b871153`. Because the pattern bypasses the framebuffer, DDR and line cache while video does not, the fault is field readout, confirming the classification entry 514 assigned. A static read of `rtl/mpeg2_luma_framebuffer.sv` mapped the mechanism but did not identify the defect, and it disproved the leading hypothesis: the 480-entry presentation sequence is not free to sit at an arbitrary raster phase, because the per-generation reset zeroes `line_done_sequence_mem` and the event advancing it is gated on `picture_present_rd`, which asserts only at the authored first-field origin, so entry zero is anchored to the correct field by construction. The monitored reader-fell-behind and same-bank refill collision detectors also remain clear in every run, so neither is the cause.
+
+#### Next Steps:
+
+Instrument the per-field invariants the static read identified, all of which are currently unmeasured because existing telemetry counts whole pictures and therefore cannot see a single stale field. Derive the true presentation sequence index in the video domain from the raster position as the authored-parity field line or two hundred forty plus that line, compare it against the memory-domain `line_done_sequence_mem`, and record mismatch count, the first mismatching pair and maximum drift. Add per-parity displayed-line counts for each generation so that a frozen top field appears directly as an imbalance against the expected two hundred forty and two hundred forty, record whether publication ever asserts on the wrong raster parity, and count DDR line refills served to each field. Extend the hardware snapshot from schema ten to schema eleven by appending words only, without repurposing any established MPEG, prediction, PCM, scheduler or error field, exactly as `52a5a64` extended schema nine to ten, and move the checksum accordingly. Update the telemetry decoder and its tests, add focused framebuffer and native integration regressions covering an ordinary locked sequence and a deliberately stalled field, retain the complete native and scheduler suites, then run a clean Quartus Prime 17.0.2 build with focused timing analysis and install through rollback-safe ordinary FTP. Repeat the fixture with the live burst and require the new counters to identify which invariant breaks when the top field freezes. No presentation, cache, scheduler or native timing behavior may change in this observational commit.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 514 COMMIT Unreleased 9573923 2026-08-25T11:06:08-07:00
 
 #### Coming From:
@@ -1218,35 +1247,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 475 COMMIT Unreleased eab57b7 2026-08-24T14:01:04-07:00
-
-#### Coming From:
-
-Unreleased acdbf8b
-
-#### Purpose:
-
-Qualify and package the reproducible v0.7.0 release candidate from the accepted FPGA and host baselines.
-
-#### Outcome:
-
-Commit `eab57b7` updates `README.md`, `CHANGELOG.md` and new `docs/RELEASE_NOTES_v0.7.0.md` for the matching RBF, patched Main and ARM helper release. A clean from-scratch Quartus Prime 17.0.2 build completes with zero errors and reproduces the accepted 4,184,380-byte RBF exactly at SHA-256 `484328e51c6e764890bf2bdcd947448e2eaaaac2c603e93da28009475e44dafc`; global setup, hold, recovery, removal and minimum-pulse-width slack are respectively +0.311, +0.238, +3.365, +0.497 and +1.122 ns, with +1.782 ns decoder setup, +11.294 ns decoder recovery and +8.284 ns video setup. The fit uses 29,325 ALMs, 45,259 registers, 3,655,139 block-memory bits, 464 RAM blocks, 65 DSP blocks and three PLLs. The focused RTL suites pass picture timestamps, PTS timeline, codes-one-through-five scheduling and cadence floor, transport gating, download re-arm, system clock, in-band metadata, clean-video queuing, audio output, the 8,192-frame FIFO and schema-nine telemetry. The optional legacy Cycle-A wrapper is not a current release gate: its three reported failures are stale fixture/inventory or fixed-cycle signature expectations, while the emitted functional result counters are complete and error-free. Native and sanitized helper qualification, the exact 14,315-picture transport soak, two byte-identical official-toolchain helper builds and two byte-identical patched-Main builds retain the accepted results. The assembled archive `host/build/MiSTer_Media_Player_v0.7.0.zip` is 2,749,946 bytes at SHA-256 `bae3c3c17d2381cb91e2baff98ec9cf22fed88b04d01bc1349574ae57b917377`; its internal `SHA256SUMS` verifies the date-coded RBF, Main, executable `linux/MediaPlayer_Helper`, installation guide, source provenance and both licenses. Generated regression media is excluded. Read-only plain-FTP verification with the default MiSTer login and no SSH keys already proves that the active RBF, helper and Main are the exact release bytes, so no installation mutation is needed before the final gate.
-
-#### Next Steps:
-
-Power-cycle the MiSTer and run exactly four files in order: `00_good_480p_48k.mpg`, `02_good_video_only.mpg`, `01_good_480p_44k.mpg` without reboot after the silent file, and `20_bbb_full_48k.mpg` after a fresh power cycle. Capture schema-nine telemetry and all three LED states for each, require correct video and audio behavior with zero aggregate, decoder, presentation, PCM protocol and underrun errors, then update the release notes to record the passed gate and have the user create the annotated `v0.7.0` tag and GitHub pre-release from the exact final commit.
-
-#### Files Modified:
-
-- README.md
-- CHANGELOG.md
-- docs/RELEASE_NOTES_v0.7.0.md
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
