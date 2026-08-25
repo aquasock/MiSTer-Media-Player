@@ -17,6 +17,9 @@ module mpeg2_h262_hardware_cadence_profiler #(
     input wire clk_mpeg2,input wire reset_mpeg2,
     input wire clk_video,input wire reset_video,input wire pixel_ce,
     input wire native_active,
+    input wire framebuffer_generation_reset,
+    input wire framebuffer_picture_present,
+    input wire framebuffer_prefill_deadline_missed,
     input wire fifo_pending,input wire decoder_ready,
     input wire presentation_hold,input wire destination_hold,
     input wire scratch_available,input wire promotion_active,
@@ -58,20 +61,20 @@ module mpeg2_h262_hardware_cadence_profiler #(
     output reg [7:0] video_b,output wire snapshot_ready
 );
 
-localparam integer SNAPSHOT_WORDS=38;
+localparam integer SNAPSHOT_WORDS=41;
 localparam integer SNAPSHOT_BITS=SNAPSHOT_WORDS*32;
 localparam [23:0] TERMINAL_SNAPSHOT_LIMIT=
     TERMINAL_SNAPSHOT_DELAY-24'd1;
 localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
-localparam [31:0] SNAPSHOT_FORMAT={8'd9,8'd38,16'd60000};
-// Entry 485: keep all 38 rows visible without changing their encoding. The
+localparam [31:0] SNAPSHOT_FORMAT={8'd10,8'd41,16'd60000};
+// Entry 511: keep all 41 rows visible without changing their encoding. The
 // mode observation is already in clk_video and affects overlay placement only.
 localparam [11:0] OVERLAY_X=12'd8;
-localparam [11:0] OVERLAY_DIAG_Y=12'd444;
-localparam [11:0] OVERLAY_NATIVE_Y=12'd324;
-localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd152;
+localparam [11:0] OVERLAY_DIAG_Y=12'd436;
+localparam [11:0] OVERLAY_NATIVE_Y=12'd316;
+localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd164;
 
 reg session_active;
 reg fifo_pending_q,decoder_ready_q,presentation_hold_q,destination_hold_q;
@@ -113,6 +116,16 @@ reg [31:0] prediction_requests,prediction_request_wait_cycles;
 reg [31:0] prediction_response_cycles;
 reg prediction_outstanding;
 reg [31:0] writer_wait_cycles;
+reg framebuffer_generation_reset_d;
+reg framebuffer_picture_present_d;
+reg framebuffer_prefill_deadline_missed_d;
+reg framebuffer_publication_pending;
+reg [31:0] framebuffer_publication_latency;
+reg [31:0] framebuffer_max_publication_latency;
+reg [15:0] framebuffer_reset_count;
+reg [15:0] framebuffer_publication_count;
+reg [15:0] framebuffer_unpublished_reset_count;
+reg [15:0] framebuffer_prefill_miss_count;
 reg [7:0] reference_picture_count,b_picture_count;
 reg [7:0] display_picture_count,display_swap_count;
 reg b_picture_complete_d;
@@ -142,6 +155,13 @@ wire display_swap_now=first_present_valid&&
      (display_scratch_q!=display_scratch_d)||
      (display_scratch_q&&(display_scratch_bank_q!=display_scratch_bank_d)));
 wire prediction_request_accepted=prediction_read_q&&!prediction_busy_q;
+wire framebuffer_generation_reset_edge=
+    framebuffer_generation_reset&&!framebuffer_generation_reset_d;
+wire framebuffer_picture_present_edge=
+    framebuffer_picture_present&&!framebuffer_picture_present_d;
+wire framebuffer_prefill_deadline_missed_edge=
+    framebuffer_prefill_deadline_missed&&
+    !framebuffer_prefill_deadline_missed_d;
 wire session_progress=decoder_byte_accepted_q||reference_picture_complete_q||
     b_picture_complete_edge||display_swap_now||prediction_request_accepted||
     prediction_data_ready_q||writer_write_q;
@@ -216,7 +236,12 @@ wire [31:0] snapshot_word_35={completed_frame_bank_q,display_frame_bank_q,
     sequence_end_seen_q,presentation_complete_q,presentation_error_q,
     associated_count_q,display_pts_q[10:0]};
 wire [31:0] snapshot_word_36=scheduler_debug_state_q;
-wire [31:0] snapshot_word_37=snapshot_word_00^snapshot_word_01^
+wire [31:0] snapshot_word_37={framebuffer_reset_count,
+    framebuffer_publication_count};
+wire [31:0] snapshot_word_38={framebuffer_unpublished_reset_count,
+    framebuffer_prefill_miss_count};
+wire [31:0] snapshot_word_39=framebuffer_max_publication_latency;
+wire [31:0] snapshot_word_40=snapshot_word_00^snapshot_word_01^
     snapshot_word_02^snapshot_word_03^snapshot_word_04^snapshot_word_05^
     snapshot_word_06^snapshot_word_07^snapshot_word_08^snapshot_word_09^
     snapshot_word_10^snapshot_word_11^snapshot_word_12^snapshot_word_13^
@@ -225,11 +250,13 @@ wire [31:0] snapshot_word_37=snapshot_word_00^snapshot_word_01^
     snapshot_word_22^snapshot_word_23^snapshot_word_24^snapshot_word_25^
     snapshot_word_26^snapshot_word_27^snapshot_word_28^snapshot_word_29^
     snapshot_word_30^snapshot_word_31^snapshot_word_32^snapshot_word_33^
-    snapshot_word_34^snapshot_word_35^snapshot_word_36;
+    snapshot_word_34^snapshot_word_35^snapshot_word_36^snapshot_word_37^
+    snapshot_word_38^snapshot_word_39;
 
 task capture_snapshot;
 begin
-    snapshot_mpeg2<={snapshot_word_37,snapshot_word_36,snapshot_word_35,
+    snapshot_mpeg2<={snapshot_word_40,snapshot_word_39,snapshot_word_38,
+        snapshot_word_37,snapshot_word_36,snapshot_word_35,
         snapshot_word_34,snapshot_word_33,snapshot_word_32,
         snapshot_word_31,snapshot_word_30,snapshot_word_29,snapshot_word_28,
         snapshot_word_27,snapshot_word_26,snapshot_word_25,snapshot_word_24,
@@ -274,6 +301,15 @@ always @(posedge clk_mpeg2) begin
         prediction_requests<=0;prediction_request_wait_cycles<=0;
         prediction_response_cycles<=0;prediction_outstanding<=0;
         writer_wait_cycles<=0;reference_picture_count<=0;b_picture_count<=0;
+        framebuffer_generation_reset_d<=0;
+        framebuffer_picture_present_d<=0;
+        framebuffer_prefill_deadline_missed_d<=0;
+        framebuffer_publication_pending<=0;
+        framebuffer_publication_latency<=0;
+        framebuffer_max_publication_latency<=0;
+        framebuffer_reset_count<=0;framebuffer_publication_count<=0;
+        framebuffer_unpublished_reset_count<=0;
+        framebuffer_prefill_miss_count<=0;
         display_picture_count<=0;display_swap_count<=0;
         b_picture_complete_d<=0;display_frame_bank_d<=0;
         display_scratch_d<=0;display_scratch_bank_d<=0;
@@ -322,6 +358,10 @@ always @(posedge clk_mpeg2) begin
         pcm_fifo_peak_q<=pcm_fifo_peak;
         top_field_first_q<=top_field_first;
         repeat_first_field_q<=repeat_first_field;
+        framebuffer_generation_reset_d<=framebuffer_generation_reset;
+        framebuffer_picture_present_d<=framebuffer_picture_present;
+        framebuffer_prefill_deadline_missed_d<=
+            framebuffer_prefill_deadline_missed;
         b_picture_complete_d<=b_picture_complete_q;
         display_frame_bank_d<=display_frame_bank_q;
         display_scratch_d<=display_scratch_q;
@@ -363,6 +403,35 @@ always @(posedge clk_mpeg2) begin
                 prediction_response_cycles<=prediction_response_cycles+1'b1;
             if(writer_write_q&&writer_busy_q)
                 writer_wait_cycles<=writer_wait_cycles+1'b1;
+            if(framebuffer_generation_reset_edge)begin
+                if(framebuffer_reset_count!=16'hffff)
+                    framebuffer_reset_count<=framebuffer_reset_count+1'b1;
+                if(framebuffer_publication_pending&&
+                   (framebuffer_unpublished_reset_count!=16'hffff))
+                    framebuffer_unpublished_reset_count<=
+                        framebuffer_unpublished_reset_count+1'b1;
+                framebuffer_publication_pending<=1;
+                framebuffer_publication_latency<=0;
+            end else if(framebuffer_publication_pending&&
+                        (framebuffer_publication_latency!=32'hffffffff))
+                framebuffer_publication_latency<=
+                    framebuffer_publication_latency+1'b1;
+            if(framebuffer_picture_present_edge)begin
+                if(framebuffer_publication_count!=16'hffff)
+                    framebuffer_publication_count<=
+                        framebuffer_publication_count+1'b1;
+                if(framebuffer_publication_pending)begin
+                    if(framebuffer_publication_latency>
+                       framebuffer_max_publication_latency)
+                        framebuffer_max_publication_latency<=
+                            framebuffer_publication_latency;
+                    framebuffer_publication_pending<=0;
+                end
+            end
+            if(framebuffer_prefill_deadline_missed_edge&&
+               (framebuffer_prefill_miss_count!=16'hffff))
+                framebuffer_prefill_miss_count<=
+                    framebuffer_prefill_miss_count+1'b1;
             if(profile_window_active&&swap_window_pulse_q&&
                candidate_presentable_q&&timestamp_candidate_active_q)begin
                 if(cadence_slot_q&&!timestamp_candidate_due_q&&
@@ -538,6 +607,9 @@ always @* begin
     35:overlay_row_word=snapshot_sync_2[1151:1120];
     36:overlay_row_word=snapshot_sync_2[1183:1152];
     37:overlay_row_word=snapshot_sync_2[1215:1184];
+    38:overlay_row_word=snapshot_sync_2[1247:1216];
+    39:overlay_row_word=snapshot_sync_2[1279:1248];
+    40:overlay_row_word=snapshot_sync_2[1311:1280];
     default:overlay_row_word=0;
     endcase
 end

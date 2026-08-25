@@ -12,10 +12,12 @@ from PIL import Image
 
 
 MAGIC = 0x4D4D5031
-WORDS = 38
 X0 = 8
-DIAGNOSTIC_Y0 = 444
-NATIVE_480I_Y0 = 324
+WORDS = 41
+DIAGNOSTIC_Y0 = 436
+NATIVE_480I_Y0 = 316
+LEGACY_DIAGNOSTIC_Y0 = 444
+LEGACY_NATIVE_480I_Y0 = 324
 CELL = 4
 ROW_PREFIX = (1, 0, 1, 0)
 
@@ -44,51 +46,65 @@ def decode_words(path: Path | str) -> list[int]:
             f"least {minimum_width} horizontal pixels"
         )
 
-    if image.height >= DIAGNOSTIC_Y0 + WORDS * CELL:
-        y_origin = DIAGNOSTIC_Y0
-    elif image.height >= NATIVE_480I_Y0 + WORDS * CELL:
-        y_origin = NATIVE_480I_Y0
-    else:
-        raise TelemetryDecodeError(
-            f"image is {image.width}x{image.height}; neither the 800x600 "
-            "diagnostic nor 720x480 native telemetry layout fits"
-        )
+    layouts = (
+        (DIAGNOSTIC_Y0, WORDS),
+        (NATIVE_480I_Y0, WORDS),
+        (LEGACY_DIAGNOSTIC_Y0, 38),
+        (LEGACY_NATIVE_480I_Y0, 38),
+    )
+    failures: list[str] = []
+    for y_origin, word_count in layouts:
+        if image.height < y_origin + word_count * CELL:
+            continue
+        try:
+            words: list[int] = []
+            for row in range(word_count):
+                bits = [
+                    _cell_bit(image, y_origin, column, row)
+                    for column in range(43)
+                ]
+                if tuple(bits[:4]) != ROW_PREFIX:
+                    raise TelemetryDecodeError(
+                        f"row {row}: telemetry prefix absent ({bits[:4]})"
+                    )
+                encoded_row = 0
+                for bit in bits[4:10]:
+                    encoded_row = (encoded_row << 1) | bit
+                if encoded_row != row:
+                    raise TelemetryDecodeError(
+                        f"row {row}: encoded row index is {encoded_row}"
+                    )
+                word = 0
+                for bit in bits[10:42]:
+                    word = (word << 1) | bit
+                if bits[42] != (word.bit_count() & 1):
+                    raise TelemetryDecodeError(f"row {row}: parity mismatch")
+                words.append(word)
 
-    words: list[int] = []
-    for row in range(WORDS):
-        bits = [_cell_bit(image, y_origin, column, row) for column in range(43)]
-        if tuple(bits[:4]) != ROW_PREFIX:
-            raise TelemetryDecodeError(
-                f"row {row}: telemetry prefix absent ({bits[:4]})"
-            )
-        encoded_row = 0
-        for bit in bits[4:10]:
-            encoded_row = (encoded_row << 1) | bit
-        if encoded_row != row:
-            raise TelemetryDecodeError(
-                f"row {row}: encoded row index is {encoded_row}"
-            )
-        word = 0
-        for bit in bits[10:42]:
-            word = (word << 1) | bit
-        if bits[42] != (word.bit_count() & 1):
-            raise TelemetryDecodeError(f"row {row}: parity mismatch")
-        words.append(word)
+            if words[0] != MAGIC:
+                raise TelemetryDecodeError(f"bad magic 0x{words[0]:08x}")
+            declared_words = (words[1] >> 16) & 0xFF
+            if declared_words != word_count:
+                raise TelemetryDecodeError(
+                    f"snapshot declares {declared_words} words, "
+                    f"layout has {word_count}"
+                )
+            checksum = 0
+            for word in words[:-1]:
+                checksum ^= word
+            if checksum != words[-1]:
+                raise TelemetryDecodeError(
+                    f"checksum mismatch 0x{checksum:08x}/"
+                    f"0x{words[-1]:08x}"
+                )
+            return words
+        except TelemetryDecodeError as exc:
+            failures.append(f"y={y_origin} words={word_count}: {exc}")
 
-    if words[0] != MAGIC:
-        raise TelemetryDecodeError(f"bad magic 0x{words[0]:08x}")
-    if ((words[1] >> 16) & 0xFF) != WORDS:
-        raise TelemetryDecodeError(
-            f"snapshot declares {(words[1] >> 16) & 0xFF} words, expected {WORDS}"
-        )
-    checksum = 0
-    for word in words[:-1]:
-        checksum ^= word
-    if checksum != words[-1]:
-        raise TelemetryDecodeError(
-            f"checksum mismatch 0x{checksum:08x}/0x{words[-1]:08x}"
-        )
-    return words
+    raise TelemetryDecodeError(
+        f"image is {image.width}x{image.height}; no supported telemetry "
+        f"layout decoded ({'; '.join(failures)})"
+    )
 
 
 def parse_words(words: list[int]) -> dict[str, Any]:
@@ -241,10 +257,14 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "hold_promotion_pending_cycles": (
             None if schema_version >= 9 else words[24]
         ),
-        # Entry 468 (schema 9): word 24 becomes two saturated late-window
-        # admission-conflict counts. The installed diagnostic starts at STC
-        # second 500; the fixed overlay remains 38 words.
-        "late_window_start_seconds": 500 if schema_version >= 9 else None,
+        # Entry 468 (schema 9): word 24 becomes two saturated admission-
+        # conflict counts. Schema 9's credits diagnostic begins at second 500;
+        # Entry 511 schema 10 restores whole-session capture for short native
+        # fixtures while retaining backward-compatible schema-9 decoding.
+        "late_window_start_seconds": (
+            0 if schema_version >= 10 else
+            500 if schema_version >= 9 else None
+        ),
         "timestamp_delay_conflicts": (
             (words[24] >> 16) & 0xFFFF if schema_version >= 9 else None
         ),
@@ -275,7 +295,28 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "presentation_error": bool((terminal >> 19) & 1),
         "scheduler_debug_word": scheduler,
         "scheduler_flags": scheduler_flags(scheduler),
-        "checksum": words[37],
+        # Entry 511 (schema 10): three appended words observe the boundary
+        # between a scheduler bank swap and actual framebuffer publication.
+        "framebuffer_reset_count": (
+            (words[37] >> 16) & 0xFFFF if schema_version >= 10 else None
+        ),
+        "framebuffer_publication_count": (
+            words[37] & 0xFFFF if schema_version >= 10 else None
+        ),
+        "framebuffer_unpublished_reset_count": (
+            (words[38] >> 16) & 0xFFFF if schema_version >= 10 else None
+        ),
+        "framebuffer_prefill_miss_count": (
+            words[38] & 0xFFFF if schema_version >= 10 else None
+        ),
+        "framebuffer_max_publication_latency_cycles": (
+            words[39] if schema_version >= 10 else None
+        ),
+        "framebuffer_max_publication_latency_seconds": (
+            words[39] / clock_hz
+            if schema_version >= 10 and clock_hz else None
+        ),
+        "checksum": words[-1],
     }
 
 
@@ -384,6 +425,17 @@ def main() -> int:
                 "late-window: start={late_window_start_seconds}s "
                 "timestamp_delay={timestamp_delay_conflicts} "
                 "timestamp_advance={timestamp_advance_conflicts}".format(
+                    **result
+                )
+            )
+        if result["schema_version"] >= 10:
+            print(
+                "framebuffer: resets={framebuffer_reset_count} "
+                "publications={framebuffer_publication_count} "
+                "unpublished_resets={framebuffer_unpublished_reset_count} "
+                "prefill_misses={framebuffer_prefill_miss_count} "
+                "max_latency={framebuffer_max_publication_latency_cycles}cy/"
+                "{framebuffer_max_publication_latency_seconds:.6f}s".format(
                     **result
                 )
             )

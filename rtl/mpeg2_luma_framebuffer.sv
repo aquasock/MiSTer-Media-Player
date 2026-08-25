@@ -46,6 +46,8 @@ module mpeg2_luma_framebuffer
     output reg         read_seen,
     output reg         cache_error,
     output reg         bank_overlap_error,
+    output wire        picture_present_debug,
+    output wire        prefill_deadline_missed_debug,
 
     // Independent fixed video side - 40 MHz.
     input  wire        rd_clk,
@@ -700,7 +702,11 @@ reg        native_interlaced_r2;
 reg        first_field_r1;
 reg        first_field_r2;
 reg        picture_present_rd;
+reg        prefill_deadline_missed_rd;
 reg        line_done_pending_rd;
+
+assign picture_present_debug = picture_present_rd;
+assign prefill_deadline_missed_debug = prefill_deadline_missed_rd;
 
 // kate - Phase 1P: the module reset input is synchronized to mem_clk by the
 // top level.  It still crosses into the independent 40 MHz rd_clk domain, so
@@ -716,6 +722,15 @@ always @(posedge rd_clk or posedge reset) begin
 end
 
 wire rd_reset = rd_reset_sync[2];
+wire framebuffer_descriptor_valid =
+    (picture_width_r2 != 12'd0) && (picture_height_r2 != 11'd0);
+wire native_publish_origin =
+    framebuffer_descriptor_valid && native_interlaced_r2 && pixel_en &&
+    (h_pos == 12'd0) && (v_pos[8:1] == 8'd0) &&
+    (v_pos[0] == first_field_r2);
+wire progressive_publish_origin =
+    framebuffer_descriptor_valid && !native_interlaced_r2 &&
+    (h_pos == 12'd0) && (v_pos == 12'd0);
 
 always @(posedge rd_clk) begin
     if (rd_reset) begin
@@ -730,6 +745,7 @@ always @(posedge rd_clk) begin
         first_field_r1        <= 1'b0;
         first_field_r2        <= 1'b0;
         picture_present_rd   <= 1'b0;
+        prefill_deadline_missed_rd <= 1'b0;
         line_done_toggle_rd  <= 1'b0;
         line_done_pending_rd <= 1'b0;
         cache_scan_active_rd <= 1'b0;
@@ -758,13 +774,17 @@ always @(posedge rd_clk) begin
             // Publish at the first active line of the authored first field, or
             // at the legacy progressive frame origin.
             if (!picture_present_rd && cache_ready_r2 &&
-                ((!native_interlaced_r2 &&
-                  (h_pos == 12'd0) && (v_pos == 12'd0)) ||
-                 (native_interlaced_r2 && pixel_en &&
-                  (h_pos == 12'd0) &&
-                  (v_pos[8:1] == 8'd0) &&
-                  (v_pos[0] == first_field_r2))))
+                (progressive_publish_origin || native_publish_origin))
                 picture_present_rd <= 1'b1;
+
+            // Entry 511: passive native publication deadline evidence.  A
+            // descriptor is already live and the authored first-field origin
+            // has arrived, but the six-line prefill has not crossed into the
+            // video domain.  Retain one level for this framebuffer generation;
+            // the external profiler counts its synchronized rising edge.
+            if (!picture_present_rd && native_publish_origin &&
+                !cache_ready_r2)
+                prefill_deadline_missed_rd <= 1'b1;
 
             // The event is emitted on the logical sample after the last DDR
             // cache request for this displayed source line.

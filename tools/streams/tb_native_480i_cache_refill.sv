@@ -47,6 +47,8 @@ wire cache_ready;
 wire read_seen;
 wire cache_error;
 wire bank_overlap_error;
+wire picture_present_debug;
+wire prefill_deadline_missed_debug;
 wire [7:0] video_r;
 wire [7:0] video_g;
 wire [7:0] video_b;
@@ -73,6 +75,8 @@ mpeg2_luma_framebuffer dut
     .read_seen          (read_seen),
     .cache_error        (cache_error),
     .bank_overlap_error (bank_overlap_error),
+    .picture_present_debug(picture_present_debug),
+    .prefill_deadline_missed_debug(prefill_deadline_missed_debug),
     .rd_clk             (rd_clk),
     .h_pos              (h_pos),
     .v_pos              (v_pos),
@@ -92,6 +96,7 @@ integer response_latency;
 integer response_delay = 0;
 integer response_words = 0;
 reg slow_mode = 1'b0;
+reg late_prefill_mode = 1'b0;
 
 always @(posedge mem_clk) begin
     ddram_dout_ready <= 1'b0;
@@ -136,7 +141,8 @@ end
 
 initial begin
     slow_mode = $test$plusargs("SLOW");
-    response_latency = slow_mode ? 3400 : 64;
+    late_prefill_mode = $test$plusargs("PREFILL_LATE");
+    response_latency = (slow_mode || late_prefill_mode) ? 3400 : 64;
 
     repeat (8) @(posedge mem_clk);
     reset = 1'b0;
@@ -145,15 +151,29 @@ initial begin
     @(posedge mem_clk);
     picture_complete = 1'b0;
 
-    wait (cache_ready);
-    repeat (8) @(posedge rd_clk);
+    if (late_prefill_mode)
+        repeat (12) @(posedge rd_clk);
+    else begin
+        wait (cache_ready);
+        repeat (8) @(posedge rd_clk);
+    end
     running = 1'b1;
     wait (!running);
     repeat (400) @(posedge mem_clk);
 
-    if (slow_mode) begin
+    if (late_prefill_mode) begin
+        if (!prefill_deadline_missed_debug)
+            $fatal(1, "late native origin did not flag prefill deadline miss");
+        if (picture_present_debug)
+            $fatal(1, "late native origin published an unready cache");
+        $display({"NATIVE_CACHE_REFILL_PASS mode=prefill-late miss=1 ",
+                  "published=0 latency=3400"});
+    end
+    else if (slow_mode) begin
         if (!bank_overlap_error)
             $fatal(1, "late DDR return did not flag cache-bank overlap");
+        if (!picture_present_debug || prefill_deadline_missed_debug)
+            $fatal(1, "delayed ready-first publication telemetry mismatch");
         $display({"NATIVE_CACHE_REFILL_PASS mode=delayed overlap=1 ",
                   "latency=3400"});
     end
@@ -161,6 +181,8 @@ initial begin
         if (cache_error || bank_overlap_error)
             $fatal(1, "ordinary DDR service flagged cache error %0d/%0d",
                    cache_error, bank_overlap_error);
+        if (!picture_present_debug || prefill_deadline_missed_debug)
+            $fatal(1, "ordinary publication telemetry mismatch");
         $display({"NATIVE_CACHE_REFILL_PASS mode=ordinary overlap=0 ",
                   "latency=64"});
     end

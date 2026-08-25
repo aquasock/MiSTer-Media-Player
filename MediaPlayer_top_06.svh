@@ -16,6 +16,36 @@ wire mpeg2_new_framebuffer_reset =
     reset_mpeg2 ||
     (mpeg2_new_framebuffer_swap_reset_count != 3'd0) ||
     mpeg2_new_native_mode_change;
+wire mpeg2_new_framebuffer_generation_reset =
+    (mpeg2_new_framebuffer_swap_reset_count != 3'd0) ||
+    mpeg2_new_native_mode_change;
+
+wire mpeg2_new_framebuffer_picture_present_rd;
+wire mpeg2_new_framebuffer_prefill_deadline_missed_rd;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] mpeg2_new_framebuffer_picture_present_sync;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] mpeg2_new_framebuffer_prefill_missed_sync;
+
+always @(posedge clk_mpeg2) begin
+    if (reset_mpeg2) begin
+        mpeg2_new_framebuffer_picture_present_sync <= 3'b000;
+        mpeg2_new_framebuffer_prefill_missed_sync <= 3'b000;
+    end
+    else begin
+        mpeg2_new_framebuffer_picture_present_sync <=
+            {mpeg2_new_framebuffer_picture_present_sync[1:0],
+             mpeg2_new_framebuffer_picture_present_rd};
+        mpeg2_new_framebuffer_prefill_missed_sync <=
+            {mpeg2_new_framebuffer_prefill_missed_sync[1:0],
+             mpeg2_new_framebuffer_prefill_deadline_missed_rd};
+    end
+end
+
+wire mpeg2_new_framebuffer_picture_present =
+    mpeg2_new_framebuffer_picture_present_sync[2];
+wire mpeg2_new_framebuffer_prefill_deadline_missed =
+    mpeg2_new_framebuffer_prefill_missed_sync[2];
 
 localparam [28:0] MPEG2_NEW_DDR_FRAME_BANK_WORDS     = 29'h00010000;
 localparam [28:0] MPEG2_NEW_DDR_FRAME_SCRATCH0_WORDS = 29'h00020000;
@@ -54,6 +84,9 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
     .read_seen      (mpeg2_new_ddr_read_seen),
     .cache_error    (mpeg2_new_ddr_cache_error),
     .bank_overlap_error(mpeg2_new_ddr_bank_overlap_error),
+    .picture_present_debug(mpeg2_new_framebuffer_picture_present_rd),
+    .prefill_deadline_missed_debug(
+        mpeg2_new_framebuffer_prefill_deadline_missed_rd),
     .rd_clk         (clk_video),
     .h_pos          (display_h_pos),
     .v_pos          (display_v_pos),

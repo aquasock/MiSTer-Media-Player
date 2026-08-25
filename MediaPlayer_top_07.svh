@@ -74,7 +74,7 @@ wire [15:0] mpeg2_new_cadence_error_flags = {
 };
 
 mpeg2_h262_hardware_cadence_profiler #(
-    .PROFILE_START_STC_SECONDS(14'd500)
+    .PROFILE_START_STC_SECONDS(14'd0)
 )
 mpeg2_h262_hardware_cadence_profiler
 (
@@ -84,6 +84,12 @@ mpeg2_h262_hardware_cadence_profiler
     .reset_video               (reset_video),
     .pixel_ce                  (display_pixel_ce),
     .native_active             (display_native_interlaced),
+    .framebuffer_generation_reset(
+        mpeg2_new_framebuffer_generation_reset),
+    .framebuffer_picture_present(
+        mpeg2_new_framebuffer_picture_present),
+    .framebuffer_prefill_deadline_missed(
+        mpeg2_new_framebuffer_prefill_deadline_missed),
     .fifo_pending              (!mpeg2_stream_empty),
     .decoder_ready             (mpeg2_new_decoder_stream_ready),
     .presentation_hold         (mpeg2_new_b_presentation_hold),

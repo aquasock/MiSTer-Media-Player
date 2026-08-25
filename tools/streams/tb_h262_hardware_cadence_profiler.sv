@@ -33,6 +33,9 @@ reg [13:0] pcm_sample_count=0;
 reg [6:0] pcm_fifo_peak=0;
 reg top_field_first=0,repeat_first_field=0;
 reg native_active=0;
+reg framebuffer_generation_reset=0;
+reg framebuffer_picture_present=0;
+reg framebuffer_prefill_deadline_missed=0;
 reg [11:0] h_pos=0,v_pos=0;
 reg [7:0] base_r=8'h12,base_g=8'h34,base_b=8'h56;
 reg base_de=1;
@@ -50,6 +53,10 @@ mpeg2_h262_hardware_cadence_profiler #(
     .clk_mpeg2(clk_mpeg2),.reset_mpeg2(reset_mpeg2),
     .clk_video(clk_video),.reset_video(reset_video),.pixel_ce(1'b1),
     .native_active(native_active),
+    .framebuffer_generation_reset(framebuffer_generation_reset),
+    .framebuffer_picture_present(framebuffer_picture_present),
+    .framebuffer_prefill_deadline_missed(
+        framebuffer_prefill_deadline_missed),
     .fifo_pending(fifo_pending),.decoder_ready(decoder_ready),
     .presentation_hold(presentation_hold),.destination_hold(destination_hold),
     .scratch_available(scratch_available),.promotion_active(promotion_active),
@@ -93,6 +100,31 @@ begin
 end
 endtask
 
+task pulse_framebuffer_reset;
+begin
+    @(negedge clk_mpeg2);
+    framebuffer_picture_present=0;
+    framebuffer_generation_reset=1;
+    @(negedge clk_mpeg2);framebuffer_generation_reset=0;
+    repeat(2)@(posedge clk_mpeg2);
+end
+endtask
+
+task publish_framebuffer;
+begin
+    @(negedge clk_mpeg2);framebuffer_picture_present=1;
+    repeat(2)@(posedge clk_mpeg2);
+end
+endtask
+
+task pulse_prefill_miss;
+begin
+    @(negedge clk_mpeg2);framebuffer_prefill_deadline_missed=1;
+    @(negedge clk_mpeg2);framebuffer_prefill_deadline_missed=0;
+    repeat(2)@(posedge clk_mpeg2);
+end
+endtask
+
 task pulse_reference;
 begin
     @(negedge clk_mpeg2);reference_picture_complete=1;
@@ -132,6 +164,9 @@ begin
     scheduler_debug_state=0;decoder_byte_accepted=0;error_flags=0;
     pcm_sample_count=0;pcm_fifo_peak=0;
     native_active=0;
+    framebuffer_generation_reset=0;
+    framebuffer_picture_present=0;
+    framebuffer_prefill_deadline_missed=0;
     stc_seconds=14'd5;
     repeat(5)@(posedge clk_mpeg2);reset_mpeg2=0;
     repeat(5)@(posedge clk_video);reset_video=0;
@@ -141,11 +176,11 @@ endtask
 task verify_checksum;
 begin
     checksum=0;
-    for(i=0;i<37;i=i+1)
+    for(i=0;i<40;i=i+1)
         checksum=checksum^dut.snapshot_sync_2[i*32+:32];
-    if(checksum!==dut.snapshot_sync_2[1215:1184])
+    if(checksum!==dut.snapshot_sync_2[1311:1280])
         $fatal(1,"checksum mismatch %h/%h",checksum,
-               dut.snapshot_sync_2[1215:1184]);
+               dut.snapshot_sync_2[1311:1280]);
 end
 endtask
 
@@ -154,7 +189,7 @@ task verify_overlay_prefix;
     integer x;
 begin
     native_active=native_mode;
-    v_pos=native_mode?12'd325:12'd445;
+    v_pos=native_mode?12'd317:12'd437;
     for(x=0;x<=29;x=x+1)begin
         @(negedge clk_video);h_pos=x;
         @(posedge clk_video);#1;
@@ -206,6 +241,20 @@ initial begin
     picture_count=1;
     pulse_reference();
 
+    // Entry 511: one reset publishes normally, then a second generation is
+    // superseded by a third before publication.  The final generation misses
+    // its authored prefill origin and eventually publishes.  All observations
+    // are passive and must survive in schema-ten words 37 through 39.
+    pulse_framebuffer_reset();
+    repeat(5)@(posedge clk_mpeg2);
+    publish_framebuffer();
+    pulse_framebuffer_reset();
+    repeat(3)@(posedge clk_mpeg2);
+    pulse_framebuffer_reset();
+    pulse_prefill_miss();
+    repeat(7)@(posedge clk_mpeg2);
+    publish_framebuffer();
+
     // Three deliberately different display gaps exercise ranking and ordinals.
     repeat(12)@(posedge clk_mpeg2);swap_bank(1);
     repeat(6) @(posedge clk_mpeg2);swap_bank(2);
@@ -223,7 +272,7 @@ initial begin
 
     if(dut.snapshot_sync_2[31:0]!==32'h4d4d5031)
         $fatal(1,"bad magic %h",dut.snapshot_sync_2[31:0]);
-    if(dut.snapshot_sync_2[63:32]!==32'h0926ea60)
+    if(dut.snapshot_sync_2[63:32]!==32'h0a29ea60)
         $fatal(1,"bad format %h",dut.snapshot_sync_2[63:32]);
     if(dut.snapshot_sync_2[831:830]!==2'd1)
         $fatal(1,"quiet snapshot reason missing");
@@ -243,6 +292,14 @@ initial begin
         $fatal(1,"outlier context mismatch %h",dut.snapshot_sync_2[895:864]);
     if(dut.snapshot_sync_2[815:800]==0)
         $fatal(1,"expected at least one outlier gap");
+    if(dut.snapshot_sync_2[1215:1184]!=={16'd3,16'd2})
+        $fatal(1,"framebuffer reset/publication mismatch %h",
+               dut.snapshot_sync_2[1215:1184]);
+    if(dut.snapshot_sync_2[1247:1216]!=={16'd1,16'd1})
+        $fatal(1,"framebuffer race/prefill mismatch %h",
+               dut.snapshot_sync_2[1247:1216]);
+    if(dut.snapshot_sync_2[1279:1248]==0)
+        $fatal(1,"framebuffer publication latency missing");
     verify_checksum();
     verify_overlay_prefix(1'b0);
     verify_overlay_prefix(1'b1);
@@ -387,7 +444,7 @@ initial begin
     if({video_r,video_g,video_b}!==24'h123456)
         $fatal(1,"base video changed outside overlay");
 
-    $display("HARDWARE_CADENCE_PROFILER_PASS schema=9 late-window+timestamp-conflicts+audio-defer+forced+fatal+no-progress checksum=%h",
+    $display("HARDWARE_CADENCE_PROFILER_PASS schema=10 framebuffer-publication+timestamp-conflicts+audio-defer+forced+fatal+no-progress checksum=%h",
              checksum);
     $finish;
 end

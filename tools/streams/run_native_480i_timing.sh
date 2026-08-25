@@ -66,6 +66,7 @@ iverilog -g2012 \
   "${repo_root}/tools/streams/tb_native_480i_cache_refill.sv"
 vvp "${build_dir}/tb_native_480i_cache_refill"
 vvp "${build_dir}/tb_native_480i_cache_refill" +SLOW
+vvp "${build_dir}/tb_native_480i_cache_refill" +PREFILL_LATE
 
 iverilog -g2012 \
   -s tb_h262_hardware_cadence_profiler \
