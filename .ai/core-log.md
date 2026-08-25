@@ -1,3 +1,32 @@
+## 510 COMMIT Unreleased 48c2c87 2026-08-25T07:56:37-07:00
+
+#### Coming From:
+
+Unreleased 48c2c87
+
+#### Purpose:
+
+Capture the repeated TFF Bob comparison and determine whether the intermittent native ghost depends on Weave field history.
+
+#### Outcome:
+
+The user changed only HDMI scaler deinterlacer from Weave to Bob, retained Native timing pattern Off and Interlaced output Native 480i, and ran `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` three consecutive times on the exact installed `48c2c87` image. One of the three runs showed the intermittent ghost earlier in the stream, so Weave's multi-field reconstruction history is not its sole cause. Bob is otherwise mostly perfect while the bar moves left to right; the approximately 60 Hz flicker and fuzzy stationary bar are the expected Bob tradeoff from displaying one field at a time rather than reconstructing full vertical detail. All LEDs pass. The untouched terminal screenshot from the run which ghosted was triggered and retrieved entirely through ordinary FTP with the default `root` and `1` login and no SSH. `.ai/current_results/entry509_terminal_drain_bob.png` is 11,976 bytes with SHA-256 `08b22c2e3cb3cfc470ab7a77586d5e45d5ea8f6794550dcf9ed1b21cb93b4b87`. Schema nine accepts all 5,007,304 bytes and its wrapped counts represent exactly 300 decoded pictures, 300 displayed pictures and 299 swaps. Those 299 intervals span 598,786,877 decoder cycles or 9.979781 seconds and deliver 29.960576 pictures per second. Top-field-first remains correct, sequence end is seen, presentation completes, the session reaches quiet reason one and every aggregate, presentation, destination and cache-bank-overlap error is clear. The terminal raster is the correct final authored weave and contains no retained old position. Scheduler ownership and cadence therefore remain clean even in a Bob run where the user saw the live ghost. The current profiler's zero ranked gaps cannot clear an intermittent early-run stall because its hardware instance deliberately begins gap ranking at STC second 500 for the former full-movie credits investigation, far beyond this ten-second fixture. A plausible remaining boundary is the variable reset-and-prefill interval between a scheduler display-bank swap and the framebuffer's next field-origin publication; missing that cache-ready deadline would be invisible to the current swap counter and could affect Bob and Weave alike.
+
+#### Next Steps:
+
+Stop before changing presentation or cache behavior and obtain approval for one observational diagnostic RBF. Begin ranked display-gap capture at STC second zero for short native fixtures and extend the hardware snapshot without repurposing existing MPEG, audio or prediction fields to record framebuffer publication count, authored field origins missed while the post-swap prefill is not ready, maximum swap-to-publication latency and a compact cache refill deadline state. Update the telemetry decoder and focused profiler, framebuffer and native integration regressions, then clean-build and install through rollback-safe ordinary FTP. Repeat the TFF light-motion fixture in Bob up to three times and capture the first run which ghosts. A nonzero missed-origin or excessive publication latency correlated with that run will justify a narrow prefetch/publication correction; exact framebuffer publication with regular ranked scheduler gaps will clear the FPGA delivery path and leave the residual to the downstream display. Do not alter Bob, Weave, native timing or scheduler ownership in the diagnostic commit.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 509 COMMIT Unreleased 48c2c87 2026-08-25T07:29:58-07:00
 
 #### Coming From:
@@ -1203,34 +1232,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 470 COMMIT Unreleased 9a5eea3 2026-08-24T12:38:50-07:00
-
-#### Coming From:
-
-Unreleased 8c59ddb
-
-#### Purpose:
-
-Prevent sparse presentation timestamps from advancing pictures ahead of the exact-rate cadence while retaining their ability to delay future pictures.
-
-#### Outcome:
-
-Commit `9a5eea3` makes the cadence accumulator a mandatory presentation floor: a timestamped candidate now presents only when both the exact-rate cadence slot and its PTS are due, while an untimestamped candidate continues using cadence alone. The old timestamp-only early-admission branch and its partial-credit reset are gone; picture ownership, B-picture reordering, scratch allocation, cadence constants, timestamp association, transport, profiler and audio logic are unchanged. The directed scheduler proof holds an already-due timestamp while cadence is early, admits it on the first cadence-due window, preserves a future timestamp's ability to delay through safe windows, prevents the following untimestamped candidate from bursting, includes timestamped swaps in the minimum-gap invariant, and retains exact counts of 479, 240, 250, 599 and 600 presentations for 23.976, 24, 25, 29.97 and 30 fps respectively. Picture timestamp, PTS timeline, transport gate, download rearm, system clock, in-band metadata, clean-video queue, PCM output, 8,192-frame PCM FIFO and schema-nine profiler regressions all pass. Quartus 17.0.2 completes in ten minutes 31 seconds with zero errors and 147 established warnings. Timing is met with global worst setup slack 0.311 nanoseconds, hold 0.238, recovery 3.365, removal 0.497 and minimum pulse width 1.122; Phase-1P reports find decoder same-clock setup slack 1.782 across 100 paths with none violated, decoder recovery 11.294 and video same-clock setup 8.284 across 80 paths with none violated. The fit uses 29,325 ALMs, 45,259 registers, 3,655,139 memory bits at 65 percent, 464 of 553 RAM blocks at 84 percent and 65 DSP blocks. The 4,184,380-byte RBF is SHA-256 `484328e51c6e764890bf2bdcd947448e2eaaaac2c603e93da28009475e44dafc`. Installation used plain FTP with the default MiSTer login and no SSH keys: the prior active `8c59ddb` image first verified at SHA-256 `c2ebbfa10935d43ff0d7e66ae0c6468b63385f29ff5a154f9a50b8725dfa5ea1`, its rollback copy verifies byte-identically as `/media/fat/MediaPlayer.backup.pre-pts-floor.8c59ddb.rbf`, the staged candidate and final active image both verified byte-identically at the new hash, and the temporary staged file was removed; helper, Main and media files are unchanged.
-
-#### Next Steps:
-
-Power-cycle once to load `9a5eea3`, set Audio Test to Off and run `20_bbb_full_48k.mpg` end to end without interruption, watching the credits specifically for the former approximately one-second beat and leaving the final diagnostic image loaded for capture. Require all 84,423,309 clean-video bytes and all 14,315 pictures to complete, sequence end and quiet reason one, aggregate errors zero, and both audio underrun and PCM protocol error clear. Schema nine's `timestamp_advance_conflicts` counter observes the PTS-due versus cadence-early opportunity rather than an actual swap, so it may still report approximately 97 after this correction; the scheduler now suppresses those opportunities by construction. If the user sees smooth credits and correctness remains clean, accept `9a5eea3`; if the cadence remains, preserve this result and investigate the separately measured 66.3168-millisecond scratch-unavailable reorder gaps rather than revisiting timestamp admission. Roll back to `/media/fat/MediaPlayer.backup.pre-pts-floor.8c59ddb.rbf` for any correctness, completion or audio regression.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
