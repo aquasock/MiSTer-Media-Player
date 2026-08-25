@@ -1,3 +1,38 @@
+## 504 COMMIT Unreleased ??? 2026-08-25T03:04:24-07:00
+
+#### Coming From:
+
+Unreleased 4e4da3a
+
+#### Purpose:
+
+Remove the serialized inverse-quantization replay that limits full-D1 all-I playback and publish the approved two-tier output wording.
+
+#### Outcome:
+
+The approved proposal is to stream each finalized inverse-quantized coefficient directly into the already-idle IDCT instead of first storing all 64 coefficients and then replaying the block for another 64 clocks. The current parser deliberately waits for the completed reconstruction before admitting the next block, so this removes only redundant handoff latency and leaves coefficient order, mismatch control, saturation, IDCT arithmetic and picture scheduling unchanged. A 720x480 4:2:0 picture contains 8,100 blocks, making the replay cost 518,400 decoder clocks or 8.64 milliseconds per picture at 60 MHz. Fresh four-frame baselines are 10,000,059 clocks for TFF, 10,022,306 for BFF and 15,121,737 for the progressive control, with zero pixels outside tolerance in every accepted reconstruction run. The expected interlaced result is about 7.93 million clocks, below the 8.008-million-clock four-frame implementation ceiling corresponding to 29.97 pictures per second. The same bounded cycle will rename the menu choice to `HDMI scaler deinterlacer`, document Bob/Weave as the normal processed-HDMI tier and document Native 480i plus MiSTer's separate `direct_video` setting as the untouched external-processing and eventual SDI-conversion tier.
+
+#### Next Steps:
+
+Implement the direct inverse-quantization-to-IDCT stream and add a deterministic four-frame 29.97-fps throughput assertion to the interlaced reconstruction regression. Run the focused TFF, BFF, progressive and field-DCT controls, followed by the full native regression suite, and commit the source only if pixel equivalence and field order remain exact. Then perform a clean Quartus build and timing review, stage the image by ordinary FTP with the default MiSTer username and password while preserving the current installed image as rollback, and validate both TFF and BFF motion fixtures in Bob and Weave before considering the optimization passed.
+
+#### Files Modified:
+
+- `rtl/mpeg2_new/mpeg2_h262_inverse_quant.sv`
+- `tools/streams/tb_h262_interlaced_i_reconstruction.sv`
+- `MediaPlayer_top_00.svh`
+- `README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/MPEG2_NEW_DECODER.md`
+- `CHANGELOG.md`
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 503 COMMIT Unreleased 4e4da3a 2026-08-25T02:59:35-07:00
 
 #### Coming From:
@@ -1192,34 +1227,6 @@ Power-cycle once to load `cd8d78a`, set Audio Test to Off and run `23_bbb_openin
 - tools/streams/tb_h262_clean_video_queue.sv
 - tools/streams/tb_h262_inband_metadata.sv
 - tools/streams/tb_h262_inband_metadata_file.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 464 COMMIT Unreleased 6dece4c 2026-08-24T10:58:31-07:00
-
-#### Coming From:
-
-Unreleased 6dece4c
-
-#### Purpose:
-
-Record that packed PCM materially improves the visible full-soak cadence but leaves the deterministic audio underrun and its surviving presentation-gap signature unresolved.
-
-#### Outcome:
-
-The user completed `20_bbb_full_48k.mpg` on the packed-record `6dece4c` image and reports that the roughly one-second cadence is now only slight in the credits and looks substantially better overall. A fresh schema-eight screenshot was triggered and retrieved exclusively through plain FTP with the default MiSTer `root` login, without SSH or keys. The 8,112-byte capture is SHA-256 `14226d6bd2b4e690786d9b560ef2f2673af4694ac4679679b7431b71e7b31e98`. It froze for fatal-or-no-progress reason three with aggregate flags exactly `0x0400`, a real `audio_pcm_underrun`; PCM protocol, presentation and destination errors remain clear. The freeze occurs at exactly 35,705,169 accepted clean-video bytes, the same boundary as the `14e0629` soak in entry 461, while gap outliers move only from 132 to 131 and the three largest gaps remain bit-identical at 431.059 milliseconds at display ordinal fourteen and 82.896 milliseconds at ordinals fifteen and seventeen. Packing therefore removed enough shared-path overhead to produce a clear visual improvement, but the exact repeated underrun boundary separates that fatal condition from aggregate record bandwidth and the unchanged gap signature leaves the presentation residue in place. The previously named `mpeg2_h262_stream_transport_gate` is not itself a valid PCM buffering location because its interface sees only the pre-extractor FIFO and decoder ready/valid state; PCM becomes visible only inside `mpeg2_h262_inband_metadata`.
-
-#### Next Steps:
-
-Stop before changing RTL and obtain approval for a revised isolation boundary. The proposed next cycle is to decouple record extraction from decoder backpressure at the actual split point by adding and testing a bounded post-extraction clean-video queue, allowing the extractor to continue reaching PCM records while the decoder temporarily refuses video; size and resource cost must be established before choosing a depth, and the existing pre-extractor clock-domain FIFO must remain sufficient for safe ingress. Deepening `audio_pcm_fifo` is secondary because the fit already uses 446 of 553 RAM blocks and a larger sink only extends the starvation threshold without removing the coupling. Acceptance remains a complete quiet soak with `audio_pcm_underrun` clear, sequence end and all 14,315 pictures accounted for, followed by the 24-second diagnostic and elementary-stream controls to prove that the queue changes neither video bytes nor presentation order; the user's residual credits cadence must also be compared separately because this capture proves it is no longer equivalent to the underrun.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
