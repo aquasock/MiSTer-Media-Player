@@ -13,9 +13,11 @@ from PIL import Image
 
 MAGIC = 0x4D4D5031
 X0 = 8
-WORDS = 41
-DIAGNOSTIC_Y0 = 436
-NATIVE_480I_Y0 = 316
+WORDS = 44
+DIAGNOSTIC_Y0 = 424
+NATIVE_480I_Y0 = 304
+SCHEMA10_DIAGNOSTIC_Y0 = 436
+SCHEMA10_NATIVE_480I_Y0 = 316
 LEGACY_DIAGNOSTIC_Y0 = 444
 LEGACY_NATIVE_480I_Y0 = 324
 CELL = 4
@@ -49,6 +51,8 @@ def decode_words(path: Path | str) -> list[int]:
     layouts = (
         (DIAGNOSTIC_Y0, WORDS),
         (NATIVE_480I_Y0, WORDS),
+        (SCHEMA10_DIAGNOSTIC_Y0, 41),
+        (SCHEMA10_NATIVE_480I_Y0, 41),
         (LEGACY_DIAGNOSTIC_Y0, 38),
         (LEGACY_NATIVE_480I_Y0, 38),
     )
@@ -316,6 +320,26 @@ def parse_words(words: list[int]) -> dict[str, Any]:
             words[39] / clock_hz
             if schema_version >= 10 and clock_hz else None
         ),
+        # Entry 516 (schema 11): three appended words expose the per-field
+        # readout invariants that whole-picture counters cannot see.
+        "framebuffer_last_first_field_lines": (
+            (words[40] >> 16) & 0xFFFF if schema_version >= 11 else None
+        ),
+        "framebuffer_last_second_field_lines": (
+            words[40] & 0xFFFF if schema_version >= 11 else None
+        ),
+        "framebuffer_last_first_field_fetches": (
+            (words[41] >> 16) & 0xFFFF if schema_version >= 11 else None
+        ),
+        "framebuffer_last_second_field_fetches": (
+            words[41] & 0xFFFF if schema_version >= 11 else None
+        ),
+        "framebuffer_field_line_imbalance_count": (
+            (words[42] >> 16) & 0xFFFF if schema_version >= 11 else None
+        ),
+        "framebuffer_sequence_phase_error_count": (
+            words[42] & 0xFFFF if schema_version >= 11 else None
+        ),
         "checksum": words[-1],
     }
 
@@ -436,6 +460,20 @@ def main() -> int:
                 "prefill_misses={framebuffer_prefill_miss_count} "
                 "max_latency={framebuffer_max_publication_latency_cycles}cy/"
                 "{framebuffer_max_publication_latency_seconds:.6f}s".format(
+                    **result
+                )
+            )
+        if result["schema_version"] >= 11:
+            print(
+                "field readout: last_generation_lines="
+                "{framebuffer_last_first_field_lines}/"
+                "{framebuffer_last_second_field_lines} "
+                "last_generation_fetches="
+                "{framebuffer_last_first_field_fetches}/"
+                "{framebuffer_last_second_field_fetches} "
+                "line_imbalance_generations="
+                "{framebuffer_field_line_imbalance_count} "
+                "phase_errors={framebuffer_sequence_phase_error_count}".format(
                     **result
                 )
             )

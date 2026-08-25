@@ -48,6 +48,13 @@ module mpeg2_luma_framebuffer
     output reg         bank_overlap_error,
     output wire        picture_present_debug,
     output wire        prefill_deadline_missed_debug,
+    // Entry 516: passive per-field readout evidence.  Levels and toggles only;
+    // the external profiler counts their synchronized edges.
+    output wire        sequence_phase_error_debug,
+    output wire        first_field_line_toggle_debug,
+    output wire        second_field_line_toggle_debug,
+    output wire        first_field_fetch_toggle_debug,
+    output wire        second_field_fetch_toggle_debug,
 
     // Independent fixed video side - 40 MHz.
     input  wire        rd_clk,
@@ -124,6 +131,12 @@ reg [7:0]  fetch_segment_words;
 reg [7:0]  recv_word_index;
 reg [28:0] fetch_address;
 reg        fetch_cache_bank;
+
+// Entry 516: passive per-field DDR service evidence.  A luma line address in
+// native mode carries the field parity in bit 0, so each launched luma fetch
+// can be attributed to the authored first field or the other field.
+reg        first_field_fetch_toggle_mem;
+reg        second_field_fetch_toggle_mem;
 
 assign ddram_burstcnt = (mem_state == MEM_ISSUE) ? fetch_segment_words : 8'd0;
 assign ddram_addr     = (mem_state == MEM_ISSUE) ? fetch_address : 29'd0;
@@ -278,6 +291,15 @@ task automatic launch_fetch;
         recv_word_index    <= 8'd0;
         fetch_cache_bank   <= cache_bank;
 
+        if ((kind == FETCH_Y) && native_interlaced_mem) begin
+            if (line_number[0] == first_field_mem)
+                first_field_fetch_toggle_mem <=
+                    ~first_field_fetch_toggle_mem;
+            else
+                second_field_fetch_toggle_mem <=
+                    ~second_field_fetch_toggle_mem;
+        end
+
         if (kind == FETCH_Y)
             fetch_address <= DDR_Y_BASE + row_times_90(line_number);
         else if (kind == FETCH_CB)
@@ -307,6 +329,8 @@ always @(posedge mem_clk) begin
         recv_word_index       <= 8'd0;
         fetch_address         <= 29'd0;
         fetch_cache_bank      <= 1'b0;
+        first_field_fetch_toggle_mem  <= 1'b0;
+        second_field_fetch_toggle_mem <= 1'b0;
 
         prefill_step          <= 3'd0;
         prefill_done          <= 1'b0;
@@ -705,8 +729,23 @@ reg        picture_present_rd;
 reg        prefill_deadline_missed_rd;
 reg        line_done_pending_rd;
 
+// Entry 516: the memory side advances a free-running 0..479 presentation
+// sequence on exactly the line-consumed events generated below.  A replica in
+// this domain therefore carries the same value without any clock crossing, and
+// can be compared against the index implied by the raster position itself.  A
+// disagreement means the sequence has lost phase with the field being scanned.
+reg [8:0]  sequence_replica_rd;
+reg        sequence_phase_error_rd;
+reg        first_field_line_toggle_rd;
+reg        second_field_line_toggle_rd;
+
 assign picture_present_debug = picture_present_rd;
 assign prefill_deadline_missed_debug = prefill_deadline_missed_rd;
+assign first_field_fetch_toggle_debug  = first_field_fetch_toggle_mem;
+assign second_field_fetch_toggle_debug = second_field_fetch_toggle_mem;
+assign sequence_phase_error_debug     = sequence_phase_error_rd;
+assign first_field_line_toggle_debug  = first_field_line_toggle_rd;
+assign second_field_line_toggle_debug = second_field_line_toggle_rd;
 
 // kate - Phase 1P: the module reset input is synchronized to mem_clk by the
 // top level.  It still crosses into the independent 40 MHz rd_clk domain, so
@@ -732,6 +771,15 @@ wire progressive_publish_origin =
     framebuffer_descriptor_valid && !native_interlaced_r2 &&
     (h_pos == 12'd0) && (v_pos == 12'd0);
 
+// Entry 516: presentation-sequence index implied by the scanned raster line.
+// Native v_pos carries the field parity in bit 0 and the field line in [8:1],
+// matching the 480-entry order of interlaced_luma_row: the authored first
+// field occupies 0..239 and the other field 240..479.
+wire       raster_first_field_rd = (v_pos[0] == first_field_r2);
+wire [8:0] sequence_expected_rd =
+    raster_first_field_rd ? {1'b0, v_pos[8:1]}
+                          : (9'd240 + {1'b0, v_pos[8:1]});
+
 always @(posedge rd_clk) begin
     if (rd_reset) begin
         cache_ready_r1       <= 1'b0;
@@ -751,6 +799,10 @@ always @(posedge rd_clk) begin
         cache_scan_active_rd <= 1'b0;
         cache_scan_y_bank_rd <= 1'b0;
         cache_scan_c_bank_rd <= 1'b0;
+        sequence_replica_rd  <= 9'd0;
+        sequence_phase_error_rd <= 1'b0;
+        first_field_line_toggle_rd  <= 1'b0;
+        second_field_line_toggle_rd <= 1'b0;
     end
     else begin
         cache_ready_r1    <= cache_ready;
@@ -800,7 +852,29 @@ always @(posedge rd_clk) begin
                   (h_pos == 12'd759) &&
                   (v_pos >= 12'd60) &&
                   (v_pos < (12'd60 + {1'b0, picture_height_r2})))))
+            begin
                 line_done_pending_rd <= 1'b1;
+
+                // Entry 516: this is the same event the memory side counts, so
+                // compare the replica against the raster before advancing it
+                // and toggle one evidence line per scanned field parity.
+                if (native_interlaced_r2) begin
+                    if (sequence_replica_rd != sequence_expected_rd)
+                        sequence_phase_error_rd <= 1'b1;
+
+                    if (raster_first_field_rd)
+                        first_field_line_toggle_rd <=
+                            ~first_field_line_toggle_rd;
+                    else
+                        second_field_line_toggle_rd <=
+                            ~second_field_line_toggle_rd;
+
+                    if (sequence_replica_rd == 9'd479)
+                        sequence_replica_rd <= 9'd0;
+                    else
+                        sequence_replica_rd <= sequence_replica_rd + 9'd1;
+                end
+            end
         end
     end
 end

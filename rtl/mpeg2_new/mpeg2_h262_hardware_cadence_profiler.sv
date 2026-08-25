@@ -20,6 +20,14 @@ module mpeg2_h262_hardware_cadence_profiler #(
     input wire framebuffer_generation_reset,
     input wire framebuffer_picture_present,
     input wire framebuffer_prefill_deadline_missed,
+    // Entry 516: per-field readout evidence.  The phase level and the two
+    // displayed-line toggles are synchronized video-domain signals; the two
+    // DDR service toggles are generated on this clock.
+    input wire framebuffer_sequence_phase_error,
+    input wire framebuffer_first_field_line,
+    input wire framebuffer_second_field_line,
+    input wire framebuffer_first_field_fetch,
+    input wire framebuffer_second_field_fetch,
     input wire fifo_pending,input wire decoder_ready,
     input wire presentation_hold,input wire destination_hold,
     input wire scratch_available,input wire promotion_active,
@@ -61,19 +69,21 @@ module mpeg2_h262_hardware_cadence_profiler #(
     output reg [7:0] video_b,output wire snapshot_ready
 );
 
-localparam integer SNAPSHOT_WORDS=41;
+localparam integer SNAPSHOT_WORDS=44;
 localparam integer SNAPSHOT_BITS=SNAPSHOT_WORDS*32;
 localparam [23:0] TERMINAL_SNAPSHOT_LIMIT=
     TERMINAL_SNAPSHOT_DELAY-24'd1;
 localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
-localparam [31:0] SNAPSHOT_FORMAT={8'd10,8'd41,16'd60000};
+localparam [31:0] SNAPSHOT_FORMAT={8'd11,8'd44,16'd60000};
 // Entry 511: keep all 41 rows visible without changing their encoding. The
 // mode observation is already in clk_video and affects overlay placement only.
 localparam [11:0] OVERLAY_X=12'd8;
-localparam [11:0] OVERLAY_DIAG_Y=12'd436;
-localparam [11:0] OVERLAY_NATIVE_Y=12'd316;
+// Entry 516: schema 11 adds three words, so both origins move twelve rows up
+// to keep the final row inside the diagnostic and native rasters alike.
+localparam [11:0] OVERLAY_DIAG_Y=12'd424;
+localparam [11:0] OVERLAY_NATIVE_Y=12'd304;
 localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd164;
 
 reg session_active;
@@ -119,6 +129,21 @@ reg [31:0] writer_wait_cycles;
 reg framebuffer_generation_reset_d;
 reg framebuffer_picture_present_d;
 reg framebuffer_prefill_deadline_missed_d;
+reg framebuffer_sequence_phase_error_d;
+reg framebuffer_first_field_line_d;
+reg framebuffer_second_field_line_d;
+reg framebuffer_first_field_fetch_d;
+reg framebuffer_second_field_fetch_d;
+reg [15:0] gen_first_field_lines;
+reg [15:0] gen_second_field_lines;
+reg [15:0] gen_first_field_fetches;
+reg [15:0] gen_second_field_fetches;
+reg [15:0] last_first_field_lines;
+reg [15:0] last_second_field_lines;
+reg [15:0] last_first_field_fetches;
+reg [15:0] last_second_field_fetches;
+reg [15:0] field_line_imbalance_count;
+reg [15:0] sequence_phase_error_count;
 reg framebuffer_publication_pending;
 reg [31:0] framebuffer_publication_latency;
 reg [31:0] framebuffer_max_publication_latency;
@@ -162,6 +187,16 @@ wire framebuffer_picture_present_edge=
 wire framebuffer_prefill_deadline_missed_edge=
     framebuffer_prefill_deadline_missed&&
     !framebuffer_prefill_deadline_missed_d;
+wire framebuffer_sequence_phase_error_edge=
+    framebuffer_sequence_phase_error&&!framebuffer_sequence_phase_error_d;
+wire framebuffer_first_field_line_edge=
+    framebuffer_first_field_line!=framebuffer_first_field_line_d;
+wire framebuffer_second_field_line_edge=
+    framebuffer_second_field_line!=framebuffer_second_field_line_d;
+wire framebuffer_first_field_fetch_edge=
+    framebuffer_first_field_fetch!=framebuffer_first_field_fetch_d;
+wire framebuffer_second_field_fetch_edge=
+    framebuffer_second_field_fetch!=framebuffer_second_field_fetch_d;
 wire session_progress=decoder_byte_accepted_q||reference_picture_complete_q||
     b_picture_complete_edge||display_swap_now||prediction_request_accepted||
     prediction_data_ready_q||writer_write_q;
@@ -241,7 +276,13 @@ wire [31:0] snapshot_word_37={framebuffer_reset_count,
 wire [31:0] snapshot_word_38={framebuffer_unpublished_reset_count,
     framebuffer_prefill_miss_count};
 wire [31:0] snapshot_word_39=framebuffer_max_publication_latency;
-wire [31:0] snapshot_word_40=snapshot_word_00^snapshot_word_01^
+wire [31:0] snapshot_word_40={last_first_field_lines,
+    last_second_field_lines};
+wire [31:0] snapshot_word_41={last_first_field_fetches,
+    last_second_field_fetches};
+wire [31:0] snapshot_word_42={field_line_imbalance_count,
+    sequence_phase_error_count};
+wire [31:0] snapshot_word_43=snapshot_word_00^snapshot_word_01^
     snapshot_word_02^snapshot_word_03^snapshot_word_04^snapshot_word_05^
     snapshot_word_06^snapshot_word_07^snapshot_word_08^snapshot_word_09^
     snapshot_word_10^snapshot_word_11^snapshot_word_12^snapshot_word_13^
@@ -251,11 +292,13 @@ wire [31:0] snapshot_word_40=snapshot_word_00^snapshot_word_01^
     snapshot_word_26^snapshot_word_27^snapshot_word_28^snapshot_word_29^
     snapshot_word_30^snapshot_word_31^snapshot_word_32^snapshot_word_33^
     snapshot_word_34^snapshot_word_35^snapshot_word_36^snapshot_word_37^
-    snapshot_word_38^snapshot_word_39;
+    snapshot_word_38^snapshot_word_39^snapshot_word_40^snapshot_word_41^
+    snapshot_word_42;
 
 task capture_snapshot;
 begin
-    snapshot_mpeg2<={snapshot_word_40,snapshot_word_39,snapshot_word_38,
+    snapshot_mpeg2<={snapshot_word_43,snapshot_word_42,snapshot_word_41,
+        snapshot_word_40,snapshot_word_39,snapshot_word_38,
         snapshot_word_37,snapshot_word_36,snapshot_word_35,
         snapshot_word_34,snapshot_word_33,snapshot_word_32,
         snapshot_word_31,snapshot_word_30,snapshot_word_29,snapshot_word_28,
@@ -310,6 +353,16 @@ always @(posedge clk_mpeg2) begin
         framebuffer_reset_count<=0;framebuffer_publication_count<=0;
         framebuffer_unpublished_reset_count<=0;
         framebuffer_prefill_miss_count<=0;
+        framebuffer_sequence_phase_error_d<=0;
+        framebuffer_first_field_line_d<=0;
+        framebuffer_second_field_line_d<=0;
+        framebuffer_first_field_fetch_d<=0;
+        framebuffer_second_field_fetch_d<=0;
+        gen_first_field_lines<=0;gen_second_field_lines<=0;
+        gen_first_field_fetches<=0;gen_second_field_fetches<=0;
+        last_first_field_lines<=0;last_second_field_lines<=0;
+        last_first_field_fetches<=0;last_second_field_fetches<=0;
+        field_line_imbalance_count<=0;sequence_phase_error_count<=0;
         display_picture_count<=0;display_swap_count<=0;
         b_picture_complete_d<=0;display_frame_bank_d<=0;
         display_scratch_d<=0;display_scratch_bank_d<=0;
@@ -362,6 +415,11 @@ always @(posedge clk_mpeg2) begin
         framebuffer_picture_present_d<=framebuffer_picture_present;
         framebuffer_prefill_deadline_missed_d<=
             framebuffer_prefill_deadline_missed;
+        framebuffer_sequence_phase_error_d<=framebuffer_sequence_phase_error;
+        framebuffer_first_field_line_d<=framebuffer_first_field_line;
+        framebuffer_second_field_line_d<=framebuffer_second_field_line;
+        framebuffer_first_field_fetch_d<=framebuffer_first_field_fetch;
+        framebuffer_second_field_fetch_d<=framebuffer_second_field_fetch;
         b_picture_complete_d<=b_picture_complete_q;
         display_frame_bank_d<=display_frame_bank_q;
         display_scratch_d<=display_scratch_q;
@@ -403,9 +461,38 @@ always @(posedge clk_mpeg2) begin
                 prediction_response_cycles<=prediction_response_cycles+1'b1;
             if(writer_write_q&&writer_busy_q)
                 writer_wait_cycles<=writer_wait_cycles+1'b1;
+            if(framebuffer_first_field_line_edge&&
+               (gen_first_field_lines!=16'hffff))
+                gen_first_field_lines<=gen_first_field_lines+1'b1;
+            if(framebuffer_second_field_line_edge&&
+               (gen_second_field_lines!=16'hffff))
+                gen_second_field_lines<=gen_second_field_lines+1'b1;
+            if(framebuffer_first_field_fetch_edge&&
+               (gen_first_field_fetches!=16'hffff))
+                gen_first_field_fetches<=gen_first_field_fetches+1'b1;
+            if(framebuffer_second_field_fetch_edge&&
+               (gen_second_field_fetches!=16'hffff))
+                gen_second_field_fetches<=gen_second_field_fetches+1'b1;
+            if(framebuffer_sequence_phase_error_edge&&
+               (sequence_phase_error_count!=16'hffff))
+                sequence_phase_error_count<=sequence_phase_error_count+1'b1;
             if(framebuffer_generation_reset_edge)begin
                 if(framebuffer_reset_count!=16'hffff)
                     framebuffer_reset_count<=framebuffer_reset_count+1'b1;
+                // Entry 516: close the generation just ended.  Both fields of
+                // a native frame present the same number of lines, so an
+                // inequality is itself the defect; the retained pair keeps the
+                // last generation's absolute figures for inspection.
+                last_first_field_lines<=gen_first_field_lines;
+                last_second_field_lines<=gen_second_field_lines;
+                last_first_field_fetches<=gen_first_field_fetches;
+                last_second_field_fetches<=gen_second_field_fetches;
+                if((gen_first_field_lines!=gen_second_field_lines)&&
+                   (field_line_imbalance_count!=16'hffff))
+                    field_line_imbalance_count<=
+                        field_line_imbalance_count+1'b1;
+                gen_first_field_lines<=0;gen_second_field_lines<=0;
+                gen_first_field_fetches<=0;gen_second_field_fetches<=0;
                 if(framebuffer_publication_pending&&
                    (framebuffer_unpublished_reset_count!=16'hffff))
                     framebuffer_unpublished_reset_count<=

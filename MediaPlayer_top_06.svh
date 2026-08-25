@@ -22,15 +22,32 @@ wire mpeg2_new_framebuffer_generation_reset =
 
 wire mpeg2_new_framebuffer_picture_present_rd;
 wire mpeg2_new_framebuffer_prefill_deadline_missed_rd;
+// Entry 516: additional video-domain per-field evidence levels/toggles.
+wire mpeg2_new_framebuffer_sequence_phase_error_rd;
+wire mpeg2_new_framebuffer_first_field_line_toggle_rd;
+wire mpeg2_new_framebuffer_second_field_line_toggle_rd;
+// The DDR service evidence is generated on mem_clk, which is clk_mpeg2 itself,
+// so it needs no synchronizer and stays fully timed.
+wire mpeg2_new_framebuffer_first_field_fetch_toggle;
+wire mpeg2_new_framebuffer_second_field_fetch_toggle;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] mpeg2_new_framebuffer_picture_present_sync;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] mpeg2_new_framebuffer_prefill_missed_sync;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] mpeg2_new_framebuffer_phase_error_sync;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] mpeg2_new_framebuffer_first_field_line_sync;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] mpeg2_new_framebuffer_second_field_line_sync;
 
 always @(posedge clk_mpeg2) begin
     if (reset_mpeg2) begin
         mpeg2_new_framebuffer_picture_present_sync <= 3'b000;
         mpeg2_new_framebuffer_prefill_missed_sync <= 3'b000;
+        mpeg2_new_framebuffer_phase_error_sync <= 3'b000;
+        mpeg2_new_framebuffer_first_field_line_sync <= 3'b000;
+        mpeg2_new_framebuffer_second_field_line_sync <= 3'b000;
     end
     else begin
         mpeg2_new_framebuffer_picture_present_sync <=
@@ -39,6 +56,15 @@ always @(posedge clk_mpeg2) begin
         mpeg2_new_framebuffer_prefill_missed_sync <=
             {mpeg2_new_framebuffer_prefill_missed_sync[1:0],
              mpeg2_new_framebuffer_prefill_deadline_missed_rd};
+        mpeg2_new_framebuffer_phase_error_sync <=
+            {mpeg2_new_framebuffer_phase_error_sync[1:0],
+             mpeg2_new_framebuffer_sequence_phase_error_rd};
+        mpeg2_new_framebuffer_first_field_line_sync <=
+            {mpeg2_new_framebuffer_first_field_line_sync[1:0],
+             mpeg2_new_framebuffer_first_field_line_toggle_rd};
+        mpeg2_new_framebuffer_second_field_line_sync <=
+            {mpeg2_new_framebuffer_second_field_line_sync[1:0],
+             mpeg2_new_framebuffer_second_field_line_toggle_rd};
     end
 end
 
@@ -46,6 +72,12 @@ wire mpeg2_new_framebuffer_picture_present =
     mpeg2_new_framebuffer_picture_present_sync[2];
 wire mpeg2_new_framebuffer_prefill_deadline_missed =
     mpeg2_new_framebuffer_prefill_missed_sync[2];
+wire mpeg2_new_framebuffer_sequence_phase_error =
+    mpeg2_new_framebuffer_phase_error_sync[2];
+wire mpeg2_new_framebuffer_first_field_line =
+    mpeg2_new_framebuffer_first_field_line_sync[2];
+wire mpeg2_new_framebuffer_second_field_line =
+    mpeg2_new_framebuffer_second_field_line_sync[2];
 
 localparam [28:0] MPEG2_NEW_DDR_FRAME_BANK_WORDS     = 29'h00010000;
 localparam [28:0] MPEG2_NEW_DDR_FRAME_SCRATCH0_WORDS = 29'h00020000;
@@ -87,6 +119,16 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
     .picture_present_debug(mpeg2_new_framebuffer_picture_present_rd),
     .prefill_deadline_missed_debug(
         mpeg2_new_framebuffer_prefill_deadline_missed_rd),
+    .sequence_phase_error_debug(
+        mpeg2_new_framebuffer_sequence_phase_error_rd),
+    .first_field_line_toggle_debug(
+        mpeg2_new_framebuffer_first_field_line_toggle_rd),
+    .second_field_line_toggle_debug(
+        mpeg2_new_framebuffer_second_field_line_toggle_rd),
+    .first_field_fetch_toggle_debug(
+        mpeg2_new_framebuffer_first_field_fetch_toggle),
+    .second_field_fetch_toggle_debug(
+        mpeg2_new_framebuffer_second_field_fetch_toggle),
     .rd_clk         (clk_video),
     .h_pos          (display_h_pos),
     .v_pos          (display_v_pos),

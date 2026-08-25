@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prove schema-ten and legacy schema-nine telemetry raster decoding."""
+"""Prove schema-eleven, schema-ten and legacy schema-nine raster decoding."""
 
 from __future__ import annotations
 
@@ -12,6 +12,22 @@ import decode_hardware_cadence as cadence
 
 
 def snapshot_words() -> list[int]:
+    """Schema eleven: forty-four words ending in the XOR checksum."""
+    words = [cadence.MAGIC, 0x0B2CEA60]
+    words.extend((0x10203040 + index * 0x01010101) & 0xFFFFFFFF
+                 for index in range(2, 37))
+    words.extend(((3 << 16) | 2, (1 << 16) | 1, 12345))
+    # Entry 516 per-field evidence: equal displayed lines, a starved first
+    # field, five imbalanced generations and seven sequence phase errors.
+    words.extend((((240 << 16) | 240), ((17 << 16) | 240), ((5 << 16) | 7)))
+    checksum = 0
+    for word in words:
+        checksum ^= word
+    words.append(checksum)
+    return words
+
+
+def schema10_snapshot_words() -> list[int]:
     words = [cadence.MAGIC, 0x0A29EA60]
     words.extend((0x10203040 + index * 0x01010101) & 0xFFFFFFFF
                  for index in range(2, 37))
@@ -79,6 +95,37 @@ def main() -> None:
             raise SystemExit("framebuffer prefill miss was not decoded")
         if parsed["framebuffer_max_publication_latency_cycles"] != 12345:
             raise SystemExit("framebuffer publication latency was not decoded")
+        if parsed["schema_version"] != 11:
+            raise SystemExit("schema eleven was not reported")
+        if parsed["framebuffer_last_first_field_lines"] != 240:
+            raise SystemExit("first-field displayed lines were not decoded")
+        if parsed["framebuffer_last_second_field_lines"] != 240:
+            raise SystemExit("second-field displayed lines were not decoded")
+        if parsed["framebuffer_last_first_field_fetches"] != 17:
+            raise SystemExit("first-field DDR fetches were not decoded")
+        if parsed["framebuffer_last_second_field_fetches"] != 240:
+            raise SystemExit("second-field DDR fetches were not decoded")
+        if parsed["framebuffer_field_line_imbalance_count"] != 5:
+            raise SystemExit("field line imbalance count was not decoded")
+        if parsed["framebuffer_sequence_phase_error_count"] != 7:
+            raise SystemExit("sequence phase error count was not decoded")
+
+        schema10 = schema10_snapshot_words()
+        schema10_diagnostic = temp / "schema10_diagnostic.png"
+        schema10_native = temp / "schema10_native.png"
+        render(schema10_diagnostic, 800, 600,
+               cadence.SCHEMA10_DIAGNOSTIC_Y0, schema10)
+        render(schema10_native, 720, 480,
+               cadence.SCHEMA10_NATIVE_480I_Y0, schema10)
+        if cadence.decode_words(schema10_diagnostic) != schema10:
+            raise SystemExit("schema-ten diagnostic telemetry mismatch")
+        if cadence.decode_words(schema10_native) != schema10:
+            raise SystemExit("schema-ten native telemetry mismatch")
+        schema10_parsed = cadence.decode(schema10_native)
+        if schema10_parsed["schema_version"] != 10:
+            raise SystemExit("schema ten was not reported")
+        if schema10_parsed["framebuffer_last_first_field_lines"] is not None:
+            raise SystemExit("schema ten must not report per-field evidence")
 
         legacy = legacy_snapshot_words()
         render(legacy_diagnostic, 800, 600,
@@ -100,7 +147,8 @@ def main() -> None:
         result = cadence.decode(overlap)
         if not result["cache_bank_overlap_error"]:
             raise SystemExit("cache-bank overlap telemetry bit was not decoded")
-    print("CADENCE_DECODER_LAYOUT_PASS schema10=436/316/41 legacy=444/324/38")
+    print("CADENCE_DECODER_LAYOUT_PASS schema11=424/304/44 "
+          "schema10=436/316/41 legacy=444/324/38")
 
 
 if __name__ == "__main__":
