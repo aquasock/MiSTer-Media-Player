@@ -1,3 +1,32 @@
+## 509 COMMIT Unreleased 48c2c87 2026-08-25T07:29:58-07:00
+
+#### Coming From:
+
+Unreleased 48c2c87
+
+#### Purpose:
+
+Capture the terminal-drain hardware result and separate its accepted presentation completion from the remaining intermittent display-history ghost and faint moving-line artifact.
+
+#### Outcome:
+
+The user reloaded the installed `48c2c87` image and ran `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off, HDMI scaler deinterlacer Weave and Interlaced output Native 480i. Playback is materially better and the prior pervasive ghosting is almost gone, but one intermittent event near mid-run retained an old image for a noticeable interval, and the user can still barely see the transient short horizontal lines while the movie is moving; those lines are now gray. USER and POWER are solid and DISK blinks twice. The untouched terminal screenshot was triggered, retrieved and decoded entirely through ordinary FTP with the default `root` and `1` login and no SSH. `.ai/current_results/entry508_terminal_drain_hardware.png` is 11,909 bytes with SHA-256 `6db00f683783d9fbe2aea7579b9e30c228c82ecb47c6e182a2e534b27b593320`. Schema nine accepts all 5,007,304 bytes, and its wrapped reference, display and swap counts of 44, 44 and 43 represent exactly 300 decoded pictures, 300 displayed pictures and 299 swaps. The 299 presentation intervals span 599,109,027 decoder cycles or 9.985150 seconds and deliver 29.944466 pictures per second. Top-field-first remains correct, sequence end is seen, presentation completes, the session reaches quiet reason one and every aggregate, presentation, destination and cache-bank-overlap error is clear. The final raster contains the correct authored last-field weave at x=512 through x=543 and x=516 through x=547 rather than an old terminal position. Commit `48c2c87` therefore passes its bounded terminal-drain objective and eliminates the prior missing final picture. The clean swap count and cadence place the remaining intermittent stuck appearance below scheduler ownership; together with the previously analyzed pair-identical step-hold recording, its working classification remains downstream Weave or display field-history processing. The live-only gray dashes remain unresolved because the terminal still cannot retain them and the cache-bank overlap diagnostic excludes only the monitored same-bank refill collision.
+
+#### Next Steps:
+
+Keep the exact installed `48c2c87` image, Native timing pattern Off and Interlaced output Native 480i, change only HDMI scaler deinterlacer from Weave to Bob and run `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` three consecutive times. Report whether any old bar or image persists during any run, whether the faint gray horizontal dashes remain, and the final USER, DISK and POWER states, then leave the last terminal image displayed for another ordinary-FTP capture. Bob removes Weave's multi-field reconstruction history while retaining the decoder, scheduler, DDR frame banks and line-cache path: disappearance of the intermittent ghost with unchanged clean cadence will confirm the established downstream-history classification, while gray dashes in both modes will isolate the next cycle to line-cache delivery instrumentation. Do not change RTL or native timing before this comparison.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 508 COMMIT Unreleased 48c2c87 2026-08-25T04:26:41-07:00
 
 #### Coming From:
@@ -1203,33 +1232,5 @@ Power-cycle once to load `9a5eea3`, set Audio Test to Off and run `20_bbb_full_4
 
 - [x] Built
 - [ ] Passed
-
----
-## 469 COMMIT Unreleased 8c59ddb 2026-08-24T12:33:55-07:00
-
-#### Coming From:
-
-Unreleased 8c59ddb
-
-#### Purpose:
-
-Capture the schema-nine full-soak credits window and identify the mechanism behind the remaining visible cadence.
-
-#### Outcome:
-
-The user again sees the slight credits cadence on the diagnostic image. The completed screenshot was captured exclusively through plain FTP with the default MiSTer login and no SSH keys; `.ai/current_results/entry469_full_soak_credits_window.png` is 8,102 bytes with SHA-256 `747774eafd35e0239072f090a3dc27492bf9628a86fe828a02f4388b8cc8381d`. Schema nine passes every correctness invariant: all 84,423,309 clean-video bytes were accepted, aggregate error flags are zero, audio underrun and PCM protocol error are clear, sequence end was seen, presentation completed, and the snapshot closed normally for quiet reason one at STC second 596. The late window begins at second 500 and records 97 timestamp-advance conflicts but zero timestamp-delay conflicts. That is one early-admission conflict per 0.990 seconds across the 96-second observation window, matching the approximately one-second beat the user sees and directly isolating it to the timestamp-to-cadence handoff. Each conflict is an eligible raster window where the sparse PTS says the candidate is due while the exact-rate cadence accumulator says it is not yet due. The current scheduler lets the timestamp replace the cadence gate, displays that picture early, and clears partial cadence credit, so each roughly one-second timestamp can perturb otherwise exact 24 fps pacing. The three largest late-window gaps are all 3,979,008 decoder cycles or 66.3168 milliseconds with a cadence slot ready but no presentable candidate and no scratch bank available; thirty late outliers therefore also preserve evidence of reorder pressure, but that signature cannot explain the one-second periodicity as closely as the 97 timestamp conflicts do. The observational `8c59ddb` image is consequently accepted: it leaves playback and all transport/audio completion invariants unchanged and distinguishes the residual mechanism as designed.
-
-#### Next Steps:
-
-Make the narrow timestamp-admission correction only after approval: retain the exact-rate cadence gate as a mandatory floor, allowing a timestamped candidate to wait when its PTS is not due but never allowing an already-due sparse PTS to advance the candidate before the next cadence slot. Preserve every ownership, reorder, scratch-bank, accumulator-rate and audio-path rule. Prove in scheduler simulation that the 97 advance-conflict class no longer causes an early swap, that a future timestamp can still delay presentation, and that all supported free-running cadence sequences remain bit-exact; then run the focused regressions, build, install through plain FTP with an exact rollback, and repeat the full movie. Hardware acceptance requires the credits beat to disappear without reintroducing audio underrun, completion errors, missing pictures or a new timestamp-delay stall.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
