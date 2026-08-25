@@ -1,3 +1,32 @@
+## 501 COMMIT Unreleased 4e4da3a 2026-08-25T02:50:47-07:00
+
+#### Coming From:
+
+Unreleased 4e4da3a
+
+#### Purpose:
+
+Adopt a permanent two-tier output model serving processed-HDMI viewers and native-480i external-processing users.
+
+#### Outcome:
+
+The user approved two explicit product tiers going forward: a normal processed-HDMI path using MiSTer's scaler with user-selectable Bob or Weave deinterlacing, and a separate Native 480i path that preserves correctly ordered, standards-timed decoded fields for eventual HDMI-to-SDI conversion and high-end external processing. The native tier must not silently deinterlace, scale or field-combine the source, while the convenience tier may use MiSTer's existing reconstruction and should clearly identify that processing in the menu and documentation. The current `4e4da3a` build already supplies native 480i timing and the scaler's Bob/Weave request, but MiSTer's `direct_video` bypass is framework configuration supplied through `cfg[10]`, not a signal this core can switch through its own status menu. Future menu work may select and label the core's intended output tier, but documentation and UI must not imply that this alone enables raw HDMI; actual SDI qualification will use the Native 480i tier together with MiSTer's direct-video setting and a compatible converter or sink.
+
+#### Next Steps:
+
+Complete entry 500's installed-build validation before changing the menu again: run the BFF light-motion fixture with Bob selected, capture visual and schema-nine evidence, then repeat the TFF fixture if BFF passes. After those results settle the processed-HDMI path, propose one bounded menu and documentation refinement that names the processed control `HDMI scaler deinterlacer`, presents Native 480i as the external-processing tier, suppresses or clearly marks irrelevant combinations and documents the separate MiSTer direct-video requirement. Do not implement a core-native deinterlacer or claim SDI readiness until raw-output timing has been tested on a compatible direct-video sink or converter.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 500 COMMIT Unreleased 4e4da3a 2026-08-25T02:45:02-07:00
 
 #### Coming From:
@@ -1210,42 +1239,6 @@ Power-cycle so the new FPGA image loads, set Audio Test to Off and run `23_bbb_o
 - tools/streams/strip_inband_pcm.py
 - tools/streams/tb_h262_inband_metadata.sv
 - tools/streams/verify_arm_av_pipeline.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 461 COMMIT Unreleased fccb003 2026-08-24T09:31:39-07:00
-
-#### Coming From:
-
-Unreleased 14e0629
-
-#### Purpose:
-
-Revert the startup byte budget after the soak cleared the drift risk and returned an underrun at 62 seconds.
-
-#### Outcome:
-
-The user played `20_bbb_full_48k.mpg` end to end on the `14e0629` helper and reports audio and video perfectly in sync throughout, confirmed by watching the credits, with a small once-per-second cadence still visible and ordinary terminal indication of USER solid on, DISK blinking eleven times and POWER solid on. That answers the question the soak was run for: coalescing timestamps to one per encoded group does not cost alignment over ten minutes, so extrapolation across a group is sound and `14e0629` stands on its drift risk. The capture is 8,108 bytes at SHA-256 `52a27c69794e4b1177f8377e1923b249943d6326eaef2a65919777fcf8817ba9`, small because the final raster is black, and it shows the profiler frozen rather than quiet: the snapshot reason is fatal or no progress and the sole aggregate flag is `0x0400`, a real `audio_pcm_underrun`, with PCM protocol, presentation and destination errors all clear. It froze at 35,705,169 accepted transport bytes of 342,083,863, which is 62.2 seconds into the movie, and had already counted 132 gap outliers by then.
-
-The underrun is therefore not fixed on long content, only moved. Entry 451 measured it at 21.74 seconds under `f2b2e02`; it now arrives at 62.2 seconds under a helper whose host analysis reports an audio deficit of zero across the entire movie. That contradiction is informative rather than a measurement error, because the host model asks whether audio crosses ahead of the video timeline and cannot see the other direction of the same coupling: when the compressed video FIFO is full, video bytes block the shared path and the PCM records queued behind them wait, so the sink can starve while the producer is comfortably ahead of schedule. The 24-second diagnostic never reaches that state and shows no underrun; the movie does, twice, at different points under two different helpers.
-
-That makes the startup byte budget from entry 455 a suspect rather than a neutral change. It exists to keep the compressed FIFO as full as possible, which is precisely the condition under which video blocks PCM, and entry 456 already measured that it bought no cadence improvement at all: outliers moved from 174 to 170 and presentation hold from 7,967,197 to 12,376,681 cycles, less than two percent of the distance to the raw control. It is a change that has not paid for itself and that plausibly makes the audio side worse. The cadence residue is unchanged in shape, with the largest gaps still 431.059 milliseconds at display ordinal fourteen and 82.896 at ordinals fifteen and seventeen, the same signature seen under every audio-video helper so far.
-
-The revert was approved and is commit `fccb003`, which removes `PCM_STARTUP_VIDEO_BYTES` and ends the lead on the second picture again while leaving the delivery-order bounds from `cf1d173` and the timestamp coalescing from `14e0629` untouched. The startup lead returns to 5,301 bytes on the diagnostic and 20,564 on both controls, and each of those is exactly four bytes past that stream's second picture start code, which sits at 5,297 and 20,560 respectively. That corrects entry 455, which reported the controls' lead rising from 1,280 bytes: 1,280 was their initial PCM batch, not their lead, and their lead under the two-picture boundary has always been 20,564. The diagnostic figure of 5,301 in that entry was right.
-
-Everything else is unchanged, which is the point of a revert. Removing PCM from the new helper's transport still yields exactly `25_bbb_opening24_gop_pts.m2v` at SHA-256 `83930a92f9796b5c47a7719d4b635243eb84f8226c7f937465e31a68e13365f0`, the 26-record layout hardware presented with zero outliers, so the lead never touched record placement. The soak keeps 598 timestamps, 84,423,309 clean video bytes, 28,628,352 PCM frames at SHA-256 `337b1387b9324b6c391a3223ced8f7660bd5144267b29d3964b4ed6b282839af`, video and timestamps at SHA-256 `545075cdc22437cb994efde832e8f09c663ac569bf8e98d406025ef480d2cd81`, a 342,083,863-byte transport, steady batches within 2,048, PCM-free spans within 4,052 bytes and an audio deficit of zero. All fixtures at both sample rates, both controls and the diagnostic pass under native and address-and-undefined-sanitized helpers, the nine-case envelope retains three passes and six intended failures with identical statuses and messages, and two official GCC 10.2.1 builds are byte-identical at 361,452 bytes and SHA-256 `dbcbd74a84cb7cb57583c5ac0d4dfb0b5e695148c350551295bb4f4b299338cb`. Only the helper was installed, with `14e0629` preserved exactly as `/media/fat/linux/MediaPlayer_Helper.backup.pre-lead-revert.14e0629`; no RBF, Main or media file changed.
-
-#### Next Steps:
-
-Run `20_bbb_full_48k.mpg` end to end and report where the underrun lands, which is the only question this commit asks. The comparison is the 62.2-second freeze under `14e0629` and the 21.74-second freeze under `f2b2e02`; a later freeze or a clean quiet snapshot confirms that keeping the compressed FIFO full starves the audio sink through the shared path, while an underrun at the same point exonerates the lead, which stays reverted either way because it was never measured to help. Report audio and video alignment through the credits again, any crackle or dropout, the visible cadence and all three LEDs, then leave the final image loaded for a schema-eight capture. Whatever the result, the dominant cadence mechanism is unchanged and FPGA-side, ordered by the evidence in entry 461: carrying many samples per PCM record, which cuts record count and path bandwidth together and is the only candidate that addresses cadence and underrun at once; buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate` so a full video FIFO cannot block audio; and deepening `audio_pcm_fifo`, which raises the starvation threshold without changing the coupling that causes it.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
 
 #### Status:
 
