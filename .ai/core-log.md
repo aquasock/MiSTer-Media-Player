@@ -1,3 +1,31 @@
+## 486 COMMIT Unreleased 5568aa9 2026-08-24T23:08:41-07:00
+
+#### Coming From:
+
+Unreleased 5568aa9
+
+#### Purpose:
+
+Record the sustained native-480i TFF hardware result, accept the complete native telemetry and capture diagnostics, and identify all-I decode throughput as a confounder before field-order qualification.
+
+#### Outcome:
+
+The user watched the complete `_cadence/native_480i_tff_10s.m2v` run in Native 480i mode and reports smooth playback with no visible jumps or dropped frames or fields, correct crop, some apparent softness and what resembles 60 Hz flicker. USER and POWER remain solid and DISK blinks twice at the terminal image. The 720x480 screenshot was triggered and retrieved entirely through ordinary authenticated FTP using the default MiSTer login and no SSH; `.ai/current_results/entry485_native480i_tff_10s.png` is 116,611 bytes with SHA-256 `e0961e226beaa193d086f42b15697f140553e9d4232eb1fabc540a8ef97798a7`. Its complete visible schema-nine record reports all 13,145,582 accepted transport writes for the 13,145,581-byte source, 300 reference and displayed pictures, 299 physical-frame swaps, stable `top_field_first=1`, rate code four, sequence end, presentation completion and quiet reason-one termination. Aggregate, decoder, presentation, destination, audio-underrun and PCM-protocol errors are all clear; no decode, reorder, promotion, future-reference, scratch or terminal-boundary work remains. First presentation occurs at 2,629,099 cycles and the last at 1,199,249,429 cycles, so the 299 swap intervals occupy 1,196,620,330 cycles, or 19.943672 seconds at 60 MHz. The actual sustained rate is therefore 14.992 pictures per second; the decoded display counter wraps modulo 256, so the helper's uncorrected 2.156-fps display is not applicable to this 300-picture run. The visual observation and counters agree that the scheduler does not discard pictures or fields: it preserves order and holds each decoded frame until the next one is available. This complex 720x480 all-I visual fixture therefore overloads the present decoder at roughly half the authored 29.97-picture rate and cannot qualify authored native field cadence, softness or flicker. The final still contains the expected weave of temporally separated fields and proves that the full native telemetry layout is now observable. DISK code two remains the passive third-I progress indication rather than an error. Native output remains unpassed, and BFF is deferred.
+
+#### Next Steps:
+
+Do not change native timing or run the BFF fixture from this result. Prepare a deterministic low-complexity 720x480 frame-DCT all-I TFF motion fixture with flat regions, high-contrast moving geometry and explicit field-order cues so the existing decoder can sustain the authored 30000/1001 picture rate. First run that same fixture in the 800x600 Diagnostic mode to establish real-time decode throughput and a progressive visual baseline, then run it in Native 480i mode and compare sharpness, flicker, motion direction and terminal telemetry. Proceed to the corresponding BFF fixture only after the TFF stream completes in approximately ten seconds with approximately 29.97 pictures per second, zero errors and no visible drops. Keep the public interlaced compatibility claim disabled.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 485 COMMIT Unreleased 5568aa9 2026-08-24T22:41:28-07:00
 
 #### Coming From:
@@ -1236,36 +1264,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-## 446 COMMIT Unreleased f2b2e02 2026-08-24T06:48:23-07:00
-
-#### Coming From:
-
-Unreleased 3814243
-
-#### Purpose:
-
-Close the recovered-control half of the unexpected 50 fps success and define the conservative release-boundary correction.
-
-#### Outcome:
-
-The user immediately replayed `00_good_480p_48k.mpg` after the unexpectedly successful rate-code-six stream and reports normal playback with USER and POWER solid on and DISK blinking eleven times. The launch-free recovered-control capture is 104,769 bytes at SHA-256 `c96ccf4db6e5f39434e12d881aca4241e6ef8510cc662ee07a0800f867577006`; schema-eight telemetry reports the complete 48-picture, 47-swap control with zero aggregate, decoder, presentation or audio errors and normal quiet completion. Commit `f2b2e02` now makes the helper's runtime boundary match the offline checker without changing RTL, Main, media or the transport protocol. A read-only first pass incrementally scans only the selected H.262 elementary video stream, preserves scanner state across Program Stream PES boundaries, validates the first sequence header and rewinds before the normal demux can emit video or decode PCM. Codes one through five remain accepted, while codes six through eight and every other out-of-range code fail clearly before either standard-output transport or an explicit PCM file receives a byte. Permanent verifier cases cover all five accepted raw codes, all three rejected raw codes, a rate-code-six sequence header split across two video PES packets and the generated `bad_rate_50.mpg` envelope case with zero-byte rejection outputs. Short and faded fixtures at 48 and 44.1 kHz pass under native and address-and-undefined-sanitized helpers with byte-identical video, exact established PCM lengths, maximum sample error two, correlation rounding to one and one clean end. The nine-case compatibility corpus retains exactly three passes and six intended failures. Bounded scheduling is unchanged for both controls, and the 596-second soak reproduces transport SHA-256 `3364dac5631d266adfb726c0bd26751e66ad069dd06c5ca23433d9c28c3df93d`, video/PTS SHA-256 `db00682bb603a5f575df5a1d5d0b7a580c46ca99eed028f024ac6bc37016f38f` and PCM SHA-256 `337b1387b9324b6c391a3223ced8f7660bd5144267b29d3964b4ed6b282839af`, with its established 64,768-byte maximum PCM-free video gap and 2,048-sample maximum steady batch. Two official GCC 10.2.1 builds are byte-identical; the 361,452-byte static stripped ARM EABI5 helper has SHA-256 `4b496d9725dc520bd463a4e22e22430ebb575e778cf65cfd3f9c20a8e7479a58`. No installed file has changed.
-
-#### Next Steps:
-
-Retrieve and verify the currently installed helper before mutation, preserve it under a new exact rollback name, upload helper SHA-256 `4b496d9725dc520bd463a4e22e22430ebb575e778cf65cfd3f9c20a8e7479a58` through a commit-specific staging name and retrieve it byte-identically before promotion. Leave RBF, Main and every media file unchanged, and do not launch playback during installation. Then run only `14_bad_rate_50.mpg`; require a prompt non-successful return with no ordinary pass LEDs, immediately replay `00_good_480p_48k.mpg` without reboot and require the established aligned, crackle-free control with USER and POWER solid and DISK blinking eleven times. Leave `15_bad_truncated.mpg` and the full soak deferred until that corrected fifth pair passes.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- tools/streams/verify_arm_av_pipeline.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
 
 ---
