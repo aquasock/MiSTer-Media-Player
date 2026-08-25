@@ -1,3 +1,32 @@
+## 503 COMMIT Unreleased 4e4da3a 2026-08-25T02:59:35-07:00
+
+#### Coming From:
+
+Unreleased 4e4da3a
+
+#### Purpose:
+
+Capture the TFF processed-HDMI Bob result and complete field-order validation of the Bob/Weave control.
+
+#### Outcome:
+
+The user ran `_cadence/native_480i_tff_light_10s.m2v` with native 480i active and Bob selected and reports issues broadly similar to BFF Bob with slight visual differences, followed by USER and POWER solid and DISK blinking twice. The untouched terminal image was triggered and retrieved entirely through ordinary FTP with the default `root` and `1` login and no SSH; `.ai/current_results/entry503_tff_light_hdmi_bob.png` is 11,865 bytes with SHA-256 `9bfbb7f0595707877835dd38f8b2ab2458086fc83314b037725d742d6d3cb604`. Schema nine accepts all 5,007,304 bytes, preserves top-field-first, reaches sequence end and presentation completion, closes normally for quiet reason one and reports zero aggregate, presentation, destination, cache-bank-overlap, audio-underrun and PCM-protocol errors. The wrapped picture and swap counters again represent all 300 pictures and 299 swaps. First presentation is cycle 2,378,246 and last is 719,313,464, so 299 intervals span 716,935,218 cycles or 11.948920 seconds and deliver 25.023181 pictures per second. This differs from BFF Bob by only 304,372 cycles or 5.072867 milliseconds across the whole run, and from the accepted TFF Weave run by only 609,880 cycles or 10.164667 milliseconds; those small decoder-runtime variations cannot explain the reported mode-specific live appearance. The TFF and BFF Bob terminal rasters are structurally equivalent apart from the expected field-marker and field-phase content, while both field orders remain logically exact. The current result therefore closes the discriminator: residual shorter shadows, more frequent visible steps and slight instability are field-order-independent behavior of MiSTer's processed-HDMI Bob reconstruction combined with the separate approximately 25-picture-per-second all-I decoder ceiling, not reversed fields or corruption. Commit `4e4da3a` passes its hardware objective because Bob and Weave are both selectable, preserve native/raw and progressive behavior and expose the intended motion-versus-stability tradeoff without correctness errors.
+
+#### Next Steps:
+
+Freeze the Bob/Weave control and do not attempt another deinterlacer implementation. Retain Weave for users prioritizing stable vertical detail and Bob for users prioritizing shorter motion history, while Native 480i remains the unprocessed external-processing tier. Bundle the already approved menu wording `HDMI scaler deinterlacer` and two-tier documentation with the next materially useful source build rather than spending a Quartus cycle on labels alone. The next technical proposal should address the independent approximately 25-picture-per-second full-D1 all-I throughput ceiling that now dominates the remaining visible jumps, beginning with measured decoder-stage occupancy and a bounded optimization that preserves TFF/BFF timing, field order and the now accepted scaler selection; native direct-video and eventual SDI qualification remain separate until compatible hardware is available.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 502 COMMIT Unreleased 4e4da3a 2026-08-25T02:55:54-07:00
 
 #### Coming From:
@@ -1187,38 +1216,6 @@ The user completed `20_bbb_full_48k.mpg` on the packed-record `6dece4c` image an
 #### Next Steps:
 
 Stop before changing RTL and obtain approval for a revised isolation boundary. The proposed next cycle is to decouple record extraction from decoder backpressure at the actual split point by adding and testing a bounded post-extraction clean-video queue, allowing the extractor to continue reaching PCM records while the decoder temporarily refuses video; size and resource cost must be established before choosing a depth, and the existing pre-extractor clock-domain FIFO must remain sufficient for safe ingress. Deepening `audio_pcm_fifo` is secondary because the fit already uses 446 of 553 RAM blocks and a larger sink only extends the starvation threshold without removing the coupling. Acceptance remains a complete quiet soak with `audio_pcm_underrun` clear, sequence end and all 14,315 pictures accounted for, followed by the 24-second diagnostic and elementary-stream controls to prove that the queue changes neither video bytes nor presentation order; the user's residual credits cadence must also be compared separately because this capture proves it is no longer equivalent to the underrun.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 463 COMMIT Unreleased 6dece4c 2026-08-24T10:41:16-07:00
-
-#### Coming From:
-
-Unreleased 6dece4c
-
-#### Purpose:
-
-Record that the packed record format decodes correctly on hardware and leaves the 24-second diagnostic where it already was, so the soak decides it.
-
-#### Outcome:
-
-The user power-cycled onto the `6dece4c` image and reports `23_bbb_opening24_exact_av.mpg` looking perfect with no stutter at all and normal LEDs. The capture is 545,953 bytes at SHA-256 `706c546680d8f67053c5cd2f37fdefbd43d6deb354b2fca2bc7a94ccb0516fcd`. The format contract holds, which was the first thing this commit had to prove: `pcm_protocol_error` is false, so the extractor and the helper agree about the frame count, aggregate error flags are zero, there is no underrun, all 3,138,619 transport bytes are accepted, 194 reference plus 383 B pictures decode, all 577 pictures display with 576 swaps, sequence end is seen, presentation completes and the snapshot is the normal quiet reason one. A record carrying sixteen frames is decoded into sixteen sample events with the audio intact, on hardware, at a third of the previous path bandwidth.
-
-The cadence counters are unchanged rather than improved, and that should be stated plainly against the acceptance this commit was given. Gap outliers are 13, exactly what `14e0629` measured; presentation hold is 267,676,803 cycles against 266,426,934; decoder stall 646,658,859 against 644,608,100; `hold_scratch_available_cycles` is bit-identical at 2,984,466; and the three largest gaps are the same 431.059 milliseconds at display ordinal fourteen and 82.896 at ordinals fifteen and seventeen. The acceptance recorded in entry 462 was that the outlier count fall below 13 on this file, and it did not. What the user sees as perfect is consistent with the counters: the remaining gaps sit within the first second, where a single hitch during the opening fade is far less visible than the once-per-second beat that record density used to produce across the whole run.
-
-This file was therefore already at its floor before the format change, and cannot separate a bandwidth improvement from no improvement. The soak can, because that is where both surviving symptoms live: the once-per-second beat the user still saw in the credits under `14e0629`, and an underrun that has stood at 21.74, 62.2 and 39.3 seconds across three helpers without ever being attacked at its cause. A 39.2 percent smaller transport and 94 percent fewer records change the shared path's occupancy by more than any previous cycle, and ten minutes is the only measurement that reaches it.
-
-#### Next Steps:
-
-Run `20_bbb_full_48k.mpg` end to end without rebooting and report the cadence through the body and the credits, audio and video alignment at the opening, the high-motion sequence near 7:22 and the closing sting, any crackle or dropout, and all three LEDs, then leave the final image loaded for a schema-eight capture. Acceptance is a quiet snapshot rather than the fatal one the last two soaks produced, with `audio_pcm_underrun` clear, all 14,315 pictures accounted for after eight-bit wrap and sequence end seen. If the underrun is gone, `6dece4c` is the first commit to clear both hardware symptoms and the next question is release qualification rather than diagnosis. If it survives, the remaining candidates are buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate` so a full video FIFO cannot block audio, and deepening `audio_pcm_fifo`, which the fit report now shows would compete for RAM blocks already at 81 percent. If the credits still beat once a second while the underrun clears, the presentation scratch scheduler is the remaining target, measured against the `scratch_available` and `pending_frame_released` evidence at ordinals fourteen and fifteen.
 
 #### Files Modified:
 
