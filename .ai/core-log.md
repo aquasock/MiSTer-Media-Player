@@ -1,3 +1,34 @@
+## 506 COMMIT Unreleased f866ce2 2026-08-25T03:40:25-07:00
+
+#### Coming From:
+
+Unreleased f866ce2
+
+#### Purpose:
+
+Capture the first optimized TFF Weave hardware run and distinguish decoder throughput from presentation ownership.
+
+#### Outcome:
+
+The user opened `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off, the renamed HDMI scaler deinterlacer set to Weave and Interlaced output set to Native 480i. The image looks better, but the moving bar stops before crossing the screen; USER and DISK are solid off and POWER blinks once. The untouched image was triggered and retrieved entirely through ordinary FTP with the default `root` and `1` login and no SSH. `.ai/current_results/entry506_tff_light_weave_throughput.png` is 12,014 bytes with SHA-256 `9d17a5d3523c7f090576e99516b51d9e7bd4590b482c8972846abee379cbcaef`.
+
+Schema nine freezes for fatal-or-no-progress reason three after accepting only 283,775 of 5,007,304 bytes, decoding seventeen I pictures and displaying fifteen with fourteen swaps; sequence end and session quiet are absent. The first-to-last presentation span is 28,123,416 decoder clocks or 0.4687236 seconds, delivering 29.868349 pictures per second across the short fourteen-interval window. Top-field-first remains correct, audio and PCM errors are clear, no cache-bank or destination overlap error appears and the decode/presentation result otherwise remains coherent. The sole aggregate bit is `0x0200`, `presentation_error`. At the freeze, the scheduler has a released primary pending frame while the optimized overlap decode has already completed the next frame; `pending_frame_valid` and `pending_frame_released` are both set, `ordinary_reference_decode_open` has just closed and the current scheduler intentionally treats completion before predecessor presentation as fatal. The prior measured-latency regression modeled a three-field or approximately 50-millisecond decode and explicitly asserted this early completion must fail. Removing the IQ replay shortened a light all-I picture enough to reach that formerly impossible state. The throughput fix therefore succeeds, but exposes a latent one-slot ordinary-presentation queue limit rather than a decoder, field-order, scaler-mode or pixel fault.
+
+#### Next Steps:
+
+Do not run Bob or BFF on `f866ce2`; they will reach the same field-order-independent scheduler boundary. Obtain approval for one bounded presentation-queue correction that preserves the direct IQ-to-IDCT throughput. Extend only native untimestamped frame-rate-code-four all-I ordinary ownership from one pending identity to the two pending identities physically supported by the three ordinary DDR banks: if an overlap decode completes before its predecessor presents, retain the completed bank in a secondary slot, stop further payload before any bank can be reused, promote that slot when the predecessor swaps and resume into the newly freed bank. Add an accelerated integration regression that reproduces the seventeen-decoded/fifteen-displayed failure, proves sustained 29.97-fps presentation with bounded backpressure and validates premature completion as safe only in this exact native all-I class; retain fatal guards for displayed-bank reuse, bank duplication, P/B, timestamps and all non-native modes. Re-run the complete native, reconstruction and mixed I/P/B suites, clean-build, install through rollback-safe ordinary FTP and restart the four-mode hardware matrix from TFF Weave.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 505 COMMIT Unreleased f866ce2 2026-08-25T03:34:13-07:00
 
 #### Coming From:
@@ -1200,33 +1231,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-## 466 COMMIT Unreleased cd8d78a 2026-08-24T11:31:01-07:00
-
-#### Coming From:
-
-Unreleased cd8d78a
-
-#### Purpose:
-
-Record the clean-video queue's first hardware diagnostic and decide whether it is safe to proceed to the full soak.
-
-#### Outcome:
-
-The user reports that `23_bbb_opening24_exact_av.mpg` looks the same as the already perfect `6dece4c` run, with USER and POWER solid on and DISK blinking eleven times. The completed screenshot was captured exclusively through plain FTP with the default MiSTer `root` login and no SSH keys; the 545,933-byte file is SHA-256 `f8093abe08bf43974a9c45e94d22f294db4a3f7203efa8f0c01f46edbb46203d`. Schema eight is clean: aggregate error flags are zero, audio underrun and PCM protocol error are false, all 3,138,619 clean-video bytes were accepted, all 194 reference plus 383 B pictures decoded, all 577 pictures displayed with 576 swaps, all 24 timestamps associated, sequence end was seen, presentation completed and the snapshot closed normally for quiet reason one. The queue preserved the exact accepted-byte and timestamp contracts while materially reducing the transient it was sized to absorb: the largest startup display gap fell from 431.059 milliseconds on `6dece4c` to 116.054 milliseconds on `cd8d78a`; the following two 82.896-millisecond gaps remain bit-identical, gap outliers move from thirteen to fourteen, decoder stall remains effectively unchanged at 646,766,052 cycles against 646,658,859, and presentation hold rises from 267,676,803 to 279,210,653 cycles. This passes the short diagnostic and rules out companion timestamp-position corruption, but it does not yet prove that the queue can prevent the deterministic full-soak audio underrun.
-
-#### Next Steps:
-
-Without changing or rebooting the installed image, run `20_bbb_full_48k.mpg` end to end, observe audio and video through the opening, body, high-motion sequence near 7:22, credits and closing sting, report any crackle, dropout or residual cadence plus all three LED states, and leave the final image loaded for another schema-eight capture. Primary acceptance is a normal quiet completion with aggregate error flags zero, `audio_pcm_underrun` and PCM protocol error clear, sequence end seen and all 14,315 pictures accounted for; the visual report separately decides whether the queue also improves the slight credits cadence that survived `6dece4c`. A repeated fatal snapshot at accepted byte 35,705,169 means the post-extraction depth did not isolate the audio path sufficiently and should be analyzed before any further RTL change.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
