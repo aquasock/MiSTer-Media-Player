@@ -214,6 +214,7 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         # word 18 hold the saturated peak PCM FIFO occupancy.
         "pcm_fifo_peak": metadata & 0x7F,
         "error_flags": (words[19] >> 16) & 0xFFFF,
+        "cache_bank_overlap_error": bool((words[19] >> 28) & 1),
         "audio_underrun": bool((words[19] >> 26) & 1),
         "pcm_protocol_error": bool((words[19] >> 27) & 1),
         # Entry 365 (schema 5): the formerly reserved low half of word 19

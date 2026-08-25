@@ -45,6 +45,7 @@ module mpeg2_luma_framebuffer
     output reg         cache_ready,
     output reg         read_seen,
     output reg         cache_error,
+    output reg         bank_overlap_error,
 
     // Independent fixed video side - 40 MHz.
     input  wire        rd_clk,
@@ -137,12 +138,21 @@ reg       prefill_done;
 // maintains the associated line number locally instead of sampling an 11-bit
 // binary bus asynchronously.
 reg        line_done_toggle_rd;
+reg        cache_scan_active_rd;
+reg        cache_scan_y_bank_rd;
+reg        cache_scan_c_bank_rd;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg        line_done_toggle_m1;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg        line_done_toggle_m2;
 reg        line_done_toggle_seen;
 reg [10:0] line_done_sequence_mem;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [1:0] cache_scan_active_sync;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [1:0] cache_scan_y_bank_sync;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [1:0] cache_scan_c_bank_sync;
 
 reg        pending_event;
 reg [10:0] pending_event_line;
@@ -301,11 +311,15 @@ always @(posedge mem_clk) begin
         cache_ready           <= 1'b0;
         read_seen             <= 1'b0;
         cache_error           <= 1'b0;
+        bank_overlap_error    <= 1'b0;
 
         line_done_toggle_m1   <= 1'b0;
         line_done_toggle_m2   <= 1'b0;
         line_done_toggle_seen <= 1'b0;
         line_done_sequence_mem <= 11'd0;
+        cache_scan_active_sync <= 2'b00;
+        cache_scan_y_bank_sync <= 2'b00;
+        cache_scan_c_bank_sync <= 2'b00;
 
         pending_event         <= 1'b0;
         pending_event_line    <= 11'd0;
@@ -333,6 +347,23 @@ always @(posedge mem_clk) begin
         // multi-bit CDC path.
         line_done_toggle_m1 <= line_done_toggle_rd;
         line_done_toggle_m2 <= line_done_toggle_m1;
+        cache_scan_active_sync <=
+            {cache_scan_active_sync[0], cache_scan_active_rd};
+        cache_scan_y_bank_sync <=
+            {cache_scan_y_bank_sync[0], cache_scan_y_bank_rd};
+        cache_scan_c_bank_sync <=
+            {cache_scan_c_bank_sync[0], cache_scan_c_bank_rd};
+
+        // Passive deadline diagnostic. A cache bank contains exactly one
+        // presentation line (or interlaced chroma pair), so a DDR return that
+        // writes the bank currently being scanned can expose stale/new words
+        // as short horizontal dashes. This does not alter refill control.
+        if (ddram_dout_ready && cache_scan_active_sync[1] &&
+            (((fetch_kind == FETCH_Y) &&
+              (fetch_cache_bank == cache_scan_y_bank_sync[1])) ||
+             ((fetch_kind != FETCH_Y) &&
+              (fetch_cache_bank == cache_scan_c_bank_sync[1]))))
+            bank_overlap_error <= 1'b1;
 
         if (line_done_toggle_m2 != line_done_toggle_seen) begin
             line_done_toggle_seen <= line_done_toggle_m2;
@@ -701,6 +732,9 @@ always @(posedge rd_clk) begin
         picture_present_rd   <= 1'b0;
         line_done_toggle_rd  <= 1'b0;
         line_done_pending_rd <= 1'b0;
+        cache_scan_active_rd <= 1'b0;
+        cache_scan_y_bank_rd <= 1'b0;
+        cache_scan_c_bank_rd <= 1'b0;
     end
     else begin
         cache_ready_r1    <= cache_ready;
@@ -715,6 +749,12 @@ always @(posedge rd_clk) begin
         first_field_r2       <= first_field_r1;
 
         if (pixel_ce) begin
+            cache_scan_active_rd <= decoded_picture_window;
+            cache_scan_y_bank_rd <=
+                native_interlaced_r2 ? source_y[1] : source_y[0];
+            cache_scan_c_bank_rd <=
+                native_interlaced_r2 ? source_y[2] : source_y[1];
+
             // Publish at the first active line of the authored first field, or
             // at the legacy progressive frame origin.
             if (!picture_present_rd && cache_ready_r2 &&

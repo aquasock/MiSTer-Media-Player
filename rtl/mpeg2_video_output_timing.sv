@@ -70,6 +70,7 @@ reg        native_field;
 reg        native_first_field;
 reg        native_active_line;
 reg        native_active_seen;
+reg        native_tail_window_d;
 
 wire native_hsync_low =
     (native_h >= NTSC_H_SYNC_START) &&
@@ -82,6 +83,16 @@ wire native_vsync_low = !native_field ?
      (native_field_tick <  NTSC_BOT_VS_END));
 
 wire native_tail_window = !native_active_line && native_active_seen;
+// The cadence accumulator consumes the field-window edge in clk_mpeg2.  At
+// the end of the authored second field, delay the physical frame-bank window
+// by one complete logical sample so that edge has crossed and updated credit
+// before the scheduler evaluates admission.  Both windows remain safely in
+// vertical blanking; progressive timing is unchanged.
+wire native_frame_window =
+    native_tail_window &&
+    native_tail_window_d &&
+    (native_field != native_first_field) &&
+    native_active;
 
 assign h_pos = native_active ? native_h : diag_h;
 assign v_pos = native_active ?
@@ -99,7 +110,7 @@ assign field = native_active && native_field;
 assign field_window = native_active ? native_tail_window :
     (diag_v >= DIAG_V_ACTIVE);
 assign frame_window = native_active ?
-    (native_tail_window && (native_field != native_first_field)) :
+    native_frame_window :
     (diag_v >= DIAG_V_ACTIVE);
 
 always @(posedge clk) begin
@@ -118,6 +129,7 @@ always @(posedge clk) begin
         native_first_field    <= 1'b0;
         native_active_line    <= 1'b1;
         native_active_seen    <= 1'b1;
+        native_tail_window_d  <= 1'b0;
     end
     else begin
         native_request_sync  <= {native_request_sync[0],
@@ -130,6 +142,8 @@ always @(posedge clk) begin
             native_ce_div <= native_ce_div + 2'd1;
 
             if (native_ce) begin
+                native_tail_window_d <= native_tail_window;
+
                 if (native_h == NTSC_H_TOTAL-1)
                     native_h <= 12'd0;
                 else
@@ -212,6 +226,7 @@ always @(posedge clk) begin
                     native_field       <= ~top_field_first_sync[1];
                     native_field_tick  <= 18'd0;
                     native_field_line  <= 8'd0;
+                    native_tail_window_d <= 1'b0;
                     native_h <= top_field_first_sync[1] ? 12'd0 : 12'd429;
 
                     if (top_field_first_sync[1]) begin

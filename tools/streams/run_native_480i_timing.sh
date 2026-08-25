@@ -30,6 +30,23 @@ vvp "${build_dir}/tb_native_480i_timing"
 vvp "${build_dir}/tb_native_480i_timing" +BFF
 
 iverilog -g2012 \
+  -s tb_native_480i_presentation_integration \
+  -o "${build_dir}/tb_native_480i_presentation_integration" \
+  "${repo_root}/rtl/mpeg2_video_output_timing.sv" \
+  "${repo_root}/rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv" \
+  "${repo_root}/tools/streams/tb_native_480i_presentation_integration.sv"
+vvp "${build_dir}/tb_native_480i_presentation_integration"
+
+iverilog -g2012 \
+  -s tb_native_480i_cache_refill \
+  -o "${build_dir}/tb_native_480i_cache_refill" \
+  "${repo_root}/rtl/mpeg2_new/mpeg2_ycbcr_to_rgb_bt601.sv" \
+  "${repo_root}/rtl/mpeg2_luma_framebuffer.sv" \
+  "${repo_root}/tools/streams/tb_native_480i_cache_refill.sv"
+vvp "${build_dir}/tb_native_480i_cache_refill"
+vvp "${build_dir}/tb_native_480i_cache_refill" +SLOW
+
+iverilog -g2012 \
   -s tb_h262_hardware_cadence_profiler \
   -o "${build_dir}/tb_h262_hardware_cadence_profiler" \
   "${repo_root}/rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv" \

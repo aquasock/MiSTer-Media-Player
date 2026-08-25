@@ -171,8 +171,17 @@ initial begin
 
             if (field_window && !old_field_window)
                 field_window_rises = field_window_rises + 1;
-            if (frame_window && !old_frame_window)
+            if (field_window && !old_field_window) begin
+                if (h_pos != 12'd0)
+                    fail("native field window did not begin at h=0");
+                if (frame_window)
+                    fail("native cadence and frame windows rose together");
+            end
+            if (frame_window && !old_frame_window) begin
                 frame_window_rises = frame_window_rises + 1;
+                if (!field_window || (h_pos != 12'd1))
+                    fail("native frame window was not one sample after cadence");
+            end
             old_field_window = field_window;
             old_frame_window = frame_window;
         end

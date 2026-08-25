@@ -26,7 +26,8 @@ wire mpeg2_new_cadence_session_quiet =
     !audio_pcm_terminal_pending;
 
 wire [15:0] mpeg2_new_cadence_error_flags = {
-    4'd0,
+    3'd0,
+    mpeg2_new_ddr_bank_overlap_error,
     mpeg2_new_inband_pcm_protocol_error,
     audio_pcm_underrun_sync[1],
     mpeg2_new_b_presentation_error,
@@ -203,6 +204,7 @@ wire mpeg2_new_normal_user_led =
 //   1 syntax          4 inverse_quant                   7 recon
 //   2 phase1_probe    5 inverse_quant_unsupported_matrix 8 ddr_store
 //   3 pred            6 idct                            9 ddr_cache
+//  10 ddr_cache_bank_overlap
 //
 // No decode, presentation, ownership or acceptance behavior is altered; the
 // acceptance term itself still drives the steady-ON state unchanged.
@@ -215,7 +217,8 @@ wire [3:0] mpeg2_new_diag_error_code_live =
     mpeg2_new_idct_error                       ? 4'd6 :
     mpeg2_new_recon_error                      ? 4'd7 :
     mpeg2_new_ddr_store_error                  ? 4'd8 :
-    mpeg2_new_ddr_cache_error                  ? 4'd9 : 4'd0;
+    mpeg2_new_ddr_cache_error                  ? 4'd9 :
+    mpeg2_new_ddr_bank_overlap_error           ? 4'd10 : 4'd0;
 
 // kate - Commit 178 sub-code diagnostic.
 //

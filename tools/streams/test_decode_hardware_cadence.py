@@ -47,12 +47,24 @@ def main() -> None:
         temp = Path(name)
         diagnostic = temp / "diagnostic.png"
         native = temp / "native.png"
+        overlap = temp / "native_overlap.png"
         render(diagnostic, 800, 600, cadence.DIAGNOSTIC_Y0, expected)
         render(native, 720, 480, cadence.NATIVE_480I_Y0, expected)
         if cadence.decode_words(diagnostic) != expected:
             raise SystemExit("800x600 diagnostic telemetry mismatch")
         if cadence.decode_words(native) != expected:
             raise SystemExit("720x480 native telemetry mismatch")
+
+        overlap_words = expected.copy()
+        overlap_words[19] |= 1 << 28
+        checksum = 0
+        for word in overlap_words[:-1]:
+            checksum ^= word
+        overlap_words[-1] = checksum
+        render(overlap, 720, 480, cadence.NATIVE_480I_Y0, overlap_words)
+        result = cadence.decode(overlap)
+        if not result["cache_bank_overlap_error"]:
+            raise SystemExit("cache-bank overlap telemetry bit was not decoded")
     print("CADENCE_DECODER_LAYOUT_PASS diagnostic_y=444 native_y=324 words=38")
 
 

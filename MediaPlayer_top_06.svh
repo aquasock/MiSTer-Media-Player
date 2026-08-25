@@ -52,6 +52,7 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
     .cache_ready    (mpeg2_new_ddr_cache_ready),
     .read_seen      (mpeg2_new_ddr_read_seen),
     .cache_error    (mpeg2_new_ddr_cache_error),
+    .bank_overlap_error(mpeg2_new_ddr_bank_overlap_error),
     .rd_clk         (clk_video),
     .h_pos          (display_h_pos),
     .v_pos          (display_v_pos),

@@ -21,6 +21,7 @@ reg         mpeg2_new_b_decode_scratch_bank;
 wire        mpeg2_new_ddr_cache_ready;
 wire        mpeg2_new_ddr_read_seen;
 wire        mpeg2_new_ddr_cache_error;
+wire        mpeg2_new_ddr_bank_overlap_error;
 
 wire [4:0] mpeg2_new_effective_quantiser_scale_code =
 	mpeg2_new_macroblock_quant ?
