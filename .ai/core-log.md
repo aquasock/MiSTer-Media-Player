@@ -1,3 +1,31 @@
+## 489 COMMIT Unreleased 8d9043a 2026-08-24T23:35:44-07:00
+
+#### Coming From:
+
+Unreleased 8d9043a
+
+#### Purpose:
+
+Record the native TFF comparison, identify the exact half-rate native admission defect and distinguish the authored reference lines from transient cache-like playback artifacts.
+
+#### Outcome:
+
+The user ran `_cadence/native_480i_tff_light_10s.m2v` in `Native 480i` mode and reports that the comb-like artifacts improved relative to the progressive weave, the approximately 60 Hz flicker returned and the apparent playback rate seemed similar. USER and POWER remained solid and DISK blinked twice. The user sees two authored full-width gray reference lines, but separately observes many transient one-pixel-high, roughly fifteen-pixel-long horizontal dashes across the screen only while native playback is active; these are not the fixture's reference lines and are absent from the settled terminal still. The 720x480 screenshot was triggered and retrieved entirely through ordinary FTP using the default MiSTer login and no SSH; `.ai/current_results/entry488_tff_light_native480i.png` is 11,916 bytes with SHA-256 `74788181ac9642ef09bba56d2cd70bddf9c0895167f1d1bb9740f7812e891363`. Schema nine accepts all 5,007,304 bytes, reports 300 reference and displayed pictures and 299 swaps after modulo-counter interpretation, preserves stable `top_field_first=1`, sees sequence end and presentation completion and reaches normal quiet reason one with every aggregate, decoder, presentation, destination, cache, audio-underrun and PCM-protocol error clear. First presentation occurs at 2,378,252 cycles and the last at 1,199,271,231 cycles, so the 299 intervals occupy 1,196,892,979 cycles, or 19.948216 seconds. Native presentation therefore sustains 14.988809 pictures per second, materially slower than the same stream's 20.101481-picture progressive diagnostic baseline; the visual rate estimate does not distinguish that difference. RTL inspection identifies the exact deterministic cause. On the non-first native field, `display_field_window` and `display_frame_window` rise together and cross identically into the scheduler as simultaneous cadence and swap pulses. After a presentation, rate-code-four credit is zero; the first field adds 5,652, then the second-field swap evaluates the old 5,652 against the due threshold of 5,723 before its coincident tick is applied, misses that frame window and updates credit to 11,304. The following native frame is therefore admitted, producing one swap every four fields and the measured 14.99-picture rate. The existing native scheduler test incorrectly applies two field ticks and then a separate frame-window pulse, so it proves intended arithmetic but not actual integrated pulse ordering. The settled still shows only the authored full-width references and expected field weave; it cannot capture the transient short dashes. The line-cache error bit currently detects a reader falling more than one complete line behind but does not identify a cache bank being refilled while that same bank is still scanned, leaving a plausible refill-deadline blind spot. The unused 135 MHz PLL output cannot safely replace the current 60 MHz shared decoder/DDRAM clock without a new clock-domain boundary, so the user's historical clock observation is relevant evidence but not yet a safe direct fix.
+
+#### Next Steps:
+
+With explicit user approval, create one bounded native-presentation correction and diagnostic commit. Separate the native frame-window assertion from the second-field cadence assertion by a deterministic logical-sample interval inside vertical blanking, preserving the scheduler's established progressive arithmetic while ensuring the second field's credit is visible before physical bank admission. Replace the synthetic native scheduler test with an integrated timing-to-scheduler regression that reproduces the current simultaneous-pulse half-rate failure and proves one 30000/1001 presentation per two fields after correction. Add a passive sticky line-cache bank-overlap diagnostic and a native delayed-DDR live-raster stress case so the next hardware run can distinguish an actual refill collision from an output-clock symptom without changing clocks or cache depth speculatively. Rebuild and install the exact RBF, rerun only the light TFF fixture in Native 480i, require the decoder-limited rate to match the approximately 20.10-picture progressive baseline rather than 14.99, report flicker and transient dashes and leave the result for FTP-only capture. Continue to defer BFF and the public interlaced compatibility claim.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 488 COMMIT Unreleased 8d9043a 2026-08-24T23:22:04-07:00
 
 #### Coming From:
@@ -1236,33 +1264,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-## 449 COMMIT Unreleased f2b2e02 2026-08-24T07:05:26-07:00
-
-#### Coming From:
-
-Unreleased f2b2e02
-
-#### Purpose:
-
-Complete the six-case input-envelope failure sweep with explicit truncated-stream rejection and immediate known-good recovery.
-
-#### Outcome:
-
-Without rebooting after the corrected 50 fps pair, the user loaded `15_bad_truncated.mpg`; it settles on a blank screen with USER blinking eight times, DISK solid off and POWER solid on, the same explicit decoder-failure indication as the unsupported geometry cases rather than ordinary success or a wedge. Immediate return to `00_good_480p_48k.mpg` passes like the established controls. The untouched 800x600 recovered-control capture is 104,740 bytes at SHA-256 `cd77217789074dbe3273f773dbf6723e0e62014e065ea7894bb3ea4402578393`. Its schema-eight telemetry reports all 582,742 accepted transport bytes, 44 associated timestamps, seventeen reference plus 31 B pictures, all 48 pictures displayed and 47 swaps. Sequence end and presentation completion are true; aggregate errors are zero, audio underrun and PCM protocol error are false, all decoder, presentation and destination errors are clear, and no decode, reorder, scratch, promotion, future-reference or terminal-boundary work remains at the normal quiet reason-one snapshot. First presentation occurs at 2,430,404 cycles, the final picture at 1.961 seconds and quiet completion at 2.057 seconds, with delivered cadence 24.469 frames per second. All six intended failure cases have now failed visibly without wedging the MiSTer, and every one has recovered immediately to a telemetry-clean 48 kHz control without reboot.
-
-#### Next Steps:
-
-Power-cycle once, set Audio Test to Off and run only `20_bbb_full_48k.mpg` through its complete 9:56 duration. Check opening audio-video alignment, ordinary scene transitions, the high-motion sequence near 7:22, credits and the final audio tail; report any crackle, dropout, progressive drift, visible stutter or corruption and all three terminal LEDs. Leave the final image loaded for a schema-eight capture. Do not replay the soak or any other file before that capture.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
