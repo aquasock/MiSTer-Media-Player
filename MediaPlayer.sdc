@@ -87,6 +87,15 @@ set_false_path \
     -to [get_keepers {*|mpeg2_video_output_timing:*|top_field_first_sync[0]}]
 set_false_path \
     -to [get_keepers {*|mpeg2_new_native_active_sync[0]}]
+
+# Entry 512: the framebuffer's video-domain publication levels cross into
+# explicit three-stage decoder-domain synchronizers for passive telemetry.
+# Cut only each asynchronous source-to-stage-zero path. The two synchronous
+# stage-to-stage delivery paths remain fully timed.
+set_false_path \
+    -to [get_keepers {*|mpeg2_new_framebuffer_picture_present_sync[0]}]
+set_false_path \
+    -to [get_keepers {*|mpeg2_new_framebuffer_prefill_missed_sync[0]}]
 set_false_path \
     -from [get_keepers {*|hps_io:hps_io|status[123]}] \
     -to   [get_keepers {*|native_timing_pattern_sync[0]}]
