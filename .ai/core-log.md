@@ -1,3 +1,37 @@
+## 500 COMMIT Unreleased 4e4da3a 2026-08-25T02:45:02-07:00
+
+#### Coming From:
+
+Unreleased baf5d2c
+
+#### Purpose:
+
+Expose MiSTer's processed-HDMI Bob/Weave choice without altering native raw 480i or progressive output.
+
+#### Outcome:
+
+Commit `4e4da3a` replaces the hardwired `HDMI_BOB_DEINT=0` with a clock-domain-safe `HDMI deinterlacer` menu control on status bit 124, retaining Weave as the default and asserting MiSTer's existing Bob request only while native interlaced output is active; direct video continues to carry the core's raw fields and progressive output always suppresses the request. The focused selector test passes reset, native Weave, native Bob, progressive suppression and return cases. The complete native timing suite passes stable and changed-order handling, exhaustive 4:2:0 mapping, exact TFF and BFF half-line timing, timing-pattern isolation, ordinary ownership, measured-latency presentation, ordinary and delayed cache refills, cadence-profiler schema and decoder layout. TFF/BFF interlaced reconstruction also passes with zero out-of-tolerance samples and the progressive control remains distinct. The Icarus live-raster wrapper reproduced all functional counts with zero functional errors but ended one scheduler cycle below its fixed wrapper expectation; the independently regenerated input was byte-identical and the canonical Verilator live-raster run passed the exact 6,529,997-cycle expectation with every error counter clear. A clean Quartus 17.0.2 build completed in 10 minutes 59 seconds with zero errors, full-design setup, hold and recovery slack of 0.184, 0.231 and 3.194 nanoseconds, focused decoder setup and recovery slack of 1.357 and 10.515 nanoseconds and focused video setup slack of 2.432 nanoseconds. Fit uses 29,568 ALMs at 71 percent, 45,515 registers, 3,655,139 memory bits at 65 percent, 464 RAM blocks at 84 percent and 67 DSP blocks at 60 percent. The 4,184,000-byte RBF has SHA-256 `94d194e36f7deeacaf899934547860366a8649455e8c4f0d15ac51e478d90aff`; it was uploaded and retrieved under a staging name, promoted through ordinary FTP with the default `root` and `1` login and retrieved again at the exact local hash. The predecessor remains `/media/fat/MediaPlayer.rbf.rollback-pre-4e4da3a` at SHA-256 `67bd360b0efa1864ca5184049ad6dfd9fc2edc006421871309c2c0be9de70969`. No helper, Main, media or MiSTer configuration changed.
+
+#### Next Steps:
+
+Reload the core, leave `Native timing pattern` Off, select `HDMI deinterlacer` Bob and `Interlaced output` Native 480i, then run only `_cadence/native_480i_bff_light_10s.m2v`. Judge rightward motion, field-marker order, bob shimmer or vertical-detail loss and specifically whether the long historical bars and retained OSD disappear; report all three LEDs and leave the terminal image loaded for an ordinary-FTP schema-nine capture. Acceptance requires the prior clean logical telemetry plus materially shorter field history than Weave. If BFF Bob passes, run the TFF light-motion fixture second under the same settings. Keep the public native-interlace claim disabled until both are captured, keep raw direct-video qualification separate and defer a core-native deinterlacer unless MiSTer's scaler path proves inadequate or a distinct core-generated 480p mode is approved.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_01.svh
+- files.qip
+- rtl/mpeg2_hdmi_deinterlace_control.sv
+- tools/streams/run_native_480i_timing.sh
+- tools/streams/tb_hdmi_deinterlace_control.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 499 COMMIT Unreleased baf5d2c 2026-08-25T02:06:54-07:00
 
 #### Coming From:
@@ -1212,38 +1246,6 @@ Run `20_bbb_full_48k.mpg` end to end and report where the underrun lands, which 
 #### Files Modified:
 
 - host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 460 COMMIT Unreleased 14e0629 2026-08-24T09:14:42-07:00
-
-#### Coming From:
-
-Unreleased 14e0629
-
-#### Purpose:
-
-Record that timestamp coalescing removed the per-second beat and most of the audio-video cadence defect, and hold the result until the ten-minute soak proves alignment.
-
-#### Outcome:
-
-The user ran `23_bbb_opening24_exact_av.mpg` on the `14e0629` helper and reports it running correctly with the beat gone, reserving judgement until the credits are seen, with all LEDs normal. The capture is 545,909 bytes at SHA-256 `840f9b69781815cea1ee38006d0f7346d97d9403c42389e7d2897c2e2b24fd9e`, and it carries the largest single improvement this investigation has produced. Gap outliers fall from 170 to 13 over 24 seconds, presentation hold rises from 12,376,681 to 266,426,934 cycles, presentation stall from 11,794,180 to 262,253,206 and `hold_scratch_available_cycles` from 582,616 to 2,984,466, which is within four cycles of the smooth raw control's 2,984,470. Correctness is unchanged and complete: zero aggregate error flags, no underrun, no PCM protocol error, all 577 pictures displayed with 576 swaps, sequence end, presentation complete and normal quiet reason one. Accepted transport bytes are 3,138,618, exactly the video's own length, so the spurious byte that both 551-record streams accepted is gone with the records that caused it.
-
-The improvement is larger than this cycle predicted and the prediction was wrong in an informative way. Entry 459 measured 21 outliers attributable to 551 records on a stream with no PCM and expected the audio-video file to fall from 170 to about 149. It fell to 13. A record therefore does not cost a fixed amount: on a path already saturated by real-time PCM gating each timestamp costs far more than it does on an idle one, so the two mechanisms compound rather than add. That also revises the accounting recorded in entry 457, where 149 of the 170 outliers were attributed to gating alone; the honest split is that gating remains the enabling condition, since presentation hold is still 266,426,934 against the raw control's 781,845,922, but record density was the larger lever on this content.
-
-Thirteen outliers remain and their shape is unchanged. The largest is 431.059 milliseconds at display ordinal fourteen with the decoder ready, input pending, scratch available and the scheduler reporting presentation complete, the same ordinal and the same signature as the worst gap under `9f83805`. The second and third are 82.896 milliseconds at ordinals fifteen and seventeen, one with both a reorder run and a decode in flight and no scratch available, one with the decoder not ready. Presentation slack at a third of the raw control's is consistent with a path still paced by the audio sink.
-
-#### Next Steps:
-
-Run `20_bbb_full_48k.mpg` end to end before this commit is called good. Cadence is not what the soak is for: sparse timestamps mean presentation extrapolates across a whole encoded group rather than a packet, so the question is whether audio and video are still aligned through the credits and at the final plate, and drift is what would send `14e0629` back to `MediaPlayer_Helper.backup.pre-timestamp-coalesce.9f83805`. Report alignment at the opening, at the high-motion sequence near 7:22, through the credits and at the closing sting, plus any crackle, dropout or visible corruption and all three LEDs, then leave the final image loaded for a schema-eight capture requiring zero aggregate, decoder, presentation, destination, underrun and PCM protocol errors with all 14,315 pictures accounted for after eight-bit wrap. If alignment holds, the remaining cadence work is the dominant mechanism and it is FPGA-side, with three candidates to cost against resource and timing numbers: deepening `audio_pcm_fifo` past any lead the helper can produce, buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate` so compressed video keeps flowing, and carrying many samples per PCM record, which after this result is the most attractive of the three because it reduces record count and path bandwidth at the same time.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
