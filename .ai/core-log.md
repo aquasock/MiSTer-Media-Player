@@ -1,3 +1,31 @@
+## 484 COMMIT Unreleased 2bb8def 2026-08-24T22:33:38-07:00
+
+#### Coming From:
+
+Unreleased 2bb8def
+
+#### Purpose:
+
+Record the first native-480i TFF hardware result without overclaiming its very short visual fixture or the clipped diagnostic overlay.
+
+#### Outcome:
+
+The user loaded `_cadence/native_480i_tff.m2v` in Native 480i mode and reports that the display accepted an interlaced picture, the image filled the vertical screen area, visible interlacing artifacts appeared, playback stopped after roughly one second, the MiSTer remained responsive, USER was solid, DISK blinked twice and POWER was solid. The final 720x480 image was triggered and retrieved entirely through ordinary FTP with the default `root` / `1` login and no SSH; `.ai/current_results/entry483_native480i_tff_failure.png` is 127,692 bytes with SHA-256 `7d658ebde64f06818e1c02f2ad4cafd4452ddb79a8830a8c658c603865f1d7ba`. The capture proves native raster activation and shows the expected temporally separated edges of a 60000/1001 source woven into interlaced fields, but it cannot establish live field-order quality from a still image. The generated fixture contains only four 30000/1001 pictures, or about 0.133 seconds of coded video, so its apparent short stop is expected and it is too brief for a useful live-motion judgment. USER solid and POWER solid indicate the bounded decode was accepted; DISK code two is the passive final-GOP progress probe arming on the third I picture and observing its publication, not a decoder error. The schema-nine overlay still begins at diagnostic line 444 and therefore extends below the 480-line native raster; only its first rows appear in this capture and the full terminal record cannot be decoded. Native output remains unpassed because visible deinterlacing quality, sustained field cadence and BFF behavior are not yet established.
+
+#### Next Steps:
+
+Before changing presentation behavior, prepare a bounded diagnostic proposal that generates longer deterministic TFF and BFF motion fixtures, moves the fixed telemetry block into the visible native raster while retaining its 800x600 position, teaches the decoder to read either layout and changes the screenshot trigger to write `/dev/MiSTer_cmd` through authenticated FTP rather than SSH. Rebuild and install that observability candidate, then run the longer TFF clip first to distinguish correct display deinterlacing from a field-order or field-cadence fault; defer BFF until TFF is captured and understood. Keep the public interlaced compatibility claim disabled.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 483 COMMIT Unreleased 2bb8def 2026-08-24T16:09:09-07:00
 
 #### Coming From:
@@ -1232,29 +1260,3 @@ None.
 - [ ] Passed
 
 ---
-## 444 COMMIT Unreleased 3814243 2026-08-24T06:41:18-07:00
-
-#### Coming From:
-
-Unreleased 3814243
-
-#### Purpose:
-
-Qualify explicit decoder rejection and recovery for the out-of-envelope 720x576 PAL geometry case.
-
-#### Outcome:
-
-The user reports that `13_bad_geometry_pal.mpg` behaves exactly like the preceding geometry test: a black screen, USER blinking eight times, DISK solid off and POWER solid on, followed by an immediate successful `00_good_480p_48k.mpg` replay without reboot. The launch-free recovered-control capture is 104,787 bytes at SHA-256 `bac9bc0944d06035259c84abf05ff7bd5cffb683955b7fb9ca7d6127608f7fd7`. Schema-eight telemetry proves the PAL-height error was cleared: aggregate flags are zero, audio underrun and PCM protocol error are false, all decoder, presentation and destination errors are clear, all 582,742 transport bytes are accepted, 44 timestamps associate, seventeen reference plus 31 B pictures decode and all 48 pictures display with 47 swaps. Sequence end, presentation complete and normal quiet reason one are true with no pending scheduler state and saturated healthy PCM activity. This accepts the fourth recovery pair and independently confirms geometry diagnostic code eight and clean next-stream re-arm for both excessive width-height and excessive-height-only cases.
-
-#### Next Steps:
-
-Without rebooting, run `14_bad_rate_50.mpg` for no more than ten seconds, record its visible result and USER, DISK and POWER states, then immediately run `00_good_480p_48k.mpg` and record alignment, sound, picture and all three LEDs again. An explicit rejection or non-successful settlement followed by a clean control is a pass; stop and report an unavailable menu, ignored input or failed control before any reboot. Do not continue to `15_bad_truncated.mpg` until this fifth pair is recorded.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
