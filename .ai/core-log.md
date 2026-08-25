@@ -1,3 +1,37 @@
+## 513 COMMIT Unreleased ??? 2026-08-25T09:58:18-07:00
+
+#### Coming From:
+
+Unreleased 69a4f20
+
+#### Purpose:
+
+Add a moving final-mux native pattern that distinguishes FPGA field-readout retention from MiSTer scaler or display retention.
+
+#### Outcome:
+
+The user approved the revised diagnostic after review of `.ai/current_results/PXL_20260825_160322728.mp4`, a 56,383,735-byte 13.564622-second Pixel 8 Pro recording at SHA-256 `267561d6246d06ce7ec03f533e979b6b1bd7e15c27fffa8bc01b9f8154adaec6`. The ordinary full-height bar moves and wraps throughout the active playback, while a separate upper-half bar remains fixed at one horizontal position for nearly the entire ten-second session and disappears abruptly when playback completes and the terminal overlay returns. This is not a brief Bob tradeoff, rolling-shutter duplicate or panel afterimage. The paired schema-ten capture accepts the complete 5,007,304-byte stream, represents all 300 pictures and 299 swaps in its wrapped counters, records 300 framebuffer resets, 299 publications, zero superseded unpublished generations, zero prefill misses, a maximum 2,002,005-cycle publication latency, three regular 2,002,000-cycle ranked gaps, normal quiet completion and no error. Whole-frame scheduling and the instrumented publication boundary are therefore clean, but field-specific line-cache/readout and the processed-HDMI scaler remain unresolved. The approved discriminator restores a dynamic pattern after the framebuffer and before the cadence overlay so the same native sync, field signal and scaler path can be observed without any decoder, DDR or line-cache pixels.
+
+#### Next Steps:
+
+Preserve the established static native bars and add a separately selectable moving mode whose pair-identical fields show a narrow full-height bar held for thirty complete output frames before jumping ninety-six pixels across deterministic positions, with pair-identical horizontal references and no decoder-derived pixel input. Add directed regression coverage for unchanged static colors, sync and blanking passthrough, exact frame-window hold length, jump and wrap positions and identical TFF/BFF field content. Run the complete native timing suite, reconstruction controls and canonical mixed I/P/B live-raster regression, then clean-build Quartus Prime 17.0.2, require positive global and focused timing, stage and round-trip verify the exact RBF through ordinary FTP, preserve the installed `69a4f20` image as rollback and promote only the diagnostic candidate. Hardware validation will replay `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` in Bob with the moving bypass enabled: a retained bar will place the fault downstream in MiSTer's processed-HDMI scaler or display, while clean jumps will place it in FPGA field-specific framebuffer cache or readout.
+
+#### Files Modified:
+
+- `MediaPlayer.sdc`
+- `MediaPlayer_top_00.svh`
+- `MediaPlayer_top_01.svh`
+- `MediaPlayer_top_07.svh`
+- `rtl/mpeg2_native_timing_pattern.sv`
+- `tools/streams/tb_native_480i_timing_pattern.sv`
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 512 COMMIT Unreleased 69a4f20 2026-08-25T08:40:51-07:00
 
 #### Coming From:
@@ -1204,34 +1238,6 @@ Without rebooting after the accepted video-only session, the user ran `00_good_4
 #### Next Steps:
 
 After approval, qualify v0.7.0 from the exact accepted source boundary with a clean from-scratch Quartus 17.0.2 build, the standard Phase-1P timing reports, the complete focused and host regression suites, and a reproducible official-toolchain helper build. Verify the release RBF and helper hashes, then update `README.md`, `CHANGELOG.md` and new v0.7.0 release notes to describe bounded Program Stream input, MPEG Layer II audio, real PTS scheduling, the exact-cadence correction, supported limits, hardware validation and timing/resource results. Package the date-coded RBF and matching helper from the final documentation commit, install the exact candidate through plain FTP with rollback preserved, run the release hardware gate, and only after it passes have the user create the annotated `v0.7.0` tag and GitHub pre-release from that exact commit.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 473 COMMIT Unreleased acdbf8b 2026-08-24T13:30:57-07:00
-
-#### Coming From:
-
-Unreleased acdbf8b
-
-#### Purpose:
-
-Accept silent video-only Program Stream playback in hardware and advance to the immediate audio-video recovery control.
-
-#### Outcome:
-
-The user reports that `02_good_video_only.mpg` played correctly, ending with USER and POWER solid on and DISK blinking eleven times. The final image was triggered and retrieved exclusively through plain FTP with the default MiSTer login and no SSH keys; `.ai/current_results/entry473_video_only_program_stream.png` is 104,593 bytes with SHA-256 `ce53ec3dde8cf964f09d7e80a497be4d516c6bfbf02cb767f1c43cdf1a96409c`. Schema nine reports zero aggregate errors, no audio underrun or PCM protocol error, zero PCM samples, all seventeen reference and 31 B pictures decoded, all 48 pictures displayed with 47 swaps, sequence end, presentation completion and ordinary quiet reason one at STC second two, with no pending decoder or scheduler work. The accepted-byte counter is 582,742 rather than Entry 472's stated 582,741: host demux proves the video-only, 48 kHz and 44.1 kHz controls contain the identical 582,741-byte H.262 payload at SHA-256 `079d7c7393ce2bb80fe716f927733c3aa5e492a4812922bc9b10b6dd9e25330a`, while every prior hardware capture of that payload also reports 582,742 accepted transfer bytes, so Entry 472 mixed the host payload size with the established MiSTer hardware count rather than identifying a regression. This hardware-accepts the bounded silent-stream fallback in helper source `acdbf8b` while retaining accepted FPGA source `9a5eea3`.
-
-#### Next Steps:
-
-Without rebooting, run only `00_good_480p_48k.mpg` with Audio Test Off and report audio-video alignment, any crackle or dropout and all three terminal LEDs, then leave its final image loaded for capture. Require the established 582,742 accepted transfer bytes, all 48 pictures and 47 swaps, audio present without underrun or PCM protocol error, zero aggregate errors, sequence end, presentation completion and normal quiet reason one. A clean result proves immediate recovery from the no-PCM session and freezes `acdbf8b` with `9a5eea3` for the clean v0.7.0 release-qualification build; any failure requires retaining this accepted video-only evidence and diagnosing session re-arm before release work.
 
 #### Files Modified:
 
