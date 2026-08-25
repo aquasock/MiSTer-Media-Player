@@ -1,3 +1,39 @@
+## 511 COMMIT Unreleased ??? 2026-08-25T08:00:22-07:00
+
+#### Coming From:
+
+Unreleased 48c2c87
+
+#### Purpose:
+
+Instrument the intermittent native framebuffer publication boundary without changing decoder, scheduler, cache or output behavior.
+
+#### Outcome:
+
+The user approved one observational diagnostic RBF after entry 510 reproduced the intermittent ghost in one of three Bob runs despite exact 300-picture decode and display completion, 299 scheduler swaps, normal quiet termination and zero error flags. Bob removes Weave's multi-field reconstruction history but retains the same decoder, DDR frame banks, framebuffer reset, six-line prefill and line-cache delivery path, so the ghost is not solely a Weave artifact. The current schema-nine profiler cannot preserve the event because its hardware instance begins ranked gap capture at STC second 500 for the earlier full-movie credits investigation, and it counts scheduler bank swaps rather than the later video-domain publication of pixels from the new bank. The approved diagnostic will remain passive: short-run ranked gaps will begin at second zero, and three new snapshot words will count framebuffer reset and publication events, resets that occur before the preceding bank ever publishes, native authored field origins missed because prefill is not ready and maximum reset-to-publication latency. Existing MPEG, prediction, audio and error telemetry will remain intact under a versioned schema extension.
+
+#### Next Steps:
+
+Expose synchronized framebuffer picture-present and prefill-deadline-miss observations, add passive counters to a schema-ten forty-one-word cadence snapshot, move the checksum without repurposing existing fields and update the decoder plus focused framebuffer, profiler and native regressions. Prove the diagnostics detect a deliberately late prefill and a reset-before-publication race while leaving exact cache mapping, field timing, publication cadence, mixed I/P/B playback and all prior functional paths unchanged. Commit only clean regressions, run a clean Quartus build and focused timing analysis, preserve `48c2c87` as rollback through ordinary FTP, install the verified diagnostic and repeat the TFF light-motion fixture in Bob up to three times. Correlation between a ghost run and a missed-origin, unpublished reset or excessive publication latency will justify a narrow publication fix; exact publication telemetry will clear this FPGA boundary and retain the downstream-display diagnosis.
+
+#### Files Modified:
+
+- `MediaPlayer_top_06.svh`
+- `MediaPlayer_top_07.svh`
+- `rtl/mpeg2_luma_framebuffer.sv`
+- `rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv`
+- `tools/streams/decode_hardware_cadence.py`
+- `tools/streams/tb_h262_hardware_cadence_profiler.sv`
+- `tools/streams/tb_native_480i_cache_refill.sv`
+- `tools/streams/test_decode_hardware_cadence.py`
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 510 COMMIT Unreleased 48c2c87 2026-08-25T07:56:37-07:00
 
 #### Coming From:
@@ -1204,33 +1240,5 @@ Power-cycle once, set Audio Test to Off and run only `02_good_video_only.mpg`. I
 
 - [x] Built
 - [ ] Passed
-
----
-## 471 COMMIT Unreleased 9a5eea3 2026-08-24T13:10:34-07:00
-
-#### Coming From:
-
-Unreleased 9a5eea3
-
-#### Purpose:
-
-Accept the timestamp cadence floor on a complete hardware soak and establish the release-candidate presentation baseline.
-
-#### Outcome:
-
-The user watched `20_bbb_full_48k.mpg` end to end on `9a5eea3` and reports perfectly smooth motion with no jumps even in the credits, followed by USER and POWER solid on and DISK blinking eleven times. The final screenshot was captured exclusively through plain FTP with the default MiSTer login and no SSH keys; `.ai/current_results/entry471_full_soak_pts_cadence_floor.png` is 8,145 bytes with SHA-256 `5648ae703647ba1996a0615e6770b40c30ea9175df5e43bc798a694682a41f01`. Schema nine accepts all 84,423,309 clean-video bytes, reports zero aggregate errors, no audio underrun or PCM protocol error, sequence end, presentation completion and normal quiet reason one at STC second 597; the eight-bit display counters wrap exactly as expected for all 14,315 pictures and 14,314 swaps to 235 and 234. The credits-window result is stronger than the visual observation alone: gap outliers fall from thirty on `8c59ddb` to zero, and all three largest gaps are now 2,984,256 decoder cycles or 49.7376 milliseconds rather than 3,979,008 cycles or 66.3168 milliseconds. The profiler records 149 timestamp-advance opportunities and zero delay opportunities because it observes the PTS-due versus cadence-early condition rather than a completed swap; after the correction a retained timestamp may remain in that condition across more than one raster window while the mandatory cadence floor blocks it, so this larger passive count does not represent early presentation. The absence of late-window outliers, clean terminal evidence and user's smooth-credits report together accept `9a5eea3` and confirm that the former approximately one-second cadence was caused by sparse timestamps replacing the exact-rate admission gate.
-
-#### Next Steps:
-
-Freeze `9a5eea3` as the accepted FPGA functional baseline and preserve `/media/fat/MediaPlayer.backup.pre-pts-floor.8c59ddb.rbf` until release qualification is complete. Before starting broader decoder features, close or explicitly document the remaining host-side video-only Program Stream boundary, where `good_video_only.mpg` currently reaches the helper's 512 KiB lookahead error instead of playing or reporting the intended missing-audio condition. Then qualify v0.7.0 from an exact release-candidate commit with a clean from-scratch Quartus 17.0.2 build, Phase-1P timing reports, the complete hardware regression pack, supported 44.1 and 48 kHz controls, expected-failure recovery sweep and final audio-video soak; update README, changelog and release notes to describe the now-proven Program Stream, audio and PTS behavior, package the date-coded RBF and matching helper, and have the user create the annotated `v0.7.0` tag and GitHub pre-release from that exact commit.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
