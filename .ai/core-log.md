@@ -1,3 +1,32 @@
+## 497 COMMIT Unreleased baf5d2c 2026-08-25T01:49:06-07:00
+
+#### Coming From:
+
+Unreleased baf5d2c
+
+#### Purpose:
+
+Use the user's high-frame-rate recording to classify the step-hold ghost before spending a Quartus cycle on the proposed moving framebuffer-bypass pattern.
+
+#### Outcome:
+
+The user supplied `.ai/current_results/PXL_20260825_084158381.mp4`, a 68,665,532-byte, 16.631233-second 1920x1080 H.264 Pixel 8 Pro recording at an average 59.706937 frames per second and SHA-256 `d2a4d296d8dd9f86ee6cacc341992b144722b741be35b46606d441a199782386`. Frame-by-frame review confirms the naked-eye report and materially changes the diagnosis. At a representative jump, the old bar is absent before the transition, becomes visible alongside the immediately present new bar, then alternates between bright, dim and field-striped appearances before fading away over roughly nine captured 30-fps samples; during the same interval the new bar alternates between complete and field-striped appearances and then stabilizes. The two stationary horizontal references remain stable throughout. That gradual, intensity-weighted temporal decay and alternating reconstruction is characteristic of downstream field-history processing by the display scaler or deinterlacer, potentially compounded by the phone's own temporal video processing, rather than binary stale DDR or line-cache pixels. The user's direct visual observation establishes that the effect exists before the camera, while the recording exposes its temporal structure. Combined with the pair-identical decoded source, zero old-position source pixels, clean cache and destination telemetry, a clean terminal framebuffer and the static framebuffer-bypass result, this is strong enough to clear framebuffer corruption as the working diagnosis and supersedes entry 496's need to modify cache RTL. It is not a mathematical replacement for a moving final-mux bypass, but that build is now confirmation rather than a prerequisite.
+
+#### Next Steps:
+
+Stop and obtain approval to supersede entry 496's moving-bypass build. If approved, make no RTL or RBF change for this ghost and treat it as downstream interlace reconstruction on the present display; optionally confirm later with deinterlacing disabled, a game mode, a different native-480i display or the moving final-mux pattern if a public compatibility claim requires formal isolation. Advance the core qualification instead to the already deferred bottom-field-first hardware case: regenerate and validate the established BFF light-motion fixture byte-identically, install only that media file through staged ordinary FTP with the default MiSTer login, then run it in native 480i and capture field order, motion, LEDs and schema-nine telemetry before addressing the independent approximately 25-picture-per-second all-I throughput ceiling. Keep the public native-interlace compatibility claim disabled until BFF passes.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 496 COMMIT Unreleased baf5d2c 2026-08-25T01:38:31-07:00
 
 #### Coming From:
@@ -1219,42 +1248,6 @@ Commit `1a6e6b4` builds the control that decides between those two readings. `st
 #### Next Steps:
 
 Power-cycle, set Audio Test to Off and run only `26_bbb_opening24_pts_noprefix.m2v`, then report visible stutter and all three LEDs and leave the final image loaded for a schema-eight capture. It carries the same 551 records as the control that produced 21 outliers, differing only in that none of them sits on a start-code prefix. A clean run with 3,138,618 accepted bytes proves the residue is the adjacency and makes the correction a helper-side one, never placing a record where the preceding bytes end in `00 00 01`, which also removes 66 such adjacencies from the audio-video transport and must then be retested there. A run that still produces about 21 outliers proves the cost is per-record and independent of placement, which leaves the spurious byte as a second and separate defect in extraction. Either result leaves the dominant mechanism untouched and architectural: with PCM present the shared byte path is paced by the audio sink, presentation hold collapses from roughly 780,000,000 cycles to 12,376,681, and correcting that means deepening `audio_pcm_fifo` past any lead the helper can produce or buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate`, both Quartus work to be chosen on resource and timing numbers.
-
-#### Files Modified:
-
-- tools/streams/strip_inband_pcm.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 457 COMMIT Unreleased 2054426 2026-08-24T08:53:01-07:00
-
-#### Coming From:
-
-Unreleased 386d3c1
-
-#### Purpose:
-
-Measure the residual record-carrying cadence cost against record density, after the timestamp-only control isolated PCM gating as the dominant mechanism.
-
-#### Outcome:
-
-The user ran `24_bbb_opening24_pts_only.m2v` and reports the stutter mostly gone but still present, and still worse than the audio-free control played in the past, with ordinary terminal indication of USER solid on, DISK blinking eleven times and POWER solid on. The capture is 545,928 bytes at SHA-256 `46e4a18ef82db01fb8d275389deda76664df91ee94b8881de1fa53b8d011d15a`, with zero aggregate error flags, all 3,138,619 bytes accepted, all 577 pictures displayed with 576 swaps, sequence end, presentation complete and normal quiet reason one. The control answers the question it was built for, and the split is lopsided. Presentation hold returns to 783,626,293 cycles against the raw control's 781,845,922 and the audio-video file's 12,376,681, and presentation stall to 775,473,833 against 777,671,229 and 11,794,180. Decoder stall is 655,681,763 against the raw control's 655,685,975, a difference of four thousand cycles in six hundred and fifty million. Removing PCM from a stream that keeps the same video bytes, the same 551 timestamps at the same offsets and the same record extraction restores the decoder's slack completely.
-
-The outlier count falls from 170 to 21 while the raw control's is zero, so the two mechanisms are now separated and measured. Real-time PCM sink gating destroys the decoder's reservoir and accounts for roughly 149 of the 170 outliers: with PCM present the shared path advances only as fast as the 48 kHz sink drains, the decoder can never run ahead, and every picture whose decode overruns its frame interval is late. That is why bounding delivery order and filling the compressed FIFO both failed to help; neither can create slack on a path that is paced by an audio sink, and the helper has no way to reach it. The remaining 21 outliers belong to the records themselves, because this control has full slack and still misses deadlines the identical unannotated video never missed. Its largest gaps are 116.054 milliseconds at display ordinal 65 with no compressed input pending and the scheduler reporting a released pending frame, 82.896 milliseconds at ordinal 196 with both scratch banks pending during a closed reorder run, and 66.317 milliseconds at ordinal 28 with the decoder not ready. `hold_scratch_available_cycles` also rises to 6,963,478 against the raw control's 2,984,470, so the scratch pool is being held longer when records are present even though nothing is starved.
-
-The transport-level adjacency recorded in entry 456 is now a candidate mechanism for that residue rather than a curiosity. This control carries 551 timestamp records and two picture start codes that its video does not contain, and it produces 21 outliers; the audio-video transports carry the same timestamps plus more than a million PCM records, present 59 and 66 such adjacencies before extraction, and produce 139 and 170. The correlation is suggestive but not proof, because record count, adjacency count and PCM gating all rise together and only gating has been isolated so far.
-
-The density control was approved and built. Commit `2054426` teaches `strip_inband_pcm.py` to keep only the first timestamp of each group, which changes record count without touching a single video byte: `25_bbb_opening24_gop_pts.m2v` is 3,138,852 bytes at SHA-256 `83930a92f9796b5c47a7719d4b635243eb84f8226c7f937465e31a68e13365f0` and carries 26 timestamps against the 551 of `24_bbb_opening24_pts_only.m2v`. Removing its timestamps reduces it to the same accepted video at SHA-256 `100dcb7d536918263def73bc2b8e660fdb2e975221ccd9d548b0845bb853471a`, the helper passes it through byte-identically under native and sanitized builds, and regenerating the dense control after the change reproduces the installed file exactly, so the tool's existing behaviour is unchanged. Only that file was installed, by the same staged roundtrip, with the `9f83805` helper confirmed still resident; no RBF, Main or other media file was touched.
-
-One confound has to be stated rather than discovered later. The sparse control carries 577 picture start codes before extraction, exactly what its video contains, because both of the entry 456 adjacencies happened to belong to dropped records. It therefore varies record count and adjacency count together, from 551 and two to 26 and zero. A fall in outliers is consistent with either a per-record cost or the adjacency, and separating those two would need a third control that keeps 551 records while avoiding the adjacency; no change in outliers rules out both and leaves the presentation timeline itself, which is the more valuable answer and the reason to run this control first.
-
-#### Next Steps:
-
-Power-cycle, set Audio Test to Off and run only `25_bbb_opening24_gop_pts.m2v`, then report visible stutter and all three LEDs and leave the final image loaded for a schema-eight capture. The measurement is the outlier count against 21 for 551 records, zero for no records and 170 for the audio-video file, with presentation hold expected to stay near the raw control's 781,845,922 cycles because this control has no PCM and therefore no gating. An outlier count falling roughly with record count makes the residue a per-record cost in extraction or the decoder pipeline, and the follow-up is a 551-record control built to avoid the two adjacencies, which separates the record from where it lands. An unchanged count of about 21 makes the residue a property of timestamp-driven presentation, and the follow-up is FPGA-side at the `pending_frame_released` state seen at ordinal 65 and the both-banks-pending reorder state at ordinal 196. Either way the dominant mechanism is unchanged and still architectural: the shared byte path is paced by the audio sink whenever PCM is present, and correcting it means either deepening `audio_pcm_fifo` beyond any lead the helper can produce or buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate` so compressed video keeps flowing, both of which are Quartus work to be chosen on resource and timing numbers.
 
 #### Files Modified:
 
