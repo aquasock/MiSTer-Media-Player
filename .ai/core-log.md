@@ -1,3 +1,31 @@
+## 491 COMMIT Unreleased f6f2fe4 2026-08-25T00:24:32-07:00
+
+#### Coming From:
+
+Unreleased f6f2fe4
+
+#### Purpose:
+
+Record the cadence-corrected native TFF hardware result, test the new cache-bank-overlap hypothesis and identify the remaining half-rate mechanism.
+
+#### Outcome:
+
+The user reloaded the exact `f6f2fe4` image, ran `_cadence/native_480i_tff_light_10s.m2v` in `Native 480i` mode and reports approximately the same speed as before, unchanged approximately 60 Hz flicker and the same quantity of transient tiny horizontal lines during playback. USER and POWER remain solid and DISK blinks twice. The untouched terminal screenshot was triggered and retrieved entirely through ordinary FTP with the default MiSTer login and no SSH; `.ai/current_results/entry490_tff_light_native480i_cadencefix.png` is 11,945 bytes with SHA-256 `1af6b303238d82fa3fc03840ad92c93afe0402923b100ef462a7eb0417c61d1a`. Schema nine accepts all 5,007,304 bytes, reconstructs 300 reference and displayed pictures and 299 swaps from the wrapped counters, preserves stable `top_field_first=1`, sees sequence end and presentation completion and reaches normal quiet reason one. Every aggregate, decoder, presentation, destination, cache, audio-underrun and PCM-protocol error is clear, including the new `cache_bank_overlap_error`; the tested same-bank active-scan refill collision therefore did not occur. First presentation is at 2,378,243 cycles and the last at 1,197,988,906 cycles, so the 299 intervals occupy 1,195,610,663 cycles, or 19.926844 seconds and 15.004885 pictures per second. This is materially identical to entry 489's 14.988809 pictures per second and proves the cadence-window separation did not remove the half-rate behavior. The integrated regression's immediate synthetic feeder hid the actual limiting interaction. The same fixture's progressive diagnostic baseline takes 14.874526 seconds, or approximately 49.75 milliseconds per decoded picture. Native output offers a complete-frame presentation boundary every 33.37 milliseconds, but `ordinary_reference_waiting` asserts `presentation_hold` while one decoded reference waits for that boundary. Decode therefore resumes only after presentation, completes approximately 49.75 milliseconds later, misses the immediately following native frame boundary and waits to the next one; the serial decode-plus-window quantization deterministically becomes about 66.73 milliseconds per picture, or 14.99 pictures per second. The synthetic feeder publishes a new completed frame immediately after the pending slot clears and thus proves cadence arithmetic without modeling measured decode latency or the real hold. The settled raster does not contain the transient short lines, and the clear overlap flag rules out only the specific monitored collision rather than every cache or output-path mechanism.
+
+#### Next Steps:
+
+With explicit user approval, replace the immediate-feeder integration case with a measured-latency ordinary-reference regression that reproduces the current approximately 15-picture-per-second native result through the real `presentation_hold` path. Then use the already implemented third ordinary DDR frame region to permit exactly one queued ordinary reference while a prior reference awaits its safe complete-frame boundary, with explicit ownership assertions preventing decode from targeting the displayed or pending bank and with all established I, P and B presentation regressions retained. The corrected measured-latency regression must approach the decoder-limited approximately 20.10-picture-per-second baseline without changing native field order or the 59.94-field raster. In the same diagnostic build, add a selectable native video-domain timing pattern that bypasses decoder DDR and line caches while preserving the exact 480i timing, so one hardware run can determine whether the flicker and transient short lines originate in the timing/output path or only during framebuffer refill. Rebuild and install only after timing closure, then rerun the TFF fixture for cadence and the bypass pattern for artifact isolation. Continue to defer BFF and any public native-interlace compatibility claim.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 490 COMMIT Unreleased f6f2fe4 2026-08-25T00:16:30-07:00
 
 #### Coming From:
@@ -1236,36 +1264,6 @@ One encoding variable remains because the existing squirrel clip begins a fresh 
 #### Next Steps:
 
 Without rebooting, run only `22_bbb_opening24_exact_video.m2v`. Report whether its 24-second motion is continuous or shows the repeated-frame cadence seen during the opening of `20_bbb_full_48k.mpg`, plus USER, DISK and POWER at the end, then leave its final image loaded for schema-eight capture. A clean exact-byte raw run will conclusively place both the cadence regression and the soak's early underrun in shared in-band PCM/video pacing; matching stutter will instead identify the encoded opening's decoder workload. Do not replay the full Program Stream or run another file before capture.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 451 COMMIT Unreleased f2b2e02 2026-08-24T07:22:11-07:00
-
-#### Coming From:
-
-Unreleased f2b2e02
-
-#### Purpose:
-
-Close the full audio-video soak with quantified cadence and audio evidence, distinguish authored end-sting level from helper decode, and select the shortest isolating follow-up.
-
-#### Outcome:
-
-The user completed `20_bbb_full_48k.mpg` without replay. Audio stayed synchronized for the full 9:56 and had no crackle or audible stutter during the body, but video showed definite brief repeated or late frames roughly every quarter to half second, more frequently than once per second. At the closing iris immediately before the final plate, the audio sounded as if it blew out. The untouched terminal screenshot is 8,050 bytes at SHA-256 `4ad16a8fc108fe0935fd48651e688c35af97988612357cced397de6a8334290e` and correctly shows the final black raster, but schema-eight telemetry had frozen on the first fatal condition about 21.74 seconds into playback. Its sole aggregate flag is `0x0400`, a real `audio_pcm_underrun`; PCM protocol, presentation and destination errors remain clear. At that freeze 2,876,134 transport bytes had been accepted and 139 display gaps had already exceeded the profiler's 3,000,000-cycle or 50-millisecond outlier threshold. The three largest gaps are each 6,963,264 cycles or 116.054 milliseconds at picture ordinals nine, 57 and 81; all record `decoder_ready` false and compressed-input FIFO pending while scratch space is available and neither presentation nor destination holds. The eight-bit long-run picture counters wrap, but their states and the 16-bit outlier count prove frequent decoder-input lateness rather than source timestamp jitter or a presentation hold, matching the user's observation while the audio-owned timeline preserves long-term sync.
-
-Main's retained 3,972,939-byte log at SHA-256 `90ceb8a7ac772cf2822ad4311e3d6b08e111068ea5cef6ddcd7b8934c87ef810` proves complete host delivery despite that hardware freeze: helper exit is zero, all 342,199,090 deterministic transport bytes arrive over 83,545 reads with 667 transient would-block results, all 84,543,918 video and PTS bytes and all 28,628,352 PCM frames are emitted, and the established scheduler peaks remain 370,338 video bytes plus 6,654 samples. The final-sting decode is not invented by the helper. Helper and FFmpeg outputs are both exactly 28,628,352 stereo frames; across the entire movie and every measured tail window the helper differs by at most two signed sixteen-bit counts with approximately 0.504-count RMS error. At 579.946 seconds, 16.478 seconds before the end and coincident with the user's closing-iris marker, both decodes reach full scale on the same four samples. That loud transient is therefore present in the encoded source and the ARM decode preserves it, though the independent early hardware underrun means the overall playback path still fails the clean-audio requirement. The soak fails release acceptance on both frequent cadence outliers and sticky underrun even though it completes, stays synchronized and avoids audible body crackle.
-
-#### Next Steps:
-
-Before any source or installed-state change, record the soak's final USER, DISK and POWER states, then run only the already installed `13_bbb_squirrel_15sec_native24_q6.m2v` without rebooting. Its exact 2,603,570-byte SHA-256 is `9257ffadc24eb6696fc9760f3253764b396c993dfc3640e921c97611bad2edce`, it contains 360 audio-free pictures from the 7:15–7:30 high-motion sequence and it passes the same video envelope. Report whether its motion is continuous or shows the same repeated-frame cadence, especially at the wooden spikes near 7:22, plus all three final LEDs, then leave its final image loaded for schema-eight capture. A smooth raw clip isolates the defect to shared in-band PCM/video pacing; matching stutter instead isolates it to decoder throughput or a decoder-side regression. Do not replay the ten-minute Program Stream.
 
 #### Files Modified:
 
