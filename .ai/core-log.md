@@ -1,3 +1,36 @@
+## 496 COMMIT Unreleased baf5d2c 2026-08-25T01:38:31-07:00
+
+#### Coming From:
+
+Unreleased baf5d2c
+
+#### Purpose:
+
+Record the pair-identical TFF step-hold hardware result and separate framebuffer persistence from downstream motion-adaptive interlace processing before changing cache RTL.
+
+#### Outcome:
+
+The user ran only `_cadence/native_480i_tff_step_hold_10s.m2v` with `Native timing pattern` Off and native 480i active. There is no flicker, combing, horizontal dashes or other steady-state artifact, and the picture looks excellent. At each discrete bar jump, however, the old position remains slightly visible for approximately half a second while the new position initially appears to be missing alternating scan lines; the new bar then becomes complete and the old position disappears fully. Playback completes and all three LED indications pass. The untouched terminal frame was captured entirely through ordinary FTP with the default MiSTer login and no SSH. `.ai/current_results/entry495_tff_step_hold.png` is 7,689 bytes with SHA-256 `37d7e8687b28b258a1b1d4e996609bb5c49f98235e72967e9e2d1f00fbde84fc`; it shows one complete current bar and no old-position residue after stabilization.
+
+Schema nine accepts all 3,483,304 bytes, reconstructs all 300 reference and displayed pictures and 299 swaps from the wrapped counters, preserves top-field-first, reaches sequence end and presentation completion and closes normally for quiet reason one. Aggregate, decoder, presentation, destination, cache-bank-overlap, audio-underrun and PCM-protocol errors are all clear, and no destination holds occur. The first presentation at cycle 2,332,280 and last at cycle 706,661,049 span 704,328,769 cycles, or 11.738813 seconds and 25.471060 pictures per second. The terminal still and telemetry therefore show that the transient resolves rather than accumulating into a corrupt frame.
+
+The fixture makes two conclusions firm. Its decoded validator proves both authored fields are identical, the current position is complete in adjacent field rows, every prior non-current position is background after a jump and the maximum adjacent-field row delta is zero; therefore neither an encoded old bar nor ordinary one-field temporal separation can last half a second. The static video-domain pattern previously proved decode and DDR traffic do not perturb native sync or the final mux. But the earlier plan's statement that persistence would by itself prove stale framebuffer content was too strong: a downstream television, scaler or capture device doing motion-adaptive deinterlacing can also retain several prior fields after a discontinuous motion step and can temporarily reconstruct only alternating lines at the new position. Because the prior bypass pattern was static, it could not distinguish that external temporal processing from the framebuffer and line caches. The clear cache-bank-overlap flag excludes only a refill into the line-cache bank currently being scanned and does not settle the broader framebuffer case.
+
+#### Next Steps:
+
+Stop before changing framebuffer or cache RTL and obtain approval for one moving video-domain discriminator. Extend `Native timing pattern` from Off/Static to Off/Static bars/Step-hold, with the new mode generating the same narrow field-invariant bar directly after the framebuffer, holding each position for thirty complete output frames and jumping ninety-six pixels while MPEG decode and DDR traffic continue underneath. Regress exact native timing, pair-identical fields, hold length, jump positions and unchanged static-pattern behavior, then build and install one RBF through the established staged ordinary-FTP process. Replay the same TFF file with the video-domain Step-hold mode enabled. If the approximately half-second ghost and incomplete new lines repeat, the artifact is downstream display processing and the FPGA pixel path is cleared; if the bypass bar changes cleanly while the decoded bar does not, the fault is inside framebuffer publication or line-cache generation and the following RTL cycle should instrument current display-bank identity and per-line cache generation. Continue to defer BFF, throughput optimization and any public native-interlace compatibility claim.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 495 COMMIT Unreleased baf5d2c 2026-08-25T01:30:20-07:00
 
 #### Coming From:
@@ -1222,42 +1255,6 @@ One confound has to be stated rather than discovered later. The sparse control c
 #### Next Steps:
 
 Power-cycle, set Audio Test to Off and run only `25_bbb_opening24_gop_pts.m2v`, then report visible stutter and all three LEDs and leave the final image loaded for a schema-eight capture. The measurement is the outlier count against 21 for 551 records, zero for no records and 170 for the audio-video file, with presentation hold expected to stay near the raw control's 781,845,922 cycles because this control has no PCM and therefore no gating. An outlier count falling roughly with record count makes the residue a per-record cost in extraction or the decoder pipeline, and the follow-up is a 551-record control built to avoid the two adjacencies, which separates the record from where it lands. An unchanged count of about 21 makes the residue a property of timestamp-driven presentation, and the follow-up is FPGA-side at the `pending_frame_released` state seen at ordinal 65 and the both-banks-pending reorder state at ordinal 196. Either way the dominant mechanism is unchanged and still architectural: the shared byte path is paced by the audio sink whenever PCM is present, and correcting it means either deepening `audio_pcm_fifo` beyond any lead the helper can produce or buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate` so compressed video keeps flowing, both of which are Quartus work to be chosen on resource and timing numbers.
-
-#### Files Modified:
-
-- tools/streams/strip_inband_pcm.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 456 COMMIT Unreleased 386d3c1 2026-08-24T08:41:14-07:00
-
-#### Coming From:
-
-Unreleased 9f83805
-
-#### Purpose:
-
-Separate in-band records from real-time PCM gating with a timestamp-only control derived from the helper's own transport, before any FPGA work begins.
-
-#### Outcome:
-
-The user reran `23_bbb_opening24_exact_av.mpg` on the `9f83805` helper and reports audio synchronization still good, the stutter slightly worse, and ordinary terminal indication with USER solid on, DISK blinking eleven times and POWER solid on. The capture is 545,938 bytes at SHA-256 `99b09546a25c7c104bd5e0c304b68170487620f8d403140392dd4bdf6e065ba4`. Correctness is unchanged and complete: zero aggregate error flags, no underrun, no PCM protocol error, all 3,138,619 bytes accepted, all 577 pictures displayed with 576 swaps, sequence end, presentation complete and normal quiet reason one. The startup budget did what it was measured to do on the host and did not do what it was predicted to do on hardware. First presentation returns to 2,275,519 cycles against the raw control's 2,275,460, so the fuller lead costs nothing at startup and the user confirms synchronization is unaffected, which settles the one risk that bounded the budget. But the outlier count falls only from 174 to 170, the largest gap grows from 182.371 to 431.059 milliseconds, and the session lengthens from 24.044 to 24.369 seconds.
-
-Presentation hold rises from 7,967,197 to 12,376,681 cycles, a 55 percent improvement on a quantity that must reach roughly 781,845,922 to match the smooth raw control. Tripling the compressed-FIFO lead moved the deficit by less than two percent of the distance, so the missing slack is not the lead and cannot be bought with more of it. Decode work remains identical across all three runs, with decoder stall at 655,685,975 raw, 644,013,299 on `cf1d173` and 643,974,167 now, and intra, predicted and bidirectional stalls matching to within three percent throughout. The hypothesis recorded in entry 455 is therefore refuted by its own acceptance test, and delivery ordering is exonerated as the cause of the cadence: two independent transport corrections, one bounding delivery order and one filling the sink FIFO, both leave the outlier count essentially where it was while decode work never changes.
-
-The remaining evidence points inside the FPGA. The two largest reordered gaps at picture ordinals fifteen and 33 repeat their `cf1d173` signature exactly, at 198.950 milliseconds each with `decoder_ready` true, compressed input pending, `scratch_available` false, a reorder run active, a decode in flight and a future frame pending, which is scratch exhaustion during reorder rather than any shortage of bytes. The new largest gap at ordinal fourteen has the opposite signature, 431.059 milliseconds with scratch available, the decoder ready and the scheduler reporting presentation complete, so it is a scheduler state question rather than a resource one. `hold_scratch_available_cycles` also falls from 3,397,412 to 582,616 while the lead grew, which is consistent with the scratch pool, not the byte path, being what the audio-video case runs out of.
-
-That control was approved and is built by `strip_inband_pcm.py` in commit `386d3c1`, which removes only the PCM records from the helper's own output rather than rebuilding the stream, so the timestamps land at exactly the elementary-stream offsets hardware saw. The generated `24_bbb_opening24_pts_only.m2v` is 3,143,577 bytes at SHA-256 `2a58632d3efbb4581d1cf3434d3dbe1d39f4f1ee2f4561cfdc2f47b7d0c13d39`, matching the video and timestamp byte count the analyzer measured for the audio-video transport, and carries all 551 timestamp records with 1,154,304 PCM records removed. Removing the timestamps as well reduces it to the accepted raw control at SHA-256 `100dcb7d536918263def73bc2b8e660fdb2e975221ccd9d548b0845bb853471a`, so the video is provably the same 577 pictures that already played smoothly. The helper passes the file through byte-identically under both native and sanitized builds, since an elementary stream takes no scheduling. Only that file was installed, by the same staged roundtrip; the `9f83805` helper was confirmed still resident and unchanged, and no RBF, Main or existing media file was touched.
-
-Validating the control surfaced a transport property worth recording on its own. The compatibility checker reads the annotated file as 579 pictures with two of them missing a coding extension, against 577 in the unannotated control, and the two extra picture start codes sit exactly where a record follows video whose last three bytes are `00 00 01`: the record's own leading zero completes a picture start code that the video did not contain. The same adjacency exists in the shipped audio-video transports, where a scan taken before record extraction sees 636 picture start codes under `f2b2e02` and 643 under `9f83805` rather than 577, because PCM records are inserted at far more points than timestamps are. Stripping records restores the exact video in every case, so a byte-serial extractor that strips before parsing is unaffected, and the hardware displayed exactly 577 pictures in both audio-video runs, which argues that picture counting happens after extraction. It nonetheless means the record insertion point is not neutral to a parser reading the stream ahead of extraction, and that the count of such adjacencies rose with each of the two transport corrections while the outlier count did not fall. Whether that is coincidence or mechanism is precisely what the installed control now separates.
-
-#### Next Steps:
-
-Power-cycle, set Audio Test to Off and run only `24_bbb_opening24_pts_only.m2v`, which has no audio by construction, then report visible stutter and all three LEDs and leave the final image loaded for a schema-eight capture. The comparison is against the raw control's zero outliers and 781,845,922 cycles of presentation hold, and against the 170 outliers and 12,376,681 cycles measured on the audio-video file whose video bytes and timestamps this control reproduces exactly. A smooth run places the defect in PCM sink gating and its interaction with the reorder and scratch logic, and the next work is FPGA-side. A stuttering run places it in timestamp-driven presentation or in record extraction itself, reproducible with no audio at all, and the immediate follow-up is then a second control with the timestamps removed to separate the records from the presentation timeline they carry. Either way, do not change the helper again until this control has answered, because two transport corrections have now been spent on a mechanism that has not been isolated.
 
 #### Files Modified:
 
