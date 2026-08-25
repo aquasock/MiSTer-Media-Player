@@ -47,6 +47,48 @@ begin
 end
 endtask
 
+task automatic prepare_secondary;
+begin
+    reset_case(); publish_bank1(); header_i();
+    completed_bank=2; frame_waiting=1;
+    @(posedge clk); #1; frame_waiting=0; active_bank=0;
+end
+endtask
+
+task automatic pulse_end;
+begin
+    sequence_end=1;
+    @(posedge clk); #1; sequence_end=0;
+end
+endtask
+
+task automatic pulse_swap;
+begin
+    swap=1;
+    @(posedge clk); #1; swap=0;
+end
+endtask
+
+task automatic accrue_frame_slot;
+begin
+    cadence=1; @(posedge clk); #1; cadence=0;
+    @(posedge clk); #1;
+    cadence=1; @(posedge clk); #1; cadence=0;
+    @(posedge clk); #1;
+end
+endtask
+
+task automatic require_terminal_empty;
+begin
+    accrue_frame_slot(); pulse_swap();
+    @(posedge clk); #1;
+    if (error || display_bank != 2 || dut.pending_frame_valid ||
+        dut.ordinary_secondary_valid ||
+        dut.ordinary_terminal_drain_pending || hold)
+        $fatal(1,"terminal ordinary queue did not drain");
+end
+endtask
+
 initial begin
     // A P picture may never enter the native all-I exception.
     reset_case(); publish_bank1();
@@ -94,8 +136,48 @@ initial begin
     @(posedge clk); #1; frame_waiting=0;
     if (!error) $fatal(1,"duplicate pending-bank completion was not caught");
 
+    // Sequence end before promotion must remain sticky through both queued
+    // presentations and retire the secondary as the final displayed frame.
+    prepare_secondary(); pulse_end();
+    if (!dut.ordinary_terminal_drain_pending ||
+        !dut.ordinary_secondary_released || !hold || error)
+        $fatal(1,"pre-promotion sequence end was not retained");
+    pulse_swap();
+    if (dut.pending_frame_bank != 2 || !dut.pending_frame_released)
+        $fatal(1,"terminal secondary was not promoted released");
+    require_terminal_empty();
+
+    // The one-cycle terminal event may coincide with secondary completion.
+    reset_case(); publish_bank1(); header_i();
+    completed_bank=2; frame_waiting=1; sequence_end=1;
+    @(posedge clk); #1;
+    frame_waiting=0; sequence_end=0; active_bank=0;
+    if (!dut.ordinary_secondary_valid ||
+        !dut.ordinary_secondary_released ||
+        !dut.ordinary_terminal_drain_pending || error)
+        $fatal(1,"completion-coincident sequence end was lost");
+    pulse_swap(); require_terminal_empty();
+
+    // It may also coincide with promotion or arrive just after promotion.
+    prepare_secondary(); sequence_end=1; swap=1;
+    @(posedge clk); #1; sequence_end=0; swap=0;
+    if (dut.pending_frame_bank != 2 || !dut.pending_frame_released ||
+        !dut.ordinary_terminal_drain_pending || error)
+        $fatal(1,"promotion-coincident sequence end was lost");
+    require_terminal_empty();
+
+    prepare_secondary(); pulse_swap();
+    if (dut.pending_frame_bank != 2 || dut.pending_frame_released || hold)
+        $fatal(1,"unreleased post-promotion control is invalid");
+    pulse_end();
+    if (!dut.pending_frame_released ||
+        !dut.ordinary_terminal_drain_pending || error)
+        $fatal(1,"post-promotion sequence end was lost");
+    require_terminal_empty();
+
     $display({"NATIVE_ORDINARY_OWNERSHIP_PASS p_serial=1 display_guard=1 ",
-              "secondary_queue=1 ordered_resume=1 duplicate_guard=1"});
+              "secondary_queue=1 ordered_resume=1 duplicate_guard=1 ",
+              "terminal=before/completion/promotion/after"});
     $finish;
 end
 endmodule

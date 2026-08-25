@@ -105,6 +105,7 @@ reg ordinary_secondary_valid;
 reg [1:0] ordinary_secondary_bank;
 reg ordinary_secondary_released;
 reg ordinary_resume_pending;
+reg ordinary_terminal_drain_pending;
 
 // Entry 354: the fixed 40 MHz 800x600 raster produces one swap window every
 // 1056*628 pixels.  Accumulate source-picture credit in pixel-clock units for
@@ -272,7 +273,8 @@ wire ordinary_secondary_mode_safe=
     (frame_rate_code==4'h4)&&!display_scratch&&!reorder_active;
 wire ordinary_secondary_release_now=
     ordinary_secondary_valid&&!ordinary_secondary_released&&
-    (sequence_end||(i_picture_start&&ordinary_secondary_mode_safe));
+    (sequence_end||ordinary_terminal_drain_pending||
+     (i_picture_start&&ordinary_secondary_mode_safe));
 wire ordinary_secondary_resume_now=
     ordinary_secondary_valid&&!ordinary_secondary_released&&
     i_picture_start&&ordinary_secondary_mode_safe;
@@ -317,6 +319,7 @@ always @(posedge clk) begin
         ordinary_secondary_bank<=0;
         ordinary_secondary_released<=0;
         ordinary_resume_pending<=0;
+        ordinary_terminal_drain_pending<=0;
         run_picture_count<=0;presentation_complete<=1;presentation_error<=0;
         cadence_credit<=CADENCE_DUE_24FPS;cadence_rate_code_q<=0;
     end else begin
@@ -360,7 +363,9 @@ always @(posedge clk) begin
              !ordinary_reference_present_now))begin
             pending_frame_valid<=1;
             pending_frame_bank<=completed_frame_bank;
-            pending_frame_released<=sequence_end||terminal_boundary_pending||
+            pending_frame_released<=sequence_end||
+                                    ordinary_terminal_drain_pending||
+                                    terminal_boundary_pending||
                                     non_b_picture_start;
             terminal_boundary_pending<=0;
         end
@@ -389,8 +394,19 @@ always @(posedge clk) begin
             queued_overlap_decode_open<=0;
         end
 
-        if(pending_frame_valid&&(non_b_picture_start||sequence_end))
+        if(pending_frame_valid&&(non_b_picture_start||sequence_end||
+                                ordinary_terminal_drain_pending))
             pending_frame_released<=1;
+
+        // The raw sequence-end event is only one cycle wide.  Native all-I
+        // ownership may promote a secondary identity on that same edge, so
+        // retain terminal permission until the complete ordinary queue drains.
+        if(sequence_end&&ordinary_secondary_mode_safe)
+            ordinary_terminal_drain_pending<=1;
+        else if(ordinary_terminal_drain_pending&&
+                !pending_frame_valid&&!ordinary_secondary_valid&&
+                !ordinary_reference_decode_open&&!frame_waiting)
+            ordinary_terminal_drain_pending<=0;
 
         // A native all-I stream may use the third ordinary frame region while
         // the preceding completed reference waits for its full-frame boundary.
@@ -434,7 +450,8 @@ always @(posedge clk) begin
                 else begin
                     ordinary_secondary_valid<=1;
                     ordinary_secondary_bank<=completed_frame_bank;
-                    ordinary_secondary_released<=sequence_end;
+                    ordinary_secondary_released<=sequence_end||
+                                                   ordinary_terminal_drain_pending;
                     ordinary_resume_pending<=0;
                 end
             end
@@ -769,7 +786,8 @@ always @(posedge clk) begin
                     pending_frame_valid<=1;
                     pending_frame_bank<=ordinary_secondary_bank;
                     pending_frame_released<=ordinary_secondary_released||
-                                            ordinary_secondary_release_now;
+                                            ordinary_secondary_release_now||
+                                            ordinary_terminal_drain_pending;
                     ordinary_secondary_valid<=0;
                     ordinary_secondary_released<=0;
                     if((ordinary_resume_pending||
@@ -787,6 +805,7 @@ always @(posedge clk) begin
                     pending_frame_valid<=1;
                     pending_frame_bank<=completed_frame_bank;
                     pending_frame_released<=sequence_end||
+                                            ordinary_terminal_drain_pending||
                                             terminal_boundary_pending||
                                             non_b_picture_start;
                     terminal_boundary_pending<=0;
@@ -883,6 +902,7 @@ always @(posedge clk) begin
             ordinary_secondary_valid<=0;
             ordinary_secondary_released<=0;
             ordinary_resume_pending<=0;
+            ordinary_terminal_drain_pending<=0;
         end
     end
 end
