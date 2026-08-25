@@ -1,4 +1,4 @@
-## 512 COMMIT Unreleased ??? 2026-08-25T08:40:51-07:00
+## 512 COMMIT Unreleased 69a4f20 2026-08-25T08:40:51-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Constrain only the asynchronous first stages of the new framebuffer telemetry sy
 
 #### Outcome:
 
-The clean Quartus Prime 17.0.2 build of `52a5a64` completed in 10 minutes 34 seconds with zero errors and produced an RBF, but global setup failed at negative 1.883 nanoseconds and is not eligible for installation. Focused timing proves the established same-clock decoder paths remain positive at 1.457 nanoseconds and video paths remain positive at 2.611 nanoseconds. The only two violations are the intentional 54 MHz video-domain `picture_present_rd` and `prefill_deadline_missed_rd` levels entering stage zero of their respective three-stage 60 MHz synchronizers. Their raw asynchronous phase relationship creates a 1.850-nanosecond TimeQuest relationship which must not be treated as a synchronous transfer. The approved build correction will add two destination-scoped false paths to stage zero only, matching the existing project convention for mode, cadence, download, snapshot and cache synchronizers. Stages zero-to-one and one-to-two will remain fully timed, and no RTL, diagnostic meaning, clock or functional behavior will change.
+The clean Quartus Prime 17.0.2 build of `52a5a64` completed in 10 minutes 34 seconds with zero errors and produced an RBF, but global setup failed at negative 1.883 nanoseconds and is not eligible for installation. Focused timing proved the established same-clock decoder paths remained positive at 1.457 nanoseconds and video paths remained positive at 2.611 nanoseconds. The only two violations were the intentional 54 MHz video-domain `picture_present_rd` and `prefill_deadline_missed_rd` levels entering stage zero of their respective three-stage 60 MHz synchronizers. Their raw asynchronous phase relationship created a 1.850-nanosecond TimeQuest relationship which must not be treated as a synchronous transfer. Commit `69a4f20` adds two destination-scoped false paths to stage zero only, matching the existing project convention for mode, cadence, download, snapshot and cache synchronizers. TimeQuest matches both keepers without an empty-filter warning; rerunning the focused reports against the fitted netlist removes both violations and leaves decoder setup at positive 1.457 nanoseconds, decoder recovery at positive 11.713 nanoseconds and video setup at positive 2.611 nanoseconds with zero violated paths. Stages zero-to-one and one-to-two remain fully timed, and no RTL, diagnostic meaning, clock or functional behavior changes.
 
 #### Next Steps:
 
-Add the two exact first-stage exceptions to `MediaPlayer.sdc`, verify the exceptions match nonempty keepers, rerun focused timing and then perform another clean Quartus build from an empty database. Require positive global setup, hold, recovery, removal and pulse-width margins plus positive focused decoder and video setup before generating hashes or touching the MiSTer. If timing passes, preserve `48c2c87` as rollback and install the corrected diagnostic through ordinary FTP with the default `root` and `1` login; if either exception is empty or any synchronous path remains violated, stop and correct the constraint rather than installing.
+Perform another clean Quartus Prime 17.0.2 build from an empty database and rerun focused timing. Require positive global setup, hold, recovery, removal and pulse-width margins plus positive focused decoder and video setup before generating hashes or touching the MiSTer. If timing passes, preserve `48c2c87` as rollback and install the `69a4f20` diagnostic through ordinary FTP with the default `root` and `1` login; if any synchronous path remains violated, stop and correct the constraint rather than installing.
 
 #### Files Modified:
 
