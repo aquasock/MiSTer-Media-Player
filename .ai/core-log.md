@@ -1,3 +1,34 @@
+## 499 COMMIT Unreleased baf5d2c 2026-08-25T02:06:54-07:00
+
+#### Coming From:
+
+Unreleased baf5d2c
+
+#### Purpose:
+
+Capture the BFF hardware run and distinguish core field-order failure from artifacts introduced by the active MiSTer HDMI scaling path.
+
+#### Outcome:
+
+The user ran `_cadence/native_480i_bff_light_10s.m2v`, reports many visible issues and the expected terminal LEDs with USER solid, DISK blinking twice and POWER solid. The untouched terminal image was captured entirely through ordinary FTP with the default login and no SSH; `.ai/current_results/entry498_bff_light_native480i.png` is 11,828 bytes with SHA-256 `e08199714000955a47588255aef8aacd7b9902467458f32e891363342e825332`. Schema nine accepts exactly all 5,007,154 source bytes, reconstructs all 300 reference and displayed pictures and 299 swaps from the wrapped counters, reports stable bottom-field-first with `top_field_first=0`, reaches sequence end and presentation completion and closes normally for quiet reason one. Aggregate, decoder, presentation, destination, cache-bank-overlap, audio-underrun and PCM-protocol errors are all clear. First presentation at cycle 2,378,235 and last at 718,901,048 span 716,522,813 cycles, or 11.942047 seconds and 25.037584 pictures per second, materially matching the accepted TFF light-motion rate.
+
+The user's 61,120,546-byte, 14.788667-second Pixel 8 Pro recording `.ai/current_results/PXL_20260825_085714649.mp4` is SHA-256 `4646fc58721626cac3f5da1fcd0d49712f8c93632f602af7ebf90ab6203846a9` and averages 59.775504 captured frames per second. Frame-by-frame review shows the bright current bar progressing monotonically to the right with no field-order backstep or reversal, while a dim historical bar trails many source fields behind and portions of the already closed MiSTer OSD remain visible during startup. The fixture's decoded BFF planes independently place the bottom-field bar at x=40 before the top-field bar at x=44, then advance both four pixels per field; the timing and framebuffer regressions and hardware telemetry preserve that order. Because the OSD is composited after the MPEG framebuffer, its retained shapes cannot originate in decoder DDR or line caches. An ordinary-FTP inspection also finds no active `/media/fat/MiSTer.ini`; the installed example documents `direct_video=0` as the default. The run therefore feeds the core's native 480i into MiSTer's `ascal` path rather than sending raw 480i to HDMI, and `MediaPlayer_top_00.svh` currently hardwires `HDMI_BOB_DEINT=0`, selecting the scaler's weave and field-buffer path. The recording is consistent with field-history retention in that path, potentially compounded by the monitor and phone, not BFF decoding or field-order reversal. BFF logical acceptance passes, but visual acceptance through the current scaled-HDMI weave path does not.
+
+#### Next Steps:
+
+Stop and obtain approval for a revised bounded scaler-path commit before addressing decoder throughput. Add an `HDMI deinterlacer` menu choice using the next free status bit, retain Weave as the existing default and drive MiSTer's already implemented `HDMI_BOB_DEINT` only when native interlaced output is active and Bob is selected; direct-video raw 480i and progressive output must remain unchanged. Add a focused control regression proving progressive always requests no bob, native Weave remains zero and native Bob asserts the framework signal, retain all TFF/BFF timing, framebuffer and presentation regressions, then complete a clean Quartus build and staged ordinary-FTP installation. Rerun BFF light motion in Bob mode first and TFF light motion second, requiring monotonic motion without long historical bars or retained OSD. Do not create or alter `MiSTer.ini` and do not enable `direct_video` without separate user direction; raw-output qualification on a compatible sink remains a later, distinct test, and the public interlace claim stays disabled.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 498 COMMIT Unreleased baf5d2c 2026-08-25T01:54:16-07:00
 
 #### Coming From:
@@ -1213,42 +1244,6 @@ Run `20_bbb_full_48k.mpg` end to end before this commit is called good. Cadence 
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 459 COMMIT Unreleased 14e0629 2026-08-24T09:10:04-07:00
-
-#### Coming From:
-
-Unreleased 1a6e6b4
-
-#### Purpose:
-
-Coalesce the helper's timestamp records to the density hardware has already run cleanly, after record placement was ruled out and record count was not.
-
-#### Outcome:
-
-The user ran `26_bbb_opening24_pts_noprefix.m2v` and reports a stutter about once a second, resembling the cadence beat seen in earlier 24 and 25 frame-per-second work, with LEDs unchanged at USER solid on, DISK blinking eleven times and POWER solid on. The capture is 545,908 bytes at SHA-256 `e50bd5345423e36abec4895d9be9d5ca8e83a08e3a657996afa72e9cc5c11eaa`, and it reproduces the 551-record control rather than improving on it: 21 gap outliers again, the same three largest gaps of 116.054 milliseconds at display ordinal 65, 82.896 at ordinal 196 and 66.317 at ordinal 28, the same 3,138,619 accepted bytes and a bit-identical `hold_scratch_available_cycles` of 6,963,478. Forty-four decoded fields match exactly and the sixteen that differ do so in the fourth significant figure or below. Moving every record off a start-code prefix changed nothing.
-
-That refutes the adjacency reading recorded in entry 458, and the accepted-byte evidence with it: this control has no record on a prefix, presents 577 picture start codes to a pre-extraction scan and still accepts 3,138,619 bytes, so the spurious byte tracks record count rather than record placement and is not the mechanism it looked like. What survives is simpler and is now measured three times over. Zero records give zero outliers, 26 records give zero outliers, and 551 records give 21 outliers whether or not any of them sits on a prefix. The residual cost is per record, at roughly one late presentation for every 26 records carried, and at 551 records over 24 seconds that lands close enough to one per second to be exactly the beat the user describes. Presentation slack is not involved: presentation hold is 783,657,982 cycles against the raw control's 781,845,922, so the decoder has its full reservoir and still misses these deadlines.
-
-The helper's own record density is therefore a defect rather than a fixed cost. It emits one timestamp per video PES packet carrying a timestamp, which is 551 records for 24 seconds of this mux, while the FPGA presented the same 577 pictures perfectly from 26 timestamps and associated 24 of them. Nothing in presentation needed the other 525.
-
-Commit `14e0629` was approved and implements it. A timestamp is written when a sequence or group start code has passed since the last one, or after `PTS_MAX_PICTURE_GAP` pictures so a stream carrying neither boundary still receives one periodically; presentation reconstructs display order from each picture's own temporal reference in between. The timeline itself is untouched, because a chunk still carries its timestamp for the audio horizon whether or not a record is written for it, and both the scheduled and explicit output paths gate identically so the transport contract does not depend on which one produced it. Record counts fall from 551 to 26 on the diagnostic, from 48 to six on both controls, from one to one on the short and faded fixtures and from 13,401 to 598 on the full soak, which is one per encoded group rather than one per timestamped packet.
-
-The strongest host proof is an equality rather than a bound. Removing PCM from the new helper's transport for the diagnostic yields exactly `25_bbb_opening24_gop_pts.m2v` at SHA-256 `83930a92f9796b5c47a7719d4b635243eb84f8226c7f937465e31a68e13365f0`, the 26-record control that hardware has already presented with zero gap outliers and the same three largest display gaps as unannotated video. The helper now produces that record layout by construction rather than by filtering. Everything else holds: clean video is unchanged at 84,423,309 bytes for the soak and reduces to SHA-256 `100dcb7d536918263def73bc2b8e660fdb2e975221ccd9d548b0845bb853471a` on the diagnostic, PCM remains 28,628,352 frames at SHA-256 `337b1387b9324b6c391a3223ced8f7660bd5144267b29d3964b4ed6b282839af`, the startup lead stays at 28,654 bytes, steady batches within 2,048, PCM-free spans within 4,052 bytes and the audio deficit at zero. The soak transport shrinks from 342,199,090 to 342,083,863 bytes, exactly the 12,803 records no longer written, and its video and timestamp stream is now SHA-256 `545075cdc22437cb994efde832e8f09c663ac569bf8e98d406025ef480d2cd81`, which supersedes the long-established `db00682b` figure for that quantity while the video underneath it is unchanged. All fixtures at both sample rates, both controls and the diagnostic pass under native and address-and-undefined-sanitized helpers, the nine-case envelope retains three passes and six intended failures with identical statuses and messages, and two official GCC 10.2.1 builds are byte-identical at 361,452 bytes and SHA-256 `3a46ee0cba082e970948078c9f6675aca47c2cbe6b02262b90daca653e0a5333`. Only the helper was installed, with `9f83805` preserved exactly as `/media/fat/linux/MediaPlayer_Helper.backup.pre-timestamp-coalesce.9f83805`; no RBF, Main or media file changed.
-
-#### Next Steps:
-
-Power-cycle, set Audio Test to Off and run `23_bbb_opening24_exact_av.mpg`, the audio-video diagnostic rather than a control, since the helper now produces the proven record layout itself. Require the once-per-second beat to be gone and report what remains, plus all three LEDs, leaving the final image loaded for a schema-eight capture; the expectation is the outlier count falling from 170 by the 21 that record density accounted for, with presentation hold still collapsed near 12,376,681 cycles because PCM gating is untouched. Then run `20_bbb_full_48k.mpg` end to end, because sparse timestamps mean presentation extrapolates for longer and only ten minutes can show whether audio and video are still aligned at the end; drift there, not cadence, is what would send this change back. After that the remaining work is the dominant mechanism and it is FPGA-side, with three candidates to cost against resources and timing: deepening `audio_pcm_fifo` past any lead the helper can produce, buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate` so compressed video keeps flowing, and carrying many samples per PCM record, which would cut audio path bandwidth and the per-record cost this cycle measured at the price of a transport format change on both sides.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
 
 #### Status:
 
