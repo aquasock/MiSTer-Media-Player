@@ -51,6 +51,21 @@ set_false_path \
     -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|line_done_toggle_rd*}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|line_done_toggle_m1}]
 
+# The passive line-cache overlap diagnostic registers the active scan state and
+# selected cache banks in the 54 MHz presentation domain, then samples each
+# single-bit level through an explicit two-stage synchronizer in the 60 MHz
+# memory domain. Cut only the source -> first-stage paths; the second stages and
+# sticky overlap detector remain fully timed.
+set_false_path \
+    -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|cache_scan_active_rd}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|cache_scan_active_sync[0]}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|cache_scan_y_bank_rd}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|cache_scan_y_bank_sync[0]}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|cache_scan_c_bank_rd}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|cache_scan_c_bank_sync[0]}]
+
 # kate - Phase 1S publication scheduling adds one single-bit video-domain
 # blanking-window level. It is registered in the 54 MHz domain, then sampled by
 # an explicit three-stage synchronizer in the 60 MHz decoder/DDRAM domain. Cut
