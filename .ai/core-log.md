@@ -1,3 +1,32 @@
+## 498 COMMIT Unreleased baf5d2c 2026-08-25T01:54:16-07:00
+
+#### Coming From:
+
+Unreleased baf5d2c
+
+#### Purpose:
+
+Reproduce, validate and install the deferred bottom-field-first light-motion fixture without changing the accepted FPGA image.
+
+#### Outcome:
+
+The user approved entry 497's recommendation to skip the no-longer-required moving final-mux pattern and advance to BFF hardware qualification. Two independent invocations of `generate_test_interlaced_i_frames.py --light-visual-seconds 10` reproduce every generated artifact and the complete manifest byte-for-byte. The BFF light-motion fixture contains 300 all-I 720x480 pictures at 30000/1001, is 5,007,154 bytes with encoded SHA-256 `b26d0d4090ec8c39346782918e97eb0721ba0da5670b42ef14435e385f822271`, decodes to YUV420p SHA-256 `554fbf879319392629bb1d3ac7a041358929e0ee2e8fed6a7a05862f9efa65eb`, preserves bottom-field-first `bb` signalling in all pictures and remains decoded-plane-identical before and after the signalling patch. The analyzer retains the intentional interlaced all-I candidate classification and the public compatibility checker deliberately fails because native interlaced support is not publicly enabled. No source or RBF build was needed. The active `/media/fat/MediaPlayer.rbf` was independently retrieved at the exact accepted `2601573` SHA-256 `67bd360b0efa1864ca5184049ad6dfd9fc2edc006421871309c2c0be9de70969`. Only the BFF media file was uploaded under a temporary name through ordinary FTP with the default `root` and `1` login and no SSH, retrieved at the local hash, promoted as `/media/fat/_cadence/native_480i_bff_light_10s.m2v`, retrieved again at the same hash and left with no staging file. Helper, Main and existing media files were not changed.
+
+#### Next Steps:
+
+Leave `Native timing pattern` Off, set `Interlaced output` to `Native 480i` and run only `_cadence/native_480i_bff_light_10s.m2v`. Judge whether the bar continues moving smoothly to the right without field-order reversal, backstep or alternating-field judder, whether the upper and lower field markers remain orderly, and report flicker, combing, horizontal dashes or any other artifact separately from the already classified display-history ghost. Report USER, DISK and POWER after completion and leave the terminal image loaded for an ordinary-FTP schema-nine capture. Acceptance requires all 300 pictures and 299 swaps, stable bottom-field-first telemetry, sequence end and presentation completion, zero aggregate, presentation, destination and cache-bank-overlap errors and a decoder-limited duration comparable to the accepted TFF light-motion run. Keep the public native-interlace compatibility claim disabled until this BFF result is captured; address the independent approximately 25-picture-per-second all-I throughput ceiling afterward.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 497 COMMIT Unreleased baf5d2c 2026-08-25T01:49:06-07:00
 
 #### Coming From:
@@ -1220,38 +1249,6 @@ Power-cycle, set Audio Test to Off and run `23_bbb_opening24_exact_av.mpg`, the 
 #### Files Modified:
 
 - host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 458 COMMIT Unreleased 1a6e6b4 2026-08-24T08:59:05-07:00
-
-#### Coming From:
-
-Unreleased 2054426
-
-#### Purpose:
-
-Record that the residual cadence cost tracks timestamp record placement rather than presentation, and build the control that separates the record from where it lands.
-
-#### Outcome:
-
-The user ran `25_bbb_opening24_gop_pts.m2v` and reports the stutter gone, with ordinary terminal indication of USER solid on, DISK blinking eleven times and POWER solid on. The capture is 545,920 bytes at SHA-256 `4cf3439106759505629e761981abfcc7ccdc05e3648df08586bb6ced939e3949` and the run is indistinguishable from the unannotated control: zero aggregate error flags, all 577 pictures displayed with 576 swaps, sequence end, presentation complete, normal quiet reason one, zero gap outliers, and the same three largest display gaps of 49,738 microseconds at display ordinals three, four and six that the raw control produced. Presentation hold is 778,283,682 cycles against the raw control's 781,845,922, and decoder stall 655,665,458 against 655,685,975. Twenty-six timestamps cost nothing measurable; 551 cost 21 outliers and a 116.054-millisecond worst gap. The residue therefore scales with record placement and is not a property of timestamp-driven presentation, because this control is timestamp-driven, associates 24 timestamps and still presents exactly as the unannotated video does.
-
-One counter separates the two candidate mechanisms more sharply than the outlier count does. Accepted transport bytes are 3,138,618 for the raw control and 3,138,618 for this one, both exactly the video's own length after extraction, but 3,138,619 for the 551-record control and for the audio-video file, which is one byte more than the video contains. The two streams that accept a spurious byte are precisely the two that carry a record immediately after video ending in `00 00 01`, and the two that accept the exact count are the two with no such adjacency. That is direct evidence that record extraction mishandles a record placed on a start-code prefix, injecting a byte into the elementary stream the decoder then has to absorb, rather than evidence that records cost pipeline time in proportion to their number.
-
-Commit `1a6e6b4` builds the control that decides between those two readings. `strip_inband_pcm.py` can now defer a record by one video byte when it would otherwise land on a start-code prefix, which preserves the record count at 551, the offsets of every other record, all 577 pictures and the exact video at SHA-256 `100dcb7d536918263def73bc2b8e660fdb2e975221ccd9d548b0845bb853471a`. The generated `26_bbb_opening24_pts_noprefix.m2v` is 3,143,577 bytes at SHA-256 `d94e9780fdb86680edd484ed5f1e68381abdd7ee18a24e8c3e9195c779a49cf0`, the same length as the dense control, and a scan before extraction now finds exactly 577 picture start codes rather than 579. The helper passes it through byte-identically under native and sanitized builds, and regenerating both earlier controls after the change reproduces the installed files exactly. Only that file was installed, by the same staged roundtrip, with the `9f83805` helper confirmed still resident and no RBF, Main or other media file touched.
-
-#### Next Steps:
-
-Power-cycle, set Audio Test to Off and run only `26_bbb_opening24_pts_noprefix.m2v`, then report visible stutter and all three LEDs and leave the final image loaded for a schema-eight capture. It carries the same 551 records as the control that produced 21 outliers, differing only in that none of them sits on a start-code prefix. A clean run with 3,138,618 accepted bytes proves the residue is the adjacency and makes the correction a helper-side one, never placing a record where the preceding bytes end in `00 00 01`, which also removes 66 such adjacencies from the audio-video transport and must then be retested there. A run that still produces about 21 outliers proves the cost is per-record and independent of placement, which leaves the spurious byte as a second and separate defect in extraction. Either result leaves the dominant mechanism untouched and architectural: with PCM present the shared byte path is paced by the audio sink, presentation hold collapses from roughly 780,000,000 cycles to 12,376,681, and correcting that means deepening `audio_pcm_fifo` past any lead the helper can produce or buffering a stalled PCM record aside in `mpeg2_h262_stream_transport_gate`, both Quartus work to be chosen on resource and timing numbers.
-
-#### Files Modified:
-
-- tools/streams/strip_inband_pcm.py
 
 #### Status:
 
