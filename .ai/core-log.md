@@ -1,4 +1,4 @@
-## 543 COMMIT Unreleased ??? 2026-08-26T14:35:16-07:00
+## 543 COMMIT Unreleased 7cdfcec 2026-08-26T14:35:16-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Close timing for the raster-phase correction by changing only the reproducible Q
 
 #### Outcome:
 
-Entry 542 proved that commit `99fc1ea` compiles cleanly and restores the established MiSTer raster-control contract, but its retained seed-fourteen fit missed global setup by 0.199 nanoseconds and was therefore not deployed. The user approved one additional shortened cycle with no long regressions. The only planned source change is the Quartus seed assignment; framebuffer RTL, decoder behavior, clocks, constraints, diagnostics, menu, host software and MiSTer configuration remain unchanged.
+Entry 542 proved that commit `99fc1ea` compiles cleanly and restores the established MiSTer raster-control contract, but its retained seed-fourteen fit missed global setup by 0.199 nanoseconds and was therefore not deployed. Commit `7cdfcec` changes only the reproducible Quartus seed assignment from fourteen to fifteen; framebuffer RTL, decoder behavior, clocks, constraints, diagnostics, menu, host software and MiSTer configuration are unchanged. Per the user's shortened-cycle direction, the focused cache-refill testbench elaborated successfully without running `vvp`, and no native, reconstruction or live-raster regression was run. The retained-state seed-fifteen incremental compilation reused synthesis and completed in 9 minutes 22 seconds with zero errors. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.213, 0.249, 3.598, 0.614 and 0.925 nanoseconds. The fit uses 31,407 ALMs, 49,499 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The 4,278,588-byte RBF has SHA-256 `5895917446f140bc53130fcf4b93226fa507cd9c6b9f335c00660c7428711365` and is eligible for hardware validation.
 
 #### Next Steps:
 
-Set the Quartus project seed to fifteen, commit and push that single change, then run the focused compile-only elaboration and one retained-state incremental Quartus build on GUNSMOKE without running `vvp` or any native, reconstruction or live-raster suite. Deploy only if compilation succeeds with zero errors and setup, hold, recovery, removal and minimum-pulse-width timing are all non-negative. If it passes, directly replace only `/media/fat/MediaPlayer.rbf`, independently verify the active image and stop for an idle-screen scaler-lock check before any media playback.
+Copy the exact seed-fifteen RBF from the designated GUNSMOKE checkout to the Raspberry Pi, directly replace only `/media/fat/MediaPlayer.rbf` through ordinary FTP without creating a backup, rollback or staging file, and independently read back the active image to verify its size and SHA-256. Reload the core and stop at the idle screen. Hardware acceptance begins with stable scaler lock and one genuinely fresh screenshot before any media playback; if idle lock fails, immediately restore the retained exact `164c7e6` image.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Set the Quartus project seed to fifteen, commit and push that single change, the
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
