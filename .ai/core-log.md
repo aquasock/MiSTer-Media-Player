@@ -1,4 +1,4 @@
-## 528 COMMIT Unreleased ??? 2026-08-26T01:36:57-07:00
+## 528 COMMIT Unreleased 5de0e1d 2026-08-26T01:36:57-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Expose and correct any native line-cache registered-address or byte-lane alignme
 
 #### Outcome:
 
-The user approved entry 527's bounded cache-read alignment cycle after schema sixteen proved correct row, bank and generation provenance but saturated content mismatches in both fields. This proposal changes no behavior speculatively: the first gate replaces the cache test's identical DDR words with deterministic position-varying words containing distinct bytes in all eight lanes while preserving the implemented registered M10K read-address model, four-read-clock pixel cadence, TFF and BFF field order, frame wrap and ordinary refill timing. Only if that test reproduces an exact raw-versus-displayed position mismatch will the same commit correct the proven pipeline alignment and require bit-exact 720-byte line comparisons; if it does not reproduce, work stops before RTL changes and the next proposal becomes a lane-resolved schema-seventeen diagnostic.
+The position-varying regression reproduced the hardware defect before any RTL change: every eighth luma pixel failed at lane seven because the registered M10K read address had already advanced to the following word, beginning at x=7 where expected byte `cb` was read as the next word's `cc`, then repeating at x=15, x=23 and every subsequent word boundary; both completed field fingerprints mismatched. Commit `5de0e1d` drives both luma and chroma cache addresses from the already delayed source coordinates, aligning the registered RAM word with the separately delayed byte-lane selector, and expands the regression to generate distinct values for every DDR word and all eight lanes while comparing every displayed luma byte against its exact physical row, word and lane. Position-varying TFF and BFF controls then complete all 720 bytes of every line with zero mismatches, one injected cache bit produces exactly one mismatch at x=80, word ten, lane zero, and the forced wrong-bank control remains tag-only. The complete native suite passes field order, mapping, exact TFF/BFF timing, Bob and Weave control, pattern isolation, ownership, the measured presentation integration, ordinary/delayed/late-prefill cache modes, schema sixteen and all retained decoder layouts. TFF, BFF and progressive reconstruction remain at 7,926,459, 7,948,706 and 13,048,137 cycles with zero out-of-tolerance pixels, field-DCT rejection remains at 82,326 cycles and the canonical seventy-two-picture mixed-I/P/B live raster remains exactly 6,529,997 cycles with twenty-five publications, forty-seven B pictures, seventy-one swaps and every error clear. The requested retained-state incremental Quartus Prime 17.0.2 build completes in ten minutes thirty seconds with zero errors and 143 established warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.230, 0.244, 4.356, 0.570 and 0.925 nanoseconds with zero endpoint negative slack; focused decoder setup and recovery are positive 1.139 and 11.267 nanoseconds and focused video setup is positive 2.778 nanoseconds, all with zero violated paths. Only the established unmatched `RESET` filter remains. The fitted netlist retains all twelve delayed x-coordinate bits and all thirteen delayed y-coordinate bits used by the corrected cache address path; synthesis merges the redundant luma lane register into those identical coordinate keepers. The fit uses 30,460 ALMs, 48,582 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The 4,252,684-byte RBF has SHA-256 `9260f3c36d4515f03bee4f0ecb24af6c7dc9e4dfb4ff387ec5e841bca39ad96c`.
 
 #### Next Steps:
 
-Synchronize the designated GUNSMOKE checkout from the authoritative master branch, implement and run the position-varying native cache regression there, and inspect the first failing word and lane. If the existing RTL fails deterministically, make the smallest registered-read-address and byte-lane correction supported by that evidence, rerun the focused TFF and BFF cache controls followed by the complete native, reconstruction and canonical mixed-I/P/B live-raster suites, commit the source on the Raspberry Pi, synchronize GUNSMOKE to the exact source hash and perform an incremental Quartus Prime 17.0.2 build with timing, resource and netlist checks. Preserve schema sixteen unchanged for the hardware acceptance run and directly replace only `/media/fat/MediaPlayer.rbf` after a verified build, without creating backup, rollback or staging files.
+Copy the exact `5de0e1d` RBF from the designated GUNSMOKE checkout to the Raspberry Pi, directly replace only `/media/fat/MediaPlayer.rbf` through absolute-path ordinary FTP without creating backup, rollback or staging files, and verify the active image by independent readback. Reload the core, run `_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i while the corrected thirty-second burst captures fresh live frames, then decode unchanged schema sixteen from the same run. Hardware acceptance requires both field bars to advance with the authored four-pixel separation, no missing or frozen parity, no horizontal stale fragments, zero tag and content mismatch counts, all 300 pictures and 299 swaps and every aggregate, overlap, prefill, phase and region error clear.
 
 #### Files Modified:
 
@@ -23,7 +23,7 @@ Synchronize the designated GUNSMOKE checkout from the authoritative master branc
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
