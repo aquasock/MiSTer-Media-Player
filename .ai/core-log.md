@@ -1,3 +1,32 @@
+## 530 COMMIT Unreleased 5de0e1d 2026-08-26T02:28:14-07:00
+
+#### Coming From:
+
+Unreleased 5de0e1d
+
+#### Purpose:
+
+Resolve the registered-cache-read alignment hardware run and identify the next evidence boundary for the remaining second-field and horizontal-line corruption.
+
+#### Outcome:
+
+The user reloaded the exact `5de0e1d` image and ran `_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i while the corrected burst acquired ninety-five fresh screenshots over thirty seconds. The user reports that the prior extra bar on the right is no longer visible while the left bar sweeps, so the registered-address correction materially improves the duplicated or frozen bar symptom, but explicitly reports that the second field is still visibly wrong and thin grey horizontal lines remain throughout moving content; the image is therefore not accepted. Schema sixteen accepts all 5,007,304 bytes, reaches sequence end, presentation completion and normal quiet reason one, and its wrapped counters represent 300 framebuffer resets, 299 publications, 300 displayed pictures and 299 swaps. Every aggregate, cache-overlap, prefill, region and phase error is clear. Both field tag-mismatch and content-mismatch counters are exactly zero across 255 reported fingerprints per field; the terminal first-field raw and displayed fingerprints are both `f964952b`, and the second-field pair are both `8c26df67`. This is the expected change from entry 527's saturated raw-versus-cache mismatches and proves the corrected cache RAM write and registered readout now preserve every fingerprinted luma line, but it does not prove that the luma bytes arriving from DDR were originally written correctly. The selected live evidence `.ai/current_results/entry530_schema16_live_lines.png` is 9,828 bytes with SHA-256 `2b307a525e8b808c61f09bfff0e3643611f6e4e6d63b43438739c61815c678a8` and preserves the reported horizontal fragments; `.ai/current_results/entry530_schema16_terminal.png` is 12,478 bytes with SHA-256 `162ef1bb6119d2423a675cff82e9b5955fc668c6eea4fbbc982f06258d033462` and contains blocky lower-left content absent from the authored terminal frame. The cache-alignment correction therefore passes its narrow raw-versus-cache objective, while the overall native hardware result remains failed and the next distinction is accepted framebuffer writes versus later raw DDR returns.
+
+#### Next Steps:
+
+Stop before another behavioral correction and obtain approval for a schema-seventeen write-to-read provenance diagnostic. Fingerprint each accepted luma DDR writer word with its physical bank, row and word position, retain completed per-line expected fingerprints by framebuffer generation, and compare them against the already observed raw DDR return for the same published bank, row and generation before the line enters the cache. Preserve schema sixteen through legacy decoding and add directed controls proving clean equality, one accepted-write or readback corruption as a content mismatch, and wrong bank, row or generation as provenance mismatches; run the complete native, reconstruction and canonical live-raster suites before an incremental Quartus build. A write-versus-read mismatch localizes the remaining corruption to writer packing, address acceptance, DDR storage or region ownership, while equality moves the boundary upstream into reconstructed pixels or downstream beyond the already-cleared cache and requires a separate output-coordinate discriminator. Continue direct verified replacement of only `/media/fat/MediaPlayer.rbf` with no backup, rollback or staging files.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 529 COMMIT Unreleased 5de0e1d 2026-08-26T02:19:45-07:00
 
 #### Coming From:
@@ -1220,45 +1249,6 @@ With explicit user approval, replace the immediate-feeder integration case with 
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 490 COMMIT Unreleased f6f2fe4 2026-08-25T00:16:30-07:00
-
-#### Coming From:
-
-Unreleased 8d9043a
-
-#### Purpose:
-
-Correct native 480i frame admission to one presentation per authored frame and add a passive diagnostic for line-cache refill overlap.
-
-#### Outcome:
-
-Commits `6f4e1aa` and `f6f2fe4` implement and close the approved native TFF correction. Native timing now raises the cadence window at logical sample zero of the vertical-blanking tail and raises the frame-admission window one complete logical 13.5 MHz sample later, so the synchronized scheduler applies the second-field credit before testing the physical bank swap. The integrated 54 MHz timing to 60 MHz scheduler regression observes twelve fields, six frame windows and six presentations at 30000/1001 with no coincident cadence and admission pulses; the established synthetic scheduler rates remain unchanged for all five supported rate codes. The framebuffer now passively synchronizes active scan and selected Y/C cache-bank levels into the memory domain and latches a telemetry-only overlap error if a completed DDR refill writes the bank currently being scanned. The ordinary-latency live-raster test remains clear at latency 64 while the forced-delay case deterministically latches overlap at latency 3400, and the schema-nine decoder exposes the new flag. Exact TFF and BFF field timing, exhaustive interlaced cache mapping, stable field-order controls, scheduler rates, cadence profiling, telemetry decoding and fixture generation all pass. The first full compile exposed only the three intentional first-stage 54-to-60 MHz diagnostic synchronizer paths; `f6f2fe4` adds narrowly scoped timing exceptions for those destinations, leaving all second stages and functional logic timed. The exact `f6f2fe4` rebuild completes with zero errors and 144 warnings, 29,434 of 41,910 ALMs, 3,655,139 of 5,662,720 memory bits and 65 of 112 DSP blocks. Worst-case global setup, hold, recovery and removal margins are respectively 0.593, 0.243, 3.336 and 0.531 ns; the decoder and video setup margins are 1.453 and 2.848 ns. The 4,192,152-byte RBF has SHA-256 `9f60f116d145fde30e93de7db17bfc525168db0e5781f7d167f04ee2b5c01904`. It was uploaded, retrieved byte-identically under a staging name and promoted entirely through ordinary FTP with the default MiSTer login and no SSH. `/media/fat/MediaPlayer.rbf` retrieves at the exact new hash, while the known prior 4,210,740-byte image is preserved as `/media/fat/MediaPlayer.rbf.rollback-20260825T0015` at SHA-256 `5544bb48bea6d0f066b01f09f63087d46e7a52438ca60b6872b9f452ef213c09`.
-
-#### Next Steps:
-
-Reload the Media Player core, set `Interlaced output` to `Native 480i` and run only `_cadence/native_480i_tff_light_10s.m2v`. Judge whether playback is materially closer to the progressive diagnostic duration rather than the prior approximately twenty-second half-rate native run, whether the approximately 60 Hz flicker and transient one-pixel-high short dashes are gone or changed, and whether motion and field combing remain orderly. Report USER, DISK and POWER after completion and leave the final image loaded for an FTP-only schema-nine capture. Acceptance requires approximately 20.10 displayed pictures per second for this decoder-limited fixture, all 300 pictures and 299 swaps, zero aggregate errors and a clear new cache-bank-overlap flag. Continue to defer BFF and any public native-interlace compatibility claim until this TFF result passes.
-
-#### Files Modified:
-
-- MediaPlayer.sdc
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_06.svh
-- MediaPlayer_top_07.svh
-- rtl/mpeg2_luma_framebuffer.sv
-- rtl/mpeg2_video_output_timing.sv
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/run_native_480i_timing.sh
-- tools/streams/tb_native_480i_cache_refill.sv
-- tools/streams/tb_native_480i_presentation_integration.sv
-- tools/streams/tb_native_480i_timing.sv
-- tools/streams/test_decode_hardware_cadence.py
 
 #### Status:
 
