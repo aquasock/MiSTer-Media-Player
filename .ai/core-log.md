@@ -1,3 +1,74 @@
+## 519 COMMIT Unreleased 2668c8f 2026-08-25T19:53:29-07:00
+
+#### Coming From:
+
+Unreleased 7356e4a
+
+#### Purpose:
+
+Observe the luma content DDR returns for each field parity.
+
+#### Outcome:
+
+This commit folds every returned luma word into a per-parity signature and sets a varied flag when any word differs from the first that parity saw, attributing each word by `fetch_line[0]` against `first_field_mem`. Reading `fetch_line` also cleared one long-standing assigned-but-never-read warning, so the build reports 143 rather than the established 144. A clean build completed in 10 minutes 31 seconds with zero errors, global setup, hold, recovery, removal and minimum-pulse-width margins of positive 0.230, 0.253, 2.888, 0.689 and 0.925 nanoseconds, focused decoder setup and recovery of positive 1.735 and 11.737 and focused video setup of positive 2.346, all with zero violated paths, a fit of 29,440 ALMs and 45,469 registers, and every new register confirmed present by netlist probe. The 4,205,620-byte RBF has SHA-256 `c0eb30d2181b613a383b506bb30482f700c92c17eff7da33b082d049ac05c197` and was installed rollback-safe with `7356e4a` preserved. The first hardware attempt read schema twelve because the core had not been reloaded; the file on the card was verified correct and the run repeated after a reload. That repeat produced the clearest symptom capture so far, showing both presentations in one session: the first field blank at pre-playback level 24 with no bar for roughly eight seconds, then a transition, then the first field frozen on a picture with a stationary bar parked at x=112 through x=143 while the odd field continued sweeping, then correct content in both parities at terminal drain. The content counters from that run are void. Word forty was concatenated as eight, eight, one, one, six, three and three bits, which totals thirty rather than thirty-two, so the assignment zero-extended on the left and every field decoded two bits from its intended position. The reported varied flags and signatures are therefore meaningless, and the earlier explanation attributing their inconsistency to per-generation latching was wrong. The directed profiler regression did not catch it because it compared an equally malformed thirty-bit literal against the same wire, the same class of blind spot as the overlay case in entry 516 where a test validated the defect instead of detecting it. Schema twelve is unaffected and entry 518's conclusions stand, because its word forty totalled eight, eight, ten, three and three bits, which is exactly thirty-two. The padding has since been corrected to eight bits and a session-wide rework moves the accumulation into the profiler, whose reset scope is the session rather than the generation, so a parity that never receives varying data reports varied low regardless of which generation precedes terminal quiet. That rework lints clean but its directed regression currently fails with snapshot reason three, the fatal-error path, at 12.159 microseconds whenever the luma-return stimulus is present; the failure time is identical for a two-cycle and a three-cycle stimulus task, which rules out the no-progress budget that caused two earlier regression failures, and the mechanism is not yet understood. Nothing of that rework is committed. It remains uncommitted in the working tree so it is not lost, and the installed image remains `2668c8f`, which runs and captures normally but whose word-forty fields must not be read.
+
+#### Next Steps:
+
+Root-cause the profiler regression failure before anything else, since snapshot reason three means an error flag is asserting during the luma-return stimulus and that must be understood rather than worked around. Then complete the session-wide content rework on top of the corrected thirty-two-bit padding, and add a width check to the regression so a malformed snapshot word fails on its own rather than being confirmed by a matching malformed expectation, which is the specific gap that let both this defect and the entry 516 overlay defect reach a build. Rebuild, reinstall rollback-safe and repeat the fixture with a burst, reading the two varied flags and two signatures alongside burst frames from the same run. A first field whose returns never vary across the whole session while the second field's do proves the data is already wrong when it arrives and moves the search upstream of the framebuffer entirely; both parities varying proves correct data arrives and is lost afterwards, which would be the first evidence pointing downstream of the fetch. Retain the standing observation that the symptom presents in two forms, so a single run's flags do not generalize.
+
+#### Files Modified:
+
+- `MediaPlayer_top_06.svh`
+- `MediaPlayer_top_07.svh`
+- `rtl/mpeg2_luma_framebuffer.sv`
+- `rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv`
+- `tools/streams/decode_hardware_cadence.py`
+- `tools/streams/tb_h262_hardware_cadence_profiler.sv`
+- `tools/streams/test_decode_hardware_cadence.py`
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
+## 518 COMMIT Unreleased 7356e4a 2026-08-25T19:52:53-07:00
+
+#### Coming From:
+
+Unreleased 3e91073
+
+#### Purpose:
+
+Record which DDR region each field parity's fetch actually resolves into.
+
+#### Outcome:
+
+Entry 517 showed the framebuffer requesting every first-field row correctly and receiving pre-playback content, so this commit observes the one thing no counter recorded: which of the five DDR regions the top-level offset steers each fetch into. The framebuffer emits a plain row address and `mpeg2_new_display_frame_offset` is added combinationally at issue time, so a native frame readout spanning two vertical periods could in principle straddle a display swap and resolve its two parities differently. The top level now samples the region on each parity's fetch edge and the profiler latches both and counts generations where they disagree; all of it is `clk_mpeg2` logic and none enters the video domain. Schema twelve retires the per-parity displayed-line counters, which entry 517 proved uninformative by reading two hundred forty against two hundred forty while the field carried no picture, and reuses their bits for the two regions and a mismatch count at the same forty-three words. Retiring them also removed two video-domain toggles, two three-stage synchronizers and two timing exceptions, which is why this build has more margin than the one before it. A clean Quartus Prime 17.0.2 build completed in 10 minutes 35 seconds with zero errors and the established 144 warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.343, 0.252, 3.420, 0.572 and 0.925 nanoseconds, with global setup above the accepted `9573923` baseline rather than merely matching it. Focused decoder setup and recovery are positive 1.608 and 11.174 nanoseconds and focused video setup is positive 3.117 nanoseconds, all with zero violated paths, and a timing-netlist probe confirms every new register survives. The fit uses 29,399 ALMs and 45,254 registers. The 4,223,092-byte RBF has SHA-256 `2d011ce350f427f0d3c4eb147825947c6bf93a9ec7fc4e8a0771f1a86cc3ed58` and was installed rollback-safe over ordinary FTP with `3e91073` preserved. On hardware the symptom reproduced across fourteen live burst frames with the first field blank at pre-playback level and the odd field sweeping normally, while the counters reported 242 first-field and 240 second-field fetches, region one for both parities, zero region mismatches across all three hundred generations and zero phase errors. Both parities therefore resolve into the same region in every generation, the straddled-swap mechanism does not occur, and the banked address path is exonerated along with readout sequencing, field phase and per-parity fetch service. A static read then eliminated the writer structurally rather than by measurement: `mpeg2_h262_ddram_store_420p.sv` uses the identical base, bank offsets and ninety-word row stride as the reader, and snaps each block origin to a multiple of eight so every write covers eight consecutive frame rows and cannot populate one parity without the other.
+
+#### Next Steps:
+
+Observe the luma content DDR returns for each parity, since every measurement so far has observed control rather than data and all of it has been correct. Fold each returned luma word into a per-parity signature and set a flag when any returned word differs from the first that parity saw, attributing the word by the fetch address parity. Keep the accumulation on the decoder clock, publish it in the existing forty-three words, and read it alongside burst frames from the same run because the symptom presents in two forms: a first field blank at pre-playback level, and a first field frozen on a picture.
+
+#### Files Modified:
+
+- `MediaPlayer.sdc`
+- `MediaPlayer_top_06.svh`
+- `MediaPlayer_top_07.svh`
+- `rtl/mpeg2_luma_framebuffer.sv`
+- `rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv`
+- `tools/streams/decode_hardware_cadence.py`
+- `tools/streams/tb_h262_hardware_cadence_profiler.sv`
+- `tools/streams/test_decode_hardware_cadence.py`
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 517 COMMIT Unreleased 3e91073 2026-08-25T18:48:23-07:00
 
 #### Coming From:
@@ -1189,64 +1260,6 @@ The annotated `v0.7.0` tag object is `3e6d994d588a027b7e9b5fcbb8b0ba2950ae3472` 
 #### Next Steps:
 
 Treat v0.7.0 and its published archive as immutable. Begin any later work under a new Unreleased proposal, retain the exact `9a5eea3` FPGA and `acdbf8b` helper baselines for reproduction, and do not replace the tag or asset in place; publish a new semantic version if a released file ever needs to change.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 479 COMMIT Unreleased 37d913b 2026-08-24T14:24:41-07:00
-
-#### Coming From:
-
-Unreleased eab57b7
-
-#### Purpose:
-
-Accept the completed four-file v0.7.0 hardware release gate and finalize the public qualification record.
-
-#### Outcome:
-
-After a fresh power cycle, the user watched `20_bbb_full_48k.mpg` through its natural end and reports that everything passes, including the opening, transitions, high-motion sequence and rolling credits, with USER solid on, DISK blinking eleven times and POWER solid on. The final image was triggered and retrieved exclusively through plain FTP with the default MiSTer login and no SSH keys; `.ai/current_results/entry479_release_gate_full_soak.png` is 8,156 bytes with SHA-256 `08b075111ee41b2621db28abfde247ca676764ef6d78f5ed79c144e173418d7d`. Schema nine accepts all 84,423,309 H.262 bytes, and its wrapped counters correspond exactly to all 4,773 reference plus 9,542 B pictures, all 14,315 displayed pictures and 14,314 swaps. PCM sample and FIFO-peak telemetry saturate normally, aggregate error flags are zero, audio underrun and PCM protocol error are clear, sequence end is seen, presentation completes and the session freezes for normal quiet reason one at STC second 596. The credits window records zero gap outliers; its three largest gaps are each 2,984,256 decoder cycles or 49.7376 milliseconds, with 147 passive timestamp-advance opportunities and zero delay conflicts. Every terminal decoder, destination, presentation, reorder, scratch, promotion and future-reference state is clear. Together with the accepted power-cycle 48 kHz control, no-reboot video-only stream and no-reboot 44.1 kHz recovery control, this completes the exact four-file release gate on the reproducible RBF, helper and Main. Commit `37d913b` updates `README.md`, `CHANGELOG.md` and `docs/RELEASE_NOTES_v0.7.0.md` with the passed results and capture hashes. The internal package checksums still pass, and the unchanged 2,749,946-byte `MiSTer_Media_Player_v0.7.0.zip` retains SHA-256 `bae3c3c17d2381cb91e2baff98ec9cf22fed88b04d01bc1349574ae57b917377`.
-
-#### Next Steps:
-
-After this metadata commit is pushed, have the user create the annotated `v0.7.0` tag at the exact resulting `origin/master` commit and publish a GitHub pre-release using `docs/RELEASE_NOTES_v0.7.0.md`. Attach `host/build/MiSTer_Media_Player_v0.7.0.zip` and the loose `host/build/release-v0.7.0/MediaPlayer_20260824.rbf`; do not attach the generated regression media. After the tag and pre-release exist, verify their target and asset hashes, add the required VERSION record and leave `Unreleased` empty for the next milestone.
-
-#### Files Modified:
-
-- README.md
-- CHANGELOG.md
-- docs/RELEASE_NOTES_v0.7.0.md
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 478 COMMIT Unreleased eab57b7 2026-08-24T14:11:18-07:00
-
-#### Coming From:
-
-Unreleased eab57b7
-
-#### Purpose:
-
-Accept no-reboot 44.1 kHz audio recovery from the silent Program Stream as the third v0.7.0 release-gate test.
-
-#### Outcome:
-
-Without rebooting after the accepted zero-PCM session, the user reports that `01_good_480p_44k.mpg` passes with USER solid on, DISK blinking eleven times and POWER solid on. The final image was triggered and retrieved exclusively through plain FTP with the default MiSTer login and no SSH keys; `.ai/current_results/entry478_release_gate_44k_recovery.png` is 104,593 bytes with SHA-256 `4220305dabf9759e02c8f6c573fffb7768a43a338055d8a27ea77058f5fc8b8f`. Schema nine proves that audio delivery restarted: PCM sample count and FIFO high-water fields reach their healthy saturated telemetry values, while audio underrun, PCM protocol error and aggregate error flags remain clear. The core accepts the complete 582,741-byte H.262 payload, associates five timestamps, decodes seventeen reference and 31 B pictures, displays all 48 pictures with 47 swaps, records zero display-gap outliers, sees sequence end, completes presentation and freezes for normal quiet reason one at STC second two. Every decoder, destination, presentation, reorder, scratch, promotion, future-reference and terminal state is clear. This passes test three of the exact four-file v0.7.0 release gate and proves the required 48 kHz audio-video to silent to 44.1 kHz audio-video sequence without reboot.
-
-#### Next Steps:
-
-Power-cycle the MiSTer once, leave Audio Test Off and run only `20_bbb_full_48k.mpg` through its natural 9:56 end. Watch opening motion and sync, scene transitions, the high-motion squirrel sequence near 7:22 and the rolling credits, requiring no crackle, dropout, drift, repeated sections, corruption or recurring cadence jump. After completion, report audio-video behavior and all three LEDs, then leave the final image loaded for schema-nine capture. Do not replay or launch another file before the final evidence is retrieved.
 
 #### Files Modified:
 
