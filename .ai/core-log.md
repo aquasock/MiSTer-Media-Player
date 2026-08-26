@@ -1,3 +1,32 @@
+## 522 COMMIT Unreleased bfb9361 2026-08-25T20:39:25-07:00
+
+#### Coming From:
+
+Unreleased bfb9361
+
+#### Purpose:
+
+Interpret the first schema-fourteen hardware result and define the next evidence boundary without mistaking session-wide variation for generation-correlated correctness.
+
+#### Outcome:
+
+After reloading the installed `bfb9361` image, the user ran `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` and reports that what appeared to be the second field was duplicated, with the established ghosting and tiny horizontal grey lines still visible during playback. The terminal screenshot `.ai/current_results/entry522_schema14_terminal.png` was triggered and retrieved through ordinary authenticated FTP at 12,278 bytes and SHA-256 `7803856948fb73b61b332a0525fbf89289ef90b3dd0c41d4dbec63567ce5cfc2`. Schema fourteen accepts all 5,007,304 source bytes and its wrapped counters reconstruct 300 reference and displayed pictures with 299 swaps across 599,290,215 cycles, or 29.935413 pictures per second. Sequence end, presentation completion and quiet reason one are present; all error flags are clear. The framebuffer reports 300 generation resets, 299 publications, zero unpublished resets, zero prefill misses, a 2,002,004-cycle maximum publication latency, 242 first-field and 240 second-field fetches in the terminal generation, region one for both fields, zero region mismatches and zero phase errors. Both session-wide varied flags are set and the first-field and second-field signatures are respectively `0x37` and `0x03`. This disproves only a parity returning one constant sampled byte for the entire session. Entries 520 and 521 stated the stronger inference too broadly: the current signature XORs only byte lane zero of each returned sixty-four-bit word and aggregates all generations, so activity outside the symptom-bearing interval can set varied and a terminal snapshot cannot prove that the correct position-dependent field content arrived during the duplicated or ghosted frame. The result therefore passes the schema-fourteen diagnostic objective but does not yet place the loss definitively on either side of the DDR return; it narrows the required correlation to the raw-return, line-cache write and displayed-cache-read boundary.
+
+#### Next Steps:
+
+Do not make a behavioral correction from the coarse signatures. Prepare a bounded schema-fifteen diagnostic that computes generation-correlated, position-sensitive luma fingerprints over all eight bytes of every raw DDR return and over the corresponding post-cache displayed luma samples for each field parity, transfers only completed stable fingerprints across the video-to-decoder clock boundary and counts raw-versus-displayed mismatches without feeding control logic. Retain the established fetch, region, phase, publication and error evidence, add directed tests that prove matching TFF and BFF fields compare equal and an intentionally corrupted cache word compares unequal, preserve schema-fourteen through legacy decoding and run the complete native, reconstruction and live-raster suites before any clean build. If timing closes, repeat the same fixture while an agent-triggered live screenshot burst captures the visible duplication and read the correlated fingerprints from that same run; a mismatch localizes the defect to cache write/readout, while equality moves the search after the cache output.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 521 COMMIT Unreleased bfb9361 2026-08-25T20:30:53-07:00
 
 #### Coming From:
@@ -1241,37 +1270,5 @@ Install the exact RBF and deterministic TFF/BFF fixtures by plain FTP using the 
 
 - [x] Built
 - [ ] Passed
-
----
-## 482 COMMIT Unreleased 4c4d0e3 2026-08-24T15:29:53-07:00
-
-#### Coming From:
-
-Unreleased 46bf297
-
-#### Purpose:
-
-Admit and prove pixel reconstruction for the exact native-480i interlaced frame-DCT all-I subset established by the deterministic TFF/BFF fixtures, without yet changing video timing or claiming native output support.
-
-#### Outcome:
-
-Commit `4c4d0e3` admits only the approved 720x480, 30000/1001, 4:2:0, all-I, frame-picture/frame-DCT interlaced subset. The frontend now captures `chroma_420_type` explicitly and requires `progressive_sequence=0`, `progressive_frame=0`, `chroma_420_type=0`, `repeat_first_field=0`, frame prediction/DCT, valid I-picture syntax and no concealment vectors; either authored `top_field_first` value is preserved. Progressive acceptance remains under its original predicate, and field pictures, field-DCT pictures, repeat-first-field and unsupported motion syntax remain excluded. A new end-to-end RTL bench exercises the live frontend, I-picture parser/bookkeeper, inverse quantizer, IDCT and intra reconstruction against independent FFmpeg planar-YCbCr oracles. The TFF fixture reconstructs all 4 pictures and 2,073,600 component samples with 9,442 one-LSB differences, zero samples beyond the established one-LSB IDCT tolerance and maximum delta 1. The BFF fixture reconstructs all 4 pictures and 2,073,600 samples with 9,632 one-LSB differences, zero beyond tolerance and maximum delta 1. The released progressive all-I control reconstructs all 4 pictures and 2,073,600 samples with 69,671 one-LSB differences, zero beyond tolerance and maximum delta 1. A valid interlaced field-DCT negative control reaches the frontend but never asserts phase-one acceptance and reconstructs zero pictures. Current and exact pre-change `6636e8b` Cycle-A parser-equivalence runs produce byte-identical deterministic result lines across all eight cases; the same three legacy fixed-expectation wrapper exits occur on both revisions and remain outside the release gate. Quartus 17.0.2 synthesis, fitting, assembly and TimeQuest complete with zero errors. Focused timing reports zero violations with 1.748 ns decoder setup slack, 10.182 ns decoder recovery slack and 8.519 ns video setup slack; global endpoint TNS is zero. Fitter use is 29,134 ALMs, 45,135 registers, 3,655,139 block-memory bits, 464 RAM blocks and 65 DSP blocks. The resulting RBF is 4,186,320 bytes with SHA-256 `49ff363a6ab284f301ac30d96e3a976fafc0208317afd7fa486435ad6110b0fa`. Presentation deliberately remains the existing 800x600 progressive diagnostic path, and the user-facing compatibility checker still reports these streams unsupported until native 480i output is proven.
-
-#### Next Steps:
-
-Prepare the separate native 480i timing and presentation proposal. Add standards-correct alternating field timing with the required half-line relationship, use authored `top_field_first` only to choose the first displayed field, map the reconstructed frame into field-aware luma and 4:2:0 chroma presentation, drive MiSTer field signalling, and retain the current progressive diagnostic path as a selectable fallback until hardware proof passes. Keep field pictures, field-DCT, repeat-first-field, P/B interlacing and the user-facing compatibility claim out of scope. Qualify timing in RTL before installing any candidate RBF by plain FTP for visual TFF/BFF hardware testing.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_frontend.sv
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_02.svh
-- tools/streams/tb_h262_interlaced_i_reconstruction.sv
-- tools/streams/run_interlaced_i_reconstruction.sh
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
