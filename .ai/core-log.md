@@ -1,3 +1,33 @@
+## 539 COMMIT Unreleased ??? 2026-08-26T05:50:53-07:00
+
+#### Coming From:
+
+Unreleased 018093a
+
+#### Purpose:
+
+Prove that framebuffer publication preserves one current authored generation across both native field caches before changing RTL.
+
+#### Outcome:
+
+The user approved entry 538's next bounded simulation cycle after the generation-aware scheduler model passed without a replay. The planned change is confined first to the existing native 480i cache-refill regression: associate each selected framebuffer generation with its authored luma content, carry the generation through reset, prefill and publication, and assert that the first and second field caches both publish the same current generation rather than an older, mixed or repeated generation. Exercise ordinary, delayed and back-to-back refill timing already modeled by the test. The current framebuffer RTL will remain untouched unless this exact simulation reproduces a generation mismatch. No hardware diagnostic layout, menu, scheduler, decoder, host software or MiSTer configuration change is planned.
+
+#### Next Steps:
+
+Extend and run the existing framebuffer publication test first against the exact current RTL on GUNSMOKE. If it fails, preserve the selected, first-field and second-field generation sequence, add the smallest same-edge control reproducing the mismatch and correct only the responsible reset, prefill or publication transition. Then rerun the focused cache and presentation tests, complete native timing and reconstruction suites and canonical mixed-I/P/B live-raster regression before an incremental Quartus build. If both fields remain generation-consistent in every current timing case, stop without changing RTL or building an RBF and move the remaining investigation after the FPGA cache output.
+
+#### Files Modified:
+
+- tools/streams/tb_native_480i_cache_refill.sv
+- rtl/mpeg2_luma_framebuffer.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 538 COMMIT Unreleased 018093a 2026-08-26T05:36:53-07:00
 
 #### Coming From:
@@ -1215,37 +1245,6 @@ Reload the core, leave `Native timing pattern` Off, select `HDMI deinterlacer` B
 - rtl/mpeg2_hdmi_deinterlace_control.sv
 - tools/streams/run_native_480i_timing.sh
 - tools/streams/tb_hdmi_deinterlace_control.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 499 COMMIT Unreleased baf5d2c 2026-08-25T02:06:54-07:00
-
-#### Coming From:
-
-Unreleased baf5d2c
-
-#### Purpose:
-
-Capture the BFF hardware run and distinguish core field-order failure from artifacts introduced by the active MiSTer HDMI scaling path.
-
-#### Outcome:
-
-The user ran `_cadence/native_480i_bff_light_10s.m2v`, reports many visible issues and the expected terminal LEDs with USER solid, DISK blinking twice and POWER solid. The untouched terminal image was captured entirely through ordinary FTP with the default login and no SSH; `.ai/current_results/entry498_bff_light_native480i.png` is 11,828 bytes with SHA-256 `e08199714000955a47588255aef8aacd7b9902467458f32e891363342e825332`. Schema nine accepts exactly all 5,007,154 source bytes, reconstructs all 300 reference and displayed pictures and 299 swaps from the wrapped counters, reports stable bottom-field-first with `top_field_first=0`, reaches sequence end and presentation completion and closes normally for quiet reason one. Aggregate, decoder, presentation, destination, cache-bank-overlap, audio-underrun and PCM-protocol errors are all clear. First presentation at cycle 2,378,235 and last at 718,901,048 span 716,522,813 cycles, or 11.942047 seconds and 25.037584 pictures per second, materially matching the accepted TFF light-motion rate.
-
-The user's 61,120,546-byte, 14.788667-second Pixel 8 Pro recording `.ai/current_results/PXL_20260825_085714649.mp4` is SHA-256 `4646fc58721626cac3f5da1fcd0d49712f8c93632f602af7ebf90ab6203846a9` and averages 59.775504 captured frames per second. Frame-by-frame review shows the bright current bar progressing monotonically to the right with no field-order backstep or reversal, while a dim historical bar trails many source fields behind and portions of the already closed MiSTer OSD remain visible during startup. The fixture's decoded BFF planes independently place the bottom-field bar at x=40 before the top-field bar at x=44, then advance both four pixels per field; the timing and framebuffer regressions and hardware telemetry preserve that order. Because the OSD is composited after the MPEG framebuffer, its retained shapes cannot originate in decoder DDR or line caches. An ordinary-FTP inspection also finds no active `/media/fat/MiSTer.ini`; the installed example documents `direct_video=0` as the default. The run therefore feeds the core's native 480i into MiSTer's `ascal` path rather than sending raw 480i to HDMI, and `MediaPlayer_top_00.svh` currently hardwires `HDMI_BOB_DEINT=0`, selecting the scaler's weave and field-buffer path. The recording is consistent with field-history retention in that path, potentially compounded by the monitor and phone, not BFF decoding or field-order reversal. BFF logical acceptance passes, but visual acceptance through the current scaled-HDMI weave path does not.
-
-#### Next Steps:
-
-Stop and obtain approval for a revised bounded scaler-path commit before addressing decoder throughput. Add an `HDMI deinterlacer` menu choice using the next free status bit, retain Weave as the existing default and drive MiSTer's already implemented `HDMI_BOB_DEINT` only when native interlaced output is active and Bob is selected; direct-video raw 480i and progressive output must remain unchanged. Add a focused control regression proving progressive always requests no bob, native Weave remains zero and native Bob asserts the framework signal, retain all TFF/BFF timing, framebuffer and presentation regressions, then complete a clean Quartus build and staged ordinary-FTP installation. Rerun BFF light motion in Bob mode first and TFF light motion second, requiring monotonic motion without long historical bars or retained OSD. Do not create or alter `MiSTer.ini` and do not enable `direct_video` without separate user direction; raw-output qualification on a compatible sink remains a later, distinct test, and the public interlace claim stays disabled.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
