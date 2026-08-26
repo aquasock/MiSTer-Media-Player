@@ -1,4 +1,4 @@
-## 523 COMMIT Unreleased ??? 2026-08-25T20:41:57-07:00
+## 523 COMMIT Unreleased 4e4db95 2026-08-25T20:41:57-07:00
 
 #### Coming From:
 
@@ -10,26 +10,29 @@ Correlate each symptom-bearing generation's complete DDR-return luma content wit
 
 #### Outcome:
 
-The user approved the schema-fifteen diagnostic proposed by entry 522 and an accompanying thirty-second live screenshot burst using the currently installed schema-fourteen image before source changes begin. The burst acquired forty-nine screenshots at approximately 1.6 frames per second: the first seventeen are distinct live frames and the final thirty-two are one byte-identical terminal frame. Representative early, middle and late live frames show both field bars advancing but commonly separated by roughly twenty-four pixels rather than the authored four-pixel weave offset, with the short horizontal grey edge fragments visible beside one field's bar. This run is therefore a field-age mismatch rather than either field remaining constant for the full session. The proposed source boundary remains observational: compute position-sensitive fingerprints across all eight bytes of every native luma DDR return for each field parity, compute the same fingerprints over post-cache luma samples in displayed field order, publish only stable completed values across the video-to-decoder clock boundary and count generation-aligned raw-versus-displayed mismatches. The fingerprints must not feed cache, decoder, scheduler or presentation control.
+The pre-change thirty-second burst acquired forty-nine screenshots at approximately 1.6 frames per second, with seventeen distinct live frames followed by thirty-two byte-identical terminal frames. Both field bars advance during the live interval but are commonly separated by roughly twenty-four pixels rather than the authored four-pixel weave offset, and short horizontal grey edge fragments accompany one field, proving a field-age mismatch rather than one field remaining constant for the entire session. Commit `4e4db95` adds a passive position-sensitive thirty-two-bit fingerprint over all eight bytes of every native luma DDR return and the same byte sequence read from the post-cache display path, separated by authored field and framebuffer generation. Completed video-domain fingerprints cross as stable bundled data behind a three-stage toggle synchronizer, only the source-to-first-stage paths are cut, and the memory domain publishes raw, displayed and mismatch evidence without feeding cache, decoder, scheduler or presentation control. Cadence schema fifteen expands to forty-eight words at diagnostic and native origins 408 and 288, preserves words zero through forty-one, records the four most recent fingerprints and four saturating completion or mismatch counts, retains schema fourteen through legacy decoding, checks every overlay row and independently guards the packed count width. Directed TFF and BFF cache runs each produce two matching completions, an intentionally corrupted cache byte produces exactly one mismatch, and the complete native suite, interlaced reconstruction suite and canonical mixed I/P/B live-raster suite pass, the latter retaining exactly 6,529,997 cycles, twenty-five publications, forty-seven B-picture persistences, seventy-one swaps and no errors. A clean Quartus Prime 17.0.2 build from empty generated state completes in eleven minutes four seconds with zero errors and 143 established warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.172, 0.245, 3.999, 0.591 and 0.925 nanoseconds with zero endpoint negative slack; focused decoder setup and recovery are positive 1.311 and 11.527 nanoseconds and focused video setup is positive 2.987 nanoseconds, all with zero violated paths. Only the established unmatched `RESET` filter remains, and a timing-netlist probe finds every new raw, displayed and mismatch register. The fit uses 30,027 ALMs, 46,948 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The 4,207,656-byte RBF has SHA-256 `f53a686f0775b6bf1fce6be14669c2fe9761e2f6edcdcd5fd4d972b744711b93` and was written directly to `/media/fat/MediaPlayer.rbf`; an immediate ordinary-FTP readback matches its size and hash exactly. At the user's direction, all twenty `MediaPlayer.backup.*` and `MediaPlayer.rbf.rollback*` files were deleted from the MiSTer, the prior active file was not disturbed during that cleanup, and future installations will directly replace and verify the active file without creating backup, rollback or staging copies.
 
 #### Next Steps:
 
-Implement schema fifteen with directed TFF and BFF controls whose raw and displayed fingerprints match, an intentionally corrupted cache-word case that must mismatch, an independent payload-width and overlay-row-coverage check, and schema-fourteen through legacy decoder compatibility. Retain the established fetch, region, phase, publication, error and session-wide content evidence, and do not treat a coarse session-wide varied flag as proof about a particular generation. Run the focused cache, profiler and decoder tests followed by the complete native timing, reconstruction and canonical live-raster suites. Commit and push the source only after every regression passes, then perform a clean Quartus Prime 17.0.2 build, focused timing and timing-netlist presence checks; install rollback-safe and repeat the fixture with an agent-triggered live burst only if timing closes.
+Reload the installed `4e4db95` image, run `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i while an agent-triggered thirty-second screenshot burst captures the live fault, then decode schema fifteen from that same run. A raw-versus-displayed mismatch localizes corruption to the line-cache write or readout boundary; equality while the field-age mismatch is visible moves the investigation after the cache output. Record the hardware result in a new entry because this source and build boundary is now settled, and continue replacing the active RBF directly without creating backup, rollback or staging files.
 
 #### Files Modified:
 
 - `MediaPlayer_top_06.svh`
 - `MediaPlayer_top_07.svh`
+- `MediaPlayer.sdc`
 - `rtl/mpeg2_luma_framebuffer.sv`
 - `rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv`
 - `tools/streams/decode_hardware_cadence.py`
+- `tools/streams/run_native_480i_timing.sh`
 - `tools/streams/tb_h262_hardware_cadence_profiler.sv`
 - `tools/streams/tb_interlaced_420_cache_mapping.sv`
+- `tools/streams/tb_native_480i_cache_refill.sv`
 - `tools/streams/test_decode_hardware_cadence.py`
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
