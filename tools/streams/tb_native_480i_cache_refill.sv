@@ -192,6 +192,7 @@ integer response_words = 0;
 reg [28:0] response_address = 29'd0;
 reg slow_mode = 1'b0;
 reg late_prefill_mode = 1'b0;
+reg generation_delay_mode = 1'b0;
 integer fingerprint_count = 0;
 integer fingerprint_mismatch_count = 0;
 integer position_mismatch_count = 0;
@@ -522,13 +523,19 @@ initial begin
     slow_mode = $test$plusargs("SLOW");
     late_prefill_mode = $test$plusargs("PREFILL_LATE");
     generation_mode = $test$plusargs("GENERATIONS");
+    generation_delay_mode = $test$plusargs("GEN_DELAY");
     fingerprint_mode = $test$plusargs("FINGERPRINT") || generation_mode;
     bff_mode = $test$plusargs("BFF");
-    response_latency = (slow_mode || late_prefill_mode) ? 3400 : 64;
+    response_latency = generation_delay_mode ? 512 :
+        ((slow_mode || late_prefill_mode) ? 3400 : 64);
     compute_expected_field_fingerprints();
 
+    if (generation_delay_mode && !generation_mode)
+        $fatal(1,"GEN_DELAY requires GENERATIONS");
+
     if (generation_mode) begin
-        if (late_prefill_mode || $test$plusargs("CORRUPT") ||
+        if (slow_mode || late_prefill_mode ||
+            $test$plusargs("CORRUPT") ||
             $test$plusargs("READ_CORRUPT") ||
             $test$plusargs("WRITE_INVALID") ||
             $test$plusargs("WRONG_BANK"))
