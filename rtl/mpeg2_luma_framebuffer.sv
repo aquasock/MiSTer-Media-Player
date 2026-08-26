@@ -1307,15 +1307,10 @@ wire sequence_first_field_rd = (sequence_replica_rd < 9'd240);
 wire [31:0] luma_line_display_final_rd =
     luma_fingerprint_byte(luma_line_display_accumulator_rd,y_rd_data);
 wire luma_line_expected_bank_rd = source_y_d[1];
-// picture_present_rd rises at the native origin one cache-read pipeline stage
-// before decoded_picture_window_d can qualify that first returned byte.  Admit
-// the delayed x=0 sample explicitly so the diagnostic covers all 720 bytes of
-// the first published line as well as every already-published line.
+// The publication-effective qualifier below admits the first returned byte,
+// so every native diagnostic sample follows the same displayed-pixel window.
 wire native_luma_sample_valid_rd =
-    native_interlaced_r2 &&
-    (decoded_picture_window_d ||
-     (picture_present_rd && pixel_en && (source_x_d == 12'd0) &&
-      (source_y_d < {1'b0,picture_height_r2})));
+    native_interlaced_r2 && decoded_picture_window_d;
 wire luma_line_tag_mismatch_now =
     !luma_line_tag_valid_rd ||
     (luma_line_tag_row_rd != source_y_d[10:0]) ||
@@ -1637,9 +1632,13 @@ wire source_window = native_interlaced_r2 ?
 wire [11:0] source_x = native_interlaced_r2 ? h_pos : (h_pos - 12'd40);
 wire [11:0] source_y = native_interlaced_r2 ? v_pos : (v_pos - 12'd60);
 
+wire picture_present_effective =
+    picture_present_rd ||
+    (!picture_present_rd && cache_ready_r2 &&
+     (progressive_publish_origin || native_publish_origin));
 wire decoded_picture_window =
     source_window &&
-    picture_present_rd &&
+    picture_present_effective &&
     (source_x < picture_width_r2) &&
     (source_y < {1'b0, picture_height_r2});
 
@@ -1664,6 +1663,9 @@ reg [2:0] y_byte_lane_d;
 reg [2:0] c_byte_lane_d;
 reg       source_window_d;
 reg       decoded_picture_window_d;
+reg       pixel_en_d;
+reg       h_sync_d;
+reg       v_sync_d;
 
 reg [7:0] y_rd_data;
 reg [7:0] cb_rd_data;
@@ -1737,6 +1739,9 @@ always @(posedge rd_clk) begin
         c_byte_lane_d             <= 3'd0;
         source_window_d           <= 1'b0;
         decoded_picture_window_d  <= 1'b0;
+        pixel_en_d                 <= 1'b0;
+        h_sync_d                   <= 1'b0;
+        v_sync_d                   <= 1'b0;
         video_r                   <= 8'd0;
         video_g                   <= 8'd0;
         video_b                   <= 8'd0;
@@ -1749,10 +1754,13 @@ always @(posedge rd_clk) begin
         c_byte_lane_d            <= c_byte_lane;
         source_window_d          <= source_window;
         decoded_picture_window_d <= decoded_picture_window;
+        pixel_en_d                <= pixel_en;
+        h_sync_d                  <= h_sync;
+        v_sync_d                  <= v_sync;
 
-        video_de <= pixel_en;
-        video_hs <= h_sync;
-        video_vs <= v_sync;
+        video_de <= pixel_en_d;
+        video_hs <= h_sync_d;
+        video_vs <= v_sync_d;
 
         if (decoded_picture_window_d) begin
             video_r <= rgb_r;
