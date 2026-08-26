@@ -29,6 +29,11 @@ module mpeg2_h262_hardware_cadence_profiler #(
     input wire framebuffer_luma_return_valid,
     input wire framebuffer_luma_return_first_field,
     input wire [7:0] framebuffer_luma_return_byte,
+    input wire framebuffer_luma_fingerprint_valid,
+    input wire framebuffer_luma_fingerprint_first_field,
+    input wire [31:0] framebuffer_luma_fingerprint_raw,
+    input wire [31:0] framebuffer_luma_fingerprint_display,
+    input wire framebuffer_luma_fingerprint_mismatch,
     input wire framebuffer_first_field_fetch,
     input wire framebuffer_second_field_fetch,
     input wire fifo_pending,input wire decoder_ready,
@@ -72,22 +77,22 @@ module mpeg2_h262_hardware_cadence_profiler #(
     output reg [7:0] video_b,output wire snapshot_ready
 );
 
-localparam integer SNAPSHOT_WORDS=43;
+localparam integer SNAPSHOT_WORDS=48;
 localparam integer SNAPSHOT_BITS=SNAPSHOT_WORDS*32;
 localparam [23:0] TERMINAL_SNAPSHOT_LIMIT=
     TERMINAL_SNAPSHOT_DELAY-24'd1;
 localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
-localparam [31:0] SNAPSHOT_FORMAT={8'd14,8'd43,16'd60000};
+localparam [31:0] SNAPSHOT_FORMAT={8'd15,8'd48,16'd60000};
 // Entry 511: keep all 41 rows visible without changing their encoding. The
 // mode observation is already in clk_video and affects overlay placement only.
 localparam [11:0] OVERLAY_X=12'd8;
 // Entry 516: schema 11 appends two packed words, so both origins move eight
 // rows up to keep the final row flush with the diagnostic and native rasters.
-localparam [11:0] OVERLAY_DIAG_Y=12'd428;
-localparam [11:0] OVERLAY_NATIVE_Y=12'd308;
-localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd172;
+localparam [11:0] OVERLAY_DIAG_Y=12'd408;
+localparam [11:0] OVERLAY_NATIVE_Y=12'd288;
+localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd192;
 
 reg session_active;
 reg fifo_pending_q,decoder_ready_q,presentation_hold_q,destination_hold_q;
@@ -154,6 +159,14 @@ reg first_field_seen;
 reg second_field_seen;
 reg last_first_field_varied;
 reg last_second_field_varied;
+reg [31:0] last_first_field_raw_fingerprint;
+reg [31:0] last_first_field_display_fingerprint;
+reg [31:0] last_second_field_raw_fingerprint;
+reg [31:0] last_second_field_display_fingerprint;
+reg [7:0] first_field_fingerprint_count;
+reg [7:0] second_field_fingerprint_count;
+reg [7:0] first_field_fingerprint_mismatch_count;
+reg [7:0] second_field_fingerprint_mismatch_count;
 reg [7:0] sequence_phase_error_count;
 reg framebuffer_publication_pending;
 reg [31:0] framebuffer_publication_latency;
@@ -307,7 +320,26 @@ endgenerate
 wire [31:0] snapshot_word_41={last_first_field_signature,
     last_second_field_signature,field_region_mismatch_count,
     sequence_phase_error_count};
-wire [31:0] snapshot_word_42=snapshot_word_00^snapshot_word_01^
+wire [31:0] snapshot_word_42=last_first_field_raw_fingerprint;
+wire [31:0] snapshot_word_43=last_first_field_display_fingerprint;
+wire [31:0] snapshot_word_44=last_second_field_raw_fingerprint;
+wire [31:0] snapshot_word_45=last_second_field_display_fingerprint;
+localparam integer SNAPSHOT_WORD_46_BITS=8+8+8+8;
+wire [SNAPSHOT_WORD_46_BITS-1:0] snapshot_word_46_payload;
+assign snapshot_word_46_payload[31:24]=first_field_fingerprint_count;
+assign snapshot_word_46_payload[23:16]=second_field_fingerprint_count;
+assign snapshot_word_46_payload[15:8]=
+    first_field_fingerprint_mismatch_count;
+assign snapshot_word_46_payload[7:0]=
+    second_field_fingerprint_mismatch_count;
+wire [31:0] snapshot_word_46=snapshot_word_46_payload;
+generate
+if(SNAPSHOT_WORD_46_BITS!=32)begin:invalid_snapshot_word_46_width
+    initial $fatal(1,"snapshot word 46 is %0d bits, expected 32",
+                   SNAPSHOT_WORD_46_BITS);
+end
+endgenerate
+wire [31:0] snapshot_word_47=snapshot_word_00^snapshot_word_01^
     snapshot_word_02^snapshot_word_03^snapshot_word_04^snapshot_word_05^
     snapshot_word_06^snapshot_word_07^snapshot_word_08^snapshot_word_09^
     snapshot_word_10^snapshot_word_11^snapshot_word_12^snapshot_word_13^
@@ -317,11 +349,14 @@ wire [31:0] snapshot_word_42=snapshot_word_00^snapshot_word_01^
     snapshot_word_26^snapshot_word_27^snapshot_word_28^snapshot_word_29^
     snapshot_word_30^snapshot_word_31^snapshot_word_32^snapshot_word_33^
     snapshot_word_34^snapshot_word_35^snapshot_word_36^snapshot_word_37^
-    snapshot_word_38^snapshot_word_39^snapshot_word_40^snapshot_word_41;
+    snapshot_word_38^snapshot_word_39^snapshot_word_40^snapshot_word_41^
+    snapshot_word_42^snapshot_word_43^snapshot_word_44^snapshot_word_45^
+    snapshot_word_46;
 
 task capture_snapshot;
 begin
-    snapshot_mpeg2<={snapshot_word_42,snapshot_word_41,
+    snapshot_mpeg2<={snapshot_word_47,snapshot_word_46,snapshot_word_45,
+        snapshot_word_44,snapshot_word_43,snapshot_word_42,snapshot_word_41,
         snapshot_word_40,snapshot_word_39,snapshot_word_38,
         snapshot_word_37,snapshot_word_36,snapshot_word_35,
         snapshot_word_34,snapshot_word_33,snapshot_word_32,
@@ -388,6 +423,14 @@ always @(posedge clk_mpeg2) begin
         first_field_reference<=0;second_field_reference<=0;
         first_field_seen<=0;second_field_seen<=0;
         last_first_field_varied<=0;last_second_field_varied<=0;
+        last_first_field_raw_fingerprint<=0;
+        last_first_field_display_fingerprint<=0;
+        last_second_field_raw_fingerprint<=0;
+        last_second_field_display_fingerprint<=0;
+        first_field_fingerprint_count<=0;
+        second_field_fingerprint_count<=0;
+        first_field_fingerprint_mismatch_count<=0;
+        second_field_fingerprint_mismatch_count<=0;
         display_picture_count<=0;display_swap_count<=0;
         b_picture_complete_d<=0;display_frame_bank_d<=0;
         display_scratch_d<=0;display_scratch_bank_d<=0;
@@ -504,6 +547,34 @@ always @(posedge clk_mpeg2) begin
                     end
                     else if(framebuffer_luma_return_byte!=second_field_reference)
                         last_second_field_varied<=1;
+                end
+            end
+            if(framebuffer_luma_fingerprint_valid)begin
+                if(framebuffer_luma_fingerprint_first_field)begin
+                    last_first_field_raw_fingerprint<=
+                        framebuffer_luma_fingerprint_raw;
+                    last_first_field_display_fingerprint<=
+                        framebuffer_luma_fingerprint_display;
+                    if(first_field_fingerprint_count!=8'hff)
+                        first_field_fingerprint_count<=
+                            first_field_fingerprint_count+1'b1;
+                    if(framebuffer_luma_fingerprint_mismatch&&
+                       (first_field_fingerprint_mismatch_count!=8'hff))
+                        first_field_fingerprint_mismatch_count<=
+                            first_field_fingerprint_mismatch_count+1'b1;
+                end
+                else begin
+                    last_second_field_raw_fingerprint<=
+                        framebuffer_luma_fingerprint_raw;
+                    last_second_field_display_fingerprint<=
+                        framebuffer_luma_fingerprint_display;
+                    if(second_field_fingerprint_count!=8'hff)
+                        second_field_fingerprint_count<=
+                            second_field_fingerprint_count+1'b1;
+                    if(framebuffer_luma_fingerprint_mismatch&&
+                       (second_field_fingerprint_mismatch_count!=8'hff))
+                        second_field_fingerprint_mismatch_count<=
+                            second_field_fingerprint_mismatch_count+1'b1;
                 end
             end
             if(framebuffer_first_field_fetch_edge&&
@@ -739,6 +810,11 @@ always @* begin
     40:overlay_row_word=snapshot_sync_2[1311:1280];
     41:overlay_row_word=snapshot_sync_2[1343:1312];
     42:overlay_row_word=snapshot_sync_2[1375:1344];
+    43:overlay_row_word=snapshot_sync_2[1407:1376];
+    44:overlay_row_word=snapshot_sync_2[1439:1408];
+    45:overlay_row_word=snapshot_sync_2[1471:1440];
+    46:overlay_row_word=snapshot_sync_2[1503:1472];
+    47:overlay_row_word=snapshot_sync_2[1535:1504];
     default:overlay_row_word=0;
     endcase
 end

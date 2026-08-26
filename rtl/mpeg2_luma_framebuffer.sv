@@ -60,6 +60,13 @@ module mpeg2_luma_framebuffer
     output wire        luma_return_valid_debug,
     output wire        luma_return_first_field_debug,
     output wire [7:0]  luma_return_byte_debug,
+    // Entry 523: one mem-clock pulse per completed displayed field, carrying
+    // the generation-correlated raw-return and post-cache fingerprints.
+    output reg         luma_fingerprint_valid_debug,
+    output reg         luma_fingerprint_first_field_debug,
+    output reg  [31:0] luma_fingerprint_raw_debug,
+    output reg  [31:0] luma_fingerprint_display_debug,
+    output reg         luma_fingerprint_mismatch_debug,
 
     // Independent fixed video side - 40 MHz.
     input  wire        rd_clk,
@@ -116,6 +123,32 @@ function automatic [28:0] row_times_45;
     end
 endfunction
 
+// A low-cost position-sensitive fingerprint.  Rotating once per byte before
+// XOR means the same byte stream produces the same value whether it arrives
+// eight bytes per DDR word or one byte per displayed pixel.  This is passive
+// diagnostic evidence, not a data-integrity guarantee or standard checksum.
+function automatic [31:0] luma_fingerprint_byte;
+    input [31:0] fingerprint;
+    input [7:0] value;
+    begin
+        luma_fingerprint_byte = {fingerprint[30:0],fingerprint[31]} ^
+                                {24'd0,value};
+    end
+endfunction
+
+function automatic [31:0] luma_fingerprint_word;
+    input [31:0] fingerprint;
+    input [63:0] value;
+    reg [31:0] next;
+    integer lane;
+    begin
+        next = fingerprint;
+        for (lane = 0; lane < 8; lane = lane + 1)
+            next = luma_fingerprint_byte(next,value[lane*8 +: 8]);
+        luma_fingerprint_word = next;
+    end
+endfunction
+
 // -------------------------------------------------------------------------
 // Memory-side picture descriptor and line-fetch controller.
 // -------------------------------------------------------------------------
@@ -142,6 +175,26 @@ reg        fetch_cache_bank;
 // can be attributed to the authored first field or the other field.
 reg        first_field_fetch_toggle_mem;
 reg        second_field_fetch_toggle_mem;
+reg [31:0] first_field_raw_fingerprint_mem;
+reg [31:0] second_field_raw_fingerprint_mem;
+
+// Completed display fingerprints are stable before their toggle traverses
+// this three-stage bundled-data handshake back to mem_clk.
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0]  luma_fingerprint_toggle_sync;
+reg        luma_fingerprint_toggle_seen;
+reg        luma_fingerprint_first_m1;
+reg        luma_fingerprint_first_m2;
+reg [31:0] luma_fingerprint_display_m1;
+reg [31:0] luma_fingerprint_display_m2;
+reg [31:0] luma_fingerprint_accumulator_rd;
+reg [31:0] luma_fingerprint_completed_rd;
+reg        luma_fingerprint_first_field_rd;
+reg        luma_fingerprint_toggle_rd;
+reg        luma_fingerprint_first_reported_rd;
+reg        luma_fingerprint_second_reported_rd;
+reg [11:0] source_x_d;
+reg [11:0] source_y_d;
 
 assign ddram_burstcnt = (mem_state == MEM_ISSUE) ? fetch_segment_words : 8'd0;
 assign ddram_addr     = (mem_state == MEM_ISSUE) ? fetch_address : 29'd0;
@@ -336,6 +389,19 @@ always @(posedge mem_clk) begin
         fetch_cache_bank      <= 1'b0;
         first_field_fetch_toggle_mem  <= 1'b0;
         second_field_fetch_toggle_mem <= 1'b0;
+        first_field_raw_fingerprint_mem  <= 32'd0;
+        second_field_raw_fingerprint_mem <= 32'd0;
+        luma_fingerprint_toggle_sync     <= 3'b000;
+        luma_fingerprint_toggle_seen     <= 1'b0;
+        luma_fingerprint_first_m1        <= 1'b0;
+        luma_fingerprint_first_m2        <= 1'b0;
+        luma_fingerprint_display_m1      <= 32'd0;
+        luma_fingerprint_display_m2      <= 32'd0;
+        luma_fingerprint_valid_debug     <= 1'b0;
+        luma_fingerprint_first_field_debug <= 1'b0;
+        luma_fingerprint_raw_debug       <= 32'd0;
+        luma_fingerprint_display_debug   <= 32'd0;
+        luma_fingerprint_mismatch_debug  <= 1'b0;
 
         prefill_step          <= 3'd0;
         prefill_done          <= 1'b0;
@@ -372,6 +438,42 @@ always @(posedge mem_clk) begin
         y_cache_wr_en  <= 1'b0;
         cb_cache_wr_en <= 1'b0;
         cr_cache_wr_en <= 1'b0;
+        luma_fingerprint_valid_debug <= 1'b0;
+
+        luma_fingerprint_toggle_sync <=
+            {luma_fingerprint_toggle_sync[1:0],
+             luma_fingerprint_toggle_rd};
+        luma_fingerprint_first_m1 <=
+            luma_fingerprint_first_field_rd;
+        luma_fingerprint_first_m2 <= luma_fingerprint_first_m1;
+        luma_fingerprint_display_m1 <=
+            luma_fingerprint_completed_rd;
+        luma_fingerprint_display_m2 <= luma_fingerprint_display_m1;
+
+        if (luma_fingerprint_toggle_sync[2] !=
+            luma_fingerprint_toggle_seen) begin
+            luma_fingerprint_toggle_seen <=
+                luma_fingerprint_toggle_sync[2];
+            luma_fingerprint_valid_debug <= 1'b1;
+            luma_fingerprint_first_field_debug <=
+                luma_fingerprint_first_m2;
+            luma_fingerprint_display_debug <=
+                luma_fingerprint_display_m2;
+            if (luma_fingerprint_first_m2) begin
+                luma_fingerprint_raw_debug <=
+                    first_field_raw_fingerprint_mem;
+                luma_fingerprint_mismatch_debug <=
+                    first_field_raw_fingerprint_mem !=
+                    luma_fingerprint_display_m2;
+            end
+            else begin
+                luma_fingerprint_raw_debug <=
+                    second_field_raw_fingerprint_mem;
+                luma_fingerprint_mismatch_debug <=
+                    second_field_raw_fingerprint_mem !=
+                    luma_fingerprint_display_m2;
+            end
+        end
 
         // Synchronize the one-bit line-consumed event.  The associated source
         // line number is generated locally below, eliminating the old binary
@@ -462,6 +564,19 @@ always @(posedge mem_clk) begin
             MEM_RECV: begin
                 if (ddram_dout_ready) begin
                     read_seen <= 1'b1;
+
+                    if ((fetch_kind == FETCH_Y) && native_interlaced_mem) begin
+                        if (fetch_line[0] == first_field_mem)
+                            first_field_raw_fingerprint_mem <=
+                                luma_fingerprint_word(
+                                    first_field_raw_fingerprint_mem,
+                                    ddram_dout);
+                        else
+                            second_field_raw_fingerprint_mem <=
+                                luma_fingerprint_word(
+                                    second_field_raw_fingerprint_mem,
+                                    ddram_dout);
+                    end
 
                     case (fetch_kind)
                         FETCH_Y: begin
@@ -807,6 +922,14 @@ always @(posedge rd_clk) begin
         cache_scan_c_bank_rd <= 1'b0;
         sequence_replica_rd  <= 9'd0;
         sequence_phase_error_rd <= 1'b0;
+        luma_fingerprint_accumulator_rd <= 32'd0;
+        luma_fingerprint_completed_rd   <= 32'd0;
+        luma_fingerprint_first_field_rd <= 1'b0;
+        luma_fingerprint_toggle_rd      <= 1'b0;
+        luma_fingerprint_first_reported_rd <= 1'b0;
+        luma_fingerprint_second_reported_rd <= 1'b0;
+        source_x_d                      <= 12'd0;
+        source_y_d                      <= 12'd0;
     end
     else begin
         cache_ready_r1    <= cache_ready;
@@ -821,6 +944,8 @@ always @(posedge rd_clk) begin
         first_field_r2       <= first_field_r1;
 
         if (pixel_ce) begin
+            source_x_d <= source_x;
+            source_y_d <= source_y;
             cache_scan_active_rd <= decoded_picture_window;
             cache_scan_y_bank_rd <=
                 native_interlaced_r2 ? source_y[1] : source_y[0];
@@ -847,6 +972,43 @@ always @(posedge rd_clk) begin
             if (line_done_pending_rd) begin
                 line_done_pending_rd <= 1'b0;
                 line_done_toggle_rd <= ~line_done_toggle_rd;
+            end
+
+            // Fold the exact luma byte selected from the cache for each
+            // displayed pixel.  The delayed coordinates identify that byte,
+            // matching the line-cache address/lane pipeline below.  At the
+            // final pixel of either 240-line field, latch the completed value
+            // and toggle the bundled-data handshake back to mem_clk.
+            if (native_interlaced_r2 && decoded_picture_window_d) begin
+                if ((source_x_d == 12'd719) &&
+                    (source_y_d[8:1] == 8'd239)) begin
+                    if ((source_y_d[0] == first_field_r2) &&
+                        !luma_fingerprint_first_reported_rd) begin
+                        luma_fingerprint_completed_rd <=
+                            luma_fingerprint_byte(
+                                luma_fingerprint_accumulator_rd,y_rd_data);
+                        luma_fingerprint_first_field_rd <= 1'b1;
+                        luma_fingerprint_toggle_rd <=
+                            ~luma_fingerprint_toggle_rd;
+                        luma_fingerprint_first_reported_rd <= 1'b1;
+                    end
+                    else if ((source_y_d[0] != first_field_r2) &&
+                             !luma_fingerprint_second_reported_rd) begin
+                        luma_fingerprint_completed_rd <=
+                            luma_fingerprint_byte(
+                                luma_fingerprint_accumulator_rd,y_rd_data);
+                        luma_fingerprint_first_field_rd <= 1'b0;
+                        luma_fingerprint_toggle_rd <=
+                            ~luma_fingerprint_toggle_rd;
+                        luma_fingerprint_second_reported_rd <= 1'b1;
+                    end
+                    luma_fingerprint_accumulator_rd <= 32'd0;
+                end
+                else begin
+                    luma_fingerprint_accumulator_rd <=
+                        luma_fingerprint_byte(
+                            luma_fingerprint_accumulator_rd,y_rd_data);
+                end
             end
 
             if (picture_present_rd &&

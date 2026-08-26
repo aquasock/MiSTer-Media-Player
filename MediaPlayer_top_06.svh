@@ -32,6 +32,11 @@ wire mpeg2_new_framebuffer_second_field_fetch_toggle;
 wire mpeg2_new_luma_return_valid;
 wire mpeg2_new_luma_return_first_field;
 wire [7:0] mpeg2_new_luma_return_byte;
+wire mpeg2_new_luma_fingerprint_valid;
+wire mpeg2_new_luma_fingerprint_first_field;
+wire [31:0] mpeg2_new_luma_fingerprint_raw;
+wire [31:0] mpeg2_new_luma_fingerprint_display;
+wire mpeg2_new_luma_fingerprint_mismatch;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] mpeg2_new_framebuffer_picture_present_sync;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
@@ -152,6 +157,12 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
     .luma_return_valid_debug(mpeg2_new_luma_return_valid),
     .luma_return_first_field_debug(mpeg2_new_luma_return_first_field),
     .luma_return_byte_debug(mpeg2_new_luma_return_byte),
+    .luma_fingerprint_valid_debug(mpeg2_new_luma_fingerprint_valid),
+    .luma_fingerprint_first_field_debug(
+        mpeg2_new_luma_fingerprint_first_field),
+    .luma_fingerprint_raw_debug(mpeg2_new_luma_fingerprint_raw),
+    .luma_fingerprint_display_debug(mpeg2_new_luma_fingerprint_display),
+    .luma_fingerprint_mismatch_debug(mpeg2_new_luma_fingerprint_mismatch),
     .rd_clk         (clk_video),
     .h_pos          (display_h_pos),
     .v_pos          (display_v_pos),

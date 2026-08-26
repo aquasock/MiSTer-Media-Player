@@ -67,6 +67,9 @@ iverilog -g2012 \
 vvp "${build_dir}/tb_native_480i_cache_refill"
 vvp "${build_dir}/tb_native_480i_cache_refill" +SLOW
 vvp "${build_dir}/tb_native_480i_cache_refill" +PREFILL_LATE
+vvp "${build_dir}/tb_native_480i_cache_refill" +FINGERPRINT
+vvp "${build_dir}/tb_native_480i_cache_refill" +FINGERPRINT +BFF
+vvp "${build_dir}/tb_native_480i_cache_refill" +FINGERPRINT +CORRUPT
 
 iverilog -g2012 \
   -s tb_h262_hardware_cadence_profiler \

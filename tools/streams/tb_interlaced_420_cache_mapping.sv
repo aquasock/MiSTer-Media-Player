@@ -21,6 +21,12 @@ reg [11:0] h_pos=0,v_pos=0;
 wire [7:0] burst;wire [28:0] addr;wire rd;
 wire ready,seen,error;wire [7:0] r,g,b;wire de,hs,vs;
 integer i;
+integer lane;
+reg [31:0] raw_fingerprint;
+reg [31:0] display_fingerprint;
+reg [31:0] corrupt_fingerprint;
+reg [63:0] fingerprint_word_0;
+reg [63:0] fingerprint_word_1;
 
 always #5 clk=~clk;
 
@@ -47,6 +53,41 @@ begin
  if(dut.interlaced_chroma_row(pair[7:0],first_field)!==expected[10:0])
    $fatal(1,"chroma first=%0d pair=%0d got=%0d expected=%0d",first_field,pair,
           dut.interlaced_chroma_row(pair[7:0],first_field),expected);
+end endtask
+
+task check_fingerprint(input first_field);
+begin
+ fingerprint_word_0=first_field?64'h8877665544332211:
+                                64'h1122334455667788;
+ fingerprint_word_1=first_field?64'h1020304050607080:
+                                64'h8070605040302010;
+ raw_fingerprint=0;
+ raw_fingerprint=dut.luma_fingerprint_word(raw_fingerprint,
+                                            fingerprint_word_0);
+ raw_fingerprint=dut.luma_fingerprint_word(raw_fingerprint,
+                                            fingerprint_word_1);
+ display_fingerprint=0;
+ for(lane=0;lane<8;lane=lane+1)
+   display_fingerprint=dut.luma_fingerprint_byte(
+       display_fingerprint,fingerprint_word_0[lane*8+:8]);
+ for(lane=0;lane<8;lane=lane+1)
+   display_fingerprint=dut.luma_fingerprint_byte(
+       display_fingerprint,fingerprint_word_1[lane*8+:8]);
+ if(raw_fingerprint!==display_fingerprint)
+   $fatal(1,"fingerprint match failed first_field=%0d raw=%h display=%h",
+          first_field,raw_fingerprint,display_fingerprint);
+
+ corrupt_fingerprint=0;
+ for(lane=0;lane<8;lane=lane+1)
+   corrupt_fingerprint=dut.luma_fingerprint_byte(
+       corrupt_fingerprint,
+       fingerprint_word_0[lane*8+:8]^(lane==3?8'h01:8'h00));
+ for(lane=0;lane<8;lane=lane+1)
+   corrupt_fingerprint=dut.luma_fingerprint_byte(
+       corrupt_fingerprint,fingerprint_word_1[lane*8+:8]);
+ if(raw_fingerprint===corrupt_fingerprint)
+   $fatal(1,"corrupted cache byte did not change fingerprint first_field=%0d",
+          first_field);
 end endtask
 
 initial begin
@@ -82,8 +123,11 @@ initial begin
  if(dut.y_refill_line!==11'd3||dut.c_refill_line!==11'd3)
    $fatal(1,"BFF frame-wrap refill wrong");
 
+ check_fingerprint(1'b0);
+ check_fingerprint(1'b1);
+
  $display({"RESULT luma_sequences=960 chroma_sequences=480 ",
-           "tff_refill=PASS bff_refill=PASS PASS"});
+           "tff_refill=PASS bff_refill=PASS fingerprints=PASS PASS"});
  $finish;
 end
 endmodule

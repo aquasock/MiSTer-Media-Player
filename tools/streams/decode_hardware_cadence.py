@@ -13,9 +13,11 @@ from PIL import Image
 
 MAGIC = 0x4D4D5031
 X0 = 8
-WORDS = 43
-DIAGNOSTIC_Y0 = 428
-NATIVE_480I_Y0 = 308
+WORDS = 48
+DIAGNOSTIC_Y0 = 408
+NATIVE_480I_Y0 = 288
+SCHEMA14_DIAGNOSTIC_Y0 = 428
+SCHEMA14_NATIVE_480I_Y0 = 308
 SCHEMA10_DIAGNOSTIC_Y0 = 436
 SCHEMA10_NATIVE_480I_Y0 = 316
 LEGACY_DIAGNOSTIC_Y0 = 444
@@ -51,6 +53,8 @@ def decode_words(path: Path | str) -> list[int]:
     layouts = (
         (DIAGNOSTIC_Y0, WORDS),
         (NATIVE_480I_Y0, WORDS),
+        (SCHEMA14_DIAGNOSTIC_Y0, 43),
+        (SCHEMA14_NATIVE_480I_Y0, 43),
         (SCHEMA10_DIAGNOSTIC_Y0, 41),
         (SCHEMA10_NATIVE_480I_Y0, 41),
         (LEGACY_DIAGNOSTIC_Y0, 38),
@@ -376,6 +380,33 @@ def parse_words(words: list[int]) -> dict[str, Any]:
             words[41] & 0xFF if schema_version >= 13
             else words[41] & 0xFFFF if schema_version >= 11 else None
         ),
+        # Entry 523 (schema 15): completed, generation-aligned fingerprints
+        # cover all raw DDR luma bytes and the corresponding post-cache luma
+        # pixels.  Counts saturate at 255; mismatch counts are per parity.
+        "framebuffer_last_first_field_raw_fingerprint": (
+            words[42] if schema_version >= 15 else None
+        ),
+        "framebuffer_last_first_field_display_fingerprint": (
+            words[43] if schema_version >= 15 else None
+        ),
+        "framebuffer_last_second_field_raw_fingerprint": (
+            words[44] if schema_version >= 15 else None
+        ),
+        "framebuffer_last_second_field_display_fingerprint": (
+            words[45] if schema_version >= 15 else None
+        ),
+        "framebuffer_first_field_fingerprint_count": (
+            (words[46] >> 24) & 0xFF if schema_version >= 15 else None
+        ),
+        "framebuffer_second_field_fingerprint_count": (
+            (words[46] >> 16) & 0xFF if schema_version >= 15 else None
+        ),
+        "framebuffer_first_field_fingerprint_mismatch_count": (
+            (words[46] >> 8) & 0xFF if schema_version >= 15 else None
+        ),
+        "framebuffer_second_field_fingerprint_mismatch_count": (
+            words[46] & 0xFF if schema_version >= 15 else None
+        ),
         "checksum": words[-1],
     }
 
@@ -506,6 +537,22 @@ def main() -> int:
                 "{framebuffer_second_field_varied} "
                 "signatures={framebuffer_first_field_signature:#04x}/"
                 "{framebuffer_second_field_signature:#04x}".format(**result)
+            )
+        if result["schema_version"] >= 15:
+            print(
+                "field fingerprints: first raw/display="
+                "{framebuffer_last_first_field_raw_fingerprint:#010x}/"
+                "{framebuffer_last_first_field_display_fingerprint:#010x} "
+                "second raw/display="
+                "{framebuffer_last_second_field_raw_fingerprint:#010x}/"
+                "{framebuffer_last_second_field_display_fingerprint:#010x} "
+                "completed={framebuffer_first_field_fingerprint_count}/"
+                "{framebuffer_second_field_fingerprint_count} "
+                "mismatches="
+                "{framebuffer_first_field_fingerprint_mismatch_count}/"
+                "{framebuffer_second_field_fingerprint_mismatch_count}".format(
+                    **result
+                )
             )
         if result["schema_version"] >= 12:
             print(

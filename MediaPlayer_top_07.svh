@@ -103,6 +103,13 @@ mpeg2_h262_hardware_cadence_profiler
     .framebuffer_luma_return_valid(mpeg2_new_luma_return_valid),
     .framebuffer_luma_return_first_field(mpeg2_new_luma_return_first_field),
     .framebuffer_luma_return_byte(mpeg2_new_luma_return_byte),
+    .framebuffer_luma_fingerprint_valid(mpeg2_new_luma_fingerprint_valid),
+    .framebuffer_luma_fingerprint_first_field(
+        mpeg2_new_luma_fingerprint_first_field),
+    .framebuffer_luma_fingerprint_raw(mpeg2_new_luma_fingerprint_raw),
+    .framebuffer_luma_fingerprint_display(mpeg2_new_luma_fingerprint_display),
+    .framebuffer_luma_fingerprint_mismatch(
+        mpeg2_new_luma_fingerprint_mismatch),
     .framebuffer_first_field_fetch(
         mpeg2_new_framebuffer_first_field_fetch_toggle),
     .framebuffer_second_field_fetch(

@@ -51,6 +51,20 @@ set_false_path \
     -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|line_done_toggle_rd*}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|line_done_toggle_m1}]
 
+# Entry 523: the post-cache luma fingerprint and field identity freeze before
+# their completion toggle traverses three mem_clk sampling stages.  Cut only
+# each source -> first bundled-data/toggle sampling stage; the second stages,
+# event detection and raw-versus-display comparison remain fully timed.
+set_false_path \
+    -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_fingerprint_completed_rd[*]}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_fingerprint_display_m1[*]}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_fingerprint_first_field_rd}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_fingerprint_first_m1}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_fingerprint_toggle_rd}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_fingerprint_toggle_sync[0]}]
+
 # The passive line-cache overlap diagnostic registers the active scan state and
 # selected cache banks in the 54 MHz presentation domain, then samples each
 # single-bit level through an explicit two-stage synchronizer in the 60 MHz

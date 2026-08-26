@@ -16,7 +16,25 @@ module altsyncram #(
     input [width_b-1:0] data_b, input wren_b,
     output [width_a-1:0] q_a
 );
-assign q_b = {width_b{1'b0}};
+reg [width_a-1:0] memory [0:numwords_a-1];
+reg [widthad_b-1:0] address_b_q;
+reg corrupted = 1'b0;
+wire corrupt_mode = $test$plusargs("CORRUPT");
+always @(posedge clock0) begin
+    if (wren_a) begin
+        if (corrupt_mode && (numwords_a == 180) &&
+            !corrupted && (address_a == 10)) begin
+            memory[address_a] <= data_a ^ {{(width_a-1){1'b0}},1'b1};
+            corrupted <= 1'b1;
+        end
+        else begin
+            memory[address_a] <= data_a;
+        end
+    end
+end
+always @(posedge clock1)
+    address_b_q <= address_b;
+assign q_b = memory[address_b_q];
 assign q_a = {width_a{1'b0}};
 endmodule
 
@@ -30,13 +48,19 @@ reg running = 1'b0;
 reg [1:0] ce_div = 2'd0;
 reg [11:0] h_pos = 12'd0;
 reg [8:0] sequence_line = 9'd0;
+reg fingerprint_mode = 1'b0;
+reg bff_mode = 1'b0;
 
 always #8.333 mem_clk = ~mem_clk;
 always #9.259 rd_clk = ~rd_clk;
 
 wire pixel_ce = (ce_div == 2'd3);
 wire pixel_en = running && (h_pos < 12'd720);
-wire [11:0] v_pos = {3'd0, sequence_line[7:0], 1'b0};
+wire [8:0] field_line = (sequence_line < 9'd240) ?
+    sequence_line : (sequence_line - 9'd240);
+wire field_parity = (sequence_line < 9'd240) ?
+    bff_mode : ~bff_mode;
+wire [11:0] v_pos = {2'd0,field_line,1'b0} + field_parity;
 
 wire [7:0] ddram_burstcnt;
 wire [28:0] ddram_addr;
@@ -49,6 +73,11 @@ wire cache_error;
 wire bank_overlap_error;
 wire picture_present_debug;
 wire prefill_deadline_missed_debug;
+wire luma_fingerprint_valid_debug;
+wire luma_fingerprint_first_field_debug;
+wire [31:0] luma_fingerprint_raw_debug;
+wire [31:0] luma_fingerprint_display_debug;
+wire luma_fingerprint_mismatch_debug;
 wire [7:0] video_r;
 wire [7:0] video_g;
 wire [7:0] video_b;
@@ -64,7 +93,7 @@ mpeg2_luma_framebuffer dut
     .horizontal_size    (14'd720),
     .vertical_size      (14'd480),
     .native_interlaced  (1'b1),
-    .top_field_first    (1'b1),
+    .top_field_first    (~bff_mode),
     .ddram_busy         (1'b0),
     .ddram_dout         (ddram_dout),
     .ddram_dout_ready   (ddram_dout_ready),
@@ -77,6 +106,12 @@ mpeg2_luma_framebuffer dut
     .bank_overlap_error (bank_overlap_error),
     .picture_present_debug(picture_present_debug),
     .prefill_deadline_missed_debug(prefill_deadline_missed_debug),
+    .luma_fingerprint_valid_debug(luma_fingerprint_valid_debug),
+    .luma_fingerprint_first_field_debug(
+        luma_fingerprint_first_field_debug),
+    .luma_fingerprint_raw_debug(luma_fingerprint_raw_debug),
+    .luma_fingerprint_display_debug(luma_fingerprint_display_debug),
+    .luma_fingerprint_mismatch_debug(luma_fingerprint_mismatch_debug),
     .rd_clk             (rd_clk),
     .h_pos              (h_pos),
     .v_pos              (v_pos),
@@ -97,6 +132,19 @@ integer response_delay = 0;
 integer response_words = 0;
 reg slow_mode = 1'b0;
 reg late_prefill_mode = 1'b0;
+integer fingerprint_count = 0;
+integer fingerprint_mismatch_count = 0;
+
+always @(posedge mem_clk) begin
+    if (luma_fingerprint_valid_debug) begin
+        fingerprint_count <= fingerprint_count + 1;
+        if (luma_fingerprint_mismatch_debug)
+            fingerprint_mismatch_count <= fingerprint_mismatch_count + 1;
+        if (luma_fingerprint_mismatch_debug !=
+            (luma_fingerprint_raw_debug != luma_fingerprint_display_debug))
+            $fatal(1,"fingerprint mismatch flag disagrees with payload");
+    end
+end
 
 always @(posedge mem_clk) begin
     ddram_dout_ready <= 1'b0;
@@ -130,7 +178,7 @@ always @(posedge rd_clk) begin
         if (h_pos == 12'd857) begin
             h_pos <= 12'd0;
             sequence_line <= sequence_line + 9'd1;
-            if (sequence_line == 9'd11)
+            if (sequence_line == (fingerprint_mode ? 9'd479 : 9'd11))
                 running <= 1'b0;
         end
         else begin
@@ -142,6 +190,8 @@ end
 initial begin
     slow_mode = $test$plusargs("SLOW");
     late_prefill_mode = $test$plusargs("PREFILL_LATE");
+    fingerprint_mode = $test$plusargs("FINGERPRINT");
+    bff_mode = $test$plusargs("BFF");
     response_latency = (slow_mode || late_prefill_mode) ? 3400 : 64;
 
     repeat (8) @(posedge mem_clk);
@@ -161,7 +211,23 @@ initial begin
     wait (!running);
     repeat (400) @(posedge mem_clk);
 
-    if (late_prefill_mode) begin
+    if (fingerprint_mode) begin
+        if (fingerprint_count != 2)
+            $fatal(1,"expected two completed field fingerprints, got %0d",
+                   fingerprint_count);
+        if ($test$plusargs("CORRUPT")) begin
+            if (fingerprint_mismatch_count != 1)
+                $fatal(1,"corrupted cache expected one mismatch, got %0d",
+                       fingerprint_mismatch_count);
+        end
+        else if (fingerprint_mismatch_count != 0)
+            $fatal(1,"matching cache produced %0d fingerprint mismatches",
+                   fingerprint_mismatch_count);
+        $display("NATIVE_CACHE_FINGERPRINT_PASS order=%s corrupted=%0d completed=%0d mismatches=%0d",
+                 bff_mode?"BFF":"TFF",$test$plusargs("CORRUPT"),
+                 fingerprint_count,fingerprint_mismatch_count);
+    end
+    else if (late_prefill_mode) begin
         if (!prefill_deadline_missed_debug)
             $fatal(1, "late native origin did not flag prefill deadline miss");
         if (picture_present_debug)
@@ -190,7 +256,7 @@ initial begin
 end
 
 initial begin
-    #5000000;
+    #100000000;
     $fatal(1, "timeout");
 end
 

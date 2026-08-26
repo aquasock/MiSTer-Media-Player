@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prove schema-fourteen through legacy cadence-overlay decoding."""
+"""Prove schema-fifteen through legacy cadence-overlay decoding."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from PIL import Image
 import decode_hardware_cadence as cadence
 
 
-def snapshot_words(schema_version: int = 14) -> list[int]:
+def schema14_snapshot_words(schema_version: int = 14) -> list[int]:
     """Build a forty-three-word schema 13/14 record with XOR checksum."""
     words = [cadence.MAGIC,
              (schema_version << 24) | (43 << 16) | 60000]
@@ -27,6 +27,20 @@ def snapshot_words(schema_version: int = 14) -> list[int]:
     words.extend((((17 << 24) | (240 << 16) | (0 << 15) | (1 << 14) |
                    (2 << 3) | 1),
                   ((0xA5 << 24) | (0x3C << 16) | (5 << 8) | 7)))
+    checksum = 0
+    for word in words:
+        checksum ^= word
+    words.append(checksum)
+    return words
+
+
+def snapshot_words() -> list[int]:
+    """Build a forty-eight-word schema 15 record with XOR checksum."""
+    words = schema14_snapshot_words()[:-1]
+    words[1] = (15 << 24) | (48 << 16) | 60000
+    words.extend((0x12345678, 0x12345678,
+                  0x89ABCDEF, 0x89ABCDEE,
+                  (44 << 24) | (44 << 16) | (0 << 8) | 7))
     checksum = 0
     for word in words:
         checksum ^= word
@@ -102,8 +116,8 @@ def main() -> None:
             raise SystemExit("framebuffer prefill miss was not decoded")
         if parsed["framebuffer_max_publication_latency_cycles"] != 12345:
             raise SystemExit("framebuffer publication latency was not decoded")
-        if parsed["schema_version"] != 14:
-            raise SystemExit("schema fourteen was not reported")
+        if parsed["schema_version"] != 15:
+            raise SystemExit("schema fifteen was not reported")
         if parsed["framebuffer_content_scope"] != "session":
             raise SystemExit("schema fourteen content scope was not decoded")
         if parsed["framebuffer_first_field_varied"] is not False:
@@ -128,11 +142,42 @@ def main() -> None:
             raise SystemExit("schema twelve must not report displayed lines")
         if parsed["framebuffer_sequence_phase_error_count"] != 7:
             raise SystemExit("sequence phase error count was not decoded")
+        if parsed["framebuffer_last_first_field_raw_fingerprint"] != 0x12345678:
+            raise SystemExit("first-field raw fingerprint was not decoded")
+        if parsed["framebuffer_last_first_field_display_fingerprint"] != 0x12345678:
+            raise SystemExit("first-field display fingerprint was not decoded")
+        if parsed["framebuffer_last_second_field_raw_fingerprint"] != 0x89ABCDEF:
+            raise SystemExit("second-field raw fingerprint was not decoded")
+        if parsed["framebuffer_last_second_field_display_fingerprint"] != 0x89ABCDEE:
+            raise SystemExit("second-field display fingerprint was not decoded")
+        if parsed["framebuffer_first_field_fingerprint_count"] != 44:
+            raise SystemExit("first-field fingerprint count was not decoded")
+        if parsed["framebuffer_second_field_fingerprint_count"] != 44:
+            raise SystemExit("second-field fingerprint count was not decoded")
+        if parsed["framebuffer_first_field_fingerprint_mismatch_count"] != 0:
+            raise SystemExit("first-field mismatch count was not decoded")
+        if parsed["framebuffer_second_field_fingerprint_mismatch_count"] != 7:
+            raise SystemExit("second-field mismatch count was not decoded")
 
-        schema13 = snapshot_words(13)
+        schema14 = schema14_snapshot_words()
+        schema14_diagnostic = temp / "schema14_diagnostic.png"
+        schema14_native = temp / "schema14_native.png"
+        render(schema14_diagnostic, 800, 600,
+               cadence.SCHEMA14_DIAGNOSTIC_Y0, schema14)
+        render(schema14_native, 720, 480,
+               cadence.SCHEMA14_NATIVE_480I_Y0, schema14)
+        if cadence.decode_words(schema14_diagnostic) != schema14:
+            raise SystemExit("schema-fourteen diagnostic telemetry mismatch")
+        schema14_parsed = cadence.decode(schema14_native)
+        if schema14_parsed["schema_version"] != 14:
+            raise SystemExit("schema fourteen was not retained")
+        if schema14_parsed["framebuffer_last_first_field_raw_fingerprint"] is not None:
+            raise SystemExit("schema fourteen must not report fingerprints")
+
+        schema13 = schema14_snapshot_words(13)
         schema13_native = temp / "schema13_native.png"
         render(schema13_native, 720, 480,
-               cadence.NATIVE_480I_Y0, schema13)
+               cadence.SCHEMA14_NATIVE_480I_Y0, schema13)
         schema13_parsed = cadence.decode(schema13_native)
         if schema13_parsed["schema_version"] != 13:
             raise SystemExit("schema thirteen was not reported")
@@ -178,7 +223,8 @@ def main() -> None:
         result = cadence.decode(overlap)
         if not result["cache_bank_overlap_error"]:
             raise SystemExit("cache-bank overlap telemetry bit was not decoded")
-    print("CADENCE_DECODER_LAYOUT_PASS schema14=428/308/43 "
+    print("CADENCE_DECODER_LAYOUT_PASS schema15=408/288/48 "
+          "schema14=428/308/43 "
           "schema13=428/308/43 "
           "schema10=436/316/41 legacy=444/324/38")
 

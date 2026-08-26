@@ -42,6 +42,11 @@ reg [2:0] framebuffer_second_field_region=0;
 reg framebuffer_luma_return_valid=0;
 reg framebuffer_luma_return_first_field=0;
 reg [7:0] framebuffer_luma_return_byte=0;
+reg framebuffer_luma_fingerprint_valid=0;
+reg framebuffer_luma_fingerprint_first_field=0;
+reg [31:0] framebuffer_luma_fingerprint_raw=0;
+reg [31:0] framebuffer_luma_fingerprint_display=0;
+reg framebuffer_luma_fingerprint_mismatch=0;
 reg framebuffer_first_field_fetch=0;
 reg framebuffer_second_field_fetch=0;
 integer field_index;
@@ -72,6 +77,14 @@ mpeg2_h262_hardware_cadence_profiler #(
     .framebuffer_luma_return_valid(framebuffer_luma_return_valid),
     .framebuffer_luma_return_first_field(framebuffer_luma_return_first_field),
     .framebuffer_luma_return_byte(framebuffer_luma_return_byte),
+    .framebuffer_luma_fingerprint_valid(framebuffer_luma_fingerprint_valid),
+    .framebuffer_luma_fingerprint_first_field(
+        framebuffer_luma_fingerprint_first_field),
+    .framebuffer_luma_fingerprint_raw(framebuffer_luma_fingerprint_raw),
+    .framebuffer_luma_fingerprint_display(
+        framebuffer_luma_fingerprint_display),
+    .framebuffer_luma_fingerprint_mismatch(
+        framebuffer_luma_fingerprint_mismatch),
     .framebuffer_first_field_fetch(framebuffer_first_field_fetch),
     .framebuffer_second_field_fetch(framebuffer_second_field_fetch),
     .fifo_pending(fifo_pending),.decoder_ready(decoder_ready),
@@ -169,6 +182,24 @@ begin
 end
 endtask
 
+task drive_luma_fingerprint;
+    input first_field;
+    input [31:0] raw_fingerprint;
+    input [31:0] display_fingerprint;
+begin
+    @(negedge clk_mpeg2);
+    framebuffer_luma_fingerprint_valid=1;
+    framebuffer_luma_fingerprint_first_field=first_field;
+    framebuffer_luma_fingerprint_raw=raw_fingerprint;
+    framebuffer_luma_fingerprint_display=display_fingerprint;
+    framebuffer_luma_fingerprint_mismatch=
+        (raw_fingerprint!=display_fingerprint);
+    @(negedge clk_mpeg2);
+    framebuffer_luma_fingerprint_valid=0;
+    framebuffer_luma_fingerprint_mismatch=0;
+end
+endtask
+
 task drive_field_fetches;
     input integer first_count;
     input integer second_count;
@@ -247,6 +278,11 @@ begin
     framebuffer_luma_return_valid=0;
     framebuffer_luma_return_first_field=0;
     framebuffer_luma_return_byte=0;
+    framebuffer_luma_fingerprint_valid=0;
+    framebuffer_luma_fingerprint_first_field=0;
+    framebuffer_luma_fingerprint_raw=0;
+    framebuffer_luma_fingerprint_display=0;
+    framebuffer_luma_fingerprint_mismatch=0;
     framebuffer_first_field_fetch=0;
     framebuffer_second_field_fetch=0;
     stc_seconds=14'd5;
@@ -258,11 +294,11 @@ endtask
 task verify_checksum;
 begin
     checksum=0;
-    for(i=0;i<42;i=i+1)
+    for(i=0;i<47;i=i+1)
         checksum=checksum^dut.snapshot_sync_2[i*32+:32];
-    if(checksum!==dut.snapshot_sync_2[1375:1344])
+    if(checksum!==dut.snapshot_sync_2[1535:1504])
         $fatal(1,"checksum mismatch %h/%h",checksum,
-               dut.snapshot_sync_2[1375:1344]);
+               dut.snapshot_sync_2[1535:1504]);
 end
 endtask
 
@@ -276,8 +312,8 @@ task verify_overlay_row_coverage;
     reg [11:0] y0;
 begin
     native_active=native_mode;
-    y0=native_mode?12'd308:12'd428;
-    for(row=0;row<43;row=row+1)begin
+    y0=native_mode?12'd288:12'd408;
+    for(row=0;row<48;row=row+1)begin
         v_pos=y0+row[11:0]*12'd4;
         @(negedge clk_video);h_pos=0;
         @(posedge clk_video);#1;
@@ -299,7 +335,7 @@ task verify_overlay_prefix;
     integer x;
 begin
     native_active=native_mode;
-    v_pos=native_mode?12'd309:12'd429;
+    v_pos=native_mode?12'd289:12'd409;
     for(x=0;x<=29;x=x+1)begin
         @(negedge clk_video);h_pos=x;
         @(posedge clk_video);#1;
@@ -373,6 +409,8 @@ initial begin
     drive_luma_return(1'b1,8'h11);
     drive_luma_return(1'b0,8'h20);
     drive_luma_return(1'b0,8'h4f);
+    drive_luma_fingerprint(1'b1,32'h12345678,32'h12345678);
+    drive_luma_fingerprint(1'b0,32'h89abcdef,32'h89abcdee);
     pulse_decoder_progress();
     drive_field_fetches(1,3);
     pulse_sequence_phase_error();
@@ -398,11 +436,14 @@ initial begin
 
     if(dut.snapshot_sync_2[31:0]!==32'h4d4d5031)
         $fatal(1,"bad magic %h",dut.snapshot_sync_2[31:0]);
-    if(dut.snapshot_sync_2[63:32]!==32'h0e2bea60)
+    if(dut.snapshot_sync_2[63:32]!==32'h0f30ea60)
         $fatal(1,"bad format %h",dut.snapshot_sync_2[63:32]);
     if(dut.SNAPSHOT_WORD_40_BITS!=32)
         $fatal(1,"snapshot word 40 width is %0d",
                dut.SNAPSHOT_WORD_40_BITS);
+    if(dut.SNAPSHOT_WORD_46_BITS!=32)
+        $fatal(1,"snapshot word 46 width is %0d",
+               dut.SNAPSHOT_WORD_46_BITS);
     if(dut.snapshot_sync_2[831:830]!==2'd1)
         $fatal(1,"quiet snapshot reason missing");
     if(dut.snapshot_sync_2[829:816]!==14'd10368)
@@ -438,6 +479,14 @@ initial begin
     if(dut.snapshot_sync_2[1343:1312]!=={8'h11,8'h6f,8'd1,8'd1})
         $fatal(1,"per-field signature/mismatch/phase mismatch %h",
                dut.snapshot_sync_2[1343:1312]);
+    if(dut.snapshot_sync_2[1375:1344]!==32'h12345678||
+       dut.snapshot_sync_2[1407:1376]!==32'h12345678||
+       dut.snapshot_sync_2[1439:1408]!==32'h89abcdef||
+       dut.snapshot_sync_2[1471:1440]!==32'h89abcdee)
+        $fatal(1,"generation fingerprint payload mismatch");
+    if(dut.snapshot_sync_2[1503:1472]!==32'h01010001)
+        $fatal(1,"generation fingerprint counts mismatch %h",
+               dut.snapshot_sync_2[1503:1472]);
     verify_checksum();
     verify_overlay_prefix(1'b0);
     verify_overlay_prefix(1'b1);
@@ -584,7 +633,7 @@ initial begin
     if({video_r,video_g,video_b}!==24'h123456)
         $fatal(1,"base video changed outside overlay");
 
-    $display("HARDWARE_CADENCE_PROFILER_PASS schema=14 field-content+framebuffer-publication+timestamp-conflicts+audio-defer+forced+fatal+no-progress checksum=%h",
+    $display("HARDWARE_CADENCE_PROFILER_PASS schema=15 generation-fingerprints+field-content+framebuffer-publication+timestamp-conflicts+audio-defer+forced+fatal+no-progress checksum=%h",
              checksum);
     $finish;
 end
