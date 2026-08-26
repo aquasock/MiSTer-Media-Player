@@ -1663,9 +1663,6 @@ reg [2:0] y_byte_lane_d;
 reg [2:0] c_byte_lane_d;
 reg       source_window_d;
 reg       decoded_picture_window_d;
-reg       pixel_en_d;
-reg       h_sync_d;
-reg       v_sync_d;
 
 reg [7:0] y_rd_data;
 reg [7:0] cb_rd_data;
@@ -1739,9 +1736,6 @@ always @(posedge rd_clk) begin
         c_byte_lane_d             <= 3'd0;
         source_window_d           <= 1'b0;
         decoded_picture_window_d  <= 1'b0;
-        pixel_en_d                 <= 1'b0;
-        h_sync_d                   <= 1'b0;
-        v_sync_d                   <= 1'b0;
         video_r                   <= 8'd0;
         video_g                   <= 8'd0;
         video_b                   <= 8'd0;
@@ -1754,13 +1748,13 @@ always @(posedge rd_clk) begin
         c_byte_lane_d            <= c_byte_lane;
         source_window_d          <= source_window;
         decoded_picture_window_d <= decoded_picture_window;
-        pixel_en_d                <= pixel_en;
-        h_sync_d                  <= h_sync;
-        v_sync_d                  <= v_sync;
 
-        video_de <= pixel_en_d;
-        video_hs <= h_sync_d;
-        video_vs <= v_sync_d;
+        // These controls are part of MiSTer's external raster contract and
+        // intentionally remain in the established current-pixel phase.  RGB
+        // data has its own cache/conversion pipeline and must not shift sync.
+        video_de <= pixel_en;
+        video_hs <= h_sync;
+        video_vs <= v_sync;
 
         if (decoded_picture_window_d) begin
             video_r <= rgb_r;

@@ -228,8 +228,6 @@ reg [7:0] expected_video_b = 8'd0;
 reg expected_video_de = 1'b0;
 reg expected_video_hs = 1'b1;
 reg expected_video_vs = 1'b1;
-reg stimulus_hs_d = 1'b1;
-reg stimulus_vs_d = 1'b1;
 reg output_check_pending = 1'b0;
 reg output_active_pending = 1'b0;
 reg [11:0] output_x_pending = 12'd0;
@@ -340,8 +338,6 @@ endtask
 always @(posedge rd_clk) begin
     if (reset) begin
         picture_present_q <= 1'b0;
-        stimulus_hs_d <= 1'b1;
-        stimulus_vs_d <= 1'b1;
         output_check_pending <= 1'b0;
         output_active_pending <= 1'b0;
         expected_video_r <= 8'd0;
@@ -366,15 +362,15 @@ always @(posedge rd_clk) begin
         end
 
         if (pixel_ce) begin
-            stimulus_hs_d <= stimulus_hs;
-            stimulus_vs_d <= stimulus_vs;
             output_check_pending <= generation_mode && running;
             output_active_pending <= dut.decoded_picture_window_d;
             output_x_pending <= dut.source_x_d;
             output_y_pending <= dut.source_y_d;
-            expected_video_de <= dut.source_window_d;
-            expected_video_hs <= stimulus_hs_d;
-            expected_video_vs <= stimulus_vs_d;
+            // External raster controls retain the current input phase even
+            // though RGB sample validity is checked on its registered path.
+            expected_video_de <= pixel_en;
+            expected_video_hs <= stimulus_hs;
+            expected_video_vs <= stimulus_vs;
 
             if (dut.decoded_picture_window_d) begin
                 expected_luma_word = ddr_word_pattern(
