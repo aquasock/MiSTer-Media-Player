@@ -1,3 +1,32 @@
+## 543 COMMIT Unreleased ??? 2026-08-26T14:35:16-07:00
+
+#### Coming From:
+
+Unreleased 99fc1ea
+
+#### Purpose:
+
+Close timing for the raster-phase correction by changing only the reproducible Quartus placement seed from fourteen to fifteen.
+
+#### Outcome:
+
+Entry 542 proved that commit `99fc1ea` compiles cleanly and restores the established MiSTer raster-control contract, but its retained seed-fourteen fit missed global setup by 0.199 nanoseconds and was therefore not deployed. The user approved one additional shortened cycle with no long regressions. The only planned source change is the Quartus seed assignment; framebuffer RTL, decoder behavior, clocks, constraints, diagnostics, menu, host software and MiSTer configuration remain unchanged.
+
+#### Next Steps:
+
+Set the Quartus project seed to fifteen, commit and push that single change, then run the focused compile-only elaboration and one retained-state incremental Quartus build on GUNSMOKE without running `vvp` or any native, reconstruction or live-raster suite. Deploy only if compilation succeeds with zero errors and setup, hold, recovery, removal and minimum-pulse-width timing are all non-negative. If it passes, directly replace only `/media/fat/MediaPlayer.rbf`, independently verify the active image and stop for an idle-screen scaler-lock check before any media playback.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 542 COMMIT Unreleased 99fc1ea 2026-08-26T14:15:33-07:00
 
 #### Coming From:
@@ -1220,34 +1249,5 @@ Perform a clean Quartus Prime 17.0.2 build and the Phase-1P timing review. If fi
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 503 COMMIT Unreleased 4e4da3a 2026-08-25T02:59:35-07:00
-
-#### Coming From:
-
-Unreleased 4e4da3a
-
-#### Purpose:
-
-Capture the TFF processed-HDMI Bob result and complete field-order validation of the Bob/Weave control.
-
-#### Outcome:
-
-The user ran `_cadence/native_480i_tff_light_10s.m2v` with native 480i active and Bob selected and reports issues broadly similar to BFF Bob with slight visual differences, followed by USER and POWER solid and DISK blinking twice. The untouched terminal image was triggered and retrieved entirely through ordinary FTP with the default `root` and `1` login and no SSH; `.ai/current_results/entry503_tff_light_hdmi_bob.png` is 11,865 bytes with SHA-256 `9bfbb7f0595707877835dd38f8b2ab2458086fc83314b037725d742d6d3cb604`. Schema nine accepts all 5,007,304 bytes, preserves top-field-first, reaches sequence end and presentation completion, closes normally for quiet reason one and reports zero aggregate, presentation, destination, cache-bank-overlap, audio-underrun and PCM-protocol errors. The wrapped picture and swap counters again represent all 300 pictures and 299 swaps. First presentation is cycle 2,378,246 and last is 719,313,464, so 299 intervals span 716,935,218 cycles or 11.948920 seconds and deliver 25.023181 pictures per second. This differs from BFF Bob by only 304,372 cycles or 5.072867 milliseconds across the whole run, and from the accepted TFF Weave run by only 609,880 cycles or 10.164667 milliseconds; those small decoder-runtime variations cannot explain the reported mode-specific live appearance. The TFF and BFF Bob terminal rasters are structurally equivalent apart from the expected field-marker and field-phase content, while both field orders remain logically exact. The current result therefore closes the discriminator: residual shorter shadows, more frequent visible steps and slight instability are field-order-independent behavior of MiSTer's processed-HDMI Bob reconstruction combined with the separate approximately 25-picture-per-second all-I decoder ceiling, not reversed fields or corruption. Commit `4e4da3a` passes its hardware objective because Bob and Weave are both selectable, preserve native/raw and progressive behavior and expose the intended motion-versus-stability tradeoff without correctness errors.
-
-#### Next Steps:
-
-Freeze the Bob/Weave control and do not attempt another deinterlacer implementation. Retain Weave for users prioritizing stable vertical detail and Bob for users prioritizing shorter motion history, while Native 480i remains the unprocessed external-processing tier. Bundle the already approved menu wording `HDMI scaler deinterlacer` and two-tier documentation with the next materially useful source build rather than spending a Quartus cycle on labels alone. The next technical proposal should address the independent approximately 25-picture-per-second full-D1 all-I throughput ceiling that now dominates the remaining visible jumps, beginning with measured decoder-stage occupancy and a bounded optimization that preserves TFF/BFF timing, field order and the now accepted scaler selection; native direct-video and eventual SDI qualification remain separate until compatible hardware is available.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
