@@ -96,11 +96,11 @@ Read this core.md file first. Treat core.md is the primary project-level source 
 
 - When responding to the user, follow the chain of events:
 
-1. Record the current time in a file on the local GitHub root named "response_timestamp.txt". If the file already exists, replace it.
+1. Run the following command on the users Raspberry Pi: "rpi-keyboard-config leds set --colour red"
 
 2. Continue normal agent "Thinking" process.
 
-3. Compare the elapsed time from "response_timestamp.txt" and if the elapsed time exceeds one minute, run the command: "paplay /usr/share/sounds/freedesktop/stereo/complete.oga" on the users local PC. Then respond to the user regardless of elapsed time.
+3. Run the following command on the users Raspberry Pi: "rpi-keyboard-config leds set --colour green"
 
 4. Await user input.
 
