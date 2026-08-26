@@ -69,22 +69,22 @@ module mpeg2_h262_hardware_cadence_profiler #(
     output reg [7:0] video_b,output wire snapshot_ready
 );
 
-localparam integer SNAPSHOT_WORDS=44;
+localparam integer SNAPSHOT_WORDS=43;
 localparam integer SNAPSHOT_BITS=SNAPSHOT_WORDS*32;
 localparam [23:0] TERMINAL_SNAPSHOT_LIMIT=
     TERMINAL_SNAPSHOT_DELAY-24'd1;
 localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
-localparam [31:0] SNAPSHOT_FORMAT={8'd11,8'd44,16'd60000};
+localparam [31:0] SNAPSHOT_FORMAT={8'd11,8'd43,16'd60000};
 // Entry 511: keep all 41 rows visible without changing their encoding. The
 // mode observation is already in clk_video and affects overlay placement only.
 localparam [11:0] OVERLAY_X=12'd8;
-// Entry 516: schema 11 adds three words, so both origins move twelve rows up
-// to keep the final row inside the diagnostic and native rasters alike.
-localparam [11:0] OVERLAY_DIAG_Y=12'd424;
-localparam [11:0] OVERLAY_NATIVE_Y=12'd304;
-localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd176;
+// Entry 516: schema 11 appends two packed words, so both origins move eight
+// rows up to keep the final row flush with the diagnostic and native rasters.
+localparam [11:0] OVERLAY_DIAG_Y=12'd428;
+localparam [11:0] OVERLAY_NATIVE_Y=12'd308;
+localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd172;
 
 reg session_active;
 reg fifo_pending_q,decoder_ready_q,presentation_hold_q,destination_hold_q;
@@ -134,14 +134,14 @@ reg framebuffer_first_field_line_d;
 reg framebuffer_second_field_line_d;
 reg framebuffer_first_field_fetch_d;
 reg framebuffer_second_field_fetch_d;
-reg [15:0] gen_first_field_lines;
-reg [15:0] gen_second_field_lines;
-reg [15:0] gen_first_field_fetches;
-reg [15:0] gen_second_field_fetches;
-reg [15:0] last_first_field_lines;
-reg [15:0] last_second_field_lines;
-reg [15:0] last_first_field_fetches;
-reg [15:0] last_second_field_fetches;
+reg [7:0] gen_first_field_lines;
+reg [7:0] gen_second_field_lines;
+reg [7:0] gen_first_field_fetches;
+reg [7:0] gen_second_field_fetches;
+reg [7:0] last_first_field_lines;
+reg [7:0] last_second_field_lines;
+reg [7:0] last_first_field_fetches;
+reg [7:0] last_second_field_fetches;
 reg [15:0] field_line_imbalance_count;
 reg [15:0] sequence_phase_error_count;
 reg framebuffer_publication_pending;
@@ -276,13 +276,12 @@ wire [31:0] snapshot_word_37={framebuffer_reset_count,
 wire [31:0] snapshot_word_38={framebuffer_unpublished_reset_count,
     framebuffer_prefill_miss_count};
 wire [31:0] snapshot_word_39=framebuffer_max_publication_latency;
-wire [31:0] snapshot_word_40={last_first_field_lines,
+wire [31:0] snapshot_word_40={last_first_field_fetches,
+    last_second_field_fetches,last_first_field_lines,
     last_second_field_lines};
-wire [31:0] snapshot_word_41={last_first_field_fetches,
-    last_second_field_fetches};
-wire [31:0] snapshot_word_42={field_line_imbalance_count,
+wire [31:0] snapshot_word_41={field_line_imbalance_count,
     sequence_phase_error_count};
-wire [31:0] snapshot_word_43=snapshot_word_00^snapshot_word_01^
+wire [31:0] snapshot_word_42=snapshot_word_00^snapshot_word_01^
     snapshot_word_02^snapshot_word_03^snapshot_word_04^snapshot_word_05^
     snapshot_word_06^snapshot_word_07^snapshot_word_08^snapshot_word_09^
     snapshot_word_10^snapshot_word_11^snapshot_word_12^snapshot_word_13^
@@ -292,12 +291,11 @@ wire [31:0] snapshot_word_43=snapshot_word_00^snapshot_word_01^
     snapshot_word_26^snapshot_word_27^snapshot_word_28^snapshot_word_29^
     snapshot_word_30^snapshot_word_31^snapshot_word_32^snapshot_word_33^
     snapshot_word_34^snapshot_word_35^snapshot_word_36^snapshot_word_37^
-    snapshot_word_38^snapshot_word_39^snapshot_word_40^snapshot_word_41^
-    snapshot_word_42;
+    snapshot_word_38^snapshot_word_39^snapshot_word_40^snapshot_word_41;
 
 task capture_snapshot;
 begin
-    snapshot_mpeg2<={snapshot_word_43,snapshot_word_42,snapshot_word_41,
+    snapshot_mpeg2<={snapshot_word_42,snapshot_word_41,
         snapshot_word_40,snapshot_word_39,snapshot_word_38,
         snapshot_word_37,snapshot_word_36,snapshot_word_35,
         snapshot_word_34,snapshot_word_33,snapshot_word_32,
@@ -462,16 +460,16 @@ always @(posedge clk_mpeg2) begin
             if(writer_write_q&&writer_busy_q)
                 writer_wait_cycles<=writer_wait_cycles+1'b1;
             if(framebuffer_first_field_line_edge&&
-               (gen_first_field_lines!=16'hffff))
+               (gen_first_field_lines!=8'hff))
                 gen_first_field_lines<=gen_first_field_lines+1'b1;
             if(framebuffer_second_field_line_edge&&
-               (gen_second_field_lines!=16'hffff))
+               (gen_second_field_lines!=8'hff))
                 gen_second_field_lines<=gen_second_field_lines+1'b1;
             if(framebuffer_first_field_fetch_edge&&
-               (gen_first_field_fetches!=16'hffff))
+               (gen_first_field_fetches!=8'hff))
                 gen_first_field_fetches<=gen_first_field_fetches+1'b1;
             if(framebuffer_second_field_fetch_edge&&
-               (gen_second_field_fetches!=16'hffff))
+               (gen_second_field_fetches!=8'hff))
                 gen_second_field_fetches<=gen_second_field_fetches+1'b1;
             if(framebuffer_sequence_phase_error_edge&&
                (sequence_phase_error_count!=16'hffff))
@@ -699,7 +697,6 @@ always @* begin
     40:overlay_row_word=snapshot_sync_2[1311:1280];
     41:overlay_row_word=snapshot_sync_2[1343:1312];
     42:overlay_row_word=snapshot_sync_2[1375:1344];
-    43:overlay_row_word=snapshot_sync_2[1407:1376];
     default:overlay_row_word=0;
     endcase
 end

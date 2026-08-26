@@ -228,11 +228,11 @@ endtask
 task verify_checksum;
 begin
     checksum=0;
-    for(i=0;i<43;i=i+1)
+    for(i=0;i<42;i=i+1)
         checksum=checksum^dut.snapshot_sync_2[i*32+:32];
-    if(checksum!==dut.snapshot_sync_2[1407:1376])
+    if(checksum!==dut.snapshot_sync_2[1375:1344])
         $fatal(1,"checksum mismatch %h/%h",checksum,
-               dut.snapshot_sync_2[1407:1376]);
+               dut.snapshot_sync_2[1375:1344]);
 end
 endtask
 
@@ -246,8 +246,8 @@ task verify_overlay_row_coverage;
     reg [11:0] y0;
 begin
     native_active=native_mode;
-    y0=native_mode?12'd304:12'd424;
-    for(row=0;row<44;row=row+1)begin
+    y0=native_mode?12'd308:12'd428;
+    for(row=0;row<43;row=row+1)begin
         v_pos=y0+row[11:0]*12'd4;
         @(negedge clk_video);h_pos=0;
         @(posedge clk_video);#1;
@@ -269,7 +269,7 @@ task verify_overlay_prefix;
     integer x;
 begin
     native_active=native_mode;
-    v_pos=native_mode?12'd305:12'd425;
+    v_pos=native_mode?12'd309:12'd429;
     for(x=0;x<=29;x=x+1)begin
         @(negedge clk_video);h_pos=x;
         @(posedge clk_video);#1;
@@ -361,7 +361,7 @@ initial begin
 
     if(dut.snapshot_sync_2[31:0]!==32'h4d4d5031)
         $fatal(1,"bad magic %h",dut.snapshot_sync_2[31:0]);
-    if(dut.snapshot_sync_2[63:32]!==32'h0b2cea60)
+    if(dut.snapshot_sync_2[63:32]!==32'h0b2bea60)
         $fatal(1,"bad format %h",dut.snapshot_sync_2[63:32]);
     if(dut.snapshot_sync_2[831:830]!==2'd1)
         $fatal(1,"quiet snapshot reason missing");
@@ -389,15 +389,12 @@ initial begin
                dut.snapshot_sync_2[1247:1216]);
     if(dut.snapshot_sync_2[1279:1248]==0)
         $fatal(1,"framebuffer publication latency missing");
-    if(dut.snapshot_sync_2[1311:1280]!=={16'd3,16'd2})
-        $fatal(1,"per-field displayed line mismatch %h",
+    if(dut.snapshot_sync_2[1311:1280]!=={8'd1,8'd3,8'd3,8'd2})
+        $fatal(1,"per-field fetch/line mismatch %h",
                dut.snapshot_sync_2[1311:1280]);
-    if(dut.snapshot_sync_2[1343:1312]!=={16'd1,16'd3})
-        $fatal(1,"per-field DDR fetch mismatch %h",
-               dut.snapshot_sync_2[1343:1312]);
-    if(dut.snapshot_sync_2[1375:1344]!=={16'd1,16'd1})
+    if(dut.snapshot_sync_2[1343:1312]!=={16'd1,16'd1})
         $fatal(1,"field imbalance/phase error mismatch %h",
-               dut.snapshot_sync_2[1375:1344]);
+               dut.snapshot_sync_2[1343:1312]);
     verify_checksum();
     verify_overlay_prefix(1'b0);
     verify_overlay_prefix(1'b1);

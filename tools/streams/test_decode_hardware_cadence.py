@@ -13,13 +13,14 @@ import decode_hardware_cadence as cadence
 
 def snapshot_words() -> list[int]:
     """Schema eleven: forty-four words ending in the XOR checksum."""
-    words = [cadence.MAGIC, 0x0B2CEA60]
+    words = [cadence.MAGIC, 0x0B2BEA60]
     words.extend((0x10203040 + index * 0x01010101) & 0xFFFFFFFF
                  for index in range(2, 37))
     words.extend(((3 << 16) | 2, (1 << 16) | 1, 12345))
     # Entry 516 per-field evidence: equal displayed lines, a starved first
     # field, five imbalanced generations and seven sequence phase errors.
-    words.extend((((240 << 16) | 240), ((17 << 16) | 240), ((5 << 16) | 7)))
+    words.extend((((17 << 24) | (240 << 16) | (240 << 8) | 240),
+                  ((5 << 16) | 7)))
     checksum = 0
     for word in words:
         checksum ^= word
@@ -147,7 +148,7 @@ def main() -> None:
         result = cadence.decode(overlap)
         if not result["cache_bank_overlap_error"]:
             raise SystemExit("cache-bank overlap telemetry bit was not decoded")
-    print("CADENCE_DECODER_LAYOUT_PASS schema11=424/304/44 "
+    print("CADENCE_DECODER_LAYOUT_PASS schema11=428/308/43 "
           "schema10=436/316/41 legacy=444/324/38")
 
 

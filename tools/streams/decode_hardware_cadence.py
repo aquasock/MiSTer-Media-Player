@@ -13,9 +13,9 @@ from PIL import Image
 
 MAGIC = 0x4D4D5031
 X0 = 8
-WORDS = 44
-DIAGNOSTIC_Y0 = 424
-NATIVE_480I_Y0 = 304
+WORDS = 43
+DIAGNOSTIC_Y0 = 428
+NATIVE_480I_Y0 = 308
 SCHEMA10_DIAGNOSTIC_Y0 = 436
 SCHEMA10_NATIVE_480I_Y0 = 316
 LEGACY_DIAGNOSTIC_Y0 = 444
@@ -322,23 +322,27 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         ),
         # Entry 516 (schema 11): three appended words expose the per-field
         # readout invariants that whole-picture counters cannot see.
-        "framebuffer_last_first_field_lines": (
-            (words[40] >> 16) & 0xFFFF if schema_version >= 11 else None
-        ),
-        "framebuffer_last_second_field_lines": (
-            words[40] & 0xFFFF if schema_version >= 11 else None
-        ),
+        # Word 40 packs four saturating eight-bit per-generation figures: a
+        # native field presents 240 lines and is served 240 luma rows, so the
+        # whole ordinary range fits.  255 means "at least 255", which only
+        # arises when one generation spans several displayed frames.
         "framebuffer_last_first_field_fetches": (
-            (words[41] >> 16) & 0xFFFF if schema_version >= 11 else None
+            (words[40] >> 24) & 0xFF if schema_version >= 11 else None
         ),
         "framebuffer_last_second_field_fetches": (
-            words[41] & 0xFFFF if schema_version >= 11 else None
+            (words[40] >> 16) & 0xFF if schema_version >= 11 else None
+        ),
+        "framebuffer_last_first_field_lines": (
+            (words[40] >> 8) & 0xFF if schema_version >= 11 else None
+        ),
+        "framebuffer_last_second_field_lines": (
+            words[40] & 0xFF if schema_version >= 11 else None
         ),
         "framebuffer_field_line_imbalance_count": (
-            (words[42] >> 16) & 0xFFFF if schema_version >= 11 else None
+            (words[41] >> 16) & 0xFFFF if schema_version >= 11 else None
         ),
         "framebuffer_sequence_phase_error_count": (
-            words[42] & 0xFFFF if schema_version >= 11 else None
+            words[41] & 0xFFFF if schema_version >= 11 else None
         ),
         "checksum": words[-1],
     }
