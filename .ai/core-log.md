@@ -1,3 +1,32 @@
+## 537 COMMIT Unreleased d566668 2026-08-26T05:29:56-07:00
+
+#### Coming From:
+
+Unreleased d566668
+
+#### Purpose:
+
+Accept the canonical MediaPlayer selector path and define the next bounded stale-generation investigation without adding hardware diagnostics.
+
+#### Outcome:
+
+After restarting into the independently verified 1,166,244-byte Main executable at SHA-256 `5a6cbf7e85682ac301d57470b8b2c952d3bbfa42af55484bd70dd0d36724ae96`, the user confirms that MediaPlayer now opens at the required `/media/fat/games/MediaPlayer` path, so commit `d566668` passes its hardware objective. The separate Big Buck Bunny result remains failed with both old-frame ghosting and thin horizontal lines. Existing evidence now clears real-content four-picture reconstruction, accepted framebuffer write versus raw DDR return, raw return versus line-cache output after the registered-address correction, presentation count, cadence and all monitored error flags. Static review identifies one remaining regression blind spot before a behavioral scheduler change: `tb_native_480i_presentation_integration.sv` counts changes of the two-bit display bank and verifies aggregate decoded and presented counts, but it does not tag each bank with its authored picture generation or assert monotonic displayed generation. The current test can therefore pass while a scheduler ownership race replays an older generation through a different bank, which matches the unresolved symptom class without requiring another hardware diagnostic layout.
+
+#### Next Steps:
+
+Obtain approval for one bounded scheduler cycle. Extend only the existing native 480i presentation integration model with generation identities carried by its three ordinary banks and assert that every presentation advances to the next authored generation under the measured three-field decoder latency, the accelerated one-field case and terminal drain. Run that test first against the current scheduler. If it exposes a replay or ordering failure, correct only the responsible ordinary-reference ownership transition and rerun the focused scheduler, native timing, framebuffer, complete reconstruction and canonical live-raster regressions before an incremental Quartus build. If generation order already passes, stop without changing RTL and return to the framebuffer publication boundary using the current diagnostic layout rather than adding another schema.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 536 COMMIT Unreleased d566668 2026-08-26T05:21:07-07:00
 
 #### Coming From:
@@ -1213,35 +1242,6 @@ The user approved entry 497's recommendation to skip the no-longer-required movi
 #### Next Steps:
 
 Leave `Native timing pattern` Off, set `Interlaced output` to `Native 480i` and run only `_cadence/native_480i_bff_light_10s.m2v`. Judge whether the bar continues moving smoothly to the right without field-order reversal, backstep or alternating-field judder, whether the upper and lower field markers remain orderly, and report flicker, combing, horizontal dashes or any other artifact separately from the already classified display-history ghost. Report USER, DISK and POWER after completion and leave the terminal image loaded for an ordinary-FTP schema-nine capture. Acceptance requires all 300 pictures and 299 swaps, stable bottom-field-first telemetry, sequence end and presentation completion, zero aggregate, presentation, destination and cache-bank-overlap errors and a decoder-limited duration comparable to the accepted TFF light-motion run. Keep the public native-interlace compatibility claim disabled until this BFF result is captured; address the independent approximately 25-picture-per-second all-I throughput ceiling afterward.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 497 COMMIT Unreleased baf5d2c 2026-08-25T01:49:06-07:00
-
-#### Coming From:
-
-Unreleased baf5d2c
-
-#### Purpose:
-
-Use the user's high-frame-rate recording to classify the step-hold ghost before spending a Quartus cycle on the proposed moving framebuffer-bypass pattern.
-
-#### Outcome:
-
-The user supplied `.ai/current_results/PXL_20260825_084158381.mp4`, a 68,665,532-byte, 16.631233-second 1920x1080 H.264 Pixel 8 Pro recording at an average 59.706937 frames per second and SHA-256 `d2a4d296d8dd9f86ee6cacc341992b144722b741be35b46606d441a199782386`. Frame-by-frame review confirms the naked-eye report and materially changes the diagnosis. At a representative jump, the old bar is absent before the transition, becomes visible alongside the immediately present new bar, then alternates between bright, dim and field-striped appearances before fading away over roughly nine captured 30-fps samples; during the same interval the new bar alternates between complete and field-striped appearances and then stabilizes. The two stationary horizontal references remain stable throughout. That gradual, intensity-weighted temporal decay and alternating reconstruction is characteristic of downstream field-history processing by the display scaler or deinterlacer, potentially compounded by the phone's own temporal video processing, rather than binary stale DDR or line-cache pixels. The user's direct visual observation establishes that the effect exists before the camera, while the recording exposes its temporal structure. Combined with the pair-identical decoded source, zero old-position source pixels, clean cache and destination telemetry, a clean terminal framebuffer and the static framebuffer-bypass result, this is strong enough to clear framebuffer corruption as the working diagnosis and supersedes entry 496's need to modify cache RTL. It is not a mathematical replacement for a moving final-mux bypass, but that build is now confirmation rather than a prerequisite.
-
-#### Next Steps:
-
-Stop and obtain approval to supersede entry 496's moving-bypass build. If approved, make no RTL or RBF change for this ghost and treat it as downstream interlace reconstruction on the present display; optionally confirm later with deinterlacing disabled, a game mode, a different native-480i display or the moving final-mux pattern if a public compatibility claim requires formal isolation. Advance the core qualification instead to the already deferred bottom-field-first hardware case: regenerate and validate the established BFF light-motion fixture byte-identically, install only that media file through staged ordinary FTP with the default MiSTer login, then run it in native 480i and capture field order, motion, LEDs and schema-nine telemetry before addressing the independent approximately 25-picture-per-second all-I throughput ceiling. Keep the public native-interlace compatibility claim disabled until BFF passes.
 
 #### Files Modified:
 
