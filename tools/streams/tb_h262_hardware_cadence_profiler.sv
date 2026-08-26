@@ -39,6 +39,10 @@ reg framebuffer_prefill_deadline_missed=0;
 reg framebuffer_sequence_phase_error=0;
 reg [2:0] framebuffer_first_field_region=0;
 reg [2:0] framebuffer_second_field_region=0;
+reg [7:0] framebuffer_first_field_signature=0;
+reg [7:0] framebuffer_second_field_signature=0;
+reg framebuffer_first_field_varied=0;
+reg framebuffer_second_field_varied=0;
 reg framebuffer_first_field_fetch=0;
 reg framebuffer_second_field_fetch=0;
 integer field_index;
@@ -66,6 +70,10 @@ mpeg2_h262_hardware_cadence_profiler #(
     .framebuffer_sequence_phase_error(framebuffer_sequence_phase_error),
     .framebuffer_first_field_region(framebuffer_first_field_region),
     .framebuffer_second_field_region(framebuffer_second_field_region),
+    .framebuffer_first_field_signature(framebuffer_first_field_signature),
+    .framebuffer_second_field_signature(framebuffer_second_field_signature),
+    .framebuffer_first_field_varied(framebuffer_first_field_varied),
+    .framebuffer_second_field_varied(framebuffer_second_field_varied),
     .framebuffer_first_field_fetch(framebuffer_first_field_fetch),
     .framebuffer_second_field_fetch(framebuffer_second_field_fetch),
     .fifo_pending(fifo_pending),.decoder_ready(decoder_ready),
@@ -135,6 +143,21 @@ begin
     @(negedge clk_mpeg2);
     framebuffer_first_field_region=first_region;
     framebuffer_second_field_region=second_region;
+    @(posedge clk_mpeg2);
+end
+endtask
+
+task drive_field_content;
+    input first_varied;
+    input second_varied;
+    input [7:0] first_signature;
+    input [7:0] second_signature;
+begin
+    @(negedge clk_mpeg2);
+    framebuffer_first_field_varied=first_varied;
+    framebuffer_second_field_varied=second_varied;
+    framebuffer_first_field_signature=first_signature;
+    framebuffer_second_field_signature=second_signature;
     @(posedge clk_mpeg2);
 end
 endtask
@@ -214,6 +237,10 @@ begin
     framebuffer_sequence_phase_error=0;
     framebuffer_first_field_region=0;
     framebuffer_second_field_region=0;
+    framebuffer_first_field_signature=0;
+    framebuffer_second_field_signature=0;
+    framebuffer_first_field_varied=0;
+    framebuffer_second_field_varied=0;
     framebuffer_first_field_fetch=0;
     framebuffer_second_field_fetch=0;
     stc_seconds=14'd5;
@@ -335,6 +362,7 @@ initial begin
     drive_field_fetches(2,2);
     pulse_framebuffer_reset();
     drive_field_regions(3'd2,3'd1);
+    drive_field_content(1'b0,1'b1,8'ha5,8'h3c);
     drive_field_fetches(1,3);
     pulse_sequence_phase_error();
     pulse_framebuffer_reset();
@@ -359,7 +387,7 @@ initial begin
 
     if(dut.snapshot_sync_2[31:0]!==32'h4d4d5031)
         $fatal(1,"bad magic %h",dut.snapshot_sync_2[31:0]);
-    if(dut.snapshot_sync_2[63:32]!==32'h0c2bea60)
+    if(dut.snapshot_sync_2[63:32]!==32'h0d2bea60)
         $fatal(1,"bad format %h",dut.snapshot_sync_2[63:32]);
     if(dut.snapshot_sync_2[831:830]!==2'd1)
         $fatal(1,"quiet snapshot reason missing");
@@ -387,11 +415,12 @@ initial begin
                dut.snapshot_sync_2[1247:1216]);
     if(dut.snapshot_sync_2[1279:1248]==0)
         $fatal(1,"framebuffer publication latency missing");
-    if(dut.snapshot_sync_2[1311:1280]!=={8'd1,8'd3,10'd0,3'd2,3'd1})
-        $fatal(1,"per-field fetch/region mismatch %h",
+    if(dut.snapshot_sync_2[1311:1280]!==
+       {8'd1,8'd3,1'b0,1'b1,6'd0,3'd2,3'd1})
+        $fatal(1,"per-field fetch/region/varied mismatch %h",
                dut.snapshot_sync_2[1311:1280]);
-    if(dut.snapshot_sync_2[1343:1312]!=={16'd1,16'd1})
-        $fatal(1,"region mismatch/phase error mismatch %h",
+    if(dut.snapshot_sync_2[1343:1312]!=={8'ha5,8'h3c,8'd1,8'd1})
+        $fatal(1,"per-field signature/mismatch/phase mismatch %h",
                dut.snapshot_sync_2[1343:1312]);
     verify_checksum();
     verify_overlay_prefix(1'b0);
@@ -539,7 +568,7 @@ initial begin
     if({video_r,video_g,video_b}!==24'h123456)
         $fatal(1,"base video changed outside overlay");
 
-    $display("HARDWARE_CADENCE_PROFILER_PASS schema=12 field-readout+framebuffer-publication+timestamp-conflicts+audio-defer+forced+fatal+no-progress checksum=%h",
+    $display("HARDWARE_CADENCE_PROFILER_PASS schema=13 field-content+framebuffer-publication+timestamp-conflicts+audio-defer+forced+fatal+no-progress checksum=%h",
              checksum);
     $finish;
 end

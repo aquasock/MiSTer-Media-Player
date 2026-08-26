@@ -26,6 +26,10 @@ module mpeg2_h262_hardware_cadence_profiler #(
     input wire framebuffer_sequence_phase_error,
     input wire [2:0] framebuffer_first_field_region,
     input wire [2:0] framebuffer_second_field_region,
+    input wire [7:0] framebuffer_first_field_signature,
+    input wire [7:0] framebuffer_second_field_signature,
+    input wire framebuffer_first_field_varied,
+    input wire framebuffer_second_field_varied,
     input wire framebuffer_first_field_fetch,
     input wire framebuffer_second_field_fetch,
     input wire fifo_pending,input wire decoder_ready,
@@ -76,7 +80,7 @@ localparam [23:0] TERMINAL_SNAPSHOT_LIMIT=
 localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
-localparam [31:0] SNAPSHOT_FORMAT={8'd12,8'd43,16'd60000};
+localparam [31:0] SNAPSHOT_FORMAT={8'd13,8'd43,16'd60000};
 // Entry 511: keep all 41 rows visible without changing their encoding. The
 // mode observation is already in clk_video and affects overlay placement only.
 localparam [11:0] OVERLAY_X=12'd8;
@@ -138,8 +142,12 @@ reg [7:0] last_first_field_fetches;
 reg [7:0] last_second_field_fetches;
 reg [2:0] last_first_field_region;
 reg [2:0] last_second_field_region;
-reg [15:0] field_region_mismatch_count;
-reg [15:0] sequence_phase_error_count;
+reg [7:0] field_region_mismatch_count;
+reg [7:0] last_first_field_signature;
+reg [7:0] last_second_field_signature;
+reg last_first_field_varied;
+reg last_second_field_varied;
+reg [7:0] sequence_phase_error_count;
 reg framebuffer_publication_pending;
 reg [31:0] framebuffer_publication_latency;
 reg [31:0] framebuffer_max_publication_latency;
@@ -269,9 +277,11 @@ wire [31:0] snapshot_word_38={framebuffer_unpublished_reset_count,
     framebuffer_prefill_miss_count};
 wire [31:0] snapshot_word_39=framebuffer_max_publication_latency;
 wire [31:0] snapshot_word_40={last_first_field_fetches,
-    last_second_field_fetches,10'd0,last_first_field_region,
+    last_second_field_fetches,last_first_field_varied,
+    last_second_field_varied,6'd0,last_first_field_region,
     last_second_field_region};
-wire [31:0] snapshot_word_41={field_region_mismatch_count,
+wire [31:0] snapshot_word_41={last_first_field_signature,
+    last_second_field_signature,field_region_mismatch_count,
     sequence_phase_error_count};
 wire [31:0] snapshot_word_42=snapshot_word_00^snapshot_word_01^
     snapshot_word_02^snapshot_word_03^snapshot_word_04^snapshot_word_05^
@@ -350,6 +360,8 @@ always @(posedge clk_mpeg2) begin
         last_first_field_fetches<=0;last_second_field_fetches<=0;
         last_first_field_region<=0;last_second_field_region<=0;
         field_region_mismatch_count<=0;sequence_phase_error_count<=0;
+        last_first_field_signature<=0;last_second_field_signature<=0;
+        last_first_field_varied<=0;last_second_field_varied<=0;
         display_picture_count<=0;display_swap_count<=0;
         b_picture_complete_d<=0;display_frame_bank_d<=0;
         display_scratch_d<=0;display_scratch_bank_d<=0;
@@ -453,7 +465,7 @@ always @(posedge clk_mpeg2) begin
                (gen_second_field_fetches!=8'hff))
                 gen_second_field_fetches<=gen_second_field_fetches+1'b1;
             if(framebuffer_sequence_phase_error_edge&&
-               (sequence_phase_error_count!=16'hffff))
+               (sequence_phase_error_count!=8'hff))
                 sequence_phase_error_count<=sequence_phase_error_count+1'b1;
             if(framebuffer_generation_reset_edge)begin
                 if(framebuffer_reset_count!=16'hffff)
@@ -466,9 +478,14 @@ always @(posedge clk_mpeg2) begin
                 last_second_field_fetches<=gen_second_field_fetches;
                 last_first_field_region<=framebuffer_first_field_region;
                 last_second_field_region<=framebuffer_second_field_region;
+                last_first_field_signature<=framebuffer_first_field_signature;
+                last_second_field_signature<=
+                    framebuffer_second_field_signature;
+                last_first_field_varied<=framebuffer_first_field_varied;
+                last_second_field_varied<=framebuffer_second_field_varied;
                 if((framebuffer_first_field_region!=
                     framebuffer_second_field_region)&&
-                   (field_region_mismatch_count!=16'hffff))
+                   (field_region_mismatch_count!=8'hff))
                     field_region_mismatch_count<=
                         field_region_mismatch_count+1'b1;
                 gen_first_field_fetches<=0;gen_second_field_fetches<=0;

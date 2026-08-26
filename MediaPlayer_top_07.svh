@@ -100,6 +100,10 @@ mpeg2_h262_hardware_cadence_profiler
         mpeg2_new_framebuffer_sequence_phase_error),
     .framebuffer_first_field_region(mpeg2_new_first_field_region),
     .framebuffer_second_field_region(mpeg2_new_second_field_region),
+    .framebuffer_first_field_signature(mpeg2_new_first_field_signature),
+    .framebuffer_second_field_signature(mpeg2_new_second_field_signature),
+    .framebuffer_first_field_varied(mpeg2_new_first_field_varied),
+    .framebuffer_second_field_varied(mpeg2_new_second_field_varied),
     .framebuffer_first_field_fetch(
         mpeg2_new_framebuffer_first_field_fetch_toggle),
     .framebuffer_second_field_fetch(

@@ -28,6 +28,11 @@ wire mpeg2_new_framebuffer_sequence_phase_error_rd;
 // so it needs no synchronizer and stays fully timed.
 wire mpeg2_new_framebuffer_first_field_fetch_toggle;
 wire mpeg2_new_framebuffer_second_field_fetch_toggle;
+// Entry 519: per-parity luma return content, generated on clk_mpeg2.
+wire [7:0] mpeg2_new_first_field_signature;
+wire [7:0] mpeg2_new_second_field_signature;
+wire mpeg2_new_first_field_varied;
+wire mpeg2_new_second_field_varied;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] mpeg2_new_framebuffer_picture_present_sync;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
@@ -145,6 +150,10 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
         mpeg2_new_framebuffer_first_field_fetch_toggle),
     .second_field_fetch_toggle_debug(
         mpeg2_new_framebuffer_second_field_fetch_toggle),
+    .first_field_signature_debug(mpeg2_new_first_field_signature),
+    .second_field_signature_debug(mpeg2_new_second_field_signature),
+    .first_field_varied_debug(mpeg2_new_first_field_varied),
+    .second_field_varied_debug(mpeg2_new_second_field_varied),
     .rd_clk         (clk_video),
     .h_pos          (display_h_pos),
     .v_pos          (display_v_pos),

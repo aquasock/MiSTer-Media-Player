@@ -12,16 +12,20 @@ import decode_hardware_cadence as cadence
 
 
 def snapshot_words() -> list[int]:
-    """Schema twelve: forty-three words ending in the XOR checksum."""
-    words = [cadence.MAGIC, 0x0C2BEA60]
+    """Schema thirteen: forty-three words ending in the XOR checksum."""
+    words = [cadence.MAGIC, 0x0D2BEA60]
     words.extend((0x10203040 + index * 0x01010101) & 0xFFFFFFFF
                  for index in range(2, 37))
     words.extend(((3 << 16) | 2, (1 << 16) | 1, 12345))
     # Entry 518 per-field evidence: a starved first field whose fetches
     # resolved into region 2 while the other parity used region 1, with five
     # mismatching generations and seven sequence phase errors.
-    words.extend((((17 << 24) | (240 << 16) | (2 << 3) | 1),
-                  ((5 << 16) | 7)))
+    # A starved first field whose returns never varied, against a second
+    # field that did, plus differing regions, five mismatches, seven phase
+    # errors and distinct per-parity content signatures.
+    words.extend((((17 << 24) | (240 << 16) | (0 << 15) | (1 << 14) |
+                   (2 << 3) | 1),
+                  ((0xA5 << 24) | (0x3C << 16) | (5 << 8) | 7)))
     checksum = 0
     for word in words:
         checksum ^= word
@@ -97,8 +101,16 @@ def main() -> None:
             raise SystemExit("framebuffer prefill miss was not decoded")
         if parsed["framebuffer_max_publication_latency_cycles"] != 12345:
             raise SystemExit("framebuffer publication latency was not decoded")
-        if parsed["schema_version"] != 12:
-            raise SystemExit("schema twelve was not reported")
+        if parsed["schema_version"] != 13:
+            raise SystemExit("schema thirteen was not reported")
+        if parsed["framebuffer_first_field_varied"] is not False:
+            raise SystemExit("first-field varied flag was not decoded")
+        if parsed["framebuffer_second_field_varied"] is not True:
+            raise SystemExit("second-field varied flag was not decoded")
+        if parsed["framebuffer_first_field_signature"] != 0xA5:
+            raise SystemExit("first-field signature was not decoded")
+        if parsed["framebuffer_second_field_signature"] != 0x3C:
+            raise SystemExit("second-field signature was not decoded")
         if parsed["framebuffer_last_first_field_fetches"] != 17:
             raise SystemExit("first-field DDR fetches were not decoded")
         if parsed["framebuffer_last_second_field_fetches"] != 240:
@@ -151,7 +163,7 @@ def main() -> None:
         result = cadence.decode(overlap)
         if not result["cache_bank_overlap_error"]:
             raise SystemExit("cache-bank overlap telemetry bit was not decoded")
-    print("CADENCE_DECODER_LAYOUT_PASS schema12=428/308/43 "
+    print("CADENCE_DECODER_LAYOUT_PASS schema13=428/308/43 "
           "schema10=436/316/41 legacy=444/324/38")
 
 

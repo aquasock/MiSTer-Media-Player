@@ -347,13 +347,30 @@ def parse_words(words: list[int]) -> dict[str, Any]:
             words[40] & 0x7 if schema_version >= 12 else None
         ),
         "framebuffer_field_region_mismatch_count": (
-            (words[41] >> 16) & 0xFFFF if schema_version >= 12 else None
+            (words[41] >> 8) & 0xFF if schema_version >= 13
+            else (words[41] >> 16) & 0xFFFF if schema_version == 12 else None
+        ),
+        # Entry 519 (schema 13): the luma content DDR actually returned for
+        # each parity this generation.  A retained uniform field returns an
+        # unvarying value; a field carrying picture cannot.
+        "framebuffer_first_field_varied": (
+            bool((words[40] >> 15) & 1) if schema_version >= 13 else None
+        ),
+        "framebuffer_second_field_varied": (
+            bool((words[40] >> 14) & 1) if schema_version >= 13 else None
+        ),
+        "framebuffer_first_field_signature": (
+            (words[41] >> 24) & 0xFF if schema_version >= 13 else None
+        ),
+        "framebuffer_second_field_signature": (
+            (words[41] >> 16) & 0xFF if schema_version >= 13 else None
         ),
         "framebuffer_field_line_imbalance_count": (
             (words[41] >> 16) & 0xFFFF if schema_version == 11 else None
         ),
         "framebuffer_sequence_phase_error_count": (
-            words[41] & 0xFFFF if schema_version >= 11 else None
+            words[41] & 0xFF if schema_version >= 13
+            else words[41] & 0xFFFF if schema_version >= 11 else None
         ),
         "checksum": words[-1],
     }
@@ -477,6 +494,13 @@ def main() -> int:
                 "{framebuffer_max_publication_latency_seconds:.6f}s".format(
                     **result
                 )
+            )
+        if result["schema_version"] >= 13:
+            print(
+                "field content: varied={framebuffer_first_field_varied}/"
+                "{framebuffer_second_field_varied} "
+                "signatures={framebuffer_first_field_signature:#04x}/"
+                "{framebuffer_second_field_signature:#04x}".format(**result)
             )
         if result["schema_version"] >= 12:
             print(
