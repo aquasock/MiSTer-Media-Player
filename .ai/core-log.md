@@ -1,3 +1,31 @@
+## 526 COMMIT Unreleased 98ee2dc 2026-08-26T00:56:34-07:00
+
+#### Coming From:
+
+Unreleased 98ee2dc
+
+#### Purpose:
+
+Install and verify the exact schema-sixteen image without creating any backup, rollback or staging file.
+
+#### Outcome:
+
+The exact 4,239,056-byte `98ee2dc` RBF was copied from the designated GUNSMOKE checkout to the Raspberry Pi and independently retained SHA-256 `ef78d18bb5f8fe974e1b132df73305878e1da99fd72f602a28c223fb295c8825`. Two initial `curl` uploads were rejected with FTP status 550 and changed nothing because curl interpreted the URL relative to the server login directory `/root`; the established Python `ftplib` absolute-path operation then wrote directly to `/media/fat/MediaPlayer.rbf` with no intermediate remote filename. An initial curl readback likewise fetched the unrelated historical `/root/MediaPlayer.rbf`, which exposed the path interpretation rather than an installation failure. Absolute-path `ftplib` readback of `/media/fat/MediaPlayer.rbf` returns exactly 4,239,056 bytes at the candidate hash and compares byte-identically with the local build. No backup, rollback or staging file was created or modified.
+
+#### Next Steps:
+
+Reload the Media Player core, prepare `_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i and reply ready. Start playback immediately when prompted while a corrected thirty-second burst deletes the prior screenshot before every trigger, then leave the terminal image loaded for absolute-path schema-sixteen capture and decoding. Report whether the first-field bar remains frozen and whether the grey line fragments remain visible.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
 ## 525 COMMIT Unreleased 98ee2dc 2026-08-25T23:27:33-07:00
 
 #### Coming From:
@@ -1227,34 +1255,6 @@ Set `Interlaced output` to `800x600 Diagnostic` and run only `_cadence/native_48
 #### Files Modified:
 
 - tools/streams/generate_test_interlaced_i_frames.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 486 COMMIT Unreleased 5568aa9 2026-08-24T23:08:41-07:00
-
-#### Coming From:
-
-Unreleased 5568aa9
-
-#### Purpose:
-
-Record the sustained native-480i TFF hardware result, accept the complete native telemetry and capture diagnostics, and identify all-I decode throughput as a confounder before field-order qualification.
-
-#### Outcome:
-
-The user watched the complete `_cadence/native_480i_tff_10s.m2v` run in Native 480i mode and reports smooth playback with no visible jumps or dropped frames or fields, correct crop, some apparent softness and what resembles 60 Hz flicker. USER and POWER remain solid and DISK blinks twice at the terminal image. The 720x480 screenshot was triggered and retrieved entirely through ordinary authenticated FTP using the default MiSTer login and no SSH; `.ai/current_results/entry485_native480i_tff_10s.png` is 116,611 bytes with SHA-256 `e0961e226beaa193d086f42b15697f140553e9d4232eb1fabc540a8ef97798a7`. Its complete visible schema-nine record reports all 13,145,582 accepted transport writes for the 13,145,581-byte source, 300 reference and displayed pictures, 299 physical-frame swaps, stable `top_field_first=1`, rate code four, sequence end, presentation completion and quiet reason-one termination. Aggregate, decoder, presentation, destination, audio-underrun and PCM-protocol errors are all clear; no decode, reorder, promotion, future-reference, scratch or terminal-boundary work remains. First presentation occurs at 2,629,099 cycles and the last at 1,199,249,429 cycles, so the 299 swap intervals occupy 1,196,620,330 cycles, or 19.943672 seconds at 60 MHz. The actual sustained rate is therefore 14.992 pictures per second; the decoded display counter wraps modulo 256, so the helper's uncorrected 2.156-fps display is not applicable to this 300-picture run. The visual observation and counters agree that the scheduler does not discard pictures or fields: it preserves order and holds each decoded frame until the next one is available. This complex 720x480 all-I visual fixture therefore overloads the present decoder at roughly half the authored 29.97-picture rate and cannot qualify authored native field cadence, softness or flicker. The final still contains the expected weave of temporally separated fields and proves that the full native telemetry layout is now observable. DISK code two remains the passive third-I progress indication rather than an error. Native output remains unpassed, and BFF is deferred.
-
-#### Next Steps:
-
-Do not change native timing or run the BFF fixture from this result. Prepare a deterministic low-complexity 720x480 frame-DCT all-I TFF motion fixture with flat regions, high-contrast moving geometry and explicit field-order cues so the existing decoder can sustain the authored 30000/1001 picture rate. First run that same fixture in the 800x600 Diagnostic mode to establish real-time decode throughput and a progressive visual baseline, then run it in Native 480i mode and compare sharpness, flicker, motion direction and terminal telemetry. Proceed to the corresponding BFF fixture only after the TFF stream completes in approximately ten seconds with approximately 29.97 pictures per second, zero errors and no visible drops. Keep the public interlaced compatibility claim disabled.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
