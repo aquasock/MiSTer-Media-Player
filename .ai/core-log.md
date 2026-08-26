@@ -1,6 +1,42 @@
-## 515 COMMIT Unreleased 9573923 2026-08-25T11:32:46-07:00
+## 516 COMMIT Unreleased 3e91073 2026-08-25T18:31:59-07:00
 
 #### Coming From:
+
+Unreleased 9573923
+
+#### Purpose:
+
+Instrument the per-field framebuffer readout invariants that whole-picture counters cannot observe.
+
+#### Outcome:
+
+Entry 515 placed the fault in framebuffer field readout, and this cycle adds passive evidence for it. The framebuffer exports a sticky per-generation field-phase error, one toggle per displayed line of each parity from the video domain, and one toggle per launched luma DDR line fetch of each parity from the memory domain, which is `clk_mpeg2` itself and therefore needs no synchronizer. Three-stage synchronizers carry the video-domain levels to the decoder domain and `MediaPlayer.sdc` cuts only their stage-zero paths, matching the convention `69a4f20` established. Cadence schema ten becomes schema eleven at forty-three words: one appended word packs four saturating eight-bit per-generation figures for first-field and second-field DDR fetches and displayed lines, a second carries sixteen-bit counts of generations whose per-parity line counts disagreed and of field-phase errors, and the checksum moves to word forty-two. A native field presents two hundred forty lines and is served two hundred forty luma rows, so eight bits carry the ordinary range while two hundred fifty-five reports saturation, which arises only when one generation spans several displayed frames. Both overlay origins move eight rows up to 428 and 308 so the final row stays flush with the diagnostic and native rasters. The Python decoder accepts schema eleven while schema ten and legacy schema nine still decode at their original origins. Reaching this state required three corrections, all recorded here rather than hidden. Commit `9bff941` appended three words but did not extend the overlay's per-word case statement or its fixed height, so nothing read words forty-one through forty-three and synthesis correctly deleted the entire phase-error synchronizer chain, the fetch toggles, the per-generation latches and both counters; a `get_keepers` probe returned zero keepers for every one of them, and the only symptom in an otherwise clean build was an ignored-filter warning naming `mpeg2_new_framebuffer_phase_error_sync[0]`. The profiler regression had passed because it asserts against the snapshot register directly and never exercised the overlay decode, so `5c6c311` added the missing branches, raised the height and introduced a row-coverage regression that walks every word row checking the decoded index, the rendered word and that the row lies inside the overlay height; reinstating the short height proves it fails. That build restored all keepers but global setup fell to negative 0.082 nanoseconds entirely inside MiSTer's `ascal` scaler. Packing to forty-three words in `0d2aead` unexpectedly grew the fit to 29,680 ALMs and left setup at negative 0.091 with the critical path relocated inside `ascal`, proving word count was not the cost. Commit `3e91073` instead removed the video-domain arithmetic by replacing a nine-bit expected-index adder and equality comparator with a single constant magnitude compare: the replica's own position names its field, so comparing that parity against the raster parity detects a retained or misaligned field without computing the index. A clean Quartus Prime 17.0.2 build from empty generated state completed in 10 minutes 47 seconds with zero errors and the established 144 warnings, none attributable to the new logic. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.252, 0.244, 4.132, 0.589 and 0.925 nanoseconds, with global setup exactly matching the accepted `9573923` build. Focused decoder setup and recovery are positive 1.646 and 11.735 nanoseconds and focused video setup is positive 2.811 nanoseconds, all with zero violated paths. Only the pre-existing `RESET` filter remains unmatched, and a timing-netlist probe confirms every new register survives. The fit uses 29,448 ALMs, 45,442 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The 4,219,576-byte RBF has SHA-256 `05e3a5b564ca49554707d39205749f9b96dec8028fcfe68a562b30d921f0aa54`. The complete native suite passes all thirteen cases including the new row-coverage check, and TFF, BFF and progressive reconstruction retain zero out-of-tolerance pixels at 7,926,459, 7,948,706 and 13,048,137 cycles with field-DCT rejection at 82,326 cycles. The live raster soak still fails its historical 6,529,997-cycle assertion against an observed 6,529,996 with every other figure clean; it compiles none of the files this cycle changed, so the drift entry 511 documented remains outstanding and independent. No decoder, scheduler, cache, presentation or native timing behavior changes.
+
+#### Next Steps:
+
+Preserve the running `9573923` image as `/media/fat/MediaPlayer.rbf.rollback-pre-3e91073` through ordinary FTP with the default `root` and `1` login, round-trip verify both it and the staged candidate, promote the candidate, verify the promoted file at its exact hash and remove only the temporary stage while leaving helper, media, Main and MiSTer configuration untouched. Then run `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off, Interlaced output Native 480i and the deinterlacer that ghosts most readily, and capture the terminal raster along with a live burst through `/dev/MiSTer_cmd`. Acceptance requires the established 300 decoded pictures, 299 swaps, normal quiet completion and no aggregate or presentation error, with the new evidence read alongside. Balanced per-parity DDR fetch counts with zero phase errors would clear field readout and force the investigation back upstream to what writes the frame, while a starved first-field fetch count during a generation the burst shows frozen would localize the defect to the refill path and justify a bounded correction there. Report the per-generation figures with the burst evidence before any behavioral change is proposed.
+
+#### Files Modified:
+
+- `MediaPlayer.sdc`
+- `MediaPlayer_top_06.svh`
+- `MediaPlayer_top_07.svh`
+- `rtl/mpeg2_luma_framebuffer.sv`
+- `rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv`
+- `tools/streams/decode_hardware_cadence.py`
+- `tools/streams/tb_h262_hardware_cadence_profiler.sv`
+- `tools/streams/test_decode_hardware_cadence.py`
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
+## 515 COMMIT Unreleased 9573923 2026-08-25T11:32:46-07:00
+
+#### Coming From:fff
 
 Unreleased 9573923
 
@@ -1210,34 +1246,6 @@ Without rebooting after the accepted 48 kHz control, the user reports that `02_g
 #### Next Steps:
 
 Without rebooting, run only `01_good_480p_44k.mpg` with Audio Test Off. Require audio to restart immediately and remain aligned, crackle-free and dropout-free after the zero-PCM session, with all 48 pictures and 47 swaps, healthy PCM activity, zero aggregate, decoder, presentation, underrun and protocol errors, sequence end, presentation completion and normal quiet reason one. Report all three terminal LEDs and leave the final image loaded for capture. Do not begin the full soak until this recovery transition is accepted.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 476 COMMIT Unreleased eab57b7 2026-08-24T14:06:42-07:00
-
-#### Coming From:
-
-Unreleased eab57b7
-
-#### Purpose:
-
-Accept the v0.7.0 release gate's power-cycle 48 kHz audio-video control and advance to silent Program Stream playback.
-
-#### Outcome:
-
-After the required power cycle, the user reports that `00_good_480p_48k.mpg` passes with USER solid on, DISK blinking eleven times and POWER solid on. The final image was triggered and retrieved exclusively through plain FTP with the default MiSTer login and no SSH keys; `.ai/current_results/entry476_release_gate_48k.png` is 104,559 bytes with SHA-256 `f57df09f5f3da51e9eceec797e52fd5369fe5a35324566b382cd56c602bf7cd0`. Schema nine accepts the complete 582,741-byte H.262 payload, associates five timestamps, decodes seventeen reference and 31 B pictures, and displays all 48 pictures with 47 swaps. PCM sample count and FIFO peak saturate their healthy telemetry fields, while aggregate error flags are zero, audio underrun and PCM protocol error are clear, no display-gap outlier is recorded, sequence end is seen, presentation completes and the session freezes for normal quiet reason one at STC second two. Decoder, presentation, destination, reorder, scratch, promotion, future-reference and terminal state are clean. This passes test one of the exact four-file v0.7.0 release gate on the reproducible release binaries.
-
-#### Next Steps:
-
-Without rebooting, run only `02_good_video_only.mpg` with Audio Test Off. Require the complete picture to play silently, USER and POWER solid on, no audio output, all 48 pictures and 47 swaps, zero PCM samples, zero aggregate, decoder, presentation, underrun and protocol errors, sequence end, presentation completion and normal quiet reason one. Report all three terminal LEDs and leave the final image loaded for capture. Do not run the 44.1 kHz recovery control until this silent session is captured.
 
 #### Files Modified:
 
