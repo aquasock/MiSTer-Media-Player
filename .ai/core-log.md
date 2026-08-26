@@ -1,3 +1,32 @@
+## 536 COMMIT Unreleased ??? 2026-08-26T05:21:07-07:00
+
+#### Coming From:
+
+Unreleased 1f80432
+
+#### Purpose:
+
+Force MediaPlayer's selector to open the canonical games directory after the generic resolver chose the legacy root-level directory.
+
+#### Outcome:
+
+The user reports that the exact entry 535 Big Buck Bunny Bob run still showed both old-frame ghosting and thin horizontal lines, so the visual defect remains failed despite clean accepted-write-versus-raw-DDR-read evidence; no additional FPGA diagnostic or behavioral change is included here. The separately installed Main directory change also failed its hardware objective. Read-only FTP inspection proves that both `/media/fat/MediaPlayer` and `/media/fat/games/MediaPlayer` exist, and static review shows `user_io_get_core_path(NULL, 1)` delegates to `findGamesDir`, whose compatibility search intentionally prefers the legacy root-level core directory before `games/MediaPlayer`. The planned correction remains confined to the pinned Main patch: MediaPlayer's selector invocation and its internal home boundary will both use canonical relative path `games/MediaPlayer`, which resolves to `/media/fat/games/MediaPlayer` in Main's storage namespace and prevents the generic legacy resolver or remembered `Selected_F` path from redirecting the initial view. Other cores, the FPGA RBF and the ARM helper remain unchanged.
+
+#### Next Steps:
+
+Update only the existing Main patch, apply it cleanly to pinned upstream commit `0a8fb44`, build twice with the checksum-verified official Arm GNU 10.2 toolchain and require byte-identical outputs. Commit and push the correction from the Raspberry Pi, directly replace only `/media/fat/MiSTer` without backup, rollback or staging files, verify it by independent FTP readback and have the user restart. Hardware acceptance requires every opening of MediaPlayer's selector to begin at `/media/fat/games/MediaPlayer`; after that narrow correction, resume the visual investigation from scheduler display-bank and generation selection without adding a new diagnostic layout.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 535 COMMIT Unreleased 164c7e6 2026-08-26T05:12:51-07:00
 
 #### Coming From:
@@ -1213,39 +1242,6 @@ The user supplied `.ai/current_results/PXL_20260825_084158381.mp4`, a 68,665,532
 #### Next Steps:
 
 Stop and obtain approval to supersede entry 496's moving-bypass build. If approved, make no RTL or RBF change for this ghost and treat it as downstream interlace reconstruction on the present display; optionally confirm later with deinterlacing disabled, a game mode, a different native-480i display or the moving final-mux pattern if a public compatibility claim requires formal isolation. Advance the core qualification instead to the already deferred bottom-field-first hardware case: regenerate and validate the established BFF light-motion fixture byte-identically, install only that media file through staged ordinary FTP with the default MiSTer login, then run it in native 480i and capture field order, motion, LEDs and schema-nine telemetry before addressing the independent approximately 25-picture-per-second all-I throughput ceiling. Keep the public native-interlace compatibility claim disabled until BFF passes.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 496 COMMIT Unreleased baf5d2c 2026-08-25T01:38:31-07:00
-
-#### Coming From:
-
-Unreleased baf5d2c
-
-#### Purpose:
-
-Record the pair-identical TFF step-hold hardware result and separate framebuffer persistence from downstream motion-adaptive interlace processing before changing cache RTL.
-
-#### Outcome:
-
-The user ran only `_cadence/native_480i_tff_step_hold_10s.m2v` with `Native timing pattern` Off and native 480i active. There is no flicker, combing, horizontal dashes or other steady-state artifact, and the picture looks excellent. At each discrete bar jump, however, the old position remains slightly visible for approximately half a second while the new position initially appears to be missing alternating scan lines; the new bar then becomes complete and the old position disappears fully. Playback completes and all three LED indications pass. The untouched terminal frame was captured entirely through ordinary FTP with the default MiSTer login and no SSH. `.ai/current_results/entry495_tff_step_hold.png` is 7,689 bytes with SHA-256 `37d7e8687b28b258a1b1d4e996609bb5c49f98235e72967e9e2d1f00fbde84fc`; it shows one complete current bar and no old-position residue after stabilization.
-
-Schema nine accepts all 3,483,304 bytes, reconstructs all 300 reference and displayed pictures and 299 swaps from the wrapped counters, preserves top-field-first, reaches sequence end and presentation completion and closes normally for quiet reason one. Aggregate, decoder, presentation, destination, cache-bank-overlap, audio-underrun and PCM-protocol errors are all clear, and no destination holds occur. The first presentation at cycle 2,332,280 and last at cycle 706,661,049 span 704,328,769 cycles, or 11.738813 seconds and 25.471060 pictures per second. The terminal still and telemetry therefore show that the transient resolves rather than accumulating into a corrupt frame.
-
-The fixture makes two conclusions firm. Its decoded validator proves both authored fields are identical, the current position is complete in adjacent field rows, every prior non-current position is background after a jump and the maximum adjacent-field row delta is zero; therefore neither an encoded old bar nor ordinary one-field temporal separation can last half a second. The static video-domain pattern previously proved decode and DDR traffic do not perturb native sync or the final mux. But the earlier plan's statement that persistence would by itself prove stale framebuffer content was too strong: a downstream television, scaler or capture device doing motion-adaptive deinterlacing can also retain several prior fields after a discontinuous motion step and can temporarily reconstruct only alternating lines at the new position. Because the prior bypass pattern was static, it could not distinguish that external temporal processing from the framebuffer and line caches. The clear cache-bank-overlap flag excludes only a refill into the line-cache bank currently being scanned and does not settle the broader framebuffer case.
-
-#### Next Steps:
-
-Stop before changing framebuffer or cache RTL and obtain approval for one moving video-domain discriminator. Extend `Native timing pattern` from Off/Static to Off/Static bars/Step-hold, with the new mode generating the same narrow field-invariant bar directly after the framebuffer, holding each position for thirty complete output frames and jumping ninety-six pixels while MPEG decode and DDR traffic continue underneath. Regress exact native timing, pair-identical fields, hold length, jump positions and unchanged static-pattern behavior, then build and install one RBF through the established staged ordinary-FTP process. Replay the same TFF file with the video-domain Step-hold mode enabled. If the approximately half-second ghost and incomplete new lines repeat, the artifact is downstream display processing and the FPGA pixel path is cleared; if the bypass bar changes cleanly while the decoded bar does not, the fault is inside framebuffer publication or line-cache generation and the following RTL cycle should instrument current display-bank identity and per-line cache generation. Continue to defer BFF, throughput optimization and any public native-interlace compatibility claim.
 
 #### Files Modified:
 
