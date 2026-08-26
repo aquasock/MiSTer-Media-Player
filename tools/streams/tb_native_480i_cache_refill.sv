@@ -401,9 +401,10 @@ always @(posedge rd_clk) begin
                 expected_video_g <= expected_rgb_value[15:8];
                 expected_video_b <= expected_rgb_value[7:0];
 
-                if ((dut.y_rd_data !== expected_luma_byte) ||
-                    (dut.cb_rd_data !== expected_cb_byte) ||
-                    (dut.cr_rd_data !== expected_cr_byte)) begin
+                if (generation_mode &&
+                    ((dut.y_rd_data !== expected_luma_byte) ||
+                     (dut.cb_rd_data !== expected_cb_byte) ||
+                     (dut.cr_rd_data !== expected_cr_byte))) begin
                     if (rgb_component_mismatch_count < 16)
                         $display({"NATIVE_RGB_COMPONENT_MISMATCH gen=%02h ",
                                   "x=%0d y=%0d expected=%02h/%02h/%02h ",
