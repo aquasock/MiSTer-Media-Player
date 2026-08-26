@@ -10,21 +10,20 @@ Make the existing native presentation regression prove monotonic picture-generat
 
 #### Outcome:
 
-The user approved entry 537's bounded scheduler-generation cycle. The current integration model proves decoder and presentation totals and observes two-bit display-bank changes, but it does not associate authored picture generations with those banks or verify their displayed order. The planned first change is confined to `tb_native_480i_presentation_integration.sv`: tag every completed ordinary bank with its monotonically increasing decoded generation, sample that tag whenever each scheduler changes the displayed bank and require the presented sequence to advance without repeats, regressions or skips under the measured three-field decoder latency, accelerated one-field pressure and finite terminal drain. Scheduler RTL will remain untouched unless the current implementation fails that concrete assertion; if it does, only the responsible ordinary-reference ownership transition will be corrected. No hardware diagnostic layout, menu, decoder datapath, DDR storage, line cache or host software change is planned.
+The user approved entry 537's bounded scheduler-generation cycle. Commit `018093a` changes only the existing native 480i presentation integration test, tagging every completed ordinary bank with its monotonically increasing decoded generation and requiring every observed display-bank change to present exactly the next generation. The untouched scheduler passes all four paths over twenty exact native frame windows: serialized decoding presents generations one through ten, measured three-field overlap presents one through thirteen, accelerated one-field pressure presents generations one through twenty while decoding twenty-one and exercises both the secondary queue and backpressure, and the finite terminal case decodes and presents all eight generations with the queue empty. The exact run completes at 682,495,674,081 picoseconds with `generation_order=1`, no untagged bank, repeat, regression, skip or presentation error. This rejects an old-generation replay inside the current abstract ordinary-reference scheduler model and does not justify changing scheduler RTL. No Quartus build, RBF deployment, hardware diagnostic layout, menu, decoder datapath, DDR storage, line cache or host software change was made.
 
 #### Next Steps:
 
-Run the generation-aware integration test first against the exact current scheduler and preserve the failing sequence if it reproduces stale presentation. If a scheduler defect is proven, add the smallest directed control for its same-edge condition, correct only that transition and rerun the focused presentation and ownership tests followed by native timing, framebuffer, complete reconstruction and canonical mixed-I/P/B live-raster regressions. Proceed to an incremental Quartus build and direct MiSTer replacement only after every regression passes; if the current scheduler is generation-monotonic, stop without changing RTL and return to the framebuffer publication boundary using the existing diagnostic layout.
+Do not modify the presentation scheduler or run Quartus from this result. The next bounded investigation should carry an authored generation identity through the existing framebuffer publication simulation boundary, from the scheduler-selected display bank and reset generation to `picture_present_rd` and the two field-cache publications, and assert that both fields of each published frame use the same current generation before pixels reach the existing cache output. Reuse the present diagnostic layout and tests; only a reproduced generation mismatch should authorize a framebuffer publication correction and incremental build.
 
 #### Files Modified:
 
 - tools/streams/tb_native_480i_presentation_integration.sv
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 
