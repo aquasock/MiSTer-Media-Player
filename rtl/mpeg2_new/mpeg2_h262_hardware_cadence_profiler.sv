@@ -285,30 +285,15 @@ wire [31:0] snapshot_word_38={framebuffer_unpublished_reset_count,
 wire [31:0] snapshot_word_39=framebuffer_max_publication_latency;
 // 8 + 8 + 1 + 1 + 8 + 3 + 3 = 32.  The padding must keep this exact, or the
 // whole word shifts right and every field decodes from the wrong bits.
-typedef struct packed {
-    logic [7:0] first_field_fetches;
-    logic [7:0] second_field_fetches;
-    logic       first_field_varied;
-    logic       second_field_varied;
-    logic [7:0] reserved;
-    logic [2:0] first_field_region;
-    logic [2:0] second_field_region;
-} snapshot_word_40_t;
-localparam integer SNAPSHOT_WORD_40_BITS=$bits(snapshot_word_40_t);
-wire snapshot_word_40_t snapshot_word_40_payload;
-assign snapshot_word_40_payload.first_field_fetches=
-    last_first_field_fetches;
-assign snapshot_word_40_payload.second_field_fetches=
-    last_second_field_fetches;
-assign snapshot_word_40_payload.first_field_varied=
-    last_first_field_varied;
-assign snapshot_word_40_payload.second_field_varied=
-    last_second_field_varied;
-assign snapshot_word_40_payload.reserved=8'd0;
-assign snapshot_word_40_payload.first_field_region=
-    last_first_field_region;
-assign snapshot_word_40_payload.second_field_region=
-    last_second_field_region;
+localparam integer SNAPSHOT_WORD_40_BITS=8+8+1+1+8+3+3;
+wire [SNAPSHOT_WORD_40_BITS-1:0] snapshot_word_40_payload;
+assign snapshot_word_40_payload[31:24]=last_first_field_fetches;
+assign snapshot_word_40_payload[23:16]=last_second_field_fetches;
+assign snapshot_word_40_payload[15]=last_first_field_varied;
+assign snapshot_word_40_payload[14]=last_second_field_varied;
+assign snapshot_word_40_payload[13:6]=8'd0;
+assign snapshot_word_40_payload[5:3]=last_first_field_region;
+assign snapshot_word_40_payload[2:0]=last_second_field_region;
 wire [31:0] snapshot_word_40=snapshot_word_40_payload;
 // Entry 520: this assertion is independent of the expected snapshot literal.
 // A repeated malformed concatenation in the test therefore cannot validate
