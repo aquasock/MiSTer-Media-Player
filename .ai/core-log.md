@@ -1,3 +1,33 @@
+## 538 COMMIT Unreleased ??? 2026-08-26T05:36:53-07:00
+
+#### Coming From:
+
+Unreleased d566668
+
+#### Purpose:
+
+Make the existing native presentation regression prove monotonic picture-generation order and correct only a reproduced scheduler replay.
+
+#### Outcome:
+
+The user approved entry 537's bounded scheduler-generation cycle. The current integration model proves decoder and presentation totals and observes two-bit display-bank changes, but it does not associate authored picture generations with those banks or verify their displayed order. The planned first change is confined to `tb_native_480i_presentation_integration.sv`: tag every completed ordinary bank with its monotonically increasing decoded generation, sample that tag whenever each scheduler changes the displayed bank and require the presented sequence to advance without repeats, regressions or skips under the measured three-field decoder latency, accelerated one-field pressure and finite terminal drain. Scheduler RTL will remain untouched unless the current implementation fails that concrete assertion; if it does, only the responsible ordinary-reference ownership transition will be corrected. No hardware diagnostic layout, menu, decoder datapath, DDR storage, line cache or host software change is planned.
+
+#### Next Steps:
+
+Run the generation-aware integration test first against the exact current scheduler and preserve the failing sequence if it reproduces stale presentation. If a scheduler defect is proven, add the smallest directed control for its same-edge condition, correct only that transition and rerun the focused presentation and ownership tests followed by native timing, framebuffer, complete reconstruction and canonical mixed-I/P/B live-raster regressions. Proceed to an incremental Quartus build and direct MiSTer replacement only after every regression passes; if the current scheduler is generation-monotonic, stop without changing RTL and return to the framebuffer publication boundary using the existing diagnostic layout.
+
+#### Files Modified:
+
+- tools/streams/tb_native_480i_presentation_integration.sv
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 537 COMMIT Unreleased d566668 2026-08-26T05:29:56-07:00
 
 #### Coming From:
@@ -1213,35 +1243,6 @@ The user's 61,120,546-byte, 14.788667-second Pixel 8 Pro recording `.ai/current_
 #### Next Steps:
 
 Stop and obtain approval for a revised bounded scaler-path commit before addressing decoder throughput. Add an `HDMI deinterlacer` menu choice using the next free status bit, retain Weave as the existing default and drive MiSTer's already implemented `HDMI_BOB_DEINT` only when native interlaced output is active and Bob is selected; direct-video raw 480i and progressive output must remain unchanged. Add a focused control regression proving progressive always requests no bob, native Weave remains zero and native Bob asserts the framework signal, retain all TFF/BFF timing, framebuffer and presentation regressions, then complete a clean Quartus build and staged ordinary-FTP installation. Rerun BFF light motion in Bob mode first and TFF light motion second, requiring monotonic motion without long historical bars or retained OSD. Do not create or alter `MiSTer.ini` and do not enable `direct_video` without separate user direction; raw-output qualification on a compatible sink remains a later, distinct test, and the public interlace claim stays disabled.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 498 COMMIT Unreleased baf5d2c 2026-08-25T01:54:16-07:00
-
-#### Coming From:
-
-Unreleased baf5d2c
-
-#### Purpose:
-
-Reproduce, validate and install the deferred bottom-field-first light-motion fixture without changing the accepted FPGA image.
-
-#### Outcome:
-
-The user approved entry 497's recommendation to skip the no-longer-required moving final-mux pattern and advance to BFF hardware qualification. Two independent invocations of `generate_test_interlaced_i_frames.py --light-visual-seconds 10` reproduce every generated artifact and the complete manifest byte-for-byte. The BFF light-motion fixture contains 300 all-I 720x480 pictures at 30000/1001, is 5,007,154 bytes with encoded SHA-256 `b26d0d4090ec8c39346782918e97eb0721ba0da5670b42ef14435e385f822271`, decodes to YUV420p SHA-256 `554fbf879319392629bb1d3ac7a041358929e0ee2e8fed6a7a05862f9efa65eb`, preserves bottom-field-first `bb` signalling in all pictures and remains decoded-plane-identical before and after the signalling patch. The analyzer retains the intentional interlaced all-I candidate classification and the public compatibility checker deliberately fails because native interlaced support is not publicly enabled. No source or RBF build was needed. The active `/media/fat/MediaPlayer.rbf` was independently retrieved at the exact accepted `2601573` SHA-256 `67bd360b0efa1864ca5184049ad6dfd9fc2edc006421871309c2c0be9de70969`. Only the BFF media file was uploaded under a temporary name through ordinary FTP with the default `root` and `1` login and no SSH, retrieved at the local hash, promoted as `/media/fat/_cadence/native_480i_bff_light_10s.m2v`, retrieved again at the same hash and left with no staging file. Helper, Main and existing media files were not changed.
-
-#### Next Steps:
-
-Leave `Native timing pattern` Off, set `Interlaced output` to `Native 480i` and run only `_cadence/native_480i_bff_light_10s.m2v`. Judge whether the bar continues moving smoothly to the right without field-order reversal, backstep or alternating-field judder, whether the upper and lower field markers remain orderly, and report flicker, combing, horizontal dashes or any other artifact separately from the already classified display-history ghost. Report USER, DISK and POWER after completion and leave the terminal image loaded for an ordinary-FTP schema-nine capture. Acceptance requires all 300 pictures and 299 swaps, stable bottom-field-first telemetry, sequence end and presentation completion, zero aggregate, presentation, destination and cache-bank-overlap errors and a decoder-limited duration comparable to the accepted TFF light-motion run. Keep the public native-interlace compatibility claim disabled until this BFF result is captured; address the independent approximately 25-picture-per-second all-I throughput ceiling afterward.
 
 #### Files Modified:
 
