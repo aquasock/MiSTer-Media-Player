@@ -1,4 +1,33 @@
-## 534 COMMIT Unreleased ??? 2026-08-26T04:59:18-07:00
+## 535 COMMIT Unreleased 164c7e6 2026-08-26T05:12:51-07:00
+
+#### Coming From:
+
+Unreleased 1f80432
+
+#### Purpose:
+
+Record the first Big Buck Bunny Bob hardware result from the accepted-luma-write versus raw-DDR-read diagnostic.
+
+#### Outcome:
+
+The user completed `/media/fat/games/MediaPlayer/bbb_480i_tff_15s_8mbps.m2v` in Bob on the exact `164c7e6` diagnostic RBF and left its terminal image displayed before the separate MiSTer Main installation. The untouched screenshot `.ai/current_results/entry533_bbb_tff_bob_8mbps_terminal.png` was triggered and retrieved through ordinary authenticated FTP at 479,905 bytes and SHA-256 `6543b7be8fd03f65fdb15da628c8a89ab1e24d73089cd3556554ec4bdc61733a`. The core accepts all 15,150,646 source bytes and its wrapped counters reconstruct 449 framebuffer generations and displayed pictures with 448 publications and swaps. Those 448 presentation intervals span 919,176,899 decoder cycles or 15.319615 seconds, delivering 29.243555 pictures per second. Top-field-first is preserved, sequence end and presentation completion are present, the session freezes normally for quiet reason one and every aggregate, presentation, destination, cache-overlap, prefill, region and phase error is clear. Both field comparisons reach 255 valid samples in physical region zero with zero mismatches: the first-field accepted-write and raw-return fingerprints are both `25e325e3`, and the second-field pair are both `bdc0bdc0`. The diagnostic objective therefore passes and proves that the selected raw DDR data is byte-consistent with the accepted framebuffer writes for both parities during this real-content run; the user's visual verdict for this exact run remains to be recorded before choosing the next behavioral boundary.
+
+#### Next Steps:
+
+Obtain the user's visual report for this exact Bob playback, specifically whether old frames or horizontal lines remained. If the symptom remained, do not change DDR storage or readback: combine this equality with the existing correct line-cache fingerprints and the four-picture reconstruction result to review scheduler display-bank and generation selection against the accepted write provenance before proposing one bounded correction. Independently restart the MiSTer when convenient and validate the newly installed Main default-directory change recorded in entry 534.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
+## 534 COMMIT Unreleased 1f80432 2026-08-26T04:59:18-07:00
 
 #### Coming From:
 
@@ -10,11 +39,11 @@ Make the Media Player file selector open the core's resolved games directory ins
 
 #### Outcome:
 
-The user requested that opening the core's media selector default to the correct directory under `/media/fat/games` while the current Big Buck Bunny hardware test continues. The planned change is confined to the pinned MiSTer Main patch: when the active core is MediaPlayer, the generic file-selection call will use `user_io_get_core_path(NULL, 1)`, which resolves the existing core-specific games directory through Main's storage and prefix rules, while every other core retains its remembered `Selected_F` behavior. The FPGA RBF and ARM media helper will not change.
+Commit `1f80432` confines the change to one hunk in the pinned MiSTer Main patch. When MediaPlayer opens its generic file selector, Main now passes `user_io_get_core_path(NULL, 1)` so its established storage and prefix rules resolve `/media/fat/games/MediaPlayer`; every other core retains its remembered `Selected_F` behavior. The complete patch applies cleanly to pinned Main commit `0a8fb44`, and the FPGA RBF and ARM media helper are unchanged. The official Arm GNU 10.2-2020.11 archive verifies at the established SHA-256 `102825ae56c9e00142d06f35d2bdd3299edb6060e84a275a25b095e66fd3fc2a` and identifies as GCC 10.2.1. Two clean GUNSMOKE builds are byte-identical, each producing a 1,166,244-byte ARM EABI5 executable at SHA-256 `0ec0d60bf415dc96765e20f00df838e4f3d1b5a7d1e70490e8daad174b20ee26`. Deployment waited until the user's active playback and terminal capture were complete. Because Linux rejected an in-place write of the running executable as text-busy, the resolved `/media/fat/MiSTer` path was directly deleted and rewritten in one FTP session with automatic local recovery available; independent readback is byte-identical at the expected size and hash. No MiSTer backup, rollback or staging filename was created, and no restart was triggered.
 
 #### Next Steps:
 
-Update the single Main patch hunk, apply it cleanly to the pinned upstream commit, build the patched ARM MiSTer executable on GUNSMOKE and verify the output. Commit and push the source change from the Raspberry Pi, then directly replace only `/media/fat/MiSTer` after the user's active playback test has completed so the running session is not disturbed. Verify the installed file by independent FTP readback; the new default takes effect on the next MiSTer restart.
+Restart the MiSTer when convenient, reload MediaPlayer and open its media selector. Hardware acceptance requires the selector to begin in `/media/fat/games/MediaPlayer`, permit the intended file to be selected normally and leave another core's remembered selector path unchanged. The installed executable is already verified, but the entry remains unpassed until that post-restart behavior is observed.
 
 #### Files Modified:
 
@@ -22,7 +51,7 @@ Update the single Main patch hunk, apply it cleanly to the pinned upstream commi
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
@@ -1221,35 +1250,6 @@ Stop before changing framebuffer or cache RTL and obtain approval for one moving
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 495 COMMIT Unreleased baf5d2c 2026-08-25T01:30:20-07:00
-
-#### Coming From:
-
-Unreleased 2601573
-
-#### Purpose:
-
-Create and install the pair-identical step-hold TFF fixture that distinguishes stale framebuffer pixels from authored temporal interlace and downstream display persistence.
-
-#### Outcome:
-
-Commit `baf5d2c` adds `--step-hold-visual-seconds` to the deterministic interlaced all-I generator without changing its established default, sustained-motion or low-complexity-motion outputs. The new source authors an eight-pixel bright bar identically in both fields, holds each position for sixty 60000/1001 source fields or thirty 30000/1001 output pictures, then jumps ninety-six pixels; two stationary horizontal references remain while alternating field markers are deliberately absent. A permanent decoded-plane validator checks every frame, proves the current bar bright in both adjacent field rows, checks every previous non-current position remains background after each jump and records zero maximum difference between representative adjacent field rows. Independent generations reproduce byte-identical TFF and BFF outputs, retain the exact four-picture baseline hashes, preserve patched-versus-unpatched decoded-plane equality, contain 300 all-I pictures with the intended field order and remain deliberately rejected by the public compatibility checker. The 3,483,304-byte TFF fixture is SHA-256 `71f00b8f8c919857fe8c92bec9f0dfd440493650573ef0ae4bc0ac4b7754f4df`; its decoded YUV420 plane hash is `cf629eaefc50ffb89d83450332cd312828390bcdc94454d45e823139edfe8544`, and nine decoded jumps contain no prior-position residue. Its byte-identical regeneration was uploaded under a staging name and retrieved at the local hash, promoted as `/media/fat/_cadence/native_480i_tff_step_hold_10s.m2v`, retrieved again at the same hash and only then had the stage removed, entirely through ordinary FTP with the default MiSTer login and no SSH. The BFF counterpart remains local and deferred. The installed RBF was independently retrieved unchanged at the exact `2601573` hash `67bd360b0efa1864ca5184049ad6dfd9fc2edc006421871309c2c0be9de70969`; helper and Main were not touched.
-
-#### Next Steps:
-
-Turn `Native timing pattern` Off, keep `Interlaced output` at `Native 480i` and run only `_cadence/native_480i_tff_step_hold_10s.m2v`. The narrow white bar should remain fixed for about one authored second and then jump ninety-six pixels nine times; after each jump judge whether the old position disappears immediately or within one field or frame, or remains visibly stuck for a material fraction of the next hold, and note any comb, flicker or horizontal dashes. Report USER, DISK and POWER and leave the final image loaded for an FTP-only schema-nine capture. Immediate clean disappearance places the earlier continuous-motion shadow in ordinary interlaced temporal presentation or downstream display processing, while persistence into the hold proves stale framebuffer, cache or frame-bank content and requires a targeted field/cache identity RTL diagnostic. Continue to defer BFF, throughput optimization and any public native-interlace compatibility claim.
-
-#### Files Modified:
-
-- tools/streams/generate_test_interlaced_i_frames.py
 
 #### Status:
 
