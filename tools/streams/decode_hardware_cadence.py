@@ -350,9 +350,13 @@ def parse_words(words: list[int]) -> dict[str, Any]:
             (words[41] >> 8) & 0xFF if schema_version >= 13
             else (words[41] >> 16) & 0xFFFF if schema_version == 12 else None
         ),
-        # Entry 519 (schema 13): the luma content DDR actually returned for
-        # each parity this generation.  A retained uniform field returns an
-        # unvarying value; a field carrying picture cannot.
+        # Entry 519 (schema 13) records the luma content returned in the last
+        # framebuffer generation. Entry 520 (schema 14) retains the same bit
+        # layout but accumulates it across the complete profiler session.
+        "framebuffer_content_scope": (
+            "session" if schema_version >= 14
+            else "last_generation" if schema_version == 13 else None
+        ),
         "framebuffer_first_field_varied": (
             bool((words[40] >> 15) & 1) if schema_version >= 13 else None
         ),
@@ -497,7 +501,8 @@ def main() -> int:
             )
         if result["schema_version"] >= 13:
             print(
-                "field content: varied={framebuffer_first_field_varied}/"
+                "field content: scope={framebuffer_content_scope} "
+                "varied={framebuffer_first_field_varied}/"
                 "{framebuffer_second_field_varied} "
                 "signatures={framebuffer_first_field_signature:#04x}/"
                 "{framebuffer_second_field_signature:#04x}".format(**result)

@@ -53,13 +53,13 @@ module mpeg2_luma_framebuffer
     output wire        sequence_phase_error_debug,
     output wire        first_field_fetch_toggle_debug,
     output wire        second_field_fetch_toggle_debug,
-    // Entry 519: content evidence.  Every measurement so far observed control
-    // -- addresses, counts, phases, regions -- and all of it was correct, so
-    // these observe the luma data DDR actually returns for each parity.
-    output wire [7:0]  first_field_signature_debug,
-    output wire [7:0]  second_field_signature_debug,
-    output wire        first_field_varied_debug,
-    output wire        second_field_varied_debug,
+    // Entry 520: raw per-parity luma return event.  Entry 519 accumulated this
+    // inside the framebuffer, where it cleared on every generation reset and
+    // so reported whatever short generation preceded terminal quiet.  Export
+    // the event instead and let the profiler accumulate it session-wide.
+    output wire        luma_return_valid_debug,
+    output wire        luma_return_first_field_debug,
+    output wire [7:0]  luma_return_byte_debug,
 
     // Independent fixed video side - 40 MHz.
     input  wire        rd_clk,
@@ -142,20 +142,6 @@ reg        fetch_cache_bank;
 // can be attributed to the authored first field or the other field.
 reg        first_field_fetch_toggle_mem;
 reg        second_field_fetch_toggle_mem;
-
-// Entry 519: per-parity luma return content for this framebuffer generation.
-// The signature folds every returned word; the varied flag records whether any
-// returned word differed from the first one this parity saw.  A field showing
-// retained uniform background returns an unvarying value, while a field
-// carrying real picture cannot.
-reg [7:0]  first_field_signature_mem;
-reg [7:0]  second_field_signature_mem;
-reg [7:0]  first_field_reference_mem;
-reg [7:0]  second_field_reference_mem;
-reg        first_field_seen_mem;
-reg        second_field_seen_mem;
-reg        first_field_varied_mem;
-reg        second_field_varied_mem;
 
 assign ddram_burstcnt = (mem_state == MEM_ISSUE) ? fetch_segment_words : 8'd0;
 assign ddram_addr     = (mem_state == MEM_ISSUE) ? fetch_address : 29'd0;
@@ -350,14 +336,6 @@ always @(posedge mem_clk) begin
         fetch_cache_bank      <= 1'b0;
         first_field_fetch_toggle_mem  <= 1'b0;
         second_field_fetch_toggle_mem <= 1'b0;
-        first_field_signature_mem  <= 8'd0;
-        second_field_signature_mem <= 8'd0;
-        first_field_reference_mem  <= 8'd0;
-        second_field_reference_mem <= 8'd0;
-        first_field_seen_mem       <= 1'b0;
-        second_field_seen_mem      <= 1'b0;
-        first_field_varied_mem     <= 1'b0;
-        second_field_varied_mem    <= 1'b0;
 
         prefill_step          <= 3'd0;
         prefill_done          <= 1'b0;
@@ -417,32 +395,6 @@ always @(posedge mem_clk) begin
              ((fetch_kind != FETCH_Y) &&
               (fetch_cache_bank == cache_scan_c_bank_sync[1]))))
             bank_overlap_error <= 1'b1;
-
-        // Entry 519: fold each returned luma word into its parity's evidence.
-        // fetch_line carries the DDR row, so its bit zero is the field parity.
-        if (ddram_dout_ready && (fetch_kind == FETCH_Y) &&
-            native_interlaced_mem) begin
-            if (fetch_line[0] == first_field_mem) begin
-                first_field_signature_mem <=
-                    first_field_signature_mem ^ ddram_dout[7:0];
-                if (!first_field_seen_mem) begin
-                    first_field_seen_mem      <= 1'b1;
-                    first_field_reference_mem <= ddram_dout[7:0];
-                end
-                else if (ddram_dout[7:0] != first_field_reference_mem)
-                    first_field_varied_mem <= 1'b1;
-            end
-            else begin
-                second_field_signature_mem <=
-                    second_field_signature_mem ^ ddram_dout[7:0];
-                if (!second_field_seen_mem) begin
-                    second_field_seen_mem      <= 1'b1;
-                    second_field_reference_mem <= ddram_dout[7:0];
-                end
-                else if (ddram_dout[7:0] != second_field_reference_mem)
-                    second_field_varied_mem <= 1'b1;
-            end
-        end
 
         if (line_done_toggle_m2 != line_done_toggle_seen) begin
             line_done_toggle_seen <= line_done_toggle_m2;
@@ -794,10 +746,10 @@ assign picture_present_debug = picture_present_rd;
 assign prefill_deadline_missed_debug = prefill_deadline_missed_rd;
 assign first_field_fetch_toggle_debug  = first_field_fetch_toggle_mem;
 assign second_field_fetch_toggle_debug = second_field_fetch_toggle_mem;
-assign first_field_signature_debug  = first_field_signature_mem;
-assign second_field_signature_debug = second_field_signature_mem;
-assign first_field_varied_debug     = first_field_varied_mem;
-assign second_field_varied_debug    = second_field_varied_mem;
+assign luma_return_valid_debug =
+    ddram_dout_ready && (fetch_kind == FETCH_Y) && native_interlaced_mem;
+assign luma_return_first_field_debug = (fetch_line[0] == first_field_mem);
+assign luma_return_byte_debug        = ddram_dout[7:0];
 assign sequence_phase_error_debug     = sequence_phase_error_rd;
 
 // kate - Phase 1P: the module reset input is synchronized to mem_clk by the

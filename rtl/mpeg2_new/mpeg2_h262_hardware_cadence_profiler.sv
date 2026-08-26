@@ -26,10 +26,9 @@ module mpeg2_h262_hardware_cadence_profiler #(
     input wire framebuffer_sequence_phase_error,
     input wire [2:0] framebuffer_first_field_region,
     input wire [2:0] framebuffer_second_field_region,
-    input wire [7:0] framebuffer_first_field_signature,
-    input wire [7:0] framebuffer_second_field_signature,
-    input wire framebuffer_first_field_varied,
-    input wire framebuffer_second_field_varied,
+    input wire framebuffer_luma_return_valid,
+    input wire framebuffer_luma_return_first_field,
+    input wire [7:0] framebuffer_luma_return_byte,
     input wire framebuffer_first_field_fetch,
     input wire framebuffer_second_field_fetch,
     input wire fifo_pending,input wire decoder_ready,
@@ -80,7 +79,7 @@ localparam [23:0] TERMINAL_SNAPSHOT_LIMIT=
 localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
-localparam [31:0] SNAPSHOT_FORMAT={8'd13,8'd43,16'd60000};
+localparam [31:0] SNAPSHOT_FORMAT={8'd14,8'd43,16'd60000};
 // Entry 511: keep all 41 rows visible without changing their encoding. The
 // mode observation is already in clk_video and affects overlay placement only.
 localparam [11:0] OVERLAY_X=12'd8;
@@ -143,8 +142,16 @@ reg [7:0] last_second_field_fetches;
 reg [2:0] last_first_field_region;
 reg [2:0] last_second_field_region;
 reg [7:0] field_region_mismatch_count;
+// Entry 520: session-wide per-parity luma return content.  These are cleared
+// only with the profiler itself, never per generation, so a parity that never
+// receives varying data over the whole session reports varied low regardless
+// of which generation happens to precede terminal quiet.
 reg [7:0] last_first_field_signature;
 reg [7:0] last_second_field_signature;
+reg [7:0] first_field_reference;
+reg [7:0] second_field_reference;
+reg first_field_seen;
+reg second_field_seen;
 reg last_first_field_varied;
 reg last_second_field_varied;
 reg [7:0] sequence_phase_error_count;
@@ -276,10 +283,42 @@ wire [31:0] snapshot_word_37={framebuffer_reset_count,
 wire [31:0] snapshot_word_38={framebuffer_unpublished_reset_count,
     framebuffer_prefill_miss_count};
 wire [31:0] snapshot_word_39=framebuffer_max_publication_latency;
-wire [31:0] snapshot_word_40={last_first_field_fetches,
-    last_second_field_fetches,last_first_field_varied,
-    last_second_field_varied,6'd0,last_first_field_region,
-    last_second_field_region};
+// 8 + 8 + 1 + 1 + 8 + 3 + 3 = 32.  The padding must keep this exact, or the
+// whole word shifts right and every field decodes from the wrong bits.
+typedef struct packed {
+    logic [7:0] first_field_fetches;
+    logic [7:0] second_field_fetches;
+    logic       first_field_varied;
+    logic       second_field_varied;
+    logic [7:0] reserved;
+    logic [2:0] first_field_region;
+    logic [2:0] second_field_region;
+} snapshot_word_40_t;
+localparam integer SNAPSHOT_WORD_40_BITS=$bits(snapshot_word_40_t);
+wire snapshot_word_40_t snapshot_word_40_payload;
+assign snapshot_word_40_payload.first_field_fetches=
+    last_first_field_fetches;
+assign snapshot_word_40_payload.second_field_fetches=
+    last_second_field_fetches;
+assign snapshot_word_40_payload.first_field_varied=
+    last_first_field_varied;
+assign snapshot_word_40_payload.second_field_varied=
+    last_second_field_varied;
+assign snapshot_word_40_payload.reserved=8'd0;
+assign snapshot_word_40_payload.first_field_region=
+    last_first_field_region;
+assign snapshot_word_40_payload.second_field_region=
+    last_second_field_region;
+wire [31:0] snapshot_word_40=snapshot_word_40_payload;
+// Entry 520: this assertion is independent of the expected snapshot literal.
+// A repeated malformed concatenation in the test therefore cannot validate
+// the same width defect a second time.
+generate
+if(SNAPSHOT_WORD_40_BITS!=32)begin:invalid_snapshot_word_40_width
+    initial $fatal(1,"snapshot word 40 is %0d bits, expected 32",
+                   SNAPSHOT_WORD_40_BITS);
+end
+endgenerate
 wire [31:0] snapshot_word_41={last_first_field_signature,
     last_second_field_signature,field_region_mismatch_count,
     sequence_phase_error_count};
@@ -361,6 +400,8 @@ always @(posedge clk_mpeg2) begin
         last_first_field_region<=0;last_second_field_region<=0;
         field_region_mismatch_count<=0;sequence_phase_error_count<=0;
         last_first_field_signature<=0;last_second_field_signature<=0;
+        first_field_reference<=0;second_field_reference<=0;
+        first_field_seen<=0;second_field_seen<=0;
         last_first_field_varied<=0;last_second_field_varied<=0;
         display_picture_count<=0;display_swap_count<=0;
         b_picture_complete_d<=0;display_frame_bank_d<=0;
@@ -458,6 +499,28 @@ always @(posedge clk_mpeg2) begin
                 prediction_response_cycles<=prediction_response_cycles+1'b1;
             if(writer_write_q&&writer_busy_q)
                 writer_wait_cycles<=writer_wait_cycles+1'b1;
+            if(framebuffer_luma_return_valid)begin
+                if(framebuffer_luma_return_first_field)begin
+                    last_first_field_signature<=last_first_field_signature^
+                        framebuffer_luma_return_byte;
+                    if(!first_field_seen)begin
+                        first_field_seen<=1;
+                        first_field_reference<=framebuffer_luma_return_byte;
+                    end
+                    else if(framebuffer_luma_return_byte!=first_field_reference)
+                        last_first_field_varied<=1;
+                end
+                else begin
+                    last_second_field_signature<=last_second_field_signature^
+                        framebuffer_luma_return_byte;
+                    if(!second_field_seen)begin
+                        second_field_seen<=1;
+                        second_field_reference<=framebuffer_luma_return_byte;
+                    end
+                    else if(framebuffer_luma_return_byte!=second_field_reference)
+                        last_second_field_varied<=1;
+                end
+            end
             if(framebuffer_first_field_fetch_edge&&
                (gen_first_field_fetches!=8'hff))
                 gen_first_field_fetches<=gen_first_field_fetches+1'b1;
@@ -478,11 +541,7 @@ always @(posedge clk_mpeg2) begin
                 last_second_field_fetches<=gen_second_field_fetches;
                 last_first_field_region<=framebuffer_first_field_region;
                 last_second_field_region<=framebuffer_second_field_region;
-                last_first_field_signature<=framebuffer_first_field_signature;
-                last_second_field_signature<=
-                    framebuffer_second_field_signature;
-                last_first_field_varied<=framebuffer_first_field_varied;
-                last_second_field_varied<=framebuffer_second_field_varied;
+
                 if((framebuffer_first_field_region!=
                     framebuffer_second_field_region)&&
                    (field_region_mismatch_count!=8'hff))

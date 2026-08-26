@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prove schema-twelve, schema-eleven, schema-ten and legacy decoding."""
+"""Prove schema-fourteen through legacy cadence-overlay decoding."""
 
 from __future__ import annotations
 
@@ -11,9 +11,10 @@ from PIL import Image
 import decode_hardware_cadence as cadence
 
 
-def snapshot_words() -> list[int]:
-    """Schema thirteen: forty-three words ending in the XOR checksum."""
-    words = [cadence.MAGIC, 0x0D2BEA60]
+def snapshot_words(schema_version: int = 14) -> list[int]:
+    """Build a forty-three-word schema 13/14 record with XOR checksum."""
+    words = [cadence.MAGIC,
+             (schema_version << 24) | (43 << 16) | 60000]
     words.extend((0x10203040 + index * 0x01010101) & 0xFFFFFFFF
                  for index in range(2, 37))
     words.extend(((3 << 16) | 2, (1 << 16) | 1, 12345))
@@ -101,8 +102,10 @@ def main() -> None:
             raise SystemExit("framebuffer prefill miss was not decoded")
         if parsed["framebuffer_max_publication_latency_cycles"] != 12345:
             raise SystemExit("framebuffer publication latency was not decoded")
-        if parsed["schema_version"] != 13:
-            raise SystemExit("schema thirteen was not reported")
+        if parsed["schema_version"] != 14:
+            raise SystemExit("schema fourteen was not reported")
+        if parsed["framebuffer_content_scope"] != "session":
+            raise SystemExit("schema fourteen content scope was not decoded")
         if parsed["framebuffer_first_field_varied"] is not False:
             raise SystemExit("first-field varied flag was not decoded")
         if parsed["framebuffer_second_field_varied"] is not True:
@@ -125,6 +128,18 @@ def main() -> None:
             raise SystemExit("schema twelve must not report displayed lines")
         if parsed["framebuffer_sequence_phase_error_count"] != 7:
             raise SystemExit("sequence phase error count was not decoded")
+
+        schema13 = snapshot_words(13)
+        schema13_native = temp / "schema13_native.png"
+        render(schema13_native, 720, 480,
+               cadence.NATIVE_480I_Y0, schema13)
+        schema13_parsed = cadence.decode(schema13_native)
+        if schema13_parsed["schema_version"] != 13:
+            raise SystemExit("schema thirteen was not reported")
+        if schema13_parsed["framebuffer_content_scope"] != "last_generation":
+            raise SystemExit("schema thirteen content scope was not retained")
+        if schema13_parsed["framebuffer_first_field_signature"] != 0xA5:
+            raise SystemExit("schema thirteen field content was not retained")
 
         schema10 = schema10_snapshot_words()
         schema10_diagnostic = temp / "schema10_diagnostic.png"
@@ -163,7 +178,8 @@ def main() -> None:
         result = cadence.decode(overlap)
         if not result["cache_bank_overlap_error"]:
             raise SystemExit("cache-bank overlap telemetry bit was not decoded")
-    print("CADENCE_DECODER_LAYOUT_PASS schema13=428/308/43 "
+    print("CADENCE_DECODER_LAYOUT_PASS schema14=428/308/43 "
+          "schema13=428/308/43 "
           "schema10=436/316/41 legacy=444/324/38")
 
 
