@@ -1,3 +1,42 @@
+## 525 COMMIT Unreleased ??? 2026-08-25T23:27:33-07:00
+
+#### Coming From:
+
+Unreleased 4e4db95
+
+#### Purpose:
+
+Distinguish incorrect native line-cache provenance from corruption of correctly selected cache content.
+
+#### Outcome:
+
+The approved schema-sixteen development boundary will attach a completed raw luma-line fingerprint, physical source row, cache bank and framebuffer generation to each native cache fill without changing cache control or presentation behavior. Stable completed per-bank tags will cross to the video domain, the applicable tag will be latched before display of each line and the post-cache line fingerprint will be compared at line completion. The diagnostic will preserve the first tag mismatch and first content mismatch separately for each authored field and count both classes independently so hardware can distinguish wrong refill ownership or bank selection from corruption in the dual-clock RAM write, word address or byte-lane read pipeline.
+
+#### Next Steps:
+
+Implement schema sixteen while retaining all schema-fifteen and older telemetry layouts, add directed TFF and BFF tag and content matches plus injected wrong-bank and one-byte cache-content failures, and run the complete native, interlaced reconstruction and canonical mixed-picture live-raster regressions. If those pass, perform a clean Quartus Prime 17.0.2 build, verify timing and retained diagnostic registers, directly replace only `/media/fat/MediaPlayer.rbf`, verify the active image by readback and prepare the established TFF light-motion hardware run with a corrected fresh screenshot burst and schema-sixteen capture.
+
+#### Files Modified:
+
+- `MediaPlayer_top_06.svh`
+- `MediaPlayer_top_07.svh`
+- `MediaPlayer.sdc`
+- `rtl/mpeg2_luma_framebuffer.sv`
+- `rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv`
+- `tools/streams/decode_hardware_cadence.py`
+- `tools/streams/run_native_480i_timing.sh`
+- `tools/streams/tb_h262_hardware_cadence_profiler.sv`
+- `tools/streams/tb_interlaced_420_cache_mapping.sv`
+- `tools/streams/tb_native_480i_cache_refill.sv`
+- `tools/streams/test_decode_hardware_cadence.py`
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 524 COMMIT Unreleased 4e4db95 2026-08-25T21:43:10-07:00
 
 #### Coming From:
