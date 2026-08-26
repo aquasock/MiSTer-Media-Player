@@ -1,3 +1,32 @@
+## 544 COMMIT Unreleased 7cdfcec 2026-08-26T14:57:08-07:00
+
+#### Coming From:
+
+Unreleased 7cdfcec
+
+#### Purpose:
+
+Record hardware acceptance of the restored MiSTer raster-control phase and preserve one fresh post-playback terminal capture.
+
+#### Outcome:
+
+The user reloaded the exact seed-fifteen `7cdfcec` image and reports that the idle screen works normally apart from the pre-existing flicker; after running the established Big Buck Bunny test file with HDMI scaler deinterlacer set to Weave, the catastrophic whole-screen synchronization failure is gone and the screen remains capture-capable. The fixed remote screenshot filename was deleted before triggering, so `.ai/current_results/entry544_seed15_terminal.png` is genuinely fresh rather than reused evidence; it is 479,876 bytes with SHA-256 `aaf9abd06b8286463ac2cd2081540e8c89ec14de29ade0cc1d84cf35b1eef5cd`. Schema sixteen accepts all 15,150,646 source bytes, reaches sequence end, presentation completion and normal quiet reason one, and its wrapped counters represent 449 framebuffer and displayed pictures with 448 publications and swaps. The terminal generation fetches 242 first-field and 240 second-field lines from region zero with zero region, phase, prefill, unpublished-reset, cache-overlap, presentation, audio, tag, content or accepted-write-versus-raw-return errors. MiSTer's screenshot command succeeds without the prior `Scaled not available` failure. The seed-fifteen correction therefore passes its bounded scaler-lock and external raster-phase objective in Weave; it does not fix or explain the remaining motion flicker.
+
+#### Next Steps:
+
+Keep commit `7cdfcec`, seed fifteen and the restored undelayed `video_de`, `video_hs` and `video_vs` contract as the new hardware baseline, and do not revisit the rejected registered-control phase. Treat the remaining flicker as a separate decoded-field presentation defect. Before another behavioral change, compare this terminal evidence with the user's live observation and choose one bounded source boundary that can be tested with a compile-only check, one incremental Quartus build and a short hardware playback; do not resume the long regression suites unless a change materially requires them.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 543 COMMIT Unreleased 7cdfcec 2026-08-26T14:35:16-07:00
 
 #### Coming From:
@@ -1212,42 +1241,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 504 COMMIT Unreleased f866ce2 2026-08-25T03:04:24-07:00
-
-#### Coming From:
-
-Unreleased 4e4da3a
-
-#### Purpose:
-
-Remove the serialized inverse-quantization replay that limits full-D1 all-I playback and publish the approved two-tier output wording.
-
-#### Outcome:
-
-Commit `f866ce2` streams each finalized inverse-quantized coefficient directly into the already-idle IDCT instead of first storing and replaying the complete 64-coefficient block. The parser continues to wait for completed reconstruction before admitting another block, so coefficient order, saturation, mismatch control, IDCT arithmetic and block ownership remain unchanged. The TFF four-picture reconstruction falls from 10,000,059 to 7,926,459 clocks and BFF falls from 10,022,306 to 7,948,706: both remove exactly 2,073,600 clocks, equal to 64 clocks times 8,100 blocks times four pictures. At 60 MHz those results correspond to approximately 30.28 and 30.19 pictures per second including the regression's framing overhead and pass the new 8,008,000-clock four-picture implementation gate for 29.97 fps. All 2,073,600 TFF samples retain the established 9,442 one-LSB differences, all BFF samples retain 9,632, the progressive control retains 69,671 and every case has zero pixels outside the one-LSB IDCT tolerance; the field-DCT rejection control also remains exact. The complete native suite passes stable TFF/BFF order, exhaustive 4:2:0 cache mapping, exact half-line timing, Bob/Weave selection, timing-pattern isolation, safe ownership, measured-latency overlap, ordinary/delayed refill behavior and schema-nine telemetry. The canonical 72-picture mixed I/P/B live-raster soak remains bit-exact at its 6,529,997-clock signature with all publication, prediction, DDR and presentation counters correct and every error clear. The menu now names `HDMI scaler deinterlacer`, and the README, architecture, decoder notes and changelog document processed-HDMI Bob/Weave separately from Native 480i plus MiSTer's external `direct_video` requirement.
-
-A clean Quartus Prime 17.0.2 build completes in 10 minutes 23 seconds with zero errors and 144 established warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively +0.128, +0.251, +3.352, +0.449 and +0.925 nanoseconds; focused 60 MHz decoder setup and recovery are +1.543 and +11.393 nanoseconds and focused video setup is +2.658 nanoseconds, all with zero violated paths. The fit uses 28,969 ALMs, 44,696 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs, reducing the prior Bob/Weave build by 599 ALMs and 819 registers with unchanged memory. The 4,171,412-byte RBF has SHA-256 `acc28e644100e0452e45fcfe9749762d3a690ca8d6da9479cc4a2ac23d736b7b`. Ordinary FTP with the default `root` and `1` login and no SSH first retrieved the active `4e4da3a` image at its known `94d194e36f7deeacaf899934547860366a8649455e8c4f0d15ac51e478d90aff` hash, preserved and round-trip verified it as `/media/fat/MediaPlayer.rbf.rollback-pre-f866ce2`, round-trip verified the staged candidate and then verified the promoted `/media/fat/MediaPlayer.rbf` at the exact candidate hash. The temporary stage was removed; Main, helper, media and MiSTer configuration are unchanged.
-
-#### Next Steps:
-
-Perform a clean Quartus Prime 17.0.2 build and the Phase-1P timing review. If fit and timing pass, stage the exact RBF through ordinary FTP with the default MiSTer `root` and `1` login, retrieve it for byte verification, preserve the current `4e4da3a` image as rollback and promote the candidate without changing Main, helper, media or MiSTer configuration. Reload the core and run the established TFF and BFF light-motion fixtures in both Weave and Bob. Hardware acceptance requires the schema-nine picture rate to reach native 29.97-fps presentation without errors or dropped pictures while retaining the already accepted field order and the expected scaler-mode visual tradeoff.
-
-#### Files Modified:
-
-- `rtl/mpeg2_new/mpeg2_h262_inverse_quant.sv`
-- `tools/streams/tb_h262_interlaced_i_reconstruction.sv`
-- `MediaPlayer_top_00.svh`
-- `README.md`
-- `docs/ARCHITECTURE.md`
-- `docs/MPEG2_NEW_DECODER.md`
-- `CHANGELOG.md`
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
