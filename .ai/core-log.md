@@ -1,6 +1,35 @@
-## 516 COMMIT Unreleased 3e91073 2026-08-25T18:31:59-07:00
+## 517 COMMIT Unreleased 3e91073 2026-08-25T18:48:23-07:00
 
 #### Coming From:
+
+Unreleased 3e91073
+
+#### Purpose:
+
+Read the new per-field evidence on hardware and determine whether framebuffer field readout is actually at fault.
+
+#### Outcome:
+
+The instrumented `3e91073` image was installed rollback-safe and run against `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off, Interlaced output Native 480i and Bob, while a live burst sampled the core's raster at roughly 2.4 hertz. Schema eleven decoded on hardware for the first time at forty-three words from the moved native origin. Its verdict is that field readout is correct and entry 515's classification is superseded. The last generation was served 242 first-field and 240 second-field luma line fetches, presented 240 lines of each parity, and recorded zero generations of per-parity line imbalance and zero field-phase errors, while the established counters remained at 300 framebuffer resets, 299 publications, zero prefill misses and zero superseded generations. The 242 figure confirms the counter rather than contradicting it, because the two prefill luma lines are the sequence-zero and sequence-one rows and both therefore carry first-field parity by construction. The session itself was ordinary, with the complete 5,007,304-byte stream accepted, 300 decoded pictures, 300 displayed and 299 swaps across 599,116,647 cycles or 9.985277 seconds, top-field-first, sequence end seen, presentation complete, quiet reason one and every error clear. Against that, the burst shows the first field carrying no picture at all. Fourteen distinct live frames each place the moving bar on odd rows only, and the even rows sit at background level 24, which is the pre-playback screen rather than the fixture's level 19; a sweep found zero even-row pixels above background anywhere outside the reference rows and the telemetry overlay. Only the terminal frame shows both parities agreeing at the authored weave. The framebuffer therefore requests every first-field row, on the correct lines, in the correct field phase, and receives pre-playback content: the addresses are right and what they resolve to is wrong. Evidence is `.ai/current_results/entry517_stale_first_field_live.png` at 10,031 bytes with SHA-256 `a6ff293687eca203b3660e4881ffb0884e04676975aaeaab8633a090fcee566c` and `.ai/current_results/entry517_field_readout_counters.png` at 12,262 bytes with SHA-256 `bb02eca2ea6ce2364146f48a13c83ca14c487d579fec586abba117963d1a91d0`. A static read of the address path identifies the mechanism this evidence points at without proving it. The framebuffer emits a plain row address and the top level adds `mpeg2_new_display_frame_offset` combinationally at the instant each fetch is issued, selecting between five distinct DDR regions for bank zero, bank one, bank two and the two scratch areas. The framebuffer has no knowledge of which region its correct row lands in, and a native frame readout is uniquely exposed because its 480-entry sequence spans two vertical periods and can therefore straddle a display-bank swap, leaving the two fields resolved into different regions while every framebuffer counter still reads perfectly. No existing signal records which region a fetch resolved into, so this is invisible to all present telemetry. Commit `3e91073` passes its objective: the instrumentation was built to decide this question and it decided it against the standing hypothesis.
+
+#### Next Steps:
+
+Instrument the region a fetch actually resolves into, keeping every new observation inside the decoder clock domain so that none of it competes with the framework scaler for video-domain placement, which is what cost three rebuilds in the previous cycle. The display bank, display scratch and scratch bank levels already live on that clock, as do the two per-parity fetch toggles the framebuffer exports, so the top level can latch the region in effect on each first-field and each second-field fetch edge and compare them per generation. Retire the per-parity displayed-line counters, which have now demonstrably served their purpose by reading two hundred forty against two hundred forty with zero imbalance while the field carried no picture at all, and reuse their bits for the two observed regions and a count of generations whose two parities resolved differently. Publish this as schema twelve at the same forty-three words so the snapshot does not grow, update the telemetry decoder and its layout test for both schema twelve and the existing schema eleven and ten, extend the profiler regression with a directed case where the two parities disagree, then clean-build with focused timing and confirm by netlist probe that every new register survives and no timing exception is left unmatched before installing rollback-safe. Two differing regions localize the defect to the banked address path and justify a bounded correction there, while identical regions in every generation clear that path and move the investigation to whatever populates the first field's rows.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
+## 516 COMMIT Unreleased 3e91073 2026-08-25T18:31:59-07:00
+
+#### Coming From:ff
 
 Unreleased 9573923
 
@@ -1218,34 +1247,6 @@ Without rebooting after the accepted zero-PCM session, the user reports that `01
 #### Next Steps:
 
 Power-cycle the MiSTer once, leave Audio Test Off and run only `20_bbb_full_48k.mpg` through its natural 9:56 end. Watch opening motion and sync, scene transitions, the high-motion squirrel sequence near 7:22 and the rolling credits, requiring no crackle, dropout, drift, repeated sections, corruption or recurring cadence jump. After completion, report audio-video behavior and all three LEDs, then leave the final image loaded for schema-nine capture. Do not replay or launch another file before the final evidence is retrieved.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 477 COMMIT Unreleased eab57b7 2026-08-24T14:08:55-07:00
-
-#### Coming From:
-
-Unreleased eab57b7
-
-#### Purpose:
-
-Accept silent Program Stream playback as the second v0.7.0 release-gate test and advance to no-reboot 44.1 kHz recovery.
-
-#### Outcome:
-
-Without rebooting after the accepted 48 kHz control, the user reports that `02_good_video_only.mpg` passes with USER solid on, DISK blinking eleven times and POWER solid on. The final image was triggered and retrieved exclusively through plain FTP with the default MiSTer login and no SSH keys; `.ai/current_results/entry477_release_gate_video_only.png` is 104,561 bytes with SHA-256 `9f9d3fccab5e20c6b0e932065b3960e5b4f80ff30ed0d13cc6bf50c7591df586`. Schema nine reports exactly zero delivered PCM samples, no audio underrun or PCM protocol error, zero aggregate errors and no display-gap outlier. It accepts the established 582,742 MiSTer transfer-byte count for the 582,741-byte demultiplexed H.262 payload, associates five timestamps, decodes seventeen reference and 31 B pictures, displays all 48 pictures with 47 swaps over 1.959896 seconds at 23.980870 frames per second, sees sequence end, completes presentation and freezes for normal quiet reason one at STC second two. Every decoder, destination, presentation, reorder, scratch, promotion, future-reference and terminal state is clear. The FIFO high-water telemetry remains saturated from the preceding audio session because that top-level diagnostic is reset only with the core, but the session PCM counter is zero and the user heard the required silence. This passes test two of the exact four-file v0.7.0 release gate.
-
-#### Next Steps:
-
-Without rebooting, run only `01_good_480p_44k.mpg` with Audio Test Off. Require audio to restart immediately and remain aligned, crackle-free and dropout-free after the zero-PCM session, with all 48 pictures and 47 swaps, healthy PCM activity, zero aggregate, decoder, presentation, underrun and protocol errors, sequence end, presentation completion and normal quiet reason one. Report all three terminal LEDs and leave the final image loaded for capture. Do not begin the full soak until this recovery transition is accepted.
 
 #### Files Modified:
 
