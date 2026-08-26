@@ -73,6 +73,9 @@ vvp "${build_dir}/tb_native_480i_cache_refill" +FINGERPRINT +CORRUPT
 vvp "${build_dir}/tb_native_480i_cache_refill" +FINGERPRINT +WRONG_BANK
 vvp "${build_dir}/tb_native_480i_cache_refill" +FINGERPRINT +READ_CORRUPT
 vvp "${build_dir}/tb_native_480i_cache_refill" +FINGERPRINT +WRITE_INVALID
+vvp "${build_dir}/tb_native_480i_cache_refill" +GENERATIONS
+vvp "${build_dir}/tb_native_480i_cache_refill" +GENERATIONS +BFF
+vvp "${build_dir}/tb_native_480i_cache_refill" +GENERATIONS +SLOW
 
 iverilog -g2012 \
   -s tb_h262_luma_write_fingerprint \

@@ -50,6 +50,8 @@ reg [11:0] h_pos = 12'd0;
 reg [8:0] sequence_line = 9'd0;
 reg fingerprint_mode = 1'b0;
 reg bff_mode = 1'b0;
+reg generation_mode = 1'b0;
+reg [7:0] framebuffer_generation = 8'h2a;
 
 always #8.333 mem_clk = ~mem_clk;
 always #9.259 rd_clk = ~rd_clk;
@@ -116,7 +118,7 @@ mpeg2_luma_framebuffer dut
     .vertical_size      (14'd480),
     .native_interlaced  (1'b1),
     .top_field_first    (~bff_mode),
-    .framebuffer_generation(8'h2a),
+    .framebuffer_generation(framebuffer_generation),
     .write_read_expected_region(3'd0),
     .write_read_expected_valid(write_read_expected_valid),
     .write_read_expected_even_fingerprint(expected_even_field_fingerprint),
@@ -202,10 +204,10 @@ integer write_read_count = 0;
 integer write_read_mismatch_count = 0;
 integer first_field_write_read_count = 0;
 integer second_field_write_read_count = 0;
+integer generation_publication_count = 0;
+reg picture_present_q = 1'b0;
 reg [63:0] expected_luma_word;
 reg [7:0] expected_luma_byte;
-integer expected_row;
-integer expected_word;
 
 function automatic [63:0] ddr_word_pattern;
     input [28:0] word_address;
@@ -213,7 +215,8 @@ function automatic [63:0] ddr_word_pattern;
     begin
         for (lane = 0; lane < 8; lane = lane + 1)
             ddr_word_pattern[lane*8 +: 8] =
-                word_address[7:0] + word_address[15:8] + (lane * 8'h1d);
+                word_address[7:0] + word_address[15:8] + (lane * 8'h1d) +
+                (generation_mode ? framebuffer_generation : 8'd0);
     end
 endfunction
 
@@ -239,7 +242,46 @@ function automatic [31:0] position_fingerprint_word;
     end
 endfunction
 
+task automatic compute_expected_field_fingerprints;
+    integer row;
+    integer word_index;
+    begin
+        expected_even_field_fingerprint = 32'd0;
+        expected_odd_field_fingerprint = 32'd0;
+        for (row = 0; row < 480; row = row + 1)
+            for (word_index = 0; word_index < 90;
+                 word_index = word_index + 1)
+                if (row[0])
+                    expected_odd_field_fingerprint =
+                        expected_odd_field_fingerprint ^
+                        position_fingerprint_word(3'd0,row[10:0],
+                            word_index[6:0],ddr_word_pattern(
+                                29'h06000000 + (row * 90) + word_index));
+                else
+                    expected_even_field_fingerprint =
+                        expected_even_field_fingerprint ^
+                        position_fingerprint_word(3'd0,row[10:0],
+                            word_index[6:0],ddr_word_pattern(
+                                29'h06000000 + (row * 90) + word_index));
+    end
+endtask
+
 always @(posedge rd_clk) begin
+    if (reset)
+        picture_present_q <= 1'b0;
+    else begin
+        picture_present_q <= picture_present_debug;
+        if (picture_present_debug && !picture_present_q) begin
+            generation_publication_count <=
+                generation_publication_count + 1;
+            if (generation_mode &&
+                (dut.framebuffer_generation_r2 != framebuffer_generation))
+                $fatal(1,{"published generation mismatch selected=%02h ",
+                          "published=%02h"},framebuffer_generation,
+                       dut.framebuffer_generation_r2);
+        end
+    end
+
     if (pixel_ce && fingerprint_mode &&
         dut.native_luma_sample_valid_rd) begin
         expected_luma_word = ddr_word_pattern(
@@ -296,6 +338,18 @@ always @(posedge mem_clk) begin
              (luma_provenance_expected_generation_debug !=
               luma_provenance_tagged_generation_debug)))
             $fatal(1,"matching provenance carried unequal tags");
+        if (generation_mode &&
+            ((luma_provenance_expected_generation_debug !=
+              framebuffer_generation) ||
+             (luma_provenance_tagged_generation_debug !=
+              framebuffer_generation)))
+            $fatal(1,{"field-cache generation mismatch selected=%02h ",
+                      "expected=%02h tagged=%02h field=%0d row=%0d"},
+                   framebuffer_generation,
+                   luma_provenance_expected_generation_debug,
+                   luma_provenance_tagged_generation_debug,
+                   luma_provenance_first_field_debug,
+                   luma_provenance_expected_row_debug);
     end
 end
 
@@ -372,33 +426,121 @@ always @(posedge rd_clk) begin
     end
 end
 
-initial begin
-    expected_even_field_fingerprint = 32'd0;
-    expected_odd_field_fingerprint = 32'd0;
-    for (expected_row = 0; expected_row < 480;
-         expected_row = expected_row + 1)
-        for (expected_word = 0; expected_word < 90;
-             expected_word = expected_word + 1)
-            if (expected_row[0])
-                expected_odd_field_fingerprint =
-                    expected_odd_field_fingerprint ^
-                    position_fingerprint_word(3'd0,expected_row[10:0],
-                        expected_word[6:0],ddr_word_pattern(
-                            29'h06000000 + (expected_row * 90) +
-                            expected_word));
-            else
-                expected_even_field_fingerprint =
-                    expected_even_field_fingerprint ^
-                    position_fingerprint_word(3'd0,expected_row[10:0],
-                        expected_word[6:0],ddr_word_pattern(
-                            29'h06000000 + (expected_row * 90) +
-                            expected_word));
+task automatic run_publication_generation;
+    input [7:0] generation;
+    input first_generation;
+    integer fingerprint_before;
+    integer provenance_before;
+    integer first_field_before;
+    integer second_field_before;
+    integer write_read_before;
+    integer publication_before;
+    integer tag_mismatch_before;
+    integer content_mismatch_before;
+    integer fingerprint_mismatch_before;
+    integer write_read_mismatch_before;
+    integer position_mismatch_before;
+    begin
+        if (first_generation) begin
+            framebuffer_generation = generation;
+            compute_expected_field_fingerprints();
+            repeat (8) @(posedge mem_clk);
+        end
+        else begin
+            @(negedge mem_clk);
+            reset = 1'b1;
+            picture_complete = 1'b0;
+            running = 1'b0;
+            framebuffer_generation = generation;
+            compute_expected_field_fingerprints();
+            repeat (8) @(posedge mem_clk);
+        end
 
+        fingerprint_before = fingerprint_count;
+        provenance_before = provenance_count;
+        first_field_before = first_field_provenance_count;
+        second_field_before = second_field_provenance_count;
+        write_read_before = write_read_count;
+        publication_before = generation_publication_count;
+        tag_mismatch_before = provenance_tag_mismatch_count;
+        content_mismatch_before = provenance_content_mismatch_count;
+        fingerprint_mismatch_before = fingerprint_mismatch_count;
+        write_read_mismatch_before = write_read_mismatch_count;
+        position_mismatch_before = position_mismatch_count;
+
+        @(negedge mem_clk);
+        reset = 1'b0;
+        @(negedge mem_clk);
+        picture_complete = 1'b1;
+        @(negedge mem_clk);
+        picture_complete = 1'b0;
+
+        wait (cache_ready);
+        repeat (8) @(posedge rd_clk);
+        running = 1'b1;
+        wait (!running);
+        repeat (400) @(posedge mem_clk);
+
+        if ((fingerprint_count - fingerprint_before) != 2)
+            $fatal(1,"generation %02h fingerprints=%0d expected=2",generation,
+                   fingerprint_count - fingerprint_before);
+        if ((provenance_count - provenance_before) != 480)
+            $fatal(1,"generation %02h provenance=%0d expected=480",generation,
+                   provenance_count - provenance_before);
+        if (((first_field_provenance_count - first_field_before) != 240) ||
+            ((second_field_provenance_count - second_field_before) != 240))
+            $fatal(1,{"generation %02h field provenance first/second=",
+                      "%0d/%0d expected=240/240"},generation,
+                   first_field_provenance_count - first_field_before,
+                   second_field_provenance_count - second_field_before);
+        if ((write_read_count - write_read_before) != 2)
+            $fatal(1,"generation %02h write/read completions=%0d expected=2",
+                   generation,write_read_count - write_read_before);
+        if ((generation_publication_count - publication_before) != 1)
+            $fatal(1,"generation %02h publications=%0d expected=1",generation,
+                   generation_publication_count - publication_before);
+        if ((provenance_tag_mismatch_count != tag_mismatch_before) ||
+            (provenance_content_mismatch_count != content_mismatch_before) ||
+            (fingerprint_mismatch_count != fingerprint_mismatch_before) ||
+            (write_read_mismatch_count != write_read_mismatch_before) ||
+            (position_mismatch_count != position_mismatch_before))
+            $fatal(1,{"generation %02h mismatch delta tag/content/cache/",
+                      "write-read/position=%0d/%0d/%0d/%0d/%0d"},generation,
+                   provenance_tag_mismatch_count - tag_mismatch_before,
+                   provenance_content_mismatch_count - content_mismatch_before,
+                   fingerprint_mismatch_count - fingerprint_mismatch_before,
+                   write_read_mismatch_count - write_read_mismatch_before,
+                   position_mismatch_count - position_mismatch_before);
+
+        $display({"NATIVE_CACHE_GENERATION generation=%02h order=%s ",
+                  "fields=240/240 publication=1 mismatches=0"},generation,
+                 bff_mode?"BFF":"TFF");
+    end
+endtask
+
+initial begin
     slow_mode = $test$plusargs("SLOW");
     late_prefill_mode = $test$plusargs("PREFILL_LATE");
-    fingerprint_mode = $test$plusargs("FINGERPRINT");
+    generation_mode = $test$plusargs("GENERATIONS");
+    fingerprint_mode = $test$plusargs("FINGERPRINT") || generation_mode;
     bff_mode = $test$plusargs("BFF");
     response_latency = (slow_mode || late_prefill_mode) ? 3400 : 64;
+    compute_expected_field_fingerprints();
+
+    if (generation_mode) begin
+        if (late_prefill_mode || $test$plusargs("CORRUPT") ||
+            $test$plusargs("READ_CORRUPT") ||
+            $test$plusargs("WRITE_INVALID") ||
+            $test$plusargs("WRONG_BANK"))
+            $fatal(1,"generation sequence does not combine with fault injection");
+        run_publication_generation(8'h2a,1'b1);
+        run_publication_generation(8'h2b,1'b0);
+        run_publication_generation(8'h2c,1'b0);
+        $display({"NATIVE_CACHE_GENERATION_PASS order=%s generations=3 ",
+                  "publications=3 fields=720/720 mismatches=0 latency=%0d"},
+                 bff_mode?"BFF":"TFF",response_latency);
+        $finish;
+    end
 
     repeat (8) @(posedge mem_clk);
     reset = 1'b0;
