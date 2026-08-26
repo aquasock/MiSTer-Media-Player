@@ -1,4 +1,4 @@
-## 536 COMMIT Unreleased ??? 2026-08-26T05:21:07-07:00
+## 536 COMMIT Unreleased d566668 2026-08-26T05:21:07-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Force MediaPlayer's selector to open the canonical games directory after the gen
 
 #### Outcome:
 
-The user reports that the exact entry 535 Big Buck Bunny Bob run still showed both old-frame ghosting and thin horizontal lines, so the visual defect remains failed despite clean accepted-write-versus-raw-DDR-read evidence; no additional FPGA diagnostic or behavioral change is included here. The separately installed Main directory change also failed its hardware objective. Read-only FTP inspection proves that both `/media/fat/MediaPlayer` and `/media/fat/games/MediaPlayer` exist, and static review shows `user_io_get_core_path(NULL, 1)` delegates to `findGamesDir`, whose compatibility search intentionally prefers the legacy root-level core directory before `games/MediaPlayer`. The planned correction remains confined to the pinned Main patch: MediaPlayer's selector invocation and its internal home boundary will both use canonical relative path `games/MediaPlayer`, which resolves to `/media/fat/games/MediaPlayer` in Main's storage namespace and prevents the generic legacy resolver or remembered `Selected_F` path from redirecting the initial view. Other cores, the FPGA RBF and the ARM helper remain unchanged.
+The user reports that the exact entry 535 Big Buck Bunny Bob run still showed both old-frame ghosting and thin horizontal lines, so the visual defect remains failed despite clean accepted-write-versus-raw-DDR-read evidence; no additional FPGA diagnostic or behavioral change is included here. The separately installed Main directory change also failed its hardware objective. Read-only FTP inspection proves that both `/media/fat/MediaPlayer` and `/media/fat/games/MediaPlayer` exist, and static review shows `user_io_get_core_path(NULL, 1)` delegates to `findGamesDir`, whose compatibility search intentionally prefers the legacy root-level core directory before `games/MediaPlayer`. Commit `d566668` corrects only the pinned Main patch: MediaPlayer's selector invocation and its internal home boundary now both use canonical relative path `games/MediaPlayer`, which resolves to `/media/fat/games/MediaPlayer` in Main's storage namespace and prevents the generic legacy resolver or remembered `Selected_F` path from redirecting the initial view. The complete patch applies cleanly to pinned Main commit `0a8fb44`; other cores, the FPGA RBF and the ARM helper remain unchanged. Two clean builds with the checksum-verified official Arm GNU 10.2 toolchain are byte-identical, each producing a 1,166,244-byte ARM EABI5 executable at SHA-256 `5a6cbf7e85682ac301d57470b8b2c952d3bbfa42af55484bd70dd0d36724ae96`. Only `/media/fat/MiSTer` was directly deleted and rewritten in one ordinary-FTP session with automatic local recovery available, and independent readback matches the exact size and hash. No MiSTer backup, rollback or staging filename was created, and no restart was triggered.
 
 #### Next Steps:
 
-Update only the existing Main patch, apply it cleanly to pinned upstream commit `0a8fb44`, build twice with the checksum-verified official Arm GNU 10.2 toolchain and require byte-identical outputs. Commit and push the correction from the Raspberry Pi, directly replace only `/media/fat/MiSTer` without backup, rollback or staging files, verify it by independent FTP readback and have the user restart. Hardware acceptance requires every opening of MediaPlayer's selector to begin at `/media/fat/games/MediaPlayer`; after that narrow correction, resume the visual investigation from scheduler display-bank and generation selection without adding a new diagnostic layout.
+Have the user restart the MiSTer, reload MediaPlayer and open its selector repeatedly, including after entering a subdirectory and selecting a file. Hardware acceptance requires every opening to begin at `/media/fat/games/MediaPlayer` even while the legacy `/media/fat/MediaPlayer` directory remains present. After that narrow correction is accepted, resume the visual investigation from scheduler display-bank and generation selection without adding a new diagnostic layout.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Update only the existing Main patch, apply it cleanly to pinned upstream commit 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
