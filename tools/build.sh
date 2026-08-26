@@ -21,7 +21,7 @@
 #   Build/All Clean            tools/build.sh all-clean
 
 QUARTUS=/home/vash/intelFPGA_lite/17.0_T/quartus/bin
-RBF=/run/media/vash/GIT/MiSTer-Media-Player/output_files/MediaPlayer.rbf
+RBF=/run/media/vash/GIT/test1/MiSTer-Media-Player/output_files/MediaPlayer.rbf
 MISTER=ftp://10.10.0.30//media/fat/MediaPlayer.rbf
 BEEP="play -q -n synth 0.15 sine 1000"
 
