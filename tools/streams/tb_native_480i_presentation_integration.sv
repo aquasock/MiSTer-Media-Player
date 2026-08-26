@@ -266,10 +266,23 @@ reg [1:0] base_display_q = 2'd0;
 reg [1:0] overlap_display_q = 2'd0;
 reg [1:0] accelerated_display_q = 2'd0;
 reg [1:0] terminal_display_q = 2'd0;
+reg [15:0] base_generation_by_bank [0:2];
+reg [15:0] overlap_generation_by_bank [0:2];
+reg [15:0] accelerated_generation_by_bank [0:2];
+reg [15:0] terminal_generation_by_bank [0:2];
+reg [2:0] base_generation_valid = 3'b000;
+reg [2:0] overlap_generation_valid = 3'b000;
+reg [2:0] accelerated_generation_valid = 3'b000;
+reg [2:0] terminal_generation_valid = 3'b000;
+reg [15:0] base_last_generation = 16'd0;
+reg [15:0] overlap_last_generation = 16'd0;
+reg [15:0] accelerated_last_generation = 16'd0;
+reg [15:0] terminal_last_generation = 16'd0;
 reg accelerated_secondary_seen = 1'b0;
 reg accelerated_backpressure_seen = 1'b0;
 reg terminal_secondary_seen = 1'b0;
 reg terminal_sequence_seen = 1'b0;
+integer bank_index;
 always @(posedge clk_mpeg2) begin
     if (reset_mpeg2) begin
         cadence_ticks <= 0;
@@ -282,6 +295,20 @@ always @(posedge clk_mpeg2) begin
         overlap_display_q <= 2'd0;
         accelerated_display_q <= 2'd0;
         terminal_display_q <= 2'd0;
+        base_generation_valid <= 3'b000;
+        overlap_generation_valid <= 3'b000;
+        accelerated_generation_valid <= 3'b000;
+        terminal_generation_valid <= 3'b000;
+        base_last_generation <= 16'd0;
+        overlap_last_generation <= 16'd0;
+        accelerated_last_generation <= 16'd0;
+        terminal_last_generation <= 16'd0;
+        for (bank_index = 0; bank_index < 3; bank_index = bank_index + 1) begin
+            base_generation_by_bank[bank_index] <= 16'd0;
+            overlap_generation_by_bank[bank_index] <= 16'd0;
+            accelerated_generation_by_bank[bank_index] <= 16'd0;
+            terminal_generation_by_bank[bank_index] <= 16'd0;
+        end
         accelerated_secondary_seen <= 1'b0;
         accelerated_backpressure_seen <= 1'b0;
         terminal_secondary_seen <= 1'b0;
@@ -289,17 +316,68 @@ always @(posedge clk_mpeg2) begin
     end else begin
         if (cadence_tick_pulse) cadence_ticks <= cadence_ticks + 1;
         if (swap_window_pulse) frame_windows <= frame_windows + 1;
+        if (base_waiting) begin
+            base_generation_by_bank[base_completed_bank] <= base_decoded_count;
+            base_generation_valid[base_completed_bank] <= 1'b1;
+        end
+        if (overlap_waiting) begin
+            overlap_generation_by_bank[overlap_completed_bank] <=
+                overlap_decoded_count;
+            overlap_generation_valid[overlap_completed_bank] <= 1'b1;
+        end
+        if (accelerated_waiting) begin
+            accelerated_generation_by_bank[accelerated_completed_bank] <=
+                accelerated_decoded_count;
+            accelerated_generation_valid[accelerated_completed_bank] <= 1'b1;
+        end
+        if (terminal_waiting) begin
+            terminal_generation_by_bank[terminal_completed_bank] <=
+                terminal_decoded_count;
+            terminal_generation_valid[terminal_completed_bank] <= 1'b1;
+        end
         if (base_display_bank != base_display_q) begin
+            if (!base_generation_valid[base_display_bank])
+                $fatal(1,"serialized displayed untagged bank=%0d",
+                       base_display_bank);
+            if (base_generation_by_bank[base_display_bank] !=
+                base_last_generation + 1'b1)
+                $fatal(1,{"serialized generation order last=%0d next=%0d ",
+                          "bank=%0d"},base_last_generation,
+                       base_generation_by_bank[base_display_bank],
+                       base_display_bank);
             base_presentations <= base_presentations + 1;
             base_display_q <= base_display_bank;
+            base_last_generation <= base_generation_by_bank[base_display_bank];
         end
         if (overlap_display_bank != overlap_display_q) begin
+            if (!overlap_generation_valid[overlap_display_bank])
+                $fatal(1,"overlap displayed untagged bank=%0d",
+                       overlap_display_bank);
+            if (overlap_generation_by_bank[overlap_display_bank] !=
+                overlap_last_generation + 1'b1)
+                $fatal(1,{"overlap generation order last=%0d next=%0d ",
+                          "bank=%0d"},overlap_last_generation,
+                       overlap_generation_by_bank[overlap_display_bank],
+                       overlap_display_bank);
             overlap_presentations <= overlap_presentations + 1;
             overlap_display_q <= overlap_display_bank;
+            overlap_last_generation <=
+                overlap_generation_by_bank[overlap_display_bank];
         end
         if (accelerated_display_bank != accelerated_display_q) begin
+            if (!accelerated_generation_valid[accelerated_display_bank])
+                $fatal(1,"accelerated displayed untagged bank=%0d",
+                       accelerated_display_bank);
+            if (accelerated_generation_by_bank[accelerated_display_bank] !=
+                accelerated_last_generation + 1'b1)
+                $fatal(1,{"accelerated generation order last=%0d next=%0d ",
+                          "bank=%0d"},accelerated_last_generation,
+                       accelerated_generation_by_bank[accelerated_display_bank],
+                       accelerated_display_bank);
             accelerated_presentations <= accelerated_presentations + 1;
             accelerated_display_q <= accelerated_display_bank;
+            accelerated_last_generation <=
+                accelerated_generation_by_bank[accelerated_display_bank];
         end
         if (accelerated_scheduler.ordinary_secondary_valid)
             accelerated_secondary_seen <= 1'b1;
@@ -307,8 +385,19 @@ always @(posedge clk_mpeg2) begin
             accelerated_hold)
             accelerated_backpressure_seen <= 1'b1;
         if (terminal_display_bank != terminal_display_q) begin
+            if (!terminal_generation_valid[terminal_display_bank])
+                $fatal(1,"terminal displayed untagged bank=%0d",
+                       terminal_display_bank);
+            if (terminal_generation_by_bank[terminal_display_bank] !=
+                terminal_last_generation + 1'b1)
+                $fatal(1,{"terminal generation order last=%0d next=%0d ",
+                          "bank=%0d"},terminal_last_generation,
+                       terminal_generation_by_bank[terminal_display_bank],
+                       terminal_display_bank);
             terminal_presentations <= terminal_presentations + 1;
             terminal_display_q <= terminal_display_bank;
+            terminal_last_generation <=
+                terminal_generation_by_bank[terminal_display_bank];
         end
         if (terminal_scheduler.ordinary_secondary_valid)
             terminal_secondary_seen <= 1'b1;
@@ -355,6 +444,16 @@ initial begin
     if (terminal_decoded_count != 16'd8 || terminal_presentations != 8)
         $fatal(1,"terminal decoded/presented=%0d/%0d expected=8/8",
                terminal_decoded_count,terminal_presentations);
+    if (base_last_generation != base_presentations ||
+        overlap_last_generation != overlap_presentations ||
+        accelerated_last_generation != accelerated_presentations ||
+        terminal_last_generation != terminal_presentations)
+        $fatal(1,{"generation totals base=%0d/%0d overlap=%0d/%0d ",
+                  "accelerated=%0d/%0d terminal=%0d/%0d"},
+               base_last_generation,base_presentations,
+               overlap_last_generation,overlap_presentations,
+               accelerated_last_generation,accelerated_presentations,
+               terminal_last_generation,terminal_presentations);
     if (terminal_scheduler.pending_frame_valid ||
         terminal_scheduler.ordinary_secondary_valid ||
         terminal_scheduler.ordinary_terminal_drain_pending || terminal_hold)
@@ -364,7 +463,7 @@ initial begin
               "serialized_presented=10 overlap_presented=13 ",
               "accelerated_decoded=21 accelerated_presented=20 ",
               "accelerated_queue=1 terminal_decoded=8 ",
-              "terminal_presented=8 terminal_empty=1"});
+              "terminal_presented=8 terminal_empty=1 generation_order=1"});
     $finish;
 end
 initial begin
