@@ -108,6 +108,9 @@ wire [7:0] video_b;
 wire video_de;
 wire video_hs;
 wire video_vs;
+wire stimulus_hs = !((h_pos >= 12'd760) && (h_pos < 12'd824));
+wire stimulus_vs = !((sequence_line >= 9'd3) &&
+                     (sequence_line < 9'd6));
 
 mpeg2_luma_framebuffer dut
 (
@@ -176,8 +179,8 @@ mpeg2_luma_framebuffer dut
     .v_pos              (v_pos),
     .pixel_ce           (pixel_ce),
     .pixel_en           (pixel_en),
-    .h_sync             (1'b1),
-    .v_sync             (1'b1),
+    .h_sync             (stimulus_hs),
+    .v_sync             (stimulus_vs),
     .video_r            (video_r),
     .video_g            (video_g),
     .video_b            (video_b),
@@ -206,9 +209,31 @@ integer write_read_mismatch_count = 0;
 integer first_field_write_read_count = 0;
 integer second_field_write_read_count = 0;
 integer generation_publication_count = 0;
+integer rgb_component_mismatch_count = 0;
+integer rgb_output_mismatch_count = 0;
+integer output_control_mismatch_count = 0;
+integer rgb_active_pixel_count = 0;
+integer output_sample_count = 0;
 reg picture_present_q = 1'b0;
 reg [63:0] expected_luma_word;
+reg [63:0] expected_cb_word;
+reg [63:0] expected_cr_word;
 reg [7:0] expected_luma_byte;
+reg [7:0] expected_cb_byte;
+reg [7:0] expected_cr_byte;
+reg [23:0] expected_rgb_value;
+reg [7:0] expected_video_r = 8'd0;
+reg [7:0] expected_video_g = 8'd0;
+reg [7:0] expected_video_b = 8'd0;
+reg expected_video_de = 1'b0;
+reg expected_video_hs = 1'b1;
+reg expected_video_vs = 1'b1;
+reg stimulus_hs_d = 1'b1;
+reg stimulus_vs_d = 1'b1;
+reg output_check_pending = 1'b0;
+reg output_active_pending = 1'b0;
+reg [11:0] output_x_pending = 12'd0;
+reg [11:0] output_y_pending = 12'd0;
 
 function automatic [63:0] ddr_word_pattern;
     input [28:0] word_address;
@@ -218,6 +243,51 @@ function automatic [63:0] ddr_word_pattern;
             ddr_word_pattern[lane*8 +: 8] =
                 word_address[7:0] + word_address[15:8] + (lane * 8'h1d) +
                 (generation_mode ? framebuffer_generation : 8'd0);
+    end
+endfunction
+
+function automatic [10:0] chroma_row_for_luma;
+    input [10:0] luma_row;
+    begin
+        chroma_row_for_luma = {3'd0,luma_row[8:2],luma_row[0]};
+    end
+endfunction
+
+function automatic [7:0] clip_rgb_reference;
+    input integer value;
+    begin
+        if (value < 0)
+            clip_rgb_reference = 8'd0;
+        else if (value > 255)
+            clip_rgb_reference = 8'd255;
+        else
+            clip_rgb_reference = value[7:0];
+    end
+endfunction
+
+function automatic [23:0] bt601_reference;
+    input [7:0] y;
+    input [7:0] cb;
+    input [7:0] cr;
+    integer y_offset;
+    integer cb_offset;
+    integer cr_offset;
+    integer red_scaled;
+    integer green_scaled;
+    integer blue_scaled;
+    begin
+        y_offset = y - 16;
+        cb_offset = cb - 128;
+        cr_offset = cr - 128;
+        red_scaled = (298 * y_offset) + (409 * cr_offset) + 128;
+        green_scaled = (298 * y_offset) - (100 * cb_offset) -
+                       (208 * cr_offset) + 128;
+        blue_scaled = (298 * y_offset) + (516 * cb_offset) + 128;
+        bt601_reference = {
+            clip_rgb_reference(red_scaled >>> 8),
+            clip_rgb_reference(green_scaled >>> 8),
+            clip_rgb_reference(blue_scaled >>> 8)
+        };
     end
 endfunction
 
@@ -268,8 +338,21 @@ task automatic compute_expected_field_fingerprints;
 endtask
 
 always @(posedge rd_clk) begin
-    if (reset)
+    if (reset) begin
         picture_present_q <= 1'b0;
+        stimulus_hs_d <= 1'b1;
+        stimulus_vs_d <= 1'b1;
+        output_check_pending <= 1'b0;
+        output_active_pending <= 1'b0;
+        expected_video_r <= 8'd0;
+        expected_video_g <= 8'd0;
+        expected_video_b <= 8'd0;
+        expected_video_de <= 1'b0;
+        expected_video_hs <= 1'b1;
+        expected_video_vs <= 1'b1;
+        output_x_pending <= 12'd0;
+        output_y_pending <= 12'd0;
+    end
     else begin
         picture_present_q <= picture_present_debug;
         if (picture_present_debug && !picture_present_q) begin
@@ -280,6 +363,72 @@ always @(posedge rd_clk) begin
                 $fatal(1,{"published generation mismatch selected=%02h ",
                           "published=%02h"},framebuffer_generation,
                        dut.framebuffer_generation_r2);
+        end
+
+        if (pixel_ce) begin
+            stimulus_hs_d <= stimulus_hs;
+            stimulus_vs_d <= stimulus_vs;
+            output_check_pending <= generation_mode && running;
+            output_active_pending <= dut.decoded_picture_window_d;
+            output_x_pending <= dut.source_x_d;
+            output_y_pending <= dut.source_y_d;
+            expected_video_de <= dut.source_window_d;
+            expected_video_hs <= stimulus_hs_d;
+            expected_video_vs <= stimulus_vs_d;
+
+            if (dut.decoded_picture_window_d) begin
+                expected_luma_word = ddr_word_pattern(
+                    29'h06000000 +
+                    dut.row_times_90(dut.source_y_d[10:0]) +
+                    {22'd0,dut.source_x_d[9:3]});
+                expected_cb_word = ddr_word_pattern(
+                    29'h0600a8c0 +
+                    (chroma_row_for_luma(dut.source_y_d[10:0]) * 45) +
+                    {23'd0,dut.source_x_d[9:4]});
+                expected_cr_word = ddr_word_pattern(
+                    29'h0600d2f0 +
+                    (chroma_row_for_luma(dut.source_y_d[10:0]) * 45) +
+                    {23'd0,dut.source_x_d[9:4]});
+                expected_luma_byte =
+                    expected_luma_word[dut.source_x_d[2:0]*8 +: 8];
+                expected_cb_byte =
+                    expected_cb_word[dut.source_x_d[3:1]*8 +: 8];
+                expected_cr_byte =
+                    expected_cr_word[dut.source_x_d[3:1]*8 +: 8];
+                expected_rgb_value = bt601_reference(expected_luma_byte,
+                    expected_cb_byte,expected_cr_byte);
+                expected_video_r <= expected_rgb_value[23:16];
+                expected_video_g <= expected_rgb_value[15:8];
+                expected_video_b <= expected_rgb_value[7:0];
+
+                if ((dut.y_rd_data !== expected_luma_byte) ||
+                    (dut.cb_rd_data !== expected_cb_byte) ||
+                    (dut.cr_rd_data !== expected_cr_byte)) begin
+                    if (rgb_component_mismatch_count < 16)
+                        $display({"NATIVE_RGB_COMPONENT_MISMATCH gen=%02h ",
+                                  "x=%0d y=%0d expected=%02h/%02h/%02h ",
+                                  "actual=%02h/%02h/%02h"},
+                                 framebuffer_generation,dut.source_x_d,
+                                 dut.source_y_d,expected_luma_byte,
+                                 expected_cb_byte,expected_cr_byte,
+                                 dut.y_rd_data,dut.cb_rd_data,dut.cr_rd_data);
+                    rgb_component_mismatch_count <=
+                        rgb_component_mismatch_count + 1;
+                end
+            end
+            else if (dut.source_window_d) begin
+                expected_video_r <= 8'd24;
+                expected_video_g <= 8'd24;
+                expected_video_b <= 8'd24;
+            end
+            else begin
+                expected_video_r <= 8'd0;
+                expected_video_g <= 8'd0;
+                expected_video_b <= 8'd0;
+            end
+        end
+        else begin
+            output_check_pending <= 1'b0;
         end
     end
 
@@ -300,6 +449,40 @@ always @(posedge rd_clk) begin
                          expected_luma_byte,dut.y_rd_data,
                          dut.y_cache_rd_addr);
             position_mismatch_count <= position_mismatch_count + 1;
+        end
+    end
+end
+
+always @(negedge rd_clk) begin
+    if (output_check_pending) begin
+        output_sample_count <= output_sample_count + 1;
+        if (output_active_pending)
+            rgb_active_pixel_count <= rgb_active_pixel_count + 1;
+
+        if ((video_r !== expected_video_r) ||
+            (video_g !== expected_video_g) ||
+            (video_b !== expected_video_b)) begin
+            if (rgb_output_mismatch_count < 16)
+                $display({"NATIVE_RGB_OUTPUT_MISMATCH gen=%02h x=%0d y=%0d ",
+                          "expected=%02h/%02h/%02h actual=%02h/%02h/%02h"},
+                         framebuffer_generation,output_x_pending,
+                         output_y_pending,expected_video_r,expected_video_g,
+                         expected_video_b,video_r,video_g,video_b);
+            rgb_output_mismatch_count <= rgb_output_mismatch_count + 1;
+        end
+
+        if ((video_de !== expected_video_de) ||
+            (video_hs !== expected_video_hs) ||
+            (video_vs !== expected_video_vs)) begin
+            if (output_control_mismatch_count < 16)
+                $display({"NATIVE_RGB_CONTROL_MISMATCH gen=%02h x=%0d y=%0d ",
+                          "expected_de/hs/vs=%0d/%0d/%0d ",
+                          "actual=%0d/%0d/%0d"},framebuffer_generation,
+                         output_x_pending,output_y_pending,expected_video_de,
+                         expected_video_hs,expected_video_vs,video_de,
+                         video_hs,video_vs);
+            output_control_mismatch_count <=
+                output_control_mismatch_count + 1;
         end
     end
 end
@@ -441,6 +624,11 @@ task automatic run_publication_generation;
     integer fingerprint_mismatch_before;
     integer write_read_mismatch_before;
     integer position_mismatch_before;
+    integer component_mismatch_before;
+    integer rgb_output_mismatch_before;
+    integer control_mismatch_before;
+    integer active_pixel_before;
+    integer output_sample_before;
     begin
         if (first_generation) begin
             framebuffer_generation = generation;
@@ -468,6 +656,11 @@ task automatic run_publication_generation;
         fingerprint_mismatch_before = fingerprint_mismatch_count;
         write_read_mismatch_before = write_read_mismatch_count;
         position_mismatch_before = position_mismatch_count;
+        component_mismatch_before = rgb_component_mismatch_count;
+        rgb_output_mismatch_before = rgb_output_mismatch_count;
+        control_mismatch_before = output_control_mismatch_count;
+        active_pixel_before = rgb_active_pixel_count;
+        output_sample_before = output_sample_count;
 
         @(negedge mem_clk);
         reset = 1'b0;
@@ -500,21 +693,35 @@ task automatic run_publication_generation;
         if ((generation_publication_count - publication_before) != 1)
             $fatal(1,"generation %02h publications=%0d expected=1",generation,
                    generation_publication_count - publication_before);
+        if ((rgb_active_pixel_count - active_pixel_before) != 345600)
+            $fatal(1,"generation %02h active RGB pixels=%0d expected=345600",
+                   generation,rgb_active_pixel_count - active_pixel_before);
+        if ((output_sample_count - output_sample_before) != 411840)
+            $fatal(1,"generation %02h output samples=%0d expected=411840",
+                   generation,output_sample_count - output_sample_before);
         if ((provenance_tag_mismatch_count != tag_mismatch_before) ||
             (provenance_content_mismatch_count != content_mismatch_before) ||
             (fingerprint_mismatch_count != fingerprint_mismatch_before) ||
             (write_read_mismatch_count != write_read_mismatch_before) ||
-            (position_mismatch_count != position_mismatch_before))
+            (position_mismatch_count != position_mismatch_before) ||
+            (rgb_component_mismatch_count != component_mismatch_before) ||
+            (rgb_output_mismatch_count != rgb_output_mismatch_before) ||
+            (output_control_mismatch_count != control_mismatch_before))
             $fatal(1,{"generation %02h mismatch delta tag/content/cache/",
-                      "write-read/position=%0d/%0d/%0d/%0d/%0d"},generation,
+                      "write-read/position/component/rgb/control=",
+                      "%0d/%0d/%0d/%0d/%0d/%0d/%0d/%0d"},generation,
                    provenance_tag_mismatch_count - tag_mismatch_before,
                    provenance_content_mismatch_count - content_mismatch_before,
                    fingerprint_mismatch_count - fingerprint_mismatch_before,
                    write_read_mismatch_count - write_read_mismatch_before,
-                   position_mismatch_count - position_mismatch_before);
+                   position_mismatch_count - position_mismatch_before,
+                   rgb_component_mismatch_count - component_mismatch_before,
+                   rgb_output_mismatch_count - rgb_output_mismatch_before,
+                   output_control_mismatch_count - control_mismatch_before);
 
         $display({"NATIVE_CACHE_GENERATION generation=%02h order=%s ",
-                  "fields=240/240 publication=1 mismatches=0"},generation,
+                  "fields=240/240 rgb=345600 controls=411840 ",
+                  "publication=1 mismatches=0"},generation,
                  bff_mode?"BFF":"TFF");
     end
 endtask
