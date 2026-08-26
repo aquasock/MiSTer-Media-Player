@@ -1,3 +1,33 @@
+## 540 COMMIT Unreleased ??? 2026-08-26T12:43:39-07:00
+
+#### Coming From:
+
+Unreleased 1439bf3
+
+#### Purpose:
+
+Prove that generation-correct native cache content remains position-correct through chroma selection, BT.601 conversion and registered RGB output before changing RTL.
+
+#### Outcome:
+
+The user approved entry 539's next bounded simulation cycle after scheduler selection, framebuffer publication and both luma field-cache outputs passed three authored generations without a mismatch. The planned change remains inside the existing native cache-refill regression first: generate position- and generation-dependent luma and chroma DDR content, derive the expected 4:2:0 sample coordinates and BT.601 RGB value for every active pixel, and compare that value with the framebuffer's registered `video_r`, `video_g`, `video_b`, data-enable and sync-aligned output under ordinary TFF, ordinary BFF and valid delayed DDR service. The current framebuffer, RGB converter, final mux, hardware diagnostic layout, menu, scheduler, decoder, host software and MiSTer configuration remain untouched unless the exact current simulation reproduces a post-cache mismatch.
+
+#### Next Steps:
+
+Extend and run the existing generation-aware cache-refill test first against the exact current RTL on GUNSMOKE. If it fails, preserve the first mismatching generation, field, x and y coordinate and the expected and observed YCbCr and RGB values, then correct only a proven chroma cache address, byte-lane or RGB-valid pipeline transition and rerun the complete native, reconstruction and canonical live-raster suites before an incremental Quartus build. If every output pixel remains position- and generation-correct, stop without changing RTL or building an RBF and move the remaining investigation to the existing final mux and processed-HDMI boundary without adding another hardware telemetry schema.
+
+#### Files Modified:
+
+- tools/streams/tb_native_480i_cache_refill.sv
+- rtl/mpeg2_luma_framebuffer.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 539 COMMIT Unreleased 1439bf3 2026-08-26T05:50:53-07:00
 
 #### Coming From:
@@ -1211,40 +1241,6 @@ Complete entry 500's installed-build validation before changing the menu again: 
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 500 COMMIT Unreleased 4e4da3a 2026-08-25T02:45:02-07:00
-
-#### Coming From:
-
-Unreleased baf5d2c
-
-#### Purpose:
-
-Expose MiSTer's processed-HDMI Bob/Weave choice without altering native raw 480i or progressive output.
-
-#### Outcome:
-
-Commit `4e4da3a` replaces the hardwired `HDMI_BOB_DEINT=0` with a clock-domain-safe `HDMI deinterlacer` menu control on status bit 124, retaining Weave as the default and asserting MiSTer's existing Bob request only while native interlaced output is active; direct video continues to carry the core's raw fields and progressive output always suppresses the request. The focused selector test passes reset, native Weave, native Bob, progressive suppression and return cases. The complete native timing suite passes stable and changed-order handling, exhaustive 4:2:0 mapping, exact TFF and BFF half-line timing, timing-pattern isolation, ordinary ownership, measured-latency presentation, ordinary and delayed cache refills, cadence-profiler schema and decoder layout. TFF/BFF interlaced reconstruction also passes with zero out-of-tolerance samples and the progressive control remains distinct. The Icarus live-raster wrapper reproduced all functional counts with zero functional errors but ended one scheduler cycle below its fixed wrapper expectation; the independently regenerated input was byte-identical and the canonical Verilator live-raster run passed the exact 6,529,997-cycle expectation with every error counter clear. A clean Quartus 17.0.2 build completed in 10 minutes 59 seconds with zero errors, full-design setup, hold and recovery slack of 0.184, 0.231 and 3.194 nanoseconds, focused decoder setup and recovery slack of 1.357 and 10.515 nanoseconds and focused video setup slack of 2.432 nanoseconds. Fit uses 29,568 ALMs at 71 percent, 45,515 registers, 3,655,139 memory bits at 65 percent, 464 RAM blocks at 84 percent and 67 DSP blocks at 60 percent. The 4,184,000-byte RBF has SHA-256 `94d194e36f7deeacaf899934547860366a8649455e8c4f0d15ac51e478d90aff`; it was uploaded and retrieved under a staging name, promoted through ordinary FTP with the default `root` and `1` login and retrieved again at the exact local hash. The predecessor remains `/media/fat/MediaPlayer.rbf.rollback-pre-4e4da3a` at SHA-256 `67bd360b0efa1864ca5184049ad6dfd9fc2edc006421871309c2c0be9de70969`. No helper, Main, media or MiSTer configuration changed.
-
-#### Next Steps:
-
-Reload the core, leave `Native timing pattern` Off, select `HDMI deinterlacer` Bob and `Interlaced output` Native 480i, then run only `_cadence/native_480i_bff_light_10s.m2v`. Judge rightward motion, field-marker order, bob shimmer or vertical-detail loss and specifically whether the long historical bars and retained OSD disappear; report all three LEDs and leave the terminal image loaded for an ordinary-FTP schema-nine capture. Acceptance requires the prior clean logical telemetry plus materially shorter field history than Weave. If BFF Bob passes, run the TFF light-motion fixture second under the same settings. Keep the public native-interlace claim disabled until both are captured, keep raw direct-video qualification separate and defer a core-native deinterlacer unless MiSTer's scaler path proves inadequate or a distinct core-generated 480p mode is approved.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_01.svh
-- files.qip
-- rtl/mpeg2_hdmi_deinterlace_control.sv
-- tools/streams/run_native_480i_timing.sh
-- tools/streams/tb_hdmi_deinterlace_control.sv
 
 #### Status:
 
