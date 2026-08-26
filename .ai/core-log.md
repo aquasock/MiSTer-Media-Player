@@ -1,3 +1,32 @@
+## 529 COMMIT Unreleased 5de0e1d 2026-08-26T02:19:45-07:00
+
+#### Coming From:
+
+Unreleased 5de0e1d
+
+#### Purpose:
+
+Install and verify the exact registered-cache-read alignment image without creating any backup, rollback or staging file.
+
+#### Outcome:
+
+The exact 4,252,684-byte `5de0e1d` RBF was copied from the designated GUNSMOKE checkout to the Raspberry Pi and independently retained SHA-256 `9260f3c36d4515f03bee4f0ecb24af6c7dc9e4dfb4ff387ec5e841bca39ad96c`. Python `ftplib` used an absolute `STOR /media/fat/MediaPlayer.rbf` command to directly replace only the active image, then a new FTP session independently retrieved the same absolute path. Candidate and readback are both 4,252,684 bytes, carry the exact expected hash and compare byte-for-byte with exit zero. A directory check finds no filename containing backup, rollback or stage, so deployment created no auxiliary remote file and did not change helper, media, Main or MiSTer configuration.
+
+#### Next Steps:
+
+Reload the Media Player core, prepare `_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i and reply ready. Start playback immediately when prompted while the corrected thirty-second burst deletes the prior screenshot before every trigger, then leave the terminal image displayed for schema-sixteen capture. Report whether both field bars now move together with the authored four-pixel separation and whether the many horizontal grey fragments are gone; acceptance also requires zero schema-sixteen tag and content mismatch counts, 300 pictures, 299 swaps and every aggregate, overlap, prefill, phase and region error clear.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 528 COMMIT Unreleased 5de0e1d 2026-08-26T01:36:57-07:00
 
 #### Coming From:
@@ -1230,34 +1259,6 @@ Reload the Media Player core, set `Interlaced output` to `Native 480i` and run o
 - tools/streams/tb_native_480i_presentation_integration.sv
 - tools/streams/tb_native_480i_timing.sv
 - tools/streams/test_decode_hardware_cadence.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 489 COMMIT Unreleased 8d9043a 2026-08-24T23:35:44-07:00
-
-#### Coming From:
-
-Unreleased 8d9043a
-
-#### Purpose:
-
-Record the native TFF comparison, identify the exact half-rate native admission defect and distinguish the authored reference lines from transient cache-like playback artifacts.
-
-#### Outcome:
-
-The user ran `_cadence/native_480i_tff_light_10s.m2v` in `Native 480i` mode and reports that the comb-like artifacts improved relative to the progressive weave, the approximately 60 Hz flicker returned and the apparent playback rate seemed similar. USER and POWER remained solid and DISK blinked twice. The user sees two authored full-width gray reference lines, but separately observes many transient one-pixel-high, roughly fifteen-pixel-long horizontal dashes across the screen only while native playback is active; these are not the fixture's reference lines and are absent from the settled terminal still. The 720x480 screenshot was triggered and retrieved entirely through ordinary FTP using the default MiSTer login and no SSH; `.ai/current_results/entry488_tff_light_native480i.png` is 11,916 bytes with SHA-256 `74788181ac9642ef09bba56d2cd70bddf9c0895167f1d1bb9740f7812e891363`. Schema nine accepts all 5,007,304 bytes, reports 300 reference and displayed pictures and 299 swaps after modulo-counter interpretation, preserves stable `top_field_first=1`, sees sequence end and presentation completion and reaches normal quiet reason one with every aggregate, decoder, presentation, destination, cache, audio-underrun and PCM-protocol error clear. First presentation occurs at 2,378,252 cycles and the last at 1,199,271,231 cycles, so the 299 intervals occupy 1,196,892,979 cycles, or 19.948216 seconds. Native presentation therefore sustains 14.988809 pictures per second, materially slower than the same stream's 20.101481-picture progressive diagnostic baseline; the visual rate estimate does not distinguish that difference. RTL inspection identifies the exact deterministic cause. On the non-first native field, `display_field_window` and `display_frame_window` rise together and cross identically into the scheduler as simultaneous cadence and swap pulses. After a presentation, rate-code-four credit is zero; the first field adds 5,652, then the second-field swap evaluates the old 5,652 against the due threshold of 5,723 before its coincident tick is applied, misses that frame window and updates credit to 11,304. The following native frame is therefore admitted, producing one swap every four fields and the measured 14.99-picture rate. The existing native scheduler test incorrectly applies two field ticks and then a separate frame-window pulse, so it proves intended arithmetic but not actual integrated pulse ordering. The settled still shows only the authored full-width references and expected field weave; it cannot capture the transient short dashes. The line-cache error bit currently detects a reader falling more than one complete line behind but does not identify a cache bank being refilled while that same bank is still scanned, leaving a plausible refill-deadline blind spot. The unused 135 MHz PLL output cannot safely replace the current 60 MHz shared decoder/DDRAM clock without a new clock-domain boundary, so the user's historical clock observation is relevant evidence but not yet a safe direct fix.
-
-#### Next Steps:
-
-With explicit user approval, create one bounded native-presentation correction and diagnostic commit. Separate the native frame-window assertion from the second-field cadence assertion by a deterministic logical-sample interval inside vertical blanking, preserving the scheduler's established progressive arithmetic while ensuring the second field's credit is visible before physical bank admission. Replace the synthetic native scheduler test with an integrated timing-to-scheduler regression that reproduces the current simultaneous-pulse half-rate failure and proves one 30000/1001 presentation per two fields after correction. Add a passive sticky line-cache bank-overlap diagnostic and a native delayed-DDR live-raster stress case so the next hardware run can distinguish an actual refill collision from an output-clock symptom without changing clocks or cache depth speculatively. Rebuild and install the exact RBF, rerun only the light TFF fixture in Native 480i, require the decoder-limited rate to match the approximately 20.10-picture progressive baseline rather than 14.99, report flicker and transient dashes and leave the result for FTP-only capture. Continue to defer BFF and the public interlaced compatibility claim.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
