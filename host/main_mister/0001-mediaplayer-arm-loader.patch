@@ -19,6 +19,17 @@ index 0c74e21..292e70e 100644
  						if (is_gba() && FileExists(user_io_make_filepath(HomeDir(), "goomba.rom"))) strcat(ext, "GB GBC");
  						while (strlen(ext) % 3) strcat(ext, " ");
  
+@@ -2443,7 +2445,9 @@ void HandleUI(void)
+ 						}
+ 
+ 						if (!mgl->done) menustate = MENU_GENERIC_FILE_SELECTED;
+-						else if (select) SelectFile(Selected_F[ioctl_index & 15], ext, fs_Options, fs_MenuSelect, fs_MenuCancel);
++						else if (select) SelectFile(mediaplayer_is_core() ?
++							user_io_get_core_path(NULL, 1) : Selected_F[ioctl_index & 15],
++							ext, fs_Options, fs_MenuSelect, fs_MenuCancel);
+ 						else if (recent_init(ioctl_index)) menustate = MENU_RECENT1;
+ 					}
+ 					else if (p[0] == 'S' && (select || recent))
 @@ -2738,11 +2740,18 @@ void HandleUI(void)
  					}
  					else
