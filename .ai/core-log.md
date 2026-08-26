@@ -1,3 +1,32 @@
+## 527 COMMIT Unreleased 98ee2dc 2026-08-26T01:20:30-07:00
+
+#### Coming From:
+
+Unreleased 98ee2dc
+
+#### Purpose:
+
+Resolve the schema-sixteen hardware result and distinguish wrong native cache-line provenance from corruption of correctly tagged cache bytes.
+
+#### Outcome:
+
+The user reloaded the exact `98ee2dc` image and, after stopping one false start made with the wrong media, ran `_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i while the corrected burst deleted the fixed remote screenshot before every trigger. The thirty-second burst retrieved ninety-three fresh PNGs: fourteen byte-identical pre-playback frames, thirty distinct live frames numbered fourteen through forty-three and forty-nine byte-identical terminal frames. The fixture authors a thirty-two-pixel bar that advances four pixels per source field and alternating upper and lower field markers. At representative active rows 200 and 201, frames fourteen through thirty-three contain no bright first-parity bar while the other parity advances around the screen. In frame thirty-four the missing parity appears at x=360 through x=391 and remains fixed there through frame forty-three, while the other parity continues from x=357 through x=516 with a wrap during the interval. The live images therefore preserve both observed failure forms in one run: a missing field followed by one stale field bar, split moving edges and many horizontal comb-like fragments. The user's initial impression that playback might have been smoother was explicitly withdrawn as uncertain because of the time since the prior run, so no performance change is claimed for this passive diagnostic image. Schema sixteen accepts all 5,007,304 source bytes and its wrapped counters represent 300 reference and displayed pictures and 299 swaps. The 299 presentation intervals span 599,534,823 cycles, 9.992247 seconds or 29.923 pictures per second. The session reaches sequence end, presentation completion and normal quiet reason one with every aggregate, cache-overlap, prefill, region and phase error clear; it records 300 framebuffer resets, 299 publications and 242/240 terminal-generation field fetches. Both per-field content-mismatch counters saturate at 255 while both tag-mismatch counters remain exactly zero. The first mismatch for the authored first field expects and carries row two, bank one and generation one; the other field likewise expects and carries row three, bank one and generation one. Both first mismatches compare raw fingerprint `001fffe0` with displayed-cache fingerprint `001fffc0`, an XOR difference of exactly `00000020`. The terminal first-field raw/display pair is `f964952b`/`e855bf21` and the second-field pair is `8c26df67`/`ab1ec443`. Correct row, bank and generation tags with independently wrong bytes on at least 255 lines of each parity rule out refill ownership and source-row selection and place the defect in cache RAM write, registered read-address or byte-lane alignment. The selected evidence is `.ai/current_results/entry527_schema16_live_missing_field.png` at 9,790 bytes with SHA-256 `0447f759660eb50926fb97d56d6e9bc446f0b92716b7a83027e2631f32530869`, `.ai/current_results/entry527_schema16_live_field_appears.png` at 11,836 bytes with SHA-256 `74528360d21de793e95505301abc725c6fe2834ae05e7d0b6cd1e42a2fd936f1`, `.ai/current_results/entry527_schema16_live_stale_split.png` at 11,297 bytes with SHA-256 `0805c00621d72e25e48bfccfe2ab4bf4e71326e52c9425c77c9dd06d51180357` and `.ai/current_results/entry527_schema16_terminal.png` at 12,691 bytes with SHA-256 `9064b4493e439cfd76cc58ebf5603da16317c6da2e082f251f52f9949df7460c`. Source review also exposes a regression blind spot: the ordinary cache test returns the same 64-bit value for every word, so its realistic registered-address model cannot reveal a word-position or byte-lane shift except for the separately injected bit. The implementation uses a clock-registered M10K read address and a separately delayed byte-lane selector, making a position-varying timing regression the next evidence boundary before another hardware-only schema.
+
+#### Next Steps:
+
+Stop before changing behavior and obtain approval for one bounded cache-read alignment cycle. On the designated GUNSMOKE checkout, strengthen the native cache regression with distinct bytes in every lane and position-varying 64-bit words while retaining the real four-read-clock pixel cadence, TFF and BFF field order, wrap and refill timing. Require the current RTL either to reproduce a raw-versus-displayed mismatch at an exact word/lane boundary or to pass bit-exactly. If it reproduces, correct only the proven registered-read-address and byte-lane pipeline alignment, require all 720 bytes of every line to compare exactly, rerun the complete native, reconstruction and canonical live-raster suites, then perform an incremental Quartus build and use unchanged schema sixteen for hardware acceptance. If the stronger regression does not reproduce the hardware signature, stop without a behavioral change and propose schema seventeen with per-byte-lane raw/display fingerprints. Continue direct verified replacement of only `/media/fat/MediaPlayer.rbf` with no backup, rollback or staging files.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 526 COMMIT Unreleased 98ee2dc 2026-08-26T00:56:34-07:00
 
 #### Coming From:
@@ -1227,34 +1256,6 @@ Revise the isolation sequence rather than generating another nominally real-time
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 487 COMMIT Unreleased 8d9043a 2026-08-24T23:14:45-07:00
-
-#### Coming From:
-
-Unreleased 5568aa9
-
-#### Purpose:
-
-Create and install a deterministic low-complexity interlaced motion fixture that can separate decoder throughput from progressive-versus-native presentation quality.
-
-#### Outcome:
-
-Commit `8d9043a` extends the existing interlaced all-I generator with an optional low-complexity 720x480 source while preserving the established detailed and four-picture defaults. The source runs at 60000/1001 pictures per second and contains broad flat regions, two stationary horizontal sharpness references, a high-contrast vertical bar moving four pixels per source field and alternating upper/lower field markers; FFmpeg weaves pairs into 30000/1001 frame-DCT all-I TFF or BFF pictures before the established signalling-only patch. `--light-visual-seconds 10` deterministically reproduces a 300-picture, 5,007,304-byte TFF stream with encoded SHA-256 `f45995d8786ffd229baaf8085e68f33a7866771d7038525fe0b6accdc7a0a2d7`, decoded-plane SHA-256 `2fbaaafa949092fd2025633390258989b6bb931ee0b0f3ae48bd125ab431ccb1` and `tt` signalling. Its 5,007,154-byte BFF companion has encoded SHA-256 `b26d0d4090ec8c39346782918e97eb0721ba0da5670b42ef14435e385f822271`, decoded-plane SHA-256 `554fbf879319392629bb1d3ac7a041358929e0ee2e8fed6a7a05862f9efa65eb` and `bb` signalling. A second independent generation reproduces both streams and the complete manifest byte-for-byte; patched and unpatched decoded YCbCr planes are identical, every picture is I coded, authored field order is stable and the analyzer retains the intentional candidate classification. Native field-order locking and rejection, exhaustive interlaced 4:2:0 cache mapping, exact TFF/BFF field timing, schema-nine cadence profiling and dual-layout telemetry decoding all pass. No RTL or RBF changed, so the already installed exact `5568aa9` image remains the applicable hardware. Only the TFF fixture was uploaded through ordinary FTP with the default `root` / `1` login as `/media/fat/_cadence/native_480i_tff_light_10s.m2v`; independent FTP retrieval is byte-identical at 5,007,304 bytes and SHA-256 `f45995d8786ffd229baaf8085e68f33a7866771d7038525fe0b6accdc7a0a2d7`. The BFF artifact remains local and deferred.
-
-#### Next Steps:
-
-Set `Interlaced output` to `800x600 Diagnostic` and run only `_cadence/native_480i_tff_light_10s.m2v`. Observe whether the clip lasts approximately ten seconds, whether the bar traverses smoothly without jumps or pauses, and whether the bar edge and two horizontal reference lines look sharp; report softness, flicker and USER, DISK and POWER at completion, then leave the final image loaded for an FTP-only schema-nine capture. Do not switch to Native 480i or run BFF until the progressive baseline is captured and proves approximately 29.97 pictures per second with zero errors.
-
-#### Files Modified:
-
-- tools/streams/generate_test_interlaced_i_frames.py
 
 #### Status:
 
