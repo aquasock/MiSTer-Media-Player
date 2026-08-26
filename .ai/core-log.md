@@ -1,3 +1,38 @@
+## 520 COMMIT Unreleased ??? 2026-08-25T20:00:21-07:00
+
+#### Coming From:
+
+Unreleased 2668c8f
+
+#### Purpose:
+
+Repair and complete the session-wide per-field luma-content diagnostic so its telemetry is structurally valid and independently regression-protected.
+
+#### Outcome:
+
+The user approved continuation after recovery reproduced the uncommitted schema-fourteen profiler regression failure and identified it as an unintended no-progress test snapshot rather than an asserted design error: the added luma-return stimulus extended a deliberately short test interval beyond the sixty-four-cycle watchdog while none of those passive diagnostic events are, or should become, production session progress. The existing uncommitted rework remains the approved source boundary: export each native luma return from the framebuffer, accumulate signatures and varied state across the whole profiler session, correct snapshot word forty to exactly thirty-two bits and retain all established field-fetch, region, publication and phase evidence.
+
+#### Next Steps:
+
+Keep the production no-progress definition unchanged and make the directed telemetry scenario supply an explicit genuine decoder-progress event before its long passive sequence, then add an independent elaboration-time width assertion that fails even when an expected literal repeats the same malformed concatenation. Complete schema-fourteen decoding and compatibility tests without repurposing any established field, run the focused profiler and decoder tests followed by the complete native timing and reconstruction suites, and proceed to a clean Quartus Prime 17.0.2 build with focused timing and netlist-presence checks only after every regression passes. If the image closes timing, install it rollback-safe over ordinary FTP and repeat the native TFF light-motion fixture with a live burst, reading both session-wide varied flags and signatures from the same symptom-bearing run.
+
+#### Files Modified:
+
+- `MediaPlayer_top_06.svh`
+- `MediaPlayer_top_07.svh`
+- `rtl/mpeg2_luma_framebuffer.sv`
+- `rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv`
+- `tools/streams/decode_hardware_cadence.py`
+- `tools/streams/tb_h262_hardware_cadence_profiler.sv`
+- `tools/streams/test_decode_hardware_cadence.py`
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 519 COMMIT Unreleased 2668c8f 2026-08-25T19:53:29-07:00
 
 #### Coming From:
@@ -1236,34 +1271,6 @@ Prepare the next Unreleased source proposal to open only the I-picture frontend 
 - tools/streams/analyze_h262_compatibility.py
 - tools/streams/check_media_compatibility.py
 - tools/streams/generate_test_interlaced_i_frames.py
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 480 VERSION v0.7.0 0064148 2026-08-24T14:39:58-07:00
-
-#### Coming From:
-
-Unreleased 37d913b
-
-#### Purpose:
-
-Record publication and independent verification of the v0.7.0 annotated tag, GitHub pre-release and matched runtime archive.
-
-#### Outcome:
-
-The annotated `v0.7.0` tag object is `3e6d994d588a027b7e9b5fcbb8b0ba2950ae3472` and resolves exactly to release commit `0064148502356b70bde7fc700ca3c81c3744576d`. GitHub reports a published, non-draft pre-release named `v0.7.0` at `https://github.com/aquasock/MiSTer-Media-Player/releases/tag/v0.7.0`, published 2026-08-24T21:36:33Z. The release asset was downloaded independently from GitHub: `MiSTer_Media_Player_v0.7.0.zip` is exactly 2,749,946 bytes with SHA-256 `bae3c3c17d2381cb91e2baff98ec9cf22fed88b04d01bc1349574ae57b917377`, matching the locally qualified archive. Its compressed-data test passes for all eight entries, and its internal `SHA256SUMS` identifies the qualified 4,184,380-byte `MediaPlayer_20260824.rbf` at `484328e51c6e764890bf2bdcd947448e2eaaaac2c603e93da28009475e44dafc`, 1,166,244-byte patched `MiSTer` at `16517a9927c659616796b45c8e2488da2a26f0595c91418ed09dc0eb7a5787aa`, and executable 361,452-byte `linux/MediaPlayer_Helper` at `c99237246416ecd8278d90ff6e15e7a00cd8ab1d49c960b8c77fbe00f4ba0483`, plus installation, provenance and license files. A separate loose RBF is deliberately unnecessary for this milestone because all three runtime components are a matched set; distributing the verified archive as the sole binary asset reduces partial-install mismatch risk while the tagged source archives remain available automatically. The four-file hardware gate, clean FPGA build, host qualification, tag target, release notes and published binary are consequently complete and mutually consistent.
-
-#### Next Steps:
-
-Treat v0.7.0 and its published archive as immutable. Begin any later work under a new Unreleased proposal, retain the exact `9a5eea3` FPGA and `acdbf8b` helper baselines for reproduction, and do not replace the tag or asset in place; publish a new semantic version if a released file ever needs to change.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
