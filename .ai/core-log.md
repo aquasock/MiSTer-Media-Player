@@ -1,4 +1,4 @@
-## 539 COMMIT Unreleased ??? 2026-08-26T05:50:53-07:00
+## 539 COMMIT Unreleased 1439bf3 2026-08-26T05:50:53-07:00
 
 #### Coming From:
 
@@ -10,21 +10,21 @@ Prove that framebuffer publication preserves one current authored generation acr
 
 #### Outcome:
 
-The user approved entry 538's next bounded simulation cycle after the generation-aware scheduler model passed without a replay. The planned change is confined first to the existing native 480i cache-refill regression: associate each selected framebuffer generation with its authored luma content, carry the generation through reset, prefill and publication, and assert that the first and second field caches both publish the same current generation rather than an older, mixed or repeated generation. Exercise ordinary, delayed and back-to-back refill timing already modeled by the test. The current framebuffer RTL will remain untouched unless this exact simulation reproduces a generation mismatch. No hardware diagnostic layout, menu, scheduler, decoder, host software or MiSTer configuration change is planned.
+Commits `19b417d` and `1439bf3` extend only the existing native cache-refill test and runner with authored framebuffer generations `2a`, `2b` and `2c`, generation-dependent position-varying DDR bytes and assertions from publication through every displayed luma cache line. The initial use of `+SLOW` correctly reproduced that mode's intentional cache-bank-overlap fault and could not serve as a clean full-frame discriminator, so `1439bf3` leaves that established fault case unchanged and adds a separate 512-cycle delayed-but-valid service case. On the untouched framebuffer RTL, ordinary TFF, ordinary BFF and delayed TFF each publish all three generations exactly once, complete 240 first-field and 240 second-field lines per generation and report zero generation, tag, content, cache, accepted-write-versus-read or byte-position mismatch. The complete native timing runner passes exact field timing, 4:2:0 mapping, Bob and Weave control, pattern isolation, scheduler ownership and monotonic generation order, ordinary service, intentional overlap, late prefill, clean and injected fingerprint classifications, all three new publication sequences, the luma writer fingerprint, the current hardware-profiler layout and retained decoder layouts. This clears scheduler-selected generation through framebuffer publication and both native luma field caches, so no framebuffer or scheduler RTL change, Quartus build, RBF deployment, hardware diagnostic layout, menu, decoder or host change was made.
 
 #### Next Steps:
 
-Extend and run the existing framebuffer publication test first against the exact current RTL on GUNSMOKE. If it fails, preserve the selected, first-field and second-field generation sequence, add the smallest same-edge control reproducing the mismatch and correct only the responsible reset, prefill or publication transition. Then rerun the focused cache and presentation tests, complete native timing and reconstruction suites and canonical mixed-I/P/B live-raster regression before an incremental Quartus build. If both fields remain generation-consistent in every current timing case, stop without changing RTL or building an RBF and move the remaining investigation after the FPGA cache output.
+Do not modify the presentation scheduler or framebuffer publication logic and do not run Quartus from this result. The next bounded simulation should extend the same cache-refill regression across chroma-cache selection, BT.601 conversion and the registered framebuffer RGB output, using generation- and position-dependent Y, Cb and Cr content under ordinary TFF, ordinary BFF and valid delayed service. A reproduced output mismatch should authorize only the responsible chroma address, byte-lane or RGB-valid pipeline correction; exact equality moves the remaining investigation to the existing final mux and processed-HDMI boundary without adding another hardware telemetry schema.
 
 #### Files Modified:
 
 - tools/streams/tb_native_480i_cache_refill.sv
-- rtl/mpeg2_luma_framebuffer.sv
+- tools/streams/run_native_480i_timing.sh
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 
