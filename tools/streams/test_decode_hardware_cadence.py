@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prove schema-sixteen through legacy cadence-overlay decoding."""
+"""Prove the current consolidated and retained legacy telemetry decoding."""
 
 from __future__ import annotations
 
@@ -49,9 +49,19 @@ def schema15_snapshot_words() -> list[int]:
 
 
 def snapshot_words() -> list[int]:
-    """Build a sixty-one-word schema 16 record with XOR checksum."""
+    """Build a sixty-one-word current diagnostic record with XOR checksum."""
     words = schema15_snapshot_words()[:-1]
     words[1] = (16 << 24) | (61 << 16) | 60000
+    # Entry 531 marks the current layout and replaces the historical whole-
+    # field cache pair with accepted-write/raw-DDR-return evidence.
+    words[40] |= (1 << 13) | (1 << 12) | (1 << 11) | (4 << 8)
+    words[42:47] = [
+        0x12345678,
+        0x12345678,
+        0x89ABCDEF,
+        0x89ABCDEF,
+        (44 << 24) | (44 << 16),
+    ]
     words.extend((
         (1 << 24) | (2 << 16) | (3 << 8) | 4,
         (12 << 21) | (14 << 10) | (0 << 9) | (1 << 8),
@@ -168,22 +178,32 @@ def main() -> None:
             raise SystemExit("schema twelve must not report displayed lines")
         if parsed["framebuffer_sequence_phase_error_count"] != 7:
             raise SystemExit("sequence phase error count was not decoded")
-        if parsed["framebuffer_last_first_field_raw_fingerprint"] != 0x12345678:
-            raise SystemExit("first-field raw fingerprint was not decoded")
-        if parsed["framebuffer_last_first_field_display_fingerprint"] != 0x12345678:
-            raise SystemExit("first-field display fingerprint was not decoded")
-        if parsed["framebuffer_last_second_field_raw_fingerprint"] != 0x89ABCDEF:
-            raise SystemExit("second-field raw fingerprint was not decoded")
-        if parsed["framebuffer_last_second_field_display_fingerprint"] != 0x89ABCDEE:
-            raise SystemExit("second-field display fingerprint was not decoded")
-        if parsed["framebuffer_first_field_fingerprint_count"] != 44:
-            raise SystemExit("first-field fingerprint count was not decoded")
-        if parsed["framebuffer_second_field_fingerprint_count"] != 44:
-            raise SystemExit("second-field fingerprint count was not decoded")
-        if parsed["framebuffer_first_field_fingerprint_mismatch_count"] != 0:
-            raise SystemExit("first-field mismatch count was not decoded")
-        if parsed["framebuffer_second_field_fingerprint_mismatch_count"] != 7:
-            raise SystemExit("second-field mismatch count was not decoded")
+        if parsed["framebuffer_write_read_scope"] != \
+                "accepted_luma_write_to_raw_ddr_return":
+            raise SystemExit("current write/read scope was not decoded")
+        if not parsed["framebuffer_write_read_first_expected_valid"] or \
+                not parsed["framebuffer_write_read_second_expected_valid"]:
+            raise SystemExit("write/read expected validity was not decoded")
+        if parsed["framebuffer_write_read_region"] != 4:
+            raise SystemExit("write/read physical region was not decoded")
+        if parsed["framebuffer_write_read_first_expected_fingerprint"] != \
+                0x12345678 or \
+                parsed["framebuffer_write_read_first_raw_fingerprint"] != \
+                0x12345678:
+            raise SystemExit("first-field write/read pair was not decoded")
+        if parsed["framebuffer_write_read_second_expected_fingerprint"] != \
+                0x89ABCDEF or \
+                parsed["framebuffer_write_read_second_raw_fingerprint"] != \
+                0x89ABCDEF:
+            raise SystemExit("second-field write/read pair was not decoded")
+        if parsed["framebuffer_write_read_first_count"] != 44 or \
+                parsed["framebuffer_write_read_second_count"] != 44:
+            raise SystemExit("write/read completion counts were not decoded")
+        if parsed["framebuffer_write_read_first_mismatch_count"] != 0 or \
+                parsed["framebuffer_write_read_second_mismatch_count"] != 0:
+            raise SystemExit("write/read mismatch counts were not decoded")
+        if parsed["framebuffer_last_first_field_raw_fingerprint"] is not None:
+            raise SystemExit("current layout exposed a retired cache aggregate")
         if parsed["framebuffer_first_field_tag_mismatch_count"] != 1:
             raise SystemExit("first-field tag mismatch count was not decoded")
         if parsed["framebuffer_second_field_tag_mismatch_count"] != 2:
@@ -290,11 +310,8 @@ def main() -> None:
         result = cadence.decode(overlap)
         if not result["cache_bank_overlap_error"]:
             raise SystemExit("cache-bank overlap telemetry bit was not decoded")
-    print("CADENCE_DECODER_LAYOUT_PASS schema16=356/236/61 "
-          "schema15=408/288/48 "
-          "schema14=428/308/43 "
-          "schema13=428/308/43 "
-          "schema10=436/316/41 legacy=444/324/38")
+    print("CADENCE_DECODER_LAYOUT_PASS current=356/236/61 "
+          "retained=48,43,41,38-words")
 
 
 if __name__ == "__main__":

@@ -90,6 +90,16 @@ wire [7:0] luma_provenance_expected_generation_debug;
 wire [7:0] luma_provenance_tagged_generation_debug;
 wire [31:0] luma_provenance_raw_fingerprint_debug;
 wire [31:0] luma_provenance_display_fingerprint_debug;
+wire luma_write_read_valid_debug;
+wire luma_write_read_first_field_debug;
+wire luma_write_read_expected_valid_debug;
+wire [2:0] luma_write_read_region_debug;
+wire [31:0] luma_write_read_expected_fingerprint_debug;
+wire [31:0] luma_write_read_raw_fingerprint_debug;
+wire luma_write_read_mismatch_debug;
+reg [31:0] expected_even_field_fingerprint = 32'd0;
+reg [31:0] expected_odd_field_fingerprint = 32'd0;
+wire write_read_expected_valid = !$test$plusargs("WRITE_INVALID");
 wire [7:0] video_r;
 wire [7:0] video_g;
 wire [7:0] video_b;
@@ -107,6 +117,10 @@ mpeg2_luma_framebuffer dut
     .native_interlaced  (1'b1),
     .top_field_first    (~bff_mode),
     .framebuffer_generation(8'h2a),
+    .write_read_expected_region(3'd0),
+    .write_read_expected_valid(write_read_expected_valid),
+    .write_read_expected_even_fingerprint(expected_even_field_fingerprint),
+    .write_read_expected_odd_fingerprint(expected_odd_field_fingerprint),
     .ddram_busy         (1'b0),
     .ddram_dout         (ddram_dout),
     .ddram_dout_ready   (ddram_dout_ready),
@@ -144,6 +158,17 @@ mpeg2_luma_framebuffer dut
         luma_provenance_raw_fingerprint_debug),
     .luma_provenance_display_fingerprint_debug(
         luma_provenance_display_fingerprint_debug),
+    .luma_write_read_valid_debug(luma_write_read_valid_debug),
+    .luma_write_read_first_field_debug(
+        luma_write_read_first_field_debug),
+    .luma_write_read_expected_valid_debug(
+        luma_write_read_expected_valid_debug),
+    .luma_write_read_region_debug(luma_write_read_region_debug),
+    .luma_write_read_expected_fingerprint_debug(
+        luma_write_read_expected_fingerprint_debug),
+    .luma_write_read_raw_fingerprint_debug(
+        luma_write_read_raw_fingerprint_debug),
+    .luma_write_read_mismatch_debug(luma_write_read_mismatch_debug),
     .rd_clk             (rd_clk),
     .h_pos              (h_pos),
     .v_pos              (v_pos),
@@ -173,8 +198,14 @@ integer provenance_tag_mismatch_count = 0;
 integer provenance_content_mismatch_count = 0;
 integer first_field_provenance_count = 0;
 integer second_field_provenance_count = 0;
+integer write_read_count = 0;
+integer write_read_mismatch_count = 0;
+integer first_field_write_read_count = 0;
+integer second_field_write_read_count = 0;
 reg [63:0] expected_luma_word;
 reg [7:0] expected_luma_byte;
+integer expected_row;
+integer expected_word;
 
 function automatic [63:0] ddr_word_pattern;
     input [28:0] word_address;
@@ -183,6 +214,28 @@ function automatic [63:0] ddr_word_pattern;
         for (lane = 0; lane < 8; lane = lane + 1)
             ddr_word_pattern[lane*8 +: 8] =
                 word_address[7:0] + word_address[15:8] + (lane * 8'h1d);
+    end
+endfunction
+
+function automatic [31:0] position_fingerprint_word;
+    input [2:0] region;
+    input [10:0] row;
+    input [6:0] word_index;
+    input [63:0] value;
+    reg [31:0] result;
+    reg [31:0] token;
+    integer lane;
+    begin
+        result = 32'd0;
+        for (lane = 0; lane < 8; lane = lane + 1) begin
+            token = {row[8:0],word_index,lane[2:0],
+                     value[lane*8 +: 8],5'b10101} ^
+                    {region,29'h12d4a6b};
+            token = token ^ {token[15:0],token[31:16]};
+            token = token ^ {token[26:0],token[31:27]};
+            result = result ^ token;
+        end
+        position_fingerprint_word = result;
     end
 endfunction
 
@@ -247,6 +300,28 @@ always @(posedge mem_clk) begin
 end
 
 always @(posedge mem_clk) begin
+    if (luma_write_read_valid_debug) begin
+        write_read_count <= write_read_count + 1;
+        if (luma_write_read_first_field_debug)
+            first_field_write_read_count <= first_field_write_read_count + 1;
+        else
+            second_field_write_read_count <= second_field_write_read_count + 1;
+        if (luma_write_read_mismatch_debug)
+            write_read_mismatch_count <= write_read_mismatch_count + 1;
+        if (luma_write_read_region_debug != 3'd0)
+            $fatal(1,"write/read comparison reported wrong region %0d",
+                   luma_write_read_region_debug);
+        if (luma_write_read_expected_valid_debug !=
+            write_read_expected_valid)
+            $fatal(1,"write/read expected-valid payload mismatch");
+        if (!luma_write_read_mismatch_debug &&
+            (luma_write_read_expected_fingerprint_debug !=
+             luma_write_read_raw_fingerprint_debug))
+            $fatal(1,"write/read equality flag disagrees with fingerprints");
+    end
+end
+
+always @(posedge mem_clk) begin
     ddram_dout_ready <= 1'b0;
 
     if (reset) begin
@@ -264,7 +339,12 @@ always @(posedge mem_clk) begin
         if (response_delay != 0)
             response_delay <= response_delay - 1;
         else begin
-            ddram_dout <= ddr_word_pattern(response_address);
+            if ($test$plusargs("READ_CORRUPT") &&
+                (response_address ==
+                 (29'h06000000 + (29'd200 * 29'd90) + 29'd10)))
+                ddram_dout <= ddr_word_pattern(response_address) ^ 64'd1;
+            else
+                ddram_dout <= ddr_word_pattern(response_address);
             ddram_dout_ready <= 1'b1;
             response_words <= response_words - 1;
             response_address <= response_address + 29'd1;
@@ -293,6 +373,27 @@ always @(posedge rd_clk) begin
 end
 
 initial begin
+    expected_even_field_fingerprint = 32'd0;
+    expected_odd_field_fingerprint = 32'd0;
+    for (expected_row = 0; expected_row < 480;
+         expected_row = expected_row + 1)
+        for (expected_word = 0; expected_word < 90;
+             expected_word = expected_word + 1)
+            if (expected_row[0])
+                expected_odd_field_fingerprint =
+                    expected_odd_field_fingerprint ^
+                    position_fingerprint_word(3'd0,expected_row[10:0],
+                        expected_word[6:0],ddr_word_pattern(
+                            29'h06000000 + (expected_row * 90) +
+                            expected_word));
+            else
+                expected_even_field_fingerprint =
+                    expected_even_field_fingerprint ^
+                    position_fingerprint_word(3'd0,expected_row[10:0],
+                        expected_word[6:0],ddr_word_pattern(
+                            29'h06000000 + (expected_row * 90) +
+                            expected_word));
+
     slow_mode = $test$plusargs("SLOW");
     late_prefill_mode = $test$plusargs("PREFILL_LATE");
     fingerprint_mode = $test$plusargs("FINGERPRINT");
@@ -330,7 +431,7 @@ initial begin
         else if (fingerprint_mismatch_count != 0)
             $fatal(1,"matching cache produced %0d fingerprint mismatches",
                    fingerprint_mismatch_count);
-        if ($test$plusargs("CORRUPT")) begin
+        if ($test$plusargs("CORRUPT") || $test$plusargs("READ_CORRUPT")) begin
             if (position_mismatch_count != 1)
                 $fatal(1,"corrupt-byte expected one position mismatch, got %0d",
                        position_mismatch_count);
@@ -364,6 +465,25 @@ initial begin
             $fatal(1,"matching line provenance failed tag/content=%0d/%0d",
                    provenance_tag_mismatch_count,
                    provenance_content_mismatch_count);
+        if ((write_read_count != 2) ||
+            (first_field_write_read_count != 1) ||
+            (second_field_write_read_count != 1))
+            $fatal(1,"write/read completion imbalance total/first/second=%0d/%0d/%0d",
+                   write_read_count,first_field_write_read_count,
+                   second_field_write_read_count);
+        if ($test$plusargs("READ_CORRUPT")) begin
+            if (write_read_mismatch_count != 1)
+                $fatal(1,"raw DDR corruption expected one write/read mismatch, got %0d",
+                       write_read_mismatch_count);
+        end
+        else if ($test$plusargs("WRITE_INVALID")) begin
+            if (write_read_mismatch_count != 2)
+                $fatal(1,"invalid writer provenance expected two mismatches, got %0d",
+                       write_read_mismatch_count);
+        end
+        else if (write_read_mismatch_count != 0)
+            $fatal(1,"matching accepted writes/readback produced %0d mismatches",
+                   write_read_mismatch_count);
         $display("NATIVE_CACHE_FINGERPRINT_PASS order=%s corrupted=%0d completed=%0d mismatches=%0d",
                  bff_mode?"BFF":"TFF",$test$plusargs("CORRUPT"),
                  fingerprint_count,fingerprint_mismatch_count);

@@ -34,6 +34,12 @@ module mpeg2_luma_framebuffer
     input  wire        native_interlaced,
     input  wire        top_field_first,
     input  wire [7:0]  framebuffer_generation,
+    // Entry 531: passive expected fingerprints retained from accepted DDR
+    // writer transactions for the physical region currently being displayed.
+    input  wire [2:0]  write_read_expected_region,
+    input  wire        write_read_expected_valid,
+    input  wire [31:0] write_read_expected_even_fingerprint,
+    input  wire [31:0] write_read_expected_odd_fingerprint,
 
     input  wire        ddram_busy,
     input  wire [63:0] ddram_dout,
@@ -82,6 +88,15 @@ module mpeg2_luma_framebuffer
     output reg  [7:0]  luma_provenance_tagged_generation_debug,
     output reg  [31:0] luma_provenance_raw_fingerprint_debug,
     output reg  [31:0] luma_provenance_display_fingerprint_debug,
+    // One event after all 240 unique rows of an authored field have returned
+    // from DDR.  This compares accepted writer content with pre-cache readback.
+    output reg         luma_write_read_valid_debug,
+    output reg         luma_write_read_first_field_debug,
+    output reg         luma_write_read_expected_valid_debug,
+    output reg  [2:0]  luma_write_read_region_debug,
+    output reg  [31:0] luma_write_read_expected_fingerprint_debug,
+    output reg  [31:0] luma_write_read_raw_fingerprint_debug,
+    output reg         luma_write_read_mismatch_debug,
 
     // Independent fixed video side - 40 MHz.
     input  wire        rd_clk,
@@ -164,6 +179,31 @@ function automatic [31:0] luma_fingerprint_word;
     end
 endfunction
 
+// Entry 531: the same independently position-mixed contribution used by the
+// DDR writer.  XOR accumulation is transaction-order independent, allowing
+// block-row writes to compare with sequential display-line reads.
+function automatic [31:0] luma_position_fingerprint_word;
+    input [2:0] region;
+    input [10:0] row;
+    input [6:0] word_index;
+    input [63:0] value;
+    reg [31:0] result;
+    reg [31:0] token;
+    integer lane;
+    begin
+        result = 32'd0;
+        for (lane = 0; lane < 8; lane = lane + 1) begin
+            token = {row[8:0],word_index,lane[2:0],
+                     value[lane*8 +: 8],5'b10101} ^
+                    {region,29'h12d4a6b};
+            token = token ^ {token[15:0],token[31:16]};
+            token = token ^ {token[26:0],token[31:27]};
+            result = result ^ token;
+        end
+        luma_position_fingerprint_word = result;
+    end
+endfunction
+
 // -------------------------------------------------------------------------
 // Memory-side picture descriptor and line-fetch controller.
 // -------------------------------------------------------------------------
@@ -192,6 +232,12 @@ reg        first_field_fetch_toggle_mem;
 reg        second_field_fetch_toggle_mem;
 reg [31:0] first_field_raw_fingerprint_mem;
 reg [31:0] second_field_raw_fingerprint_mem;
+reg [31:0] luma_position_line_accumulator_mem;
+reg [31:0] luma_position_even_accumulator_mem;
+reg [31:0] luma_position_odd_accumulator_mem;
+reg [7:0]  luma_position_even_line_count_mem;
+reg [7:0]  luma_position_odd_line_count_mem;
+reg [479:0] luma_position_line_seen_mem;
 
 // Entry 525: the raw fingerprint is reset at launch of each logical luma-line
 // fetch and committed atomically with its physical row, bank and generation
@@ -461,8 +507,10 @@ task automatic launch_fetch;
         recv_word_index    <= 8'd0;
         fetch_cache_bank   <= cache_bank;
 
-        if (kind == FETCH_Y)
+        if (kind == FETCH_Y) begin
             luma_line_raw_accumulator_mem <= 32'd0;
+            luma_position_line_accumulator_mem <= 32'd0;
+        end
 
         if ((kind == FETCH_Y) && native_interlaced_mem) begin
             if (line_number[0] == first_field_mem)
@@ -483,6 +531,22 @@ task automatic launch_fetch;
         mem_state <= MEM_ISSUE;
     end
 endtask
+
+wire [7:0] luma_position_word_index_mem =
+    fetch_word_offset + recv_word_index;
+wire [31:0] luma_position_word_contribution_mem =
+    luma_position_fingerprint_word(write_read_expected_region,fetch_line,
+        luma_position_word_index_mem[6:0],
+        ddram_dout);
+wire [31:0] luma_position_completed_line_mem =
+    luma_position_line_accumulator_mem ^
+    luma_position_word_contribution_mem;
+wire [31:0] luma_position_completed_even_field_mem =
+    luma_position_even_accumulator_mem ^
+    luma_position_completed_line_mem;
+wire [31:0] luma_position_completed_odd_field_mem =
+    luma_position_odd_accumulator_mem ^
+    luma_position_completed_line_mem;
 
 always @(posedge mem_clk) begin
     if (reset) begin
@@ -507,6 +571,12 @@ always @(posedge mem_clk) begin
         first_field_raw_fingerprint_mem  <= 32'd0;
         second_field_raw_fingerprint_mem <= 32'd0;
         luma_line_raw_accumulator_mem <= 32'd0;
+        luma_position_line_accumulator_mem <= 32'd0;
+        luma_position_even_accumulator_mem <= 32'd0;
+        luma_position_odd_accumulator_mem <= 32'd0;
+        luma_position_even_line_count_mem <= 8'd0;
+        luma_position_odd_line_count_mem <= 8'd0;
+        luma_position_line_seen_mem <= 480'd0;
         luma_tag_raw_bank0_mem <= 32'd0;
         luma_tag_raw_bank1_mem <= 32'd0;
         luma_tag_row_bank0_mem <= 11'd0;
@@ -566,6 +636,13 @@ always @(posedge mem_clk) begin
         luma_provenance_tagged_generation_debug <= 8'd0;
         luma_provenance_raw_fingerprint_debug <= 32'd0;
         luma_provenance_display_fingerprint_debug <= 32'd0;
+        luma_write_read_valid_debug <= 1'b0;
+        luma_write_read_first_field_debug <= 1'b0;
+        luma_write_read_expected_valid_debug <= 1'b0;
+        luma_write_read_region_debug <= 3'd0;
+        luma_write_read_expected_fingerprint_debug <= 32'd0;
+        luma_write_read_raw_fingerprint_debug <= 32'd0;
+        luma_write_read_mismatch_debug <= 1'b0;
 
         prefill_step          <= 3'd0;
         prefill_done          <= 1'b0;
@@ -604,6 +681,7 @@ always @(posedge mem_clk) begin
         cr_cache_wr_en <= 1'b0;
         luma_fingerprint_valid_debug <= 1'b0;
         luma_provenance_valid_debug <= 1'b0;
+        luma_write_read_valid_debug <= 1'b0;
 
         luma_provenance_toggle_sync <=
             {luma_provenance_toggle_sync[1:0],luma_provenance_toggle_rd};
@@ -796,6 +874,9 @@ always @(posedge mem_clk) begin
                         luma_line_raw_accumulator_mem <=
                             luma_fingerprint_word(
                                 luma_line_raw_accumulator_mem,ddram_dout);
+                        luma_position_line_accumulator_mem <=
+                            luma_position_line_accumulator_mem ^
+                            luma_position_word_contribution_mem;
                         if (fetch_line[0] == first_field_mem)
                             first_field_raw_fingerprint_mem <=
                                 luma_fingerprint_word(
@@ -888,6 +969,67 @@ always @(posedge mem_clk) begin
                                     luma_tag_valid_bank0_mem <= 1'b1;
                                     luma_tag_toggle_bank0_mem <=
                                         ~luma_tag_toggle_bank0_mem;
+                                end
+
+                                // Compare only the first completed fetch of a
+                                // physical row in this framebuffer generation.
+                                // Native prefill may fetch two rows again during
+                                // scanout; the seen vector prevents duplicates
+                                // from changing the field fingerprint.
+                                if ((fetch_line < 11'd480) &&
+                                    !luma_position_line_seen_mem[fetch_line]) begin
+                                    luma_position_line_seen_mem[fetch_line] <=
+                                        1'b1;
+                                    if (!fetch_line[0]) begin
+                                        luma_position_even_accumulator_mem <=
+                                            luma_position_completed_even_field_mem;
+                                        luma_position_even_line_count_mem <=
+                                            luma_position_even_line_count_mem +
+                                            8'd1;
+                                        if (luma_position_even_line_count_mem ==
+                                            8'd239) begin
+                                            luma_write_read_valid_debug <= 1'b1;
+                                            luma_write_read_first_field_debug <=
+                                                !first_field_mem;
+                                            luma_write_read_expected_valid_debug <=
+                                                write_read_expected_valid;
+                                            luma_write_read_region_debug <=
+                                                write_read_expected_region;
+                                            luma_write_read_expected_fingerprint_debug <=
+                                                write_read_expected_even_fingerprint;
+                                            luma_write_read_raw_fingerprint_debug <=
+                                                luma_position_completed_even_field_mem;
+                                            luma_write_read_mismatch_debug <=
+                                                !write_read_expected_valid ||
+                                                (write_read_expected_even_fingerprint !=
+                                                 luma_position_completed_even_field_mem);
+                                        end
+                                    end
+                                    else begin
+                                        luma_position_odd_accumulator_mem <=
+                                            luma_position_completed_odd_field_mem;
+                                        luma_position_odd_line_count_mem <=
+                                            luma_position_odd_line_count_mem +
+                                            8'd1;
+                                        if (luma_position_odd_line_count_mem ==
+                                            8'd239) begin
+                                            luma_write_read_valid_debug <= 1'b1;
+                                            luma_write_read_first_field_debug <=
+                                                first_field_mem;
+                                            luma_write_read_expected_valid_debug <=
+                                                write_read_expected_valid;
+                                            luma_write_read_region_debug <=
+                                                write_read_expected_region;
+                                            luma_write_read_expected_fingerprint_debug <=
+                                                write_read_expected_odd_fingerprint;
+                                            luma_write_read_raw_fingerprint_debug <=
+                                                luma_position_completed_odd_field_mem;
+                                            luma_write_read_mismatch_debug <=
+                                                !write_read_expected_valid ||
+                                                (write_read_expected_odd_fingerprint !=
+                                                 luma_position_completed_odd_field_mem);
+                                        end
+                                    end
                                 end
                             end
 

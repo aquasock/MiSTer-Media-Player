@@ -64,7 +64,10 @@ module mpeg2_h262_ddram_arbiter
     output wire        ddram_rd,
     output wire [63:0] ddram_din,
     output wire [7:0]  ddram_be,
-    output wire        ddram_we
+    output wire        ddram_we,
+    // Entry 531: passive pulse identifying the exact cycle on which the
+    // writer request above is accepted by the external DDR interface.
+    output wire        writer_accept_debug
 );
 
 localparam integer DESCRIPTOR_DEPTH=`H262_PREDICTION_DESCRIPTOR_DEPTH;
@@ -139,6 +142,7 @@ assign ddram_we =
 
 wire reader_accept=grant_reader&&!ddram_busy;
 wire prediction_accept=grant_prediction&&!ddram_busy;
+assign writer_accept_debug=grant_writer&&!ddram_busy;
 wire read_accept=reader_accept||prediction_accept;
 wire accepted_owner_prediction=prediction_accept;
 wire [7:0] accepted_words=reader_accept?

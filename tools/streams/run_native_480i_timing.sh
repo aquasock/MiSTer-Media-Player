@@ -71,6 +71,15 @@ vvp "${build_dir}/tb_native_480i_cache_refill" +FINGERPRINT
 vvp "${build_dir}/tb_native_480i_cache_refill" +FINGERPRINT +BFF
 vvp "${build_dir}/tb_native_480i_cache_refill" +FINGERPRINT +CORRUPT
 vvp "${build_dir}/tb_native_480i_cache_refill" +FINGERPRINT +WRONG_BANK
+vvp "${build_dir}/tb_native_480i_cache_refill" +FINGERPRINT +READ_CORRUPT
+vvp "${build_dir}/tb_native_480i_cache_refill" +FINGERPRINT +WRITE_INVALID
+
+iverilog -g2012 \
+  -s tb_h262_luma_write_fingerprint \
+  -o "${build_dir}/tb_h262_luma_write_fingerprint" \
+  "${repo_root}/rtl/mpeg2_new/mpeg2_h262_luma_write_fingerprint.sv" \
+  "${repo_root}/tools/streams/tb_h262_luma_write_fingerprint.sv"
+vvp "${build_dir}/tb_h262_luma_write_fingerprint"
 
 iverilog -g2012 \
   -s tb_h262_hardware_cadence_profiler \

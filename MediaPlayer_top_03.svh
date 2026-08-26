@@ -94,6 +94,13 @@ mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 	.block_origin_y                     (mpeg2_new_recon_block_origin_y)
 );
 
+wire mpeg2_new_luma_writer_word;
+wire [2:0] mpeg2_new_luma_writer_region;
+wire mpeg2_new_luma_writer_row_parity;
+wire mpeg2_new_luma_writer_picture_start;
+wire mpeg2_new_luma_writer_picture_complete;
+wire [31:0] mpeg2_new_luma_writer_position_fingerprint;
+
 mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 (
 	.clk             (clk_mpeg2),

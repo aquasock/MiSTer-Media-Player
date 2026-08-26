@@ -134,6 +134,9 @@ def parse_words(words: list[int]) -> dict[str, Any]:
     snapshot_meta = words[25]
     terminal = words[35]
     scheduler = words[36]
+    current_write_read_layout = (
+        schema_version >= 16 and bool((words[40] >> 13) & 1)
+    )
 
     def provenance_event(
         meta_index: int,
@@ -407,32 +410,83 @@ def parse_words(words: list[int]) -> dict[str, Any]:
             words[41] & 0xFF if schema_version >= 13
             else words[41] & 0xFFFF if schema_version >= 11 else None
         ),
-        # Entry 523 (schema 15): completed, generation-aligned fingerprints
-        # cover all raw DDR luma bytes and the corresponding post-cache luma
-        # pixels.  Counts saturate at 255; mismatch counts are per parity.
+        # The historical schema-15 interpretation remains available for old
+        # screenshots. Entry 531 marks the one current diagnostic in word 40
+        # and reuses words 42-46 for accepted-write versus raw-DDR readback.
         "framebuffer_last_first_field_raw_fingerprint": (
-            words[42] if schema_version >= 15 else None
+            words[42]
+            if schema_version >= 15 and not current_write_read_layout else None
         ),
         "framebuffer_last_first_field_display_fingerprint": (
-            words[43] if schema_version >= 15 else None
+            words[43]
+            if schema_version >= 15 and not current_write_read_layout else None
         ),
         "framebuffer_last_second_field_raw_fingerprint": (
-            words[44] if schema_version >= 15 else None
+            words[44]
+            if schema_version >= 15 and not current_write_read_layout else None
         ),
         "framebuffer_last_second_field_display_fingerprint": (
-            words[45] if schema_version >= 15 else None
+            words[45]
+            if schema_version >= 15 and not current_write_read_layout else None
         ),
         "framebuffer_first_field_fingerprint_count": (
-            (words[46] >> 24) & 0xFF if schema_version >= 15 else None
+            (words[46] >> 24) & 0xFF
+            if schema_version >= 15 and not current_write_read_layout else None
         ),
         "framebuffer_second_field_fingerprint_count": (
-            (words[46] >> 16) & 0xFF if schema_version >= 15 else None
+            (words[46] >> 16) & 0xFF
+            if schema_version >= 15 and not current_write_read_layout else None
         ),
         "framebuffer_first_field_fingerprint_mismatch_count": (
-            (words[46] >> 8) & 0xFF if schema_version >= 15 else None
+            (words[46] >> 8) & 0xFF
+            if schema_version >= 15 and not current_write_read_layout else None
         ),
         "framebuffer_second_field_fingerprint_mismatch_count": (
-            words[46] & 0xFF if schema_version >= 15 else None
+            words[46] & 0xFF
+            if schema_version >= 15 and not current_write_read_layout else None
+        ),
+        "framebuffer_write_read_scope": (
+            "accepted_luma_write_to_raw_ddr_return"
+            if current_write_read_layout else None
+        ),
+        "framebuffer_write_read_first_expected_valid": (
+            bool((words[40] >> 12) & 1)
+            if current_write_read_layout else None
+        ),
+        "framebuffer_write_read_second_expected_valid": (
+            bool((words[40] >> 11) & 1)
+            if current_write_read_layout else None
+        ),
+        "framebuffer_write_read_region": (
+            (words[40] >> 8) & 0x7
+            if current_write_read_layout else None
+        ),
+        "framebuffer_write_read_first_expected_fingerprint": (
+            words[42] if current_write_read_layout else None
+        ),
+        "framebuffer_write_read_first_raw_fingerprint": (
+            words[43] if current_write_read_layout else None
+        ),
+        "framebuffer_write_read_second_expected_fingerprint": (
+            words[44] if current_write_read_layout else None
+        ),
+        "framebuffer_write_read_second_raw_fingerprint": (
+            words[45] if current_write_read_layout else None
+        ),
+        "framebuffer_write_read_first_count": (
+            (words[46] >> 24) & 0xFF
+            if current_write_read_layout else None
+        ),
+        "framebuffer_write_read_second_count": (
+            (words[46] >> 16) & 0xFF
+            if current_write_read_layout else None
+        ),
+        "framebuffer_write_read_first_mismatch_count": (
+            (words[46] >> 8) & 0xFF
+            if current_write_read_layout else None
+        ),
+        "framebuffer_write_read_second_mismatch_count": (
+            words[46] & 0xFF if current_write_read_layout else None
         ),
         # Entry 525 (schema 16): per-line cache provenance keeps ownership/tag
         # failures distinct from content failures with matching tags.
@@ -497,6 +551,19 @@ def validate(
             f"delivered {result['delivered_fps']:.6f} fps, "
             f"required {require_fps:.6f} fps"
         )
+    if result["framebuffer_write_read_scope"] is not None:
+        if not result["framebuffer_write_read_first_expected_valid"]:
+            failures.append("first-field accepted-write fingerprint is invalid")
+        if not result["framebuffer_write_read_second_expected_valid"]:
+            failures.append("second-field accepted-write fingerprint is invalid")
+        if result["framebuffer_write_read_first_count"] == 0:
+            failures.append("no first-field write/read comparison completed")
+        if result["framebuffer_write_read_second_count"] == 0:
+            failures.append("no second-field write/read comparison completed")
+        if result["framebuffer_write_read_first_mismatch_count"]:
+            failures.append("first-field accepted-write/raw-read mismatch")
+        if result["framebuffer_write_read_second_mismatch_count"]:
+            failures.append("second-field accepted-write/raw-read mismatch")
     return failures
 
 
@@ -587,7 +654,25 @@ def main() -> int:
                 "signatures={framebuffer_first_field_signature:#04x}/"
                 "{framebuffer_second_field_signature:#04x}".format(**result)
             )
-        if result["schema_version"] >= 15:
+        if result["framebuffer_write_read_scope"] is not None:
+            print(
+                "write/read fingerprints: first expected/raw="
+                "{framebuffer_write_read_first_expected_fingerprint:#010x}/"
+                "{framebuffer_write_read_first_raw_fingerprint:#010x} "
+                "second expected/raw="
+                "{framebuffer_write_read_second_expected_fingerprint:#010x}/"
+                "{framebuffer_write_read_second_raw_fingerprint:#010x} "
+                "valid={framebuffer_write_read_first_expected_valid}/"
+                "{framebuffer_write_read_second_expected_valid} "
+                "completed={framebuffer_write_read_first_count}/"
+                "{framebuffer_write_read_second_count} "
+                "mismatches="
+                "{framebuffer_write_read_first_mismatch_count}/"
+                "{framebuffer_write_read_second_mismatch_count}".format(
+                    **result
+                )
+            )
+        elif result["schema_version"] >= 15:
             print(
                 "field fingerprints: first raw/display="
                 "{framebuffer_last_first_field_raw_fingerprint:#010x}/"

@@ -66,6 +66,14 @@ wire [7:0] mpeg2_new_luma_provenance_expected_generation;
 wire [7:0] mpeg2_new_luma_provenance_tagged_generation;
 wire [31:0] mpeg2_new_luma_provenance_raw_fingerprint;
 wire [31:0] mpeg2_new_luma_provenance_display_fingerprint;
+wire mpeg2_new_luma_write_read_valid;
+wire mpeg2_new_luma_write_read_first_field;
+wire mpeg2_new_luma_write_read_expected_valid;
+wire [2:0] mpeg2_new_luma_write_read_region;
+wire [31:0] mpeg2_new_luma_write_read_expected_fingerprint;
+wire [31:0] mpeg2_new_luma_write_read_raw_fingerprint;
+wire mpeg2_new_luma_write_read_mismatch;
+wire mpeg2_new_ddr_writer_accept;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] mpeg2_new_framebuffer_picture_present_sync;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
@@ -125,6 +133,37 @@ wire [2:0] mpeg2_new_display_region =
         (mpeg2_new_display_scratch_bank ? 3'd4 : 3'd3) :
         {1'b0, mpeg2_new_display_frame_bank};
 
+// Entry 531: address bits [18:16] encode bank two and the scratch regions as
+// 4, 2 and 3 respectively.  Keep that physical encoding for an exact compare
+// against accepted writer transactions.
+wire [2:0] mpeg2_new_display_physical_region =
+    mpeg2_new_display_scratch ?
+        (mpeg2_new_display_scratch_bank ? 3'd3 : 3'd2) :
+    (mpeg2_new_display_frame_bank == 2'd2) ? 3'd4 :
+        {1'b0,mpeg2_new_display_frame_bank};
+
+wire [31:0] mpeg2_new_luma_writer_expected_even;
+wire [31:0] mpeg2_new_luma_writer_expected_odd;
+wire mpeg2_new_luma_writer_expected_valid;
+
+mpeg2_h262_luma_write_fingerprint mpeg2_h262_luma_write_fingerprint
+(
+    .clk(clk_mpeg2),
+    .reset(reset_mpeg2),
+    .writer_accept(mpeg2_new_ddr_writer_accept),
+    .luma_word(mpeg2_new_luma_writer_word),
+    .luma_region(mpeg2_new_luma_writer_region),
+    .luma_row_parity(mpeg2_new_luma_writer_row_parity),
+    .luma_picture_start(mpeg2_new_luma_writer_picture_start),
+    .luma_picture_complete(mpeg2_new_luma_writer_picture_complete),
+    .luma_position_fingerprint(
+        mpeg2_new_luma_writer_position_fingerprint),
+    .display_region(mpeg2_new_display_physical_region),
+    .expected_even_fingerprint(mpeg2_new_luma_writer_expected_even),
+    .expected_odd_fingerprint(mpeg2_new_luma_writer_expected_odd),
+    .expected_valid(mpeg2_new_luma_writer_expected_valid)
+);
+
 reg [2:0] mpeg2_new_first_field_region;
 reg [2:0] mpeg2_new_second_field_region;
 reg       mpeg2_new_first_field_fetch_d;
@@ -165,6 +204,12 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
     .native_interlaced(mpeg2_new_native_active_sync[2]),
     .top_field_first(mpeg2_new_native_top_field_first),
     .framebuffer_generation(mpeg2_new_framebuffer_generation),
+    .write_read_expected_region(mpeg2_new_display_physical_region),
+    .write_read_expected_valid(mpeg2_new_luma_writer_expected_valid),
+    .write_read_expected_even_fingerprint(
+        mpeg2_new_luma_writer_expected_even),
+    .write_read_expected_odd_fingerprint(
+        mpeg2_new_luma_writer_expected_odd),
     .ddram_busy     (mpeg2_new_ddr_reader_busy),
     .ddram_dout     (DDRAM_DOUT),
     .ddram_dout_ready(mpeg2_new_ddr_reader_dout_ready),
@@ -216,6 +261,17 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
         mpeg2_new_luma_provenance_raw_fingerprint),
     .luma_provenance_display_fingerprint_debug(
         mpeg2_new_luma_provenance_display_fingerprint),
+    .luma_write_read_valid_debug(mpeg2_new_luma_write_read_valid),
+    .luma_write_read_first_field_debug(
+        mpeg2_new_luma_write_read_first_field),
+    .luma_write_read_expected_valid_debug(
+        mpeg2_new_luma_write_read_expected_valid),
+    .luma_write_read_region_debug(mpeg2_new_luma_write_read_region),
+    .luma_write_read_expected_fingerprint_debug(
+        mpeg2_new_luma_write_read_expected_fingerprint),
+    .luma_write_read_raw_fingerprint_debug(
+        mpeg2_new_luma_write_read_raw_fingerprint),
+    .luma_write_read_mismatch_debug(mpeg2_new_luma_write_read_mismatch),
     .rd_clk         (clk_video),
     .h_pos          (display_h_pos),
     .v_pos          (display_v_pos),
@@ -259,5 +315,6 @@ mpeg2_h262_ddram_arbiter mpeg2_h262_ddram_arbiter
     .ddram_rd        (DDRAM_RD),
     .ddram_din       (DDRAM_DIN),
     .ddram_be        (DDRAM_BE),
-    .ddram_we        (DDRAM_WE)
+    .ddram_we        (DDRAM_WE),
+    .writer_accept_debug(mpeg2_new_ddr_writer_accept)
 );

@@ -17,7 +17,14 @@
 	.ddram_rd        (mpeg2_new_ddr_wr_rd),
 	.ddram_din       (mpeg2_new_ddr_wr_din),
 	.ddram_be        (mpeg2_new_ddr_wr_be),
-	.ddram_we        (mpeg2_new_ddr_wr_we)
+	.ddram_we        (mpeg2_new_ddr_wr_we),
+	.luma_word_debug (mpeg2_new_luma_writer_word),
+	.luma_region_debug(mpeg2_new_luma_writer_region),
+	.luma_row_parity_debug(mpeg2_new_luma_writer_row_parity),
+	.luma_picture_start_debug(mpeg2_new_luma_writer_picture_start),
+	.luma_picture_complete_debug(mpeg2_new_luma_writer_picture_complete),
+	.luma_position_fingerprint_debug(
+	                  mpeg2_new_luma_writer_position_fingerprint)
 );
 
 // kate - Phase 1T-o: the controlled pattern-only P macroblock has no explicit

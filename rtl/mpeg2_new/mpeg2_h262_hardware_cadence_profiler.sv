@@ -46,6 +46,13 @@ module mpeg2_h262_hardware_cadence_profiler #(
     input wire [7:0] framebuffer_luma_provenance_tagged_generation,
     input wire [31:0] framebuffer_luma_provenance_raw_fingerprint,
     input wire [31:0] framebuffer_luma_provenance_display_fingerprint,
+    input wire framebuffer_luma_write_read_valid,
+    input wire framebuffer_luma_write_read_first_field,
+    input wire framebuffer_luma_write_read_expected_valid,
+    input wire [2:0] framebuffer_luma_write_read_region,
+    input wire [31:0] framebuffer_luma_write_read_expected_fingerprint,
+    input wire [31:0] framebuffer_luma_write_read_raw_fingerprint,
+    input wire framebuffer_luma_write_read_mismatch,
     input wire framebuffer_first_field_fetch,
     input wire framebuffer_second_field_fetch,
     input wire fifo_pending,input wire decoder_ready,
@@ -179,6 +186,22 @@ reg [7:0] first_field_fingerprint_count;
 reg [7:0] second_field_fingerprint_count;
 reg [7:0] first_field_fingerprint_mismatch_count;
 reg [7:0] second_field_fingerprint_mismatch_count;
+// Entry 531: the single current layout reuses words 42 through 46 for the
+// stronger accepted-write versus raw-DDR-return boundary.  If a mismatch is
+// ever seen, the pair freezes on the first mismatch; otherwise it follows the
+// most recent completed field and proves equality at terminal quiet.
+reg [31:0] first_field_write_read_expected;
+reg [31:0] first_field_write_read_raw;
+reg [31:0] second_field_write_read_expected;
+reg [31:0] second_field_write_read_raw;
+reg [7:0] first_field_write_read_count;
+reg [7:0] second_field_write_read_count;
+reg [7:0] first_field_write_read_mismatch_count;
+reg [7:0] second_field_write_read_mismatch_count;
+reg first_field_write_read_expected_valid;
+reg second_field_write_read_expected_valid;
+reg [2:0] first_field_write_read_region;
+reg [2:0] second_field_write_read_region;
 reg [7:0] first_field_tag_mismatch_count;
 reg [7:0] second_field_tag_mismatch_count;
 reg [7:0] first_field_content_mismatch_count;
@@ -336,7 +359,11 @@ assign snapshot_word_40_payload[31:24]=last_first_field_fetches;
 assign snapshot_word_40_payload[23:16]=last_second_field_fetches;
 assign snapshot_word_40_payload[15]=last_first_field_varied;
 assign snapshot_word_40_payload[14]=last_second_field_varied;
-assign snapshot_word_40_payload[13:6]=8'd0;
+assign snapshot_word_40_payload[13]=1'b1;
+assign snapshot_word_40_payload[12]=first_field_write_read_expected_valid;
+assign snapshot_word_40_payload[11]=second_field_write_read_expected_valid;
+assign snapshot_word_40_payload[10:8]=first_field_write_read_region;
+assign snapshot_word_40_payload[7:6]=2'd0;
 assign snapshot_word_40_payload[5:3]=last_first_field_region;
 assign snapshot_word_40_payload[2:0]=last_second_field_region;
 wire [31:0] snapshot_word_40=snapshot_word_40_payload;
@@ -352,18 +379,18 @@ endgenerate
 wire [31:0] snapshot_word_41={last_first_field_signature,
     last_second_field_signature,field_region_mismatch_count,
     sequence_phase_error_count};
-wire [31:0] snapshot_word_42=last_first_field_raw_fingerprint;
-wire [31:0] snapshot_word_43=last_first_field_display_fingerprint;
-wire [31:0] snapshot_word_44=last_second_field_raw_fingerprint;
-wire [31:0] snapshot_word_45=last_second_field_display_fingerprint;
+wire [31:0] snapshot_word_42=first_field_write_read_expected;
+wire [31:0] snapshot_word_43=first_field_write_read_raw;
+wire [31:0] snapshot_word_44=second_field_write_read_expected;
+wire [31:0] snapshot_word_45=second_field_write_read_raw;
 localparam integer SNAPSHOT_WORD_46_BITS=8+8+8+8;
 wire [SNAPSHOT_WORD_46_BITS-1:0] snapshot_word_46_payload;
-assign snapshot_word_46_payload[31:24]=first_field_fingerprint_count;
-assign snapshot_word_46_payload[23:16]=second_field_fingerprint_count;
+assign snapshot_word_46_payload[31:24]=first_field_write_read_count;
+assign snapshot_word_46_payload[23:16]=second_field_write_read_count;
 assign snapshot_word_46_payload[15:8]=
-    first_field_fingerprint_mismatch_count;
+    first_field_write_read_mismatch_count;
 assign snapshot_word_46_payload[7:0]=
-    second_field_fingerprint_mismatch_count;
+    second_field_write_read_mismatch_count;
 wire [31:0] snapshot_word_46=snapshot_word_46_payload;
 wire [31:0] luma_provenance_meta_now={
     framebuffer_luma_provenance_expected_row,
@@ -493,6 +520,18 @@ always @(posedge clk_mpeg2) begin
         second_field_fingerprint_count<=0;
         first_field_fingerprint_mismatch_count<=0;
         second_field_fingerprint_mismatch_count<=0;
+        first_field_write_read_expected<=0;
+        first_field_write_read_raw<=0;
+        second_field_write_read_expected<=0;
+        second_field_write_read_raw<=0;
+        first_field_write_read_count<=0;
+        second_field_write_read_count<=0;
+        first_field_write_read_mismatch_count<=0;
+        second_field_write_read_mismatch_count<=0;
+        first_field_write_read_expected_valid<=0;
+        second_field_write_read_expected_valid<=0;
+        first_field_write_read_region<=0;
+        second_field_write_read_region<=0;
         first_field_tag_mismatch_count<=0;
         second_field_tag_mismatch_count<=0;
         first_field_content_mismatch_count<=0;
@@ -657,6 +696,46 @@ always @(posedge clk_mpeg2) begin
                        (second_field_fingerprint_mismatch_count!=8'hff))
                         second_field_fingerprint_mismatch_count<=
                             second_field_fingerprint_mismatch_count+1'b1;
+                end
+            end
+            if(framebuffer_luma_write_read_valid)begin
+                if(framebuffer_luma_write_read_first_field)begin
+                    if(first_field_write_read_count!=8'hff)
+                        first_field_write_read_count<=
+                            first_field_write_read_count+1'b1;
+                    if(framebuffer_luma_write_read_mismatch&&
+                       (first_field_write_read_mismatch_count!=8'hff))
+                        first_field_write_read_mismatch_count<=
+                            first_field_write_read_mismatch_count+1'b1;
+                    if(first_field_write_read_mismatch_count==8'd0)begin
+                        first_field_write_read_expected<=
+                            framebuffer_luma_write_read_expected_fingerprint;
+                        first_field_write_read_raw<=
+                            framebuffer_luma_write_read_raw_fingerprint;
+                        first_field_write_read_expected_valid<=
+                            framebuffer_luma_write_read_expected_valid;
+                        first_field_write_read_region<=
+                            framebuffer_luma_write_read_region;
+                    end
+                end
+                else begin
+                    if(second_field_write_read_count!=8'hff)
+                        second_field_write_read_count<=
+                            second_field_write_read_count+1'b1;
+                    if(framebuffer_luma_write_read_mismatch&&
+                       (second_field_write_read_mismatch_count!=8'hff))
+                        second_field_write_read_mismatch_count<=
+                            second_field_write_read_mismatch_count+1'b1;
+                    if(second_field_write_read_mismatch_count==8'd0)begin
+                        second_field_write_read_expected<=
+                            framebuffer_luma_write_read_expected_fingerprint;
+                        second_field_write_read_raw<=
+                            framebuffer_luma_write_read_raw_fingerprint;
+                        second_field_write_read_expected_valid<=
+                            framebuffer_luma_write_read_expected_valid;
+                        second_field_write_read_region<=
+                            framebuffer_luma_write_read_region;
+                    end
                 end
             end
             if(framebuffer_luma_provenance_valid)begin

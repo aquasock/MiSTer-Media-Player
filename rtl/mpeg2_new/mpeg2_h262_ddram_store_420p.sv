@@ -9,7 +9,14 @@ module mpeg2_h262_ddram_store(
  input wire pixel_valid,input wire block_start,input wire block_complete,
  output reg block_stored,output reg write_seen,output reg store_error,
  input wire ddram_busy,output wire [7:0] ddram_burstcnt,output wire [28:0] ddram_addr,
- output wire ddram_rd,output wire [63:0] ddram_din,output wire [7:0] ddram_be,output wire ddram_we);
+ output wire ddram_rd,output wire [63:0] ddram_din,output wire [7:0] ddram_be,output wire ddram_we,
+ // Entry 531: passive metadata for an accepted writer word.  The arbiter
+ // supplies the acceptance pulse; these values describe the simultaneously
+ // presented store word and never feed the writer or DDR control path.
+ output wire luma_word_debug,output wire [2:0] luma_region_debug,
+ output wire luma_row_parity_debug,output wire luma_picture_start_debug,
+ output wire luma_picture_complete_debug,
+ output wire [31:0] luma_position_fingerprint_debug);
 localparam [1:0] Y=0,CB=1,CR=2;
 localparam [28:0] YB=29'h06000000,CBB=29'h0600A8C0,CRB=29'h0600D2F0,BANK=29'h00010000,SCRATCH0=29'h00020000,SCRATCH1=29'h00030000;
 wire scratch_tag=(pixel_component==Y)&&(pixel_x[11:10]==2'b11);
@@ -39,6 +46,43 @@ wire [28:0] stride=(ac==Y)?90:45;
 assign ddram_burstcnt=writing?1:0;assign ddram_addr=writing?wa:0;assign ddram_rd=0;
 assign ddram_din=(wr==0)?b0:(wr==1)?b1:(wr==2)?b2:(wr==3)?b3:(wr==4)?b4:(wr==5)?b5:(wr==6)?b6:b7;
 assign ddram_be=8'hff;assign ddram_we=writing;
+
+wire [11:0] luma_debug_row=oy+{9'd0,wr};
+wire [6:0] luma_debug_word=ox[9:3];
+
+// XORing independently position-mixed word contributions makes the completed
+// field fingerprint insensitive to the writer's block-row transaction order
+// while retaining row, word, lane and byte sensitivity.
+function automatic [31:0] position_fingerprint_word;
+ input [2:0] region;
+ input [10:0] row;
+ input [6:0] word_index;
+ input [63:0] value;
+ reg [31:0] result;
+ reg [31:0] token;
+ integer lane;
+ begin
+  result=32'd0;
+  for(lane=0;lane<8;lane=lane+1)begin
+   token={row[8:0],word_index,lane[2:0],value[lane*8 +: 8],5'b10101}^
+         {region,29'h12d4a6b};
+   token=token^{token[15:0],token[31:16]};
+   token=token^{token[26:0],token[31:27]};
+   result=result^token;
+  end
+  position_fingerprint_word=result;
+ end
+endfunction
+
+assign luma_word_debug=writing&&(ac==Y);
+assign luma_region_debug=wa[18:16];
+assign luma_row_parity_debug=luma_debug_row[0];
+assign luma_picture_start_debug=luma_word_debug&&
+    (luma_debug_row==12'd0)&&(luma_debug_word==7'd0);
+assign luma_picture_complete_debug=luma_word_debug&&
+    (luma_debug_row==12'd479)&&(luma_debug_word==7'd89);
+assign luma_position_fingerprint_debug=position_fingerprint_word(
+    luma_region_debug,luma_debug_row[10:0],luma_debug_word,ddram_din);
 always @(posedge clk)begin
  if(reset)begin cap<=0;flush<=0;writing<=0;ab<=0;ascratch<=0;ascratch_bank<=0;ac<=0;ox<=0;oy<=0;wr<=0;wa<=0;sh<=0;block_stored<=0;write_seen<=0;store_error<=0;end
  else begin

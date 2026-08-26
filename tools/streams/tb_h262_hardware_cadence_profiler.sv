@@ -59,6 +59,13 @@ reg [7:0] framebuffer_luma_provenance_expected_generation=0;
 reg [7:0] framebuffer_luma_provenance_tagged_generation=0;
 reg [31:0] framebuffer_luma_provenance_raw_fingerprint=0;
 reg [31:0] framebuffer_luma_provenance_display_fingerprint=0;
+reg framebuffer_luma_write_read_valid=0;
+reg framebuffer_luma_write_read_first_field=0;
+reg framebuffer_luma_write_read_expected_valid=0;
+reg [2:0] framebuffer_luma_write_read_region=0;
+reg [31:0] framebuffer_luma_write_read_expected_fingerprint=0;
+reg [31:0] framebuffer_luma_write_read_raw_fingerprint=0;
+reg framebuffer_luma_write_read_mismatch=0;
 reg framebuffer_first_field_fetch=0;
 reg framebuffer_second_field_fetch=0;
 integer field_index;
@@ -120,6 +127,18 @@ mpeg2_h262_hardware_cadence_profiler #(
         framebuffer_luma_provenance_raw_fingerprint),
     .framebuffer_luma_provenance_display_fingerprint(
         framebuffer_luma_provenance_display_fingerprint),
+    .framebuffer_luma_write_read_valid(framebuffer_luma_write_read_valid),
+    .framebuffer_luma_write_read_first_field(
+        framebuffer_luma_write_read_first_field),
+    .framebuffer_luma_write_read_expected_valid(
+        framebuffer_luma_write_read_expected_valid),
+    .framebuffer_luma_write_read_region(framebuffer_luma_write_read_region),
+    .framebuffer_luma_write_read_expected_fingerprint(
+        framebuffer_luma_write_read_expected_fingerprint),
+    .framebuffer_luma_write_read_raw_fingerprint(
+        framebuffer_luma_write_read_raw_fingerprint),
+    .framebuffer_luma_write_read_mismatch(
+        framebuffer_luma_write_read_mismatch),
     .framebuffer_first_field_fetch(framebuffer_first_field_fetch),
     .framebuffer_second_field_fetch(framebuffer_second_field_fetch),
     .fifo_pending(fifo_pending),.decoder_ready(decoder_ready),
@@ -268,6 +287,28 @@ begin
 end
 endtask
 
+task drive_luma_write_read;
+    input first_field;
+    input expected_valid;
+    input [2:0] region;
+    input [31:0] expected_fingerprint;
+    input [31:0] raw_fingerprint;
+begin
+    @(negedge clk_mpeg2);
+    framebuffer_luma_write_read_valid=1;
+    framebuffer_luma_write_read_first_field=first_field;
+    framebuffer_luma_write_read_expected_valid=expected_valid;
+    framebuffer_luma_write_read_region=region;
+    framebuffer_luma_write_read_expected_fingerprint=expected_fingerprint;
+    framebuffer_luma_write_read_raw_fingerprint=raw_fingerprint;
+    framebuffer_luma_write_read_mismatch=
+        !expected_valid||(expected_fingerprint!=raw_fingerprint);
+    @(negedge clk_mpeg2);
+    framebuffer_luma_write_read_valid=0;
+    framebuffer_luma_write_read_mismatch=0;
+end
+endtask
+
 task drive_field_fetches;
     input integer first_count;
     input integer second_count;
@@ -363,6 +404,13 @@ begin
     framebuffer_luma_provenance_tagged_generation=0;
     framebuffer_luma_provenance_raw_fingerprint=0;
     framebuffer_luma_provenance_display_fingerprint=0;
+    framebuffer_luma_write_read_valid=0;
+    framebuffer_luma_write_read_first_field=0;
+    framebuffer_luma_write_read_expected_valid=0;
+    framebuffer_luma_write_read_region=0;
+    framebuffer_luma_write_read_expected_fingerprint=0;
+    framebuffer_luma_write_read_raw_fingerprint=0;
+    framebuffer_luma_write_read_mismatch=0;
     framebuffer_first_field_fetch=0;
     framebuffer_second_field_fetch=0;
     stc_seconds=14'd5;
@@ -491,6 +539,14 @@ initial begin
     drive_luma_return(1'b0,8'h4f);
     drive_luma_fingerprint(1'b1,32'h12345678,32'h12345678);
     drive_luma_fingerprint(1'b0,32'h89abcdef,32'h89abcdee);
+    drive_luma_write_read(1'b1,1'b1,3'd4,
+                          32'h01020304,32'h01020304);
+    drive_luma_write_read(1'b1,1'b1,3'd4,
+                          32'h11121314,32'h11121315);
+    drive_luma_write_read(1'b1,1'b1,3'd4,
+                          32'h21222324,32'h21222324);
+    drive_luma_write_read(1'b0,1'b1,3'd4,
+                          32'h31323334,32'h31323336);
     drive_luma_provenance(1'b1,1'b1,11'd12,11'd14,1'b0,1'b1,
                           8'h2a,8'h29,32'haaaa0001,32'hbbbb0001);
     drive_luma_provenance(1'b0,1'b1,11'd13,11'd15,1'b1,1'b0,
@@ -559,7 +615,7 @@ initial begin
     if(dut.snapshot_sync_2[1279:1248]==0)
         $fatal(1,"framebuffer publication latency missing");
     if(dut.snapshot_sync_2[1311:1280]!==
-       {8'd1,8'd3,1'b0,1'b1,8'd0,3'd2,3'd1})
+       {8'd1,8'd3,1'b0,1'b1,1'b1,1'b1,1'b1,3'd4,2'd0,3'd2,3'd1})
         $fatal(1,"per-field fetch/region/varied mismatch %h",
                dut.snapshot_sync_2[1311:1280]);
     // First field saw 0x11 three times: unvarying, signature 0x11.
@@ -567,13 +623,13 @@ initial begin
     if(dut.snapshot_sync_2[1343:1312]!=={8'h11,8'h6f,8'd1,8'd1})
         $fatal(1,"per-field signature/mismatch/phase mismatch %h",
                dut.snapshot_sync_2[1343:1312]);
-    if(dut.snapshot_sync_2[1375:1344]!==32'h12345678||
-       dut.snapshot_sync_2[1407:1376]!==32'h12345678||
-       dut.snapshot_sync_2[1439:1408]!==32'h89abcdef||
-       dut.snapshot_sync_2[1471:1440]!==32'h89abcdee)
-        $fatal(1,"generation fingerprint payload mismatch");
-    if(dut.snapshot_sync_2[1503:1472]!==32'h01010001)
-        $fatal(1,"generation fingerprint counts mismatch %h",
+    if(dut.snapshot_sync_2[1375:1344]!==32'h11121314||
+       dut.snapshot_sync_2[1407:1376]!==32'h11121315||
+       dut.snapshot_sync_2[1439:1408]!==32'h31323334||
+       dut.snapshot_sync_2[1471:1440]!==32'h31323336)
+        $fatal(1,"write/read first-mismatch payload mismatch");
+    if(dut.snapshot_sync_2[1503:1472]!==32'h03010101)
+        $fatal(1,"write/read completion counts mismatch %h",
                dut.snapshot_sync_2[1503:1472]);
     if(dut.snapshot_sync_2[1535:1504]!==32'h01010101)
         $fatal(1,"provenance mismatch counts mismatch %h",
@@ -742,7 +798,7 @@ initial begin
     if({video_r,video_g,video_b}!==24'h123456)
         $fatal(1,"base video changed outside overlay");
 
-    $display("HARDWARE_CADENCE_PROFILER_PASS schema=16 line-provenance+generation-fingerprints+field-content+framebuffer-publication+timestamp-conflicts+audio-defer+forced+fatal+no-progress checksum=%h",
+    $display("HARDWARE_CADENCE_PROFILER_PASS current-diagnostic line-provenance+write-read-fingerprints+field-content+framebuffer-publication+timestamp-conflicts+audio-defer+forced+fatal+no-progress checksum=%h",
              checksum);
     $finish;
 end

@@ -134,6 +134,20 @@ mpeg2_h262_hardware_cadence_profiler
         mpeg2_new_luma_provenance_raw_fingerprint),
     .framebuffer_luma_provenance_display_fingerprint(
         mpeg2_new_luma_provenance_display_fingerprint),
+    .framebuffer_luma_write_read_valid(
+        mpeg2_new_luma_write_read_valid),
+    .framebuffer_luma_write_read_first_field(
+        mpeg2_new_luma_write_read_first_field),
+    .framebuffer_luma_write_read_expected_valid(
+        mpeg2_new_luma_write_read_expected_valid),
+    .framebuffer_luma_write_read_region(
+        mpeg2_new_luma_write_read_region),
+    .framebuffer_luma_write_read_expected_fingerprint(
+        mpeg2_new_luma_write_read_expected_fingerprint),
+    .framebuffer_luma_write_read_raw_fingerprint(
+        mpeg2_new_luma_write_read_raw_fingerprint),
+    .framebuffer_luma_write_read_mismatch(
+        mpeg2_new_luma_write_read_mismatch),
     .framebuffer_first_field_fetch(
         mpeg2_new_framebuffer_first_field_fetch_toggle),
     .framebuffer_second_field_fetch(
