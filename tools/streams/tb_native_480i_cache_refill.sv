@@ -162,15 +162,51 @@ mpeg2_luma_framebuffer dut
 integer response_latency;
 integer response_delay = 0;
 integer response_words = 0;
+reg [28:0] response_address = 29'd0;
 reg slow_mode = 1'b0;
 reg late_prefill_mode = 1'b0;
 integer fingerprint_count = 0;
 integer fingerprint_mismatch_count = 0;
+integer position_mismatch_count = 0;
 integer provenance_count = 0;
 integer provenance_tag_mismatch_count = 0;
 integer provenance_content_mismatch_count = 0;
 integer first_field_provenance_count = 0;
 integer second_field_provenance_count = 0;
+reg [63:0] expected_luma_word;
+reg [7:0] expected_luma_byte;
+
+function automatic [63:0] ddr_word_pattern;
+    input [28:0] word_address;
+    integer lane;
+    begin
+        for (lane = 0; lane < 8; lane = lane + 1)
+            ddr_word_pattern[lane*8 +: 8] =
+                word_address[7:0] + word_address[15:8] + (lane * 8'h1d);
+    end
+endfunction
+
+always @(posedge rd_clk) begin
+    if (pixel_ce && fingerprint_mode &&
+        dut.native_luma_sample_valid_rd) begin
+        expected_luma_word = ddr_word_pattern(
+            29'h06000000 + dut.row_times_90(dut.source_y_d[10:0]) +
+            {22'd0,dut.source_x_d[9:3]});
+        expected_luma_byte =
+            expected_luma_word[dut.source_x_d[2:0]*8 +: 8];
+        if (dut.y_rd_data !== expected_luma_byte) begin
+            if (position_mismatch_count < 16)
+                $display({"NATIVE_CACHE_POSITION_MISMATCH x=%0d y=%0d ",
+                          "word=%0d lane=%0d expected=%02h actual=%02h ",
+                          "rd_addr=%0d"},
+                         dut.source_x_d,dut.source_y_d,
+                         dut.source_x_d[9:3],dut.source_x_d[2:0],
+                         expected_luma_byte,dut.y_rd_data,
+                         dut.y_cache_rd_addr);
+            position_mismatch_count <= position_mismatch_count + 1;
+        end
+    end
+end
 
 always @(posedge mem_clk) begin
     if (luma_fingerprint_valid_debug) begin
@@ -216,17 +252,22 @@ always @(posedge mem_clk) begin
     if (reset) begin
         response_delay <= 0;
         response_words <= 0;
+        response_address <= 29'd0;
+        ddram_dout <= 64'd0;
     end
     else if ((response_words == 0) && ddram_rd) begin
         response_delay <= response_latency;
         response_words <= ddram_burstcnt;
+        response_address <= ddram_addr;
     end
     else if (response_words != 0) begin
         if (response_delay != 0)
             response_delay <= response_delay - 1;
         else begin
+            ddram_dout <= ddr_word_pattern(response_address);
             ddram_dout_ready <= 1'b1;
             response_words <= response_words - 1;
+            response_address <= response_address + 29'd1;
         end
     end
 end
@@ -289,6 +330,14 @@ initial begin
         else if (fingerprint_mismatch_count != 0)
             $fatal(1,"matching cache produced %0d fingerprint mismatches",
                    fingerprint_mismatch_count);
+        if ($test$plusargs("CORRUPT")) begin
+            if (position_mismatch_count != 1)
+                $fatal(1,"corrupt-byte expected one position mismatch, got %0d",
+                       position_mismatch_count);
+        end
+        else if (position_mismatch_count != 0)
+            $fatal(1,"matching cache produced %0d position mismatches",
+                   position_mismatch_count);
         if (provenance_count != 480)
             $fatal(1,"expected 480 line provenance events, got %0d",
                    provenance_count);

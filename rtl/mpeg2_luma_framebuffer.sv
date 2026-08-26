@@ -1501,16 +1501,19 @@ wire decoded_picture_window =
     (source_x < picture_width_r2) &&
     (source_y < {1'b0, picture_height_r2});
 
-wire [6:0] y_word_index = source_x[9:3];
-wire [5:0] c_word_index = source_x[9:4];
+// The M10K read address is registered on rd_clk.  Hold it on the delayed
+// pixel coordinates so its returned word advances with the separately delayed
+// byte-lane selector, not one word early on lane seven.
+wire [6:0] y_word_index_d = source_x_d[9:3];
+wire [5:0] c_word_index_d = source_x_d[9:4];
 
 assign y_cache_rd_addr =
-    ((native_interlaced_r2 ? source_y[1] : source_y[0]) ?
-        8'd90 : 8'd0) + {1'b0, y_word_index};
+    ((native_interlaced_r2 ? source_y_d[1] : source_y_d[0]) ?
+        8'd90 : 8'd0) + {1'b0, y_word_index_d};
 
 assign c_cache_rd_addr =
-    ((native_interlaced_r2 ? source_y[2] : source_y[1]) ?
-        7'd45 : 7'd0) + {1'b0, c_word_index};
+    ((native_interlaced_r2 ? source_y_d[2] : source_y_d[1]) ?
+        7'd45 : 7'd0) + {1'b0, c_word_index_d};
 
 wire [2:0] y_byte_lane = source_x[2:0];
 wire [2:0] c_byte_lane = source_x[3:1];
