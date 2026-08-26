@@ -47,6 +47,18 @@ reg framebuffer_luma_fingerprint_first_field=0;
 reg [31:0] framebuffer_luma_fingerprint_raw=0;
 reg [31:0] framebuffer_luma_fingerprint_display=0;
 reg framebuffer_luma_fingerprint_mismatch=0;
+reg framebuffer_luma_provenance_valid=0;
+reg framebuffer_luma_provenance_first_field=0;
+reg framebuffer_luma_provenance_tag_mismatch=0;
+reg framebuffer_luma_provenance_content_mismatch=0;
+reg framebuffer_luma_provenance_expected_bank=0;
+reg framebuffer_luma_provenance_tagged_bank=0;
+reg [10:0] framebuffer_luma_provenance_expected_row=0;
+reg [10:0] framebuffer_luma_provenance_tagged_row=0;
+reg [7:0] framebuffer_luma_provenance_expected_generation=0;
+reg [7:0] framebuffer_luma_provenance_tagged_generation=0;
+reg [31:0] framebuffer_luma_provenance_raw_fingerprint=0;
+reg [31:0] framebuffer_luma_provenance_display_fingerprint=0;
 reg framebuffer_first_field_fetch=0;
 reg framebuffer_second_field_fetch=0;
 integer field_index;
@@ -85,6 +97,29 @@ mpeg2_h262_hardware_cadence_profiler #(
         framebuffer_luma_fingerprint_display),
     .framebuffer_luma_fingerprint_mismatch(
         framebuffer_luma_fingerprint_mismatch),
+    .framebuffer_luma_provenance_valid(framebuffer_luma_provenance_valid),
+    .framebuffer_luma_provenance_first_field(
+        framebuffer_luma_provenance_first_field),
+    .framebuffer_luma_provenance_tag_mismatch(
+        framebuffer_luma_provenance_tag_mismatch),
+    .framebuffer_luma_provenance_content_mismatch(
+        framebuffer_luma_provenance_content_mismatch),
+    .framebuffer_luma_provenance_expected_bank(
+        framebuffer_luma_provenance_expected_bank),
+    .framebuffer_luma_provenance_tagged_bank(
+        framebuffer_luma_provenance_tagged_bank),
+    .framebuffer_luma_provenance_expected_row(
+        framebuffer_luma_provenance_expected_row),
+    .framebuffer_luma_provenance_tagged_row(
+        framebuffer_luma_provenance_tagged_row),
+    .framebuffer_luma_provenance_expected_generation(
+        framebuffer_luma_provenance_expected_generation),
+    .framebuffer_luma_provenance_tagged_generation(
+        framebuffer_luma_provenance_tagged_generation),
+    .framebuffer_luma_provenance_raw_fingerprint(
+        framebuffer_luma_provenance_raw_fingerprint),
+    .framebuffer_luma_provenance_display_fingerprint(
+        framebuffer_luma_provenance_display_fingerprint),
     .framebuffer_first_field_fetch(framebuffer_first_field_fetch),
     .framebuffer_second_field_fetch(framebuffer_second_field_fetch),
     .fifo_pending(fifo_pending),.decoder_ready(decoder_ready),
@@ -127,6 +162,39 @@ begin
     @(negedge clk_mpeg2);decoder_byte_accepted=1;
     @(negedge clk_mpeg2);decoder_byte_accepted=0;
     repeat(3)@(posedge clk_mpeg2);
+end
+endtask
+
+task drive_luma_provenance;
+    input first_field;
+    input tag_mismatch;
+    input [10:0] expected_row;
+    input [10:0] tagged_row;
+    input expected_bank;
+    input tagged_bank;
+    input [7:0] expected_generation;
+    input [7:0] tagged_generation;
+    input [31:0] raw_fingerprint;
+    input [31:0] display_fingerprint;
+begin
+    @(negedge clk_mpeg2);
+    framebuffer_luma_provenance_valid=1;
+    framebuffer_luma_provenance_first_field=first_field;
+    framebuffer_luma_provenance_tag_mismatch=tag_mismatch;
+    framebuffer_luma_provenance_content_mismatch=
+        !tag_mismatch&&(raw_fingerprint!=display_fingerprint);
+    framebuffer_luma_provenance_expected_row=expected_row;
+    framebuffer_luma_provenance_tagged_row=tagged_row;
+    framebuffer_luma_provenance_expected_bank=expected_bank;
+    framebuffer_luma_provenance_tagged_bank=tagged_bank;
+    framebuffer_luma_provenance_expected_generation=expected_generation;
+    framebuffer_luma_provenance_tagged_generation=tagged_generation;
+    framebuffer_luma_provenance_raw_fingerprint=raw_fingerprint;
+    framebuffer_luma_provenance_display_fingerprint=display_fingerprint;
+    @(negedge clk_mpeg2);
+    framebuffer_luma_provenance_valid=0;
+    framebuffer_luma_provenance_tag_mismatch=0;
+    framebuffer_luma_provenance_content_mismatch=0;
 end
 endtask
 
@@ -283,6 +351,18 @@ begin
     framebuffer_luma_fingerprint_raw=0;
     framebuffer_luma_fingerprint_display=0;
     framebuffer_luma_fingerprint_mismatch=0;
+    framebuffer_luma_provenance_valid=0;
+    framebuffer_luma_provenance_first_field=0;
+    framebuffer_luma_provenance_tag_mismatch=0;
+    framebuffer_luma_provenance_content_mismatch=0;
+    framebuffer_luma_provenance_expected_bank=0;
+    framebuffer_luma_provenance_tagged_bank=0;
+    framebuffer_luma_provenance_expected_row=0;
+    framebuffer_luma_provenance_tagged_row=0;
+    framebuffer_luma_provenance_expected_generation=0;
+    framebuffer_luma_provenance_tagged_generation=0;
+    framebuffer_luma_provenance_raw_fingerprint=0;
+    framebuffer_luma_provenance_display_fingerprint=0;
     framebuffer_first_field_fetch=0;
     framebuffer_second_field_fetch=0;
     stc_seconds=14'd5;
@@ -294,11 +374,11 @@ endtask
 task verify_checksum;
 begin
     checksum=0;
-    for(i=0;i<47;i=i+1)
+    for(i=0;i<60;i=i+1)
         checksum=checksum^dut.snapshot_sync_2[i*32+:32];
-    if(checksum!==dut.snapshot_sync_2[1535:1504])
+    if(checksum!==dut.snapshot_sync_2[1951:1920])
         $fatal(1,"checksum mismatch %h/%h",checksum,
-               dut.snapshot_sync_2[1535:1504]);
+               dut.snapshot_sync_2[1951:1920]);
 end
 endtask
 
@@ -312,8 +392,8 @@ task verify_overlay_row_coverage;
     reg [11:0] y0;
 begin
     native_active=native_mode;
-    y0=native_mode?12'd288:12'd408;
-    for(row=0;row<48;row=row+1)begin
+    y0=native_mode?12'd236:12'd356;
+    for(row=0;row<61;row=row+1)begin
         v_pos=y0+row[11:0]*12'd4;
         @(negedge clk_video);h_pos=0;
         @(posedge clk_video);#1;
@@ -335,7 +415,7 @@ task verify_overlay_prefix;
     integer x;
 begin
     native_active=native_mode;
-    v_pos=native_mode?12'd289:12'd409;
+    v_pos=native_mode?12'd237:12'd357;
     for(x=0;x<=29;x=x+1)begin
         @(negedge clk_video);h_pos=x;
         @(posedge clk_video);#1;
@@ -411,6 +491,14 @@ initial begin
     drive_luma_return(1'b0,8'h4f);
     drive_luma_fingerprint(1'b1,32'h12345678,32'h12345678);
     drive_luma_fingerprint(1'b0,32'h89abcdef,32'h89abcdee);
+    drive_luma_provenance(1'b1,1'b1,11'd12,11'd14,1'b0,1'b1,
+                          8'h2a,8'h29,32'haaaa0001,32'hbbbb0001);
+    drive_luma_provenance(1'b0,1'b1,11'd13,11'd15,1'b1,1'b0,
+                          8'h2a,8'h28,32'haaaa0002,32'hbbbb0002);
+    drive_luma_provenance(1'b1,1'b0,11'd20,11'd20,1'b0,1'b0,
+                          8'h2a,8'h2a,32'h11111111,32'h11111110);
+    drive_luma_provenance(1'b0,1'b0,11'd21,11'd21,1'b0,1'b0,
+                          8'h2a,8'h2a,32'h22222222,32'h22222220);
     pulse_decoder_progress();
     drive_field_fetches(1,3);
     pulse_sequence_phase_error();
@@ -436,7 +524,7 @@ initial begin
 
     if(dut.snapshot_sync_2[31:0]!==32'h4d4d5031)
         $fatal(1,"bad magic %h",dut.snapshot_sync_2[31:0]);
-    if(dut.snapshot_sync_2[63:32]!==32'h0f30ea60)
+    if(dut.snapshot_sync_2[63:32]!==32'h103dea60)
         $fatal(1,"bad format %h",dut.snapshot_sync_2[63:32]);
     if(dut.SNAPSHOT_WORD_40_BITS!=32)
         $fatal(1,"snapshot word 40 width is %0d",
@@ -487,6 +575,27 @@ initial begin
     if(dut.snapshot_sync_2[1503:1472]!==32'h01010001)
         $fatal(1,"generation fingerprint counts mismatch %h",
                dut.snapshot_sync_2[1503:1472]);
+    if(dut.snapshot_sync_2[1535:1504]!==32'h01010101)
+        $fatal(1,"provenance mismatch counts mismatch %h",
+               dut.snapshot_sync_2[1535:1504]);
+    if(dut.snapshot_sync_2[1567:1536]!==
+       {11'd12,11'd14,1'b0,1'b1,8'd0} ||
+       dut.snapshot_sync_2[1599:1568]!=={8'h2a,8'h29,16'd0} ||
+       dut.snapshot_sync_2[1631:1600]!==
+       {11'd13,11'd15,1'b1,1'b0,8'd0} ||
+       dut.snapshot_sync_2[1663:1632]!=={8'h2a,8'h28,16'd0})
+        $fatal(1,"first tag-mismatch evidence not retained");
+    if(dut.snapshot_sync_2[1695:1664]!==
+       {11'd20,11'd20,1'b0,1'b0,8'd0} ||
+       dut.snapshot_sync_2[1727:1696]!=={8'h2a,8'h2a,16'd0} ||
+       dut.snapshot_sync_2[1759:1728]!==32'h11111111 ||
+       dut.snapshot_sync_2[1791:1760]!==32'h11111110 ||
+       dut.snapshot_sync_2[1823:1792]!==
+       {11'd21,11'd21,1'b0,1'b0,8'd0} ||
+       dut.snapshot_sync_2[1855:1824]!=={8'h2a,8'h2a,16'd0} ||
+       dut.snapshot_sync_2[1887:1856]!==32'h22222222 ||
+       dut.snapshot_sync_2[1919:1888]!==32'h22222220)
+        $fatal(1,"first content-mismatch evidence not retained");
     verify_checksum();
     verify_overlay_prefix(1'b0);
     verify_overlay_prefix(1'b1);
@@ -633,7 +742,7 @@ initial begin
     if({video_r,video_g,video_b}!==24'h123456)
         $fatal(1,"base video changed outside overlay");
 
-    $display("HARDWARE_CADENCE_PROFILER_PASS schema=15 generation-fingerprints+field-content+framebuffer-publication+timestamp-conflicts+audio-defer+forced+fatal+no-progress checksum=%h",
+    $display("HARDWARE_CADENCE_PROFILER_PASS schema=16 line-provenance+generation-fingerprints+field-content+framebuffer-publication+timestamp-conflicts+audio-defer+forced+fatal+no-progress checksum=%h",
              checksum);
     $finish;
 end

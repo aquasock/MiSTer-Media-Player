@@ -34,6 +34,7 @@ mpeg2_luma_framebuffer dut(
  .reset(1'b1),.mem_clk(clk),.picture_complete(1'b0),
  .horizontal_size(14'd720),.vertical_size(14'd480),
  .native_interlaced(1'b1),.top_field_first(1'b1),
+ .framebuffer_generation(8'd0),
  .ddram_busy(1'b0),.ddram_dout(64'd0),.ddram_dout_ready(1'b0),
  .ddram_burstcnt(burst),.ddram_addr(addr),.ddram_rd(rd),
  .cache_ready(ready),.read_seen(seen),.cache_error(error),

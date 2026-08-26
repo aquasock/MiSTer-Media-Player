@@ -42,6 +42,9 @@ set_false_path \
 set_false_path \
     -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|first_field_mem}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|first_field_r1}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_new_framebuffer_generation[*]}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|framebuffer_generation_r1[*]}]
 
 # 54 MHz presentation -> 60 MHz memory/decoder line-consumed handshake.
 # kate - Phase 1S removed the old asynchronous 11-bit line-number bus.  Only the
@@ -64,6 +67,29 @@ set_false_path \
 set_false_path \
     -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_fingerprint_toggle_rd}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_fingerprint_toggle_sync[0]}]
+
+# Entry 525: completed per-bank cache tags freeze in mem_clk before their
+# individual toggles cross to rd_clk.  Cut only each stable bundle's source to
+# its explicit first sampling stage and each toggle to synchronizer stage zero.
+set_false_path \
+    -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_tag_*_mem*}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_tag_*_r1*}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_tag_toggle_bank0_mem}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_tag_toggle_bank0_sync_rd[0]}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_tag_toggle_bank1_mem}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_tag_toggle_bank1_sync_rd[0]}]
+
+# Each completed video-domain line comparison freezes its provenance bundle
+# before the event toggle crosses back to mem_clk.  Later stages, profiler
+# capture and every cache-control path remain timed normally.
+set_false_path \
+    -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_provenance_*_rd*}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_provenance_*_m1*}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_provenance_toggle_rd}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|luma_provenance_toggle_sync[0]}]
 
 # The passive line-cache overlap diagnostic registers the active scan state and
 # selected cache banks in the 54 MHz presentation domain, then samples each

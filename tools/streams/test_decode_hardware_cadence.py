@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prove schema-fifteen through legacy cadence-overlay decoding."""
+"""Prove schema-sixteen through legacy cadence-overlay decoding."""
 
 from __future__ import annotations
 
@@ -34,13 +34,39 @@ def schema14_snapshot_words(schema_version: int = 14) -> list[int]:
     return words
 
 
-def snapshot_words() -> list[int]:
+def schema15_snapshot_words() -> list[int]:
     """Build a forty-eight-word schema 15 record with XOR checksum."""
     words = schema14_snapshot_words()[:-1]
     words[1] = (15 << 24) | (48 << 16) | 60000
     words.extend((0x12345678, 0x12345678,
                   0x89ABCDEF, 0x89ABCDEE,
                   (44 << 24) | (44 << 16) | (0 << 8) | 7))
+    checksum = 0
+    for word in words:
+        checksum ^= word
+    words.append(checksum)
+    return words
+
+
+def snapshot_words() -> list[int]:
+    """Build a sixty-one-word schema 16 record with XOR checksum."""
+    words = schema15_snapshot_words()[:-1]
+    words[1] = (16 << 24) | (61 << 16) | 60000
+    words.extend((
+        (1 << 24) | (2 << 16) | (3 << 8) | 4,
+        (12 << 21) | (14 << 10) | (0 << 9) | (1 << 8),
+        (0x2A << 24) | (0x29 << 16),
+        (13 << 21) | (15 << 10) | (1 << 9) | (0 << 8),
+        (0x2A << 24) | (0x28 << 16),
+        (20 << 21) | (20 << 10),
+        (0x2A << 24) | (0x2A << 16),
+        0x11111111,
+        0x11111110,
+        (21 << 21) | (21 << 10),
+        (0x2A << 24) | (0x2A << 16),
+        0x22222222,
+        0x22222220,
+    ))
     checksum = 0
     for word in words:
         checksum ^= word
@@ -116,8 +142,8 @@ def main() -> None:
             raise SystemExit("framebuffer prefill miss was not decoded")
         if parsed["framebuffer_max_publication_latency_cycles"] != 12345:
             raise SystemExit("framebuffer publication latency was not decoded")
-        if parsed["schema_version"] != 15:
-            raise SystemExit("schema fifteen was not reported")
+        if parsed["schema_version"] != 16:
+            raise SystemExit("schema sixteen was not reported")
         if parsed["framebuffer_content_scope"] != "session":
             raise SystemExit("schema fourteen content scope was not decoded")
         if parsed["framebuffer_first_field_varied"] is not False:
@@ -158,6 +184,47 @@ def main() -> None:
             raise SystemExit("first-field mismatch count was not decoded")
         if parsed["framebuffer_second_field_fingerprint_mismatch_count"] != 7:
             raise SystemExit("second-field mismatch count was not decoded")
+        if parsed["framebuffer_first_field_tag_mismatch_count"] != 1:
+            raise SystemExit("first-field tag mismatch count was not decoded")
+        if parsed["framebuffer_second_field_tag_mismatch_count"] != 2:
+            raise SystemExit("second-field tag mismatch count was not decoded")
+        if parsed["framebuffer_first_field_content_mismatch_count"] != 3:
+            raise SystemExit("first-field content mismatch count was not decoded")
+        if parsed["framebuffer_second_field_content_mismatch_count"] != 4:
+            raise SystemExit("second-field content mismatch count was not decoded")
+        first_tag = parsed["framebuffer_first_field_first_tag_mismatch"]
+        if first_tag is None or first_tag["expected_row"] != 12 or \
+                first_tag["tagged_row"] != 14 or \
+                first_tag["expected_bank"] != 0 or \
+                first_tag["tagged_bank"] != 1 or \
+                first_tag["expected_generation"] != 0x2A or \
+                first_tag["tagged_generation"] != 0x29:
+            raise SystemExit("first-field tag mismatch evidence was not decoded")
+        second_content = parsed[
+            "framebuffer_second_field_first_content_mismatch"
+        ]
+        if second_content is None or second_content["expected_row"] != 21 or \
+                second_content["tagged_row"] != 21 or \
+                second_content["raw_fingerprint"] != 0x22222222 or \
+                second_content["display_fingerprint"] != 0x22222220:
+            raise SystemExit(
+                "second-field content mismatch evidence was not decoded"
+            )
+
+        schema15 = schema15_snapshot_words()
+        schema15_diagnostic = temp / "schema15_diagnostic.png"
+        schema15_native = temp / "schema15_native.png"
+        render(schema15_diagnostic, 800, 600,
+               cadence.SCHEMA15_DIAGNOSTIC_Y0, schema15)
+        render(schema15_native, 720, 480,
+               cadence.SCHEMA15_NATIVE_480I_Y0, schema15)
+        if cadence.decode_words(schema15_diagnostic) != schema15:
+            raise SystemExit("schema-fifteen diagnostic telemetry mismatch")
+        schema15_parsed = cadence.decode(schema15_native)
+        if schema15_parsed["schema_version"] != 15:
+            raise SystemExit("schema fifteen was not retained")
+        if schema15_parsed["framebuffer_first_field_tag_mismatch_count"] is not None:
+            raise SystemExit("schema fifteen must not report line provenance")
 
         schema14 = schema14_snapshot_words()
         schema14_diagnostic = temp / "schema14_diagnostic.png"
@@ -223,7 +290,8 @@ def main() -> None:
         result = cadence.decode(overlap)
         if not result["cache_bank_overlap_error"]:
             raise SystemExit("cache-bank overlap telemetry bit was not decoded")
-    print("CADENCE_DECODER_LAYOUT_PASS schema15=408/288/48 "
+    print("CADENCE_DECODER_LAYOUT_PASS schema16=356/236/61 "
+          "schema15=408/288/48 "
           "schema14=428/308/43 "
           "schema13=428/308/43 "
           "schema10=436/316/41 legacy=444/324/38")

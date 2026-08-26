@@ -33,6 +33,7 @@ module mpeg2_luma_framebuffer
     input  wire [13:0] vertical_size,
     input  wire        native_interlaced,
     input  wire        top_field_first,
+    input  wire [7:0]  framebuffer_generation,
 
     input  wire        ddram_busy,
     input  wire [63:0] ddram_dout,
@@ -67,6 +68,20 @@ module mpeg2_luma_framebuffer
     output reg  [31:0] luma_fingerprint_raw_debug,
     output reg  [31:0] luma_fingerprint_display_debug,
     output reg         luma_fingerprint_mismatch_debug,
+    // Entry 525: one mem-clock pulse for every completed native displayed
+    // luma line.  The bundled evidence is passive and never feeds cache control.
+    output reg         luma_provenance_valid_debug,
+    output reg         luma_provenance_first_field_debug,
+    output reg         luma_provenance_tag_mismatch_debug,
+    output reg         luma_provenance_content_mismatch_debug,
+    output reg         luma_provenance_expected_bank_debug,
+    output reg         luma_provenance_tagged_bank_debug,
+    output reg  [10:0] luma_provenance_expected_row_debug,
+    output reg  [10:0] luma_provenance_tagged_row_debug,
+    output reg  [7:0]  luma_provenance_expected_generation_debug,
+    output reg  [7:0]  luma_provenance_tagged_generation_debug,
+    output reg  [31:0] luma_provenance_raw_fingerprint_debug,
+    output reg  [31:0] luma_provenance_display_fingerprint_debug,
 
     // Independent fixed video side - 40 MHz.
     input  wire        rd_clk,
@@ -178,6 +193,24 @@ reg        second_field_fetch_toggle_mem;
 reg [31:0] first_field_raw_fingerprint_mem;
 reg [31:0] second_field_raw_fingerprint_mem;
 
+// Entry 525: the raw fingerprint is reset at launch of each logical luma-line
+// fetch and committed atomically with its physical row, bank and generation
+// only after the final DDR word arrives.  Each bank's toggle changes last, so
+// its associated tag bundle remains stable throughout synchronization.
+reg [31:0] luma_line_raw_accumulator_mem;
+reg [31:0] luma_tag_raw_bank0_mem;
+reg [31:0] luma_tag_raw_bank1_mem;
+reg [10:0] luma_tag_row_bank0_mem;
+reg [10:0] luma_tag_row_bank1_mem;
+reg [7:0]  luma_tag_generation_bank0_mem;
+reg [7:0]  luma_tag_generation_bank1_mem;
+reg        luma_tag_bank_bank0_mem;
+reg        luma_tag_bank_bank1_mem;
+reg        luma_tag_valid_bank0_mem;
+reg        luma_tag_valid_bank1_mem;
+reg        luma_tag_toggle_bank0_mem;
+reg        luma_tag_toggle_bank1_mem;
+
 // Completed display fingerprints are stable before their toggle traverses
 // this three-stage bundled-data handshake back to mem_clk.
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
@@ -195,6 +228,85 @@ reg        luma_fingerprint_first_reported_rd;
 reg        luma_fingerprint_second_reported_rd;
 reg [11:0] source_x_d;
 reg [11:0] source_y_d;
+
+// Completed cache tags cross from mem_clk to rd_clk as stable bundled data.
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] luma_tag_toggle_bank0_sync_rd;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] luma_tag_toggle_bank1_sync_rd;
+reg        luma_tag_toggle_bank0_seen_rd;
+reg        luma_tag_toggle_bank1_seen_rd;
+reg [31:0] luma_tag_raw_bank0_r1;
+reg [31:0] luma_tag_raw_bank0_r2;
+reg [31:0] luma_tag_raw_bank1_r1;
+reg [31:0] luma_tag_raw_bank1_r2;
+reg [10:0] luma_tag_row_bank0_r1;
+reg [10:0] luma_tag_row_bank0_r2;
+reg [10:0] luma_tag_row_bank1_r1;
+reg [10:0] luma_tag_row_bank1_r2;
+reg [7:0]  luma_tag_generation_bank0_r1;
+reg [7:0]  luma_tag_generation_bank0_r2;
+reg [7:0]  luma_tag_generation_bank1_r1;
+reg [7:0]  luma_tag_generation_bank1_r2;
+reg        luma_tag_bank_bank0_r1;
+reg        luma_tag_bank_bank0_r2;
+reg        luma_tag_bank_bank1_r1;
+reg        luma_tag_bank_bank1_r2;
+reg        luma_tag_valid_bank0_r1;
+reg        luma_tag_valid_bank0_r2;
+reg        luma_tag_valid_bank1_r1;
+reg        luma_tag_valid_bank1_r2;
+reg [31:0] luma_tag_raw_bank0_visible_rd;
+reg [31:0] luma_tag_raw_bank1_visible_rd;
+reg [10:0] luma_tag_row_bank0_visible_rd;
+reg [10:0] luma_tag_row_bank1_visible_rd;
+reg [7:0]  luma_tag_generation_bank0_visible_rd;
+reg [7:0]  luma_tag_generation_bank1_visible_rd;
+reg        luma_tag_bank_bank0_visible_rd;
+reg        luma_tag_bank_bank1_visible_rd;
+reg        luma_tag_valid_bank0_visible_rd;
+reg        luma_tag_valid_bank1_visible_rd;
+
+// The applicable stable tag is latched at the first byte of a displayed line.
+reg [31:0] luma_line_tag_raw_rd;
+reg [10:0] luma_line_tag_row_rd;
+reg [7:0]  luma_line_tag_generation_rd;
+reg        luma_line_tag_valid_rd;
+reg        luma_line_tag_bank_rd;
+reg [31:0] luma_line_display_accumulator_rd;
+
+// Completed per-line comparisons cross back to mem_clk behind one toggle.
+reg        luma_provenance_toggle_rd;
+reg        luma_provenance_first_field_rd;
+reg        luma_provenance_tag_mismatch_rd;
+reg        luma_provenance_content_mismatch_rd;
+reg        luma_provenance_expected_bank_rd;
+reg        luma_provenance_tagged_bank_rd;
+reg [10:0] luma_provenance_expected_row_rd;
+reg [10:0] luma_provenance_tagged_row_rd;
+reg [7:0]  luma_provenance_expected_generation_rd;
+reg [7:0]  luma_provenance_tagged_generation_rd;
+reg [31:0] luma_provenance_raw_fingerprint_rd;
+reg [31:0] luma_provenance_display_fingerprint_rd;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] luma_provenance_toggle_sync;
+reg        luma_provenance_toggle_seen;
+reg        luma_provenance_first_m1,luma_provenance_first_m2;
+reg        luma_provenance_tag_mismatch_m1,luma_provenance_tag_mismatch_m2;
+reg        luma_provenance_content_mismatch_m1;
+reg        luma_provenance_content_mismatch_m2;
+reg        luma_provenance_expected_bank_m1,luma_provenance_expected_bank_m2;
+reg        luma_provenance_tagged_bank_m1,luma_provenance_tagged_bank_m2;
+reg [10:0] luma_provenance_expected_row_m1,luma_provenance_expected_row_m2;
+reg [10:0] luma_provenance_tagged_row_m1,luma_provenance_tagged_row_m2;
+reg [7:0] luma_provenance_expected_generation_m1;
+reg [7:0] luma_provenance_expected_generation_m2;
+reg [7:0] luma_provenance_tagged_generation_m1;
+reg [7:0] luma_provenance_tagged_generation_m2;
+reg [31:0] luma_provenance_raw_fingerprint_m1;
+reg [31:0] luma_provenance_raw_fingerprint_m2;
+reg [31:0] luma_provenance_display_fingerprint_m1;
+reg [31:0] luma_provenance_display_fingerprint_m2;
 
 assign ddram_burstcnt = (mem_state == MEM_ISSUE) ? fetch_segment_words : 8'd0;
 assign ddram_addr     = (mem_state == MEM_ISSUE) ? fetch_address : 29'd0;
@@ -349,6 +461,9 @@ task automatic launch_fetch;
         recv_word_index    <= 8'd0;
         fetch_cache_bank   <= cache_bank;
 
+        if (kind == FETCH_Y)
+            luma_line_raw_accumulator_mem <= 32'd0;
+
         if ((kind == FETCH_Y) && native_interlaced_mem) begin
             if (line_number[0] == first_field_mem)
                 first_field_fetch_toggle_mem <=
@@ -391,6 +506,19 @@ always @(posedge mem_clk) begin
         second_field_fetch_toggle_mem <= 1'b0;
         first_field_raw_fingerprint_mem  <= 32'd0;
         second_field_raw_fingerprint_mem <= 32'd0;
+        luma_line_raw_accumulator_mem <= 32'd0;
+        luma_tag_raw_bank0_mem <= 32'd0;
+        luma_tag_raw_bank1_mem <= 32'd0;
+        luma_tag_row_bank0_mem <= 11'd0;
+        luma_tag_row_bank1_mem <= 11'd0;
+        luma_tag_generation_bank0_mem <= 8'd0;
+        luma_tag_generation_bank1_mem <= 8'd0;
+        luma_tag_bank_bank0_mem <= 1'b0;
+        luma_tag_bank_bank1_mem <= 1'b0;
+        luma_tag_valid_bank0_mem <= 1'b0;
+        luma_tag_valid_bank1_mem <= 1'b0;
+        luma_tag_toggle_bank0_mem <= 1'b0;
+        luma_tag_toggle_bank1_mem <= 1'b0;
         luma_fingerprint_toggle_sync     <= 3'b000;
         luma_fingerprint_toggle_seen     <= 1'b0;
         luma_fingerprint_first_m1        <= 1'b0;
@@ -402,6 +530,42 @@ always @(posedge mem_clk) begin
         luma_fingerprint_raw_debug       <= 32'd0;
         luma_fingerprint_display_debug   <= 32'd0;
         luma_fingerprint_mismatch_debug  <= 1'b0;
+        luma_provenance_toggle_sync <= 3'b000;
+        luma_provenance_toggle_seen <= 1'b0;
+        luma_provenance_first_m1 <= 1'b0;
+        luma_provenance_first_m2 <= 1'b0;
+        luma_provenance_tag_mismatch_m1 <= 1'b0;
+        luma_provenance_tag_mismatch_m2 <= 1'b0;
+        luma_provenance_content_mismatch_m1 <= 1'b0;
+        luma_provenance_content_mismatch_m2 <= 1'b0;
+        luma_provenance_expected_bank_m1 <= 1'b0;
+        luma_provenance_expected_bank_m2 <= 1'b0;
+        luma_provenance_tagged_bank_m1 <= 1'b0;
+        luma_provenance_tagged_bank_m2 <= 1'b0;
+        luma_provenance_expected_row_m1 <= 11'd0;
+        luma_provenance_expected_row_m2 <= 11'd0;
+        luma_provenance_tagged_row_m1 <= 11'd0;
+        luma_provenance_tagged_row_m2 <= 11'd0;
+        luma_provenance_expected_generation_m1 <= 8'd0;
+        luma_provenance_expected_generation_m2 <= 8'd0;
+        luma_provenance_tagged_generation_m1 <= 8'd0;
+        luma_provenance_tagged_generation_m2 <= 8'd0;
+        luma_provenance_raw_fingerprint_m1 <= 32'd0;
+        luma_provenance_raw_fingerprint_m2 <= 32'd0;
+        luma_provenance_display_fingerprint_m1 <= 32'd0;
+        luma_provenance_display_fingerprint_m2 <= 32'd0;
+        luma_provenance_valid_debug <= 1'b0;
+        luma_provenance_first_field_debug <= 1'b0;
+        luma_provenance_tag_mismatch_debug <= 1'b0;
+        luma_provenance_content_mismatch_debug <= 1'b0;
+        luma_provenance_expected_bank_debug <= 1'b0;
+        luma_provenance_tagged_bank_debug <= 1'b0;
+        luma_provenance_expected_row_debug <= 11'd0;
+        luma_provenance_tagged_row_debug <= 11'd0;
+        luma_provenance_expected_generation_debug <= 8'd0;
+        luma_provenance_tagged_generation_debug <= 8'd0;
+        luma_provenance_raw_fingerprint_debug <= 32'd0;
+        luma_provenance_display_fingerprint_debug <= 32'd0;
 
         prefill_step          <= 3'd0;
         prefill_done          <= 1'b0;
@@ -439,6 +603,69 @@ always @(posedge mem_clk) begin
         cb_cache_wr_en <= 1'b0;
         cr_cache_wr_en <= 1'b0;
         luma_fingerprint_valid_debug <= 1'b0;
+        luma_provenance_valid_debug <= 1'b0;
+
+        luma_provenance_toggle_sync <=
+            {luma_provenance_toggle_sync[1:0],luma_provenance_toggle_rd};
+        luma_provenance_first_m1 <= luma_provenance_first_field_rd;
+        luma_provenance_first_m2 <= luma_provenance_first_m1;
+        luma_provenance_tag_mismatch_m1 <= luma_provenance_tag_mismatch_rd;
+        luma_provenance_tag_mismatch_m2 <= luma_provenance_tag_mismatch_m1;
+        luma_provenance_content_mismatch_m1 <=
+            luma_provenance_content_mismatch_rd;
+        luma_provenance_content_mismatch_m2 <=
+            luma_provenance_content_mismatch_m1;
+        luma_provenance_expected_bank_m1 <= luma_provenance_expected_bank_rd;
+        luma_provenance_expected_bank_m2 <= luma_provenance_expected_bank_m1;
+        luma_provenance_tagged_bank_m1 <= luma_provenance_tagged_bank_rd;
+        luma_provenance_tagged_bank_m2 <= luma_provenance_tagged_bank_m1;
+        luma_provenance_expected_row_m1 <= luma_provenance_expected_row_rd;
+        luma_provenance_expected_row_m2 <= luma_provenance_expected_row_m1;
+        luma_provenance_tagged_row_m1 <= luma_provenance_tagged_row_rd;
+        luma_provenance_tagged_row_m2 <= luma_provenance_tagged_row_m1;
+        luma_provenance_expected_generation_m1 <=
+            luma_provenance_expected_generation_rd;
+        luma_provenance_expected_generation_m2 <=
+            luma_provenance_expected_generation_m1;
+        luma_provenance_tagged_generation_m1 <=
+            luma_provenance_tagged_generation_rd;
+        luma_provenance_tagged_generation_m2 <=
+            luma_provenance_tagged_generation_m1;
+        luma_provenance_raw_fingerprint_m1 <=
+            luma_provenance_raw_fingerprint_rd;
+        luma_provenance_raw_fingerprint_m2 <=
+            luma_provenance_raw_fingerprint_m1;
+        luma_provenance_display_fingerprint_m1 <=
+            luma_provenance_display_fingerprint_rd;
+        luma_provenance_display_fingerprint_m2 <=
+            luma_provenance_display_fingerprint_m1;
+
+        if (luma_provenance_toggle_sync[2] !=
+            luma_provenance_toggle_seen) begin
+            luma_provenance_toggle_seen <= luma_provenance_toggle_sync[2];
+            luma_provenance_valid_debug <= 1'b1;
+            luma_provenance_first_field_debug <= luma_provenance_first_m2;
+            luma_provenance_tag_mismatch_debug <=
+                luma_provenance_tag_mismatch_m2;
+            luma_provenance_content_mismatch_debug <=
+                luma_provenance_content_mismatch_m2;
+            luma_provenance_expected_bank_debug <=
+                luma_provenance_expected_bank_m2;
+            luma_provenance_tagged_bank_debug <=
+                luma_provenance_tagged_bank_m2;
+            luma_provenance_expected_row_debug <=
+                luma_provenance_expected_row_m2;
+            luma_provenance_tagged_row_debug <=
+                luma_provenance_tagged_row_m2;
+            luma_provenance_expected_generation_debug <=
+                luma_provenance_expected_generation_m2;
+            luma_provenance_tagged_generation_debug <=
+                luma_provenance_tagged_generation_m2;
+            luma_provenance_raw_fingerprint_debug <=
+                luma_provenance_raw_fingerprint_m2;
+            luma_provenance_display_fingerprint_debug <=
+                luma_provenance_display_fingerprint_m2;
+        end
 
         luma_fingerprint_toggle_sync <=
             {luma_fingerprint_toggle_sync[1:0],
@@ -566,6 +793,9 @@ always @(posedge mem_clk) begin
                     read_seen <= 1'b1;
 
                     if ((fetch_kind == FETCH_Y) && native_interlaced_mem) begin
+                        luma_line_raw_accumulator_mem <=
+                            luma_fingerprint_word(
+                                luma_line_raw_accumulator_mem,ddram_dout);
                         if (fetch_line[0] == first_field_mem)
                             first_field_raw_fingerprint_mem <=
                                 luma_fingerprint_word(
@@ -630,6 +860,36 @@ always @(posedge mem_clk) begin
                         else begin
                             // Complete logical line fetch.
                             mem_state <= MEM_IDLE;
+
+                            if ((fetch_kind == FETCH_Y) &&
+                                native_interlaced_mem) begin
+                                if (fetch_cache_bank) begin
+                                    luma_tag_raw_bank1_mem <=
+                                        luma_fingerprint_word(
+                                            luma_line_raw_accumulator_mem,
+                                            ddram_dout);
+                                    luma_tag_row_bank1_mem <= fetch_line;
+                                    luma_tag_generation_bank1_mem <=
+                                        framebuffer_generation;
+                                    luma_tag_bank_bank1_mem <= fetch_cache_bank;
+                                    luma_tag_valid_bank1_mem <= 1'b1;
+                                    luma_tag_toggle_bank1_mem <=
+                                        ~luma_tag_toggle_bank1_mem;
+                                end
+                                else begin
+                                    luma_tag_raw_bank0_mem <=
+                                        luma_fingerprint_word(
+                                            luma_line_raw_accumulator_mem,
+                                            ddram_dout);
+                                    luma_tag_row_bank0_mem <= fetch_line;
+                                    luma_tag_generation_bank0_mem <=
+                                        framebuffer_generation;
+                                    luma_tag_bank_bank0_mem <= fetch_cache_bank;
+                                    luma_tag_valid_bank0_mem <= 1'b1;
+                                    luma_tag_toggle_bank0_mem <=
+                                        ~luma_tag_toggle_bank0_mem;
+                                end
+                            end
 
                             if (!prefill_done) begin
                                 if (prefill_step == 3'd5) begin
@@ -845,6 +1105,8 @@ reg        native_interlaced_r1;
 reg        native_interlaced_r2;
 reg        first_field_r1;
 reg        first_field_r2;
+reg [7:0]  framebuffer_generation_r1;
+reg [7:0]  framebuffer_generation_r2;
 reg        picture_present_rd;
 reg        prefill_deadline_missed_rd;
 reg        line_done_pending_rd;
@@ -900,6 +1162,23 @@ wire progressive_publish_origin =
 // misaligned field breaks the parity, which is the invariant that matters.
 wire raster_first_field_rd   = (v_pos[0] == first_field_r2);
 wire sequence_first_field_rd = (sequence_replica_rd < 9'd240);
+wire [31:0] luma_line_display_final_rd =
+    luma_fingerprint_byte(luma_line_display_accumulator_rd,y_rd_data);
+wire luma_line_expected_bank_rd = source_y_d[1];
+// picture_present_rd rises at the native origin one cache-read pipeline stage
+// before decoded_picture_window_d can qualify that first returned byte.  Admit
+// the delayed x=0 sample explicitly so the diagnostic covers all 720 bytes of
+// the first published line as well as every already-published line.
+wire native_luma_sample_valid_rd =
+    native_interlaced_r2 &&
+    (decoded_picture_window_d ||
+     (picture_present_rd && pixel_en && (source_x_d == 12'd0) &&
+      (source_y_d < {1'b0,picture_height_r2})));
+wire luma_line_tag_mismatch_now =
+    !luma_line_tag_valid_rd ||
+    (luma_line_tag_row_rd != source_y_d[10:0]) ||
+    (luma_line_tag_bank_rd != luma_line_expected_bank_rd) ||
+    (luma_line_tag_generation_rd != framebuffer_generation_r2);
 
 always @(posedge rd_clk) begin
     if (rd_reset) begin
@@ -913,6 +1192,8 @@ always @(posedge rd_clk) begin
         native_interlaced_r2  <= 1'b0;
         first_field_r1        <= 1'b0;
         first_field_r2        <= 1'b0;
+        framebuffer_generation_r1 <= 8'd0;
+        framebuffer_generation_r2 <= 8'd0;
         picture_present_rd   <= 1'b0;
         prefill_deadline_missed_rd <= 1'b0;
         line_done_toggle_rd  <= 1'b0;
@@ -930,6 +1211,58 @@ always @(posedge rd_clk) begin
         luma_fingerprint_second_reported_rd <= 1'b0;
         source_x_d                      <= 12'd0;
         source_y_d                      <= 12'd0;
+        luma_tag_toggle_bank0_sync_rd <= 3'b000;
+        luma_tag_toggle_bank1_sync_rd <= 3'b000;
+        luma_tag_toggle_bank0_seen_rd <= 1'b0;
+        luma_tag_toggle_bank1_seen_rd <= 1'b0;
+        luma_tag_raw_bank0_r1 <= 32'd0;
+        luma_tag_raw_bank0_r2 <= 32'd0;
+        luma_tag_raw_bank1_r1 <= 32'd0;
+        luma_tag_raw_bank1_r2 <= 32'd0;
+        luma_tag_row_bank0_r1 <= 11'd0;
+        luma_tag_row_bank0_r2 <= 11'd0;
+        luma_tag_row_bank1_r1 <= 11'd0;
+        luma_tag_row_bank1_r2 <= 11'd0;
+        luma_tag_generation_bank0_r1 <= 8'd0;
+        luma_tag_generation_bank0_r2 <= 8'd0;
+        luma_tag_generation_bank1_r1 <= 8'd0;
+        luma_tag_generation_bank1_r2 <= 8'd0;
+        luma_tag_bank_bank0_r1 <= 1'b0;
+        luma_tag_bank_bank0_r2 <= 1'b0;
+        luma_tag_bank_bank1_r1 <= 1'b0;
+        luma_tag_bank_bank1_r2 <= 1'b0;
+        luma_tag_valid_bank0_r1 <= 1'b0;
+        luma_tag_valid_bank0_r2 <= 1'b0;
+        luma_tag_valid_bank1_r1 <= 1'b0;
+        luma_tag_valid_bank1_r2 <= 1'b0;
+        luma_tag_raw_bank0_visible_rd <= 32'd0;
+        luma_tag_raw_bank1_visible_rd <= 32'd0;
+        luma_tag_row_bank0_visible_rd <= 11'd0;
+        luma_tag_row_bank1_visible_rd <= 11'd0;
+        luma_tag_generation_bank0_visible_rd <= 8'd0;
+        luma_tag_generation_bank1_visible_rd <= 8'd0;
+        luma_tag_bank_bank0_visible_rd <= 1'b0;
+        luma_tag_bank_bank1_visible_rd <= 1'b0;
+        luma_tag_valid_bank0_visible_rd <= 1'b0;
+        luma_tag_valid_bank1_visible_rd <= 1'b0;
+        luma_line_tag_raw_rd <= 32'd0;
+        luma_line_tag_row_rd <= 11'd0;
+        luma_line_tag_generation_rd <= 8'd0;
+        luma_line_tag_valid_rd <= 1'b0;
+        luma_line_tag_bank_rd <= 1'b0;
+        luma_line_display_accumulator_rd <= 32'd0;
+        luma_provenance_toggle_rd <= 1'b0;
+        luma_provenance_first_field_rd <= 1'b0;
+        luma_provenance_tag_mismatch_rd <= 1'b0;
+        luma_provenance_content_mismatch_rd <= 1'b0;
+        luma_provenance_expected_bank_rd <= 1'b0;
+        luma_provenance_tagged_bank_rd <= 1'b0;
+        luma_provenance_expected_row_rd <= 11'd0;
+        luma_provenance_tagged_row_rd <= 11'd0;
+        luma_provenance_expected_generation_rd <= 8'd0;
+        luma_provenance_tagged_generation_rd <= 8'd0;
+        luma_provenance_raw_fingerprint_rd <= 32'd0;
+        luma_provenance_display_fingerprint_rd <= 32'd0;
     end
     else begin
         cache_ready_r1    <= cache_ready;
@@ -942,6 +1275,54 @@ always @(posedge rd_clk) begin
         native_interlaced_r2 <= native_interlaced_r1;
         first_field_r1       <= first_field_mem;
         first_field_r2       <= first_field_r1;
+        framebuffer_generation_r1 <= framebuffer_generation;
+        framebuffer_generation_r2 <= framebuffer_generation_r1;
+
+        luma_tag_toggle_bank0_sync_rd <=
+            {luma_tag_toggle_bank0_sync_rd[1:0],luma_tag_toggle_bank0_mem};
+        luma_tag_toggle_bank1_sync_rd <=
+            {luma_tag_toggle_bank1_sync_rd[1:0],luma_tag_toggle_bank1_mem};
+        luma_tag_raw_bank0_r1 <= luma_tag_raw_bank0_mem;
+        luma_tag_raw_bank0_r2 <= luma_tag_raw_bank0_r1;
+        luma_tag_raw_bank1_r1 <= luma_tag_raw_bank1_mem;
+        luma_tag_raw_bank1_r2 <= luma_tag_raw_bank1_r1;
+        luma_tag_row_bank0_r1 <= luma_tag_row_bank0_mem;
+        luma_tag_row_bank0_r2 <= luma_tag_row_bank0_r1;
+        luma_tag_row_bank1_r1 <= luma_tag_row_bank1_mem;
+        luma_tag_row_bank1_r2 <= luma_tag_row_bank1_r1;
+        luma_tag_generation_bank0_r1 <= luma_tag_generation_bank0_mem;
+        luma_tag_generation_bank0_r2 <= luma_tag_generation_bank0_r1;
+        luma_tag_generation_bank1_r1 <= luma_tag_generation_bank1_mem;
+        luma_tag_generation_bank1_r2 <= luma_tag_generation_bank1_r1;
+        luma_tag_bank_bank0_r1 <= luma_tag_bank_bank0_mem;
+        luma_tag_bank_bank0_r2 <= luma_tag_bank_bank0_r1;
+        luma_tag_bank_bank1_r1 <= luma_tag_bank_bank1_mem;
+        luma_tag_bank_bank1_r2 <= luma_tag_bank_bank1_r1;
+        luma_tag_valid_bank0_r1 <= luma_tag_valid_bank0_mem;
+        luma_tag_valid_bank0_r2 <= luma_tag_valid_bank0_r1;
+        luma_tag_valid_bank1_r1 <= luma_tag_valid_bank1_mem;
+        luma_tag_valid_bank1_r2 <= luma_tag_valid_bank1_r1;
+
+        if (luma_tag_toggle_bank0_sync_rd[2] !=
+            luma_tag_toggle_bank0_seen_rd) begin
+            luma_tag_toggle_bank0_seen_rd <= luma_tag_toggle_bank0_sync_rd[2];
+            luma_tag_raw_bank0_visible_rd <= luma_tag_raw_bank0_r2;
+            luma_tag_row_bank0_visible_rd <= luma_tag_row_bank0_r2;
+            luma_tag_generation_bank0_visible_rd <=
+                luma_tag_generation_bank0_r2;
+            luma_tag_bank_bank0_visible_rd <= luma_tag_bank_bank0_r2;
+            luma_tag_valid_bank0_visible_rd <= luma_tag_valid_bank0_r2;
+        end
+        if (luma_tag_toggle_bank1_sync_rd[2] !=
+            luma_tag_toggle_bank1_seen_rd) begin
+            luma_tag_toggle_bank1_seen_rd <= luma_tag_toggle_bank1_sync_rd[2];
+            luma_tag_raw_bank1_visible_rd <= luma_tag_raw_bank1_r2;
+            luma_tag_row_bank1_visible_rd <= luma_tag_row_bank1_r2;
+            luma_tag_generation_bank1_visible_rd <=
+                luma_tag_generation_bank1_r2;
+            luma_tag_bank_bank1_visible_rd <= luma_tag_bank_bank1_r2;
+            luma_tag_valid_bank1_visible_rd <= luma_tag_valid_bank1_r2;
+        end
 
         if (pixel_ce) begin
             source_x_d <= source_x;
@@ -979,7 +1360,7 @@ always @(posedge rd_clk) begin
             // matching the line-cache address/lane pipeline below.  At the
             // final pixel of either 240-line field, latch the completed value
             // and toggle the bundled-data handshake back to mem_clk.
-            if (native_interlaced_r2 && decoded_picture_window_d) begin
+            if (native_luma_sample_valid_rd) begin
                 if ((source_x_d == 12'd719) &&
                     (source_y_d[8:1] == 8'd239)) begin
                     if ((source_y_d[0] == first_field_r2) &&
@@ -1008,6 +1389,69 @@ always @(posedge rd_clk) begin
                     luma_fingerprint_accumulator_rd <=
                         luma_fingerprint_byte(
                             luma_fingerprint_accumulator_rd,y_rd_data);
+                end
+            end
+
+            // Entry 525: compare every displayed native luma line against the
+            // completed tag for the physical cache bank selected by that line.
+            // Tag mismatches and content mismatches are mutually exclusive so
+            // the hardware result identifies ownership separately from bytes.
+            if (native_luma_sample_valid_rd) begin
+                if (source_x_d == 12'd0) begin
+                    luma_line_display_accumulator_rd <=
+                        luma_fingerprint_byte(32'd0,y_rd_data);
+                    if (source_y_d[1]) begin
+                        luma_line_tag_raw_rd <=
+                            luma_tag_raw_bank1_visible_rd;
+                        luma_line_tag_row_rd <=
+                            luma_tag_row_bank1_visible_rd;
+                        luma_line_tag_generation_rd <=
+                            luma_tag_generation_bank1_visible_rd;
+                        luma_line_tag_bank_rd <=
+                            luma_tag_bank_bank1_visible_rd;
+                        luma_line_tag_valid_rd <=
+                            luma_tag_valid_bank1_visible_rd;
+                    end
+                    else begin
+                        luma_line_tag_raw_rd <=
+                            luma_tag_raw_bank0_visible_rd;
+                        luma_line_tag_row_rd <=
+                            luma_tag_row_bank0_visible_rd;
+                        luma_line_tag_generation_rd <=
+                            luma_tag_generation_bank0_visible_rd;
+                        luma_line_tag_bank_rd <=
+                            luma_tag_bank_bank0_visible_rd;
+                        luma_line_tag_valid_rd <=
+                            luma_tag_valid_bank0_visible_rd;
+                    end
+                end
+                else if (source_x_d == 12'd719) begin
+                    luma_provenance_first_field_rd <=
+                        (source_y_d[0] == first_field_r2);
+                    luma_provenance_tag_mismatch_rd <=
+                        luma_line_tag_mismatch_now;
+                    luma_provenance_content_mismatch_rd <=
+                        !luma_line_tag_mismatch_now &&
+                        (luma_line_tag_raw_rd != luma_line_display_final_rd);
+                    luma_provenance_expected_bank_rd <=
+                        luma_line_expected_bank_rd;
+                    luma_provenance_tagged_bank_rd <= luma_line_tag_bank_rd;
+                    luma_provenance_expected_row_rd <= source_y_d[10:0];
+                    luma_provenance_tagged_row_rd <= luma_line_tag_row_rd;
+                    luma_provenance_expected_generation_rd <=
+                        framebuffer_generation_r2;
+                    luma_provenance_tagged_generation_rd <=
+                        luma_line_tag_generation_rd;
+                    luma_provenance_raw_fingerprint_rd <= luma_line_tag_raw_rd;
+                    luma_provenance_display_fingerprint_rd <=
+                        luma_line_display_final_rd;
+                    luma_provenance_toggle_rd <= ~luma_provenance_toggle_rd;
+                    luma_line_display_accumulator_rd <= 32'd0;
+                end
+                else begin
+                    luma_line_display_accumulator_rd <=
+                        luma_fingerprint_byte(
+                            luma_line_display_accumulator_rd,y_rd_data);
                 end
             end
 

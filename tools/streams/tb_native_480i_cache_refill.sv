@@ -78,6 +78,18 @@ wire luma_fingerprint_first_field_debug;
 wire [31:0] luma_fingerprint_raw_debug;
 wire [31:0] luma_fingerprint_display_debug;
 wire luma_fingerprint_mismatch_debug;
+wire luma_provenance_valid_debug;
+wire luma_provenance_first_field_debug;
+wire luma_provenance_tag_mismatch_debug;
+wire luma_provenance_content_mismatch_debug;
+wire luma_provenance_expected_bank_debug;
+wire luma_provenance_tagged_bank_debug;
+wire [10:0] luma_provenance_expected_row_debug;
+wire [10:0] luma_provenance_tagged_row_debug;
+wire [7:0] luma_provenance_expected_generation_debug;
+wire [7:0] luma_provenance_tagged_generation_debug;
+wire [31:0] luma_provenance_raw_fingerprint_debug;
+wire [31:0] luma_provenance_display_fingerprint_debug;
 wire [7:0] video_r;
 wire [7:0] video_g;
 wire [7:0] video_b;
@@ -94,6 +106,7 @@ mpeg2_luma_framebuffer dut
     .vertical_size      (14'd480),
     .native_interlaced  (1'b1),
     .top_field_first    (~bff_mode),
+    .framebuffer_generation(8'h2a),
     .ddram_busy         (1'b0),
     .ddram_dout         (ddram_dout),
     .ddram_dout_ready   (ddram_dout_ready),
@@ -112,6 +125,25 @@ mpeg2_luma_framebuffer dut
     .luma_fingerprint_raw_debug(luma_fingerprint_raw_debug),
     .luma_fingerprint_display_debug(luma_fingerprint_display_debug),
     .luma_fingerprint_mismatch_debug(luma_fingerprint_mismatch_debug),
+    .luma_provenance_valid_debug(luma_provenance_valid_debug),
+    .luma_provenance_first_field_debug(luma_provenance_first_field_debug),
+    .luma_provenance_tag_mismatch_debug(
+        luma_provenance_tag_mismatch_debug),
+    .luma_provenance_content_mismatch_debug(
+        luma_provenance_content_mismatch_debug),
+    .luma_provenance_expected_bank_debug(
+        luma_provenance_expected_bank_debug),
+    .luma_provenance_tagged_bank_debug(luma_provenance_tagged_bank_debug),
+    .luma_provenance_expected_row_debug(luma_provenance_expected_row_debug),
+    .luma_provenance_tagged_row_debug(luma_provenance_tagged_row_debug),
+    .luma_provenance_expected_generation_debug(
+        luma_provenance_expected_generation_debug),
+    .luma_provenance_tagged_generation_debug(
+        luma_provenance_tagged_generation_debug),
+    .luma_provenance_raw_fingerprint_debug(
+        luma_provenance_raw_fingerprint_debug),
+    .luma_provenance_display_fingerprint_debug(
+        luma_provenance_display_fingerprint_debug),
     .rd_clk             (rd_clk),
     .h_pos              (h_pos),
     .v_pos              (v_pos),
@@ -134,6 +166,11 @@ reg slow_mode = 1'b0;
 reg late_prefill_mode = 1'b0;
 integer fingerprint_count = 0;
 integer fingerprint_mismatch_count = 0;
+integer provenance_count = 0;
+integer provenance_tag_mismatch_count = 0;
+integer provenance_content_mismatch_count = 0;
+integer first_field_provenance_count = 0;
+integer second_field_provenance_count = 0;
 
 always @(posedge mem_clk) begin
     if (luma_fingerprint_valid_debug) begin
@@ -143,6 +180,33 @@ always @(posedge mem_clk) begin
         if (luma_fingerprint_mismatch_debug !=
             (luma_fingerprint_raw_debug != luma_fingerprint_display_debug))
             $fatal(1,"fingerprint mismatch flag disagrees with payload");
+    end
+end
+
+always @(posedge mem_clk) begin
+    if (luma_provenance_valid_debug) begin
+        provenance_count <= provenance_count + 1;
+        if (luma_provenance_first_field_debug)
+            first_field_provenance_count <= first_field_provenance_count + 1;
+        else
+            second_field_provenance_count <= second_field_provenance_count + 1;
+        if (luma_provenance_tag_mismatch_debug)
+            provenance_tag_mismatch_count <=
+                provenance_tag_mismatch_count + 1;
+        if (luma_provenance_content_mismatch_debug)
+            provenance_content_mismatch_count <=
+                provenance_content_mismatch_count + 1;
+        if (luma_provenance_tag_mismatch_debug &&
+            luma_provenance_content_mismatch_debug)
+            $fatal(1,"tag and content mismatch classes overlapped");
+        if (!luma_provenance_tag_mismatch_debug &&
+            ((luma_provenance_expected_row_debug !=
+              luma_provenance_tagged_row_debug) ||
+             (luma_provenance_expected_bank_debug !=
+              luma_provenance_tagged_bank_debug) ||
+             (luma_provenance_expected_generation_debug !=
+              luma_provenance_tagged_generation_debug)))
+            $fatal(1,"matching provenance carried unequal tags");
     end
 end
 
@@ -204,8 +268,10 @@ initial begin
     if (late_prefill_mode)
         repeat (12) @(posedge rd_clk);
     else begin
-        wait (cache_ready);
-        repeat (8) @(posedge rd_clk);
+    wait (cache_ready);
+    repeat (8) @(posedge rd_clk);
+    if ($test$plusargs("WRONG_BANK"))
+        force dut.luma_tag_bank_bank0_visible_rd = 1'b1;
     end
     running = 1'b1;
     wait (!running);
@@ -223,6 +289,32 @@ initial begin
         else if (fingerprint_mismatch_count != 0)
             $fatal(1,"matching cache produced %0d fingerprint mismatches",
                    fingerprint_mismatch_count);
+        if (provenance_count != 480)
+            $fatal(1,"expected 480 line provenance events, got %0d",
+                   provenance_count);
+        if ((first_field_provenance_count != 240) ||
+            (second_field_provenance_count != 240))
+            $fatal(1,"field provenance imbalance %0d/%0d",
+                   first_field_provenance_count,second_field_provenance_count);
+        if ($test$plusargs("WRONG_BANK")) begin
+            if ((provenance_tag_mismatch_count == 0) ||
+                (provenance_content_mismatch_count != 0))
+                $fatal(1,"wrong-bank classification mismatch tag/content=%0d/%0d",
+                       provenance_tag_mismatch_count,
+                       provenance_content_mismatch_count);
+        end
+        else if ($test$plusargs("CORRUPT")) begin
+            if ((provenance_tag_mismatch_count != 0) ||
+                (provenance_content_mismatch_count != 1))
+                $fatal(1,"corrupt-byte classification mismatch tag/content=%0d/%0d",
+                       provenance_tag_mismatch_count,
+                       provenance_content_mismatch_count);
+        end
+        else if ((provenance_tag_mismatch_count != 0) ||
+                 (provenance_content_mismatch_count != 0))
+            $fatal(1,"matching line provenance failed tag/content=%0d/%0d",
+                   provenance_tag_mismatch_count,
+                   provenance_content_mismatch_count);
         $display("NATIVE_CACHE_FINGERPRINT_PASS order=%s corrupted=%0d completed=%0d mismatches=%0d",
                  bff_mode?"BFF":"TFF",$test$plusargs("CORRUPT"),
                  fingerprint_count,fingerprint_mismatch_count);

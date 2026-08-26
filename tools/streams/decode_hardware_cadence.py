@@ -13,9 +13,11 @@ from PIL import Image
 
 MAGIC = 0x4D4D5031
 X0 = 8
-WORDS = 48
-DIAGNOSTIC_Y0 = 408
-NATIVE_480I_Y0 = 288
+WORDS = 61
+DIAGNOSTIC_Y0 = 356
+NATIVE_480I_Y0 = 236
+SCHEMA15_DIAGNOSTIC_Y0 = 408
+SCHEMA15_NATIVE_480I_Y0 = 288
 SCHEMA14_DIAGNOSTIC_Y0 = 428
 SCHEMA14_NATIVE_480I_Y0 = 308
 SCHEMA10_DIAGNOSTIC_Y0 = 436
@@ -53,6 +55,8 @@ def decode_words(path: Path | str) -> list[int]:
     layouts = (
         (DIAGNOSTIC_Y0, WORDS),
         (NATIVE_480I_Y0, WORDS),
+        (SCHEMA15_DIAGNOSTIC_Y0, 48),
+        (SCHEMA15_NATIVE_480I_Y0, 48),
         (SCHEMA14_DIAGNOSTIC_Y0, 43),
         (SCHEMA14_NATIVE_480I_Y0, 43),
         (SCHEMA10_DIAGNOSTIC_Y0, 41),
@@ -130,6 +134,29 @@ def parse_words(words: list[int]) -> dict[str, Any]:
     snapshot_meta = words[25]
     terminal = words[35]
     scheduler = words[36]
+
+    def provenance_event(
+        meta_index: int,
+        generation_index: int,
+        raw_index: int | None = None,
+        display_index: int | None = None,
+    ) -> dict[str, Any] | None:
+        if schema_version < 16:
+            return None
+        meta = words[meta_index]
+        generations = words[generation_index]
+        return {
+            "expected_row": (meta >> 21) & 0x7FF,
+            "tagged_row": (meta >> 10) & 0x7FF,
+            "expected_bank": (meta >> 9) & 1,
+            "tagged_bank": (meta >> 8) & 1,
+            "expected_generation": (generations >> 24) & 0xFF,
+            "tagged_generation": (generations >> 16) & 0xFF,
+            "raw_fingerprint": words[raw_index] if raw_index is not None else None,
+            "display_fingerprint": (
+                words[display_index] if display_index is not None else None
+            ),
+        }
 
     def scheduler_flags(state: int) -> dict[str, Any]:
         result = {
@@ -407,6 +434,28 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "framebuffer_second_field_fingerprint_mismatch_count": (
             words[46] & 0xFF if schema_version >= 15 else None
         ),
+        # Entry 525 (schema 16): per-line cache provenance keeps ownership/tag
+        # failures distinct from content failures with matching tags.
+        "framebuffer_first_field_tag_mismatch_count": (
+            (words[47] >> 24) & 0xFF if schema_version >= 16 else None
+        ),
+        "framebuffer_second_field_tag_mismatch_count": (
+            (words[47] >> 16) & 0xFF if schema_version >= 16 else None
+        ),
+        "framebuffer_first_field_content_mismatch_count": (
+            (words[47] >> 8) & 0xFF if schema_version >= 16 else None
+        ),
+        "framebuffer_second_field_content_mismatch_count": (
+            words[47] & 0xFF if schema_version >= 16 else None
+        ),
+        "framebuffer_first_field_first_tag_mismatch": provenance_event(48, 49),
+        "framebuffer_second_field_first_tag_mismatch": provenance_event(50, 51),
+        "framebuffer_first_field_first_content_mismatch": provenance_event(
+            52, 53, 54, 55
+        ),
+        "framebuffer_second_field_first_content_mismatch": provenance_event(
+            56, 57, 58, 59
+        ),
         "checksum": words[-1],
     }
 
@@ -553,6 +602,33 @@ def main() -> int:
                 "{framebuffer_second_field_fingerprint_mismatch_count}".format(
                     **result
                 )
+            )
+        if result["schema_version"] >= 16:
+            print(
+                "line provenance mismatches: tag first/second="
+                "{framebuffer_first_field_tag_mismatch_count}/"
+                "{framebuffer_second_field_tag_mismatch_count} "
+                "content first/second="
+                "{framebuffer_first_field_content_mismatch_count}/"
+                "{framebuffer_second_field_content_mismatch_count}".format(
+                    **result
+                )
+            )
+            print(
+                "first tag mismatch: "
+                f"{result['framebuffer_first_field_first_tag_mismatch']}"
+            )
+            print(
+                "second tag mismatch: "
+                f"{result['framebuffer_second_field_first_tag_mismatch']}"
+            )
+            print(
+                "first content mismatch: "
+                f"{result['framebuffer_first_field_first_content_mismatch']}"
+            )
+            print(
+                "second content mismatch: "
+                f"{result['framebuffer_second_field_first_content_mismatch']}"
             )
         if result["schema_version"] >= 12:
             print(

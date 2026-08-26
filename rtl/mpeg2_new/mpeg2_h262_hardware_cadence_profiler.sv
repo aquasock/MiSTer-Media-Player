@@ -34,6 +34,18 @@ module mpeg2_h262_hardware_cadence_profiler #(
     input wire [31:0] framebuffer_luma_fingerprint_raw,
     input wire [31:0] framebuffer_luma_fingerprint_display,
     input wire framebuffer_luma_fingerprint_mismatch,
+    input wire framebuffer_luma_provenance_valid,
+    input wire framebuffer_luma_provenance_first_field,
+    input wire framebuffer_luma_provenance_tag_mismatch,
+    input wire framebuffer_luma_provenance_content_mismatch,
+    input wire framebuffer_luma_provenance_expected_bank,
+    input wire framebuffer_luma_provenance_tagged_bank,
+    input wire [10:0] framebuffer_luma_provenance_expected_row,
+    input wire [10:0] framebuffer_luma_provenance_tagged_row,
+    input wire [7:0] framebuffer_luma_provenance_expected_generation,
+    input wire [7:0] framebuffer_luma_provenance_tagged_generation,
+    input wire [31:0] framebuffer_luma_provenance_raw_fingerprint,
+    input wire [31:0] framebuffer_luma_provenance_display_fingerprint,
     input wire framebuffer_first_field_fetch,
     input wire framebuffer_second_field_fetch,
     input wire fifo_pending,input wire decoder_ready,
@@ -77,22 +89,22 @@ module mpeg2_h262_hardware_cadence_profiler #(
     output reg [7:0] video_b,output wire snapshot_ready
 );
 
-localparam integer SNAPSHOT_WORDS=48;
+localparam integer SNAPSHOT_WORDS=61;
 localparam integer SNAPSHOT_BITS=SNAPSHOT_WORDS*32;
 localparam [23:0] TERMINAL_SNAPSHOT_LIMIT=
     TERMINAL_SNAPSHOT_DELAY-24'd1;
 localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
-localparam [31:0] SNAPSHOT_FORMAT={8'd15,8'd48,16'd60000};
+localparam [31:0] SNAPSHOT_FORMAT={8'd16,8'd61,16'd60000};
 // Entry 511: keep all 41 rows visible without changing their encoding. The
 // mode observation is already in clk_video and affects overlay placement only.
 localparam [11:0] OVERLAY_X=12'd8;
 // Entry 516: schema 11 appends two packed words, so both origins move eight
 // rows up to keep the final row flush with the diagnostic and native rasters.
-localparam [11:0] OVERLAY_DIAG_Y=12'd408;
-localparam [11:0] OVERLAY_NATIVE_Y=12'd288;
-localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd192;
+localparam [11:0] OVERLAY_DIAG_Y=12'd356;
+localparam [11:0] OVERLAY_NATIVE_Y=12'd236;
+localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd244;
 
 reg session_active;
 reg fifo_pending_q,decoder_ready_q,presentation_hold_q,destination_hold_q;
@@ -167,6 +179,26 @@ reg [7:0] first_field_fingerprint_count;
 reg [7:0] second_field_fingerprint_count;
 reg [7:0] first_field_fingerprint_mismatch_count;
 reg [7:0] second_field_fingerprint_mismatch_count;
+reg [7:0] first_field_tag_mismatch_count;
+reg [7:0] second_field_tag_mismatch_count;
+reg [7:0] first_field_content_mismatch_count;
+reg [7:0] second_field_content_mismatch_count;
+reg first_field_tag_mismatch_seen;
+reg second_field_tag_mismatch_seen;
+reg first_field_content_mismatch_seen;
+reg second_field_content_mismatch_seen;
+reg [31:0] first_field_tag_mismatch_meta;
+reg [31:0] second_field_tag_mismatch_meta;
+reg [15:0] first_field_tag_mismatch_generations;
+reg [15:0] second_field_tag_mismatch_generations;
+reg [31:0] first_field_content_mismatch_meta;
+reg [31:0] second_field_content_mismatch_meta;
+reg [15:0] first_field_content_mismatch_generations;
+reg [15:0] second_field_content_mismatch_generations;
+reg [31:0] first_field_content_mismatch_raw;
+reg [31:0] first_field_content_mismatch_display;
+reg [31:0] second_field_content_mismatch_raw;
+reg [31:0] second_field_content_mismatch_display;
 reg [7:0] sequence_phase_error_count;
 reg framebuffer_publication_pending;
 reg [31:0] framebuffer_publication_latency;
@@ -333,13 +365,36 @@ assign snapshot_word_46_payload[15:8]=
 assign snapshot_word_46_payload[7:0]=
     second_field_fingerprint_mismatch_count;
 wire [31:0] snapshot_word_46=snapshot_word_46_payload;
+wire [31:0] luma_provenance_meta_now={
+    framebuffer_luma_provenance_expected_row,
+    framebuffer_luma_provenance_tagged_row,
+    framebuffer_luma_provenance_expected_bank,
+    framebuffer_luma_provenance_tagged_bank,8'd0};
+wire [15:0] luma_provenance_generations_now={
+    framebuffer_luma_provenance_expected_generation,
+    framebuffer_luma_provenance_tagged_generation};
 generate
 if(SNAPSHOT_WORD_46_BITS!=32)begin:invalid_snapshot_word_46_width
     initial $fatal(1,"snapshot word 46 is %0d bits, expected 32",
                    SNAPSHOT_WORD_46_BITS);
 end
 endgenerate
-wire [31:0] snapshot_word_47=snapshot_word_00^snapshot_word_01^
+wire [31:0] snapshot_word_47={first_field_tag_mismatch_count,
+    second_field_tag_mismatch_count,first_field_content_mismatch_count,
+    second_field_content_mismatch_count};
+wire [31:0] snapshot_word_48=first_field_tag_mismatch_meta;
+wire [31:0] snapshot_word_49={first_field_tag_mismatch_generations,16'd0};
+wire [31:0] snapshot_word_50=second_field_tag_mismatch_meta;
+wire [31:0] snapshot_word_51={second_field_tag_mismatch_generations,16'd0};
+wire [31:0] snapshot_word_52=first_field_content_mismatch_meta;
+wire [31:0] snapshot_word_53={first_field_content_mismatch_generations,16'd0};
+wire [31:0] snapshot_word_54=first_field_content_mismatch_raw;
+wire [31:0] snapshot_word_55=first_field_content_mismatch_display;
+wire [31:0] snapshot_word_56=second_field_content_mismatch_meta;
+wire [31:0] snapshot_word_57={second_field_content_mismatch_generations,16'd0};
+wire [31:0] snapshot_word_58=second_field_content_mismatch_raw;
+wire [31:0] snapshot_word_59=second_field_content_mismatch_display;
+wire [31:0] snapshot_word_60=snapshot_word_00^snapshot_word_01^
     snapshot_word_02^snapshot_word_03^snapshot_word_04^snapshot_word_05^
     snapshot_word_06^snapshot_word_07^snapshot_word_08^snapshot_word_09^
     snapshot_word_10^snapshot_word_11^snapshot_word_12^snapshot_word_13^
@@ -351,11 +406,18 @@ wire [31:0] snapshot_word_47=snapshot_word_00^snapshot_word_01^
     snapshot_word_34^snapshot_word_35^snapshot_word_36^snapshot_word_37^
     snapshot_word_38^snapshot_word_39^snapshot_word_40^snapshot_word_41^
     snapshot_word_42^snapshot_word_43^snapshot_word_44^snapshot_word_45^
-    snapshot_word_46;
+    snapshot_word_46^snapshot_word_47^snapshot_word_48^snapshot_word_49^
+    snapshot_word_50^snapshot_word_51^snapshot_word_52^snapshot_word_53^
+    snapshot_word_54^snapshot_word_55^snapshot_word_56^snapshot_word_57^
+    snapshot_word_58^snapshot_word_59;
 
 task capture_snapshot;
 begin
-    snapshot_mpeg2<={snapshot_word_47,snapshot_word_46,snapshot_word_45,
+    snapshot_mpeg2<={snapshot_word_60,snapshot_word_59,snapshot_word_58,
+        snapshot_word_57,snapshot_word_56,snapshot_word_55,snapshot_word_54,
+        snapshot_word_53,snapshot_word_52,snapshot_word_51,snapshot_word_50,
+        snapshot_word_49,snapshot_word_48,snapshot_word_47,
+        snapshot_word_46,snapshot_word_45,
         snapshot_word_44,snapshot_word_43,snapshot_word_42,snapshot_word_41,
         snapshot_word_40,snapshot_word_39,snapshot_word_38,
         snapshot_word_37,snapshot_word_36,snapshot_word_35,
@@ -431,6 +493,26 @@ always @(posedge clk_mpeg2) begin
         second_field_fingerprint_count<=0;
         first_field_fingerprint_mismatch_count<=0;
         second_field_fingerprint_mismatch_count<=0;
+        first_field_tag_mismatch_count<=0;
+        second_field_tag_mismatch_count<=0;
+        first_field_content_mismatch_count<=0;
+        second_field_content_mismatch_count<=0;
+        first_field_tag_mismatch_seen<=0;
+        second_field_tag_mismatch_seen<=0;
+        first_field_content_mismatch_seen<=0;
+        second_field_content_mismatch_seen<=0;
+        first_field_tag_mismatch_meta<=0;
+        second_field_tag_mismatch_meta<=0;
+        first_field_tag_mismatch_generations<=0;
+        second_field_tag_mismatch_generations<=0;
+        first_field_content_mismatch_meta<=0;
+        second_field_content_mismatch_meta<=0;
+        first_field_content_mismatch_generations<=0;
+        second_field_content_mismatch_generations<=0;
+        first_field_content_mismatch_raw<=0;
+        first_field_content_mismatch_display<=0;
+        second_field_content_mismatch_raw<=0;
+        second_field_content_mismatch_display<=0;
         display_picture_count<=0;display_swap_count<=0;
         b_picture_complete_d<=0;display_frame_bank_d<=0;
         display_scratch_d<=0;display_scratch_bank_d<=0;
@@ -575,6 +657,68 @@ always @(posedge clk_mpeg2) begin
                        (second_field_fingerprint_mismatch_count!=8'hff))
                         second_field_fingerprint_mismatch_count<=
                             second_field_fingerprint_mismatch_count+1'b1;
+                end
+            end
+            if(framebuffer_luma_provenance_valid)begin
+                if(framebuffer_luma_provenance_first_field)begin
+                    if(framebuffer_luma_provenance_tag_mismatch)begin
+                        if(first_field_tag_mismatch_count!=8'hff)
+                            first_field_tag_mismatch_count<=
+                                first_field_tag_mismatch_count+1'b1;
+                        if(!first_field_tag_mismatch_seen)begin
+                            first_field_tag_mismatch_seen<=1'b1;
+                            first_field_tag_mismatch_meta<=
+                                luma_provenance_meta_now;
+                            first_field_tag_mismatch_generations<=
+                                luma_provenance_generations_now;
+                        end
+                    end
+                    else if(framebuffer_luma_provenance_content_mismatch)begin
+                        if(first_field_content_mismatch_count!=8'hff)
+                            first_field_content_mismatch_count<=
+                                first_field_content_mismatch_count+1'b1;
+                        if(!first_field_content_mismatch_seen)begin
+                            first_field_content_mismatch_seen<=1'b1;
+                            first_field_content_mismatch_meta<=
+                                luma_provenance_meta_now;
+                            first_field_content_mismatch_generations<=
+                                luma_provenance_generations_now;
+                            first_field_content_mismatch_raw<=
+                                framebuffer_luma_provenance_raw_fingerprint;
+                            first_field_content_mismatch_display<=
+                                framebuffer_luma_provenance_display_fingerprint;
+                        end
+                    end
+                end
+                else begin
+                    if(framebuffer_luma_provenance_tag_mismatch)begin
+                        if(second_field_tag_mismatch_count!=8'hff)
+                            second_field_tag_mismatch_count<=
+                                second_field_tag_mismatch_count+1'b1;
+                        if(!second_field_tag_mismatch_seen)begin
+                            second_field_tag_mismatch_seen<=1'b1;
+                            second_field_tag_mismatch_meta<=
+                                luma_provenance_meta_now;
+                            second_field_tag_mismatch_generations<=
+                                luma_provenance_generations_now;
+                        end
+                    end
+                    else if(framebuffer_luma_provenance_content_mismatch)begin
+                        if(second_field_content_mismatch_count!=8'hff)
+                            second_field_content_mismatch_count<=
+                                second_field_content_mismatch_count+1'b1;
+                        if(!second_field_content_mismatch_seen)begin
+                            second_field_content_mismatch_seen<=1'b1;
+                            second_field_content_mismatch_meta<=
+                                luma_provenance_meta_now;
+                            second_field_content_mismatch_generations<=
+                                luma_provenance_generations_now;
+                            second_field_content_mismatch_raw<=
+                                framebuffer_luma_provenance_raw_fingerprint;
+                            second_field_content_mismatch_display<=
+                                framebuffer_luma_provenance_display_fingerprint;
+                        end
+                    end
                 end
             end
             if(framebuffer_first_field_fetch_edge&&
@@ -815,6 +959,19 @@ always @* begin
     45:overlay_row_word=snapshot_sync_2[1471:1440];
     46:overlay_row_word=snapshot_sync_2[1503:1472];
     47:overlay_row_word=snapshot_sync_2[1535:1504];
+    48:overlay_row_word=snapshot_sync_2[1567:1536];
+    49:overlay_row_word=snapshot_sync_2[1599:1568];
+    50:overlay_row_word=snapshot_sync_2[1631:1600];
+    51:overlay_row_word=snapshot_sync_2[1663:1632];
+    52:overlay_row_word=snapshot_sync_2[1695:1664];
+    53:overlay_row_word=snapshot_sync_2[1727:1696];
+    54:overlay_row_word=snapshot_sync_2[1759:1728];
+    55:overlay_row_word=snapshot_sync_2[1791:1760];
+    56:overlay_row_word=snapshot_sync_2[1823:1792];
+    57:overlay_row_word=snapshot_sync_2[1855:1824];
+    58:overlay_row_word=snapshot_sync_2[1887:1856];
+    59:overlay_row_word=snapshot_sync_2[1919:1888];
+    60:overlay_row_word=snapshot_sync_2[1951:1920];
     default:overlay_row_word=0;
     endcase
 end

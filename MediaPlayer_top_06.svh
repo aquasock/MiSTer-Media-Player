@@ -19,6 +19,23 @@ wire mpeg2_new_framebuffer_reset =
 wire mpeg2_new_framebuffer_generation_reset =
     (mpeg2_new_framebuffer_swap_reset_count != 3'd0) ||
     mpeg2_new_native_mode_change;
+reg mpeg2_new_framebuffer_generation_reset_d;
+reg [7:0] mpeg2_new_framebuffer_generation;
+
+always @(posedge clk_mpeg2) begin
+    if (reset_mpeg2) begin
+        mpeg2_new_framebuffer_generation_reset_d <= 1'b0;
+        mpeg2_new_framebuffer_generation <= 8'd0;
+    end
+    else begin
+        mpeg2_new_framebuffer_generation_reset_d <=
+            mpeg2_new_framebuffer_generation_reset;
+        if (mpeg2_new_framebuffer_generation_reset &&
+            !mpeg2_new_framebuffer_generation_reset_d)
+            mpeg2_new_framebuffer_generation <=
+                mpeg2_new_framebuffer_generation + 8'd1;
+    end
+end
 
 wire mpeg2_new_framebuffer_picture_present_rd;
 wire mpeg2_new_framebuffer_prefill_deadline_missed_rd;
@@ -37,6 +54,18 @@ wire mpeg2_new_luma_fingerprint_first_field;
 wire [31:0] mpeg2_new_luma_fingerprint_raw;
 wire [31:0] mpeg2_new_luma_fingerprint_display;
 wire mpeg2_new_luma_fingerprint_mismatch;
+wire mpeg2_new_luma_provenance_valid;
+wire mpeg2_new_luma_provenance_first_field;
+wire mpeg2_new_luma_provenance_tag_mismatch;
+wire mpeg2_new_luma_provenance_content_mismatch;
+wire mpeg2_new_luma_provenance_expected_bank;
+wire mpeg2_new_luma_provenance_tagged_bank;
+wire [10:0] mpeg2_new_luma_provenance_expected_row;
+wire [10:0] mpeg2_new_luma_provenance_tagged_row;
+wire [7:0] mpeg2_new_luma_provenance_expected_generation;
+wire [7:0] mpeg2_new_luma_provenance_tagged_generation;
+wire [31:0] mpeg2_new_luma_provenance_raw_fingerprint;
+wire [31:0] mpeg2_new_luma_provenance_display_fingerprint;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] mpeg2_new_framebuffer_picture_present_sync;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
@@ -135,6 +164,7 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
     // video-domain descriptor synchronizers with the published picture.
     .native_interlaced(mpeg2_new_native_active_sync[2]),
     .top_field_first(mpeg2_new_native_top_field_first),
+    .framebuffer_generation(mpeg2_new_framebuffer_generation),
     .ddram_busy     (mpeg2_new_ddr_reader_busy),
     .ddram_dout     (DDRAM_DOUT),
     .ddram_dout_ready(mpeg2_new_ddr_reader_dout_ready),
@@ -163,6 +193,29 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
     .luma_fingerprint_raw_debug(mpeg2_new_luma_fingerprint_raw),
     .luma_fingerprint_display_debug(mpeg2_new_luma_fingerprint_display),
     .luma_fingerprint_mismatch_debug(mpeg2_new_luma_fingerprint_mismatch),
+    .luma_provenance_valid_debug(mpeg2_new_luma_provenance_valid),
+    .luma_provenance_first_field_debug(
+        mpeg2_new_luma_provenance_first_field),
+    .luma_provenance_tag_mismatch_debug(
+        mpeg2_new_luma_provenance_tag_mismatch),
+    .luma_provenance_content_mismatch_debug(
+        mpeg2_new_luma_provenance_content_mismatch),
+    .luma_provenance_expected_bank_debug(
+        mpeg2_new_luma_provenance_expected_bank),
+    .luma_provenance_tagged_bank_debug(
+        mpeg2_new_luma_provenance_tagged_bank),
+    .luma_provenance_expected_row_debug(
+        mpeg2_new_luma_provenance_expected_row),
+    .luma_provenance_tagged_row_debug(
+        mpeg2_new_luma_provenance_tagged_row),
+    .luma_provenance_expected_generation_debug(
+        mpeg2_new_luma_provenance_expected_generation),
+    .luma_provenance_tagged_generation_debug(
+        mpeg2_new_luma_provenance_tagged_generation),
+    .luma_provenance_raw_fingerprint_debug(
+        mpeg2_new_luma_provenance_raw_fingerprint),
+    .luma_provenance_display_fingerprint_debug(
+        mpeg2_new_luma_provenance_display_fingerprint),
     .rd_clk         (clk_video),
     .h_pos          (display_h_pos),
     .v_pos          (display_v_pos),

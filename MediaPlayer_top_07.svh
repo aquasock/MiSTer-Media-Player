@@ -110,6 +110,30 @@ mpeg2_h262_hardware_cadence_profiler
     .framebuffer_luma_fingerprint_display(mpeg2_new_luma_fingerprint_display),
     .framebuffer_luma_fingerprint_mismatch(
         mpeg2_new_luma_fingerprint_mismatch),
+    .framebuffer_luma_provenance_valid(
+        mpeg2_new_luma_provenance_valid),
+    .framebuffer_luma_provenance_first_field(
+        mpeg2_new_luma_provenance_first_field),
+    .framebuffer_luma_provenance_tag_mismatch(
+        mpeg2_new_luma_provenance_tag_mismatch),
+    .framebuffer_luma_provenance_content_mismatch(
+        mpeg2_new_luma_provenance_content_mismatch),
+    .framebuffer_luma_provenance_expected_bank(
+        mpeg2_new_luma_provenance_expected_bank),
+    .framebuffer_luma_provenance_tagged_bank(
+        mpeg2_new_luma_provenance_tagged_bank),
+    .framebuffer_luma_provenance_expected_row(
+        mpeg2_new_luma_provenance_expected_row),
+    .framebuffer_luma_provenance_tagged_row(
+        mpeg2_new_luma_provenance_tagged_row),
+    .framebuffer_luma_provenance_expected_generation(
+        mpeg2_new_luma_provenance_expected_generation),
+    .framebuffer_luma_provenance_tagged_generation(
+        mpeg2_new_luma_provenance_tagged_generation),
+    .framebuffer_luma_provenance_raw_fingerprint(
+        mpeg2_new_luma_provenance_raw_fingerprint),
+    .framebuffer_luma_provenance_display_fingerprint(
+        mpeg2_new_luma_provenance_display_fingerprint),
     .framebuffer_first_field_fetch(
         mpeg2_new_framebuffer_first_field_fetch_toggle),
     .framebuffer_second_field_fetch(
