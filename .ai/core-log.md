@@ -1,3 +1,32 @@
+## 541 COMMIT Unreleased 00267dc 2026-08-26T14:11:30-07:00
+
+#### Coming From:
+
+Unreleased 00267dc
+
+#### Purpose:
+
+Record the seed-fourteen native RGB-control hardware failure and restore the last known-stable core before another source change.
+
+#### Outcome:
+
+The user reloaded the exact 4,248,132-byte `00267dc` image at SHA-256 `c061bf77cd2117d35d34c75d8aaee9374eb4552fee6b5f915ba351d95376ea7e` and reports that it is dramatically worse before any media is opened: the entire screen is unstable and the image appears to be repeatedly trying to exist. The MiSTer reports `Scaled not available` when asked to capture that live raster, so the unchanged `cadence_probe.png` subsequently retrieved by FTP is stale and is excluded from evidence. This behavior begins with the core's idle output and therefore precedes MPEG decoding, DDR access, Bob/Weave reconstruction and source cadence. Static comparison identifies the introduced hardware boundary: `c21912a` added `pixel_en_d`, `h_sync_d` and `v_sync_d` and drove `video_de`, `video_hs` and `video_vs` from those one-clock-delayed registers to satisfy an internal RGB-alignment assertion. Real hardware proves that contract wrong because MiSTer's downstream scaler requires the established undelayed external timing phase; no PLL or clock frequency was changed. The active `/media/fat/MediaPlayer.rbf` was directly restored from the retained exact `164c7e6` image, independently read back at 4,225,296 bytes and SHA-256 `b5ce400b43311a74b0607137bce4498685490b74e5d08587538a68e7cdce8d96`, and no backup, rollback or staging filename was created. After reloading, the user confirms the display returned to its prior stable-lock but still visually bad and flickery baseline. Entry 540 remains built but fails hardware acceptance and its RBF is withdrawn.
+
+#### Next Steps:
+
+Stop before another build and obtain approval for one corrective cycle with no new diagnostic schema. Strengthen the native framebuffer regression to assert the established top-level output contract separately from internal RGB sample validity, then revert only the one-clock `video_de`, `video_hs` and `video_vs` delay proven to break hardware while retaining or rejecting the first-origin publication qualifier strictly by directed simulation evidence. Rerun the focused native tests, complete native suite, reconstruction suite and canonical live-raster soak, then perform one incremental Quartus build. Hardware validation must begin with idle-screen scaler lock and a successful fresh screenshot before any media playback; only after that passes should Big Buck Bunny be retried.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 540 COMMIT Unreleased 00267dc 2026-08-26T12:43:39-07:00
 
 #### Coming From:
@@ -1210,35 +1239,6 @@ The user ran only `_cadence/native_480i_bff_light_10s.m2v` with native 480i acti
 #### Next Steps:
 
 Keep `Native timing pattern` Off, `HDMI deinterlacer` Bob and `Interlaced output` Native 480i, then run only `_cadence/native_480i_tff_light_10s.m2v`. Compare shadow duration, step frequency and final-image instability directly with this BFF Bob result, report all three LEDs and leave the terminal image loaded for an ordinary-FTP schema-nine capture. Matching clean telemetry and materially similar Bob artifacts will show the residual is field-order-independent scaler behavior and complete the current Bob/Weave control validation; a strong TFF/BFF visual asymmetry would instead require checking how the framework's Bob path interprets field polarity before refining the two-tier menu. Do not change MiSTer configuration or run the native direct-video/SDI tier yet.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 501 COMMIT Unreleased 4e4da3a 2026-08-25T02:50:47-07:00
-
-#### Coming From:
-
-Unreleased 4e4da3a
-
-#### Purpose:
-
-Adopt a permanent two-tier output model serving processed-HDMI viewers and native-480i external-processing users.
-
-#### Outcome:
-
-The user approved two explicit product tiers going forward: a normal processed-HDMI path using MiSTer's scaler with user-selectable Bob or Weave deinterlacing, and a separate Native 480i path that preserves correctly ordered, standards-timed decoded fields for eventual HDMI-to-SDI conversion and high-end external processing. The native tier must not silently deinterlace, scale or field-combine the source, while the convenience tier may use MiSTer's existing reconstruction and should clearly identify that processing in the menu and documentation. The current `4e4da3a` build already supplies native 480i timing and the scaler's Bob/Weave request, but MiSTer's `direct_video` bypass is framework configuration supplied through `cfg[10]`, not a signal this core can switch through its own status menu. Future menu work may select and label the core's intended output tier, but documentation and UI must not imply that this alone enables raw HDMI; actual SDI qualification will use the Native 480i tier together with MiSTer's direct-video setting and a compatible converter or sink.
-
-#### Next Steps:
-
-Complete entry 500's installed-build validation before changing the menu again: run the BFF light-motion fixture with Bob selected, capture visual and schema-nine evidence, then repeat the TFF fixture if BFF passes. After those results settle the processed-HDMI path, propose one bounded menu and documentation refinement that names the processed control `HDMI scaler deinterlacer`, presents Native 480i as the external-processing tier, suppresses or clearly marks irrelevant combinations and documents the separate MiSTer direct-video requirement. Do not implement a core-native deinterlacer or claim SDI readiness until raw-output timing has been tested on a compatible direct-video sink or converter.
 
 #### Files Modified:
 
