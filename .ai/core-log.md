@@ -1,3 +1,33 @@
+## 528 COMMIT Unreleased ??? 2026-08-26T01:36:57-07:00
+
+#### Coming From:
+
+Unreleased 98ee2dc
+
+#### Purpose:
+
+Expose and correct any native line-cache registered-address or byte-lane alignment defect hidden by the constant-data regression stimulus.
+
+#### Outcome:
+
+The user approved entry 527's bounded cache-read alignment cycle after schema sixteen proved correct row, bank and generation provenance but saturated content mismatches in both fields. This proposal changes no behavior speculatively: the first gate replaces the cache test's identical DDR words with deterministic position-varying words containing distinct bytes in all eight lanes while preserving the implemented registered M10K read-address model, four-read-clock pixel cadence, TFF and BFF field order, frame wrap and ordinary refill timing. Only if that test reproduces an exact raw-versus-displayed position mismatch will the same commit correct the proven pipeline alignment and require bit-exact 720-byte line comparisons; if it does not reproduce, work stops before RTL changes and the next proposal becomes a lane-resolved schema-seventeen diagnostic.
+
+#### Next Steps:
+
+Synchronize the designated GUNSMOKE checkout from the authoritative master branch, implement and run the position-varying native cache regression there, and inspect the first failing word and lane. If the existing RTL fails deterministically, make the smallest registered-read-address and byte-lane correction supported by that evidence, rerun the focused TFF and BFF cache controls followed by the complete native, reconstruction and canonical mixed-I/P/B live-raster suites, commit the source on the Raspberry Pi, synchronize GUNSMOKE to the exact source hash and perform an incremental Quartus Prime 17.0.2 build with timing, resource and netlist checks. Preserve schema sixteen unchanged for the hardware acceptance run and directly replace only `/media/fat/MediaPlayer.rbf` after a verified build, without creating backup, rollback or staging files.
+
+#### Files Modified:
+
+- rtl/mpeg2_luma_framebuffer.sv
+- tools/streams/tb_native_480i_cache_refill.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 527 COMMIT Unreleased 98ee2dc 2026-08-26T01:20:30-07:00
 
 #### Coming From:
@@ -1224,34 +1254,6 @@ The user ran `_cadence/native_480i_tff_light_10s.m2v` in `Native 480i` mode and 
 #### Next Steps:
 
 With explicit user approval, create one bounded native-presentation correction and diagnostic commit. Separate the native frame-window assertion from the second-field cadence assertion by a deterministic logical-sample interval inside vertical blanking, preserving the scheduler's established progressive arithmetic while ensuring the second field's credit is visible before physical bank admission. Replace the synthetic native scheduler test with an integrated timing-to-scheduler regression that reproduces the current simultaneous-pulse half-rate failure and proves one 30000/1001 presentation per two fields after correction. Add a passive sticky line-cache bank-overlap diagnostic and a native delayed-DDR live-raster stress case so the next hardware run can distinguish an actual refill collision from an output-clock symptom without changing clocks or cache depth speculatively. Rebuild and install the exact RBF, rerun only the light TFF fixture in Native 480i, require the decoder-limited rate to match the approximately 20.10-picture progressive baseline rather than 14.99, report flicker and transient dashes and leave the result for FTP-only capture. Continue to defer BFF and the public interlaced compatibility claim.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 488 COMMIT Unreleased 8d9043a 2026-08-24T23:22:04-07:00
-
-#### Coming From:
-
-Unreleased 8d9043a
-
-#### Purpose:
-
-Record the low-complexity TFF progressive-baseline result and separate expected temporal weave combing from the measured full-D1 all-I throughput ceiling.
-
-#### Outcome:
-
-The user ran `_cadence/native_480i_tff_light_10s.m2v` with `Interlaced output` set to `800x600 Diagnostic` and reports that it looked good for interlaced material, the prior flicker disappeared, motion looked good, the duration seemed close to ten seconds and USER and POWER remained solid while DISK blinked twice. The user also saw dot crawl on vertical edges and the apparent non-alignment or comb of the two fields, which limited fine motion judgment. The final 800x600 screenshot was triggered and retrieved entirely through ordinary FTP using the default MiSTer login and no SSH; `.ai/current_results/entry487_tff_light_diagnostic.png` is 19,667 bytes with SHA-256 `fbf4dca1fcf6bd87280888fbeaba24905bac1c53d3e0fb76f939dc024ae6edc8`. The visible schema-nine record accepts all 5,007,304 source bytes, reports 300 reference and displayed pictures and 299 swaps after interpreting the eight-bit picture and swap counters modulo 256, preserves stable `top_field_first=1`, sees sequence end and presentation completion and reaches normal quiet reason one. Aggregate, decoder, presentation, destination, audio-underrun and PCM-protocol errors are all clear, and no scheduler work remains. First presentation occurs at 2,378,246 cycles and the last at 894,849,788 cycles, so 299 swap intervals occupy 892,471,542 cycles, or 14.874526 seconds at 60 MHz. The actual sustained rate is 20.101 pictures per second, not 29.97; the helper's direct 2.891-fps value is invalid after the display counter wraps. This improves materially over the detailed fixture's 14.992 pictures per second but still fails the intended real-time baseline. The screenshot shows the authored four-pixel temporal separation between the top and bottom scanlines of the moving vertical bar. Because the diagnostic output deliberately weaves fields captured at successive 60000/1001 source times into one progressive frame, that comb is expected and does not by itself indicate reversed field order or misplaced cache lines. The no-flicker result provides a useful progressive-output comparison, but full-D1 all-I decode throughput remains a confounder and native interlace is not yet passed.
-
-#### Next Steps:
-
-Revise the isolation sequence rather than generating another nominally real-time full-D1 all-I stream. With explicit user approval, run the same `_cadence/native_480i_tff_light_10s.m2v` once in `Native 480i` mode and compare its live bar edge, comb or dot crawl, flicker and motion directly against this captured progressive weave baseline; leave the final image loaded for an FTP-only capture. Treat that run only as a presentation-quality comparison at the measured approximately 20.1-picture decode rate, not as a 29.97-fps cadence qualification. If native presentation removes or materially reduces the weave comb, keep native timing unchanged and plan decoder-throughput or interlaced predictive-picture work separately. If it does not, add a decoder-independent native field-rate raster diagnostic before changing presentation timing. Continue to defer BFF and the public interlaced compatibility claim.
 
 #### Files Modified:
 
