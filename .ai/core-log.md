@@ -1,4 +1,4 @@
-## 540 COMMIT Unreleased ??? 2026-08-26T12:43:39-07:00
+## 540 COMMIT Unreleased 00267dc 2026-08-26T12:43:39-07:00
 
 #### Coming From:
 
@@ -10,20 +10,22 @@ Prove that generation-correct native cache content remains position-correct thro
 
 #### Outcome:
 
-The user approved entry 539's next bounded simulation cycle after scheduler selection, framebuffer publication and both luma field-cache outputs passed three authored generations without a mismatch. The planned change remains inside the existing native cache-refill regression first: generate position- and generation-dependent luma and chroma DDR content, derive the expected 4:2:0 sample coordinates and BT.601 RGB value for every active pixel, and compare that value with the framebuffer's registered `video_r`, `video_g`, `video_b`, data-enable and sync-aligned output under ordinary TFF, ordinary BFF and valid delayed DDR service. The current framebuffer, RGB converter, final mux, hardware diagnostic layout, menu, scheduler, decoder, host software and MiSTer configuration remain untouched unless the exact current simulation reproduces a post-cache mismatch.
+The untouched framebuffer reproduced one exact post-cache defect before any behavioral change: position- and generation-varying Y, Cb and Cr samples reached the correct BT.601 components and RGB values, but data enable and both syncs led the registered RGB by one pixel, the first active pixel appeared before publication qualified it, and each generation emitted 345,599 rather than 345,600 active RGB pixels. Commits `771daa7`, `c21912a` and `d5485a7` add the independent component/RGB oracle, qualify the first origin pixel from the ready descriptor and register output controls alongside RGB, while scoping the new monitor away from the existing intentional overlap-fault control. Ordinary TFF, ordinary BFF and 512-cycle delayed service then each pass three generations with 240/240 field lines, exactly 345,600 active RGB pixels and 411,840 output samples per generation and zero component, RGB, control, publication, tag, content, cache or generation mismatch. The complete native suite passes field order, mapping, exact timing, Bob/Weave control, pattern isolation, ownership, ordinary/delayed/late-prefill refill, every fingerprint classifier and retained profiler layout. TFF, BFF and progressive reconstruction pass at 7,926,459, 7,948,706 and 13,048,137 cycles with zero out-of-tolerance pixels, field-DCT rejection remains 82,326 cycles and the canonical mixed-I/P/B live raster remains exactly 6,529,997 cycles with twenty-five publications, forty-seven B-picture persistences, seventy-one swaps and every error clear. The first retained-state seed-twelve fit missed setup by 0.230 nanoseconds entirely inside MiSTer's unchanged `ascal` scaler and seed thirteen reduced that miss to 0.028 nanoseconds; commit `00267dc` makes seed fourteen reproducible and removes three stale exceptions for an older aggregate fingerprint path that the current single diagnostic layout no longer consumes and synthesis removes completely, while all 434 current provenance keepers remain present. The seed-fourteen incremental fitter completes in 8 minutes 20 seconds with zero errors. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.138, 0.240, 3.787, 0.594 and 0.925 nanoseconds; focused decoder setup and recovery are positive 1.659 and 10.811 nanoseconds and focused video setup is positive 2.596 nanoseconds, all with zero violated paths. Only the established unmatched `RESET` filter remains. The fit uses 31,580 ALMs, 49,554 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The 4,248,132-byte RBF has SHA-256 `c061bf77cd2117d35d34c75d8aaee9374eb4552fee6b5f915ba351d95376ea7e`.
 
 #### Next Steps:
 
-Extend and run the existing generation-aware cache-refill test first against the exact current RTL on GUNSMOKE. If it fails, preserve the first mismatching generation, field, x and y coordinate and the expected and observed YCbCr and RGB values, then correct only a proven chroma cache address, byte-lane or RGB-valid pipeline transition and rerun the complete native, reconstruction and canonical live-raster suites before an incremental Quartus build. If every output pixel remains position- and generation-correct, stop without changing RTL or building an RBF and move the remaining investigation to the existing final mux and processed-HDMI boundary without adding another hardware telemetry schema.
+Copy the exact `00267dc` RBF from the designated GUNSMOKE checkout to the Raspberry Pi, directly replace only `/media/fat/MediaPlayer.rbf` through ordinary FTP without creating backup, rollback or staging files and verify the active image by independent readback. Reload the core and run `/media/fat/games/MediaPlayer/bbb_480i_tff_15s_8mbps.m2v` first with HDMI scaler deinterlacer Bob and then Weave, leaving Native timing pattern Off and Interlaced output Native 480i. Hardware acceptance requires smooth full-rate playback, normal menu response, audio, no retained old frame, no vertical or horizontal distortion and no left-edge crawl; report Bob and Weave separately before marking this entry passed.
 
 #### Files Modified:
 
 - tools/streams/tb_native_480i_cache_refill.sv
 - rtl/mpeg2_luma_framebuffer.sv
+- MediaPlayer.qsf
+- MediaPlayer.sdc
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
