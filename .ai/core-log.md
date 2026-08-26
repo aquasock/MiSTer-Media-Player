@@ -1,3 +1,32 @@
+## 533 COMMIT Unreleased 164c7e6 2026-08-26T04:54:09-07:00
+
+#### Coming From:
+
+Unreleased 5de0e1d
+
+#### Purpose:
+
+Build and directly install the scoped accepted-write-versus-raw-read diagnostic for one Big Buck Bunny Bob hardware discriminator.
+
+#### Outcome:
+
+The scope review confirms that commit `164c7e6` adds one passive accepted-luma-write through raw-DDR-read comparison path: ten runtime source files carry the observation through existing interfaces and seven files provide directed tests and diagnostic decoding, while no signal feeds the decoder, scheduler, framebuffer ownership, DDR write control, line-cache control or video output. The previously interrupted canonical seventy-two-picture mixed-I/P/B live-raster regression now completes in 6,529,997 cycles with twenty-five reference publications, forty-seven B pictures, seventy-one swaps and every decoder, reconstruction, DDR, cache, presentation and ownership error clear. The real Big Buck Bunny four-picture reconstruction comparison also passes all 2,073,600 positioned samples within the established one-LSB transform tolerance in 7,837,323 cycles. The retained-state Quartus Prime 17.0.2 build completes in 11:08 with zero errors and 172 warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.021, 0.260, 3.793, 0.542 and 0.925 nanoseconds; focused decoder setup and recovery are positive 1.202 and 11.265 nanoseconds and focused video setup is positive 2.626 nanoseconds, all with zero violated paths. The fit uses 31,240 of 41,910 ALMs, 49,445 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The 4,225,296-byte RBF has SHA-256 `b5ce400b43311a74b0607137bce4498685490b74e5d08587538a68e7cdce8d96`. It was copied from the designated GUNSMOKE checkout and directly replaced only `/media/fat/MediaPlayer.rbf` through ordinary FTP; independent readback is byte-identical at the same size and hash, and no MediaPlayer backup, rollback or staging filename exists.
+
+#### Next Steps:
+
+Reload the Media Player core, choose Bob, leave the native timing pattern Off and replay only `/media/fat/games/MediaPlayer/bbb_480i_tff_15s_8mbps.m2v`. Report whether old frames still reappear during otherwise smooth playback and leave the terminal image displayed. Retrieve and decode that terminal image through ordinary FTP. A write-versus-read mismatch places the stale content in accepted writer packing, physical DDR addressing, storage or readback; equality proves the selected framebuffer contains exactly what was written and moves the correction boundary to scheduler bank or generation selection without another diagnostic layout.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 532 COMMIT Unreleased 5de0e1d 2026-08-26T04:35:28-07:00
 
 #### Coming From:
@@ -1216,34 +1245,6 @@ The user enabled `Native timing pattern`, kept native 480i active and replayed `
 #### Next Steps:
 
 Stop before changing RTL and obtain approval for one content-only framebuffer discriminator. Extend the deterministic interlaced generator with a narrow bar whose two authored fields are identical and whose position holds for approximately one second before a large discrete step, then generate and upload only the TFF fixture through ordinary FTP without changing the accepted RBF. Long static holds remove continuous-motion and bar-width ambiguity: if the old position disappears within the next field or frame and each held position is clean, the original comb and apparent shadow are authored temporal interlace or downstream display processing; if the old position persists materially into the hold, the framebuffer cache or frame-bank handoff is retaining stale pixels and the next RTL cycle should instrument field and cache identity. Keep `Native timing pattern` Off for that fixture, continue to defer BFF and do not make a public native-interlace compatibility claim. Treat the separate 25-picture-per-second decoder throughput ceiling as a later optimization rather than mixing it into this artifact discriminator.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 493 COMMIT Unreleased 2601573 2026-08-25T01:20:24-07:00
-
-#### Coming From:
-
-Unreleased 2601573
-
-#### Purpose:
-
-Record the three-bank native TFF hardware result and advance to the framebuffer-independent timing-pattern discriminator.
-
-#### Outcome:
-
-The user reloaded the exact `2601573` image, left `Native timing pattern` Off and ran `_cadence/native_480i_tff_light_10s.m2v` in `Native 480i` mode. Playback feels faster but still lags the nominal source, flicker is reduced but remains, the transient one-pixel-high short dashes are gone, combing remains and the moving vertical bar can leave a temporarily stationary shadow while it continues rightward. USER and POWER are solid and DISK blinks twice. The untouched terminal screenshot was triggered and retrieved entirely through ordinary FTP with the default MiSTer login and no SSH; `.ai/current_results/entry492_tff_native480i_overlap.png` is 11,867 bytes with SHA-256 `2d8a9ae24dc9d5ffc7d38d1707a197694c29f239a808c18bcb3e3d4a58985d84`. Schema nine accepts all 5,007,304 bytes and its wrapped counters represent all 300 reference and displayed pictures and 299 swaps, with stable top-field-first signalling, sequence end, presentation completion and normal quiet reason one. Aggregate, decoder, presentation, destination, cache-bank-overlap, audio-underrun and PCM-protocol errors are all clear. The first presentation is at cycle 2,378,291 and the last at 718,703,629, so the 299 intervals span 716,325,338 cycles, 11.938756 seconds or 25.044486 pictures per second. The overlap therefore removes the prior deterministic 15.004885-picture serialization and exceeds the predicted approximately 20.10-picture baseline because that earlier progressive measurement also included ordinary presentation waiting; the remaining approximately 40-millisecond decoder throughput is still below the 29.97-picture source and explains the residual lag. Presentation hold collapses from the prior run's hundreds of millions of cycles to 108,513 cycles, while the disappearance of the short dashes and reduced flicker show that their severity was coupled to the old stop-and-resume schedule even though the clear cache-overlap flag still rules out only the monitored same-bank refill collision. The still preserves the authored interlaced edge structure but cannot determine whether the reported temporary moving shadow is an intended field-time separation or stale pixel delivery; the static timing pattern is now the required discriminator.
-
-#### Next Steps:
-
-Without changing the RBF, enable `Native timing pattern`, keep `Interlaced output` at `Native 480i` and replay only `_cadence/native_480i_tff_light_10s.m2v`. The moving source will be hidden behind eight static vertical color bars while decoder and DDRAM activity continue, so judge whether the bars flicker, acquire transient horizontal dashes, shimmer at their vertical boundaries or leave any changing ghost edge; report USER, DISK and POWER and leave the terminal pattern image loaded for a second FTP-only capture. Stable bars with ordinary telemetry will place the remaining comb and moving shadow in framebuffer or field-content presentation rather than native sync timing, while flickering or changing bars will retain the timing/output path as the cause. Continue to defer BFF and any public native-interlace compatibility claim.
 
 #### Files Modified:
 
