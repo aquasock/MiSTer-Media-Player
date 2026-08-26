@@ -1,3 +1,32 @@
+## 545 COMMIT Unreleased 7cdfcec 2026-08-26T15:04:12-07:00
+
+#### Coming From:
+
+Unreleased 7cdfcec
+
+#### Purpose:
+
+Record the seed-fifteen Bob comparison and determine whether the remaining visual artifact follows decoder cadence or field reconstruction cadence.
+
+#### Outcome:
+
+The user reran the same Big Buck Bunny test file on the exact `7cdfcec` image with HDMI scaler deinterlacer changed only from Weave to Bob. Playback frame rate still appears correct and Bob looks better overall, while both the visible flicker and the residual ghosting appear at approximately twice the Weave cadence, like the same artifact running at double speed without speeding up the movie. The user judges that the decoder is keeping up and error-free but old frames remain visibly sticky in both Bob and Weave. The fixed remote screenshot filename was deleted before triggering, so `.ai/current_results/entry545_seed15_bob_terminal.png` is a genuinely fresh Bob capture; it is 479,897 bytes with SHA-256 `e917c5ef0c9cd00f7d72509e1360b63e3f89f76b1b6c3845578d2c93d2914ddf`. Schema sixteen accepts all 15,150,646 source bytes, reaches sequence end, presentation completion and normal quiet reason one, and its wrapped counters represent 449 displayed pictures and 448 publications and swaps. The terminal generation fetches 242 first-field and 240 second-field lines from region zero with zero region, phase, prefill, unpublished-reset, cache-overlap, presentation, audio, tag, content or accepted-write-versus-raw-return errors. The Bob presentation span is 920,029,226 decoder cycles versus 921,157,194 in the preceding Weave run, a difference of only 18.799 milliseconds across the complete file, confirming that the doubled artifact cadence is not doubled decoder or scheduler speed. The result instead ties the visible rate change to Bob exposing individual fields at field cadence while Weave combines field history at frame cadence; it does not by itself establish whether the remaining severity is expected deinterlacing behavior or an additional field-content defect.
+
+#### Next Steps:
+
+Retain Bob as the current preferred processed-HDMI mode and make no decoder, scheduler or raster-control change from this terminal evidence. Use one short, direct visual discriminator before another build: compare the same moving interval against a software Bob and Weave reference made from the exact interlaced test stream, focusing on whether MiSTer shows only the expected Bob line-doubling and Weave motion combing or retains an older field beyond one field interval. If MiSTer matches the reference, treat the residual difference as the normal Bob-versus-Weave tradeoff; if it retains older content, propose one bounded correction at the first proven divergent field boundary.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 544 COMMIT Unreleased 7cdfcec 2026-08-26T14:57:08-07:00
 
 #### Coming From:
@@ -1212,34 +1241,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 505 COMMIT Unreleased f866ce2 2026-08-25T03:34:13-07:00
-
-#### Coming From:
-
-Unreleased f866ce2
-
-#### Purpose:
-
-Place the native-interlace cadence fixtures under the MiSTer MediaPlayer directory for convenient hardware validation.
-
-#### Outcome:
-
-The existing `/media/fat/_cadence` directory was copied, not moved, to `/media/fat/MediaPlayer/_cadence` using only ordinary FTP with the default MiSTer `root` and `1` login and no SSH. All eighteen files were downloaded from the original folder, uploaded into the new folder and downloaded again; every source and destination SHA-256 pair matched. The copied set includes the TFF and BFF light-motion fixtures required for commit `f866ce2`, the longer interlaced fixtures, the step-hold diagnostic, the preserved cadence RBF and the existing MGL controls. The original `/media/fat/_cadence` contents remain intact, and no RBF, Main, helper, configuration or media outside the new copy was changed.
-
-#### Next Steps:
-
-Reload the installed `f866ce2` core, leave `Native timing pattern` Off, choose `HDMI scaler deinterlacer` Weave and `Interlaced output` Native 480i, then open `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v`. Report motion smoothness, ghosting or flicker and all three LED states, and leave the terminal image displayed for an ordinary-FTP schema-nine capture. Follow with TFF Bob, BFF Weave and BFF Bob only after each preceding result is captured.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
