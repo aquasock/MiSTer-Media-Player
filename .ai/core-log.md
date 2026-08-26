@@ -1,4 +1,4 @@
-## 542 COMMIT Unreleased ??? 2026-08-26T14:15:33-07:00
+## 542 COMMIT Unreleased 99fc1ea 2026-08-26T14:15:33-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Restore MiSTer's established external raster-control phase after entry 541 prove
 
 #### Outcome:
 
-The user approved an accelerated corrective cycle after the exact `00267dc` hardware image made the complete idle screen repeatedly lose synchronization and prevented a fresh scaled screenshot, while direct restoration of `164c7e6` immediately returned the display to its prior stable-lock baseline. The correction is restricted to removing `pixel_en_d`, `h_sync_d` and `v_sync_d` and again driving framebuffer `video_de`, `video_hs` and `video_vs` from the established current-cycle inputs. The existing focused cache-refill test will distinguish that external passthrough contract from registered RGB sample validity so it no longer demands the hardware-invalid phase. No PLL, pixel clock, decoder, cache, scheduler, diagnostic layout, menu, host software or MiSTer configuration change is planned.
+The user approved an accelerated corrective cycle after the exact `00267dc` hardware image made the complete idle screen repeatedly lose synchronization and prevented a fresh scaled screenshot, while direct restoration of `164c7e6` immediately returned the display to its prior stable-lock baseline. Commit `99fc1ea` removes only `pixel_en_d`, `h_sync_d` and `v_sync_d`, again drives framebuffer `video_de`, `video_hs` and `video_vs` from the established current-cycle inputs and updates the focused cache-refill test to compile against that external passthrough contract. Per the user's shortened-cycle direction, the focused testbench was elaborated successfully without running `vvp`; the long native, reconstruction and live-raster regressions were not run. One retained-state incremental Quartus compilation completed successfully in 11 minutes 13 seconds with zero errors, but TimeQuest reported global setup slack of negative 0.199 nanoseconds; hold, recovery, removal and minimum-pulse-width slack were positive 0.257, 4.275, 0.595 and 0.925 nanoseconds. The fit used 31,377 ALMs, 49,635 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The non-deployable 4,271,344-byte RBF has SHA-256 `f53a3251b4676d2176b0838b4def338800ca96dfcffe92e9f6a1d6191bf41018`. Because setup timing did not close, the RBF was not copied from GUNSMOKE or installed on MiSTer; the verified `164c7e6` image remains active.
 
 #### Next Steps:
 
-Make only the scoped framebuffer and focused-test correction, perform compile-only syntax/elaboration checks without running the long native, reconstruction or live-raster regressions, commit and push the source, then run one retained-state incremental Quartus build on GUNSMOKE. If compilation and timing complete without error, directly install and verify the RBF with no backup, rollback or staging file. Hardware validation begins and stops at idle-screen scaler lock plus one genuinely fresh screenshot; do not play media until that gate passes.
+Stop without deploying or starting another build. If the user approves one additional incremental placement seed, change only the reproducible Quartus seed, build once on GUNSMOKE and deploy only if every reported timing class is non-negative. Hardware validation must then begin and stop at idle-screen scaler lock plus one genuinely fresh screenshot; do not play media until that gate passes.
 
 #### Files Modified:
 
@@ -23,7 +23,7 @@ Make only the scoped framebuffer and focused-test correction, perform compile-on
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
