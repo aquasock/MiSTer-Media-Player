@@ -1,3 +1,36 @@
+## 546 COMMIT Unreleased ??? 2026-08-26T15:25:27-07:00
+
+#### Coming From:
+
+Unreleased 7cdfcec
+
+#### Purpose:
+
+Remove the measured native-playback frame-slot misses by overlapping reconstructed-block capture with the preceding block's DDR write drain.
+
+#### Outcome:
+
+The seed-fifteen Bob and Weave captures are error-free but correct entry 545's provisional judgment that the decoder keeps up: Bob contains eleven exact doubled frame gaps and Weave contains twelve, reducing delivery to about 29.2 rather than 29.97 pictures per second and retaining an old frame for one extra 33.37-millisecond slot at each miss. The current block writer serializes every reconstructed block behind eight accepted DDR row writes. This entry authorizes one bounded two-bank capture queue, with parser capacity acknowledgement kept separate from actual DDR-completion notification. No framebuffer, scheduler, diagnostic schema, raster control, menu or host software changes are authorized.
+
+#### Next Steps:
+
+Implement the two-bank writer and one focused ordered-data/backpressure regression, compile the affected integration targets and run the established four-picture reconstruction/write simulation on GUNSMOKE. If those checks pass, commit and push the source, perform one incremental Quartus build and deploy only an all-positive-timing image by directly replacing `/media/fat/MediaPlayer.rbf`. Hardware acceptance requires complete Bob and Weave playback with no doubled presentation gaps and every existing error clear.
+
+#### Files Modified:
+
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_02.svh
+- MediaPlayer_top_04.svh
+- rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
+- tools/streams/tb_h262_ddram_store_overlap.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 545 COMMIT Unreleased 7cdfcec 2026-08-26T15:04:12-07:00
 
 #### Coming From:
@@ -1205,37 +1238,6 @@ Restart hardware validation at `MediaPlayer/_cadence/native_480i_tff_light_10s.m
 - `rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv`
 - `tools/streams/tb_native_ordinary_overlap_ownership.sv`
 - `tools/streams/tb_native_480i_presentation_integration.sv`
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 506 COMMIT Unreleased f866ce2 2026-08-25T03:40:25-07:00
-
-#### Coming From:
-
-Unreleased f866ce2
-
-#### Purpose:
-
-Capture the first optimized TFF Weave hardware run and distinguish decoder throughput from presentation ownership.
-
-#### Outcome:
-
-The user opened `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off, the renamed HDMI scaler deinterlacer set to Weave and Interlaced output set to Native 480i. The image looks better, but the moving bar stops before crossing the screen; USER and DISK are solid off and POWER blinks once. The untouched image was triggered and retrieved entirely through ordinary FTP with the default `root` and `1` login and no SSH. `.ai/current_results/entry506_tff_light_weave_throughput.png` is 12,014 bytes with SHA-256 `9d17a5d3523c7f090576e99516b51d9e7bd4590b482c8972846abee379cbcaef`.
-
-Schema nine freezes for fatal-or-no-progress reason three after accepting only 283,775 of 5,007,304 bytes, decoding seventeen I pictures and displaying fifteen with fourteen swaps; sequence end and session quiet are absent. The first-to-last presentation span is 28,123,416 decoder clocks or 0.4687236 seconds, delivering 29.868349 pictures per second across the short fourteen-interval window. Top-field-first remains correct, audio and PCM errors are clear, no cache-bank or destination overlap error appears and the decode/presentation result otherwise remains coherent. The sole aggregate bit is `0x0200`, `presentation_error`. At the freeze, the scheduler has a released primary pending frame while the optimized overlap decode has already completed the next frame; `pending_frame_valid` and `pending_frame_released` are both set, `ordinary_reference_decode_open` has just closed and the current scheduler intentionally treats completion before predecessor presentation as fatal. The prior measured-latency regression modeled a three-field or approximately 50-millisecond decode and explicitly asserted this early completion must fail. Removing the IQ replay shortened a light all-I picture enough to reach that formerly impossible state. The throughput fix therefore succeeds, but exposes a latent one-slot ordinary-presentation queue limit rather than a decoder, field-order, scaler-mode or pixel fault.
-
-#### Next Steps:
-
-Do not run Bob or BFF on `f866ce2`; they will reach the same field-order-independent scheduler boundary. Obtain approval for one bounded presentation-queue correction that preserves the direct IQ-to-IDCT throughput. Extend only native untimestamped frame-rate-code-four all-I ordinary ownership from one pending identity to the two pending identities physically supported by the three ordinary DDR banks: if an overlap decode completes before its predecessor presents, retain the completed bank in a secondary slot, stop further payload before any bank can be reused, promote that slot when the predecessor swaps and resume into the newly freed bank. Add an accelerated integration regression that reproduces the seventeen-decoded/fifteen-displayed failure, proves sustained 29.97-fps presentation with bounded backpressure and validates premature completion as safe only in this exact native all-I class; retain fatal guards for displayed-bank reuse, bank duplication, P/B, timestamps and all non-native modes. Re-run the complete native, reconstruction and mixed I/P/B suites, clean-build, install through rollback-safe ordinary FTP and restart the four-mode hardware matrix from TFF Weave.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
