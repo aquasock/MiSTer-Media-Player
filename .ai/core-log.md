@@ -1,3 +1,33 @@
+## 542 COMMIT Unreleased ??? 2026-08-26T14:15:33-07:00
+
+#### Coming From:
+
+Unreleased 00267dc
+
+#### Purpose:
+
+Restore MiSTer's established external raster-control phase after entry 541 proved the one-clock delay breaks scaler lock.
+
+#### Outcome:
+
+The user approved an accelerated corrective cycle after the exact `00267dc` hardware image made the complete idle screen repeatedly lose synchronization and prevented a fresh scaled screenshot, while direct restoration of `164c7e6` immediately returned the display to its prior stable-lock baseline. The correction is restricted to removing `pixel_en_d`, `h_sync_d` and `v_sync_d` and again driving framebuffer `video_de`, `video_hs` and `video_vs` from the established current-cycle inputs. The existing focused cache-refill test will distinguish that external passthrough contract from registered RGB sample validity so it no longer demands the hardware-invalid phase. No PLL, pixel clock, decoder, cache, scheduler, diagnostic layout, menu, host software or MiSTer configuration change is planned.
+
+#### Next Steps:
+
+Make only the scoped framebuffer and focused-test correction, perform compile-only syntax/elaboration checks without running the long native, reconstruction or live-raster regressions, commit and push the source, then run one retained-state incremental Quartus build on GUNSMOKE. If compilation and timing complete without error, directly install and verify the RBF with no backup, rollback or staging file. Hardware validation begins and stops at idle-screen scaler lock plus one genuinely fresh screenshot; do not play media until that gate passes.
+
+#### Files Modified:
+
+- rtl/mpeg2_luma_framebuffer.sv
+- tools/streams/tb_native_480i_cache_refill.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 541 COMMIT Unreleased 00267dc 2026-08-26T14:11:30-07:00
 
 #### Coming From:
@@ -1219,34 +1249,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 502 COMMIT Unreleased 4e4da3a 2026-08-25T02:55:54-07:00
-
-#### Coming From:
-
-Unreleased 4e4da3a
-
-#### Purpose:
-
-Capture the BFF processed-HDMI Bob result and separate decoder cadence from the scaler's deinterlacing tradeoff.
-
-#### Outcome:
-
-The user ran only `_cadence/native_480i_bff_light_10s.m2v` with native 480i active and Bob selected. The menu disappears normally, motion now appears to run at the right field rate, the historical shadow lags for less time but jumps more frequently and the final image is slightly unstable; USER and POWER remain solid and DISK blinks twice. The untouched terminal image was triggered and retrieved entirely through ordinary FTP with the default `root` and `1` login and no SSH; `.ai/current_results/entry502_bff_light_hdmi_bob.png` is 11,860 bytes with SHA-256 `3970ae3eedcc91b6fa75d2fca0fad253d6aef63d849d4708c9328bfadfabd5b0`. Schema nine accepts all 5,007,154 bytes, preserves bottom-field-first, reaches sequence end and presentation completion, closes normally for quiet reason one and reports zero aggregate, presentation, destination, cache-bank-overlap, audio-underrun and PCM-protocol errors. The eight-bit picture and swap counters wrap to 44 and 43 exactly as expected for 300 pictures and 299 swaps. First presentation remains cycle 2,378,235 and last presentation is cycle 719,009,081, so the 299 intervals span 716,630,846 cycles or 11.943847 seconds and deliver 25.033809 pictures per second. The prior Weave run delivered 25.037584 pictures per second and finished only 108,033 decoder cycles or 1.80055 milliseconds earlier across the entire fixture, proving Bob did not materially change decoder throughput or source presentation cadence. The shorter history, more visible steps and live final-image instability instead characterize MiSTer's Bob reconstruction: it removes most long field history by expanding individual fields, at the expected cost of greater vertical jitter and reduced stable vertical detail. BFF core logic passes, while processed-HDMI Bob remains a user-selectable motion-versus-stability tradeoff rather than a universal replacement for Weave.
-
-#### Next Steps:
-
-Keep `Native timing pattern` Off, `HDMI deinterlacer` Bob and `Interlaced output` Native 480i, then run only `_cadence/native_480i_tff_light_10s.m2v`. Compare shadow duration, step frequency and final-image instability directly with this BFF Bob result, report all three LEDs and leave the terminal image loaded for an ordinary-FTP schema-nine capture. Matching clean telemetry and materially similar Bob artifacts will show the residual is field-order-independent scaler behavior and complete the current Bob/Weave control validation; a strong TFF/BFF visual asymmetry would instead require checking how the framework's Bob path interprets field polarity before refining the two-tier menu. Do not change MiSTer configuration or run the native direct-video/SDI tier yet.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
