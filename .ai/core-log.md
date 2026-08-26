@@ -1,3 +1,39 @@
+## 523 COMMIT Unreleased ??? 2026-08-25T20:41:57-07:00
+
+#### Coming From:
+
+Unreleased bfb9361
+
+#### Purpose:
+
+Correlate each symptom-bearing generation's complete DDR-return luma content with the luma actually read from the line cache for display.
+
+#### Outcome:
+
+The user approved the schema-fifteen diagnostic proposed by entry 522 and an accompanying thirty-second live screenshot burst using the currently installed schema-fourteen image before source changes begin. The burst acquired forty-nine screenshots at approximately 1.6 frames per second: the first seventeen are distinct live frames and the final thirty-two are one byte-identical terminal frame. Representative early, middle and late live frames show both field bars advancing but commonly separated by roughly twenty-four pixels rather than the authored four-pixel weave offset, with the short horizontal grey edge fragments visible beside one field's bar. This run is therefore a field-age mismatch rather than either field remaining constant for the full session. The proposed source boundary remains observational: compute position-sensitive fingerprints across all eight bytes of every native luma DDR return for each field parity, compute the same fingerprints over post-cache luma samples in displayed field order, publish only stable completed values across the video-to-decoder clock boundary and count generation-aligned raw-versus-displayed mismatches. The fingerprints must not feed cache, decoder, scheduler or presentation control.
+
+#### Next Steps:
+
+Implement schema fifteen with directed TFF and BFF controls whose raw and displayed fingerprints match, an intentionally corrupted cache-word case that must mismatch, an independent payload-width and overlay-row-coverage check, and schema-fourteen through legacy decoder compatibility. Retain the established fetch, region, phase, publication, error and session-wide content evidence, and do not treat a coarse session-wide varied flag as proof about a particular generation. Run the focused cache, profiler and decoder tests followed by the complete native timing, reconstruction and canonical live-raster suites. Commit and push the source only after every regression passes, then perform a clean Quartus Prime 17.0.2 build, focused timing and timing-netlist presence checks; install rollback-safe and repeat the fixture with an agent-triggered live burst only if timing closes.
+
+#### Files Modified:
+
+- `MediaPlayer_top_06.svh`
+- `MediaPlayer_top_07.svh`
+- `rtl/mpeg2_luma_framebuffer.sv`
+- `rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv`
+- `tools/streams/decode_hardware_cadence.py`
+- `tools/streams/tb_h262_hardware_cadence_profiler.sv`
+- `tools/streams/tb_interlaced_420_cache_mapping.sv`
+- `tools/streams/test_decode_hardware_cadence.py`
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 522 COMMIT Unreleased bfb9361 2026-08-25T20:39:25-07:00
 
 #### Coming From:
@@ -1211,60 +1247,6 @@ Before changing presentation behavior, prepare a bounded diagnostic proposal tha
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 483 COMMIT Unreleased 2bb8def 2026-08-24T16:09:09-07:00
-
-#### Coming From:
-
-Unreleased 4c4d0e3
-
-#### Purpose:
-
-Implement and qualify the first native 720x480 interlaced presentation path for the already-proven stable-field-order, frame-DCT all-I subset, while retaining an explicit progressive diagnostic fallback and making no SDI or processing-bypass claim.
-
-#### Outcome:
-
-Commit `2bb8def` adds a selectable native 720x480 interlaced presentation path for the bounded frame-DCT all-I subset. A 54 MHz video domain provides an exact divide-by-four 13.5 MHz logical sample cadence, 858-sample lines, two 262.5-line fields with continuous half-line phase, 720x480 active video, negative sync and field identity on `VGA_F1`; the existing 800x600 progressive diagnostic path remains selectable. The frontend publishes an exact accepted-picture field-order event, physical frame banks retain their own `top_field_first` metadata, a session lock rejects an unexpected field-order change, and the scheduler now advances cadence every field while allowing physical frame-bank swaps only at the authored first-field frame boundary. The DDR presentation cache maps even/odd luma lines by displayed field and shares each interlaced 4:2:0 chroma row across the corresponding two same-field luma lines. Focused RTL regressions pass stable TFF, stable BFF, field-order-change rejection and reset cases; both field orders each produce four fields with 225,225 logical field ticks, 172,800 active samples, 2,574 sync samples and a 429-sample half-line, while exhaustive cache tests cover 960 luma and 480 chroma line sequences. Scheduler, picture-timestamp, cadence-profiler, dense-publication and progressive live-raster regressions pass. End-to-end reconstruction remains within the established one-LSB IDCT tolerance for all 2,073,600 component samples in each four-picture fixture: TFF has 9,442 one-LSB differences and BFF has 9,632, with zero larger differences; the progressive control likewise has zero differences beyond one LSB. The compatibility checker deliberately continues to report the new streams unsupported pending hardware proof. A clean Quartus 17.0.2 synthesis, fit, assembly and TimeQuest build completes with zero errors; global endpoint TNS is zero, focused decoder setup/recovery slack is 1.506/10.530 ns and video setup slack is 2.503 ns. Fitter use is 29,361 ALMs, 45,247 registers, 3,655,139 block-memory bits, 464 RAM blocks, 65 DSP blocks and 3 PLLs. The 4,209,032-byte RBF has SHA-256 `71462f2ded90f4d40c7502cd58d07e99620d51a3e00f5b58ccfcd38d24e1833e`. Field pictures, field-DCT, repeat-first-field, interlaced P/B pictures, the public compatibility claim and all external processing/SDI work remain unsupported.
-
-#### Next Steps:
-
-Install the exact RBF and deterministic TFF/BFF fixtures by plain FTP using the default MiSTer username and password, with no SSH keys. Reload the core and test TFF first in Native 480i mode, checking display lock, field order, combing or judder, crop and LED state, then capture the final image. Test BFF separately only after the TFF capture using the same observations. Keep the public compatibility claim disabled until both field orders pass on hardware; retain the 800x600 diagnostic mode for isolation and do not claim SDI or processing bypass. Field pictures, field-DCT, repeat-first-field and interlaced P/B pictures remain later milestones.
-
-#### Files Modified:
-
-- MediaPlayer.sdc
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_04.svh
-- MediaPlayer_top_05.svh
-- MediaPlayer_top_06.svh
-- MediaPlayer_top_07.svh
-- files.qip
-- rtl/mpeg2_luma_framebuffer.sv
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- rtl/mpeg2_new/mpeg2_h262_frontend.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- rtl/mpeg2_new/mpeg2_h262_native_field_order.sv
-- rtl/mpeg2_new/mpeg2_h262_picture_timestamp.sv
-- rtl/mpeg2_video_output_timing.sv
-- rtl/pll/pll_0002.v
-- tools/phase1p_timing.tcl
-- tools/streams/run_native_480i_timing.sh
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_dense_publication_order.sv
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/streams/tb_h262_picture_timestamp.sv
-- tools/streams/tb_interlaced_420_cache_mapping.sv
-- tools/streams/tb_native_480i_timing.sv
-- tools/streams/tb_native_field_order.sv
 
 #### Status:
 
