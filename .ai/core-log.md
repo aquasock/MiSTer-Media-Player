@@ -1,3 +1,32 @@
+## 534 COMMIT Unreleased ??? 2026-08-26T04:59:18-07:00
+
+#### Coming From:
+
+Unreleased 164c7e6
+
+#### Purpose:
+
+Make the Media Player file selector open the core's resolved games directory instead of a previously selected path.
+
+#### Outcome:
+
+The user requested that opening the core's media selector default to the correct directory under `/media/fat/games` while the current Big Buck Bunny hardware test continues. The planned change is confined to the pinned MiSTer Main patch: when the active core is MediaPlayer, the generic file-selection call will use `user_io_get_core_path(NULL, 1)`, which resolves the existing core-specific games directory through Main's storage and prefix rules, while every other core retains its remembered `Selected_F` behavior. The FPGA RBF and ARM media helper will not change.
+
+#### Next Steps:
+
+Update the single Main patch hunk, apply it cleanly to the pinned upstream commit, build the patched ARM MiSTer executable on GUNSMOKE and verify the output. Commit and push the source change from the Raspberry Pi, then directly replace only `/media/fat/MiSTer` after the user's active playback test has completed so the running session is not disturbed. Verify the installed file by independent FTP readback; the new default takes effect on the next MiSTer restart.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 533 COMMIT Unreleased 164c7e6 2026-08-26T04:54:09-07:00
 
 #### Coming From:
@@ -1221,34 +1250,6 @@ Turn `Native timing pattern` Off, keep `Interlaced output` at `Native 480i` and 
 #### Files Modified:
 
 - tools/streams/generate_test_interlaced_i_frames.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 494 COMMIT Unreleased 2601573 2026-08-25T01:26:01-07:00
-
-#### Coming From:
-
-Unreleased 2601573
-
-#### Purpose:
-
-Record the native timing-pattern hardware discriminator and relocate the remaining motion artifacts to framebuffer or field-content presentation.
-
-#### Outcome:
-
-The user enabled `Native timing pattern`, kept native 480i active and replayed `_cadence/native_480i_tff_light_10s.m2v`; the eight static vertical bars remained absolutely unchanged throughout playback and looked as if no file had been launched, while USER and POWER stayed solid and DISK blinked twice. The untouched terminal pattern was captured entirely through ordinary FTP with the default MiSTer login and no SSH; `.ai/current_results/entry493_native_timing_pattern.png` is 7,336 bytes with SHA-256 `8a34c6f8bd0de81cc8f6bd9f02a165626e7a629c547f7d294f26da16140a61da`. The image shows eight clean full-height bars with stable vertical boundaries and no short horizontal dashes or changing ghost edge. Schema nine proves the apparently static view concealed a complete active decode: all 5,007,304 bytes were accepted, the wrapped counters represent 300 reference and displayed pictures and 299 swaps, top-field-first stayed stable, sequence end and presentation completion occurred and the snapshot closed normally for quiet reason one. Aggregate, decoder, presentation, destination, cache-bank-overlap, audio-underrun and PCM-protocol errors are all clear. The 299 presentation intervals span 716,738,843 cycles from cycle 2,378,246 to 719,117,089, or 11.945647 seconds and 25.030037 pictures per second, materially identical to the normal-video run's 25.044486 pictures per second. Decoder and DDRAM traffic therefore continued without perturbing the video-domain pattern, decisively excluding the native sync clock, field cadence and final output mux as the cause of playback-induced flicker, transient dashes or moving ghost content. Earlier progressive and native terminal stills also show the same completed 32-pixel-wide authored bar with bright interior and combed boundaries, so a still cannot distinguish the user's live persistence report from normal temporal field separation; the remaining diagnostic boundary is dynamic framebuffer and field-content presentation, while the independent approximately 25-picture decoder ceiling remains below the 29.97-picture source.
-
-#### Next Steps:
-
-Stop before changing RTL and obtain approval for one content-only framebuffer discriminator. Extend the deterministic interlaced generator with a narrow bar whose two authored fields are identical and whose position holds for approximately one second before a large discrete step, then generate and upload only the TFF fixture through ordinary FTP without changing the accepted RBF. Long static holds remove continuous-motion and bar-width ambiguity: if the old position disappears within the next field or frame and each held position is clean, the original comb and apparent shadow are authored temporal interlace or downstream display processing; if the old position persists materially into the hold, the framebuffer cache or frame-bank handoff is retaining stale pixels and the next RTL cycle should instrument field and cache identity. Keep `Native timing pattern` Off for that fixture, continue to defer BFF and do not make a public native-interlace compatibility claim. Treat the separate 25-picture-per-second decoder throughput ceiling as a later optimization rather than mixing it into this artifact discriminator.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
