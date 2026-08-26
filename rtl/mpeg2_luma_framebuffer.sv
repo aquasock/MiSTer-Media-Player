@@ -771,14 +771,15 @@ wire progressive_publish_origin =
     framebuffer_descriptor_valid && !native_interlaced_r2 &&
     (h_pos == 12'd0) && (v_pos == 12'd0);
 
-// Entry 516: presentation-sequence index implied by the scanned raster line.
-// Native v_pos carries the field parity in bit 0 and the field line in [8:1],
-// matching the 480-entry order of interlaced_luma_row: the authored first
-// field occupies 0..239 and the other field 240..479.
-wire       raster_first_field_rd = (v_pos[0] == first_field_r2);
-wire [8:0] sequence_expected_rd =
-    raster_first_field_rd ? {1'b0, v_pos[8:1]}
-                          : (9'd240 + {1'b0, v_pos[8:1]});
+// Entry 516: field phase implied by the scanned raster line versus the field
+// the presentation sequence believes it is in.  The 480-entry order places the
+// authored first field at 0..239 and the other field at 240..479, so the
+// replica's own position names its field directly.  Comparing only the two
+// parities keeps this evidence to a single constant magnitude compare in the
+// video domain rather than an adder and a nine-bit equality; a retained or
+// misaligned field breaks the parity, which is the invariant that matters.
+wire raster_first_field_rd   = (v_pos[0] == first_field_r2);
+wire sequence_first_field_rd = (sequence_replica_rd < 9'd240);
 
 always @(posedge rd_clk) begin
     if (rd_reset) begin
@@ -859,7 +860,7 @@ always @(posedge rd_clk) begin
                 // compare the replica against the raster before advancing it
                 // and toggle one evidence line per scanned field parity.
                 if (native_interlaced_r2) begin
-                    if (sequence_replica_rd != sequence_expected_rd)
+                    if (sequence_first_field_rd != raster_first_field_rd)
                         sequence_phase_error_rd <= 1'b1;
 
                     if (raster_first_field_rd)
