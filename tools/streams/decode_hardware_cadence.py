@@ -322,24 +322,35 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         ),
         # Entry 516 (schema 11): three appended words expose the per-field
         # readout invariants that whole-picture counters cannot see.
-        # Word 40 packs four saturating eight-bit per-generation figures: a
-        # native field presents 240 lines and is served 240 luma rows, so the
-        # whole ordinary range fits.  255 means "at least 255", which only
-        # arises when one generation spans several displayed frames.
+        # Word 40 carries two saturating eight-bit per-generation DDR fetch
+        # counts.  A native field is served 240 luma rows, so 255 means "at
+        # least 255" and arises only when one generation spans several frames.
         "framebuffer_last_first_field_fetches": (
             (words[40] >> 24) & 0xFF if schema_version >= 11 else None
         ),
         "framebuffer_last_second_field_fetches": (
             (words[40] >> 16) & 0xFF if schema_version >= 11 else None
         ),
+        # Entry 517 retired the per-parity displayed-line counts, which read
+        # 240/240 while the field carried no picture.  Schema 12 reuses their
+        # bits for the DDR region each parity's fetch actually resolved into.
         "framebuffer_last_first_field_lines": (
-            (words[40] >> 8) & 0xFF if schema_version >= 11 else None
+            (words[40] >> 8) & 0xFF if schema_version == 11 else None
         ),
         "framebuffer_last_second_field_lines": (
-            words[40] & 0xFF if schema_version >= 11 else None
+            words[40] & 0xFF if schema_version == 11 else None
+        ),
+        "framebuffer_last_first_field_region": (
+            (words[40] >> 3) & 0x7 if schema_version >= 12 else None
+        ),
+        "framebuffer_last_second_field_region": (
+            words[40] & 0x7 if schema_version >= 12 else None
+        ),
+        "framebuffer_field_region_mismatch_count": (
+            (words[41] >> 16) & 0xFFFF if schema_version >= 12 else None
         ),
         "framebuffer_field_line_imbalance_count": (
-            (words[41] >> 16) & 0xFFFF if schema_version >= 11 else None
+            (words[41] >> 16) & 0xFFFF if schema_version == 11 else None
         ),
         "framebuffer_sequence_phase_error_count": (
             words[41] & 0xFFFF if schema_version >= 11 else None
@@ -467,7 +478,20 @@ def main() -> int:
                     **result
                 )
             )
-        if result["schema_version"] >= 11:
+        if result["schema_version"] >= 12:
+            print(
+                "field readout: last_generation_fetches="
+                "{framebuffer_last_first_field_fetches}/"
+                "{framebuffer_last_second_field_fetches} "
+                "regions={framebuffer_last_first_field_region}/"
+                "{framebuffer_last_second_field_region} "
+                "region_mismatch_generations="
+                "{framebuffer_field_region_mismatch_count} "
+                "phase_errors={framebuffer_sequence_phase_error_count}".format(
+                    **result
+                )
+            )
+        elif result["schema_version"] == 11:
             print(
                 "field readout: last_generation_lines="
                 "{framebuffer_last_first_field_lines}/"

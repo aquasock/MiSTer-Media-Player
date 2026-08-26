@@ -37,8 +37,8 @@ reg framebuffer_generation_reset=0;
 reg framebuffer_picture_present=0;
 reg framebuffer_prefill_deadline_missed=0;
 reg framebuffer_sequence_phase_error=0;
-reg framebuffer_first_field_line=0;
-reg framebuffer_second_field_line=0;
+reg [2:0] framebuffer_first_field_region=0;
+reg [2:0] framebuffer_second_field_region=0;
 reg framebuffer_first_field_fetch=0;
 reg framebuffer_second_field_fetch=0;
 integer field_index;
@@ -64,8 +64,8 @@ mpeg2_h262_hardware_cadence_profiler #(
     .framebuffer_prefill_deadline_missed(
         framebuffer_prefill_deadline_missed),
     .framebuffer_sequence_phase_error(framebuffer_sequence_phase_error),
-    .framebuffer_first_field_line(framebuffer_first_field_line),
-    .framebuffer_second_field_line(framebuffer_second_field_line),
+    .framebuffer_first_field_region(framebuffer_first_field_region),
+    .framebuffer_second_field_region(framebuffer_second_field_region),
     .framebuffer_first_field_fetch(framebuffer_first_field_fetch),
     .framebuffer_second_field_fetch(framebuffer_second_field_fetch),
     .fifo_pending(fifo_pending),.decoder_ready(decoder_ready),
@@ -128,16 +128,13 @@ begin
 end
 endtask
 
-task drive_field_lines;
-    input integer first_count;
-    input integer second_count;
+task drive_field_regions;
+    input [2:0] first_region;
+    input [2:0] second_region;
 begin
-    for(field_index=0;field_index<first_count;field_index=field_index+1)
-        @(negedge clk_mpeg2)
-            framebuffer_first_field_line=~framebuffer_first_field_line;
-    for(field_index=0;field_index<second_count;field_index=field_index+1)
-        @(negedge clk_mpeg2)
-            framebuffer_second_field_line=~framebuffer_second_field_line;
+    @(negedge clk_mpeg2);
+    framebuffer_first_field_region=first_region;
+    framebuffer_second_field_region=second_region;
     @(posedge clk_mpeg2);
 end
 endtask
@@ -215,8 +212,8 @@ begin
     framebuffer_picture_present=0;
     framebuffer_prefill_deadline_missed=0;
     framebuffer_sequence_phase_error=0;
-    framebuffer_first_field_line=0;
-    framebuffer_second_field_line=0;
+    framebuffer_first_field_region=0;
+    framebuffer_second_field_region=0;
     framebuffer_first_field_fetch=0;
     framebuffer_second_field_fetch=0;
     stc_seconds=14'd5;
@@ -325,18 +322,19 @@ initial begin
     // superseded by a third before publication.  The final generation misses
     // its authored prefill origin and eventually publishes.  All observations
     // are passive and must survive in schema-ten words 37 through 39.
-    // Entry 516 folds per-field evidence into these same three generations so
+    // Entry 518 folds per-field evidence into these same three generations so
     // the established reset, publication, race and prefill counts are
-    // unchanged.  The first generation is balanced; the second starves the
-    // first field's DDR service while both parities still present their lines,
-    // which is exactly the signature of a retained field.
+    // unchanged.  The first generation is balanced and resolves both parities
+    // into one region; the second starves the first field's DDR service and
+    // splits the two parities across regions, which is the signature under
+    // investigation.
     pulse_framebuffer_reset();
     repeat(5)@(posedge clk_mpeg2);
     publish_framebuffer();
-    drive_field_lines(2,2);
+    drive_field_regions(3'd1,3'd1);
     drive_field_fetches(2,2);
     pulse_framebuffer_reset();
-    drive_field_lines(3,2);
+    drive_field_regions(3'd2,3'd1);
     drive_field_fetches(1,3);
     pulse_sequence_phase_error();
     pulse_framebuffer_reset();
@@ -361,7 +359,7 @@ initial begin
 
     if(dut.snapshot_sync_2[31:0]!==32'h4d4d5031)
         $fatal(1,"bad magic %h",dut.snapshot_sync_2[31:0]);
-    if(dut.snapshot_sync_2[63:32]!==32'h0b2bea60)
+    if(dut.snapshot_sync_2[63:32]!==32'h0c2bea60)
         $fatal(1,"bad format %h",dut.snapshot_sync_2[63:32]);
     if(dut.snapshot_sync_2[831:830]!==2'd1)
         $fatal(1,"quiet snapshot reason missing");
@@ -389,11 +387,11 @@ initial begin
                dut.snapshot_sync_2[1247:1216]);
     if(dut.snapshot_sync_2[1279:1248]==0)
         $fatal(1,"framebuffer publication latency missing");
-    if(dut.snapshot_sync_2[1311:1280]!=={8'd1,8'd3,8'd3,8'd2})
-        $fatal(1,"per-field fetch/line mismatch %h",
+    if(dut.snapshot_sync_2[1311:1280]!=={8'd1,8'd3,10'd0,3'd2,3'd1})
+        $fatal(1,"per-field fetch/region mismatch %h",
                dut.snapshot_sync_2[1311:1280]);
     if(dut.snapshot_sync_2[1343:1312]!=={16'd1,16'd1})
-        $fatal(1,"field imbalance/phase error mismatch %h",
+        $fatal(1,"region mismatch/phase error mismatch %h",
                dut.snapshot_sync_2[1343:1312]);
     verify_checksum();
     verify_overlay_prefix(1'b0);
@@ -541,7 +539,7 @@ initial begin
     if({video_r,video_g,video_b}!==24'h123456)
         $fatal(1,"base video changed outside overlay");
 
-    $display("HARDWARE_CADENCE_PROFILER_PASS schema=11 field-readout+framebuffer-publication+timestamp-conflicts+audio-defer+forced+fatal+no-progress checksum=%h",
+    $display("HARDWARE_CADENCE_PROFILER_PASS schema=12 field-readout+framebuffer-publication+timestamp-conflicts+audio-defer+forced+fatal+no-progress checksum=%h",
              checksum);
     $finish;
 end

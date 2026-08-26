@@ -51,8 +51,6 @@ module mpeg2_luma_framebuffer
     // Entry 516: passive per-field readout evidence.  Levels and toggles only;
     // the external profiler counts their synchronized edges.
     output wire        sequence_phase_error_debug,
-    output wire        first_field_line_toggle_debug,
-    output wire        second_field_line_toggle_debug,
     output wire        first_field_fetch_toggle_debug,
     output wire        second_field_fetch_toggle_debug,
 
@@ -736,16 +734,12 @@ reg        line_done_pending_rd;
 // disagreement means the sequence has lost phase with the field being scanned.
 reg [8:0]  sequence_replica_rd;
 reg        sequence_phase_error_rd;
-reg        first_field_line_toggle_rd;
-reg        second_field_line_toggle_rd;
 
 assign picture_present_debug = picture_present_rd;
 assign prefill_deadline_missed_debug = prefill_deadline_missed_rd;
 assign first_field_fetch_toggle_debug  = first_field_fetch_toggle_mem;
 assign second_field_fetch_toggle_debug = second_field_fetch_toggle_mem;
 assign sequence_phase_error_debug     = sequence_phase_error_rd;
-assign first_field_line_toggle_debug  = first_field_line_toggle_rd;
-assign second_field_line_toggle_debug = second_field_line_toggle_rd;
 
 // kate - Phase 1P: the module reset input is synchronized to mem_clk by the
 // top level.  It still crosses into the independent 40 MHz rd_clk domain, so
@@ -802,8 +796,6 @@ always @(posedge rd_clk) begin
         cache_scan_c_bank_rd <= 1'b0;
         sequence_replica_rd  <= 9'd0;
         sequence_phase_error_rd <= 1'b0;
-        first_field_line_toggle_rd  <= 1'b0;
-        second_field_line_toggle_rd <= 1'b0;
     end
     else begin
         cache_ready_r1    <= cache_ready;
@@ -862,13 +854,6 @@ always @(posedge rd_clk) begin
                 if (native_interlaced_r2) begin
                     if (sequence_first_field_rd != raster_first_field_rd)
                         sequence_phase_error_rd <= 1'b1;
-
-                    if (raster_first_field_rd)
-                        first_field_line_toggle_rd <=
-                            ~first_field_line_toggle_rd;
-                    else
-                        second_field_line_toggle_rd <=
-                            ~second_field_line_toggle_rd;
 
                     if (sequence_replica_rd == 9'd479)
                         sequence_replica_rd <= 9'd0;

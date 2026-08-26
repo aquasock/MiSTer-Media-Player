@@ -24,8 +24,6 @@ wire mpeg2_new_framebuffer_picture_present_rd;
 wire mpeg2_new_framebuffer_prefill_deadline_missed_rd;
 // Entry 516: additional video-domain per-field evidence levels/toggles.
 wire mpeg2_new_framebuffer_sequence_phase_error_rd;
-wire mpeg2_new_framebuffer_first_field_line_toggle_rd;
-wire mpeg2_new_framebuffer_second_field_line_toggle_rd;
 // The DDR service evidence is generated on mem_clk, which is clk_mpeg2 itself,
 // so it needs no synchronizer and stays fully timed.
 wire mpeg2_new_framebuffer_first_field_fetch_toggle;
@@ -36,18 +34,12 @@ reg [2:0] mpeg2_new_framebuffer_picture_present_sync;
 reg [2:0] mpeg2_new_framebuffer_prefill_missed_sync;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] mpeg2_new_framebuffer_phase_error_sync;
-(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
-reg [2:0] mpeg2_new_framebuffer_first_field_line_sync;
-(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
-reg [2:0] mpeg2_new_framebuffer_second_field_line_sync;
 
 always @(posedge clk_mpeg2) begin
     if (reset_mpeg2) begin
         mpeg2_new_framebuffer_picture_present_sync <= 3'b000;
         mpeg2_new_framebuffer_prefill_missed_sync <= 3'b000;
         mpeg2_new_framebuffer_phase_error_sync <= 3'b000;
-        mpeg2_new_framebuffer_first_field_line_sync <= 3'b000;
-        mpeg2_new_framebuffer_second_field_line_sync <= 3'b000;
     end
     else begin
         mpeg2_new_framebuffer_picture_present_sync <=
@@ -59,12 +51,6 @@ always @(posedge clk_mpeg2) begin
         mpeg2_new_framebuffer_phase_error_sync <=
             {mpeg2_new_framebuffer_phase_error_sync[1:0],
              mpeg2_new_framebuffer_sequence_phase_error_rd};
-        mpeg2_new_framebuffer_first_field_line_sync <=
-            {mpeg2_new_framebuffer_first_field_line_sync[1:0],
-             mpeg2_new_framebuffer_first_field_line_toggle_rd};
-        mpeg2_new_framebuffer_second_field_line_sync <=
-            {mpeg2_new_framebuffer_second_field_line_sync[1:0],
-             mpeg2_new_framebuffer_second_field_line_toggle_rd};
     end
 end
 
@@ -74,10 +60,6 @@ wire mpeg2_new_framebuffer_prefill_deadline_missed =
     mpeg2_new_framebuffer_prefill_missed_sync[2];
 wire mpeg2_new_framebuffer_sequence_phase_error =
     mpeg2_new_framebuffer_phase_error_sync[2];
-wire mpeg2_new_framebuffer_first_field_line =
-    mpeg2_new_framebuffer_first_field_line_sync[2];
-wire mpeg2_new_framebuffer_second_field_line =
-    mpeg2_new_framebuffer_second_field_line_sync[2];
 
 localparam [28:0] MPEG2_NEW_DDR_FRAME_BANK_WORDS     = 29'h00010000;
 localparam [28:0] MPEG2_NEW_DDR_FRAME_SCRATCH0_WORDS = 29'h00020000;
@@ -92,6 +74,44 @@ wire [28:0] mpeg2_new_display_frame_offset =
                                              29'd0;
 assign mpeg2_new_ddr_rd_banked_addr =
     mpeg2_new_ddr_rd_addr + mpeg2_new_display_frame_offset;
+
+// Entry 518: the framebuffer emits a plain row address and learns nothing
+// about which of the five DDR regions the offset above steers it into.  A
+// native frame readout spans two vertical periods and can straddle a display
+// swap, so each parity may resolve into a different region while every
+// framebuffer counter still reads correctly.  Sample the region in effect on
+// each parity's fetch edge.  All of this is clk_mpeg2 logic and none of it
+// enters the video domain.
+wire [2:0] mpeg2_new_display_region =
+    mpeg2_new_display_scratch ?
+        (mpeg2_new_display_scratch_bank ? 3'd4 : 3'd3) :
+        {1'b0, mpeg2_new_display_frame_bank};
+
+reg [2:0] mpeg2_new_first_field_region;
+reg [2:0] mpeg2_new_second_field_region;
+reg       mpeg2_new_first_field_fetch_d;
+reg       mpeg2_new_second_field_fetch_d;
+
+always @(posedge clk_mpeg2) begin
+    if (reset_mpeg2) begin
+        mpeg2_new_first_field_region  <= 3'd0;
+        mpeg2_new_second_field_region <= 3'd0;
+        mpeg2_new_first_field_fetch_d  <= 1'b0;
+        mpeg2_new_second_field_fetch_d <= 1'b0;
+    end
+    else begin
+        mpeg2_new_first_field_fetch_d  <=
+            mpeg2_new_framebuffer_first_field_fetch_toggle;
+        mpeg2_new_second_field_fetch_d <=
+            mpeg2_new_framebuffer_second_field_fetch_toggle;
+        if (mpeg2_new_framebuffer_first_field_fetch_toggle !=
+            mpeg2_new_first_field_fetch_d)
+            mpeg2_new_first_field_region <= mpeg2_new_display_region;
+        if (mpeg2_new_framebuffer_second_field_fetch_toggle !=
+            mpeg2_new_second_field_fetch_d)
+            mpeg2_new_second_field_region <= mpeg2_new_display_region;
+    end
+end
 
 
 mpeg2_luma_framebuffer mpeg2_luma_framebuffer
@@ -121,10 +141,6 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
         mpeg2_new_framebuffer_prefill_deadline_missed_rd),
     .sequence_phase_error_debug(
         mpeg2_new_framebuffer_sequence_phase_error_rd),
-    .first_field_line_toggle_debug(
-        mpeg2_new_framebuffer_first_field_line_toggle_rd),
-    .second_field_line_toggle_debug(
-        mpeg2_new_framebuffer_second_field_line_toggle_rd),
     .first_field_fetch_toggle_debug(
         mpeg2_new_framebuffer_first_field_fetch_toggle),
     .second_field_fetch_toggle_debug(

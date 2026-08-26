@@ -98,14 +98,11 @@ set_false_path \
     -to [get_keepers {*|mpeg2_new_framebuffer_prefill_missed_sync[0]}]
 
 # Entry 516: the additional per-field readout evidence uses the same idiom.
-# The two DDR service toggles are generated on clk_mpeg2 itself and stay fully
-# timed, so only these three video-domain sources need a stage-zero cut.
+# The DDR service toggles and the region sampling are generated on clk_mpeg2
+# itself and stay fully timed, so only this one video-domain source needs a
+# stage-zero cut.
 set_false_path \
     -to [get_keepers {*|mpeg2_new_framebuffer_phase_error_sync[0]}]
-set_false_path \
-    -to [get_keepers {*|mpeg2_new_framebuffer_first_field_line_sync[0]}]
-set_false_path \
-    -to [get_keepers {*|mpeg2_new_framebuffer_second_field_line_sync[0]}]
 
 # Native diagnostic menu controls originate in the framework status bus and
 # enter explicit two-stage video-domain synchronizers. Cut only their

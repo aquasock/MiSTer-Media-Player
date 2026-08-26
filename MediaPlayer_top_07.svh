@@ -98,10 +98,8 @@ mpeg2_h262_hardware_cadence_profiler
         mpeg2_new_framebuffer_prefill_deadline_missed),
     .framebuffer_sequence_phase_error(
         mpeg2_new_framebuffer_sequence_phase_error),
-    .framebuffer_first_field_line(
-        mpeg2_new_framebuffer_first_field_line),
-    .framebuffer_second_field_line(
-        mpeg2_new_framebuffer_second_field_line),
+    .framebuffer_first_field_region(mpeg2_new_first_field_region),
+    .framebuffer_second_field_region(mpeg2_new_second_field_region),
     .framebuffer_first_field_fetch(
         mpeg2_new_framebuffer_first_field_fetch_toggle),
     .framebuffer_second_field_fetch(
