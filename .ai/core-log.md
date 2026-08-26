@@ -1,4 +1,33 @@
-## 531 COMMIT Unreleased ??? 2026-08-26T02:39:38-07:00
+## 532 COMMIT Unreleased 5de0e1d 2026-08-26T04:35:28-07:00
+
+#### Coming From:
+
+Unreleased 164c7e6
+
+#### Purpose:
+
+Establish the commercial-DVD-rate Bob and Weave behavior and verify real Big Buck Bunny I-picture reconstruction before another RTL change.
+
+#### Outcome:
+
+The exact fifteen-second 720x480 top-field-first all-I Big Buck Bunny fixture contains 449 pictures at 30000/1001 and 8 Mb/s target, 9 Mb/s maximum and 1,835 kb buffer settings; it is 15,150,646 bytes with SHA-256 `04758691e3e51c72ca2e7c3723b4dda2fbd473783425215df8ec2dcb5585cbe0`, and the signalling patch leaves FFmpeg's decoded YCbCr planes unchanged. On the active `5de0e1d` hardware, Bob accepts every byte and produces 449 displayed pictures and 448 swaps over 15.323544 seconds, or 29.236 pictures per second; Weave produces the same counts over 15.328045 seconds, or 29.227 pictures per second. The user reports both modes run at speed with a responsive MiSTer menu, but both retain old-frame ghosting; the apparent approximately 60 Hz Weave flicker is specifically old frames rapidly reappearing rather than a separate brightness or sync defect. Both terminal captures have every aggregate, decoder, cache-tag, cache-content, region, phase, prefill and overlap error clear. The selected Bob and Weave terminal evidence has SHA-256 `f6f1934392ef40ce4668319281d8fc64904af3b193622252aaf73e23e6ecd049` and `54c1771a2dc01f4dfd4c0fe6116e9fa4307a35ad7db0c169da0f07e8bf24d157`. A four-picture sequence-ended excerpt is 147,746 bytes with SHA-256 `32148a07ad51aaa9472bd4ffc6993cdee638d884e4e8903b5144054186a99654`; the existing complete parser, inverse-quantization, IDCT and reconstruction simulation on GUNSMOKE produces all 2,073,600 positioned YCbCr samples, has zero samples outside the established one-LSB transform tolerance and completes in 7,837,323 cycles below the 8,008,000-cycle four-picture real-time limit. The MPEG-2 I-picture decode and reconstruction path is therefore correct for this real content and the remaining stale-frame defect is later in framebuffer generation or presentation selection. The earlier accidental run of a different file is excluded from this result.
+
+#### Next Steps:
+
+Do not change the decoder or add another independently named diagnostic. Review the already committed but unbuilt accepted-write-versus-raw-read instrumentation at `164c7e6` against the newly isolated stale-frame presentation failure and reduce it if any signal does not directly distinguish framebuffer generation ownership from stale bank selection. Only after that scope review should the single consolidated diagnostic receive an incremental Quartus build and direct replacement of `/media/fat/MediaPlayer.rbf`; hardware acceptance remains smooth Bob and Weave without any old picture reappearing, while native bypass remains deferred for community validation after progressive presentation is correct.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
+## 531 COMMIT Unreleased 164c7e6 2026-08-26T02:39:38-07:00
 
 #### Coming From:
 
@@ -10,24 +39,29 @@ Maintain one consolidated current hardware diagnostic while distinguishing accep
 
 #### Outcome:
 
-The user approved continuation and directed that diagnostics remain one current consolidated layout rather than accumulating newly named schema revisions. The planned change will update the existing current diagnostic in place, observe only accepted luma writer transactions, fold each value together with its physical region, row, word and byte position, and compare completed field fingerprints with position-identical raw DDR return fingerprints before those bytes enter the already-cleared line cache. The diagnostic will remain passive and will not feed decoder, DDR ownership, cache, scheduler, presentation or video control. No additional RBF, backup, rollback or staging file will be created on the MiSTer.
+Commit `164c7e6` implements the accepted-write-versus-raw-read diagnostic in the single current hardware layout, including position-sensitive fingerprints, physical-region and generation validity, first-mismatch evidence and directed clean, corrupted-data and invalid-provenance controls. The implementation changed seventeen source and regression files with 892 insertions and 60 deletions. Focused decoder, unit, native and reconstruction simulations passed, but the canonical seventy-two-picture live-raster run was interrupted before completion and no Quartus build or MiSTer deployment was performed. The active MiSTer image therefore remains the exact `5de0e1d` build. The user subsequently raised a valid scope concern because the passive diagnostic touched substantially more files than expected for the remaining visual defect, so this commit is recorded but parked pending a scope review rather than treated as authorization to build or deploy it.
 
 #### Next Steps:
 
-Implement the accepted-write and raw-return field fingerprints with explicit physical-region and completion validity, expose content mismatches and first-mismatch evidence through the single current diagnostic layout, and add directed clean, corrupted-data and invalid-provenance controls. Retain compatibility decoding only as a repository safety net without presenting each historical layout as a separate ongoing diagnostic, then run the complete native, reconstruction and canonical live-raster suites. If all regressions pass, synchronize the exact source commit to the designated GUNSMOKE checkout, perform an incremental Quartus build with retained generated state, verify timing and the RBF hash, directly replace only `/media/fat/MediaPlayer.rbf`, and repeat the same TFF hardware run. A write-versus-read mismatch localizes the residual second-field and grey-line corruption to writer packing, accepted DDR address or data, storage, readback or region ownership; equality moves the search outside that boundary without authorizing a behavioral correction.
+Do not build or deploy `164c7e6` until the new commercial-DVD-rate Bob and Weave evidence is recorded and the instrumentation scope is reviewed against the now clearer stale-frame symptom. Retain one current diagnostic layout and remove or defer any signal that does not directly distinguish accepted framebuffer content and generation ownership from later raw reads and displayed bank selection.
 
 #### Files Modified:
 
 - MediaPlayer_top_03.svh
+- MediaPlayer_top_04.svh
 - MediaPlayer_top_06.svh
 - MediaPlayer_top_07.svh
+- files.qip
 - rtl/mpeg2_luma_framebuffer.sv
 - rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
 - rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
 - rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- rtl/mpeg2_new/mpeg2_h262_luma_write_fingerprint.sv
 - tools/streams/decode_hardware_cadence.py
 - tools/streams/run_native_480i_timing.sh
 - tools/streams/tb_h262_hardware_cadence_profiler.sv
+- tools/streams/tb_h262_luma_write_fingerprint.sv
+- tools/streams/tb_interlaced_420_cache_mapping.sv
 - tools/streams/tb_native_480i_cache_refill.sv
 - tools/streams/test_decode_hardware_cadence.py
 
@@ -1214,53 +1248,6 @@ Without changing the RBF, enable `Native timing pattern`, keep `Interlaced outpu
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 492 COMMIT Unreleased 2601573 2026-08-25T01:09:18-07:00
-
-#### Coming From:
-
-Unreleased f6f2fe4
-
-#### Purpose:
-
-Remove the avoidable native all-I decode/presentation serialization and add a framebuffer-independent native timing pattern for the remaining flicker and short-line isolation.
-
-#### Outcome:
-
-Commit `2601573` implements the approved bounded native correction and diagnostic. The presentation scheduler permits exactly one native, untimestamped, frame-rate-code-four I picture to decode into the existing third ordinary frame region while its released predecessor waits for a complete-frame native swap boundary. Admission requires the decode bank to differ from both the visible and pending banks, retains the completed-bank identity for the whole transaction, rejects any destination change into the visible bank, rejects completion before the predecessor presents and leaves timestamped, progressive, P, B and scratch-frame behavior on the established serialized paths. A measured-latency integration regression models the hardware's approximately 50-millisecond all-I decode time across twenty real native frame windows: the old path reproduces ten decoded and ten displayed pictures, or approximately 15 fps, while the overlap path produces thirteen decoded and thirteen displayed pictures, or the decoder-limited approximately 20 fps, with no presentation error. Separate negative cases prove that a P header cannot enter the exception, a displayed-bank destination is fatal and premature completion cannot overwrite the pending predecessor.
-
-The new `Native timing pattern` menu option selects eight field-invariant vertical bars only when native output is active. It replaces the final framebuffer RGB, data-enable and sync source while the decoder, DDRAM, cache refill, scheduler and cadence profiler continue running underneath, so playback with the pattern enabled distinguishes native timing/output artifacts from framebuffer and line-cache pixel delivery without changing the 480i raster. The pattern contains no horizontal one-line detail and its RTL regression proves blanking, sync passthrough, all eight bar boundaries and structural field invariance. Exact TFF and BFF timing, field order, exhaustive interlaced 4:2:0 mapping, measured presentation latency, safe/unsafe ordinary ownership, ordinary and delayed cache refill, schema-nine cadence profiling and decoding, scheduler rate codes one through five, timestamp cadence floor, dense three-bank publication, the progressive live-raster DDR soak and TFF/BFF/progressive reconstruction all pass. The legacy Cycle-A wrapper retains its established three fixed-expectation nonzero cases, while every emitted functional result remains complete and error-free.
-
-The clean from-scratch Quartus Prime 17.0.2 build finishes in 11:07 with zero errors and 144 established warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively +0.386, +0.245, +4.208, +0.566 and +0.925 nanoseconds. Focused decoder setup and recovery margins are +0.881 and +11.444 nanoseconds, and video setup is +2.076 nanoseconds, with zero violated paths. The fit uses 29,554 of 41,910 ALMs, 45,539 registers, 3,655,139 block-memory bits, 464 RAM blocks, 65 DSP blocks and three PLLs. The 4,195,444-byte RBF has SHA-256 `67bd360b0efa1864ca5184049ad6dfd9fc2edc006421871309c2c0be9de70969`. Installation used only ordinary FTP with the default `root` / `1` login and no SSH keys. The prior active 4,192,152-byte RBF was independently retrieved at SHA-256 `9f60f116d145fde30e93de7db17bfc525168db0e5781f7d167f04ee2b5c01904` and preserved byte-identically as `/media/fat/MediaPlayer.rbf.rollback-pre-2601573`. The new image was uploaded under a staging name, retrieved at its local hash, promoted, retrieved again from `/media/fat/MediaPlayer.rbf` at the same hash and only then had the temporary stage removed. Helper, Main and media files were not changed.
-
-#### Next Steps:
-
-Reload the Media Player core, leave `Native timing pattern` Off, set `Interlaced output` to `Native 480i` and run only `_cadence/native_480i_tff_light_10s.m2v`. Observe the apparent duration, motion continuity, approximately 60 Hz flicker and transient one-pixel-high short dashes, report USER, DISK and POWER and leave the final image loaded for an FTP-only schema-nine capture. Acceptance is all 300 pictures and 299 swaps with zero aggregate and ownership errors, and a presentation span near the established approximately 14.87-second decoder-limited progressive result rather than the previous approximately 19.93-second serialized native result. After that normal-video capture, enable `Native timing pattern`, replay the same file and report whether the bars themselves flicker or acquire transient short lines; do not run that second isolation view before the normal telemetry is captured. Continue to defer BFF and any public native-interlace compatibility claim.
-
-#### Files Modified:
-
-- MediaPlayer.sdc
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_05.svh
-- MediaPlayer_top_06.svh
-- MediaPlayer_top_07.svh
-- files.qip
-- rtl/mpeg2_native_timing_pattern.sv
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- tools/streams/run_native_480i_timing.sh
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_dense_publication_order.sv
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/streams/tb_native_480i_presentation_integration.sv
-- tools/streams/tb_native_480i_timing_pattern.sv
-- tools/streams/tb_native_ordinary_overlap_ownership.sv
 
 #### Status:
 
