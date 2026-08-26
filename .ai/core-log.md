@@ -1,3 +1,32 @@
+## 524 COMMIT Unreleased 4e4db95 2026-08-25T21:43:10-07:00
+
+#### Coming From:
+
+Unreleased 4e4db95
+
+#### Purpose:
+
+Resolve the schema-fifteen hardware result and identify which side of the raw-DDR-to-displayed-cache boundary loses field content.
+
+#### Outcome:
+
+The user reloaded the directly installed `4e4db95` image and ran `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i while an agent-triggered burst sampled the live raster. The first burst retrieved the same pre-existing terminal PNG fifty-four times because its quarter-second settle interval allowed the fixed remote filename to be fetched before the new screenshot replaced it; deleting that exact remote screenshot before each subsequent trigger made stale reuse impossible. The corrected thirty-second burst returned twenty-five fresh screenshots, the first eight distinct and live and the final seventeen one byte-identical quiet snapshot. Across all eight live frames the authored first field is cleanly frozen at x=72 through x=103 for the complete 176-row bar, while the other field advances through x positions 424, 48, 360, 648, 272, 584, 208 and 496; the user independently confirms the screen behaved as before with one bar stuck on the left and the other moving right. Schema fifteen from the same run accepts all 5,007,304 bytes, records 299 framebuffer resets and publications, sequence end, presentation completion and quiet reason one, and keeps every aggregate, cache-overlap, prefill, region and phase error clear. The final generation retains 242 first-field and 240 second-field fetches. Its completed first-field raw and displayed fingerprints are respectively `f964952b` and `e855bf31`, while the second-field pair is `8c26df67` and `ab1ec443`; both completion counters and both mismatch counters saturate at 255, proving at least 255 independently completed mismatches for each parity rather than a terminal-only anomaly. The raw DDR-return byte stream therefore does not survive the line-cache write and post-cache readout boundary in either field, while the gross visual retention remains asymmetric to the first field. This passes the schema-fifteen diagnostic objective and localizes the fault inside cache population, bank ownership, address selection or readout rather than the decoder, DDR region, native raster, final mux or processed-HDMI capture path. Evidence is `.ai/current_results/entry524_stale_first_field_live_early.png` at 11,113 bytes with SHA-256 `2131b1178899856a454a033721c11143c822160259219d6e1e23a44a3624a000`, `.ai/current_results/entry524_stale_first_field_live_late.png` at 11,120 bytes with SHA-256 `d254713100fad7b6a8a410e0d0f0e625e797d7c7c2cec8bc85e298571d239d88` and `.ai/current_results/entry524_schema15_terminal.png` at 12,484 bytes with SHA-256 `b4b78e8d4415f66de5fbc6f6be3795e410ed2e96ad4b95454239fee948157e62`.
+
+#### Next Steps:
+
+Stop before changing behavior and obtain approval for one schema-sixteen cache-provenance boundary. At completion of each luma-line fill, retain the raw line fingerprint, physical source row, cache bank and framebuffer generation; synchronize only completed stable per-bank tags to the video domain, latch the applicable tag before each displayed line begins and compare its expected row and raw line fingerprint with the post-cache bytes completed at that line's end. Preserve the first tag mismatch and first content mismatch separately for each authored field and count each class without feeding cache control. Directed simulation must prove correct TFF and BFF tag/content matches, a wrong-bank tag failure and a one-byte cache-content failure, while the full native, reconstruction and canonical live-raster suites remain exact. A hardware tag mismatch would identify refill ownership or bank selection, while matching tags with differing content would isolate the dual-clock RAM write, word address or byte-lane read pipeline. Continue direct verified replacement of only `/media/fat/MediaPlayer.rbf` with no backup, rollback or staging files.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 523 COMMIT Unreleased 4e4db95 2026-08-25T20:41:57-07:00
 
 #### Coming From:
@@ -1222,34 +1251,6 @@ Push the exact source and metadata commits, then install the exact RBF plus both
 - tools/streams/run_native_480i_timing.sh
 - tools/streams/tb_h262_hardware_cadence_profiler.sv
 - tools/streams/test_decode_hardware_cadence.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 484 COMMIT Unreleased 2bb8def 2026-08-24T22:33:38-07:00
-
-#### Coming From:
-
-Unreleased 2bb8def
-
-#### Purpose:
-
-Record the first native-480i TFF hardware result without overclaiming its very short visual fixture or the clipped diagnostic overlay.
-
-#### Outcome:
-
-The user loaded `_cadence/native_480i_tff.m2v` in Native 480i mode and reports that the display accepted an interlaced picture, the image filled the vertical screen area, visible interlacing artifacts appeared, playback stopped after roughly one second, the MiSTer remained responsive, USER was solid, DISK blinked twice and POWER was solid. The final 720x480 image was triggered and retrieved entirely through ordinary FTP with the default `root` / `1` login and no SSH; `.ai/current_results/entry483_native480i_tff_failure.png` is 127,692 bytes with SHA-256 `7d658ebde64f06818e1c02f2ad4cafd4452ddb79a8830a8c658c603865f1d7ba`. The capture proves native raster activation and shows the expected temporally separated edges of a 60000/1001 source woven into interlaced fields, but it cannot establish live field-order quality from a still image. The generated fixture contains only four 30000/1001 pictures, or about 0.133 seconds of coded video, so its apparent short stop is expected and it is too brief for a useful live-motion judgment. USER solid and POWER solid indicate the bounded decode was accepted; DISK code two is the passive final-GOP progress probe arming on the third I picture and observing its publication, not a decoder error. The schema-nine overlay still begins at diagnostic line 444 and therefore extends below the 480-line native raster; only its first rows appear in this capture and the full terminal record cannot be decoded. Native output remains unpassed because visible deinterlacing quality, sustained field cadence and BFF behavior are not yet established.
-
-#### Next Steps:
-
-Before changing presentation behavior, prepare a bounded diagnostic proposal that generates longer deterministic TFF and BFF motion fixtures, moves the fixed telemetry block into the visible native raster while retaining its 800x600 position, teaches the decoder to read either layout and changes the screenshot trigger to write `/dev/MiSTer_cmd` through authenticated FTP rather than SSH. Rebuild and install that observability candidate, then run the longer TFF clip first to distinguish correct display deinterlacing from a field-order or field-cadence fault; defer BFF until TFF is captured and understood. Keep the public interlaced compatibility claim disabled.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
