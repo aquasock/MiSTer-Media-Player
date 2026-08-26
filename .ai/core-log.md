@@ -1,4 +1,4 @@
-## 525 COMMIT Unreleased ??? 2026-08-25T23:27:33-07:00
+## 525 COMMIT Unreleased 98ee2dc 2026-08-25T23:27:33-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Distinguish incorrect native line-cache provenance from corruption of correctly 
 
 #### Outcome:
 
-The approved schema-sixteen development boundary will attach a completed raw luma-line fingerprint, physical source row, cache bank and framebuffer generation to each native cache fill without changing cache control or presentation behavior. Stable completed per-bank tags will cross to the video domain, the applicable tag will be latched before display of each line and the post-cache line fingerprint will be compared at line completion. The diagnostic will preserve the first tag mismatch and first content mismatch separately for each authored field and count both classes independently so hardware can distinguish wrong refill ownership or bank selection from corruption in the dual-clock RAM write, word address or byte-lane read pipeline.
+Commit `98ee2dc` implements schema sixteen without changing cache control or presentation behavior. Every completed native luma fill now publishes a stable per-bank raw fingerprint, physical row, bank and eight-bit framebuffer generation tag across a bundled-data toggle handshake; the video side latches the selected tag, fingerprints all seven hundred twenty returned cache bytes and reports mutually exclusive tag or content mismatch evidence per line. The profiler preserves the first tag and content mismatch separately for each authored field, adds four saturating mismatch counters, advances the overlay to sixty-one words and retains schema fifteen through legacy decoding. The initial clean TFF line test exposed a diagnostic-only startup gap in which the delayed publication qualifier omitted pixel zero of the first displayed line and left its tag at reset generation zero; the same source commit corrects that qualifier and all four directed controls then pass, with TFF and BFF equality, one injected byte producing content-only mismatch and a forced wrong bank producing tag-only mismatch. The complete native suite passes its established field-order, mapping, timing, presentation, refill, profiler and decoder gates; TFF, BFF and progressive reconstruction retain zero out-of-tolerance pixels at 7,926,459, 7,948,706 and 13,048,137 cycles, field-DCT rejection remains at 82,326 cycles and the canonical seventy-two-picture mixed I/P/B live raster remains exactly 6,529,997 cycles with twenty-five publications, forty-seven B pictures, seventy-one swaps and every error clear. A from-scratch Quartus Prime 17.0.2 build completes in ten minutes fifty seconds with zero errors and 143 established warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.352, 0.245, 4.056, 0.590 and 0.925 nanoseconds with zero endpoint negative slack; focused decoder setup and recovery are positive 1.509 and 10.903 nanoseconds and focused video setup is positive 3.328 nanoseconds, all with zero violated paths. Only the established unmatched `RESET` filter remains, and timing-netlist probes find every sampled schema-sixteen generation, synchronized tag, provenance toggle, mismatch counter, metadata and fingerprint register group. The fit uses 30,748 ALMs, 48,766 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The 4,239,056-byte RBF has SHA-256 `ef78d18bb5f8fe974e1b132df73305878e1da99fd72f602a28c223fb295c8825`.
 
 #### Next Steps:
 
-Implement schema sixteen while retaining all schema-fifteen and older telemetry layouts, add directed TFF and BFF tag and content matches plus injected wrong-bank and one-byte cache-content failures, and run the complete native, interlaced reconstruction and canonical mixed-picture live-raster regressions. If those pass, perform a clean Quartus Prime 17.0.2 build, verify timing and retained diagnostic registers, directly replace only `/media/fat/MediaPlayer.rbf`, verify the active image by readback and prepare the established TFF light-motion hardware run with a corrected fresh screenshot burst and schema-sixteen capture.
+Copy the exact `98ee2dc` RBF to the Raspberry Pi, directly replace only `/media/fat/MediaPlayer.rbf` on the MiSTer without creating backup, rollback or staging files and verify the active image by readback. Reload the core, prepare `_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i, then acquire a corrected fresh screenshot burst during playback and decode schema sixteen from the same run. A tag mismatch identifies wrong refill ownership, row, bank or generation; matching tags with a content mismatch identifies cache RAM write, address or byte-lane read corruption. Preserve generated Quartus state and use incremental builds for future cycles as directed by the user.
 
 #### Files Modified:
 
@@ -32,7 +32,7 @@ Implement schema sixteen while retaining all schema-fifteen and older telemetry 
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
@@ -1255,41 +1255,6 @@ Do not change native timing or run the BFF fixture from this result. Prepare a d
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 485 COMMIT Unreleased 5568aa9 2026-08-24T22:41:28-07:00
-
-#### Coming From:
-
-Unreleased 2bb8def
-
-#### Purpose:
-
-Create a diagnostic-only native-480i qualification boundary with sustained deterministic motion, fully visible telemetry and FTP-only capture while leaving presentation behavior unchanged.
-
-#### Outcome:
-
-Commit `5568aa9` adds diagnostic-only native-480i qualification support without changing native timing, field order, framebuffer mapping, cadence scheduling or compatibility classification. The deterministic generator retains the exact four-picture TFF and BFF artifacts and their established encoded and decoded hashes by default, while `--visual-seconds 10` produces separate 300-picture all-I motion clips. The 13,145,581-byte TFF visual stream has SHA-256 `4d7c14225ac6b12d37e74f5d682edbe6c6be649096db558d01629f4920f51b95`, decoded-plane SHA-256 `8847d3ea81ed81b9a14f0affb87b3751d7539957934563f9b15dc874708a31bc` and `tt` signalling. The 13,168,691-byte BFF stream has SHA-256 `1c53638979aef7a60f3a4c343d8229935c336035c637bc6cf94073675c165fe5`, decoded-plane SHA-256 `d46058ca79418905f41d50c225b12d4750a84015e7050adde9136cb211266228` and `bb` signalling. Each signalling patch is independently proven not to alter decoded YCbCr planes, and the public checker deliberately continues to reject both streams. The cadence profiler now uses the already-video-domain native-mode observation only to place its unchanged 38-row schema-nine overlay at line 324 instead of line 444; permanent RTL and Python tests prove the full record at both 720x480 and 800x600. The screenshot helper now writes its command directly to `/dev/MiSTer_cmd` through authenticated FTP and retrieves the result through FTP, with no SSH dependency; a live trigger and retrieval against the installed MiSTer succeeds. Native TFF/BFF geometry, exhaustive interlaced cache mapping, field-order locking, profiler, dual-layout decoder, scheduler rates and field/frame cadence, picture timestamps, end-to-end TFF/BFF/progressive reconstruction, field-DCT rejection and the 72-picture progressive live-raster soak all pass with their established deterministic results. A clean Quartus 17.0.2 build completes in 10:50 with zero errors and 144 established warnings. Global TNS is zero; focused decoder setup/recovery slack is 1.808/11.798 ns and video setup slack is 2.446 ns. Fitter use is 29,641 ALMs, 45,683 registers, 3,655,139 block-memory bits, 464 RAM blocks, 65 DSP blocks and 3 PLLs. The 4,210,740-byte RBF has SHA-256 `5544bb48bea6d0f066b01f09f63087d46e7a52438ca60b6872b9f452ef213c09`.
-
-#### Next Steps:
-
-Push the exact source and metadata commits, then install the exact RBF plus both generated ten-second clips through ordinary FTP using the default MiSTer login and verify all remote hashes. Reload the core and run only the longer TFF clip in Native 480i mode. Observe the full motion interval for display lock, field combing, direction-dependent judder, repeated or missing motion, crop and terminal LEDs, then leave the final image loaded. Trigger and retrieve the native schema-nine capture entirely through FTP and use its complete terminal record together with the live observation to decide whether presentation behavior needs correction. Do not run BFF until the TFF result is captured and understood, and keep the public interlaced compatibility claim disabled.
-
-#### Files Modified:
-
-- MediaPlayer_top_07.svh
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/generate_test_interlaced_i_frames.py
-- tools/streams/read_hardware_cadence.py
-- tools/streams/run_native_480i_timing.sh
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-- tools/streams/test_decode_hardware_cadence.py
 
 #### Status:
 
