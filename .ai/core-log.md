@@ -1,3 +1,32 @@
+## 521 COMMIT Unreleased bfb9361 2026-08-25T20:30:53-07:00
+
+#### Coming From:
+
+Unreleased bfb9361
+
+#### Purpose:
+
+Correct the deployment-path diagnosis and install the verified schema-fourteen candidate rollback-safe.
+
+#### Outcome:
+
+Entry 520's reported active-image mismatch came from using a relative FTP URL with curl's single-directory method, which resolved a different server object containing the user-identified bad compile rather than the authoritative absolute `/media/fat/MediaPlayer.rbf`; its attempted rollback upload was rejected with FTP status 550 and changed no file. Repeating the read with the repository's established double-slash absolute URL retrieved the true active image at entry 519's exact 4,205,620-byte size and SHA-256 `c0eb30d2181b613a383b506bb30482f700c92c17eff7da33b082d049ac05c197`. After the user explicitly authorized replacement, ordinary FTP preserved and round-trip verified that image as `/media/fat/MediaPlayer.rbf.rollback-pre-bfb9361`, staged and round-trip verified the 4,188,256-byte `bfb9361` candidate at SHA-256 `4f51994b786a6728a1ce57d120fec12c889460bfbbce7757354ad523bb7c29df`, promoted it to the absolute active path and retrieved the active and rollback files again at their respective exact hashes. The first relative stage-delete command was rejected without changing the verified files; an absolute delete removed only `MediaPlayer.rbf.stage-bfb9361`, and a final directory read confirms the stage is absent while the active and rollback names remain. No helper, media, Main or MiSTer configuration changed.
+
+#### Next Steps:
+
+Reload the core and repeat `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off, Interlaced output Native 480i and the deinterlacer that exposes the symptom most readily. Capture a live burst and the terminal schema-fourteen snapshot from the same run, retaining the established acceptance of 300 decoded pictures, 299 swaps, quiet completion and no aggregate, presentation or phase error. Read both session-wide varied flags and signatures: a first field that never varies while the second does proves the data is already wrong when it arrives and moves the search upstream of the framebuffer, while both parities varying proves correct data arrives and is lost afterwards.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 520 COMMIT Unreleased bfb9361 2026-08-25T20:00:21-07:00
 
 #### Coming From:
@@ -1239,38 +1268,6 @@ Prepare the separate native 480i timing and presentation proposal. Add standards
 - MediaPlayer_top_02.svh
 - tools/streams/tb_h262_interlaced_i_reconstruction.sv
 - tools/streams/run_interlaced_i_reconstruction.sh
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-## 481 COMMIT Unreleased 46bf297 2026-08-24T15:22:14-07:00
-
-#### Coming From:
-
-VERSION v0.7.0 0064148
-
-#### Purpose:
-
-Establish the standards and deterministic-regression foundation for the first bounded native-interlaced I-frame milestone without changing current playback behavior.
-
-#### Outcome:
-
-Commit `46bf297` adds controlled H.262 records for interlaced sequence/frame semantics, macroblock height, picture structure, authored first-field order, frame-DCT/frame-prediction, repeat/chroma constraints, field-period output and interlaced 4:2:0 sample organization. The new deterministic generator produces four-picture 720x480 all-I elementary streams at 30000/1001 for both TFF and BFF. The TFF artifact is 157,688 bytes at SHA-256 `61ba1555df74e63fbfed83dbe674cd31a4886505193c6dcc7d4fe104d2cbe828`; FFprobe reports field order `tt`, and its decoded YCbCr planes hash to `3984cdfe2e8f98ac2b9734f7e484976c2200faf6363a380df1e21176161ae392`. The BFF artifact is 160,157 bytes at SHA-256 `6da990f80eb349928cd9ee843094bbb2faeedbd2d8bf9c1a874cb71ab89a69b6`; FFprobe reports `bb`, and its decoded planes hash to `2927bb2b3ce1327e8055cbb5516657cef9b7e7b9ae8869af094f47cca6933ae3`. In both cases the signalling-only patch leaves decoded YCbCr bytes identical to the unpatched frame-DCT source. The analyzer recognizes exactly the approved 4:2:0 interlaced all-I frame-picture envelope while continuing to classify ordinary progressive regressions unchanged. The user-facing compatibility checker deliberately reports both new streams unsupported until RTL playback is enabled, preventing a premature support claim. Python compilation, generator assertions, manifest assertions, independent FFmpeg decode, FFprobe field-order checks, current checker-boundary checks and regeneration of the existing progressive compatibility corpus all pass. Generated media remains ignored and reproducible from committed source.
-
-#### Next Steps:
-
-Prepare the next Unreleased source proposal to open only the I-picture frontend capability gate for the proven 720x480 interlaced frame-DCT subset and add RTL regression coverage that reconstructs both generated fixtures against the recorded FFmpeg plane hashes while leaving field presentation on the existing progressive diagnostic display. Do not enable the compatibility checker or native output claim until that decoder proof passes. Native 480i timing, field-aware chroma presentation and MiSTer field signalling remain the following separately qualified commit.
-
-#### Files Modified:
-
-- .ai/core-reference.md
-- .gitignore
-- tools/streams/analyze_h262_compatibility.py
-- tools/streams/check_media_compatibility.py
-- tools/streams/generate_test_interlaced_i_frames.py
 
 #### Status:
 
