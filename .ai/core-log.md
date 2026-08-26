@@ -1,3 +1,43 @@
+## 531 COMMIT Unreleased ??? 2026-08-26T02:39:38-07:00
+
+#### Coming From:
+
+Unreleased 5de0e1d
+
+#### Purpose:
+
+Maintain one consolidated current hardware diagnostic while distinguishing accepted luma framebuffer writes from the raw DDR data later returned for display.
+
+#### Outcome:
+
+The user approved continuation and directed that diagnostics remain one current consolidated layout rather than accumulating newly named schema revisions. The planned change will update the existing current diagnostic in place, observe only accepted luma writer transactions, fold each value together with its physical region, row, word and byte position, and compare completed field fingerprints with position-identical raw DDR return fingerprints before those bytes enter the already-cleared line cache. The diagnostic will remain passive and will not feed decoder, DDR ownership, cache, scheduler, presentation or video control. No additional RBF, backup, rollback or staging file will be created on the MiSTer.
+
+#### Next Steps:
+
+Implement the accepted-write and raw-return field fingerprints with explicit physical-region and completion validity, expose content mismatches and first-mismatch evidence through the single current diagnostic layout, and add directed clean, corrupted-data and invalid-provenance controls. Retain compatibility decoding only as a repository safety net without presenting each historical layout as a separate ongoing diagnostic, then run the complete native, reconstruction and canonical live-raster suites. If all regressions pass, synchronize the exact source commit to the designated GUNSMOKE checkout, perform an incremental Quartus build with retained generated state, verify timing and the RBF hash, directly replace only `/media/fat/MediaPlayer.rbf`, and repeat the same TFF hardware run. A write-versus-read mismatch localizes the residual second-field and grey-line corruption to writer packing, accepted DDR address or data, storage, readback or region ownership; equality moves the search outside that boundary without authorizing a behavioral correction.
+
+#### Files Modified:
+
+- MediaPlayer_top_03.svh
+- MediaPlayer_top_06.svh
+- MediaPlayer_top_07.svh
+- rtl/mpeg2_luma_framebuffer.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/run_native_480i_timing.sh
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+- tools/streams/tb_native_480i_cache_refill.sv
+- tools/streams/test_decode_hardware_cadence.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 530 COMMIT Unreleased 5de0e1d 2026-08-26T02:28:14-07:00
 
 #### Coming From:
@@ -1221,34 +1261,6 @@ Reload the Media Player core, leave `Native timing pattern` Off, set `Interlaced
 - tools/streams/tb_native_480i_presentation_integration.sv
 - tools/streams/tb_native_480i_timing_pattern.sv
 - tools/streams/tb_native_ordinary_overlap_ownership.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-## 491 COMMIT Unreleased f6f2fe4 2026-08-25T00:24:32-07:00
-
-#### Coming From:
-
-Unreleased f6f2fe4
-
-#### Purpose:
-
-Record the cadence-corrected native TFF hardware result, test the new cache-bank-overlap hypothesis and identify the remaining half-rate mechanism.
-
-#### Outcome:
-
-The user reloaded the exact `f6f2fe4` image, ran `_cadence/native_480i_tff_light_10s.m2v` in `Native 480i` mode and reports approximately the same speed as before, unchanged approximately 60 Hz flicker and the same quantity of transient tiny horizontal lines during playback. USER and POWER remain solid and DISK blinks twice. The untouched terminal screenshot was triggered and retrieved entirely through ordinary FTP with the default MiSTer login and no SSH; `.ai/current_results/entry490_tff_light_native480i_cadencefix.png` is 11,945 bytes with SHA-256 `1af6b303238d82fa3fc03840ad92c93afe0402923b100ef462a7eb0417c61d1a`. Schema nine accepts all 5,007,304 bytes, reconstructs 300 reference and displayed pictures and 299 swaps from the wrapped counters, preserves stable `top_field_first=1`, sees sequence end and presentation completion and reaches normal quiet reason one. Every aggregate, decoder, presentation, destination, cache, audio-underrun and PCM-protocol error is clear, including the new `cache_bank_overlap_error`; the tested same-bank active-scan refill collision therefore did not occur. First presentation is at 2,378,243 cycles and the last at 1,197,988,906 cycles, so the 299 intervals occupy 1,195,610,663 cycles, or 19.926844 seconds and 15.004885 pictures per second. This is materially identical to entry 489's 14.988809 pictures per second and proves the cadence-window separation did not remove the half-rate behavior. The integrated regression's immediate synthetic feeder hid the actual limiting interaction. The same fixture's progressive diagnostic baseline takes 14.874526 seconds, or approximately 49.75 milliseconds per decoded picture. Native output offers a complete-frame presentation boundary every 33.37 milliseconds, but `ordinary_reference_waiting` asserts `presentation_hold` while one decoded reference waits for that boundary. Decode therefore resumes only after presentation, completes approximately 49.75 milliseconds later, misses the immediately following native frame boundary and waits to the next one; the serial decode-plus-window quantization deterministically becomes about 66.73 milliseconds per picture, or 14.99 pictures per second. The synthetic feeder publishes a new completed frame immediately after the pending slot clears and thus proves cadence arithmetic without modeling measured decode latency or the real hold. The settled raster does not contain the transient short lines, and the clear overlap flag rules out only the specific monitored collision rather than every cache or output-path mechanism.
-
-#### Next Steps:
-
-With explicit user approval, replace the immediate-feeder integration case with a measured-latency ordinary-reference regression that reproduces the current approximately 15-picture-per-second native result through the real `presentation_hold` path. Then use the already implemented third ordinary DDR frame region to permit exactly one queued ordinary reference while a prior reference awaits its safe complete-frame boundary, with explicit ownership assertions preventing decode from targeting the displayed or pending bank and with all established I, P and B presentation regressions retained. The corrected measured-latency regression must approach the decoder-limited approximately 20.10-picture-per-second baseline without changing native field order or the 59.94-field raster. In the same diagnostic build, add a selectable native video-domain timing pattern that bypasses decoder DDR and line caches while preserving the exact 480i timing, so one hardware run can determine whether the flicker and transient short lines originate in the timing/output path or only during framebuffer refill. Rebuild and install only after timing closure, then rerun the TFF fixture for cadence and the bypass pattern for artifact isolation. Continue to defer BFF and any public native-interlace compatibility claim.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
