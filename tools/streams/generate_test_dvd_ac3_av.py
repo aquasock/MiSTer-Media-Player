@@ -37,6 +37,44 @@ AC3_SUBSTREAM = 0x80
 TONES = ((220, 'FL'), (277, 'FR'), (330, 'FC'), (55, 'LFE'), (440, 'BL'), (554, 'BR'))
 
 
+def extract_ac3(data: bytes, substream: int) -> bytes:
+    """Concatenate one private stream 1 substream into an elementary stream.
+
+    Decoding this rather than the program keeps container timestamps out of the
+    reference entirely, and it is byte for byte what the helper is handed.
+    """
+    out = bytearray()
+    offset = 0
+    synced = False
+    while offset + 4 <= len(data):
+        if data[offset:offset + 3] != b'\x00\x00\x01':
+            offset += 1
+            continue
+        sid = data[offset + 3]
+        if sid == 0xBA:
+            offset += 14 + (data[offset + 13] & 7)
+            continue
+        if sid == 0xB9:
+            break
+        length = int.from_bytes(data[offset + 4:offset + 6], 'big')
+        payload = data[offset + 6:offset + 6 + length]
+        if sid == 0xBD and len(payload) > 3 and (payload[0] & 0xc0) == 0x80:
+            start = 3 + payload[2]
+            body = payload[start:]
+            if len(body) > 4 and body[0] == substream:
+                first = int.from_bytes(body[2:4], 'big')
+                frames = body[4:]
+                if not synced:
+                    if not first:
+                        offset += 6 + length
+                        continue
+                    frames = frames[first - 1:]
+                    synced = True
+                out += frames
+        offset += 6 + length
+    return bytes(out)
+
+
 def build_audio_filter(duration: float) -> str:
     parts = [f'sine=frequency={hz}:duration={duration}:sample_rate=48000[a{i}]'
              for i, (hz, _name) in enumerate(TONES)]
@@ -93,10 +131,17 @@ def main() -> int:
         (temp / 'decode.yuv').unlink()
 
         # Independent reference decode of the muxed program, downmixed to stereo.
+        elementary = temp / 'audio.ac3'
+        elementary.write_bytes(extract_ac3(program.read_bytes(), AC3_SUBSTREAM))
+        dvd.require(elementary.stat().st_size > 0, 'no AC-3 substream payload found')
         reference = temp / 'reference.s16le'
-        run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-xerror', '-i', str(program),
-             '-map', '0:a:0', '-ac', '2', '-ar', '48000', '-f', 's16le', str(reference)])
+        run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-xerror',
+             '-f', 'ac3', '-i', str(elementary),
+             '-ac', '2', '-ar', '48000', '-f', 's16le', str(reference)])
         dvd.require(reference.stat().st_size % 4 == 0, 'reference PCM is not stereo s16le')
+        reference_frames = reference.stat().st_size // 4
+        dvd.require(abs(reference_frames / 48000 - duration) < 0.2,
+                    f'reference PCM covers {reference_frames / 48000:.3f}s, expected {duration}s')
         probe = json.loads(subprocess.check_output(
             ['ffprobe', '-hide_banner', '-loglevel', 'error', '-show_streams',
              '-select_streams', 'a:0', '-of', 'json', str(program)], text=True))['streams'][0]
@@ -114,8 +159,10 @@ def main() -> int:
                   'audio_bits_per_second': AUDIO_RATE,
                   'audio_private_substream': AC3_SUBSTREAM,
                   'channel_tones_hz': {name: hz for hz, name in TONES},
+                  'audio_elementary_sha256': digest(elementary),
+                  'audio_elementary_bytes': elementary.stat().st_size,
                   'reference_pcm_sha256': digest(reference),
-                  'reference_pcm_frames': reference.stat().st_size // 4,
+                  'reference_pcm_frames': reference_frames,
                   'program_end_seen': ids['program_end_seen'],
                   'pack_check': packs,
                   'ffmpeg_version': subprocess.check_output(['ffmpeg', '-version'], text=True).splitlines()[0],
