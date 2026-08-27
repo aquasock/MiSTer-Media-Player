@@ -1,3 +1,34 @@
+## 599 COMMIT Unreleased ??? 2026-08-27T04:24:46-07:00
+
+#### Coming From:
+
+Unreleased feb50c2
+
+#### Purpose:
+
+Remove the normal two-clock writer acknowledgement delay while preserving capture-bank capacity protection.
+
+#### Outcome:
+
+The user approves implementing the bounded writer-grant candidate identified in entry 598. Add an early acknowledgement on a valid completed capture only when the alternate bank is free, and retain a single pending acknowledgement when both banks are occupied until capacity actually returns. This must remain a pulse associated with a completed block, never an idle-ready level or an unconditional reconstruction bypass. Preserve block_stored, capture/drain data and ordering, all addresses and byte lanes, reset/error behavior and diagnostic capacity reporting. Correct the adjacent stale top-level comment that describes the existing pulse as a level. Extend the existing writer-overlap test for same-edge grants, delayed/full-bank grants, no duplicates or idle grants, random backpressure, reset, protocol errors and complete word/lane comparisons. No arithmetic, clock, scheduler, startup, transport, queue capacity or host-loader change is authorized by this boundary. The installed a4f2769 pair remains unchanged until the new source has passed simulation and clean Quartus timing qualification; the current Main binary is to be retained because host source is unchanged. Hardware acceptance is pending and cannot be inferred from entry 598's unsafe ideal-memory control.
+
+#### Next Steps:
+
+Implement and first validate the writer contract on GUNSMOKE, publish the exact source from the Pi, then have GUNSMOKE pull that source before official regression and a clean FPGA build. Require complete capacity protection and data equivalence, supported reconstruction and shared-writer/P/B regressions, native presentation/startup checks, and zero late intervals on the exact 449-picture ceiling fixture with the actual new capacity acknowledgement in both saved phases and modeled memory pressure. Check a longer sustained ceiling run and the qualified 8 Mbps fixture without treating ideal simulation as hardware acceptance. Preserve and independently verify restoration artifacts, then deploy only a timing-clean qualified RBF using verified staged transfer and complete fresh readback while confirming Main remains unchanged. Leave reboot, core activation and playback to the user, request one ceiling replay with menu checks and retained terminal telemetry, and keep the separate combined-stream and remaining DVD feature gates open. Preserve restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
+- MediaPlayer_top_02.svh
+- tools/streams/tb_h262_ddram_store_overlap.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 598 COMMIT Unreleased feb50c2 2026-08-27T04:21:04-07:00
 
 #### Coming From:
@@ -1149,35 +1180,6 @@ Request approval to implement and hardware-test a 64-KiB clean-video queue with 
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 559 COMMIT Unreleased 31a87b6 2026-08-26T22:13:16-07:00
-
-#### Coming From:
-
-Unreleased 31a87b6
-
-#### Purpose:
-
-Read the first hardware deadline capture and distinguish missing presentation candidates from scheduler refusal.
-
-#### Outcome:
-
-The user reported the requested file run complete and telemetry ready. A fresh FTP screenshot, after removing only the old fixed screenshot target, validates as schema nineteen with checksum and full counters: all 15,150,646 bytes, 449 decoded/display pictures and 448 swaps, sequence end and presentation completion, and zero aggregate error flags. Two confirmed doubled intervals are explicitly associated with full picture ordinals six and 348; the earlier modulo-bank inference is now directly corroborated. Neither candidate was presentable at its actual missed window, with only five and 347 completed references respectively, and neither presentation nor destination hold was asserted. Candidate six became ready 28.854 milliseconds late, while candidate 348 became ready only 0.297 milliseconds late; each missed window added one 33.367-millisecond frame period. The preceding swap-to-deadline intervals contain 13.594 and 15.129 milliseconds with the decoder ready but its clean-video queue empty, versus zero and 36 clocks of writer-capacity blocking. In both records, the clean-video queue had a byte available at the captured deadline itself, when the decoder was busy. These measurements identify late candidate production and substantial earlier input-availability gaps, not an on-time candidate rejected at either window. They do not yet prove a specific host-refill cause: the one-byte bitreader can advertise readiness while the parser is in `ST_WAIT_PIPELINE`, so input-ready/empty time can overlap transform work and must not all be counted as critical-path delay. The counters cover only the previous display interval, and writer-capacity blocking does not measure every DDR-service delay. The 347-completion to 348-readiness interval is 61.911 milliseconds in hardware versus 44.903 milliseconds between completions in the ideal-input/DDR simulation, an additional 17.008 milliseconds; the different initial raster phase and unobserved host schedule prevent treating that comparison as an exact replay. At picture 348's deadline the accepted stream position is just 83 bytes before the next picture header. The input path has a 32-KiB HPS FIFO followed by the metadata extractor and a 16-KiB clean-video queue, providing a concrete next simulation boundary without changing HDMI timing. Overall cadence is 29.806318 pictures per second over 15.030370 seconds; two doubled gaps contribute 66.733 milliseconds, while another 15.370 milliseconds comes from the first-reference-completion versus later-swap timestamp basis. The screenshot and complete decode, calculations and limitations are retained in `.ai/current_results/entry559_bob_terminal.png` and `entry559_bob_capture.json`; screenshot SHA-256 is `50571f4d7558c24fee23cced747f39d5a80b3ee887d9bb03411c8633b0d9ea17`. No production source, active image, display settings or core lifecycle changed during capture. The diagnostic yielded useful hardware evidence, but the remaining cadence issue is not resolved and this elementary stream does not validate audio synchronization.
-
-#### Next Steps:
-
-Request approval for the next cadence cycle: extend the real-pipeline simulation with the existing HPS ingress, extractor and clean-video queues, separating critical byte waits from transform overlap and varying refill pauses within the measured evidence rather than claiming an invented host trace is ground truth. Compare startup reserve, input buffering and bounded decode-headroom improvements, preserving byte/pixel identity, end-of-stream draining, repeated-load behavior, Bob/Weave transitions and the accepted continuous HDMI sync. Select a playback change only after its benefit and limits are demonstrated; then require existing regressions, a clean positive-timing build and independently verified deployment before another hardware test. No additional screenshot is needed before that simulation work.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
