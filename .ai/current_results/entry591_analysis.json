@@ -1,0 +1,317 @@
+{
+  "source_commit": "a4f2769f6e55774abfc5990052702734b9024d15",
+  "analyzed": "2026-08-27T03:20:24-07:00",
+  "user_report": "I ran the file without rebooting. The data is on the screen. It looked good to me as well.",
+  "verdict": "PASS scoped warm 8 Mbps elementary-stream regression: full completion, guarded integrity, zero post-startup deadline misses or outliers, nominal steady swap interval. Does not clear the high-bitrate case or untested modes.",
+  "boot_evidence": {
+    "current": [
+      "Aug 27 10:08:35 MiSTer syslog.info syslogd started: BusyBox v1.33.1"
+    ],
+    "prior_entry590": [
+      "Aug 27 10:08:35 MiSTer syslog.info syslogd started: BusyBox v1.33.1"
+    ],
+    "same_linux_boot": true,
+    "user_reports_no_reboot": true,
+    "limits": "Corroborates no intervening Linux reboot. Capture does not independently prove that no core reload or mode switch occurred."
+  },
+  "telemetry": {
+    "accepted_bytes": 15150646,
+    "reference_pictures": 449,
+    "display_pictures": 449,
+    "display_swaps": 448,
+    "error_flags": 0,
+    "deadline_gap_count": 0,
+    "gap_outlier_count": 0,
+    "first_present_cycle": 1870111,
+    "last_present_cycle": 901122741,
+    "cadence_cycles": 899252630,
+    "cadence_seconds": 14.987543833333334,
+    "delivered_fps": 29.891488891169548,
+    "decoder_stall_cycles": 854163888,
+    "session_cycles": 901123764,
+    "presentation_hold_total_cycles": 26946870,
+    "writer_wait_cycles": 15228471
+  },
+  "helper": {
+    "summary": {
+      "t": 14910219,
+      "polls": 572,
+      "poll_us": 14856695,
+      "poll_max_us": 114117,
+      "data_polls": 232,
+      "data_poll_us": 14854430,
+      "intervals": 571,
+      "interval_us": 14893376,
+      "interval_max_us": 114239,
+      "read_calls": 1266,
+      "read_us": 308037,
+      "tx_calls": 925,
+      "tx_us": 14512587,
+      "tx_max_us": 29762,
+      "ack_chunks": 14,
+      "fast_bytes": 15029026,
+      "slow_bytes": 121620,
+      "burst_calls": 885783,
+      "status_queries": 947518,
+      "transport_mode": 2
+    },
+    "read_count": 925,
+    "delivery_bytes_per_second": 1016884.6697782325,
+    "matched_endpoint_bytes": 15134262,
+    "matched_endpoint_us": 14882968,
+    "first_read": {
+      "t": 22729,
+      "latency_us": 20380,
+      "count": 16384
+    },
+    "first_completed_chunk": {
+      "t": 27034,
+      "latency_us": 24686,
+      "would_block": 340,
+      "count": 16384
+    },
+    "startup_eagain": 340,
+    "steady_eagain": 0,
+    "mean_data_poll_us": 64027.71551724138,
+    "transfer_fraction_of_poll": 0.976838186420331,
+    "read_fraction_of_poll": 0.020733884622387417,
+    "unsampled_full_chunk_tx_us": {
+      "count": 910,
+      "min": 3361,
+      "median": 15657.0,
+      "p95_nearest_rank": 22405,
+      "max": 29762
+    },
+    "fast_fraction": 0.9919726195173459,
+    "mean_fast_batch_bytes": 16.96693885522752,
+    "zero_credit_acknowledged_words": 60810,
+    "batches_per_chunk": {
+      "count": 925,
+      "min": 2,
+      "median": 995,
+      "p95_nearest_rank": 1388,
+      "max": 2197
+    },
+    "queries_per_chunk": {
+      "count": 925,
+      "min": 3,
+      "median": 1043,
+      "p95_nearest_rank": 1533,
+      "max": 2253
+    },
+    "status_acknowledged_word_transactions": 6632626,
+    "all_logged_chunks_pass_transport_validation": true,
+    "sampled_ack_records": [
+      {
+        "t": 824703,
+        "event": 64,
+        "words": 0,
+        "high_reads": 0,
+        "low_reads": 0,
+        "high_wait_words": 0,
+        "low_wait_words": 0,
+        "high_max_reads": 0,
+        "low_max_reads": 0,
+        "uninitialized": 0
+      },
+      {
+        "t": 1912717,
+        "event": 128,
+        "words": 0,
+        "high_reads": 0,
+        "low_reads": 0,
+        "high_wait_words": 0,
+        "low_wait_words": 0,
+        "high_max_reads": 0,
+        "low_max_reads": 0,
+        "uninitialized": 0
+      },
+      {
+        "t": 2993572,
+        "event": 192,
+        "words": 0,
+        "high_reads": 0,
+        "low_reads": 0,
+        "high_wait_words": 0,
+        "low_wait_words": 0,
+        "high_max_reads": 0,
+        "low_max_reads": 0,
+        "uninitialized": 0
+      },
+      {
+        "t": 4280379,
+        "event": 256,
+        "words": 165,
+        "high_reads": 328,
+        "low_reads": 6320,
+        "high_wait_words": 163,
+        "low_wait_words": 164,
+        "high_max_reads": 2,
+        "low_max_reads": 5993,
+        "uninitialized": 0
+      },
+      {
+        "t": 5292827,
+        "event": 320,
+        "words": 15,
+        "high_reads": 30,
+        "low_reads": 30,
+        "high_wait_words": 15,
+        "low_wait_words": 15,
+        "high_max_reads": 2,
+        "low_max_reads": 2,
+        "uninitialized": 0
+      },
+      {
+        "t": 6253024,
+        "event": 384,
+        "words": 23,
+        "high_reads": 46,
+        "low_reads": 46,
+        "high_wait_words": 23,
+        "low_wait_words": 23,
+        "high_max_reads": 2,
+        "low_max_reads": 2,
+        "uninitialized": 0
+      },
+      {
+        "t": 7270283,
+        "event": 448,
+        "words": 164,
+        "high_reads": 328,
+        "low_reads": 1143,
+        "high_wait_words": 164,
+        "low_wait_words": 163,
+        "high_max_reads": 2,
+        "low_max_reads": 818,
+        "uninitialized": 0
+      },
+      {
+        "t": 8297860,
+        "event": 512,
+        "words": 6,
+        "high_reads": 12,
+        "low_reads": 12,
+        "high_wait_words": 6,
+        "low_wait_words": 6,
+        "high_max_reads": 2,
+        "low_max_reads": 2,
+        "uninitialized": 0
+      },
+      {
+        "t": 9347691,
+        "event": 576,
+        "words": 180,
+        "high_reads": 358,
+        "low_reads": 564,
+        "high_wait_words": 178,
+        "low_wait_words": 178,
+        "high_max_reads": 2,
+        "low_max_reads": 208,
+        "uninitialized": 0
+      },
+      {
+        "t": 10439298,
+        "event": 640,
+        "words": 183,
+        "high_reads": 364,
+        "low_reads": 1226,
+        "high_wait_words": 181,
+        "low_wait_words": 183,
+        "high_max_reads": 2,
+        "low_max_reads": 862,
+        "uninitialized": 0
+      },
+      {
+        "t": 11481668,
+        "event": 704,
+        "words": 169,
+        "high_reads": 337,
+        "low_reads": 5342,
+        "high_wait_words": 168,
+        "low_wait_words": 169,
+        "high_max_reads": 2,
+        "low_max_reads": 5006,
+        "uninitialized": 0
+      },
+      {
+        "t": 12338759,
+        "event": 768,
+        "words": 0,
+        "high_reads": 0,
+        "low_reads": 0,
+        "high_wait_words": 0,
+        "low_wait_words": 0,
+        "high_max_reads": 0,
+        "low_max_reads": 0,
+        "uninitialized": 0
+      },
+      {
+        "t": 13558545,
+        "event": 832,
+        "words": 16,
+        "high_reads": 32,
+        "low_reads": 32,
+        "high_wait_words": 16,
+        "low_wait_words": 16,
+        "high_max_reads": 2,
+        "low_max_reads": 2,
+        "uninitialized": 0
+      },
+      {
+        "t": 14417449,
+        "event": 896,
+        "words": 12,
+        "high_reads": 24,
+        "low_reads": 24,
+        "high_wait_words": 12,
+        "low_wait_words": 12,
+        "high_max_reads": 2,
+        "low_max_reads": 2,
+        "uninitialized": 0
+      }
+    ]
+  },
+  "cadence": {
+    "nominal_fps": 29.97002997002997,
+    "largest_post_first_swap_intervals_cycles": [
+      2002000,
+      2002000,
+      2002000
+    ],
+    "largest_post_first_swap_intervals_seconds": [
+      0.03336666666666667,
+      0.03336666666666667,
+      0.03336666666666667
+    ],
+    "steady_interval_fps": 29.97002997002997,
+    "aggregate_span_seconds": 14.987543833333334,
+    "nominal_448_interval_span_seconds": 14.948266666666667,
+    "startup_inclusive_excess_seconds": 0.039277166666666474,
+    "interpretation": "Schema19 first_present_cycle is assigned on first reference_picture_complete, before first visible release; the aggregate includes startup reserve/alignment. Post-first-swap deadline and ranked-gap records start at the first actual swap. Aggregate 29.891489 fps is not a steady-state slowdown."
+  },
+  "qualified_regression_comparison": {
+    "baseline_entry": 564,
+    "baseline_source": "2acabc5",
+    "baseline_scope": "Clean Bob 8 Mbps acceptance; current display mode is not independently encoded.",
+    "same_file_byte_count": true,
+    "same_picture_and_swap_counts": true,
+    "same_zero_errors_deadlines_outliers": true,
+    "same_maximum_steady_interval_cycles": 2002000,
+    "baseline_startup_inclusive_aggregate_fps": 29.870022331353198,
+    "current_startup_inclusive_aggregate_fps": 29.891488891169548
+  },
+  "correction_to_entry590": "Entry590 described its 17.563778-second aggregate as first-to-last presentation and treated its excess over 448 nominal intervals as entirely cadence delay. The start is actually first reference completion, so the aggregate includes startup and is not pure visible playback timing. Its 77 actual post-startup deadline misses and 66.733-ms maximum intervals still independently prove remaining high-bitrate lateness; the overall diagnosis and measured comparative improvement remain valid.",
+  "measurement_limits": [
+    "Acceptance is scoped to this completed warm 8 Mbps run. It is not arbitrary seek/cancel coverage, a full mode-switch matrix, or acceptance of the 34.9 MB high-bitrate fixture.",
+    "Menu responsiveness was requested but is still not separately confirmed; user says only that playback looked good. Maximum measured media-poll duration is 114.117 ms, not direct UI latency.",
+    "Average delivery is paced by downstream consumption and is not maximum physical link throughput.",
+    "The lightweight rolling digest can collide; normal successful guard checks are not proof against every possible corruption.",
+    "No source, binary, configuration, reboot, core reload or playback was changed during evidence collection."
+  ],
+  "next_steps": "Retain a4f2769 as the tested guarded-transport candidate and preserve both hardware captures. Obtain a separate current menu-response report. Before another production change, propose and get approval for focused decoder/backpressure diagnosis of the high-bitrate case; retain credits, checksum/count guards, startup, sync and queue sizes. Do not request another identical 8 Mbps run without a new diagnostic question.",
+  "production_changed": false,
+  "analysis_checks": "PASS",
+  "scoped_warm_8mbps_hardware_pass": true,
+  "high_bitrate_steady_cadence_pass": false
+}

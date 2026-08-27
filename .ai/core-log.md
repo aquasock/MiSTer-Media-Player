@@ -1,3 +1,32 @@
+## 591 COMMIT Unreleased a4f2769 2026-08-27T03:21:12-07:00
+
+#### Coming From:
+
+Unreleased a4f2769
+
+#### Purpose:
+
+Validate the guarded transport on the qualified 8 Mbps elementary stream after a warm file load.
+
+#### Outcome:
+
+The user reports running the requested file without rebooting and says playback looked good. The helper log identifies `bbb_480i_tff_15s_8mbps.m2v`, runtime `transport=credit_fast_v1` and mode 2; its new child/session data and the unchanged 10:08:35 UTC Linux boot corroborate a new run without an intervening system reboot. This does not independently establish whether a core reload or mode switch occurred. The log was collected before a fresh screenshot, and complete host/FPGA readbacks retain both qualified `a4f2769` hashes. All 15,150,646 bytes, 449 reference/display pictures and 448 swaps complete with zero aggregate errors, no transport integrity abort, normal helper exit, sequence end and quiet terminal presentation. All 925 chunk byte totals, fast/slow counts, batch/query totals and fourteen payload-ACK samples reconcile. Fast transfers carry 15,029,026 bytes, or 99.1973 percent; 121,620 bytes use acknowledged single-word progress. There are zero actual post-startup deadline misses, zero cadence outliers and no retained missed-deadline records. The three largest measured post-first-swap intervals are exactly 2,002,000 decoder clocks, or 33.366667 milliseconds, matching steady 29.970030-fps cadence and the qualified entry-564 8 Mbps acceptance. The raw aggregate is 29.891489 fps across 14.987544 seconds because schema nineteen assigns its starting timestamp on first reference completion, before visible release, so it includes startup reserve and raster alignment; its 39.277-millisecond excess over 448 nominal intervals is not evidence of steady slowdown. This also corrects entry 590's description of its aggregate as first-to-last presentation and its implication that the entire excess duration was cadence delay: those aggregate measurements include startup, but that run's 77 actual post-startup missed intervals and 66.733-millisecond maximum gaps still independently establish remaining high-bitrate lateness. Matched delivery averages 1,016,885 B/s, paced by this smaller stream's downstream consumption rather than establishing raw link capacity. The host issues 885,783 fast batches averaging 16.967 bytes and 947,518 status queries; this confirms small available-credit grants under steady consumption, not a throughput regression compared with the larger file. All 340 helper EAGAIN events occur before first delivery. Data-bearing polls average 64.028 milliseconds and peak at 114.117 milliseconds; these measure Main-loop blocking exposure, and current menu responsiveness is still not separately confirmed by the user's visual report. Capture, complete decode, checked analysis and prior qualified-file comparison are preserved as `.ai/current_results/entry591_*`. No source, deployed binary, configuration, lifecycle or playback action was changed during collection. This entry passes the scoped warm 8 Mbps hardware regression and preserves its prior steady cadence; it does not pass the high-bitrate fixture, all display modes, arbitrary cancellation or the remaining unsupported feature set.
+
+#### Next Steps:
+
+Retain `a4f2769` and the restoration pair as the tested guarded-transport baseline, with entry 590 preserving the larger-file improvement and entry 591 closing the requested warm 8 Mbps regression. Obtain a separate report of menu responsiveness during playback without requesting another identical file run unless a new diagnostic question requires it. For further performance work, propose and obtain approval for a focused investigation of the remaining high-bitrate decoder-side processing/backpressure, using the retained ready/input/writer evidence to distinguish internal decode waits from output pressure and status-query overhead before changing production behavior. Preserve credit and integrity checks, both FIFO sizes, guarded startup, continuous HDMI sync and black idle. Keep unsupported interlaced P/B, field-picture/DCT, audio/PTS, mode-switch/cancellation coverage and historical assertion drift explicitly outside this acceptance, leave reboot/playback control with the user, keep restricted `core.md` unchanged and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 590 COMMIT Unreleased a4f2769 2026-08-27T03:13:17-07:00
 
 #### Coming From:
@@ -1168,34 +1197,5 @@ Obtain explicit user authorization to overwrite the active `/media/fat/MediaPlay
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 551 COMMIT Unreleased 558efef 2026-08-26T19:51:11-07:00
-
-#### Coming From:
-
-Unreleased 558efef
-
-#### Purpose:
-
-Characterize the visible flicker from camera footage, including the pre-playback interval no capture had ever observed.
-
-#### Outcome:
-
-Two user recordings settle what the flicker actually is, and it is not what thirty entries of framebuffer instrumentation assumed. The first is `.ai/current_results/PXL_20260827_023203846.mp4`, 99,984,960 bytes with SHA-256 `f7e5f638649d567b2f440760e8482253ffc58258b6653e72eae3d1391cce4246`, 1920 by 1080 at sixty frames per second for 24.07 seconds, playback beginning near six and a half seconds. Before playback the framebuffer still presents the previous run's final picture behind the file selector, a foliage scene retained beneath the menu with the telemetry overlay at left, which is the stuck screen the user described. The transition itself is decisive: at 6.600 seconds change rises from the camera noise floor, and at 6.750 seconds one frame shows Big Buck Bunny's opening sky and bird woven line by line with the previous scene's tree trunks, two entirely different pictures interleaved on alternate scanlines. That photograph is the same defect the schema-eighteen field analysis measured as bit-identical even rows, but with the two source pictures visibly distinct rather than a subtle ghost. Retained as `.ai/current_results/entry551_pre_playback_retained_frame.png` at 1,632,365 bytes with SHA-256 `51c9bafecad1b200cfd1318bcdb2be3af4fb67575768b908562be56e03eed458` and `.ai/current_results/entry551_field_weave_two_scenes.png` at 1,613,919 bytes with SHA-256 `4e1f2627ecc9a4082be321c4033e456301ed07079ba9ebc0dea119f76e528a50`. The stale field therefore survives a generation reset, a mode change and a fresh publication, which constrains whatever holds it. The second recording is `.ai/current_results/PXL_20260827_024238007.mp4`, 30,673,309 bytes with SHA-256 `a72e6ead0e645530d4a86b6eb314051d7b0740b687c77fd72e413fcfc9e34e3d`, a high-rate capture exported as 608 frames at thirty frames per second representing 2.53 seconds of real time at 240 frames per second. Its change series autocorrelates at 0.95 for a period of four frames, so the camera is phase locked to the display's sixty hertz refresh; sampling every fourth frame removes that aliasing and leaves genuine content change at sixty hertz. In that series the defect has an unmistakable signature. Across the affected interval the change one step apart averages 21.11 while the change two steps apart averages 2.59, so the display returns to the same image every 33.3 milliseconds: it is alternating between two fixed images at sixty hertz, a thirty hertz flip, rather than advancing through the video. Normal playback in the same clip shows the opposite relation, 4.26 at one step against 5.60 at two, which is what progressing motion looks like. Sixty-one per cent of the clip is in that alternating state, in two episodes of 783 and 733 milliseconds, so a single stick lasts roughly three quarters of a second or about twenty-two frame slots. The user confirms this is the sticking they see. A plausible mechanism follows directly and is worth testing rather than assuming: if the core holds one picture and keeps emitting its two fields alternately, a Weave deinterlacer that combines the two most recently arrived fields produces one composite and then the same pair in the opposite order, two vertically offset images alternating at thirty hertz. That would make a held picture strobe rather than merely freeze, and it agrees with entry 545's observation that Bob shows the artifact at approximately twice the Weave cadence, since Bob exposes single fields at field rate. Two attempted camera analyses failed and are recorded so they are not repeated: whole-frame difference cannot separate a stuck display from a genuinely static scene, and a vertical high-frequency measure intended to detect field mismatch is flat at 0.573 to 0.585 across all 608 frames because the camera does not sample display scanlines at a fixed phase. Ordinary sixty hertz FTP rasters remain the better instrument for field content; the camera's value is temporal.
-
-#### Next Steps:
-
-Reconcile the two facts that must both be true. The display holds one picture for roughly seven hundred fifty milliseconds, about twenty-two slots, while schema-sixteen telemetry reports 449 pictures and 448 swaps across the fifteen second file, close to the full 29.97 rate. Either the swap presents content identical to the previous picture, or the held interval is invisible to the swap counter; both halves are measurable and one of them is wrong. Prefer that question over any further framebuffer instrument, since fetch addresses, region resolution, cache writes and the write-read fingerprints are already exact. Test the Weave field-order hypothesis directly by comparing a deliberately held picture in Weave against the same interval in Bob, which pairs fields differently, before proposing any change. The analog VGA path remains fully driven with `VGA_F1` and `VGA_SCALER` low, so a CRT on an analog board would show the raw core output with the deinterlacer wholly removed and would separate a core-side hold from a deinterlacer amplification. Do not trust the pixel harness committed in entry 550 until its progressive control passes.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
