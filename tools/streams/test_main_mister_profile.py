@@ -162,7 +162,7 @@ static std::deque<int> pipe_reads;
 static std::vector<uint8_t> delivered;
 static std::vector<unsigned> sampled_events;
 static bool correct_core = true;
-static bool fail_open = false;
+static bool fail_open = false, fail_burst = false;
 static unsigned mock_tx_calls = 0, releases = 0, closes = 0;
 static int fake_clock(clockid_t, timespec *ts) {
     ts->tv_sec = fake_us / 1000000; ts->tv_nsec = (fake_us % 1000000) * 1000;
@@ -201,6 +201,12 @@ static void user_io_file_tx_data_ack(const uint8_t *data, uint32_t size, fpga_sp
     }
     user_io_file_tx_data(data, size);
 }
+static int user_io_file_tx_data_burst(const uint8_t *data, uint32_t size,
+    media_burst_state *state, media_burst_stats *stats, fpga_spi_profile *p) {
+    state->mode = 1;
+    if (fail_burst) { stats->error = 3; return 0; }
+    user_io_file_tx_data_ack(data, size, p); stats->slow_bytes += size; return 1;
+}
 #define clock_gettime fake_clock
 #define read fake_read
 #define write fake_write
@@ -218,7 +224,7 @@ static size_t occurrences(const std::string &needle) {
 static void session() {
     helper_fd = -1; helper_pid = -1; diagnostic_close(); log_text.clear();
     delivered.clear(); sampled_events.clear(); pipe_reads.clear(); mock_tx_calls = 0;
-    releases = closes = 0; correct_core = true; fail_open = false;
+    releases = closes = 0; correct_core = true; fail_open = fail_burst = false;
     diagnostic_open("file:test.m2v", 1); helper_fd = 42; helper_pid = -1;
     download_active = 1; download_assert_us = fake_us;
 }
@@ -246,10 +252,11 @@ int main() {
     assert(transfer_profile.read_calls == 68 && transfer_profile.read_us == 68 * 3);
     assert(transfer_profile.tx_calls == 66 && transfer_profile.tx_us == 66 * 11);
     assert(transfer_profile.tx_max_us == 11 && transfer_profile.ack_chunks == 1);
+    assert(transfer_profile.slow_bytes == delivered.size() && transfer_profile.fast_bytes == 0);
     assert(transfer_profile.polls == 18 && transfer_profile.data_polls == 17);
     assert(transfer_profile.intervals == 17 && !transfer_profile.poll_active);
     assert(releases == 1 && diagnostic_fd == -1 && helper_fd == -1);
-    assert(log_text.find("transport=ack_bulk_preload_v1") != std::string::npos);
+    assert(log_text.find("transport=credit_fast_v1") != std::string::npos);
     assert(occurrences("first_read latency_us=") == 1 && occurrences("first_byte latency_us=") == 1);
     assert(occurrences("profile_ack event=64 ") == 1 && occurrences("profile_summary ") == 1);
     assert(log_text.find("read event=66 count=3 submitted=1064963 read_us=3 tx_us=11 ack_sample=0") != std::string::npos);
@@ -277,8 +284,18 @@ int main() {
     assert(occurrences("profile_summary ") == 1 && releases == 1 && !transfer_profile.poll_active);
     puts("PASS loader: warm reset, read-error errno retention, core-change and external-stop exits");
 
+    session(); fail_burst = true; pipe_reads = {16384, 16384, 0}; mediaplayer_poll();
+    assert(helper_fd == -1 && releases == 1 && pipe_reads.size() == 2);
+    assert(submitted_bytes == 0 && read_events == 0 && delivered.empty());
+    assert(log_text.find("stop reason=transport-fault") != std::string::npos);
+    assert(log_text.find("transport_fault error=3") != std::string::npos);
+    mediaplayer_poll(); assert(pipe_reads.size() == 2);
+    puts("PASS loader: transport fault stops session before another read or retry");
+
     session(); diagnostic_close(); log_text.clear(); fail_open = true;
+    burst_state.mode = 2; burst_state.words = 99; burst_state.digest = 17;
     diagnostic_open("file:test.m2v", 1); helper_fd = 42; download_active = 1;
+    assert(!burst_state.mode && !burst_state.words && !burst_state.digest);
     pipe_reads = {16384, 0}; const auto prior_polls = transfer_profile.polls;
     mediaplayer_poll();
     assert(log_text.empty() && sampled_events.empty() && transfer_profile.polls == prior_polls);
@@ -305,6 +322,11 @@ static unsigned latency, stall_mode, occupancy, max_occupancy, reads, resets;
 static uint64_t cycles;
 static std::vector<uint16_t> accepted;
 static unsigned case_size;
+static bool guarded, force_zero, reset_status, change_status;
+static unsigned capacity = 16384, drain_period = 97, fault_kind, fast_rises;
+static uint32_t sink_words;
+static uint16_t sink_digest;
+static unsigned status_fault;
 static bool case_bulk;
 #undef assert
 #define assert(c) do { if (!(c)) { fprintf(stderr, "RTL check failed: %s line=%d size=%u bulk=%d latency=%u stalls=%u cycle=%llu accepted=%zu occupancy=%u\n", #c, __LINE__, case_size, case_bulk, latency, stall_mode, (unsigned long long)cycles, accepted.size(), occupancy); abort(); } } while (0)
@@ -312,27 +334,50 @@ static void tick() {
     ++cycles;
     // Two-word test sink: hold full until a deliberately slow consumer drains.
     // Also vary wait independently, including the shared vs_wait gate.
-    dut->io_wait = stall_mode && (occupancy >= 2 || (stall_mode == 2 && cycles % 113 < 37));
-    dut->vs_wait = stall_mode == 2 && cycles % 211 < 29;
+    dut->ioctl_burst_credit = force_zero || occupancy + 32 >= capacity ? 0 : std::min(4096u, capacity - occupancy - 32);
+    dut->ioctl_burst_words = reset_status ? 0 : sink_words;
+    dut->ioctl_burst_digest = reset_status ? 0 : sink_digest;
+    dut->ioctl_burst_ready = dut->ioctl_download && status_fault != 1;
+    dut->ioctl_burst_fault = status_fault == 2;
+    if (status_fault == 3) dut->ioctl_burst_credit = 4097;
+    if (status_fault == 4) dut->ioctl_burst_words ^= 1;
+    if (status_fault == 5) dut->ioctl_burst_digest ^= 1;
+    dut->io_wait = guarded ? occupancy >= capacity : stall_mode && (occupancy >= 2 || (stall_mode == 2 && cycles % 113 < 37));
+    dut->vs_wait = !guarded && stall_mode == 2 && cycles % 211 < 29;
     dut->clk_sys = 0; dut->eval();
     const bool wr = dut->ioctl_wr;
     const uint16_t data = dut->ioctl_dout;
     dut->clk_sys = 1; dut->eval();
     if (wr) {
         accepted.push_back(data);
-        if (stall_mode) { ++occupancy; max_occupancy = std::max(max_occupancy, occupancy); assert(occupancy <= 2); }
+        ++sink_words; sink_digest = uint16_t((sink_digest << 1) | (sink_digest >> 15)) ^ data;
+        if (stall_mode || guarded) { ++occupancy; max_occupancy = std::max(max_occupancy, occupancy); assert(occupancy <= (guarded ? capacity : 2)); }
     }
-    if (occupancy && cycles % 97 == 0) --occupancy;
+    if (occupancy && cycles % drain_period == 0) --occupancy;
 }
 static void fpga_gpo_write(uint32_t v) {
     gpo_copy = v; dut->gp_out = v;
     for (unsigned i=0; i<latency; ++i) tick();
 }
+static void fpga_gpo_writeN(uint32_t v) {
+    if (v & SSPI_STROBE) {
+        ++fast_rises;
+        if (fast_rises == 3) {
+            if (fault_kind == 1) v &= ~SSPI_STROBE; // Drop one rising strobe.
+            if (fault_kind == 2) v ^= 1; // Alter one received payload bit.
+            if (fault_kind == 3) reset_status = true;
+            if (fault_kind == 4) status_fault = 2;
+        }
+    }
+    // Production writeN does not update Main's cached GPO value.
+    const auto cached = gpo_copy; fpga_gpo_write(v); gpo_copy = cached;
+}
 static uint32_t fpga_gpo_read() { return gpo_copy; }
 static int fpga_gpi_read() {
     assert(++reads < 10000000);
     for (unsigned i=0; i<latency; ++i) tick();
-    return dut->io_ack ? SSPI_ACK : 0;
+    const unsigned data = dut->fp_dout ^ (change_status && dut->fp_dout == 0x4D50 ? 1 : 0);
+    return (dut->io_ack ? SSPI_ACK : 0) | data;
 }
 static void fpga_wait_to_reset() { ++resets; assert(false); }
 static void EnableFpga() { fpga_gpo_write(gpo_copy | (1u << 18)); }
@@ -345,6 +390,7 @@ RTL_TESTS = r'''
 static void begin_session() {
     dut.reset(new Vbridge); accepted.clear(); occupancy = max_occupancy = reads = resets = 0; cycles = 0;
     gpo_copy = 0x80000000; dut->gp_out = gpo_copy;
+    sink_words = 0; sink_digest = 0; fast_rises = 0; reset_status = false; status_fault = 0;
     for (int i=0; i<12; ++i) tick();
     EnableFpga(); spi8(0x53); fpga_spi(1); DisableFpga();
     for (int i=0; i<8; ++i) tick();
@@ -388,6 +434,62 @@ int main() {
         ++cases;
     }
     assert(cases == 168 && backpressured > 0);
+    unsigned burst_cases = 0;
+    guarded = true; stall_mode = 0;
+    for (unsigned delay : {1u, 2u, 5u, 13u}) for (unsigned cap : {64u, 16384u})
+    for (unsigned size : {0u, 1u, 2u, 3u, 8193u, 32769u}) for (unsigned offset : {0u, 1u}) {
+        latency = delay; capacity = cap; case_size = size;
+        begin_session(); media_burst_state state = {}; media_burst_stats stats = {};
+        std::vector<uint8_t> storage(size + 2), bytes(size);
+        for (unsigned i=0; i<size; ++i) storage[i+offset] = bytes[i] = uint8_t(i*37+19);
+        assert(user_io_file_tx_data_burst(storage.data()+offset, size, &state, &stats, nullptr));
+        for (int i=0; i<8; ++i) tick();
+        assert(accepted == packed(bytes) && !stats.error);
+        assert(stats.fast_bytes + stats.slow_bytes == size);
+        assert(state.mode == (size ? (TEST_WIDE && TEST_BURST ? 2u : 1u) : 0u));
+        if (!TEST_WIDE || !TEST_BURST || offset) assert(!stats.fast_bytes);
+        else if (size >= 2) assert(stats.fast_bytes && stats.queries > stats.batches);
+        ++burst_cases;
+    }
+    if (TEST_WIDE && TEST_BURST) {
+        latency = 1; capacity = 64; begin_session();
+        // A full sink plus zero credit must use acknowledged progress and drain.
+        occupancy = capacity; force_zero = true;
+        std::vector<uint8_t> bytes(16, 0x39); media_burst_state state = {}; media_burst_stats stats = {};
+        assert(user_io_file_tx_data_burst(bytes.data(), bytes.size(), &state, &stats, nullptr));
+        assert(!stats.fast_bytes && stats.slow_bytes == bytes.size() && accepted == packed(bytes));
+        force_zero = false;
+        // Count wrap and coherent snapshot even if live inputs change mid-query.
+        begin_session(); sink_words = 0xfffffffcu; sink_digest = 0x1234;
+        state = {}; stats = {};
+        assert(user_io_file_tx_data_burst(bytes.data(), bytes.size(), &state, &stats, nullptr));
+        assert(state.words == 4 && state.digest == sink_digest);
+        EnableFpga(); const auto before_words = sink_words; const auto before_digest = sink_digest;
+        assert(spi_w(0x57) == 0x4D50); sink_words += 999; sink_digest ^= 0x8888;
+        assert(spi_w(0) == 0xB001); const auto credit = spi_w(0); assert(credit <= 4096);
+        uint32_t snapshot = spi_w(0); snapshot |= uint32_t(spi_w(0)) << 16;
+        assert(snapshot == before_words && spi_w(0) == before_digest && spi_w(0) == 1);
+        DisableFpga();
+        // Each uncertain first batch is rejected without sending a second batch.
+        for (unsigned fault : {1u, 2u, 3u, 4u}) {
+            capacity = 16384; begin_session(); fault_kind = fault; state = {}; stats = {};
+            bytes.resize(16384);
+            assert(!user_io_file_tx_data_burst(bytes.data(), bytes.size(), &state, &stats, nullptr));
+            assert(stats.error && stats.batches == 1 && stats.fast_bytes == 8192 && fast_rises == 4096);
+            assert(accepted.size() == (fault == 1 ? 4095u : 4096u));
+            fault_kind = 0;
+        }
+        for (unsigned fault : {1u, 2u, 3u, 4u, 5u, 6u}) {
+            begin_session(); state = {}; stats = {};
+            assert(user_io_file_tx_data_burst(bytes.data(), 16, &state, &stats, nullptr));
+            const auto count = accepted.size(); status_fault = fault; change_status = fault == 6; stats = {};
+            assert(!user_io_file_tx_data_burst(bytes.data(), 16, &state, &stats, nullptr));
+            assert(stats.error && accepted.size() == count && !stats.fast_bytes && !stats.slow_bytes);
+            change_status = false;
+        }
+        puts("PASS guarded fault cases: zero/full credits, counter wrap, coherent snapshot, lost/corrupt word, reset, overflow, invalid credit/count/digest/capability, no second batch");
+    }
+    printf("PASS burst RTL wide=%d capability=%d: %u cases; credit bounds, alignment, odd tails, legacy discovery, minimum one-cycle posted writes\n", TEST_WIDE, TEST_BURST, burst_cases);
     dut.reset(); // Destroy the last model before Verilator's thread-local context.
     printf("PASS RTL wide=%d: %u cases, upstream and bulk; four bridge latencies, full sink, independent waits, consecutive chunks, odd tails, download release\n", TEST_WIDE, cases);
 }
@@ -402,8 +504,11 @@ def rtl_module() -> tuple[str, dict]:
     fio = hps[hps.index("localparam FIO_FILE_TX      ="):hps.index("\nendmodule", hps.index("localparam FIO_FILE_TX      ="))]
     # Move only the ACK declaration into the module port list.
     handshake = handshake.replace("reg  io_ack;\n", "", 1)
-    header = '''module bridge #(parameter WIDE=1)(
+    header = '''module bridge #(parameter WIDE=1, parameter MEDIA_BURST=1)(
 input clk_sys, input [31:0] gp_out, input io_wait, input vs_wait,
+input [14:0] ioctl_burst_credit, input [31:0] ioctl_burst_words,
+input [15:0] ioctl_burst_digest, input ioctl_burst_ready, input ioctl_burst_fault,
+output reg [15:0] fp_dout,
 output reg io_ack, output reg ioctl_wr, output reg ioctl_download,
 output reg [(WIDE ? 15 : 7):0] ioctl_dout, output reg [26:0] ioctl_addr);
 localparam DW = WIDE ? 15 : 7;
@@ -417,7 +522,7 @@ wire [DW:0] ioctl_din = 0;
 '''
     hashes = {"sys_top_handshake_sha256": hashlib.sha256(handshake.encode()).hexdigest(),
               "hps_io_fio_block_sha256": hashlib.sha256(fio.encode()).hexdigest()}
-    return header + handshake + fio + "\nendmodule\n", hashes
+    return header + handshake + fio.replace("reg [15:0] fp_dout;", "") + "\nendmodule\n", hashes
 
 
 def run(main_source: Path, compiler: str, sanitize: bool, rtl: bool = False) -> dict:
@@ -434,7 +539,9 @@ def run(main_source: Path, compiler: str, sanitize: bool, rtl: bool = False) -> 
         fpga = (work / "fpga_io.cpp").read_text()
         io = (work / "user_io.cpp").read_text()
         struct = re.search(r"struct fpga_spi_profile\n\{.*?\n\};", (work / "fpga_io.h").read_text(), re.S)[0]
-        (work / "fpga_io.h").write_text("#pragma once\n#include <stdint.h>\n" + struct + "\n")
+        burst_structs = "\n".join(re.search(r"struct " + n + r"\n\{.*?\n\};", (work / "user_io.h").read_text(), re.S)[0]
+                                  for n in ("media_burst_state", "media_burst_stats"))
+        (work / "fpga_io.h").write_text("#pragma once\n#include <stdint.h>\n" + struct + "\n" + burst_structs + "\n")
         ordinary = function(upstream("fpga_io.cpp"), "fpga_spi")
         assert ordinary == function(fpga, "fpga_spi"), "Ordinary non-media ACK path changed"
         assert function(upstream("user_io.cpp"), "user_io_file_tx_data") == function(io, "user_io_file_tx_data")
@@ -470,13 +577,18 @@ def run(main_source: Path, compiler: str, sanitize: bool, rtl: bool = False) -> 
             source += "static uint16_t spi_w(uint16_t w) { return fpga_spi(w); }\n"
             source += "static uint8_t spi_b(uint8_t w) { return uint8_t(fpga_spi(w)); }\n"
             source += function(upstream("spi.cpp"), "spi_write") + bulk
-            source += function(io, "user_io_file_tx_data") + function(io, "user_io_file_tx_data_ack") + RTL_TESTS
+            source += function(io, "user_io_file_tx_data") + function(io, "user_io_file_tx_data_ack")
+            source += burst_structs + "\n" + re.search(r"struct media_burst_status\n\{.*?\n\};", io, re.S)[0] + "\n"
+            source += function(fpga, "fpga_spi_fast_block_write")
+            for name in ("media_burst_query", "media_burst_account", "user_io_file_tx_data_burst"):
+                source += function(io, name)
+            source += RTL_TESTS
             (work / "bridge_test.cpp").write_text(source)
-            for wide in (0, 1):
-                obj = work / f"obj{wide}"
+            for wide, capability in ((0, 1), (1, 0), (1, 1)):
+                obj = work / f"obj{wide}_{capability}"
                 command = ["verilator", "--cc", "--exe", "--build", "-j", "4", "-Wno-fatal",
-                           "--top-module", "bridge", f"-GWIDE={wide}", "--Mdir", str(obj),
-                           "-CFLAGS", f"-std=c++14 -O2 -DTEST_WIDE={wide}",
+                           "--top-module", "bridge", f"-GWIDE={wide}", f"-GMEDIA_BURST={capability}", "--Mdir", str(obj),
+                           "-CFLAGS", f"-std=c++14 -O2 -DTEST_WIDE={wide} -DTEST_BURST={capability}",
                            str(work / "bridge.sv"), str(work / "bridge_test.cpp")]
                 built = subprocess.run(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                 if built.returncode:
@@ -484,7 +596,7 @@ def run(main_source: Path, compiler: str, sanitize: bool, rtl: bool = False) -> 
                 result = subprocess.run([str(obj / "Vbridge")], text=True, capture_output=True)
                 if result.returncode:
                     raise RuntimeError(result.stdout + result.stderr)
-                reports[f"rtl_wide_{wide}"] = result.stdout
+                reports[f"rtl_wide_{wide}_capability_{capability}"] = result.stdout
                 print(result.stdout, end="")
         return {"pinned_main_commit": PIN, "compiler": compiler, "sanitizers": sanitize,
                 "rtl_blocks": rtl_hashes, "reports": reports}

@@ -32,7 +32,7 @@
 //  1 - F12 is passed to core, F12 + (L/R)GUI key bring framework menu
 
 //
-module hps_io #(parameter CONF_STR, CONF_STR_BRAM=0, PS2DIV=0, WIDE=0, VDNUM=1, BLKSZ=2, PS2WE=0, STRLEN=$size(CONF_STR)>>3, F12KEYMOD=0)
+module hps_io #(parameter CONF_STR, CONF_STR_BRAM=0, PS2DIV=0, WIDE=0, VDNUM=1, BLKSZ=2, PS2WE=0, STRLEN=$size(CONF_STR)>>3, F12KEYMOD=0, MEDIA_BURST=0)
 (
 	input             clk_sys,
 	inout      [45:0] HPS_BUS,
@@ -155,6 +155,12 @@ module hps_io #(parameter CONF_STR, CONF_STR_BRAM=0, PS2DIV=0, WIDE=0, VDNUM=1, 
 	output reg        ioctl_rd,
 	output reg [31:0] ioctl_file_ext,
 	input             ioctl_wait,
+	// Optional MediaPlayer status extension; ignored when MEDIA_BURST=0.
+	input      [14:0] ioctl_burst_credit,
+	input      [31:0] ioctl_burst_words,
+	input      [15:0] ioctl_burst_digest,
+	input             ioctl_burst_ready,
+	input             ioctl_burst_fault,
 
 	// [15]: 0 - unset, 1 - set. [1:0]: 0 - none, 1 - 32MB, 2 - 64MB, 3 - 128MB
 	// [14]: debug mode: [8]: 1 - phase up, 0 - phase down. [7:0]: amount of shift.
@@ -619,6 +625,7 @@ localparam FIO_FILE_TX      = 8'h53;
 localparam FIO_FILE_TX_DAT  = 8'h54;
 localparam FIO_FILE_INDEX   = 8'h55;
 localparam FIO_FILE_INFO    = 8'h56;
+localparam FIO_MEDIA_STATUS = 8'h57;
 
 reg [15:0] fp_dout;
 always@(posedge clk_sys) begin : fio_block
@@ -628,6 +635,10 @@ always@(posedge clk_sys) begin : fio_block
 	reg        wr;
 	reg  [1:0] req_io;
 	reg        skip_add;
+	reg [14:0] burst_credit_snapshot;
+	reg [31:0] burst_words_snapshot;
+	reg [15:0] burst_digest_snapshot;
+	reg [1:0]  burst_flags_snapshot;
 
 	ioctl_rd <= 0;
 	ioctl_wr <= wr;
@@ -648,9 +659,28 @@ always@(posedge clk_sys) begin : fio_block
 				has_cmd <= 1;
 				cnt <= 0;
 				req_io <= 0;
+				if (MEDIA_BURST && io_din == FIO_MEDIA_STATUS) begin
+					fp_dout <= 16'h4D50;
+					burst_credit_snapshot <= ioctl_burst_credit;
+					burst_words_snapshot <= ioctl_burst_words;
+					burst_digest_snapshot <= ioctl_burst_digest;
+					burst_flags_snapshot <= {ioctl_burst_fault, ioctl_burst_ready};
+				end
 			end else begin
 
 				case(cmd)
+					FIO_MEDIA_STATUS: if (MEDIA_BURST) begin
+						case (cnt)
+							0: fp_dout <= 16'hB001;
+							1: fp_dout <= {1'b0, burst_credit_snapshot};
+							2: fp_dout <= burst_words_snapshot[15:0];
+							3: fp_dout <= burst_words_snapshot[31:16];
+							4: fp_dout <= burst_digest_snapshot;
+							5: fp_dout <= {14'd0, burst_flags_snapshot};
+							default: fp_dout <= 0;
+						endcase
+						if (cnt != 7) cnt <= cnt + 1'b1;
+					end
 					FIO_FILE_INFO:
 						if(~cnt[1]) begin
 							case(cnt)

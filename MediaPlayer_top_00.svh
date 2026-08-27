@@ -106,6 +106,10 @@ wire        ioctl_wr;
 wire [26:0] ioctl_addr;
 wire [15:0] ioctl_dout;
 wire        mpeg2_stream_full;
+wire [14:0] mpeg2_burst_credit;
+wire        mpeg2_burst_ready, mpeg2_burst_fault;
+wire [31:0] mpeg2_burst_words;
+wire [15:0] mpeg2_burst_digest;
 wire        mpeg2_stream_empty;
 wire [7:0]  mpeg2_fifo_data;
 wire [7:0]  mpeg2_stream_data;
@@ -125,7 +129,7 @@ wire [32:0] mpeg2_new_extracted_pts_90k;
 wire        mpeg2_new_extracted_metadata_valid;
 wire        mpeg2_new_extracted_metadata_ready;
 
-hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .WIDE(1), .MEDIA_BURST(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
@@ -145,7 +149,12 @@ hps_io #(.CONF_STR(CONF_STR), .WIDE(1)) hps_io
 	.ioctl_addr(ioctl_addr),
 	.ioctl_dout(ioctl_dout),
 
-	.ioctl_wait(ioctl_download && mpeg2_stream_full)
+	.ioctl_wait(ioctl_download && mpeg2_stream_full),
+	.ioctl_burst_credit(mpeg2_burst_credit),
+	.ioctl_burst_words(mpeg2_burst_words),
+	.ioctl_burst_digest(mpeg2_burst_digest),
+	.ioctl_burst_ready(mpeg2_burst_ready && ioctl_download && ioctl_index[5:0] == 6'd1),
+	.ioctl_burst_fault(mpeg2_burst_fault)
 );
 
 ///////////////////////   CLOCKS   ///////////////////////////////
@@ -686,6 +695,12 @@ mpeg2_stream_fifo mpeg2_stream_fifo
 	.wr_data  (mpeg2_stream_wr ? ioctl_dout : 16'd0),
 	.wr_en    (mpeg2_stream_wr),
 	.wr_full  (mpeg2_stream_full),
+	.wr_attempt(ioctl_download && ioctl_wr && ioctl_index[5:0] == 6'd1),
+	.burst_credit(mpeg2_burst_credit),
+	.burst_ready(mpeg2_burst_ready),
+	.burst_fault(mpeg2_burst_fault),
+	.burst_words(mpeg2_burst_words),
+	.burst_digest(mpeg2_burst_digest),
 
 	.rd_clk   (clk_mpeg2),
 	.rd_en    (mpeg2_stream_rd),

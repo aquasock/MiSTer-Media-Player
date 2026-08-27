@@ -188,10 +188,10 @@ index 0c74e21..473cfb0 100644
  				printf("Saving config to %s\n", filename);
 diff --git a/support/mediaplayer/mediaplayer.cpp b/support/mediaplayer/mediaplayer.cpp
 new file mode 100644
-index 0000000..db82e00
+index 0000000..663f7b0
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,419 @@
+@@ -0,0 +1,446 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -233,9 +233,11 @@ index 0000000..db82e00
 +	uint64_t intervals, interval_us, interval_max_us;
 +	uint64_t read_calls, read_us;
 +	uint64_t tx_calls, tx_us, tx_max_us, ack_chunks;
++	uint64_t fast_bytes, slow_bytes, burst_calls, status_queries;
 +	bool poll_active;
 +};
 +static media_transfer_profile transfer_profile = {};
++static media_burst_state burst_state = {};
 +
 +
 +static uint64_t monotonic_us()
@@ -291,14 +293,18 @@ index 0000000..db82e00
 +	                 "data_polls=%llu data_poll_us=%llu "
 +	                 "intervals=%llu interval_us=%llu interval_max_us=%llu "
 +	                 "read_calls=%llu read_us=%llu tx_calls=%llu tx_us=%llu "
-+	                 "tx_max_us=%llu ack_chunks=%llu\n",
++	                 "tx_max_us=%llu ack_chunks=%llu fast_bytes=%llu slow_bytes=%llu "
++	                 "burst_calls=%llu status_queries=%llu transport_mode=%u\n",
 +	                 (unsigned long long)p.polls, (unsigned long long)p.poll_us,
 +	                 (unsigned long long)p.poll_max_us, (unsigned long long)p.data_polls,
 +	                 (unsigned long long)p.data_poll_us, (unsigned long long)p.intervals,
 +	                 (unsigned long long)p.interval_us, (unsigned long long)p.interval_max_us,
 +	                 (unsigned long long)p.read_calls, (unsigned long long)p.read_us,
 +	                 (unsigned long long)p.tx_calls, (unsigned long long)p.tx_us,
-+	                 (unsigned long long)p.tx_max_us, (unsigned long long)p.ack_chunks);
++	                 (unsigned long long)p.tx_max_us, (unsigned long long)p.ack_chunks,
++	                 (unsigned long long)p.fast_bytes, (unsigned long long)p.slow_bytes,
++	                 (unsigned long long)p.burst_calls, (unsigned long long)p.status_queries,
++	                 burst_state.mode);
 +}
 +
 +static void diagnostic_close()
@@ -316,6 +322,7 @@ index 0000000..db82e00
 +static void diagnostic_open(const char *source_spec, unsigned char index)
 +{
 +	diagnostic_close();
++	burst_state = {};
 +	diagnostic_fd = open(diagnostic_path,
 +	                     O_WRONLY | O_CREAT | O_TRUNC | O_APPEND | O_CLOEXEC,
 +	                     0644);
@@ -330,7 +337,7 @@ index 0000000..db82e00
 +	diagnostic_write("start source=%s index=%u core=%s alternate=%s\n",
 +	                 source_spec, (unsigned)index,
 +	                 user_io_get_core_name(), user_io_get_core_name(1));
-+	diagnostic_write("profile_version=1 transport=ack_bulk_preload_v1 ack_sample_every=64 "
++	diagnostic_write("profile_version=1 transport=credit_fast_v1 ack_sample_every=64 "
 +	                 "first_byte_means=first_chunk_complete "
 +	                 "interval_means=media_poll_entry_to_entry\n");
 +}
@@ -506,7 +513,9 @@ index 0000000..db82e00
 +				                 (unsigned long long)(read_end - download_assert_us),
 +				                 (int)count);
 +			const uint64_t tx_start = profiling ? monotonic_us() : 0;
-+			user_io_file_tx_data_ack(buffer, (uint32_t)count, sampled ? &ack : NULL);
++			media_burst_stats burst = {};
++			const int complete = user_io_file_tx_data_burst(buffer, (uint32_t)count,
++			    &burst_state, &burst, sampled ? &ack : NULL);
 +			const uint64_t tx_end = profiling ? monotonic_us() : 0;
 +			const uint64_t tx_elapsed = tx_end - tx_start;
 +			if (profiling)
@@ -516,6 +525,23 @@ index 0000000..db82e00
 +				if (tx_elapsed > transfer_profile.tx_max_us)
 +					transfer_profile.tx_max_us = tx_elapsed;
 +				transfer_profile.ack_chunks += sampled;
++				transfer_profile.fast_bytes += burst.fast_bytes;
++				transfer_profile.slow_bytes += burst.slow_bytes;
++				transfer_profile.burst_calls += burst.batches;
++				transfer_profile.status_queries += burst.queries;
++			}
++			if (!complete)
++			{
++				diagnostic_write("transport_fault error=%u mode=%u attempted_fast_bytes=%u "
++				                 "attempted_slow_bytes=%u verified_prior_bytes=%llu "
++				                 "expected_words=%u observed_words=%u expected_digest=%04x "
++				                 "observed_digest=%04x credit=%u flags=%u\n",
++				                 burst.error, burst_state.mode, burst.fast_bytes, burst.slow_bytes,
++				                 (unsigned long long)submitted_bytes,
++				                 burst.expected_words, burst.observed_words,
++				                 burst.expected_digest, burst.observed_digest, burst.credit, burst.flags);
++				stop_with_reason("transport-fault");
++				return;
 +			}
 +			submitted_bytes += (uint64_t)count;
 +			read_events++;
@@ -527,10 +553,11 @@ index 0000000..db82e00
 +				                 would_block_events, (int)count);
 +			}
 +			diagnostic_write("read event=%u count=%d submitted=%llu read_us=%llu "
-+			                 "tx_us=%llu ack_sample=%u\n",
++			                 "tx_us=%llu ack_sample=%u fast_bytes=%u slow_bytes=%u batches=%u queries=%u\n",
 +			                 read_events, (int)count, (unsigned long long)submitted_bytes,
 +			                 (unsigned long long)(read_end - read_start),
-+			                 (unsigned long long)tx_elapsed, (unsigned)sampled);
++			                 (unsigned long long)tx_elapsed, (unsigned)sampled,
++			                 burst.fast_bytes, burst.slow_bytes, burst.batches, burst.queries);
 +			if (sampled)
 +				diagnostic_write("profile_ack event=%u words=%llu high_reads=%llu "
 +				                 "low_reads=%llu high_wait_words=%llu low_wait_words=%llu "
@@ -629,7 +656,7 @@ index 0000000..ca9fba0
 +
 +#endif
 diff --git a/user_io.cpp b/user_io.cpp
-index 511c7a4..3293d38 100644
+index 511c7a4..661b045 100644
 --- a/user_io.cpp
 +++ b/user_io.cpp
 @@ -42,6 +42,7 @@
@@ -640,7 +667,7 @@ index 511c7a4..3293d38 100644
  
  static char core_path[1024] = {};
  static char rbf_path[1024] = {};
-@@ -2076,6 +2077,16 @@ void user_io_file_tx_data(const uint8_t *addr, uint32_t len)
+@@ -2076,6 +2077,118 @@ void user_io_file_tx_data(const uint8_t *addr, uint32_t len)
  	DisableFpga();
  }
  
@@ -654,10 +681,112 @@ index 511c7a4..3293d38 100644
 +	DisableFpga();
 +}
 +
++struct media_burst_status
++{
++	bool supported;
++	uint16_t credit, digest, flags;
++	uint32_t words;
++};
++
++static media_burst_status media_burst_query(media_burst_stats *stats)
++{
++	EnableFpga();
++	const uint16_t magic = spi_w(0x57);
++	const uint16_t version = spi_w(0);
++	media_burst_status status;
++	status.supported = magic == 0x4D50 && version == 0xB001;
++	status.credit = spi_w(0);
++	const uint32_t low = spi_w(0);
++	status.words = low | ((uint32_t)spi_w(0) << 16);
++	status.digest = spi_w(0);
++	status.flags = spi_w(0);
++	DisableFpga();
++	++stats->queries;
++	return status;
++}
++
++static void media_burst_account(media_burst_state *state, const uint8_t *addr, uint32_t len)
++{
++	state->words += (len + 1) / 2;
++	while (len)
++	{
++		uint16_t word = *addr++; --len;
++		if (len) { word |= (uint16_t)*addr++ << 8; --len; }
++		state->digest = (uint16_t)((state->digest << 1) | (state->digest >> 15)) ^ word;
++	}
++}
++
++// A capability/status command brackets every fast batch. Its accepted count and
++// checksum also drain/verify the prior FIO write pipeline before further data.
++int user_io_file_tx_data_burst(const uint8_t *addr, uint32_t len,
++                              media_burst_state *state, media_burst_stats *stats,
++                              fpga_spi_profile *profile)
++{
++	if (!len) return 1;
++	if (!fio_size) state->mode = 1;
++	if (state->mode == 1)
++	{
++		user_io_file_tx_data_ack(addr, len, profile);
++		stats->slow_bytes += len;
++		return 1;
++	}
++	media_burst_status status = media_burst_query(stats);
++	if (!state->mode)
++	{
++		if (!status.supported)
++		{
++			state->mode = 1;
++			user_io_file_tx_data_ack(addr, len, profile);
++			stats->slow_bytes += len;
++			return 1;
++		}
++		state->mode = 2;
++		state->words = status.words;
++		state->digest = status.digest;
++	}
++	for (;;)
++	{
++		stats->expected_words = state->words;
++		stats->observed_words = status.words;
++		stats->expected_digest = state->digest;
++		stats->observed_digest = status.digest;
++		stats->credit = status.credit;
++		stats->flags = status.flags;
++		if (!status.supported || status.credit > 4096) { stats->error = 1; return 0; }
++		if (status.flags != 1) { stats->error = 2; return 0; }
++		if (status.words != state->words || status.digest != state->digest) { stats->error = 3; return 0; }
++		if (!len) return 1;
++		uint32_t count;
++		if (((uintptr_t)addr & 1) || len < 2 || !status.credit)
++		{
++			// Unaligned buffers keep the byte-safe path. Zero credits make one
++			// acknowledged word of progress rather than spinning on status.
++			count = ((uintptr_t)addr & 1) ? len : (len < 2 ? len : 2);
++			user_io_file_tx_data_ack(addr, count, profile);
++			stats->slow_bytes += count;
++		}
++		else
++		{
++			count = len / 2;
++			if (count > status.credit) count = status.credit;
++			EnableFpga();
++			spi8(FIO_FILE_TX_DAT);
++			fpga_spi_fast_block_write((const uint16_t *)addr, count);
++			DisableFpga();
++			count *= 2;
++			stats->fast_bytes += count;
++			++stats->batches;
++		}
++		media_burst_account(state, addr, count);
++		addr += count; len -= count;
++		status = media_burst_query(stats);
++	}
++}
++
  void user_io_set_upload(unsigned char enable, int addr)
  {
  	EnableFpga();
-@@ -3160,6 +3171,7 @@ void user_io_poll()
+@@ -3160,6 +3273,7 @@ void user_io_poll()
  	// this is reduce risk of screenshot occurring while the scaler
  	// is being updated and getting a corrupted image.
  	add_frame_callback(screenshot_cb);
@@ -666,16 +795,34 @@ index 511c7a4..3293d38 100644
  	if ((core_type != CORE_TYPE_SHARPMZ) &&
  		(core_type != CORE_TYPE_8BIT))
 diff --git a/user_io.h b/user_io.h
-index 648736f..925de4e 100644
+index 648736f..f91969d 100644
 --- a/user_io.h
 +++ b/user_io.h
-@@ -229,6 +229,9 @@ void user_io_set_index(unsigned char index);
+@@ -229,6 +229,27 @@ void user_io_set_index(unsigned char index);
  void user_io_set_aindex(uint16_t index);
  void user_io_set_download(unsigned char enable, int addr = 0);
  void user_io_file_tx_data(const uint8_t *addr, uint32_t len);
 +struct fpga_spi_profile;
 +void user_io_file_tx_data_ack(const uint8_t *addr, uint32_t len,
 +                            fpga_spi_profile *profile);
++// mode: 0 probe, 1 legacy acknowledged, 2 verified credit protocol.
++struct media_burst_state
++{
++	unsigned mode;
++	uint32_t words;
++	uint16_t digest;
++};
++struct media_burst_stats
++{
++	uint32_t fast_bytes, slow_bytes, batches, queries;
++	uint32_t expected_words, observed_words;
++	uint16_t expected_digest, observed_digest, credit, flags;
++	unsigned error;
++};
++int user_io_file_tx_data_burst(const uint8_t *addr, uint32_t len,
++                              media_burst_state *state, media_burst_stats *stats,
++                              fpga_spi_profile *profile);
++
  void user_io_set_upload(unsigned char enable, int addr = 0);
  void user_io_file_rx_data(uint8_t *addr, uint32_t len);
  void user_io_file_info(const char *ext);
