@@ -1,3 +1,32 @@
+## 564 COMMIT Unreleased 2acabc5 2026-08-26T23:19:26-07:00
+
+#### Coming From:
+
+Unreleased 2acabc5
+
+#### Purpose:
+
+Validate the guarded startup and larger input queue against the requested clean Bob hardware run.
+
+#### Outcome:
+
+The user reports that playback looks perfect and observes that the former grey 800x600 background is now solid black, without considering that a defect. A fresh FTP screenshot was triggered after deleting only the old fixed screenshot target; its schema-nineteen checksum validates all 15,150,646 bytes, 449 decoded and displayed pictures, 448 swaps, sequence end, presentation completion and quiet terminal reason one with zero aggregate errors. Both ranked-gap and actual missed-deadline counters are zero, the deadline-record array is empty, and all three largest measured post-first-swap intervals are exactly 2,002,000 decoder clocks, or 33.366667 milliseconds. The previous picture-six and picture-348 missed windows from entry 559 therefore do not recur in this run, consistent with the user's visual acceptance and the intended steady 29.970030-fps schedule. The raw aggregate remains 29.870022 fps because schema nineteen starts at first reference completion and includes startup buffering and raster alignment; its 899,898,892-cycle span exceeds 448 nominal intervals by 3,002,892 clocks, or 50.0482 milliseconds, without any post-startup gap. This is not evidence of slower steady playback. The black idle background follows directly from the RGB startup mask remaining active before picture release; DE, HS, VS and the idle timing generator are unchanged. This entry passes the requested clean Bob elementary-stream hardware case, not all interlaced formats or repeated-load conditions. Bob selection and loaded-source identity follow the user's preceding reload/run workflow rather than being encoded in the screenshot. No core, media, configuration or lifecycle change was made during capture. Evidence is `.ai/current_results/entry564_bob_terminal.png`, 476,291 bytes with SHA-256 `c442dd2144982f65b4bc19d0cdd07c1399936133e8e30f6ec90fcd6a1feeaf2b`, and `entry564_bob_capture.json`, including the complete decode, comparison, calculations and scope limitations.
+
+#### Next Steps:
+
+Have the user replay the same file multiple times without rebooting and test Bob/Weave switching, leaving the final telemetry visible and reporting any flicker, pacing change or loading problem. Preserve the accepted clean-run behavior and black startup background. If those checks also pass, close the current HDMI cadence correction for the bounded all-I path and move to a separately approved audio/PTS qualification boundary before broader interlaced P/B, field-coding and format work. Partial-transfer cancellation and the pre-existing live-raster assertion drift remain outside this hardware acceptance, and analog diagnostics remain excluded.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 563 COMMIT Unreleased 2acabc5 2026-08-26T23:13:49-07:00
 
 #### Coming From:
@@ -1212,35 +1241,6 @@ Copy the exact `98ee2dc` RBF to the Raspberry Pi, directly replace only `/media/
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 524 COMMIT Unreleased 4e4db95 2026-08-25T21:43:10-07:00
-
-#### Coming From:
-
-Unreleased 4e4db95
-
-#### Purpose:
-
-Resolve the schema-fifteen hardware result and identify which side of the raw-DDR-to-displayed-cache boundary loses field content.
-
-#### Outcome:
-
-The user reloaded the directly installed `4e4db95` image and ran `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i while an agent-triggered burst sampled the live raster. The first burst retrieved the same pre-existing terminal PNG fifty-four times because its quarter-second settle interval allowed the fixed remote filename to be fetched before the new screenshot replaced it; deleting that exact remote screenshot before each subsequent trigger made stale reuse impossible. The corrected thirty-second burst returned twenty-five fresh screenshots, the first eight distinct and live and the final seventeen one byte-identical quiet snapshot. Across all eight live frames the authored first field is cleanly frozen at x=72 through x=103 for the complete 176-row bar, while the other field advances through x positions 424, 48, 360, 648, 272, 584, 208 and 496; the user independently confirms the screen behaved as before with one bar stuck on the left and the other moving right. Schema fifteen from the same run accepts all 5,007,304 bytes, records 299 framebuffer resets and publications, sequence end, presentation completion and quiet reason one, and keeps every aggregate, cache-overlap, prefill, region and phase error clear. The final generation retains 242 first-field and 240 second-field fetches. Its completed first-field raw and displayed fingerprints are respectively `f964952b` and `e855bf31`, while the second-field pair is `8c26df67` and `ab1ec443`; both completion counters and both mismatch counters saturate at 255, proving at least 255 independently completed mismatches for each parity rather than a terminal-only anomaly. The raw DDR-return byte stream therefore does not survive the line-cache write and post-cache readout boundary in either field, while the gross visual retention remains asymmetric to the first field. This passes the schema-fifteen diagnostic objective and localizes the fault inside cache population, bank ownership, address selection or readout rather than the decoder, DDR region, native raster, final mux or processed-HDMI capture path. Evidence is `.ai/current_results/entry524_stale_first_field_live_early.png` at 11,113 bytes with SHA-256 `2131b1178899856a454a033721c11143c822160259219d6e1e23a44a3624a000`, `.ai/current_results/entry524_stale_first_field_live_late.png` at 11,120 bytes with SHA-256 `d254713100fad7b6a8a410e0d0f0e625e797d7c7c2cec8bc85e298571d239d88` and `.ai/current_results/entry524_schema15_terminal.png` at 12,484 bytes with SHA-256 `b4b78e8d4415f66de5fbc6f6be3795e410ed2e96ad4b95454239fee948157e62`.
-
-#### Next Steps:
-
-Stop before changing behavior and obtain approval for one schema-sixteen cache-provenance boundary. At completion of each luma-line fill, retain the raw line fingerprint, physical source row, cache bank and framebuffer generation; synchronize only completed stable per-bank tags to the video domain, latch the applicable tag before each displayed line begins and compare its expected row and raw line fingerprint with the post-cache bytes completed at that line's end. Preserve the first tag mismatch and first content mismatch separately for each authored field and count each class without feeding cache control. Directed simulation must prove correct TFF and BFF tag/content matches, a wrong-bank tag failure and a one-byte cache-content failure, while the full native, reconstruction and canonical live-raster suites remain exact. A hardware tag mismatch would identify refill ownership or bank selection, while matching tags with differing content would isolate the dual-clock RAM write, word address or byte-lane read pipeline. Continue direct verified replacement of only `/media/fat/MediaPlayer.rbf` with no backup, rollback or staging files.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 
