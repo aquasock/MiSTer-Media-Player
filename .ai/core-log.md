@@ -1,3 +1,42 @@
+## 561 COMMIT Unreleased ??? 2026-08-26T22:44:26-07:00
+
+#### Coming From:
+
+Unreleased c4628b5
+
+#### Purpose:
+
+Increase resilience to delivery pauses with a larger clean-video queue and coherent readiness-based startup for native elementary-stream playback.
+
+#### Outcome:
+
+The user approved implementing and hardware-testing the entry-560 candidate. The planned production boundary enlarges the clean-video queue to 64 KiB while retaining timestamp byte ordering, then holds native untimestamped all-I startup until a second presentable picture or terminal sequence end is available. The first cached picture will become visible only at a complete field-pair boundary; scheduler swaps follow its synchronized visibility acknowledgement, preserving a full first field pair and continuous HS, VS and DE. Timestamp or PCM metadata, incompatible picture types and non-native sessions bypass this startup policy, with no rearming on Bob/Weave changes. The existing schema-nineteen aggregate clock begins at first reference completion and therefore continues to include startup buffering; steady swap intervals and deadline counts, rather than that aggregate alone, determine playback cadence. This does not claim an exact replay of the hardware picture-348 miss or faster decoding.
+
+#### Next Steps:
+
+Implement the production controller and queue, exercise actual startup logic in the real-pipeline harness and add directed field-boundary, short-file, mode-bypass and warm-download-rearm coverage. Compare complete picture identities against the existing baseline under input pauses and alternate phases, preserve the native and metadata regressions, and publish the source before a clean Quartus build on GUNSMOKE. Require positive setup, hold, recovery, removal and pulse-width timing and a fitting memory allocation before directly replacing the active MiSTer image under standing authorization and verifying a fresh full FTP readback. Leave reload to the user and request one clean Bob run before repeated-load and Bob/Weave checks.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_clean_video_queue.sv
+- rtl/mpeg2_new/mpeg2_h262_native_startup.sv
+- MediaPlayer_top_05.svh
+- MediaPlayer_top_07.svh
+- MediaPlayer.sdc
+- files.qip
+- tools/streams/tb_h262_input_cadence.sv
+- tools/streams/run_input_cadence.py
+- tools/streams/tb_h262_native_startup.sv
+- tools/streams/run_native_480i_timing.sh
+- README.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 560 COMMIT Unreleased c4628b5 2026-08-26T22:38:14-07:00
 
 #### Coming From:
@@ -1211,31 +1250,3 @@ None.
 
 ---
 
-## 521 COMMIT Unreleased bfb9361 2026-08-25T20:30:53-07:00
-
-#### Coming From:
-
-Unreleased bfb9361
-
-#### Purpose:
-
-Correct the deployment-path diagnosis and install the verified schema-fourteen candidate rollback-safe.
-
-#### Outcome:
-
-Entry 520's reported active-image mismatch came from using a relative FTP URL with curl's single-directory method, which resolved a different server object containing the user-identified bad compile rather than the authoritative absolute `/media/fat/MediaPlayer.rbf`; its attempted rollback upload was rejected with FTP status 550 and changed no file. Repeating the read with the repository's established double-slash absolute URL retrieved the true active image at entry 519's exact 4,205,620-byte size and SHA-256 `c0eb30d2181b613a383b506bb30482f700c92c17eff7da33b082d049ac05c197`. After the user explicitly authorized replacement, ordinary FTP preserved and round-trip verified that image as `/media/fat/MediaPlayer.rbf.rollback-pre-bfb9361`, staged and round-trip verified the 4,188,256-byte `bfb9361` candidate at SHA-256 `4f51994b786a6728a1ce57d120fec12c889460bfbbce7757354ad523bb7c29df`, promoted it to the absolute active path and retrieved the active and rollback files again at their respective exact hashes. The first relative stage-delete command was rejected without changing the verified files; an absolute delete removed only `MediaPlayer.rbf.stage-bfb9361`, and a final directory read confirms the stage is absent while the active and rollback names remain. No helper, media, Main or MiSTer configuration changed.
-
-#### Next Steps:
-
-Reload the core and repeat `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off, Interlaced output Native 480i and the deinterlacer that exposes the symptom most readily. Capture a live burst and the terminal schema-fourteen snapshot from the same run, retaining the established acceptance of 300 decoded pictures, 299 swaps, quiet completion and no aggregate, presentation or phase error. Read both session-wide varied flags and signatures: a first field that never varies while the second does proves the data is already wrong when it arrives and moves the search upstream of the framebuffer, while both parities varying proves correct data arrives and is lost afterwards.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
