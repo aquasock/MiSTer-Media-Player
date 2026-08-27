@@ -1,3 +1,32 @@
+## 590 COMMIT Unreleased a4f2769 2026-08-27T03:13:17-07:00
+
+#### Coming From:
+
+Unreleased a4f2769
+
+#### Purpose:
+
+Verify guarded fast-block activation and measure the first high-bitrate hardware run against the acknowledged baseline.
+
+#### Outcome:
+
+The user reports no visible slowdown. The helper log was retrieved first, followed by a freshly triggered screenshot and complete host/FPGA readbacks; both installed hashes match qualified `a4f2769`, and a new Linux boot at 10:08:35 UTC plus runtime `transport=credit_fast_v1` and mode 2 corroborate activation. All 34,919,166 bytes, 449 pictures and 448 swaps complete with zero decoder error flags, normal helper exit, sequence end and quiet terminal presentation. There is no transport integrity abort, and all 2,132 logged chunk byte/count/checksum completions and batch/query totals reconcile. Fast transfers carry 34,896,748 bytes, or 99.9358 percent; the remaining 22,418 bytes use acknowledged single-word progress at zero credit. Compared with entry 587, matched completed-chunk delivery rises from 1,578,252 to 1,988,891 B/s, a 26.02 percent gain, and cadence rises from 20.248749 to 25.507040 fps. The first-to-last presentation span falls from 22.124823 to 17.563778 seconds, while complete transfer-call time falls from 21.202251 to 16.624084 seconds. Delayed eventual presentation intervals fall from 167 to 77, and the three longest retained gaps are now 66.733 milliseconds instead of a maximum 166.833 milliseconds, a 60 percent reduction consistent with the user's improved perception. Strict 30000/1001 cadence is still not met: 448 intervals would take 14.948267 seconds at nominal rate, 2.615512 seconds less than observed. The cause visible in retained deadlines has changed: the first three delayed deadlines, full-width picture ordinals 8, 11 and 14, now have both decoder input and upstream FIFO input pending, decoder not ready, zero input-starvation cycles and no presentation/destination hold; their writer-capacity blocked counts are 127, 36 and 215 cycles. Prior retained misses had ready-but-empty decoder input. The gated upstream-pending/decoder-not-ready counter covers 95.8468 percent of captured session cycles, supporting a shift toward decoder-side processing or backpressure, but it does not identify a specific arithmetic stage or exclude internal waits. Only three delayed-deadline records are retained, so their cause must not be assigned to all 77 late intervals. Host grants are predominantly small after initial 8 KiB batches: 791,350 fast batches average 44.10 bytes, with 804,691 status queries containing 5,632,837 acknowledged status-word transactions. FIFO consumption now governs small grants, and query overhead may matter; the log does not separate raw bus time, status time and downstream wait time. The 1.989 MB/s consumption-limited average is not a raw link-capacity measurement, and no 10 MB/s claim is established. All 587 helper EAGAIN events precede first delivery. Mean data-bearing poll duration improves to 32.768 milliseconds, but the maximum remains 81.485 milliseconds; these are blocking exposure rather than measured UI response, and current menu responsiveness has not been separately reported. The eight-bit largest-gap ordinals remain ambiguous after 256 pictures; do not confuse them with full-width deadline ordinals. Capture, decoded packet, helper log and checked comparison are stored as `.ai/current_results/entry590_*`. No production source, installed binary, configuration, reboot, reload or playback was changed during collection. Transport functionality and substantial improvement are verified, but full high-bitrate cadence acceptance and the separate 8 Mbps regression remain outstanding.
+
+#### Next Steps:
+
+With this high-bitrate evidence preserved, ask the user to play `bbb_480i_tff_15s_8mbps.m2v` once using the same installed pair and display mode, leave telemetry displayed, and report whether the menu remains responsive. Collect its helper log before another playback, then a fresh screenshot and image checks; verify mode 2, complete byte/picture counts, no integrity/decoder errors and cadence. Keep the guarded credit and integrity protocol, both FIFO capacities, startup controller, continuous HDMI sync and black idle unchanged. Before any further decoder or transport revision, propose a focused boundary and obtain approval; the current evidence points toward downstream processing/backpressure but does not yet isolate an internal stage or justify removing safeguards. Preserve the restoration copies and outstanding unsupported interlaced P/B, field-picture/DCT, audio/PTS, cancellation and historical assertion-drift limits. Keep restricted `core.md` unchanged, retain the forty-entry ring and do not mark nominal-cadence acceptance passed from the user's visual report alone.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 589 COMMIT Unreleased a4f2769 2026-08-27T03:07:27-07:00
 
 #### Coming From:
@@ -1163,37 +1192,6 @@ Reconcile the two facts that must both be true. The display holds one picture fo
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 550 COMMIT Unreleased 558efef 2026-08-26T19:32:00-07:00
-
-#### Coming From:
-
-Unreleased 127f576
-
-#### Purpose:
-
-Test whether interlaced P reconstruction drops a field parity, which entry 549 left as the last remaining explanation for the frozen first field.
-
-#### Outcome:
-
-Entry 549 established that every stage from the DDR write to the screen is faithful and concluded the staleness must already exist in what the writer stored, leaving reconstruction as the only candidate and noting that no regression could observe it. Commit `558efef` builds the missing vehicle. The soak's pixel oracle was hardwired to the one hundred twenty-eight by ninety-six, twenty-four picture mixed raster through an array bound of 442,367, component offsets of 12,288 and 15,360, a picture stride of 18,432, row strides of one hundred twenty-eight and sixty-four, a coordinate guard and a temporal-reference bound. All of those now derive from `PIXEL_WIDTH`, `PIXEL_HEIGHT` and `PIXEL_PICTURES`, whose defaults reproduce the original fixture exactly, and a new wrapper overrides them to seven hundred twenty by four hundred eighty across eight pictures. Per-parity mismatch counters were added and the summary is now emitted at the freeze path as well as at ordinary completion, so an early stop no longer discards the result. The interlaced P fixture from entry 549 was validated properly: decoding the patched and unpatched streams yields byte-identical 4,147,200-byte planes, so the signalling patch is semantically neutral and the oracle is sound, a check the all-I generator performs and the P generator had originally omitted. The experiment then answered the question it was built for, against the hypothesis. Across 3,093,120 samples it recorded 216,868 mismatches with a maximum delta of 231, but split by field parity those were 67,792 of 1,031,040 even against 68,532 of 1,031,040 odd, that is 6.58 and 6.65 per cent. Errors are distributed evenly across both fields. Nothing that damages both parities equally can leave one field bit-identical for seconds while the other updates every frame, so interlaced P reconstruction does not explain the flicker and the last standing hypothesis is eliminated. The apparent seven per cent defect is itself withdrawn, because the control refutes it. Running the known-good progressive fixture through the same harness mismatches 822,919 of 1,271,808 samples, 64.7 per cent, with a maximum delta of 251 and the same even-odd symmetry, while the identical run reports the decoder healthy with twenty-five pictures, twenty-five publications, twenty-five promotions, seventy-one swaps, exact accounting and no errors. A raw FFmpeg yuv420p decode is therefore not the oracle format this mode expects, and no figure the harness produces is meaningful until that control passes; the testbench and runner are committed carrying that warning in their headers. Two hardcoded bounds were found only by the run failing, a coordinate guard rejecting x of one hundred twenty-eight and a temporal-reference bound of twenty-four, both generalization defects of this commit rather than findings. Everything trustworthy continues to show the decoder healthy: interlaced I reconstruction retains zero out-of-tolerance pixels at 7,926,459, 7,948,706 and 13,048,137 cycles, the native suite passes twenty-three cases, and hardware plays the complete 15,150,646-byte file with 449 pictures, 448 swaps and every error flag clear.
-
-#### Next Steps:
-
-Do not trust the pixel harness until the progressive control passes; establishing the oracle format `MIXED_PIXEL_MODE` actually expects is the prerequisite for any future use, and the absence of a runner script for the existing wrapper is why the interface had to be guessed. The flicker now has no candidate: reconstruction through writer, DDR, fetch, cache, display and output stage are each verified faithful by exact measurement, yet a first field stops updating for seconds. Prefer a measurement that leaves the current path entirely rather than another instrument inside it. The analog VGA output is already fully driven including the `VGA_F1` field flag with `VGA_SCALER` low, so an analog I/O board would present the core's raw 480i to a CRT with MiSTer's scaler wholly out of the loop; that is the only available observation that no capture through the processed path can reach, and it would separate a core-side field fault from anything introduced downstream. Camera footage of the interval before playback begins is also outstanding from the user, since every burst so far starts after the first pictures are already displayed.
-
-#### Files Modified:
-
-- tools/streams/run_interlaced_p_pixels.sh
-- tools/streams/tb_h262_interlaced_p_pixels.sv
-- tools/streams/tb_h262_live_raster_soak.sv
 
 #### Status:
 
