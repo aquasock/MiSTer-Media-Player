@@ -1,0 +1,25 @@
+{
+  "fixture": "/home/vash/mister-builds/entry624/suite/test_5_audio_ac3_51.mpg",
+  "helper": "/home/vash/mister-builds/entry624/helper.native",
+  "codec": "ac3",
+  "expected_data_type": 1,
+  "stream_bytes": 2304000,
+  "bursts_parsed": 375,
+  "period_samples_seen": [
+    1536
+  ],
+  "frame_lengths_seen": [
+    1792
+  ],
+  "carried_bytes": 672000,
+  "source_bytes": 672000,
+  "source_trailing_bytes_ignored": 0,
+  "frames_byte_identical": true,
+  "carried_decode_sha256": "ce9c0a07feb84f9cc9e701a3519e644f2d597b43cf932ec36e4da4f320b986ce",
+  "source_decode_sha256": "ce9c0a07feb84f9cc9e701a3519e644f2d597b43cf932ec36e4da4f320b986ce",
+  "decodes_match": true,
+  "problems": [],
+  "problem_count": 0,
+  "scope": "Byte correctness of the emitted bursts only. It does not prove any receiver locks onto them, nor that the path to the S/PDIF pin is bit transparent, both of which need hardware.",
+  "passed": true
+}

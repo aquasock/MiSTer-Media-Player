@@ -1,0 +1,76 @@
+{
+  "source_commit": "140a5b711e84821688641c8903000e02e78f580c",
+  "ready_for_user_hardware_test": true,
+  "hardware_accepted": false,
+  "deployed_by_agent": false,
+  "new_rbf_required": false,
+  "main": {
+    "name": "main-build",
+    "source_commit": "140a5b711e84821688641c8903000e02e78f580c",
+    "commands": [
+      [
+        "make",
+        "-j8"
+      ]
+    ],
+    "exit_code": 0,
+    "seconds": 4.738416799999868,
+    "log_sha256": "dc49fcce2ab7694b0f19619165bf0a2c7a3464fc9566bf5a15c3cb258e1ca005",
+    "pinned_main_commit": "0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f",
+    "clean_build": true,
+    "compiler": "arm-none-linux-gnueabihf-gcc (GNU Toolchain for the A-profile Architecture 10.2-2020.11 (arm-10.16)) 10.2.1 20201103",
+    "bytes": 1170340,
+    "sha256": "01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9",
+    "file": "/home/vash/mister-builds/entry624/Main_MiSTer/bin/MiSTer: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-armhf.so.3, for GNU/Linux 3.2.0, stripped",
+    "warnings": []
+  },
+  "files": {
+    "MiSTer": {
+      "bytes": 1170340,
+      "sha256": "01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9"
+    },
+    "games/MediaPlayer/test_1_interlace_tff.mpg": {
+      "bytes": 3401745,
+      "sha256": "a20a80e31ebaaa22c507b6eb5c760a33ecca9061289645c040a55a8d4f031395"
+    },
+    "games/MediaPlayer/test_2_interlace_bff.mpg": {
+      "bytes": 3401745,
+      "sha256": "c4d687ec0c5b75a52c5a83f7162ceb2e1e2f0ca41a50471e444285c7d2fd2f71"
+    },
+    "games/MediaPlayer/test_3_deinterlace_bob_weave.mpg": {
+      "bytes": 12517393,
+      "sha256": "6b0f0aeea6d2a47a7b1bea3687c3af797ee78b031417eb91cd3659a63db584fc"
+    },
+    "games/MediaPlayer/test_4_progressive.mpg": {
+      "bytes": 12501009,
+      "sha256": "40b29e13eb07980286e37d4e6d16740bf140beeb45d570bb1e19cd3a89f59b2b"
+    },
+    "games/MediaPlayer/test_5_audio_ac3_51.mpg": {
+      "bytes": 3792913,
+      "sha256": "0948a0ceceaf86bc476d430376a1588546bf7d70111095f347eaf82753c4b723"
+    },
+    "games/MediaPlayer/test_6_audio_dts_51.mpg": {
+      "bytes": 5410833,
+      "sha256": "588a36c195c527d36ace829b16d218fb8bcaa0f174396b0ea72316e145192cf3"
+    }
+  },
+  "passed": [
+    "native_loader_and_transport",
+    "address_undefined_sanitizers",
+    "production_RTL_bridge_legacy_and_credit",
+    "20_step_resume_cases_and_fault_guards",
+    "24_seeded_short_read_credit_sequences",
+    "six_corrected_fixtures_360_pictures_each",
+    "720_temporal_field_positions_each_bar_fixture",
+    "two_generations_byte_identical",
+    "old_static_and_wrong_field_order_negative_controls",
+    "pending_byte_loss_negative_control",
+    "all_fixture_clean_video_byte_exact",
+    "mp2_modes_equal_and_original_audio_preserved",
+    "ac3_independent_decode_max_difference_two",
+    "ac3_and_dts_passthrough_byte_exact",
+    "existing_ceiling_generator_tests",
+    "persistent_backups_verified"
+  ],
+  "scope": "No physical playback or deployment; no new FPGA build or timing claim. Main rebuilt, helper/RBF retained. Legacy and terminal cleanup are not hard realtime bounded."
+}

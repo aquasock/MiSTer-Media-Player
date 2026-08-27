@@ -1,0 +1,35 @@
+{
+  "archive": "MediaPlayer_140a5b7_regression_update.zip",
+  "bytes": 12662276,
+  "sha256": "faa79844d7af3d6de039bcdf1b4d3667f50488241bda5785325d42e0ac880103",
+  "files": {
+    "MiSTer": {
+      "bytes": 1170340,
+      "sha256": "01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9"
+    },
+    "games/MediaPlayer/test_1_interlace_tff.mpg": {
+      "bytes": 3401745,
+      "sha256": "a20a80e31ebaaa22c507b6eb5c760a33ecca9061289645c040a55a8d4f031395"
+    },
+    "games/MediaPlayer/test_2_interlace_bff.mpg": {
+      "bytes": 3401745,
+      "sha256": "c4d687ec0c5b75a52c5a83f7162ceb2e1e2f0ca41a50471e444285c7d2fd2f71"
+    },
+    "games/MediaPlayer/test_3_deinterlace_bob_weave.mpg": {
+      "bytes": 12517393,
+      "sha256": "6b0f0aeea6d2a47a7b1bea3687c3af797ee78b031417eb91cd3659a63db584fc"
+    },
+    "games/MediaPlayer/test_4_progressive.mpg": {
+      "bytes": 12501009,
+      "sha256": "40b29e13eb07980286e37d4e6d16740bf140beeb45d570bb1e19cd3a89f59b2b"
+    },
+    "games/MediaPlayer/test_5_audio_ac3_51.mpg": {
+      "bytes": 3792913,
+      "sha256": "0948a0ceceaf86bc476d430376a1588546bf7d70111095f347eaf82753c4b723"
+    },
+    "games/MediaPlayer/test_6_audio_dts_51.mpg": {
+      "bytes": 5410833,
+      "sha256": "588a36c195c527d36ace829b16d218fb8bcaa0f174396b0ea72316e145192cf3"
+    }
+  }
+}

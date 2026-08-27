@@ -1,0 +1,27 @@
+{
+  "name": "media",
+  "source_commit": "140a5b711e84821688641c8903000e02e78f580c",
+  "commands": [
+    [
+      "python3",
+      "tools/streams/generate_test_suite.py",
+      "--output-dir",
+      "/home/vash/mister-builds/entry624/suite"
+    ],
+    [
+      "make",
+      "-B",
+      "-C",
+      "host/arm",
+      "DEPS_DIR=/home/vash/mister-builds/entry624/deps",
+      "OUTPUT=/home/vash/mister-builds/entry624/helper.native"
+    ],
+    [
+      "python3",
+      "tools/streams/test_dvd_ceiling.py"
+    ]
+  ],
+  "exit_code": 0,
+  "seconds": 19.520075689999885,
+  "log_sha256": "3f31cf0453a9e40b461cadc97ad9640a14f11ccf968e032c594647431835ab80"
+}
