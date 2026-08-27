@@ -1,3 +1,33 @@
+## 586 COMMIT Unreleased ??? 2026-08-27T02:05:53-07:00
+
+#### Coming From:
+
+Unreleased 32ba178
+
+#### Purpose:
+
+Reduce MediaPlayer host transfer overhead with a bulk word loop that preloads the next payload during the acknowledged low phase while preserving FPGA flow control.
+
+#### Outcome:
+
+The user approved proceeding with entry 585's transfer optimization. The selected host-only boundary keeps the existing FPGA protocol and both ACK waits, replacing MediaPlayer's per-word calls with a dedicated bulk implementation that writes initial low data once, raises the strobe and waits for ACK-high, then lowers the strobe with the next word already prepared and waits for ACK-low before the next rise. Payload is never changed before the prior word's high acknowledgement, and no next rise occurs before its low acknowledgement. For N nonempty data words this reduces GPO writes from 3N to 2N+1 while retaining backpressure and the final low-clock cached state. Ordinary non-media transfers remain unchanged. Separate compile-time sampled and unsampled loop variants keep every-sixty-fourth-chunk ACK profiling without a runtime per-word profiling branch, and a runtime transport marker distinguishes the new path. Wide little-endian packing, padded odd tails, narrow transfers, zero lengths and uninitialized-FPGA handling remain explicit. This is a bounded reduction in bridge overhead, not a promise to reach the high-bitrate file's 2.33 MB/s demand; an FPGA protocol revision remains outside this approval. No source or deployed binary has changed yet.
+
+#### Next Steps:
+
+Implement the bulk primitive and MediaPlayer-only dispatch in the pinned Main_MiSTer patch, extending the existing native regression to compare consumed words, ACK sequences, framing, final cached GPO and register-write counts against upstream under delayed ACKs, odd tails and reset exits. Exercise the actual new functions against Verilated handshake and download blocks extracted from the existing FPGA source, varying bridge latency and sustained backpressure, so the changed low-phase data timing is tested beyond scripted ACK responses. Retain loader, EOF, errno, warm-reset, core-change and diagnostic-unavailable coverage, run native and sanitizer checks on GUNSMOKE, publish the source from the Pi, then pull and build that exact published source with official ARM GNU 10.2.1 20201103. Preserve and hash the current host binary, stage and independently read back the candidate, verify executable permissions, rename and verify the complete active image and unchanged FPGA hash under standing deployment permission. Leave reboot and playback to the user; request one cold high-bitrate run to compare throughput, ACK behavior, cadence and meadow slowdown, followed by the outstanding qualified 8 Mbps regression. Preserve startup, queue size, HDMI sync, black idle behavior and the existing unsupported-feature boundaries; do not adopt unchecked writes or alter FPGA logic if the host-only improvement is insufficient.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/streams/test_main_mister_profile.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 585 COMMIT Unreleased 32ba178 2026-08-27T01:59:36-07:00
 
 #### Coming From:
@@ -1171,40 +1201,6 @@ Do not propose a correction from this evidence alone. The measurement establishe
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 546 COMMIT Unreleased 008909d 2026-08-26T17:06:34-07:00
-
-#### Coming From:
-
-Unreleased 7cdfcec
-
-#### Purpose:
-
-Remove the measured native-playback frame-slot misses by overlapping reconstructed-block capture with the preceding block's DDR write drain.
-
-#### Outcome:
-
-Commit `008909d` gives the block writer two capture banks with per-bank geometry and a pending flag, separate capture and drain pointers, and a drain-side address view so every address, bound and debug value describes the bank being written rather than the bank being filled. A new `block_accepted` output carries capacity acknowledgement while `block_stored` keeps its exact previous meaning as the DDR-completion pulse, and `pipeline_block_done` on `mpeg2_h262_two_picture_probe` now takes the capacity signal; that signal's only functional use down the chain is the parser's `ST_WAIT_PIPELINE` gate, since `two_picture_probe_p_chain` and `picture_bookkeeper` merely forward it. Reaching a working image took four builds and two hardware failures, both recorded here rather than hidden. The first candidate expressed the capture banks as a two-dimensional array, which Quartus inferred as a sixteen-by-sixty-four `altsyncram` occupying two M10K blocks and absorbing the write pointer into an M10K read-address register; the combinational read this writer requires has no M10K equivalent, iverilog models a plain array either way, and no available simulation could see the difference. That image failed on hardware and the array is now held in registers by a `ramstyle` attribute, restoring memory bits and RAM blocks to the exact `7cdfcec` figures. The second candidate still failed, at fifty-four accepted bytes and 2,057 cycles with error flag bit three, `inverse_quant_error`, which is far upstream of any DDR activity. Its cause was expressing the capacity acknowledgement as a level: `cap` clears at `block_complete`, which is exactly when the parser reaches its wait state, so the gate stood open and the parser advanced into a busy inverse-quantiser. A first repair that consumed a credit on the writer's own `block_start` was also wrong and was discarded before building, because that strobe arrives only after inverse-quant, transform and reconstruction latency, leaving the credit high across the window that matters. The accepted form keeps `block_stored`'s pulse discipline and merely moves it earlier: one grant on each rising edge of capture-bank availability, emitted strictly after the parser is already waiting and therefore no more missable than the completion pulse it replaces. The focused regression `tb_h262_ddram_store_overlap.sv` proves ordered, exact sixteen-row delivery across two overlapped blocks, refuses a third while both banks are occupied, requires a grant per freed bank and rejects the level form that failed on hardware; an earlier version of that regression passed both forms and was therefore worthless, which is recorded because the same blind spot has now appeared twice in this project. The B-presentation scheduler, four-picture interlaced reconstruction and live-raster soak testbenches are unchanged, the soak retaining its pre-existing 6,529,996 against 6,529,997 assertion drift; none of them exercise the parser gate, the soak tying `pipeline_block_done` to constant one, so no simulation available here could validate the fix. A seed-fifteen fit missed global setup at negative 0.025 nanoseconds and was rejected; advancing the reproducible placement seed to sixteen with no RTL change produced positive 0.255, 0.246, 3.504, 0.556 and 0.925 nanosecond setup, hold, recovery, removal and minimum-pulse-width margins, above the `7cdfcec` baseline's positive 0.213 setup. The fit uses 31,522 ALMs, 49,958 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs, with no inferred RAM in the store module. The 4,230,940-byte RBF has SHA-256 `65c3c901419b128b868ea6b30031261f4e4f6a019bddb7bc3387fa473de82ef0`. On hardware the established Big Buck Bunny file plays complete in Weave with all 15,150,646 bytes accepted, wrapped counters representing 449 decoded and displayed pictures with 448 swaps, sequence end seen, presentation completion, normal quiet reason one and every error flag clear. Doubled presentation gaps fall from twelve to two, at display ordinals six and ninety-two, the presentation span shortens from 921,157,194 to 901,694,453 decoder cycles or 324.4 milliseconds, and delivery rises from 29.181 to 29.811 pictures per second against the 29.970 ideal. The entry's stated acceptance bar of no doubled gaps is therefore not fully met, two remaining and the span still 2.40 slots over ideal, but the writer serialization it targeted is substantially removed.
-
-#### Next Steps:
-
-Treat the residual two doubled gaps as a smaller, separate throughput question and do not reopen the writer for them without new evidence. The visible flicker is not this defect and is addressed in entry 547. Before any further writer work, note that no simulation here covers the parser-to-writer handshake, because the live-raster soak ties `pipeline_block_done` to constant one and the scheduler and overlap testbenches drive the writer directly; an integration testbench that models the parser gate would have caught both hardware failures in this cycle and is the single highest-value regression this area lacks.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_04.svh
-- rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
-- tools/streams/tb_h262_ddram_store_overlap.sv
 
 #### Status:
 
