@@ -1,3 +1,32 @@
+## 622 COMMIT Unreleased 44ee05a 2026-08-27T09:00:58-07:00
+
+#### Coming From:
+
+Unreleased 078d36b
+
+#### Purpose:
+
+Close the commercial AC-3 gap by qualifying decode and passthrough against a real DVD track.
+
+#### Outcome:
+
+The user confirmed that a DVD image already on the build PC exists for this purpose, so the last honest gap in AC-3 qualification is closed against real programme material rather than synthetic tones. The image is an unencrypted standard VIDEO_TS structure and no protection was circumvented; one title VOB was extracted locally and nothing derived from the film is committed, with only numeric results retained. That VOB carries three real AC-3 tracks, being 5.1 at 448 kbit/s, stereo at 192 kbit/s and 5.1 at 384 kbit/s, and the helper selects the first as designed. Over 55,414,272 stereo frames, or 1154.5 seconds, the helper's decode against an independent FFmpeg decode of the same track gives maximum absolute difference 299, RMS difference 2.60 and correlation 0.999976, with overall level matching at 376.17 against 376.18 RMS. That is a much larger deviation than the synthetic fixture's maximum difference of three and correlation of 0.999999971, which is the expected consequence of real dynamic range control and dialogue normalization being exercised for the first time, and the residual sits 43.2 dB below the signal. The cause was confirmed rather than assumed by a control: decoding the reference again with dynamic range compression disabled makes the match far worse, at maximum difference 4123, RMS difference 79.17 and correlation 0.989129, and raises the reference level to 428.72 RMS, which is 1.14 dB above the compressed result. That establishes both that the disc carries substantial dynamic range metadata and that the helper applies it, matching the reference decoder's default behaviour, since liba52 enables dynamic range by default and neither decoder applies dialogue normalization. The remaining difference is decoder implementation, not a metadata mismatch. Passthrough was qualified on the same real track: the helper emitted 36,077 bursts, every one a 1536-sample period carrying a 1792-byte frame as expected for constant-rate 448 kbit/s, and all 64,649,984 bytes carried are byte identical to the AC-3 extracted from the disc, with an independent decoder producing matching output. One tool change was needed and is deliberately narrow. A VOB from a multi-file title ends mid-frame by construction, so the helper correctly refuses its truncated tail; rather than loosen the helper or the default gate, the verifier gained an explicit opt-in that accepts exactly that case and ignores the source's trailing 672-byte partial frame. An earlier attempt at the comparison exhausted memory and took the machine down, because it loaded both 212-megabyte captures as double precision and then copied them again; the retained driver streams in chunks and never holds more than a few megabytes.
+
+#### Next Steps:
+
+Audio qualification is complete for this release, covering MPEG Layer II, AC-3 decode and AC-3 and DTS passthrough, against both synthetic fixtures and a real commercial track. Prepare the release next. The README must state plainly what the decoder accepts, being 4:2:0 I-pictures only, frame structured, frame DCT and frame prediction only, 720 by 480 at 30000/1001 with no repeat first field, and must not imply general interlaced MPEG-2 or DVD compatibility; it should describe audio separately, since audio support is genuinely broader than video and includes passthrough for material the core cannot decode itself. Release notes should carry the entry 616 wording of one or two repeated frames at the picture 690 cut, the marginal scaler paths recovered by reseeding in entry 618, and an honest split of which audio claims are measured and which rest on listening. The community sound test should ask for AC-3 and DTS separately with LFE called out, since entry 621 showed the same device treating them differently. The interlaced video gates of entry 609 remain open and explicitly out of scope. Note for any future disc work that this image is a usable real-world Program Stream source, but that the core cannot decode its video, which uses picture types and structures outside the supported set. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+- tools/streams/verify_ac3_passthrough.py
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 621 COMMIT Unreleased 078d36b 2026-08-27T08:49:23-07:00
 
 #### Coming From:
@@ -1156,35 +1185,6 @@ Obtain explicit approval to publish the two profiling source files to `aquasock/
 
 - host/main_mister/0001-mediaplayer-arm-loader.patch
 - tools/streams/test_main_mister_profile.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 582 COMMIT Unreleased ad364bf 2026-08-27T01:33:33-07:00
-
-#### Coming From:
-
-Unreleased ad364bf
-
-#### Purpose:
-
-Record standing user authorization to publish this project's diagnostic evidence and project-log updates to its GitHub repository.
-
-#### Outcome:
-
-After entry 581's publication was blocked pending explicit consent for its diagnostic logs and screen content, the user approved uploading those files and the log update to `aquasock/MiSTer-Media-Player` and stated that this may be done automatically going forward. This is standing authorization to commit and push project-related diagnostic logs, telemetry captures and screenshots, associated analysis and project-log updates to that same GitHub repository during the normal project workflow, without asking separately for publication each time. Continue to inspect the payload and exclude credentials, private keys and unrelated personal or system data. This approval concerns evidence publication; it does not approve the proposed host-transfer profiling or optimization cycle, replacement of the MiSTer system binary, new hardware actions or edits to restricted `core.md`. Entry 581 remains the latest hardware result: the 16 KiB host buffer is active but high-bitrate playback fails cadence acceptance, and the FPGA image remains unchanged. No new build or hardware test was performed for this authorization record.
-
-#### Next Steps:
-
-Publish the pending entry-581 evidence and this authorization record from the Raspberry Pi checkout to GitHub master, verify the remote commit and retain this standing publication permission in future recovery context. Apply it to subsequent relevant evidence and log updates without an additional publication question. Obtain approval for the separate host-transfer profiling and safe optimization proposal before changing production source or deploying a host binary, retain required backpressure and byte handling, and keep the unresolved hardware acceptance and 8 Mbps regression visible. Preserve `core.md`, the existing untracked screenshots and the forty-entry log ring.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 

@@ -1,0 +1,25 @@
+{
+  "fixture": "/home/vash/mister-builds/entry622/VTS_01_1.VOB",
+  "helper": "host/build/media_player_helper.native",
+  "codec": "ac3",
+  "expected_data_type": 1,
+  "stream_bytes": 221657088,
+  "bursts_parsed": 36077,
+  "period_samples_seen": [
+    1536
+  ],
+  "frame_lengths_seen": [
+    1792
+  ],
+  "carried_bytes": 64649984,
+  "source_bytes": 64649984,
+  "source_trailing_bytes_ignored": 672,
+  "frames_byte_identical": true,
+  "carried_decode_sha256": "2ef855ad4be180e0df149a94745685bfb40f65d1066b30d88f6733734ba33b34",
+  "source_decode_sha256": "2ef855ad4be180e0df149a94745685bfb40f65d1066b30d88f6733734ba33b34",
+  "decodes_match": true,
+  "problems": [],
+  "problem_count": 0,
+  "scope": "Byte correctness of the emitted bursts only. It does not prove any receiver locks onto them, nor that the path to the S/PDIF pin is bit transparent, both of which need hardware.",
+  "passed": true
+}
