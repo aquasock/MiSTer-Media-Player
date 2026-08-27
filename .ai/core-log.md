@@ -1,3 +1,32 @@
+## 589 COMMIT Unreleased a4f2769 2026-08-27T03:07:27-07:00
+
+#### Coming From:
+
+Unreleased a4f2769
+
+#### Purpose:
+
+Deploy the qualified guarded fast-block host and FPGA pair after MiSTer connectivity is restored.
+
+#### Outcome:
+
+The user reports that the MiSTer is connected, and FTP access to `10.10.0.30` succeeds. The active predecessors match the expected `be8502b` host and `2acabc5` FPGA hashes. Both complete images were retrieved and fsynced locally, then retained and independently hash-verified and fsynced under `/home/vash/mister-builds/entry588-backup` on GUNSMOKE as `MiSTer.prea4f2769` and `MediaPlayer.rbf.prea4f2769`. A read-only backup attempt exposed FTP transfer-mode handling after a directory listing; the procedural scripts were corrected and the complete backup pass repeated before deployment, without changing production source or artifacts. The qualified `a4f2769` candidates were staged at `/media/fat/MiSTer.new` and `/media/fat/MediaPlayer.rbf.new`, and both passed complete fresh-connection readbacks and permission checks before either rename. The active predecessors were reverified immediately before replacement. Each file rename is atomic; the pair is not, but both mixed-version combinations preserve acknowledged transfers. A further independent FTP connection verified both complete active files, executable permissions and absence of both staging paths. Installed `/media/fat/MiSTer` is 1,170,340 bytes with SHA-256 `3841e2cc6eef4bfc9e46a7ffa075aff76b65d5405f81efb1355373292b35846f`; installed `/media/fat/MediaPlayer.rbf` is 4,332,748 bytes with SHA-256 `15bc3057a4f16369bc4a3dac01e30f63e5fc563a43b1922214b5b478c17c66c2`. Deployment evidence and restoration details are in `.ai/current_results/entry589_deployment.json`; corrected procedural scripts remain under `/home/vash/mister-builds/entry588/resume-scripts`. Entry 588's clean builds, regressions and positive timing qualification remain applicable; no rebuild or production change was needed. No reboot, core reload, playback, helper replacement or configuration edit occurred. The new files are installed, but runtime activation, performance and hardware acceptance are not yet verified.
+
+#### Next Steps:
+
+Have the user cold-power-cycle the MiSTer, load MediaPlayer and play `bbb_480i_tff_15s.m2v` once, then leave terminal telemetry displayed without replaying or running the 8 Mbps file yet. Collect `/tmp/MediaPlayer_ARM.log` first, then a fresh screenshot and complete installed-image readbacks; require a new boot, marker `transport=credit_fast_v1`, transport mode 2 with nonzero fast bytes, no integrity fault, all 34,919,166 bytes, 449 pictures, 448 swaps and zero decoder errors. Compare delivery rate, transfer time, cadence and delayed intervals against entry 587's 1,578,252 B/s, 21.202251 seconds, 20.248749 fps and 167 delayed intervals, and ask whether the meadow slowdown and menu responsiveness changed. Preserve this capture before the separate qualified 8 Mbps regression. Treat 10 MB/s as the user's earlier guess and decoder-bound playback as an unverified hypothesis. Preserve startup, continuous HDMI sync, black idle, both queue capacities and existing unsupported-feature limits; retain the restoration pair, standing qualified-deployment permission and user control of reboot/playback. Keep restricted `core.md` unchanged and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 588 COMMIT Unreleased a4f2769 2026-08-27T02:59:27-07:00
 
 #### Coming From:
@@ -1173,38 +1202,3 @@ Do not trust the pixel harness until the progressive control passes; establishin
 
 ---
 
-## 549 COMMIT Unreleased 127f576 2026-08-26T19:03:23-07:00
-
-#### Coming From:
-
-Unreleased ffd0496
-
-#### Purpose:
-
-Determine whether the fetched luma words reach the line cache, and locate the frozen first field once the whole read path is accounted for.
-
-#### Outcome:
-
-Commit `b15b251` adds the last missing read-path measurement. The framebuffer exports the cache write event where `y_cache_wr_en` is raised, carrying validity, the parity of the fetch in flight and the actual cache address, and the profiler counts words and sums addresses for each parity, latched per generation. Schema seventeen becomes schema eighteen at sixty-four words with both appended words exactly thirty-two bits and both overlay origins moved eight rows up to 344 and 224. The references are again computed rather than observed: a healthy generation writes two hundred forty-two by ninety, or 21,780, first-field words and two hundred forty by ninety, or 21,600, second-field words, with sixteen-bit address sums of 48,766 and 32,656. An address sum was chosen over the XOR used for rows because the expected XOR is zero for both parities, which is also what no writes at all would produce and so could not discriminate the case under investigation. A clean build completed in 11 minutes 23 seconds with zero errors and 148 warnings, global setup, hold, recovery, removal and minimum-pulse-width margins of positive 0.217, 0.192, 4.020, 0.621 and 0.925 nanoseconds, a fit of 31,673 ALMs and 50,112 registers with block-memory bits and RAM blocks unchanged, and a netlist probe confirming every accumulator survives. The hardware reading is unambiguous. A burst on the same run showed the first field frozen in twenty of twenty-four active transitions, the worst observed, one stretch spanning fifteen consecutive samples, while the terminal snapshot returned every value exactly at its expected figure: row XOR two and zero, no region change, two hundred forty-two and two hundred forty fetches, 21,780 and 21,600 cache writes, and address sums 48,766 and 32,656. The pre-existing write-read fingerprints agree as well, the first-field expected and raw values both reading 635,643,363 and the second-field pair both 3,183,525,312, with zero session-scoped content mismatches and zero tag mismatches. The whole chain from reconstruction through writer, DDR, fetch, cache and display is therefore verified faithful while the displayed first field is seconds old. Because the luma line cache holds two lines and is overwritten every scanline, a field cannot be frozen inside it, so the staleness must already exist in what the writer stored, and the writer cannot skip a parity since its eight-row blocks span four even and four odd rows. The defect is therefore upstream of the DDR write, in what reconstruction hands the writer. A coverage gap matching that conclusion exists and had never been noticed: pixel-accurate reconstruction is verified for interlaced I pictures by a testbench whose source list stops at `mpeg2_h262_intra_recon` and cannot decode a P picture at all, and for progressive mixed I/P/B by the soak's `MIXED_PIXEL_MODE`, whose oracle is hardwired to a one hundred twenty-eight by ninety-six, twenty-four picture raster. Interlaced P and B reconstruction at 480i, which is what the test programme stream actually contains, has never been checked by anything. Commit `127f576` adds the missing fixture generator. FFmpeg cannot be asked directly for the wanted combination, since requesting interlaced encoding produces field motion types, field DCT and f_code three, which the decoder rejects at the first P header with no P pictures reconstructed; the generator therefore encodes frame-DCT frame-motion MPEG-2 with a short GOP and small motion range and applies the all-I generator's signalling patch, yielding a 304,926-byte frame-coded interlaced sequence with picture order I P P P I P P P, f_code one by one and top-field-first. Replayed through the soak, which compiles the complete decoder, that fixture is not rejected: six picture headers, 1,304 macroblocks and 1,305 motion vectors are processed before the bench freezes having consumed the whole stream, which is consistent with an eight-picture fixture ending early rather than a proven defect. No conclusion about field content can be drawn, because the soak has no pixel oracle for this raster.
-
-#### Next Steps:
-
-Generalize the soak's `MIXED_PIXEL_MODE` oracle dimensions so it can accept a 720 by 480 interlaced fixture and compare reconstruction against an FFmpeg decode, then replay the new interlaced P fixture and assert that both field parities change between consecutive pictures. That work is bounded, entirely local to the build PC and needs no image, install or playback. Do not propose a correction before it reproduces: the read path is now exonerated by exact measurement, but the reconstruction hypothesis is still only the last remaining candidate rather than a demonstrated fault. Retain the observation that field-motion interlaced P is refused outright while frame-coded interlaced P decodes, since any future fixture must stay inside the supported subset to be meaningful.
-
-#### Files Modified:
-
-- MediaPlayer_top_06.svh
-- MediaPlayer_top_07.svh
-- rtl/mpeg2_luma_framebuffer.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/generate_test_interlaced_p_frames.py
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-- tools/streams/test_decode_hardware_cadence.py
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
