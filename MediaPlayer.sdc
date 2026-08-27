@@ -240,3 +240,13 @@ set_false_path \
 # wraclr/rdaclr synchronizer stage-0 structure rather than the whole FIFO.
 set_false_path -to [get_keepers {*|dcfifo:*|dcfifo_*:auto_generated|dffpipe_*:wraclr|dffe*a[0]}]
 set_false_path -to [get_keepers {*|dcfifo:*|dcfifo_*:auto_generated|dffpipe_*:rdaclr|dffe*a[0]}]
+
+# Entry 561: single-bit startup request/bypass and visibility acknowledgement.
+# Only the asynchronous source-to-first-stage transfers are cut; all following
+# synchronizer stages, frame-window logic and scheduler admission remain timed.
+set_false_path -from [get_keepers {*|mpeg2_h262_native_startup:*|bypass}] \
+    -to [get_keepers {*|mpeg2_h262_native_startup:*|bypass_sync[0]}]
+set_false_path -from [get_keepers {*|mpeg2_h262_native_startup:*|show_request}] \
+    -to [get_keepers {*|mpeg2_h262_native_startup:*|show_request_sync[0]}]
+set_false_path -from [get_keepers {*|mpeg2_h262_native_startup:*|shown}] \
+    -to [get_keepers {*|mpeg2_h262_native_startup:*|shown_sync[0]}]

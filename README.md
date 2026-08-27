@@ -178,6 +178,23 @@ The build script pins the minimp3 revision, MiSTer Main revision, dependency has
 - Output offers two interlaced tiers. Normal processed HDMI sends native 480i timing into MiSTer's scaler and lets the `HDMI scaler deinterlacer` menu choose Weave or Bob. The external-processing tier preserves native 480i fields; truly unscaled HDMI additionally requires MiSTer's separate `direct_video` setting, which the core menu cannot enable.
 - Files should be opened through the normal MiSTer file menu; MGL injection is not a qualified loading method.
 
+### Native elementary-stream startup (unreleased)
+
+The clean-video queue holds up to 64 KiB. For native 29.97-fps all-I video
+without PTS or PCM records, the first cached picture stays black until a second
+picture is presentable (or sequence end arrives for a one-picture file). It is
+then shown at a complete field-pair boundary, with swaps starting on subsequent
+boundaries. HS, VS, DE and the raster clock stay continuous. This adds startup
+reserve; it does not change playback speed or accelerate decoding. Timestamped
+video, audio and other modes bypass the reserve. A new download rearms it;
+Bob/Weave changes do not.
+
+Schema 19 still timestamps its first presentation at **first reference decode
+completion**, so its aggregate rate includes startup wait. Use the subsequent
+swap intervals and deadline-gap counts to assess steady cadence. The simulation
+runner additionally reports `visible_start_cycle` and `visible_span_cycles`;
+its FIFO/host/DDR and field-window models are not a full HDMI hardware replay.
+
 ## Diagnostic streams
 
 Generated binary media remains local and is not included in the public release. The four release-gate Program Streams are reproducible through the committed generators and are identified by SHA-256 in the release notes.

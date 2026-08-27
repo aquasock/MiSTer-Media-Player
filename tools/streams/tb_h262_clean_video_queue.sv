@@ -75,8 +75,8 @@ mpeg2_h262_clean_video_queue queue
     .output_metadata_valid(output_metadata_valid)
 );
 
-reg [7:0] expected [0:255];
-reg [7:0] received [0:255];
+reg [7:0] expected [0:89999];
+reg [7:0] received [0:89999];
 integer expected_count = 0;
 integer received_count = 0;
 integer pcm_seen = 0;
@@ -187,6 +187,30 @@ initial begin
         $fatal(1,"metadata ordering failed seen=%0d pos=%0d/%0d pts=%0d/%0d",
                metadata_seen,metadata_position[0],metadata_position[1],
                metadata_pts[0],metadata_pts[1]);
+
+    // Exercise every new address bit and physical wrap with metadata on both
+    // sides of the old 16 KiB limit. No byte can accidentally form a start code.
+    @(negedge clk);output_ready=0;
+    for(i=0;i<65536;i=i+1)begin
+        if(i==16384)send_pts(33'd270000);
+        if(i==49152)send_pts(33'd360000);
+        send_video(1+((i^(i>>8))%255));
+    end
+    @(negedge clk);input_end=1;
+    repeat(20)@(negedge clk);
+    if(!queue.video_full || queue.video_fifo.count!=65536)
+        $fatal(1,"64 KiB queue did not retain full capacity");
+    input_end=0;output_ready=1;
+    for(i=0;i<20000;i=i+1)send_video(1+((i*3)%255));
+    @(negedge clk);input_end=1;
+    repeat(90000)@(negedge clk);
+    if(received_count!=expected_count || output_pending_debug)
+        $fatal(1,"capacity/wrap drain failed");
+    for(i=0;i<expected_count;i=i+1)
+        if(received[i]!==expected[i])$fatal(1,"capacity/wrap byte mismatch %0d",i);
+    if(metadata_seen!=4 || metadata_position[2]!=160+16384 ||
+       metadata_position[3]!=160+49152 || metadata_pts[2]!=270000 || metadata_pts[3]!=360000)
+        $fatal(1,"capacity/wrap metadata order failed");
 
     $display("H262_CLEAN_VIDEO_QUEUE_PASS bytes=%0d pcm=%0d metadata=%0d",
              received_count,pcm_seen,metadata_seen);

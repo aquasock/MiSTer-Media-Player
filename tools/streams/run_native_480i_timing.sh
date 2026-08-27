@@ -5,6 +5,14 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 build_dir="$(mktemp -d)"
 trap 'rm -rf "${build_dir}"' EXIT
 
+iverilog -g2012 -s tb_h262_native_startup \
+  -o "${build_dir}/tb_h262_native_startup" \
+  "${repo_root}/rtl/mpeg2_new/mpeg2_h262_native_startup.sv" \
+  "${repo_root}/rtl/mpeg2_new/mpeg2_h262_download_rearm.sv" \
+  "${repo_root}/rtl/mpeg2_hdmi_deinterlace_control.sv" \
+  "${repo_root}/tools/streams/tb_h262_native_startup.sv"
+vvp "${build_dir}/tb_h262_native_startup"
+
 iverilog -g2012 \
   -s tb_native_field_order \
   -o "${build_dir}/tb_native_field_order" \

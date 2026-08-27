@@ -103,6 +103,24 @@ end
 wire [31:0] mpeg2_new_b_scheduler_debug_state;
 wire mpeg2_new_b_cadence_slot_debug;
 wire mpeg2_new_b_candidate_presentable_debug;
+wire mpeg2_new_startup_swaps_enabled;
+wire mpeg2_new_startup_video_blank;
+mpeg2_h262_native_startup mpeg2_h262_native_startup (
+    .clk_mpeg2(clk_mpeg2), .reset_mpeg2(reset_mpeg2),
+    .clk_video(clk_video), .reset_video(reset_video),
+    .native_request(mpeg2_new_native_480i_request),
+    .frame_rate_code(mpeg2_new_frame_rate_code),
+    .first_picture_complete(mpeg2_new_first_picture_420_parsed),
+    .candidate_presentable(mpeg2_new_b_candidate_presentable_debug),
+    .sequence_end_seen(mpeg2_new_sequence_end_seen),
+    .bypass_event(mpeg2_new_extracted_metadata_valid ||
+        mpeg2_new_inband_pcm_valid ||
+        (mpeg2_new_picture_header_classified_now && !mpeg2_new_i_picture_start_now) ||
+        mpeg2_new_syntax_error || mpeg2_new_phase1_probe_error),
+    .frame_window(display_frame_window),
+    .swaps_enabled(mpeg2_new_startup_swaps_enabled),
+    .video_blank(mpeg2_new_startup_video_blank)
+);
 mpeg2_h262_picture_timestamp mpeg2_h262_picture_timestamp
 (
     .clk                     (clk_mpeg2),
@@ -150,7 +168,8 @@ mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
 (
     .clk                         (clk_mpeg2),
     .reset                       (reset_mpeg2),
-    .swap_window_pulse           (mpeg2_new_swap_window_pulse),
+    .swap_window_pulse           (mpeg2_new_swap_window_pulse &&
+                                 mpeg2_new_startup_swaps_enabled),
     .cadence_tick_pulse          (mpeg2_new_cadence_window_pulse),
     .frame_rate_code             (mpeg2_new_frame_rate_code),
     .timestamp_candidate_active  (mpeg2_new_timestamp_candidate_active),

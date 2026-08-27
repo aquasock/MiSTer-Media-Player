@@ -33,11 +33,11 @@ mpeg2_native_timing_pattern mpeg2_native_timing_pattern
 );
 
 assign presentation_base_r = display_native_timing_pattern ?
-                             native_pattern_r : fb_video_r;
+                             native_pattern_r : (mpeg2_new_startup_video_blank ? 8'd0 : fb_video_r);
 assign presentation_base_g = display_native_timing_pattern ?
-                             native_pattern_g : fb_video_g;
+                             native_pattern_g : (mpeg2_new_startup_video_blank ? 8'd0 : fb_video_g);
 assign presentation_base_b = display_native_timing_pattern ?
-                             native_pattern_b : fb_video_b;
+                             native_pattern_b : (mpeg2_new_startup_video_blank ? 8'd0 : fb_video_b);
 assign presentation_base_de = display_native_timing_pattern ?
                               native_pattern_de : fb_video_de;
 assign presentation_base_hs = display_native_timing_pattern ?
@@ -50,6 +50,7 @@ assign presentation_base_vs = display_native_timing_pattern ?
 // and its overlay appears after either a quiet drain or the bounded terminal
 // diagnostic timeout.
 wire mpeg2_new_cadence_session_quiet =
+    mpeg2_new_startup_swaps_enabled &&
     mpeg2_new_sequence_end_seen &&
     mpeg2_new_b_presentation_complete &&
     !mpeg2_new_b_scheduler_debug_state[26] &&

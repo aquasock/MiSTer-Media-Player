@@ -36,8 +36,8 @@ module mpeg2_h262_clean_video_queue
     output wire        output_metadata_valid
 );
 
-localparam integer VIDEO_DEPTH = 16384;
-localparam integer VIDEO_ADDRESS_WIDTH = 14;
+localparam integer VIDEO_DEPTH = 65536;
+localparam integer VIDEO_ADDRESS_WIDTH = 16;
 localparam integer METADATA_DEPTH = 16;
 localparam integer METADATA_ADDRESS_WIDTH = 4;
 localparam integer METADATA_WIDTH = 65;
@@ -82,10 +82,9 @@ always @(posedge clk) begin
 end
 
 scfifo #(
-    // 16 KiB covers 115.9 ms at the measured 138 KiB/s video rate, beyond
-    // the repeated 82.896 ms stalls that drain the helper's 85.3 ms reserve.
-    // It costs about sixteen M10K blocks rather than the roughly fifty-two a
-    // queue sized for the unrelated 431 ms startup transient would require.
+    // Entry 561: retain more compressed video across host delivery pauses.
+    // This is capacity, not a fixed delay or a promise about source bitrate.
+    // Metadata remains paired with decoder-consumed byte positions below.
     .lpm_numwords         (VIDEO_DEPTH),
     .lpm_showahead        ("ON"),
     .lpm_type             ("scfifo"),

@@ -3,11 +3,13 @@
 // raster, physical DDR service or measured host trace is modeled here.
 // The FIFO primitives below model bounded showahead storage and synchronized
 // pointer visibility, not Intel metastability or exact vendor flag latency.
-// Capacity overrides and suppressed startup windows are simulation experiments
-// only: they do not alter production RTL or establish a hardware fix.
+// Production startup is instantiated by default. Legacy raw-window suppression
+// and capacity overrides remain explicit experiment controls, not hardware proof.
 module tb_h262_input_cadence;
     localparam integer MAX_STREAM_BYTES=16777216;
-    reg clk=0,clk_host=0,reset=1;
+    reg clk=0,clk_host=0,clk_video=0,reset=1;
+    reg global_reset=1;
+    integer warm_reload=0,lifetime_cycles=0,production_startup=1;
     wire stream_valid;
     wire [7:0] stream_data;
     reg [7:0] stream_mem[0:MAX_STREAM_BYTES-1];
@@ -99,6 +101,25 @@ module tb_h262_input_cadence;
     wire end_now=stream_valid&&(window_next==32'h000001b7);
     wire waiting=picture_complete&&first_parsed&&(completed_bank!=display_bank);
     reg tick=0,swap=0;
+    reg video_frame_window=0,swap_video=0;
+    reg [2:0] swap_sync=0;
+    wire startup_enabled,video_blank;
+    wire scheduler_swap=production_startup ? (swap_sync[1]&&!swap_sync[2]&&startup_enabled) : swap;
+    reg end_seen=0,visible_recorded=0;
+    mpeg2_h262_native_startup startup(
+        .clk_mpeg2(clk),.reset_mpeg2(reset),.clk_video(clk_video),.reset_video(global_reset),
+        .native_request(phase1_supported&&!progressive_sequence),.frame_rate_code(frame_rate_code),
+        .first_picture_complete(first_parsed),.candidate_presentable(presentable),
+        .sequence_end_seen(end_seen),.bypass_event(metadata_valid||pcm_valid),
+        .frame_window(video_frame_window),.swaps_enabled(startup_enabled),.video_blank(video_blank));
+    always #5.555 clk_video=~clk_video; // 54 MHz versus 60 MHz decoder (scaled)
+    always @(posedge clk_video) begin
+        if(global_reset)swap_video<=0;else swap_video<=video_frame_window;
+    end
+    always @(posedge clk) begin
+        if(reset)begin swap_sync<=0;end_seen<=0;end
+        else begin swap_sync<={swap_sync[1:0],swap_video};if(end_now)end_seen<=1;end
+    end
     wire [31:0] scheduler_debug;
     wire presentable,cadence_slot;
     integer hold_cycles=0,writer_wait=0,parser_busy=0;
@@ -112,7 +133,7 @@ module tb_h262_input_cadence;
     always #15 clk_host=~clk_host;
     assign stream_valid=direct ? (stream_index<stream_len&&decoder_accept) : queue_valid;
     assign stream_data=direct ? stream_mem[stream_index] : queue_data;
-    mpeg2_stream_fifo ingress_fifo(.reset(reset),.wr_clk(clk_host),
+    mpeg2_stream_fifo ingress_fifo(.reset(warm_reload ? global_reset : reset),.wr_clk(clk_host),
         .wr_data(host_data),.wr_en(host_write),.wr_full(hps_full),
         .rd_clk(clk),.rd_en(hps_read),.rd_data(hps_data),.rd_empty(hps_empty));
     mpeg2_h262_stream_transport_gate gate(.clk(clk),.reset(reset),
@@ -244,7 +265,7 @@ module tb_h262_input_cadence;
         .store_error(writer_error),.ddram_busy(writer_busy),.ddram_we(writer_we),
         .ddram_addr(writer_addr),.block_stored(writer_stored));
     mpeg2_h262_b_presentation_scheduler scheduler(
-        .clk(clk),.reset(reset),.swap_window_pulse(swap),.cadence_tick_pulse(tick),
+        .clk(clk),.reset(reset),.swap_window_pulse(scheduler_swap),.cadence_tick_pulse(tick),
         .frame_rate_code(frame_rate_code),.timestamp_candidate_active(1'b0),
         .timestamp_candidate_due(1'b0),.native_ordinary_overlap_enable(1'b1),
         .active_frame_bank(active_bank),.frame_waiting(waiting),
@@ -265,7 +286,7 @@ module tb_h262_input_cadence;
         .scratch_available(1'b1),.promotion_active(1'b0),.frame_waiting(waiting),
         .completed_frame_bank(completed_bank),.presentation_complete(1'b1),
         .presentation_error(presentation_error),.scheduler_debug_state(scheduler_debug),
-        .swap_window_pulse(swap),.candidate_presentable(presentable),
+        .swap_window_pulse(production_startup ? (swap_sync[1]&&!swap_sync[2]) : swap),.candidate_presentable(presentable),
         .timestamp_candidate_active(1'b0),.timestamp_candidate_due(1'b0),.cadence_slot(cadence_slot),
         .decoder_byte_accepted(stream_valid),.picture_coding_type(picture_coding_type),
         .temporal_reference(10'd0),.frame_rate_code(frame_rate_code),.picture_count(picture_count),
@@ -286,6 +307,8 @@ module tb_h262_input_cadence;
         if (!$value$plusargs("PICTURES=%d",expected_pictures)) $fatal(1,"missing PICTURES");
         if ($value$plusargs("PHASE=%d",phase)) begin end
         if ($value$plusargs("DIRECT=%d",direct)) begin end
+        if ($value$plusargs("PRODUCTION_STARTUP=%d",production_startup)) begin end
+        if ($value$plusargs("WARM_RELOAD=%d",warm_reload)) begin end
         if ($value$plusargs("HOST_STRIDE=%d",host_stride)) begin end
         if ($value$plusargs("RESUME_CYCLES=%d",resume_cycles)) begin end
         if ($value$plusargs("STARTUP_WINDOWS=%d",startup_windows)) begin end
@@ -300,7 +323,7 @@ module tb_h262_input_cadence;
         if (!fd) $fatal(1,"cannot open report");
         $fdisplay(fd,"event,picture,cycle,interval,bank,detail");
         for(session_number=1;session_number<=sessions;session_number=session_number+1)begin
-            reset=1;repeat(10)@(negedge clk_host);@(negedge clk);reset=0;
+            reset=1;repeat(10)@(negedge clk_host);@(negedge clk);reset=0;global_reset=0;
             $fdisplay(fd,"session,%0d,0,0,0,0",session_number);
             wait(session_done);repeat(2000)@(negedge clk);
             if(!profiler_snapshot_ready)$fatal(1,"snapshot did not settle");
@@ -317,10 +340,13 @@ module tb_h262_input_cadence;
         $fclose(fd);$finish;
     end
     always @(negedge clk) begin
+        if(global_reset)lifetime_cycles=0;else lifetime_cycles=lifetime_cycles+1;
+        // Full-pair window level starts before the decoder-domain edge, as in top.
+        video_frame_window=((lifetime_cycles+2002000-phase+5)%2002000)<100;
         if(reset)begin total_cycles=0;tick=0;swap=0;skipped_windows=0;end
         else begin
             total_cycles=total_cycles+1;
-            tick=((total_cycles+2002000-phase+4)%1001000)==0;
+            tick=(((production_startup ? lifetime_cycles : total_cycles)+2002000-phase+4)%1001000)==0;
             swap=(total_cycles%2002000)==phase;
             if(swap&&completed>0&&skipped_windows<startup_windows)begin
                 swap=0;skipped_windows=skipped_windows+1;
@@ -332,11 +358,16 @@ module tb_h262_input_cadence;
             stream_index<=0;window<=0;header_capture<=0;header_second<=0;
             hold_cycles=0;writer_wait=0;parser_busy=0;completed=0;presented=0;pixels=0;
             words=0;stores=0;headers=0;first_present=0;last_present=0;previous_complete=0;
-            gaps=0;previous_display=0;session_done=0;input_wait=0;critical_wait=0;
+            gaps=0;previous_display=0;session_done=0;visible_recorded=0;input_wait=0;critical_wait=0;
             transform_overlap=0;header_wait=0;interval_input=0;interval_critical=0;interval_overlap=0;
             peak_clean=0;peak_hps=0;pixel_hash=64'hcbf29ce484222325;
             for(integer bank=0;bank<3;bank=bank+1)begin generation[bank]=0;completed_hash[bank]=0;end
         end else if(!session_done) begin
+            if(production_startup&&!video_blank&&!visible_recorded)begin
+                visible_recorded=1;
+                if(display_bank!=0 || completed<1)$fatal(1,"initial visible bank wrong");
+                $fdisplay(fd,"visible,1,%0d,0,%0d,0",total_cycles,display_bank);
+            end
             if(queue.video_fifo.count>peak_clean)peak_clean=queue.video_fifo.count;
             if(ingress_fifo.stream_fifo.occupancy>peak_hps)peak_hps=ingress_fifo.stream_fifo.occupancy;
             if(input_empty&&parser_ready&&!presentation_hold&&stream_index<stream_len)begin
@@ -389,11 +420,12 @@ module tb_h262_input_cadence;
                 if(completed%32==0)$display("INTEGRATED_PROGRESS pictures=%0d cycles=%0d",completed,total_cycles);
                 $fflush(fd);
             end
-            if(swap && completed>1 && !presentable)begin
+            if(scheduler_swap && completed>1 && !presentable)begin
                 $fdisplay(fd,"empty_window,%0d,%0d,%0d,%0d,%0d",presented+1,total_cycles,interval_input,interval_critical,interval_overlap);
             end
             // Observe registered display state on the following clock; intervals remain exact.
             if(display_bank!=previous_display)begin
+                if(production_startup&&!visible_recorded)$fatal(1,"swap before initial visibility");
                 if(generation[display_bank]!=presented+1)$fatal(1,"lost/duplicate identity expected=%0d actual=%0d",presented+1,generation[display_bank]);
                 presented=presented+1;
                 $fdisplay(fd,"present,%0d,%0d,%0d,%0d,%08x",presented,total_cycles,total_cycles-last_present,display_bank,scheduler_debug);
@@ -404,7 +436,7 @@ module tb_h262_input_cadence;
                 last_present=total_cycles;previous_display=display_bank;
                 interval_input=0;interval_critical=0;interval_overlap=0;
             end
-            if(presented==expected_pictures && stream_index==stream_len && stores==expected_pictures*8100)begin
+            if((!production_startup||visible_recorded) && presented==expected_pictures && stream_index==stream_len && stores==expected_pictures*8100)begin
                 if(completed!=expected_pictures||words!=expected_pictures*64800||headers!=expected_pictures)
                     $fatal(1,"incomplete stream");
                 if(input_wait!=critical_wait+transform_overlap+header_wait)$fatal(1,"input partition mismatch");
@@ -420,7 +452,7 @@ module tb_h262_input_cadence;
 endmodule
 
 // Same-clock showahead queue. The capacity override is deliberately confined
-// to this simulation primitive; the production queue remains 16 KiB.
+// to this simulation primitive; production defaults to 64 KiB.
 module scfifo #(
     parameter integer lpm_numwords=16,lpm_width=8,lpm_widthu=4,
     parameter lpm_showahead="ON",lpm_type="scfifo",

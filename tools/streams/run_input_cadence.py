@@ -2,7 +2,7 @@
 """Reproduce bounded input-cadence experiments with the real I decode pipeline.
 
 Requires Verilator and a supported 720x480 interlaced all-I elementary stream.
-FIFO capacities and startup windows are simulation-only experiments. Host
+Production startup is the default; capacity and legacy-window overrides are experiments. Host
 resume delays are scenarios, not measured hardware traces. Pixel fingerprints
 compare scheduling variants; they are not an independent decoder pixel oracle.
 """
@@ -38,7 +38,9 @@ def main() -> None:
     ap.add_argument('--host-stride', type=int, default=8)
     ap.add_argument('--resume-ms', type=float, default=0)
     ap.add_argument('--hps-bytes', type=int, default=32768)
-    ap.add_argument('--clean-bytes', type=int, default=16384)
+    ap.add_argument('--clean-bytes', type=int, default=65536)
+    ap.add_argument('--legacy-startup', action='store_true', help='Disable production readiness startup for baseline experiments')
+    ap.add_argument('--warm-reload', action='store_true', help='Keep the drained HPS FIFO and video phase across repeated sessions')
     ap.add_argument('--startup-windows', type=int, default=0)
     ap.add_argument('--sessions', type=int, default=1)
     ap.add_argument('--busy-period', type=int, default=0)
@@ -47,6 +49,8 @@ def main() -> None:
     args = ap.parse_args()
     if args.pictures < 1 or args.first_picture < 1 or args.resume_ms < 0 or args.sessions < 1:
         ap.error('pictures/sessions must be positive and resume-ms nonnegative')
+    if args.startup_windows and not args.legacy_startup:
+        ap.error('--startup-windows requires --legacy-startup')
     out = args.output.resolve()
     out.mkdir(parents=True, exist_ok=True)
     # A failed rerun must not leave a previous success looking current.
@@ -101,6 +105,7 @@ def main() -> None:
                f'+PICTURES={args.pictures}', f'+DIRECT={int(args.direct)}', f'+PHASE={args.phase}',
                f'+HOST_STRIDE={args.host_stride}', f'+RESUME_CYCLES={round(args.resume_ms * 60000)}',
                f'+HPS_BYTES={args.hps_bytes}', f'+CLEAN_BYTES={args.clean_bytes}',
+               f'+PRODUCTION_STARTUP={int(not args.legacy_startup)}', f'+WARM_RELOAD={int(args.warm_reload)}',
                f'+STARTUP_WINDOWS={args.startup_windows}', f'+SESSIONS={args.sessions}',
                f'+BUSY_PERIOD={args.busy_period}', f'+BUSY_LENGTH={args.busy_length}']
     print('RUN', ' '.join(command), flush=True)
@@ -130,6 +135,8 @@ def main() -> None:
         for row in csv.DictReader(stream):
             if row['event'] == 'session':
                 session = int(row['picture']) - 1
+            elif row['event'] == 'visible':
+                sessions[session]['visible_start_cycle'] = int(row['cycle'])
             elif row['event'] == 'pixels':
                 sessions[session]['pixel_fingerprints'].append(row['detail'])
             elif row['event'] == 'present':
@@ -143,6 +150,9 @@ def main() -> None:
                     'input_wait': int(row['interval']), 'critical_wait': int(row['bank']),
                     'transform_overlap': int(row['detail'])})
     for session in sessions:
+        if not args.legacy_startup:
+            assert session['visible_start_cycle'] >= session['summary']['first']
+            session['visible_span_cycles'] = session['summary']['last'] - session['visible_start_cycle'] if args.pictures > 1 else 0
         assert len(session['pixel_fingerprints']) == args.pictures
         assert session['summary']['gaps'] == len(session['gaps'])
         assert session['pixel_fingerprints'] == sessions[0]['pixel_fingerprints']
@@ -163,7 +173,7 @@ def main() -> None:
         'compile_command': compile_command, 'run_command': command, 'exit_code': result.returncode,
         'runtime_seconds': elapsed, 'sessions': sessions,
         'comparison_passed': bool(args.compare),
-        'limits': 'Behavioral FIFO flags/pointer visibility; synthetic host resume pauses; ideal or periodic modeled DDR. No physical HPS/scaler, no HDMI raster, no independent pixel oracle. Capacity/startup overrides are simulation-only.',
+        'limits': 'Behavioral FIFO flags/pointer visibility; synthetic host resume pauses; ideal or periodic modeled DDR. Production startup with synthetic full-pair windows, behavioral video clock and drained-FIFO warm reload. No physical HPS/scaler, HDMI pixel raster, partial-transfer abort or independent pixel oracle. Legacy/capacity overrides are experiments. Profiler first_present remains first-reference time, not visibility.',
         'artifacts_sha256': {name: sha(out / name) for name in ('run.log', 'pictures.csv')},
     }
     (out / 'result.json').write_text(json.dumps(report, indent=2) + '\n')
