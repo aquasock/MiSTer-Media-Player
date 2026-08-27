@@ -1,0 +1,7 @@
+{
+  "test": "tools/streams/tb_h262_ddram_store_overlap.sv",
+  "source_sha256": "b7b77dfa66c68c975d36260eecc7237cfd6c1ab1253370a5d7fe064d11605832",
+  "result": "DDRAM_STORE_OVERLAP_PASS writes=16 grants=2 overlap_grants=2",
+  "scope": "Existing two-bank capture/drain and full-capacity backpressure regression, unchanged production writer.",
+  "production_changed": false
+}

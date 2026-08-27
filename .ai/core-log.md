@@ -1,3 +1,32 @@
+## 598 COMMIT Unreleased feb50c2 2026-08-27T04:21:04-07:00
+
+#### Coming From:
+
+Unreleased feb50c2
+
+#### Purpose:
+
+Isolate processing, writer handoff and presentation-release costs behind the DVD-ceiling cadence misses.
+
+#### Outcome:
+
+The user authorizes investigation, with production and MiSTer lifecycle unchanged. GUNSMOKE pulled the published 39f0875 checkout and compiled a temporary observer containing the current production frontend, full publication shell, I parser/IQ/IDCT/reconstruction, two-bank writer and presentation scheduler. The exact 449-picture ceiling fixture is supplied without input starvation, and DDR writes are always ready; actual HPS transport, queues, arbiter/read contention, scaler and startup/video clock crossings are excluded. Raster phase and first permitted swap are derived from the two hardware captures, so startup is calibrated rather than independently reproduced. Both baseline phases complete all 449 picture identities, 448 swaps, 29,095,200 DDR words and 3,636,900 blocks without asserted errors, but retain late intervals: Weave-phase ordinals [181, 348] and Bob-phase ordinals [181, 348]. These ideal-memory positions are not the physical 167/346 positions and must not be represented as an exact hardware replay. Every baseline picture has exactly 203 parser wait clocks per block, versus 201 in entry 597. From coefficient-end to reconstruction is 200 clocks, while actual writer acknowledgement takes 202. Subtracting measured presentation holds reproduces every isolated per-picture cost plus exactly 16,200 writer clocks, with only the expected one-clock first-publication-shell offset. The normal handoff therefore adds 0.270000 milliseconds per picture even when memory never blocks. Next-header release is 37 clocks at the observed target publication boundaries. Adding isolated interval cost, the fixed writer overhead, that release delay and the saved hardware capacity-block count exactly reconstructs both Weave reference-to-ready intervals and Bob picture 167; Bob picture 346 differs by only 26 clocks, or 0.433 microseconds. The hardware capacity counter and reference interval have slightly different starting boundaries, so this close accounting is supporting evidence rather than a full physical stall trace. Across this fixture, processing with the fixed writer handoff averages 33.529155 milliseconds per picture against the 33.366667-millisecond budget, approximately 29.824790 fps of processing capacity, and exceeds 449 nominal budgets by 72.957150 milliseconds before real-memory delays. Buffering alone cannot hide a sustained deficit indefinitely. An ideal-memory testbench control releases the parser directly on reconstruction completion while leaving the actual writer running; it displays all 449 identities with the same word/block totals and late intervals []. This control is not a deployable fix because it bypasses capacity when both writer banks are occupied, and no new pixel-value oracle was run. The existing unchanged writer-overlap regression separately passes sixteen writes and two grants while enforcing full-bank backpressure. Evidence and exact observer/commands are retained as .ai/current_results/entry598_*, with full builds under /home/vash/mister-builds/entry598. No production source, deployed binary, clock, cadence, queue, startup setting or MiSTer action changed; Built refers to diagnostic compilation and strict hardware acceptance remains open.
+
+#### Next Steps:
+
+Use a bounded capacity-safe writer-grant retiming as the first production candidate: remove both normal handoff clocks only when the alternate capture bank is actually free, retain exactly one delayed grant when full, and preserve block_stored, DDR address/payload/order, bank ownership, reset and error behavior. Do not deploy the direct-reconstruction diagnostic bypass or weaken the next-header release barrier, and do not change clock, cadence, startup, transport guards or queue sizes. Extend the existing writer-overlap regression for immediate versus delayed grants, duplicate/premature-grant rejection, sustained and random backpressure, reset and complete word/lane equivalence; then run the supported reconstruction, writer/presentation integration and P/B-client regressions before official Quartus timing/build qualification. Recheck the exact ceiling clip in both user-controlled modes and a longer run to establish sustained margin, keeping the warm 8 Mbps regression and restoration pair. The separate 10.08 Mbps combined audio/video gate and remaining DVD features remain outside this result. Preserve user lifecycle/playback control, restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 597 COMMIT Unreleased feb50c2 2026-08-27T04:02:24-07:00
 
 #### Coming From:
@@ -1141,35 +1170,6 @@ The user reported the requested file run complete and telemetry ready. A fresh F
 #### Next Steps:
 
 Request approval for the next cadence cycle: extend the real-pipeline simulation with the existing HPS ingress, extractor and clean-video queues, separating critical byte waits from transform overlap and varying refill pauses within the measured evidence rather than claiming an invented host trace is ground truth. Compare startup reserve, input buffering and bounded decode-headroom improvements, preserving byte/pixel identity, end-of-stream draining, repeated-load behavior, Bob/Weave transitions and the accepted continuous HDMI sync. Select a playback change only after its benefit and limits are demonstrated; then require existing regressions, a clean positive-timing build and independently verified deployment before another hardware test. No additional screenshot is needed before that simulation work.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 558 COMMIT Unreleased 31a87b6 2026-08-26T22:07:06-07:00
-
-#### Coming From:
-
-Unreleased 31a87b6
-
-#### Purpose:
-
-Qualify and deploy the approved passive deadline diagnostic while retaining the accepted HDMI sync correction.
-
-#### Outcome:
-
-Source `31a87b6` completed a clean Quartus 17.0.2 Lite build on GUNSMOKE in 688.32 seconds with seed 16, zero errors and 208 warnings. Every timing class is positive: setup 0.240 ns, hold 0.252 ns, recovery 3.363 ns, removal 0.567 ns, minimum pulse width 0.925 ns; all reported total negative slack values are zero. The 4,280,760-byte image has SHA-256 `3ab905467e890366a091a31884639cce6a79626413f5eb16f72a8d0756b702b5`. The full existing native-video script exited successfully, including presentation overlap, continuous sync across generation resets, both field orders, cache fault controls, three-generation ownership with delayed memory, writer fingerprints and the schema-nineteen recorder/screenshot round trip. Separate queue and writer availability tests also pass. The simulated tracked source outside metadata is byte-identical to the official build checkout. An additional real frontend, reconstruction, writer, scheduler and profiler simulation of the exact first eight source pictures reproduces only the picture-six miss: its candidate becomes ready 669,812 decoder clocks, or 11.164 milliseconds, after the missed window, with zero decoder-input starvation and zero writer-capacity blocking. This validates recorder attribution under ideal input and DDR availability, not the cause of the hardware picture-348 gap. The accepted framebuffer, timing generator, scheduler, scaler, constraints and seed remain unchanged from `30d300a`; this is a diagnostic image, not a cadence fix. Under the user's standing replacement authorization, the active `/media/fat/MediaPlayer.rbf` was replaced directly over FTP, and an independent fresh connection read back the entire image with matching size and SHA-256. No core reload or reboot was triggered. Build, validation and deployment evidence is preserved in the three entry-557 JSON files under `.ai/current_results`, with full reports and test artifacts under `/home/vash/mister-builds/entry557-31a87b6` and `/home/vash/mister-builds/entry557-diagnostics`. Hardware validation remains pending. The separate live-raster soak's previously recorded assertion drift was not addressed or reported as passing. In response to the user's roadmap question, the recommended later sequence is current 480i HDMI and audio/timestamp qualification, interlaced P/B and field-coding support, then broader cadence and format coverage; those later implementation changes are not part of this approval.
-
-#### Next Steps:
-
-Have the user reload the core, select Bob and play `bbb_480i_tff_15s_8mbps.m2v` once without further menu or mode changes, leaving terminal telemetry visible. Capture and validate schema nineteen, then inspect the full picture ordinals, actual missed-window readiness, clean-queue starvation and writer-capacity blocking before proposing a playback change. Preserve the accepted HDMI sync behavior and leave analog diagnostics out of scope. After this clean case, retain repeated file loads and Bob/Weave switching as regression conditions. Require a measured explanation and an approved fix before claiming the remaining cadence issue is resolved.
 
 #### Files Modified:
 
