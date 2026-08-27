@@ -7,7 +7,8 @@ module mpeg2_h262_ddram_store(
  input wire clk,input wire reset,input wire[1:0] frame_bank,input wire [7:0] pixel_value,
  input wire [1:0] pixel_component,input wire [11:0] pixel_x,input wire [11:0] pixel_y,
  input wire pixel_valid,input wire block_start,input wire block_complete,
- output reg block_stored,output reg write_seen,output reg store_error,
+ output reg block_stored,output wire block_accepted,
+ output reg write_seen,output reg store_error,
  input wire ddram_busy,output wire [7:0] ddram_burstcnt,output wire [28:0] ddram_addr,
  output wire ddram_rd,output wire [63:0] ddram_din,output wire [7:0] ddram_be,output wire ddram_we,
  // Entry 531: passive metadata for an accepted writer word.  The arbiter
@@ -35,20 +36,61 @@ wire [11:0] ex=wide_bs?{2'b00,pixel_x[9:0]}:legacy_bs?{4'b0000,pixel_x[7:0]}:(ta
 wire [11:0] ey=wide_bs?{3'b000,pixel_y[8:0]}:pixel_y;
 function automatic [28:0] r90;input [11:0] r;reg [28:0] x;begin x={17'd0,r};r90=(x<<6)+(x<<4)+(x<<3)+(x<<1);end endfunction
 function automatic [28:0] r45;input [11:0] r;reg [28:0] x;begin x={17'd0,r};r45=(x<<5)+(x<<3)+(x<<2)+x;end endfunction
-reg [63:0] b0,b1,b2,b3,b4,b5,b6,b7,sh;
+// Entry 546: two capture banks.  One bank accepts the next reconstructed
+// block while the other drains its eight DDR row writes, so the parser is no
+// longer serialized behind the drain.  Capacity acknowledgement (block_accepted)
+// is deliberately separate from DDR completion (block_stored): the parser is
+// released as soon as a capture bank is free, while every consumer that counts
+// completed stores keeps the unchanged block_stored pulse.
+// Keep the capture banks in registers.  Quartus otherwise infers a 16x64
+// altsyncram and absorbs the wr/drain_bank flops into an M10K read-address
+// register; the combinational read this writer needs has no M10K equivalent,
+// and iverilog models a plain array either way, so simulation cannot see the
+// difference.  The single-bank predecessor used discrete registers.
+(* ramstyle = "logic" *) reg [63:0] blk [0:1][0:7];
+reg [63:0] sh;
 wire [63:0] shn={pixel_value,sh[63:8]};
-reg cap,flush,writing,ascratch,ascratch_bank;reg[1:0] ab;reg [1:0] ac;reg [11:0] ox,oy;reg [2:0] wr;reg [28:0] wa;
-wire good=((ac==Y)&&(ox<720)&&(oy<480))||(((ac==CB)||(ac==CR))&&(ox<360)&&(oy<240));
-wire [28:0] off=ascratch?(ascratch_bank?SCRATCH1:SCRATCH0):
-                 (ab==2'd1)?BANK:(ab==2'd2)?29'h00040000:29'd0;
-wire [28:0] first=(ac==Y)?YB+off+r90(oy)+{20'd0,ox[11:3]}:(ac==CB)?CBB+off+r45(oy)+{20'd0,ox[11:3]}:CRB+off+r45(oy)+{20'd0,ox[11:3]};
-wire [28:0] stride=(ac==Y)?90:45;
+reg cap,writing;
+reg cap_bank,drain_bank;
+reg pend [0:1];
+reg        asc_b  [0:1];
+reg        ascb_b [0:1];
+reg [1:0]  ab_b   [0:1];
+reg [1:0]  ac_b   [0:1];
+reg [11:0] ox_b   [0:1];
+reg [11:0] oy_b   [0:1];
+reg [2:0] wr;reg [28:0] wa;
+
+// Drain-side view: every address, bound and debug value describes the bank
+// currently being written, never the bank being captured into.
+wire [1:0]  dac  = ac_b[drain_bank];
+wire [1:0]  dab  = ab_b[drain_bank];
+wire        dasc = asc_b[drain_bank];
+wire        dascb= ascb_b[drain_bank];
+wire [11:0] dox  = ox_b[drain_bank];
+wire [11:0] doy  = oy_b[drain_bank];
+wire good=((dac==Y)&&(dox<720)&&(doy<480))||(((dac==CB)||(dac==CR))&&(dox<360)&&(doy<240));
+wire [28:0] off=dasc?(dascb?SCRATCH1:SCRATCH0):
+                 (dab==2'd1)?BANK:(dab==2'd2)?29'h00040000:29'd0;
+wire [28:0] first=(dac==Y)?YB+off+r90(doy)+{20'd0,dox[11:3]}:(dac==CB)?CBB+off+r45(doy)+{20'd0,dox[11:3]}:CRB+off+r45(doy)+{20'd0,dox[11:3]};
+wire [28:0] stride=(dac==Y)?90:45;
+
+// Capacity grant.  This must keep block_stored's pulse discipline, not be a
+// level: the parser enters its wait state as soon as it starts a block, long
+// before IQ/IDCT/reconstruction deliver that block here, so any level that is
+// high in the meantime lets it run on without waiting.  A pulse cannot be
+// missed for the same reason block_stored could not -- it is emitted strictly
+// after the parser is already waiting -- and it arrives one drain earlier.
+wire room_available = !cap && !pend[cap_bank];
+reg  room_available_d;
+reg  accepted_pulse;
+assign block_accepted = accepted_pulse;
 assign ddram_burstcnt=writing?1:0;assign ddram_addr=writing?wa:0;assign ddram_rd=0;
-assign ddram_din=(wr==0)?b0:(wr==1)?b1:(wr==2)?b2:(wr==3)?b3:(wr==4)?b4:(wr==5)?b5:(wr==6)?b6:b7;
+assign ddram_din=blk[drain_bank][wr];
 assign ddram_be=8'hff;assign ddram_we=writing;
 
-wire [11:0] luma_debug_row=oy+{9'd0,wr};
-wire [6:0] luma_debug_word=ox[9:3];
+wire [11:0] luma_debug_row=doy+{9'd0,wr};
+wire [6:0] luma_debug_word=dox[9:3];
 
 // XORing independently position-mixed word contributions makes the completed
 // field fingerprint insensitive to the writer's block-row transaction order
@@ -74,7 +116,7 @@ function automatic [31:0] position_fingerprint_word;
  end
 endfunction
 
-assign luma_word_debug=writing&&(ac==Y);
+assign luma_word_debug=writing&&(dac==Y);
 assign luma_region_debug=wa[18:16];
 assign luma_row_parity_debug=luma_debug_row[0];
 assign luma_picture_start_debug=luma_word_debug&&
@@ -83,26 +125,51 @@ assign luma_picture_complete_debug=luma_word_debug&&
     (luma_debug_row==12'd479)&&(luma_debug_word==7'd89);
 assign luma_position_fingerprint_debug=position_fingerprint_word(
     luma_region_debug,luma_debug_row[10:0],luma_debug_word,ddram_din);
+integer rst_i;
 always @(posedge clk)begin
- if(reset)begin cap<=0;flush<=0;writing<=0;ab<=0;ascratch<=0;ascratch_bank<=0;ac<=0;ox<=0;oy<=0;wr<=0;wa<=0;sh<=0;block_stored<=0;write_seen<=0;store_error<=0;end
+ if(reset)begin
+  cap<=0;writing<=0;cap_bank<=0;drain_bank<=0;wr<=0;wa<=0;sh<=0;
+  room_available_d<=1;accepted_pulse<=0;
+  block_stored<=0;write_seen<=0;store_error<=0;
+  for(rst_i=0;rst_i<2;rst_i=rst_i+1)begin
+   pend[rst_i]<=0;ac_b[rst_i]<=0;ab_b[rst_i]<=0;
+   asc_b[rst_i]<=0;ascb_b[rst_i]<=0;ox_b[rst_i]<=0;oy_b[rst_i]<=0;
+  end
+ end
  else begin
   block_stored<=0;
+  // One grant each time a capture bank becomes free again.
+  room_available_d<=room_available;
+  accepted_pulse<=room_available&&!room_available_d;
   if(block_start)begin
-   if(cap||flush||writing)store_error<=1;
-   cap<=1;ac<=ec;ab<=frame_bank;ascratch<=scratch_tag;ascratch_bank<=wide_bs1;ox<={ex[11:3],3'b000};oy<={ey[11:3],3'b000};
+   // Only the target capture bank must be free.  A block still draining in
+   // the other bank is no longer an error -- that overlap is the point.
+   if(cap||pend[cap_bank])store_error<=1;
+   cap<=1;ac_b[cap_bank]<=ec;ab_b[cap_bank]<=frame_bank;
+   asc_b[cap_bank]<=scratch_tag;ascb_b[cap_bank]<=wide_bs1;
+   ox_b[cap_bank]<={ex[11:3],3'b000};oy_b[cap_bank]<={ey[11:3],3'b000};
    if(scratch_tag&&(bsc==2'b11))store_error<=1;
   end
   if(pixel_valid)begin
    if(!(cap||block_start))store_error<=1;
-   else begin sh<=shn;if(pixel_x[2:0]==7)case(pixel_y[2:0])0:b0<=shn;1:b1<=shn;2:b2<=shn;3:b3<=shn;4:b4<=shn;5:b5<=shn;6:b6<=shn;7:b7<=shn;endcase end
+   else begin sh<=shn;if(pixel_x[2:0]==7)blk[cap_bank][pixel_y[2:0]]<=shn;end
   end
-  if(block_complete)begin if(!cap||flush||writing)store_error<=1;cap<=0;flush<=1;end
-  if(!writing&&flush)begin
-   if(!good)begin store_error<=1;flush<=0;block_stored<=1;end
-   else begin wr<=0;wa<=first;writing<=1;end
-  end else if(writing&&!ddram_busy)begin
+  if(block_complete)begin
+   if(!cap)store_error<=1;
+   cap<=0;pend[cap_bank]<=1;cap_bank<=~cap_bank;
+  end
+  if(!writing)begin
+   if(pend[drain_bank])begin
+    if(!good)begin
+     store_error<=1;pend[drain_bank]<=0;drain_bank<=~drain_bank;block_stored<=1;
+    end
+    else begin wr<=0;wa<=first;writing<=1;end
+   end
+  end else if(!ddram_busy)begin
    write_seen<=1;
-   if(wr==7)begin writing<=0;flush<=0;block_stored<=1;end
+   if(wr==7)begin
+    writing<=0;pend[drain_bank]<=0;drain_bank<=~drain_bank;block_stored<=1;
+   end
    else begin wr<=wr+1'b1;wa<=wa+stride;end
   end
  end

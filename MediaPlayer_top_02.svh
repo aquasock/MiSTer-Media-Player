@@ -92,7 +92,11 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.vertical_size               (mpeg2_new_vertical_size),
 	.intra_dc_precision          (mpeg2_new_intra_dc_precision),
 	.intra_vlc_format            (mpeg2_new_intra_vlc_format),
-	.pipeline_block_done         (mpeg2_new_ddr_block_stored),
+	// Entry 546: release the parser on writer capacity rather than on DDR
+	// completion.  Its only use down this chain is the ST_WAIT_PIPELINE gate,
+	// so a level meaning "a capture bank is free" cannot be missed the way a
+	// completion pulse could once capture and drain overlap.
+	.pipeline_block_done         (mpeg2_new_ddr_block_accepted),
 	.recon_block_complete        (mpeg2_new_recon_block_complete),
 	.p_persistence_complete      (mpeg2_new_pred_persisted_seen),
 	.p_row_persistence_complete  (mpeg2_new_pred_row_persisted),
