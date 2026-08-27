@@ -1,3 +1,34 @@
+## 615 COMMIT Unreleased ??? 2026-08-27T07:46:16-07:00
+
+#### Coming From:
+
+Unreleased 9623fa7
+
+#### Purpose:
+
+Pack AC-3 frames into IEC 61937 bursts in the helper behind an audio output selection.
+
+#### Outcome:
+
+This entry is the approved plan and is written before its commit exists. The user asked for real surround from S/PDIF before the next release, specified an option choosing S/PDIF or HDMI audio with the unused output muted, asked for a six channel sound test in S/PDIF mode, and explicitly approved forking framework code. The user's test device is a Samsung HW-B550F, a 2.1 soundbar with DTS Virtual:X rather than a discrete 5.1 receiver, so it can decode and virtualize but cannot verify discrete channel routing; that verification genuinely requires the community test the user asked for, and this must not be described as 5.1 validation on the user's own hardware. The immediate audible gain for that device is that LFE reaches the subwoofer at all, since the stereo downmix currently discards it. No new fixture is needed for the sound test because the existing channel sweep already sounds one channel at a time and becomes a true six channel test the moment passthrough exists. The timing is exact: an AC-3 frame is 1536 samples at 48 kHz and an IEC 61937 burst period is 1536 stereo frames, or 6144 bytes, so one frame maps to one burst period with no rate conversion. The burst carries the `0xF872` and `0x4E1F` sync words, a data type of one for AC-3, a length in bits, then the frame byte swapped into sixteen bit words and zero stuffed. The work is split because the risk is uneven. This first boundary is host only: the helper gains an audio output selection defaulting to HDMI, packs bursts instead of decoded PCM when S/PDIF is selected, and is verified offline by parsing the emitted stream back into frames and decoding those frames with an independent decoder, which needs no RTL, no Main change, no FPGA build and no hardware. The second boundary integrates it, and its pieces are already identified: an OSD option in the core, mutual muting of the unused output, a bit transparent path because the framework mixer applies attenuation, boost, mix and a biquad to every sample, the S/PDIF non audio channel status bit which is currently hardwired to zero so the stream always declares linear PCM, and a Main patch line so the launch passes the selected mode, since the decoder lives on the ARM and only the ARM can choose what to emit. Packing in fabric instead was considered and rejected for this release because it would need a frame buffer and a packer in a device already at 93 percent M10K, whereas helper packing costs no fabric memory at all; the accepted cost is that the mode is fixed when playback starts rather than switchable mid-file. Nothing is claimed as working until the offline verification exists, and this entry records no completed build, packing or hardware evidence.
+
+#### Next Steps:
+
+Implement the helper selection and burst packing, then verify offline that the emitted stream parses as valid bursts at the correct period with correct sync words, data type and length, that the extracted frames are byte identical to the source AC-3 frames, and that an independent decoder reproduces the same audio from them. Keep the decoded stereo path and the accepted MPEG Layer II path unchanged and prove both still pass. Replace this entry's `???` with the real abbreviated SHA once the source commit exists and complete the entry with what actually happened. Only then start the second boundary, defining before any RTL edit what the OSD option is called, how muting is enforced, and how the bit transparent path is proven rather than assumed. Do not describe a soundbar locking onto a burst as proof of discrete channel routing. The MPEG Layer II regression telemetry is still uncaptured and needs one dedicated replay with nothing played afterwards, because the single fixed helper log path has already lost that evidence twice. A commercial AC-3 track with real dynamic range control remains uncompared. The interlaced video gates of entry 609 remain open and unstarted. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- host/arm/ARCHITECTURE.md
+- tools/streams/verify_ac3_passthrough.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 614 COMMIT Unreleased 9623fa7 2026-08-27T07:34:33-07:00
 
 #### Coming From:
@@ -1141,35 +1172,6 @@ The user has cut the diagnostic cadence and this supersedes the Next Steps of en
 #### Next Steps:
 
 Await the user's choice of the next single circumstance to test rather than proposing a sampling programme. The open question is unchanged and is stated in entry 575: measured first-byte latency does not predict whether a cold run gaps, since 37.6 milliseconds was clean while 21.9 and 35.3 milliseconds gapped, so phase alignment between byte arrival and the early cadence deadline remains the most likely operative variable and no current counter measures it. The single most discriminating circumstance available without a new build is playing the higher-bitrate `bbb_480i_tff_15s.m2v`, which is 34,919,166 bytes against 15,150,646 for the qualified file and therefore demands about 2,327,944 bytes per second, well above the 1,443,000 bytes per second burst rate measured in entry 575. If the defect is delivery-bound that file should fail consistently and severely rather than intermittently, and if it plays as well as the smaller file then delivery rate is not the operative constraint and the boundary moves to the FPGA side. Do not deploy the helper-side priming correction, which entry 575 showed is not yet justified. Do not raise the per-poll chunk budget. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 575 COMMIT Unreleased deced5c 2026-08-27T00:44:54-07:00
-
-#### Coming From:
-
-Unreleased deced5c
-
-#### Purpose:
-
-Measure assertion-to-first-byte latency on a verified cold run using the instrumented `deced5c` binary and test the dead-time inference of entry 572.
-
-#### Outcome:
-
-The power cycle is verified by a single new syslogd start at 07:41:02 UTC replacing the 07:25:17 boot, the user played once and stopped, and the helper log survived at 205,355 bytes. The timestamped record format itself proves the instrumented binary is the one that ran. The run came up clean, with zero cadence outliers, zero missed deadlines, 449 pictures, 448 swaps, all 15,150,646 bytes accepted and zero error flags, and its cadence counters are indistinguishable from earlier uninstrumented clean runs, so no behavioural change is evident, though one sample cannot prove the instrumentation non-invasive. The measurement the boundary was built for reads `first_byte latency_us=37556 would_block=672`, or 37.6 milliseconds from download assertion to first submitted byte, which falls inside the 13.9 to 63.8 millisecond band entry 572 inferred and therefore confirms that inference by direct measurement. The timestamps also permit the delivery curve to be computed for the first time from all 3,699 read records rather than inferred from telemetry arithmetic, and it shows that delivery is not a constant-rate process. It bursts at about 1.43 times realtime, 1,442,776 bytes per second from 97 to 199 milliseconds and 1,446,123 from 199 to 298, then decays through 1.28 and 1.06 times realtime and settles at consumption-paced realtime, finishing the whole session at 1,017,538 bytes per second. Because the ordinal five and six deadlines fall at roughly 200 to 270 milliseconds, they sit inside the burst, so treating delivery as constant-rate is valid for the startup window that matters but not for the session as a whole. That measured burst rate of about 1,443,000 bytes per second supersedes the 1,392,000 figure derived arithmetically in entries 571 and 572, which was 3.7 percent low, and the correction is self-validating: recomputing warm dead times at the measured rate tightens their spread from plus or minus 1.2 milliseconds to plus or minus 0.35 across five independent sessions, constraining the rate to about one percent. This corrects entry 572, which stated that warm dead time is zero. It is not; warm dead time is a consistent 8.0 to 8.7 milliseconds, averaging about 8.3, and the apparent zero was an artefact of the low rate estimate absorbing the real warm latency. The cold-versus-warm separation is unaffected and in fact widens, with cold dead times recomputing to 21.9, 35.3, 68.1 and 68.7 milliseconds against that 8.3 baseline. The most important result, however, is negative and must not be smoothed over. Dead time does not predict the outcome. This run measured 37.6 milliseconds and was clean, while entry 568 gapped at 35.3 and block 1 run 1 gapped at 21.9, and block 3 run 1 missed twice at 68.1. Dead time is therefore necessary context but not a sufficient predictor of a missed deadline, exactly paralleling entry 569 where starvation magnitude also failed to predict the miss. The most likely remaining variable is phase alignment between byte arrival and where the cadence deadline falls, which no existing counter measures. Cold outcomes now stand at three gapped and two clean across five verified cold runs. The burst rate is measured from this one cold run and warm runs remain uninstrumented, so their burst rate is supported by the residual cluster rather than measured directly, and the measured-latency population is one. Evidence is `.ai/current_results/entry575_cold_arm_helper.log`, `entry575_cold_terminal.png` and `entry575_cold_capture.json`.
-
-#### Next Steps:
-
-Do not propose the helper-side priming correction yet, because the justification for it has weakened rather than strengthened. Priming would reduce dead time from tens of milliseconds toward the warm baseline, but a run at 37.6 milliseconds was clean while runs at 21.9 and 35.3 gapped, so reducing dead time alone is not established to eliminate the miss and could be built and deployed without fixing anything. Gather measured latencies paired with outcomes instead, which the instrument now makes cheap: repeat the verified power cycle, single playback and immediate log fetch several times for cold samples, and separately instrument warm runs by fetching the helper log after a replay, so both populations carry measured rather than assumed latency. Six to eight paired samples should show whether any latency threshold separates clean from gapped runs or whether the outcome is independent of latency, which would confirm phase alignment as the operative variable and move the boundary again. If latency proves not to separate the populations, the next instrumentation step is to record, at each early cadence deadline, the phase between the most recent byte arrival and the deadline itself, which is an FPGA-side counter rather than a host-side one and would require a Quartus build. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Do not raise the per-poll chunk budget, which entry 572 ruled out and which the measured burst curve confirms is not limiting during the window that matters. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
 
 #### Files Modified:
 
