@@ -1,3 +1,32 @@
+## 551 COMMIT Unreleased 558efef 2026-08-26T19:51:11-07:00
+
+#### Coming From:
+
+Unreleased 558efef
+
+#### Purpose:
+
+Characterize the visible flicker from camera footage, including the pre-playback interval no capture had ever observed.
+
+#### Outcome:
+
+Two user recordings settle what the flicker actually is, and it is not what thirty entries of framebuffer instrumentation assumed. The first is `.ai/current_results/PXL_20260827_023203846.mp4`, 99,984,960 bytes with SHA-256 `f7e5f638649d567b2f440760e8482253ffc58258b6653e72eae3d1391cce4246`, 1920 by 1080 at sixty frames per second for 24.07 seconds, playback beginning near six and a half seconds. Before playback the framebuffer still presents the previous run's final picture behind the file selector, a foliage scene retained beneath the menu with the telemetry overlay at left, which is the stuck screen the user described. The transition itself is decisive: at 6.600 seconds change rises from the camera noise floor, and at 6.750 seconds one frame shows Big Buck Bunny's opening sky and bird woven line by line with the previous scene's tree trunks, two entirely different pictures interleaved on alternate scanlines. That photograph is the same defect the schema-eighteen field analysis measured as bit-identical even rows, but with the two source pictures visibly distinct rather than a subtle ghost. Retained as `.ai/current_results/entry551_pre_playback_retained_frame.png` at 1,632,365 bytes with SHA-256 `51c9bafecad1b200cfd1318bcdb2be3af4fb67575768b908562be56e03eed458` and `.ai/current_results/entry551_field_weave_two_scenes.png` at 1,613,919 bytes with SHA-256 `4e1f2627ecc9a4082be321c4033e456301ed07079ba9ebc0dea119f76e528a50`. The stale field therefore survives a generation reset, a mode change and a fresh publication, which constrains whatever holds it. The second recording is `.ai/current_results/PXL_20260827_024238007.mp4`, 30,673,309 bytes with SHA-256 `a72e6ead0e645530d4a86b6eb314051d7b0740b687c77fd72e413fcfc9e34e3d`, a high-rate capture exported as 608 frames at thirty frames per second representing 2.53 seconds of real time at 240 frames per second. Its change series autocorrelates at 0.95 for a period of four frames, so the camera is phase locked to the display's sixty hertz refresh; sampling every fourth frame removes that aliasing and leaves genuine content change at sixty hertz. In that series the defect has an unmistakable signature. Across the affected interval the change one step apart averages 21.11 while the change two steps apart averages 2.59, so the display returns to the same image every 33.3 milliseconds: it is alternating between two fixed images at sixty hertz, a thirty hertz flip, rather than advancing through the video. Normal playback in the same clip shows the opposite relation, 4.26 at one step against 5.60 at two, which is what progressing motion looks like. Sixty-one per cent of the clip is in that alternating state, in two episodes of 783 and 733 milliseconds, so a single stick lasts roughly three quarters of a second or about twenty-two frame slots. The user confirms this is the sticking they see. A plausible mechanism follows directly and is worth testing rather than assuming: if the core holds one picture and keeps emitting its two fields alternately, a Weave deinterlacer that combines the two most recently arrived fields produces one composite and then the same pair in the opposite order, two vertically offset images alternating at thirty hertz. That would make a held picture strobe rather than merely freeze, and it agrees with entry 545's observation that Bob shows the artifact at approximately twice the Weave cadence, since Bob exposes single fields at field rate. Two attempted camera analyses failed and are recorded so they are not repeated: whole-frame difference cannot separate a stuck display from a genuinely static scene, and a vertical high-frequency measure intended to detect field mismatch is flat at 0.573 to 0.585 across all 608 frames because the camera does not sample display scanlines at a fixed phase. Ordinary sixty hertz FTP rasters remain the better instrument for field content; the camera's value is temporal.
+
+#### Next Steps:
+
+Reconcile the two facts that must both be true. The display holds one picture for roughly seven hundred fifty milliseconds, about twenty-two slots, while schema-sixteen telemetry reports 449 pictures and 448 swaps across the fifteen second file, close to the full 29.97 rate. Either the swap presents content identical to the previous picture, or the held interval is invisible to the swap counter; both halves are measurable and one of them is wrong. Prefer that question over any further framebuffer instrument, since fetch addresses, region resolution, cache writes and the write-read fingerprints are already exact. Test the Weave field-order hypothesis directly by comparing a deliberately held picture in Weave against the same interval in Bob, which pairs fields differently, before proposing any change. The analog VGA path remains fully driven with `VGA_F1` and `VGA_SCALER` low, so a CRT on an analog board would show the raw core output with the deinterlacer wholly removed and would separate a core-side hold from a deinterlacer amplification. Do not trust the pixel harness committed in entry 550 until its progressive control passes.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 550 COMMIT Unreleased 558efef 2026-08-26T19:32:00-07:00
 
 #### Coming From:
@@ -1218,43 +1247,6 @@ Use ordinary FTP with the default `root` and `1` login to verify the active imag
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 511 COMMIT Unreleased 52a5a64 2026-08-25T08:00:22-07:00
-
-#### Coming From:
-
-Unreleased 48c2c87
-
-#### Purpose:
-
-Instrument the intermittent native framebuffer publication boundary without changing decoder, scheduler, cache or output behavior.
-
-#### Outcome:
-
-Commit `52a5a64` adds only passive native framebuffer-publication evidence. The framebuffer exports its video-domain picture-present level and a per-generation sticky indication that the authored first-field origin arrived before the six-line cache prefill was ready; three-stage synchronizers carry both levels to the 60 MHz decoder domain while the existing scheduler-generated framebuffer reset supplies the generation boundary. Cadence schema ten expands from thirty-eight to forty-one words without repurposing the established MPEG, prediction, PCM, scheduler or error fields. Its appended words count generation resets, picture publications, resets which supersede an unpublished generation, prefill deadline misses and maximum reset-to-publication latency, and the checksum moves to word forty. Ranked gaps and timestamp conflicts begin at STC second zero in this diagnostic hardware instance. The overlay moves eight pixels upward to retain all rows inside both diagnostic and native rasters, while the Python decoder accepts both new schema-ten positions and the two legacy schema-nine positions. Directed tests proved an ordinary ready-first publication, a deliberately late prefill which records a miss without publishing unready pixels, and a three-reset/two-publication sequence with one superseded generation; the profiler retained exact counts, nonzero latency and a valid checksum, and both schema versions decoded from both raster layouts. The complete native suite passed field order, exact 4:2:0 mapping, TFF and BFF timing, Bob and Weave control, timing pattern, ordinary ownership, twenty-window accelerated presentation, ordinary and delayed cache refill and the new late-prefill case. All five scheduler frame rates and native field cadence passed. TFF, BFF and progressive reconstruction retained zero out-of-tolerance pixels at 7,926,459, 7,948,706 and 13,048,137 cycles, and field-DCT rejection remained 82,326 cycles. The canonical seventy-two-picture mixed I/P/B raster completed all twenty-five reference publications, forty-seven B-picture persistences and seventy-one swaps with exact DDR and reconstruction accounting and zero errors at 6,529,996 cycles. Its historical assertion expects 6,529,997 cycles, but an untouched archived `48c2c87` source snapshot replayed against the exact same 291,641-byte fixture produced the identical cycle-by-cycle trace, identical 6,529,996 terminal count and identical sole assertion, proving the one-cycle expectation drift predates and is independent of this observational commit. No unrelated decoder test was changed or relaxed.
-
-#### Next Steps:
-
-Run a clean Quartus Prime 17.0.2 build and focused timing analysis, preserve the currently installed `48c2c87` image as rollback through ordinary FTP with the default `root` and `1` login, round-trip verify and promote the `52a5a64` diagnostic image, and leave helper, media, Main and MiSTer configuration untouched. Repeat `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` in Bob up to three times and leave the first ghosted run's terminal raster displayed for ordinary-FTP capture. A nonzero prefill miss, superseded unpublished reset or excessive publication latency correlated with the ghost will justify a narrow cache-publication correction; complete publication with regular ranked gaps will clear this FPGA boundary and retain the downstream-display diagnosis.
-
-#### Files Modified:
-
-- `MediaPlayer_top_06.svh`
-- `MediaPlayer_top_07.svh`
-- `rtl/mpeg2_luma_framebuffer.sv`
-- `rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv`
-- `tools/streams/decode_hardware_cadence.py`
-- `tools/streams/run_native_480i_timing.sh`
-- `tools/streams/tb_h262_hardware_cadence_profiler.sv`
-- `tools/streams/tb_native_480i_cache_refill.sv`
-- `tools/streams/test_decode_hardware_cadence.py`
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
