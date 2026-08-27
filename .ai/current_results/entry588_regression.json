@@ -1,0 +1,82 @@
+{
+  "source_commit": "a4f2769f6e55774abfc5990052702734b9024d15",
+  "started": "2026-08-27T02:44:11-07:00",
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "tools/streams/test_main_mister_profile.py",
+        "--main-source",
+        "/home/vash/mister-builds/entry588/Main_MiSTer",
+        "--rtl",
+        "--report",
+        "/home/vash/mister-builds/entry588/tests.json"
+      ],
+      "exit_code": 0,
+      "seconds": 14.98299517997657,
+      "log": "/home/vash/mister-builds/entry588/regression-0.log",
+      "sha256": "c1ab0ec27652b91ae42dfd095c8951abab314916a1e4e8b22660a3df44bc6a26"
+    },
+    {
+      "command": [
+        "python3",
+        "tools/streams/test_main_mister_profile.py",
+        "--main-source",
+        "/home/vash/mister-builds/entry588/Main_MiSTer",
+        "--sanitize",
+        "--report",
+        "/home/vash/mister-builds/entry588/tests-sanitized.json"
+      ],
+      "exit_code": 0,
+      "seconds": 2.815092058997834,
+      "log": "/home/vash/mister-builds/entry588/regression-1.log",
+      "sha256": "31c764ebbe68d2796f0867de3f400aa5cf13d7943ccf4865d057ea2528568d9d"
+    },
+    {
+      "command": [
+        "bash",
+        "tools/streams/run_native_480i_timing.sh"
+      ],
+      "exit_code": 0,
+      "seconds": 839.5386434620013,
+      "log": "/home/vash/mister-builds/entry588/regression-2.log",
+      "sha256": "5f96d512c7fe83ec71233983e13d4148a90e53b1633a2432636a1328a494c255"
+    },
+    {
+      "command": [
+        "iverilog",
+        "-g2012",
+        "-s",
+        "tb_mpeg2_stream_fifo_burst",
+        "-o",
+        "/home/vash/mister-builds/entry588/fifo-default.vvp",
+        "rtl/mpeg2_stream_fifo.sv",
+        "tools/streams/tb_mpeg2_stream_fifo_burst.sv",
+        "/home/vash/intelFPGA_lite/17.0_T/quartus/eda/sim_lib/altera_mf.v"
+      ],
+      "exit_code": 0,
+      "seconds": 10.551002839987632,
+      "log": "/home/vash/mister-builds/entry588/fifo-default.log",
+      "sha256": "fa128f1edd8311c88e9beef5c996e77406880ad88b1c22e6fc377db43dc5395e"
+    },
+    {
+      "command": [
+        "iverilog",
+        "-g2012",
+        "-s",
+        "tb_mpeg2_stream_fifo_burst",
+        "-o",
+        "/home/vash/mister-builds/entry588/fifo-cyclone-v.vvp",
+        "-DFIFO_CYCLONE_V",
+        "rtl/mpeg2_stream_fifo.sv",
+        "tools/streams/tb_mpeg2_stream_fifo_burst.sv",
+        "/home/vash/intelFPGA_lite/17.0_T/quartus/eda/sim_lib/altera_mf.v"
+      ],
+      "exit_code": 0,
+      "seconds": 11.110693808994256,
+      "log": "/home/vash/mister-builds/entry588/fifo-cyclone-v.log",
+      "sha256": "7efa291e98e815a2ae47d239a51c00e29fdb84778d436dd34892cc51dba5a069"
+    }
+  ],
+  "finished": "2026-08-27T02:58:50-07:00"
+}

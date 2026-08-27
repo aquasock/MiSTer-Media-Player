@@ -1,0 +1,22 @@
+{
+  "source_commit": "a4f2769f6e55774abfc5990052702734b9024d15",
+  "source_sha256": {
+    "MediaPlayer_top_00.svh": "222e6507b48cc28ba91d06165ff776ab8e490150ad38af0c23d8ed53631edecf",
+    "rtl/mpeg2_stream_fifo.sv": "71c32ffdff785297ffd97838e1f7e93e2301f9ade642b2644d830798d42336c1",
+    "sys/hps_io.sv": "ab88c3f9ae812b9671ba80cf5f55e0251b6ddcc6a4d5167146c33e5a2f81f523",
+    "host/main_mister/0001-mediaplayer-arm-loader.patch": "af00ea598f9852a03b01eaef723d748e20bec972f3444b4e15b68c71ba964ec4",
+    "host/arm/ARCHITECTURE.md": "7af56fcc6cd6d4acb75da874b9a0879ae3acfa6943e1c0fd9e06d51ee3d80f10",
+    "tools/streams/test_main_mister_profile.py": "7b7154f136603d103c652f01c0c39badaff900467c0cf5d4e1941333e2c99296",
+    "tools/streams/tb_mpeg2_stream_fifo_burst.sv": "d5eee7875a9c30e1be75e35e8b254ab4af17ba55e8a7fa7f39252fea03f1c5ab"
+  },
+  "core_md_git_blob": "6ccaa838b8afac82857eab9fc3fadd488038abfc",
+  "transport": "credit_fast_v1",
+  "no_hardware_performance_claim": true,
+  "candidate_findings": [
+    "Actual host/extracted handshake and FIO tests pass at modeled register-write delays of 1, 2, 5 and 13 system clocks. These are protocol stress tests, not a model of physical throughput.",
+    "A Cyclone V mixed-width FIFO partial-byte read after full exposed a transient wrapped zero used count. Credit now rejects zero used count unless write-domain empty agrees. Both vendor model families pass after correction.",
+    "Legacy and narrow fallback, unaligned and odd lengths, zero/full credits, coherent snapshots, counter wrap, dropped/corrupt data, reset, bad credit/count/digest/capability and no second batch on fault are covered.",
+    "Rolling 16-bit rotate/XOR checksum is not collision-proof; it is accompanied by accepted-word count and overflow/ready checks.",
+    "Ingest FIFO nominal 32 KiB, clean video queue 64 KiB, decoder/startup/video timing unchanged."
+  ]
+}

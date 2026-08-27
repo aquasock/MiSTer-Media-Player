@@ -1,0 +1,19 @@
+{
+  "source_commit": "a4f2769f6e55774abfc5990052702734b9024d15",
+  "main_mister_commit": "0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f",
+  "clean_build": true,
+  "started": "2026-08-27T02:44:08-07:00",
+  "compiler": "arm-none-linux-gnueabihf-gcc (GNU Toolchain for the A-profile Architecture 10.2-2020.11 (arm-10.16)) 10.2.1 20201103",
+  "exit_code": 0,
+  "elapsed_seconds": 4.43197712401161,
+  "finished": "2026-08-27T02:44:13-07:00",
+  "log_sha256": "dc49fcce2ab7694b0f19619165bf0a2c7a3464fc9566bf5a15c3cb258e1ca005",
+  "warnings": [],
+  "errors": [],
+  "binary": {
+    "path": "/home/vash/mister-builds/entry588/Main_MiSTer/bin/MiSTer",
+    "bytes": 1170340,
+    "sha256": "3841e2cc6eef4bfc9e46a7ffa075aff76b65d5405f81efb1355373292b35846f",
+    "file": "/home/vash/mister-builds/entry588/Main_MiSTer/bin/MiSTer: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-armhf.so.3, for GNU/Linux 3.2.0, stripped"
+  }
+}

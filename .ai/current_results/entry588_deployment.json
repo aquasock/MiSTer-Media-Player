@@ -1,0 +1,27 @@
+{
+  "host": "10.10.0.30",
+  "port": 21,
+  "checked": "2026-08-27T02:53:16-07:00",
+  "deployed": false,
+  "remote_writes": false,
+  "reachable": false,
+  "error": "[Errno 113] No route to host",
+  "source_commit": "a4f2769f6e55774abfc5990052702734b9024d15",
+  "authorization": "User-approved implementation and standing qualified deployment permission.",
+  "status": "blocked_by_device_connectivity",
+  "first_attempt": "FTP connection failed with Errno 113 before login or writes; local backup files were not created.",
+  "backup_created": false,
+  "persistent_backup_created": false,
+  "lifecycle": "No reboot, core reload, playback, remote file write, helper or configuration change.",
+  "last_verified_host_source": "be8502bf579725a278f7d98b9a99487fb6c11f87",
+  "last_verified_fpga_source": "2acabc5457171f342a06f93b1edfb1c361748ce8",
+  "last_attempt_completed": "2026-08-27T02:59:26-07:00",
+  "failed_connectivity_attempts": 3,
+  "final_error": "FTP connect failed with [Errno 113] No route to host before login or remote writes.",
+  "resume_scripts": {
+    "backup_on_pi": "/tmp/entry588_backup.py",
+    "deploy_on_pi": "/tmp/entry588_deploy.py",
+    "persistent_copies": "/home/vash/mister-builds/entry588/resume-scripts",
+    "requirement": "Before deployment, retain both fresh backups on GUNSMOKE, independently verify their hashes and write /tmp/entry588-deployment/persistent-backups-verified.json mapping each filename to its SHA-256. Deployment requires the published source and passing reports, stages and verifies both files before rename, then reads back active images through a fresh connection. Do not reboot or launch playback."
+  }
+}

@@ -1,0 +1,5 @@
+/home/vash/intelFPGA_lite/17.0_T/quartus/eda/sim_lib/altera_mf.v:31624: warning: input port aclr is coerced to inout.
+/home/vash/intelFPGA_lite/17.0_T/quartus/eda/sim_lib/altera_mf.v:31641: warning: input port aclr is coerced to inout.
+rtl/mpeg2_stream_fifo.sv:79: warning: input port aclr is coerced to inout.
+PASS vendor mixed-width FIFO: full_bytes=32766, 26878 credit batches, full/partial-byte counts, 32-word reserve, asynchronous clocks, pointer wrap, reset, overflow and exact data/digest
+tools/streams/tb_mpeg2_stream_fifo_burst.sv:133: $finish called at 6684110000 (1ps)

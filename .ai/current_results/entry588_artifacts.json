@@ -1,0 +1,20 @@
+{
+  "source_commit": "a4f2769f6e55774abfc5990052702734b9024d15",
+  "hardware_tested": false,
+  "deployed": false,
+  "transport_marker": "credit_fast_v1",
+  "artifacts": {
+    "MiSTer": {
+      "bytes": 1170340,
+      "sha256": "3841e2cc6eef4bfc9e46a7ffa075aff76b65d5405f81efb1355373292b35846f",
+      "build_pc_path": "/home/vash/mister-builds/entry588/Main_MiSTer/bin/MiSTer",
+      "pi_path": "/tmp/entry588-reports/MiSTer"
+    },
+    "MediaPlayer.rbf": {
+      "bytes": 4332748,
+      "sha256": "15bc3057a4f16369bc4a3dac01e30f63e5fc563a43b1922214b5b478c17c66c2",
+      "build_pc_path": "/home/vash/mister-builds/entry588/FPGA/output_files/MediaPlayer.rbf",
+      "pi_path": "/tmp/entry588-reports/MediaPlayer.rbf"
+    }
+  }
+}
