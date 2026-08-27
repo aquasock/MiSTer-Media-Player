@@ -1,3 +1,32 @@
+## 605 COMMIT Unreleased d466bed 2026-08-27T06:12:39-07:00
+
+#### Coming From:
+
+Unreleased d466bed
+
+#### Purpose:
+
+Validate the timestamp-aware native overlap fix against the full-movie 480i audio/video endurance fixture on hardware.
+
+#### Outcome:
+
+The user deployed the entry 604 candidate, reloaded from a clean reboot, selected Weave and played the full film once, reporting correct audio, video, sync and menu behavior throughout with no freeze. The helper log was retrieved first, then the fixed screenshot was deleted, regenerated and re-fetched, and installed artifacts were read back on a fresh connection. The installed 4,354,700-byte RBF is SHA256 `d46f80061a3270c1fed07a089517e70b413d3353858dc0d8937ac1bb0070aa6a`, matching published source `d466bed` exactly; Main remains `3841e2cc6eef4bfc9e46a7ffa075aff76b65d5405f81efb1355373292b35846f`, identical to the entry 604 pre-deployment backup, and the fixture is still 739,065,873 bytes at `beb5c738910321fbbdf482220c19af36e7c2d2bb1913e8872f679eeb1f589642`. The single syslog boot line at 12:51:01 UTC is consistent with the reported clean reboot. Schema-nineteen telemetry decodes with valid parity and checksum 1372493136 and reports 17,876 reference pictures, 17,876 displayed pictures and 17,875 swaps, exactly the entry 602 fixture count, with `error_flags` zero, `presentation_error` clear, sequence end seen, presentation complete, quiet snapshot reason and zero timestamp advance or delay conflicts. Accepted video is 715,713,077 bytes, byte-exact against the qualified demuxed payload. Helper PID 907 submitted all 839,409,548 expected transport bytes over 51,234 reads with 800 sampled ACK records, 837,544,742 fast and 1,864,806 acknowledged bytes reconciling to the total, EOF at 596.439564 seconds and exit code zero, so the entry 603 fatal drain signature does not recur. The entry 603 freeze at 81 displayed pictures and 2.740979 seconds is cleared. One deadline gap and one outlier are recorded: a single 4,004,000-clock interval, 66.733333 milliseconds, at displayed picture 692 of 17,876, roughly 3.9 percent into the film; the gap record's ordinal field is only eight bits and its value 180 aliases to that same picture. At that deadline the decoder was ready but no candidate was presentable, the writer was busy without capacity blocking, the upstream FIFO was pending and 677,670 clocks of input starvation had accumulated since the previous swap with a 1,721,347-clock candidate ready delay at 27,772,349 accepted bytes, while presentation hold, presentation error and both timestamp candidate signals were false. That identifies one source-delivery starvation slot, not the ownership or timestamp guard this cycle repaired, and it cost 33.366667 milliseconds across the whole film. The 32-bit 60 MHz session timer wrapped eight times, so the reported 23.814501-second cadence and 750.593107 aggregate FPS are wrapping artifacts; the reconstructed span is 35,788,608,404 clocks or 596.476807 seconds against the 596.462533-second fixture, giving 29.967636 true aggregate FPS versus the 29.970030 nominal rate, with a 856,404-clock residual over 17,875 intervals. Audio underrun and PCM protocol error are clear with PCM FIFO peak 127, but `pcm_sample_count` at 16,383 and `associated_count` at 255 are saturated fields and are not whole-film totals, so telemetry does not independently count audio frames. Sync, sound and menu response are accepted from the user's report without independent measurement, and no pixel oracle was applied to playback; the retained still is the telemetry packet itself, not a video frame. Of 574 total helper would-block events, only eleven are individually logged at power-of-two gates, all before first delivery at 42.017 milliseconds with nothing submitted, so a complete absence of steady would-block is not proven. This accepts `d466bed` for one Weave full-movie combined-rate soak from a clean reboot; it does not qualify Bob, warm replay, AC-3, interlaced P/B or field DCT, navigation, ISO or disk playback, or general commercial-DVD compatibility. Evidence and the exact capture and analysis drivers are retained as `.ai/current_results/entry605_*`, with the helper log stored losslessly compressed under its original hash. No production source, deployed file, setting, reboot, reload or playback occurred during collection; only the fixed screenshot was replaced.
+
+#### Next Steps:
+
+Retain `d466bed` as the accepted baseline and preserve the entry 604 restoration pair. No further identical Weave replay is needed to reconfirm this result. The next useful boundaries, in order, are a Bob full-movie run of the same fixture to close the mode gap, then an investigation of the single starvation slot at picture 692 to decide whether helper delivery or upstream buffering deserves a production change, using the existing telemetry rather than new instrumentation if possible. Do not tune throughput, clocks, startup or queue sizes on the strength of one missed slot in 17,875. Because saturated audio counters cannot prove whole-film audio integrity, define what would constitute acceptable audio evidence before any audio-focused cycle, and keep AC-3, interlaced P/B, navigation and disk-source work as separately scoped gates with acceptance criteria set in advance. Leave lifecycle and playback under user control, preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 604 COMMIT Unreleased d466bed 2026-08-27T05:41:11-07:00
 
 #### Coming From:
@@ -1145,31 +1174,3 @@ None.
 
 ---
 
-## 565 COMMIT Unreleased 2acabc5 2026-08-26T23:21:45-07:00
-
-#### Coming From:
-
-Unreleased 2acabc5
-
-#### Purpose:
-
-Record the current accepted build, recovery context and outstanding validation for an agent handover requested by the user.
-
-#### Outcome:
-
-The current production source is `2acabc5457171f342a06f93b1edfb1c361748ce8`, with all source changes committed on master; subsequent commits are project-memory updates. The installed and user-loaded `/media/fat/MediaPlayer.rbf` is the qualified 4,346,416-byte image with SHA-256 `fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347`. The user says playback looks perfect. Entry 564 is the latest hardware acceptance: the requested clean Bob run of `bbb_480i_tff_15s_8mbps.m2v` accepts all 15,150,646 bytes, displays all 449 pictures with 448 swaps, terminates quietly and reports zero errors, zero cadence outliers and zero missed deadlines. The previous misses at pictures six and 348 are absent, and the maximum post-first-swap interval is exactly 2,002,000 clocks, consistent with 29.970030-fps steady playback. The aggregate 29.870022-fps figure includes startup because schema nineteen timestamps first reference completion rather than first visibility; do not treat it as renewed slowness. The user accepts the now-black idle background, which is the RGB startup mask, not a new sync or raster change. Preserve the earlier continuous-HS/VS framebuffer fix from `30d300a`, the 64-KiB clean-video queue and the guarded readiness-based startup controller. The controller waits for another presentable picture or short-file sequence end, releases the first cached picture at a complete field-pair boundary, then observes the acknowledged window high and low before enabling swaps; this last guard is essential because the preceding `134b401` controller fails the deliberately skewed CDC test. Timestamp/PCM records, incompatible pictures and non-native sessions bypass the reserve. The final build uses seed 16 and has positive setup, hold, recovery, removal and pulse-width margins of 0.141, 0.249, 3.830, 0.531 and 0.925 ns, with 512 of 553 RAM blocks occupied. The eleven-scenario simulation matrix covers 540 matching reconstructed pictures, full-file and dense-pause cases, alternate phases, drained-FIFO warm sessions, short EOF and modeled DDR pressure; the native suite and updated skew test pass. These are not an exact physical host/HDMI replay, partial-transfer cancellation test or independent pixel oracle. Build, validation and deployment manifests are `.ai/current_results/entry562_build.json`, `entry562_validation.json` and `entry562_deployment.json`; the latest screenshot and complete hardware decode are `entry564_bob_terminal.png` and `entry564_bob_capture.json`. GUNSMOKE is available through the configured SSH alias `mister-build`; the clean official build and RBF are under `/home/vash/mister-builds/entry562-2acabc5`, final simulation reports under `/home/vash/mister-builds/entry562-results`, and the unchanged native-suite log under `/home/vash/mister-builds/entry561-results`. The simulation checkout `/home/vash/mister-builds/entry561-sim` has a historical detached HEAD and modified files whose final source identity was verified; use published GitHub source for subsequent official builds. The superseded `entry561-134b401` build was stopped and must not be deployed. The Pi repository has no outstanding tracked source edits; eleven older untracked diagnostic PNGs were deliberately left untouched. No new source change or build is pending. The user requested this handover before performing the remaining repeated-load/mode-switch checks, so their result must not be assumed.
-
-#### Next Steps:
-
-Follow `core.md` recovery policy and resume with the remaining hardware test, not another speculative fix: ask the user to replay the same file several times without rebooting and switch Bob/Weave, reporting any flicker, pacing or load problem and leaving final telemetry visible. Capture through ordinary FTP only at MiSTer `10.10.0.30`; delete only `/media/fat/screenshots/cadence_probe.png` before triggering a new screenshot to prevent stale-file reuse, then decode with the existing cadence tools. Do not remotely reload, reboot or launch through MGL. Standing authorization permits future direct active-RBF replacement only after a qualified build and fresh complete FTP readback, without backup or staging files. Keep HDMI at the user's existing 1080p configuration and keep analog diagnostics excluded. If repeated loads and Bob/Weave also pass, close the bounded all-I HDMI cadence correction and obtain approval for the next audio/PTS qualification or broader interlaced implementation boundary. Interlaced P/B, field pictures and field-DCT remain unsupported; partial-transfer cancellation and the old 6,529,996-versus-6,529,997 live-raster assertion drift remain unvalidated or unresolved. Do not reuse entry 550's unvalidated pixel harness as a passed oracle. Keep `core.md` unchanged, preserve the forty-entry log ring and publish future approved plans before editing production source.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----

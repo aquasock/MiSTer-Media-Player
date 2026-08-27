@@ -1,0 +1,97 @@
+{
+  "accepted_bytes": 715713077,
+  "accepted_bytes_exact": true,
+  "ack_chunks": 800,
+  "audio_state": {
+    "audio_underrun": false,
+    "pcm_fifo_peak": 127,
+    "pcm_protocol_error": false
+  },
+  "cleared_entry603_freeze": true,
+  "counts_exact": true,
+  "deadline_record_ordinal": 692,
+  "entry603_freeze_point_pictures": 81,
+  "error_state": {
+    "cache_bank_overlap_error": false,
+    "error_flags": 0,
+    "presentation_complete": true,
+    "presentation_error": false,
+    "sequence_end_seen": true,
+    "session_quiet": true,
+    "snapshot_reason": "quiet",
+    "timestamp_advance_conflicts": 0,
+    "timestamp_delay_conflicts": 0
+  },
+  "expected_video_payload_entry602": 715713077,
+  "fast_bytes": 837544742,
+  "fast_plus_slow": 839409548,
+  "finish_lines": [
+    "t=596439573 finish reason=eof fd=14 download=1 submitted=839409548 reads=51234 would_block=574"
+  ],
+  "first_read_us": 42017,
+  "fixture_duration_seconds_entry602": 596.462533,
+  "gap_excess_seconds": 0.03336666666666667,
+  "gap_ordinal_8bit": 180,
+  "gap_ordinal_aliases_to_deadline_record": true,
+  "gap_position_fraction": 0.03871112105616469,
+  "gap_seconds": 0.06673333333333334,
+  "helper_eof_seconds": 596.439564,
+  "helper_eof_us": 596439564,
+  "helper_exit": "t=596439786 child wait=907 status=0x0 wait_errno=0 exited=1 exit_code=0 signaled=0 signal=0",
+  "helper_expected_bytes_entry602": 839409548,
+  "helper_reads": 51234,
+  "helper_submitted_bytes": 839409548,
+  "helper_transport_exact": true,
+  "helper_would_block": 574,
+  "inferred_wraps": 8,
+  "installed": {
+    "boot": [
+      "Aug 27 12:51:01 MiSTer syslog.info syslogd started: BusyBox v1.33.1"
+    ],
+    "media_matches": true,
+    "rbf_is_d466bed": true
+  },
+  "missed_slot_cause": {
+    "accepted_bytes_at_deadline": 27772349,
+    "candidate_presentable": false,
+    "candidate_ready_delay_cycles": 1721347,
+    "completed_reference_count": 691,
+    "decoder_ready": true,
+    "input_starved_cycles_since_previous_swap": 677670,
+    "last_reference_completion_age_cycles": 2028782,
+    "presentation_error": false,
+    "presentation_hold": false,
+    "timestamp_candidate_active": false,
+    "timestamp_candidate_due": false,
+    "upstream_fifo_pending": true,
+    "writer_busy": true,
+    "writer_capacity_blocked": false
+  },
+  "missed_slot_fraction": 5.5944055944055945e-05,
+  "model_residual_cycles": 856404,
+  "model_residual_seconds": 0.0142734,
+  "modeled_true_cycles": 35787752000,
+  "nominal_interval_cycles": 2002000,
+  "picture_counts": {
+    "display_pictures": 17876,
+    "display_swaps": 17875,
+    "expected_entry602": 17876,
+    "reference_pictures": 17876
+  },
+  "reported_cadence_cycles": 1428870036,
+  "reported_cadence_seconds_is_wrapped": true,
+  "saturated_counters": {
+    "associated_count": 255,
+    "display_counts_saturated": false,
+    "display_pictures_8bit": 212,
+    "display_swaps_8bit": 211,
+    "pcm_sample_count": 16383
+  },
+  "slow_bytes": 1864806,
+  "true_fps": 29.96763629066196,
+  "true_span_cycles": 35788608404,
+  "true_span_seconds": 596.4768067333333,
+  "would_block_after_first_read": 0,
+  "would_block_events": 11,
+  "wrap_seconds": 71.58278826666667
+}
