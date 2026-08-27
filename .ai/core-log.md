@@ -1,3 +1,32 @@
+## 609 COMMIT Unreleased d466bed 2026-08-27T06:42:34-07:00
+
+#### Coming From:
+
+Unreleased d466bed
+
+#### Purpose:
+
+Record the user's decision to accept the picture 690 repeated frame as a known limitation rather than deepen the input FIFO.
+
+#### Outcome:
+
+The user rejected the entry 608 proposal to raise `mpeg2_stream_fifo` from 16,384 to 32,768 sixteen-bit words and directed that the defect be logged as a known limitation, so no RTL change is made and the memory headroom of 41 free M10K blocks is preserved for future work. The accepted limitation is stated precisely so a future agent does not rediscover it as a fault: with 98,304 bytes of compressed read-ahead and consumption-paced transport, any coded picture larger than 138,344 bytes cannot be fully buffered ahead of its own decode and costs one display slot, which the hardware shows as a single frame repeated for two slot periods rather than a dropped frame. In the qualified full-movie fixture this affects exactly one picture, number 690 at 150,316 bytes at the scene cut near 23.09 seconds, producing one 66.733333-millisecond interval, roughly 33.4 milliseconds of added running time and no error flag, no dropped picture and no audio effect. The user watched both Bob and Weave runs in full and did not perceive it. This limitation is a property of buffer depth against peak coded picture size, not of the film, so other sources with a picture above the threshold will show the same single-slot repeat at that picture, and sources whose peak stays below it will not. The threshold is not a standards limit and must never be described as one; ITU-T H.262 and H.222.0 impose no such constraint, and the fixture itself is legal with zero VBV underflow throughout. The margin to the runner-up picture is only 1,994 bytes, so the exact threshold should be treated as approximate and re-derived rather than quoted as exact if the buffer depth, declared rate or decode timing assumption ever changes. The known fix, if the trade is ever worth making, is recorded in entry 608 along with its estimated cost of roughly 26 M10K blocks and its fit and timing risk at 93 percent utilization. No source, build, deployment, setting or playback changed in this cycle, and the Built and Passed marks refer to the unchanged, already-accepted `d466bed`.
+
+#### Next Steps:
+
+Treat `d466bed` as the current accepted baseline with the picture 690 limitation documented, and do not reopen it as a defect without new evidence such as a source that misses more than one slot or a run whose miss count exceeds the model's prediction. Carry the limitation into release notes when a version boundary is next prepared, since it is user-visible behavior on high-peak sources. The remaining qualification gates are unchanged and each needs scope and acceptance criteria agreed before work starts: Bob and Weave coverage beyond this single fixture, AC-3 audio, interlaced P and B pictures and field DCT, navigation, and ISO or disk-sourced playback. Await the user's direction on which gate to open next rather than selecting one unilaterally. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 608 COMMIT Unreleased d466bed 2026-08-27T06:39:56-07:00
 
 #### Coming From:
@@ -1133,35 +1162,6 @@ All five block 2 sessions are clean, reporting zero cadence outliers and zero mi
 #### Next Steps:
 
 Take the genuine cold sample that is still missing by having the user fully power-cycle the MiSTer at the wall rather than reloading the core or using a menu reset, then play the file five times, so a verified cold-after-power-cycle block can be compared against block 1's verified cold-after-boot capture and entry 568's unverifiable one. Confirm the reboot afterward from `/tmp/messages` rather than from recollection, since that check is cheap and has now twice contradicted the reported procedure. Then run the separation experiment the open conflict requires: after a warm block that has produced a gap, reload only the core without rebooting and replay, which isolates core-reload freshness from page-cache warmth as the operative variable. The planned FTP cache-warming test is now partly redundant for confirming that warmth helps and should be reserved for the case where the power-cycle block comes up cold and gapped, where it would still discriminate mechanism. Pursue the ARM helper log as a first-class evidence source in parallel, since it is the only view of the delivery side: determine from the helper source whether the 4,096-byte read size is fixed or configurable and whether a larger read or readahead would lift the 1.38 times realtime ceiling, and add timestamps to that log if a diagnostic change is later approved. Do not propose a source change until the cold and core-reload cases are separated. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 569 COMMIT Unreleased 2acabc5 2026-08-27T00:04:40-07:00
-
-#### Coming From:
-
-Unreleased 2acabc5
-
-#### Purpose:
-
-Collect a repeated-run series from a single reboot to establish the starvation range and determine whether a zero-gap run is reachable on this build.
-
-#### Outcome:
-
-The user rebooted, loaded the core and played the same file in Weave repeatedly, reporting five runs since that reboot. Capture was automated by polling the FTP screenshot trigger and archiving any completed quiet session whose telemetry checksum had not been seen before. Before trusting the series the capture path itself was controlled: six consecutive probes of a static post-run screen returned byte-identical PNGs and identical decoded telemetry, so the capture is deterministic and the five distinct checksums recorded are five distinct sessions rather than repeated reads of one. The poller has one defect worth recording, which is that it exited on reaching a preset four-sample target while the user was still running, so the fifth session was recovered only by a manual probe; the sample cap must be removed before the next block. Absolute run ordinals remain unconfirmed. The user believes the first run was missed, but five distinct sessions were captured and no FTP dropout was logged during the window, which means no reboot occurred inside it, so either the five captures are runs one through five or run one was missed and a sixth run occurred. Capture order is certain and every trend below is order-based and unaffected by that ambiguity. All five sessions pass every acceptance term, accepting all 15,150,646 bytes and displaying 449 pictures with 448 swaps, zero error flags, quiet terminal and presentation complete. The central result is that a zero-gap run is reachable on this build: the fourth capture reported zero cadence outliers and zero missed deadlines, matching entry 564 and establishing that the defect is intermittent rather than universal. Across the capture order, starvation at the ordinal-six deadline falls monotonically through 1,103,135, 1,079,350 and 1,043,165 cycles, then the clean run with no record, then 555,422 cycles, while bytes accepted at that deadline rise monotonically through 312,328, 324,224, 335,258 and 379,200. That is the warming signature the cold-versus-warm inference predicted. The feed rate, however, does not warm continuously; it saturates at about 1.38 times realtime, roughly 1,392,000 bytes per second, with captures two, three and five all at 1.38 exactly as entries 566 and 567 were, and only the colder captures below it at 1.30 and 1.22. That is a ceiling of the delivery path rather than a continuum. Most importantly, warming does not prevent the miss. The fifth capture had the least starvation of any gapped run at 9.26 milliseconds and the highest byte delivery at 379,200, and still lost the ordinal-six slot by the same 4,004,000 cycles. Starvation magnitude therefore does not predict whether the slot is lost, and the ordinal-six miss is a marginal timing race against one specific deadline rather than a simple bandwidth deficit. This materially revises the entry 568 reading that framed the problem as prefill depth alone. Every gap in this block is exactly 4,004,000 cycles, two nominal intervals, leaving entry 568's 6,006,000-cycle gap still the only one of its size, and the writer and DDR path stays clean in every gapped capture with upstream FIFO pending, writer busy and writer capacity blocked all false. Cold sampling remains weak at two samples across all work to date, and those two disagree substantially at 1,659,347 and 1,103,135 cycles. Evidence is the five capture pairs under `.ai/current_results` named `entry569_block1_run1` through `run4` and `entry569_block1_onscreen`, with the consolidated series, capture-method validation and scope limits in `entry569_block1_series.json`.
-
-#### Next Steps:
-
-Resolve the run-ordinal ambiguity with the user before treating the first capture as a cold sample, since that single value is what separates the two competing cold figures. Then run at least two further blocks with the sample cap removed, each a full reboot followed by five uninterrupted replays, so cold sampling reaches a usable count and the zero-gap rate can be estimated rather than inferred from two isolated clean runs. Because starvation magnitude has now been shown not to predict the miss, the more valuable experiment is the one already proposed but not yet run: reboot, load the core, read the media file over FTP to populate the page cache, then play once, which tests the read-latency mechanism directly instead of by correlation. That still requires the media path on the MiSTer, which the user has not yet supplied and which was not found under the obvious locations. Also obtain whether entry 564 was preceded by a reboot, or drop it as evidence. Do not propose a source change yet. The marginal-race result means a release gate conditioned on accepted bytes or queue occupancy alone would not have saved the fifth capture, so any startup-controller boundary must be sized against the deadline timing rather than against a byte threshold, and the delivery ceiling of 1.38 times realtime should be characterised before deciding whether the correct boundary is the startup controller or the ARM-side feed. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
 
 #### Files Modified:
 
