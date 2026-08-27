@@ -1,3 +1,32 @@
+## 594 COMMIT Unreleased feb50c2 2026-08-27T03:48:08-07:00
+
+#### Coming From:
+
+Unreleased feb50c2
+
+#### Purpose:
+
+Verify completion and presentation timing of the first DVD-ceiling video hardware run.
+
+#### Outcome:
+
+The user says playback looked perfect and the menu remains responsive after playback; this does not confirm menu response during playback. The helper log identifies bbb_480i_tff_15s_9800kbps.m2v, runtime credit_fast_v1 and transport mode 2. The log was retrieved before replacing the fixed screenshot and collecting a fresh checksum-valid schema-nineteen packet. Complete media and installed Main/RBF readbacks retain the qualified fixture and a4f2769 hashes, and the same 10:08:35 UTC Linux boot confirms no intervening system reboot since the prior warm run; core reload and display-mode selection are not independently encoded. All 18,402,691 source bytes, 449 reference/display pictures and 448 swaps complete with zero aggregate decoder errors, no transport integrity fault, normal helper exit, sequence end and quiet presentation completion. All 1,124 chunks and seventeen sampled ACK records reconcile with cumulative counters. The final 3,459-byte chunk consists of 3,458 fast bytes and one acknowledged tail byte; its wide-word zero padding explains the FPGA count of 18,402,692 accepted bytes, with no missing source byte. Fast blocks carry 18,385,220 bytes or 99.9051 percent; acknowledged payload accounts for 17,471 bytes in 8,736 words, including the single padded tail. There are 913,967 fast batches averaging 20.116 bytes and 923,827 status queries. Matched completed-chunk delivery is 1,224,493 bytes per second, consumption-paced rather than a raw capacity measurement. All 169 EAGAIN events precede first delivery. Data-bearing polls average 53.262 milliseconds and peak at 79.040 milliseconds; these are blocking exposure, not measured UI latency. Strict cadence does not pass: two actual post-startup deadline misses and two outliers correspond to 66.733-millisecond intervals, while the third-largest interval is nominal 33.366667 milliseconds. All pictures are displayed; two preceding pictures are held for an extra nominal period, totaling 66.733 milliseconds of added hold. Both missed deadlines are retained at full-width ordinals 167 and 346; the second largest-gap ordinal wraps to 90 and must not be mistaken for picture 90. At both deadlines input and upstream data are pending, decoder_ready is false, the candidate is not presentable, interval input-starvation is zero and neither presentation nor destination hold is asserted. The candidates become presentable 26,678 and 5,085 decoder cycles after the deadline, or 0.444633 and 0.084750 milliseconds. Writer-capacity blocked time is only 353 and 412 cycles, respectively, but the evidence does not isolate a particular arithmetic stage or exclude internal waits. These are downstream processing/retirement margin misses rather than observed empty-input delivery stalls. The raw 29.704965-fps aggregate spans 15.081654 seconds and includes startup; after subtracting the two known extra intervals, its remaining excess over nominal is 66.654 milliseconds of startup-inclusive timing, not further steady slowdown. Evidence is retained as .ai/current_results/entry594_*; no source, deployment, configuration, reboot, reload or playback changed during collection. This run is complete and visually accepted by the user but does not meet the agreed zero-deadline-miss ceiling gate, so Passed remains unchecked.
+
+#### Next Steps:
+
+Keep the exact feb50c2-generated 9.8 Mbps fixture and installed a4f2769 pair as the baseline. Propose a focused investigation of decoder and reference-retirement timing around the two retained misses, using the exact stream and existing GUNSMOKE simulation harnesses to distinguish decode work, internal waits and final publication latency before a production revision. Preserve full-rate cadence rather than masking missed deadlines in telemetry. Do not raise the test bitrate or return to making the optional 18.65 Mbps stress file an acceptance requirement. Clear these two in-scope late intervals, then validate the separate 10.08 Mbps combined-stream gate with supported audio and timing; current video completion does not pass that integration boundary or the remaining DVD feature set. If another hardware run is needed, give it a specific diagnostic purpose and preserve its helper log before replay. Keep after-playback and during-playback menu reports distinct. Preserve credits and integrity checks, both queue capacities, guarded startup, continuous HDMI sync, black idle and restoration copies, leave lifecycle/playback control with the user, keep restricted core.md unchanged and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 593 COMMIT Unreleased feb50c2 2026-08-27T03:34:43-07:00
 
 #### Coming From:
@@ -1162,34 +1191,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 554 COMMIT Unreleased 30d300a 2026-08-26T21:03:11-07:00
-
-#### Coming From:
-
-Unreleased 30d300a
-
-#### Purpose:
-
-Record hardware acceptance of the framebuffer sync correction in both HDMI deinterlacing modes.
-
-#### Outcome:
-
-After reloading the deployed `30d300a` image, the user reports no flicker and smooth playback in both Bob and Weave, confirming the bounded hardware objective of entry 552. The user's initial impression of faster playback was explicitly withdrawn, so no speed correction or further speed investigation is requested. A fresh screenshot of the most recent Bob terminal state was obtained after deleting only the previous fixed screenshot target; `.ai/current_results/entry554_bob_terminal.png` is 476,506 bytes with SHA-256 `de017a4bd453bb6569beafe656509e42893eb3c38d10d545462dbc592af903fb`. Schema eighteen accepts all 15,150,646 bytes of the established Big Buck Bunny clip, reaches sequence end and presentation completion, freezes normally for quiet, and reports zero aggregate, presentation, cache-overlap, prefill, unpublished-reset, region, phase, tag, content or write-read mismatch errors. Both field fingerprints match their accepted-write expectations. Independent probing of the exact MiSTer file on GUNSMOKE verifies the known source checksum, 449 decoded pictures, frame-rate code four in all 449 sequence headers and zero rate-extension numerator and denominator fields, confirming 30000/1001 through H262-027. The eight-bit display counts wrap to 193 pictures and 192 swaps; corroborating sixteen-bit reset and publication counters are both 448. The resulting 448 intervals span 901,156,958 decoder cycles, or 15.019283 seconds at sixty megahertz, averaging 29.828322 pictures per second with two 66.733-millisecond gap outliers. The generic telemetry decoder's uncorrected delivered-fps field uses the wrapped counter and must not be taken literally for this run. Full telemetry, source-probe evidence and count interpretation are retained in `.ai/current_results/entry554_hardware_acceptance.json`. No RTL, settings, active image or playback state was changed during this inspection. Hardware acceptance here covers the observed flicker and smooth Bob/Weave playback, not every remaining media-player feature or the unrelated live-raster assertion drift.
-
-#### Next Steps:
-
-Keep `30d300a` as the hardware-validated baseline for the HDMI flicker correction and preserve its qualified build artifact and independent deployment checksum. Await the user's next requested development objective rather than changing cadence in response to the withdrawn speed impression. Future image replacements during approved development remain authorized under entry 553, with timing qualification and independent readback retained.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
