@@ -1,3 +1,35 @@
+## 602 COMMIT Unreleased ??? 2026-08-27T05:10:55-07:00
+
+#### Coming From:
+
+Unreleased f615ce0
+
+#### Purpose:
+
+Prepare a reproducible full-movie native-480i audio/video endurance fixture near the DVD combined-rate target.
+
+#### Outcome:
+
+The user requests combining audio, video and longer playback in one full Big Buck Bunny run. Generate the complete existing source on GUNSMOKE as the supported 720x480 TFF all-I frame-DCT subset at 30000/1001 with 48 kHz stereo MP2. Target 9.6 Mbps CBR video plus 192 kbps audio in a 10.08 Mbps MPEG-2 Program Stream, leaving packet overhead within the combined target while retaining the separately accepted 9.8 Mbps video-only ceiling result. Add a deterministic generator and focused validation tests, parameterize the existing narrow CBR checker and remove an unnecessary unbounded slice in the signalling patch so full-length generation is practical. Verify decoded-plane equality across the signalling patch, exact demuxed video, full source coverage, finite video VBV occupancy, program termination, audio duration and complete helper video/PTS/PCM scheduling before deploying only the new media. The generic v0.7 compatibility check still rejects native interlaced candidates using an obsolete support message; do not report it as passing or change its production policy in this fixture boundary. Use the current accepted native-structure check and current helper instead. No production RTL, Main, helper, clocks, startup, queues or settings change is proposed. The existing 32-bit 60 MHz session timer wraps during a ten-minute run, so terminal aggregate FPS is not a valid standalone acceptance measure. Full picture counts, per-interval deadline counters, helper completion, audio errors and user playback/sync/menu observations must be assessed separately. This is an implementation qualification fixture, not a complete DVD application-conformance claim.
+
+#### Next Steps:
+
+Record and publish this approved fixture plan, implement and test the generator, publish its source from the Pi, then have GUNSMOKE pull that exact source for official generation and helper qualification. Check a short candidate before committing to the full encoding where useful. Preserve the current Main and f615ce0 RBF, stage a uniquely named media file and verify full readback hashes before and after renaming it into the test folder. Leave playback and lifecycle with the user and request one complete run with audible sound, sync and menu checks and the final telemetry retained. Keep hardware Passed unchecked until that run is collected. Preserve restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+- tools/streams/generate_test_dvd_av_soak.py
+- tools/streams/generate_test_dvd_ceiling.py
+- tools/streams/generate_test_interlaced_i_frames.py
+- tools/streams/test_dvd_ceiling.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 601 COMMIT Unreleased f615ce0 2026-08-27T05:04:37-07:00
 
 #### Coming From:
@@ -1136,38 +1168,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 562 COMMIT Unreleased 2acabc5 2026-08-26T22:55:24-07:00
-
-#### Coming From:
-
-Unreleased 134b401
-
-#### Purpose:
-
-Make the first complete visible field pair independent of relative synchronizer latency before qualifying the startup candidate for hardware.
-
-#### Outcome:
-
-Source `2acabc5` adds an explicit observed-window guard to the approved startup implementation. After the video-domain visibility acknowledgement arrives, the decoder must observe the synchronized first window high and then low before allowing any swap, removing dependence on the relative arrival order of two independent synchronizers. The first visible bank therefore remains for a complete field pair even when the window crossing is delayed. The directed test alternates ordinary and deliberately delayed window crossings across 24 readiness phases and passes full-first-pair, short EOF, warm download rearm, interrupted startup, bypass and Bob/Weave controls. As a negative control, the same skew test fails the previous 134b401 controller with shown and first-swap boundary both seven, proving it detects the race. The correction does not change intended frame timing, queue size, sync, ownership or timestamp policy. The superseded build and unfinished full simulation were stopped without deployment; completed initial-candidate tests remain evidence only for that source. A fresh empty-state Quartus build and full real-pipeline simulation matrix are now running for 2acabc5. The existing native suite continues with unchanged timing, framebuffer, scheduler and profiler source, and the changed startup controller/test has been separately rerun. Hardware acceptance remains pending.
-
-#### Next Steps:
-
-Finish the corrected-source full-file, dense-excerpt, input-pause, phase, short-file and warm-load matrix with pixel-identity comparison, and verify the unchanged native-suite source provenance plus the separately updated startup result. Require a successful clean build with positive setup, hold, recovery, removal and pulse-width margins before direct active-image replacement and independent full FTP readback. Record those outcomes in a new entry and leave reload and the clean Bob run to the user.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_native_startup.sv
-- MediaPlayer_top_05.svh
-- tools/streams/tb_h262_native_startup.sv
-- tools/streams/tb_h262_input_cadence.sv
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
