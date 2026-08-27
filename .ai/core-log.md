@@ -1,3 +1,32 @@
+## 563 COMMIT Unreleased 2acabc5 2026-08-26T23:13:49-07:00
+
+#### Coming From:
+
+Unreleased 2acabc5
+
+#### Purpose:
+
+Qualify and deploy the guarded native startup and larger input queue for the next clean HDMI cadence test.
+
+#### Outcome:
+
+Source `2acabc5` completes a clean Quartus 17.0.2 Lite build from empty generated state on GUNSMOKE in 722.51 seconds with seed 16, zero errors and 208 warnings. All timing classes are positive: setup 0.141 ns, hold 0.249 ns, recovery 3.830 ns, removal 0.531 ns, minimum pulse width 0.925 ns; every reported total negative slack is zero. The fit uses 31,304 ALMs, 49,685 registers, 4,048,355 block-memory bits, 512 RAM blocks and 67 DSP blocks. All sixteen unmatched diagnostic/reset timing filters are inherited from the installed schema-nineteen source; none of the new startup crossings is unmatched, and the tracked build source remains unchanged. Eleven simulation scenarios cover 540 reconstructed pictures across thirteen sessions, with every picture fingerprint matching its corresponding full-source baseline picture. The full 449-picture run under a synthetic thirty-millisecond host-resume pause has zero post-startup gaps; its visibility-based span is 896,896,004 decoder cycles, approximately 29.970030 pictures per second, with a few clocks of observation skew. The dense source-340-through-355 excerpt passes a forty-five-millisecond pause without the three legacy gaps, as do alternate phases, three drained-FIFO warm loads, periodic DDR pressure and one/two-picture EOF cases. The legacy 16-KiB/no-reserve control still reproduces its expected picture-six gap. The 24-phase deliberately skewed startup test passes, while the previous controller fails the same control by replacing the first bank at its initial visible boundary. The native suite exits successfully in 839.54 seconds; its timing, framebuffer, ownership and profiler source is unchanged by the guard correction, and its changed initial startup invocation is superseded by the separately passing corrected test. The queue capacity/wrap regression passes 85,696 bytes, four ordered timestamps and three PCM samples. The pipeline model uses synthetic host pauses, behavioral FIFO visibility and synthetic field windows, not a measured hardware trace or full HDMI raster; fingerprints establish scheduling invariance rather than an independent pixel oracle. Schema nineteen's aggregate still starts at first reference completion and includes startup buffering, so steady swap intervals and deadline counts remain the hardware cadence criterion. The 4,346,416-byte RBF has SHA-256 `fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347` and was directly installed at `/media/fat/MediaPlayer.rbf` under standing authorization. A fresh independent FTP connection read back the entire active image with matching size and hash; no backup, staging file, reload, reboot or media/configuration change was made. Build, validation and deployment evidence is in the three entry-562 JSON files under `.ai/current_results`; full logs and traces remain under `/home/vash/mister-builds/entry562-results` and the clean build directory `/home/vash/mister-builds/entry562-2acabc5`. Hardware acceptance is pending, partial-transfer cancellation is not covered by the drained-FIFO warm test, and the pre-existing live-raster assertion drift remains unresolved.
+
+#### Next Steps:
+
+Have the user reload the installed `2acabc5` core, select Bob and play `bbb_480i_tff_15s_8mbps.m2v` once without mode or menu changes, then leave terminal telemetry visible for a fresh capture. Check all 449 pictures and 448 swaps, terminal completion, zero aggregate errors and zero deadline gaps, especially the prior ordinals six and 348; distinguish the deliberate startup wait from steady playback cadence. If the clean run passes, repeat loads and Bob/Weave switching before claiming the cadence issue resolved. Keep analog diagnostics out of scope and preserve the accepted continuous HDMI sync fix.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 562 COMMIT Unreleased 2acabc5 2026-08-26T22:55:24-07:00
 
 #### Coming From:
@@ -1212,45 +1241,6 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 523 COMMIT Unreleased 4e4db95 2026-08-25T20:41:57-07:00
-
-#### Coming From:
-
-Unreleased bfb9361
-
-#### Purpose:
-
-Correlate each symptom-bearing generation's complete DDR-return luma content with the luma actually read from the line cache for display.
-
-#### Outcome:
-
-The pre-change thirty-second burst acquired forty-nine screenshots at approximately 1.6 frames per second, with seventeen distinct live frames followed by thirty-two byte-identical terminal frames. Both field bars advance during the live interval but are commonly separated by roughly twenty-four pixels rather than the authored four-pixel weave offset, and short horizontal grey edge fragments accompany one field, proving a field-age mismatch rather than one field remaining constant for the entire session. Commit `4e4db95` adds a passive position-sensitive thirty-two-bit fingerprint over all eight bytes of every native luma DDR return and the same byte sequence read from the post-cache display path, separated by authored field and framebuffer generation. Completed video-domain fingerprints cross as stable bundled data behind a three-stage toggle synchronizer, only the source-to-first-stage paths are cut, and the memory domain publishes raw, displayed and mismatch evidence without feeding cache, decoder, scheduler or presentation control. Cadence schema fifteen expands to forty-eight words at diagnostic and native origins 408 and 288, preserves words zero through forty-one, records the four most recent fingerprints and four saturating completion or mismatch counts, retains schema fourteen through legacy decoding, checks every overlay row and independently guards the packed count width. Directed TFF and BFF cache runs each produce two matching completions, an intentionally corrupted cache byte produces exactly one mismatch, and the complete native suite, interlaced reconstruction suite and canonical mixed I/P/B live-raster suite pass, the latter retaining exactly 6,529,997 cycles, twenty-five publications, forty-seven B-picture persistences, seventy-one swaps and no errors. A clean Quartus Prime 17.0.2 build from empty generated state completes in eleven minutes four seconds with zero errors and 143 established warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.172, 0.245, 3.999, 0.591 and 0.925 nanoseconds with zero endpoint negative slack; focused decoder setup and recovery are positive 1.311 and 11.527 nanoseconds and focused video setup is positive 2.987 nanoseconds, all with zero violated paths. Only the established unmatched `RESET` filter remains, and a timing-netlist probe finds every new raw, displayed and mismatch register. The fit uses 30,027 ALMs, 46,948 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The 4,207,656-byte RBF has SHA-256 `f53a686f0775b6bf1fce6be14669c2fe9761e2f6edcdcd5fd4d972b744711b93` and was written directly to `/media/fat/MediaPlayer.rbf`; an immediate ordinary-FTP readback matches its size and hash exactly. At the user's direction, all twenty `MediaPlayer.backup.*` and `MediaPlayer.rbf.rollback*` files were deleted from the MiSTer, the prior active file was not disturbed during that cleanup, and future installations will directly replace and verify the active file without creating backup, rollback or staging copies.
-
-#### Next Steps:
-
-Reload the installed `4e4db95` image, run `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i while an agent-triggered thirty-second screenshot burst captures the live fault, then decode schema fifteen from that same run. A raw-versus-displayed mismatch localizes corruption to the line-cache write or readout boundary; equality while the field-age mismatch is visible moves the investigation after the cache output. Record the hardware result in a new entry because this source and build boundary is now settled, and continue replacing the active RBF directly without creating backup, rollback or staging files.
-
-#### Files Modified:
-
-- `MediaPlayer_top_06.svh`
-- `MediaPlayer_top_07.svh`
-- `MediaPlayer.sdc`
-- `rtl/mpeg2_luma_framebuffer.sv`
-- `rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv`
-- `tools/streams/decode_hardware_cadence.py`
-- `tools/streams/run_native_480i_timing.sh`
-- `tools/streams/tb_h262_hardware_cadence_profiler.sv`
-- `tools/streams/tb_interlaced_420_cache_mapping.sv`
-- `tools/streams/tb_native_480i_cache_refill.sv`
-- `tools/streams/test_decode_hardware_cadence.py`
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
 
