@@ -1,3 +1,34 @@
+## 604 COMMIT Unreleased ??? 2026-08-27T05:41:11-07:00
+
+#### Coming From:
+
+Unreleased 6669b70
+
+#### Purpose:
+
+Allow timestamped native all-I playback to use the bounded ordinary frame queue without false ownership aborts.
+
+#### Outcome:
+
+The user approves fixing the presentation-queue defect reproduced in entry 603. Remove the per-candidate timestamp-active restriction from native ordinary overlap admission and secondary release/retention, because candidate timestamp validity changes during legitimate classification and presentation; it is not a change of bank ownership or picture class. Keep the existing three-bank capacity rules, distinct display/pending/secondary identities, decoder destination guards, native 30000/1001 and I-only restrictions, P/B and mode-transition rejection, cadence floor and timestamp-due presentation gate unchanged. A retained frame continues to carry its own timestamp through the existing physical-bank association. Add regression coverage to the existing native ownership test file using the real timestamp ownership and timeline modules, including changing candidate validity, future/late/missing timestamps, held secondary frames, promotion/publication races, no early presentation, reset/new-session behavior and terminal drain. Connect the added test top through the existing native regression runner. No host helper, Main, audio PCM path, clock, timestamp arithmetic, queue size, media or production telemetry change is proposed. Preserve the existing f615ce0 installation and failing full A/V fixture until the candidate is qualified; hardware acceptance is pending.
+
+#### Next Steps:
+
+Implement and test the bounded queue policy on GUNSMOKE, requiring the old implementation to fail the new timestamp case while bank-alias and P/B protections remain effective. Publish the source from the Pi and have GUNSMOKE pull that exact source for official regression and a clean Quartus build. Re-run the actual 100-picture A/V opening with exact timestamp identities and zero missed slots, extend coverage through a longer actual A/V prefix including missing timestamps, and retain the exact 449-picture video-only ceiling plus supported P/B, timestamp, transport and native presentation regressions. Treat authored/ideal-memory simulation as distinct from physical playback. Compare warning/timing reports against accepted f615ce0, require positive timing, verify fresh persistent restoration artifacts, then deploy only the qualified RBF with staged transfer and full fresh readbacks while retaining Main and media. Leave reload and playback with the user and request the same full-movie Bob test with sound, sync and menu checks. Record build results without checking hardware Passed, preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/streams/tb_native_ordinary_overlap_ownership.sv
+- tools/streams/run_native_480i_timing.sh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 603 COMMIT Unreleased 6669b70 2026-08-27T05:37:49-07:00
 
 #### Coming From:
@@ -1131,35 +1162,6 @@ The current production source is `2acabc5457171f342a06f93b1edfb1c361748ce8`, wit
 #### Next Steps:
 
 Follow `core.md` recovery policy and resume with the remaining hardware test, not another speculative fix: ask the user to replay the same file several times without rebooting and switch Bob/Weave, reporting any flicker, pacing or load problem and leaving final telemetry visible. Capture through ordinary FTP only at MiSTer `10.10.0.30`; delete only `/media/fat/screenshots/cadence_probe.png` before triggering a new screenshot to prevent stale-file reuse, then decode with the existing cadence tools. Do not remotely reload, reboot or launch through MGL. Standing authorization permits future direct active-RBF replacement only after a qualified build and fresh complete FTP readback, without backup or staging files. Keep HDMI at the user's existing 1080p configuration and keep analog diagnostics excluded. If repeated loads and Bob/Weave also pass, close the bounded all-I HDMI cadence correction and obtain approval for the next audio/PTS qualification or broader interlaced implementation boundary. Interlaced P/B, field pictures and field-DCT remain unsupported; partial-transfer cancellation and the old 6,529,996-versus-6,529,997 live-raster assertion drift remain unvalidated or unresolved. Do not reuse entry 550's unvalidated pixel harness as a passed oracle. Keep `core.md` unchanged, preserve the forty-entry log ring and publish future approved plans before editing production source.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 564 COMMIT Unreleased 2acabc5 2026-08-26T23:19:26-07:00
-
-#### Coming From:
-
-Unreleased 2acabc5
-
-#### Purpose:
-
-Validate the guarded startup and larger input queue against the requested clean Bob hardware run.
-
-#### Outcome:
-
-The user reports that playback looks perfect and observes that the former grey 800x600 background is now solid black, without considering that a defect. A fresh FTP screenshot was triggered after deleting only the old fixed screenshot target; its schema-nineteen checksum validates all 15,150,646 bytes, 449 decoded and displayed pictures, 448 swaps, sequence end, presentation completion and quiet terminal reason one with zero aggregate errors. Both ranked-gap and actual missed-deadline counters are zero, the deadline-record array is empty, and all three largest measured post-first-swap intervals are exactly 2,002,000 decoder clocks, or 33.366667 milliseconds. The previous picture-six and picture-348 missed windows from entry 559 therefore do not recur in this run, consistent with the user's visual acceptance and the intended steady 29.970030-fps schedule. The raw aggregate remains 29.870022 fps because schema nineteen starts at first reference completion and includes startup buffering and raster alignment; its 899,898,892-cycle span exceeds 448 nominal intervals by 3,002,892 clocks, or 50.0482 milliseconds, without any post-startup gap. This is not evidence of slower steady playback. The black idle background follows directly from the RGB startup mask remaining active before picture release; DE, HS, VS and the idle timing generator are unchanged. This entry passes the requested clean Bob elementary-stream hardware case, not all interlaced formats or repeated-load conditions. Bob selection and loaded-source identity follow the user's preceding reload/run workflow rather than being encoded in the screenshot. No core, media, configuration or lifecycle change was made during capture. Evidence is `.ai/current_results/entry564_bob_terminal.png`, 476,291 bytes with SHA-256 `c442dd2144982f65b4bc19d0cdd07c1399936133e8e30f6ec90fcd6a1feeaf2b`, and `entry564_bob_capture.json`, including the complete decode, comparison, calculations and scope limitations.
-
-#### Next Steps:
-
-Have the user replay the same file multiple times without rebooting and test Bob/Weave switching, leaving the final telemetry visible and reporting any flicker, pacing change or loading problem. Preserve the accepted clean-run behavior and black startup background. If those checks also pass, close the current HDMI cadence correction for the bounded all-I path and move to a separately approved audio/PTS qualification boundary before broader interlaced P/B, field-coding and format work. Partial-transfer cancellation and the pre-existing live-raster assertion drift remain outside this hardware acceptance, and analog diagnostics remain excluded.
 
 #### Files Modified:
 
