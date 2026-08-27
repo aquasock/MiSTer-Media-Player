@@ -1,3 +1,32 @@
+## 614 COMMIT Unreleased 9623fa7 2026-08-27T07:34:33-07:00
+
+#### Coming From:
+
+Unreleased 9623fa7
+
+#### Purpose:
+
+Record the channel sweep run's own hardware telemetry and transport log.
+
+#### Outcome:
+
+The capture requested as the MPEG Layer II regression is in fact the AC-3 channel sweep run, which the helper log identifies unambiguously by source path, so it is recorded as what it is rather than as the regression it was expected to be. That is a useful outcome anyway, because entry 613 had to accept the sweep without its own transport log after the movie overwrote the previous one; this capture supplies it. The sweep completes cleanly with all 360 reference and display pictures, 359 swaps, 14,469,731 accepted video bytes, `error_flags` zero, presentation error clear, sequence end seen, presentation complete, quiet snapshot, and zero deadline gaps and outliers, with all three largest display intervals at exactly the nominal 2,002,000 clocks. Audio underrun and PCM protocol error are clear at FIFO peak 127, and both timestamp conflict counters are zero. Helper PID 3257 submitted 16,958,580 transport bytes over 1,036 reads with 16 sampled ACK records and exited zero at 11.931 seconds. The installed RBF still hashes to accepted `d466bed`, Main is unchanged, and the full movie fixture is still present and byte-exact at 739,065,873 bytes, so the AC-3 work has disturbed nothing on the target. The MPEG Layer II hardware regression therefore remains uncaptured: its log was overwritten by this sweep run exactly as the single fixed log path implies, and the user's report that the movie plays perfectly still stands without telemetry behind it. That gap is stated rather than closed. This entry makes no source change, so Built and Passed refer to the accepted helper at `9623fa7`, with Passed covering the sweep run's own clean completion.
+
+#### Next Steps:
+
+The MPEG Layer II regression needs one dedicated replay with nothing played afterwards, capturing the helper log before anything else is started, and requiring all 17,876 pictures, the exact 839,409,548 transport bytes and the entry 605 and 606 error and deadline state, allowing for the one known repeated frame at picture 692 recorded in entry 609. The user has asked for real surround over S/PDIF before release, which is the passthrough boundary and is scoped but not started. Its shape is now known from the framework: an AC-3 frame is 1536 samples at 48 kHz and an IEC 61937 burst occupies exactly the same period, so the helper can pack the bursts on the ARM and send them down the existing PCM transport without a new transport or any decoder in fabric. Three obstacles are real and must be settled before work starts. The framework's mixer applies attenuation, boost, mix and a biquad filter to every sample, and passthrough requires a bit-transparent path because any non-unity gain destroys the burst. The S/PDIF encoder hardwires the channel status non-audio bit to zero, so the stream always declares linear PCM, and setting it means editing framework code this project has otherwise left alone. HDMI would carry the same burst data as if it were PCM, which is loud noise on speakers, so a mode selection and an HDMI audio decision are required rather than optional. DTS passthrough is the same machinery with a different data type and burst length. A commercial AC-3 track with real dynamic range control is still uncompared, and the interlaced video gates of entry 609 remain open and unstarted. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 613 COMMIT Unreleased 9623fa7 2026-08-27T07:30:48-07:00
 
 #### Coming From:
@@ -1150,35 +1179,6 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 574 COMMIT Unreleased deced5c 2026-08-27T00:40:07-07:00
-
-#### Coming From:
-
-Unreleased deced5c
-
-#### Purpose:
-
-Back up and replace the host-side MiSTer main binary with the instrumented `deced5c` build under explicit user approval.
-
-#### Outcome:
-
-The user explicitly approved deployment and explicitly asked for a backup first, so standing RBF authorization was neither needed nor relied upon; this replaces a system binary rather than a core image and was treated accordingly. The existing `/media/fat/MiSTer` was read back in full over FTP at 1,166,244 bytes, its length checked against the server's own size report, written to disk and then re-hashed from disk, giving SHA-256 `5a6cbf7e85682ac301d57470b8b2c952d3bbfa42af55484bd70dd0d36724ae96`. That backup is held at `/home/vash/mister-builds/entry573-deced5c/` outside the repository, because a 1.1-megabyte system binary does not belong in git, and restoring it is a single FTP upload should the instrumented build misbehave. Deployment avoided writing into the running binary's inode. The new image was uploaded to `/media/fat/MiSTer.new`, that staged copy was read back in full and hash-compared before anything was renamed, and only then was it renamed over the live path, which unlinks the old inode while the running process keeps its own. A fresh independent FTP connection then read back the entire active file. Staged and active readbacks both return 1,166,244 bytes with SHA-256 `bd182e9c26e91bb3bdb140835dbda40a0f0a8179060fa47939cbb6c073ecf1dd`, matching the build exactly, no staging file remains, and permissions read as `-rwxr-xr-x`. The replaced and replacing binaries are both 1,166,244 bytes; since their hashes differ, the identical length is coincidental alignment in a stripped image and not a failed or partial write. The FPGA bitstream is untouched. No Quartus build was performed for this boundary and the qualified `2acabc5` image with SHA-256 `fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347` remains installed at `/media/fat/MediaPlayer.rbf`. The replacement takes effect on the next boot, since the currently running process retains the old inode until then. No playback has yet been run against the instrumented binary, so this entry records deployment only; the instrumentation is intended to be purely observational with no behavioural change, and that expectation is not yet confirmed on hardware. Evidence is `.ai/current_results/entry574_deployment.json`.
-
-#### Next Steps:
-
-Have the user power-cycle at the wall, load the core, play the file once and then stop without replaying, so `/tmp/MediaPlayer_ARM.log` survives for collection; a replay overwrites it, which is exactly how the cold log was lost in entry 571. Verify the power cycle from `/tmp/messages` rather than from recollection, since that check has already contradicted the reported procedure twice. Fetch the helper log first and the cadence screenshot second, then confirm three things: that the measured assertion-to-first-byte latency falls within the 13.9 to 63.8 millisecond band inferred in entry 572, that the timestamped blocked-poll records account for that interval rather than leaving it unexplained, and that cadence behaviour is unchanged from the uninstrumented build so the observation is confirmed non-invasive. Because entry 572 showed cold is not deterministic, with three of four verified cold runs gapping and one clean, expect to repeat this for at least two further verified cold samples before the dead-time distribution is usable. If the measurement confirms the inference, propose the helper-side correction of priming the media source before asserting download as a separate approved boundary. Hold the startup-absorption candidate in reserve and treat its margin as unsafe, the 64-KiB queue covering 64.9 milliseconds against a worst observed 63.8. Do not raise the per-poll chunk budget, which entry 572 ruled out. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
 

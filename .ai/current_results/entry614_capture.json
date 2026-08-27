@@ -1,0 +1,58 @@
+{
+  "captured": "2026-08-27T07:32:49-07:00",
+  "host": "10.10.0.30",
+  "candidate": "d466bed",
+  "expected_rbf_sha256": "d46f80061a3270c1fed07a089517e70b413d3353858dc0d8937ac1bb0070aa6a",
+  "expected_media_sha256": "beb5c738910321fbbdf482220c19af36e7c2d2bb1913e8872f679eeb1f589642",
+  "expected_media_bytes": 739065873,
+  "user_report": "MP2 full movie replay on the AC-3 helper; reported working perfectly",
+  "mode": null,
+  "files": {
+    "/tmp/MediaPlayer_ARM.log": {
+      "local": "/tmp/entry614-capture/entry614_arm_helper.log",
+      "bytes": 158544,
+      "sha256": "107c825d760c9c6d33d77cd75834f025234fab2dac19ddeff537c92f2687937a"
+    },
+    "/tmp/messages": {
+      "local": "/tmp/entry614-capture/messages",
+      "bytes": 46646,
+      "sha256": "8aa50fb28456ef9220f6742e52b0d45275811669ae4ca1ac4868164a1e4f29eb"
+    },
+    "/media/fat/screenshots/cadence_probe.png": {
+      "local": "/tmp/entry614-capture/entry614_terminal.png",
+      "bytes": 128552,
+      "sha256": "207243c421a3db882ae15e19db6dbd67a302ef8a755ea30c1222809bbc12b966"
+    },
+    "/media/fat/MiSTer": {
+      "local": "/tmp/entry614-capture/MiSTer",
+      "bytes": 1170340,
+      "sha256": "3841e2cc6eef4bfc9e46a7ffa075aff76b65d5405f81efb1355373292b35846f"
+    },
+    "/media/fat/MediaPlayer.rbf": {
+      "local": "/tmp/entry614-capture/MediaPlayer.rbf",
+      "bytes": 4354700,
+      "sha256": "d46f80061a3270c1fed07a089517e70b413d3353858dc0d8937ac1bb0070aa6a"
+    },
+    "/media/fat/games/MediaPlayer/bbb_full_480i_tff_av_10080kbps.mpg": {
+      "local": "/tmp/entry614-capture/fixture.mpg",
+      "bytes": 739065873,
+      "sha256": "beb5c738910321fbbdf482220c19af36e7c2d2bb1913e8872f679eeb1f589642"
+    }
+  },
+  "operations": [
+    "RETR /tmp/MediaPlayer_ARM.log",
+    "RETR /tmp/messages",
+    "DELE /media/fat/screenshots/cadence_probe.png",
+    "STOR screenshot command only",
+    "RETR /media/fat/screenshots/cadence_probe.png",
+    "RETR /media/fat/MiSTer",
+    "RETR /media/fat/MediaPlayer.rbf",
+    "RETR /media/fat/games/MediaPlayer/bbb_full_480i_tff_av_10080kbps.mpg"
+  ],
+  "syslog_boot_lines": [
+    "Aug 27 12:51:01 MiSTer syslog.info syslogd started: BusyBox v1.33.1"
+  ],
+  "installed_candidate_is_d466bed": true,
+  "media_matches_entry602": true,
+  "unchanged_target_state": "No reload, reboot, launch, media/config edit or deployment; only the fixed screenshot was replaced."
+}
