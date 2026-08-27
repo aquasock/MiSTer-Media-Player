@@ -1,4 +1,33 @@
-## 615 COMMIT Unreleased ??? 2026-08-27T07:46:16-07:00
+## 616 COMMIT Unreleased e2bf23f 2026-08-27T07:52:18-07:00
+
+#### Coming From:
+
+Unreleased e2bf23f
+
+#### Purpose:
+
+Capture the outstanding MPEG Layer II hardware regression on the AC-3 helper.
+
+#### Outcome:
+
+The full movie replay on the new helper is finally captured with its own log, closing the gap entries 613 and 614 left open. Completion is exact: all 17,876 reference and display pictures, 17,875 swaps, 715,713,077 accepted video bytes, `error_flags` zero, presentation error clear, sequence end seen, presentation complete, quiet snapshot, audio underrun and PCM protocol clear, both timestamp conflict counters zero, and helper PID 3477 submitting all 839,409,548 transport bytes over 51,234 reads with exit zero. The accepted MPEG Layer II path therefore survives codec selection on hardware, which host testing had suggested but not proven. One measured quantity did change and is reported rather than smoothed over: this run missed two display slots where entries 605 and 606 each missed one. The deadline records place them at displayed pictures 691 and 692, adjacent and at the same scene cut as before, with two 4,004,000-clock intervals whose eight bit gap ordinals 179 and 180 alias to those pictures. Both records show no presentable candidate with the decoder not ready and the upstream FIFO pending, presentation error and the timestamp signals clear, and input starvation of 1,009,994 and 727,897 clocks. The new helper is not implicated by the evidence available. Delivery timing is materially identical across all three movie runs, with median inter-read gaps of 11,463, 11,468 and 11,475 microseconds, ninety-ninth percentiles of 20,986, 20,966 and 20,931, maxima of 41,289, 41,309 and 41,304, and the same 23.5 millisecond worst gap in the window around the cut, while the MPEG Layer II PCM output was already proven byte identical on the host in both output modes. What the extra slot exposes is a flaw in the entry 608 and 609 model rather than a new fault. That model tested each picture independently against a full buffer, which is why it predicted exactly one miss, but after picture 690 overruns the buffer is not refilled to full, so picture 691 at 95,308 bytes is then also uncovered. Taking the pair together, 245,624 bytes must arrive against 98,304 bytes of buffer plus two frame periods of delivery, a deficit of about 67,240 bytes or roughly 1.7 slots, so one or two lost slots at this cut are both consistent with the mechanism and the exact count depends on phase. Entry 609's known limitation stands but its wording of exactly one repeated frame is too strong and is corrected here to one or two at that cut. The user reports the movie plays perfectly, which is consistent: two repeated frames at a scene cut in a ten minute film are not perceptible. No source change is made in this entry, so Built and Passed refer to `e2bf23f`, with Passed covering the MPEG Layer II regression.
+
+#### Next Steps:
+
+Treat the MPEG Layer II regression as closed and do not repeat the full replay to observe the missed slot count again, since a single run per circumstance is the standing practice and the mechanism is now understood. If that judder is ever to be removed, the fix remains the deeper input buffer costed in entry 608 at roughly 26 M10K against 41 free, and the cascade behaviour means the buffer must cover consecutive large pictures rather than only the single largest, which makes that fix less attractive rather than more. Carry the corrected wording, being one or two repeated frames at the picture 690 cut, into release notes rather than entry 609's original phrasing. The audio work continues at the second passthrough boundary described in entry 615. A commercial AC-3 track with real dynamic range control remains uncompared, and the interlaced video gates of entry 609 remain open and unstarted. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
+## 615 COMMIT Unreleased e2bf23f 2026-08-27T07:52:18-07:00
 
 #### Coming From:
 
@@ -10,21 +39,22 @@ Pack AC-3 frames into IEC 61937 bursts in the helper behind an audio output sele
 
 #### Outcome:
 
-This entry is the approved plan and is written before its commit exists. The user asked for real surround from S/PDIF before the next release, specified an option choosing S/PDIF or HDMI audio with the unused output muted, asked for a six channel sound test in S/PDIF mode, and explicitly approved forking framework code. The user's test device is a Samsung HW-B550F, a 2.1 soundbar with DTS Virtual:X rather than a discrete 5.1 receiver, so it can decode and virtualize but cannot verify discrete channel routing; that verification genuinely requires the community test the user asked for, and this must not be described as 5.1 validation on the user's own hardware. The immediate audible gain for that device is that LFE reaches the subwoofer at all, since the stereo downmix currently discards it. No new fixture is needed for the sound test because the existing channel sweep already sounds one channel at a time and becomes a true six channel test the moment passthrough exists. The timing is exact: an AC-3 frame is 1536 samples at 48 kHz and an IEC 61937 burst period is 1536 stereo frames, or 6144 bytes, so one frame maps to one burst period with no rate conversion. The burst carries the `0xF872` and `0x4E1F` sync words, a data type of one for AC-3, a length in bits, then the frame byte swapped into sixteen bit words and zero stuffed. The work is split because the risk is uneven. This first boundary is host only: the helper gains an audio output selection defaulting to HDMI, packs bursts instead of decoded PCM when S/PDIF is selected, and is verified offline by parsing the emitted stream back into frames and decoding those frames with an independent decoder, which needs no RTL, no Main change, no FPGA build and no hardware. The second boundary integrates it, and its pieces are already identified: an OSD option in the core, mutual muting of the unused output, a bit transparent path because the framework mixer applies attenuation, boost, mix and a biquad to every sample, the S/PDIF non audio channel status bit which is currently hardwired to zero so the stream always declares linear PCM, and a Main patch line so the launch passes the selected mode, since the decoder lives on the ARM and only the ARM can choose what to emit. Packing in fabric instead was considered and rejected for this release because it would need a frame buffer and a packer in a device already at 93 percent M10K, whereas helper packing costs no fabric memory at all; the accepted cost is that the mode is fixed when playback starts rather than switchable mid-file. Nothing is claimed as working until the offline verification exists, and this entry records no completed build, packing or hardware evidence.
+Published source `e2bf23f` adds `--audio-out`, defaulting to `hdmi`, and emits IEC 61937 bursts instead of decoded stereo when `spdif` is selected. One AC-3 frame is 1536 samples and one burst period is 1536 stereo frames, so a frame fills a period exactly and the bursts ride the existing PCM transport with no rate conversion, no new record type and no FPGA memory, which matters at 93 percent M10K. Each burst carries the `0xF872` and `0x4E1F` sync words, data type one, the length in bits, the frame written as big-endian sixteen bit words so bytes reach the line in order, and zero stuffing for the remainder. liba52 is not initialized at all in passthrough, since nothing is decoded. Verification is offline and byte exact: the emitted stream is 2,304,000 bytes forming 375 whole burst periods, every one parses with correct sync words, data type, whole-byte length and zero stuffing, every payload begins with the AC-3 sync word, all frames are the expected 1792 bytes, and the 672,000 bytes carried are byte identical to the AC-3 extracted from the source. An independent decoder produces the same SHA256 from the carried frames as from the source frames. The decoded paths are unchanged: AC-3 stereo still matches its reference at maximum difference three and correlation 0.999999971, the channel sweep still places all six channels correctly, and the MPEG Layer II movie produces identical output in both `hdmi` and `spdif` modes, byte for byte, since passthrough applies to AC-3 only. A build defect was found and fixed rather than worked around: native and cross builds shared one liba52 object directory, so switching compilers produced a confusing wrong-format link error; objects are now kept per compiler. The helper cross-compiles clean under `-Werror` with ARM GNU 10.2 to a static binary with SHA256 `f07e4ce2bb2a431802f9c8631a228bb70c363455954315883776f58ce87a75db`. What this does not establish is as important: it proves the bytes are correct, not that any receiver locks onto them, and not that the path from the helper to the S/PDIF pin is bit transparent. It is not deployed, and it cannot work on hardware until the second boundary lands, because nothing yet selects the mode, mutes the unused output, bypasses the framework mixer's attenuation, boost, mix and filter, or sets the S/PDIF non audio channel status bit that is currently hardwired to zero. Built therefore refers to the helper only and Passed remains unchecked.
 
 #### Next Steps:
 
-Implement the helper selection and burst packing, then verify offline that the emitted stream parses as valid bursts at the correct period with correct sync words, data type and length, that the extracted frames are byte identical to the source AC-3 frames, and that an independent decoder reproduces the same audio from them. Keep the decoded stereo path and the accepted MPEG Layer II path unchanged and prove both still pass. Replace this entry's `???` with the real abbreviated SHA once the source commit exists and complete the entry with what actually happened. Only then start the second boundary, defining before any RTL edit what the OSD option is called, how muting is enforced, and how the bit transparent path is proven rather than assumed. Do not describe a soundbar locking onto a burst as proof of discrete channel routing. The MPEG Layer II regression telemetry is still uncaptured and needs one dedicated replay with nothing played afterwards, because the single fixed helper log path has already lost that evidence twice. A commercial AC-3 track with real dynamic range control remains uncompared. The interlaced video gates of entry 609 remain open and unstarted. Preserve restricted core.md and maintain the forty-entry ring.
+Start the second boundary, which is the integration the user described: an OSD option choosing S/PDIF or HDMI audio, the unused output muted, a bit transparent path proven rather than assumed, the framework fork the user approved for the channel status bit and the mixer bypass, and a Main patch line so the launch passes the selected mode. Define the option name, the muting mechanism and the transparency proof before editing RTL. When it reaches hardware, the existing channel sweep fixture is the six channel sound test with no new fixture needed, and LFE becomes audible for the first time because the stereo downmix discards it. Do not describe the user's 2.1 soundbar locking onto a burst as proof of discrete channel routing; that needs the community test on real 5.1 hardware. A commercial AC-3 track with real dynamic range control remains uncompared. The interlaced video gates of entry 609 remain open and unstarted. Preserve restricted core.md and maintain the forty-entry ring.
 
 #### Files Modified:
 
 - host/arm/media_player_helper.c
+- host/arm/Makefile
 - host/arm/ARCHITECTURE.md
 - tools/streams/verify_ac3_passthrough.py
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
@@ -1143,35 +1173,6 @@ The larger file is 34,919,166 bytes against 15,150,646 for the qualified file, c
 #### Next Steps:
 
 The user intends one further run of the same larger file, which is now a genuine test rather than a repeat, because the page cache holds the file after this run while the constraint identified here is the per-poll budget and not read latency. The prediction to be recorded before that data arrives is that warming will change nothing material: first-byte latency should fall from its 23,749 microseconds toward the warm baseline, but the delivery rate should stay near 1,412,000 bytes per second, the delivered frame rate should stay near 18.1 and the missed-deadline count should remain in the same order. If instead the warm run recovers substantially, the per-poll budget is not the whole constraint and this entry's arithmetic is wrong somewhere. After that, propose a bounded delivery-side change for approval rather than implementing it: raise the per-poll chunk count or the buffer size in `mediaplayer_poll()` within `host/main_mister/0001-mediaplayer-arm-loader.patch`, sized against DVD peak program-stream rate with real margin rather than against this one test file, and assess first whether spending longer in that function starves MiSTer main's other per-poll work, which is the obvious risk and has not been examined. That change would need no Quartus build and would be validated by replaying this same larger file and checking the delivery rate against the new budget arithmetic. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 576 COMMIT Unreleased deced5c 2026-08-27T00:48:31-07:00
-
-#### Coming From:
-
-Unreleased deced5c
-
-#### Purpose:
-
-Record the user's revised diagnostic cadence and state the cold-boot behaviour of `2acabc5` as it currently stands.
-
-#### Outcome:
-
-The user has cut the diagnostic cadence and this supersedes the Next Steps of entry 575, which proposed collecting six to eight paired latency and outcome samples. That plan is withdrawn. Their instruction is that going forward the file is run once under different circumstances rather than repeatedly under the same one, on the grounds that each sample costs a manual power cycle, core load and playback and that varying the condition returns more per run than repeating it. Future hardware requests must therefore be designed as a single run that changes one condition and must state what that one run would discriminate; if a conclusion genuinely requires repetition, say so and let the user decide rather than scheduling the repeats. The user also asked directly whether the file plays perfectly on a cold boot, and on the present evidence it does not, though the defect is narrow. Across strictly verified cold boots, where the power cycle was confirmed from `/tmp/messages` or from a live FTP dropout rather than from recollection, block 1 run 1 and block 3 run 1 gapped with one and two missed deadlines while entries 572 and 575 were clean, giving two clean and two gapped; entry 568 also gapped but its reboot predates the syslog that was later checked and cannot be verified, which would make it three gapped of five. Cold boot therefore plays perfectly roughly half the time. What a failure costs is one or two dropped frames inside the first 270 milliseconds at display picture ordinals five and six, and nothing after. In every session ever measured, gapped or clean, the second and third ranked display gaps are exactly 2,002,000 cycles, so steady-state cadence past the startup region is nominal without exception, and every run completes with all 15,150,646 bytes accepted, 449 pictures, 448 swaps and zero error flags. Warm replays are clean in every sample except the block 1 series, where the media was still warming across successive runs. No source change, build or deployment was made for this entry. The installed FPGA image remains the qualified `2acabc5` bitstream with SHA-256 `fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347`, and the installed host binary remains the instrumented `deced5c` build with SHA-256 `bd182e9c26e91bb3bdb140835dbda40a0f0a8179060fa47939cbb6c073ecf1dd`, whose pre-deployment backup is held at `/home/vash/mister-builds/entry573-deced5c/`.
-
-#### Next Steps:
-
-Await the user's choice of the next single circumstance to test rather than proposing a sampling programme. The open question is unchanged and is stated in entry 575: measured first-byte latency does not predict whether a cold run gaps, since 37.6 milliseconds was clean while 21.9 and 35.3 milliseconds gapped, so phase alignment between byte arrival and the early cadence deadline remains the most likely operative variable and no current counter measures it. The single most discriminating circumstance available without a new build is playing the higher-bitrate `bbb_480i_tff_15s.m2v`, which is 34,919,166 bytes against 15,150,646 for the qualified file and therefore demands about 2,327,944 bytes per second, well above the 1,443,000 bytes per second burst rate measured in entry 575. If the defect is delivery-bound that file should fail consistently and severely rather than intermittently, and if it plays as well as the smaller file then delivery rate is not the operative constraint and the boundary moves to the FPGA side. Do not deploy the helper-side priming correction, which entry 575 showed is not yet justified. Do not raise the per-poll chunk budget. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
 
 #### Files Modified:
 
