@@ -1,3 +1,32 @@
+## 581 COMMIT Unreleased ad364bf 2026-08-27T01:30:00-07:00
+
+#### Coming From:
+
+Unreleased ad364bf
+
+#### Purpose:
+
+Validate the larger host delivery buffer on one cold high-bitrate playback and identify the remaining transfer boundary.
+
+#### Outcome:
+
+The user reports a cold reboot followed by one playback that runs perfectly in some places and very slowly in others. The new syslog start at 08:23:32 UTC, replacing the previously collected 08:05:14 start, corroborates the reboot. The helper log was fetched before a fresh screenshot, with only the old fixed screenshot deleted before triggering. Full readbacks confirm the recorded `ad364bf` host binary and unchanged `2acabc5` FPGA image, and the exact 34,919,166-byte media file matches SHA-256 `90976c09e12dfe03243d5c8daccf65ecc98b4d0008cb5489e96c73f667434979`. Schema nineteen validates all 449 pictures, 448 swaps, sequence end, quiet presentation completion and zero aggregate errors, but records 185 delayed presentation intervals over 24.433194 seconds, averaging 18.335712 fps; the three largest holds are 200.2, 166.833 and 166.833 milliseconds at ordinals 95, 93 and 94. The buffer change is active: 2,131 reads contain 16,384 bytes and the final read contains 4,862, with normal helper exit and no pipe EAGAIN after the first completed chunk. Matched completed-read endpoints measure 1,427,919 bytes per second and an inferred 21.7955 four-read polls per second, versus entry 578's 1,420,489 and 86.7080. Four times the chunk size therefore yields only about half a percent more throughput while the inferred poll rate falls fourfold; the high-bitrate acceptance fails. This corrects entries 577 through 580's causal attribution to a fixed poll budget: agreement between throughput and a poll rate derived from the same read count is substantially algebraic, not independent evidence that poll frequency remains fixed. The data support transfer cost scaling with bytes, but do not separate bridge overhead from legitimate FPGA wait. The verified stream's picture spans range from 27,190 to 253,632 bytes against approximately 47,645 delivered bytes per nominal frame interval, consistent with alternating smooth and slow passages rather than a continuously wrong raster clock. Source review also revises the proposed fast-write follow-on: `fpga_spi` waits for both ACK high and ACK low, and this core's input FIFO full signal controls that acknowledgement through `ioctl_wait` and `sys_top`; `spi_block_write` omits those waits and also lacks the wide-mode odd-byte tail handling of `spi_write`. It must not be substituted blindly. Absence of helper-pipe EAGAIN does not prove absence of FPGA backpressure. The logged first-byte latency of 45,532 microseconds is actually assertion to first completed chunk because logging follows transmission, so it includes the larger chunk's transfer time. The 185 counter counts delayed presentation intervals, not every missed frame slot. Last-three-read spans inside individual polls have a 33.772-millisecond median and 67.404-millisecond maximum, establishing exposure to UI service delays but not a measured UI response. No production source, deployed binary, configuration or lifecycle was changed. Capture, full decode, helper log, fixture analysis, comparisons and source-review limitations are retained in the five entry-581 evidence files under `.ai/current_results`; the media readback occurred after the completed cold test and warms cache for subsequent non-rebooted playback.
+
+#### Next Steps:
+
+Obtain approval for a bounded host-transfer profiling and safe optimization cycle rather than raising the buffer again or replacing acknowledged writes with unchecked fast writes. Measure pipe read and transfer durations separately at chunk boundaries, sampled ACK-loop statistics and actual poll or UI service duration without per-word logging, then distinguish bridge overhead from FIFO wait before choosing a correction that preserves backpressure, byte order and odd-tail handling. Any subsequent host-system-binary deployment requires explicit approval, retained restoration data and verified staged replacement plus full readback; standing RBF permission does not cover it. Ask whether the interface remained responsive during this run, and retain one qualified 8 Mbps fixture regression as outstanding rather than assuming it passed. Respect one run per changed circumstance. Keep FPGA startup, the 64-KiB clean-video queue, continuous HDMI sync and black startup background unchanged; analog work remains excluded and the previously recorded interlaced, audio, cancellation and assertion-drift limitations remain unresolved. Preserve `core.md` and the forty-entry log ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 580 COMMIT Unreleased ad364bf 2026-08-27T01:06:04-07:00
 
 #### Coming From:
@@ -1177,35 +1206,6 @@ Stop without deploying or starting another build. If the user approves one addit
 
 - rtl/mpeg2_luma_framebuffer.sv
 - tools/streams/tb_native_480i_cache_refill.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 541 COMMIT Unreleased 00267dc 2026-08-26T14:11:30-07:00
-
-#### Coming From:
-
-Unreleased 00267dc
-
-#### Purpose:
-
-Record the seed-fourteen native RGB-control hardware failure and restore the last known-stable core before another source change.
-
-#### Outcome:
-
-The user reloaded the exact 4,248,132-byte `00267dc` image at SHA-256 `c061bf77cd2117d35d34c75d8aaee9374eb4552fee6b5f915ba351d95376ea7e` and reports that it is dramatically worse before any media is opened: the entire screen is unstable and the image appears to be repeatedly trying to exist. The MiSTer reports `Scaled not available` when asked to capture that live raster, so the unchanged `cadence_probe.png` subsequently retrieved by FTP is stale and is excluded from evidence. This behavior begins with the core's idle output and therefore precedes MPEG decoding, DDR access, Bob/Weave reconstruction and source cadence. Static comparison identifies the introduced hardware boundary: `c21912a` added `pixel_en_d`, `h_sync_d` and `v_sync_d` and drove `video_de`, `video_hs` and `video_vs` from those one-clock-delayed registers to satisfy an internal RGB-alignment assertion. Real hardware proves that contract wrong because MiSTer's downstream scaler requires the established undelayed external timing phase; no PLL or clock frequency was changed. The active `/media/fat/MediaPlayer.rbf` was directly restored from the retained exact `164c7e6` image, independently read back at 4,225,296 bytes and SHA-256 `b5ce400b43311a74b0607137bce4498685490b74e5d08587538a68e7cdce8d96`, and no backup, rollback or staging filename was created. After reloading, the user confirms the display returned to its prior stable-lock but still visually bad and flickery baseline. Entry 540 remains built but fails hardware acceptance and its RBF is withdrawn.
-
-#### Next Steps:
-
-Stop before another build and obtain approval for one corrective cycle with no new diagnostic schema. Strengthen the native framebuffer regression to assert the established top-level output contract separately from internal RGB sample validity, then revert only the one-clock `video_de`, `video_hs` and `video_vs` delay proven to break hardware while retaining or rejecting the first-origin publication qualifier strictly by directed simulation evidence. Rerun the focused native tests, complete native suite, reconstruction suite and canonical live-raster soak, then perform one incremental Quartus build. Hardware validation must begin with idle-screen scaler lock and a successful fresh screenshot before any media playback; only after that passes should Big Buck Bunny be retried.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 

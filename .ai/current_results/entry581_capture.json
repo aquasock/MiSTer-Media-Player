@@ -1,0 +1,54 @@
+{
+  "captured": "2026-08-27T01:25:45-07:00",
+  "host": "10.10.0.30",
+  "user_report": "Cold reboot and one playback; perfect in some places and really slow in others.",
+  "files": {
+    "/tmp/MediaPlayer_ARM.log": {
+      "local": "/home/vash/MiSTer-Media-Player/.ai/current_results/entry581_cold_arm_helper.log",
+      "bytes": 122014,
+      "sha256": "ebd3ca29c6ba18bcbfaf358bf4c41ecaf52caa87541e43566f36f563fdab08fb"
+    },
+    "/tmp/messages": {
+      "local": "/tmp/entry581-capture/messages",
+      "bytes": 37990,
+      "sha256": "f7b0560e2d7618f61e726b24e339aace4e8921ffc4888eaf2788dec47e247fe4"
+    },
+    "/media/fat/screenshots/cadence_probe.png": {
+      "local": "/home/vash/MiSTer-Media-Player/.ai/current_results/entry581_cold_terminal.png",
+      "bytes": 522749,
+      "sha256": "6ec46e5d34ea82e59f96f3832463fc78b53c0d9c2846c7b0127549b295b27013"
+    },
+    "/media/fat/MiSTer": {
+      "local": "/tmp/entry581-capture/MiSTer",
+      "bytes": 1166244,
+      "sha256": "a850ec3fc8c78b6ed72e3421858f9e3c40a5d2a4ff59a533d52dd0df47213a86"
+    },
+    "/media/fat/MediaPlayer.rbf": {
+      "local": "/tmp/entry581-capture/MediaPlayer.rbf",
+      "bytes": 4346416,
+      "sha256": "fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347"
+    }
+  },
+  "operations": [
+    "RETR /tmp/MediaPlayer_ARM.log",
+    "RETR /tmp/messages",
+    "DELE /media/fat/screenshots/cadence_probe.png",
+    "STOR screenshot command only",
+    "RETR /media/fat/screenshots/cadence_probe.png",
+    "RETR /media/fat/MiSTer",
+    "RETR /media/fat/MediaPlayer.rbf"
+  ],
+  "syslog_boot_lines": [
+    "Aug 27 08:23:32 MiSTer syslog.info syslogd started: BusyBox v1.33.1"
+  ],
+  "unchanged_target_state": "No reload, reboot, launch, media/config edit or deployment; only the fixed screenshot was replaced.",
+  "verified_fixture": {
+    "remote": "/media/fat/games/MediaPlayer/bbb_480i_tff_15s.m2v",
+    "bytes": 34919166,
+    "sha256": "90976c09e12dfe03243d5c8daccf65ecc98b4d0008cb5489e96c73f667434979",
+    "local": "/tmp/bbb_480i_tff_15s.m2v",
+    "local_sha256": "90976c09e12dfe03243d5c8daccf65ecc98b4d0008cb5489e96c73f667434979",
+    "matches": true,
+    "caveat": "Read after the completed cold test; this warms filesystem cache for any future non-rebooted playback."
+  }
+}
