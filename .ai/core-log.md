@@ -1,4 +1,33 @@
-## 546 COMMIT Unreleased ??? 2026-08-26T15:25:27-07:00
+## 547 COMMIT Unreleased 008909d 2026-08-26T17:07:17-07:00
+
+#### Coming From:
+
+Unreleased 008909d
+
+#### Purpose:
+
+Characterize the residual playback flicker by sampling the live raster instead of relying on terminal captures and subjective description.
+
+#### Outcome:
+
+Fifty full-raster screenshots were triggered at 0.6-second intervals through the MiSTer's ordinary FTP view of `/dev/MiSTer_cmd` while the established Big Buck Bunny file played in Weave on the accepted `008909d` image, every target filename being deleted beforehand so a missed trigger reports as absent rather than returning a stale frame. Forty-eight arrived and captures nine through thirty-two span roughly fourteen seconds of live playback, the preceding and following captures being the identical pre-start and post-playback terminal rasters. Comparing each capture against its predecessor separately by field parity is decisive: across captures seventeen to twenty-one and again across twenty-three to thirty-one the even rows are bit-identical, a mean absolute difference of exactly zero, while the odd rows change by between 0.808 and 98.798 over the same intervals. The even field refreshed only twice in fourteen seconds, once after approximately 3.0 seconds and once after approximately 5.4 seconds, while the odd field changed at every sample. Top-field-first is set and the framebuffer derives its authored first field as the inverse of that flag, so the frozen parity is the first field. A displayed frame therefore weaves a live field against one up to several seconds old, which at field rate is the flicker the user reports and also explains the translucent second image visible in the retained evidence, where a pale disc and bird shapes from an older picture are interleaved line by line with the current scene. Retained captures are `.ai/current_results/entry546_weave_frozen_field_20.png` at 345,683 bytes with SHA-256 `04e99ef04be4146f3a7627ccc042e076e8a3fd4d156a4e5630e7d081351e44fc`, `entry546_weave_frozen_field_21.png` at 349,434 bytes with SHA-256 `261a7a9c27680c046eb3a835094ebb685c285aade8b3d774f0d284dc1dbc90fc`, which shares its even field bit-for-bit with the preceding capture, and `entry546_weave_frozen_field_22.png` at 349,936 bytes with SHA-256 `f46104e32a8d83ef9462fd60a1e5e4bb182188e801cc2ef0bd745eb612e68510`, the frame where that field finally updates. This is the same signature entries 515 through 519 pursued and never closed, and it is separate from the frame-slot misses of entry 546, since two dropped slots in 448 cannot hold a field static for seconds. The most important result is that every existing counter calls this run clean: the schema-sixteen terminal capture reports all bytes accepted, 449 pictures, 448 swaps, 242 first-field and 240 second-field line fetches from a single region, and zero region, phase, prefill, unpublished-reset, cache-overlap, presentation, audio, tag, content and accepted-write errors. The per-field instrumentation added across entries 516 to 519 does not detect a first field that has not changed in three seconds, and entry 519 already recorded that the content evidence shipped with a malformed thirty-bit snapshot word, so its clear content result has never been trustworthy.
+
+#### Next Steps:
+
+Do not propose a correction from this evidence alone. The measurement establishes what the defect is, that it is upstream of anything the present telemetry inspects, and that the telemetry cannot see it; it does not establish where the first field stops being refreshed. Before any behavioral change, re-establish trustworthy content evidence, since the existing content word was proven malformed and every subsequent clean reading from it is void. The decisive next measurement compares, per parity and per generation, whether the pixels delivered to the display actually change between consecutive published generations, which no current counter attempts. Prefer a burst of live captures over a terminal capture for any hardware check of this defect, because every terminal raster in this investigation has shown both fields correct while live frames were visibly wrong.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
+## 546 COMMIT Unreleased 008909d 2026-08-26T17:06:34-07:00
 
 #### Coming From:
 
@@ -10,14 +39,15 @@ Remove the measured native-playback frame-slot misses by overlapping reconstruct
 
 #### Outcome:
 
-The seed-fifteen Bob and Weave captures are error-free but correct entry 545's provisional judgment that the decoder keeps up: Bob contains eleven exact doubled frame gaps and Weave contains twelve, reducing delivery to about 29.2 rather than 29.97 pictures per second and retaining an old frame for one extra 33.37-millisecond slot at each miss. The current block writer serializes every reconstructed block behind eight accepted DDR row writes. This entry authorizes one bounded two-bank capture queue, with parser capacity acknowledgement kept separate from actual DDR-completion notification. No framebuffer, scheduler, diagnostic schema, raster control, menu or host software changes are authorized.
+Commit `008909d` gives the block writer two capture banks with per-bank geometry and a pending flag, separate capture and drain pointers, and a drain-side address view so every address, bound and debug value describes the bank being written rather than the bank being filled. A new `block_accepted` output carries capacity acknowledgement while `block_stored` keeps its exact previous meaning as the DDR-completion pulse, and `pipeline_block_done` on `mpeg2_h262_two_picture_probe` now takes the capacity signal; that signal's only functional use down the chain is the parser's `ST_WAIT_PIPELINE` gate, since `two_picture_probe_p_chain` and `picture_bookkeeper` merely forward it. Reaching a working image took four builds and two hardware failures, both recorded here rather than hidden. The first candidate expressed the capture banks as a two-dimensional array, which Quartus inferred as a sixteen-by-sixty-four `altsyncram` occupying two M10K blocks and absorbing the write pointer into an M10K read-address register; the combinational read this writer requires has no M10K equivalent, iverilog models a plain array either way, and no available simulation could see the difference. That image failed on hardware and the array is now held in registers by a `ramstyle` attribute, restoring memory bits and RAM blocks to the exact `7cdfcec` figures. The second candidate still failed, at fifty-four accepted bytes and 2,057 cycles with error flag bit three, `inverse_quant_error`, which is far upstream of any DDR activity. Its cause was expressing the capacity acknowledgement as a level: `cap` clears at `block_complete`, which is exactly when the parser reaches its wait state, so the gate stood open and the parser advanced into a busy inverse-quantiser. A first repair that consumed a credit on the writer's own `block_start` was also wrong and was discarded before building, because that strobe arrives only after inverse-quant, transform and reconstruction latency, leaving the credit high across the window that matters. The accepted form keeps `block_stored`'s pulse discipline and merely moves it earlier: one grant on each rising edge of capture-bank availability, emitted strictly after the parser is already waiting and therefore no more missable than the completion pulse it replaces. The focused regression `tb_h262_ddram_store_overlap.sv` proves ordered, exact sixteen-row delivery across two overlapped blocks, refuses a third while both banks are occupied, requires a grant per freed bank and rejects the level form that failed on hardware; an earlier version of that regression passed both forms and was therefore worthless, which is recorded because the same blind spot has now appeared twice in this project. The B-presentation scheduler, four-picture interlaced reconstruction and live-raster soak testbenches are unchanged, the soak retaining its pre-existing 6,529,996 against 6,529,997 assertion drift; none of them exercise the parser gate, the soak tying `pipeline_block_done` to constant one, so no simulation available here could validate the fix. A seed-fifteen fit missed global setup at negative 0.025 nanoseconds and was rejected; advancing the reproducible placement seed to sixteen with no RTL change produced positive 0.255, 0.246, 3.504, 0.556 and 0.925 nanosecond setup, hold, recovery, removal and minimum-pulse-width margins, above the `7cdfcec` baseline's positive 0.213 setup. The fit uses 31,522 ALMs, 49,958 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs, with no inferred RAM in the store module. The 4,230,940-byte RBF has SHA-256 `65c3c901419b128b868ea6b30031261f4e4f6a019bddb7bc3387fa473de82ef0`. On hardware the established Big Buck Bunny file plays complete in Weave with all 15,150,646 bytes accepted, wrapped counters representing 449 decoded and displayed pictures with 448 swaps, sequence end seen, presentation completion, normal quiet reason one and every error flag clear. Doubled presentation gaps fall from twelve to two, at display ordinals six and ninety-two, the presentation span shortens from 921,157,194 to 901,694,453 decoder cycles or 324.4 milliseconds, and delivery rises from 29.181 to 29.811 pictures per second against the 29.970 ideal. The entry's stated acceptance bar of no doubled gaps is therefore not fully met, two remaining and the span still 2.40 slots over ideal, but the writer serialization it targeted is substantially removed.
 
 #### Next Steps:
 
-Implement the two-bank writer and one focused ordered-data/backpressure regression, compile the affected integration targets and run the established four-picture reconstruction/write simulation on GUNSMOKE. If those checks pass, commit and push the source, perform one incremental Quartus build and deploy only an all-positive-timing image by directly replacing `/media/fat/MediaPlayer.rbf`. Hardware acceptance requires complete Bob and Weave playback with no doubled presentation gaps and every existing error clear.
+Treat the residual two doubled gaps as a smaller, separate throughput question and do not reopen the writer for them without new evidence. The visible flicker is not this defect and is addressed in entry 547. Before any further writer work, note that no simulation here covers the parser-to-writer handshake, because the live-raster soak ties `pipeline_block_done` to constant one and the scheduler and overlap testbenches drive the writer directly; an integration testbench that models the parser gate would have caught both hardware failures in this cycle and is the single highest-value regression this area lacks.
 
 #### Files Modified:
 
+- MediaPlayer.qsf
 - MediaPlayer_top_01.svh
 - MediaPlayer_top_02.svh
 - MediaPlayer_top_04.svh
@@ -26,10 +56,11 @@ Implement the two-bank writer and one focused ordered-data/backpressure regressi
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
+
 
 ## 545 COMMIT Unreleased 7cdfcec 2026-08-26T15:04:12-07:00
 
@@ -1201,37 +1232,6 @@ The user approved a bounded terminal-drain correction after entry 507 materially
 #### Next Steps:
 
 Run a clean Quartus build and focused timing analysis, preserve `c78bd15` as rollback through ordinary FTP, install the byte-verified image and repeat `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off, HDMI scaler deinterlacer Weave and Interlaced output Native 480i. Acceptance requires all 300 pictures and 299 swaps, normal quiet completion, no aggregate or presentation error and passing LEDs.
-
-#### Files Modified:
-
-- `rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv`
-- `tools/streams/tb_native_ordinary_overlap_ownership.sv`
-- `tools/streams/tb_native_480i_presentation_integration.sv`
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 507 COMMIT Unreleased c78bd15 2026-08-25T03:43:42-07:00
-
-#### Coming From:
-
-Unreleased f866ce2
-
-#### Purpose:
-
-Retain two pending native all-I frames safely when optimized decode momentarily outruns the 29.97-fps presentation boundary.
-
-#### Outcome:
-
-Commit `c78bd15` retains one completed secondary native all-I identity while its predecessor still owns the primary pending slot. It admits only the next safe I-picture classification boundary, then applies payload backpressure until the predecessor presents and the freed display bank becomes the resumed decode destination. Duplicate pending-bank and displayed-bank reuse remain fatal, while P pictures still cannot enter the exception. The accelerated 480i integration model repeatedly exercised this queue with one-field decode latency and completed twenty frame windows with forty field ticks, twenty-one decoded pictures, twenty ordered presentations and no scheduler error. The former three-field controls remained exactly ten serialized and thirteen overlapped decoded/presented pictures. Native cache/cadence tests passed, TFF and BFF reconstruction remained within one code value with zero out-of-tolerance pixels at 7,926,459 and 7,948,706 cycles, the progressive control passed at 13,048,137 cycles, and the canonical mixed I/P/B live-raster result remained exactly 6,529,997 cycles with all decoder, reconstruction and presentation checks clear. A clean Quartus Prime 17.0.2 build completed in 10 minutes 36 seconds with zero errors and 144 established warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively +0.321, +0.246, +3.444, +0.634 and +0.925 nanoseconds; focused decoder setup and recovery are +1.805 and +9.741 nanoseconds and focused video setup is +2.729 nanoseconds, all with zero violated paths. The fit uses 29,124 ALMs, 44,427 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The 4,150,888-byte RBF has SHA-256 `e8e71ce25ba6dd9d783bacb4b62a237bdd0de4d98a8891b00dd5bf82bb80636f`. Ordinary FTP with the default `root` and `1` login retrieved the active `f866ce2` image at its exact known `acc28e644100e0452e45fcfe9749762d3a690ca8d6da9479cc4a2ac23d736b7b` hash, preserved and round-trip verified it as `/media/fat/MediaPlayer.rbf.rollback-pre-c78bd15`, round-trip verified the staged candidate and then verified the promoted `/media/fat/MediaPlayer.rbf` at the exact candidate hash. The temporary stage is absent; helper, Main, media and MiSTer configuration are unchanged.
-
-#### Next Steps:
-
-Restart hardware validation at `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off, HDMI scaler deinterlacer Weave and Interlaced output Native 480i. Confirm that the complete moving bar now reaches the right edge, that presentation remains smooth and stable, and that USER/DISK/POWER all report pass before marking this entry passed.
 
 #### Files Modified:
 
