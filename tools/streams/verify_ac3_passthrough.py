@@ -103,6 +103,9 @@ def main() -> int:
     parser.add_argument('--data-type', type=int, default=None,
                         help='expected IEC 61937 data type; defaults by codec')
     parser.add_argument('--report', type=Path, default=None)
+    parser.add_argument('--allow-truncated-tail', action='store_true',
+                        help='accept a source that ends mid-frame, as a VOB '
+                             'fragment from a multi-file title legitimately does')
     args = parser.parse_args()
 
     with tempfile.TemporaryDirectory(prefix='ac3_passthrough_') as directory:
@@ -113,7 +116,10 @@ def main() -> int:
              '--source', f'file:{args.fixture.resolve()}',
              '--pcm-out', str(burst_pcm), '--video-out', str(temp / 'v.m2v')],
             capture_output=True, text=True)
-        if result.returncode:
+        tail_only = (args.allow_truncated_tail and
+                     'truncated or undecodable' in result.stderr and
+                     burst_pcm.exists() and burst_pcm.stat().st_size > 0)
+        if result.returncode and not tail_only:
             print(result.stderr[-4000:])
             raise SystemExit('helper failed in passthrough mode')
         raw = burst_pcm.read_bytes()
@@ -122,6 +128,12 @@ def main() -> int:
             expect = 11 if args.codec == 'dts' else 1
         bursts, carried, problems = parse_bursts(raw, expect)
         source_frames = extract_ac3(args.fixture.read_bytes(), args.substream)
+        if args.allow_truncated_tail and len(source_frames) > len(carried):
+            # The source's final partial frame is never emitted, by design.
+            trailing = len(source_frames) - len(carried)
+            source_frames = source_frames[:len(carried)]
+        else:
+            trailing = 0
         identical = carried == source_frames
         if not identical:
             problems.append('carried frames differ from the source AC-3')
@@ -145,6 +157,7 @@ def main() -> int:
             'period_samples_seen': sorted({b['period_samples'] for b in bursts}),
             'frame_lengths_seen': sorted({b['length_bytes'] for b in bursts}),
             'carried_bytes': len(carried), 'source_bytes': len(source_frames),
+            'source_trailing_bytes_ignored': trailing,
             'frames_byte_identical': identical,
             'carried_decode_sha256': decoded['carried'],
             'source_decode_sha256': decoded['source'],
