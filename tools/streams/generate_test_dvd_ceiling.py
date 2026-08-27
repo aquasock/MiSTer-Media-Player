@@ -42,14 +42,24 @@ def require(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
-def check_structure(path: Path, frames: int) -> dict:
+def check_structure(path: Path, frames: int, top_field_first: bool = True,
+                    classification: str = CLASSIFICATION) -> dict:
+    """Check a fixture's picture structure.
+
+    The defaults are the DVD ceiling fixture's requirements, being TFF
+    interlaced frames. The test suite also builds BFF and progressive files,
+    which are equally supported by the decoder, so both expectations are
+    parameters rather than assumptions.
+    """
     result = analyzer.analyze_file(path)
-    require(result['classification'] == CLASSIFICATION,
+    require(result['classification'] == classification,
             f'unsupported structure: {result["classification_reasons"]}')
     require(len(result['pictures']) == frames, 'unexpected picture count')
     for pic in result['pictures']:
         c = pic['coding_extension']
-        require(c['top_field_first'], 'fixture requires TFF input')
+        if top_field_first is not None:
+            require(c['top_field_first'] == top_field_first,
+                    f'fixture requires {"TFF" if top_field_first else "BFF"} input')
         require(not c['q_scale_type'] and not c['intra_vlc_format']
                 and not c['alternate_scan'] and c['intra_dc_precision'] == 0,
                 'fixture requires ordinary linear-quantizer intra coding')

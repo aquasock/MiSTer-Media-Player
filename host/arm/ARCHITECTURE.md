@@ -126,29 +126,45 @@ understate capacity, which is safe. Main is the only writer and may spend a
 snapshot only once; no other producer may consume the advertised space.
 
 At session start Main probes capability. Narrow or older cores retain the
-acknowledged bulk preload path for the session. A capable core receives no more
-than the current credit through `fpga_spi_fast_block_write`: data-low/strobe-high
-posted writes per word and a final low, with acknowledged command framing.
-Unaligned buffers and odd tails use the byte-safe acknowledged path. Zero
-credit causes one acknowledged word of progress before another query.
+acknowledged payload path; its handshake waits are not covered by the new
+verified-credit yield guarantee. The old blocking burst API remains available
+for compatibility callers. Ordinary non-media SPI and FIO functions are unchanged.
+
+The media loader uses `user_io_file_tx_data_step`, which sends at most one
+2048-byte batch per call and never more words than the verified credit. Zero
+credit returns successfully with zero bytes consumed, allowing Main to process
+its menu before trying again. Unaligned input is packed into aligned local words;
+an odd final byte gets a zero high byte. No acknowledged payload fallback is
+used for a capable core, including at zero credit.
+
+A persistent 16 KiB buffer retains unsent bytes across polls. At most one pipe
+read and eight transfer steps occur per poll, with a 2000-microsecond elapsed
+budget checked between steps even when logging is unavailable. This is a work
+budget, not a hard realtime bound: a status transaction, current step, scheduler
+preemption, logging and the existing terminal/child cleanup can extend a call.
+Short odd pipe reads retain their last byte until another read or EOF; only the
+true final byte is padded. EOF releases download only after pending bytes drain.
+Cancellation, read errors and core changes discard pending state before restart.
 
 An acknowledged status transaction follows each batch, after the final low and
 select release, so the FIO pipeline drains before the snapshot. Main checks
-accepted count, digest, capability, ready and overflow before sending more data.
-Any mismatch stops the session and kills the helper process group before
-waiting; an uncertain partial batch is never retried. A reset between chunks
-therefore fails validation instead of silently resuming. Session state resets
-even when the diagnostic log cannot be opened. A new host with an older FPGA
-falls back, and the new FPGA preserves the old acknowledged host protocol.
+accepted count, digest, capability, ready and overflow before and after a batch,
+including after a zero-credit yield. Any mismatch stops the session; an uncertain
+partial batch is never retried. Counter and digest state resets for a new session,
+even when the diagnostic log cannot be opened. The FPGA protocol is unchanged.
 
-`/tmp/MediaPlayer_ARM.log` identifies `transport=credit_fast_v1` and records fast
-bytes, acknowledged bytes, batch counts, status queries and transport mode
-(0 unprobed, 1 legacy, 2 guarded). Faults include the verified prior byte total
-and attempted bytes for the failed chunk. Submitted-byte accounting advances
-only for completely verified chunks. Every-64th-chunk ACK profiling covers only
-acknowledged payload fallback, not fast data or status commands. Transfer time
-includes queries and checksum work. Hardware delivery rate and decoder limits
-must be measured; the modeled register spacing is not a throughput prediction.
+`/tmp/MediaPlayer_ARM.log` now identifies `profile_version=2` and
+`transport=credit_step_v1`. `pipe_read` records describe actual source reads;
+`transfer` records sample the first four and every 64th verified transfer step.
+Submitted bytes advance after each verified step, not only after a whole pipe
+chunk. `tx_calls` counts productive steps, while `tx_us` and `tx_max_us` also
+include queries that yield without payload. `ack_chunks` counts sampled steps;
+capable-core payloads are fast writes, not acknowledged data. Summary counters
+retain fast/slow bytes, batch counts, queries and mode (0 probe, 1 legacy,
+2 guarded). Sum all pipe-read counts and compare with the final submitted total
+on successful EOF; do not treat sampled transfer records as a complete byte log
+or parse these logs with the historical version-one read-record analyzer.
+Hardware menu response and sustained A/V delivery still require measurement.
 
 On the build PC, run `tools/streams/test_main_mister_profile.py --main-source
 <Main_MiSTer checkout> --rtl`, then repeat with `--sanitize`. The RTL mode uses

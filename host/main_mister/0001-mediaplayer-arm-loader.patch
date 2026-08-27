@@ -191,7 +191,7 @@ new file mode 100644
 index 0000000..663f7b0
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,454 @@
+@@ -0,0 +1,440 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -238,6 +238,12 @@ index 0000000..663f7b0
 +};
 +static media_transfer_profile transfer_profile = {};
 +static media_burst_state burst_state = {};
++static uint8_t pending_buffer[16384];
++static uint32_t pending_size = 0, pending_offset = 0;
++static bool pending_eof = false;
++static unsigned transfer_events = 0;
++static const unsigned media_poll_budget_us = 2000;
++static const unsigned media_poll_step_limit = 8;
 +
 +
 +static uint64_t monotonic_us()
@@ -323,10 +329,12 @@ index 0000000..663f7b0
 +{
 +	diagnostic_close();
 +	burst_state = {};
++	pending_size = pending_offset = 0;
++	pending_eof = false;
++	transfer_events = 0;
 +	diagnostic_fd = open(diagnostic_path,
 +	                     O_WRONLY | O_CREAT | O_TRUNC | O_APPEND | O_CLOEXEC,
 +	                     0644);
-+	if (diagnostic_fd < 0) return;
 +	submitted_bytes = 0;
 +	read_events = 0;
 +	would_block_events = 0;
@@ -337,9 +345,9 @@ index 0000000..663f7b0
 +	diagnostic_write("start source=%s index=%u core=%s alternate=%s\n",
 +	                 source_spec, (unsigned)index,
 +	                 user_io_get_core_name(), user_io_get_core_name(1));
-+	diagnostic_write("profile_version=1 transport=credit_fast_v1 ack_sample_every=64 "
-+	                 "first_byte_means=first_chunk_complete "
-+	                 "interval_means=media_poll_entry_to_entry\n");
++	diagnostic_write("profile_version=2 transport=credit_step_v1 ack_sample_every=64 "
++	                 "first_byte_means=first_verified_step "
++	                 "interval_means=media_poll_entry_to_entry poll_budget_us=2000 step_bytes=2048 step_limit=8\n");
 +}
 +
 +static int has_core_prefix(const char *name)
@@ -363,6 +371,8 @@ index 0000000..663f7b0
 +
 +static void finish_download(const char *reason)
 +{
++	pending_size = pending_offset = 0;
++	pending_eof = false;
 +	diagnostic_write("finish reason=%s fd=%d download=%d submitted=%llu reads=%u would_block=%u\n",
 +	                 reason, helper_fd, download_active,
 +	                 (unsigned long long)submitted_bytes, read_events,
@@ -491,137 +501,113 @@ index 0000000..663f7b0
 +
 +static void mediaplayer_poll_inner()
 +{
-+	uint8_t buffer[16384];
-+	int chunks = 0;
-+
 +	if (helper_fd < 0) return;
-+	if (!mediaplayer_is_core())
++	if (!mediaplayer_is_core()) { stop_with_reason("core-changed"); return; }
++	const uint64_t poll_start = monotonic_us();
++	bool read_this_poll = false;
++	for (unsigned step = 0; step < media_poll_step_limit; ++step)
 +	{
-+		stop_with_reason("core-changed");
-+		return;
-+	}
-+	while (chunks++ < 4)
-+	{
-+		const bool profiling = diagnostic_fd >= 0;
-+		const uint64_t read_start = profiling ? monotonic_us() : 0;
-+		ssize_t count = read(helper_fd, buffer, sizeof(buffer));
-+		const int read_errno = count < 0 ? errno : 0;
-+		const uint64_t read_end = profiling ? monotonic_us() : 0;
-+		if (profiling)
++		if (step && monotonic_us() - poll_start >= media_poll_budget_us) return;
++		// A lone byte waits for its partner (or EOF); never pad a short pipe
++		// read in the middle of the byte stream. No second pipe read per poll.
++		if (pending_size - pending_offset < 2 && !pending_eof)
 +		{
-+			++transfer_profile.read_calls;
-+			transfer_profile.read_us += read_end - read_start;
-+		}
-+		if (count > 0)
-+		{
-+			const bool sampled = profiling && !((read_events + 1) % 64);
-+			fpga_spi_profile ack = {};
-+			if (profiling && !first_byte_seen)
-+				diagnostic_write("first_read latency_us=%llu count=%d\n",
-+				                 (unsigned long long)(read_end - download_assert_us),
-+				                 (int)count);
-+			const uint64_t tx_start = profiling ? monotonic_us() : 0;
-+			media_burst_stats burst = {};
-+			const int complete = user_io_file_tx_data_burst(buffer, (uint32_t)count,
-+			    &burst_state, &burst, sampled ? &ack : NULL);
-+			const uint64_t tx_end = profiling ? monotonic_us() : 0;
-+			const uint64_t tx_elapsed = tx_end - tx_start;
-+			if (profiling)
++			if (read_this_poll) return;
++			read_this_poll = true;
++			const uint32_t remaining = pending_size - pending_offset;
++			if (remaining) pending_buffer[0] = pending_buffer[pending_offset];
++			pending_size = remaining; pending_offset = 0;
++			const uint64_t read_start = monotonic_us();
++			const ssize_t count = read(helper_fd, pending_buffer + remaining,
++			                           sizeof(pending_buffer) - remaining);
++			const int read_errno = count < 0 ? errno : 0;
++			const uint64_t read_elapsed = monotonic_us() - read_start;
++			if (diagnostic_fd >= 0) { ++transfer_profile.read_calls; transfer_profile.read_us += read_elapsed; }
++			if (count > 0)
 +			{
-+				++transfer_profile.tx_calls;
-+				transfer_profile.tx_us += tx_elapsed;
-+				if (tx_elapsed > transfer_profile.tx_max_us)
-+					transfer_profile.tx_max_us = tx_elapsed;
-+				transfer_profile.ack_chunks += sampled;
-+				transfer_profile.fast_bytes += burst.fast_bytes;
-+				transfer_profile.slow_bytes += burst.slow_bytes;
-+				transfer_profile.burst_calls += burst.batches;
-+				transfer_profile.status_queries += burst.queries;
++				pending_size += (uint32_t)count; ++read_events;
++				diagnostic_write("pipe_read event=%u count=%d read_us=%llu buffered=%u\n",
++				                 read_events, (int)count, (unsigned long long)read_elapsed, pending_size);
 +			}
-+			if (!complete)
++			else if (!count) { pending_eof = true; diagnostic_write("helper stdout eof\n"); }
++			else if (read_errno == EAGAIN || read_errno == EWOULDBLOCK || read_errno == EINTR)
 +			{
-+				diagnostic_write("transport_fault error=%u mode=%u attempted_fast_bytes=%u "
-+				                 "attempted_slow_bytes=%u verified_prior_bytes=%llu "
-+				                 "expected_words=%u observed_words=%u expected_digest=%04x "
-+				                 "observed_digest=%04x credit=%u flags=%u\n",
-+				                 burst.error, burst_state.mode, burst.fast_bytes, burst.slow_bytes,
-+				                 (unsigned long long)submitted_bytes,
-+				                 burst.expected_words, burst.observed_words,
-+				                 burst.expected_digest, burst.observed_digest, burst.credit, burst.flags);
-+				stop_with_reason("transport-fault");
++				++would_block_events;
++				if (would_block_events <= 4 || !(would_block_events & (would_block_events - 1)))
++					diagnostic_write("would_block count=%u submitted=%llu\n", would_block_events, (unsigned long long)submitted_bytes);
 +				return;
 +			}
-+			submitted_bytes += (uint64_t)count;
-+			read_events++;
-+			if (!first_byte_seen)
++			else
 +			{
-+				first_byte_seen = 1;
-+				diagnostic_write("first_byte latency_us=%llu would_block=%u count=%d\n",
-+				                 (unsigned long long)(monotonic_us() - download_assert_us),
-+				                 would_block_events, (int)count);
++				diagnostic_write("read failed errno=%d message=%s\n", read_errno, strerror(read_errno));
++				stop_with_reason("read-error"); return;
 +			}
-+			diagnostic_write("read event=%u count=%d submitted=%llu read_us=%llu "
-+			                 "tx_us=%llu ack_sample=%u fast_bytes=%u slow_bytes=%u batches=%u queries=%u\n",
-+			                 read_events, (int)count, (unsigned long long)submitted_bytes,
-+			                 (unsigned long long)(read_end - read_start),
-+			                 (unsigned long long)tx_elapsed, (unsigned)sampled,
-+			                 burst.fast_bytes, burst.slow_bytes, burst.batches, burst.queries);
-+			if (sampled)
-+				diagnostic_write("profile_ack event=%u words=%llu high_reads=%llu "
-+				                 "low_reads=%llu high_wait_words=%llu low_wait_words=%llu "
-+				                 "high_max_reads=%llu low_max_reads=%llu uninitialized=%llu\n",
-+				                 read_events, (unsigned long long)ack.words,
-+				                 (unsigned long long)ack.high_reads,
-+				                 (unsigned long long)ack.low_reads,
-+				                 (unsigned long long)ack.high_wait_words,
-+				                 (unsigned long long)ack.low_wait_words,
-+				                 (unsigned long long)ack.high_max_reads,
-+				                 (unsigned long long)ack.low_max_reads,
-+				                 (unsigned long long)ack.uninitialized);
-+			continue;
 +		}
-+		if (count < 0 && (read_errno == EAGAIN || read_errno == EWOULDBLOCK))
++		if (pending_eof && pending_size == pending_offset)
 +		{
-+			would_block_events++;
-+			if (would_block_events <= 4 ||
-+			    !(would_block_events & (would_block_events - 1)))
-+				diagnostic_write("would_block count=%u submitted=%llu\n",
-+				                 would_block_events,
-+				                 (unsigned long long)submitted_bytes);
++			finish_download("eof");
++			if (helper_pid > 0)
++			{
++				int status = 0;
++				pid_t result = waitpid(helper_pid, &status, 0);
++				int wait_errno = result < 0 ? errno : 0;
++				diagnostic_write("child wait=%d status=0x%x wait_errno=%d exited=%d exit_code=%d signaled=%d signal=%d\n",
++				                 (int)result, status, wait_errno,
++				                 WIFEXITED(status),
++				                 WIFEXITED(status) ? WEXITSTATUS(status) : -1,
++				                 WIFSIGNALED(status),
++				                 WIFSIGNALED(status) ? WTERMSIG(status) : 0);
++				if (result == helper_pid &&
++				    (!WIFEXITED(status) || WEXITSTATUS(status)))
++					printf("MediaPlayer: ARM helper exited with an error\n");
++				helper_pid = -1;
++			}
++			diagnostic_write("transfer complete submitted=%llu reads=%u\n",
++			                 (unsigned long long)submitted_bytes, read_events);
++			diagnostic_close();
++			printf("MediaPlayer: stream transfer finished\n");
 +			return;
 +		}
-+		if (count < 0)
++		uint32_t available = pending_size - pending_offset;
++		if (!pending_eof) available &= ~1u;
++		if (!available) return;
++		const bool sampled = diagnostic_fd >= 0 && !((transfer_events + 1) % 64);
++		fpga_spi_profile ack = {};
++		media_burst_stats burst = {};
++		uint32_t consumed = 0;
++		const uint64_t tx_start = monotonic_us();
++		const int valid = user_io_file_tx_data_step(pending_buffer + pending_offset,
++		    available, &burst_state, &burst, &consumed, sampled ? &ack : NULL);
++		const uint64_t tx_elapsed = monotonic_us() - tx_start;
++		if (diagnostic_fd >= 0)
 +		{
-+			diagnostic_write("read failed errno=%d message=%s\n",
-+			                 read_errno, strerror(read_errno));
-+			printf("MediaPlayer: helper pipe failed: %s\n", strerror(read_errno));
++			transfer_profile.tx_us += tx_elapsed;
++			if (tx_elapsed > transfer_profile.tx_max_us) transfer_profile.tx_max_us = tx_elapsed;
++			transfer_profile.fast_bytes += burst.fast_bytes;
++			transfer_profile.slow_bytes += burst.slow_bytes;
++			transfer_profile.burst_calls += burst.batches;
++			transfer_profile.status_queries += burst.queries;
++			if (consumed) { ++transfer_profile.tx_calls; transfer_profile.ack_chunks += sampled; }
 +		}
-+		else
++		if (!valid || consumed > available)
 +		{
-+			diagnostic_write("helper stdout eof\n");
++			diagnostic_write("transport_fault error=%u mode=%u verified_prior_bytes=%llu expected_words=%u observed_words=%u expected_digest=%04x observed_digest=%04x credit=%u flags=%u\n",
++			    burst.error, burst_state.mode, (unsigned long long)submitted_bytes,
++			    burst.expected_words, burst.observed_words, burst.expected_digest, burst.observed_digest, burst.credit, burst.flags);
++			stop_with_reason("transport-fault"); return;
 +		}
-+		finish_download(count < 0 ? "read-error" : "eof");
-+		if (helper_pid > 0)
++		if (!consumed) return; // No credits: leave the exact pending bytes for next poll.
++		pending_offset += consumed; submitted_bytes += consumed; ++transfer_events;
++		if (!first_byte_seen)
 +		{
-+			int status = 0;
-+			pid_t result = waitpid(helper_pid, &status, 0);
-+			int wait_errno = result < 0 ? errno : 0;
-+			diagnostic_write("child wait=%d status=0x%x wait_errno=%d exited=%d exit_code=%d signaled=%d signal=%d\n",
-+			                 (int)result, status, wait_errno,
-+			                 WIFEXITED(status),
-+			                 WIFEXITED(status) ? WEXITSTATUS(status) : -1,
-+			                 WIFSIGNALED(status),
-+			                 WIFSIGNALED(status) ? WTERMSIG(status) : 0);
-+			if (result == helper_pid &&
-+			    (!WIFEXITED(status) || WEXITSTATUS(status)))
-+				printf("MediaPlayer: ARM helper exited with an error\n");
-+			helper_pid = -1;
++			first_byte_seen = 1;
++			diagnostic_write("first_byte latency_us=%llu would_block=%u count=%u\n",
++			    (unsigned long long)(monotonic_us() - download_assert_us), would_block_events, consumed);
 +		}
-+		diagnostic_write("transfer complete submitted=%llu reads=%u\n",
-+		                 (unsigned long long)submitted_bytes, read_events);
-+		diagnostic_close();
-+		printf("MediaPlayer: stream transfer finished\n");
-+		return;
++		if (transfer_events <= 4 || sampled)
++			diagnostic_write("transfer event=%u count=%u submitted=%llu tx_us=%llu fast_bytes=%u slow_bytes=%u queries=%u\n",
++			    transfer_events, consumed, (unsigned long long)submitted_bytes,
++			    (unsigned long long)tx_elapsed, burst.fast_bytes, burst.slow_bytes, burst.queries);
 +	}
 +}
 +
@@ -675,7 +661,7 @@ index 511c7a4..661b045 100644
  
  static char core_path[1024] = {};
  static char rbf_path[1024] = {};
-@@ -2076,6 +2077,118 @@ void user_io_file_tx_data(const uint8_t *addr, uint32_t len)
+@@ -2076,6 +2077,185 @@ void user_io_file_tx_data(const uint8_t *addr, uint32_t len)
  	DisableFpga();
  }
  
@@ -791,10 +777,77 @@ index 511c7a4..661b045 100644
 +	}
 +}
 +
++// One verified-credit transaction, at most 2048 source bytes. Success may
++// consume zero bytes: the caller must retain the buffer and yield, not spin.
++// Legacy cores retain acknowledged semantics (and their existing wait behavior).
++int user_io_file_tx_data_step(const uint8_t *addr, uint32_t len,
++                             media_burst_state *state, media_burst_stats *stats,
++                             uint32_t *consumed, fpga_spi_profile *profile)
++{
++	*consumed = 0;
++	if (!len) return 1;
++	if (!fio_size) state->mode = 1;
++	media_burst_status status = {};
++	if (state->mode != 1)
++	{
++		status = media_burst_query(stats);
++		if (!state->mode)
++		{
++			state->mode = status.supported ? 2 : 1;
++			state->words = status.words;
++			state->digest = status.digest;
++		}
++	}
++	uint32_t count = len < 2048 ? len : 2048;
++	if (state->mode == 1)
++	{
++		user_io_file_tx_data_ack(addr, count, profile);
++		stats->slow_bytes += count;
++		*consumed = count;
++		return 1;
++	}
++	// Validate before sending, including when a previous call yielded.
++	stats->expected_words = state->words;
++	stats->observed_words = status.words;
++	stats->expected_digest = state->digest;
++	stats->observed_digest = status.digest;
++	stats->credit = status.credit;
++	stats->flags = status.flags;
++	if (!status.supported || status.credit > 4096) { stats->error = 1; return 0; }
++	if (status.flags != 1) { stats->error = 2; return 0; }
++	if (status.words != state->words || status.digest != state->digest) { stats->error = 3; return 0; }
++	if (!status.credit) return 1;
++	if (count > status.credit * 2u) count = status.credit * 2u;
++	// Pack locally, so unaligned input never falls back to a blocking ACK.
++	// The loader offers an odd length only after EOF: padding occurs once.
++	uint16_t words[1024];
++	for (uint32_t i = 0; i < count; i += 2)
++		words[i / 2] = addr[i] | (i + 1 < count ? uint16_t(addr[i + 1]) << 8 : 0);
++	EnableFpga();
++	spi8(FIO_FILE_TX_DAT);
++	fpga_spi_fast_block_write(words, (count + 1) / 2);
++	DisableFpga();
++	stats->fast_bytes += count;
++	++stats->batches;
++	media_burst_account(state, addr, count);
++	status = media_burst_query(stats);
++	stats->expected_words = state->words;
++	stats->observed_words = status.words;
++	stats->expected_digest = state->digest;
++	stats->observed_digest = status.digest;
++	stats->credit = status.credit;
++	stats->flags = status.flags;
++	if (!status.supported || status.credit > 4096) { stats->error = 1; return 0; }
++	if (status.flags != 1) { stats->error = 2; return 0; }
++	if (status.words != state->words || status.digest != state->digest) { stats->error = 3; return 0; }
++	*consumed = count;
++	return 1;
++}
++
  void user_io_set_upload(unsigned char enable, int addr)
  {
  	EnableFpga();
-@@ -3160,6 +3273,7 @@ void user_io_poll()
+@@ -3160,6 +3340,7 @@ void user_io_poll()
  	// this is reduce risk of screenshot occurring while the scaler
  	// is being updated and getting a corrupted image.
  	add_frame_callback(screenshot_cb);
@@ -806,7 +859,7 @@ diff --git a/user_io.h b/user_io.h
 index 648736f..f91969d 100644
 --- a/user_io.h
 +++ b/user_io.h
-@@ -229,6 +229,27 @@ void user_io_set_index(unsigned char index);
+@@ -229,6 +229,30 @@ void user_io_set_index(unsigned char index);
  void user_io_set_aindex(uint16_t index);
  void user_io_set_download(unsigned char enable, int addr = 0);
  void user_io_file_tx_data(const uint8_t *addr, uint32_t len);
@@ -830,6 +883,9 @@ index 648736f..f91969d 100644
 +int user_io_file_tx_data_burst(const uint8_t *addr, uint32_t len,
 +                              media_burst_state *state, media_burst_stats *stats,
 +                              fpga_spi_profile *profile);
++int user_io_file_tx_data_step(const uint8_t *addr, uint32_t len,
++                             media_burst_state *state, media_burst_stats *stats,
++                             uint32_t *consumed, fpga_spi_profile *profile);
 +
  void user_io_set_upload(unsigned char enable, int addr = 0);
  void user_io_file_rx_data(uint8_t *addr, uint32_t len);

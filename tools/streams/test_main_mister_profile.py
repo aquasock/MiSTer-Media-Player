@@ -149,6 +149,7 @@ LOADER_PRELUDE = r'''
 #include <strings.h>
 #include <deque>
 #include <vector>
+#include <algorithm>
 #include <signal.h>
 #include <fcntl.h>
 #include <sys/types.h>
@@ -164,6 +165,7 @@ static std::vector<unsigned> sampled_events;
 static bool correct_core = true;
 static bool fail_open = false, fail_burst = false;
 static unsigned mock_tx_calls = 0, releases = 0, closes = 0;
+static unsigned source_offset = 0, step_quota = 2048, step_us = 11, step_calls = 0, odd_steps = 0;
 static int fake_clock(clockid_t, timespec *ts) {
     ts->tv_sec = fake_us / 1000000; ts->tv_nsec = (fake_us % 1000000) * 1000;
     errno = ERANGE; // A measurement must not overwrite a captured read errno.
@@ -174,7 +176,8 @@ static ssize_t fake_read(int fd, void *buf, size_t size) {
     int n = pipe_reads.front(); pipe_reads.pop_front(); fake_us += 3;
     if (n < 0) { errno = -n; return -1; }
     assert(size_t(n) <= size);
-    for (int i = 0; i < n; ++i) static_cast<uint8_t *>(buf)[i] = uint8_t(i * 29 + mock_tx_calls);
+    for (int i = 0; i < n; ++i) static_cast<uint8_t *>(buf)[i] = uint8_t((source_offset + i) * 29 + 7);
+    source_offset += n;
     return n;
 }
 static ssize_t fake_write(int fd, const void *buf, size_t size) {
@@ -187,25 +190,21 @@ static int fake_fsync(int) { return 0; }
 static const char *user_io_get_core_name(int = 0) { return correct_core ? "MediaPlayer" : "Other"; }
 static const char *getFullPath(const char *p) { return p; }
 static void user_io_set_download(int on) { if (!on) ++releases; }
+static unsigned user_io_status_get(const char *) { return 0; }
 static void user_io_set_index(unsigned char) {}
 static void user_io_file_info(const char *) {}
 int mediaplayer_start_source(const char *, unsigned char);
-static void user_io_file_tx_data(const uint8_t *data, uint32_t size) {
-    delivered.insert(delivered.end(), data, data + size); ++mock_tx_calls; fake_us += 11;
-}
-static void user_io_file_tx_data_ack(const uint8_t *data, uint32_t size, fpga_spi_profile *p) {
-    if (p) {
-        sampled_events.push_back(mock_tx_calls + 1); p->words = (size + 1) / 2;
-        p->high_reads = p->words * 2; p->low_reads = p->words;
-        p->high_wait_words = p->words; p->high_max_reads = 2; p->low_max_reads = 1;
-    }
-    user_io_file_tx_data(data, size);
-}
-static int user_io_file_tx_data_burst(const uint8_t *data, uint32_t size,
-    media_burst_state *state, media_burst_stats *stats, fpga_spi_profile *p) {
-    state->mode = 1;
+static int user_io_file_tx_data_step(const uint8_t *data, uint32_t size,
+    media_burst_state *state, media_burst_stats *stats, uint32_t *consumed, fpga_spi_profile *) {
+    ++step_calls; state->mode = 2; *consumed = 0; stats->queries = 1;
+    fake_us += step_us;
     if (fail_burst) { stats->error = 3; return 0; }
-    user_io_file_tx_data_ack(data, size, p); stats->slow_bytes += size; return 1;
+    unsigned n = std::min(size, std::min(2048u, step_quota));
+    if (!n) return 1;
+    assert(n <= 2048); odd_steps += n & 1;
+    delivered.insert(delivered.end(), data, data + n); ++mock_tx_calls;
+    stats->fast_bytes = n; stats->batches = 1; stats->queries = 2; *consumed = n;
+    return 1;
 }
 #define clock_gettime fake_clock
 #define read fake_read
@@ -224,83 +223,101 @@ static size_t occurrences(const std::string &needle) {
 static void session() {
     helper_fd = -1; helper_pid = -1; diagnostic_close(); log_text.clear();
     delivered.clear(); sampled_events.clear(); pipe_reads.clear(); mock_tx_calls = 0;
+    source_offset = 0; step_quota = 2048; step_us = 11; step_calls = odd_steps = 0;
     releases = closes = 0; correct_core = true; fail_open = fail_burst = false;
     diagnostic_open("file:test.m2v", 1); helper_fd = 42; helper_pid = -1;
     download_active = 1; download_assert_us = fake_us;
 }
-int main() {
-    session();
-    pipe_reads = {-EAGAIN}; mediaplayer_poll();
-    assert(would_block_events == 1 && helper_fd == 42 && releases == 0);
-    assert(transfer_profile.polls == 1 && transfer_profile.read_us == 3);
-    assert(transfer_profile.data_polls == 0 && mock_tx_calls == 0);
-    const uint64_t after_empty = fake_us; fake_us += 500;
-    for (int i = 0; i < 65; ++i) pipe_reads.push_back(16384);
-    pipe_reads.push_back(3); pipe_reads.push_back(0);
-    mediaplayer_poll();
-    assert(mock_tx_calls == 4 && pipe_reads.size() == 63); // Four chunks, no fifth read.
-    assert(transfer_profile.poll_interval >= fake_us - after_empty - 100);
-    while (helper_fd >= 0) { fake_us += 17; mediaplayer_poll(); }
-    assert(mock_tx_calls == 66 && delivered.size() == 65 * 16384 + 3);
-    assert(read_events == 66 && submitted_bytes == delivered.size());
-    assert(sampled_events == std::vector<unsigned>{64});
-    size_t at = 0;
-    for (unsigned event = 0; event < 66; ++event) {
-        unsigned size = event == 65 ? 3 : 16384;
-        for (unsigned i = 0; i < size; ++i) assert(delivered[at++] == uint8_t(i * 29 + event));
+static void pump() {
+    unsigned polls=0;
+    while (helper_fd >= 0) {
+        assert(++polls < 100000); auto before=step_calls;
+        fake_us += 17; mediaplayer_poll(); assert(step_calls-before <= 8);
     }
-    assert(transfer_profile.read_calls == 68 && transfer_profile.read_us == 68 * 3);
-    assert(transfer_profile.tx_calls == 66 && transfer_profile.tx_us == 66 * 11);
-    assert(transfer_profile.tx_max_us == 11 && transfer_profile.ack_chunks == 1);
-    assert(transfer_profile.slow_bytes == delivered.size() && transfer_profile.fast_bytes == 0);
-    assert(transfer_profile.polls == 18 && transfer_profile.data_polls == 17);
-    assert(transfer_profile.intervals == 17 && !transfer_profile.poll_active);
-    assert(releases == 1 && diagnostic_fd == -1 && helper_fd == -1);
-    assert(log_text.find("transport=credit_fast_v1") != std::string::npos);
-    assert(occurrences("first_read latency_us=") == 1 && occurrences("first_byte latency_us=") == 1);
-    assert(occurrences("profile_ack event=64 ") == 1 && occurrences("profile_summary ") == 1);
-    assert(log_text.find("read event=66 count=3 submitted=1064963 read_us=3 tx_us=11 ack_sample=0") != std::string::npos);
-    assert(log_text.find("finish reason=eof") != std::string::npos);
-    const auto saved = transfer_profile; const auto length = log_text.size();
-    mediaplayer_poll(); diagnostic_close();
-    assert(transfer_profile.polls == saved.polls && log_text.size() == length);
-    puts("PASS loader: sampled 66-chunk session, EAGAIN, four-read budget, byte order, odd tail, EOF totals and idle no-op");
+}
+static void exact_bytes(size_t expected) {
+    assert(delivered.size() == expected && submitted_bytes == expected);
+    for (size_t i=0; i<expected; ++i) assert(delivered[i] == uint8_t(i*29+7));
+}
+int main() {
+    session(); pipe_reads={-EAGAIN}; mediaplayer_poll();
+    assert(helper_fd==42 && releases==0 && !step_calls && would_block_events==1);
+    for (int i=0; i<65; ++i) pipe_reads.push_back(16384);
+    pipe_reads.push_back(3); pipe_reads.push_back(0);
+    mediaplayer_poll(); assert(mock_tx_calls==8 && pipe_reads.size()==66);
+    pump(); exact_bytes(65*16384+3);
+    assert(read_events==66 && odd_steps==1 && releases==1 && !pending_size);
+    assert(transfer_profile.fast_bytes==delivered.size() && transfer_profile.slow_bytes==0);
+    assert(log_text.find("profile_version=2 transport=credit_step_v1")!=std::string::npos);
+    assert(occurrences("first_byte latency_us=")==1 && occurrences("profile_summary ")==1);
+    assert(log_text.find("finish reason=eof")!=std::string::npos);
+    auto saved=step_calls; mediaplayer_poll(); assert(step_calls==saved);
+    puts("PASS loader: complete 66-read stream, bounded steps, exact bytes, terminal padding, EOF and idle");
 
-    // Reset sampling and all profiling totals on a warm session.
-    session(); pipe_reads = {1, 0}; mediaplayer_poll();
-    assert(transfer_profile.polls == 1 && transfer_profile.tx_calls == 1);
-    assert(transfer_profile.intervals == 0 && sampled_events.empty());
-    assert(occurrences("profile_summary ") == 1 && delivered.size() == 1);
-    session(); pipe_reads = {-EIO}; mediaplayer_poll();
-    assert(log_text.find("finish reason=read-error") != std::string::npos);
-    assert(log_text.find("read failed errno=5 ") != std::string::npos);
-    assert(transfer_profile.polls == 1 && transfer_profile.read_us == 3);
-    assert(transfer_profile.tx_calls == 0 && releases == 1);
-    session(); correct_core = false; mediaplayer_poll();
-    assert(log_text.find("stop reason=core-changed") != std::string::npos);
-    assert(transfer_profile.polls == 1 && transfer_profile.read_calls == 0 && releases == 1);
-    session(); pipe_reads = {7, -EAGAIN}; mediaplayer_poll();
-    mediaplayer_stop();
-    assert(occurrences("profile_summary ") == 1 && releases == 1 && !transfer_profile.poll_active);
-    puts("PASS loader: warm reset, read-error errno retention, core-change and external-stop exits");
+    session(); step_quota=0; pipe_reads={16384,2,0};
+    for (int i=0;i<100;++i) mediaplayer_poll();
+    assert(pipe_reads.size()==2 && delivered.empty() && pending_size==16384 && !pending_offset);
+    assert(step_calls==100 && !releases);
+    step_quota=64; mediaplayer_poll(); assert(delivered.size()==512 && pipe_reads.size()==2);
+    step_quota=2048; pump(); exact_bytes(16386);
+    puts("PASS loader: 100 zero-credit yields, limited-credit resume, no extra reads or byte loss");
 
-    session(); fail_burst = true; pipe_reads = {16384, 16384, 0}; mediaplayer_poll();
-    assert(helper_fd == -1 && releases == 1 && pipe_reads.size() == 2);
-    assert(submitted_bytes == 0 && read_events == 0 && delivered.empty());
-    assert(log_text.find("stop reason=transport-fault") != std::string::npos);
-    assert(log_text.find("transport_fault error=3") != std::string::npos);
-    mediaplayer_poll(); assert(pipe_reads.size() == 2);
-    puts("PASS loader: transport fault stops session before another read or retry");
+    session(); pipe_reads={1,-EAGAIN,3,5,-EINTR,2,0}; pump(); exact_bytes(11);
+    assert(odd_steps==1 && read_events==4 && would_block_events==2);
+    session(); pipe_reads={1,0}; step_quota=0;
+    mediaplayer_poll(); assert(!step_calls && pipe_reads.size()==1);
+    mediaplayer_poll(); assert(pending_eof && !releases && pipe_reads.empty());
+    for(int i=0;i<10;++i) mediaplayer_poll();
+    assert(!releases && delivered.empty());
+    step_quota=2048; pump(); exact_bytes(1); assert(odd_steps==1 && releases==1);
+    puts("PASS loader: odd short reads across EAGAIN/EINTR, EOF retained while credit blocked, one final pad");
 
-    session(); diagnostic_close(); log_text.clear(); fail_open = true;
-    burst_state.mode = 2; burst_state.words = 99; burst_state.digest = 17;
-    diagnostic_open("file:test.m2v", 1); helper_fd = 42; download_active = 1;
-    assert(!burst_state.mode && !burst_state.words && !burst_state.digest);
-    pipe_reads = {16384, 0}; const auto prior_polls = transfer_profile.polls;
-    mediaplayer_poll();
-    assert(log_text.empty() && sampled_events.empty() && transfer_profile.polls == prior_polls);
-    assert(delivered.size() == 16384 && helper_fd == -1);
-    puts("PASS loader: unavailable diagnostic endpoint preserves ordinary transfer without sampling");
+    session(); pipe_reads={16384,0}; step_us=600;
+    auto before=fake_us; mediaplayer_poll();
+    assert(mock_tx_calls==4 && pending_offset==8192 && fake_us-before<2700);
+    pump(); exact_bytes(16384);
+    puts("PASS loader: 2ms work budget checked between bounded steps independently of diagnostic logging");
+
+    session(); pipe_reads={16384,16384,0}; step_quota=64; mediaplayer_poll();
+    saved=delivered.size(); fail_burst=true; mediaplayer_poll();
+    assert(helper_fd==-1 && releases==1 && pipe_reads.size()==2 && delivered.size()==saved);
+    assert(!pending_size && !pending_offset && log_text.find("stop reason=transport-fault")!=std::string::npos);
+    mediaplayer_poll(); assert(delivered.size()==saved);
+    session(); pipe_reads={16384,0}; step_quota=0; mediaplayer_poll();
+    correct_core=false; mediaplayer_poll(); assert(releases==1 && !pending_size && delivered.empty());
+    session(); pipe_reads={16384,0}; step_quota=0; mediaplayer_poll();
+    mediaplayer_stop(); assert(releases==1 && !pending_size && !pending_offset);
+    session(); pipe_reads={7,0}; pump(); exact_bytes(7);
+    assert(odd_steps==1 && occurrences("profile_summary ")==1);
+    session(); pipe_reads={-EIO}; mediaplayer_poll();
+    assert(releases==1 && log_text.find("read failed errno=5 ")!=std::string::npos);
+    puts("PASS loader: faults never retry, cancel/core change clear pending bytes, clean warm restart and read errors");
+
+    for(unsigned trial=1;trial<=24;++trial) {
+        session(); unsigned seed=trial, total=0, polls=0;
+        for(unsigned i=0;i<50;++i) {
+            seed=seed*1664525u+1013904223u;
+            unsigned n=1+(seed%127); total+=n; pipe_reads.push_back(n);
+            if(i%7==0) pipe_reads.push_back(-EAGAIN);
+        }
+        pipe_reads.push_back(0);
+        while(helper_fd>=0) {
+            assert(++polls<10000); seed=seed*1664525u+1013904223u;
+            step_quota=(seed%5==0)?0:2*(1+seed%64);
+            auto before=step_calls; mediaplayer_poll(); assert(step_calls-before<=8);
+        }
+        exact_bytes(total); assert(odd_steps==(total&1u) && releases==1);
+    }
+    puts("PASS loader: 24 seeded short-read/credit-stall sequences preserve every byte and final padding");
+
+    session(); diagnostic_close(); log_text.clear(); fail_open=true;
+    diagnostic_open("file:test.m2v",1); helper_fd=42; download_active=1;
+    step_quota=0; pipe_reads={16384,0}; mediaplayer_poll();
+    assert(log_text.empty() && pending_size==16384 && !delivered.size());
+    step_quota=2048; step_us=600; before=fake_us; mediaplayer_poll();
+    assert(delivered.size()==8192 && fake_us-before==2400);
+    pump(); exact_bytes(16384); assert(log_text.empty());
+    puts("PASS loader: missing diagnostic endpoint preserves zero-credit yield, time budget and data");
 }
 '''
 
@@ -490,6 +507,54 @@ int main() {
         puts("PASS guarded fault cases: zero/full credits, counter wrap, coherent snapshot, lost/corrupt word, reset, overflow, invalid credit/count/digest/capability, no second batch");
     }
     printf("PASS burst RTL wide=%d capability=%d: %u cases; credit bounds, alignment, odd tails, legacy discovery, minimum one-cycle posted writes\n", TEST_WIDE, TEST_BURST, burst_cases);
+    if (!TEST_WIDE || !TEST_BURST) {
+        latency=1; capacity=64; begin_session(); media_burst_state state={};
+        media_burst_stats stats={}; uint32_t n=0; std::vector<uint8_t> bytes(17,0x71);
+        assert(user_io_file_tx_data_step(bytes.data(),bytes.size(),&state,&stats,&n,nullptr));
+        for(unsigned i=0;i<8;++i)tick();
+        assert(n==17 && stats.slow_bytes==17 && !stats.fast_bytes && accepted==packed(bytes));
+        puts("PASS step legacy: existing acknowledged semantics retained");
+    }
+    if (TEST_WIDE && TEST_BURST) {
+        unsigned step_cases=0;
+        for (unsigned cap : {64u,16384u}) for (unsigned offset : {0u,1u})
+        for (unsigned size : {1u,2u,3u,2049u,16385u}) {
+            capacity=cap; latency=1; begin_session();
+            std::vector<uint8_t> storage(size+1),bytes(size);
+            for(unsigned i=0;i<size;++i) storage[i+offset]=bytes[i]=uint8_t(i*17+5);
+            media_burst_state state={}; uint32_t at=0; unsigned calls=0;
+            while(at<size) {
+                assert(++calls<100000); media_burst_stats stats={}; uint32_t n=999;
+                assert(user_io_file_tx_data_step(storage.data()+offset+at,size-at,&state,&stats,&n,nullptr));
+                assert(n<=2048 && stats.batches<=1 && stats.queries<=2 && !stats.slow_bytes);
+                assert((n==0)==(stats.batches==0)); at+=n;
+                for(unsigned i=0;i<200;++i)tick();
+            }
+            assert(accepted==packed(bytes) && state.words==accepted.size()); ++step_cases;
+        }
+        capacity=64; begin_session(); force_zero=true;
+        media_burst_state state={}; std::vector<uint8_t> bytes(4096,0x39);
+        for(unsigned i=0;i<100;++i) {
+            media_burst_stats stats={}; uint32_t n=99;
+            assert(user_io_file_tx_data_step(bytes.data(),bytes.size(),&state,&stats,&n,nullptr));
+            assert(!n && !stats.batches && stats.queries==1 && accepted.empty());
+        }
+        force_zero=false;
+        // State must still be checked after a yield, before any payload is sent.
+        status_fault=4; media_burst_stats stats={}; uint32_t n=99;
+        assert(!user_io_file_tx_data_step(bytes.data(),bytes.size(),&state,&stats,&n,nullptr));
+        assert(!n && accepted.empty());
+        for(unsigned fault : {1u,2u,3u,4u}) {
+            capacity=16384; begin_session(); state={}; stats={}; fault_kind=fault;
+            assert(!user_io_file_tx_data_step(bytes.data(),bytes.size(),&state,&stats,&n,nullptr));
+            assert(!n && stats.error && stats.batches==1 && stats.fast_bytes==2048);
+            assert(fast_rises==1024); fault_kind=0;
+        }
+        begin_session(); sink_words=0xfffffffcu; sink_digest=0x1234; state={}; stats={};
+        assert(user_io_file_tx_data_step(bytes.data(),16,&state,&stats,&n,nullptr));
+        assert(n==16 && state.words==4 && state.digest==sink_digest);
+        printf("PASS step RTL: %u resume cases, unaligned/odd tails, 100 zero-credit yields, post-yield integrity, uncertain batch rejection, counter wrap\n",step_cases);
+    }
     dut.reset(); // Destroy the last model before Verilator's thread-local context.
     printf("PASS RTL wide=%d: %u cases, upstream and bulk; four bridge latencies, full sink, independent waits, consecutive chunks, odd tails, download release\n", TEST_WIDE, cases);
 }
@@ -566,7 +631,7 @@ def run(main_source: Path, compiler: str, sanitize: bool, rtl: bool = False) -> 
             if sanitize:
                 command += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer"]
             subprocess.run(command + [str(cpp), "-o", str(executable)], check=True)
-            result = subprocess.run([str(executable)], check=True, text=True, capture_output=True)
+            result = subprocess.run([str(executable)], check=True, text=True, capture_output=True, timeout=180)
             reports[name] = result.stdout
             print(result.stdout, end="")
         rtl_hashes = {}
@@ -580,7 +645,7 @@ def run(main_source: Path, compiler: str, sanitize: bool, rtl: bool = False) -> 
             source += function(io, "user_io_file_tx_data") + function(io, "user_io_file_tx_data_ack")
             source += burst_structs + "\n" + re.search(r"struct media_burst_status\n\{.*?\n\};", io, re.S)[0] + "\n"
             source += function(fpga, "fpga_spi_fast_block_write")
-            for name in ("media_burst_query", "media_burst_account", "user_io_file_tx_data_burst"):
+            for name in ("media_burst_query", "media_burst_account", "user_io_file_tx_data_burst", "user_io_file_tx_data_step"):
                 source += function(io, name)
             source += RTL_TESTS
             (work / "bridge_test.cpp").write_text(source)
@@ -593,7 +658,7 @@ def run(main_source: Path, compiler: str, sanitize: bool, rtl: bool = False) -> 
                 built = subprocess.run(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                 if built.returncode:
                     raise RuntimeError(built.stdout)
-                result = subprocess.run([str(obj / "Vbridge")], text=True, capture_output=True)
+                result = subprocess.run([str(obj / "Vbridge")], text=True, capture_output=True, timeout=300)
                 if result.returncode:
                     raise RuntimeError(result.stdout + result.stderr)
                 reports[f"rtl_wide_{wide}_capability_{capability}"] = result.stdout
