@@ -1,3 +1,32 @@
+## 621 COMMIT Unreleased 078d36b 2026-08-27T08:49:23-07:00
+
+#### Coming From:
+
+Unreleased 078d36b
+
+#### Purpose:
+
+Accept DTS passthrough on hardware and resolve the reported missing subwoofer channel.
+
+#### Outcome:
+
+The user played the DTS sweep and reports every channel working except the subwoofer, with no format indicator appearing, which that soundbar never shows. Telemetry is clean: all 360 reference and display pictures with 359 swaps, 12,073,316 accepted video bytes, `error_flags` zero, sequence end seen, presentation complete, quiet snapshot, zero deadline gaps, and audio underrun and PCM protocol clear, with helper PID 1109 submitting 14,562,142 transport bytes over 889 reads and exiting zero. The new diagnostics work as intended and the log now states both the selected mode and the DTS substream on its own, which is exactly the gap entry 619 had to fill with a listening report. The missing subwoofer is diagnosed rather than left open, and it is not a defect in this core. Decoding the fixture's DTS elementary stream to six discrete channels shows the LFE channel present at 1267.3 RMS in its own slot against about 2896 for the other channels, a level difference that is normal for DTS before a decoder applies LFE gain and is not evidence of loss. The helper then emitted 1,125 valid bursts with no problems, and decoding the frames recovered from that emitted output yields the same LFE at exactly the same 1267.3 RMS on the same channel. Since the carried frames are byte identical to the source, this chain establishes that what the core transmits contains the subwoofer channel. The omission is therefore downstream in the soundbar's DTS handling, and it is DTS specific to that device, because AC-3 LFE was clearly audible on the same hardware in entry 619. Why that decoder drops it is not established and is not testable from here, with bass management, DTS Virtual:X processing and LFE gain conventions all plausible. DTS passthrough is accepted on the evidence that the bytes are provably correct, that an independent decoder recovers every channel including LFE from what the core actually emits, and that the user heard the remaining channels through the soundbar's own decoder. As with AC-3, a 2.1 device cannot verify discrete channel routing, so that remains for the community test. The DTS fixture uses 8 Mbit/s video by necessity and is not a rate ceiling test.
+
+#### Next Steps:
+
+Do not chase the subwoofer behaviour further without different hardware, since the transmitted bytes are already proven correct and no change here could alter what that soundbar does; a tester with a discrete 5.1 DTS decoder would settle it as a side effect of the community test. Ask the community test to report AC-3 and DTS separately and to note LFE explicitly, because this run shows the two codecs can behave differently on the same device. The remaining audio item is a commercial AC-3 track with real dynamic range control and dialogue normalization, which synthetic tones cannot substitute for. Then prepare the release. The user has accepted current video capability as the release scope, so the README must state plainly what the decoder accepts, being 4:2:0 I-pictures only, frame structured, frame DCT and frame prediction only, 720 by 480 at 30000/1001 with no repeat first field, and must not imply general interlaced MPEG-2 or DVD compatibility. Release notes should carry the entry 616 wording of one or two repeated frames at the picture 690 cut, the audio capability including which parts are verified and which rest on a listening report, and the marginal scaler paths recovered by reseeding. The interlaced video gates of entry 609 remain open and explicitly out of scope for this release. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 620 COMMIT Unreleased 078d36b 2026-08-27T08:43:19-07:00
 
 #### Coming From:
@@ -1152,35 +1181,6 @@ After entry 581's publication was blocked pending explicit consent for its diagn
 #### Next Steps:
 
 Publish the pending entry-581 evidence and this authorization record from the Raspberry Pi checkout to GitHub master, verify the remote commit and retain this standing publication permission in future recovery context. Apply it to subsequent relevant evidence and log updates without an additional publication question. Obtain approval for the separate host-transfer profiling and safe optimization proposal before changing production source or deploying a host binary, retain required backpressure and byte handling, and keep the unresolved hardware acceptance and 8 Mbps regression visible. Preserve `core.md`, the existing untracked screenshots and the forty-entry log ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 581 COMMIT Unreleased ad364bf 2026-08-27T01:30:00-07:00
-
-#### Coming From:
-
-Unreleased ad364bf
-
-#### Purpose:
-
-Validate the larger host delivery buffer on one cold high-bitrate playback and identify the remaining transfer boundary.
-
-#### Outcome:
-
-The user reports a cold reboot followed by one playback that runs perfectly in some places and very slowly in others. The new syslog start at 08:23:32 UTC, replacing the previously collected 08:05:14 start, corroborates the reboot. The helper log was fetched before a fresh screenshot, with only the old fixed screenshot deleted before triggering. Full readbacks confirm the recorded `ad364bf` host binary and unchanged `2acabc5` FPGA image, and the exact 34,919,166-byte media file matches SHA-256 `90976c09e12dfe03243d5c8daccf65ecc98b4d0008cb5489e96c73f667434979`. Schema nineteen validates all 449 pictures, 448 swaps, sequence end, quiet presentation completion and zero aggregate errors, but records 185 delayed presentation intervals over 24.433194 seconds, averaging 18.335712 fps; the three largest holds are 200.2, 166.833 and 166.833 milliseconds at ordinals 95, 93 and 94. The buffer change is active: 2,131 reads contain 16,384 bytes and the final read contains 4,862, with normal helper exit and no pipe EAGAIN after the first completed chunk. Matched completed-read endpoints measure 1,427,919 bytes per second and an inferred 21.7955 four-read polls per second, versus entry 578's 1,420,489 and 86.7080. Four times the chunk size therefore yields only about half a percent more throughput while the inferred poll rate falls fourfold; the high-bitrate acceptance fails. This corrects entries 577 through 580's causal attribution to a fixed poll budget: agreement between throughput and a poll rate derived from the same read count is substantially algebraic, not independent evidence that poll frequency remains fixed. The data support transfer cost scaling with bytes, but do not separate bridge overhead from legitimate FPGA wait. The verified stream's picture spans range from 27,190 to 253,632 bytes against approximately 47,645 delivered bytes per nominal frame interval, consistent with alternating smooth and slow passages rather than a continuously wrong raster clock. Source review also revises the proposed fast-write follow-on: `fpga_spi` waits for both ACK high and ACK low, and this core's input FIFO full signal controls that acknowledgement through `ioctl_wait` and `sys_top`; `spi_block_write` omits those waits and also lacks the wide-mode odd-byte tail handling of `spi_write`. It must not be substituted blindly. Absence of helper-pipe EAGAIN does not prove absence of FPGA backpressure. The logged first-byte latency of 45,532 microseconds is actually assertion to first completed chunk because logging follows transmission, so it includes the larger chunk's transfer time. The 185 counter counts delayed presentation intervals, not every missed frame slot. Last-three-read spans inside individual polls have a 33.772-millisecond median and 67.404-millisecond maximum, establishing exposure to UI service delays but not a measured UI response. No production source, deployed binary, configuration or lifecycle was changed. Capture, full decode, helper log, fixture analysis, comparisons and source-review limitations are retained in the five entry-581 evidence files under `.ai/current_results`; the media readback occurred after the completed cold test and warms cache for subsequent non-rebooted playback.
-
-#### Next Steps:
-
-Obtain approval for a bounded host-transfer profiling and safe optimization cycle rather than raising the buffer again or replacing acknowledged writes with unchecked fast writes. Measure pipe read and transfer durations separately at chunk boundaries, sampled ACK-loop statistics and actual poll or UI service duration without per-word logging, then distinguish bridge overhead from FIFO wait before choosing a correction that preserves backpressure, byte order and odd-tail handling. Any subsequent host-system-binary deployment requires explicit approval, retained restoration data and verified staged replacement plus full readback; standing RBF permission does not cover it. Ask whether the interface remained responsive during this run, and retain one qualified 8 Mbps fixture regression as outstanding rather than assuming it passed. Respect one run per changed circumstance. Keep FPGA startup, the 64-KiB clean-video queue, continuous HDMI sync and black startup background unchanged; analog work remains excluded and the previously recorded interlaced, audio, cancellation and assertion-drift limitations remain unresolved. Preserve `core.md` and the forty-entry log ring.
 
 #### Files Modified:
 

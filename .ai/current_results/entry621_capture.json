@@ -1,0 +1,58 @@
+{
+  "captured": "2026-08-27T08:48:21-07:00",
+  "host": "10.10.0.30",
+  "candidate": "d466bed",
+  "expected_rbf_sha256": "61a2fed28425a461c8b886bdf809e3ef76a320e5688bb22a816135c36ef981ce",
+  "expected_media_sha256": "6d10d3681bb7403ef83696f276cc87b82cfe991053e212051bf4cb097be53524",
+  "expected_media_bytes": 14526481,
+  "user_report": "DTS passthrough: all channels worked except the subwoofer; no DTS indicator on the soundbar",
+  "mode": null,
+  "files": {
+    "/tmp/MediaPlayer_ARM.log": {
+      "local": "/tmp/entry621-capture/entry621_arm_helper.log",
+      "bytes": 136320,
+      "sha256": "351faf5fb370555074999e14e7774c1554a8eedf8280f115f788aea57136327e"
+    },
+    "/tmp/messages": {
+      "local": "/tmp/entry621-capture/messages",
+      "bytes": 41859,
+      "sha256": "05d5ec54ef19777e0f16ecb9b0b0e39d75a122090ecaaa10ff8dfbc5e8ef58fd"
+    },
+    "/media/fat/screenshots/cadence_probe.png": {
+      "local": "/tmp/entry621-capture/entry621_terminal.png",
+      "bytes": 133170,
+      "sha256": "84ad8a077479e40c9cb2f099a2bb1a2b20c0f4efc23bdd9457ce6a29714984f9"
+    },
+    "/media/fat/MiSTer": {
+      "local": "/tmp/entry621-capture/MiSTer",
+      "bytes": 1170340,
+      "sha256": "0ee87029f0a00a50731707e8114363fc7019ae4c1200de85d90533c9163b5241"
+    },
+    "/media/fat/MediaPlayer.rbf": {
+      "local": "/tmp/entry621-capture/MediaPlayer.rbf",
+      "bytes": 4332740,
+      "sha256": "61a2fed28425a461c8b886bdf809e3ef76a320e5688bb22a816135c36ef981ce"
+    },
+    "/media/fat/games/MediaPlayer/dts_channel_sweep_12s.mpg": {
+      "local": "/tmp/entry621-capture/fixture.mpg",
+      "bytes": 14526481,
+      "sha256": "6d10d3681bb7403ef83696f276cc87b82cfe991053e212051bf4cb097be53524"
+    }
+  },
+  "operations": [
+    "RETR /tmp/MediaPlayer_ARM.log",
+    "RETR /tmp/messages",
+    "DELE /media/fat/screenshots/cadence_probe.png",
+    "STOR screenshot command only",
+    "RETR /media/fat/screenshots/cadence_probe.png",
+    "RETR /media/fat/MiSTer",
+    "RETR /media/fat/MediaPlayer.rbf",
+    "RETR /media/fat/games/MediaPlayer/dts_channel_sweep_12s.mpg"
+  ],
+  "syslog_boot_lines": [
+    "Aug 27 15:32:59 MiSTer syslog.info syslogd started: BusyBox v1.33.1"
+  ],
+  "installed_candidate_is_d466bed": true,
+  "media_matches_entry602": true,
+  "unchanged_target_state": "No reload, reboot, launch, media/config edit or deployment; only the fixed screenshot was replaced."
+}
