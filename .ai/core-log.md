@@ -1,3 +1,34 @@
+## 550 COMMIT Unreleased 558efef 2026-08-26T19:32:00-07:00
+
+#### Coming From:
+
+Unreleased 127f576
+
+#### Purpose:
+
+Test whether interlaced P reconstruction drops a field parity, which entry 549 left as the last remaining explanation for the frozen first field.
+
+#### Outcome:
+
+Entry 549 established that every stage from the DDR write to the screen is faithful and concluded the staleness must already exist in what the writer stored, leaving reconstruction as the only candidate and noting that no regression could observe it. Commit `558efef` builds the missing vehicle. The soak's pixel oracle was hardwired to the one hundred twenty-eight by ninety-six, twenty-four picture mixed raster through an array bound of 442,367, component offsets of 12,288 and 15,360, a picture stride of 18,432, row strides of one hundred twenty-eight and sixty-four, a coordinate guard and a temporal-reference bound. All of those now derive from `PIXEL_WIDTH`, `PIXEL_HEIGHT` and `PIXEL_PICTURES`, whose defaults reproduce the original fixture exactly, and a new wrapper overrides them to seven hundred twenty by four hundred eighty across eight pictures. Per-parity mismatch counters were added and the summary is now emitted at the freeze path as well as at ordinary completion, so an early stop no longer discards the result. The interlaced P fixture from entry 549 was validated properly: decoding the patched and unpatched streams yields byte-identical 4,147,200-byte planes, so the signalling patch is semantically neutral and the oracle is sound, a check the all-I generator performs and the P generator had originally omitted. The experiment then answered the question it was built for, against the hypothesis. Across 3,093,120 samples it recorded 216,868 mismatches with a maximum delta of 231, but split by field parity those were 67,792 of 1,031,040 even against 68,532 of 1,031,040 odd, that is 6.58 and 6.65 per cent. Errors are distributed evenly across both fields. Nothing that damages both parities equally can leave one field bit-identical for seconds while the other updates every frame, so interlaced P reconstruction does not explain the flicker and the last standing hypothesis is eliminated. The apparent seven per cent defect is itself withdrawn, because the control refutes it. Running the known-good progressive fixture through the same harness mismatches 822,919 of 1,271,808 samples, 64.7 per cent, with a maximum delta of 251 and the same even-odd symmetry, while the identical run reports the decoder healthy with twenty-five pictures, twenty-five publications, twenty-five promotions, seventy-one swaps, exact accounting and no errors. A raw FFmpeg yuv420p decode is therefore not the oracle format this mode expects, and no figure the harness produces is meaningful until that control passes; the testbench and runner are committed carrying that warning in their headers. Two hardcoded bounds were found only by the run failing, a coordinate guard rejecting x of one hundred twenty-eight and a temporal-reference bound of twenty-four, both generalization defects of this commit rather than findings. Everything trustworthy continues to show the decoder healthy: interlaced I reconstruction retains zero out-of-tolerance pixels at 7,926,459, 7,948,706 and 13,048,137 cycles, the native suite passes twenty-three cases, and hardware plays the complete 15,150,646-byte file with 449 pictures, 448 swaps and every error flag clear.
+
+#### Next Steps:
+
+Do not trust the pixel harness until the progressive control passes; establishing the oracle format `MIXED_PIXEL_MODE` actually expects is the prerequisite for any future use, and the absence of a runner script for the existing wrapper is why the interface had to be guessed. The flicker now has no candidate: reconstruction through writer, DDR, fetch, cache, display and output stage are each verified faithful by exact measurement, yet a first field stops updating for seconds. Prefer a measurement that leaves the current path entirely rather than another instrument inside it. The analog VGA output is already fully driven including the `VGA_F1` field flag with `VGA_SCALER` low, so an analog I/O board would present the core's raw 480i to a CRT with MiSTer's scaler wholly out of the loop; that is the only available observation that no capture through the processed path can reach, and it would separate a core-side field fault from anything introduced downstream. Camera footage of the interval before playback begins is also outstanding from the user, since every burst so far starts after the first pictures are already displayed.
+
+#### Files Modified:
+
+- tools/streams/run_interlaced_p_pixels.sh
+- tools/streams/tb_h262_interlaced_p_pixels.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 549 COMMIT Unreleased 127f576 2026-08-26T19:03:23-07:00
 
 #### Coming From:
@@ -1225,34 +1256,5 @@ Run a clean Quartus Prime 17.0.2 build and focused timing analysis, preserve the
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 510 COMMIT Unreleased 48c2c87 2026-08-25T07:56:37-07:00
-
-#### Coming From:
-
-Unreleased 48c2c87
-
-#### Purpose:
-
-Capture the repeated TFF Bob comparison and determine whether the intermittent native ghost depends on Weave field history.
-
-#### Outcome:
-
-The user changed only HDMI scaler deinterlacer from Weave to Bob, retained Native timing pattern Off and Interlaced output Native 480i, and ran `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` three consecutive times on the exact installed `48c2c87` image. One of the three runs showed the intermittent ghost earlier in the stream, so Weave's multi-field reconstruction history is not its sole cause. Bob is otherwise mostly perfect while the bar moves left to right; the approximately 60 Hz flicker and fuzzy stationary bar are the expected Bob tradeoff from displaying one field at a time rather than reconstructing full vertical detail. All LEDs pass. The untouched terminal screenshot from the run which ghosted was triggered and retrieved entirely through ordinary FTP with the default `root` and `1` login and no SSH. `.ai/current_results/entry509_terminal_drain_bob.png` is 11,976 bytes with SHA-256 `08b22c2e3cb3cfc470ab7a77586d5e45d5ea8f6794550dcf9ed1b21cb93b4b87`. Schema nine accepts all 5,007,304 bytes and its wrapped counts represent exactly 300 decoded pictures, 300 displayed pictures and 299 swaps. Those 299 intervals span 598,786,877 decoder cycles or 9.979781 seconds and deliver 29.960576 pictures per second. Top-field-first remains correct, sequence end is seen, presentation completes, the session reaches quiet reason one and every aggregate, presentation, destination and cache-bank-overlap error is clear. The terminal raster is the correct final authored weave and contains no retained old position. Scheduler ownership and cadence therefore remain clean even in a Bob run where the user saw the live ghost. The current profiler's zero ranked gaps cannot clear an intermittent early-run stall because its hardware instance deliberately begins gap ranking at STC second 500 for the former full-movie credits investigation, far beyond this ten-second fixture. A plausible remaining boundary is the variable reset-and-prefill interval between a scheduler display-bank swap and the framebuffer's next field-origin publication; missing that cache-ready deadline would be invisible to the current swap counter and could affect Bob and Weave alike.
-
-#### Next Steps:
-
-Stop before changing presentation or cache behavior and obtain approval for one observational diagnostic RBF. Begin ranked display-gap capture at STC second zero for short native fixtures and extend the hardware snapshot without repurposing existing MPEG, audio or prediction fields to record framebuffer publication count, authored field origins missed while the post-swap prefill is not ready, maximum swap-to-publication latency and a compact cache refill deadline state. Update the telemetry decoder and focused profiler, framebuffer and native integration regressions, then clean-build and install through rollback-safe ordinary FTP. Repeat the TFF light-motion fixture in Bob up to three times and capture the first run which ghosts. A nonzero missed-origin or excessive publication latency correlated with that run will justify a narrow prefetch/publication correction; exact framebuffer publication with regular ranked scheduler gaps will clear the FPGA delivery path and leave the residual to the downstream display. Do not alter Bob, Weave, native timing or scheduler ownership in the diagnostic commit.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
