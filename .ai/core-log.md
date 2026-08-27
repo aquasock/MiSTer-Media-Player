@@ -1,3 +1,32 @@
+## 592 COMMIT Unreleased a4f2769 2026-08-27T03:29:04-07:00
+
+#### Coming From:
+
+Unreleased a4f2769
+
+#### Purpose:
+
+Refocus performance acceptance on DVD-Video bitrate ceilings rather than the higher-rate diagnostic fixture.
+
+#### Outcome:
+
+The user clarifies that proper commercial DVD playback is the objective and asks to validate the maximum bitrate a DVD can deliver. This supersedes entry 591's proposed priority of further optimization for the 18.65 Mbps file: that file is retained as optional stress evidence, not a required DVD acceptance gate. The working SD DVD-Video targets are 9.8 Mbps for video, or 1,225,000 bytes per second, and 10.08 Mbps for the combined program stream, or 1,260,000 bytes per second. The combined rate is a shared budget, not an allowance added to video. The project reference was consulted first; it explicitly defers exact DVD application constraints to authorized DVD FLLC Part 2 and Part 3 books, which were not available. Adobe's primary DVD authoring primer, Japanese March-2004 edition, page 14, independently supports these two numerical targets at `https://www.adobe.com/jp/motion/pdfs/DVD_Primer.pdf#page=14`. This is supporting vendor guidance, not a substitute for the controlled DVD books or a formal application-conformance claim, so the restricted core and controlled reference remain unchanged. Scope, citation and validation criteria are retained in `.ai/current_results/entry592_dvd_rate_scope.json`. Entry 591 establishes clean steady playback of the 8 Mbps fixture only; neither the 9.8 Mbps video ceiling nor the 10.08 Mbps combined ceiling has been validated. Bitrate alone also does not bound decoder work or prove support for every DVD picture structure. The compressed disc-input budget must not become a hard cap on the internal helper-to-FPGA path, which can carry protocol framing and expanded decoded audio. No new fixture, source change, build, deployment, reboot, reload or playback was performed in this scope review. The qualified a4f2769 pair and restoration copies remain the baseline; Built refers to its existing qualification and Passed remains unchecked for the new ceiling target.
+
+#### Next Steps:
+
+Prepare a deterministic near-ceiling 9.8 Mbps video regression on GUNSMOKE within the currently supported picture subset, preserving a committed generation recipe and checking actual encoded rate, headers, buffering constraints and software decode rather than relying on the filename or encoder target alone. Validate steady nominal cadence, complete picture/byte counts, zero decoder and transport errors, startup and warm-load behavior, and menu responsiveness on hardware, leaving lifecycle and playback control with the user. Then qualify the 10.08 Mbps combined-stream budget with supported audio and timing when that boundary is ready, accounting for internal framing and decoded PCM traffic and retaining reasonable measured margin. Keep full commercial-DVD compatibility separate from this rate gate: interlaced P/B, field-picture/DCT, NTSC/PAL and film cadence, audio/PTS, navigation and other pending application features require their own coverage. Do not resume production optimization solely to pass the 18.65 Mbps stress file. If an in-scope ceiling test identifies a defect, propose a bounded revision based on that evidence while preserving credits, integrity checks, queue capacities, guarded startup, continuous HDMI sync and black idle. Keep core.md unchanged and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 591 COMMIT Unreleased a4f2769 2026-08-27T03:21:12-07:00
 
 #### Coming From:
@@ -1156,42 +1185,6 @@ Ask the user to reload MediaPlayer, confirm stable HDMI lock before playback, an
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 552 COMMIT Unreleased 30d300a 2026-08-26T20:05:04-07:00
-
-#### Coming From:
-
-Unreleased 558efef
-
-#### Purpose:
-
-Reproduce the observed stale-field HDMI hold in a simulation of the actual MiSTer scaler before proposing a behavioral correction.
-
-#### Outcome:
-
-The user approved the HDMI-only reproduction cycle and confirmed 1080p output. GHDL was unpacked privately on GUNSMOKE; direct behavioral execution of the unchanged scaler stopped on a natural-range underflow before video, so the harness synthesizes the actual VHDL into hardware-width Verilog and runs it with Verilator. The production timing generator, framebuffer output controls, sync-fix and scanline pipeline are retained, synthetic RGB labels replace only picture content, and a checked Avalon model supplies the scaler memory. Initial runs without generation resets did not reproduce the fault. Adding the real four-decoder-clock framebuffer reset at each frame window reproduces missing or retained content despite continuously advancing source pictures: the old path produces seventy-six scaler-input sync pulses for fifty-one source fields, all thirty-seven checked steady frames fail, and retained content reaches twenty-two pictures of age. The cause is the framebuffer's reset branch forcing active-low native HS and VS low while the independent timing generator continues, creating an extra vertical sync on each swap and rotating scaler buffers without a newly written field. This qualifies entry 550's output-stage exclusion: the moving-pattern bypass does not exercise framebuffer output controls during generation resets. The bounded correction keeps video_de, video_hs and video_vs sampling the same current-pixel inputs at the same clock-enable phase during picture/cache resets; RGB reset, decode, ownership, scaler logic and constraints are unchanged. The identical corrected 1080p run produces exactly fifty-one sync pulses for fifty-one fields and passes all thirty-seven checked frames with every output pixel accounted for and no identity older than two pictures. Bob, progressive and identical-field controls pass; an intentional twenty-three-slot source hold produces one settled Weave image for forty output frames and then resumes motion; deliberately stale source content still fails only the stale-field checks. A BFF startup case exposed an artificial two-megabyte limit in the memory model, corrected to the full eight megabytes per bank; BFF with memory stalls then passes twenty checked frames, and repeated before/after Weave runs match the earlier reports exactly for their first thirty-two frames, with all twenty-one checked frames failing before and passing after. The existing cache regression's new sync case fails on unchanged RTL at 380.619 nanoseconds and passes sixteen reset pulses after correction; ordinary refill, slow refill, late prefill, both field-order fingerprint and three-generation controls, and delayed generation reads all pass. Summaries, input hashes and output report hashes are retained in `.ai/current_results/entry552_hdmi_simulation.json`. This reproduces a stale-field failure mechanism, not the exact camera cadence or television processing; startup mode-lock frames are explicitly excluded. Publication of the initially prepared plan was denied by the approval system; the user subsequently explicitly approved committing and pushing master and proceeding to the official build. Source commit `30d300a` was published from the Pi and cloned into a fresh GUNSMOKE build directory. The unchanged seed-sixteen Quartus configuration completed in 685.70 seconds with zero errors and 148 warnings. Every reported timing class is positive: global setup 0.127, hold 0.216, recovery 3.908, removal 0.536 and minimum pulse width 0.925 nanoseconds, with zero total negative slack. The fit uses 31,653 ALMs, 50,399 registers, 3,655,139 block-memory bits, 464 RAM blocks and 67 DSP blocks. The generated RBF is 4,244,104 bytes with SHA-256 `d676cb58cb22d991a0638bd0dab2885f7b1bcdd87d23e085910ab05dd1acec57`, copied to the Pi as `/tmp/MediaPlayer_entry552_30d300a.rbf`; `.ai/current_results/entry552_build.json` retains all clock/class margins and build provenance. Deployment was rejected by the approval system because publishing and building did not explicitly authorize replacing the active MiSTer image. No upload or reload occurred, and hardware acceptance remains pending.
-
-#### Next Steps:
-
-Obtain explicit user authorization to overwrite the active `/media/fat/MediaPlayer.rbf`, then directly upload the already qualified image and verify its complete SHA-256 through a fresh FTP connection, without creating backups or staging copies on the MiSTer. Ask the user to reload and validate idle lock plus the established Big Buck Bunny playback in Weave and Bob over HDMI. Record deployment and hardware results in the next entry, without marking hardware acceptance from simulation alone. The pre-existing live-raster assertion drift remains outside this correction.
-
-#### Files Modified:
-
-- rtl/mpeg2_luma_framebuffer.sv
-- tools/streams/tb_native_480i_cache_refill.sv
-- tools/streams/run_native_480i_timing.sh
-- tools/streams/run_hdmi_scaler_sim.sh
-- tools/streams/tb_hdmi_scaler_stimulus.sv
-- tools/streams/tb_hdmi_scaler.sv
-- tools/streams/check_hdmi_scaler_sim.py
-- tools/streams/hdmi_scaler_simulation.md
 
 #### Status:
 
