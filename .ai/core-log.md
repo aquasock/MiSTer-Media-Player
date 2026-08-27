@@ -1,3 +1,33 @@
+## 583 COMMIT Unreleased ??? 2026-08-27T01:37:49-07:00
+
+#### Coming From:
+
+Unreleased ad364bf
+
+#### Purpose:
+
+Separate helper pipe-read time, acknowledged FPGA-transfer cost and main-loop blocking with bounded host-side profiling.
+
+#### Outcome:
+
+The user directed development to continue after entry 581 identified the unchanged delivery ceiling and entry 582 recorded standing evidence-publication permission. This cycle implements passive host profiling before selecting a transfer optimization. Retain the 16 KiB buffer, four-chunk poll limit, byte ordering, odd-byte handling and existing ACK-high and ACK-low backpressure. Add timestamps around pipe reads and complete transfers, actual media-poll durations and entry intervals, and aggregate ACK-read counts on one sampled chunk in sixty-four without per-word logging or clocks. The ordinary transfer path remains in use for unsampled chunks and other cores. Label the existing first-byte record as first completed chunk and separately measure the first successful read so startup transport cost is not mistaken for source latency. Reuse the pinned Main_MiSTer integration patch and add a focused regression that exercises the real patched functions against mocked register, pipe and clock interfaces, checking identical acknowledged word traces, delayed ACKs, odd and narrow transfers, error exits, poll budgets, sampling, EOF and session reset. No optimization, FPGA rebuild, host-binary deployment or hardware acceptance is claimed at proposal time.
+
+#### Next Steps:
+
+Publish this approved plan from the Raspberry Pi before changing production source, implement and verify the profiling patch, and build the host binary on GUNSMOKE with the pinned Main_MiSTer revision and official ARM GNU 10.2 compiler. Preserve other work in existing checkouts and use an isolated build directory. Record the source hash, focused test results, build output and instrumentation limitations, then request explicit approval before replacing the MiSTer system binary with retained restoration data and verified staged replacement plus full readback. After approved deployment, use one high-bitrate playback to distinguish pipe-read, transfer and ACK-wait contributions and measure actual poll-service intervals; the new measurements must precede any transfer optimization. Keep the FPGA image, startup reserve, clean-video queue, continuous HDMI sync and black idle background unchanged, and retain the pending 8 Mbps regression and UI-responsiveness observation.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/streams/test_main_mister_profile.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 582 COMMIT Unreleased ad364bf 2026-08-27T01:33:33-07:00
 
 #### Coming From:
@@ -1181,34 +1211,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 543 COMMIT Unreleased 7cdfcec 2026-08-26T14:35:16-07:00
-
-#### Coming From:
-
-Unreleased 99fc1ea
-
-#### Purpose:
-
-Close timing for the raster-phase correction by changing only the reproducible Quartus placement seed from fourteen to fifteen.
-
-#### Outcome:
-
-Entry 542 proved that commit `99fc1ea` compiles cleanly and restores the established MiSTer raster-control contract, but its retained seed-fourteen fit missed global setup by 0.199 nanoseconds and was therefore not deployed. Commit `7cdfcec` changes only the reproducible Quartus seed assignment from fourteen to fifteen; framebuffer RTL, decoder behavior, clocks, constraints, diagnostics, menu, host software and MiSTer configuration are unchanged. Per the user's shortened-cycle direction, the focused cache-refill testbench elaborated successfully without running `vvp`, and no native, reconstruction or live-raster regression was run. The retained-state seed-fifteen incremental compilation reused synthesis and completed in 9 minutes 22 seconds with zero errors. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.213, 0.249, 3.598, 0.614 and 0.925 nanoseconds. The fit uses 31,407 ALMs, 49,499 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The 4,278,588-byte RBF has SHA-256 `5895917446f140bc53130fcf4b93226fa507cd9c6b9f335c00660c7428711365` and is eligible for hardware validation.
-
-#### Next Steps:
-
-Copy the exact seed-fifteen RBF from the designated GUNSMOKE checkout to the Raspberry Pi, directly replace only `/media/fat/MediaPlayer.rbf` through ordinary FTP without creating a backup, rollback or staging file, and independently read back the active image to verify its size and SHA-256. Reload the core and stop at the idle screen. Hardware acceptance begins with stable scaler lock and one genuinely fresh screenshot before any media playback; if idle lock fails, immediately restore the retained exact `164c7e6` image.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
