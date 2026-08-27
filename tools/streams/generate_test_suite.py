@@ -71,7 +71,16 @@ TESTS = [
      'AC-3 5.1 channel sweep: FL, FR, FC, LFE, BL, BR, two seconds each.'),
     ('6_audio_dts_51', BAR, 'interlaced', True, 'dts',
      'DTS 5.1 channel sweep, same order. Passthrough only; select S/PDIF.'),
+    ('7_progressive_ipb', PROG, 'progressive', None, 'mp2',
+     'Progressive 480p with an ordinary GOP, so P and B pictures are actually '
+     'exercised. Every other test in this set is all-I.'),
 ]
+
+# Every test above is all-I, which is what the interlaced path accepts. Test
+# seven deliberately is not: it carries P and B pictures so the progressive
+# path's picture-type support can be established by playing it rather than
+# inferred from the RTL.
+GOP_OVERRIDES = {'7_progressive_ipb': ('15', '2')}
 
 
 def audio_args(codec: str, duration: float) -> tuple[list[str], list[str]]:
@@ -164,7 +173,9 @@ def build(name: str, video_filter: str, mode: str, tff, codec: str,
         run(['ffmpeg', '-hide_banner', '-loglevel', 'warning', '-xerror', '-threads', '1',
              '-f', 'lavfi', '-i', vf, *a_in, *filters, *maps, *interlace_vf,
              '-c:v', 'mpeg2video', '-pix_fmt', 'yuv420p', '-threads', '1',
-             '-flags', '+bitexact', '-g', '1', '-bf', '0',
+             '-flags', '+bitexact',
+             '-g', GOP_OVERRIDES.get(name, ('1', '0'))[0],
+             '-bf', GOP_OVERRIDES.get(name, ('1', '0'))[1],
              # Capped variable rate, not constant rate: these are hand tests,
              # and the synthetic content is compressible enough that forcing
              # constant rate makes the encoder's rate control underflow. The
