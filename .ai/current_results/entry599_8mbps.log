@@ -1,0 +1,19 @@
+INTEGRATED_PROGRESS pictures=32 cycles=65932749
+INTEGRATED_PROGRESS pictures=64 cycles=129989441
+INTEGRATED_PROGRESS pictures=96 cycles=193994191
+INTEGRATED_PROGRESS pictures=128 cycles=258104530
+INTEGRATED_PROGRESS pictures=160 cycles=322943971
+INTEGRATED_PROGRESS pictures=192 cycles=386273058
+INTEGRATED_PROGRESS pictures=224 cycles=450372631
+INTEGRATED_PROGRESS pictures=256 cycles=514393042
+INTEGRATED_PROGRESS pictures=288 cycles=578473137
+INTEGRATED_PROGRESS pictures=320 cycles=642551324
+INTEGRATED_PROGRESS pictures=352 cycles=707794385
+INTEGRATED_PROGRESS pictures=384 cycles=770636765
+INTEGRATED_PROGRESS pictures=416 cycles=834785981
+INTEGRATED_PROGRESS pictures=448 cycles=898778076
+INTEGRATED_PASS writer=1 phase=1961195 displayed=449 gaps=0 elapsed_seconds=15.016797 words=29095200 stores=3636900
+- /home/vash/mister-builds/entry599/tb_entry599_i_cadence.sv:318: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01
+- Verilator: $finish at 9s; walltime 687.095 s; speed 13.146 ms/s
+- Verilator: cpu 686.804 s on 1 threads; alloced 281 MB

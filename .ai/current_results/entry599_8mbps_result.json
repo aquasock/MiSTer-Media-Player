@@ -1,0 +1,25 @@
+{
+  "case": "8mbps",
+  "source_commit": "f615ce02ba8a96ac198b26c24ff5c4b7cecfd1b4",
+  "exit_code": 0,
+  "seconds": 687.1734602249926,
+  "expected_pictures": 449,
+  "command": [
+    "/home/vash/mister-builds/entry599/obj/integrated",
+    "+HEX=/tmp/entry555-i-profile/source.hex",
+    "+LEN=15150646",
+    "+PICTURES=449",
+    "+REPORT=/home/vash/mister-builds/entry599/8mbps_events.csv",
+    "+METRICS=/home/vash/mister-builds/entry599/8mbps_metrics.csv",
+    "+PHASE=1961195",
+    "+FIRST_SWAP=7967195",
+    "+WRITER=1",
+    "+BUSY_PERIOD=0",
+    "+BUSY_LENGTH=0"
+  ],
+  "present_count": 448,
+  "completed": 449,
+  "missed_pictures": [],
+  "capacity_cycles": 0,
+  "ack_latency_extra": 0
+}

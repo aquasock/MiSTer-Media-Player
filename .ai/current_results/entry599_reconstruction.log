@@ -1,0 +1,50 @@
+generated test_interlaced_i_tff.m2v: order=top-first frames=4 bytes=157688 sha256=61ba1555df74e63fbfed83dbe674cd31a4886505193c6dcc7d4fe104d2cbe828 decoded_sha256=3984cdfe2e8f98ac2b9734f7e484976c2200faf6363a380df1e21176161ae392
+generated test_interlaced_i_bff.m2v: order=bottom-first frames=4 bytes=160157 sha256=6da990f80eb349928cd9ee843094bbb2faeedbd2d8bf9c1a874cb71ab89a69b6 decoded_sha256=2927bb2b3ce1327e8055cbb5516657cef9b7e7b9ae8869af094f47cca6933ae3
+wrote: /run/media/vash/GIT/MiSTer-Media-Player/tools/streams/generated_interlaced/interlaced_manifest.json
+make: Entering directory '/run/media/vash/GIT/MiSTer-Media-Player/simulation/interlaced_i/obj'
+g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -c -o verilated.o /usr/share/verilator/include/verilated.cpp
+g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -c -o verilated_timing.o /usr/share/verilator/include/verilated_timing.cpp
+g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -c -o verilated_threads.o /usr/share/verilator/include/verilated_threads.cpp
+python3 /usr/share/verilator/bin/verilator_includer -DVL_INCLUDE_OPT=include Vtb_h262_interlaced_i_reconstruction.cpp Vtb_h262_interlaced_i_reconstruction___024root__DepSet_hc6a42a41__0.cpp Vtb_h262_interlaced_i_reconstruction___024root__DepSet_he6982911__0.cpp Vtb_h262_interlaced_i_reconstruction__main.cpp Vtb_h262_interlaced_i_reconstruction__ConstPool_0.cpp Vtb_h262_interlaced_i_reconstruction___024root__Slow.cpp Vtb_h262_interlaced_i_reconstruction___024root__DepSet_hc6a42a41__0__Slow.cpp Vtb_h262_interlaced_i_reconstruction___024root__DepSet_he6982911__0__Slow.cpp Vtb_h262_interlaced_i_reconstruction__Syms.cpp > Vtb_h262_interlaced_i_reconstruction__ALL.cpp
+echo "" > Vtb_h262_interlaced_i_reconstruction__ALL.verilator_deplist.tmp
+g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -c -o Vtb_h262_interlaced_i_reconstruction__ALL.o Vtb_h262_interlaced_i_reconstruction__ALL.cpp
+g++    verilated.o verilated_timing.o verilated_threads.o Vtb_h262_interlaced_i_reconstruction__ALL.a    -pthread -lpthread -latomic   -o interlaced_i
+rm Vtb_h262_interlaced_i_reconstruction__ALL.verilator_deplist.tmp
+make: Leaving directory '/run/media/vash/GIT/MiSTer-Media-Player/simulation/interlaced_i/obj'
+- V e r i l a t i o n   R e p o r t: Verilator 5.032 2025-01-01 rev (Debian 5.032-1)
+- Verilator: Built from 1.075 MB sources in 10 modules, into 1.067 MB in 9 C++ files needing 0.001 MB
+- Verilator: Walltime 2.683 s (elab=0.007, cvt=0.072, bld=2.571); cpu 0.126 s on 6 threads; alloced 38.898 MB
+run     : tff
+I_RECON_RESULT progressive=0 tff=1 pictures=4 pixels=2073600 differences=9442 out_of_tolerance=0 max_delta=1 cycles=7926459
+PASS tb_h262_interlaced_i_reconstruction accept
+- /run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_interlaced_i_reconstruction.sv:270: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01
+- Verilator: $finish at 79ms; walltime 2.672 s; speed 29.660 ms/s
+- Verilator: cpu 2.672 s on 1 threads; alloced 220 MB
+run     : bff
+I_RECON_RESULT progressive=0 tff=0 pictures=4 pixels=2073600 differences=9632 out_of_tolerance=0 max_delta=1 cycles=7948706
+PASS tb_h262_interlaced_i_reconstruction accept
+- /run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_interlaced_i_reconstruction.sv:270: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01
+- Verilator: $finish at 79ms; walltime 2.650 s; speed 29.995 ms/s
+- Verilator: cpu 2.650 s on 1 threads; alloced 220 MB
+generated: /run/media/vash/GIT/MiSTer-Media-Player/tools/streams/test_i_baseline.m2v
+geometry: 45x30 macroblocks (720x480, 1350 total), one slice per row
+bytes: 726703
+sha256: ac7183a653be10aa44c2a1083f87abc77a971916a69678e9cf528de4dd2bff55
+picture order: I I I I
+verification: all-intra, full-width raster/slice structure, FFmpeg decode completes cleanly
+run     : progressive control
+I_RECON_RESULT progressive=1 tff=0 pictures=4 pixels=2073600 differences=69671 out_of_tolerance=0 max_delta=1 cycles=13048137
+PASS tb_h262_interlaced_i_reconstruction accept
+- /run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_interlaced_i_reconstruction.sv:270: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01
+- Verilator: $finish at 130ms; walltime 4.300 s; speed 30.345 ms/s
+- Verilator: cpu 4.300 s on 1 threads; alloced 220 MB
+run     : field-DCT rejection control
+INTERLACED_I_REJECT_RESULT frontend=1 phase1=0 pictures=0 cycles=82326
+PASS tb_h262_interlaced_i_reconstruction reject
+- /run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_interlaced_i_reconstruction.sv:251: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01
+- Verilator: $finish at 823us; walltime 0.032 s; speed 26.755 ms/s
+- Verilator: cpu 0.031 s on 1 threads; alloced 220 MB

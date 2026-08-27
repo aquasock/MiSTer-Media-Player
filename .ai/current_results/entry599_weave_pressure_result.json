@@ -1,0 +1,25 @@
+{
+  "case": "weave_pressure",
+  "source_commit": "f615ce02ba8a96ac198b26c24ff5c4b7cecfd1b4",
+  "exit_code": 0,
+  "seconds": 685.7353974359867,
+  "expected_pictures": 449,
+  "command": [
+    "/home/vash/mister-builds/entry599/obj/integrated",
+    "+HEX=/home/vash/mister-builds/entry597/fixture.hex",
+    "+LEN=18402691",
+    "+PICTURES=449",
+    "+REPORT=/home/vash/mister-builds/entry599/weave_pressure_events.csv",
+    "+METRICS=/home/vash/mister-builds/entry599/weave_pressure_metrics.csv",
+    "+PHASE=1961195",
+    "+FIRST_SWAP=7967195",
+    "+WRITER=1",
+    "+BUSY_PERIOD=1000003",
+    "+BUSY_LENGTH=500"
+  ],
+  "present_count": 448,
+  "completed": 449,
+  "missed_pictures": [],
+  "capacity_cycles": 130831,
+  "ack_latency_extra": 131613
+}

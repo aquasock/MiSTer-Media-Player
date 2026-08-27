@@ -1,0 +1,10 @@
+[
+  {
+    "name": "tb_h262_double_scratch_tags",
+    "baseline_exit": 4
+  },
+  {
+    "name": "tb_h262_prediction_error_sources",
+    "baseline_exit": 1
+  }
+]

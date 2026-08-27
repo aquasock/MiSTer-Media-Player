@@ -1,0 +1,12 @@
+{
+  "source_commit": "f615ce02ba8a96ac198b26c24ff5c4b7cecfd1b4",
+  "reviewed": true,
+  "blocking_new_warnings": false,
+  "baseline_source": "a4f2769f6e55774abfc5990052702734b9024d15",
+  "warnings": 208,
+  "normalized_added": [],
+  "normalized_removed": [],
+  "new_ignored_timing_filters": [],
+  "timing_positive": true,
+  "review": "208 warnings, same normalized warning set as installed a4f2769; no new ignored timing filter, all timing categories positive and every TNS zero. Full RBF hash agrees with build manifest."
+}

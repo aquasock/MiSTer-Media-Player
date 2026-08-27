@@ -1,0 +1,100 @@
+hex     : expanding 182849 bytes -> /run/media/vash/GIT/MiSTer-Media-Player/simulation/verilator/test_b_residual_streaming.hex
+compile : 44 RTL files + testbench (verilator), swap=10000 freeze=2000000
+%Warning-INITIALDLY: /run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_live_raster_soak.sv:523:14: Non-blocking assignment '<=' in initial/final block
+                                                                                                             : ... This will be executed as a blocking assignment '='!
+  523 |         reset<=0;
+      |              ^~
+                     ... For warning description see https://verilator.org/warn/INITIALDLY?v=5.032
+                     ... Use "/* verilator lint_off INITIALDLY */" and lint_on around source to disable this message.
+make: Entering directory '/run/media/vash/GIT/MiSTer-Media-Player/simulation/verilator/test_b_residual_streaming_sw10000_fr2000000'
+g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -c -o verilated.o /usr/share/verilator/include/verilated.cpp
+g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -c -o verilated_timing.o /usr/share/verilator/include/verilated_timing.cpp
+g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -c -o verilated_threads.o /usr/share/verilator/include/verilated_threads.cpp
+g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -x c++-header Vtb_h262_live_raster_soak__pch.h -o Vtb_h262_live_raster_soak__pch.h.fast.gch
+g++   -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -x c++-header Vtb_h262_live_raster_soak__pch.h -o Vtb_h262_live_raster_soak__pch.h.slow.gch
+echo "" > Vtb_h262_live_raster_soak__ALL.verilator_deplist.tmp
+g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -include Vtb_h262_live_raster_soak__pch.h.fast -c -o Vtb_h262_live_raster_soak.o Vtb_h262_live_raster_soak.cpp
+g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -include Vtb_h262_live_raster_soak__pch.h.fast -c -o Vtb_h262_live_raster_soak___024root__DepSet_h8a8f5058__0.o Vtb_h262_live_raster_soak___024root__DepSet_h8a8f5058__0.cpp
+g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -include Vtb_h262_live_raster_soak__pch.h.fast -c -o Vtb_h262_live_raster_soak___024root__DepSet_h8a8f5058__1.o Vtb_h262_live_raster_soak___024root__DepSet_h8a8f5058__1.cpp
+g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -include Vtb_h262_live_raster_soak__pch.h.fast -c -o Vtb_h262_live_raster_soak___024root__DepSet_ha63bf002__0.o Vtb_h262_live_raster_soak___024root__DepSet_ha63bf002__0.cpp
+g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -include Vtb_h262_live_raster_soak__pch.h.fast -c -o Vtb_h262_live_raster_soak_mpeg2_h262_dct_vlc__DepSet_h4409d027__0.o Vtb_h262_live_raster_soak_mpeg2_h262_dct_vlc__DepSet_h4409d027__0.cpp
+g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -include Vtb_h262_live_raster_soak__pch.h.fast -c -o Vtb_h262_live_raster_soak_mpeg2_h262_p_non_intra_transform__DepSet_h04254c8a__0.o Vtb_h262_live_raster_soak_mpeg2_h262_p_non_intra_transform__DepSet_h04254c8a__0.cpp
+g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -include Vtb_h262_live_raster_soak__pch.h.fast -c -o Vtb_h262_live_raster_soak_mpeg2_h262_p_non_intra_transform__DepSet_h1cd5d4b4__0.o Vtb_h262_live_raster_soak_mpeg2_h262_p_non_intra_transform__DepSet_h1cd5d4b4__0.cpp
+g++ -Os  -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -include Vtb_h262_live_raster_soak__pch.h.fast -c -o Vtb_h262_live_raster_soak__main.o Vtb_h262_live_raster_soak__main.cpp
+g++   -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -include Vtb_h262_live_raster_soak__pch.h.slow -c -o Vtb_h262_live_raster_soak__ConstPool_0.o Vtb_h262_live_raster_soak__ConstPool_0.cpp
+g++   -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -include Vtb_h262_live_raster_soak__pch.h.slow -c -o Vtb_h262_live_raster_soak___024root__Slow.o Vtb_h262_live_raster_soak___024root__Slow.cpp
+g++   -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -include Vtb_h262_live_raster_soak__pch.h.slow -c -o Vtb_h262_live_raster_soak___024root__DepSet_h8a8f5058__0__Slow.o Vtb_h262_live_raster_soak___024root__DepSet_h8a8f5058__0__Slow.cpp
+g++   -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -include Vtb_h262_live_raster_soak__pch.h.slow -c -o Vtb_h262_live_raster_soak___024root__DepSet_ha63bf002__0__Slow.o Vtb_h262_live_raster_soak___024root__DepSet_ha63bf002__0__Slow.cpp
+g++   -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -include Vtb_h262_live_raster_soak__pch.h.slow -c -o Vtb_h262_live_raster_soak_mpeg2_h262_dct_vlc__Slow.o Vtb_h262_live_raster_soak_mpeg2_h262_dct_vlc__Slow.cpp
+g++   -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -include Vtb_h262_live_raster_soak__pch.h.slow -c -o Vtb_h262_live_raster_soak_mpeg2_h262_dct_vlc__DepSet_h5cb97057__0__Slow.o Vtb_h262_live_raster_soak_mpeg2_h262_dct_vlc__DepSet_h5cb97057__0__Slow.cpp
+g++   -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -include Vtb_h262_live_raster_soak__pch.h.slow -c -o Vtb_h262_live_raster_soak_mpeg2_h262_p_non_intra_transform__Slow.o Vtb_h262_live_raster_soak_mpeg2_h262_p_non_intra_transform__Slow.cpp
+g++   -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -include Vtb_h262_live_raster_soak__pch.h.slow -c -o Vtb_h262_live_raster_soak_mpeg2_h262_p_non_intra_transform__DepSet_h1cd5d4b4__0__Slow.o Vtb_h262_live_raster_soak_mpeg2_h262_p_non_intra_transform__DepSet_h1cd5d4b4__0__Slow.cpp
+g++   -I.  -MMD -I/usr/share/verilator/include -I/usr/share/verilator/include/vltstd -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TIMING=1 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-shadow -Wno-sign-compare -Wno-tautological-compare -Wno-uninitialized -Wno-unused-but-set-parameter -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable    -DVL_TIME_CONTEXT   -fcoroutines -include Vtb_h262_live_raster_soak__pch.h.slow -c -o Vtb_h262_live_raster_soak__Syms.o Vtb_h262_live_raster_soak__Syms.cpp
+g++    verilated.o verilated_timing.o verilated_threads.o Vtb_h262_live_raster_soak__ALL.a    -pthread -lpthread -latomic   -o soak
+rm Vtb_h262_live_raster_soak__ALL.verilator_deplist.tmp
+make: Leaving directory '/run/media/vash/GIT/MiSTer-Media-Player/simulation/verilator/test_b_residual_streaming_sw10000_fr2000000'
+- V e r i l a t i o n   R e p o r t: Verilator 5.032 2025-01-01 rev (Debian 5.032-1)
+- Verilator: Built from 21.033 MB sources in 48 modules, into 4.314 MB in 17 C++ files needing 0.005 MB
+- Verilator: Walltime 9.197 s (elab=0.046, cvt=0.398, bld=8.640); cpu 0.617 s on 6 threads; alloced 92.156 MB
+run     : test_b_residual_streaming
+PICSTART n=1 cycle=41 hdr=0 state=0 geom=1 cand=0 proof=0 rearm_pend=0 hold=0 waiting=0
+PICEVAL cycle=42 hdr=0 type=1 geom=1 is_p=0 wide_mode=0 gen_mode=0
+PICSTART n=2 cycle=1625724 hdr=0 state=0 geom=1 cand=0 proof=0 rearm_pend=0 hold=0 waiting=0
+PICEVAL cycle=1625733 hdr=0 type=2 geom=1 is_p=0 wide_mode=0 gen_mode=0
+PIC_FIRST_SIDEBAND pic=1 idx=3e val=0000 motion=1 desc_active=0 persisted=0 active=0
+PIC_FIRST_SIDEBAND pic=1 idx=3e val=0000 motion=1 desc_active=0 persisted=0 active=0
+PIC_FIRST_SIDEBAND pic=1 idx=3e val=0000 motion=1 desc_active=0 persisted=0 active=0
+PIC_FIRST_SIDEBAND pic=1 idx=3e val=0000 motion=1 desc_active=0 persisted=0 active=0
+ARM n=1 cycle=1626172 hdr=1 persisted=0 started=1
+ARM n=2 cycle=1649169 hdr=1 persisted=0 started=1
+ARM n=3 cycle=1672166 hdr=1 persisted=0 started=1
+ARM n=4 cycle=1695163 hdr=1 persisted=0 started=1
+ARM n=5 cycle=1718160 hdr=1 persisted=0 started=1
+ARM n=6 cycle=1741157 hdr=1 persisted=0 started=1
+ARM n=7 cycle=1764154 hdr=1 persisted=0 started=1
+ARM n=8 cycle=1787151 hdr=1 persisted=0 started=1
+ARM n=9 cycle=1810148 hdr=1 persisted=0 started=1
+ARM n=10 cycle=1833145 hdr=1 persisted=0 started=1
+ARM n=11 cycle=1856142 hdr=1 persisted=0 started=1
+ARM n=12 cycle=1879139 hdr=1 persisted=0 started=1
+ARM n=13 cycle=1902136 hdr=1 persisted=0 started=1
+ARM n=14 cycle=1925133 hdr=1 persisted=0 started=1
+ARM n=15 cycle=1948130 hdr=1 persisted=0 started=1
+ARM n=16 cycle=1971127 hdr=1 persisted=0 started=1
+ARM n=17 cycle=1994124 hdr=1 persisted=0 started=1
+ARM n=18 cycle=2017121 hdr=1 persisted=0 started=1
+ARM n=19 cycle=2040118 hdr=1 persisted=0 started=1
+ARM n=20 cycle=2063115 hdr=1 persisted=0 started=1
+ARM n=21 cycle=2086112 hdr=1 persisted=0 started=1
+ARM n=22 cycle=2109109 hdr=1 persisted=0 started=1
+ARM n=23 cycle=2132106 hdr=1 persisted=0 started=1
+ARM n=24 cycle=2155103 hdr=1 persisted=0 started=1
+ARM n=25 cycle=2178100 hdr=1 persisted=0 started=1
+ARM n=26 cycle=2201097 hdr=1 persisted=0 started=1
+ARM n=27 cycle=2224094 hdr=1 persisted=0 started=1
+ARM n=28 cycle=2247091 hdr=1 persisted=0 started=1
+ARM n=29 cycle=2270088 hdr=1 persisted=0 started=1
+PICSTART n=3 cycle=2270126 hdr=1 state=0 geom=1 cand=1 proof=0 rearm_pend=0 hold=1 waiting=0
+ORDER FINALQ_RISE cycle=2270501 hdr=1 outstanding=2
+ARM n=30 cycle=2293085 hdr=1 persisted=0 started=1
+ORDER MIXEDGE cycle=2316080 hdr=1 finalq=1 produced=0 retired=1
+ORDER PICPERS cycle=2316080 hdr=1 finalq=1 produced=0 bsel=0
+ORDER COMPLETE cycle=2316081 hdr=1 outstanding=0
+PICEVAL cycle=2316082 hdr=1 type=3 geom=1 is_p=1 wide_mode=1 gen_mode=1
+ORDER PICPERS cycle=3497921 hdr=1 finalq=0 produced=0 bsel=1
+LIVE_RASTER_RESULT bytes=182849 p_rows=30 p=1 b_rows=30 b=1 published=2 pictures=2 promotions=2 display_identity=2 swaps=2 last_p_temporal=2 ref_writes=64800 bank2_ref_writes=0 scratch0_writes=64800 scratch1_writes=0 ddr_reads=194400 cache=0/194400/0 cycles=3559997 read=1 recon=1 presentation=1 queued=0 promoted=0 error=0/0/0/0
+LIVE_RASTER_PROFILE input=3236364/0/0 input_type=1445839/689154/1101364 transform=11911/7680 raster=689850/1181250 lookup=575100/1066500 ddr_request=0/0 ddr_response=0/0 emit=518400/518400 store=89100/89100 writer=129600 presentation=110783 b_miss_prelaunch=0
+LIVE_RASTER_BACKPRESSURE decoder=3236364 base_parser=1445846 p_hold=689154 b_parse=1101364 b_persist=0 p_owner=0/0/689154/0/0/0 b_owner=16826/24629/1059909/0
+LIVE_RASTER_ROW_STAGES p=11160/1/677960/33 b=1059881/28
+LIVE_RASTER_B_REPLAY twrite=120 coeff_wait=0 coeff_writes=120
+LIVE_RASTER_PREFETCH lookups=0 requests=0 avoided=0 induced=0
+LIVE_RASTER_SIDECAR misses=0 fills=0 hits=0 bank0=0 bank1=0
+LIVE_RASTER_PARTITION lookups=0 bank4=0/0 bankrow4=0/0
+LIVE_RASTER_VICTIM lookups=0 primary_hits=0 victim_hits=0 full_misses=0 probe_cycles=0
+LIVE_RASTER_B_QUEUE current=1350 prefetch=6750 handoffs=6750 banks=4050/4050
+LIVE_RASTER_B_TAPS paired=0 single_advance=0 vertical=0 quad=0
+LIVE_RASTER_ASSERT publication=1/1/1/1 writer=1 read=1 recon=1 complete=1 errors=0/0/0/0
+- /run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_live_raster_soak.sv:1616: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01
+- Verilator: $finish at 36ms; walltime 4.622 s; speed 7.704 ms/s
+- Verilator: cpu 4.621 s on 1 threads; alloced 224 MB

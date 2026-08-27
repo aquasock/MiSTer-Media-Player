@@ -1,0 +1,14 @@
+{
+  "ceiling": {
+    "bytes": 18402691,
+    "sha256": "3e0a850a7dbbbbd05747208f97f436c8bae8120e124f05e78b8467c555a4b065"
+  },
+  "ceiling_twice": {
+    "bytes": 36805378,
+    "sha256": "9296bb7a889a7cf604e1ad7f17f03f9636cad168135d97249761bcbb6d5b7cf9"
+  },
+  "8mbps": {
+    "bytes": 15150646,
+    "sha256": "04758691e3e51c72ca2e7c3723b4dda2fbd473783425215df8ec2dcb5585cbe0"
+  }
+}

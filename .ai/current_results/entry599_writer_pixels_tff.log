@@ -1,0 +1,7 @@
+WRITER_PIXEL_PASS words=259200 lanes=2073600 capacity_blocked=3479656
+I_RECON_RESULT progressive=0 tff=1 pictures=4 pixels=2073600 differences=9442 out_of_tolerance=0 max_delta=1 cycles=11416296
+PASS tb_entry599_writer_pixels accept
+- /home/vash/mister-builds/entry599/tb_entry599_writer_pixels.sv:270: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01
+- Verilator: $finish at 114ms; walltime 2.388 s; speed 47.821 ms/s
+- Verilator: cpu 2.387 s on 1 threads; alloced 220 MB

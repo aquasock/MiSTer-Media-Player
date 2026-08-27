@@ -1,0 +1,7 @@
+/run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_b_presentation_scheduler.sv:742: error: Unable to bind wire/reg/memory `dut.ascratch' in `tb_h262_double_scratch_tags.check_tag'
+/run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_b_presentation_scheduler.sv:742: error: Unable to bind wire/reg/memory `dut.ascratch_bank' in `tb_h262_double_scratch_tags.check_tag'
+/run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_b_presentation_scheduler.sv:743: error: Unable to bind wire/reg/memory `dut.ac' in `tb_h262_double_scratch_tags.check_tag'
+/run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_b_presentation_scheduler.sv:742: error: Unable to elaborate condition expression.
+/run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_b_presentation_scheduler.sv:726: warning: Port 3 (frame_bank) of mpeg2_h262_ddram_store expects 2 bits, got 1.
+/run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_b_presentation_scheduler.sv:726:        : Padding 1 high bits of the port.
+4 error(s) during elaboration.

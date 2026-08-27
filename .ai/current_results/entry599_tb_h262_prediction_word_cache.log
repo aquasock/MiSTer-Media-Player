@@ -1,0 +1,3 @@
+PREDICTION_WORD_CACHE_RESULT hits=2 misses=21 uncached=2 downstream=22 depth=4 ordered=1 same_cycle_reuse=1 direct_response=1
+ORDERED_READ_MODEL_RESULT baseline=641 depth2=322 depth2_backpressure=346 zero_latency=64 requests=64 owner_order=P/D/P
+/run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_prediction_word_cache.sv:466: $finish called at 1410000 (1ps)

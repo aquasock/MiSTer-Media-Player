@@ -1,0 +1,2 @@
+PREDICTION_BLOCK_FETCHER_RESULT transactions=4 phases=6 words=88 depth=4 delayed=1 backpressure=1 simultaneous=1 zero_latency=1 invalid=1
+/run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_prediction_block_fetcher.sv:301: $finish called at 4030000 (1ps)

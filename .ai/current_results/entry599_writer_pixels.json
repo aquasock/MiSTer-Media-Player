@@ -1,0 +1,60 @@
+{
+  "source_commit": "f615ce02ba8a96ac198b26c24ff5c4b7cecfd1b4",
+  "all_passed": true,
+  "checks": [
+    {
+      "case": "tff",
+      "command": [
+        "/home/vash/mister-builds/entry599/writer_pixels_obj/writer_pixels",
+        "+HEX=/run/media/vash/GIT/MiSTer-Media-Player/simulation/interlaced_i/test_interlaced_i_tff.hex",
+        "+LEN=157688",
+        "+PIXELS=/run/media/vash/GIT/MiSTer-Media-Player/simulation/interlaced_i/test_interlaced_i_tff_pixels.hex",
+        "+TFF"
+      ],
+      "exit_code": 0,
+      "seconds": 2.398642429994652,
+      "sha256": "271a4d1fd904a7d52dc761ba6da02687f42039dfeb4b1fc27976537d68b9e229",
+      "pass_lines": [
+        "WRITER_PIXEL_PASS words=259200 lanes=2073600 capacity_blocked=3479656",
+        "I_RECON_RESULT progressive=0 tff=1 pictures=4 pixels=2073600 differences=9442 out_of_tolerance=0 max_delta=1 cycles=11416296",
+        "PASS tb_entry599_writer_pixels accept"
+      ]
+    },
+    {
+      "case": "bff",
+      "command": [
+        "/home/vash/mister-builds/entry599/writer_pixels_obj/writer_pixels",
+        "+HEX=/run/media/vash/GIT/MiSTer-Media-Player/simulation/interlaced_i/test_interlaced_i_bff.hex",
+        "+LEN=160157",
+        "+PIXELS=/run/media/vash/GIT/MiSTer-Media-Player/simulation/interlaced_i/test_interlaced_i_bff_pixels.hex"
+      ],
+      "exit_code": 0,
+      "seconds": 2.400451981986407,
+      "sha256": "c70de5033602038eccaa6e7e20eab7cd3e383e28a569d81ee4f60d1c00710916",
+      "pass_lines": [
+        "WRITER_PIXEL_PASS words=259200 lanes=2073600 capacity_blocked=3469360",
+        "I_RECON_RESULT progressive=0 tff=0 pictures=4 pixels=2073600 differences=9632 out_of_tolerance=0 max_delta=1 cycles=11428260",
+        "PASS tb_entry599_writer_pixels accept"
+      ]
+    },
+    {
+      "case": "progressive",
+      "command": [
+        "/home/vash/mister-builds/entry599/writer_pixels_obj/writer_pixels",
+        "+HEX=/run/media/vash/GIT/MiSTer-Media-Player/simulation/interlaced_i/test_i_baseline.hex",
+        "+LEN=726703",
+        "+PIXELS=/run/media/vash/GIT/MiSTer-Media-Player/simulation/interlaced_i/test_i_baseline_pixels.hex",
+        "+PROGRESSIVE"
+      ],
+      "exit_code": 0,
+      "seconds": 3.0373573090182617,
+      "sha256": "4e58ea3d81dc40f5d66f5fd43511544b32d4079549fee57ac7e6691912054ed0",
+      "pass_lines": [
+        "WRITER_PIXEL_PASS words=259200 lanes=2073600 capacity_blocked=1368903",
+        "I_RECON_RESULT progressive=1 tff=0 pictures=4 pixels=2073600 differences=69671 out_of_tolerance=0 max_delta=1 cycles=14423815",
+        "PASS tb_entry599_writer_pixels accept"
+      ]
+    }
+  ],
+  "scope": "12 pictures: all reconstructed samples and all accepted DDR byte lanes against FFmpeg within established +/-1 IDCT tolerance; actual candidate acknowledgement with 600/997 modeled DDR busy clocks."
+}
