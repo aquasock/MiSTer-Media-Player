@@ -1,3 +1,32 @@
+## 558 COMMIT Unreleased 31a87b6 2026-08-26T22:07:06-07:00
+
+#### Coming From:
+
+Unreleased 31a87b6
+
+#### Purpose:
+
+Qualify and deploy the approved passive deadline diagnostic while retaining the accepted HDMI sync correction.
+
+#### Outcome:
+
+Source `31a87b6` completed a clean Quartus 17.0.2 Lite build on GUNSMOKE in 688.32 seconds with seed 16, zero errors and 208 warnings. Every timing class is positive: setup 0.240 ns, hold 0.252 ns, recovery 3.363 ns, removal 0.567 ns, minimum pulse width 0.925 ns; all reported total negative slack values are zero. The 4,280,760-byte image has SHA-256 `3ab905467e890366a091a31884639cce6a79626413f5eb16f72a8d0756b702b5`. The full existing native-video script exited successfully, including presentation overlap, continuous sync across generation resets, both field orders, cache fault controls, three-generation ownership with delayed memory, writer fingerprints and the schema-nineteen recorder/screenshot round trip. Separate queue and writer availability tests also pass. The simulated tracked source outside metadata is byte-identical to the official build checkout. An additional real frontend, reconstruction, writer, scheduler and profiler simulation of the exact first eight source pictures reproduces only the picture-six miss: its candidate becomes ready 669,812 decoder clocks, or 11.164 milliseconds, after the missed window, with zero decoder-input starvation and zero writer-capacity blocking. This validates recorder attribution under ideal input and DDR availability, not the cause of the hardware picture-348 gap. The accepted framebuffer, timing generator, scheduler, scaler, constraints and seed remain unchanged from `30d300a`; this is a diagnostic image, not a cadence fix. Under the user's standing replacement authorization, the active `/media/fat/MediaPlayer.rbf` was replaced directly over FTP, and an independent fresh connection read back the entire image with matching size and SHA-256. No core reload or reboot was triggered. Build, validation and deployment evidence is preserved in the three entry-557 JSON files under `.ai/current_results`, with full reports and test artifacts under `/home/vash/mister-builds/entry557-31a87b6` and `/home/vash/mister-builds/entry557-diagnostics`. Hardware validation remains pending. The separate live-raster soak's previously recorded assertion drift was not addressed or reported as passing. In response to the user's roadmap question, the recommended later sequence is current 480i HDMI and audio/timestamp qualification, interlaced P/B and field-coding support, then broader cadence and format coverage; those later implementation changes are not part of this approval.
+
+#### Next Steps:
+
+Have the user reload the core, select Bob and play `bbb_480i_tff_15s_8mbps.m2v` once without further menu or mode changes, leaving terminal telemetry visible. Capture and validate schema nineteen, then inspect the full picture ordinals, actual missed-window readiness, clean-queue starvation and writer-capacity blocking before proposing a playback change. Preserve the accepted HDMI sync behavior and leave analog diagnostics out of scope. After this clean case, retain repeated file loads and Bob/Weave switching as regression conditions. Require a measured explanation and an approved fix before claiming the remaining cadence issue is resolved.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 557 COMMIT Unreleased 31a87b6 2026-08-26T21:45:31-07:00
 
 #### Coming From:
@@ -1219,41 +1248,5 @@ Root-cause the profiler regression failure before anything else, since snapshot 
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 518 COMMIT Unreleased 7356e4a 2026-08-25T19:52:53-07:00
-
-#### Coming From:
-
-Unreleased 3e91073
-
-#### Purpose:
-
-Record which DDR region each field parity's fetch actually resolves into.
-
-#### Outcome:
-
-Entry 517 showed the framebuffer requesting every first-field row correctly and receiving pre-playback content, so this commit observes the one thing no counter recorded: which of the five DDR regions the top-level offset steers each fetch into. The framebuffer emits a plain row address and `mpeg2_new_display_frame_offset` is added combinationally at issue time, so a native frame readout spanning two vertical periods could in principle straddle a display swap and resolve its two parities differently. The top level now samples the region on each parity's fetch edge and the profiler latches both and counts generations where they disagree; all of it is `clk_mpeg2` logic and none enters the video domain. Schema twelve retires the per-parity displayed-line counters, which entry 517 proved uninformative by reading two hundred forty against two hundred forty while the field carried no picture, and reuses their bits for the two regions and a mismatch count at the same forty-three words. Retiring them also removed two video-domain toggles, two three-stage synchronizers and two timing exceptions, which is why this build has more margin than the one before it. A clean Quartus Prime 17.0.2 build completed in 10 minutes 35 seconds with zero errors and the established 144 warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.343, 0.252, 3.420, 0.572 and 0.925 nanoseconds, with global setup above the accepted `9573923` baseline rather than merely matching it. Focused decoder setup and recovery are positive 1.608 and 11.174 nanoseconds and focused video setup is positive 3.117 nanoseconds, all with zero violated paths, and a timing-netlist probe confirms every new register survives. The fit uses 29,399 ALMs and 45,254 registers. The 4,223,092-byte RBF has SHA-256 `2d011ce350f427f0d3c4eb147825947c6bf93a9ec7fc4e8a0771f1a86cc3ed58` and was installed rollback-safe over ordinary FTP with `3e91073` preserved. On hardware the symptom reproduced across fourteen live burst frames with the first field blank at pre-playback level and the odd field sweeping normally, while the counters reported 242 first-field and 240 second-field fetches, region one for both parities, zero region mismatches across all three hundred generations and zero phase errors. Both parities therefore resolve into the same region in every generation, the straddled-swap mechanism does not occur, and the banked address path is exonerated along with readout sequencing, field phase and per-parity fetch service. A static read then eliminated the writer structurally rather than by measurement: `mpeg2_h262_ddram_store_420p.sv` uses the identical base, bank offsets and ninety-word row stride as the reader, and snaps each block origin to a multiple of eight so every write covers eight consecutive frame rows and cannot populate one parity without the other.
-
-#### Next Steps:
-
-Observe the luma content DDR returns for each parity, since every measurement so far has observed control rather than data and all of it has been correct. Fold each returned luma word into a per-parity signature and set a flag when any returned word differs from the first that parity saw, attributing the word by the fetch address parity. Keep the accumulation on the decoder clock, publish it in the existing forty-three words, and read it alongside burst frames from the same run because the symptom presents in two forms: a first field blank at pre-playback level, and a first field frozen on a picture.
-
-#### Files Modified:
-
-- `MediaPlayer.sdc`
-- `MediaPlayer_top_06.svh`
-- `MediaPlayer_top_07.svh`
-- `rtl/mpeg2_luma_framebuffer.sv`
-- `rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv`
-- `tools/streams/decode_hardware_cadence.py`
-- `tools/streams/tb_h262_hardware_cadence_profiler.sv`
-- `tools/streams/test_decode_hardware_cadence.py`
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---

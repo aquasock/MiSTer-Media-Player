@@ -1,0 +1,13 @@
+{
+  "source_commit": "31a87b6d945672e12a83bdb8ab5c7ba121514e60",
+  "timestamp": "2026-08-26T22:06:58-07:00",
+  "destination": "/media/fat/MediaPlayer.rbf",
+  "previous_bytes": 4244104,
+  "deployed_bytes": 4280760,
+  "upload_response": "226 Transfer complete",
+  "sha256": "3ab905467e890366a091a31884639cce6a79626413f5eb16f72a8d0756b702b5",
+  "independent_readback_sha256": "3ab905467e890366a091a31884639cce6a79626413f5eb16f72a8d0756b702b5",
+  "independent_readback_verified": true,
+  "reload_triggered": false,
+  "hardware_acceptance": "pending user reload and clean Bob cadence capture"
+}
