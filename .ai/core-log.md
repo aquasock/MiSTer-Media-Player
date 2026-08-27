@@ -1,3 +1,32 @@
+## 627 COMMIT Unreleased 140a5b7 2026-08-27T16:32:05-07:00
+
+#### Coming From:
+
+Unreleased 140a5b7
+
+#### Purpose:
+
+Install entry 624's Main and confirm on hardware that it removes the reported menu lag.
+
+#### Outcome:
+
+Two results are recorded. First, the AC-3 passthrough gap in the hand-test set is closed: the user re-ran test five with the output option set to S/PDIF, and its own log line confirms passthrough mode on AC-3 substream 0x80 rather than the decoded stereo mode the earlier run used. That capture completes 360 reference and display pictures with 359 swaps, `error_flags` zero, sequence end, presentation complete, quiet snapshot, zero deadline gaps and outliers, all three largest intervals at the nominal 2,002,000 clocks, audio underrun and PCM protocol clear at FIFO peak 127, and helper exit zero. An earlier attempt to capture that run collected a stale log which was still test six, identified by identical checksum, transport byte count and DTS substream line, and was discarded rather than reported. Second, entry 624's Main is now installed. It was backed up first, staged, hash checked while staged, renamed and read back on a fresh connection, giving SHA256 `01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9`; the previous Main is retained under the entry 627 backup directory, and the RBF, helper, media and settings were left untouched. After the user's reboot the helper log independently confirms it is running, reporting profile version two with `credit_step_v1`, a 2000 microsecond poll budget, 2048-byte steps and a step limit of eight, where every previous capture this session reported version one. The effect on the same test one file is decisive. Maximum media-poll occupancy falls from 160,937 to 9,287 microseconds, a factor of 17.3, and maximum poll-entry interval from 170,928 to 20,910. The acknowledged-write fallback disappears entirely: 677,119 slow bytes become zero, with all 5,556,849 bytes delivered in fast mode across 42,367 polls instead of 257. The user reports the menu is now perfect, which matches the measurement, and this run is one of the four low bitrate files that were reliably laggy before, so it is the correct subject rather than a case that was never affected. Playback is unchanged: 360 reference and display pictures, 359 swaps, 3,068,039 accepted video bytes, zero errors, zero deadline gaps and outliers, and the same nominal intervals. One honest qualification: the observed 9,287 microsecond maximum still exceeds the 2000 microsecond work budget, which entry 624 explicitly declined to present as a hard bound, and no button-response latency was measured, so the menu verdict remains a user report supported by occupancy rather than a latency measurement. Version two logging also changes record semantics, with pipe reads covering all source reads and transfer entries sampled, so version one counts are not directly comparable except for the occupancy figures used here.
+
+#### Next Steps:
+
+The menu issue is closed on this evidence and needs no further replay. The remaining blocker for the release document is unchanged and is now the only one: no test exercises P or B pictures, so generate one progressive file with an ordinary GOP using the corrected suite generator and have the user play it, which decides whether the README says progressive I-only or progressive I/P/B. Consider also whether the test set should carry that file permanently, since a release that ships hand tests should exercise the picture types it claims. Then write the README capability section and release notes, carrying the entry 616 wording of one or two repeated frames at the picture 690 cut, the marginal scaler paths recovered by reseeding in entry 618, the audio capability split between measured and listened evidence, and the DTS subwoofer behaviour of entry 621 as a device observation rather than a core limitation. The interlaced gates of entry 609, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, remain open and out of scope for this release. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 626 COMMIT Unreleased 140a5b7 2026-08-27T16:02:11-07:00
 
 #### Coming From:
@@ -1158,35 +1187,6 @@ Once the user restores MiSTer connectivity at `10.10.0.30`, resume verified pair
 - sys/hps_io.sv
 - tools/streams/tb_mpeg2_stream_fifo_burst.sv
 - tools/streams/test_main_mister_profile.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 587 COMMIT Unreleased be8502b 2026-08-27T02:22:06-07:00
-
-#### Coming From:
-
-Unreleased be8502b
-
-#### Purpose:
-
-Measure the first hardware run of the acknowledged bulk preload path and determine whether its host-side savings resolve high-bitrate playback.
-
-#### Outcome:
-
-The user reports that everything looks the same and leaves the image ready. The helper log was collected first, followed by a freshly triggered screenshot and complete host/FPGA readbacks. A new Linux boot at 09:17:15 UTC and runtime `transport=ack_bulk_preload_v1` establish activation of `be8502b`; the complete installed host hash remains `da213d6bd9cc89a9af736a0bb029f9ebadd6e6a62382728ae1bacc07a381f909`, and FPGA `2acabc5` is unchanged. All 34,919,166 bytes, 449 pictures and 448 swaps complete with zero decoder error flags, normal helper exit and a quiet completed presentation. There is a real but insufficient measured gain over entry 585: matched completed-chunk delivery rises from 1,427,221 to 1,578,252 bytes per second, or 10.58 percent, while cadence improves from 18.315332 to 20.248749 fps and from 24.460381 to 22.124823 seconds. Delayed presentation intervals fall from 186 to 167, but the two largest retained holds remain 166.833 milliseconds, consistent with the user's lack of perceptible improvement. The median unsampled full 16 KiB transfer falls from 10,780 to 9,196 microseconds, confirming that the changed word loop saved time; complete transfer-call duration falls from 23.585322 to 21.202251 seconds. Transfers and ACK waits still consume 96.36 percent of measured media-poll time, whereas pipe reads consume 0.724867 seconds or 3.29 percent. All 590 EAGAIN events occur before the first completed chunk. The 533 data-bearing polls average 41.273 milliseconds, but the maximum poll remains 81.209 milliseconds; these are blocking exposure rather than direct UI latency. Across the same 270,336 sampled words, extended ACK-low polling now occurs in seven of thirty-three chunks rather than one, with a maximum of 76 GPI reads and no uninitialized indication. Faster delivery meeting downstream flow control more often is plausible, but samples do not measure total FIFO-wait duration or establish its precise cause. The first three retained delayed deadlines find decoder input ready but empty and upstream FIFO empty; their writer-capacity blocked counts are 22, zero and 255 cycles, not all zero. The aggregate decoder-stall counter increases, but RTL gates that count on input pending and decoder not ready, so greater input availability can change its coverage and this alone is not evidence of a decoder regression. Supply remains only 67.71 percent of the file's average demand, requiring another 47.68 percent increase merely to meet that average; the largest meadow picture still needs about 161 milliseconds of bytes at this mean rate against 33.367 milliseconds per nominal frame. Preserve the eight-bit largest-gap ordinal ambiguity: raw codes 95, 98 and 15 are not unique absolute positions in this 449-picture file. The old spikes problem remains historical progressive bring-up context, not the current comparison. Capture, helper log, full decode and checked analysis are stored as `.ai/current_results/entry587_*`; no source, deployed binary, media, configuration or lifecycle was changed. Hardware cadence acceptance still fails, and neither the qualified 8 Mbps regression nor a separate current menu assessment is claimed. The user also asks about another agent's alternative delivery path and a possible 10 MB/s rate. Entries 579 and 580 identify the likely reference as `spi_block_write` through `fpga_spi_fast_block_write`, which uses the same physical GPIO-style link but omits per-word ACK reads; entry 581 already explains why that cannot be substituted without FIFO flow control. The present preload path still waits for both ACK phases. The helper currently writes to a pipe and Main owns FPGA I/O, so this is a Main transport choice rather than an existing direct-helper mode. Main also has lightweight-bridge register access, but a dedicated receiver or shared-memory/DMA route would be a distinct implementation. No measured 10 MB/s result for this target was found in the reviewed evidence, and that figure must remain unverified.
-
-#### Next Steps:
-
-Do not repeat the same hardware condition or expect another minor host-loop reduction to provide the missing throughput. Prefer investigating the existing fast-block primitive with an explicitly approved coordinated host/FPGA transport change that amortizes acknowledgements across bounded bursts backed by conservatively reported ingest-FIFO capacity, with documented strobe ordering and drain guarantees, reset and legacy fallback behavior, and overflow plus byte-count verification. The existing ingest FIFO is a separate 32 KiB mixed-width FIFO; preserve the 64 KiB clean-video queue and do not confuse or enlarge the two as a substitute for transport work. Qualification must include protocol and clock-domain/backpressure tests, the full relevant FPGA regressions, a clean Quartus build and timing review before deployment; faster transport must not be promised to remove every downstream decoder limit. Obtain approval before implementing that material protocol revision, while retaining standing publication and qualified deployment permissions. Keep `be8502b` as the current measured comparison point, preserve startup, continuous HDMI sync and black idle behavior, leave reboot and playback to the user, and retain the outstanding 8 Mbps and unsupported-feature boundaries. Keep restricted `core.md` unchanged and preserve the forty-entry ring.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 

@@ -1,0 +1,29 @@
+{
+  "deployed": "2026-08-27T16:30:16-07:00",
+  "host": "10.10.0.30",
+  "source": "entry624 package Main (other agent build)",
+  "files": {
+    "/media/fat/MediaPlayer.rbf": {
+      "bytes": 4332740,
+      "sha256": "61a2fed28425a461c8b886bdf809e3ef76a320e5688bb22a816135c36ef981ce",
+      "left_unchanged": true
+    },
+    "/media/fat/linux/MediaPlayer_Helper": {
+      "bytes": 399340,
+      "sha256": "f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8",
+      "left_unchanged": true
+    },
+    "/media/fat/MiSTer": {
+      "bytes": 1170340,
+      "sha256": "01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9",
+      "readback_sha256": "01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9",
+      "verified": true
+    }
+  },
+  "backup": {
+    "file": "/home/vash/mister-builds/entry627-backup/MiSTer.pre624",
+    "bytes": 1170340,
+    "sha256": "0ee87029f0a00a50731707e8114363fc7019ae4c1200de85d90533c9163b5241"
+  },
+  "note": "Main only. RBF, helper, media and settings untouched. No reboot performed; Main needs a reboot to take effect."
+}

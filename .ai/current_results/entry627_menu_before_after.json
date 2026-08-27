@@ -1,0 +1,41 @@
+{
+  "main_before": "0ee87029f0a00a50731707e8114363fc7019ae4c1200de85d90533c9163b5241",
+  "main_after": "01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9",
+  "logging_before": "profile_version=1 transport=credit_fast_v1",
+  "logging_after": "profile_version=2 transport=credit_step_v1 poll_budget_us=2000 step_bytes=2048 step_limit=8",
+  "test1_before": {
+    "poll_max_us": 160937,
+    "interval_max_us": 170928,
+    "polls": 257,
+    "data_polls": 85,
+    "fast_bytes": 4879730,
+    "slow_bytes": 677119,
+    "acknowledged_share_pct": 12.2,
+    "user_menu": "laggy"
+  },
+  "test1_after": {
+    "poll_max_us": 9287,
+    "interval_max_us": 20910,
+    "polls": 42367,
+    "data_polls": 41770,
+    "fast_bytes": 5556849,
+    "slow_bytes": 0,
+    "acknowledged_share_pct": 0.0,
+    "user_menu": "perfect"
+  },
+  "poll_max_reduction_factor": 17.3,
+  "playback_unchanged": {
+    "pictures": 360,
+    "swaps": 359,
+    "error_flags": 0,
+    "deadline_gaps": 0,
+    "accepted_video_bytes": 3068039,
+    "largest_intervals": [
+      2002000,
+      2002000,
+      2002000
+    ],
+    "helper_bytes": 5556849
+  },
+  "caveat": "Observed maximum poll of 9287 microseconds exceeds the 2000 microsecond work budget, which the design never claimed as a hard bound. No button-response latency was measured; the menu verdict is the user report."
+}
