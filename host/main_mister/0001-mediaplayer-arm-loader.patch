@@ -191,7 +191,7 @@ new file mode 100644
 index 0000000..663f7b0
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,446 @@
+@@ -0,0 +1,454 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -418,8 +418,16 @@ index 0000000..663f7b0
 +{
 +	int pipefd[2];
 +	pid_t pid;
++	const char *audio_out;
 +
 +	if (!mediaplayer_is_core() || !source_spec || !*source_spec) return 0;
++	/*
++	 * The AC-3 decoder runs in the helper, so only the helper can choose
++	 * between decoded stereo and an IEC 61937 burst. Read the same OSD bit
++	 * the core uses for routing, here in the parent rather than after the
++	 * fork, and fix the mode for this playback.
++	 */
++	audio_out = user_io_status_get("[126]") ? "spdif" : "hdmi";
 +	mediaplayer_stop();
 +	diagnostic_open(source_spec, index);
 +	if (pipe(pipefd) < 0)
@@ -448,8 +456,8 @@ index 0000000..663f7b0
 +		close(pipefd[1]);
 +		if (diagnostic_fd >= 0 && diagnostic_fd != STDERR_FILENO)
 +			close(diagnostic_fd);
-+		execl(helper_path, "MediaPlayer_Helper", "--protocol", "1", "--source",
-+		      source_spec, (char *)NULL);
++		execl(helper_path, "MediaPlayer_Helper", "--protocol", "1",
++		      "--audio-out", audio_out, "--source", source_spec, (char *)NULL);
 +		fprintf(stderr, "MediaPlayer: cannot start %s: %s\n", helper_path, strerror(errno));
 +		_exit(127);
 +	}

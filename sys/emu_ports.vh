@@ -85,6 +85,11 @@ output [15:0] AUDIO_R,
 output        AUDIO_S,   // 1 - signed audio samples, 0 - unsigned
 output  [1:0] AUDIO_MIX, // 0 - no mix, 1 - 25%, 2 - 50%, 3 - 100% (mono)
 
+// MediaPlayer fork: 1 - AUDIO_L/R carry an IEC 61937 burst for S/PDIF and must
+// reach the pin unaltered while I2S is muted; 0 - normal mixed audio on I2S
+// with S/PDIF muted. Cores that do not drive it get the normal path.
+output        AUDIO_SPDIF_MODE,
+
 //ADC
 inout   [3:0] ADC_BUS,
 

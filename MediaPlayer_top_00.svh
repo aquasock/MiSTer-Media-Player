@@ -54,6 +54,14 @@ assign AUDIO_L = audio_pcm_output_l;
 assign AUDIO_R = audio_pcm_output_r;
 assign AUDIO_MIX = 2'd0;
 
+// Entry 617: S/PDIF AC-3 passthrough. The helper packs IEC 61937 bursts and
+// sends them down the ordinary PCM path, so the only thing this bit changes in
+// fabric is routing: the bursts must reach the S/PDIF pin unaltered and HDMI
+// must be muted rather than fed noise. Main reads the same status bit to pass
+// --audio-out to the helper, because the decoder runs there and only it can
+// choose whether to decode or pass through.
+assign AUDIO_SPDIF_MODE = status[126];
+
 // kate - Commit 180 displaces the LED_DISK file-load indicator again so it can
 // blink the progress_error conjunct sub-code, exactly as Commit 176 did and
 // Commit 177 reverted.  The assignment now lives with the rest of the blink
@@ -80,6 +88,7 @@ localparam CONF_STR = {
 	"O[125],Native pattern motion,Static,Moving;",
 	"O[120],Interlaced output,Native 480i,800x600 Diagnostic;",
 	"O[3:1],Audio test,Off,44.1k Mono,44.1k Stereo,48k Mono,48k Stereo;",
+	"O[126],Audio output,HDMI,S/PDIF AC-3;",
 	"-;",
 	"T[0],Reset;",
 	"R[0],Reset and close OSD;",

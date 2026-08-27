@@ -1601,6 +1601,8 @@ audio_out audio_out
 	.core_l(audio_l),
 	.core_r(audio_r),
 
+	.spdif_passthrough(audio_spdif_mode),
+
 `ifndef MISTER_DISABLE_ALSA
 	.alsa_l(alsa_l),
 	.alsa_r(alsa_r),
@@ -1680,6 +1682,7 @@ assign user_in[6] =         USER_IO[6];
 
 wire        clk_sys;
 wire [15:0] audio_l, audio_r;
+wire        audio_spdif_mode;
 wire        audio_s;
 wire  [1:0] audio_mix;
 wire  [1:0] scanlines;
@@ -1818,6 +1821,7 @@ emu emu
 	.AUDIO_R(audio_r),
 	.AUDIO_S(audio_s),
 	.AUDIO_MIX(audio_mix),
+	.AUDIO_SPDIF_MODE(audio_spdif_mode),
 
 	.ADC_BUS({ADC_SCK,ADC_SDO,ADC_SDI,ADC_CONVST}),
 

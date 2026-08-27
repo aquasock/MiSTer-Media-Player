@@ -47,6 +47,13 @@ module audio_out
 	input [15:0] core_l,
 	input [15:0] core_r,
 
+	// MediaPlayer fork: when high, S/PDIF carries core samples untouched for
+	// IEC 61937 passthrough and I2S is muted; when low, I2S carries the mixed
+	// audio as before and S/PDIF is muted. The passthrough path deliberately
+	// skips the filter, DC blocker and mixer, because each of those alters
+	// sample values and any alteration destroys a burst.
+	input        spdif_passthrough,
+
 	input [15:0] alsa_l,
 	input [15:0] alsa_r,
 
@@ -104,9 +111,12 @@ i2s i2s
 	.lrclk(i2s_lrclk),
 	.sdata(i2s_data),
 
-	.left_chan(al),
-	.right_chan(ar)
+	.left_chan(spdif_passthrough ? 16'd0 : al),
+	.right_chan(spdif_passthrough ? 16'd0 : ar)
 );
+
+wire [15:0] spdif_l = spdif_passthrough ? core_l : 16'd0;
+wire [15:0] spdif_r = spdif_passthrough ? core_r : 16'd0;
 
 spdif toslink
 (
@@ -115,7 +125,9 @@ spdif toslink
 	.clk_i(clk),
 	.bit_out_en_i(mclk_ce),
 
-	.sample_i({ar,al}),
+	.non_audio_i(spdif_passthrough),
+
+	.sample_i({spdif_r,spdif_l}),
 	.spdif_o(spdif)
 );
 

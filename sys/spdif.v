@@ -35,6 +35,11 @@ module spdif
     input           clk_i,
     input           rst_i,
 
+    // MediaPlayer fork: IEC 61937 passthrough. A compressed burst must be
+    // announced by channel status bit 1, otherwise the stream still claims to
+    // be linear PCM and a receiver is entitled to play it as noise.
+    input           non_audio_i,
+
     // SPDIF bit output enable
     // Single cycle pulse synchronous to clk_i which drives
     // the output bit rate.
@@ -172,7 +177,9 @@ begin
     else
         preamble_r = PREAMBLE_X; // X(M)
 
-    if (subframe_count_q[8:1] == 8'd2) // frame 2 => subframes 4 and 5 => 0 = copy inhibited, 1 = copy permitted
+    if (subframe_count_q[8:1] == 8'd1) // frame 1 => 0 = linear PCM, 1 = non-PCM data burst
+        channel_status_bit_r = non_audio_i;
+    else if (subframe_count_q[8:1] == 8'd2) // frame 2 => subframes 4 and 5 => 0 = copy inhibited, 1 = copy permitted
         channel_status_bit_r = 1'b1;
     else if (subframe_count_q[8:1] == 8'd15) // frame 15 => 0 = no indication, 1 = original media
         channel_status_bit_r = 1'b1;
