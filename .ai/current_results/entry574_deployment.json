@@ -1,0 +1,33 @@
+{
+ "source_commit": "deced5c",
+ "captured": "2026-08-27T00:39:00-07:00",
+ "operation": "host-side deployment of the instrumented MiSTer main binary",
+ "authorization": "user explicitly approved deployment in this session and explicitly requested a backup first; standing RBF authorization does not cover this and was not relied on",
+ "fpga_image_untouched": {
+  "path": "/media/fat/MediaPlayer.rbf",
+  "sha256": "fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347",
+  "note": "no Quartus build was performed and the qualified 2acabc5 bitstream remains installed"
+ },
+ "backup": {
+  "path": "/home/vash/mister-builds/entry573-deced5c/entry573_MiSTer_backup_pre_deced5c.bin",
+  "bytes": 1166244,
+  "sha256": "5a6cbf7e85682ac301d57470b8b2c952d3bbfa42af55484bd70dd0d36724ae96",
+  "verification": "full FTP readback with size checked against the SIZE command, then re-hashed from local disk after writing",
+  "location_note": "held outside the repository because a 1.1 MB system binary does not belong in git"
+ },
+ "deployed": {
+  "path": "/media/fat/MiSTer",
+  "bytes": 1166244,
+  "sha256": "bd182e9c26e91bb3bdb140835dbda40a0f0a8179060fa47939cbb6c073ecf1dd",
+  "local_copy": "/home/vash/mister-builds/entry573-deced5c/MiSTer.deced5c"
+ },
+ "method": "uploaded to /media/fat/MiSTer.new, verified the staged copy by full readback and hash comparison before any rename, then renamed over the live path so the running binary's inode was never written; a fresh independent FTP connection then read back the entire active file",
+ "verification_result": "staged and active readbacks both return 1,166,244 bytes with sha256 bd182e9c26e91bb3bdb140835dbda40a0f0a8179060fa47939cbb6c073ecf1dd, matching the build exactly; no staging file remains and permissions read -rwxr-xr-x",
+ "size_coincidence": "the replaced and replacing binaries are both 1,166,244 bytes; the hashes differ, so identical size is coincidental alignment and not a failed write",
+ "effective_when": "the replaced binary takes effect on the next boot; the currently running process retains the old inode until then",
+ "scope_limitations": [
+  "No playback has been run against the instrumented binary yet; this entry records deployment only.",
+  "The instrumentation is observational and no behavioural change is intended, but that has not yet been confirmed on hardware.",
+  "Restoration is a single FTP upload of the recorded backup should the instrumented binary misbehave."
+ ]
+}

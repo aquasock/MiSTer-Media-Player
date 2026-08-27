@@ -1,3 +1,32 @@
+## 574 COMMIT Unreleased deced5c 2026-08-27T00:40:07-07:00
+
+#### Coming From:
+
+Unreleased deced5c
+
+#### Purpose:
+
+Back up and replace the host-side MiSTer main binary with the instrumented `deced5c` build under explicit user approval.
+
+#### Outcome:
+
+The user explicitly approved deployment and explicitly asked for a backup first, so standing RBF authorization was neither needed nor relied upon; this replaces a system binary rather than a core image and was treated accordingly. The existing `/media/fat/MiSTer` was read back in full over FTP at 1,166,244 bytes, its length checked against the server's own size report, written to disk and then re-hashed from disk, giving SHA-256 `5a6cbf7e85682ac301d57470b8b2c952d3bbfa42af55484bd70dd0d36724ae96`. That backup is held at `/home/vash/mister-builds/entry573-deced5c/` outside the repository, because a 1.1-megabyte system binary does not belong in git, and restoring it is a single FTP upload should the instrumented build misbehave. Deployment avoided writing into the running binary's inode. The new image was uploaded to `/media/fat/MiSTer.new`, that staged copy was read back in full and hash-compared before anything was renamed, and only then was it renamed over the live path, which unlinks the old inode while the running process keeps its own. A fresh independent FTP connection then read back the entire active file. Staged and active readbacks both return 1,166,244 bytes with SHA-256 `bd182e9c26e91bb3bdb140835dbda40a0f0a8179060fa47939cbb6c073ecf1dd`, matching the build exactly, no staging file remains, and permissions read as `-rwxr-xr-x`. The replaced and replacing binaries are both 1,166,244 bytes; since their hashes differ, the identical length is coincidental alignment in a stripped image and not a failed or partial write. The FPGA bitstream is untouched. No Quartus build was performed for this boundary and the qualified `2acabc5` image with SHA-256 `fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347` remains installed at `/media/fat/MediaPlayer.rbf`. The replacement takes effect on the next boot, since the currently running process retains the old inode until then. No playback has yet been run against the instrumented binary, so this entry records deployment only; the instrumentation is intended to be purely observational with no behavioural change, and that expectation is not yet confirmed on hardware. Evidence is `.ai/current_results/entry574_deployment.json`.
+
+#### Next Steps:
+
+Have the user power-cycle at the wall, load the core, play the file once and then stop without replaying, so `/tmp/MediaPlayer_ARM.log` survives for collection; a replay overwrites it, which is exactly how the cold log was lost in entry 571. Verify the power cycle from `/tmp/messages` rather than from recollection, since that check has already contradicted the reported procedure twice. Fetch the helper log first and the cadence screenshot second, then confirm three things: that the measured assertion-to-first-byte latency falls within the 13.9 to 63.8 millisecond band inferred in entry 572, that the timestamped blocked-poll records account for that interval rather than leaving it unexplained, and that cadence behaviour is unchanged from the uninstrumented build so the observation is confirmed non-invasive. Because entry 572 showed cold is not deterministic, with three of four verified cold runs gapping and one clean, expect to repeat this for at least two further verified cold samples before the dead-time distribution is usable. If the measurement confirms the inference, propose the helper-side correction of priming the media source before asserting download as a separate approved boundary. Hold the startup-absorption candidate in reserve and treat its margin as unsafe, the 64-KiB queue covering 64.9 milliseconds against a worst observed 63.8. Do not raise the per-poll chunk budget, which entry 572 ruled out. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 573 COMMIT Unreleased deced5c 2026-08-27T00:31:44-07:00
 
 #### Coming From:
@@ -1186,34 +1215,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 534 COMMIT Unreleased 1f80432 2026-08-26T04:59:18-07:00
-
-#### Coming From:
-
-Unreleased 164c7e6
-
-#### Purpose:
-
-Make the Media Player file selector open the core's resolved games directory instead of a previously selected path.
-
-#### Outcome:
-
-Commit `1f80432` confines the change to one hunk in the pinned MiSTer Main patch. When MediaPlayer opens its generic file selector, Main now passes `user_io_get_core_path(NULL, 1)` so its established storage and prefix rules resolve `/media/fat/games/MediaPlayer`; every other core retains its remembered `Selected_F` behavior. The complete patch applies cleanly to pinned Main commit `0a8fb44`, and the FPGA RBF and ARM media helper are unchanged. The official Arm GNU 10.2-2020.11 archive verifies at the established SHA-256 `102825ae56c9e00142d06f35d2bdd3299edb6060e84a275a25b095e66fd3fc2a` and identifies as GCC 10.2.1. Two clean GUNSMOKE builds are byte-identical, each producing a 1,166,244-byte ARM EABI5 executable at SHA-256 `0ec0d60bf415dc96765e20f00df838e4f3d1b5a7d1e70490e8daad174b20ee26`. Deployment waited until the user's active playback and terminal capture were complete. Because Linux rejected an in-place write of the running executable as text-busy, the resolved `/media/fat/MiSTer` path was directly deleted and rewritten in one FTP session with automatic local recovery available; independent readback is byte-identical at the expected size and hash. No MiSTer backup, rollback or staging filename was created, and no restart was triggered.
-
-#### Next Steps:
-
-Restart the MiSTer when convenient, reload MediaPlayer and open its media selector. Hardware acceptance requires the selector to begin in `/media/fat/games/MediaPlayer`, permit the intended file to be selected normally and leave another core's remembered selector path unchanged. The installed executable is already verified, but the entry remains unpassed until that post-restart behavior is observed.
-
-#### Files Modified:
-
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
