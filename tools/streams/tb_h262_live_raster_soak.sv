@@ -15,6 +15,12 @@
 // same 3-I/22-P/47-B repeated-GOP transaction sequence as the 720x480 stream.
 module tb_h262_live_raster_soak #(
     parameter integer MIXED_PIXEL_MODE=0,
+    // Entry 550: the pixel oracle was hardwired to the 128x96 progressive
+    // mixed-raster fixture, so no interlaced 480i stream could ever be
+    // pixel-checked.  Defaults preserve that fixture exactly.
+    parameter integer PIXEL_WIDTH=128,
+    parameter integer PIXEL_HEIGHT=96,
+    parameter integer PIXEL_PICTURES=24,
     parameter integer MEMORY_READ_LATENCY=1,
     parameter integer SWAP_WINDOW_CYCLES=10000,
     parameter integer FREEZE_TRACE_CYCLES=2000000,
@@ -37,7 +43,17 @@ module tb_h262_live_raster_soak #(
     reg generic_stream=0;
     reg [7:0] stream_data=0;
     reg [7:0] stream_mem[0:MAX_STREAM_BYTES-1];
-    reg [7:0] pixel_oracle[0:442367];
+    localparam integer PIXEL_CWIDTH   = PIXEL_WIDTH/2;
+    localparam integer PIXEL_CHEIGHT  = PIXEL_HEIGHT/2;
+    localparam integer PIXEL_LUMA     = PIXEL_WIDTH*PIXEL_HEIGHT;
+    localparam integer PIXEL_CHROMA   = PIXEL_CWIDTH*PIXEL_CHEIGHT;
+    localparam integer PIXEL_CB_BASE  = PIXEL_LUMA;
+    localparam integer PIXEL_CR_BASE  = PIXEL_LUMA+PIXEL_CHROMA;
+    localparam integer PIXEL_PICBYTES = PIXEL_LUMA+2*PIXEL_CHROMA;
+    localparam integer PIXEL_ORACLE_MAX = PIXEL_PICBYTES*PIXEL_PICTURES-1;
+    localparam integer PIXEL_LUMA_WORDS   = PIXEL_WIDTH/8;
+    localparam integer PIXEL_CHROMA_WORDS = PIXEL_CWIDTH/8;
+    reg [7:0] pixel_oracle[0:PIXEL_ORACLE_MAX];
     reg [63:0] ddr_mem[0:DDR_WORDS-1];
     reg [1023:0] hex_path,pixel_path,prediction_trace_path,row_trace_path;
     reg [1023:0] b_block_trace_path;
@@ -138,6 +154,8 @@ module tb_h262_live_raster_soak #(
     reg [28:0] profile_victim_evicted_tag;
     integer pixel_samples=0,pixel_mismatches=0,max_pixel_delta=0;
     integer pixel_index,pixel_delta,pixel_row,pixel_word,pixel_lane;
+    integer pixel_even_samples=0,pixel_odd_samples=0;
+    integer pixel_even_mismatches=0,pixel_odd_mismatches=0;
     reg first_pixel_mismatch=0;
 
     function automatic [18:0] reference_frame_offset;
@@ -496,7 +514,7 @@ module tb_h262_live_raster_soak #(
         if(MIXED_PIXEL_MODE)begin
             if(!$value$plusargs("PIXELS=%s",pixel_path))
                 $fatal(1,"missing +PIXELS");
-            $readmemh(pixel_path,pixel_oracle,0,442367);
+            $readmemh(pixel_path,pixel_oracle,0,PIXEL_ORACLE_MAX);
         end
         if((stream_len<=0)||(stream_len>MAX_STREAM_BYTES))
             $fatal(1,"invalid LEN %0d",stream_len);
@@ -1060,9 +1078,11 @@ module tb_h262_live_raster_soak #(
             if(presentation_hold)profile_presentation<=profile_presentation+1;
         end
         if(MIXED_PIXEL_MODE&&pred_store_valid)begin
-            if(temporal_reference>=24||pixel_component>=3||
-               (pixel_component==0&&(pixel_x>=128||pixel_y>=96))||
-               (pixel_component!=0&&(pixel_x>=64||pixel_y>=48)))
+            if(temporal_reference>=PIXEL_PICTURES||pixel_component>=3||
+               (pixel_component==0&&
+                (pixel_x>=PIXEL_WIDTH||pixel_y>=PIXEL_HEIGHT))||
+               (pixel_component!=0&&
+                (pixel_x>=PIXEL_CWIDTH||pixel_y>=PIXEL_CHEIGHT)))
                 $fatal(1,"mixed pixel coordinate/tag error tr=%0d c=%0d x=%0d y=%0d raw=%h/%h refs=%0d/%0d active=%0d p_ref=%0d b_mbi=%0d b_col=%0d b_blk=%0d b_ei=%0d bank=%0d prefetch=%0d",
                        temporal_reference,pixel_component,pixel_x,pixel_y,
                        pred_store_x,pred_store_y,previous_reference_bank,
@@ -1073,20 +1093,30 @@ module tb_h262_live_raster_soak #(
                        prediction.b_probe.ei,
                        prediction.b_probe.block_consumer_bank,
                        prediction.b_probe.block_prefetch_valid);
-            pixel_index=temporal_reference*18432;
+            pixel_index=temporal_reference*PIXEL_PICBYTES;
             if(pixel_component==0)
-                pixel_index=pixel_index+pixel_y*128+pixel_x;
+                pixel_index=pixel_index+pixel_y*PIXEL_WIDTH+pixel_x;
             else if(pixel_component==1)
-                pixel_index=pixel_index+12288+pixel_y*64+pixel_x;
+                pixel_index=pixel_index+PIXEL_CB_BASE+
+                            pixel_y*PIXEL_CWIDTH+pixel_x;
             else
-                pixel_index=pixel_index+15360+pixel_y*64+pixel_x;
+                pixel_index=pixel_index+PIXEL_CR_BASE+
+                            pixel_y*PIXEL_CWIDTH+pixel_x;
             pixel_delta=$signed({1'b0,pred_store_value})-
                 $signed({1'b0,pixel_oracle[pixel_index]});
             if(pixel_delta<0)pixel_delta=-pixel_delta;
             pixel_samples=pixel_samples+1;
+            if(pixel_component==0)begin
+                if(pixel_y[0]) pixel_odd_samples=pixel_odd_samples+1;
+                else pixel_even_samples=pixel_even_samples+1;
+            end
             if(pixel_delta>max_pixel_delta)max_pixel_delta=pixel_delta;
             if(pixel_delta>2)begin
                 pixel_mismatches=pixel_mismatches+1;
+                if(pixel_component==0)begin
+                    if(pixel_y[0]) pixel_odd_mismatches=pixel_odd_mismatches+1;
+                    else pixel_even_mismatches=pixel_even_mismatches+1;
+                end
                 if(!first_pixel_mismatch)begin
                     first_pixel_mismatch=1;
                     $display("MIXED_PIXEL_FIRST tr=%0d c=%0d x=%0d y=%0d rtl=%0d oracle=%0d delta=%0d",
@@ -1133,26 +1163,30 @@ module tb_h262_live_raster_soak #(
         // against real reference content instead of the historical zero fill.
         if(MIXED_PIXEL_MODE&&picture_complete&&
            picture_coding_type==3'b001)begin
-            for(pixel_row=0;pixel_row<96;pixel_row=pixel_row+1)
-                for(pixel_word=0;pixel_word<16;pixel_word=pixel_word+1)
+            for(pixel_row=0;pixel_row<PIXEL_HEIGHT;pixel_row=pixel_row+1)
+                for(pixel_word=0;pixel_word<PIXEL_LUMA_WORDS;
+                    pixel_word=pixel_word+1)
                     for(pixel_lane=0;pixel_lane<8;pixel_lane=pixel_lane+1)
                         ddr_mem[reference_frame_offset(completed_bank)+
                                 pixel_row*90+pixel_word]
                             [pixel_lane*8 +: 8]=
-                            pixel_oracle[pixel_row*128+
+                            pixel_oracle[pixel_row*PIXEL_WIDTH+
                                          pixel_word*8+pixel_lane];
-            for(pixel_row=0;pixel_row<48;pixel_row=pixel_row+1)
-                for(pixel_word=0;pixel_word<8;pixel_word=pixel_word+1)
+            for(pixel_row=0;pixel_row<PIXEL_CHEIGHT;pixel_row=pixel_row+1)
+                for(pixel_word=0;pixel_word<PIXEL_CHROMA_WORDS;
+                    pixel_word=pixel_word+1)
                     for(pixel_lane=0;pixel_lane<8;pixel_lane=pixel_lane+1)begin
                         ddr_mem[reference_frame_offset(completed_bank)+
                                 18'h0a8c0+pixel_row*45+pixel_word]
                             [pixel_lane*8 +: 8]=
-                            pixel_oracle[12288+pixel_row*64+
+                            pixel_oracle[PIXEL_CB_BASE+
+                                         pixel_row*PIXEL_CWIDTH+
                                          pixel_word*8+pixel_lane];
                         ddr_mem[reference_frame_offset(completed_bank)+
                                 18'h0d2f0+pixel_row*45+pixel_word]
                             [pixel_lane*8 +: 8]=
-                            pixel_oracle[15360+pixel_row*64+
+                            pixel_oracle[PIXEL_CR_BASE+
+                                         pixel_row*PIXEL_CWIDTH+
                                          pixel_word*8+pixel_lane];
                     end
         end
@@ -1501,8 +1535,10 @@ module tb_h262_live_raster_soak #(
                      presentation_complete,probe_error,pred_error,
                      writer_error,presentation_error);
             if(MIXED_PIXEL_MODE)begin
-                $display("MIXED_PIXEL_RESULT samples=%0d mismatches=%0d max_delta=%0d",
-                         pixel_samples,pixel_mismatches,max_pixel_delta);
+                $display("MIXED_PIXEL_RESULT samples=%0d mismatches=%0d max_delta=%0d even=%0d/%0d odd=%0d/%0d",
+                         pixel_samples,pixel_mismatches,max_pixel_delta,
+                         pixel_even_mismatches,pixel_even_samples,
+                         pixel_odd_mismatches,pixel_odd_samples);
                 if(stream_index!=stream_len||p_rows!=48||p_pictures!=8||
                    b_rows!=90||b_pictures!=15||published_references!=9||
                    picture_count!=9||reference_promotion_count!=9||
@@ -1897,6 +1933,11 @@ module tb_h262_live_raster_soak #(
             if((FREEZE_TRACE_CYCLES!=0)&&
                (freeze_cycles==FREEZE_TRACE_CYCLES))begin
                 $display("FREEZE byte=%0d cycles=%0d", stream_index, total_cycles);
+                if(MIXED_PIXEL_MODE)
+                    $display("MIXED_PIXEL_RESULT samples=%0d mismatches=%0d max_delta=%0d even=%0d/%0d odd=%0d/%0d",
+                             pixel_samples,pixel_mismatches,max_pixel_delta,
+                             pixel_even_mismatches,pixel_even_samples,
+                             pixel_odd_mismatches,pixel_odd_samples);
                 $display("FREEZE_PROD state=%0d piccap=%0d cand=%0d proof=%0d waiting=%0d hold=%0d outstanding=%0d finalq=%0d blocked=%0d rearm=%0d err=%0d/%0d",
                     publication.p_controller.wide_general_probe.parser_state,
                     publication.p_controller.wide_general_probe.picture_capture,
