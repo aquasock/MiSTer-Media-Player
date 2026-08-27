@@ -1,3 +1,33 @@
+## 560 COMMIT Unreleased ??? 2026-08-26T22:15:02-07:00
+
+#### Coming From:
+
+Unreleased 31a87b6
+
+#### Purpose:
+
+Evaluate input buffering and startup reserve with the real decode pipeline before selecting a cadence correction.
+
+#### Outcome:
+
+The user approved the simulation work recommended after entry 559. The boundary is an extension of the real frontend, I reconstruction, writer and scheduler observer through the existing HPS stream FIFO, transport gate, metadata extractor and clean-video queue. Behavioral FIFO primitives must explicitly model their supported contracts and retain byte-order checks; refill schedules are controlled scenarios, not a recovered hardware trace. Input-ready/empty observations must be separated from critical parser waits and overlapping transform work. Compare the unchanged input path against bounded queue-capacity and startup-reserve experiments, checking picture order, reconstructed content, final drain and reset behavior. Preserve the accepted HDMI sync, production scheduler and all active hardware settings. No new playback image is authorized solely by an artificial-delay reproduction; select and document a justified candidate after evaluating the evidence and its limits.
+
+#### Next Steps:
+
+Publish this approved plan, commit a reproducible simulation harness and runner, validate its always-available control against the prior real-pipeline observer, then exercise bounded refill pauses and compare buffering and startup reserve. Use the exact test file, include short-prefix controls for fast iteration and full-stream runs for the picture-348 region, and retain replay/reset and byte/content checks. Record model limitations and measured tradeoffs before proposing the next production change or requesting another hardware run.
+
+#### Files Modified:
+
+- tools/streams/tb_h262_input_cadence.sv
+- tools/streams/run_input_cadence.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 559 COMMIT Unreleased 31a87b6 2026-08-26T22:13:16-07:00
 
 #### Coming From:
@@ -1202,41 +1232,6 @@ Reload the core and repeat `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` 
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 520 COMMIT Unreleased bfb9361 2026-08-25T20:00:21-07:00
-
-#### Coming From:
-
-Unreleased 2668c8f
-
-#### Purpose:
-
-Repair and complete the session-wide per-field luma-content diagnostic so its telemetry is structurally valid and independently regression-protected.
-
-#### Outcome:
-
-The user approved continuation after recovery reproduced the uncommitted schema-fourteen profiler regression failure and identified it as an unintended no-progress test snapshot rather than an asserted design error: the added luma-return stimulus extended a deliberately short test interval beyond the sixty-four-cycle watchdog while none of those passive diagnostic events are, or should become, production session progress. Commit `afdece5` supplies one genuine decoder-byte acceptance inside that directed scenario while leaving the production watchdog unchanged, exports each raw native luma return from the framebuffer and accumulates per-parity signature, reference and varied state across the entire profiler session. It also corrects snapshot word forty to exactly thirty-two bits, adds an independently summed elaboration-time width guard, advances the cadence format to schema fourteen and labels schema-fourteen content evidence as session scoped while retaining schema-thirteen, schema-ten and legacy decoding at their original layouts. Icarus and Verilator accepted a packed-structure implementation of the width-safe word, but the first Quartus Prime 17.0.2 analysis rejected that syntax; no image was produced from it. Correction commit `bfb9361` expresses the same independently sized payload through explicit vector slices compatible with the target compiler. The focused profiler passes schema fourteen at checksum `e2266429`; decoder layout passes schema fourteen, thirteen, ten and legacy at their established 428/308/43, 428/308/43, 436/316/41 and 444/324/38 origins and word counts. The complete native suite passes field order, mapping, exact TFF and BFF timing, Bob and Weave selection, timing-pattern isolation, ownership, the long presentation integration, every cache mode, the profiler and decoder. Its long integration retains twenty windows and forty fields, ten serialized, thirteen overlapped and twenty-one accelerated decoded pictures with twenty accelerated presentations, plus eight decoded and eight presented terminal pictures with empty terminal state. TFF, BFF and progressive reconstruction pass at 7,926,459, 7,948,706 and 13,048,137 cycles with zero out-of-tolerance pixels, field-DCT rejection passes at 82,326 cycles, and the canonical mixed I/P/B live raster remains exactly 6,529,997 cycles with twenty-five publications, forty-seven B-picture persistences, seventy-one swaps and every error clear. A clean from-scratch Quartus Prime 17.0.2 build of `bfb9361` completes in 11 minutes 2 seconds with zero errors and 143 warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.281, 0.244, 3.271, 0.595 and 0.925 nanoseconds with zero endpoint total negative slack. Focused decoder setup and recovery are positive 1.617 and 6.784 nanoseconds and focused video setup is positive 2.959 nanoseconds, all with zero violated paths; only the established unmatched `RESET` filter remains. Fit uses 29,706 ALMs, 45,755 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. A timing-netlist probe finds all eight bits of both session signatures and both varied-state keepers; the reference and seen intermediates are optimized into that retained logic. The 4,188,256-byte RBF has SHA-256 `4f51994b786a6728a1ce57d120fec12c889460bfbbce7757354ad523bb7c29df`. Deployment stopped before any write because two independent ordinary-FTP reads found the active `/media/fat/MediaPlayer.rbf` to be a stable but unrecognized 4,200,652-byte file at SHA-256 `98c73c1b23499e5461fa789b3b77fbf59d798e957b9f7e9357bf6d932009a615`, rather than entry 519's logged 4,205,620-byte `2668c8f` image at `c0eb30d2181b613a383b506bb30482f700c92c17eff7da33b082d049ac05c197`. No remote file was changed.
-
-#### Next Steps:
-
-Identify or explicitly authorize replacement of the unrecognized active RBF before deployment. If replacement is approved, preserve that exact 4,200,652-byte file as `/media/fat/MediaPlayer.rbf.rollback-pre-bfb9361`, retrieve and verify the rollback copy at SHA-256 `98c73c1b23499e5461fa789b3b77fbf59d798e957b9f7e9357bf6d932009a615`, stage and round-trip verify the `bfb9361` candidate, promote it, verify the active file at SHA-256 `4f51994b786a6728a1ce57d120fec12c889460bfbbce7757354ad523bb7c29df` and remove only the temporary stage. Leave helper, media, Main and MiSTer configuration untouched. Reload the core and repeat `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with a live burst, reading both session-wide varied flags and signatures from the same symptom-bearing run. A first field whose returns never vary across the whole session while the second field's do proves the data is already wrong when it arrives and moves the search upstream of the framebuffer; both parities varying proves correct data arrives and is lost afterwards.
-
-#### Files Modified:
-
-- `MediaPlayer_top_06.svh`
-- `MediaPlayer_top_07.svh`
-- `rtl/mpeg2_luma_framebuffer.sv`
-- `rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv`
-- `tools/streams/decode_hardware_cadence.py`
-- `tools/streams/tb_h262_hardware_cadence_profiler.sv`
-- `tools/streams/test_decode_hardware_cadence.py`
 
 #### Status:
 
