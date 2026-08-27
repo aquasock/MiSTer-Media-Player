@@ -1201,4 +1201,3 @@ Do not trust the pixel harness until the progressive control passes; establishin
 - [x] Passed
 
 ---
-
