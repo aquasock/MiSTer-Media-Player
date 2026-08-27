@@ -348,7 +348,7 @@ index 0000000..5ed0c50
 +
 +void mediaplayer_poll()
 +{
-+	uint8_t buffer[4096];
++	uint8_t buffer[16384];
 +	int chunks = 0;
 +
 +	if (helper_fd < 0) return;
