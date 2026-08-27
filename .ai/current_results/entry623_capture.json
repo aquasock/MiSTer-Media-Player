@@ -1,0 +1,41 @@
+{
+  "captured": "2026-08-27T09:20:37.945586-07:00",
+  "user_report": "Tests 1 and 2 fail: top bar never moves and MiSTer menu becomes very slow. Test-to-file mapping not yet confirmed.",
+  "files": {
+    "/tmp/MediaPlayer_ARM.log": {
+      "local": "helper.log",
+      "bytes": 44343,
+      "sha256": "5f3c73f71b18d4a66b9220963034b97b4d454aa881cf057e23ed84d55d2f9a22"
+    },
+    "/tmp/messages": {
+      "local": "messages.log",
+      "bytes": 37590,
+      "sha256": "2705ab73c2f479b8dfe532818d7d528170acd3c671f82a6f4064a7f0d3986a40"
+    },
+    "/media/fat/screenshots/cadence_probe.png": {
+      "local": "screen.png",
+      "bytes": 6735,
+      "sha256": "6336ccf80c900c9100a11b04f7c2809e489b21ca69ac71918d4850ba7992b340"
+    },
+    "/media/fat/MiSTer": {
+      "local": "MiSTer",
+      "bytes": 1170340,
+      "sha256": "0ee87029f0a00a50731707e8114363fc7019ae4c1200de85d90533c9163b5241"
+    },
+    "/media/fat/MediaPlayer.rbf": {
+      "local": "MediaPlayer.rbf",
+      "bytes": 4332740,
+      "sha256": "61a2fed28425a461c8b886bdf809e3ef76a320e5688bb22a816135c36ef981ce"
+    }
+  },
+  "errors": [],
+  "operations": [
+    "RETR /tmp/MediaPlayer_ARM.log",
+    "RETR /tmp/messages",
+    "DELE /media/fat/screenshots/cadence_probe.png",
+    "STOR screenshot command only",
+    "RETR /media/fat/screenshots/cadence_probe.png",
+    "RETR /media/fat/MiSTer",
+    "RETR /media/fat/MediaPlayer.rbf"
+  ]
+}

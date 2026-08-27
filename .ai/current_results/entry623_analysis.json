@@ -1,0 +1,86 @@
+{
+  "source_commit": "44ee05a",
+  "user_report": "Tests 1 and 2 fail: top bar never moves and MiSTer menu becomes very slow. Test-to-file mapping not yet confirmed.",
+  "test_mapping": "Target listing and uncommitted GUNSMOKE generator identify test_1_interlace_tff.mpg and test_2_interlace_bff.mpg; no distinct helper logs or telemetry for those runs remain in this capture.",
+  "fixture_analysis": [
+    {
+      "file": "test_1_interlace_tff.mpg",
+      "bytes": 2275345,
+      "sha256": "8d4b1b5fdda07cccfdb47dc33c2a8080171f2f66cdf7d47a85e04adf75c8b197",
+      "decoded_frames": 360,
+      "distinct_decoded_frame_hashes": 1,
+      "decoded_frame_hashes": [
+        "30809417f1caba5a06194ea6f01bd4da"
+      ],
+      "first_frame_bright_rows": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "decoder_stderr": ""
+    },
+    {
+      "file": "test_2_interlace_bff.mpg",
+      "bytes": 2275345,
+      "sha256": "010bca93c09ac734344324ffd62234c29cfdb32480cdc4bcff0eecd1e313f794",
+      "decoded_frames": 360,
+      "distinct_decoded_frame_hashes": 1,
+      "decoded_frame_hashes": [
+        "30809417f1caba5a06194ea6f01bd4da"
+      ],
+      "first_frame_bright_rows": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "decoder_stderr": ""
+    }
+  ],
+  "current_capture_source": "test_5_audio_ac3_51.mpg",
+  "current_capture_mode": "hdmi (decoded stereo PCM), explicitly logged",
+  "current_capture_telemetry": {
+    "checksum": 2300824580,
+    "reference_pictures": 360,
+    "display_pictures": 360,
+    "display_swaps": 359,
+    "error_flags": 0,
+    "deadline_gap_count": 0,
+    "sequence_end_seen": true,
+    "session_quiet": true
+  },
+  "profile": {
+    "polls": 395,
+    "poll_us": 11785586,
+    "poll_max_us": 189354,
+    "data_polls": 68,
+    "data_poll_us": 11783157,
+    "intervals": 394,
+    "interval_us": 11818852,
+    "interval_max_us": 189457,
+    "read_calls": 599,
+    "read_us": 412245,
+    "tx_calls": 272,
+    "tx_us": 11356220,
+    "tx_max_us": 58356,
+    "ack_chunks": 4,
+    "fast_bytes": 3756530,
+    "slow_bytes": 687449,
+    "burst_calls": 525087,
+    "status_queries": 869084,
+    "transport_mode": 2
+  },
+  "installed_helper_sha256": "f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8",
+  "menu_explanation": "Supporting evidence, not direct test-1/2 reproduction: mediaplayer_poll_inner performs up to four blocking 16384-byte transfers; the credit API drains the entire requested chunk and falls back to acknowledged writes at zero credit instead of returning to Main. Test-5 maximum media poll duration is 189354 us; tx duration max 58356 us.",
+  "generator_state": "GUNSMOKE has uncommitted generate_test_suite.py and a modified generate_test_dvd_ceiling.py; neither was edited, staged or committed by this investigation. BAR uses drawbox y=t*480-480*floor(t); both installed outputs are independently proven static. The interlace filter always uses interleave_top even for the BFF case, then changes metadata; correct temporal field placement must be verified after fixing motion.",
+  "scope": "No production edits, builds, deployments, mode changes, playback, reboot or reload. Only fixed screenshot regenerated. Hardware failure diagnosis for tests 1 and 2 is incomplete because their logs were overwritten; stationary bar is independently proven to be in the fixtures."
+}

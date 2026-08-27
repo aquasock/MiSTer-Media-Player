@@ -1,3 +1,32 @@
+## 623 COMMIT Unreleased 44ee05a 2026-08-27T09:24:06-07:00
+
+#### Coming From:
+
+Unreleased 44ee05a
+
+#### Purpose:
+
+Separate faulty motion fixtures from the reported slow menu in regression tests one and two.
+
+#### Outcome:
+
+The user reports that tests one and two leave the top bar stationary and make the MiSTer menu very slow. The target listing and an uncommitted GUNSMOKE generator identify test_1_interlace_tff.mpg and test_2_interlace_bff.mpg. Both exact target files are read back and independently decoded with FFmpeg on GUNSMOKE: each contains 360 identical decoded frames, with the white bar fixed at rows zero through seven, and both share decoded-frame MD5 30809417f1caba5a06194ea6f01bd4da. Their compressed hashes differ only as separate fixtures and are retained in the evidence. The stationary bar is therefore authored into the test files, not evidence that the core froze, and these files cannot qualify motion or field order. The generator uses a suspect drawbox position expression, always interleave_top for both field orders and a later signalling patch; fixing motion must also establish correct BFF temporal field placement rather than just changing the flag. The generator and its companion check_structure edit exist only as uncommitted GUNSMOKE work and are preserved untouched. Initial helper log collection precedes the screenshot, but the fixed log has already been overwritten by test_5_audio_ac3_51.mpg, explicitly logged in HDMI decoded-stereo mode. That capture has checksum 2300824580, all 360 reference/display pictures and 359 swaps, zero errors and deadline gaps, sequence end and quiet completion, and helper exit zero after 4,443,979 transport bytes. It is not a capture of either failed run and does not qualify the other tests. Installed RBF, Main and helper match the accepted seed-17 aa7f064, patched Main and 078d36b helper hashes. The menu complaint has separate supporting evidence: test five records a maximum Main media-poll duration of 189,354 microseconds and a maximum single transfer of 58,356 microseconds. Main performs up to four complete 16 KB transfers per poll, and the credit API drains each whole chunk, falling back to acknowledged writes at zero credit instead of yielding to the UI. The user then explicitly leaves test one on screen, allowing a separate helper-first capture of test_1_interlace_tff.mpg with PID 909 and checksum 2300351100. It completes all 360 reference/display pictures and 359 swaps, with zero errors, underruns, timestamp conflicts, deadline gaps or outliers, sequence end and quiet completion. All 272 read records reconcile to 4,443,951 submitted bytes and helper exit zero; the installed Main and RBF hashes remain unchanged. Its own profile confirms a 189,409-microsecond maximum media-poll call, 204,524 microseconds between poll entries and a 62,454-microsecond maximum single transfer. This directly documents long event-loop occupancy on test one and supports the reported menu sluggishness without inventing a measured button-response latency. The stationary file is played to completion rather than freezing in this run. Test two still lacks dedicated hardware telemetry, and no Bob/Weave selection or reboot/reload lifecycle is inferred. No production source, build, deployment, setting, reboot, reload or playback changes occur; only the fixed screenshot is regenerated. Exact capture, frame identities, generator snapshot and analysis are retained as .ai/current_results/entry623_*, with full diagnostic media off Git under /home/vash/mister-builds/regression_failure_20260827_092037. Built refers to the unchanged accepted installation; these regression tests remain unaccepted.
+
+#### Next Steps:
+
+Correct and publish the fixture generator from the preserved draft in coordination with its existing uncommitted work, requiring independently decoded motion at successive fields, correct TFF and BFF temporal ordering, supported syntax and preserved audio before replacing test media. The separate Main responsiveness fix should use resumable bounded transfer progress that returns to the event loop when credits are unavailable, preserves unsent bytes and count/digest checks, and handles EOF, cancellation, reset and odd byte tails without loss or premature completion. Scope and qualify that host change before deployment; do not weaken transport checks or alter FPGA clocks, queues or decode logic to hide a fixture defect. Test one needs no further identical replay: the fixture defect and long host-poll occupancy are already established. Test two remains without a dedicated hardware capture, but the same stationary-content defect is independently proven in its file. Capture each corrected test before a later run overwrites its log. Do not declare release regression complete on the strength of entry 622 audio acceptance. Preserve user control of lifecycle and deployment, restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 622 COMMIT Unreleased 44ee05a 2026-08-27T09:00:58-07:00
 
 #### Coming From:
@@ -1162,34 +1191,3 @@ None.
 - [ ] Passed
 
 ---
-
-## 583 COMMIT Unreleased 32ba178 2026-08-27T01:37:49-07:00
-
-#### Coming From:
-
-Unreleased ad364bf
-
-#### Purpose:
-
-Separate helper pipe-read time, acknowledged FPGA-transfer cost and main-loop blocking with bounded host-side profiling.
-
-#### Outcome:
-
-Local source `32ba178` implements the approved host profiling in the existing pinned Main_MiSTer integration patch and adds one focused regression. The 16 KiB buffer, four-chunk limit, ordinary unsampled transfer function, both ACK phases and odd-byte handling are preserved. Per-read records separate pipe-read and complete-transfer time; session summaries count actual polls, data-bearing polls, time inside polls and entry intervals. Every sixty-fourth successful read uses a separately instrumented mirror of the acknowledged word function, reporting high and low ACK-read totals, wait-word counts and maxima without additional register accesses or per-word clocks or logging. First successful pipe read is now distinguished from the legacy first-byte label, which still means first completed chunk. Tests compile the real patched functions against deterministic mocks: fourteen transport cases match the upstream register and framing trace for delayed ACKs, wide and narrow lengths, odd tails and uninitialized-FPGA exits, while the loader test verifies a sixty-six-chunk session, byte identity, sampling, four-read budget, EAGAIN, errno preservation, EOF accounting, idle behavior, warm reset, core change, external stop and unavailable diagnostic output. Both ordinary and address/undefined-behavior sanitizer runs pass, including a repeat against the exact committed candidate archive on GUNSMOKE. The user confirms that the menu remained responsive during entry 581's video playback. Source publication was separately blocked by the execution approval policy because entry 582 authorizes evidence publication but not new source-code publication; no attempt was made to bypass that gate. The build PC pulled published master `7eca031`, then an isolated candidate build used the exact unpublished `32ba178` archive against Main_MiSTer `0a8fb44` with official ARM GNU 10.2.1 20201103. It compiled 113 source files from an empty generated-object state in 4.11 seconds with zero compiler warnings or errors, producing a 1,166,244-byte ARMv7 hard-float binary with SHA-256 `1aae53b0209e873b1edfe20f60bad10c2c4cd5ce1e21f7f40eea81be313facb9`; its Pi scratch copy matches exactly and the expected profiling strings are present. The only unrelated upstream difference is a non-source miniz changelog line-ending conversion. Build, ordinary-test and sanitized-test reports plus the compiler log are retained under `.ai/current_results/entry583_*`, with the isolated build at `/home/vash/mister-builds/entry583-32ba178` and candidate Pi binary at `/tmp/entry583-reports/MiSTer`. This is a diagnostic candidate, not a throughput fix or hardware acceptance. Clock and logging overhead remain unmeasured on hardware, sampled ACK counts are not direct wait durations and may miss unsampled stalls, and poll intervals are not direct UI latency. No MiSTer binary, helper, FPGA image, configuration or lifecycle was changed.
-
-#### Next Steps:
-
-Obtain explicit approval to publish the two profiling source files to `aquasock/MiSTer-Media-Player` and to replace the host-system binary `/media/fat/MiSTer`; these are separate from standing evidence-publication and RBF permissions. Once approved, publish the local source and build-result commits from the Pi, verify GitHub and build-PC source identity, retain and hash the current host binary, stage the verified candidate, independently check the staged bytes, rename over the active path and read back the complete active image through a fresh FTP session. Leave reboot and playback to the user. Request one cold high-bitrate run, fetch the helper log before the screenshot and inspect read time, transfer time, sampled ACK loops and actual media-poll timing before choosing a correction. Confirm complete byte and picture counts, unchanged error status and whether instrumentation materially changes cadence. Retain the pending 8 Mbps regression and preserve FIFO backpressure, byte order, odd tails and the unchanged FPGA startup, queue, sync and timing behavior. Do not publish local commits or deploy the host binary until their explicit approvals are obtained.
-
-#### Files Modified:
-
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/streams/test_main_mister_profile.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
