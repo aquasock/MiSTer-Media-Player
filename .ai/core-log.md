@@ -1,3 +1,32 @@
+## 606 COMMIT Unreleased d466bed 2026-08-27T06:28:14-07:00
+
+#### Coming From:
+
+Unreleased d466bed
+
+#### Purpose:
+
+Close the remaining mode gap by replaying the full-movie fixture in Bob on the accepted candidate.
+
+#### Outcome:
+
+The user played the same film once in Bob as a warm replay with no core reload and no reboot, reporting picture and sound indistinguishable from the Weave run. The single syslog boot line remains 12:51:01 UTC, so this is a genuine same-boot comparison against entry 605 rather than a fresh-session repeat. The installed RBF still hashes to `d46f80061a3270c1fed07a089517e70b413d3353858dc0d8937ac1bb0070aa6a` for source `d466bed`, Main and the 739,065,873-byte fixture are unchanged, and a new helper PID 1339, a fresh helper log beginning at its own start line rather than extending the Weave capture, and packet checksum 1370572003 identify a distinct run. Bob matches Weave on every acceptance quantity: 17,876 reference pictures, 17,876 displayed pictures, 17,875 swaps, 715,713,077 accepted video bytes, `error_flags` zero, presentation error clear, sequence end seen, presentation complete, quiet snapshot and zero timestamp conflicts, with all 839,409,548 transport bytes submitted over 51,235 reads, 800 sampled ACK records and helper exit zero at 596.431673 seconds. Audio underrun and PCM protocol error are clear at FIFO peak 127, and the same saturated `pcm_sample_count` and `associated_count` fields again prevent any independent whole-film audio count. The important new result is that Bob reproduces the single missed display slot at exactly the same place as Weave: one 4,004,000-clock interval, 66.733333 milliseconds, at displayed picture 692 of 17,876, about 23.09 seconds in, with 691 completed references at both deadlines and accepted-byte positions of 27,778,070 in Bob against 27,772,349 in Weave, a difference of only 5,721 bytes. Both records show the writer busy without capacity blocking, no presentable candidate, the upstream FIFO pending and comparable input starvation of 699,593 clocks in Bob and 677,670 in Weave, with presentation hold, presentation error and both timestamp candidate signals false in each; the modes differ only in `decoder_ready`, false in Bob and true in Weave, and in candidate ready delay, 1,489,404 against 1,721,347 clocks. Two independent runs missing the same slot at the same bitstream position establish this as a deterministic, content-locked upstream delivery event rather than ambient jitter, and it remains outside the ownership and timestamp logic repaired this cycle. Deinterlacing mode has no measurable effect on delivery: helper would-block totals differ, 320 in Bob against 574 in Weave, as does first delivery at 23.465 against 42.017 milliseconds, but both are startup-phase effects and the reconstructed spans agree closely at 596.479325 and 596.476807 seconds against the 596.462533-second fixture, both after eight wraps of the 32-bit session timer, giving 29.967510 and 29.967636 true aggregate FPS. Reported cadence and FPS remain wrapping artifacts and must not be read directly. Picture and sound quality, synchronization and menu behavior are accepted from the user's report in both modes without independent measurement, and no pixel oracle was applied. This closes mode coverage for `d466bed` on this fixture; it does not qualify AC-3, interlaced P/B or field DCT, navigation, ISO or disk playback, or general commercial-DVD compatibility. Evidence and the exact capture and analysis drivers are retained as `.ai/current_results/entry606_*`, with the helper log stored losslessly under its original hash. Sixty-eight stale untracked result images from entries already outside the ring were deleted at the user's instruction, and the entry 605 commit remains unpushed because the environment refused the push operation. No production source, deployed file, setting, reboot, reload or playback occurred during collection; only the fixed screenshot was replaced.
+
+#### Next Steps:
+
+Both modes are now accepted for this fixture, so no further full-length replay is needed to compare them. The next boundary is to explain the picture 692 slot, which is cheap to attack offline because it is deterministic: measure the coded picture sizes and pack arrival schedule of the fixture in the neighbourhood of video byte 27.77 million and displayed picture 692, and determine whether an oversized picture, a rate spike or a pack-schedule discontinuity starves the decoder for the observed eleven and a half milliseconds. Only after that measurement should any production change be considered, and queue sizes, clocks, startup and throughput must not be tuned on the strength of one missed slot in 17,875. Because saturated audio counters cannot prove whole-film audio integrity, define acceptable audio evidence before any audio-focused cycle. Keep AC-3, interlaced P/B, navigation and disk-source work as separately scoped gates with acceptance criteria agreed in advance, leave lifecycle and playback under user control, preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 605 COMMIT Unreleased d466bed 2026-08-27T06:12:39-07:00
 
 #### Coming From:
@@ -1133,35 +1162,6 @@ The user accepted the entry 566 result, played a file in Weave mode and left the
 #### Next Steps:
 
 Stop collecting mode variations, because mode has been eliminated as a factor, and instead determine whether the ordinal-six starvation correlates with load history. Have the user power-cycle or reload the core and capture telemetry after the very first playback of a fresh core load, then after each of several successive replays without reloading, recording the run ordinal alongside each capture, so it can be established whether entry 564's clean result was specifically a cold first run and whether the starvation appears only on warm rearm. That distribution is the missing evidence needed to choose a boundary. If cold runs are clean and warm runs starve, the investigation belongs in ARM-side delivery rearm across successive sessions and the existing drained-FIFO warm-load simulation cases should be extended to model the measured 1,070,840-to-1,075,462-cycle starvation window before any RTL change is proposed; if cold runs starve too, the boundary is initial prefill depth ahead of the first cadence slot instead. Do not propose a source change until that data exists. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 566 COMMIT Unreleased 2acabc5 2026-08-26T23:38:54-07:00
-
-#### Coming From:
-
-Unreleased 2acabc5
-
-#### Purpose:
-
-Record the hardware telemetry from the user's repeated-load Bob test of `2acabc5` after they reported playback appearing slower.
-
-#### Outcome:
-
-The user replayed the same file several times in Bob mode without rebooting, reported that after a few runs it seemed to run slowly, and left the final run's terminal telemetry on screen. The stale 476,291-byte `cadence_probe.png` was deleted through FTP and confirmed absent before a new screenshot was triggered, so this is a genuinely fresh capture at 476,509 bytes with SHA-256 `11955026d61bd37806f994b4ed784e8f69227622fc51b10f5e16e9987c898eee`. The captured session still accepts all 15,150,646 bytes, displays 449 pictures with 448 swaps, sees sequence end, completes presentation and terminates quietly with reason one, zero aggregate error flags, no cache-bank overlap, no presentation error, no audio underrun, no PCM protocol error and no timestamp advance or delay conflicts. Unlike the clean entry 564 run, however, both the ranked-gap and actual missed-deadline counters are one rather than zero. The single outlier and the single deadline record are the same event at display picture ordinal six, a 4,004,000-cycle interval of 66.7333 milliseconds, which is exactly two nominal intervals and therefore one frame held for an extra field pair. Ranked gaps two and three are exactly 2,002,000 cycles, so steady-state cadence away from that one hitch is nominal and the entry 559 miss at ordinal 348 does not recur. The ordinal-six deadline record is diagnostic: at 323,580 accepted bytes the decoder is ready, the candidate is not presentable, decoder input pending, upstream FIFO pending, writer busy and writer capacity blocked are all false, writer capacity blocked cycles since the previous swap is zero, candidate ready delay is 592,128 cycles and input starved cycles since the previous swap is 1,075,462, or about 17.9 milliseconds. That signature is upstream input starvation during early startup, not a decoder, writer or DDR capacity stall, and it is the same failure class as the legacy picture-six gap that the 64-KiB clean-video queue and guarded startup were meant to close. The startup guard itself did not regress: presentation hold total fell from 27,400,352 to 27,074,752 cycles and the residual non-gap cadence excess fell from 3,002,892 to 2,053,370 cycles, so of the 4,055,370-cycle total excess over 448 nominal intervals, 2,002,000 is the single dropped slot and the remainder is a slightly shorter guarded startup wait than the accepted run. The 29.835129-fps aggregate again starts at first reference completion and includes that startup hold, so it must not be read as steady-state slowness; the honest statement is one lost frame near the start, not a globally slower run. Schema nineteen telemetry is per-session and this snapshot covers only the most recent completed session, so the earlier repeats in which the user first noticed the problem are not captured and cannot be reconstructed, and neither Bob/Weave selection, loaded-file identity nor position within the repeat sequence is encoded in the snapshot. No reload, reboot, MGL launch, media change or configuration change was made during capture, and no source change or build was performed for this entry. Evidence is `.ai/current_results/entry566_bob_repeat_terminal.png` and `entry566_bob_repeat_capture.json`, the latter carrying the full decode, the entry 564 comparison, the interval arithmetic and these scope limits.
-
-#### Next Steps:
-
-Do not commit a speculative fix on one sample. Have the user repeat the load several times again and capture telemetry after each individual run rather than only the last, so the distribution of ordinal-six starvation across cold and warm loads is measured instead of inferred, and have them note which run number each capture belongs to along with whether the perceived slowness tracks the captured gap. Also ask whether the reported slowness persisted visually through a whole run or was a brief hitch near the start, since the telemetry supports only the latter. If repeated captures confirm that ordinal-six input starvation returns on warm reloads while the first load after core load is clean, the boundary to investigate is upstream ARM-side delivery rearm across successive sessions rather than the presentation scheduler or the startup guard, and the existing drained-FIFO warm-load simulation cases should be extended to model the measured 1,075,462-cycle starvation window before any RTL change is proposed. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Bob/Weave switching has still not been reported on and remains outstanding, analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
 
 #### Files Modified:
 
