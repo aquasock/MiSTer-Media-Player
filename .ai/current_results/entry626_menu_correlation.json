@@ -1,0 +1,55 @@
+{
+  "rows": [
+    {
+      "test": 1,
+      "file_bytes": 3401745,
+      "accepted_video_bytes": 3068039,
+      "poll_max_us": 160937,
+      "acknowledged_share_pct": 12.2,
+      "user_menu": "laggy"
+    },
+    {
+      "test": 2,
+      "file_bytes": 3401745,
+      "accepted_video_bytes": 3067813,
+      "poll_max_us": 153112,
+      "acknowledged_share_pct": 12.1,
+      "user_menu": "laggy"
+    },
+    {
+      "test": 3,
+      "file_bytes": 12517393,
+      "accepted_video_bytes": 12073185,
+      "poll_max_us": 63506,
+      "acknowledged_share_pct": 3.5,
+      "user_menu": "not laggy"
+    },
+    {
+      "test": 4,
+      "file_bytes": 12501009,
+      "accepted_video_bytes": 12057601,
+      "poll_max_us": 89592,
+      "acknowledged_share_pct": 0.9,
+      "user_menu": "not laggy"
+    },
+    {
+      "test": 5,
+      "file_bytes": 3792913,
+      "accepted_video_bytes": 3068039,
+      "poll_max_us": 151366,
+      "acknowledged_share_pct": 12.0,
+      "user_menu": "laggy"
+    },
+    {
+      "test": 6,
+      "file_bytes": 5410833,
+      "accepted_video_bytes": 3068038,
+      "poll_max_us": 157991,
+      "acknowledged_share_pct": 12.4,
+      "user_menu": "laggy"
+    }
+  ],
+  "finding": "Menu lag separates on accepted video bytes, not file size. The four laggy runs all carry about 3.068 MB of video; the two responsive runs carry about 12.06 MB. Test 6 is the larger file of the two audio tests yet still laggy, because its extra size is DTS audio rather than video.",
+  "acknowledged_share": "12.0 to 12.4 percent on every laggy run against 0.9 and 3.5 percent on the two responsive ones.",
+  "not_established": "No button-response latency was measured. Entry 624 Main, which contains the yield fix, is not installed."
+}

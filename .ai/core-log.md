@@ -1,3 +1,32 @@
+## 626 COMMIT Unreleased 140a5b7 2026-08-27T16:02:11-07:00
+
+#### Coming From:
+
+Unreleased 140a5b7
+
+#### Purpose:
+
+Capture the remaining three hand tests and establish what the reported menu lag actually tracks.
+
+#### Outcome:
+
+All six hand tests now play correctly on the accepted installation. Tests four, five and six each complete 360 reference and display pictures with 359 swaps, `error_flags` zero, presentation error clear, sequence end seen, presentation complete, quiet snapshot, zero deadline gaps and outliers, and audio underrun and PCM protocol error clear, with helper exit zero. Accepted video is 12,057,601, 3,068,039 and 3,068,038 bytes. Test four confirms the progressive path works and its telemetry reports final picture type one, so it is an all-I file and exercises no P or B pictures; the progressive picture type question therefore remains open and still blocks the README. Test four also shows its three largest display intervals at 2,984,256 clocks rather than the 2,002,000 every interlaced test reports, while averaging 359 swaps across 11.96 seconds, so the progressive path paces differently with jitter that averages out rather than dropping pictures; whether that is expected is not established, and the deadline logic is scoped to native timing so its zero count is not evidence either way. Test five ran in HDMI decoded stereo mode according to its own log line, so it exercised the downmix rather than passthrough, while test six ran in S/PDIF passthrough mode on DTS substream 0x88 as required, since DTS has no decoder here. The menu question is now settled as far as measurement can take it. Lag separates cleanly on accepted video bytes rather than file size: the four runs the user found laggy each carry about 3.068 megabytes of video and hold the event loop for 151,366 to 160,937 microseconds with an acknowledged-write share of 12.0 to 12.4 percent, while the two responsive runs carry about 12.06 megabytes and hold it for 63,506 and 89,592 microseconds with shares of 3.5 and 0.9 percent. Test six is the larger file of the two audio tests yet still laggy, because its extra size is DTS audio rather than video, which is what distinguishes video bitrate from file size as the driver. Six subjective reports match the measurement without exception. The mechanism is the one already diagnosed: low bitrate video drains the FPGA slowly, transport credits run out more often, and Main falls back to acknowledged writes inside a single poll instead of yielding. This is event-loop occupancy from the helper's own profile and not a measured button-response latency. Entry 624's Main, which contains the yield fix, is still not installed, confirmed again by every log reporting profile version one. The user also observed the subwoofer present on AC-3 through S/PDIF but absent on DTS, and asked whether the receiver simply does not accept DTS surround. The evidence says it does accept and decode DTS, because the other five channels were audible in both this run and entry 621; what it does not do is deliver that stream's LFE. Entry 621 already established by measurement that the DTS bursts this core emits contain LFE at 1267.3 RMS decoded back from the helper's own output, byte identical to the source, so the omission remains downstream. A plausible unverified explanation is that the device downmixes DTS internally rather than applying bass management, and the standard DTS stereo downmix discards LFE exactly as this core's own AC-3 stereo downmix does.
+
+#### Next Steps:
+
+Install entry 624's Main and repeat one low bitrate test, being test one, two, five or six, to confirm that poll occupancy falls; that is the direct check and no further evidence gathering on the menu is needed first. Generate one progressive file with an ordinary GOP using the corrected suite generator rather than the superseded one, and have the user play it, because the difference between progressive I-only and progressive I/P/B is the last fact blocking the README and no test in this set exercises it. Consider also re-running test five in S/PDIF mode so this set covers AC-3 passthrough as well as the downmix. Do not pursue the DTS subwoofer further without different hardware, since the transmitted bytes are proven correct and no change here can alter what that device does; a tester with a discrete 5.1 DTS decoder settles it as a byproduct of the community test. When capability is established, write the README capability section and release notes carrying the entry 616 wording of one or two repeated frames at the picture 690 cut, the marginal scaler paths recovered by reseeding in entry 618, and an honest split of measured versus listened audio claims. The interlaced gates of entry 609 remain open and out of scope. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 625 COMMIT Unreleased 140a5b7 2026-08-27T15:48:33-07:00
 
 #### Coming From:
@@ -1158,36 +1187,6 @@ Do not repeat the same hardware condition or expect another minor host-loop redu
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 586 COMMIT Unreleased be8502b 2026-08-27T02:05:53-07:00
-
-#### Coming From:
-
-Unreleased 32ba178
-
-#### Purpose:
-
-Reduce MediaPlayer host transfer overhead with a bulk word loop that preloads the next payload during the acknowledged low phase while preserving FPGA flow control.
-
-#### Outcome:
-
-The approved host-only implementation is source `be8502b`. MediaPlayer now uses a dedicated bulk primitive that prepares the next payload only after the current word's ACK-high, lowers the strobe with that payload and waits for ACK-low before its next rising edge. The ordinary non-media transfer and `fpga_spi` functions remain byte-identical to pinned upstream Main_MiSTer `0a8fb44`; no FPGA source or image was changed. For a full 16 KiB wide chunk the data loop issues 16,385 GPO writes instead of 24,576, retaining both ACK phases, final low-clock cached state, little-endian packing, unaligned input safety, padded odd tails and narrow transfers. Sampled and unsampled template specializations retain every-sixty-fourth-chunk ACK profiling, and logs identify `transport=ack_bulk_preload_v1`. Forty native transport cases pass, including unchanged rising-edge payloads and ACK-read traces, exact write counts, final GPO and reset exits at the first, middle and final word; the uninitialized messages in these test reports are deliberate injected cases. Loader coverage retains four-read polling, byte identity, sampling, EAGAIN, EOF accounting, errno preservation, warm reset, core change, external stop and unavailable diagnostics. Native tests pass both normally and under ASan/UBSan. A new optional RTL mode compiles the actual clock/ACK and download blocks extracted from existing `sys_top.v` and `hps_io.sv` with Verilator, then runs both original and bulk host functions against 168 narrow and 168 wide cases with four bridge latencies, a two-word sink that reaches full, independent wait and vs_wait intervals, consecutive chunks, odd tails, exact download addresses and release. All pass; an initial simulator teardown failure after passing narrow cases was fixed by destroying the model before the thread-local Verilator context, without changing production logic. After source publication from the Pi, GUNSMOKE pulled exact `be8502b`, verified both source hashes against the tested candidate, repeated all qualification and built from zero generated objects with official ARM GNU 10.2.1 20201103. The clean compile completed in 4.17 seconds with zero compiler warnings or errors, producing a 1,166,244-byte ARMv7 hard-float binary with SHA-256 `da213d6bd9cc89a9af736a0bb029f9ebadd6e6a62382728ae1bacc07a381f909`. Its complete Pi copy matches the build report. The previous `32ba178` host image was retrieved, hashed and fsynced locally, then retained and independently verified at `/home/vash/mister-builds/entry586-backup/MiSTer.prebe8502b` on GUNSMOKE. The candidate was staged at `/media/fat/MiSTer.new`, read back through a fresh FTP connection and verified executable before rename; another fresh connection retrieved the active binary with exact matching bytes and hash, confirmed executable permissions and absence of the stage. Full FPGA readbacks before and after retain the qualified `2acabc5` hash. No reboot, core reload, playback, helper or configuration change occurred. Build, regression and deployment records are retained under `.ai/current_results/entry586_*`. This is a tested and deployed optimization candidate, not yet an active-process verification, measured speedup or hardware acceptance; simulator bridge delays are test conditions rather than a physical performance model.
-
-#### Next Steps:
-
-Have the user power-cycle, load the core and play `bbb_480i_tff_15s.m2v` once, then stop without replaying and leave terminal telemetry displayed. Fetch the helper log before the screenshot, verify a new boot and `transport=ack_bulk_preload_v1`, and compare delivery, transfer duration, sampled ACK behavior and cadence against entry 585's 1,427,221 bytes per second, 23.585322 seconds of transfer, 18.315332 fps and 186 delayed presentation intervals. Confirm full byte/picture counts, zero error flags, whether the meadow slowdown improves and current menu responsiveness. Collect that run before requesting the separate qualified 8 Mbps regression so its log is not overwritten. The reduced register-write count is not a promise to meet the file's 2.33 MB/s demand; if host-only headroom is insufficient, propose an explicitly approved FPGA transport revision rather than removing ACK protection. Preserve the existing startup controller, 64 KiB clean-video queue, continuous HDMI sync and black idle behavior, and retain all prior unsupported interlaced, audio/PTS, cancellation and assertion-drift limitations. Continue routine publication and qualified host deployment under standing permission with backup/readback safeguards, keep reboot and playback with the user and preserve restricted `core.md` plus the forty-entry ring.
-
-#### Files Modified:
-
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/streams/test_main_mister_profile.py
 
 #### Status:
 
