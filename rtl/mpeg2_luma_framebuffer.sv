@@ -1775,6 +1775,16 @@ mpeg2_ycbcr_to_rgb_bt601 mpeg2_ycbcr_to_rgb_bt601
 );
 
 always @(posedge rd_clk) begin
+    // A framebuffer reset changes picture/cache ownership, not the raster.
+    // Native sync is active-low: forcing it low on each picture swap creates
+    // an extra VS pulse and advances MiSTer's scaler field buffers twice.
+    // Preserve the established pixel-CE phase through generation resets.
+    if (pixel_ce) begin
+        video_de <= pixel_en;
+        video_hs <= h_sync;
+        video_vs <= v_sync;
+    end
+
     if (rd_reset) begin
         y_byte_lane_d             <= 3'd0;
         c_byte_lane_d             <= 3'd0;
@@ -1783,22 +1793,12 @@ always @(posedge rd_clk) begin
         video_r                   <= 8'd0;
         video_g                   <= 8'd0;
         video_b                   <= 8'd0;
-        video_de                  <= 1'b0;
-        video_hs                  <= 1'b0;
-        video_vs                  <= 1'b0;
     end
     else if (pixel_ce) begin
         y_byte_lane_d            <= y_byte_lane;
         c_byte_lane_d            <= c_byte_lane;
         source_window_d          <= source_window;
         decoded_picture_window_d <= decoded_picture_window;
-
-        // These controls are part of MiSTer's external raster contract and
-        // intentionally remain in the established current-pixel phase.  RGB
-        // data has its own cache/conversion pipeline and must not shift sync.
-        video_de <= pixel_en;
-        video_hs <= h_sync;
-        video_vs <= v_sync;
 
         if (decoded_picture_window_d) begin
             video_r <= rgb_r;

@@ -64,6 +64,7 @@ iverilog -g2012 \
   "${repo_root}/rtl/mpeg2_new/mpeg2_ycbcr_to_rgb_bt601.sv" \
   "${repo_root}/rtl/mpeg2_luma_framebuffer.sv" \
   "${repo_root}/tools/streams/tb_native_480i_cache_refill.sv"
+vvp "${build_dir}/tb_native_480i_cache_refill" +SYNC_RESET
 vvp "${build_dir}/tb_native_480i_cache_refill"
 vvp "${build_dir}/tb_native_480i_cache_refill" +SLOW
 vvp "${build_dir}/tb_native_480i_cache_refill" +PREFILL_LATE

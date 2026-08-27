@@ -51,6 +51,8 @@ reg [8:0] sequence_line = 9'd0;
 reg fingerprint_mode = 1'b0;
 reg bff_mode = 1'b0;
 reg generation_mode = 1'b0;
+reg sync_reset_mode = 1'b0;
+reg sync_reset_check = 1'b0;
 reg [7:0] framebuffer_generation = 8'h2a;
 
 always #8.333 mem_clk = ~mem_clk;
@@ -589,7 +591,7 @@ end
 
 always @(posedge rd_clk) begin
     ce_div <= ce_div + 2'd1;
-    if (reset) begin
+    if (reset && !sync_reset_mode) begin
         ce_div <= 2'd0;
         h_pos <= 12'd0;
         sequence_line <= 9'd0;
@@ -604,6 +606,17 @@ always @(posedge rd_clk) begin
         else begin
             h_pos <= h_pos + 12'd1;
         end
+    end
+end
+
+// A picture-generation reset must not become a raster sync pulse. Keep the
+// source clock and blanking timing running, as the real top level does.
+always @(posedge rd_clk) begin
+    if (sync_reset_check) begin
+        #1;
+        if ({video_de,video_hs,video_vs} !== 3'b011)
+            $fatal(1,"framebuffer reset corrupted blanking sync de/hs/vs=%b%b%b",
+                   video_de,video_hs,video_vs);
     end
 end
 
@@ -724,6 +737,22 @@ task automatic run_publication_generation;
 endtask
 
 initial begin
+    sync_reset_mode = $test$plusargs("SYNC_RESET");
+    if (sync_reset_mode) begin
+        repeat (8) @(negedge mem_clk);
+        reset = 1'b0;
+        repeat (12) @(negedge rd_clk);
+        sync_reset_check = 1'b1;
+        repeat (16) begin
+            @(negedge mem_clk);
+            reset = 1'b1;
+            repeat (4) @(negedge mem_clk);
+            reset = 1'b0;
+            repeat (13) @(negedge rd_clk);
+        end
+        $display("NATIVE_CACHE_SYNC_RESET_PASS resets=16 sync_edges=0");
+        $finish;
+    end
     slow_mode = $test$plusargs("SLOW");
     late_prefill_mode = $test$plusargs("PREFILL_LATE");
     generation_mode = $test$plusargs("GENERATIONS");
