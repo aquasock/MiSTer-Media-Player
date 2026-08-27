@@ -168,6 +168,10 @@ mpeg2_h262_luma_write_fingerprint mpeg2_h262_luma_write_fingerprint
 wire mpeg2_new_luma_fetch_valid;
 wire mpeg2_new_luma_fetch_first_field;
 wire [8:0] mpeg2_new_luma_fetch_row;
+// Entry 549: luma line-cache write evidence.
+wire mpeg2_new_luma_cache_write_valid;
+wire mpeg2_new_luma_cache_write_first_field;
+wire [7:0] mpeg2_new_luma_cache_write_addr;
 
 reg [2:0] mpeg2_new_first_field_region;
 reg [2:0] mpeg2_new_second_field_region;
@@ -232,6 +236,10 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
         mpeg2_new_framebuffer_sequence_phase_error_rd),
     .first_field_fetch_toggle_debug(
         mpeg2_new_framebuffer_first_field_fetch_toggle),
+    .luma_cache_write_valid_debug(mpeg2_new_luma_cache_write_valid),
+    .luma_cache_write_first_field_debug(
+        mpeg2_new_luma_cache_write_first_field),
+    .luma_cache_write_addr_debug(mpeg2_new_luma_cache_write_addr),
     .luma_fetch_valid_debug(mpeg2_new_luma_fetch_valid),
     .luma_fetch_first_field_debug(mpeg2_new_luma_fetch_first_field),
     .luma_fetch_row_debug(mpeg2_new_luma_fetch_row),

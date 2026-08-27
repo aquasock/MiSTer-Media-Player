@@ -104,6 +104,10 @@ mpeg2_h262_hardware_cadence_profiler
     .framebuffer_luma_fetch_first_field(mpeg2_new_luma_fetch_first_field),
     .framebuffer_luma_fetch_row(mpeg2_new_luma_fetch_row),
     .framebuffer_display_region(mpeg2_new_display_region),
+    .framebuffer_cache_write_valid(mpeg2_new_luma_cache_write_valid),
+    .framebuffer_cache_write_first_field(
+        mpeg2_new_luma_cache_write_first_field),
+    .framebuffer_cache_write_addr(mpeg2_new_luma_cache_write_addr),
     .framebuffer_luma_return_valid(mpeg2_new_luma_return_valid),
     .framebuffer_luma_return_first_field(mpeg2_new_luma_return_first_field),
     .framebuffer_luma_return_byte(mpeg2_new_luma_return_byte),

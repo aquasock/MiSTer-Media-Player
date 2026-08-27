@@ -68,6 +68,13 @@ module mpeg2_luma_framebuffer
     output wire        luma_fetch_valid_debug,
     output wire        luma_fetch_first_field_debug,
     output wire [8:0]  luma_fetch_row_debug,
+    // Entry 549: the luma line-cache write itself.  Entry 548 proved the fetch
+    // addresses are exactly right while the field displayed stale content, so
+    // the remaining uninstrumented step is whether the returned words actually
+    // land in the cache for that parity.  Nothing counts cache writes today.
+    output wire        luma_cache_write_valid_debug,
+    output wire        luma_cache_write_first_field_debug,
+    output wire [7:0]  luma_cache_write_addr_debug,
     // Entry 520: raw per-parity luma return event.  Entry 519 accumulated this
     // inside the framebuffer, where it cleared on every generation reset and
     // so reported whatever short generation preceded terminal quiet.  Export
@@ -241,6 +248,9 @@ reg        second_field_fetch_toggle_mem;
 reg        luma_fetch_valid_mem;
 reg        luma_fetch_first_field_mem;
 reg [8:0]  luma_fetch_row_mem;
+reg        luma_cache_write_valid_mem;
+reg        luma_cache_write_first_field_mem;
+reg [7:0]  luma_cache_write_addr_mem;
 reg [31:0] first_field_raw_fingerprint_mem;
 reg [31:0] second_field_raw_fingerprint_mem;
 reg [31:0] luma_position_line_accumulator_mem;
@@ -585,6 +595,9 @@ always @(posedge mem_clk) begin
         luma_fetch_valid_mem       <= 1'b0;
         luma_fetch_first_field_mem <= 1'b0;
         luma_fetch_row_mem         <= 9'd0;
+        luma_cache_write_valid_mem       <= 1'b0;
+        luma_cache_write_first_field_mem <= 1'b0;
+        luma_cache_write_addr_mem        <= 8'd0;
         first_field_raw_fingerprint_mem  <= 32'd0;
         second_field_raw_fingerprint_mem <= 32'd0;
         luma_line_raw_accumulator_mem <= 32'd0;
@@ -695,6 +708,7 @@ always @(posedge mem_clk) begin
     else begin
         y_cache_wr_en  <= 1'b0;
         luma_fetch_valid_mem <= 1'b0;
+        luma_cache_write_valid_mem <= 1'b0;
         cb_cache_wr_en <= 1'b0;
         cr_cache_wr_en <= 1'b0;
         luma_fingerprint_valid_debug <= 1'b0;
@@ -914,6 +928,12 @@ always @(posedge mem_clk) begin
                                                recv_word_index[7:0];
                             y_cache_wr_data <= ddram_dout;
                             y_cache_wr_en   <= 1'b1;
+                            luma_cache_write_valid_mem <= native_interlaced_mem;
+                            luma_cache_write_first_field_mem <=
+                                (fetch_line[0] == first_field_mem);
+                            luma_cache_write_addr_mem <=
+                                y_fetch_cache_base + fetch_word_offset +
+                                recv_word_index[7:0];
                         end
 
                         FETCH_CB: begin
@@ -1286,6 +1306,9 @@ assign second_field_fetch_toggle_debug = second_field_fetch_toggle_mem;
 assign luma_fetch_valid_debug       = luma_fetch_valid_mem;
 assign luma_fetch_first_field_debug = luma_fetch_first_field_mem;
 assign luma_fetch_row_debug         = luma_fetch_row_mem;
+assign luma_cache_write_valid_debug       = luma_cache_write_valid_mem;
+assign luma_cache_write_first_field_debug = luma_cache_write_first_field_mem;
+assign luma_cache_write_addr_debug        = luma_cache_write_addr_mem;
 assign luma_return_valid_debug =
     ddram_dout_ready && (fetch_kind == FETCH_Y) && native_interlaced_mem;
 assign luma_return_first_field_debug = (fetch_line[0] == first_field_mem);

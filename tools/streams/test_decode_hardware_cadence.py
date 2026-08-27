@@ -51,7 +51,7 @@ def schema15_snapshot_words() -> list[int]:
 def snapshot_words() -> list[int]:
     """Build a sixty-two-word current diagnostic record with XOR checksum."""
     words = schema15_snapshot_words()[:-1]
-    words[1] = (17 << 24) | (62 << 16) | 60000
+    words[1] = (18 << 24) | (64 << 16) | 60000
     # Entry 531 marks the current layout and replaces the historical whole-
     # field cache pair with accepted-write/raw-DDR-return evidence.
     words[40] |= (1 << 13) | (1 << 12) | (1 << 11) | (4 << 8)
@@ -79,6 +79,10 @@ def snapshot_words() -> list[int]:
         # Entry 548 word 60: a first field whose row XOR is wrong and whose
         # region changed mid-sweep, against a healthy second field.
         (0x1FF << 23) | (0 << 14) | (1 << 13) | (0 << 12),
+        # Entry 549 words 61-62: a first field receiving no cache writes at
+        # all against a healthy second field.
+        (0 << 16) | 21600,
+        (0 << 16) | 32656,
     ))
     checksum = 0
     for word in words:
@@ -163,7 +167,15 @@ def main() -> None:
             raise SystemExit("first-field region-changed flag was not decoded")
         if parsed["framebuffer_second_field_region_changed"] is not False:
             raise SystemExit("second-field region-changed flag was not decoded")
-        if parsed["schema_version"] != 17:
+        if parsed["framebuffer_first_field_cache_writes"] != 0:
+            raise SystemExit("first-field cache writes were not decoded")
+        if parsed["framebuffer_second_field_cache_writes"] != 21600:
+            raise SystemExit("second-field cache writes were not decoded")
+        if parsed["framebuffer_first_field_cache_addr_sum"] != 0:
+            raise SystemExit("first-field cache addr sum was not decoded")
+        if parsed["framebuffer_second_field_cache_addr_sum"] != 32656:
+            raise SystemExit("second-field cache addr sum was not decoded")
+        if parsed["schema_version"] != 18:
             raise SystemExit("schema sixteen was not reported")
         if parsed["framebuffer_content_scope"] != "session":
             raise SystemExit("schema fourteen content scope was not decoded")
@@ -321,7 +333,7 @@ def main() -> None:
         result = cadence.decode(overlap)
         if not result["cache_bank_overlap_error"]:
             raise SystemExit("cache-bank overlap telemetry bit was not decoded")
-    print("CADENCE_DECODER_LAYOUT_PASS current=352/232/62 "
+    print("CADENCE_DECODER_LAYOUT_PASS current=344/224/64 "
           "retained=48,43,41,38-words")
 
 

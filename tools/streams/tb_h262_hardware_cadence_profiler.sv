@@ -43,6 +43,9 @@ reg framebuffer_luma_fetch_valid=0;
 reg framebuffer_luma_fetch_first_field=0;
 reg [8:0] framebuffer_luma_fetch_row=0;
 reg [2:0] framebuffer_display_region=0;
+reg framebuffer_cache_write_valid=0;
+reg framebuffer_cache_write_first_field=0;
+reg [7:0] framebuffer_cache_write_addr=0;
 reg framebuffer_luma_return_valid=0;
 reg framebuffer_luma_return_first_field=0;
 reg [7:0] framebuffer_luma_return_byte=0;
@@ -101,6 +104,9 @@ mpeg2_h262_hardware_cadence_profiler #(
     .framebuffer_luma_fetch_first_field(framebuffer_luma_fetch_first_field),
     .framebuffer_luma_fetch_row(framebuffer_luma_fetch_row),
     .framebuffer_display_region(framebuffer_display_region),
+    .framebuffer_cache_write_valid(framebuffer_cache_write_valid),
+    .framebuffer_cache_write_first_field(framebuffer_cache_write_first_field),
+    .framebuffer_cache_write_addr(framebuffer_cache_write_addr),
     .framebuffer_luma_return_valid(framebuffer_luma_return_valid),
     .framebuffer_luma_return_first_field(framebuffer_luma_return_first_field),
     .framebuffer_luma_return_byte(framebuffer_luma_return_byte),
@@ -396,6 +402,9 @@ begin
     framebuffer_luma_fetch_first_field=0;
     framebuffer_luma_fetch_row=0;
     framebuffer_display_region=0;
+    framebuffer_cache_write_valid=0;
+    framebuffer_cache_write_first_field=0;
+    framebuffer_cache_write_addr=0;
     framebuffer_luma_return_valid=0;
     framebuffer_luma_return_first_field=0;
     framebuffer_luma_return_byte=0;
@@ -434,11 +443,11 @@ endtask
 task verify_checksum;
 begin
     checksum=0;
-    for(i=0;i<61;i=i+1)
+    for(i=0;i<63;i=i+1)
         checksum=checksum^dut.snapshot_sync_2[i*32+:32];
-    if(checksum!==dut.snapshot_sync_2[1983:1952])
+    if(checksum!==dut.snapshot_sync_2[2047:2016])
         $fatal(1,"checksum mismatch %h/%h",checksum,
-               dut.snapshot_sync_2[1983:1952]);
+               dut.snapshot_sync_2[2047:2016]);
 end
 endtask
 
@@ -452,8 +461,8 @@ task verify_overlay_row_coverage;
     reg [11:0] y0;
 begin
     native_active=native_mode;
-    y0=native_mode?12'd232:12'd352;
-    for(row=0;row<62;row=row+1)begin
+    y0=native_mode?12'd224:12'd344;
+    for(row=0;row<64;row=row+1)begin
         v_pos=y0+row[11:0]*12'd4;
         @(negedge clk_video);h_pos=0;
         @(posedge clk_video);#1;
@@ -475,7 +484,7 @@ task verify_overlay_prefix;
     integer x;
 begin
     native_active=native_mode;
-    v_pos=native_mode?12'd233:12'd353;
+    v_pos=native_mode?12'd225:12'd345;
     for(x=0;x<=29;x=x+1)begin
         @(negedge clk_video);h_pos=x;
         @(posedge clk_video);#1;
@@ -592,7 +601,7 @@ initial begin
 
     if(dut.snapshot_sync_2[31:0]!==32'h4d4d5031)
         $fatal(1,"bad magic %h",dut.snapshot_sync_2[31:0]);
-    if(dut.snapshot_sync_2[63:32]!==32'h113eea60)
+    if(dut.snapshot_sync_2[63:32]!==32'h1240ea60)
         $fatal(1,"bad format %h",dut.snapshot_sync_2[63:32]);
     if(dut.SNAPSHOT_WORD_40_BITS!=32)
         $fatal(1,"snapshot word 40 width is %0d",

@@ -13,9 +13,11 @@ from PIL import Image
 
 MAGIC = 0x4D4D5031
 X0 = 8
-WORDS = 62
-DIAGNOSTIC_Y0 = 352
-NATIVE_480I_Y0 = 232
+WORDS = 64
+DIAGNOSTIC_Y0 = 344
+NATIVE_480I_Y0 = 224
+SCHEMA17_DIAGNOSTIC_Y0 = 352
+SCHEMA17_NATIVE_480I_Y0 = 232
 SCHEMA16_DIAGNOSTIC_Y0 = 356
 SCHEMA16_NATIVE_480I_Y0 = 236
 SCHEMA15_DIAGNOSTIC_Y0 = 408
@@ -55,6 +57,8 @@ def decode_words(path: Path | str) -> list[int]:
         )
 
     layouts = (
+        (SCHEMA17_DIAGNOSTIC_Y0, 62),
+        (SCHEMA17_NATIVE_480I_Y0, 62),
         (SCHEMA16_DIAGNOSTIC_Y0, 61),
         (SCHEMA16_NATIVE_480I_Y0, 61),
         (DIAGNOSTIC_Y0, WORDS),
@@ -531,6 +535,22 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "framebuffer_second_field_region_changed": (
             bool((words[60] >> 12) & 1) if schema_version >= 17 else None
         ),
+        # Entry 549 (schema 18): does the fetched word actually reach the line
+        # cache for that parity?  A healthy generation writes 242*90=21780
+        # first-field and 240*90=21600 second-field words, with 16-bit address
+        # sums of 48766 and 32656.  Nothing before this counted cache writes.
+        "framebuffer_first_field_cache_writes": (
+            (words[61] >> 16) & 0xFFFF if schema_version >= 18 else None
+        ),
+        "framebuffer_second_field_cache_writes": (
+            words[61] & 0xFFFF if schema_version >= 18 else None
+        ),
+        "framebuffer_first_field_cache_addr_sum": (
+            (words[62] >> 16) & 0xFFFF if schema_version >= 18 else None
+        ),
+        "framebuffer_second_field_cache_addr_sum": (
+            words[62] & 0xFFFF if schema_version >= 18 else None
+        ),
         "checksum": words[-1],
     }
 
@@ -735,6 +755,20 @@ def main() -> int:
             print(
                 "second content mismatch: "
                 f"{result['framebuffer_second_field_first_content_mismatch']}"
+            )
+        if result["schema_version"] >= 18:
+            fw = result["framebuffer_first_field_cache_writes"]
+            sw = result["framebuffer_second_field_cache_writes"]
+            fs = result["framebuffer_first_field_cache_addr_sum"]
+            ss = result["framebuffer_second_field_cache_addr_sum"]
+            print(
+                "cache writes: first={}{} second={}{} "
+                "addr_sum={}{} / {}{}".format(
+                    fw, "" if fw == 21780 else "  <-- expect 21780",
+                    sw, "" if sw == 21600 else "  <-- expect 21600",
+                    fs, "" if fs == 48766 else "  <-- expect 48766",
+                    ss, "" if ss == 32656 else "  <-- expect 32656",
+                )
             )
         if result["schema_version"] >= 17:
             fx = result["framebuffer_first_field_row_xor"]

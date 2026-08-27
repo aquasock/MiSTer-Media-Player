@@ -30,6 +30,9 @@ module mpeg2_h262_hardware_cadence_profiler #(
     input wire framebuffer_luma_fetch_first_field,
     input wire [8:0] framebuffer_luma_fetch_row,
     input wire [2:0] framebuffer_display_region,
+    input wire framebuffer_cache_write_valid,
+    input wire framebuffer_cache_write_first_field,
+    input wire [7:0] framebuffer_cache_write_addr,
     input wire framebuffer_luma_return_valid,
     input wire framebuffer_luma_return_first_field,
     input wire [7:0] framebuffer_luma_return_byte,
@@ -100,22 +103,22 @@ module mpeg2_h262_hardware_cadence_profiler #(
     output reg [7:0] video_b,output wire snapshot_ready
 );
 
-localparam integer SNAPSHOT_WORDS=62;
+localparam integer SNAPSHOT_WORDS=64;
 localparam integer SNAPSHOT_BITS=SNAPSHOT_WORDS*32;
 localparam [23:0] TERMINAL_SNAPSHOT_LIMIT=
     TERMINAL_SNAPSHOT_DELAY-24'd1;
 localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
-localparam [31:0] SNAPSHOT_FORMAT={8'd17,8'd62,16'd60000};
+localparam [31:0] SNAPSHOT_FORMAT={8'd18,8'd64,16'd60000};
 // Entry 511: keep all 41 rows visible without changing their encoding. The
 // mode observation is already in clk_video and affects overlay placement only.
 localparam [11:0] OVERLAY_X=12'd8;
 // Entry 516: schema 11 appends two packed words, so both origins move eight
 // rows up to keep the final row flush with the diagnostic and native rasters.
-localparam [11:0] OVERLAY_DIAG_Y=12'd352;
-localparam [11:0] OVERLAY_NATIVE_Y=12'd232;
-localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd248;
+localparam [11:0] OVERLAY_DIAG_Y=12'd344;
+localparam [11:0] OVERLAY_NATIVE_Y=12'd224;
+localparam [11:0] OVERLAY_WIDTH=12'd172,OVERLAY_HEIGHT=12'd256;
 
 reg session_active;
 reg fifo_pending_q,decoder_ready_q,presentation_hold_q,destination_hold_q;
@@ -171,6 +174,17 @@ reg [7:0] last_second_field_fetches;
 // healthy 240-row sweep from repeated or wrong rows, which every existing
 // count cannot.  The region-changed flags close the second blind spot: the
 // existing region latch keeps only each parity's last sample per generation.
+// Entry 549: per-parity luma cache write evidence.  A healthy generation
+// writes 242*90=21780 first-field words and 240*90=21600 second-field words,
+// with 16-bit address sums of 48766 and 32656 respectively.
+reg [15:0] gen_first_cache_writes;
+reg [15:0] gen_second_cache_writes;
+reg [15:0] gen_first_cache_addr_sum;
+reg [15:0] gen_second_cache_addr_sum;
+reg [15:0] last_first_cache_writes;
+reg [15:0] last_second_cache_writes;
+reg [15:0] last_first_cache_addr_sum;
+reg [15:0] last_second_cache_addr_sum;
 reg [8:0] gen_first_row_xor;
 reg [8:0] gen_second_row_xor;
 reg [8:0] last_first_row_xor;
@@ -444,7 +458,11 @@ wire [31:0] snapshot_word_59=second_field_content_mismatch_display;
 // 9 + 9 + 1 + 1 + 12 = 32.
 wire [31:0] snapshot_word_60={last_first_row_xor,last_second_row_xor,
     last_first_region_changed,last_second_region_changed,12'd0};
-wire [31:0] snapshot_word_61=snapshot_word_00^snapshot_word_01^
+wire [31:0] snapshot_word_61={last_first_cache_writes,
+    last_second_cache_writes};
+wire [31:0] snapshot_word_62={last_first_cache_addr_sum,
+    last_second_cache_addr_sum};
+wire [31:0] snapshot_word_63=snapshot_word_00^snapshot_word_01^
     snapshot_word_02^snapshot_word_03^snapshot_word_04^snapshot_word_05^
     snapshot_word_06^snapshot_word_07^snapshot_word_08^snapshot_word_09^
     snapshot_word_10^snapshot_word_11^snapshot_word_12^snapshot_word_13^
@@ -459,11 +477,13 @@ wire [31:0] snapshot_word_61=snapshot_word_00^snapshot_word_01^
     snapshot_word_46^snapshot_word_47^snapshot_word_48^snapshot_word_49^
     snapshot_word_50^snapshot_word_51^snapshot_word_52^snapshot_word_53^
     snapshot_word_54^snapshot_word_55^snapshot_word_56^snapshot_word_57^
-    snapshot_word_58^snapshot_word_59^snapshot_word_60;
+    snapshot_word_58^snapshot_word_59^snapshot_word_60^
+    snapshot_word_61^snapshot_word_62;
 
 task capture_snapshot;
 begin
-    snapshot_mpeg2<={snapshot_word_61,snapshot_word_60,snapshot_word_59,
+    snapshot_mpeg2<={snapshot_word_63,snapshot_word_62,snapshot_word_61,
+        snapshot_word_60,snapshot_word_59,
         snapshot_word_58,
         snapshot_word_57,snapshot_word_56,snapshot_word_55,snapshot_word_54,
         snapshot_word_53,snapshot_word_52,snapshot_word_51,snapshot_word_50,
@@ -533,6 +553,10 @@ always @(posedge clk_mpeg2) begin
         last_first_field_region<=0;last_second_field_region<=0;
         gen_first_row_xor<=0;gen_second_row_xor<=0;
         last_first_row_xor<=0;last_second_row_xor<=0;
+        gen_first_cache_writes<=0;gen_second_cache_writes<=0;
+        gen_first_cache_addr_sum<=0;gen_second_cache_addr_sum<=0;
+        last_first_cache_writes<=0;last_second_cache_writes<=0;
+        last_first_cache_addr_sum<=0;last_second_cache_addr_sum<=0;
         gen_first_region_seed<=0;gen_second_region_seed<=0;
         gen_first_region_seen<=0;gen_second_region_seen<=0;
         gen_first_region_changed<=0;gen_second_region_changed<=0;
@@ -678,6 +702,20 @@ always @(posedge clk_mpeg2) begin
                 prediction_response_cycles<=prediction_response_cycles+1'b1;
             if(writer_write_q&&writer_busy_q)
                 writer_wait_cycles<=writer_wait_cycles+1'b1;
+            if(framebuffer_cache_write_valid)begin
+                if(framebuffer_cache_write_first_field)begin
+                    if(gen_first_cache_writes!=16'hffff)
+                        gen_first_cache_writes<=gen_first_cache_writes+1'b1;
+                    gen_first_cache_addr_sum<=gen_first_cache_addr_sum+
+                        {8'd0,framebuffer_cache_write_addr};
+                end
+                else begin
+                    if(gen_second_cache_writes!=16'hffff)
+                        gen_second_cache_writes<=gen_second_cache_writes+1'b1;
+                    gen_second_cache_addr_sum<=gen_second_cache_addr_sum+
+                        {8'd0,framebuffer_cache_write_addr};
+                end
+            end
             if(framebuffer_luma_fetch_valid)begin
                 if(framebuffer_luma_fetch_first_field)begin
                     gen_first_row_xor<=gen_first_row_xor^framebuffer_luma_fetch_row;
@@ -868,6 +906,12 @@ always @(posedge clk_mpeg2) begin
                 // last generation's absolute figures for inspection.
                 last_first_field_fetches<=gen_first_field_fetches;
                 last_second_field_fetches<=gen_second_field_fetches;
+                last_first_cache_writes<=gen_first_cache_writes;
+                last_second_cache_writes<=gen_second_cache_writes;
+                last_first_cache_addr_sum<=gen_first_cache_addr_sum;
+                last_second_cache_addr_sum<=gen_second_cache_addr_sum;
+                gen_first_cache_writes<=0;gen_second_cache_writes<=0;
+                gen_first_cache_addr_sum<=0;gen_second_cache_addr_sum<=0;
                 last_first_row_xor<=gen_first_row_xor;
                 last_second_row_xor<=gen_second_row_xor;
                 last_first_region_changed<=gen_first_region_changed;
@@ -1109,6 +1153,8 @@ always @* begin
     59:overlay_row_word=snapshot_sync_2[1919:1888];
     60:overlay_row_word=snapshot_sync_2[1951:1920];
     61:overlay_row_word=snapshot_sync_2[1983:1952];
+    62:overlay_row_word=snapshot_sync_2[2015:1984];
+    63:overlay_row_word=snapshot_sync_2[2047:2016];
     default:overlay_row_word=0;
     endcase
 end
