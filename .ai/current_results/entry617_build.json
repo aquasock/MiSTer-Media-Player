@@ -1,0 +1,62 @@
+{
+  "source_commit": "6c273b3",
+  "seed": 16,
+  "elapsed_seconds": 693,
+  "errors": 0,
+  "warnings_total": 209,
+  "baseline_warnings_total": 208,
+  "new_warning_ids": [
+    "332148"
+  ],
+  "new_warning_meaning": "timing requirements not met",
+  "other_warnings_identical_to_baseline": true,
+  "resources": {
+    "alms": 31488,
+    "alms_baseline_d466bed": 31394,
+    "alm_delta": 94,
+    "m10k": 512,
+    "m10k_baseline": 512,
+    "m10k_total": 553,
+    "block_memory_bits": 4048355,
+    "dsp": 67
+  },
+  "timing": {
+    "setup_worst_ns": -0.07,
+    "setup_baseline_ns": 0.083,
+    "hold_ns": 0.248,
+    "recovery_ns": 3.158,
+    "removal_ns": 0.488,
+    "min_pulse_width_ns": 0.925,
+    "setup_tns_ns": -0.07,
+    "failing_clock": "pll_hdmi divclk",
+    "violated_paths": [
+      {
+        "from": "ascal|o_hacc_next[9]",
+        "to": "ascal|o_hacc_next[13]",
+        "slack_ns": -0.07
+      },
+      {
+        "from": "ascal|o_hacc_next[9]",
+        "to": "ascal|o_hacc_next[13]",
+        "slack_ns": -0.012
+      }
+    ],
+    "next_path_slack_ns": 0.076
+  },
+  "rbf": {
+    "path": "/home/vash/mister-builds/entry617/FPGA/output_files/MediaPlayer.rbf",
+    "bytes": 4298348,
+    "sha256": "e96c719ab168f4f830cf12364dbdb2c6656037f9fd76b847d13a284261cc19f7",
+    "usable": false,
+    "reason": "setup timing violated; not deployed"
+  },
+  "main": {
+    "bytes": 1170340,
+    "sha256": "0ee87029f0a00a50731707e8114363fc7019ae4c1200de85d90533c9163b5241",
+    "builds": true
+  },
+  "helper": {
+    "sha256": "f07e4ce2bb2a431802f9c8631a228bb70c363455954315883776f58ce87a75db"
+  },
+  "assessment": "Failing paths are entirely inside the framework scaler ascal on the HDMI pixel clock, not in the audio change. The accepted baseline held only 0.083 ns of setup margin in that domain, so the 94 ALM increase perturbed placement enough to flip two marginal accumulator paths negative."
+}

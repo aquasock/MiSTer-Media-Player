@@ -1,3 +1,37 @@
+## 617 COMMIT Unreleased 6c273b3 2026-08-27T08:12:47-07:00
+
+#### Coming From:
+
+Unreleased e2bf23f
+
+#### Purpose:
+
+Route IEC 61937 bursts to the S/PDIF pin under an audio output option, with the unused output muted.
+
+#### Outcome:
+
+Published source `6c273b3` implements the integration the user specified and approved, including the framework fork. The S/PDIF encoder gains a non audio channel status input driving bit one, so a burst stops declaring itself linear PCM; `audio_out` gains a passthrough route feeding S/PDIF straight from the core samples while skipping the interpolating filter, the DC blocker and the attenuation, boost and mix stages, because each alters sample values and any alteration destroys a burst; I2S is muted in that mode and S/PDIF is muted outside it. A new emu port carries the selection from the core through `sys_top`, a new OSD option on status bit 126 drives it, and the Main patch reads the same bit in the parent before forking to pass `--audio-out` to the helper, so one bit drives both routing and the helper's decode or pass through decision. Main builds cleanly against the pinned commit at 1,170,340 bytes with SHA256 `0ee87029f0a00a50731707e8114363fc7019ae4c1200de85d90533c9163b5241`, which also proves the corrected patch hunk applies and that `user_io_status_get` is the right interface at that revision; an earlier edit had left that hunk's line count stale and it was recomputed rather than guessed. The build does not qualify. Quartus 17.0.2 at the pinned seed 16 completes in 11 minutes 33 seconds with zero errors, but worst setup slack is negative 0.070 nanoseconds against the accepted `d466bed` figure of positive 0.083, with total negative slack of the same 0.070. Hold, recovery, removal and minimum pulse width all improve slightly at 0.248, 3.158, 0.488 and 0.925 nanoseconds. The 4,298,348-byte RBF is therefore not usable and is not deployed. The failure is diagnosed rather than assumed: both violated paths run from `ascal|o_hacc_next[9]` to `ascal|o_hacc_next[13]` on the HDMI pixel clock, entirely inside the framework scaler's horizontal accumulator, with the next path at positive 0.076 nanoseconds, so this is a cluster of marginal arithmetic paths in framework video logic rather than anything in the audio change, which lives in the audio clock domain. Resource movement is consistent with that reading: ALMs rise from 31,394 to 31,488, a 94 ALM increase that perturbs placement, while M10K stays at 512 of 553, block memory bits and DSPs are unchanged, so the audio work costs no memory as designed. The only new warning across the whole flow is 332148, the timing violation itself; every other warning matches the accepted baseline exactly, with none disappearing. The honest conclusion is that this design has been running on roughly 0.08 nanoseconds of setup margin in the HDMI domain all along, and any change of comparable size could have exposed it. Built is left unchecked because a candidate that misses timing is not a usable build under this project's own standard, even though it compiled without errors.
+
+#### Next Steps:
+
+Decide how to recover timing before anything is deployed, and record the choice rather than quietly re-rolling until a build passes. The cheapest option is a different fitter seed, which is a tracked source change because seed 16 is pinned in the project file, and it is legitimate provided the new seed is recorded and kept for later comparability; it does not make the underlying path less marginal. The durable option is to attack the `ascal` horizontal accumulator path itself, which would benefit every future change rather than this one, but it means modifying framework video logic beyond the audio fork the user approved and should be scoped separately. Reducing the audio routing logic is unlikely to help, since the failing path is not in it. Whichever is chosen, require a clean seed-qualified build with a warning comparison against `d466bed` before deploying, and deploy the RBF, Main and helper together, because the mode bit is meaningless unless all three change as a set. On hardware the existing channel sweep is the six channel sound test, LFE becomes audible for the first time, and selecting HDMI will silence S/PDIF by design, which must not be mistaken for a fault on a system whose only speakers are on S/PDIF. Bit transparency from the core samples to the pin remains argued from the clock arithmetic rather than measured, and it is the most likely cause if a receiver fails to lock. Do not describe a 2.1 soundbar locking onto a burst as proof of discrete channel routing. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+- sys/spdif.v
+- sys/audio_out.sv
+- sys/emu_ports.vh
+- sys/sys_top.v
+- MediaPlayer_top_00.svh
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 616 COMMIT Unreleased e2bf23f 2026-08-27T07:52:18-07:00
 
 #### Coming From:
@@ -1144,35 +1178,6 @@ No power cycle preceded this run and the syslog still shows the single 07:41:02 
 #### Next Steps:
 
 Seek user approval for a bounded delivery-side change before implementing it. The proposal is to raise the bytes moved per poll in `mediaplayer_poll()` within `host/main_mister/0001-mediaplayer-arm-loader.patch` by enlarging the read buffer from 4,096 to 16,384 bytes while leaving the chunk count at four, which raises the ceiling from about 1.42 to about 5.7 megabytes per second and, because it moves the same bytes in a quarter as many read and transmit calls, should reduce rather than increase the per-byte time spent in the function. Size the target against DVD peak program-stream rate of 10.08 Mbps or about 1.26 megabytes per second with real margin rather than against this one test file, since the present twelve percent headroom over DVD peak is less than startup dead time already consumes. Before proposing the edit, examine whether `user_io_file_tx_data` accepts larger blocks without internal chunking that would negate the benefit, and estimate the added worst-case time per `user_io_poll` call against whatever else that loop must service, because that is the principal risk and is currently unexamined. No Quartus build is required and the qualified `2acabc5` bitstream is unaffected. Validation would be a single replay of this same larger file, checking measured delivery against the new budget arithmetic and confirming the delivered frame rate rises toward nominal. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 577 COMMIT Unreleased deced5c 2026-08-27T00:53:02-07:00
-
-#### Coming From:
-
-Unreleased deced5c
-
-#### Purpose:
-
-Play the higher-bitrate `bbb_480i_tff_15s.m2v` once to test whether the startup defect is delivery-bound.
-
-#### Outcome:
-
-The larger file is 34,919,166 bytes against 15,150,646 for the qualified file, carrying the same 449 pictures of the same 29.97 fps content at roughly 2.3 times the bitrate. No power cycle preceded this run; the syslog still shows the single 07:41:02 UTC boot, so it followed the entry 575 cold run on the same uptime. The user reports it played a lot slower, and the telemetry agrees emphatically. The session records 188 cadence outliers and 188 missed deadlines against the zero to two seen on the qualified file, a delivered rate of 18.1195 frames per second against a nominal 29.9700, and a cadence span of 1,483,483,716 cycles or 24.72 seconds for content that should occupy 15.0. The three largest gaps are 12,012,000, 10,010,000 and 10,010,000 cycles at ordinals 94, 93 and 95, six and five nominal intervals respectively, and the misses are spread through the session rather than confined to startup. The file nonetheless plays correctly and completely, accepting all 34,919,166 bytes, displaying all 449 pictures with 448 swaps, reaching sequence end and presentation completion with a quiet terminal and zero error flags; it is throttled, not corrupted. The instrumented helper log closes the mechanism completely. Delivery ran flat at the ceiling for the whole session, with segment rates between 1,393,653 and 1,442,109 bytes per second from 199 milliseconds through 24.7 seconds and no burst-then-decay shape, because demand exceeds supply throughout rather than only at startup. The whole-session delivery rate is 1,412,269 bytes per second across 8,526 reads. Dividing those reads by the four-chunk budget gives 2,132 polls over 24.726 seconds, an implied poll rate of 86.2 Hz, and four chunks of 4,096 bytes at 86.2 Hz is 1,412,404 bytes per second, agreeing with the measured delivery to 0.01 percent. The stream demands 2,330,798 bytes per second, giving a deficit ratio of 0.6059, and the observed frame rate ratio of 18.1195 over 29.9700 is 0.6046, agreeing to 0.2 percent. Playback is therefore throttled to exactly the delivery deficit. As before, all 384 would-block events carry a submitted count of zero and precede the first byte, so the helper always had data ready and the parent never saw EAGAIN during steady delivery, confirming that the parent's per-poll budget rather than the helper or the filesystem is the binding constraint. This corrects entry 572, which concluded that raising the four-chunk per-poll budget would not correct anything because steady throughput was never the limiting quantity, and listed that candidate as ruled out. That conclusion holds only for the qualified file, whose 1,010,157 bytes per second demand sits below the ceiling; it is false in general, and for any stream above roughly 1.41 megabytes per second the per-poll budget is precisely what throttles playback. A project-level consequence follows and should not be buried. The measured ceiling of about 1.41 megabytes per second is marginal for the stated long-term goal of commercial DVD playback, since DVD peak video bitrate is 9.8 Mbps or about 1.225 megabytes per second and a full program stream may reach 10.08 Mbps or about 1.26, leaving roughly twelve percent headroom, which is less than the startup dead time already consumes and takes no account of audio demultiplexing. Only three of the 188 deadline records are retained by the snapshot, at ordinals seven, eight and nine, and the 86.2 Hz poll rate remains inferred from read counts and elapsed time rather than measured inside MiSTer main, though it now agrees across two files with very different demands. Whether raising the per-poll budget is safe with respect to MiSTer main's other responsibilities has not been assessed and is not proposed here. Evidence is `.ai/current_results/entry577_bigfile_arm_helper.log`, `entry577_bigfile_terminal.png` and `entry577_bigfile_capture.json`.
-
-#### Next Steps:
-
-The user intends one further run of the same larger file, which is now a genuine test rather than a repeat, because the page cache holds the file after this run while the constraint identified here is the per-poll budget and not read latency. The prediction to be recorded before that data arrives is that warming will change nothing material: first-byte latency should fall from its 23,749 microseconds toward the warm baseline, but the delivery rate should stay near 1,412,000 bytes per second, the delivered frame rate should stay near 18.1 and the missed-deadline count should remain in the same order. If instead the warm run recovers substantially, the per-poll budget is not the whole constraint and this entry's arithmetic is wrong somewhere. After that, propose a bounded delivery-side change for approval rather than implementing it: raise the per-poll chunk count or the buffer size in `mediaplayer_poll()` within `host/main_mister/0001-mediaplayer-arm-loader.patch`, sized against DVD peak program-stream rate with real margin rather than against this one test file, and assess first whether spending longer in that function starves MiSTer main's other per-poll work, which is the obvious risk and has not been examined. That change would need no Quartus build and would be validated by replaying this same larger file and checking the delivery rate against the new budget arithmetic. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
 
 #### Files Modified:
 
