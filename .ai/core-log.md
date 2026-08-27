@@ -1,3 +1,32 @@
+## 584 COMMIT Unreleased 32ba178 2026-08-27T01:52:36-07:00
+
+#### Coming From:
+
+Unreleased 32ba178
+
+#### Purpose:
+
+Publish and install the verified host-transfer profiling build and record standing user authorization for future source publication and host deployment.
+
+#### Outcome:
+
+The user explicitly approved publishing the profiling source to GitHub and installing the host binary with backup and full readback, then stated that approval is not needed going forward. This extends entry 582's evidence-publication permission to source-code publication in `aquasock/MiSTer-Media-Player` and qualified host-system-binary replacement during approved project development, without repeating publication or deployment permission questions; preserve build and regression qualification, restoration data, staged verification and independent active readback. Existing requirements to keep `core.md` restricted, obtain approval for materially revised development plans and leave reboot or playback to the user remain unchanged. Source `32ba178` and its build report were pushed from the Pi, and GUNSMOKE pulled published master `41cb150`; both source-file hashes and the complete candidate binary were verified against the exact tested build, resolving entry 583's unpublished-candidate limitation without changing its source. Before writing to the target, the current 1,166,244-byte `/media/fat/MiSTer` was fully retrieved, checked against the server size and SHA-256 `a850ec3fc8c78b6ed72e3421858f9e3c40a5d2a4ff59a533d52dd0df47213a86`, flushed to local disk, then copied and independently re-hashed in persistent storage at `/home/vash/mister-builds/entry584-backup/MiSTer.pre32ba178` on GUNSMOKE. The profiling candidate was uploaded to the previously absent `/media/fat/MiSTer.new`, read back completely through a fresh FTP session, checked byte-for-byte and confirmed executable before being renamed over `/media/fat/MiSTer`. The predecessor hash was rechecked immediately before rename. A separate fresh session then retrieved the complete active file: all 1,166,244 bytes match SHA-256 `1aae53b0209e873b1edfe20f60bad10c2c4cd5ce1e21f7f40eea81be313facb9`, permissions remain `-rwxr-xr-x` and no staging file remains. Full FPGA readbacks before and after retain the qualified `2acabc5` hash `fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347`. No helper, media, configuration, core lifecycle or Linux lifecycle was changed. The running host process retains its old inode until the user reboots, so this records verified deployment rather than runtime activation, throughput improvement or hardware acceptance. The deployment manifest is `.ai/current_results/entry584_deployment.json`; the latest hardware observation remains entry 581 with the subsequently confirmed responsive menu.
+
+#### Next Steps:
+
+Have the user power-cycle the MiSTer, load the core and play `bbb_480i_tff_15s.m2v` once under the same conditions as entry 581, then stop without replaying and leave terminal telemetry displayed. Fetch `/tmp/MediaPlayer_ARM.log` before the screenshot and verify the new boot plus `profile_version=1`, per-read timing and sampled ACK records to establish runtime activation. Compare separate read and transfer durations, actual data-bearing poll timing, ACK read distributions and cadence with the prior 16 KiB run before selecting an optimization; retain the profiling overhead and sampling limitations from entry 583. Full byte and picture counts, error status and interface responsiveness still gate acceptance, and the qualified 8 Mbps regression remains outstanding. Apply the new standing publication and host-deployment permission to subsequent approved cycles without asking again for those routine actions, while retaining the verification safeguards and keeping the FPGA startup, queue, sync and timing unchanged unless a separate plan is approved.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 583 COMMIT Unreleased 32ba178 2026-08-27T01:37:49-07:00
 
 #### Coming From:
@@ -1173,35 +1202,6 @@ The user reran the same Big Buck Bunny test file on the exact `7cdfcec` image wi
 #### Next Steps:
 
 Retain Bob as the current preferred processed-HDMI mode and make no decoder, scheduler or raster-control change from this terminal evidence. Use one short, direct visual discriminator before another build: compare the same moving interval against a software Bob and Weave reference made from the exact interlaced test stream, focusing on whether MiSTer shows only the expected Bob line-doubling and Weave motion combing or retains an older field beyond one field interval. If MiSTer matches the reference, treat the residual difference as the normal Bob-versus-Weave tradeoff; if it retains older content, propose one bounded correction at the first proven divergent field boundary.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 544 COMMIT Unreleased 7cdfcec 2026-08-26T14:57:08-07:00
-
-#### Coming From:
-
-Unreleased 7cdfcec
-
-#### Purpose:
-
-Record hardware acceptance of the restored MiSTer raster-control phase and preserve one fresh post-playback terminal capture.
-
-#### Outcome:
-
-The user reloaded the exact seed-fifteen `7cdfcec` image and reports that the idle screen works normally apart from the pre-existing flicker; after running the established Big Buck Bunny test file with HDMI scaler deinterlacer set to Weave, the catastrophic whole-screen synchronization failure is gone and the screen remains capture-capable. The fixed remote screenshot filename was deleted before triggering, so `.ai/current_results/entry544_seed15_terminal.png` is genuinely fresh rather than reused evidence; it is 479,876 bytes with SHA-256 `aaf9abd06b8286463ac2cd2081540e8c89ec14de29ade0cc1d84cf35b1eef5cd`. Schema sixteen accepts all 15,150,646 source bytes, reaches sequence end, presentation completion and normal quiet reason one, and its wrapped counters represent 449 framebuffer and displayed pictures with 448 publications and swaps. The terminal generation fetches 242 first-field and 240 second-field lines from region zero with zero region, phase, prefill, unpublished-reset, cache-overlap, presentation, audio, tag, content or accepted-write-versus-raw-return errors. MiSTer's screenshot command succeeds without the prior `Scaled not available` failure. The seed-fifteen correction therefore passes its bounded scaler-lock and external raster-phase objective in Weave; it does not fix or explain the remaining motion flicker.
-
-#### Next Steps:
-
-Keep commit `7cdfcec`, seed fifteen and the restored undelayed `video_de`, `video_hs` and `video_vs` contract as the new hardware baseline, and do not revisit the rejected registered-control phase. Treat the remaining flicker as a separate decoded-field presentation defect. Before another behavioral change, compare this terminal evidence with the user's live observation and choose one bounded source boundary that can be tested with a compile-only check, one incremental Quartus build and a short hardware playback; do not resume the long regression suites unless a change materially requires them.
 
 #### Files Modified:
 
