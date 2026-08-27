@@ -1,4 +1,4 @@
-## 557 COMMIT Unreleased ??? 2026-08-26T21:45:31-07:00
+## 557 COMMIT Unreleased 31a87b6 2026-08-26T21:45:31-07:00
 
 #### Coming From:
 
@@ -10,7 +10,7 @@ Capture decoder-input and presentation readiness at missed native frame deadline
 
 #### Outcome:
 
-The user approved the passive diagnostic build proposed in entry 556. The planned schema nineteen retains the existing sixty-four-word overlay and common cadence/error counters, replacing the retired framebuffer-detail payload with full sixteen-bit picture/swap counts and the first three confirmed missed-deadline records. Each record will retain the upcoming display ordinal, completed-reference count, exact window state, completion age, decoder-input starvation and writer-capacity stall counts, accepted byte position and subsequent candidate readiness delay. Availability will be tapped directly before the decoder instead of inferred from the upstream HPS FIFO; writer capacity will be observed separately from its acknowledgement pulse and DDR busy level. Only gaps followed by an actual presentation will enter the retained records, avoiding terminal idle as a false missed picture. The continuous HDMI sync fix, raster, decoder arithmetic, scheduler admission/ownership, memory transactions and queue control remain unchanged. Existing legacy telemetry decoding will remain supported, and the retired framebuffer fields will be explicitly unavailable in schema nineteen rather than misinterpreted as errors. No new source or image has been built or deployed yet.
+The user approved the passive diagnostic build proposed in entry 556. Source `31a87b6` implements schema nineteen using the unchanged sixty-four-word overlay geometry and common cadence/error counters, replacing the retired framebuffer-detail payload with full sixteen-bit picture/swap counts and the first three confirmed missed-deadline records. Each record retains the upcoming display ordinal, completed-reference count, exact window state, completion age, decoder-input starvation and writer-capacity stall counts, accepted byte position and subsequent candidate readiness delay. The observer samples the window bus coherently, waits one further clock for the scheduler's registered bank change, and retains a miss only if a later presentation confirms that the gap eventually ended. This avoids both an on-time swap being misclassified from its old bank and terminal idle consuming record slots. Availability is tapped directly before the decoder instead of inferred from the upstream HPS FIFO; writer-capacity blocking is observed separately from its acknowledgement pulse and DDR busy level. The continuous HDMI sync fix, raster, decoder arithmetic, scheduler admission/ownership, memory transactions and queue control are unchanged. The extended RTL test passes exact window-state retention, eleven measured input-starvation cycles, writer attribution, late and already-ready candidates, on-time swaps, ordinal 348, multiple windows in one gap, bounded record retention, terminal idle and session/mode reset. A saved RTL packet decodes correctly through a rendered screenshot with ordinals three, four and 348, and the Python suite also passes legacy layouts, full 449-picture counts/rate and saturation handling. Queue and writer tests prove the new availability taps against real retained bytes and a blocked two-bank drain. Retired framebuffer fields are explicitly unavailable in schema nineteen rather than decoded as errors. The unchanged native-video regression is still running; no official Quartus image has yet been built or deployed. The user's question about using simulation alone was answered with the remaining boundary: the integrated ideal-input/DDR simulation does not reproduce the hardware picture-348 delay, so measured hardware wait evidence is needed before claiming its cause.
 
 #### Next Steps:
 
@@ -26,6 +26,8 @@ Implement the passive taps and event recorder, extend the existing profiler and 
 - rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
 - rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
 - tools/streams/tb_h262_hardware_cadence_profiler.sv
+- tools/streams/tb_h262_clean_video_queue.sv
+- tools/streams/tb_h262_ddram_store_overlap.sv
 - tools/streams/decode_hardware_cadence.py
 - tools/streams/test_decode_hardware_cadence.py
 - tools/streams/run_native_480i_timing.sh
