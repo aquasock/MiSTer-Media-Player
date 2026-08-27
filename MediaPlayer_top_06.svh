@@ -164,6 +164,11 @@ mpeg2_h262_luma_write_fingerprint mpeg2_h262_luma_write_fingerprint
     .expected_valid(mpeg2_new_luma_writer_expected_valid)
 );
 
+// Entry 548: raw fetch-address evidence, accumulated in the profiler.
+wire mpeg2_new_luma_fetch_valid;
+wire mpeg2_new_luma_fetch_first_field;
+wire [8:0] mpeg2_new_luma_fetch_row;
+
 reg [2:0] mpeg2_new_first_field_region;
 reg [2:0] mpeg2_new_second_field_region;
 reg       mpeg2_new_first_field_fetch_d;
@@ -227,6 +232,9 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
         mpeg2_new_framebuffer_sequence_phase_error_rd),
     .first_field_fetch_toggle_debug(
         mpeg2_new_framebuffer_first_field_fetch_toggle),
+    .luma_fetch_valid_debug(mpeg2_new_luma_fetch_valid),
+    .luma_fetch_first_field_debug(mpeg2_new_luma_fetch_first_field),
+    .luma_fetch_row_debug(mpeg2_new_luma_fetch_row),
     .second_field_fetch_toggle_debug(
         mpeg2_new_framebuffer_second_field_fetch_toggle),
     .luma_return_valid_debug(mpeg2_new_luma_return_valid),

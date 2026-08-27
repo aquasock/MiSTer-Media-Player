@@ -60,6 +60,14 @@ module mpeg2_luma_framebuffer
     output wire        sequence_phase_error_debug,
     output wire        first_field_fetch_toggle_debug,
     output wire        second_field_fetch_toggle_debug,
+    // Entry 548: the fetch address itself.  Every existing per-field counter
+    // is address-blind -- it attributes a launch by line_number[0] and nothing
+    // more -- so 242 first-field fetches cannot distinguish 240 distinct rows
+    // from one stale row fetched 242 times.  Export the raw event and let the
+    // profiler accumulate it against the generation boundary.
+    output wire        luma_fetch_valid_debug,
+    output wire        luma_fetch_first_field_debug,
+    output wire [8:0]  luma_fetch_row_debug,
     // Entry 520: raw per-parity luma return event.  Entry 519 accumulated this
     // inside the framebuffer, where it cleared on every generation reset and
     // so reported whatever short generation preceded terminal quiet.  Export
@@ -230,6 +238,9 @@ reg        fetch_cache_bank;
 // can be attributed to the authored first field or the other field.
 reg        first_field_fetch_toggle_mem;
 reg        second_field_fetch_toggle_mem;
+reg        luma_fetch_valid_mem;
+reg        luma_fetch_first_field_mem;
+reg [8:0]  luma_fetch_row_mem;
 reg [31:0] first_field_raw_fingerprint_mem;
 reg [31:0] second_field_raw_fingerprint_mem;
 reg [31:0] luma_position_line_accumulator_mem;
@@ -519,6 +530,9 @@ task automatic launch_fetch;
             else
                 second_field_fetch_toggle_mem <=
                     ~second_field_fetch_toggle_mem;
+            luma_fetch_valid_mem       <= 1'b1;
+            luma_fetch_first_field_mem <= (line_number[0] == first_field_mem);
+            luma_fetch_row_mem         <= line_number[8:0];
         end
 
         if (kind == FETCH_Y)
@@ -568,6 +582,9 @@ always @(posedge mem_clk) begin
         fetch_cache_bank      <= 1'b0;
         first_field_fetch_toggle_mem  <= 1'b0;
         second_field_fetch_toggle_mem <= 1'b0;
+        luma_fetch_valid_mem       <= 1'b0;
+        luma_fetch_first_field_mem <= 1'b0;
+        luma_fetch_row_mem         <= 9'd0;
         first_field_raw_fingerprint_mem  <= 32'd0;
         second_field_raw_fingerprint_mem <= 32'd0;
         luma_line_raw_accumulator_mem <= 32'd0;
@@ -677,6 +694,7 @@ always @(posedge mem_clk) begin
     end
     else begin
         y_cache_wr_en  <= 1'b0;
+        luma_fetch_valid_mem <= 1'b0;
         cb_cache_wr_en <= 1'b0;
         cr_cache_wr_en <= 1'b0;
         luma_fingerprint_valid_debug <= 1'b0;
@@ -1265,6 +1283,9 @@ assign picture_present_debug = picture_present_rd;
 assign prefill_deadline_missed_debug = prefill_deadline_missed_rd;
 assign first_field_fetch_toggle_debug  = first_field_fetch_toggle_mem;
 assign second_field_fetch_toggle_debug = second_field_fetch_toggle_mem;
+assign luma_fetch_valid_debug       = luma_fetch_valid_mem;
+assign luma_fetch_first_field_debug = luma_fetch_first_field_mem;
+assign luma_fetch_row_debug         = luma_fetch_row_mem;
 assign luma_return_valid_debug =
     ddram_dout_ready && (fetch_kind == FETCH_Y) && native_interlaced_mem;
 assign luma_return_first_field_debug = (fetch_line[0] == first_field_mem);

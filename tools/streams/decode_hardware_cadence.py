@@ -13,9 +13,11 @@ from PIL import Image
 
 MAGIC = 0x4D4D5031
 X0 = 8
-WORDS = 61
-DIAGNOSTIC_Y0 = 356
-NATIVE_480I_Y0 = 236
+WORDS = 62
+DIAGNOSTIC_Y0 = 352
+NATIVE_480I_Y0 = 232
+SCHEMA16_DIAGNOSTIC_Y0 = 356
+SCHEMA16_NATIVE_480I_Y0 = 236
 SCHEMA15_DIAGNOSTIC_Y0 = 408
 SCHEMA15_NATIVE_480I_Y0 = 288
 SCHEMA14_DIAGNOSTIC_Y0 = 428
@@ -53,6 +55,8 @@ def decode_words(path: Path | str) -> list[int]:
         )
 
     layouts = (
+        (SCHEMA16_DIAGNOSTIC_Y0, 61),
+        (SCHEMA16_NATIVE_480I_Y0, 61),
         (DIAGNOSTIC_Y0, WORDS),
         (NATIVE_480I_Y0, WORDS),
         (SCHEMA15_DIAGNOSTIC_Y0, 48),
@@ -510,6 +514,23 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "framebuffer_second_field_first_content_mismatch": provenance_event(
             56, 57, 58, 59
         ),
+        # Entry 548 (schema 17): address-sensitive fetch evidence.  A healthy
+        # native generation sweeps first-field rows 0..478 plus prefill rows 0
+        # and 2, whose XOR is 2, and second-field rows 1..479, whose XOR is 0.
+        # A repeated or wrong row set changes the signature; the existing fetch
+        # counts cannot, being attributed only by row parity.
+        "framebuffer_first_field_row_xor": (
+            (words[60] >> 23) & 0x1FF if schema_version >= 17 else None
+        ),
+        "framebuffer_second_field_row_xor": (
+            (words[60] >> 14) & 0x1FF if schema_version >= 17 else None
+        ),
+        "framebuffer_first_field_region_changed": (
+            bool((words[60] >> 13) & 1) if schema_version >= 17 else None
+        ),
+        "framebuffer_second_field_region_changed": (
+            bool((words[60] >> 12) & 1) if schema_version >= 17 else None
+        ),
         "checksum": words[-1],
     }
 
@@ -714,6 +735,19 @@ def main() -> int:
             print(
                 "second content mismatch: "
                 f"{result['framebuffer_second_field_first_content_mismatch']}"
+            )
+        if result["schema_version"] >= 17:
+            fx = result["framebuffer_first_field_row_xor"]
+            sx = result["framebuffer_second_field_row_xor"]
+            print(
+                "fetch addresses: first_row_xor={} (expect 2){} "
+                "second_row_xor={} (expect 0){} "
+                "region_changed={}/{}".format(
+                    fx, "" if fx == 2 else "  <-- UNEXPECTED",
+                    sx, "" if sx == 0 else "  <-- UNEXPECTED",
+                    result["framebuffer_first_field_region_changed"],
+                    result["framebuffer_second_field_region_changed"],
+                )
             )
         if result["schema_version"] >= 12:
             print(
