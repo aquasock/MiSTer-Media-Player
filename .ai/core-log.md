@@ -1,3 +1,32 @@
+## 582 COMMIT Unreleased ad364bf 2026-08-27T01:33:33-07:00
+
+#### Coming From:
+
+Unreleased ad364bf
+
+#### Purpose:
+
+Record standing user authorization to publish this project's diagnostic evidence and project-log updates to its GitHub repository.
+
+#### Outcome:
+
+After entry 581's publication was blocked pending explicit consent for its diagnostic logs and screen content, the user approved uploading those files and the log update to `aquasock/MiSTer-Media-Player` and stated that this may be done automatically going forward. This is standing authorization to commit and push project-related diagnostic logs, telemetry captures and screenshots, associated analysis and project-log updates to that same GitHub repository during the normal project workflow, without asking separately for publication each time. Continue to inspect the payload and exclude credentials, private keys and unrelated personal or system data. This approval concerns evidence publication; it does not approve the proposed host-transfer profiling or optimization cycle, replacement of the MiSTer system binary, new hardware actions or edits to restricted `core.md`. Entry 581 remains the latest hardware result: the 16 KiB host buffer is active but high-bitrate playback fails cadence acceptance, and the FPGA image remains unchanged. No new build or hardware test was performed for this authorization record.
+
+#### Next Steps:
+
+Publish the pending entry-581 evidence and this authorization record from the Raspberry Pi checkout to GitHub master, verify the remote commit and retain this standing publication permission in future recovery context. Apply it to subsequent relevant evidence and log updates without an additional publication question. Obtain approval for the separate host-transfer profiling and safe optimization proposal before changing production source or deploying a host binary, retain required backpressure and byte handling, and keep the unresolved hardware acceptance and 8 Mbps regression visible. Preserve `core.md`, the existing untracked screenshots and the forty-entry log ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 581 COMMIT Unreleased ad364bf 2026-08-27T01:30:00-07:00
 
 #### Coming From:
@@ -1176,36 +1205,6 @@ Copy the exact seed-fifteen RBF from the designated GUNSMOKE checkout to the Ras
 #### Files Modified:
 
 - MediaPlayer.qsf
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 542 COMMIT Unreleased 99fc1ea 2026-08-26T14:15:33-07:00
-
-#### Coming From:
-
-Unreleased 00267dc
-
-#### Purpose:
-
-Restore MiSTer's established external raster-control phase after entry 541 proved the one-clock delay breaks scaler lock.
-
-#### Outcome:
-
-The user approved an accelerated corrective cycle after the exact `00267dc` hardware image made the complete idle screen repeatedly lose synchronization and prevented a fresh scaled screenshot, while direct restoration of `164c7e6` immediately returned the display to its prior stable-lock baseline. Commit `99fc1ea` removes only `pixel_en_d`, `h_sync_d` and `v_sync_d`, again drives framebuffer `video_de`, `video_hs` and `video_vs` from the established current-cycle inputs and updates the focused cache-refill test to compile against that external passthrough contract. Per the user's shortened-cycle direction, the focused testbench was elaborated successfully without running `vvp`; the long native, reconstruction and live-raster regressions were not run. One retained-state incremental Quartus compilation completed successfully in 11 minutes 13 seconds with zero errors, but TimeQuest reported global setup slack of negative 0.199 nanoseconds; hold, recovery, removal and minimum-pulse-width slack were positive 0.257, 4.275, 0.595 and 0.925 nanoseconds. The fit used 31,377 ALMs, 49,635 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The non-deployable 4,271,344-byte RBF has SHA-256 `f53a3251b4676d2176b0838b4def338800ca96dfcffe92e9f6a1d6191bf41018`. Because setup timing did not close, the RBF was not copied from GUNSMOKE or installed on MiSTer; the verified `164c7e6` image remains active.
-
-#### Next Steps:
-
-Stop without deploying or starting another build. If the user approves one additional incremental placement seed, change only the reproducible Quartus seed, build once on GUNSMOKE and deploy only if every reported timing class is non-negative. Hardware validation must then begin and stop at idle-screen scaler lock plus one genuinely fresh screenshot; do not play media until that gate passes.
-
-#### Files Modified:
-
-- rtl/mpeg2_luma_framebuffer.sv
-- tools/streams/tb_native_480i_cache_refill.sv
 
 #### Status:
 
