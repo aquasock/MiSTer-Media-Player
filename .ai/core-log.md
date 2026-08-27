@@ -1,3 +1,32 @@
+## 553 COMMIT Unreleased 30d300a 2026-08-26T20:56:41-07:00
+
+#### Coming From:
+
+Unreleased 30d300a
+
+#### Purpose:
+
+Deploy the timing-qualified framebuffer sync correction and record the user's standing authorization for future core-image replacements.
+
+#### Outcome:
+
+The user explicitly authorized replacing the active image and stated that the agent may do so going forward. This is standing permission to directly replace this project's `/media/fat/MediaPlayer.rbf` during approved development cycles after successful build and positive timing checks, with independent full-file readback, without asking separately for replacement permission each time. The source remains `30d300a`; no source changes or additional build were needed. The Pi artifact was checked against the entry 552 build manifest, then uploaded directly through standard FTP, replacing the previous 4,248,544-byte image with the qualified 4,244,104-byte image. A new FTP connection independently read the complete destination and verified SHA-256 `d676cb58cb22d991a0638bd0dab2885f7b1bcdd87d23e085910ab05dd1acec57`, exactly matching the build-PC and Pi copies. No backup, staging copy or rollback file was created on the MiSTer, and no reload or reboot was triggered. `.ai/current_results/entry552_deployment.json` retains the transfer, independent verification and authorization record. The user has been shown actual before/after simulator output; the test's moving bar deliberately offsets the second field by four source pixels, so the corrected Weave image still exhibits expected motion combing and is not a sharpness comparison. Hardware acceptance remains pending actual HDMI playback.
+
+#### Next Steps:
+
+Ask the user to reload MediaPlayer, confirm stable HDMI lock before playback, and run the established Big Buck Bunny file at 1080p in Weave and Bob, checking whether the stale-field sticking and flicker are gone and whether any alignment defect remains. Record the user's observations in the next entry without treating successful transfer or simulation as hardware acceptance. Future timing-qualified image replacements within approved development work are already authorized; continue direct replacement and independent readback verification.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 552 COMMIT Unreleased 30d300a 2026-08-26T20:05:04-07:00
 
 #### Coming From:
@@ -1221,39 +1250,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 513 COMMIT Unreleased 9573923 2026-08-25T09:58:18-07:00
-
-#### Coming From:
-
-Unreleased 69a4f20
-
-#### Purpose:
-
-Add a moving final-mux native pattern that distinguishes FPGA field-readout retention from MiSTer scaler or display retention.
-
-#### Outcome:
-
-The user approved the revised diagnostic after review of `.ai/current_results/PXL_20260825_160322728.mp4`, a 56,383,735-byte 13.564622-second Pixel 8 Pro recording at SHA-256 `267561d6246d06ce7ec03f533e979b6b1bd7e15c27fffa8bc01b9f8154adaec6`. The ordinary full-height bar moves and wraps throughout the active playback, while a separate upper-half bar remains fixed at one horizontal position for nearly the entire ten-second session and disappears abruptly when playback completes and the terminal overlay returns. This is not a brief Bob tradeoff, rolling-shutter duplicate or panel afterimage. The paired schema-ten capture accepts the complete 5,007,304-byte stream, represents all 300 pictures and 299 swaps in its wrapped counters, records 300 framebuffer resets, 299 publications, zero superseded unpublished generations, zero prefill misses, a maximum 2,002,005-cycle publication latency, three regular 2,002,000-cycle ranked gaps, normal quiet completion and no error. Commit `9573923` retains the established status-bit-123 static bars and adds status bit 125 as a separately synchronized Static/Moving submode. Moving mode emits a sixteen-pixel pair-identical bar at x positions 48 through 624, holds each for exactly thirty complete frame-window edges, advances ninety-six pixels and wraps through seven positions; pair-identical horizontal references use the common field-row coordinate. This source remains after the framebuffer mux and before the cadence overlay, so decoder, DDR and line-cache pixels are absent while native sync, field signalling and MiSTer's processed-HDMI path remain active. Destination-scoped timing exceptions cut only the two asynchronous menu sources entering stage zero. Directed tests prove unchanged static colors, blanking and sync passthrough, exact hold, jump and wrap behavior, no double-count from a held frame-window level and identical TFF/BFF content. The complete native suite passes field order, mapping, timing, Bob/Weave control, ownership, accelerated presentation, cache refill and schema-ten telemetry; TFF, BFF and progressive reconstruction retain zero out-of-tolerance pixels at 7,926,459, 7,948,706 and 13,048,137 cycles, field-DCT rejection remains 82,326 cycles and the canonical mixed I/P/B raster remains exactly 6,529,997 cycles with every error clear. No decoder, scheduler, framebuffer, cache or native timing behavior changes. A clean Quartus Prime 17.0.2 build from empty generated state completed in 10 minutes 45 seconds with zero errors and 144 established warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.252, 0.251, 3.650, 0.630 and 0.925 nanoseconds. Focused decoder setup and recovery are positive 0.913 and 11.075 nanoseconds and focused video setup is positive 2.661 nanoseconds, all with zero violated paths. Both native menu synchronizer exceptions match without an empty-filter warning. The fit uses 29,271 ALMs, 45,209 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The 4,220,300-byte RBF has SHA-256 `03bb6a504538fd7e62b2877a428e2e570841ccb3d2d834674f163dd580d76642`. Ordinary FTP retrieved the installed `69a4f20` image at its exact known 4,237,424-byte hash `57cee7a30c9802c256398cbf44875c5c2118b4b912aca0ef08e103467068c673`, preserved and round-trip verified it as `/media/fat/MediaPlayer.rbf.rollback-pre-9573923`, round-trip verified the staged candidate and then verified the promoted `/media/fat/MediaPlayer.rbf` at the exact new hash. The temporary stage is absent; helper, media, Main and MiSTer configuration are unchanged.
-
-#### Next Steps:
-
-Reload the installed core, set HDMI scaler deinterlacer to Bob, Native timing pattern to On, Native pattern motion to Moving and Interlaced output to Native 480i, then run `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` once and record the complete active interval. The direct pattern must show one sixteen-pixel bar at a time, hold each position for approximately one second, jump ninety-six pixels and wrap after seven positions while the two horizontal references remain fixed. Any second retained bar or partial bar proves the fault is downstream of the FPGA final mux in MiSTer's processed-HDMI scaler or display; clean single-bar jumps prove the FPGA final mux and downstream path and place the decoded-video fault inside field-specific framebuffer cache or readout. Report USER, DISK and POWER and leave the terminal image displayed for ordinary-FTP capture.
-
-#### Files Modified:
-
-- `MediaPlayer.sdc`
-- `MediaPlayer_top_00.svh`
-- `MediaPlayer_top_01.svh`
-- `MediaPlayer_top_07.svh`
-- `rtl/mpeg2_native_timing_pattern.sv`
-- `tools/streams/tb_native_480i_timing_pattern.sv`
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
