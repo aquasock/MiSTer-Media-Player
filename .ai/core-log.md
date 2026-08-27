@@ -1,3 +1,33 @@
+## 629 COMMIT Unreleased ad56579 2026-08-27T17:05:22-07:00
+
+#### Coming From:
+
+Unreleased 2cb7246
+
+#### Purpose:
+
+State the decoder's actual capability and its unqualified areas in the README and changelog.
+
+#### Outcome:
+
+Published source `ad56579` rewrites the capability description now that measurement rather than inference supports it. The two video paths are described separately because they differ sharply, which the previous single row obscured: the progressive path decodes I, P and B pictures through 720x480, while the interlaced path is 720x480 at 30000/1001 only, 4:2:0, I-pictures only, frame structured, frame DCT and frame prediction only, either field order, with no `repeat_first_field`. Field pictures, field DCT, interlaced P and B, pulldown and 576i are named as rejected before decode, together with the plain consequence that most commercial DVDs use several of these and will not play. Audio is described as decoded MPEG Layer II and AC-3 with an explicit note that the AC-3 stereo downmix discards LFE by the format's convention, alongside AC-3 and DTS passthrough as IEC 61937 bursts, the passthrough-only status of DTS, the audio output option and why it mutes the output it does not drive, and the single-track limit. Four unqualified areas are recorded rather than left implicit: playback pixel accuracy has never been qualified because every previous comparison ran in simulation; sharp colour transitions carry one blended column an independent decoder does not produce; material with a large enough peak coded picture repeats one or two frames at that picture as a property of buffer depth rather than of the stream; and passthrough cannot be scaled, so volume does not apply to it. The changelog gains the AC-3, passthrough, audio output, hand test, progressive picture type, Main responsiveness and known limitation entries for the unreleased section, and the README gains a hand test section describing what each of the seven files is for and noting that the audio sweeps exercise discrete channels only in S/PDIF mode. The standards section now credits liba52 and IEC 61937 and states that the rejected picture types are limits of this implementation rather than of H.262. Nothing in the release qualification or installation sections was touched, since those describe the published v0.7.0 binaries and no new release has been prepared.
+
+#### Next Steps:
+
+The release itself is not prepared and needs the user's decision on scope and timing. If it proceeds, the outstanding work is a full regression pass on a clean build, a decision on whether the chroma edge column is investigated first or shipped as a documented characteristic, a version number, and the tag and GitHub release created by the user from the exact commit, with the binaries and hand tests packaged and identified by hash. The installation section still describes three v0.7.0 runtime files and will need a fourth line if the release ships the patched Main, since the audio output option is meaningless without it. Release notes should carry the repeated frame wording, the marginal scaler paths recovered by reseeding, the audio split between measured and listened evidence, and the DTS subwoofer behaviour as a device observation rather than a core limitation. The chroma investigation, if wanted, should ask what the core does horizontally with 4:2:0 chroma when converting for display, with an interlaced colour bar file in native 480i as the control. The interlaced gates of entry 609 remain open and out of scope. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+- README.md
+- CHANGELOG.md
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 628 COMMIT Unreleased 2cb7246 2026-08-27T16:51:13-07:00
 
 #### Coming From:
@@ -1148,35 +1178,6 @@ The user reports no visible slowdown. The helper log was retrieved first, follow
 #### Next Steps:
 
 With this high-bitrate evidence preserved, ask the user to play `bbb_480i_tff_15s_8mbps.m2v` once using the same installed pair and display mode, leave telemetry displayed, and report whether the menu remains responsive. Collect its helper log before another playback, then a fresh screenshot and image checks; verify mode 2, complete byte/picture counts, no integrity/decoder errors and cadence. Keep the guarded credit and integrity protocol, both FIFO capacities, startup controller, continuous HDMI sync and black idle unchanged. Before any further decoder or transport revision, propose a focused boundary and obtain approval; the current evidence points toward downstream processing/backpressure but does not yet isolate an internal stage or justify removing safeguards. Preserve the restoration copies and outstanding unsupported interlaced P/B, field-picture/DCT, audio/PTS, cancellation and historical assertion-drift limits. Keep restricted `core.md` unchanged, retain the forty-entry ring and do not mark nominal-cadence acceptance passed from the user's visual report alone.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 589 COMMIT Unreleased a4f2769 2026-08-27T03:07:27-07:00
-
-#### Coming From:
-
-Unreleased a4f2769
-
-#### Purpose:
-
-Deploy the qualified guarded fast-block host and FPGA pair after MiSTer connectivity is restored.
-
-#### Outcome:
-
-The user reports that the MiSTer is connected, and FTP access to `10.10.0.30` succeeds. The active predecessors match the expected `be8502b` host and `2acabc5` FPGA hashes. Both complete images were retrieved and fsynced locally, then retained and independently hash-verified and fsynced under `/home/vash/mister-builds/entry588-backup` on GUNSMOKE as `MiSTer.prea4f2769` and `MediaPlayer.rbf.prea4f2769`. A read-only backup attempt exposed FTP transfer-mode handling after a directory listing; the procedural scripts were corrected and the complete backup pass repeated before deployment, without changing production source or artifacts. The qualified `a4f2769` candidates were staged at `/media/fat/MiSTer.new` and `/media/fat/MediaPlayer.rbf.new`, and both passed complete fresh-connection readbacks and permission checks before either rename. The active predecessors were reverified immediately before replacement. Each file rename is atomic; the pair is not, but both mixed-version combinations preserve acknowledged transfers. A further independent FTP connection verified both complete active files, executable permissions and absence of both staging paths. Installed `/media/fat/MiSTer` is 1,170,340 bytes with SHA-256 `3841e2cc6eef4bfc9e46a7ffa075aff76b65d5405f81efb1355373292b35846f`; installed `/media/fat/MediaPlayer.rbf` is 4,332,748 bytes with SHA-256 `15bc3057a4f16369bc4a3dac01e30f63e5fc563a43b1922214b5b478c17c66c2`. Deployment evidence and restoration details are in `.ai/current_results/entry589_deployment.json`; corrected procedural scripts remain under `/home/vash/mister-builds/entry588/resume-scripts`. Entry 588's clean builds, regressions and positive timing qualification remain applicable; no rebuild or production change was needed. No reboot, core reload, playback, helper replacement or configuration edit occurred. The new files are installed, but runtime activation, performance and hardware acceptance are not yet verified.
-
-#### Next Steps:
-
-Have the user cold-power-cycle the MiSTer, load MediaPlayer and play `bbb_480i_tff_15s.m2v` once, then leave terminal telemetry displayed without replaying or running the 8 Mbps file yet. Collect `/tmp/MediaPlayer_ARM.log` first, then a fresh screenshot and complete installed-image readbacks; require a new boot, marker `transport=credit_fast_v1`, transport mode 2 with nonzero fast bytes, no integrity fault, all 34,919,166 bytes, 449 pictures, 448 swaps and zero decoder errors. Compare delivery rate, transfer time, cadence and delayed intervals against entry 587's 1,578,252 B/s, 21.202251 seconds, 20.248749 fps and 167 delayed intervals, and ask whether the meadow slowdown and menu responsiveness changed. Preserve this capture before the separate qualified 8 Mbps regression. Treat 10 MB/s as the user's earlier guess and decoder-bound playback as an unverified hypothesis. Preserve startup, continuous HDMI sync, black idle, both queue capacities and existing unsupported-feature limits; retain the restoration pair, standing qualified-deployment permission and user control of reboot/playback. Keep restricted `core.md` unchanged and maintain the forty-entry ring.
 
 #### Files Modified:
 
