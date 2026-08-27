@@ -33,6 +33,7 @@ wire pcm_protocol_error;
 
 wire [7:0] output_data;
 wire output_valid;
+wire output_pending_debug;
 reg output_ready = 0;
 wire [32:0] output_metadata_pts;
 wire output_metadata_valid;
@@ -69,7 +70,7 @@ mpeg2_h262_clean_video_queue queue
     .input_metadata_valid(extracted_metadata_valid),
     .input_metadata_ready(extracted_metadata_ready),
     .output_data(output_data),.output_valid(output_valid),
-    .output_ready(output_ready),
+    .output_ready(output_ready),.output_pending_debug(output_pending_debug),
     .output_metadata_pts(output_metadata_pts),
     .output_metadata_valid(output_metadata_valid)
 );
@@ -155,6 +156,8 @@ initial begin
     @(negedge clk);
     input_end = 0;
 
+    if (!output_pending_debug || output_valid)
+        $fatal(1,"queue availability was incorrectly gated by decoder ready");
     if (received_count != 0)
         $fatal(1,"decoder received %0d bytes while held",received_count);
     if (metadata_seen != 0)
@@ -169,6 +172,8 @@ initial begin
     output_ready = 1;
     repeat (220) @(posedge clk);
 
+    if (output_pending_debug)
+        $fatal(1,"empty queue still reports pending input");
     if (received_count != expected_count)
         $fatal(1,"clean byte count %0d expected %0d",
                received_count,expected_count);

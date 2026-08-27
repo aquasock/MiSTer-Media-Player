@@ -658,6 +658,7 @@ mpeg2_h262_inband_metadata mpeg2_h262_inband_metadata
 	.pcm_protocol_error (mpeg2_new_inband_pcm_protocol_error)
 );
 
+wire mpeg2_new_clean_video_pending;
 mpeg2_h262_clean_video_queue mpeg2_h262_clean_video_queue
 (
 	.clk                   (clk_mpeg2),
@@ -671,6 +672,7 @@ mpeg2_h262_clean_video_queue mpeg2_h262_clean_video_queue
 	.output_data           (mpeg2_stream_data),
 	.output_valid          (mpeg2_new_decode_stream_valid),
 	.output_ready          (mpeg2_new_stream_ready),
+	.output_pending_debug  (mpeg2_new_clean_video_pending),
 	.output_metadata_pts   (mpeg2_new_inband_pts_90k),
 	.output_metadata_valid (mpeg2_new_inband_valid)
 );

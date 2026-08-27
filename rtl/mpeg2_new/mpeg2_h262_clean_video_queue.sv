@@ -30,6 +30,7 @@ module mpeg2_h262_clean_video_queue
     output wire  [7:0] output_data,
     output wire        output_valid,
     input  wire        output_ready,
+    output wire        output_pending_debug,
 
     output wire [32:0] output_metadata_pts,
     output wire        output_metadata_valid
@@ -62,6 +63,8 @@ assign input_metadata_ready = !metadata_full;
 // The integrated decoder advances on a valid pulse, not on a held ready/valid
 // level.  Preserve that established contract at the queue output.
 assign output_valid = video_read;
+// Passive availability before ready gating; upstream FIFO empty is unrelated.
+assign output_pending_debug = !video_empty;
 assign output_metadata_valid = metadata_due;
 assign output_metadata_pts = metadata_q[32:0];
 

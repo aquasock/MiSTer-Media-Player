@@ -7,6 +7,7 @@
 //============================================================================
 `timescale 1ns/1ps
 module mpeg2_h262_hardware_cadence_profiler #(
+    parameter DEADLINE_DIAGNOSTICS = 1'b1,
     parameter [23:0] TERMINAL_SNAPSHOT_DELAY = 24'd15000000,
     parameter [26:0] NO_PROGRESS_SNAPSHOT_DELAY = 27'd60000000,
     parameter [31:0] OUTLIER_GAP_CYCLES = 32'd3000000,
@@ -63,6 +64,9 @@ module mpeg2_h262_hardware_cadence_profiler #(
     input wire framebuffer_first_field_fetch,
     input wire framebuffer_second_field_fetch,
     input wire fifo_pending,input wire decoder_ready,
+    // Entry 557: all three taps are in clk_mpeg2, unlike native_active above.
+    input wire native_decode_active,input wire decoder_input_pending,
+    input wire writer_capacity_blocked,
     input wire presentation_hold,input wire destination_hold,
     input wire scratch_available,input wire promotion_active,
     input wire frame_waiting,input wire [1:0] completed_frame_bank,
@@ -110,7 +114,8 @@ localparam [23:0] TERMINAL_SNAPSHOT_LIMIT=
 localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
-localparam [31:0] SNAPSHOT_FORMAT={8'd18,8'd64,16'd60000};
+localparam [31:0] SNAPSHOT_FORMAT=
+    {DEADLINE_DIAGNOSTICS ? 8'd19 : 8'd18,8'd64,16'd60000};
 // Entry 511: keep all 41 rows visible without changing their encoding. The
 // mode observation is already in clk_video and affects overlay placement only.
 localparam [11:0] OVERLAY_X=12'd8;
@@ -334,6 +339,125 @@ wire [31:0] completed_gap_meta=current_gap_context_valid?
 wire [31:0] completed_gap_state=current_gap_context_valid?
     current_gap_state:scheduler_debug_state_q;
 
+// Entry 557: passive missed-frame observer. Sample the complete window bus
+// together, then wait one clock for the registered scheduler bank change.
+// Thus a same-edge successful swap is not misclassified from the old bank.
+// Retain only the first miss in each gap, and commit it only on a later swap:
+// startup before the first swap and terminal idle never consume record slots.
+reg native_decode_active_q,decoder_input_pending_q,writer_capacity_blocked_q;
+reg [15:0] display_picture_count_full,display_swap_count_full;
+reg [15:0] reference_count_full,deadline_gap_count;
+reg [31:0] last_reference_cycle;
+reg [31:0] interval_input_starve,interval_writer_blocked;
+reg deadline_window_d,deadline_pending;
+reg [31:0] deadline_window_sample[0:7];
+reg [31:0] deadline_pending_sample[0:7];
+reg [31:0] deadline_records[0:23];
+wire deadline_scope=native_decode_active_q&&(frame_rate_code_q==4'h4);
+wire input_starved_now=!decoder_input_pending_q&&decoder_ready_q&&
+    !presentation_hold_q&&!destination_hold_q;
+wire [31:0] deadline_flags_now={8'd0,
+    native_decode_active_q,decoder_input_pending_q,decoder_ready_q,fifo_pending_q,
+    presentation_hold_q,destination_hold_q,writer_capacity_blocked_q,
+    writer_write_q,writer_busy_q,candidate_presentable_q,cadence_slot_q,
+    timestamp_candidate_active_q,timestamp_candidate_due_q,frame_waiting_q,
+    reference_picture_complete_q,sequence_end_seen_q,presentation_error_q,
+    display_scratch_q,display_frame_bank_q,completed_frame_bank_q,
+    first_present_valid,1'b0};
+wire [31:0] pending_ready_delay=
+    (deadline_pending_sample[6]!=32'hffffffff) ? deadline_pending_sample[6] :
+    candidate_presentable_q ? (session_cycles-deadline_pending_sample[1]) :
+                             32'hffffffff;
+integer deadline_i,deadline_slot;
+always @(posedge clk_mpeg2)begin
+    if(reset_mpeg2)begin
+        native_decode_active_q<=0;decoder_input_pending_q<=0;
+        writer_capacity_blocked_q<=0;
+        display_picture_count_full<=0;display_swap_count_full<=0;
+        reference_count_full<=0;deadline_gap_count<=0;last_reference_cycle<=0;
+        interval_input_starve<=0;interval_writer_blocked<=0;
+        deadline_window_d<=0;deadline_pending<=0;
+        for(deadline_i=0;deadline_i<8;deadline_i=deadline_i+1)begin
+            deadline_window_sample[deadline_i]<=0;
+            deadline_pending_sample[deadline_i]<=0;
+        end
+        for(deadline_i=0;deadline_i<24;deadline_i=deadline_i+1)
+            deadline_records[deadline_i]<=0;
+    end else begin
+        native_decode_active_q<=native_decode_active;
+        decoder_input_pending_q<=decoder_input_pending;
+        writer_capacity_blocked_q<=writer_capacity_blocked;
+        deadline_window_d<=0;
+        if(!snapshot_ready_mpeg2&&(session_active||decoder_byte_accepted_q))begin
+            if(reference_picture_complete_q)begin
+                if(reference_count_full!=16'hffff)
+                    reference_count_full<=reference_count_full+1'b1;
+                last_reference_cycle<=session_cycles;
+                if(!first_present_valid)display_picture_count_full<=1;
+            end
+            if(display_swap_now)begin
+                if(display_swap_count_full!=16'hffff)
+                    display_swap_count_full<=display_swap_count_full+1'b1;
+                if(display_picture_count_full!=16'hffff)
+                    display_picture_count_full<=display_picture_count_full+1'b1;
+            end
+            if(DEADLINE_DIAGNOSTICS&&deadline_scope)begin
+                if(display_swap_now)begin
+                    interval_input_starve<=0;interval_writer_blocked<=0;
+                end else begin
+                    if(input_starved_now&&(interval_input_starve!=32'hffffffff))
+                        interval_input_starve<=interval_input_starve+1'b1;
+                    if(writer_capacity_blocked_q&&(interval_writer_blocked!=32'hffffffff))
+                        interval_writer_blocked<=interval_writer_blocked+1'b1;
+                end
+                if(swap_window_pulse_q&&profile_window_active&&
+                   profile_first_present_valid)begin
+                    deadline_window_d<=1;
+                    deadline_window_sample[0]<={
+                        (display_picture_count_full==16'hffff ? 16'hffff :
+                         display_picture_count_full+16'd1),
+                        (reference_picture_complete_q&&(reference_count_full!=16'hffff) ?
+                         reference_count_full+16'd1 : reference_count_full)};
+                    deadline_window_sample[1]<=session_cycles;
+                    deadline_window_sample[2]<=deadline_flags_now;
+                    deadline_window_sample[3]<=reference_picture_complete_q ? 0 :
+                        session_cycles-last_reference_cycle;
+                    deadline_window_sample[4]<=interval_input_starve+
+                        ((input_starved_now&&(interval_input_starve!=32'hffffffff)) ? 32'd1 : 32'd0);
+                    deadline_window_sample[5]<=interval_writer_blocked+
+                        ((writer_capacity_blocked_q&&(interval_writer_blocked!=32'hffffffff)) ? 32'd1 : 32'd0);
+                    deadline_window_sample[6]<=candidate_presentable_q ? 0 : 32'hffffffff;
+                    deadline_window_sample[7]<=accepted_bytes+
+                        (decoder_byte_accepted_q ? 32'd1 : 32'd0);
+                end
+                if(deadline_window_d&&!display_swap_now&&!deadline_pending)begin
+                    deadline_pending<=1;
+                    for(deadline_i=0;deadline_i<8;deadline_i=deadline_i+1)
+                        deadline_pending_sample[deadline_i]<=deadline_window_sample[deadline_i];
+                    if((deadline_window_sample[6]==32'hffffffff)&&candidate_presentable_q)
+                        deadline_pending_sample[6]<=session_cycles-deadline_window_sample[1];
+                end
+                if(deadline_pending)
+                    deadline_pending_sample[6]<=pending_ready_delay;
+                if(display_swap_now&&deadline_pending)begin
+                    deadline_pending<=0;
+                    if(deadline_gap_count!=16'hffff)
+                        deadline_gap_count<=deadline_gap_count+1'b1;
+                    for(deadline_slot=0;deadline_slot<3;deadline_slot=deadline_slot+1)
+                        if(deadline_gap_count==deadline_slot)
+                            for(deadline_i=0;deadline_i<8;deadline_i=deadline_i+1)
+                                deadline_records[deadline_slot*8+deadline_i]<=
+                                    (deadline_i==6) ? pending_ready_delay :
+                                    deadline_pending_sample[deadline_i];
+                end
+            end else begin
+                deadline_pending<=0;
+                interval_input_starve<=0;interval_writer_blocked<=0;
+            end
+        end
+    end
+end
+
 wire [31:0] snapshot_word_00=SNAPSHOT_MAGIC;
 wire [31:0] snapshot_word_01=SNAPSHOT_FORMAT;
 wire [31:0] snapshot_word_02=accepted_bytes;
@@ -380,52 +504,52 @@ wire [31:0] snapshot_word_35={completed_frame_bank_q,display_frame_bank_q,
     sequence_end_seen_q,presentation_complete_q,presentation_error_q,
     associated_count_q,display_pts_q[10:0]};
 wire [31:0] snapshot_word_36=scheduler_debug_state_q;
-wire [31:0] snapshot_word_37={framebuffer_reset_count,
+wire [31:0] legacy_snapshot_word_37={framebuffer_reset_count,
     framebuffer_publication_count};
-wire [31:0] snapshot_word_38={framebuffer_unpublished_reset_count,
+wire [31:0] legacy_snapshot_word_38={framebuffer_unpublished_reset_count,
     framebuffer_prefill_miss_count};
-wire [31:0] snapshot_word_39=framebuffer_max_publication_latency;
+wire [31:0] legacy_snapshot_word_39=framebuffer_max_publication_latency;
 // 8 + 8 + 1 + 1 + 8 + 3 + 3 = 32.  The padding must keep this exact, or the
 // whole word shifts right and every field decodes from the wrong bits.
 localparam integer SNAPSHOT_WORD_40_BITS=8+8+1+1+8+3+3;
-wire [SNAPSHOT_WORD_40_BITS-1:0] snapshot_word_40_payload;
-assign snapshot_word_40_payload[31:24]=last_first_field_fetches;
-assign snapshot_word_40_payload[23:16]=last_second_field_fetches;
-assign snapshot_word_40_payload[15]=last_first_field_varied;
-assign snapshot_word_40_payload[14]=last_second_field_varied;
-assign snapshot_word_40_payload[13]=1'b1;
-assign snapshot_word_40_payload[12]=first_field_write_read_expected_valid;
-assign snapshot_word_40_payload[11]=second_field_write_read_expected_valid;
-assign snapshot_word_40_payload[10:8]=first_field_write_read_region;
-assign snapshot_word_40_payload[7:6]=2'd0;
-assign snapshot_word_40_payload[5:3]=last_first_field_region;
-assign snapshot_word_40_payload[2:0]=last_second_field_region;
-wire [31:0] snapshot_word_40=snapshot_word_40_payload;
+wire [SNAPSHOT_WORD_40_BITS-1:0] legacy_snapshot_word_40_payload;
+assign legacy_snapshot_word_40_payload[31:24]=last_first_field_fetches;
+assign legacy_snapshot_word_40_payload[23:16]=last_second_field_fetches;
+assign legacy_snapshot_word_40_payload[15]=last_first_field_varied;
+assign legacy_snapshot_word_40_payload[14]=last_second_field_varied;
+assign legacy_snapshot_word_40_payload[13]=1'b1;
+assign legacy_snapshot_word_40_payload[12]=first_field_write_read_expected_valid;
+assign legacy_snapshot_word_40_payload[11]=second_field_write_read_expected_valid;
+assign legacy_snapshot_word_40_payload[10:8]=first_field_write_read_region;
+assign legacy_snapshot_word_40_payload[7:6]=2'd0;
+assign legacy_snapshot_word_40_payload[5:3]=last_first_field_region;
+assign legacy_snapshot_word_40_payload[2:0]=last_second_field_region;
+wire [31:0] legacy_snapshot_word_40=legacy_snapshot_word_40_payload;
 // Entry 520: this assertion is independent of the expected snapshot literal.
 // A repeated malformed concatenation in the test therefore cannot validate
 // the same width defect a second time.
 generate
-if(SNAPSHOT_WORD_40_BITS!=32)begin:invalid_snapshot_word_40_width
+if(SNAPSHOT_WORD_40_BITS!=32)begin:invalid_legacy_snapshot_word_40_width
     initial $fatal(1,"snapshot word 40 is %0d bits, expected 32",
                    SNAPSHOT_WORD_40_BITS);
 end
 endgenerate
-wire [31:0] snapshot_word_41={last_first_field_signature,
+wire [31:0] legacy_snapshot_word_41={last_first_field_signature,
     last_second_field_signature,field_region_mismatch_count,
     sequence_phase_error_count};
-wire [31:0] snapshot_word_42=first_field_write_read_expected;
-wire [31:0] snapshot_word_43=first_field_write_read_raw;
-wire [31:0] snapshot_word_44=second_field_write_read_expected;
-wire [31:0] snapshot_word_45=second_field_write_read_raw;
+wire [31:0] legacy_snapshot_word_42=first_field_write_read_expected;
+wire [31:0] legacy_snapshot_word_43=first_field_write_read_raw;
+wire [31:0] legacy_snapshot_word_44=second_field_write_read_expected;
+wire [31:0] legacy_snapshot_word_45=second_field_write_read_raw;
 localparam integer SNAPSHOT_WORD_46_BITS=8+8+8+8;
-wire [SNAPSHOT_WORD_46_BITS-1:0] snapshot_word_46_payload;
-assign snapshot_word_46_payload[31:24]=first_field_write_read_count;
-assign snapshot_word_46_payload[23:16]=second_field_write_read_count;
-assign snapshot_word_46_payload[15:8]=
+wire [SNAPSHOT_WORD_46_BITS-1:0] legacy_snapshot_word_46_payload;
+assign legacy_snapshot_word_46_payload[31:24]=first_field_write_read_count;
+assign legacy_snapshot_word_46_payload[23:16]=second_field_write_read_count;
+assign legacy_snapshot_word_46_payload[15:8]=
     first_field_write_read_mismatch_count;
-assign snapshot_word_46_payload[7:0]=
+assign legacy_snapshot_word_46_payload[7:0]=
     second_field_write_read_mismatch_count;
-wire [31:0] snapshot_word_46=snapshot_word_46_payload;
+wire [31:0] legacy_snapshot_word_46=legacy_snapshot_word_46_payload;
 wire [31:0] luma_provenance_meta_now={
     framebuffer_luma_provenance_expected_row,
     framebuffer_luma_provenance_tagged_row,
@@ -435,33 +559,87 @@ wire [15:0] luma_provenance_generations_now={
     framebuffer_luma_provenance_expected_generation,
     framebuffer_luma_provenance_tagged_generation};
 generate
-if(SNAPSHOT_WORD_46_BITS!=32)begin:invalid_snapshot_word_46_width
+if(SNAPSHOT_WORD_46_BITS!=32)begin:invalid_legacy_snapshot_word_46_width
     initial $fatal(1,"snapshot word 46 is %0d bits, expected 32",
                    SNAPSHOT_WORD_46_BITS);
 end
 endgenerate
-wire [31:0] snapshot_word_47={first_field_tag_mismatch_count,
+wire [31:0] legacy_snapshot_word_47={first_field_tag_mismatch_count,
     second_field_tag_mismatch_count,first_field_content_mismatch_count,
     second_field_content_mismatch_count};
-wire [31:0] snapshot_word_48=first_field_tag_mismatch_meta;
-wire [31:0] snapshot_word_49={first_field_tag_mismatch_generations,16'd0};
-wire [31:0] snapshot_word_50=second_field_tag_mismatch_meta;
-wire [31:0] snapshot_word_51={second_field_tag_mismatch_generations,16'd0};
-wire [31:0] snapshot_word_52=first_field_content_mismatch_meta;
-wire [31:0] snapshot_word_53={first_field_content_mismatch_generations,16'd0};
-wire [31:0] snapshot_word_54=first_field_content_mismatch_raw;
-wire [31:0] snapshot_word_55=first_field_content_mismatch_display;
-wire [31:0] snapshot_word_56=second_field_content_mismatch_meta;
-wire [31:0] snapshot_word_57={second_field_content_mismatch_generations,16'd0};
-wire [31:0] snapshot_word_58=second_field_content_mismatch_raw;
-wire [31:0] snapshot_word_59=second_field_content_mismatch_display;
+wire [31:0] legacy_snapshot_word_48=first_field_tag_mismatch_meta;
+wire [31:0] legacy_snapshot_word_49={first_field_tag_mismatch_generations,16'd0};
+wire [31:0] legacy_snapshot_word_50=second_field_tag_mismatch_meta;
+wire [31:0] legacy_snapshot_word_51={second_field_tag_mismatch_generations,16'd0};
+wire [31:0] legacy_snapshot_word_52=first_field_content_mismatch_meta;
+wire [31:0] legacy_snapshot_word_53={first_field_content_mismatch_generations,16'd0};
+wire [31:0] legacy_snapshot_word_54=first_field_content_mismatch_raw;
+wire [31:0] legacy_snapshot_word_55=first_field_content_mismatch_display;
+wire [31:0] legacy_snapshot_word_56=second_field_content_mismatch_meta;
+wire [31:0] legacy_snapshot_word_57={second_field_content_mismatch_generations,16'd0};
+wire [31:0] legacy_snapshot_word_58=second_field_content_mismatch_raw;
+wire [31:0] legacy_snapshot_word_59=second_field_content_mismatch_display;
 // 9 + 9 + 1 + 1 + 12 = 32.
-wire [31:0] snapshot_word_60={last_first_row_xor,last_second_row_xor,
+wire [31:0] legacy_snapshot_word_60={last_first_row_xor,last_second_row_xor,
     last_first_region_changed,last_second_region_changed,12'd0};
-wire [31:0] snapshot_word_61={last_first_cache_writes,
+wire [31:0] legacy_snapshot_word_61={last_first_cache_writes,
     last_second_cache_writes};
-wire [31:0] snapshot_word_62={last_first_cache_addr_sum,
+wire [31:0] legacy_snapshot_word_62={last_first_cache_addr_sum,
     last_second_cache_addr_sum};
+// Schema 19 reuses the retired framebuffer-detail payload. Schema 18 stays
+// selectable for the established regression; no framebuffer control changes.
+wire [31:0] snapshot_word_37=DEADLINE_DIAGNOSTICS ?
+    {display_picture_count_full,display_swap_count_full} : legacy_snapshot_word_37;
+wire [31:0] snapshot_word_38=DEADLINE_DIAGNOSTICS ?
+    {reference_count_full,deadline_gap_count} : legacy_snapshot_word_38;
+wire [31:0] snapshot_word_39=DEADLINE_DIAGNOSTICS ?
+    deadline_records[0] : legacy_snapshot_word_39;
+wire [31:0] snapshot_word_40=DEADLINE_DIAGNOSTICS ?
+    deadline_records[1] : legacy_snapshot_word_40;
+wire [31:0] snapshot_word_41=DEADLINE_DIAGNOSTICS ?
+    deadline_records[2] : legacy_snapshot_word_41;
+wire [31:0] snapshot_word_42=DEADLINE_DIAGNOSTICS ?
+    deadline_records[3] : legacy_snapshot_word_42;
+wire [31:0] snapshot_word_43=DEADLINE_DIAGNOSTICS ?
+    deadline_records[4] : legacy_snapshot_word_43;
+wire [31:0] snapshot_word_44=DEADLINE_DIAGNOSTICS ?
+    deadline_records[5] : legacy_snapshot_word_44;
+wire [31:0] snapshot_word_45=DEADLINE_DIAGNOSTICS ?
+    deadline_records[6] : legacy_snapshot_word_45;
+wire [31:0] snapshot_word_46=DEADLINE_DIAGNOSTICS ?
+    deadline_records[7] : legacy_snapshot_word_46;
+wire [31:0] snapshot_word_47=DEADLINE_DIAGNOSTICS ?
+    deadline_records[8] : legacy_snapshot_word_47;
+wire [31:0] snapshot_word_48=DEADLINE_DIAGNOSTICS ?
+    deadline_records[9] : legacy_snapshot_word_48;
+wire [31:0] snapshot_word_49=DEADLINE_DIAGNOSTICS ?
+    deadline_records[10] : legacy_snapshot_word_49;
+wire [31:0] snapshot_word_50=DEADLINE_DIAGNOSTICS ?
+    deadline_records[11] : legacy_snapshot_word_50;
+wire [31:0] snapshot_word_51=DEADLINE_DIAGNOSTICS ?
+    deadline_records[12] : legacy_snapshot_word_51;
+wire [31:0] snapshot_word_52=DEADLINE_DIAGNOSTICS ?
+    deadline_records[13] : legacy_snapshot_word_52;
+wire [31:0] snapshot_word_53=DEADLINE_DIAGNOSTICS ?
+    deadline_records[14] : legacy_snapshot_word_53;
+wire [31:0] snapshot_word_54=DEADLINE_DIAGNOSTICS ?
+    deadline_records[15] : legacy_snapshot_word_54;
+wire [31:0] snapshot_word_55=DEADLINE_DIAGNOSTICS ?
+    deadline_records[16] : legacy_snapshot_word_55;
+wire [31:0] snapshot_word_56=DEADLINE_DIAGNOSTICS ?
+    deadline_records[17] : legacy_snapshot_word_56;
+wire [31:0] snapshot_word_57=DEADLINE_DIAGNOSTICS ?
+    deadline_records[18] : legacy_snapshot_word_57;
+wire [31:0] snapshot_word_58=DEADLINE_DIAGNOSTICS ?
+    deadline_records[19] : legacy_snapshot_word_58;
+wire [31:0] snapshot_word_59=DEADLINE_DIAGNOSTICS ?
+    deadline_records[20] : legacy_snapshot_word_59;
+wire [31:0] snapshot_word_60=DEADLINE_DIAGNOSTICS ?
+    deadline_records[21] : legacy_snapshot_word_60;
+wire [31:0] snapshot_word_61=DEADLINE_DIAGNOSTICS ?
+    deadline_records[22] : legacy_snapshot_word_61;
+wire [31:0] snapshot_word_62=DEADLINE_DIAGNOSTICS ?
+    deadline_records[23] : legacy_snapshot_word_62;
 wire [31:0] snapshot_word_63=snapshot_word_00^snapshot_word_01^
     snapshot_word_02^snapshot_word_03^snapshot_word_04^snapshot_word_05^
     snapshot_word_06^snapshot_word_07^snapshot_word_08^snapshot_word_09^

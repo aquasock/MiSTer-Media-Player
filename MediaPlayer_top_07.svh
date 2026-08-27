@@ -161,6 +161,9 @@ mpeg2_h262_hardware_cadence_profiler
     .framebuffer_second_field_fetch(
         mpeg2_new_framebuffer_second_field_fetch_toggle),
     .fifo_pending              (!mpeg2_stream_empty),
+    .native_decode_active      (mpeg2_new_native_active_mpeg2),
+    .decoder_input_pending     (mpeg2_new_clean_video_pending),
+    .writer_capacity_blocked   (mpeg2_new_ddr_capture_blocked),
     .decoder_ready             (mpeg2_new_decoder_stream_ready),
     .presentation_hold         (mpeg2_new_b_presentation_hold),
     .destination_hold          (mpeg2_new_p_destination_ownership_hold),

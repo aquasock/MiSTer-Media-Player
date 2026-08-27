@@ -90,6 +90,8 @@ iverilog -g2012 \
   -o "${build_dir}/tb_h262_hardware_cadence_profiler" \
   "${repo_root}/rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv" \
   "${repo_root}/tools/streams/tb_h262_hardware_cadence_profiler.sv"
-vvp "${build_dir}/tb_h262_hardware_cadence_profiler"
+vvp "${build_dir}/tb_h262_hardware_cadence_profiler" \
+  "+DEADLINE_SNAPSHOT=${build_dir}/deadline_snapshot.hex"
 
-python3 "${repo_root}/tools/streams/test_decode_hardware_cadence.py"
+python3 "${repo_root}/tools/streams/test_decode_hardware_cadence.py" \
+  --rtl-snapshot "${build_dir}/deadline_snapshot.hex"

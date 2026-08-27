@@ -14,6 +14,7 @@ reg pixel_valid=0, block_start=0, block_complete=0;
 reg ddram_busy=0;
 
 wire block_stored, block_accepted, write_seen, store_error;
+wire capture_blocked_debug;
 wire [7:0] ddram_burstcnt; wire [28:0] ddram_addr;
 wire ddram_rd; wire [63:0] ddram_din; wire [7:0] ddram_be; wire ddram_we;
 wire luma_word_debug; wire [2:0] luma_region_debug;
@@ -25,6 +26,7 @@ mpeg2_h262_ddram_store dut(
  .pixel_component(pixel_component),.pixel_x(pixel_x),.pixel_y(pixel_y),
  .pixel_valid(pixel_valid),.block_start(block_start),.block_complete(block_complete),
  .block_stored(block_stored),.block_accepted(block_accepted),
+ .capture_blocked_debug(capture_blocked_debug),
  .write_seen(write_seen),.store_error(store_error),
  .ddram_busy(ddram_busy),.ddram_burstcnt(ddram_burstcnt),.ddram_addr(ddram_addr),
  .ddram_rd(ddram_rd),.ddram_din(ddram_din),.ddram_be(ddram_be),.ddram_we(ddram_we),
@@ -80,10 +82,14 @@ initial begin
     // then confirm B is still accepted: that overlap is the whole point.
     ddram_busy=1;
     feed_block(12'd0,12'd0,8'h10);
+    if(capture_blocked_debug)
+        $fatal(1,"free second capture bank reported blocked by DDR busy");
     if(accepted_total!=1)
         $fatal(1,"exactly one grant expected after the first capture, saw %0d",
                accepted_total);
     feed_block(12'd0,12'd8,8'h20);
+    if(!capture_blocked_debug)
+        $fatal(1,"full capture queue did not report capacity blocking");
     if(accepted_total!=1)
         $fatal(1,"no further grant may be emitted while both banks are full");
     if(store_error) $fatal(1,"overlapped capture must not raise store_error");
@@ -93,6 +99,8 @@ initial begin
     r=0;
     while((nwr<16)&&(r<4000))begin @(negedge clk); r=r+1; end
     if(nwr!=16) $fatal(1,"expected 16 row writes, saw %0d",nwr);
+    if(capture_blocked_debug)
+        $fatal(1,"drained capture queue still reports blocked");
     if(store_error) $fatal(1,"drain must not raise store_error");
     if(accepted_total<2)
         $fatal(1,"a grant must follow each freed bank, saw %0d",accepted_total);

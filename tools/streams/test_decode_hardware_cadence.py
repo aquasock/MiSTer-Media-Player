@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import argparse
+import subprocess
+import sys
 import tempfile
 
 from PIL import Image
@@ -133,10 +136,88 @@ def render(path: Path, width: int, height: int, y_origin: int,
     image.save(path)
 
 
+def check_deadline_layout(temp: Path, rtl_snapshot: Path | None) -> None:
+    words = snapshot_words()
+    words[1] = (19 << 24) | (64 << 16) | 60000
+    words[6] = 896896000
+    words[17] = (193 << 24) | (193 << 8) | 192
+    words[19] = 0
+    words[37] = (449 << 16) | 448
+    words[38] = (449 << 16) | 3
+    for i, ordinal in enumerate((6, 7, 348)):
+        flags = ((1 << 23) | (1 << 21) | (1 << 20) | (1 << 13) |
+                 (1 << 1) | (1 << 4) | (2 << 2))
+        if i == 1:
+            flags ^= (1 << 21) | (1 << 20)
+            flags |= (1 << 22) | (1 << 17) | (1 << 15)
+        words[39+i*8:47+i*8] = [
+            (ordinal << 16) | (ordinal-1), 1234567+i, flags,
+            222+i, 111 if i != 1 else 0, 99 if i == 1 else 0,
+            456 if i == 0 else 0 if i == 1 else 0xFFFFFFFF, 987654+i,
+        ]
+    words[-1] = 0
+    for word in words[:-1]:
+        words[-1] ^= word
+    for native in (False, True):
+        path = temp / f"deadline_{native}.png"
+        render(path, 720 if native else 800, 480 if native else 600,
+               cadence.NATIVE_480I_Y0 if native else cadence.DIAGNOSTIC_Y0, words)
+        parsed = cadence.decode(path)
+        assert parsed["display_pictures"] == 449
+        assert parsed["display_swaps"] == 448
+        assert parsed["reference_pictures"] == 449
+        assert abs(parsed["delivered_fps"] - 30000/1001) < 1e-9
+        assert parsed["display_swaps_8bit"] == 192
+        assert not cadence.validate(parsed, expected_pictures=449)
+        assert all(value is None for key, value in parsed.items()
+                   if key.startswith("framebuffer_"))
+        records = parsed["deadline_records"]
+        assert [r["display_picture_ordinal"] for r in records] == [6, 7, 348]
+        assert records[0]["decoder_ready"] and not records[0]["decoder_input_pending"]
+        assert records[1]["decoder_input_pending"] and records[1]["writer_capacity_blocked"]
+        assert records[0]["candidate_ready_delay_cycles"] == 456
+        assert records[1]["candidate_ready_delay_cycles"] == 0
+        assert records[2]["candidate_ready_delay_cycles"] is None
+        assert records[2]["completed_reference_count"] == 347
+        assert records[2]["display_frame_bank"] == 1
+        assert records[2]["completed_frame_bank"] == 2
+        assert records[2]["accepted_bytes_at_deadline"] == 987656
+        output = subprocess.check_output([sys.executable, cadence.__file__, str(path)], text=True)
+        assert "confirmed deadline gaps: 3" in output and "UNEXPECTED" not in output
+    saturated = words.copy()
+    saturated[37] = 0xFFFFFFFF
+    parsed = cadence.parse_words(saturated)
+    assert parsed["delivered_fps"] is None and parsed["display_counts_saturated"]
+    assert "saturated" in " ".join(cadence.validate(parsed, require_fps=29))
+    empty = words.copy()
+    empty[38] &= 0xFFFF0000
+    assert cadence.parse_words(empty)["deadline_records"] == []
+    if rtl_snapshot is not None:
+        actual = [int(line, 16) for line in rtl_snapshot.read_text().splitlines()]
+        assert len(actual) == 64
+        path = temp / "rtl_deadlines.png"
+        render(path, 720, 480, cadence.NATIVE_480I_Y0, actual)
+        parsed = cadence.decode(path)
+        assert parsed["display_pictures"] == 349 and parsed["display_swaps"] == 348
+        assert parsed["deadline_gap_count"] == 4
+        records = parsed["deadline_records"]
+        assert [r["display_picture_ordinal"] for r in records] == [3, 4, 348]
+        assert records[0]["input_starved_cycles_since_previous_swap"] == 11
+        assert records[0]["candidate_ready_delay_cycles"] > 0
+        assert records[1]["candidate_ready_delay_cycles"] == 0
+        assert records[1]["writer_capacity_blocked_cycles_since_previous_swap"] > 0
+        assert records[2]["completed_reference_count"] == 347
+        print("CADENCE_RTL_PACKET_PASS schema19 ordinals=3,4,348")
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--rtl-snapshot", type=Path)
+    args = parser.parse_args()
     expected = snapshot_words()
     with tempfile.TemporaryDirectory(prefix="mister_cadence_decode_") as name:
         temp = Path(name)
+        check_deadline_layout(temp, args.rtl_snapshot)
         diagnostic = temp / "diagnostic.png"
         native = temp / "native.png"
         overlap = temp / "native_overlap.png"

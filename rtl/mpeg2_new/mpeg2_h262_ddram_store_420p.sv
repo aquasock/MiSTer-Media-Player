@@ -8,6 +8,7 @@ module mpeg2_h262_ddram_store(
  input wire [1:0] pixel_component,input wire [11:0] pixel_x,input wire [11:0] pixel_y,
  input wire pixel_valid,input wire block_start,input wire block_complete,
  output reg block_stored,output wire block_accepted,
+ output wire capture_blocked_debug,
  output reg write_seen,output reg store_error,
  input wire ddram_busy,output wire [7:0] ddram_burstcnt,output wire [28:0] ddram_addr,
  output wire ddram_rd,output wire [63:0] ddram_din,output wire [7:0] ddram_be,output wire ddram_we,
@@ -82,6 +83,9 @@ wire [28:0] stride=(dac==Y)?90:45;
 // missed for the same reason block_stored could not -- it is emitted strictly
 // after the parser is already waiting -- and it arrives one drain earlier.
 wire room_available = !cap && !pend[cap_bank];
+// A completed capture cannot release the parser until the next bank is free.
+// Do not confuse normal active capture or the acknowledgement pulse with this.
+assign capture_blocked_debug = !cap && pend[cap_bank];
 reg  room_available_d;
 reg  accepted_pulse;
 assign block_accepted = accepted_pulse;

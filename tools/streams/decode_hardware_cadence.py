@@ -130,6 +130,8 @@ def decode_words(path: Path | str) -> list[int]:
 def parse_words(words: list[int]) -> dict[str, Any]:
     format_word = words[1]
     schema_version = (format_word >> 24) & 0xFF
+    if schema_version > 19:
+        raise TelemetryDecodeError(f"unsupported telemetry schema {schema_version}")
     clock_hz = (format_word & 0xFFFF) * 1000
     counts = words[17]
     metadata = words[18]
@@ -243,7 +245,7 @@ def parse_words(words: list[int]) -> dict[str, Any]:
             )
         return result
 
-    return {
+    result = {
         "schema_version": schema_version,
         "snapshot_words": (format_word >> 16) & 0xFF,
         "decoder_clock_hz": clock_hz,
@@ -554,6 +556,62 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "checksum": words[-1],
     }
 
+    if schema_version == 19:
+        # Words 37-62 now belong to deadline evidence. Never expose their bits
+        # as the retired framebuffer fields, even when a legacy marker matches.
+        for key in result:
+            if key.startswith("framebuffer_"):
+                result[key] = None
+        result["display_pictures_8bit"] = result["display_pictures"]
+        result["display_swaps_8bit"] = result["display_swaps"]
+        result["display_pictures"] = words[37] >> 16
+        result["display_swaps"] = words[37] & 0xFFFF
+        result["reference_pictures"] = words[38] >> 16
+        result["display_counts_saturated"] = (
+            result["display_pictures"] == 0xFFFF or
+            result["display_swaps"] == 0xFFFF
+        )
+        result["delivered_fps"] = (
+            result["display_swaps"] / cadence_seconds
+            if cadence_seconds and not result["display_counts_saturated"]
+            else None
+        )
+        result["deadline_gap_count"] = words[38] & 0xFFFF
+        result["deadline_scope"] = "native_30000_1001_after_first_swap"
+        result["deadline_records"] = []
+        flag_bits = {
+            "native_active": 23, "decoder_input_pending": 22,
+            "decoder_ready": 21, "upstream_fifo_pending": 20,
+            "presentation_hold": 19, "destination_hold": 18,
+            "writer_capacity_blocked": 17, "writer_write": 16,
+            "writer_busy": 15, "candidate_presentable": 14,
+            "cadence_slot": 13, "timestamp_candidate_active": 12,
+            "timestamp_candidate_due": 11, "frame_waiting": 10,
+            "reference_complete": 9, "sequence_end_seen": 8,
+            "presentation_error": 7, "display_scratch": 6,
+            "first_reference_seen": 1,
+        }
+        for index in range(min(result["deadline_gap_count"], 3)):
+            base = 39 + index * 8
+            meta, cycle, flags, age, starvation, capacity, delay, byte = \
+                words[base:base + 8]
+            result["deadline_records"].append({
+                "display_picture_ordinal": meta >> 16,
+                "completed_reference_count": meta & 0xFFFF,
+                "deadline_session_cycle": cycle,
+                "flags_word": flags,
+                **{name: bool(flags & (1 << bit))
+                   for name, bit in flag_bits.items()},
+                "display_frame_bank": (flags >> 4) & 3,
+                "completed_frame_bank": (flags >> 2) & 3,
+                "last_reference_completion_age_cycles": age,
+                "input_starved_cycles_since_previous_swap": starvation,
+                "writer_capacity_blocked_cycles_since_previous_swap": capacity,
+                "candidate_ready_delay_cycles": None if delay == 0xFFFFFFFF else delay,
+                "accepted_bytes_at_deadline": byte,
+            })
+    return result
+
 
 def decode(path: Path | str) -> dict[str, Any]:
     return parse_words(decode_words(path))
@@ -587,7 +645,9 @@ def validate(
         failures.append(
             f"accepted {result['accepted_bytes']} bytes, expected {expected_bytes}"
         )
-    if require_fps is not None and result["delivered_fps"] + 1e-9 < require_fps:
+    if require_fps is not None and result["delivered_fps"] is None:
+        failures.append("exact delivered rate unavailable: display counters saturated")
+    elif require_fps is not None and result["delivered_fps"] + 1e-9 < require_fps:
         failures.append(
             f"delivered {result['delivered_fps']:.6f} fps, "
             f"required {require_fps:.6f} fps"
@@ -637,7 +697,7 @@ def main() -> int:
             f"hardware cadence: {result['display_pictures']} pictures, "
             f"{result['display_swaps']} intervals in "
             f"{result['cadence_seconds']:.6f} s = "
-            f"{result['delivered_fps']:.6f} fps"
+            f"{result['delivered_fps']} fps"
         )
         print(
             "stalls: decoder={decoder_stall_cycles} "
@@ -676,7 +736,7 @@ def main() -> int:
                     **result
                 )
             )
-        if result["schema_version"] >= 10:
+        if 10 <= result["schema_version"] <= 18:
             print(
                 "framebuffer: resets={framebuffer_reset_count} "
                 "publications={framebuffer_publication_count} "
@@ -687,7 +747,7 @@ def main() -> int:
                     **result
                 )
             )
-        if result["schema_version"] >= 13:
+        if 13 <= result["schema_version"] <= 18:
             print(
                 "field content: scope={framebuffer_content_scope} "
                 "varied={framebuffer_first_field_varied}/"
@@ -713,7 +773,7 @@ def main() -> int:
                     **result
                 )
             )
-        elif result["schema_version"] >= 15:
+        elif 15 <= result["schema_version"] <= 18:
             print(
                 "field fingerprints: first raw/display="
                 "{framebuffer_last_first_field_raw_fingerprint:#010x}/"
@@ -729,7 +789,7 @@ def main() -> int:
                     **result
                 )
             )
-        if result["schema_version"] >= 16:
+        if 16 <= result["schema_version"] <= 18:
             print(
                 "line provenance mismatches: tag first/second="
                 "{framebuffer_first_field_tag_mismatch_count}/"
@@ -756,7 +816,7 @@ def main() -> int:
                 "second content mismatch: "
                 f"{result['framebuffer_second_field_first_content_mismatch']}"
             )
-        if result["schema_version"] >= 18:
+        if 18 <= result["schema_version"] <= 18:
             fw = result["framebuffer_first_field_cache_writes"]
             sw = result["framebuffer_second_field_cache_writes"]
             fs = result["framebuffer_first_field_cache_addr_sum"]
@@ -770,7 +830,7 @@ def main() -> int:
                     ss, "" if ss == 32656 else "  <-- expect 32656",
                 )
             )
-        if result["schema_version"] >= 17:
+        if 17 <= result["schema_version"] <= 18:
             fx = result["framebuffer_first_field_row_xor"]
             sx = result["framebuffer_second_field_row_xor"]
             print(
@@ -783,7 +843,7 @@ def main() -> int:
                     result["framebuffer_second_field_region_changed"],
                 )
             )
-        if result["schema_version"] >= 12:
+        if 12 <= result["schema_version"] <= 18:
             print(
                 "field readout: last_generation_fetches="
                 "{framebuffer_last_first_field_fetches}/"
@@ -810,6 +870,10 @@ def main() -> int:
                     **result
                 )
             )
+        if result["schema_version"] == 19:
+            print(f"confirmed deadline gaps: {result['deadline_gap_count']}")
+            for record in result["deadline_records"]:
+                print("deadline: " + json.dumps(record, sort_keys=True))
         print(
             "largest gaps: "
             + ", ".join(

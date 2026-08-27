@@ -233,6 +233,7 @@ wire [11:0] mpeg2_new_recon_block_origin_y;
 wire        mpeg2_new_ddr_block_stored;
 // Entry 546: writer capacity acknowledgement, distinct from DDR completion.
 wire        mpeg2_new_ddr_block_accepted;
+wire        mpeg2_new_ddr_capture_blocked;
 wire        mpeg2_new_ddr_write_seen;
 wire        mpeg2_new_ddr_store_error;
 

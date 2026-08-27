@@ -10,6 +10,7 @@
 	                  mpeg2_new_recon_block_complete),
 	.block_stored    (mpeg2_new_ddr_block_stored),
 	.block_accepted  (mpeg2_new_ddr_block_accepted),
+	.capture_blocked_debug(mpeg2_new_ddr_capture_blocked),
 	.write_seen      (mpeg2_new_ddr_write_seen),
 	.store_error     (mpeg2_new_ddr_store_error),
 	.ddram_busy      (mpeg2_new_ddr_writer_busy),
