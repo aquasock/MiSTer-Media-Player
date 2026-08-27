@@ -1,0 +1,35 @@
+{
+  "deployed": "2026-08-27T07:22:25-07:00",
+  "host": "10.10.0.30",
+  "operations": [
+    "backup /media/fat/linux/MediaPlayer_Helper",
+    "backup /media/fat/MiSTer",
+    "backup /media/fat/MediaPlayer.rbf",
+    "deploy /media/fat/games/MediaPlayer/ac3_channel_sweep_12s.mpg"
+  ],
+  "files": {
+    "/media/fat/linux/MediaPlayer_Helper": {
+      "backup": "/home/vash/mister-builds/entry612-backup/MediaPlayer_Helper.pre_ac3",
+      "bytes": 399340,
+      "sha256": "100a3c1f97e9a0d0e77e3992bfc6db8584d17081798fc2e1dbeb365faf2269c4"
+    },
+    "/media/fat/MiSTer": {
+      "backup": "/home/vash/mister-builds/entry612-backup/MiSTer.pre_ac3",
+      "bytes": 1170340,
+      "sha256": "3841e2cc6eef4bfc9e46a7ffa075aff76b65d5405f81efb1355373292b35846f"
+    },
+    "/media/fat/MediaPlayer.rbf": {
+      "backup": "/home/vash/mister-builds/entry612-backup/MediaPlayer.rbf.pre_ac3",
+      "bytes": 4354700,
+      "sha256": "d46f80061a3270c1fed07a089517e70b413d3353858dc0d8937ac1bb0070aa6a"
+    },
+    "/media/fat/games/MediaPlayer/ac3_channel_sweep_12s.mpg": {
+      "local": "/tmp/ac3fix/ac3_sweep_12s.mpg",
+      "bytes": 15333393,
+      "sha256": "6adb420921791b33ea16cf880df64fe9b5665bd7cc3ae857d65f5036de9902e2",
+      "readback_sha256": "6adb420921791b33ea16cf880df64fe9b5665bd7cc3ae857d65f5036de9902e2",
+      "verified": true
+    }
+  },
+  "unchanged": "No RBF, Main, settings, reboot, core reload or playback action performed."
+}

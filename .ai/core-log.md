@@ -1,3 +1,33 @@
+## 612 COMMIT Unreleased 9623fa7 2026-08-27T07:22:37-07:00
+
+#### Coming From:
+
+Unreleased 67aaf7f
+
+#### Purpose:
+
+Capture the first AC-3 hardware run and establish which channels the stereo downmix actually carries.
+
+#### Outcome:
+
+The user played the ten second AC-3 fixture and reported hearing mixed tones from an AV receiver over S/PDIF but nothing from HDMI, on a 2.1 system fed by a portable monitor whose only outputs are two small speakers and a headphone jack. Telemetry is clean: the installed candidate and fixture hash as deployed, all 300 reference and display pictures complete with 299 swaps, `error_flags` zero, sequence end seen, presentation complete, quiet snapshot, and zero deadline gaps or outliers, with 12,066,264 accepted video bytes. Audio underrun and PCM protocol error are clear at FIFO peak 127, though `pcm_sample_count` remains a saturated field. Helper PID 2820 submitted 14,143,620 transport bytes over 865 reads and exited zero at 9.930 seconds. This is the first AC-3 audio heard from the core. A misconception in the request is corrected rather than worked around: nothing sends 5.1 anywhere, because the helper downmixes AC-3 to two channels and the framework emits linear PCM on both HDMI and S/PDIF, so the user's subwoofer is their receiver's own bass management of that stereo pair and not a channel the core produces. Discrete surround requires the separate IEC 61937 passthrough boundary. liba52 is asked for `A52_STEREO` without `A52_LFE`, so LFE is decoded and then discarded exactly as the stereo downmix convention requires; the fixture's 55 Hz LFE tone is therefore absent from the output by design and is not a fault. Proving three channels was thus not possible as posed, since only two exist in the signal, but the underlying question was answered completely by a different route. A new sweep fixture mode sounds one source channel at a time so placement is measurable without a 5.1 monitoring rig, and a new analyzer measures each slot. The first sweep exposed a defect in the fixture rather than the decoder: FFmpeg's join filter assigns inputs positionally and that order does not follow the 5.1 layout, so the first three channels were mislabelled, which is also why entry 610's tone check was unreadable and why both the helper and the reference appeared to disagree with the labels. Binding every tone to a named channel fixes it. With that corrected, all six channels land exactly where the downmix specifies: front left at 220 Hz appears only on the left and front right at 277 Hz only on the right at equal level, centre at 330 Hz appears equally in both at 4.52 dB below the fronts, the surrounds at 440 and 554 Hz appear only on their own side at 6.02 dB below the fronts, and LFE is silent in both. The entry 610 channel assignment question is therefore closed, and closed against measurement rather than labels. The silence over HDMI is unexplained and is not yet attributed, since the framework feeds HDMI and S/PDIF from the same stereo PCM; a monitor with small speakers is a plausible but unverified cause and no MiSTer audio setting has been inspected. The sweep fixture was deployed after backing up the installed Main and RBF, staged and renamed with an independent readback that matches. No RTL, FPGA build, Main, RBF, settings, reboot, reload or playback change was made, so Built refers to host tools only and Passed remains unchecked pending a listening result on the sweep.
+
+#### Next Steps:
+
+Have the user play games/MediaPlayer/ac3_channel_sweep_12s.mpg once through the receiver and report, for each two second slot in order, whether the tone appears on the left, the right, in both or not at all, expecting left, right, both, silence, left, right. Headphones on the monitor's jack are the cheapest way to separate a genuine HDMI audio fault from small speakers, and MiSTer's audio configuration should be checked before treating HDMI silence as a core defect. That listening result is what the community sound test should be built from, and any community request should say plainly that it exercises the stereo downmix, not discrete surround, so testers are not asked to judge channels the core does not yet emit. Replay the MPEG Layer II movie to confirm codec selection did not disturb the accepted path on hardware, which is still only regression tested on the host. A commercial AC-3 track with real dynamic range control and dialogue normalization remains uncompared. AC-3 and DTS passthrough over S/PDIF remain the separate later boundary, and the confirmed live S/PDIF port is a useful precondition for it. The interlaced video gates of entry 609 remain open and unstarted. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+- tools/streams/generate_test_dvd_ac3_av.py
+- tools/streams/analyze_ac3_downmix.py
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 611 COMMIT Unreleased 67aaf7f 2026-08-27T07:12:58-07:00
 
 #### Coming From:
@@ -1144,35 +1174,6 @@ Build the ARM stack with MiSTer's official ARM GNU 10.2 toolchain, never a distr
 #### Files Modified:
 
 - host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 572 COMMIT Unreleased 2acabc5 2026-08-27T00:28:08-07:00
-
-#### Coming From:
-
-Unreleased 2acabc5
-
-#### Purpose:
-
-Capture the ARM helper log from a verified cold run before any replay overwrites it, and determine whether cold delivery is limited by the per-poll budget or by EAGAIN.
-
-#### Outcome:
-
-The power cycle is verified by a single new syslogd start at 07:25:17 UTC replacing the 07:16:20 boot, and the user played once and stopped so the helper log survived. The cold run itself came up clean, with zero cadence outliers, zero missed deadlines, 449 pictures, 448 swaps, all 15,150,646 bytes accepted and zero error flags, which establishes that cold is not deterministic: of four verified cold runs, three gapped and this one did not. The helper log answers the question it was fetched for. Cold records 670 would-block events against 190 in the warm entry 570 log, but in both files every logged instance carries a submitted count of zero and precedes the first byte, and after read event one neither log records another. EAGAIN therefore never occurs during steady delivery in either thermal state, the four-chunk per-poll budget is binding in both, and the entire cold penalty is concentrated before the first byte, where cold shows three and a half times as many blocked polls as warm. That result forced a re-examination of the telemetry, and it corrects entry 571. Comparing each deadline record's measured elapsed time against the time its accepted-byte count requires at the warm steady rate of 1,392,000 bytes per second isolates a residual dead time before delivery effectively begins. Across five independent warm sessions that residual is zero within plus or minus 1.2 milliseconds, which both validates the rate and shows that warm delivery starts immediately. Across the four cold deadline records the residual is 13.9, 27.8, 60.7 and 63.8 milliseconds, and it tracks severity, since 63.8 milliseconds produced two missed deadlines while 27.8 and 13.9 produced one each. Entry 571 stated that on a cold start the upstream feed runs at 0.94 times realtime and below the rate the stream requires. That is wrong and is superseded here. The feed does not run slow; steady delivery is 1,392,000 bytes per second in every measured state. The apparent 0.94 figure divided accepted bytes by elapsed time and thereby folded the pre-first-byte stall into an apparent rate. The defect is a late start, not a slow feed. The practical consequence is that raising the four-chunk per-poll budget or the buffer size in `mediaplayer_poll()` would not correct anything, because steady throughput was never the limiting quantity, and that candidate is now ruled out. Two candidates remain. The first is to reduce cold first-byte latency on the helper side, for example by priming or reading ahead in the media source before the download is asserted. The second is to absorb the dead time before the first cadence slot in the startup controller, noting that the 64-KiB clean video queue holds 64.9 milliseconds of stream at nominal rate and therefore only just covers the worst observed 63.8 milliseconds. The second candidate returns the boundary to the startup controller that entries 569 and 571 had ruled out, but now with a quantified requirement rather than the byte threshold that entry 569 correctly rejected. This entry's own cold run contributes no dead-time datapoint because it was clean, so its contribution is the would-block count alone, and cold sampling remains at four samples. The 85 Hz poll rate is inferred from throughput arithmetic rather than measured in MiSTer main, so the warm residuals validate the resulting rate but not its decomposition into chunk count and poll frequency, and the helper log still carries no timestamps, so the 670 blocked polls cannot be converted to a duration and the dead time is inferred from telemetry arithmetic rather than measured on the ARM side. Evidence is `.ai/current_results/entry572_cold_terminal.png`, `entry572_cold_arm_helper.log` and `entry572_cold_capture.json`.
-
-#### Next Steps:
-
-Obtain user approval for a delivery-side plan before any source change, since the evidence now supports a bounded correction and the standing workflow requires the plan on record first. The proposal is to instrument before correcting: add timestamps to the helper diagnostic log and record the elapsed time from download assertion to first submitted byte, which converts the inferred dead time into a measured one and costs nothing in the decode path, then confirm on one cold run that the measured first-byte latency matches the 13.9 to 63.8 millisecond band inferred here. With that confirmed, prefer the helper-side correction of priming the media source before asserting download, because it removes the dead time rather than hiding it and leaves the FPGA startup controller and the 64-KiB queue untouched. Hold the startup-absorption candidate in reserve for the case where first-byte latency proves irreducible, and note that it has almost no margin, since the queue covers 64.9 milliseconds against a worst observed 63.8. Do not raise the per-poll chunk budget. Gather at least two further verified cold samples alongside the instrumented run so the dead-time distribution has a usable tail rather than four points, verifying each power cycle from `/tmp/messages` rather than from recollection, and fetch the helper log after the first playback of each. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged until a plan is approved. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
