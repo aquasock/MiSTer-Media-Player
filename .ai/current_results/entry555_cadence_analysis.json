@@ -1,0 +1,287 @@
+{
+  "source_commit": "30d300aa038efc03e49c247d4c7a21bcd41d73ec",
+  "hardware_capture_context": "Warm session: user switched Bob/Weave and loaded the clip repeatedly before the captured run. No clean-reboot assumption.",
+  "hardware_delay": {
+    "source_period_cycles": 2002000,
+    "intervals": 448,
+    "measured_cycles": 901156958,
+    "ideal_cycles": 896896000,
+    "excess_cycles": 4260958,
+    "two_long_intervals_extra_cycles": 4004000,
+    "initial_interval_extra_cycles": 256958,
+    "excess_ms": 71.01596666666667,
+    "initial_interval_extra_ms": 4.282633333333333,
+    "stored_outlier_ordinals": [
+      6,
+      92
+    ],
+    "possible_full_ordinals": [
+      [
+        6,
+        262
+      ],
+      [
+        92,
+        348
+      ]
+    ],
+    "clock_basis": "nominal 60 MHz decoder clock; first timestamp is first reference completion, later timestamps are display bank swaps."
+  },
+  "reconstruction_profile": {
+    "pictures": 449,
+    "pixels_per_picture": 518400,
+    "mean_ms": 32.17217635486266,
+    "maximum_ms": 48.58728333333333,
+    "over_frame_budget": [
+      {
+        "picture": 3,
+        "cycles": 2037798,
+        "ms": 33.9633,
+        "bytes": 45684
+      },
+      {
+        "picture": 4,
+        "cycles": 2034729,
+        "ms": 33.91215,
+        "bytes": 45346
+      },
+      {
+        "picture": 5,
+        "cycles": 2027619,
+        "ms": 33.79365,
+        "bytes": 44559
+      },
+      {
+        "picture": 6,
+        "cycles": 2915237,
+        "ms": 48.58728333333333,
+        "bytes": 143177
+      },
+      {
+        "picture": 7,
+        "cycles": 2056393,
+        "ms": 34.27321666666667,
+        "bytes": 47756
+      },
+      {
+        "picture": 149,
+        "cycles": 2411696,
+        "ms": 40.19493333333333,
+        "bytes": 87236
+      },
+      {
+        "picture": 150,
+        "cycles": 2416059,
+        "ms": 40.26765,
+        "bytes": 87707
+      },
+      {
+        "picture": 151,
+        "cycles": 2135882,
+        "ms": 35.59803333333333,
+        "bytes": 56581
+      },
+      {
+        "picture": 152,
+        "cycles": 2069206,
+        "ms": 34.48676666666667,
+        "bytes": 49169
+      },
+      {
+        "picture": 179,
+        "cycles": 2048872,
+        "ms": 34.147866666666665,
+        "bytes": 46915
+      },
+      {
+        "picture": 180,
+        "cycles": 2021891,
+        "ms": 33.69818333333333,
+        "bytes": 43908
+      },
+      {
+        "picture": 181,
+        "cycles": 2017366,
+        "ms": 33.622766666666664,
+        "bytes": 43408
+      },
+      {
+        "picture": 182,
+        "cycles": 2006307,
+        "ms": 33.43845,
+        "bytes": 42180
+      },
+      {
+        "picture": 183,
+        "cycles": 2017328,
+        "ms": 33.62213333333333,
+        "bytes": 43405
+      },
+      {
+        "picture": 184,
+        "cycles": 2003360,
+        "ms": 33.38933333333333,
+        "bytes": 41856
+      },
+      {
+        "picture": 347,
+        "cycles": 2291022,
+        "ms": 38.1837,
+        "bytes": 73819
+      },
+      {
+        "picture": 348,
+        "cycles": 2677933,
+        "ms": 44.632216666666665,
+        "bytes": 116815
+      },
+      {
+        "picture": 349,
+        "cycles": 2206001,
+        "ms": 36.76668333333333,
+        "bytes": 64374
+      },
+      {
+        "picture": 378,
+        "cycles": 2209755,
+        "ms": 36.82925,
+        "bytes": 64792
+      },
+      {
+        "picture": 406,
+        "cycles": 2005717,
+        "ms": 33.42861666666667,
+        "bytes": 42125
+      },
+      {
+        "picture": 410,
+        "cycles": 2030609,
+        "ms": 33.84348333333333,
+        "bytes": 44888
+      },
+      {
+        "picture": 411,
+        "cycles": 2017677,
+        "ms": 33.62795,
+        "bytes": 43443
+      },
+      {
+        "picture": 417,
+        "cycles": 2010499,
+        "ms": 33.508316666666666,
+        "bytes": 42652
+      },
+      {
+        "picture": 419,
+        "cycles": 2018835,
+        "ms": 33.64725,
+        "bytes": 43578
+      },
+      {
+        "picture": 420,
+        "cycles": 2013700,
+        "ms": 33.56166666666667,
+        "bytes": 43003
+      },
+      {
+        "picture": 421,
+        "cycles": 2007658,
+        "ms": 33.460966666666664,
+        "bytes": 42337
+      },
+      {
+        "picture": 422,
+        "cycles": 2046241,
+        "ms": 34.104016666666666,
+        "bytes": 46624
+      },
+      {
+        "picture": 423,
+        "cycles": 2058965,
+        "ms": 34.31608333333333,
+        "bytes": 48031
+      },
+      {
+        "picture": 424,
+        "cycles": 2065778,
+        "ms": 34.429633333333335,
+        "bytes": 48790
+      },
+      {
+        "picture": 425,
+        "cycles": 2084465,
+        "ms": 34.741083333333336,
+        "bytes": 50867
+      },
+      {
+        "picture": 426,
+        "cycles": 2036241,
+        "ms": 33.93735,
+        "bytes": 45508
+      },
+      {
+        "picture": 427,
+        "cycles": 2022017,
+        "ms": 33.70028333333333,
+        "bytes": 43931
+      },
+      {
+        "picture": 429,
+        "cycles": 2002578,
+        "ms": 33.3763,
+        "bytes": 41768
+      }
+    ],
+    "linear_cost_fit": {
+      "cycles_per_byte": 9.000080093983076,
+      "fixed_cycles": 1626640.0969363376,
+      "maximum_absolute_residual_cycles": 94.26853227702668
+    },
+    "boundary": "Production I parser, inverse quantization, IDCT and reconstruction from existing I test; excludes physical DDR persistence, host input transport and native presentation. Timing and exact sample counts checked, not a new pixel oracle."
+  },
+  "scheduler_controls": {
+    "unchanged_scheduler": true,
+    "consecutive_ready_picture_windows": 1000,
+    "delay_cycles_tested": [
+      4,
+      5
+    ],
+    "gaps": 0,
+    "denied_slots": 0
+  },
+  "cost_replay": {
+    "model": "Measured I decode costs rounded after 1000:1 time compression, ideal input, actual production scheduler, three rotating frame regions. Not full decoder/DDR simulation.",
+    "phases_tested": [
+      127,
+      0,
+      500,
+      1000,
+      1500
+    ],
+    "hardware_phase_approximation": 127,
+    "hardware_phase_steady_gap_picture": [
+      6
+    ],
+    "second_hardware_gap_reproduced": false,
+    "other_phase_notes": "Phases 0 and 500 also miss picture 6. Phases 1000 and 1500 absorb it with a longer initial reference-to-first-swap interval.",
+    "matching_ordinal_caveat": "Picture 348 costs 44.632 ms and matches low-eight-bit ordinal 92, but replay absorbs it; this is a candidate explanation, not proof."
+  },
+  "bitreader_finding": {
+    "file": "rtl/mpeg2_new/mpeg2_h262_bitreader.sv",
+    "behavior": "One payload byte retained; eight serial bit-consume cycles followed by a byte-refill bubble. The measured slope is approximately nine clocks per source byte."
+  },
+  "next_measurement": "Requested one replay in Bob with no menu/mode changes during playback, no reboot, leaving telemetry visible. Compare before attributing the second gap to input or mode switching.",
+  "preserved_diagnostics": "/home/vash/mister-builds/entry555-cadence-analysis",
+  "diagnostic_sha256": {
+    "tb_entry555_scheduler_control.sv": "98068ed7e2b3c428634e3b3f60895d2596d5aeccac19d407b655325eefa709a9",
+    "scheduler-control.log": "b3f063bf62cc477e29a87156c38d0feba7c4b5d7a470030b55f605f22ea2a2d9",
+    "tb_entry555_i_throughput.sv": "b7d41615bc8928bdf079afcbe6477f68807d6c03dee767eb71c37ad8ce3215fc",
+    "time.txt": "4248a5fd5cb83a2916ba230a5bed17faf599ad0aefa45abe5a7d2c5b043c37a5",
+    "tb_entry555_cost_replay.sv": "9f821ed96b8f1a55b94ba71468f549ad15098d7041071e0d7c2aa35f8851eb74",
+    "cost-replay.log": "dd2c6398a53b7770939de41bf666283ce3de4714f4867a5633b9bbddc421301a",
+    "run.log": "ebd0003c243b01ae30cb53367d98a546a16a20fc4aa429162020dcf154db427e",
+    "pictures.csv": "a6102687d577da8bdcce3ae4babe44efbf78d7841ad85fbdc68313818f8688a7",
+    "costs.hex": "1cd4f484af5258de39984c2750b0fb9019d323c44f08df031a3047fdae29d822",
+    "build.log": "39d11e7fefd8e3a1cbb23b80f60ceca0787976e960da7c18c2a3da6af784b2a0"
+  }
+}

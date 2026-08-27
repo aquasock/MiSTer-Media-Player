@@ -1,3 +1,32 @@
+## 555 COMMIT Unreleased 30d300a 2026-08-26T21:17:18-07:00
+
+#### Coming From:
+
+Unreleased 30d300a
+
+#### Purpose:
+
+Identify the remaining native playback cadence shortfall without changing the hardware-validated HDMI path.
+
+#### Outcome:
+
+The user requested a cadence investigation and clarified that entry 554's terminal capture followed repeated file loads and Bob/Weave changes, not a reboot and single launch; treat it as a warm session. The 448 measured intervals exceed their ideal duration by 4,260,958 decoder cycles, or 71.016 milliseconds: two doubled frame gaps account for 66.733 milliseconds and the first-reference-completion to later-swap timing basis accounts for the remaining 4.283 milliseconds. This is not evidence of a continuously slow raster clock. An unchanged-scheduler control with the existing ideal I feeder passes one thousand consecutive frame windows with no denial or gap at both four- and five-clock field-to-frame-window delays. A temporary observer generated from the existing interlaced-I reconstruction bench then processes the exact 449-picture clip through the production I parser, inverse quantizer, IDCT and reconstruction, checking 518,400 samples per picture and every pipeline error. It completes 866,735,142 simulated cycles in 226 seconds on GUNSMOKE. This excludes host transport, physical DDR persistence and presentation, so its timings are optimistic decode bounds, not a complete hardware reproduction. Thirty-three pictures individually exceed the 2,002,000-clock frame budget; average reconstruction is 32.172 milliseconds, picture six needs 48.587 milliseconds, and picture 348 needs 44.632 milliseconds. Across all pictures the measured cost fits 1,626,640 fixed clocks plus 9.00008 clocks per source byte with less than ninety-five clocks of residual error, matching the current bitreader's eight serial bit-consume cycles followed by a byte-refill bubble. Most overruns can be absorbed by buffering. Replaying these measured costs, compressed one thousand to one, through the actual scheduler with three ordinary banks reproduces the picture-six doubled interval near the captured raster phase, while different initial phases absorb it behind a longer initial interval. The second hardware gap is not reproduced: its stored eight-bit ordinal 92 could mean picture 92 or 348, and the expensive 347-through-349 group is a candidate rather than proof because the optimistic replay still absorbs it. No inference about mode switching or reload state has been accepted as a cause. A single Bob replay without menu or mode changes during playback, without reboot, has been requested to isolate that remaining difference. `.ai/current_results/entry555_cadence_analysis.json` retains the measurements, bounds and diagnostic hashes; the generated observer sources, complete per-picture CSV and control logs are preserved on GUNSMOKE under `/home/vash/mister-builds/entry555-cadence-analysis`. No production source, constraints, settings or active RBF changed, and entry 554's flicker acceptance remains valid; this cadence investigation is not yet closed.
+
+#### Next Steps:
+
+Capture the requested untouched Bob replay after the user reports completion, deleting the old screenshot target first, and compare its gap count, intervals and wrapped ordinals with the warm-session capture. If the second gap persists, extend the existing reproduction with the missing persistence or transport timing before changing scheduler ownership; if it appears only with interaction, exercise repeated loads and Bob/Weave switching as the user requested. Preserve `30d300a` and continuous raster sync. Treat parsing/transform throughput and startup buffering as candidate improvement boundaries only after the remaining gap is explained; neither a faster clock nor a new HDMI sync change is justified by this evidence.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 554 COMMIT Unreleased 30d300a 2026-08-26T21:03:11-07:00
 
 #### Coming From:
@@ -1221,34 +1250,5 @@ Preserve the running `9573923` image as `/media/fat/MediaPlayer.rbf.rollback-pre
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 515 COMMIT Unreleased 9573923 2026-08-25T11:32:46-07:00
-
-#### Coming From:fff
-
-Unreleased 9573923
-
-#### Purpose:
-
-Locate the native ghost by capturing the core's own raster during live playback instead of only after it ends.
-
-#### Outcome:
-
-Every prior capture in this investigation was terminal, so the intermittent ghost had never been measured while visible. Bursts of screenshot triggers issued through the MiSTer's ordinary-FTP view of `/dev/MiSTer_cmd` with the default `root` and `1` login now sample the live raster at roughly 2.4 hertz. The decisive fixture burst returned twenty-four distinct live frames of `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i. Decomposed by field, the bottom field advances its bar every single frame across the full sweep while the top field holds one position for 4.2 seconds at x=512 through x=543, jumps once and then holds the next for 4.6 seconds at x=632 through x=663. Each frozen top-field bar measures exactly thirty-two columns by one hundred seventy-six rows, the exact authored field-bar geometry, so it is a cleanly retained picture rather than a smear. An earlier burst independently caught the same asymmetry with content instead of position: at playback start the top field carried the entire previous screen at background level 24 while the bottom field carried live video at level 19, and two frames 0.8 seconds apart both showed it, which excludes the ordinary sixteen-millisecond inter-field sampling offset of an interlaced screenshot. That evidence is `.ai/current_results/entry515_live_ghost_two_bars.png` at 13,565 bytes with SHA-256 `4c6ad022c14e55a586270072a1807b5d02a2b4d5e2e1d6153dc35e975ca26c82`, `.ai/current_results/entry515_field_freeze_early.png` at 13,233 bytes with SHA-256 `d0387b6c4c423ff737ee3eff426b79759a27bde5b936392667f6252c252baaed` and `.ai/current_results/entry515_field_freeze_midrun.png` at 10,864 bytes with SHA-256 `69ac1b3517d343d8de3683c79d1596f08a6288fe17b0187af00d59586a0eefe1`. The pattern control settles the boundary. With Native timing pattern On and motion Moving the same burst returned fifty-five distinct frames over forty-six seconds at background exactly `(16,16,16)`, reference rows 120, 121, 360 and 361 and sixteen-pixel bars at the authored positions; forty-eight of them place both fields at the identical x with 3,840 bright pixels each, and the seven that differ are jump instants between adjacent authored positions which resolve to a united bar by the next sample 0.42 seconds later. The pattern therefore proves the capture path, final mux, native sync, MiSTer's processed-HDMI Bob path and the display all track a moving object within one field time, while decoded video retains a stale field for over two hundred forty field times through the same chain. Its evidence is `.ai/current_results/entry515_pattern_control_locked.png` at 7,721 bytes with SHA-256 `71ac91a908a494bce09f7ecbf32c0b8c3ca617e44e4fc8b001a13df52adc05e6` and `.ai/current_results/entry515_pattern_control_transition.png` at 9,850 bytes with SHA-256 `ac115389e3cc3ea33df5d552903f09c5f4fd77477511eda8fff294ed3b871153`. Because the pattern bypasses the framebuffer, DDR and line cache while video does not, the fault is field readout, confirming the classification entry 514 assigned. A static read of `rtl/mpeg2_luma_framebuffer.sv` mapped the mechanism but did not identify the defect, and it disproved the leading hypothesis: the 480-entry presentation sequence is not free to sit at an arbitrary raster phase, because the per-generation reset zeroes `line_done_sequence_mem` and the event advancing it is gated on `picture_present_rd`, which asserts only at the authored first-field origin, so entry zero is anchored to the correct field by construction. The monitored reader-fell-behind and same-bank refill collision detectors also remain clear in every run, so neither is the cause.
-
-#### Next Steps:
-
-Instrument the per-field invariants the static read identified, all of which are currently unmeasured because existing telemetry counts whole pictures and therefore cannot see a single stale field. Derive the true presentation sequence index in the video domain from the raster position as the authored-parity field line or two hundred forty plus that line, compare it against the memory-domain `line_done_sequence_mem`, and record mismatch count, the first mismatching pair and maximum drift. Add per-parity displayed-line counts for each generation so that a frozen top field appears directly as an imbalance against the expected two hundred forty and two hundred forty, record whether publication ever asserts on the wrong raster parity, and count DDR line refills served to each field. Extend the hardware snapshot from schema ten to schema eleven by appending words only, without repurposing any established MPEG, prediction, PCM, scheduler or error field, exactly as `52a5a64` extended schema nine to ten, and move the checksum accordingly. Update the telemetry decoder and its tests, add focused framebuffer and native integration regressions covering an ordinary locked sequence and a deliberately stalled field, retain the complete native and scheduler suites, then run a clean Quartus Prime 17.0.2 build with focused timing analysis and install through rollback-safe ordinary FTP. Repeat the fixture with the live burst and require the new counters to identify which invariant breaks when the top field freezes. No presentation, cache, scheduler or native timing behavior may change in this observational commit.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
