@@ -1,0 +1,88 @@
+{
+  "fixture": "/tmp/ac3fix/ac3_10s.mpg",
+  "helper": "host/build/media_player_helper.native",
+  "helper_frames": 480768,
+  "reference_frames": 480768,
+  "frame_count_matches": true,
+  "helper_seconds": 10.016,
+  "left": {
+    "samples": 480768,
+    "max_abs_difference": 3,
+    "rms_difference": 0.4251058957841657,
+    "correlation": 0.9999999709343115,
+    "rms_helper": 1749.1540583899966,
+    "rms_reference": 1749.2074839651998
+  },
+  "right": {
+    "samples": 480768,
+    "max_abs_difference": 3,
+    "rms_difference": 0.4491868614821915,
+    "correlation": 0.9999999674953207,
+    "rms_helper": 1749.143777653342,
+    "rms_reference": 1749.197315362631
+  },
+  "helper_left_tones": [
+    {
+      "hz": 277,
+      "relative_power": 1.0
+    },
+    {
+      "hz": 220,
+      "relative_power": 0.352279
+    },
+    {
+      "hz": 440,
+      "relative_power": 0.250396
+    },
+    {
+      "hz": 330,
+      "relative_power": 4e-06
+    }
+  ],
+  "helper_right_tones": [
+    {
+      "hz": 330,
+      "relative_power": 1.0
+    },
+    {
+      "hz": 220,
+      "relative_power": 0.354262
+    },
+    {
+      "hz": 554,
+      "relative_power": 0.249757
+    },
+    {
+      "hz": 277,
+      "relative_power": 7e-06
+    }
+  ],
+  "reference_left_tones": [
+    {
+      "hz": 277,
+      "relative_power": 1.0
+    },
+    {
+      "hz": 220,
+      "relative_power": 0.352277
+    },
+    {
+      "hz": 440,
+      "relative_power": 0.250396
+    },
+    {
+      "hz": 330,
+      "relative_power": 4e-06
+    }
+  ],
+  "helper_messages": [
+    "media_player_helper: AC-3 audio on private substream 0x80"
+  ],
+  "thresholds": {
+    "max_abs_difference": 4096,
+    "min_correlation": 0.95
+  },
+  "scope": "AC-3 decode correctness against an independent decoder; not passthrough, not hardware acceptance.",
+  "failures": [],
+  "passed": true
+}

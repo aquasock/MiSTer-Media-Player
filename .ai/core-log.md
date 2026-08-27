@@ -1,3 +1,32 @@
+## 611 COMMIT Unreleased 67aaf7f 2026-08-27T07:12:58-07:00
+
+#### Coming From:
+
+Unreleased ff6c03f
+
+#### Purpose:
+
+Qualify the AC-3 helper on a ten second fixture and stage it on the MiSTer for the user's first listening test.
+
+#### Outcome:
+
+The user asked for a ten second clip rather than a full length one for the first AC-3 test, which the fixture generator already supported. Generating at ten seconds exposed a defect in the generator rather than in the decoder: decoding the muxed program to raw stereo made FFmpeg's s16le muxer report a duplicate final DTS, which the shared runner correctly refuses because it requires clean output. Published source `67aaf7f` fixes that properly rather than by relaxing the check, extracting the private stream 1 substream into an elementary stream and decoding that instead, which carries no container timestamps and is byte for byte what the helper is handed; the elementary stream's own size and hash are now recorded too. The five second fixture regenerates unchanged through the new path. The ten second fixture is 12,787,729 bytes with SHA256 `fb71dee0a1af7746809505b73ccc432f5951fbf01579ca63bbcb90e6c7aefece`, carrying 300 pictures over 10.01 seconds of 720x480 TFF all-I video and 448 kbit/s AC-3 5.1 on substream 0x80, with a 560,896-byte AC-3 elementary stream. Against the independent FFmpeg decode the helper produces exactly 480,768 stereo frames, matching the reference frame for frame over 10.016 seconds, with maximum absolute difference three, RMS difference 0.4251 left and 0.4492 right, and correlation 0.999999971 and 0.999999967, reproducing the five second result at twice the length. The helper log line naming substream 0x80 appears as intended. Installed state was backed up before anything was written: the previous 361,452-byte helper with SHA256 `c99237246416ecd8278d90ff6e15e7a00cd8ab1d49c960b8c77fbe00f4ba0483`, the unchanged Main and the accepted `d466bed` RBF are all retained under the entry 611 backup directory. The new 399,340-byte helper with SHA256 `100a3c1f97e9a0d0e77e3992bfc6db8584d17081798fc2e1dbeb365faf2269c4` and the fixture were then deployed through a staged name with a hash check before rename and an independent readback on a fresh connection after it; both readbacks match exactly. Main, the RBF and settings are untouched, and no reboot, core reload or playback was performed, so lifecycle stays with the user. Built refers to the helper only, since no FPGA build was needed or made, and Passed remains unchecked because nothing has been listened to yet. The open questions from entry 610 are unchanged: channel assignment is still unverified because the fixture's tone labels disagree with the assumed layout in both the helper and reference decodes, and a real commercial AC-3 track with genuine dynamic range control and dialogue normalization has not been compared.
+
+#### Next Steps:
+
+Have the user select the MediaPlayer core and play games/MediaPlayer/ac3_480i_tff_5p1_10s.mpg once, reporting whether sound is present, whether it stays synchronized across the ten seconds and whether the menu stays responsive, and noting that the fixture is deliberately six discrete tones rather than programme material. Retrieve the helper log first and confirm the substream selection line, then take a fresh telemetry screenshot and check the audio error and underrun state along with the picture counts for the 300 pictures. Because this helper replaces the one the accepted full movie ran on, replay the MPEG Layer II movie afterwards to confirm codec selection did not disturb the accepted path on hardware, since only the host side has been regression tested. Then resolve channel assignment by decoding each channel separately rather than trusting the downmixed tone labels. AC-3 passthrough over S/PDIF and DTS passthrough remain the separate later boundary needing IEC 61937 packing and a neutral gain and filter chain; the user has confirmed the S/PDIF port is live and already carries stereo synchronized with HDMI, which is a useful precondition but not evidence about compressed output. The interlaced video gates of entry 609 remain open and unstarted. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+- tools/streams/generate_test_dvd_ac3_av.py
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 610 COMMIT Unreleased ff6c03f 2026-08-27T07:09:10-07:00
 
 #### Coming From:
@@ -1140,35 +1169,6 @@ The power cycle is verified by a single new syslogd start at 07:25:17 UTC replac
 #### Next Steps:
 
 Obtain user approval for a delivery-side plan before any source change, since the evidence now supports a bounded correction and the standing workflow requires the plan on record first. The proposal is to instrument before correcting: add timestamps to the helper diagnostic log and record the elapsed time from download assertion to first submitted byte, which converts the inferred dead time into a measured one and costs nothing in the decode path, then confirm on one cold run that the measured first-byte latency matches the 13.9 to 63.8 millisecond band inferred here. With that confirmed, prefer the helper-side correction of priming the media source before asserting download, because it removes the dead time rather than hiding it and leaves the FPGA startup controller and the 64-KiB queue untouched. Hold the startup-absorption candidate in reserve for the case where first-byte latency proves irreducible, and note that it has almost no margin, since the queue covers 64.9 milliseconds against a worst observed 63.8. Do not raise the per-poll chunk budget. Gather at least two further verified cold samples alongside the instrumented run so the dead-time distribution has a usable tail rather than four points, verifying each power cycle from `/tmp/messages` rather than from recollection, and fetch the helper log after the first playback of each. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged until a plan is approved. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 571 COMMIT Unreleased 2acabc5 2026-08-27T00:23:26-07:00
-
-#### Coming From:
-
-Unreleased 2acabc5
-
-#### Purpose:
-
-Capture a verified cold-after-power-cycle block and identify the mechanism behind the delivery ceiling measured in entries 569 and 570.
-
-#### Outcome:
-
-The power cycle is verified by three independent signals rather than by recollection, which matters because the two previously reported reboots were not reboots. The still-running block 2 poller logged an FTP timeout at 00:16:27 local, exactly the dropout absent both earlier times; `/tmp/messages` restarted with a single syslogd entry at 07:16:20 UTC replacing the 06:56:52 boot; and `/tmp/MediaPlayer_ARM.log` disappeared with the tmpfs wipe, confirming the page cache was cleared. Six sessions were captured, the first genuinely cold and the remaining five warm replays with no reboot between them. The cold run is the worst session recorded to date and the first with more than one missed deadline. It reports two cadence outliers and two missed deadlines, at display picture ordinals five and six, with gaps of 4,004,000 and 6,006,000 cycles and a total cadence excess of 8,192,931 cycles, or 136.5 milliseconds. The first miss moved earlier to ordinal five, which no previous session showed. The decisive number is the feed rate at that ordinal-five deadline: 191,088 bytes had been delivered by 12,066,520 session cycles, which is 950,173 bytes per second, or 0.94 times realtime against the 1,010,157 bytes per second the stream requires. On a cold start the upstream feed is running below realtime, so the decoder cannot keep up because the data is not arriving fast enough, and the miss is a genuine delivery shortfall rather than a scheduler or writer fault. By the ordinal-six deadline the feed has recovered to 1,076,291 bytes per second, or 1.07 times realtime, and every run after the first is clean, so one replay is enough to leave the failing region. All six sessions still accept all 15,150,646 bytes and display 449 pictures with 448 swaps at zero error flags, and writer capacity blocked and upstream FIFO pending are false in both cold deadline records, so the writer and DDR path remain clean throughout. The delivery ceiling itself has now been located in source rather than inferred. `mediaplayer_poll()` in `host/main_mister/0001-mediaplayer-arm-loader.patch` reads into a 4,096-byte buffer under `while (chunks++ < 4)`, so it moves at most 16,384 bytes per poll. At the implied 85 polls per second that is 1,392,000 bytes per second, precisely the 1.38 times realtime ceiling measured warm in entries 566, 567 and 569. That cap is binding rather than incidental, and the archived helper log proves it: after startup the parent never receives EAGAIN, since all 190 would-block events carry a submitted count of zero and occur before the first byte is sent, so the read loop always exits by exhausting its four-chunk budget and never by running out of data. The cross-check agrees, with 3,699 reads at four per poll giving about 925 polls across a roughly 10.9 second delivery window for a 15.0 second stream. The delivery path therefore has about 38 percent headroom over realtime when warm and falls below realtime when cold, and that band is where the startup race is decided. One capture defect is recorded: an over-broad `pkill` pattern terminated the poller mid-block and had to be restarted, though a direct probe confirmed the screen still held run four at that moment and no session was lost. The single most important missing measurement is the helper log for a cold run, which was overwritten by the subsequent replays before it could be fetched; without it, it is not known whether cold delivery is limited by read latency inside the four-chunk budget or by EAGAIN against a slower helper, and those two point at different fixes. Evidence is `.ai/current_results/entry571_block3_run1` through `run6` and the consolidated `entry571_block3_series.json`.
-
-#### Next Steps:
-
-Take one more verified power cycle and fetch `/tmp/MediaPlayer_ARM.log` immediately after the first playback and before any replay, since that single file discriminates between a read-latency limit inside the four-chunk budget and an EAGAIN limit against a slower helper, and the two imply different corrections. Confirm the power cycle from `/tmp/messages` as was done here rather than from recollection. With that measurement in hand, propose a bounded delivery-side plan for user approval before touching source: if the budget is binding while cold, raising the per-poll chunk count or the buffer size in `mediaplayer_poll()` lifts the ceiling directly and is a small, contained change to the MiSTer main patch; if EAGAIN dominates while cold, the correction belongs in the helper's own read path or in readahead instead, and raising the poll budget would achieve nothing. Do not change the FPGA startup controller, which entries 569 and 571 together have now shown is not the operative boundary, and do not commit any source change until the plan is approved. Consider adding timestamps to the helper diagnostic log as part of whichever change is approved, since its present lack of timing is the main limit on the delivery evidence. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
 
 #### Files Modified:
 
