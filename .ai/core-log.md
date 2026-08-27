@@ -1,4 +1,4 @@
-## 562 COMMIT Unreleased ??? 2026-08-26T22:55:24-07:00
+## 562 COMMIT Unreleased 2acabc5 2026-08-26T22:55:24-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Make the first complete visible field pair independent of relative synchronizer 
 
 #### Outcome:
 
-Review of source 134b401 found that its initial swap exclusion depends on two separate clock crossings retaining their simulated relative arrival order: the raw frame-window edge precedes the shown acknowledgement by one decoder stage. Physical first-stage latency can differ, so phase-only simulation does not prove that ordering. The approved full-field-pair startup behavior requires an explicit guard: after visibility is acknowledged, observe the synchronized window high and then low before allowing any swap. This changes neither the intended presentation schedule nor the buffer, sync, ownership or timestamp policy. The directed test will inject additional window-crossing delay to expose the old condition and validate the guard. Initial candidate tests already pass the dense pause excerpt, three alternate phases, three drained-FIFO warm sessions, periodic DDR pressure and one/two-picture EOF cases with no gaps; the legacy 16-KiB control retains its expected picture-six gap. Its unfinished full simulation and build will not qualify the corrected source, and no hardware has been changed.
+Source `2acabc5` adds an explicit observed-window guard to the approved startup implementation. After the video-domain visibility acknowledgement arrives, the decoder must observe the synchronized first window high and then low before allowing any swap, removing dependence on the relative arrival order of two independent synchronizers. The first visible bank therefore remains for a complete field pair even when the window crossing is delayed. The directed test alternates ordinary and deliberately delayed window crossings across 24 readiness phases and passes full-first-pair, short EOF, warm download rearm, interrupted startup, bypass and Bob/Weave controls. As a negative control, the same skew test fails the previous 134b401 controller with shown and first-swap boundary both seven, proving it detects the race. The correction does not change intended frame timing, queue size, sync, ownership or timestamp policy. The superseded build and unfinished full simulation were stopped without deployment; completed initial-candidate tests remain evidence only for that source. A fresh empty-state Quartus build and full real-pipeline simulation matrix are now running for 2acabc5. The existing native suite continues with unchanged timing, framebuffer, scheduler and profiler source, and the changed startup controller/test has been separately rerun. Hardware acceptance remains pending.
 
 #### Next Steps:
 
-Add the observed-window guard and deliberately skewed crossing regression, publish the correction, restart the full-file and scenario validation from that source and perform a fresh empty-state build. Preserve completed unchanged native tests only with exact source provenance and rerun the changed startup test. Require all five timing classes positive before direct replacement and independent complete FTP readback, then leave reload and the clean Bob run to the user.
+Finish the corrected-source full-file, dense-excerpt, input-pause, phase, short-file and warm-load matrix with pixel-identity comparison, and verify the unchanged native-suite source provenance plus the separately updated startup result. Require a successful clean build with positive setup, hold, recovery, removal and pulse-width margins before direct active-image replacement and independent full FTP readback. Record those outcomes in a new entry and leave reload and the clean Bob run to the user.
 
 #### Files Modified:
 
