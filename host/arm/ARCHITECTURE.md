@@ -55,10 +55,16 @@ share a compilation unit:
    seen and the other is ignored for the rest of the session; only the first
    AC-3 substream is played, because track switching needs the versioned
    control channel protocol one omits. AC-3 is downmixed to stereo by liba52
-   using the stream's own coefficients. DVD LPCM is still later. Passing a
-   compressed bitstream through to S/PDIF is a separate output concern, not a
-   codec one: it would bypass this decode stage entirely.
-5. Outputs: one annotated H.262-plus-PCM transport to Main, with the FPGA owning
+   using the stream's own coefficients. DVD LPCM is still later.
+5. Audio output: `--audio-out hdmi` (default) emits that decoded stereo.
+   `--audio-out spdif` bypasses the decode stage for AC-3 and emits IEC 61937
+   bursts instead, one per 1536-sample burst period, carried unchanged on the
+   existing PCM transport. The selection is made at launch because the decoder
+   runs here, so only this process can choose what to emit; MPEG Layer II is
+   unaffected and still emits decoded stereo in either mode. A burst is only
+   audible as surround if nothing downstream scales it: any gain, mix or filter
+   between here and the S/PDIF pin destroys it.
+6. Outputs: one annotated H.262-plus-PCM transport to Main, with the FPGA owning
    the separate video and PCM sinks after record extraction.
 
 Future play, pause, seek, title, chapter, angle, audio-track and subtitle-track

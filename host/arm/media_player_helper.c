@@ -83,6 +83,19 @@
 #define AC3_SAMPLES_PER_BLOCK 256
 #define AC3_SAMPLES_PER_FRAME (AC3_BLOCKS_PER_FRAME * AC3_SAMPLES_PER_BLOCK)
 
+/*
+ * IEC 61937 passthrough. The burst period for AC-3 is the frame's own 1536
+ * samples, so one frame fills exactly one period of 16-bit stereo and no rate
+ * conversion is involved: 1536 frames * 2 channels * 2 bytes = 6144 bytes. The
+ * receiver finds the burst by its sync words, so the words below are the whole
+ * contract, together with a bit transparent path to the S/PDIF pin.
+ */
+#define IEC61937_PA 0xF872u
+#define IEC61937_PB 0x4E1Fu
+#define IEC61937_DATA_TYPE_AC3 0x0001u
+#define IEC61937_BURST_BYTES (AC3_SAMPLES_PER_FRAME * 2 * 2)
+#define IEC61937_HEADER_WORDS 4
+
 struct video_chunk {
     struct video_chunk *next;
     uint8_t *data;
@@ -186,8 +199,19 @@ enum audio_codec {
     AUDIO_CODEC_AC3
 };
 
+/*
+ * The decoder runs here on the ARM, so only this process can choose between
+ * emitting decoded stereo and emitting the compressed bitstream. The selection
+ * is therefore made at launch rather than during playback.
+ */
+enum audio_output {
+    AUDIO_OUT_HDMI = 0,     /* decoded stereo PCM, the accepted behaviour */
+    AUDIO_OUT_SPDIF         /* IEC 61937 bursts for an external decoder */
+};
+
 struct audio_state {
     enum audio_codec codec;
+    enum audio_output output;
     mp3dec_t decoder;
     a52_state_t *a52;
     int a52_substream;
@@ -202,7 +226,9 @@ static void usage(const char *program)
     fprintf(stderr,
             "usage: %s [--protocol 1] [--source SOURCE | INPUT] "
             "[--pcm-out FILE] [--video-out FILE] [--audio-delay-ms MS]\n"
+            "       %s [--audio-out hdmi|spdif]\n"
             "       %s --capabilities\n",
+            program,
             program,
             program);
 }
@@ -715,6 +741,43 @@ static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
  * carried in the stream, and A52_ADJUST_LEVEL keeps that downmix from
  * clipping, so the helper never has to invent matrix coefficients of its own.
  */
+/*
+ * Wrap one AC-3 frame as an IEC 61937 burst occupying a whole burst period.
+ * The payload is written as big-endian 16-bit words so the bytes reach the
+ * S/PDIF line in their original order, and the remainder of the period is
+ * zero stuffed. Nothing may scale these samples afterwards: any gain, mix or
+ * filter turns the burst into noise for the receiver.
+ */
+static int emit_ac3_burst(struct output_state *output,
+                          const uint8_t *frame, int length)
+{
+    mp3d_sample_t burst[AC3_SAMPLES_PER_FRAME * 2];
+    int words = length / 2;
+    int i;
+
+    if (length <= 0 ||
+        (size_t)length + IEC61937_HEADER_WORDS * 2u > IEC61937_BURST_BYTES) {
+        fprintf(stderr,
+                "media_player_helper: AC-3 frame of %d bytes does not fit a "
+                "burst period\n", length);
+        return -1;
+    }
+    memset(burst, 0, sizeof(burst));
+    burst[0] = (mp3d_sample_t)(int16_t)IEC61937_PA;
+    burst[1] = (mp3d_sample_t)(int16_t)IEC61937_PB;
+    burst[2] = (mp3d_sample_t)(int16_t)IEC61937_DATA_TYPE_AC3;
+    burst[3] = (mp3d_sample_t)(int16_t)(unsigned)(length * 8);
+    for (i = 0; i < words; ++i)
+        burst[IEC61937_HEADER_WORDS + i] =
+            (mp3d_sample_t)(int16_t)(uint16_t)((frame[i * 2] << 8) |
+                                               frame[i * 2 + 1]);
+    if (length & 1)
+        burst[IEC61937_HEADER_WORDS + words] =
+            (mp3d_sample_t)(int16_t)(uint16_t)(frame[length - 1] << 8);
+    return write_pcm(output, burst, AC3_SAMPLES_PER_FRAME, 2,
+                     (int)PCM_SAMPLE_RATE);
+}
+
 static int decode_ac3_buffer(struct audio_state *audio,
                              struct output_state *output, int at_eof)
 {
@@ -746,6 +809,14 @@ static int decode_ac3_buffer(struct audio_state *audio,
                     "(supported: %u Hz)\n",
                     sample_rate, PCM_SAMPLE_RATE);
             return -1;
+        }
+        if (audio->output == AUDIO_OUT_SPDIF) {
+            /* The frame is validated by syncinfo above; hand it on untouched. */
+            if (emit_ac3_burst(output, frame, length) < 0)
+                return -1;
+            audio->a52_synced = 1;
+            offset += (size_t)length;
+            continue;
         }
         flags = A52_STEREO | A52_ADJUST_LEVEL;
         if (a52_frame(audio->a52, frame, &flags, &level, 0)) {
@@ -1285,7 +1356,7 @@ static int process_private_pes(struct media_source *input,
             result = 0;
             goto done;
         }
-        if (!audio->a52) {
+        if (!audio->a52 && audio->output != AUDIO_OUT_SPDIF) {
             /* No accelerated IMDCT is compiled in; ask for the portable path. */
             audio->a52 = a52_init(0);
             if (!audio->a52) {
@@ -1457,7 +1528,19 @@ int main(int argc, char **argv)
     int success = 0;
 
     for (i = 1; i < argc; ++i) {
-        if (!strcmp(argv[i], "--audio-delay-ms") && i + 1 < argc) {
+        if (!strcmp(argv[i], "--audio-out") && i + 1 < argc) {
+            const char *value = argv[++i];
+            if (!strcmp(value, "hdmi")) {
+                audio.output = AUDIO_OUT_HDMI;
+            } else if (!strcmp(value, "spdif")) {
+                audio.output = AUDIO_OUT_SPDIF;
+            } else {
+                fprintf(stderr,
+                        "media_player_helper: unknown audio output '%s' "
+                        "(expected hdmi or spdif)\n", value);
+                goto done;
+            }
+        } else if (!strcmp(argv[i], "--audio-delay-ms") && i + 1 < argc) {
             audio_delay_ms = (unsigned)strtoul(argv[++i], NULL, 10);
         } else if (!strcmp(argv[i], "--pcm-out") && i + 1 < argc) {
             pcm_path = argv[++i];
