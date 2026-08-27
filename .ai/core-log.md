@@ -1,3 +1,32 @@
+## 613 COMMIT Unreleased 9623fa7 2026-08-27T07:30:48-07:00
+
+#### Coming From:
+
+Unreleased 9623fa7
+
+#### Purpose:
+
+Accept AC-3 stereo decode on hardware from the channel sweep listening result.
+
+#### Outcome:
+
+The user played the channel sweep fixture and reports hearing the expected pattern correctly, and on both outputs rather than only one. The earlier HDMI silence of entry 612 is resolved and was not a core defect: the monitor's volume was turned down. HDMI and S/PDIF are therefore both confirmed to carry the decoded stereo, which matches the framework feeding both from the same PCM and removes the only unexplained observation from the previous entry. Combined with the exact host measurement in entry 612, where front left and right appear only on their own sides, centre appears equally in both at 4.52 dB below the fronts, the surrounds appear on their own sides at 6.02 dB below, and LFE is correctly absent, AC-3 stereo decode and downmix are accepted on hardware for this fixture. The user separately reports that the accepted MPEG Layer II movie also plays perfectly on the new helper, which is the hardware confirmation entry 611 and 612 asked for, but its telemetry is not captured here and that claim rests on the user's report alone. A capture attempted immediately after the report landed mid-playback: the helper log shows the full movie running with only 8,241,152 of 839,409,548 transport bytes submitted at 5.73 seconds, and the screenshot returned a 529 by 240 live video frame rather than the telemetry packet, which the decoder correctly refused as an unsupported layout. That capture is retained as a partial record and is not evidence of completion. The sweep run's own helper log is unrecoverable because the subsequent movie run overwrote it, so the sweep is accepted on the listening result and the entry 612 host measurement rather than on its own transport log; this is a consequence of the single fixed log path and is worth remembering before asking for two runs in succession. The installed RBF still hashes to accepted `d466bed`, the sweep fixture is unchanged on the target, and the Linux boot is still the same session. No source change is made in this entry, so Built and Passed refer to the accepted AC-3 helper at `9623fa7`, with Passed covering AC-3 stereo decode and downmix placement only.
+
+#### Next Steps:
+
+Let the movie finish, then capture the helper log first and a fresh telemetry screenshot to record the MPEG Layer II hardware regression properly, requiring all 17,876 pictures, the exact 839,409,548 transport bytes and the entry 605 and 606 error and deadline state, and remembering the one known repeated frame at picture 692 recorded in entry 609. Only then is codec selection proven not to have disturbed the accepted path on hardware. Ask the user to take the screenshot while the terminal telemetry screen is showing rather than during playback. A community sound test can now be written from the sweep fixture, and it must state plainly that it exercises the stereo downmix rather than discrete surround, since the core emits two channels. A commercial AC-3 track with real dynamic range control and dialogue normalization is still uncompared and remains the honest gap in this codec's qualification. AC-3 and DTS passthrough over S/PDIF remain the separate later boundary, now with both outputs confirmed working for linear PCM. The interlaced video gates of entry 609, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, remain open and unstarted. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 612 COMMIT Unreleased 9623fa7 2026-08-27T07:22:37-07:00
 
 #### Coming From:
@@ -1145,35 +1174,6 @@ Have the user power-cycle at the wall, load the core, play the file once and the
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 573 COMMIT Unreleased deced5c 2026-08-27T00:31:44-07:00
-
-#### Coming From:
-
-Unreleased 2acabc5
-
-#### Purpose:
-
-Instrument the ARM helper diagnostic log with monotonic timestamps and an explicit first-byte latency record so the cold startup dead time inferred in entry 572 becomes a measured quantity.
-
-#### Outcome:
-
-The approved plan is now committed as `deced5c` and built. Entry 572 established that steady delivery is a constant 1,392,000 bytes per second in every measured thermal state and that the cold defect is dead time before the first byte, inferred at 13.9 to 63.8 milliseconds by comparing each deadline record's elapsed time against the byte count it should have taken at that rate. That inference rests on telemetry arithmetic and on an 85 Hz poll rate that was never measured, so the correction to be made first is instrumentation rather than repair. The change is confined to `mediaplayer.cpp` as carried by `host/main_mister/0001-mediaplayer-arm-loader.patch`, which creates that file wholly, so the edit is contained to one new-file hunk whose line count is recomputed mechanically. A monotonic microsecond clock is added using `clock_gettime` with `CLOCK_MONOTONIC`, a session reference is taken in `diagnostic_open` before the first line is written so that the `start` record reads as time zero, and every diagnostic line is prefixed with elapsed microseconds composed into the same buffer as the message so that a single write call still emits a single line. The moment of download assertion is recorded, and on the transition of the read-event counter from zero to one a dedicated record reports the elapsed time from assertion to first submitted byte together with the would-block count accumulated in that interval. Nothing in the decode path, the FPGA image, the presentation scheduler, the startup controller or the 64-KiB queue is touched, the four-chunk per-poll budget is deliberately left alone because entry 572 ruled it out, and no behavioural change is intended, only observation. The FPGA bitstream is unaffected, so no Quartus build is required and the existing qualified `2acabc5` RBF with SHA-256 `fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347` remains the installed image. Deployment is therefore host-side only and consists of the rebuilt MiSTer main binary and helper, and that is a materially different and more invasive operation than the RBF replacement covered by standing authorization, since it replaces a system binary rather than a core image; it must be approved separately by the user before anything is written to the target. The change is built and verified. `git apply --check` accepted the regenerated single-hunk patch against the pinned Main_MiSTer commit `0a8fb44`, the hunk line count moving from 275 to 304, and the build completed with the official ARM GNU 10.2 toolchain reporting version 10.2.1 20201103 rather than the distribution cross-compiler, producing a 1,166,244-byte stripped ARM EABI5 binary whose MD5 is `cba107ea2c4ea39bfb1bce755b262ca6`. The only two matches for error text in the build log are the zstd source filenames `error_private.c`, so the build is clean. The instrumentation is confirmed present in the binary by the literal strings `t=%llu ` and `first_byte latency_us=%llu would_block=%u count=%d`. The edited logic was additionally compiled and executed standalone against a harness that injected a five-millisecond delay before the first byte, and the resulting record read `first_byte latency_us=5059 would_block=670`, so the measurement path is correct to within harness resolution. One pre-existing property was observed and deliberately left alone: `diagnostic_write` truncates at its 1,024-byte buffer and loses the trailing newline when a message overflows, causing the next record to concatenate. That behaviour is inherited from the original implementation, the timestamp prefix consumes only about eight of those bytes, and real records run near sixty characters, so it is immaterial here and correcting it is out of scope for this boundary.
-
-#### Next Steps:
-
-Build the ARM stack with MiSTer's official ARM GNU 10.2 toolchain, never a distribution cross-compiler, and confirm the patch applies cleanly to the pinned Main_MiSTer commit `0a8fb44` before proposing deployment. Obtain explicit user approval for replacing the host-side MiSTer main binary and helper, since standing authorization covers the RBF only, and preserve a means of restoring the current binaries before any write. Once deployed, verify a power cycle from `/tmp/messages` rather than from recollection, play once, stop, and fetch `/tmp/MediaPlayer_ARM.log` before any replay overwrites it, then confirm that the measured assertion-to-first-byte latency falls within the 13.9 to 63.8 millisecond band inferred in entry 572 and that the timestamped record of blocked polls accounts for it. Gather at least two further verified cold samples so the dead-time distribution acquires a tail rather than four points. If the measurement confirms the inference, propose the helper-side correction of priming the media source before asserting download as a separate approved boundary, since it removes the dead time rather than hiding it. Hold the startup-absorption candidate in reserve and treat its margin as unsafe, the 64-KiB queue covering 64.9 milliseconds against a worst observed 63.8. Do not raise the per-poll chunk budget. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
-
-#### Files Modified:
-
-- host/main_mister/0001-mediaplayer-arm-loader.patch
 
 #### Status:
 
