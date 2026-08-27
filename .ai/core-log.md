@@ -1,3 +1,32 @@
+## 567 COMMIT Unreleased 2acabc5 2026-08-26T23:43:47-07:00
+
+#### Coming From:
+
+Unreleased 2acabc5
+
+#### Purpose:
+
+Record the hardware telemetry from the user's Weave-mode run of `2acabc5` to determine whether the entry 566 ordinal-six gap depends on deinterlace mode.
+
+#### Outcome:
+
+The user accepted the entry 566 result, played a file in Weave mode and left the terminal telemetry on screen. The stale 476,509-byte probe from entry 566 was deleted through FTP and confirmed absent before triggering, and the new capture is 476,501 bytes with SHA-256 `57f242d044e927970686a0534a8b2a0ce859558b4a72921a0aae54900d17ed65`; its checksum of 4,099,361,451 and session length of 903,162,447 cycles both differ from entry 566, so this is a distinct session and not a stale re-read. The Weave run is functionally identical to the Bob run in every acceptance term. It accepts all 15,150,646 bytes, displays 449 pictures with 448 swaps, sees sequence end, completes presentation and terminates quietly with reason one, reporting zero error flags, no cache-bank overlap, no presentation error, no audio underrun, no PCM protocol error and no timestamp advance or delay conflicts. It also reproduces the defect exactly: one cadence outlier and one missed deadline, again at display picture ordinal six, again a 4,004,000-cycle interval of 66.7333 milliseconds that is precisely two nominal intervals, with ranked gaps two and three at exactly 2,002,000 cycles so that steady-state cadence away from the hitch is nominal. The ordinal-six deadline record carries the same upstream starvation signature as entry 566. Input starved cycles since the previous swap is 1,070,840 against 1,075,462 in Bob, a difference of only 4,622 cycles or 0.077 milliseconds, and in both runs the candidate is not presentable while upstream FIFO pending, writer busy and writer capacity blocked are all false with zero capacity-blocked cycles and a last reference completion age of about 3,912,352 cycles after five completed references. The micro-state differs only in which side of the same starvation is sampled: this run shows decoder ready false with decoder input pending true, whereas entry 566 showed decoder ready true with decoder input pending false, and the candidate ready delay is 271,690 rather than 592,128 cycles. Two independent sessions in opposite deinterlace modes producing the same ordinal, the same gap magnitude and the same starvation window establish that the defect is reproducible and that Bob versus Weave is not the variable; the failure is upstream delivery during early startup, not the presentation scheduler, the writer, DDR capacity or the deinterlacer. Total cadence excess over 448 nominal intervals is 4,393,879 cycles, of which 2,002,000 is the lost slot and 2,391,879 is the guarded startup hold, which sits between entry 566's 2,053,370 and the clean entry 564 run's 3,002,892 and therefore shows no startup regression. The 29.823923-fps aggregate again begins at first reference completion and includes that hold, so it is not a steady-state rate. Deinterlace mode is not encoded in the snapshot, so the Weave attribution rests on the user's report, and it is not known whether this was a cold first load or a warm reload. Two samples establish reproducibility rather than a rate, and entry 564 remains a clean counter-example under the same source. No reload, reboot, MGL launch, media change or configuration change was made during capture, and no source change or build was performed for this entry. Evidence is `.ai/current_results/entry567_weave_terminal.png` and `entry567_weave_capture.json`, the latter carrying the full decode, the entry 564 and 566 comparisons, the ordinal-six record diff and these scope limits.
+
+#### Next Steps:
+
+Stop collecting mode variations, because mode has been eliminated as a factor, and instead determine whether the ordinal-six starvation correlates with load history. Have the user power-cycle or reload the core and capture telemetry after the very first playback of a fresh core load, then after each of several successive replays without reloading, recording the run ordinal alongside each capture, so it can be established whether entry 564's clean result was specifically a cold first run and whether the starvation appears only on warm rearm. That distribution is the missing evidence needed to choose a boundary. If cold runs are clean and warm runs starve, the investigation belongs in ARM-side delivery rearm across successive sessions and the existing drained-FIFO warm-load simulation cases should be extended to model the measured 1,070,840-to-1,075,462-cycle starvation window before any RTL change is proposed; if cold runs starve too, the boundary is initial prefill depth ahead of the first cadence slot instead. Do not propose a source change until that data exists. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 566 COMMIT Unreleased 2acabc5 2026-08-26T23:38:54-07:00
 
 #### Coming From:
@@ -1203,34 +1232,5 @@ Copy the exact `5de0e1d` RBF from the designated GUNSMOKE checkout to the Raspbe
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 527 COMMIT Unreleased 98ee2dc 2026-08-26T01:20:30-07:00
-
-#### Coming From:
-
-Unreleased 98ee2dc
-
-#### Purpose:
-
-Resolve the schema-sixteen hardware result and distinguish wrong native cache-line provenance from corruption of correctly tagged cache bytes.
-
-#### Outcome:
-
-The user reloaded the exact `98ee2dc` image and, after stopping one false start made with the wrong media, ran `_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i while the corrected burst deleted the fixed remote screenshot before every trigger. The thirty-second burst retrieved ninety-three fresh PNGs: fourteen byte-identical pre-playback frames, thirty distinct live frames numbered fourteen through forty-three and forty-nine byte-identical terminal frames. The fixture authors a thirty-two-pixel bar that advances four pixels per source field and alternating upper and lower field markers. At representative active rows 200 and 201, frames fourteen through thirty-three contain no bright first-parity bar while the other parity advances around the screen. In frame thirty-four the missing parity appears at x=360 through x=391 and remains fixed there through frame forty-three, while the other parity continues from x=357 through x=516 with a wrap during the interval. The live images therefore preserve both observed failure forms in one run: a missing field followed by one stale field bar, split moving edges and many horizontal comb-like fragments. The user's initial impression that playback might have been smoother was explicitly withdrawn as uncertain because of the time since the prior run, so no performance change is claimed for this passive diagnostic image. Schema sixteen accepts all 5,007,304 source bytes and its wrapped counters represent 300 reference and displayed pictures and 299 swaps. The 299 presentation intervals span 599,534,823 cycles, 9.992247 seconds or 29.923 pictures per second. The session reaches sequence end, presentation completion and normal quiet reason one with every aggregate, cache-overlap, prefill, region and phase error clear; it records 300 framebuffer resets, 299 publications and 242/240 terminal-generation field fetches. Both per-field content-mismatch counters saturate at 255 while both tag-mismatch counters remain exactly zero. The first mismatch for the authored first field expects and carries row two, bank one and generation one; the other field likewise expects and carries row three, bank one and generation one. Both first mismatches compare raw fingerprint `001fffe0` with displayed-cache fingerprint `001fffc0`, an XOR difference of exactly `00000020`. The terminal first-field raw/display pair is `f964952b`/`e855bf21` and the second-field pair is `8c26df67`/`ab1ec443`. Correct row, bank and generation tags with independently wrong bytes on at least 255 lines of each parity rule out refill ownership and source-row selection and place the defect in cache RAM write, registered read-address or byte-lane alignment. The selected evidence is `.ai/current_results/entry527_schema16_live_missing_field.png` at 9,790 bytes with SHA-256 `0447f759660eb50926fb97d56d6e9bc446f0b92716b7a83027e2631f32530869`, `.ai/current_results/entry527_schema16_live_field_appears.png` at 11,836 bytes with SHA-256 `74528360d21de793e95505301abc725c6fe2834ae05e7d0b6cd1e42a2fd936f1`, `.ai/current_results/entry527_schema16_live_stale_split.png` at 11,297 bytes with SHA-256 `0805c00621d72e25e48bfccfe2ab4bf4e71326e52c9425c77c9dd06d51180357` and `.ai/current_results/entry527_schema16_terminal.png` at 12,691 bytes with SHA-256 `9064b4493e439cfd76cc58ebf5603da16317c6da2e082f251f52f9949df7460c`. Source review also exposes a regression blind spot: the ordinary cache test returns the same 64-bit value for every word, so its realistic registered-address model cannot reveal a word-position or byte-lane shift except for the separately injected bit. The implementation uses a clock-registered M10K read address and a separately delayed byte-lane selector, making a position-varying timing regression the next evidence boundary before another hardware-only schema.
-
-#### Next Steps:
-
-Stop before changing behavior and obtain approval for one bounded cache-read alignment cycle. On the designated GUNSMOKE checkout, strengthen the native cache regression with distinct bytes in every lane and position-varying 64-bit words while retaining the real four-read-clock pixel cadence, TFF and BFF field order, wrap and refill timing. Require the current RTL either to reproduce a raw-versus-displayed mismatch at an exact word/lane boundary or to pass bit-exactly. If it reproduces, correct only the proven registered-read-address and byte-lane pipeline alignment, require all 720 bytes of every line to compare exactly, rerun the complete native, reconstruction and canonical live-raster suites, then perform an incremental Quartus build and use unchanged schema sixteen for hardware acceptance. If the stronger regression does not reproduce the hardware signature, stop without a behavioral change and propose schema seventeen with per-byte-lane raw/display fingerprints. Continue direct verified replacement of only `/media/fat/MediaPlayer.rbf` with no backup, rollback or staging files.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
