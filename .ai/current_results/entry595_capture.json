@@ -1,0 +1,51 @@
+{
+  "captured": "2026-08-27T03:50:02-07:00",
+  "host": "10.10.0.30",
+  "user_report": "I ran the file in Bob mode without rebooting. Do you see anything different in the telemetry for this run?",
+  "files": {
+    "/tmp/MediaPlayer_ARM.log": {
+      "local": "/tmp/entry595-capture/entry595_bob_arm_helper.log",
+      "bytes": 170733,
+      "sha256": "008e8ae83fcdf9f4ba9d30ec3395e74539f527eb33d2e0b7caae59acbeed0b84"
+    },
+    "/tmp/messages": {
+      "local": "/tmp/entry595-capture/messages",
+      "bytes": 43570,
+      "sha256": "e358b05280bbf0f5e1a85a713d42d6ed669969e8289b7442ba78a50440e7075f"
+    },
+    "/media/fat/screenshots/cadence_probe.png": {
+      "local": "/tmp/entry595-capture/entry595_bob_terminal.png",
+      "bytes": 493891,
+      "sha256": "cde1dd58e2f5564797643f3a36e97249d094a1030bf0cf16e42063e372c1eedd"
+    },
+    "/media/fat/MiSTer": {
+      "local": "/tmp/entry595-capture/MiSTer",
+      "bytes": 1170340,
+      "sha256": "3841e2cc6eef4bfc9e46a7ffa075aff76b65d5405f81efb1355373292b35846f"
+    },
+    "/media/fat/MediaPlayer.rbf": {
+      "local": "/tmp/entry595-capture/MediaPlayer.rbf",
+      "bytes": 4332748,
+      "sha256": "15bc3057a4f16369bc4a3dac01e30f63e5fc563a43b1922214b5b478c17c66c2"
+    },
+    "/media/fat/games/MediaPlayer/bbb_480i_tff_15s_9800kbps.m2v": {
+      "local": "/tmp/entry595-capture/fixture.m2v",
+      "bytes": 18402691,
+      "sha256": "3e0a850a7dbbbbd05747208f97f436c8bae8120e124f05e78b8467c555a4b065"
+    }
+  },
+  "operations": [
+    "RETR /tmp/MediaPlayer_ARM.log",
+    "RETR /tmp/messages",
+    "DELE /media/fat/screenshots/cadence_probe.png",
+    "STOR screenshot command only",
+    "RETR /media/fat/screenshots/cadence_probe.png",
+    "RETR /media/fat/MiSTer",
+    "RETR /media/fat/MediaPlayer.rbf",
+    "RETR /media/fat/games/MediaPlayer/bbb_480i_tff_15s_9800kbps.m2v"
+  ],
+  "syslog_boot_lines": [
+    "Aug 27 10:08:35 MiSTer syslog.info syslogd started: BusyBox v1.33.1"
+  ],
+  "unchanged_target_state": "No reload, reboot, launch, media/config edit or deployment; only the fixed screenshot was replaced."
+}
