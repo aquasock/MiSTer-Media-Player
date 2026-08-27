@@ -1,3 +1,32 @@
+## 600 COMMIT Unreleased f615ce0 2026-08-27T05:00:35-07:00
+
+#### Coming From:
+
+Unreleased f615ce0
+
+#### Purpose:
+
+Validate the first hardware DVD-ceiling replay after the capacity-safe early writer acknowledgement change.
+
+#### Outcome:
+
+The user reports that the menu is okay and the screen is ready, then directs continuation. The helper log is retrieved first, followed by a newly generated screenshot with valid schema-nineteen parity/checksum and complete Main/RBF/media readbacks. The installed 4,324,340-byte RBF matches qualified f615ce0 SHA256 44606564ad40e3f9a74657fdd372a44fb6d0f74252e6d1000b2685768ca9cf01; Main remains 3841e2cc6eef4bfc9e46a7ffa075aff76b65d5405f81efb1355373292b35846f, and the exact 18,402,691-byte ceiling fixture remains 3e0a850a7dbbbbd05747208f97f436c8bae8120e124f05e78b8467c555a4b065. All 1,124 chunks and seventeen sampled ACK records reconcile without transport fault or uninitialized ACK state. The one-byte FPGA difference is the expected zero-padded final transport word, giving 18,402,692 accepted bytes. All 449 reference/display pictures and 448 swaps complete with zero error flags, normal EOF, presentation completion and quiet terminal state. Both deadline-gap and gap-outlier counters are zero, with no deadline records; all three largest measured steady intervals are the nominal 2,002,000 clocks, or 33.366667 milliseconds. The previous extra intervals at pictures 167 and 346 are absent in this run, compared with two 66.733333-millisecond intervals in each confirmed a4f2769 Weave and Bob capture. Startup-inclusive aggregate FPS is 29.883811 across 14.991394 seconds; its 43.127700-millisecond excess over 448 nominal intervals belongs to initial admission, not a steady missed slot. All 606 EAGAIN events precede first delivery, with no steady EAGAIN. The transport uses 18,373,802 fast bytes and 28,889 acknowledged bytes, 892,181 bursts and 907,750 status queries; consumption-paced statistics are not a raw link-bandwidth measurement. A new helper PID 1406, helper hash and packet checksum identify a distinct capture. The Linux boot is 11:26:59 UTC rather than the earlier 10:08:35 UTC baseline boot, so this is not a controlled same-boot comparison. Weave was requested immediately before the run, but the user response does not explicitly name the mode and this packet does not encode Bob/Weave selection. Installed-file readback also does not independently identify the currently loaded bitstream; the new capture follows the user-directed reload/playback request. Menu response is accepted as reported, without assigning a measured latency or independently separating during-versus-after behavior. The still image shows the expected final foliage/spikes scene without an obvious large artifact, not an independent full-playback pixel oracle. This clears the scoped single-run 9.8 Mbps video-ceiling cadence gate for f615ce0; Passed refers only to that observed hardware run, not both modes, warm-repeat qualification or full DVD compatibility. Evidence and exact collection/analysis drivers are retained as .ai/current_results/entry600_*. No production, deployment, configuration, reboot, core reload or playback action is performed during collection; only the fixed screenshot is replaced.
+
+#### Next Steps:
+
+Have the user replay the same ceiling file in explicitly confirmed Bob mode without rebooting or reloading, check menu response during and after playback, and retain the terminal image for a warm-run comparison. Preserve f615ce0 and the verified a4f2769 restoration pair, and do not change throughput, clocks, startup, queue sizes or source media on the strength of a single passing run. Keep mode confirmation, longer physical playback and the separate 10.08 Mbps combined-stream/audio/PTS and remaining DVD feature gates open. Leave lifecycle and playback with the user, preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 599 COMMIT Unreleased f615ce0 2026-08-27T04:53:39-07:00
 
 #### Coming From:
@@ -1146,36 +1175,6 @@ Finish the full-file fingerprint, pause, reload and native regressions, pull the
 - tools/streams/tb_h262_native_startup.sv
 - tools/streams/run_native_480i_timing.sh
 - README.md
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 560 COMMIT Unreleased c4628b5 2026-08-26T22:38:14-07:00
-
-#### Coming From:
-
-Unreleased 31a87b6
-
-#### Purpose:
-
-Evaluate input buffering and startup reserve with the real decode pipeline before selecting a cadence correction.
-
-#### Outcome:
-
-The user approved the simulation work recommended after entry 559. Source `c4628b5` adds a reproducible real-frontend, I reconstruction, writer, scheduler and profiler harness through the production HPS FIFO wrapper, transport gate, metadata extractor and clean-video queue. Behavioral FIFO primitives provide bounded showahead storage, byte ordering and synchronized pointer visibility; they are not cycle-exact Intel or physical CDC models. The final direct-input control matches entry 557's header, completion and presentation traces cycle for cycle. Twenty-five scenarios pass byte/order, sample-count, bank-generation, final-drain and counter-partition checks, and all 1,543 reconstructed pictures have fingerprints matching the corresponding pictures in the full-stream baseline; these fingerprints are scheduling-invariance checks, not a new independent pixel oracle. Full 449-picture runs complete in approximately 695 seconds each. The default queues have only the known picture-six gap; adding a synthetic thirty-millisecond host-resume pause increases its critical input wait to 886,005 clocks and produces additional service delay elsewhere, but still does not reproduce the hardware picture-348 miss. A simulation-only 64-KiB clean-video queue plus startup reserve eliminates post-startup gaps across all 449 pictures under that scenario. In a separate excerpt of the exact source pictures 340 through 355, starting with fresh decoder state and a forty-five-millisecond resume pause, default buffering produces gaps on source pictures 348, 349 and 352; the combined experiment removes all three with identical picture fingerprints. This excerpt is not a replay of the hardware state or host trace. Smaller-buffer, alternate-phase, periodic-DDR-busy and full-reset repeated-session controls pass their checks; the one-picture terminal case drains correctly. A deliberately sparse two-picture control distinguishes 47,826 clocks of transform overlap from critical byte waits, validating why the earlier hardware ready/empty count cannot all be treated as critical delay. The startup experiment suppresses raw frame windows: in the tested phases two suppressions move the first actual swap by one frame, or 33.367 milliseconds. It moves the early hold into startup and does not accelerate decoding or shorten the full-stream completion time. Production startup must instead release display and timing coherently based on readiness; the raw-window experiment must not be copied blindly. Warm partial download rearm, Bob/Weave interaction, physical host scheduling and full HDMI/DDR behavior are not newly validated here. Results, commands, hashes and limitations are preserved in `.ai/current_results/entry560_input_simulation.json`, with complete per-case reports and CSV traces under `/home/vash/mister-builds/entry560-results`. All production RTL, constraints and the installed `31a87b6` image remain unchanged. No Quartus build or new hardware acceptance was performed.
-
-#### Next Steps:
-
-Request approval to implement and hardware-test a 64-KiB clean-video queue with readiness-based startup reserve, preserving continuous HDMI sync, field-pair timing, ownership and byte/metadata ordering. Treat the simulation as evidence for resilience to input delivery pauses, not proof that the exact hardware picture-348 cause has been recovered. Define initial display release and cadence measurement explicitly so startup buffering is not mistaken for a playback-speed correction, and preserve audio/timestamp semantics rather than applying the elementary-stream experiment indiscriminately. Extend the relevant startup, short-file, warm-reload and native-mode regressions, then require a clean successful Quartus build with every timing class positive before the standing-authorized replacement and fresh complete FTP readback. Repeat the known clean Bob file before subsequent Bob/Weave and repeated-load checks.
-
-#### Files Modified:
-
-- tools/streams/tb_h262_input_cadence.sv
-- tools/streams/run_input_cadence.py
 
 #### Status:
 

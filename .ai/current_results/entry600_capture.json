@@ -1,0 +1,51 @@
+{
+  "captured": "2026-08-27T04:56:46-07:00",
+  "host": "10.10.0.30",
+  "user_report": "menu is ok. the screen is ready for you.",
+  "files": {
+    "/tmp/MediaPlayer_ARM.log": {
+      "local": "/tmp/entry600-capture/entry600_ceiling_arm_helper.log",
+      "bytes": 171178,
+      "sha256": "d4514949525836606988466723064c2572a288d9036c458d325b0ad41f8404c1"
+    },
+    "/tmp/messages": {
+      "local": "/tmp/entry600-capture/messages",
+      "bytes": 39302,
+      "sha256": "dc30090d9a1a80f21b8eed972ae79c12a04f025d49754ede5ba464efb8f7ce09"
+    },
+    "/media/fat/screenshots/cadence_probe.png": {
+      "local": "/tmp/entry600-capture/entry600_ceiling_terminal.png",
+      "bytes": 493417,
+      "sha256": "b7a2eab539435f49320cb6b4316a51cc64f8c16334b2e1197e62f4057967e806"
+    },
+    "/media/fat/MiSTer": {
+      "local": "/tmp/entry600-capture/MiSTer",
+      "bytes": 1170340,
+      "sha256": "3841e2cc6eef4bfc9e46a7ffa075aff76b65d5405f81efb1355373292b35846f"
+    },
+    "/media/fat/MediaPlayer.rbf": {
+      "local": "/tmp/entry600-capture/MediaPlayer.rbf",
+      "bytes": 4324340,
+      "sha256": "44606564ad40e3f9a74657fdd372a44fb6d0f74252e6d1000b2685768ca9cf01"
+    },
+    "/media/fat/games/MediaPlayer/bbb_480i_tff_15s_9800kbps.m2v": {
+      "local": "/tmp/entry600-capture/fixture.m2v",
+      "bytes": 18402691,
+      "sha256": "3e0a850a7dbbbbd05747208f97f436c8bae8120e124f05e78b8467c555a4b065"
+    }
+  },
+  "operations": [
+    "RETR /tmp/MediaPlayer_ARM.log",
+    "RETR /tmp/messages",
+    "DELE /media/fat/screenshots/cadence_probe.png",
+    "STOR screenshot command only",
+    "RETR /media/fat/screenshots/cadence_probe.png",
+    "RETR /media/fat/MiSTer",
+    "RETR /media/fat/MediaPlayer.rbf",
+    "RETR /media/fat/games/MediaPlayer/bbb_480i_tff_15s_9800kbps.m2v"
+  ],
+  "syslog_boot_lines": [
+    "Aug 27 11:26:59 MiSTer syslog.info syslogd started: BusyBox v1.33.1"
+  ],
+  "unchanged_target_state": "No reload, reboot, launch, media/config edit or deployment; only the fixed screenshot was replaced."
+}
