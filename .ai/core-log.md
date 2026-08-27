@@ -1,3 +1,32 @@
+## 573 COMMIT Unreleased ??? 2026-08-27T00:31:44-07:00
+
+#### Coming From:
+
+Unreleased 2acabc5
+
+#### Purpose:
+
+Instrument the ARM helper diagnostic log with monotonic timestamps and an explicit first-byte latency record so the cold startup dead time inferred in entry 572 becomes a measured quantity.
+
+#### Outcome:
+
+This entry is the approved plan and its commit does not yet exist. Entry 572 established that steady delivery is a constant 1,392,000 bytes per second in every measured thermal state and that the cold defect is dead time before the first byte, inferred at 13.9 to 63.8 milliseconds by comparing each deadline record's elapsed time against the byte count it should have taken at that rate. That inference rests on telemetry arithmetic and on an 85 Hz poll rate that was never measured, so the correction to be made first is instrumentation rather than repair. The change is confined to `mediaplayer.cpp` as carried by `host/main_mister/0001-mediaplayer-arm-loader.patch`, which creates that file wholly, so the edit is contained to one new-file hunk whose line count is recomputed mechanically. A monotonic microsecond clock is added using `clock_gettime` with `CLOCK_MONOTONIC`, a session reference is taken in `diagnostic_open` before the first line is written so that the `start` record reads as time zero, and every diagnostic line is prefixed with elapsed microseconds composed into the same buffer as the message so that a single write call still emits a single line. The moment of download assertion is recorded, and on the transition of the read-event counter from zero to one a dedicated record reports the elapsed time from assertion to first submitted byte together with the would-block count accumulated in that interval. Nothing in the decode path, the FPGA image, the presentation scheduler, the startup controller or the 64-KiB queue is touched, the four-chunk per-poll budget is deliberately left alone because entry 572 ruled it out, and no behavioural change is intended, only observation. The FPGA bitstream is unaffected, so no Quartus build is required and the existing qualified `2acabc5` RBF with SHA-256 `fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347` remains the installed image. Deployment is therefore host-side only and consists of the rebuilt MiSTer main binary and helper, and that is a materially different and more invasive operation than the RBF replacement covered by standing authorization, since it replaces a system binary rather than a core image; it must be approved separately by the user before anything is written to the target.
+
+#### Next Steps:
+
+Build the ARM stack with MiSTer's official ARM GNU 10.2 toolchain, never a distribution cross-compiler, and confirm the patch applies cleanly to the pinned Main_MiSTer commit `0a8fb44` before proposing deployment. Obtain explicit user approval for replacing the host-side MiSTer main binary and helper, since standing authorization covers the RBF only, and preserve a means of restoring the current binaries before any write. Once deployed, verify a power cycle from `/tmp/messages` rather than from recollection, play once, stop, and fetch `/tmp/MediaPlayer_ARM.log` before any replay overwrites it, then confirm that the measured assertion-to-first-byte latency falls within the 13.9 to 63.8 millisecond band inferred in entry 572 and that the timestamped record of blocked polls accounts for it. Gather at least two further verified cold samples so the dead-time distribution acquires a tail rather than four points. If the measurement confirms the inference, propose the helper-side correction of priming the media source before asserting download as a separate approved boundary, since it removes the dead time rather than hiding it. Hold the startup-absorption candidate in reserve and treat its margin as unsafe, the 64-KiB queue covering 64.9 milliseconds against a worst observed 63.8. Do not raise the per-poll chunk budget. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 572 COMMIT Unreleased 2acabc5 2026-08-27T00:28:08-07:00
 
 #### Coming From:
@@ -1181,35 +1210,6 @@ Restart the MiSTer when convenient, reload MediaPlayer and open its media select
 #### Files Modified:
 
 - host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 533 COMMIT Unreleased 164c7e6 2026-08-26T04:54:09-07:00
-
-#### Coming From:
-
-Unreleased 5de0e1d
-
-#### Purpose:
-
-Build and directly install the scoped accepted-write-versus-raw-read diagnostic for one Big Buck Bunny Bob hardware discriminator.
-
-#### Outcome:
-
-The scope review confirms that commit `164c7e6` adds one passive accepted-luma-write through raw-DDR-read comparison path: ten runtime source files carry the observation through existing interfaces and seven files provide directed tests and diagnostic decoding, while no signal feeds the decoder, scheduler, framebuffer ownership, DDR write control, line-cache control or video output. The previously interrupted canonical seventy-two-picture mixed-I/P/B live-raster regression now completes in 6,529,997 cycles with twenty-five reference publications, forty-seven B pictures, seventy-one swaps and every decoder, reconstruction, DDR, cache, presentation and ownership error clear. The real Big Buck Bunny four-picture reconstruction comparison also passes all 2,073,600 positioned samples within the established one-LSB transform tolerance in 7,837,323 cycles. The retained-state Quartus Prime 17.0.2 build completes in 11:08 with zero errors and 172 warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.021, 0.260, 3.793, 0.542 and 0.925 nanoseconds; focused decoder setup and recovery are positive 1.202 and 11.265 nanoseconds and focused video setup is positive 2.626 nanoseconds, all with zero violated paths. The fit uses 31,240 of 41,910 ALMs, 49,445 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The 4,225,296-byte RBF has SHA-256 `b5ce400b43311a74b0607137bce4498685490b74e5d08587538a68e7cdce8d96`. It was copied from the designated GUNSMOKE checkout and directly replaced only `/media/fat/MediaPlayer.rbf` through ordinary FTP; independent readback is byte-identical at the same size and hash, and no MediaPlayer backup, rollback or staging filename exists.
-
-#### Next Steps:
-
-Reload the Media Player core, choose Bob, leave the native timing pattern Off and replay only `/media/fat/games/MediaPlayer/bbb_480i_tff_15s_8mbps.m2v`. Report whether old frames still reappear during otherwise smooth playback and leave the terminal image displayed. Retrieve and decode that terminal image through ordinary FTP. A write-versus-read mismatch places the stale content in accepted writer packing, physical DDR addressing, storage or readback; equality proves the selected framebuffer contains exactly what was written and moves the correction boundary to scheduler bank or generation selection without another diagnostic layout.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
