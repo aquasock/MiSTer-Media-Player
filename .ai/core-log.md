@@ -1,3 +1,33 @@
+## 593 COMMIT Unreleased ??? 2026-08-27T03:34:43-07:00
+
+#### Coming From:
+
+Unreleased a4f2769
+
+#### Purpose:
+
+Prepare and qualify a reproducible DVD-ceiling video fixture for the unchanged guarded-transport hardware pair.
+
+#### Outcome:
+
+The user approves entry 592's DVD-focused validation direction. The immediate boundary is a 9.8 Mbps elementary-video fixture using the retained 449-picture 720x480 TFF all-I scene, preserving the supported frame-DCT structure and existing a4f2769 host/FPGA pair. Add a deterministic generation and verification tool under tools/streams, reusing the existing syntax analyzer and interlaced-signalling patch; retain the source digest, exact encoder version and command, encoded rate and buffering evidence, decoded picture counts and patched-versus-unpatched pixel equality. Small validation tests will exercise any new rate/buffer checks. The 10.08 Mbps combined-stream test remains the following integration boundary with supported audio and timing; this video-only fixture will not claim that combined acceptance or full DVD conformance. No production source change or FPGA/ARM rebuild is planned.
+
+#### Next Steps:
+
+Publish this approved plan before tool changes, implement the generator and focused checks, then publish their source from the Pi and have GUNSMOKE pull the exact commit before official generation and qualification. Require all expected I pictures, supported interlaced frame syntax, no software decode errors, reproducible output and credible near-ceiling rate/buffering evidence before copying the new uniquely named fixture to the MiSTer. Stage and independently read back the complete media file and retain its hash. Do not replace either installed binary, alter configuration, reboot, reload the core or start playback. Ask the user to run the new file once and leave the terminal telemetry visible; collect the helper log before another run, then fresh telemetry, and check full completion, zero errors and missed deadlines, normal transport integrity, nominal steady cadence and menu responsiveness. Keep the 18.65 Mbps file optional, maintain the forty-entry ring and leave restricted core.md unchanged.
+
+#### Files Modified:
+
+- tools/streams/generate_test_dvd_ceiling.py
+- tools/streams/test_dvd_ceiling.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 592 COMMIT Unreleased a4f2769 2026-08-27T03:29:04-07:00
 
 #### Coming From:
@@ -1161,34 +1191,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 553 COMMIT Unreleased 30d300a 2026-08-26T20:56:41-07:00
-
-#### Coming From:
-
-Unreleased 30d300a
-
-#### Purpose:
-
-Deploy the timing-qualified framebuffer sync correction and record the user's standing authorization for future core-image replacements.
-
-#### Outcome:
-
-The user explicitly authorized replacing the active image and stated that the agent may do so going forward. This is standing permission to directly replace this project's `/media/fat/MediaPlayer.rbf` during approved development cycles after successful build and positive timing checks, with independent full-file readback, without asking separately for replacement permission each time. The source remains `30d300a`; no source changes or additional build were needed. The Pi artifact was checked against the entry 552 build manifest, then uploaded directly through standard FTP, replacing the previous 4,248,544-byte image with the qualified 4,244,104-byte image. A new FTP connection independently read the complete destination and verified SHA-256 `d676cb58cb22d991a0638bd0dab2885f7b1bcdd87d23e085910ab05dd1acec57`, exactly matching the build-PC and Pi copies. No backup, staging copy or rollback file was created on the MiSTer, and no reload or reboot was triggered. `.ai/current_results/entry552_deployment.json` retains the transfer, independent verification and authorization record. The user has been shown actual before/after simulator output; the test's moving bar deliberately offsets the second field by four source pixels, so the corrected Weave image still exhibits expected motion combing and is not a sharpness comparison. Hardware acceptance remains pending actual HDMI playback.
-
-#### Next Steps:
-
-Ask the user to reload MediaPlayer, confirm stable HDMI lock before playback, and run the established Big Buck Bunny file at 1080p in Weave and Bob, checking whether the stale-field sticking and flicker are gone and whether any alignment defect remains. Record the user's observations in the next entry without treating successful transfer or simulation as hardware acceptance. Future timing-qualified image replacements within approved development work are already authorized; continue direct replacement and independent readback verification.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
