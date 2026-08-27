@@ -1,3 +1,32 @@
+## 568 COMMIT Unreleased 2acabc5 2026-08-26T23:48:12-07:00
+
+#### Coming From:
+
+Unreleased 2acabc5
+
+#### Purpose:
+
+Test the entry 567 hypothesis that the ordinal-six starvation is a warm-reload effect by capturing a cold first Weave run after a full MiSTer reboot.
+
+#### Outcome:
+
+The user rebooted the MiSTer, loaded the core, loaded the file and let it finish, giving the cold first-run sample entry 567 asked for. The stale 476,501-byte probe survived the reboot and was deleted through FTP and confirmed absent before triggering; the new capture is 476,520 bytes with SHA-256 `ac379d4724df8320197fd5686be22a19c58e9b8ff6463aa965d5b50cf33560f8` and a checksum of 4,176,697,056, distinct from all prior sessions. Every acceptance term still passes: all 15,150,646 bytes accepted, 449 pictures displayed with 448 swaps, sequence end seen, presentation complete, quiet terminal reason one, zero error flags, no cache-bank overlap, no presentation error, no audio underrun, no PCM protocol error and no timestamp advance or delay conflicts. The hypothesis is refuted, and refuted in the opposite direction from the one proposed. The cold run does not come up clean; it produces the worst gap measured so far. The single outlier is again at display picture ordinal six but is 6,006,000 cycles, or 100.1 milliseconds, which is three nominal intervals rather than the two seen in both warm runs. Every upstream indicator moves the same way. Input starved cycles since the previous swap rises to 1,659,347, or 27.66 milliseconds, against roughly 1,072,000 cycles or 17.85 milliseconds in entries 566 and 567, an increase of about 55 percent. Accepted bytes at the deadline falls to 296,838 from 323,580 and 331,179, so materially fewer bytes had been delivered by the same deadline. Candidate ready delay rises to 3,230,418 cycles from 592,128 and 271,690. Meanwhile the writer and DDR path stay clean exactly as before, with upstream FIFO pending, writer busy and writer capacity blocked all false and zero capacity-blocked cycles, and writer wait and decoder stall totals sit within the same narrow band as the other three runs. The starvation magnitude therefore tracks how cold the media source is rather than any session rearm state, which is consistent with ARM-side file read latency during startup and inconsistent with the delivery-rearm boundary entry 567 nominated. The guarded startup did not absorb the deficit: presentation hold total is the lowest of all four runs at 26,390,166 cycles, so the guard released on readiness while the feed was still behind, and the residual non-gap startup excess of 2,580,696 cycles remains below the clean entry 564 run's 3,002,892. Ranked gaps two and three are exactly 2,002,000 cycles in this run as in every other, confirming once more that steady-state cadence after the startup hitch is nominal and that the whole defect is confined to initial prefill depth ahead of the first cadence deadline. This is one cold sample and does not establish a cold-run rate. Entry 564 is now the only zero-gap run out of four and its load history was never recorded, so it cannot be classified as cold or warm and cannot anchor either hypothesis. Page-cache state is not measured by this telemetry, so the read-latency explanation is inference from the starvation and byte-delivery figures rather than direct measurement. Deinterlace mode and load history are not encoded in the snapshot and rest on the user's report. No source change or build was performed for this entry, and no reload, reboot, MGL launch, media change or configuration change was made during capture. Evidence is `.ai/current_results/entry568_cold_weave_terminal.png` and `entry568_cold_weave_capture.json`, the latter carrying the full decode, the four-run series, the ordinal-six comparisons and these scope limits.
+
+#### Next Steps:
+
+The boundary is now initial prefill depth ahead of the first cadence deadline, not delivery rearm and not the presentation scheduler, so the remaining evidence needed is the size of the deficit rather than more mode or reload permutations. Have the user take two or three further cold runs, each after a full reboot, and two or three further warm replays, capturing telemetry after every single one and stating which is which, so the cold and warm starvation windows acquire a range instead of one sample each and so it can be established whether any run still reaches zero gaps under known conditions. Ask specifically whether the entry 564 run was preceded by a reboot, since reclassifying it would settle whether a clean run is reachable at all on this build. With that range in hand the fix boundary can be sized directly: the guarded startup controller currently releases the first picture on readiness alone, and the measured 27.66-millisecond cold starvation window against a 33.37-millisecond cadence slot indicates the release gate needs a minimum accepted-bytes or queue-occupancy condition in addition to readiness, which is a bounded change to the startup controller rather than to the queue depth or the scheduler. Extend the existing drained-FIFO warm-load simulation cases to model both measured starvation windows before proposing that change, and do not commit source until the user approves the revised plan. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged in the meantime. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 567 COMMIT Unreleased 2acabc5 2026-08-26T23:43:47-07:00
 
 #### Coming From:
@@ -1197,36 +1226,6 @@ Reload the Media Player core, prepare `_cadence/native_480i_tff_light_10s.m2v` w
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 528 COMMIT Unreleased 5de0e1d 2026-08-26T01:36:57-07:00
-
-#### Coming From:
-
-Unreleased 98ee2dc
-
-#### Purpose:
-
-Expose and correct any native line-cache registered-address or byte-lane alignment defect hidden by the constant-data regression stimulus.
-
-#### Outcome:
-
-The position-varying regression reproduced the hardware defect before any RTL change: every eighth luma pixel failed at lane seven because the registered M10K read address had already advanced to the following word, beginning at x=7 where expected byte `cb` was read as the next word's `cc`, then repeating at x=15, x=23 and every subsequent word boundary; both completed field fingerprints mismatched. Commit `5de0e1d` drives both luma and chroma cache addresses from the already delayed source coordinates, aligning the registered RAM word with the separately delayed byte-lane selector, and expands the regression to generate distinct values for every DDR word and all eight lanes while comparing every displayed luma byte against its exact physical row, word and lane. Position-varying TFF and BFF controls then complete all 720 bytes of every line with zero mismatches, one injected cache bit produces exactly one mismatch at x=80, word ten, lane zero, and the forced wrong-bank control remains tag-only. The complete native suite passes field order, mapping, exact TFF/BFF timing, Bob and Weave control, pattern isolation, ownership, the measured presentation integration, ordinary/delayed/late-prefill cache modes, schema sixteen and all retained decoder layouts. TFF, BFF and progressive reconstruction remain at 7,926,459, 7,948,706 and 13,048,137 cycles with zero out-of-tolerance pixels, field-DCT rejection remains at 82,326 cycles and the canonical seventy-two-picture mixed-I/P/B live raster remains exactly 6,529,997 cycles with twenty-five publications, forty-seven B pictures, seventy-one swaps and every error clear. The requested retained-state incremental Quartus Prime 17.0.2 build completes in ten minutes thirty seconds with zero errors and 143 established warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.230, 0.244, 4.356, 0.570 and 0.925 nanoseconds with zero endpoint negative slack; focused decoder setup and recovery are positive 1.139 and 11.267 nanoseconds and focused video setup is positive 2.778 nanoseconds, all with zero violated paths. Only the established unmatched `RESET` filter remains. The fitted netlist retains all twelve delayed x-coordinate bits and all thirteen delayed y-coordinate bits used by the corrected cache address path; synthesis merges the redundant luma lane register into those identical coordinate keepers. The fit uses 30,460 ALMs, 48,582 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The 4,252,684-byte RBF has SHA-256 `9260f3c36d4515f03bee4f0ecb24af6c7dc9e4dfb4ff387ec5e841bca39ad96c`.
-
-#### Next Steps:
-
-Copy the exact `5de0e1d` RBF from the designated GUNSMOKE checkout to the Raspberry Pi, directly replace only `/media/fat/MediaPlayer.rbf` through absolute-path ordinary FTP without creating backup, rollback or staging files, and verify the active image by independent readback. Reload the core, run `_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i while the corrected thirty-second burst captures fresh live frames, then decode unchanged schema sixteen from the same run. Hardware acceptance requires both field bars to advance with the authored four-pixel separation, no missing or frozen parity, no horizontal stale fragments, zero tag and content mismatch counts, all 300 pictures and 299 swaps and every aggregate, overlap, prefill, phase and region error clear.
-
-#### Files Modified:
-
-- rtl/mpeg2_luma_framebuffer.sv
-- tools/streams/tb_native_480i_cache_refill.sv
 
 #### Status:
 
