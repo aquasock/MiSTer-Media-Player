@@ -1,3 +1,35 @@
+## 624 COMMIT Unreleased ??? 2026-08-27T09:27:04-07:00
+
+#### Coming From:
+
+Unreleased 44ee05a
+
+#### Purpose:
+
+Restore valid motion regressions and keep Main responsive during backpressured media transfers.
+
+#### Outcome:
+
+The user approves correcting the fixtures and the Main transfer-loop defect isolated in entry 623. Preserve the uncommitted GUNSMOKE generator and companion checker edit as recovery copies, and develop from a separate checkout rather than overwriting that work. Publish a deterministic suite generator with a genuinely moving bar and correct temporal field placement for both TFF and BFF. Require independently decoded per-field motion and field order, reject the old stationary fixture, retain the existing syntax and audio checks and avoid changing the unrelated accepted ceiling and full-movie files. Add resumable credit-aware transfer steps in the existing Main patch with persistent pending bytes, a bounded per-poll work budget and an immediate return to the menu loop when verified credits are zero. Preserve accepted-word/digest verification, alignment, terminal odd-byte handling, source order, EOF draining, session reset and cancellation; no uncertain batch may be retried after a transport fault. Retain the acknowledged legacy path without claiming it has the verified-credit path's nonblocking guarantee. Extend the existing mocked-loader and actual RTL-bridge regression runner to cover repeated yields, limited credits, integrity faults, short reads, EOF and abort/restart. This is host and fixture work only: no helper codec, FPGA source, clocks, FIFO sizes, presentation policy or timing constraints change is approved.
+
+#### Next Steps:
+
+Implement and qualify on GUNSMOKE, including native and sanitized host tests, actual bridge credit/fault tests and independent field-motion checks with negative controls. Publish source from the Pi before official qualification and build Main from the pinned upstream revision with that exact integration patch. Generate the corrected six-file suite without changing the original failing fixtures until validation succeeds, retain full-file hashes and a restoration copy of the installed Main and media, and provide verified artifacts for the user's deployment and reload rather than activating anything automatically. No new RBF is required if FPGA source remains unchanged; retain seed-17 aa7f064 and helper 078d36b. Record incomplete or canceled gates honestly, leave hardware Passed unchecked and request a single corrected test-one run with menu response and a dedicated helper-first capture. Preserve restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/streams/test_main_mister_profile.py
+- tools/streams/generate_test_suite.py
+- tools/streams/generate_test_dvd_ceiling.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 623 COMMIT Unreleased 44ee05a 2026-08-27T09:24:06-07:00
 
 #### Coming From:
@@ -1151,35 +1183,6 @@ After the user reported the screen ready, the helper log was fetched before a fr
 #### Next Steps:
 
 Prepare the next approved implementation boundary around a flow-controlled bulk transfer path that reduces per-word bridge overhead while preserving ACK/backpressure, byte order, odd tails, core readiness and reset handling, and ordinary non-media transports. Do not increase buffers again or substitute unchecked fast writes. Establish protocol and byte-trace equivalence plus delayed-backpressure tests and build with the official ARM toolchain before qualified host deployment; if adequate headroom requires an FPGA transport-protocol change, obtain approval for that material revision before implementing it. Retain the user's standing evidence/source publication and host-deployment permissions without repeating those questions, while keeping backup, staging and independent readback safeguards. Do not request another identical hardware run merely for statistics. After a changed candidate is available, validate one high-bitrate run and the outstanding qualified 8 Mbps case, and confirm whether the meadow slowdown improves and obtain a current menu-responsiveness report. Keep the existing startup controller, 64 KiB clean-video queue, continuous HDMI sync and black idle behavior unchanged, leave reboot and playback to the user, preserve restricted `core.md` and the forty-entry ring, and retain the unresolved interlaced, audio/PTS, cancellation and assertion-drift limitations from prior entries.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 584 COMMIT Unreleased 32ba178 2026-08-27T01:52:36-07:00
-
-#### Coming From:
-
-Unreleased 32ba178
-
-#### Purpose:
-
-Publish and install the verified host-transfer profiling build and record standing user authorization for future source publication and host deployment.
-
-#### Outcome:
-
-The user explicitly approved publishing the profiling source to GitHub and installing the host binary with backup and full readback, then stated that approval is not needed going forward. This extends entry 582's evidence-publication permission to source-code publication in `aquasock/MiSTer-Media-Player` and qualified host-system-binary replacement during approved project development, without repeating publication or deployment permission questions; preserve build and regression qualification, restoration data, staged verification and independent active readback. Existing requirements to keep `core.md` restricted, obtain approval for materially revised development plans and leave reboot or playback to the user remain unchanged. Source `32ba178` and its build report were pushed from the Pi, and GUNSMOKE pulled published master `41cb150`; both source-file hashes and the complete candidate binary were verified against the exact tested build, resolving entry 583's unpublished-candidate limitation without changing its source. Before writing to the target, the current 1,166,244-byte `/media/fat/MiSTer` was fully retrieved, checked against the server size and SHA-256 `a850ec3fc8c78b6ed72e3421858f9e3c40a5d2a4ff59a533d52dd0df47213a86`, flushed to local disk, then copied and independently re-hashed in persistent storage at `/home/vash/mister-builds/entry584-backup/MiSTer.pre32ba178` on GUNSMOKE. The profiling candidate was uploaded to the previously absent `/media/fat/MiSTer.new`, read back completely through a fresh FTP session, checked byte-for-byte and confirmed executable before being renamed over `/media/fat/MiSTer`. The predecessor hash was rechecked immediately before rename. A separate fresh session then retrieved the complete active file: all 1,166,244 bytes match SHA-256 `1aae53b0209e873b1edfe20f60bad10c2c4cd5ce1e21f7f40eea81be313facb9`, permissions remain `-rwxr-xr-x` and no staging file remains. Full FPGA readbacks before and after retain the qualified `2acabc5` hash `fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347`. No helper, media, configuration, core lifecycle or Linux lifecycle was changed. The running host process retains its old inode until the user reboots, so this records verified deployment rather than runtime activation, throughput improvement or hardware acceptance. The deployment manifest is `.ai/current_results/entry584_deployment.json`; the latest hardware observation remains entry 581 with the subsequently confirmed responsive menu.
-
-#### Next Steps:
-
-Have the user power-cycle the MiSTer, load the core and play `bbb_480i_tff_15s.m2v` once under the same conditions as entry 581, then stop without replaying and leave terminal telemetry displayed. Fetch `/tmp/MediaPlayer_ARM.log` before the screenshot and verify the new boot plus `profile_version=1`, per-read timing and sampled ACK records to establish runtime activation. Compare separate read and transfer durations, actual data-bearing poll timing, ACK read distributions and cadence with the prior 16 KiB run before selecting an optimization; retain the profiling overhead and sampling limitations from entry 583. Full byte and picture counts, error status and interface responsiveness still gate acceptance, and the qualified 8 Mbps regression remains outstanding. Apply the new standing publication and host-deployment permission to subsequent approved cycles without asking again for those routine actions, while retaining the verification safeguards and keeping the FPGA startup, queue, sync and timing unchanged unless a separate plan is approved.
 
 #### Files Modified:
 
