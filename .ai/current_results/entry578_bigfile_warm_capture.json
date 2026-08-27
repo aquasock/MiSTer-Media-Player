@@ -1,0 +1,101 @@
+{
+ "source_commit": "deced5c",
+ "captured": "2026-08-27T00:56:00-07:00",
+ "media": {
+  "path": "/media/fat/games/MediaPlayer/bbb_480i_tff_15s.m2v",
+  "bytes": 34919166
+ },
+ "user_report": "Played the larger file a second time without rebooting; reports it seems to run the same.",
+ "boot_state": "no power cycle; syslog still shows the single 07:41:02 UTC boot, so the page cache retained the file from entry 577",
+ "prediction_test": {
+  "prediction_source": "entry 577 Next Steps, recorded before this run",
+  "predicted": {
+   "delivery_bytes_per_s": "~1,412,000",
+   "delivered_fps": "~18.1",
+   "deadline_gap_count": "same order as 188",
+   "first_byte_latency": "lower than 23,749 us"
+  },
+  "actual": {
+   "delivery_bytes_per_s": 1420655,
+   "delivered_fps": 18.234326307315012,
+   "deadline_gap_count": 187,
+   "first_byte_latency_us": 14560
+  },
+  "verdict": "CONFIRMED on every term"
+ },
+ "outcome": {
+  "gap_outlier_count": 187,
+  "deadline_gap_count": 187,
+  "delivered_fps": 18.234326307315012,
+  "accepted_bytes": 34919166,
+  "display_pictures": 449,
+  "display_swaps": 448,
+  "error_flags": 0,
+  "cadence_seconds": 24.5690459,
+  "largest_gaps": [
+   {
+    "rank": 1,
+    "cycles": 12012000,
+    "ordinal": 96
+   },
+   {
+    "rank": 2,
+    "cycles": 10010000,
+    "ordinal": 93
+   },
+   {
+    "rank": 3,
+    "cycles": 10010000,
+    "ordinal": 94
+   }
+  ]
+ },
+ "helper_log": {
+  "archived": ".ai/current_results/entry578_bigfile_warm_arm_helper.log",
+  "reads": 8526,
+  "first_byte_latency_us": 14560,
+  "would_block_total": 185,
+  "delivery_span_s": 24.58,
+  "delivery_bytes_per_s": 1420655,
+  "implied_poll_rate_hz": 86.7,
+  "budget_arithmetic_bytes_per_s": 1420791,
+  "budget_agreement_percent": 0.01
+ },
+ "warm_vs_cold_bigfile": {
+  "first_byte_latency_us": {
+   "cold_entry577": 23749,
+   "warm_entry578": 14560,
+   "reduction_ms": 9.189
+  },
+  "would_block_before_first_byte": {
+   "cold_entry577": 384,
+   "warm_entry578": 185
+  },
+  "delivery_bytes_per_s": {
+   "cold_entry577": 1412269,
+   "warm_entry578": 1420655,
+   "change_percent": 0.59
+  },
+  "delivered_fps": {
+   "cold_entry577": 18.1195113300455,
+   "warm_entry578": 18.234326307315012
+  },
+  "deadline_gap_count": {
+   "cold_entry577": 188,
+   "warm_entry578": 187
+  },
+  "interpretation": "warming halved the blocked-poll count and cut first-byte latency by 9.2 ms, exactly as page-cache warming predicts, yet delivery rate moved only 0.6 percent and the outcome is unchanged at 187 versus 188 misses. Read latency governs startup only; the per-poll budget governs steady throughput."
+ },
+ "poll_rate_across_measurements": {
+  "entry575_small_cold": "~86 (burst window)",
+  "entry577_big_cold": 86.2,
+  "entry578_big_warm": 86.7,
+  "note": "three independent measurements across two files and two thermal states agree, and the four-chunk budget arithmetic matches measured delivery to about 0.01 percent in each"
+ },
+ "scope_limitations": [
+  "One run per condition, per the user's diagnostic cadence.",
+  "The poll rate remains inferred from read counts and elapsed time rather than measured inside MiSTer main.",
+  "Only three of the retained deadline records are available out of 187.",
+  "No assessment has been made of whether spending longer in mediaplayer_poll() would starve other per-poll work in user_io_poll, which is the principal risk of the proposed correction."
+ ]
+}

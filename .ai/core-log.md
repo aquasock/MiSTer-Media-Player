@@ -1,3 +1,32 @@
+## 578 COMMIT Unreleased deced5c 2026-08-27T00:56:47-07:00
+
+#### Coming From:
+
+Unreleased deced5c
+
+#### Purpose:
+
+Replay the larger file warm to test entry 577's recorded prediction that page-cache warming would not relieve a stream whose demand exceeds the per-poll delivery ceiling.
+
+#### Outcome:
+
+No power cycle preceded this run and the syslog still shows the single 07:41:02 UTC boot, so the page cache retained the larger file from entry 577. The prediction recorded before the run is confirmed on every term. Delivery was predicted at about 1,412,000 bytes per second and measured 1,420,655, a change of 0.6 percent; the delivered rate was predicted near 18.1 frames per second and measured 18.2343; the missed-deadline count was predicted to remain in the same order as 188 and measured 187; and first-byte latency was predicted to fall and did, from 23,749 to 14,560 microseconds. The warming itself is unmistakable and behaved exactly as page-cache warming should, halving the blocked polls that precede the first byte from 384 to 185 and cutting 9.2 milliseconds from first-byte latency, yet none of that reached the outcome. The session still accepts all 34,919,166 bytes and displays 449 pictures with 448 swaps at zero error flags, still runs 24.57 seconds for 15.0 seconds of content, and still shows its three largest gaps at 12,012,000, 10,010,000 and 10,010,000 cycles around ordinals 93 to 96. The separation this establishes is clean and is the point of the run: read latency governs startup only, and the per-poll budget governs steady throughput, so warming a file that demands more than the ceiling changes when playback begins and nothing about how it proceeds. The delivery arithmetic closes for a third time. This run implies 86.7 polls per second against 86.2 in entry 577, and four chunks of 4,096 bytes at 86.7 Hz is 1,420,791 bytes per second against a measured 1,420,655, agreeing to 0.010 percent. Across three independent measurements now, spanning two files whose demands differ by a factor of 2.3 and two thermal states, the implied poll rate sits between 86.2 and 86.7 Hz and the four-chunk budget arithmetic matches measured delivery to about a hundredth of a percent each time. The delivery ceiling is therefore established as a property of the per-poll budget rather than of the media, the filesystem, the helper or the FPGA, and entry 572's ruling-out of that candidate, already corrected in entry 577, is now contradicted by direct measurement under two thermal conditions. One risk remains entirely unassessed and must gate any correction: `mediaplayer_poll()` is called from `user_io_poll()`, so spending longer inside it delays every other responsibility of the MiSTer main loop, and nothing in this work has examined what that costs. Per the user's diagnostic cadence this is one run per condition, only three of the 187 deadline records are retained by the snapshot, and the poll rate is still inferred from read counts and elapsed time rather than measured inside MiSTer main. Evidence is `.ai/current_results/entry578_bigfile_warm_arm_helper.log`, `entry578_bigfile_warm_terminal.png` and `entry578_bigfile_warm_capture.json`.
+
+#### Next Steps:
+
+Seek user approval for a bounded delivery-side change before implementing it. The proposal is to raise the bytes moved per poll in `mediaplayer_poll()` within `host/main_mister/0001-mediaplayer-arm-loader.patch` by enlarging the read buffer from 4,096 to 16,384 bytes while leaving the chunk count at four, which raises the ceiling from about 1.42 to about 5.7 megabytes per second and, because it moves the same bytes in a quarter as many read and transmit calls, should reduce rather than increase the per-byte time spent in the function. Size the target against DVD peak program-stream rate of 10.08 Mbps or about 1.26 megabytes per second with real margin rather than against this one test file, since the present twelve percent headroom over DVD peak is less than startup dead time already consumes. Before proposing the edit, examine whether `user_io_file_tx_data` accepts larger blocks without internal chunking that would negate the benefit, and estimate the added worst-case time per `user_io_poll` call against whatever else that loop must service, because that is the principal risk and is currently unexamined. No Quartus build is required and the qualified `2acabc5` bitstream is unaffected. Validation would be a single replay of this same larger file, checking measured delivery against the new budget arithmetic and confirming the delivered frame rate rises toward nominal. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 577 COMMIT Unreleased deced5c 2026-08-27T00:53:02-07:00
 
 #### Coming From:
@@ -1181,35 +1210,6 @@ Do not modify the presentation scheduler or framebuffer publication logic and do
 
 - tools/streams/tb_native_480i_cache_refill.sv
 - tools/streams/run_native_480i_timing.sh
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 538 COMMIT Unreleased 018093a 2026-08-26T05:36:53-07:00
-
-#### Coming From:
-
-Unreleased d566668
-
-#### Purpose:
-
-Make the existing native presentation regression prove monotonic picture-generation order and correct only a reproduced scheduler replay.
-
-#### Outcome:
-
-The user approved entry 537's bounded scheduler-generation cycle. Commit `018093a` changes only the existing native 480i presentation integration test, tagging every completed ordinary bank with its monotonically increasing decoded generation and requiring every observed display-bank change to present exactly the next generation. The untouched scheduler passes all four paths over twenty exact native frame windows: serialized decoding presents generations one through ten, measured three-field overlap presents one through thirteen, accelerated one-field pressure presents generations one through twenty while decoding twenty-one and exercises both the secondary queue and backpressure, and the finite terminal case decodes and presents all eight generations with the queue empty. The exact run completes at 682,495,674,081 picoseconds with `generation_order=1`, no untagged bank, repeat, regression, skip or presentation error. This rejects an old-generation replay inside the current abstract ordinary-reference scheduler model and does not justify changing scheduler RTL. No Quartus build, RBF deployment, hardware diagnostic layout, menu, decoder datapath, DDR storage, line cache or host software change was made.
-
-#### Next Steps:
-
-Do not modify the presentation scheduler or run Quartus from this result. The next bounded investigation should carry an authored generation identity through the existing framebuffer publication simulation boundary, from the scheduler-selected display bank and reset generation to `picture_present_rd` and the two field-cache publications, and assert that both fields of each published frame use the same current generation before pixels reach the existing cache output. Reuse the present diagnostic layout and tests; only a reproduced generation mismatch should authorize a framebuffer publication correction and incremental build.
-
-#### Files Modified:
-
-- tools/streams/tb_native_480i_presentation_integration.sv
 
 #### Status:
 
