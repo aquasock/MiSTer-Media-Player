@@ -1,3 +1,32 @@
+## 559 COMMIT Unreleased 31a87b6 2026-08-26T22:13:16-07:00
+
+#### Coming From:
+
+Unreleased 31a87b6
+
+#### Purpose:
+
+Read the first hardware deadline capture and distinguish missing presentation candidates from scheduler refusal.
+
+#### Outcome:
+
+The user reported the requested file run complete and telemetry ready. A fresh FTP screenshot, after removing only the old fixed screenshot target, validates as schema nineteen with checksum and full counters: all 15,150,646 bytes, 449 decoded/display pictures and 448 swaps, sequence end and presentation completion, and zero aggregate error flags. Two confirmed doubled intervals are explicitly associated with full picture ordinals six and 348; the earlier modulo-bank inference is now directly corroborated. Neither candidate was presentable at its actual missed window, with only five and 347 completed references respectively, and neither presentation nor destination hold was asserted. Candidate six became ready 28.854 milliseconds late, while candidate 348 became ready only 0.297 milliseconds late; each missed window added one 33.367-millisecond frame period. The preceding swap-to-deadline intervals contain 13.594 and 15.129 milliseconds with the decoder ready but its clean-video queue empty, versus zero and 36 clocks of writer-capacity blocking. In both records, the clean-video queue had a byte available at the captured deadline itself, when the decoder was busy. These measurements identify late candidate production and substantial earlier input-availability gaps, not an on-time candidate rejected at either window. They do not yet prove a specific host-refill cause: the one-byte bitreader can advertise readiness while the parser is in `ST_WAIT_PIPELINE`, so input-ready/empty time can overlap transform work and must not all be counted as critical-path delay. The counters cover only the previous display interval, and writer-capacity blocking does not measure every DDR-service delay. The 347-completion to 348-readiness interval is 61.911 milliseconds in hardware versus 44.903 milliseconds between completions in the ideal-input/DDR simulation, an additional 17.008 milliseconds; the different initial raster phase and unobserved host schedule prevent treating that comparison as an exact replay. At picture 348's deadline the accepted stream position is just 83 bytes before the next picture header. The input path has a 32-KiB HPS FIFO followed by the metadata extractor and a 16-KiB clean-video queue, providing a concrete next simulation boundary without changing HDMI timing. Overall cadence is 29.806318 pictures per second over 15.030370 seconds; two doubled gaps contribute 66.733 milliseconds, while another 15.370 milliseconds comes from the first-reference-completion versus later-swap timestamp basis. The screenshot and complete decode, calculations and limitations are retained in `.ai/current_results/entry559_bob_terminal.png` and `entry559_bob_capture.json`; screenshot SHA-256 is `50571f4d7558c24fee23cced747f39d5a80b3ee887d9bb03411c8633b0d9ea17`. No production source, active image, display settings or core lifecycle changed during capture. The diagnostic yielded useful hardware evidence, but the remaining cadence issue is not resolved and this elementary stream does not validate audio synchronization.
+
+#### Next Steps:
+
+Request approval for the next cadence cycle: extend the real-pipeline simulation with the existing HPS ingress, extractor and clean-video queues, separating critical byte waits from transform overlap and varying refill pauses within the measured evidence rather than claiming an invented host trace is ground truth. Compare startup reserve, input buffering and bounded decode-headroom improvements, preserving byte/pixel identity, end-of-stream draining, repeated-load behavior, Bob/Weave transitions and the accepted continuous HDMI sync. Select a playback change only after its benefit and limits are demonstrated; then require existing regressions, a clean positive-timing build and independently verified deployment before another hardware test. No additional screenshot is needed before that simulation work.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 558 COMMIT Unreleased 31a87b6 2026-08-26T22:07:06-07:00
 
 #### Coming From:
@@ -1198,41 +1227,6 @@ The user approved continuation after recovery reproduced the uncommitted schema-
 #### Next Steps:
 
 Identify or explicitly authorize replacement of the unrecognized active RBF before deployment. If replacement is approved, preserve that exact 4,200,652-byte file as `/media/fat/MediaPlayer.rbf.rollback-pre-bfb9361`, retrieve and verify the rollback copy at SHA-256 `98c73c1b23499e5461fa789b3b77fbf59d798e957b9f7e9357bf6d932009a615`, stage and round-trip verify the `bfb9361` candidate, promote it, verify the active file at SHA-256 `4f51994b786a6728a1ce57d120fec12c889460bfbbce7757354ad523bb7c29df` and remove only the temporary stage. Leave helper, media, Main and MiSTer configuration untouched. Reload the core and repeat `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with a live burst, reading both session-wide varied flags and signatures from the same symptom-bearing run. A first field whose returns never vary across the whole session while the second field's do proves the data is already wrong when it arrives and moves the search upstream of the framebuffer; both parities varying proves correct data arrives and is lost afterwards.
-
-#### Files Modified:
-
-- `MediaPlayer_top_06.svh`
-- `MediaPlayer_top_07.svh`
-- `rtl/mpeg2_luma_framebuffer.sv`
-- `rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv`
-- `tools/streams/decode_hardware_cadence.py`
-- `tools/streams/tb_h262_hardware_cadence_profiler.sv`
-- `tools/streams/test_decode_hardware_cadence.py`
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 519 COMMIT Unreleased 2668c8f 2026-08-25T19:53:29-07:00
-
-#### Coming From:
-
-Unreleased 7356e4a
-
-#### Purpose:
-
-Observe the luma content DDR returns for each field parity.
-
-#### Outcome:
-
-This commit folds every returned luma word into a per-parity signature and sets a varied flag when any word differs from the first that parity saw, attributing each word by `fetch_line[0]` against `first_field_mem`. Reading `fetch_line` also cleared one long-standing assigned-but-never-read warning, so the build reports 143 rather than the established 144. A clean build completed in 10 minutes 31 seconds with zero errors, global setup, hold, recovery, removal and minimum-pulse-width margins of positive 0.230, 0.253, 2.888, 0.689 and 0.925 nanoseconds, focused decoder setup and recovery of positive 1.735 and 11.737 and focused video setup of positive 2.346, all with zero violated paths, a fit of 29,440 ALMs and 45,469 registers, and every new register confirmed present by netlist probe. The 4,205,620-byte RBF has SHA-256 `c0eb30d2181b613a383b506bb30482f700c92c17eff7da33b082d049ac05c197` and was installed rollback-safe with `7356e4a` preserved. The first hardware attempt read schema twelve because the core had not been reloaded; the file on the card was verified correct and the run repeated after a reload. That repeat produced the clearest symptom capture so far, showing both presentations in one session: the first field blank at pre-playback level 24 with no bar for roughly eight seconds, then a transition, then the first field frozen on a picture with a stationary bar parked at x=112 through x=143 while the odd field continued sweeping, then correct content in both parities at terminal drain. The content counters from that run are void. Word forty was concatenated as eight, eight, one, one, six, three and three bits, which totals thirty rather than thirty-two, so the assignment zero-extended on the left and every field decoded two bits from its intended position. The reported varied flags and signatures are therefore meaningless, and the earlier explanation attributing their inconsistency to per-generation latching was wrong. The directed profiler regression did not catch it because it compared an equally malformed thirty-bit literal against the same wire, the same class of blind spot as the overlay case in entry 516 where a test validated the defect instead of detecting it. Schema twelve is unaffected and entry 518's conclusions stand, because its word forty totalled eight, eight, ten, three and three bits, which is exactly thirty-two. The padding has since been corrected to eight bits and a session-wide rework moves the accumulation into the profiler, whose reset scope is the session rather than the generation, so a parity that never receives varying data reports varied low regardless of which generation precedes terminal quiet. That rework lints clean but its directed regression currently fails with snapshot reason three, the fatal-error path, at 12.159 microseconds whenever the luma-return stimulus is present; the failure time is identical for a two-cycle and a three-cycle stimulus task, which rules out the no-progress budget that caused two earlier regression failures, and the mechanism is not yet understood. Nothing of that rework is committed. It remains uncommitted in the working tree so it is not lost, and the installed image remains `2668c8f`, which runs and captures normally but whose word-forty fields must not be read.
-
-#### Next Steps:
-
-Root-cause the profiler regression failure before anything else, since snapshot reason three means an error flag is asserting during the luma-return stimulus and that must be understood rather than worked around. Then complete the session-wide content rework on top of the corrected thirty-two-bit padding, and add a width check to the regression so a malformed snapshot word fails on its own rather than being confirmed by a matching malformed expectation, which is the specific gap that let both this defect and the entry 516 overlay defect reach a build. Rebuild, reinstall rollback-safe and repeat the fixture with a burst, reading the two varied flags and two signatures alongside burst frames from the same run. A first field whose returns never vary across the whole session while the second field's do proves the data is already wrong when it arrives and moves the search upstream of the framebuffer entirely; both parities varying proves correct data arrives and is lost afterwards, which would be the first evidence pointing downstream of the fetch. Retain the standing observation that the symptom presents in two forms, so a single run's flags do not generalize.
 
 #### Files Modified:
 
