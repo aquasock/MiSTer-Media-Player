@@ -1,3 +1,39 @@
+## 552 COMMIT Unreleased ??? 2026-08-26T20:05:04-07:00
+
+#### Coming From:
+
+Unreleased 558efef
+
+#### Purpose:
+
+Reproduce the observed stale-field HDMI hold in a simulation of the actual MiSTer scaler before proposing a behavioral correction.
+
+#### Outcome:
+
+The user approved the HDMI-only reproduction cycle and confirmed 1080p output. GHDL was unpacked privately on GUNSMOKE; direct behavioral execution of the unchanged scaler stopped on a natural-range underflow before video, so the harness synthesizes the actual VHDL into hardware-width Verilog and runs it with Verilator. The production timing generator, framebuffer output controls, sync-fix and scanline pipeline are retained, synthetic RGB labels replace only picture content, and a checked Avalon model supplies the scaler memory. Initial runs without generation resets did not reproduce the fault. Adding the real four-decoder-clock framebuffer reset at each frame window reproduces missing or retained content despite continuously advancing source pictures: the old path produces seventy-six scaler-input sync pulses for fifty-one source fields, all thirty-seven checked steady frames fail, and retained content reaches twenty-two pictures of age. The cause is the framebuffer's reset branch forcing active-low native HS and VS low while the independent timing generator continues, creating an extra vertical sync on each swap and rotating scaler buffers without a newly written field. This qualifies entry 550's output-stage exclusion: the moving-pattern bypass does not exercise framebuffer output controls during generation resets. The bounded correction keeps video_de, video_hs and video_vs sampling the same current-pixel inputs at the same clock-enable phase during picture/cache resets; RGB reset, decode, ownership, scaler logic and constraints are unchanged. The identical corrected 1080p run produces exactly fifty-one sync pulses for fifty-one fields and passes all thirty-seven checked frames with every output pixel accounted for and no identity older than two pictures. Bob, progressive and identical-field controls pass; an intentional twenty-three-slot source hold produces one settled Weave image for forty output frames and then resumes motion; deliberately stale source content still fails only the stale-field checks. A BFF startup case exposed an artificial two-megabyte limit in the memory model, corrected to the full eight megabytes per bank; BFF with memory stalls then passes twenty checked frames, and repeated before/after Weave runs match the earlier reports exactly for their first thirty-two frames, with all twenty-one checked frames failing before and passing after. The existing cache regression's new sync case fails on unchanged RTL at 380.619 nanoseconds and passes sixteen reset pulses after correction; ordinary refill, slow refill, late prefill, both field-order fingerprint and three-generation controls, and delayed generation reads all pass. Summaries, input hashes and output report hashes are retained in `.ai/current_results/entry552_hdmi_simulation.json`. This reproduces a stale-field failure mechanism, not the exact camera cadence or television processing; startup mode-lock frames are explicitly excluded. Publication of the initially prepared plan was denied by the approval system; the user subsequently explicitly approved committing and pushing master and proceeding to the official build. No Quartus build or deployment has occurred.
+
+#### Next Steps:
+
+Publish the approved tested source, pull that exact commit onto GUNSMOKE and perform one Quartus build with all timing classes checked, then resolve this log entry with the source hash and measured build result. Deploy only a timing-qualified image by directly replacing and independently reading back /media/fat/MediaPlayer.rbf, then ask the user to reload and validate idle lock plus the established Big Buck Bunny playback in Weave and Bob over HDMI. Do not mark hardware acceptance from simulation alone. The pre-existing live-raster assertion drift remains outside this correction.
+
+#### Files Modified:
+
+- rtl/mpeg2_luma_framebuffer.sv
+- tools/streams/tb_native_480i_cache_refill.sv
+- tools/streams/run_native_480i_timing.sh
+- tools/streams/run_hdmi_scaler_sim.sh
+- tools/streams/tb_hdmi_scaler_stimulus.sv
+- tools/streams/tb_hdmi_scaler.sv
+- tools/streams/check_hdmi_scaler_sim.py
+- tools/streams/hdmi_scaler_simulation.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 551 COMMIT Unreleased 558efef 2026-08-26T19:51:11-07:00
 
 #### Coming From:
@@ -1214,35 +1250,6 @@ Reload the installed core, set HDMI scaler deinterlacer to Bob, Native timing pa
 - `MediaPlayer_top_07.svh`
 - `rtl/mpeg2_native_timing_pattern.sv`
 - `tools/streams/tb_native_480i_timing_pattern.sv`
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 512 COMMIT Unreleased 69a4f20 2026-08-25T08:40:51-07:00
-
-#### Coming From:
-
-Unreleased 52a5a64
-
-#### Purpose:
-
-Constrain only the asynchronous first stages of the new framebuffer telemetry synchronizers and restore clean timing without hiding their synchronous delivery paths.
-
-#### Outcome:
-
-The clean Quartus Prime 17.0.2 build of `52a5a64` completed in 10 minutes 34 seconds with zero errors and produced an RBF, but global setup failed at negative 1.883 nanoseconds and is not eligible for installation. Focused timing proved the established same-clock decoder paths remained positive at 1.457 nanoseconds and video paths remained positive at 2.611 nanoseconds. The only two violations were the intentional 54 MHz video-domain `picture_present_rd` and `prefill_deadline_missed_rd` levels entering stage zero of their respective three-stage 60 MHz synchronizers. Their raw asynchronous phase relationship created a 1.850-nanosecond TimeQuest relationship which must not be treated as a synchronous transfer. Commit `69a4f20` adds two destination-scoped false paths to stage zero only, matching the existing project convention for mode, cadence, download, snapshot and cache synchronizers. TimeQuest matches both keepers without an empty-filter warning; stages zero-to-one and one-to-two remain fully timed, and no RTL, diagnostic meaning, clock or functional behavior changes. A second clean Quartus build from an empty database completed in 10 minutes 30 seconds with zero errors and 144 established warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.206, 0.253, 3.189, 0.461 and 0.925 nanoseconds. Focused decoder setup and recovery are positive 1.873 and 11.235 nanoseconds and focused video setup is positive 3.225 nanoseconds, all with zero violated paths. The fit uses 29,133 ALMs, 44,992 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The 4,237,424-byte RBF has SHA-256 `57cee7a30c9802c256398cbf44875c5c2118b4b912aca0ef08e103467068c673`. Ordinary FTP with the default `root` and `1` login retrieved the active `48c2c87` image at its exact known `a4e7678719072f0790d8bce74f5c29e329eedb8ef5d6163245c2de8328756332` hash, preserved and round-trip verified it as `/media/fat/MediaPlayer.rbf.rollback-pre-69a4f20`, round-trip verified the staged candidate and then verified the promoted `/media/fat/MediaPlayer.rbf` at the exact new hash. The temporary stage is absent; helper, media, Main and MiSTer configuration are unchanged.
-
-#### Next Steps:
-
-Use ordinary FTP with the default `root` and `1` login to verify the active image remains the accepted `48c2c87` RBF, preserve it as `/media/fat/MediaPlayer.rbf.rollback-pre-69a4f20`, round-trip verify a staged `69a4f20` image, promote it and remove only the temporary stage while leaving helper, media, Main and MiSTer configuration untouched. Then repeat `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` in Bob up to three times and leave the first ghosted run's terminal raster displayed for capture. A nonzero prefill miss, superseded unpublished reset or excessive publication latency correlated with the ghost will justify a narrow cache-publication correction; complete publication with regular ranked gaps will clear this FPGA boundary and retain the downstream-display diagnosis.
-
-#### Files Modified:
-
-- `MediaPlayer.sdc`
 
 #### Status:
 

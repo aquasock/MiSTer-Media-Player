@@ -1,0 +1,539 @@
+{
+  "base_commit": "0bd7a631a8b6e8c401b13a62fc9627accb492a46",
+  "output": "1920x1080 approximately 60 Hz",
+  "cases": [
+    {
+      "directory": "/tmp/mister-hdmi-resets",
+      "case": "weave",
+      "summary": {
+        "mode": "weave",
+        "frames": 52,
+        "checked_frames": 37,
+        "max_age_pictures": [
+          22.0,
+          22.0
+        ],
+        "holds": [],
+        "passed": false,
+        "excluded_frames": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          49,
+          50,
+          51
+        ],
+        "error_kinds": [
+          "invalid_color",
+          "missing_content",
+          "parity_population",
+          "stale_field"
+        ],
+        "failing_frame_count": 37
+      },
+      "memory_summary": [
+        "MEMORY writes=108111 reads=221042 returned=3536672 bank_writes=19501,69153,19457 input_syncs=76 source_fields=51 generation_resets=26"
+      ],
+      "file_sha256": {
+        "weave-frames.txt": "5cb865f4052a09b2dde05d6dd4085c74ab598027eb5e2a48b7d09dcb82323a29",
+        "weave-result.json": "b67a04431b353c33aeba2fb4011f9add5df146893d4eef8b82cd521c78b684a7"
+      }
+    },
+    {
+      "directory": "/tmp/mister-hdmi-fixed",
+      "case": "weave",
+      "summary": {
+        "mode": "weave",
+        "frames": 52,
+        "checked_frames": 37,
+        "max_age_pictures": [
+          2.0,
+          2.0
+        ],
+        "holds": [],
+        "passed": true,
+        "excluded_frames": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          49,
+          50,
+          51
+        ],
+        "error_kinds": [],
+        "failing_frame_count": 0
+      },
+      "memory_summary": [
+        "MEMORY writes=108086 reads=221042 returned=3536672 bank_writes=36747,36730,34609 input_syncs=51 source_fields=51 generation_resets=26"
+      ],
+      "file_sha256": {
+        "weave-frames.txt": "a02fb36fd0fc574a88dfee60b5e6aebcaf0ff0eb2a7c8550495d1658139db2de",
+        "weave-result.json": "2815dba32e68d45fd6d628cc9ec9346b2648e4359bbc47647c5462e5ca20dec3"
+      }
+    },
+    {
+      "directory": "/tmp/mister-hdmi-fixed",
+      "case": "bob",
+      "summary": {
+        "mode": "bob",
+        "frames": 52,
+        "checked_frames": 37,
+        "max_age_pictures": [
+          2.0,
+          2.0
+        ],
+        "holds": [],
+        "passed": true,
+        "excluded_frames": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          49,
+          50,
+          51
+        ],
+        "error_kinds": [],
+        "failing_frame_count": 0
+      },
+      "memory_summary": [
+        "MEMORY writes=108086 reads=221042 returned=3536672 bank_writes=36745,36730,34611 input_syncs=51 source_fields=51 generation_resets=26"
+      ],
+      "file_sha256": {
+        "bob-frames.txt": "e6990cb78cce40d32b560ab0150994e6736650180f6e4e88123ea34286ced0de",
+        "bob-result.json": "7af1274ed6dfc53d831f001cdf960e1c03d07a876fac29c4121ca433baff0293"
+      }
+    },
+    {
+      "directory": "/tmp/mister-hdmi-fixed",
+      "case": "progressive",
+      "summary": {
+        "mode": "progressive",
+        "frames": 26,
+        "checked_frames": 12,
+        "max_age_pictures": [
+          2.0,
+          0.0
+        ],
+        "holds": [],
+        "passed": true,
+        "excluded_frames": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          24,
+          25
+        ],
+        "error_kinds": [],
+        "failing_frame_count": 0
+      },
+      "memory_summary": [
+        "MEMORY writes=150447 reads=150302 returned=2404832 bank_writes=48430,54009,48008 input_syncs=26 source_fields=26 generation_resets=26"
+      ],
+      "file_sha256": {
+        "progressive-frames.txt": "4fd3a9db8207fff01faec87fb140fa1ce345397f0f59d070c727232d5c808c28",
+        "progressive-result.json": "53b732bb3a7903b3adee429b3c3b18faf429caf7178469ba664d5aa59d6d142a"
+      }
+    },
+    {
+      "directory": "/tmp/mister-hdmi-fixed",
+      "case": "hold",
+      "summary": {
+        "mode": "hold",
+        "frames": 84,
+        "checked_frames": 70,
+        "max_age_pictures": [
+          2.0,
+          2.0
+        ],
+        "holds": [
+          {
+            "source_r": 44,
+            "first_frame": 12,
+            "frames": 48,
+            "settled_frames": 40,
+            "distinct_spatial_hashes": 1,
+            "lag1_equal": 39,
+            "lag2_equal": 38
+          }
+        ],
+        "passed": true,
+        "excluded_frames": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          82,
+          83
+        ],
+        "error_kinds": [],
+        "failing_frame_count": 0
+      },
+      "memory_summary": [
+        "MEMORY writes=177238 reads=359993 returned=5759888 bank_writes=58391,58340,60507 input_syncs=83 source_fields=83 generation_resets=42"
+      ],
+      "file_sha256": {
+        "hold-frames.txt": "c9ed89334d381c8363428731d3f7817f50225a1358439ca3303e35a6505c936e",
+        "hold-result.json": "7237ebb528576643365a4be82a01846c6dcddff8feb0b967c7f291e004e10952"
+      }
+    },
+    {
+      "directory": "/tmp/mister-hdmi-fixed",
+      "case": "stale",
+      "summary": {
+        "mode": "stale",
+        "frames": 44,
+        "checked_frames": 29,
+        "max_age_pictures": [
+          15.0,
+          2.0
+        ],
+        "holds": [],
+        "expected_stale_detected": true,
+        "passed": true,
+        "excluded_frames": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          41,
+          42,
+          43
+        ],
+        "error_kinds": [
+          "stale_field"
+        ],
+        "failing_frame_count": 21
+      },
+      "memory_summary": [
+        "MEMORY writes=90798 reads=186302 returned=2980832 bank_writes=32425,28120,30253 input_syncs=43 source_fields=43 generation_resets=22"
+      ],
+      "file_sha256": {
+        "stale-frames.txt": "92be8eddb70fbcab067c31d633f156f507a7e9da96f3eac70ccd6842d7e53adb",
+        "stale-result.json": "6f312da01c645fb7ff6cf8998e9577f59c55cec8bcb7d588bf380e5a43e46dfa"
+      }
+    },
+    {
+      "directory": "/tmp/mister-hdmi-identical",
+      "case": "identical",
+      "summary": {
+        "mode": "identical",
+        "frames": 36,
+        "checked_frames": 21,
+        "max_age_pictures": [
+          2.0,
+          0.0
+        ],
+        "holds": [],
+        "passed": true,
+        "excluded_frames": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          33,
+          34,
+          35
+        ],
+        "error_kinds": [],
+        "failing_frame_count": 0
+      },
+      "memory_summary": [
+        "MEMORY writes=73510 reads=151562 returned=2424992 bank_writes=23815,23764,25931 input_syncs=35 source_fields=35 generation_resets=18"
+      ],
+      "source_manifest": [
+        "0bd7a631a8b6e8c401b13a62fc9627accb492a46",
+        "GHDL 5.0.1 (Ubuntu 5.0.1+dfsg-1ubuntu1) [Dunoon edition]",
+        " Compiled with GNAT Version: 14.2.0",
+        " static elaboration, mcode JIT code generator",
+        "Written by Tristan Gingold.",
+        "",
+        "Copyright (C) 2003 - 2025 Tristan Gingold.",
+        "GHDL is free software, covered by the GNU General Public License.  There is NO",
+        "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+        "Verilator 5.032 2025-01-01 rev (Debian 5.032-1)",
+        "64d177a89c923179541e28b649814e670b1304cbda1561dbc0343bc5e2925993  /tmp/mister-hdmi-sim-source/sys/ascal.vhd",
+        "41621a019f974066ad0c1b5d12cb598603df18710421c61988a0f9ddc5f1c612  /tmp/mister-hdmi-sim-source/rtl/mpeg2_luma_framebuffer.sv",
+        "b65d64a64373a9cb77b391b8f54ce65c86c9049dcf4e7ac1d43a7229fd97c77f  /tmp/mister-hdmi-sim-source/rtl/mpeg2_video_output_timing.sv",
+        "ce7058ef2ae9830ccc2520151d5dbb9430e89dbd2ab3824a6b1150cdf96a5bdd  /tmp/mister-hdmi-sim-source/tools/streams/tb_hdmi_scaler.sv",
+        "4db5142c403551bfd09dfe7f065010fae1455366233bb2b32a5b50615c333ec0  /tmp/mister-hdmi-sim-source/tools/streams/tb_hdmi_scaler_stimulus.sv",
+        "7d85935901c8abcbca3f676afc5c69f31920f3153b66a28be8dfe47d68320f4a  /tmp/mister-hdmi-sim-source/tools/streams/check_hdmi_scaler_sim.py"
+      ],
+      "file_sha256": {
+        "identical-frames.txt": "95ddab5ec4474cfa49060a65f36841b8903e370905a0c9ba95567cc59312b152",
+        "identical-result.json": "9479f32d84ba155def579437e292abb4d088e21a17c38367ab58e19607232a58",
+        "identical-inputs.txt": "84d55e65cab8cdd42807caf30636f1984f80292dca07c126000c444ce89ea0cf"
+      }
+    },
+    {
+      "directory": "/tmp/mister-hdmi-fullram",
+      "case": "weave",
+      "summary": {
+        "mode": "weave",
+        "frames": 36,
+        "checked_frames": 21,
+        "max_age_pictures": [
+          2.0,
+          2.0
+        ],
+        "holds": [],
+        "passed": true,
+        "excluded_frames": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          33,
+          34,
+          35
+        ],
+        "error_kinds": [],
+        "failing_frame_count": 0
+      },
+      "memory_summary": [
+        "MEMORY writes=73510 reads=151562 returned=2424992 bank_writes=23815,23764,25931 input_syncs=35 source_fields=35 generation_resets=18"
+      ],
+      "file_sha256": {
+        "weave-frames.txt": "fb437c04fe126ccb8314a168a6f8edd70af6f4231f9df92499ce1384c8ac4c7b",
+        "weave-result.json": "490d2e5bb2391d955ab94c7335de811f9d89aab79c2a2cef91b9247504a0252e"
+      }
+    },
+    {
+      "directory": "/tmp/mister-hdmi-fullram",
+      "case": "bff",
+      "summary": {
+        "mode": "bff",
+        "frames": 36,
+        "checked_frames": 20,
+        "max_age_pictures": [
+          3.0,
+          1.0
+        ],
+        "holds": [],
+        "passed": true,
+        "excluded_frames": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          33,
+          34,
+          35
+        ],
+        "error_kinds": [],
+        "failing_frame_count": 0
+      },
+      "memory_summary": [
+        "MEMORY writes=73501 reads=159104 returned=2545664 bank_writes=23781,23788,25932 input_syncs=35 source_fields=35 generation_resets=18"
+      ],
+      "source_manifest": [
+        "0bd7a631a8b6e8c401b13a62fc9627accb492a46",
+        "GHDL 5.0.1 (Ubuntu 5.0.1+dfsg-1ubuntu1) [Dunoon edition]",
+        " Compiled with GNAT Version: 14.2.0",
+        " static elaboration, mcode JIT code generator",
+        "Written by Tristan Gingold.",
+        "",
+        "Copyright (C) 2003 - 2025 Tristan Gingold.",
+        "GHDL is free software, covered by the GNU General Public License.  There is NO",
+        "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+        "Verilator 5.032 2025-01-01 rev (Debian 5.032-1)",
+        "64d177a89c923179541e28b649814e670b1304cbda1561dbc0343bc5e2925993  /tmp/mister-hdmi-sim-source/sys/ascal.vhd",
+        "41621a019f974066ad0c1b5d12cb598603df18710421c61988a0f9ddc5f1c612  /tmp/mister-hdmi-sim-source/rtl/mpeg2_luma_framebuffer.sv",
+        "b65d64a64373a9cb77b391b8f54ce65c86c9049dcf4e7ac1d43a7229fd97c77f  /tmp/mister-hdmi-sim-source/rtl/mpeg2_video_output_timing.sv",
+        "4df3804e5e2c189612d1527c9daf452b94453c62efd3caa62004d58bb445b156  /tmp/mister-hdmi-sim-source/tools/streams/tb_hdmi_scaler.sv",
+        "4db5142c403551bfd09dfe7f065010fae1455366233bb2b32a5b50615c333ec0  /tmp/mister-hdmi-sim-source/tools/streams/tb_hdmi_scaler_stimulus.sv",
+        "7d85935901c8abcbca3f676afc5c69f31920f3153b66a28be8dfe47d68320f4a  /tmp/mister-hdmi-sim-source/tools/streams/check_hdmi_scaler_sim.py"
+      ],
+      "file_sha256": {
+        "bff-frames.txt": "55f665e1942a0d50ee2c9f09ece706aa2507fda469806c124881ac15044c78ed",
+        "bff-result.json": "b3cd860d81e285fa1cfe537640b8655546752b070246cad548d9d8c083d996a6",
+        "bff-inputs.txt": "92268eb69900750806666d1704436a55c7feace037a1d431a86ef4754a603f93"
+      }
+    },
+    {
+      "directory": "/tmp/mister-hdmi-fullram-before",
+      "case": "weave",
+      "summary": {
+        "mode": "weave",
+        "frames": 36,
+        "checked_frames": 21,
+        "max_age_pictures": [
+          14.0,
+          14.0
+        ],
+        "holds": [],
+        "passed": false,
+        "excluded_frames": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          33,
+          34,
+          35
+        ],
+        "error_kinds": [
+          "invalid_color",
+          "missing_content",
+          "parity_population",
+          "stale_field"
+        ],
+        "failing_frame_count": 21
+      },
+      "memory_summary": [
+        "MEMORY writes=73527 reads=151562 returned=2424992 bank_writes=12981,47574,12972 input_syncs=52 source_fields=35 generation_resets=18"
+      ],
+      "source_manifest": [
+        "0bd7a631a8b6e8c401b13a62fc9627accb492a46",
+        "GHDL 5.0.1 (Ubuntu 5.0.1+dfsg-1ubuntu1) [Dunoon edition]",
+        " Compiled with GNAT Version: 14.2.0",
+        " static elaboration, mcode JIT code generator",
+        "Written by Tristan Gingold.",
+        "",
+        "Copyright (C) 2003 - 2025 Tristan Gingold.",
+        "GHDL is free software, covered by the GNU General Public License.  There is NO",
+        "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+        "Verilator 5.032 2025-01-01 rev (Debian 5.032-1)",
+        "64d177a89c923179541e28b649814e670b1304cbda1561dbc0343bc5e2925993  /tmp/mister-hdmi-sim-source/sys/ascal.vhd",
+        "8dbcea019757d061bff4d5af57f96731edeb4a4e17c07d832a3799ade2a24847  /tmp/mister-hdmi-framebuffer-before.sv",
+        "b65d64a64373a9cb77b391b8f54ce65c86c9049dcf4e7ac1d43a7229fd97c77f  /tmp/mister-hdmi-sim-source/rtl/mpeg2_video_output_timing.sv",
+        "4df3804e5e2c189612d1527c9daf452b94453c62efd3caa62004d58bb445b156  /tmp/mister-hdmi-sim-source/tools/streams/tb_hdmi_scaler.sv",
+        "4db5142c403551bfd09dfe7f065010fae1455366233bb2b32a5b50615c333ec0  /tmp/mister-hdmi-sim-source/tools/streams/tb_hdmi_scaler_stimulus.sv",
+        "7d85935901c8abcbca3f676afc5c69f31920f3153b66a28be8dfe47d68320f4a  /tmp/mister-hdmi-sim-source/tools/streams/check_hdmi_scaler_sim.py"
+      ],
+      "file_sha256": {
+        "weave-frames.txt": "985202305701218dbd60656deb19f3d3a83203c3f8765ddcc25e8b53dd99a052",
+        "weave-result.json": "406dbbe19fb505eae039534bb8b15a2015101ecb0396005dcd6e63d73410334f",
+        "weave-inputs.txt": "2f7f427ff9174e9c124e3b9c8643068977c488f91af215e24ebcd443e53765c8"
+      }
+    }
+  ],
+  "allocation_control_comparisons": [
+    {
+      "original": "/tmp/mister-hdmi-resets",
+      "full_allocation": "/tmp/mister-hdmi-fullram-before",
+      "identical_report_rows": 32
+    },
+    {
+      "original": "/tmp/mister-hdmi-fixed",
+      "full_allocation": "/tmp/mister-hdmi-fullram",
+      "identical_report_rows": 32
+    }
+  ],
+  "notes": [
+    "Digital simulation of production timing/control and GHDL-synthesized ascal, with synthetic source RGB and an Avalon memory model; not an MPEG decode or physical HDMI screen simulation.",
+    "Initial lock and eight output frames after detected input format changes are excluded explicitly by the checker.",
+    "mister-hdmi-fixed/resets/identical used 2 MiB payload per 8 MiB bank; final fullram directories model the full 24 MiB allocation. Paired fullram runs match the original first 32 report rows exactly.",
+    "The first fixed Weave wrapper was edited while running and ended with a shell parse error after simulation completion. The completed report passed the independent checker manually. The finalized wrapper subsequently passed end to end for identical and full-allocation BFF.",
+    "A passed stale case means the negative control detected the deliberately stale field, with no unrelated failure; it is not clean source output.",
+    "The fixed Bob, progressive, hold, stale and full-allocation Weave cases reused the corresponding built simulation executable; their verdicts were independently checked. Source manifests are present only when the wrapper ran for that case.",
+    "No Quartus build or hardware deployment occurred. The user subsequently authorized source publication and the official build."
+  ],
+  "final_source_sha256": {
+    "rtl/mpeg2_luma_framebuffer.sv": "41621a019f974066ad0c1b5d12cb598603df18710421c61988a0f9ddc5f1c612",
+    "tools/streams/tb_native_480i_cache_refill.sv": "93507b29ae0d6a81e500966f8f68e2d20094afc26f48f575f0d5c5413d692d43",
+    "tools/streams/run_native_480i_timing.sh": "516f24dd7a65d9085911771526b29fd8a5faf31652f70e022cd7831cea57aa28",
+    "tools/streams/run_hdmi_scaler_sim.sh": "afe0540a448b4cf5ad0d467b16cdd267b3ee6aa3c8082d274962d8749e538a90",
+    "tools/streams/tb_hdmi_scaler.sv": "4df3804e5e2c189612d1527c9daf452b94453c62efd3caa62004d58bb445b156",
+    "tools/streams/tb_hdmi_scaler_stimulus.sv": "4db5142c403551bfd09dfe7f065010fae1455366233bb2b32a5b50615c333ec0",
+    "tools/streams/check_hdmi_scaler_sim.py": "7d85935901c8abcbca3f676afc5c69f31920f3153b66a28be8dfe47d68320f4a"
+  },
+  "focused_cache_regressions": {
+    "original_sync_reset": "FAIL at 380.619 ns, expected regression",
+    "corrected_sync_reset": "PASS, 16 resets",
+    "passed_cases": [
+      "default",
+      "SLOW",
+      "PREFILL_LATE",
+      "FINGERPRINT",
+      "FINGERPRINT BFF",
+      "GENERATIONS",
+      "GENERATIONS BFF",
+      "GENERATIONS GEN_DELAY"
+    ]
+  }
+}
