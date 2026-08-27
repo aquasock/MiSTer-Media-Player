@@ -76,10 +76,44 @@ def extract_ac3(data: bytes, substream: int) -> bytes:
 
 
 def build_audio_filter(duration: float) -> str:
+    """All six channels sounding at once, one steady tone each."""
     parts = [f'sine=frequency={hz}:duration={duration}:sample_rate=48000[a{i}]'
              for i, (hz, _name) in enumerate(TONES)]
+    return ';'.join(parts) + ';' + join_clause()
+
+
+def join_clause() -> str:
+    """Bind each input to a named channel.
+
+    join assigns inputs positionally by default, and entry 612 measured that
+    ordering as not matching the 5.1 layout order, which mislabelled the first
+    three channels. Naming every channel removes the ambiguity.
+    """
     inputs = ''.join(f'[a{i}]' for i in range(len(TONES)))
-    return ';'.join(parts) + f';{inputs}join=inputs={len(TONES)}:channel_layout=5.1[aout]'
+    mapping = '|'.join(f'{i}.0-{name}' for i, (_hz, name) in enumerate(TONES))
+    return (f'{inputs}join=inputs={len(TONES)}:channel_layout=5.1:'
+            f'map={mapping}[aout]')
+
+
+def build_sweep_filter(duration: float) -> str:
+    """One channel at a time, so a listener can place each in the stereo image.
+
+    Each channel sounds alone for its slot and is silent otherwise, which is
+    what makes the downmix auditable without a 5.1 monitoring rig: FL and BL
+    must appear on the left, FR and BR on the right, FC in both equally, and
+    LFE not at all, because the AC-3 stereo downmix discards it by convention.
+    """
+    slot = duration / len(TONES)
+    parts = []
+    for i, (hz, _name) in enumerate(TONES):
+        start = i * slot
+        # A short fade at each edge keeps the switch from clicking.
+        parts.append(
+            f'sine=frequency={hz}:duration={duration}:sample_rate=48000,'
+            f'volume=enable=\'between(t,{start:.6f},{start + slot:.6f})\':volume=1,'
+            f'volume=enable=\'not(between(t,{start:.6f},{start + slot:.6f}))\':volume=0'
+            f'[a{i}]')
+    return ';'.join(parts) + ';' + join_clause()
 
 
 def main() -> int:
@@ -88,6 +122,8 @@ def main() -> int:
     parser.add_argument('--duration', type=float, default=5.0,
                         help='seconds; keep short, this qualifies decode not endurance')
     parser.add_argument('--report', type=Path, default=None)
+    parser.add_argument('--sweep', action='store_true',
+                        help='sound each channel alone in turn instead of all at once')
     args = parser.parse_args()
     duration = args.duration
     dvd.require(0.5 <= duration <= 600, 'invalid duration')
@@ -105,7 +141,8 @@ def main() -> int:
         print(f'Encoding {duration}s of 480i TFF video with AC-3 5.1', flush=True)
         run(['ffmpeg', '-hide_banner', '-loglevel', 'warning', '-xerror', '-threads', '1',
              '-f', 'lavfi', '-i', f'testsrc2=size=720x480:rate=60000/1001:duration={duration}',
-             '-filter_complex', build_audio_filter(duration),
+             '-filter_complex',
+             build_sweep_filter(duration) if args.sweep else build_audio_filter(duration),
              '-map', '0:v:0', '-map', '[aout]',
              '-vf', 'tinterlace=mode=interleave_top,setsar=32/27',
              '-c:v', 'mpeg2video', '-pix_fmt', 'yuv420p', '-threads', '1',
@@ -159,6 +196,13 @@ def main() -> int:
                   'audio_bits_per_second': AUDIO_RATE,
                   'audio_private_substream': AC3_SUBSTREAM,
                   'channel_tones_hz': {name: hz for hz, name in TONES},
+                  'channel_mode': 'sweep' if args.sweep else 'simultaneous',
+                  'sweep_slot_seconds': (duration / len(TONES)) if args.sweep else None,
+                  'sweep_order': [name for _hz, name in TONES] if args.sweep else None,
+                  'expected_downmix_placement': {
+                      'FL': 'left', 'FR': 'right', 'FC': 'both equally',
+                      'LFE': 'silent; the AC-3 stereo downmix discards LFE',
+                      'BL': 'left', 'BR': 'right'} if args.sweep else None,
                   'audio_elementary_sha256': digest(elementary),
                   'audio_elementary_bytes': elementary.stat().st_size,
                   'reference_pcm_sha256': digest(reference),
