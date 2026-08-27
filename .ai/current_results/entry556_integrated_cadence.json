@@ -1,0 +1,84 @@
+{
+  "source_commit": "30d300aa038efc03e49c247d4c7a21bcd41d73ec",
+  "diagnostic_directory": "/home/vash/mister-builds/entry556-cadence-analysis",
+  "compile_exit": 0,
+  "simulation_exit": 0,
+  "runtime_seconds": 446.84825728800206,
+  "boundary": "Actual production frontend, three-bank two-picture probe shell, I parser/IQ/IDCT/reconstruction, two-bank DDR writer and native presentation scheduler. Ideal always-available decoder input; always-ready modeled DDR writes; exact cadence pulses rather than the full raster. Does not simulate the physical HPS input transfer, clean-video queue, DDR arbiter/read contention, scaler, or repeated mode/reload interactions. Pixel sample counts and identity order checked; no new pixel-value oracle.",
+  "parameters": {
+    "frame_period_cycles": 2002000,
+    "field_period_cycles": 1001000,
+    "frame_window_phase": 194681,
+    "field_to_frame_window_cycles": 4,
+    "writer_enabled": true,
+    "DDR_busy_cycles": 0,
+    "source_bytes": 15150646
+  },
+  "result": {
+    "pictures_completed": 449,
+    "pictures_presented": 449,
+    "identity_sequence_exact": true,
+    "samples_per_picture": 518400,
+    "accepted_DDR_words": 29095200,
+    "stored_blocks": 3636900,
+    "gaps": [
+      {
+        "picture": 6,
+        "cycles": 4004000
+      }
+    ],
+    "first_reference_complete": 1869567,
+    "last_presentation": 901094682,
+    "cadence_cycles": 899225115,
+    "cadence_seconds": 14.98708525,
+    "presentation_hold_cycles": 27086728,
+    "parser_not_ready_cycles": 858857311
+  },
+  "picture348": {
+    "complete_cycle": 697889382,
+    "present_cycle_observed": 698892682,
+    "actual_window_cycle": 698892681,
+    "completion_margin_cycles": 1003299,
+    "completion_margin_ms": 16.72165,
+    "gap_cycles": 2002000
+  },
+  "observer_agreement": {
+    "matching_events": 93,
+    "production_RTL_unchanged": true,
+    "faster_observer": "Removed a delayed #1 observer resume and used -O3. Headers/completions match cycle-exactly; registered presentation observations move one clock later, with all steady intervals unchanged.",
+    "slow_run": "Stopped after agreement; incomplete run is not a test pass."
+  },
+  "replay_control": {
+    "boundary": "Earlier cost model with measured writer/shell fixed overhead added, still not full decoder.",
+    "first_picture_added_cycles": 16201,
+    "later_picture_added_cycles": 16235,
+    "frame_window_phase_after_1000_to_1_compression": 195,
+    "gaps": [
+      6
+    ]
+  },
+  "reproduction": {
+    "working_directory": "/home/vash/mister-builds/entry552-30d300a",
+    "source_list": "SYSTEMVERILOG_FILE rtl/mpeg2_new entries from files.qip",
+    "compile": "verilator --binary --timing -j 6 -CFLAGS -O3 -Wno-fatal -Wno-PINMISSING -Wno-WIDTH -Wno-UNOPTFLAT -Irtl/mpeg2_new --top-module tb_entry556_i_cadence --Mdir <fresh-output> -o cadence tb_entry556_i_cadence_fast.sv <source-list>",
+    "run_arguments": [
+      "+HEX=/tmp/entry555-i-profile/source.hex",
+      "+LEN=15150646",
+      "+REPORT=<output.csv>",
+      "+PHASE=194681"
+    ]
+  },
+  "sha256": {
+    "tb_entry556_i_cadence.sv": "dee4f11332fd84db025ba2fa74ef1efa5037cf99f66a3e2456eb6d6bf1758e0d",
+    "tb_entry556_i_cadence_fast.sv": "5709ca0c10eeab8e2d2b6f86bffd75ffb1fcc881003894956013be35a2ba647d",
+    "tb_entry556_cost_replay.sv": "1a716c8f182cbef902421297f769d397f02b4eada8aa071b7ab35c01ace85be7",
+    "writer-fast.csv": "989f8adbef0db20b302352fe0f91f251309778141157405110b288260da40d88",
+    "writer-fast.log": "7e807ad55f552225de99cc9c9f069404f68d6454ae3477be29031ef31fd43405",
+    "writer-ideal.csv": "7a4f6ef369ff446ccce907ddab96df9e2333c206319fbbbd19f617b4cfe54b48",
+    "writer-ideal.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build.log": "291c47ac3ce0edd1612f11ba8023d3458aaf105effb96b3bb6414868adeec5f0",
+    "build-fast.log": "6b780373f6150c8c728a199dff2dc70181db13c4c34f6087fdb028bd07d806cc",
+    "cost-replay.log": "46a37d443fafa705785b3f83433146322434f3c9e52bd730cdc313719e2c5b1f",
+    "observer-agreement.json": "5a18d2bf46b001d8cbf3279f9510881a18149a48af19c5c4c5e0a91e7f1443a5"
+  }
+}

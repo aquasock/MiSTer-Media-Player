@@ -1,3 +1,32 @@
+## 556 COMMIT Unreleased 30d300a 2026-08-26T21:40:34-07:00
+
+#### Coming From:
+
+Unreleased 30d300a
+
+#### Purpose:
+
+Compare a rebooted single Bob run with the warm-session cadence result and extend the reproduction through the production writer and publication scheduler.
+
+#### Outcome:
+
+The user rebooted the MiSTer, loaded the core, selected Bob and played the established clip once without reported playback interaction. A fresh FTP screenshot, obtained after deleting only the fixed old screenshot target, validates as schema eighteen and is preserved in `.ai/current_results/entry556_bob_cold_terminal.png`; its SHA-256 is `08c04b672a845736dd5f6f65f27225bc324676842abf7638d0a9d5790161d489`. All 15,150,646 bytes are accepted, sequence end and presentation completion are reached, and aggregate and framebuffer integrity error counters remain zero. The source's 449 pictures and the wrapped display counts plus 448 publications support 448 swaps over 15.053786 seconds, averaging 29.759956 pictures per second. Three doubled gaps contribute 100.100 milliseconds of excess duration, with another 5.419 milliseconds attributable to the initial reference-completion versus later-swap timestamp basis. The reset count is 449, not 448: generation reset includes native mode changes as well as swaps, so never substitute that counter as the swap count; one extra native-entry reset is consistent with the cold start but was not individually traced. Repeated loads and Bob/Weave switching are therefore not necessary to trigger the recurring gap. Entry 555's ordinal ambiguity can also be narrowed using the existing bank metadata: under ordered all-I presentation from bank zero, the previous display bank is the upcoming picture ordinal minus two modulo three. The stored display banks uniquely select pictures six, seven and 348 from their eight-bit ordinals six, seven and 92; the warm run similarly selects six and 348. This is a source-invariant inference, not a newly captured per-picture hardware trace. The FIFO-pending flag observes the upstream HPS FIFO, not the separate sixteen-kibibyte clean-video queue, so an empty flag alone does not prove decoder starvation. A temporary integrated observer on GUNSMOKE now executes the unchanged production frontend, three-bank publication shell, I reconstruction, two-bank DDR writer and native scheduler together, checking exact sample counts, all error flags, picture identity order and final store totals. With always-available decoder input, always-ready DDR writes and exact field/frame pulses, all 449 pictures and 29,095,200 accepted DDR words pass in 446.85 seconds. Only picture six has a doubled interval; picture 348 completes 1,003,299 clocks, or 16.722 milliseconds, before its presentation window. The expanded simulation thus reproduces the early decode overrun but neither the additional cold picture-seven gap nor the recurring hardware picture-348 gap. Physical host transfer, extraction/clean-queue availability, DDR arbitration/read contention and full raster behavior remain outside this simulation. An optimized observer agrees with ninety-three events from the initial slower observer before that superseded run was stopped; the stopped run is not reported as a pass. Capture analysis, simulation results and diagnostic hashes are preserved in the two entry-556 JSON files, with observer sources and full CSV logs under `/home/vash/mister-builds/entry556-cadence-analysis`. No production RTL, settings, constraints or active image changed, and the accepted HDMI flicker correction remains intact.
+
+#### Next Steps:
+
+Request approval for one passive cadence-telemetry build that records the full picture ordinal and readiness at the actual missed swap window, including decoder-side clean-queue availability, writer capacity and candidate publication timing, instead of relying on a later threshold snapshot or the upstream FIFO alone. Keep the accepted HDMI sync behavior and scheduler ownership unchanged, qualify the telemetry decoder and event capture in simulation, and require a successful build with positive timing before the already-authorized direct image replacement and independent readback. First repeat this clean Bob case; retain repeated loads and Bob/Weave switching as subsequent regression conditions rather than assuming they caused the cold-run gap. Do not claim that all remaining delay is explained or apply a playback-clock adjustment from these results.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 555 COMMIT Unreleased 30d300a 2026-08-26T21:17:18-07:00
 
 #### Coming From:
@@ -1214,41 +1243,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 516 COMMIT Unreleased 3e91073 2026-08-25T18:31:59-07:00
-
-#### Coming From:ff
-
-Unreleased 9573923
-
-#### Purpose:
-
-Instrument the per-field framebuffer readout invariants that whole-picture counters cannot observe.
-
-#### Outcome:
-
-Entry 515 placed the fault in framebuffer field readout, and this cycle adds passive evidence for it. The framebuffer exports a sticky per-generation field-phase error, one toggle per displayed line of each parity from the video domain, and one toggle per launched luma DDR line fetch of each parity from the memory domain, which is `clk_mpeg2` itself and therefore needs no synchronizer. Three-stage synchronizers carry the video-domain levels to the decoder domain and `MediaPlayer.sdc` cuts only their stage-zero paths, matching the convention `69a4f20` established. Cadence schema ten becomes schema eleven at forty-three words: one appended word packs four saturating eight-bit per-generation figures for first-field and second-field DDR fetches and displayed lines, a second carries sixteen-bit counts of generations whose per-parity line counts disagreed and of field-phase errors, and the checksum moves to word forty-two. A native field presents two hundred forty lines and is served two hundred forty luma rows, so eight bits carry the ordinary range while two hundred fifty-five reports saturation, which arises only when one generation spans several displayed frames. Both overlay origins move eight rows up to 428 and 308 so the final row stays flush with the diagnostic and native rasters. The Python decoder accepts schema eleven while schema ten and legacy schema nine still decode at their original origins. Reaching this state required three corrections, all recorded here rather than hidden. Commit `9bff941` appended three words but did not extend the overlay's per-word case statement or its fixed height, so nothing read words forty-one through forty-three and synthesis correctly deleted the entire phase-error synchronizer chain, the fetch toggles, the per-generation latches and both counters; a `get_keepers` probe returned zero keepers for every one of them, and the only symptom in an otherwise clean build was an ignored-filter warning naming `mpeg2_new_framebuffer_phase_error_sync[0]`. The profiler regression had passed because it asserts against the snapshot register directly and never exercised the overlay decode, so `5c6c311` added the missing branches, raised the height and introduced a row-coverage regression that walks every word row checking the decoded index, the rendered word and that the row lies inside the overlay height; reinstating the short height proves it fails. That build restored all keepers but global setup fell to negative 0.082 nanoseconds entirely inside MiSTer's `ascal` scaler. Packing to forty-three words in `0d2aead` unexpectedly grew the fit to 29,680 ALMs and left setup at negative 0.091 with the critical path relocated inside `ascal`, proving word count was not the cost. Commit `3e91073` instead removed the video-domain arithmetic by replacing a nine-bit expected-index adder and equality comparator with a single constant magnitude compare: the replica's own position names its field, so comparing that parity against the raster parity detects a retained or misaligned field without computing the index. A clean Quartus Prime 17.0.2 build from empty generated state completed in 10 minutes 47 seconds with zero errors and the established 144 warnings, none attributable to the new logic. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.252, 0.244, 4.132, 0.589 and 0.925 nanoseconds, with global setup exactly matching the accepted `9573923` build. Focused decoder setup and recovery are positive 1.646 and 11.735 nanoseconds and focused video setup is positive 2.811 nanoseconds, all with zero violated paths. Only the pre-existing `RESET` filter remains unmatched, and a timing-netlist probe confirms every new register survives. The fit uses 29,448 ALMs, 45,442 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The 4,219,576-byte RBF has SHA-256 `05e3a5b564ca49554707d39205749f9b96dec8028fcfe68a562b30d921f0aa54`. The complete native suite passes all thirteen cases including the new row-coverage check, and TFF, BFF and progressive reconstruction retain zero out-of-tolerance pixels at 7,926,459, 7,948,706 and 13,048,137 cycles with field-DCT rejection at 82,326 cycles. The live raster soak still fails its historical 6,529,997-cycle assertion against an observed 6,529,996 with every other figure clean; it compiles none of the files this cycle changed, so the drift entry 511 documented remains outstanding and independent. No decoder, scheduler, cache, presentation or native timing behavior changes.
-
-#### Next Steps:
-
-Preserve the running `9573923` image as `/media/fat/MediaPlayer.rbf.rollback-pre-3e91073` through ordinary FTP with the default `root` and `1` login, round-trip verify both it and the staged candidate, promote the candidate, verify the promoted file at its exact hash and remove only the temporary stage while leaving helper, media, Main and MiSTer configuration untouched. Then run `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off, Interlaced output Native 480i and the deinterlacer that ghosts most readily, and capture the terminal raster along with a live burst through `/dev/MiSTer_cmd`. Acceptance requires the established 300 decoded pictures, 299 swaps, normal quiet completion and no aggregate or presentation error, with the new evidence read alongside. Balanced per-parity DDR fetch counts with zero phase errors would clear field readout and force the investigation back upstream to what writes the frame, while a starved first-field fetch count during a generation the burst shows frozen would localize the defect to the refill path and justify a bounded correction there. Report the per-generation figures with the burst evidence before any behavioral change is proposed.
-
-#### Files Modified:
-
-- `MediaPlayer.sdc`
-- `MediaPlayer_top_06.svh`
-- `MediaPlayer_top_07.svh`
-- `rtl/mpeg2_luma_framebuffer.sv`
-- `rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv`
-- `tools/streams/decode_hardware_cadence.py`
-- `tools/streams/tb_h262_hardware_cadence_profiler.sv`
-- `tools/streams/test_decode_hardware_cadence.py`
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
