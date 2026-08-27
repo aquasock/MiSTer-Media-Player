@@ -1,0 +1,43 @@
+{
+  "deployed": "2026-08-27T08:43:09-07:00",
+  "host": "10.10.0.30",
+  "source_commit": "078d36b",
+  "operations": [
+    "deploy /media/fat/linux/MediaPlayer_Helper",
+    "deploy /media/fat/games/MediaPlayer/dts_channel_sweep_12s.mpg"
+  ],
+  "backups": {
+    "/media/fat/linux/MediaPlayer_Helper": {
+      "bytes": 399340,
+      "sha256": "f07e4ce2bb2a431802f9c8631a228bb70c363455954315883776f58ce87a75db"
+    },
+    "/media/fat/games/MediaPlayer/dts_channel_sweep_12s.mpg": {
+      "absent": "error_perm('550 /media/fat/games/MediaPlayer/dts_channel_sweep_12s.mpg: No such file or directory')"
+    }
+  },
+  "files": {
+    "/media/fat/MediaPlayer.rbf": {
+      "bytes": 4332740,
+      "sha256": "61a2fed28425a461c8b886bdf809e3ef76a320e5688bb22a816135c36ef981ce",
+      "unchanged_check": true
+    },
+    "/media/fat/MiSTer": {
+      "bytes": 1170340,
+      "sha256": "0ee87029f0a00a50731707e8114363fc7019ae4c1200de85d90533c9163b5241",
+      "unchanged_check": true
+    },
+    "/media/fat/linux/MediaPlayer_Helper": {
+      "bytes": 399340,
+      "sha256": "f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8",
+      "readback_sha256": "f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8",
+      "verified": true
+    },
+    "/media/fat/games/MediaPlayer/dts_channel_sweep_12s.mpg": {
+      "bytes": 14526481,
+      "sha256": "6d10d3681bb7403ef83696f276cc87b82cfe991053e212051bf4cb097be53524",
+      "readback_sha256": "6d10d3681bb7403ef83696f276cc87b82cfe991053e212051bf4cb097be53524",
+      "verified": true
+    }
+  },
+  "unchanged": "RBF, Main, settings untouched. No reboot, core reload or playback performed."
+}

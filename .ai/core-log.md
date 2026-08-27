@@ -1,3 +1,35 @@
+## 620 COMMIT Unreleased 078d36b 2026-08-27T08:43:19-07:00
+
+#### Coming From:
+
+Unreleased aa7f064
+
+#### Purpose:
+
+Pass DTS through to S/PDIF and record the selected audio output in the helper log.
+
+#### Outcome:
+
+Published source `078d36b` adds DTS passthrough and closes the diagnostic gap entry 619 recorded. The helper now states its audio output mode at startup, so a log proves on its own which path ran rather than leaving that to a listening report. DTS arrives on private stream 1 substreams 0x88 through 0x8F and differs from AC-3 in a way that matters: it carries its own sample count in its frame header, so the burst period is read from each frame and mapped to data type 11, 12 or 13 for 512, 1024 or 2048 samples, where AC-3 is always 1536. The burst emitter is generalized over data type and period accordingly, and only 16-bit big-endian DTS is accepted, with other widths and endiannesses refused rather than guessed at. There is no DTS decoder here, so DTS is passthrough only and a DTS track selected for HDMI output is refused with a clear message instead of playing silence, which is checked and behaves as intended. The fixture generator gains a codec choice. Generating DTS exposed a real constraint rather than a defect: at the usual 1509 kbit/s, DTS plus 9.6 Mbit/s video overruns the 10.08 Mbit/s DVD mux and the muxer reports buffer underflow, so the generator now lowers video to 8 Mbit/s for DTS, which is what real DTS discs do rather than raising the mux. The verifier is extended to walk periods of any supported length and to check each payload against its own codec's sync word. Verification is byte exact: the DTS stream produces 1,125 bursts, every one a 512-sample period at data type 11 with correct sync words, whole-byte length, zero stuffing and a valid DTS sync word in the payload, and the 2,263,500 bytes carried are byte identical to the DTS extracted from the source, with an independent decoder producing the same SHA256 from the carried frames as from the originals. Every existing path is unchanged: AC-3 passthrough still produces 375 correct 1536-sample bursts with identical frames, AC-3 decoded still matches its reference at maximum difference three, the channel sweep still places all six channels correctly, and the MPEG Layer II movie still produces the same 28,628,352 samples with the same PCM hash. The helper cross-compiles clean under `-Werror` with ARM GNU 10.2 to a 399,340-byte static binary with SHA256 `f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8`. Only the helper and a new DTS fixture were deployed, each backed up, staged, hash checked and read back on a fresh connection with matching results; the RBF and Main were read back and confirmed still the accepted seed 17 and patched binaries, and no FPGA build was needed because DTS changes nothing in fabric. Built refers to the helper, and Passed is unchecked because nothing has been listened to.
+
+#### Next Steps:
+
+Have the user select S/PDIF AC-3 in the OSD and play games/MediaPlayer/dts_channel_sweep_12s.mpg once, reporting whether the soundbar produces sound and whether the low frequency slot is present, and confirm from the helper log that it now names both the audio output mode and the DTS substream. The soundbar advertises DTS Virtual:X so it should decode DTS, but as with AC-3 it cannot verify discrete channel routing on 2.1 hardware, and its lack of a format indicator remains uninformative. Note that the DTS fixture deliberately uses 8 Mbit/s video, so it is not a rate-ceiling test. After that, the remaining audio item is a commercial AC-3 track with real dynamic range control and dialogue normalization, which is the honest gap in codec qualification and cannot be closed with synthetic tones. Then prepare the release: the user has accepted the current video capability as the release scope, so the README must state plainly what the decoder accepts, being 4:2:0 I-pictures only, frame structured, frame DCT and frame prediction only, 720 by 480 at 30000/1001 with no repeat first field, and must not imply general interlaced MPEG-2 or DVD support. Release notes should carry the entry 616 wording of one or two repeated frames at the picture 690 cut and the marginal scaler paths recovered by reseeding. The interlaced video gates of entry 609 remain open and are explicitly out of scope for this release. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- host/arm/ARCHITECTURE.md
+- tools/streams/generate_test_dvd_ac3_av.py
+- tools/streams/verify_ac3_passthrough.py
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 619 COMMIT Unreleased aa7f064 2026-08-27T08:35:53-07:00
 
 #### Coming From:
@@ -1149,35 +1181,6 @@ The user reports a cold reboot followed by one playback that runs perfectly in s
 #### Next Steps:
 
 Obtain approval for a bounded host-transfer profiling and safe optimization cycle rather than raising the buffer again or replacing acknowledged writes with unchecked fast writes. Measure pipe read and transfer durations separately at chunk boundaries, sampled ACK-loop statistics and actual poll or UI service duration without per-word logging, then distinguish bridge overhead from FIFO wait before choosing a correction that preserves backpressure, byte order and odd-tail handling. Any subsequent host-system-binary deployment requires explicit approval, retained restoration data and verified staged replacement plus full readback; standing RBF permission does not cover it. Ask whether the interface remained responsive during this run, and retain one qualified 8 Mbps fixture regression as outstanding rather than assuming it passed. Respect one run per changed circumstance. Keep FPGA startup, the 64-KiB clean-video queue, continuous HDMI sync and black startup background unchanged; analog work remains excluded and the previously recorded interlaced, audio, cancellation and assertion-drift limitations remain unresolved. Preserve `core.md` and the forty-entry log ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 580 COMMIT Unreleased ad364bf 2026-08-27T01:06:04-07:00
-
-#### Coming From:
-
-Unreleased ad364bf
-
-#### Purpose:
-
-Record the current state, findings and outstanding validation for an agent handover requested by the user.
-
-#### Outcome:
-
-The current source is `ad364bf`, built and deployed but not yet hardware-validated. The FPGA bitstream was not rebuilt at any point in this cycle: the qualified `2acabc5` image with SHA-256 `fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347` remains installed at `/media/fat/MediaPlayer.rbf`, and every change since has been host-side. The deployed `/media/fat/MiSTer` is `a850ec3fc8c78b6ed72e3421858f9e3c40a5d2a4ff59a533d52dd0df47213a86`, 1,166,244 bytes, verified by full readback on a fresh connection. Three restore points are retained under `/home/vash/mister-builds/entry573-deced5c/`: the pre-instrumentation original `5a6cbf7e85682ac301d57470b8b2c952d3bbfa42af55484bd70dd0d36724ae96`, the instrumented `deced5c` build `bd182e9c26e91bb3bdb140835dbda40a0f0a8179060fa47939cbb6c073ecf1dd`, and the current one; restoration is a single FTP upload. This cycle began from a report that repeated playback ran slowly and ended by locating the delivery ceiling in source. The established mechanism is that `mediaplayer_poll()` in `host/main_mister/0001-mediaplayer-arm-loader.patch` moved at most four chunks of 4,096 bytes per poll at an implied 86.2 to 86.7 polls per second, and that budget matched measured delivery to about a hundredth of a percent across three independent measurements spanning two files whose demands differ by 2.3 times and both thermal states. The cap binds because the helper always has data ready: in every log examined, every would-block event carries a submitted count of zero and precedes the first byte, and the parent never sees EAGAIN during steady delivery. The qualified 15,150,646-byte file demands 1,010,157 bytes per second and so had roughly 1.4 times headroom, leaving only startup at risk, while the 34,919,166-byte file demands 2,330,798 and was throttled to 18.2 frames per second with 187 to 188 missed deadlines across two runs; warming that file halved its blocked polls and cut 9.2 milliseconds of first-byte latency yet moved delivery by 0.6 percent and changed nothing else, which cleanly separates read latency, governing startup only, from the per-poll budget, governing steady throughput. Four earlier conclusions in this log were corrected by later evidence and a handover must not re-adopt them: entry 568's prefill-depth framing, the accepted-bytes release gate floated around entry 569 and disproved by its own capture 5, entry 571's claim that the cold feed runs at 0.94 times realtime, which was an averaging artefact hiding a late start rather than a slow feed, and entry 572's twin claims that warm dead time is zero, since it is about 8.3 milliseconds once the burst rate is measured rather than derived, and that the per-poll budget could be ruled out, which entries 577 and 578 contradict by direct measurement. One important negative result stands unexplained: measured first-byte latency does not predict whether a cold run gaps, since 37.6 milliseconds was clean while 21.9 and 35.3 gapped and 68 gapped twice, so phase alignment between byte arrival and the early cadence deadline remains the leading hypothesis and no counter measures it. On the qualified file, cold boot plays perfectly about half the time, two clean against two gapped among strictly verified cold boots and three gapped counting the unverifiable entry 568, and a failure costs one or two dropped frames inside the first 270 milliseconds with steady-state cadence nominal in every session ever measured. A project-level consequence should not be lost: the old ceiling of about 1.41 megabytes per second left only twelve percent headroom over DVD peak program-stream rate of about 1.26, which is less than startup dead time already consumes and excludes audio demultiplexing. Practical notes for the successor: the MiSTer is at 10.10.0.30 over ordinary FTP with the default credentials, its clock runs UTC against the project's America/Phoenix local time, `/tmp/MediaPlayer_ARM.log` is rewritten per playback and must be fetched before any replay, and reboots must be verified from `/tmp/messages` rather than from recollection because the reported procedure has contradicted the device twice, a core reload being mistaken for a Linux reboot. The capture path was itself controlled: six consecutive probes of a static screen returned byte-identical images. The polling capture scripts lived in an ephemeral session scratchpad and would need rewriting; `tools/streams/read_hardware_cadence.py` and `decode_hardware_cadence.py` remain the committed tools. Note also that this agent ran on GUNSMOKE rather than the Raspberry Pi, so the `core.md` response-loop LED steps were inoperative and pushes were made from the build PC contrary to the stated convention.
-
-#### Next Steps:
-
-Resume at the pending validation, which the user has already been asked to perform: power-cycle, play `bbb_480i_tff_15s.m2v` once and stop, then fetch `/tmp/MediaPlayer_ARM.log` before the cadence screenshot. Confirm first that the per-read `count` field reports 16,384 rather than 4,096, which is the only available runtime proof that the buffer change took effect, since a stack allocation cannot be verified by string extraction in a stripped image. Then derive the poll rate from read count divided by four divided by elapsed span and treat it as the discriminating measurement: a rate holding near 86 Hz means the ceiling has risen toward 5.7 megabytes per second and the delivered frame rate should climb toward 29.97 with the missed-deadline count collapsing, whereas a rate falling proportionally toward 22 Hz means the read-back word loop dominates and the buffer size was not the operative constraint. In that second case the identified follow-on is already characterised: `spi_write` calls `spi_w`, which resolves to `fpga_spi` and performs a bridge read-back per sixteen-bit word, while `spi_block_write` wraps `fpga_spi_fast_block_write`, which issues two posted writes per word with no read-back and is already used by the IDE, x86, CDTV and Akiko paths; propose that as a separate approved boundary rather than adopting it silently. Also replay the qualified 15,150,646-byte file once to confirm the change has not disturbed previously accepted behaviour, and ask the user whether interface responsiveness has degraded, since a longer `mediaplayer_poll` delays `HandleUI`, `OsdUpdate` and `input_poll` in the same free-running main loop and that cost was never bounded in advance. Respect the user's diagnostic cadence, which is one run per circumstance rather than repeated samples for statistics; design each hardware request as a single run changing one condition and say what it would discriminate. Do not restore the per-poll budget ruling-out from entry 572, do not revive the accepted-bytes release gate, and do not change the FPGA startup controller, the 64-KiB clean video queue, the continuous HDMI sync fix or the black startup background. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain unsupported or unresolved. Keep `core.md` unchanged and preserve the forty-entry log ring.
 
 #### Files Modified:
 
