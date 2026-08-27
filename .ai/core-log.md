@@ -1,3 +1,48 @@
+## 610 COMMIT Unreleased ??? 2026-08-27T06:57:23-07:00
+
+#### Coming From:
+
+Unreleased d466bed
+
+#### Purpose:
+
+Decode DVD AC-3 audio to stereo PCM in the ARM helper on the same path MPEG Layer II already uses.
+
+#### Outcome:
+
+This entry is the approved plan and is written before its commit exists. The user directed a move away from video work to audio, asked for AC-3 first and explicitly approved vendoring liba52. The work is confined to the host helper and its fixtures, so no RTL changes, no Quartus build and no FPGA timing or memory risk are involved, and the 41 free M10K blocks stay untouched. That is possible because audio is already decoded on the HPS rather than in fabric: the helper decodes MPEG audio with vendored minimp3 and ships 48 kHz stereo PCM records to the FPGA, which owns only sample pacing and output. DVD AC-3 is 48 kHz, so the existing PCM transport, record format, scheduling reserves and sink backpressure all remain unchanged. Today `process_private_pes` reads private stream 1 and discards it, which is exactly where DVD AC-3 lives, and the helper's own architecture note already specifies AC-3 arriving behind codec selection rather than a source-specific decode path. The plan is to parse the DVD private stream 1 substream header, being the substream identifier, the frame header count and the first frame offset, then route substreams 0x80 through 0x87 to an AC-3 decoder while MPEG audio on 0xC0 through 0xDF continues to reach minimp3. Codec selection is decided from the first audio PES observed and the other codec is then ignored for that session, with the chosen substream identifier logged. Only the first audio track is supported in this boundary; multi-track selection needs the versioned control channel that protocol one deliberately omits. Decoded 5.1 is downmixed to stereo and handed to the existing emit path unchanged. liba52 0.7.4 is vendored under the helper's existing dependency directory, matching the pattern minimp3 already set, from the Ubuntu archive tarball with SHA256 `a21d724ab3b3933330194353687df82c475b5dfb997513eef4c25de6c865ec33`. It is GPL-2 and the project is GPL-2, so an earlier concern about license contamination raised during scoping was wrong and is corrected here. Its upstream attribution and COPYING are retained alongside the sources, and the helper Makefile builds them as their own translation units because the helper's own `-Werror` flags are not appropriate for unmodified upstream code. Acceptance requires a deterministic AC-3 fixture generator committed under tools/streams with media generated locally rather than committed, a full sample comparison of helper PCM against an independent FFmpeg decode reporting maximum difference, RMS, correlation and exact sample count, transport and PCM frame reconciliation, and finally one hardware run. Nothing is claimed as working until those results exist, and this entry records no completed build, decode or hardware evidence.
+
+#### Next Steps:
+
+Vendor liba52 and add the substream parsing, codec selection and downmix, then build the helper with MiSTer's official ARM GNU 10.2 toolchain rather than a distribution cross-compiler. Generate the AC-3 fixture locally and qualify decode against the independent FFmpeg reference before any hardware step, keeping the existing MP2 fixture passing unchanged so codec selection cannot regress the accepted path. Replace this entry's `???` with the real abbreviated SHA once the source commit exists and complete the entry with what actually happened. Afterwards have the user play the AC-3 fixture once and report sound, sync and menu behavior, then capture the helper log first and a fresh telemetry screenshot as usual. Keep AC-3 passthrough over S/PDIF and DTS passthrough as the separate later boundary they were scoped as, since both need IEC 61937 packing and a neutral gain and filter chain rather than any decoder change. The interlaced video gates of entry 609, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, remain open and unstarted. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- host/arm/Makefile
+- host/arm/ARCHITECTURE.md
+- host/arm/.deps/liba52/a52.h
+- host/arm/.deps/liba52/a52_internal.h
+- host/arm/.deps/liba52/attributes.h
+- host/arm/.deps/liba52/mm_accel.h
+- host/arm/.deps/liba52/bitstream.h
+- host/arm/.deps/liba52/tables.h
+- host/arm/.deps/liba52/bit_allocate.c
+- host/arm/.deps/liba52/bitstream.c
+- host/arm/.deps/liba52/downmix.c
+- host/arm/.deps/liba52/imdct.c
+- host/arm/.deps/liba52/parse.c
+- host/arm/.deps/LICENSE.liba52
+- tools/streams/generate_test_dvd_ac3_av.py
+- tools/streams/verify_ac3_pcm.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 609 COMMIT Unreleased d466bed 2026-08-27T06:42:34-07:00
 
 #### Coming From:
@@ -1133,35 +1178,6 @@ The power cycle is verified by three independent signals rather than by recollec
 #### Next Steps:
 
 Take one more verified power cycle and fetch `/tmp/MediaPlayer_ARM.log` immediately after the first playback and before any replay, since that single file discriminates between a read-latency limit inside the four-chunk budget and an EAGAIN limit against a slower helper, and the two imply different corrections. Confirm the power cycle from `/tmp/messages` as was done here rather than from recollection. With that measurement in hand, propose a bounded delivery-side plan for user approval before touching source: if the budget is binding while cold, raising the per-poll chunk count or the buffer size in `mediaplayer_poll()` lifts the ceiling directly and is a small, contained change to the MiSTer main patch; if EAGAIN dominates while cold, the correction belongs in the helper's own read path or in readahead instead, and raising the poll budget would achieve nothing. Do not change the FPGA startup controller, which entries 569 and 571 together have now shown is not the operative boundary, and do not commit any source change until the plan is approved. Consider adding timestamps to the helper diagnostic log as part of whichever change is approved, since its present lack of timing is the main limit on the delivery evidence. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 570 COMMIT Unreleased 2acabc5 2026-08-27T00:14:52-07:00
-
-#### Coming From:
-
-Unreleased 2acabc5
-
-#### Purpose:
-
-Collect a second repeated-run block and establish whether the ordinal-six miss survives a fresh start.
-
-#### Outcome:
-
-All five block 2 sessions are clean, reporting zero cadence outliers and zero missed deadlines while accepting all 15,150,646 bytes and displaying 449 pictures with 448 swaps, zero error flags and quiet terminals. The interpretation, however, is not the one the user expected, and the difference matters more than the result. The user reports rebooting before these five runs, but the device evidence does not support a Linux reboot. Both `/tmp` and `/run` are tmpfs and are recreated empty at boot, and `/tmp/messages` is the syslog and begins at boot. That file's first line is `Aug 27 06:56:52 MiSTer syslog.info syslogd started`, it runs unbroken through 07:13:46, and it contains exactly one syslogd start, while every boot-time daemon pidfile carries an mtime of 06:56. `/tmp/CORENAME` and `/tmp/RBFNAME` were restamped at 07:09. The MiSTer clock runs UTC against the agent's America/Phoenix local time, so 06:56:52 UTC is 23:56:52 local and 07:09 UTC is 00:09 local. Linux therefore booted once, before block 1, and remained up continuously across both blocks; what preceded block 2 was a core reload at 07:09 UTC, which reconfigures the FPGA but does not restart Linux and does not clear the page cache. Block 2 consequently ran against a cache already warmed by block 1's five reads of the same file, which makes it the strongest support so far for the read-latency mechanism rather than evidence that a cold start is clean. The same timeline confirms the other direction: block 1 capture 1 was taken 82 seconds after the verified boot and is a genuine cold-after-boot sample, and it gapped with 1,103,135 starved cycles. One conflict is left open and must not be smoothed over. Block 1 capture 5 was warm and still lost the ordinal-six slot at the full 1.38 times realtime feed rate, while all five block 2 runs at equal or greater warmth are clean, so page-cache warmth alone does not explain the difference and core-reload freshness may be a second factor that the present data cannot separate. A new and previously unrecorded evidence source was found during this work: the ARM helper writes `/tmp/MediaPlayer_ARM.log`, rewritten per playback, and the final block 2 run's copy is archived. It shows the helper reading the file in uniform 4,096-byte chunks, 3,699 reads for the whole 15,150,646 bytes, finishing on end of file with child exit code zero. Its blocking behaviour is the significant part. All 190 would-block events occur before the first byte is submitted, since every logged instance carries a submitted count of zero and the highest logged power of two is 128 against a total of 190, and after the first read event the helper never blocks writing to the FPGA again. The FPGA-side input FIFO is therefore never full during steady delivery, which establishes that ARM-side file read throughput is the limiting factor and is consistent with the 1.38 times realtime ceiling measured in entry 569. The 4,096-byte read granularity is the first concrete delivery-side mechanism identified and is a candidate cause of that ceiling. No genuine power-cycle sample has been taken since entry 568, whose own reboot predates the current syslog and cannot now be verified. The helper log carries no timestamps, so it establishes granularity and blocking but not read latency, and page-cache state remains unmeasured. Per the user's decision, entry 564 is dropped as evidence because its load history is not recalled, and the entry 569 ordinal ambiguity is resolved in favour of five captures mapping to five runs. Evidence is `.ai/current_results/entry570_block2_run1` through `run5`, the consolidated `entry570_block2_series.json` and the archived `entry570_arm_helper.log`.
-
-#### Next Steps:
-
-Take the genuine cold sample that is still missing by having the user fully power-cycle the MiSTer at the wall rather than reloading the core or using a menu reset, then play the file five times, so a verified cold-after-power-cycle block can be compared against block 1's verified cold-after-boot capture and entry 568's unverifiable one. Confirm the reboot afterward from `/tmp/messages` rather than from recollection, since that check is cheap and has now twice contradicted the reported procedure. Then run the separation experiment the open conflict requires: after a warm block that has produced a gap, reload only the core without rebooting and replay, which isolates core-reload freshness from page-cache warmth as the operative variable. The planned FTP cache-warming test is now partly redundant for confirming that warmth helps and should be reserved for the case where the power-cycle block comes up cold and gapped, where it would still discriminate mechanism. Pursue the ARM helper log as a first-class evidence source in parallel, since it is the only view of the delivery side: determine from the helper source whether the 4,096-byte read size is fixed or configurable and whether a larger read or readahead would lift the 1.38 times realtime ceiling, and add timestamps to that log if a diagnostic change is later approved. Do not propose a source change until the cold and core-reload cases are separated. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
 
 #### Files Modified:
 
