@@ -1,0 +1,45 @@
+{
+  "captured": "2026-08-27T05:26:44-07:00",
+  "host": "10.10.0.30",
+  "user_report": "Both Bob and Weave stop near the beginning; initial audio is audible and video looks good; menu remains responsive during freeze. Current capture mode unspecified.",
+  "files": {
+    "/tmp/MediaPlayer_ARM.log": {
+      "local": "/tmp/entry603-capture/entry603_current_arm_helper.log",
+      "bytes": 4127263,
+      "sha256": "ba4a80f9bbb997ca89b39f10484293235321234e0ffe09024cf4191ac63a079e"
+    },
+    "/tmp/messages": {
+      "local": "/tmp/entry603-capture/messages",
+      "bytes": 46843,
+      "sha256": "d5ca149774993755dece10a2abb77ed4c69a47bf28c32f538c6eb4e5d272374f"
+    },
+    "/media/fat/screenshots/cadence_probe.png": {
+      "local": "/tmp/entry603-capture/entry603_current_terminal.png",
+      "bytes": 238873,
+      "sha256": "397ab446e680b028b1086d5814642f02a585d9d3a7c0951c883273988b0b10f8"
+    },
+    "/media/fat/MiSTer": {
+      "local": "/tmp/entry603-capture/MiSTer",
+      "bytes": 1170340,
+      "sha256": "3841e2cc6eef4bfc9e46a7ffa075aff76b65d5405f81efb1355373292b35846f"
+    },
+    "/media/fat/MediaPlayer.rbf": {
+      "local": "/tmp/entry603-capture/MediaPlayer.rbf",
+      "bytes": 4324340,
+      "sha256": "44606564ad40e3f9a74657fdd372a44fb6d0f74252e6d1000b2685768ca9cf01"
+    }
+  },
+  "operations": [
+    "RETR /tmp/MediaPlayer_ARM.log",
+    "RETR /tmp/messages",
+    "DELE /media/fat/screenshots/cadence_probe.png",
+    "STOR screenshot command only",
+    "RETR /media/fat/screenshots/cadence_probe.png",
+    "RETR /media/fat/MiSTer",
+    "RETR /media/fat/MediaPlayer.rbf"
+  ],
+  "syslog_boot_lines": [
+    "Aug 27 11:26:59 MiSTer syslog.info syslogd started: BusyBox v1.33.1"
+  ],
+  "unchanged_target_state": "No reload, reboot, launch, media/config edit or deployment; only the fixed screenshot was replaced."
+}

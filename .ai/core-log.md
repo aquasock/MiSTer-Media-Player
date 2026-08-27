@@ -1,3 +1,32 @@
+## 603 COMMIT Unreleased 6669b70 2026-08-27T05:37:49-07:00
+
+#### Coming From:
+
+Unreleased 6669b70
+
+#### Purpose:
+
+Diagnose the abrupt early native-480i audio/video freeze reported in both Bob and Weave.
+
+#### Outcome:
+
+The user reports that both modes stop near the beginning, with audible initial audio, good-looking video at the correct speed until an instant freeze and a responsive menu. Only the most recent run remains available; its mode is not specified and is not encoded in schema nineteen, so do not assign this capture to either mode or infer identical counters for both. The helper log is captured first, followed by a fresh checksum/parity-valid telemetry image and Main/RBF readbacks. The sole error flag is 0x0200, presentation_error, with 83 references decoded, 81 pictures displayed and 80 swaps. The fatal snapshot occurs at 164,458,727 decoder clocks, or 2.740979 seconds, with a 2.679818-second startup-inclusive presentation span, no deadline gaps or outliers and three largest steady intervals of 2,002,001 clocks. Decoder, reconstruction, writer, PCM protocol and audio-underrun error bits are clear at that snapshot. The 32-bit timer has not wrapped. Sequence end is absent and the session is not quiet; presentation_complete being high only describes the idle B-reorder transaction, not completion of this all-I movie. The retained image shows the opening cloud/trees scene. The source media still reads back as exactly 739,065,873 bytes with SHA256 beb5c738910321fbbdf482220c19af36e7c2d2bb1913e8872f679eeb1f589642, and installed Main/f615ce0 RBF hashes are unchanged. A later helper log is an exact extension of the first capture and preserves PID 2210 through successful EOF after 213.060 seconds. All 51,234 reads, 800 sampled ACK records and 839,409,548 expected helper transport bytes reconcile without transport fault. This is the documented fail-open drain after a fatal scheduler error, not evidence that the remaining movie played; the snapshot accepted-byte count remains latched at 3,265,982. The same Linux boot as the prior captures is retained, without independently asserting absence of a core reload between the user's two mode tests. Inspection identifies an inconsistent native ordinary-queue policy: overlap admission uses timestamp_candidate_active as if it were a session-mode indicator, but that signal is false before a pending reference is released even in an anchored A/V session. The next I header both admits overlap and releases the old candidate, activating its timestamp; if the next frame completes before the old candidate presents, a legitimate third-bank secondary is retained and the timestamp/secondary guard then raises the fatal presentation error. Unmodified production timestamp ownership, timeline and scheduler modules reproduce that transition with all three bank identities distinct; raw and serialized controls avoid it. An integrated real I-decoder, reconstruction, writer, publication and timestamp/scheduler observer then uses the exact first 100 movie access units and helper timestamps, appending only a terminal sequence end. It reproduces the same guard at 80 decoded and 78 displayed pictures, with every other pipeline error clear. That is three pictures earlier than hardware, not an exact physical-cycle replay: source delivery, DDR readiness, 90 kHz ticks and swap phase are modeled and PCM/HPS/scaler/CDC timing is excluded. The same 100-picture video with timestamps removed completes all 6,480,000 DDR words and 810,000 blocks, preserves every display identity and has zero missed slots. Disabling overlap in the timestamped control also completes correctly, but produces six 4,004,000-clock intervals at displayed ordinals 49, 53, 54, 58, 59 and 63, adding 0.2002 seconds. It is therefore an inadequate smooth-playback fix. Every first-100 timestamp is present; the first omitted explicit timestamp in full-file qualification is zero-based picture 681 and cannot explain this early freeze. The full A/V hardware test fails while the previously accepted bounded video-only ceiling result remains valid. Exact logs are stored losslessly compressed with original hashes, alongside screenshots, analyses and reproduction drivers as .ai/current_results/entry603_*; the complete diagnostic workspace is /home/vash/mister-builds/entry603. No production source, media, installed file, mode, reboot, reload or playback is changed during investigation; only the fixed screenshot is replaced. Built reflects the unchanged baseline and compiled diagnostic models, and hardware Passed remains unchecked.
+
+#### Next Steps:
+
+The next useful production boundary is to make the bounded native all-I ordinary frame queue timestamp-aware while preserving its three-bank ownership, P/B exclusions, cadence floor and timestamp due gate. Do not merely suppress presentation_error, drop timestamp records, disable timestamps/audio or serialize native A/V, since the controls show either lost protection or renewed missed slots. Before editing RTL, record the precise fix and regression plan, then extend existing ownership/presentation tests with real timestamp association and timeline transitions, pending/secondary publication races, early and late timestamps, missing records, reset/new-file behavior and ordered terminal drain. Require the actual opening prefix and a longer combined stream to complete without errors or extra slots, retain the exact video-only ceiling and supported P/B regressions, then obtain a clean timing-qualified RBF and verify backups and staged deployment before the user's next run. Keep the current installation and full-movie fixture available as the reproducible failing baseline. No further identical Bob/Weave replay is needed to identify this fault; mode-specific hardware acceptance and the full physical A/V soak remain open. Preserve restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 602 COMMIT Unreleased 6669b70 2026-08-27T05:10:55-07:00
 
 #### Coming From:
@@ -1140,34 +1169,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 563 COMMIT Unreleased 2acabc5 2026-08-26T23:13:49-07:00
-
-#### Coming From:
-
-Unreleased 2acabc5
-
-#### Purpose:
-
-Qualify and deploy the guarded native startup and larger input queue for the next clean HDMI cadence test.
-
-#### Outcome:
-
-Source `2acabc5` completes a clean Quartus 17.0.2 Lite build from empty generated state on GUNSMOKE in 722.51 seconds with seed 16, zero errors and 208 warnings. All timing classes are positive: setup 0.141 ns, hold 0.249 ns, recovery 3.830 ns, removal 0.531 ns, minimum pulse width 0.925 ns; every reported total negative slack is zero. The fit uses 31,304 ALMs, 49,685 registers, 4,048,355 block-memory bits, 512 RAM blocks and 67 DSP blocks. All sixteen unmatched diagnostic/reset timing filters are inherited from the installed schema-nineteen source; none of the new startup crossings is unmatched, and the tracked build source remains unchanged. Eleven simulation scenarios cover 540 reconstructed pictures across thirteen sessions, with every picture fingerprint matching its corresponding full-source baseline picture. The full 449-picture run under a synthetic thirty-millisecond host-resume pause has zero post-startup gaps; its visibility-based span is 896,896,004 decoder cycles, approximately 29.970030 pictures per second, with a few clocks of observation skew. The dense source-340-through-355 excerpt passes a forty-five-millisecond pause without the three legacy gaps, as do alternate phases, three drained-FIFO warm loads, periodic DDR pressure and one/two-picture EOF cases. The legacy 16-KiB/no-reserve control still reproduces its expected picture-six gap. The 24-phase deliberately skewed startup test passes, while the previous controller fails the same control by replacing the first bank at its initial visible boundary. The native suite exits successfully in 839.54 seconds; its timing, framebuffer, ownership and profiler source is unchanged by the guard correction, and its changed initial startup invocation is superseded by the separately passing corrected test. The queue capacity/wrap regression passes 85,696 bytes, four ordered timestamps and three PCM samples. The pipeline model uses synthetic host pauses, behavioral FIFO visibility and synthetic field windows, not a measured hardware trace or full HDMI raster; fingerprints establish scheduling invariance rather than an independent pixel oracle. Schema nineteen's aggregate still starts at first reference completion and includes startup buffering, so steady swap intervals and deadline counts remain the hardware cadence criterion. The 4,346,416-byte RBF has SHA-256 `fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347` and was directly installed at `/media/fat/MediaPlayer.rbf` under standing authorization. A fresh independent FTP connection read back the entire active image with matching size and hash; no backup, staging file, reload, reboot or media/configuration change was made. Build, validation and deployment evidence is in the three entry-562 JSON files under `.ai/current_results`; full logs and traces remain under `/home/vash/mister-builds/entry562-results` and the clean build directory `/home/vash/mister-builds/entry562-2acabc5`. Hardware acceptance is pending, partial-transfer cancellation is not covered by the drained-FIFO warm test, and the pre-existing live-raster assertion drift remains unresolved.
-
-#### Next Steps:
-
-Have the user reload the installed `2acabc5` core, select Bob and play `bbb_480i_tff_15s_8mbps.m2v` once without mode or menu changes, then leave terminal telemetry visible for a fresh capture. Check all 449 pictures and 448 swaps, terminal completion, zero aggregate errors and zero deadline gaps, especially the prior ordinals six and 348; distinguish the deliberate startup wait from steady playback cadence. If the clean run passes, repeat loads and Bob/Weave switching before claiming the cadence issue resolved. Keep analog diagnostics out of scope and preserve the accepted continuous HDMI sync fix.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---

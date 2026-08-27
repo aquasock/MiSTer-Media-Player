@@ -1,0 +1,12 @@
+{
+  "timestamp": "2026-08-27T05:31:50-07:00",
+  "path": "/media/fat/games/MediaPlayer/bbb_full_480i_tff_av_10080kbps.mpg",
+  "bytes": 739065873,
+  "sha256": "beb5c738910321fbbdf482220c19af36e7c2d2bb1913e8872f679eeb1f589642",
+  "helper_later_sha256": "be0ea56ee47f2d953677b552e96042590225df0ec6aa1170eb264d6ea40cc46e",
+  "operations": [
+    "RETR /tmp/MediaPlayer_ARM.log",
+    "RETR /media/fat/games/MediaPlayer/bbb_full_480i_tff_av_10080kbps.mpg"
+  ],
+  "read_only": true
+}

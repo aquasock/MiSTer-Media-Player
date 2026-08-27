@@ -1,0 +1,7 @@
+INTEGRATED_PROGRESS pictures=32 cycles=63070156
+INTEGRATED_PROGRESS pictures=64 cycles=126656380
+SECONDARY_PTS_GUARD cycle=158449811 completed=80 displayed=78 active_bank=2 display_bank=2 pending_bank=0 secondary_bank=1 pts=282237 stc=285677
+SECONDARY_PTS_GUARD cycle=158449812 completed=80 displayed=78 active_bank=2 display_bank=2 pending_bank=0 secondary_bank=1 pts=282237 stc=285677
+[1584498165000] %Fatal: tb_entry603_i_pts.sv:294: Assertion failed in tb_entry603_i_pts: pipeline error syntax=0 probe=0 iq=0 matrix=0 idct=0 recon=0 writer=0 scheduler=1 picture=80 byte=3145862
+%Error: /home/vash/mister-builds/entry603/tb_entry603_i_pts.sv:294: Verilog $stop
+Aborting...
