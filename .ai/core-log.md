@@ -1,3 +1,32 @@
+## 608 COMMIT Unreleased d466bed 2026-08-27T06:39:56-07:00
+
+#### Coming From:
+
+Unreleased d466bed
+
+#### Purpose:
+
+Measure the pipeline's compressed read-ahead and test whether it explains the single missed slot.
+
+#### Outcome:
+
+The read-ahead is fixed by two declarations and needed no simulation to measure. The dual-clock `mpeg2_stream_fifo` holds 16,384 sixteen-bit words, exactly 32,768 bytes, and the `mpeg2_h262_clean_video_queue` holds a 65,536-byte eight-bit `scfifo`, giving 98,304 bytes of compressed storage ahead of the decoder, or 2.4551 frame periods at the declared 40,040 bytes per frame period. That falsifies the entry 607 hypothesis, which predicted a depth between 3.118 and 3.754 frame periods; the real depth is below both, so trough depth and read-ahead alone cannot discriminate picture 690 from the twenty-five comparably thin points the hardware absorbed. Following the pre-registered branch, helper delivery timing was examined next. An initial attempt to locate the failure by program-stream file offset was wrong and is recorded here as a correction: the helper demuxes on the HPS and its submitted counter aggregates video, PCM and metadata, so it cannot be indexed by file offsets, and the first mapping pointed at 20.2 seconds instead of the true 23.09-second event. Repeating the measurement in wall time shows delivery is steady and rules out a transport stall. Both runs move 839,409,548 transport bytes at 1,407,367 and 1,407,386 bytes per second, with median inter-read gaps of 11.463 and 11.468 milliseconds, ninety-ninth percentile gaps of 20.986 and 20.966, and maxima of 41.289 and 41.309 milliseconds occurring at 404.57 seconds in both runs rather than near the failure. No gap in either run approaches the 81.92 milliseconds needed to drain the buffer at the declared rate, and the largest gap in the whole 22-to-24-second window is 23.511 milliseconds in Weave and 20.889 in Bob, ordinary against their own percentiles. Delivery is therefore consumption-paced and rate-matched, which is the missing term. Because the transport never runs a large lead, a picture bigger than the buffer must stream in while it is being decoded, and the slot is missed when that streaming time exceeds one frame period, giving a threshold of 138,344 bytes. Applied to all 17,876 pictures, exactly one picture in the film exceeds it: picture 690 at 150,316 bytes, predicting 9.977 milliseconds of starvation against 11.295 measured in Weave and 11.660 in Bob, and predicting exactly one missed slot per run, which is what both runs recorded. The model also explains the non-events, since picture 7602 at 136,350 bytes and picture 13253 at 124,846 bytes fall below the threshold despite 13253 sitting at a deeper VBV trough. This fit should be treated as strong but not settled, because the margin between the one predicted miss and the runner-up is only 1,994 bytes, about 1.4 percent, so a modest error in the assumed consumption rate or in the one-frame-period decode assumption would change the prediction to two misses or none. The relevant headroom for any fix is memory rather than logic: the accepted build uses 512 of 553 M10K blocks at 93 percent, with block memory bits at 71 percent and ALMs at 75 percent, so only 41 M10K blocks remain. This entry performs no build and no hardware run, and its Built and Passed marks refer to the unchanged, already-accepted `d466bed`. Evidence and the exact drivers are retained as `.ai/current_results/entry608_*`.
+
+#### Next Steps:
+
+Obtain user approval before any RTL change, since the defect is one repeated frame in a ten-minute film and the only credible fix consumes most of the remaining memory headroom. The proposal to approve or reject is to raise `mpeg2_stream_fifo` from 16,384 to 32,768 sixteen-bit words, taking the stream FIFO from 32,768 to 65,536 bytes and total read-ahead to 131,072 bytes, or 3.2741 frame periods, which lifts the miss threshold to 171,112 bytes and clears the film's largest picture by 20,796 bytes. The estimated cost is roughly 26 additional M10K blocks against 41 free, taking utilization from 93 percent toward 98 percent, so fit and timing closure are the real risks and a clean build with a warning comparison against `d466bed` must gate acceptance. Growing the clean video queue instead is worse, because doubling it needs about 103 blocks and does not fit, and a non-power-of-two depth is riskier than the dual-clock alternative. Before building, extend the existing overlap and queue tests to cover the deeper FIFO and add a bounded simulation driven by the actual picture 690 bytes at consumption pace, requiring the missed slot to disappear at the new depth and to persist at the old one. If fit or timing fails, the fallback is to accept the single repeated frame and record it as a known limitation rather than to trade away presentation or prediction memory. Keep AC-3, interlaced P/B, navigation and disk-source work as separately scoped gates, preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 607 COMMIT Unreleased d466bed 2026-08-27T06:33:10-07:00
 
 #### Coming From:
@@ -1133,35 +1162,6 @@ The user rebooted, loaded the core and played the same file in Weave repeatedly,
 #### Next Steps:
 
 Resolve the run-ordinal ambiguity with the user before treating the first capture as a cold sample, since that single value is what separates the two competing cold figures. Then run at least two further blocks with the sample cap removed, each a full reboot followed by five uninterrupted replays, so cold sampling reaches a usable count and the zero-gap rate can be estimated rather than inferred from two isolated clean runs. Because starvation magnitude has now been shown not to predict the miss, the more valuable experiment is the one already proposed but not yet run: reboot, load the core, read the media file over FTP to populate the page cache, then play once, which tests the read-latency mechanism directly instead of by correlation. That still requires the media path on the MiSTer, which the user has not yet supplied and which was not found under the obvious locations. Also obtain whether entry 564 was preceded by a reboot, or drop it as evidence. Do not propose a source change yet. The marginal-race result means a release gate conditioned on accepted bytes or queue occupancy alone would not have saved the fifth capture, so any startup-controller boundary must be sized against the deadline timing rather than against a byte threshold, and the delivery ceiling of 1.38 times realtime should be characterised before deciding whether the correct boundary is the startup controller or the ARM-side feed. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 568 COMMIT Unreleased 2acabc5 2026-08-26T23:48:12-07:00
-
-#### Coming From:
-
-Unreleased 2acabc5
-
-#### Purpose:
-
-Test the entry 567 hypothesis that the ordinal-six starvation is a warm-reload effect by capturing a cold first Weave run after a full MiSTer reboot.
-
-#### Outcome:
-
-The user rebooted the MiSTer, loaded the core, loaded the file and let it finish, giving the cold first-run sample entry 567 asked for. The stale 476,501-byte probe survived the reboot and was deleted through FTP and confirmed absent before triggering; the new capture is 476,520 bytes with SHA-256 `ac379d4724df8320197fd5686be22a19c58e9b8ff6463aa965d5b50cf33560f8` and a checksum of 4,176,697,056, distinct from all prior sessions. Every acceptance term still passes: all 15,150,646 bytes accepted, 449 pictures displayed with 448 swaps, sequence end seen, presentation complete, quiet terminal reason one, zero error flags, no cache-bank overlap, no presentation error, no audio underrun, no PCM protocol error and no timestamp advance or delay conflicts. The hypothesis is refuted, and refuted in the opposite direction from the one proposed. The cold run does not come up clean; it produces the worst gap measured so far. The single outlier is again at display picture ordinal six but is 6,006,000 cycles, or 100.1 milliseconds, which is three nominal intervals rather than the two seen in both warm runs. Every upstream indicator moves the same way. Input starved cycles since the previous swap rises to 1,659,347, or 27.66 milliseconds, against roughly 1,072,000 cycles or 17.85 milliseconds in entries 566 and 567, an increase of about 55 percent. Accepted bytes at the deadline falls to 296,838 from 323,580 and 331,179, so materially fewer bytes had been delivered by the same deadline. Candidate ready delay rises to 3,230,418 cycles from 592,128 and 271,690. Meanwhile the writer and DDR path stay clean exactly as before, with upstream FIFO pending, writer busy and writer capacity blocked all false and zero capacity-blocked cycles, and writer wait and decoder stall totals sit within the same narrow band as the other three runs. The starvation magnitude therefore tracks how cold the media source is rather than any session rearm state, which is consistent with ARM-side file read latency during startup and inconsistent with the delivery-rearm boundary entry 567 nominated. The guarded startup did not absorb the deficit: presentation hold total is the lowest of all four runs at 26,390,166 cycles, so the guard released on readiness while the feed was still behind, and the residual non-gap startup excess of 2,580,696 cycles remains below the clean entry 564 run's 3,002,892. Ranked gaps two and three are exactly 2,002,000 cycles in this run as in every other, confirming once more that steady-state cadence after the startup hitch is nominal and that the whole defect is confined to initial prefill depth ahead of the first cadence deadline. This is one cold sample and does not establish a cold-run rate. Entry 564 is now the only zero-gap run out of four and its load history was never recorded, so it cannot be classified as cold or warm and cannot anchor either hypothesis. Page-cache state is not measured by this telemetry, so the read-latency explanation is inference from the starvation and byte-delivery figures rather than direct measurement. Deinterlace mode and load history are not encoded in the snapshot and rest on the user's report. No source change or build was performed for this entry, and no reload, reboot, MGL launch, media change or configuration change was made during capture. Evidence is `.ai/current_results/entry568_cold_weave_terminal.png` and `entry568_cold_weave_capture.json`, the latter carrying the full decode, the four-run series, the ordinal-six comparisons and these scope limits.
-
-#### Next Steps:
-
-The boundary is now initial prefill depth ahead of the first cadence deadline, not delivery rearm and not the presentation scheduler, so the remaining evidence needed is the size of the deficit rather than more mode or reload permutations. Have the user take two or three further cold runs, each after a full reboot, and two or three further warm replays, capturing telemetry after every single one and stating which is which, so the cold and warm starvation windows acquire a range instead of one sample each and so it can be established whether any run still reaches zero gaps under known conditions. Ask specifically whether the entry 564 run was preceded by a reboot, since reclassifying it would settle whether a clean run is reachable at all on this build. With that range in hand the fix boundary can be sized directly: the guarded startup controller currently releases the first picture on readiness alone, and the measured 27.66-millisecond cold starvation window against a 33.37-millisecond cadence slot indicates the release gate needs a minimum accepted-bytes or queue-occupancy condition in addition to readiness, which is a bounded change to the startup controller rather than to the queue depth or the scheduler. Extend the existing drained-FIFO warm-load simulation cases to model both measured starvation windows before proposing that change, and do not commit source until the user approves the revised plan. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged in the meantime. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
 
 #### Files Modified:
 
