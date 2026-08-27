@@ -1,0 +1,375 @@
+Aug 27 11:26:59 MiSTer syslog.info syslogd started: BusyBox v1.33.1
+Aug 27 11:26:59 MiSTer user.notice kernel: klogd started: BusyBox v1.33.1 (2022-12-24 16:26:14 CST)
+Aug 27 11:26:59 MiSTer user.debug kernel: [    0.000000] pcpu-alloc: s30540 r8192 d22708 u61440 alloc=15*4096
+Aug 27 11:26:59 MiSTer user.debug kernel: [    0.000000] pcpu-alloc: [0] 0 [0] 1 
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 129794
+Aug 27 11:26:59 MiSTer user.notice kernel: [    0.000000] Kernel command line: console=ttyS0,115200 loglevel=4 loop.max_part=8 mem=511M memmap=513M$511M root=/dev/mmcblk0p1 loop=linux/linux.img ro rootwait
+Aug 27 11:26:59 MiSTer user.notice kernel: [    0.000000] Unknown command line parameters: memmap=513M$511M
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] Dentry cache hash table entries: 65536 (order: 6, 262144 bytes, linear)
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] Inode-cache hash table entries: 32768 (order: 5, 131072 bytes, linear)
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] mem auto-init: stack:off, heap alloc:off, heap free:off
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] Memory: 503072K/523264K available (10240K kernel code, 851K rwdata, 2404K rodata, 1024K init, 276K bss, 20192K reserved, 0K cma-reserved)
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=2, Nodes=1
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] ftrace: allocating 32432 entries in 64 pages
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] ftrace: allocated 64 pages with 1 groups
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] trace event string verifier disabled
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] rcu: Hierarchical RCU implementation.
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] 	Rude variant of Tasks RCU enabled.
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 100 jiffies.
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] NR_IRQS: 16, nr_irqs: 16, preallocated irqs: 16
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] L2C-310 erratum 769419 enabled
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] L2C-310 enabling early BRESP for Cortex-A9
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] L2C-310 full line of zeros enabled for Cortex-A9
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] L2C-310 ID prefetch enabled, offset 8 lines
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] L2C-310 cache controller enabled, 8 ways, 512 kB
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] L2C-310: CACHE_ID 0x410030c9, AUX_CTRL 0x76460001
+Aug 27 11:26:59 MiSTer user.notice kernel: [    0.000000] random: get_random_bytes called from start_kernel+0x4b4/0x610 with crng_init=0
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] clocksource: timer1: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 19112604467 ns
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000000] sched_clock: 32 bits at 100MHz, resolution 10ns, wraps every 21474836475ns
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000017] Switching to timer-based delay loop, resolution 10ns
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000315] Console: colour dummy device 80x30
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000354] Calibrating delay loop (skipped), value calculated using timer frequency.. 200.00 BogoMIPS (lpj=100000)
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000370] pid_max: default: 32768 minimum: 301
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000490] Mount-cache hash table entries: 1024 (order: 0, 4096 bytes, linear)
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.000506] Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes, linear)
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.001230] CPU: Testing write buffer coherency: ok
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.001281] CPU0: Spectre v2: using BPIALL workaround
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.001458] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.002158] Setting up static identity map for 0x100000 - 0x10003c
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.002294] rcu: Hierarchical SRCU implementation.
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.002616] smp: Bringing up secondary CPUs ...
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.003296] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.003313] CPU1: Spectre v2: using BPIALL workaround
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.003439] smp: Brought up 1 node, 2 CPUs
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.003453] SMP: Total of 2 processors activated (400.00 BogoMIPS).
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.003463] CPU: All CPU(s) started in SVC mode.
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.003993] devtmpfs: initialized
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.008378] VFP support v0.3: implementor 41 architecture 3 part 30 variant 9 rev 4
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.008544] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 1911260446275000 ns
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.008565] futex hash table entries: 512 (order: 3, 32768 bytes, linear)
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.009503] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.010378] DMA: preallocated 256 KiB pool for atomic coherent allocations
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.011437] cpuidle: using governor ladder
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.011598] hw-breakpoint: found 5 (+1 reserved) breakpoint and 1 watchpoint registers.
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.011611] hw-breakpoint: maximum watchpoint size is 4 bytes.
+Aug 27 11:26:59 MiSTer user.notice kernel: [    0.038752] SCSI subsystem initialized
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.039031] usbcore: registered new interface driver usbfs
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.039080] usbcore: registered new interface driver hub
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.039126] usbcore: registered new device driver usb
+Aug 27 11:26:59 MiSTer user.warn kernel: [    0.039299] usb_phy_generic soc:usbphy: supply vcc not found, using dummy regulator
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.039986] pps_core: LinuxPPS API ver. 1 registered
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.039998] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <giometti@linux.it>
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.040021] PTP clock support registered
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.040178] FPGA manager framework
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.040291] Advanced Linux Sound Architecture Driver Initialized.
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.040833] Bluetooth: Core ver 2.22
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.040891] NET: Registered PF_BLUETOOTH protocol family
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.040899] Bluetooth: HCI device and connection manager initialized
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.040914] Bluetooth: HCI socket layer initialized
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.040924] Bluetooth: L2CAP socket layer initialized
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.040943] Bluetooth: SCO socket layer initialized
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.041360] clocksource: Switched to clocksource timer1
+Aug 27 11:26:59 MiSTer user.notice kernel: [    0.074394] FS-Cache: Loaded
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.079963] NET: Registered PF_INET protocol family
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.080110] IP idents hash table entries: 8192 (order: 4, 65536 bytes, linear)
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.080857] tcp_listen_portaddr_hash hash table entries: 512 (order: 0, 6144 bytes, linear)
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.080895] TCP established hash table entries: 4096 (order: 2, 16384 bytes, linear)
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.080943] TCP bind hash table entries: 4096 (order: 3, 32768 bytes, linear)
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.081014] TCP: Hash tables configured (established 4096 bind 4096)
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.081095] UDP hash table entries: 256 (order: 1, 8192 bytes, linear)
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.081125] UDP-Lite hash table entries: 256 (order: 1, 8192 bytes, linear)
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.081281] NET: Registered PF_UNIX/PF_LOCAL protocol family
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.090838] RPC: Registered named UNIX socket transport module.
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.090852] RPC: Registered udp transport module.
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.090858] RPC: Registered tcp transport module.
+Aug 27 11:26:59 MiSTer user.info kernel: [    0.090864] RPC: Registered tcp NFSv4.1 backchannel transport module.
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.002889] hw perfevents: enabled with armv7_cortex_a9 PMU driver, 7 counters available
+Aug 27 11:26:59 MiSTer user.notice kernel: [    1.005225] Initialise system trusted keyrings
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.005469] workingset: timestamp_bits=30 max_order=17 bucket_order=0
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.010910] exFAT: Version 1.2.11
+Aug 27 11:26:59 MiSTer user.notice kernel: [    1.011800] NFS: Registering the id_resolver key type
+Aug 27 11:26:59 MiSTer user.notice kernel: [    1.011833] Key type id_resolver registered
+Aug 27 11:26:59 MiSTer user.notice kernel: [    1.011840] Key type id_legacy registered
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.011934] nfs4filelayout_init: NFSv4 File Layout Driver Registering...
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.011943] nfs4flexfilelayout_init: NFSv4 Flexfile Layout Driver Registering...
+Aug 27 11:26:59 MiSTer user.notice kernel: [    1.012953] Key type cifs.idmap registered
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.013052] fuse: init (API version 7.34)
+Aug 27 11:26:59 MiSTer user.notice kernel: [    1.108240] Key type asymmetric registered
+Aug 27 11:26:59 MiSTer user.notice kernel: [    1.108257] Asymmetric key parser 'x509' registered
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.108322] io scheduler mq-deadline registered
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.108333] io scheduler kyber registered
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.109593] MiSTer_fb 22000000.MiSTer_fb: width = 640, height = 480, format=8888
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.110091] Console: switching to colour frame buffer device 80x30
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.114330] MiSTer_fb 22000000.MiSTer_fb: fb0: MiSTer_fb frame buffer device at 0x22001000+0x12c000, virt: 0x(ptrval)
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.114389] MiSTer_fb 22000000.MiSTer_fb: fb0: IRQ=52
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.115829] Serial: 8250/16550 driver, 2 ports, IRQ sharing disabled
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.117100] printk: console [ttyS0] disabled
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.117191] ffc02000.serial0: ttyS0 at MMIO 0xffc02000 (irq = 48, base_baud = 6250000) is a 16550A
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.117378] printk: console [ttyS0] enabled
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.118185] ffc03000.serial1: ttyS1 at MMIO 0xffc03000 (irq = 49, base_baud = 6250000) is a 16550A
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.121547] brd: module loaded
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.129006] loop: module loaded
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.133004] libphy: Fixed MDIO Bus: probed
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.134255] socfpga-dwmac ff702000.ethernet: IRQ eth_wake_irq not found
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.134281] socfpga-dwmac ff702000.ethernet: IRQ eth_lpi not found
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.134478] socfpga-dwmac ff702000.ethernet: PTP uses main clock
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.135323] socfpga-dwmac ff702000.ethernet: Version ID not available
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.135416] socfpga-dwmac ff702000.ethernet: 	DWMAC1000
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.135428] socfpga-dwmac ff702000.ethernet: DMA HW capability register supported
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.135437] socfpga-dwmac ff702000.ethernet: RX Checksum Offload Engine supported
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.135445] socfpga-dwmac ff702000.ethernet: COE Type 2
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.135456] socfpga-dwmac ff702000.ethernet: TX Checksum insertion supported
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.135464] socfpga-dwmac ff702000.ethernet: Enhanced/Alternate descriptors
+Aug 27 11:26:59 MiSTer user.warn kernel: [    1.135472] socfpga-dwmac ff702000.ethernet: Extended descriptors not supported
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.135480] socfpga-dwmac ff702000.ethernet: Ring mode enabled
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.144223] libphy: stmmac: probed
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.144251] Micrel KSZ9031 Gigabit PHY stmmac-0:01: attached PHY driver (mii_bus:phy_addr=stmmac-0:01, irq=POLL)
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.146180] PPP generic driver version 2.4.2
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.146530] PPP BSD Compression module registered
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.146542] PPP Deflate Compression module registered
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.146566] PPP MPPE Compression module registered
+Aug 27 11:26:59 MiSTer user.warn kernel: [    1.147018] dwc2 ffb40000.usb: supply vusb_d not found, using dummy regulator
+Aug 27 11:26:59 MiSTer user.warn kernel: [    1.147193] dwc2 ffb40000.usb: supply vusb_a not found, using dummy regulator
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.147845] dwc2 ffb40000.usb: DWC OTG Controller
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.147883] dwc2 ffb40000.usb: new USB bus registered, assigned bus number 1
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.147923] dwc2 ffb40000.usb: irq 50, io mem 0xffb40000
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.148166] usb usb1: New USB device found, idVendor=1d6b, idProduct=0002, bcdDevice= 5.15
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.148185] usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.148197] usb usb1: Product: DWC OTG Controller
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.148206] usb usb1: Manufacturer: Linux 5.15.1-MiSTer dwc2_hsotg
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.148215] usb usb1: SerialNumber: ffb40000.usb
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.148947] hub 1-0:1.0: USB hub found
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.149066] hub 1-0:1.0: 1 port detected
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.149931] usbcore: registered new interface driver cdc_acm
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.149948] cdc_acm: USB Abstract Control Model driver for USB modems and ISDN adapters
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.150151] usbcore: registered new interface driver uas
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.150262] usbcore: registered new interface driver usb-storage
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.150480] usbcore: registered new interface driver usbserial_generic
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.150527] usbserial: USB Serial support registered for generic
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.150590] usbcore: registered new interface driver ch341
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.150624] usbserial: USB Serial support registered for ch341-uart
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.150684] usbcore: registered new interface driver cp210x
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.150724] usbserial: USB Serial support registered for cp210x
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.150786] usbcore: registered new interface driver ftdi_sio
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.150819] usbserial: USB Serial support registered for FTDI USB Serial Device
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.150958] usbcore: registered new interface driver pl2303
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.151001] usbserial: USB Serial support registered for pl2303
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.151062] usbcore: registered new interface driver usb_serial_simple
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.151096] usbserial: USB Serial support registered for carelink
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.151126] usbserial: USB Serial support registered for zio
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.151157] usbserial: USB Serial support registered for funsoft
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.151187] usbserial: USB Serial support registered for flashloader
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.151228] usbserial: USB Serial support registered for google
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.151267] usbserial: USB Serial support registered for libtransistor
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.151306] usbserial: USB Serial support registered for vivopay
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.151337] usbserial: USB Serial support registered for moto_modem
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.151442] usbserial: USB Serial support registered for motorola_tetra
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.151474] usbserial: USB Serial support registered for novatel_gps
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.151504] usbserial: USB Serial support registered for hp4x
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.151532] usbserial: USB Serial support registered for suunto
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.151561] usbserial: USB Serial support registered for siemens_mpi
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.153240] vhci_hcd vhci_hcd.0: USB/IP Virtual Host Controller
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.153269] vhci_hcd vhci_hcd.0: new USB bus registered, assigned bus number 2
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.153324] vhci_hcd: created sysfs vhci_hcd.0
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.153633] usb usb2: New USB device found, idVendor=1d6b, idProduct=0002, bcdDevice= 5.15
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.153653] usb usb2: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.153666] usb usb2: Product: USB/IP Virtual Host Controller
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.153675] usb usb2: Manufacturer: Linux 5.15.1-MiSTer vhci_hcd
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.153684] usb usb2: SerialNumber: vhci_hcd.0
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.154266] hub 2-0:1.0: USB hub found
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.154337] hub 2-0:1.0: 8 ports detected
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.155422] vhci_hcd vhci_hcd.0: USB/IP Virtual Host Controller
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.155445] vhci_hcd vhci_hcd.0: new USB bus registered, assigned bus number 3
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.155889] usb usb3: We don't know the algorithms for LPM for this host, disabling LPM.
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.156045] usb usb3: New USB device found, idVendor=1d6b, idProduct=0003, bcdDevice= 5.15
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.156063] usb usb3: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.156075] usb usb3: Product: USB/IP Virtual Host Controller
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.156084] usb usb3: Manufacturer: Linux 5.15.1-MiSTer vhci_hcd
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.156093] usb usb3: SerialNumber: vhci_hcd.0
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.156691] hub 3-0:1.0: USB hub found
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.156754] hub 3-0:1.0: 8 ports detected
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.158006] usbcore: registered new device driver usbip-host
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.158947] mousedev: PS/2 mouse device common for all mice
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.159084] usbcore: registered new interface driver appletouch
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.159172] usbcore: registered new interface driver bcm5974
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.159246] usbcore: registered new interface driver synaptics_usb
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.159390] usbcore: registered new interface driver iforce
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.159680] usbcore: registered new interface driver xpad
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.160525] i2c_dev: i2c /dev entries driver
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.161656] usbcore: registered new interface driver bcm203x
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.162248] Synopsys Designware Multimedia Card Interface Driver
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.162793] dw_mmc ff704000.dwmmc0: IDMAC supports 32-bit address mode.
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.162848] dw_mmc ff704000.dwmmc0: Using internal DMA controller.
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.162864] dw_mmc ff704000.dwmmc0: Version ID is 240a
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.162937] dw_mmc ff704000.dwmmc0: DW MMC controller at irq 43,32 bit host data width,1024 deep fifo
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.163313] mmc_host mmc0: card is polling.
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.164017] hid: raw HID events driver (C) Jiri Kosina
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.165454] usbcore: registered new interface driver guncon2
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.165554] usbcore: registered new interface driver guncon3
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.165564] guncon3: USB GunCon3 Driver v0.2.0 initialized
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.168880] usbcore: registered new interface driver usbhid
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.168901] usbhid: USB HID core driver
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.169384] fpga_manager fpga0: Altera SOCFPGA FPGA Manager registered
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.170120] altera_hps2fpga_bridge ff400000.fpga_bridge: fpga bridge [lwhps2fpga] registered
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.170527] altera_hps2fpga_bridge ff500000.fpga_bridge: fpga bridge [hps2fpga] registered
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.170762] altera_hps2fpga_bridge ff600000.fpga-bridge: fpga bridge [fpga2hps] registered
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.175452] mmc_host mmc0: Bus speed (slot 0) = 50000000Hz (slot req 400000Hz, actual 396825HZ div = 63)
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.182070] MrAudio: CMA addr = 0x2400000
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.196047] MrAudio Audio buffer '/dev/MrAudio' created.
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.196047] Class --> 'MrAudio_sys'
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.196047] Major --> 257949696
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.196396] usbcore: registered new interface driver snd-usb-audio
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.197117] NET: Registered PF_PACKET protocol family
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.197168] NET: Registered PF_KEY protocol family
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.197304] Bluetooth: RFCOMM TTY layer initialized
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.197324] Bluetooth: RFCOMM socket layer initialized
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.197398] Bluetooth: RFCOMM ver 1.11
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.197419] Bluetooth: HIDP (Human Interface Emulation) ver 1.2
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.197434] Bluetooth: HIDP socket layer initialized
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.197495] 8021q: 802.1Q VLAN Support v1.8
+Aug 27 11:26:59 MiSTer user.notice kernel: [    1.197544] Key type dns_resolver registered
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.197662] ThumbEE CPU extension supported.
+Aug 27 11:26:59 MiSTer user.notice kernel: [    1.197676] Registering SWP/SWPB emulation handler
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.197955] registered taskstats version 1
+Aug 27 11:26:59 MiSTer user.notice kernel: [    1.197967] Loading compiled-in X.509 certificates
+Aug 27 11:26:59 MiSTer user.notice kernel: [    1.199006] Key type encrypted registered
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.209971] dma-pl330 ffe01000.pdma: Loaded driver for PL330 DMAC-341330
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.209994] dma-pl330 ffe01000.pdma: 	DBUFF-512x8bytes Num_Chans-8 Num_Peri-32 Num_Events-8
+Aug 27 11:26:59 MiSTer user.err kernel: [    1.214703] rtc-pcf8563 2-0051: pcf8563_write_block_data: err=-6 addr=0e, data=03
+Aug 27 11:26:59 MiSTer user.err kernel: [    1.222224] rtc-pcf8563 2-0051: pcf8563_probe: write error
+Aug 27 11:26:59 MiSTer user.warn kernel: [    1.227747] rtc-pcf8563: probe of 2-0051 failed with error -5
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.230037] rtc-m41t80 2-0068: registered as rtc0
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.231133] rtc-m41t80 2-0068: setting system clock to 2026-08-27T11:26:58 UTC (1787830018)
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.232196] i2c-gpio i2c_gpio: using lines 2012 (SDA) and 2013 (SCL)
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.232624] ALSA device list:
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.232636]   #0: Dummy 1
+Aug 27 11:26:59 MiSTer user.warn kernel: [    1.232787] dw-apb-uart ffc02000.serial0: forbid DMA for kernel console
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.232872] Waiting for root device /dev/mmcblk0p1...
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.251611] mmc_host mmc0: Bus speed (slot 0) = 50000000Hz (slot req 50000000Hz, actual 50000000HZ div = 0)
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.251694] mmc0: new high speed SDHC card at address b36d
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.252432] mmcblk0: mmc0:b36d SDABC 29.1 GiB 
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.254858]  mmcblk0: p1 p2
+Aug 27 11:26:59 MiSTer user.warn kernel: [    1.261547] [EXFAT] trying to mount...
+Aug 27 11:26:59 MiSTer user.notice kernel: [    1.285412] random: fast init done
+Aug 27 11:26:59 MiSTer user.warn kernel: [    1.318564] [EXFAT] mounted successfully
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.325689] loop8: detected capacity change from 0 to 768000
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.348717] EXT4-fs (loop8): mounted filesystem with ordered data mode. Opts: (null). Quota mode: disabled.
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.348795] VFS: Mounted root (ext4 filesystem) readonly on device 7:128.
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.363543] devtmpfs: mounted
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.367470] Freeing unused kernel image (initmem) memory: 1024K
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.367836] Run /sbin/init as init process
+Aug 27 11:26:59 MiSTer user.debug kernel: [    1.367845]   with arguments:
+Aug 27 11:26:59 MiSTer user.debug kernel: [    1.367849]     /sbin/init
+Aug 27 11:26:59 MiSTer user.debug kernel: [    1.367854]   with environment:
+Aug 27 11:26:59 MiSTer user.debug kernel: [    1.367859]     HOME=/
+Aug 27 11:26:59 MiSTer user.debug kernel: [    1.367863]     TERM=linux
+Aug 27 11:26:59 MiSTer user.debug kernel: [    1.367868]     memmap=513M$511M
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.422375] usb 1-1: new high-speed USB device number 2 using dwc2
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.600596] usb 1-1: New USB device found, idVendor=0424, idProduct=2514, bcdDevice= b.b3
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.600621] usb 1-1: New USB device strings: Mfr=0, Product=0, SerialNumber=0
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.601233] hub 1-1:1.0: USB hub found
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.601445] hub 1-1:1.0: 4 ports detected
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.884373] usb 1-1.2: new full-speed USB device number 3 using dwc2
+Aug 27 11:26:59 MiSTer user.warn kernel: [    1.920038] process '/MiSTer' started with executable stack
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.975262] usb 1-1.2: New USB device found, idVendor=2dc8, idProduct=3106, bcdDevice= 1.14
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.975288] usb 1-1.2: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.975300] usb 1-1.2: Product: 8BitDo Pro 2 Wired Controller
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.975310] usb 1-1.2: Manufacturer: 8BitDo
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.975319] usb 1-1.2: SerialNumber: DC77C8BA3005
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.976527] XPAD: original out.bInterval=4 -> new interval=4
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.976544] XPAD: original in.bInterval=2 -> new interval=2
+Aug 27 11:26:59 MiSTer user.info kernel: [    1.977112] input: 8BitDo Ultimate Wireless Controller as /devices/platform/soc/ffb40000.usb/usb1/1-1/1-1.2/1-1.2:1.0/input/input0
+Aug 27 11:26:59 MiSTer daemon.info kernel: [    2.266023] udevd[559]: starting version 3.2.9
+Aug 27 11:26:59 MiSTer user.notice kernel: [    2.308114] random: udevd: uninitialized urandom read (16 bytes read)
+Aug 27 11:26:59 MiSTer user.notice kernel: [    2.309823] random: udevd: uninitialized urandom read (16 bytes read)
+Aug 27 11:26:59 MiSTer user.notice kernel: [    2.309924] random: udevd: uninitialized urandom read (16 bytes read)
+Aug 27 11:26:59 MiSTer daemon.info kernel: [    2.353882] udevd[561]: starting eudev-3.2.9
+Aug 27 11:26:59 MiSTer user.info kernel: [    2.451225] MiSTer_fb 22000000.MiSTer_fb: width = 1920, height = 1080, format=8888
+Aug 27 11:26:59 MiSTer user.info kernel: [    2.666430] input: MiSTer virtual input as /devices/virtual/input/input1
+Aug 27 11:27:00 MiSTer user.notice kernel: [    3.016222] random: crng init done
+Aug 27 11:27:00 MiSTer user.notice kernel: [    3.016240] random: 4 urandom warning(s) missed due to ratelimiting
+Aug 27 11:27:00 MiSTer daemon.warn dbus-daemon[595]: Cannot setup inotify for '/usr/share/dbus-1/system.d'; error 'Permission denied'
+Aug 27 11:27:00 MiSTer daemon.info dhcpcd[613]: dhcpcd-9.4.0 starting
+Aug 27 11:27:00 MiSTer daemon.info dhcpcd[617]: dev: loaded udev
+Aug 27 11:27:00 MiSTer daemon.warn dhcpcd[617]: sandbox unavailable: seccomp
+Aug 27 11:27:02 MiSTer user.notice kernel: [    5.088800] cfg80211: Loading compiled-in X.509 certificates for regulatory database
+Aug 27 11:27:02 MiSTer user.notice kernel: [    5.107180] cfg80211: Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+Aug 27 11:27:02 MiSTer daemon.warn dhcpcd[617]: no interfaces have a carrier
+Aug 27 11:27:02 MiSTer user.info kernel: [    5.282492] loop0: detected capacity change from 0 to 4096
+Aug 27 11:27:02 MiSTer user.info kernel: [    5.318397] socfpga-dwmac ff702000.ethernet eth0: PHY [stmmac-0:01] driver [Micrel KSZ9031 Gigabit PHY] (irq=POLL)
+Aug 27 11:27:02 MiSTer user.info kernel: [    5.318678] socfpga-dwmac ff702000.ethernet eth0: Register MEM_TYPE_PAGE_POOL RxQ-0
+Aug 27 11:27:02 MiSTer user.info kernel: [    5.328551] EXT4-fs (loop0): recovery complete
+Aug 27 11:27:02 MiSTer user.info kernel: [    5.328577] EXT4-fs (loop0): mounted filesystem with ordered data mode. Opts: (null). Quota mode: disabled.
+Aug 27 11:27:02 MiSTer user.warn kernel: [    5.328631] ext4 filesystem being mounted at /var/lib/bluetooth supports timestamps until 2038 (0x7fffffff)
+Aug 27 11:27:02 MiSTer user.info kernel: [    5.335632] socfpga-dwmac ff702000.ethernet eth0: No Safety Features support found
+Aug 27 11:27:02 MiSTer user.info kernel: [    5.336413] socfpga-dwmac ff702000.ethernet eth0: registered PTP clock
+Aug 27 11:27:02 MiSTer user.info kernel: [    5.338298] socfpga-dwmac ff702000.ethernet eth0: configuring for phy/rgmii link mode
+Aug 27 11:27:02 MiSTer daemon.info dhcpcd[617]: eth0: waiting for carrier
+Aug 27 11:27:02 MiSTer daemon.info dhcpcd[617]: eth0: carrier acquired
+Aug 27 11:27:02 MiSTer daemon.info dhcpcd[617]: eth0: carrier lost
+Aug 27 11:27:02 MiSTer daemon.info bluetoothd[644]: Bluetooth daemon 5.61
+Aug 27 11:27:02 MiSTer daemon.notice ntpd[647]: ntpd 4.2.8p15@1.3728-o Sat Dec 24 08:21:53 UTC 2022 (1): Starting
+Aug 27 11:27:02 MiSTer daemon.notice ntpd[647]: Command line: /usr/sbin/ntpd -g -p /var/run/ntpd.pid
+Aug 27 11:27:02 MiSTer daemon.notice ntpd[647]: ----------------------------------------------------
+Aug 27 11:27:02 MiSTer daemon.notice ntpd[647]: ntp-4 is maintained by Network Time Foundation,
+Aug 27 11:27:02 MiSTer daemon.notice ntpd[647]: Inc. (NTF), a non-profit 501(c)(3) public-benefit
+Aug 27 11:27:02 MiSTer daemon.notice ntpd[647]: corporation.  Support and training for ntp-4 are
+Aug 27 11:27:02 MiSTer daemon.notice ntpd[647]: available at https://www.nwtime.org/support
+Aug 27 11:27:02 MiSTer daemon.notice ntpd[647]: ----------------------------------------------------
+Aug 27 11:27:02 MiSTer daemon.info bluetoothd[644]: Starting SDP server
+Aug 27 11:27:02 MiSTer daemon.err bluetoothd[644]: src/rfkill.c:rfkill_init() Failed to open RFKILL control device
+Aug 27 11:27:02 MiSTer daemon.info bluetoothd[644]: Bluetooth management interface 1.21 initialized
+Aug 27 11:27:02 MiSTer daemon.info ntpd[654]: proto: precision = 2.160 usec (-19)
+Aug 27 11:27:02 MiSTer daemon.info ntpd[654]: basedate set to 2022-12-12
+Aug 27 11:27:02 MiSTer daemon.info ntpd[654]: gps base set to 2022-12-18 (week 2241)
+Aug 27 11:27:02 MiSTer daemon.err ntpd[654]: restrict: ignoring line 11, address/host '[::1]' unusable.
+Aug 27 11:27:02 MiSTer daemon.info ntpd[654]: Listen and drop on 0 v4wildcard 0.0.0.0:123
+Aug 27 11:27:02 MiSTer daemon.info ntpd[654]: Listen normally on 1 lo 127.0.0.1:123
+Aug 27 11:27:02 MiSTer daemon.info ntpd[654]: Listening on routing socket on fd #18 for interface updates
+Aug 27 11:27:02 MiSTer daemon.info ntpd[654]: kernel reports TIME_ERROR: 0x41: Clock Unsynchronized
+Aug 27 11:27:02 MiSTer daemon.info ntpd[654]: kernel reports TIME_ERROR: 0x41: Clock Unsynchronized
+Aug 27 11:27:03 MiSTer daemon.notice proftpd[660]: MiSTer - ProFTPD 1.3.6e (maint) (built Sat Dec 24 2022 16:57:19 CST) standalone mode STARTUP
+Aug 27 11:27:03 MiSTer auth.info sshd[666]: Server listening on 0.0.0.0 port 22.
+Aug 27 11:27:03 MiSTer daemon.info : starting pid 671, tty '': '/bin/loadkeys /etc/kbd.map'
+Aug 27 11:27:03 MiSTer daemon.info : starting pid 672, tty '': '/bin/setfont'
+Aug 27 11:27:03 MiSTer daemon.info : starting pid 674, tty '': '/sbin/gpm -m /dev/input/mice -t imps2'
+Aug 27 11:27:03 MiSTer daemon.info : starting pid 676, tty '/dev/console': '/sbin/agetty --nohostname -L  console  xterm '
+Aug 27 11:27:03 MiSTer user.info /sbin/gpm[675]: *** info [daemon/startup.c(136)]: 
+Aug 27 11:27:03 MiSTer user.info /sbin/gpm[675]: Started gpm successfully. Entered daemon mode.
+Aug 27 11:27:03 MiSTer daemon.info : starting pid 677, tty '/dev/console': '/sbin/agetty --nohostname -L tty1 linux'
+Aug 27 11:27:03 MiSTer user.info /sbin/gpm[675]: *** info [mice.c(1990)]: 
+Aug 27 11:27:03 MiSTer user.info /sbin/gpm[675]: imps2: Auto-detected intellimouse PS/2
+Aug 27 11:27:06 MiSTer daemon.info dhcpcd[617]: eth0: carrier acquired
+Aug 27 11:27:06 MiSTer user.info kernel: [    9.442045] socfpga-dwmac ff702000.ethernet eth0: Link is Up - 1Gbps/Full - flow control off
+Aug 27 11:27:07 MiSTer daemon.info dhcpcd[617]: eth0: soliciting a DHCP lease
+Aug 27 11:27:07 MiSTer daemon.info dhcpcd[617]: eth0: offered 10.10.0.30 from 10.10.0.1
+Aug 27 11:27:07 MiSTer daemon.info dhcpcd[617]: eth0: probing address 10.10.0.30/24
+Aug 27 11:27:12 MiSTer daemon.info dhcpcd[617]: eth0: leased 10.10.0.30 for 86400 seconds
+Aug 27 11:27:12 MiSTer daemon.info dhcpcd[617]: eth0: adding route to 10.10.0.0/24
+Aug 27 11:27:12 MiSTer daemon.info dhcpcd[617]: eth0: adding default route via 10.10.0.1
+Aug 27 11:27:13 MiSTer daemon.info ntpd[654]: Listen normally on 2 eth0 10.10.0.30:123
+Aug 27 11:32:59 MiSTer daemon.info ntpd[654]: kernel reports TIME_ERROR: 0x41: Clock Unsynchronized
+Aug 27 11:34:22 MiSTer authpriv.warn proftpd[880]: MiSTer (DESKTOP-PI[10.10.0.21]) - ROOT FTP login successful
+Aug 27 11:34:22 MiSTer daemon.notice proftpd[880]: MiSTer (DESKTOP-PI[10.10.0.21]) - error: /var/log is a world-writable directory
+Aug 27 11:34:22 MiSTer daemon.notice proftpd[880]: MiSTer (DESKTOP-PI[10.10.0.21]) - unable to open TransferLog '/var/log/xferlog': No such file or directory
+Aug 27 11:53:32 MiSTer authpriv.warn proftpd[1343]: MiSTer (DESKTOP-PI[10.10.0.21]) - ROOT FTP login successful
+Aug 27 11:53:32 MiSTer daemon.notice proftpd[1343]: MiSTer (DESKTOP-PI[10.10.0.21]) - error: /var/log is a world-writable directory
+Aug 27 11:53:32 MiSTer daemon.notice proftpd[1343]: MiSTer (DESKTOP-PI[10.10.0.21]) - unable to open TransferLog '/var/log/xferlog': No such file or directory
+Aug 27 11:53:33 MiSTer authpriv.warn proftpd[1344]: MiSTer (DESKTOP-PI[10.10.0.21]) - ROOT FTP login successful
+Aug 27 11:53:33 MiSTer daemon.notice proftpd[1344]: MiSTer (DESKTOP-PI[10.10.0.21]) - error: /var/log is a world-writable directory
+Aug 27 11:53:33 MiSTer daemon.notice proftpd[1344]: MiSTer (DESKTOP-PI[10.10.0.21]) - unable to open TransferLog '/var/log/xferlog': No such file or directory
+Aug 27 11:53:33 MiSTer authpriv.warn proftpd[1345]: MiSTer (DESKTOP-PI[10.10.0.21]) - ROOT FTP login successful
+Aug 27 11:53:33 MiSTer daemon.notice proftpd[1345]: MiSTer (DESKTOP-PI[10.10.0.21]) - error: /var/log is a world-writable directory
+Aug 27 11:53:33 MiSTer daemon.notice proftpd[1345]: MiSTer (DESKTOP-PI[10.10.0.21]) - unable to open TransferLog '/var/log/xferlog': No such file or directory
+Aug 27 11:55:18 MiSTer user.info kernel: [ 1701.503812] MiSTer_fb 22000000.MiSTer_fb: width = 1920, height = 1080, format=8888
+Aug 27 11:55:18 MiSTer user.info kernel: [ 1701.587682] input: MiSTer virtual input as /devices/virtual/input/input2
+Aug 27 11:56:46 MiSTer authpriv.warn proftpd[1439]: MiSTer (DESKTOP-PI[10.10.0.21]) - ROOT FTP login successful
+Aug 27 11:56:46 MiSTer daemon.notice proftpd[1439]: MiSTer (DESKTOP-PI[10.10.0.21]) - error: /var/log is a world-writable directory
+Aug 27 11:56:46 MiSTer daemon.notice proftpd[1439]: MiSTer (DESKTOP-PI[10.10.0.21]) - unable to open TransferLog '/var/log/xferlog': No such file or directory
+Aug 27 11:56:48 MiSTer authpriv.warn proftpd[1440]: MiSTer (DESKTOP-PI[10.10.0.21]) - ROOT FTP login successful
+Aug 27 11:56:48 MiSTer daemon.notice proftpd[1440]: MiSTer (DESKTOP-PI[10.10.0.21]) - error: /var/log is a world-writable directory
+Aug 27 11:56:48 MiSTer daemon.notice proftpd[1440]: MiSTer (DESKTOP-PI[10.10.0.21]) - unable to open TransferLog '/var/log/xferlog': No such file or directory
+Aug 27 12:02:56 MiSTer authpriv.warn proftpd[1591]: MiSTer (DESKTOP-PI[10.10.0.21]) - ROOT FTP login successful
+Aug 27 12:02:56 MiSTer daemon.notice proftpd[1591]: MiSTer (DESKTOP-PI[10.10.0.21]) - error: /var/log is a world-writable directory
+Aug 27 12:02:56 MiSTer daemon.notice proftpd[1591]: MiSTer (DESKTOP-PI[10.10.0.21]) - unable to open TransferLog '/var/log/xferlog': No such file or directory

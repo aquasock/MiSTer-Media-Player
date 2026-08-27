@@ -1,3 +1,32 @@
+## 601 COMMIT Unreleased f615ce0 2026-08-27T05:04:37-07:00
+
+#### Coming From:
+
+Unreleased f615ce0
+
+#### Purpose:
+
+Confirm the DVD-ceiling cadence result in Bob and resolve the preceding run's Weave attribution.
+
+#### Outcome:
+
+The user explicitly confirms that the new run is Bob and entry 600 was Weave, resolving that entry's mode uncertainty without rewriting its historical record. The Bob helper log is retrieved first, followed by a newly generated parity/checksum-valid schema-nineteen screenshot and full Main/RBF/media readbacks. The installed f615ce0 RBF, retained Main and exact 18,402,691-byte ceiling fixture match entry 600 byte-for-byte. New helper PID 1568, helper hash a34a6fdc1f960654ced490c2e2392f956d8131b83fc1a576a1656410446c3a54 and telemetry checksum 4215072064 identify a distinct run, while the same 11:26:59 UTC Linux boot establishes no system reboot between the captures. The packet does not encode the mode or running bitstream hash, and no independent absence-of-core-reload proof is claimed. All 1,124 chunks and seventeen sampled ACK records reconcile; all 18,402,691 source bytes arrive with the expected single padded byte giving 18,402,692 FPGA-accepted bytes, no transport fault and helper exit zero. Both confirmed modes complete 449 reference/display pictures and 448 swaps with zero error flags, zero deadline gaps, zero outliers, no deadline records and normal EOF/quiet completion. Each mode's three largest steady intervals are exactly 2,002,000 clocks, or 33.366667 milliseconds. The old a4f2769 extra intervals at 167 and 346 remain absent in both new runs. Bob's startup-inclusive span is 14.996120 seconds at 29.874393 aggregate fps versus Weave's 14.991394 seconds at 29.883811; the 4.726100-millisecond difference lies in initial admission and does not indicate recurring Bob lateness. Bob's presentation hold is 5,529,868 cycles versus 5,246,150, and writer wait is 15,288,984 versus 15,282,414. All 165 Bob EAGAIN events precede first delivery, with no steady EAGAIN. Credit-fast transport carries 18,373,724 fast bytes and 28,967 acknowledged bytes in 902,794 bursts and 918,402 queries, with all guarded accounting intact; these consumption-paced statistics are not a maximum bus-bandwidth measurement. The fresh still shows the expected final foliage/spikes scene without an obvious large artifact; full-playback visual or pixel correctness is not inferred from it. The earlier Weave menu report remains valid, while this message does not separately report Bob menu behavior or playback appearance. The capacity-safe writer-retirement fix is accepted for this bounded two-mode 9.8 Mbps video-ceiling fixture and same-boot replay. Passed does not imply a long physical soak, combined audio/video qualification or complete DVD compatibility. Evidence and exact collection/analysis drivers are retained as .ai/current_results/entry601_*. No production source, deployed files, settings, reboot, core reload or playback is changed during collection; only the fixed screenshot is replaced.
+
+#### Next Steps:
+
+Retain f615ce0 as the accepted baseline for the measured ceiling-cadence fix and preserve the independently verified a4f2769 restoration artifacts. No further identical short replay is required merely to reconfirm the cleared 167/346 misses. The next useful qualification boundary is longer physical playback and the separate 10.08 Mbps combined-stream/audio/PTS and remaining DVD syntax/features, with scope and acceptance criteria defined before new production work. Keep mode-specific UI and visual claims limited to user reports, leave lifecycle/playback under user control, preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 600 COMMIT Unreleased f615ce0 2026-08-27T05:00:35-07:00
 
 #### Coming From:
@@ -1135,46 +1164,6 @@ Finish the corrected-source full-file, dense-excerpt, input-pause, phase, short-
 - MediaPlayer_top_05.svh
 - tools/streams/tb_h262_native_startup.sv
 - tools/streams/tb_h262_input_cadence.sv
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 561 COMMIT Unreleased 134b401 2026-08-26T22:44:26-07:00
-
-#### Coming From:
-
-Unreleased c4628b5
-
-#### Purpose:
-
-Increase resilience to delivery pauses with a larger clean-video queue and coherent readiness-based startup for native elementary-stream playback.
-
-#### Outcome:
-
-Source `134b401` implements the approved 64-KiB clean-video queue and native 29.97-fps elementary-stream startup reserve. It waits for a second presentable picture or terminal sequence end, unmasks the cached first bank at a complete field-pair edge and admits scheduler swaps only after that edge's synchronized visibility acknowledgement. HS, VS, DE, framebuffer sync sampling, raster clocks and ownership remain unchanged. Extracted timestamp or PCM records, non-I headers, syntax/probe errors and non-native or other-cadence sessions bypass the reserve; bypass is sticky until a new download. The actual eight-cycle download-rearm controller passes 24 readiness phases, short EOF, progressive and cadence bypass, interrupted startup and Bob/Weave controls. The extended queue test retains all 65,536 bytes at capacity and passes 85,696 ordered bytes across wrap with four correctly positioned timestamp records and three PCM samples. The first eight-picture real-pipeline run under a synthetic thirty-millisecond host-resume pause has zero missed windows or deadline gaps, with initial visibility at cycle 4,198,676 and the first actual swap one full frame later. An initial test harness wired the profiler to the old synthetic window instead of the new synchronized window and incorrectly reported six gaps; aligning that passive tap to production resolves the discrepancy without changing production control. Full-file, dense-excerpt, alternate-phase, drained-FIFO warm-session and native-suite checks are running on GUNSMOKE. Schema nineteen still measures its aggregate from first reference completion; its post-first-swap deadline records exclude startup, and the harness additionally reports visibility-based spans. This is input-pause resilience, not faster decoding or an exact replay of the hardware picture-348 miss. No Quartus build or hardware replacement has completed yet.
-
-#### Next Steps:
-
-Finish the full-file fingerprint, pause, reload and native regressions, pull the published source from GitHub into an empty build checkout on GUNSMOKE and require positive setup, hold, recovery, removal and pulse-width timing plus a fitting memory allocation. Record qualification and any subsequent findings in a new entry, then directly replace the active MiSTer image under standing authorization and verify a fresh full FTP readback. Leave reload to the user and request one clean Bob run before repeated-load and Bob/Weave checks. The separate live-raster assertion drift remains unresolved and partial-transfer HPS cancellation is not covered by the drained-FIFO warm test.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_clean_video_queue.sv
-- rtl/mpeg2_new/mpeg2_h262_native_startup.sv
-- MediaPlayer_top_05.svh
-- MediaPlayer_top_07.svh
-- MediaPlayer.sdc
-- files.qip
-- tools/streams/tb_h262_input_cadence.sv
-- tools/streams/run_input_cadence.py
-- tools/streams/tb_h262_clean_video_queue.sv
-- tools/streams/tb_h262_native_startup.sv
-- tools/streams/run_native_480i_timing.sh
-- README.md
 
 #### Status:
 
