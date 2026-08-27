@@ -1,0 +1,58 @@
+{
+  "captured": "2026-08-27T15:44:57-07:00",
+  "host": "10.10.0.30",
+  "candidate": "d466bed",
+  "expected_rbf_sha256": "61a2fed28425a461c8b886bdf809e3ef76a320e5688bb22a816135c36ef981ce",
+  "expected_media_sha256": "unknown-other-agent-fixture",
+  "expected_media_bytes": 3401745,
+  "user_report": "test 2 interlaced BFF looks good; menu still slow",
+  "mode": null,
+  "files": {
+    "/tmp/MediaPlayer_ARM.log": {
+      "local": "/tmp/entry625-capture/entry625_arm_helper.log",
+      "bytes": 54309,
+      "sha256": "46498b4a573b811312c48ec405e501449d95ce1022eab79b7372a4220e7fd88a"
+    },
+    "/tmp/messages": {
+      "local": "/tmp/entry625-capture/messages",
+      "bytes": 44831,
+      "sha256": "767a8712d16a343b5138ffbecb48031d9be7cf2a748b190a8daf78abb1b24797"
+    },
+    "/media/fat/screenshots/cadence_probe.png": {
+      "local": "/tmp/entry625-capture/entry625_terminal.png",
+      "bytes": 6920,
+      "sha256": "07e3bb3b0e520e0a0aa379fe8bed1ecdf6adc6ccf33e7142e8fe214535f750f1"
+    },
+    "/media/fat/MiSTer": {
+      "local": "/tmp/entry625-capture/MiSTer",
+      "bytes": 1170340,
+      "sha256": "0ee87029f0a00a50731707e8114363fc7019ae4c1200de85d90533c9163b5241"
+    },
+    "/media/fat/MediaPlayer.rbf": {
+      "local": "/tmp/entry625-capture/MediaPlayer.rbf",
+      "bytes": 4332740,
+      "sha256": "61a2fed28425a461c8b886bdf809e3ef76a320e5688bb22a816135c36ef981ce"
+    },
+    "/media/fat/games/MediaPlayer/test_2_interlace_bff.mpg": {
+      "local": "/tmp/entry625-capture/fixture.mpg",
+      "bytes": 3401745,
+      "sha256": "c4d687ec0c5b75a52c5a83f7162ceb2e1e2f0ca41a50471e444285c7d2fd2f71"
+    }
+  },
+  "operations": [
+    "RETR /tmp/MediaPlayer_ARM.log",
+    "RETR /tmp/messages",
+    "DELE /media/fat/screenshots/cadence_probe.png",
+    "STOR screenshot command only",
+    "RETR /media/fat/screenshots/cadence_probe.png",
+    "RETR /media/fat/MiSTer",
+    "RETR /media/fat/MediaPlayer.rbf",
+    "RETR /media/fat/games/MediaPlayer/test_2_interlace_bff.mpg"
+  ],
+  "syslog_boot_lines": [
+    "Aug 27 16:15:58 MiSTer syslog.info syslogd started: BusyBox v1.33.1"
+  ],
+  "installed_candidate_is_d466bed": true,
+  "media_matches_entry602": false,
+  "unchanged_target_state": "No reload, reboot, launch, media/config edit or deployment; only the fixed screenshot was replaced."
+}

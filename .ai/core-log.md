@@ -1,3 +1,32 @@
+## 625 COMMIT Unreleased 140a5b7 2026-08-27T15:48:33-07:00
+
+#### Coming From:
+
+Unreleased 140a5b7
+
+#### Purpose:
+
+Capture hardware results for the first three corrected hand tests and identify what the reported menu lag tracks.
+
+#### Outcome:
+
+Three duplicated efforts are resolved first. Another agent independently authored the same test suite generator, found real defects in this agent's version and corrected them, and the user directed that their files be used. Those defects were genuine: a `drawbox` position expression that was evaluated once rather than per frame, leaving a stationary bar in four of six files, and the use of top field interleaving for both field orders with only the signalling flag patched afterwards, so the bottom field first file never carried genuinely bottom-first temporal content. This agent's structural and hash checks could not have caught either, because neither verified that the picture moved. Two local commits carrying the superseded generator and a colliding entry number were discarded at the user's instruction and the published tree taken as-is; the user has since given this agent sole control of core-log.md. The three installed fixtures all play correctly. Each completes 360 reference and display pictures with 359 swaps, `error_flags` zero, presentation error clear, sequence end seen, presentation complete, quiet snapshot, zero deadline gaps and outliers, and all three largest display intervals at exactly the nominal 2,002,000 clocks, with audio underrun and PCM protocol error clear and helper exit zero. Accepted video is 3,068,039, 3,067,813 and 12,073,185 bytes respectively. The top and bottom field first files hash differently rather than differing only by a flag, which is what the other agent's interleaving fix was for, and the user reports both look correct. An installation fact matters for interpreting all of this: entry 624's Main is not installed. The running Main is still `0ee87029f0a00a50731707e8114363fc7019ae4c1200de85d90533c9163b5241` from the earlier cycle, confirmed independently by the helper log reporting profile version one rather than the version two logging that Main introduces, so none of these runs exercises its polling budget. The reported menu behaviour is nevertheless explained by measurement rather than left as an impression. Maximum media-poll occupancy is 160,937 microseconds on test one and 153,112 on test two, both of which the user found laggy, against 63,506 microseconds on test three, which the user found responsive. The acknowledged-write share of transport moves the same way, at 12.2 and 12.1 percent for tests one and two against 3.5 percent for test three. The mechanism is consistent with the other agent's diagnosis: low bitrate content drains the FPGA slowly, so transport credits run out more often and Main falls back to acknowledged writes inside a single poll instead of yielding, and the two low-rate files are 3.4 megabytes against test three's 12.5. This is event-loop occupancy measured from the helper's own profile, not a measured button-response latency, and no such latency is claimed. Tests four through six remain unrun.
+
+#### Next Steps:
+
+Capture the remaining three hand tests as the user runs them, taking the helper log before anything else is played, and expect the two small audio sweep files to show the same long poll occupancy as tests one and two for the same reason. Do not treat the menu question as open evidence-gathering: it is understood, entry 624's Main contains the fix, and the useful next step is installing that Main and repeating a low bitrate test to confirm occupancy falls. Keep the release README unwritten until the progressive picture type question is settled, since no test in this set exercises P or B pictures and the difference between progressive I-only and progressive I/P/B is exactly what the document must state correctly. When capability is established, carry the entry 616 wording of one or two repeated frames at the picture 690 cut, the marginal scaler paths recovered by reseeding in entry 618, and an honest split of measured versus listened audio claims. The interlaced gates of entry 609 remain open and out of scope for this release. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 624 COMMIT Unreleased 140a5b7 2026-08-27T09:27:04-07:00
 
 #### Coming From:
@@ -1167,31 +1196,3 @@ Have the user power-cycle, load the core and play `bbb_480i_tff_15s.m2v` once, t
 
 ---
 
-## 585 COMMIT Unreleased 32ba178 2026-08-27T01:59:36-07:00
-
-#### Coming From:
-
-Unreleased 32ba178
-
-#### Purpose:
-
-Validate the first cold profiling run and identify whether helper reads, acknowledged FPGA transfers or other main-loop work dominate high-bitrate playback.
-
-#### Outcome:
-
-After the user reported the screen ready, the helper log was fetched before a fresh terminal screenshot. Syslog records a new Linux boot at 08:52:25 UTC versus entry 581's 08:23:32; it corroborates the requested reboot but does not independently prove power removal or playback count. The runtime log contains `profile_version=1`, and full host and FPGA readbacks retain entry 584's expected hashes, establishing that host source `32ba178` is now running against unchanged FPGA `2acabc5`. All 34,919,166 bytes and 449 pictures complete, with 448 swaps, zero decoder error flags, normal helper exit and quiet completed presentation. Cadence still fails: 24.460381 seconds, 18.315332 fps and 186 delayed presentation intervals, compared with entry 581's 18.335712 fps and 185 intervals. Matched completed-chunk endpoints yield 1,427,221 bytes per second, only 0.049 percent below the prior run and far below the file's 2,330,798-byte-per-second average demand. Profiling directly separates the cost: 2,132 transfers consume 23.585322 seconds, or 96.68 percent of 24.394209 seconds inside media polls; all pipe reads consume 0.730964 seconds, or 3.00 percent, and other measured in-poll work accounts for 0.077923 seconds. The 485 EAGAIN events all precede the first successful chunk. Actual accounting records 533 data-bearing polls, averaging 45.759 milliseconds with an 80.498-millisecond maximum across all polls; these are blocking exposure, not direct UI latency. Thirty-three sampled chunks cover 270,336 words. In 32 chunks both ACK phases require at most two GPI reads per word, with nearly two reads typical; high or low wait-word counts merely mean more than one read and must not be mislabeled FIFO-full stalls. Sample event 768 is exceptional: ACK-low takes up to 72 reads, totaling 55,330 low-phase reads across 8,192 words, and nearby unsampled transfers also slow. This confirms actual extended ACK polling while leaving the cause and unsampled wait distribution unresolved. The ordinary handshake and bridge path therefore remain the useful optimization target, but eliminating flow control is unsafe. The first successful read occurs 39.694 milliseconds after download assertion and the first entire chunk completes at 51.494 milliseconds, keeping the legacy first-byte label distinct. Sampled full chunks have a 3.66 percent higher median transfer cost than unsampled chunks; these are unpaired measurements, and one nearly unchanged aggregate run cannot quantify instrumentation overhead. The retained first three delayed deadlines show ready-but-empty decoder input and empty upstream FIFO, with writer-capacity blocking of zero, zero and nine cycles. The user's earlier responsive-menu observation belongs to entry 581; current menu responsiveness remains unreported. The user subsequently identified the meadow as the current worst section and clarified that the spikes comparison refers to old progressive bring-up, not another recent run. Build-PC frame extraction from the hash-verified fixture identifies picture 350 as dense ground foliage viewed from above, with the clip's largest encoded span of 253,632 bytes, requiring about 178 milliseconds at measured mean supply against 33.367 milliseconds per nominal frame. This supports the reported meadow slowdown without establishing a relation to the old progressive issue. A source-review correction is also required: the largest-gap metadata holds only an eight-bit picture ordinal, so raw codes 93, 94 and 95 are ambiguous between pictures 93 through 95 and 349 through 351 in this 449-picture clip; the wrapped candidates coincide with the largest pictures and reported meadow scene, but the snapshot alone cannot prove that mapping. The three retained largest intervals are each 166.833 milliseconds. Capture, decode, helper log and checked analysis are retained as `.ai/current_results/entry585_*`. No production source, deployed binary, configuration or lifecycle was changed; the profiling works as a diagnostic, but smooth-playback acceptance and the qualified 8 Mbps regression remain outstanding.
-
-#### Next Steps:
-
-Prepare the next approved implementation boundary around a flow-controlled bulk transfer path that reduces per-word bridge overhead while preserving ACK/backpressure, byte order, odd tails, core readiness and reset handling, and ordinary non-media transports. Do not increase buffers again or substitute unchecked fast writes. Establish protocol and byte-trace equivalence plus delayed-backpressure tests and build with the official ARM toolchain before qualified host deployment; if adequate headroom requires an FPGA transport-protocol change, obtain approval for that material revision before implementing it. Retain the user's standing evidence/source publication and host-deployment permissions without repeating those questions, while keeping backup, staging and independent readback safeguards. Do not request another identical hardware run merely for statistics. After a changed candidate is available, validate one high-bitrate run and the outstanding qualified 8 Mbps case, and confirm whether the meadow slowdown improves and obtain a current menu-responsiveness report. Keep the existing startup controller, 64 KiB clean-video queue, continuous HDMI sync and black idle behavior unchanged, leave reboot and playback to the user, preserve restricted `core.md` and the forty-entry ring, and retain the unresolved interlaced, audio/PTS, cancellation and assertion-drift limitations from prior entries.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
