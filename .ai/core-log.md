@@ -1,4 +1,4 @@
-## 561 COMMIT Unreleased ??? 2026-08-26T22:44:26-07:00
+## 561 COMMIT Unreleased 134b401 2026-08-26T22:44:26-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Increase resilience to delivery pauses with a larger clean-video queue and coher
 
 #### Outcome:
 
-The user approved implementing and hardware-testing the entry-560 candidate. The planned production boundary enlarges the clean-video queue to 64 KiB while retaining timestamp byte ordering, then holds native untimestamped all-I startup until a second presentable picture or terminal sequence end is available. The first cached picture will become visible only at a complete field-pair boundary; scheduler swaps follow its synchronized visibility acknowledgement, preserving a full first field pair and continuous HS, VS and DE. Timestamp or PCM metadata, incompatible picture types and non-native sessions bypass this startup policy, with no rearming on Bob/Weave changes. The existing schema-nineteen aggregate clock begins at first reference completion and therefore continues to include startup buffering; steady swap intervals and deadline counts, rather than that aggregate alone, determine playback cadence. This does not claim an exact replay of the hardware picture-348 miss or faster decoding.
+Source `134b401` implements the approved 64-KiB clean-video queue and native 29.97-fps elementary-stream startup reserve. It waits for a second presentable picture or terminal sequence end, unmasks the cached first bank at a complete field-pair edge and admits scheduler swaps only after that edge's synchronized visibility acknowledgement. HS, VS, DE, framebuffer sync sampling, raster clocks and ownership remain unchanged. Extracted timestamp or PCM records, non-I headers, syntax/probe errors and non-native or other-cadence sessions bypass the reserve; bypass is sticky until a new download. The actual eight-cycle download-rearm controller passes 24 readiness phases, short EOF, progressive and cadence bypass, interrupted startup and Bob/Weave controls. The extended queue test retains all 65,536 bytes at capacity and passes 85,696 ordered bytes across wrap with four correctly positioned timestamp records and three PCM samples. The first eight-picture real-pipeline run under a synthetic thirty-millisecond host-resume pause has zero missed windows or deadline gaps, with initial visibility at cycle 4,198,676 and the first actual swap one full frame later. An initial test harness wired the profiler to the old synthetic window instead of the new synchronized window and incorrectly reported six gaps; aligning that passive tap to production resolves the discrepancy without changing production control. Full-file, dense-excerpt, alternate-phase, drained-FIFO warm-session and native-suite checks are running on GUNSMOKE. Schema nineteen still measures its aggregate from first reference completion; its post-first-swap deadline records exclude startup, and the harness additionally reports visibility-based spans. This is input-pause resilience, not faster decoding or an exact replay of the hardware picture-348 miss. No Quartus build or hardware replacement has completed yet.
 
 #### Next Steps:
 
-Implement the production controller and queue, exercise actual startup logic in the real-pipeline harness and add directed field-boundary, short-file, mode-bypass and warm-download-rearm coverage. Compare complete picture identities against the existing baseline under input pauses and alternate phases, preserve the native and metadata regressions, and publish the source before a clean Quartus build on GUNSMOKE. Require positive setup, hold, recovery, removal and pulse-width timing and a fitting memory allocation before directly replacing the active MiSTer image under standing authorization and verifying a fresh full FTP readback. Leave reload to the user and request one clean Bob run before repeated-load and Bob/Weave checks.
+Finish the full-file fingerprint, pause, reload and native regressions, pull the published source from GitHub into an empty build checkout on GUNSMOKE and require positive setup, hold, recovery, removal and pulse-width timing plus a fitting memory allocation. Record qualification and any subsequent findings in a new entry, then directly replace the active MiSTer image under standing authorization and verify a fresh full FTP readback. Leave reload to the user and request one clean Bob run before repeated-load and Bob/Weave checks. The separate live-raster assertion drift remains unresolved and partial-transfer HPS cancellation is not covered by the drained-FIFO warm test.
 
 #### Files Modified:
 
@@ -26,6 +26,7 @@ Implement the production controller and queue, exercise actual startup logic in 
 - files.qip
 - tools/streams/tb_h262_input_cadence.sv
 - tools/streams/run_input_cadence.py
+- tools/streams/tb_h262_clean_video_queue.sv
 - tools/streams/tb_h262_native_startup.sv
 - tools/streams/run_native_480i_timing.sh
 - README.md
