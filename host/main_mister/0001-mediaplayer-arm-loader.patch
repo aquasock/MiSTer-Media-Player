@@ -117,7 +117,7 @@ new file mode 100644
 index 0000000..5ed0c50
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,275 @@
+@@ -0,0 +1,304 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -131,6 +131,7 @@ index 0000000..5ed0c50
 +#include <string>
 +#include <sys/types.h>
 +#include <sys/wait.h>
++#include <time.h>
 +#include <unistd.h>
 +
 +#include "file_io.h"
@@ -145,20 +146,37 @@ index 0000000..5ed0c50
 +static uint64_t submitted_bytes = 0;
 +static unsigned read_events = 0;
 +static unsigned would_block_events = 0;
++static uint64_t session_start_us = 0;
++static uint64_t download_assert_us = 0;
++static int first_byte_seen = 0;
++
++static uint64_t monotonic_us()
++{
++	struct timespec now;
++	if (clock_gettime(CLOCK_MONOTONIC, &now)) return 0;
++	return (uint64_t)now.tv_sec * 1000000ull + (uint64_t)(now.tv_nsec / 1000);
++}
 +
 +static void diagnostic_write(const char *format, ...)
 +{
 +	char message[1024];
 +	va_list arguments;
++	int prefix;
 +	int length;
 +
 +	if (diagnostic_fd < 0) return;
++	prefix = snprintf(message, sizeof(message), "t=%llu ",
++	                  (unsigned long long)(monotonic_us() - session_start_us));
++	if (prefix < 0) return;
++	if ((size_t)prefix >= sizeof(message)) prefix = sizeof(message) - 1;
 +	va_start(arguments, format);
-+	length = vsnprintf(message, sizeof(message), format, arguments);
++	length = vsnprintf(message + prefix, sizeof(message) - (size_t)prefix,
++	                   format, arguments);
 +	va_end(arguments);
 +	if (length < 0) return;
-+	if ((size_t)length >= sizeof(message)) length = sizeof(message) - 1;
-+	(void)write(diagnostic_fd, message, (size_t)length);
++	if ((size_t)length >= sizeof(message) - (size_t)prefix)
++		length = (int)(sizeof(message) - (size_t)prefix) - 1;
++	(void)write(diagnostic_fd, message, (size_t)prefix + (size_t)length);
 +}
 +
 +static void diagnostic_close()
@@ -181,6 +199,9 @@ index 0000000..5ed0c50
 +	submitted_bytes = 0;
 +	read_events = 0;
 +	would_block_events = 0;
++	session_start_us = monotonic_us();
++	download_assert_us = 0;
++	first_byte_seen = 0;
 +	diagnostic_write("start source=%s index=%u core=%s alternate=%s\n",
 +	                 source_spec, (unsigned)index,
 +	                 user_io_get_core_name(), user_io_get_core_name(1));
@@ -318,6 +339,7 @@ index 0000000..5ed0c50
 +	user_io_file_info(".M2V");
 +	user_io_set_download(1);
 +	download_active = 1;
++	download_assert_us = monotonic_us();
 +	diagnostic_write("download asserted index=%u pid=%d\n",
 +	                 (unsigned)index, (int)helper_pid);
 +	printf("MediaPlayer: streaming %s through ARM helper\n", source_spec);
@@ -343,6 +365,13 @@ index 0000000..5ed0c50
 +			user_io_file_tx_data(buffer, (uint32_t)count);
 +			submitted_bytes += (uint64_t)count;
 +			read_events++;
++			if (!first_byte_seen)
++			{
++				first_byte_seen = 1;
++				diagnostic_write("first_byte latency_us=%llu would_block=%u count=%d\n",
++				                 (unsigned long long)(monotonic_us() - download_assert_us),
++				                 would_block_events, (int)count);
++			}
 +			diagnostic_write("read event=%u count=%d submitted=%llu\n",
 +			                 read_events, (int)count,
 +			                 (unsigned long long)submitted_bytes);
