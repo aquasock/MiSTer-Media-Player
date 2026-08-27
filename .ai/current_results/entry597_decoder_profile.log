@@ -1,0 +1,33 @@
+PROFILE pictures=16 cycles=32358329
+PROFILE pictures=32 cycles=64294681
+PROFILE pictures=48 cycles=96181762
+PROFILE pictures=64 cycles=128126930
+PROFILE pictures=80 cycles=160072134
+PROFILE pictures=96 cycles=191600440
+PROFILE pictures=112 cycles=223550214
+PROFILE pictures=128 cycles=254785101
+PROFILE pictures=144 cycles=286697600
+PROFILE pictures=160 cycles=319634540
+PROFILE pictures=176 cycles=351122985
+PROFILE pictures=192 cycles=383321189
+PROFILE pictures=208 cycles=415249792
+PROFILE pictures=224 cycles=447271270
+PROFILE pictures=240 cycles=479126298
+PROFILE pictures=256 cycles=510919831
+PROFILE pictures=272 cycles=542896699
+PROFILE pictures=288 cycles=574854175
+PROFILE pictures=304 cycles=606720071
+PROFILE pictures=320 cycles=638594872
+PROFILE pictures=336 cycles=670560644
+PROFILE pictures=352 cycles=703065042
+PROFILE pictures=368 cycles=734291522
+PROFILE pictures=384 cycles=766263314
+PROFILE pictures=400 cycles=797675180
+PROFILE pictures=416 cycles=830307340
+PROFILE pictures=432 cycles=861910309
+PROFILE pictures=448 cycles=894009835
+I_THROUGHPUT_PASS pictures=449 cycles=896002619 bytes=18402691
+- /home/vash/mister-builds/entry597/tb_entry597_i_throughput.sv:221: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01
+- Verilator: $finish at 9s; walltime 223.053 s; speed 40.172 ms/s
+- Verilator: cpu 223.040 s on 1 threads; alloced 249 MB

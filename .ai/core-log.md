@@ -1,3 +1,32 @@
+## 597 COMMIT Unreleased feb50c2 2026-08-27T04:02:24-07:00
+
+#### Coming From:
+
+Unreleased feb50c2
+
+#### Purpose:
+
+Identify the content and decoder workload associated with the repeatable missed pictures 167 and 346.
+
+#### Outcome:
+
+The profiler's full-width ordinals are one-based, corroborated by completed-reference counts 166 and 345 at the two deadlines, so the exact file indices are 166 and 345 at 5.538867 and 11.511500 seconds. All 449 pictures have the same I-picture coding extension, thirty slices, 1,350 macroblocks and 8,100 blocks; neither target is a special picture type or header-mode transition. Picture 167 shows dense foliage immediately before a cut to a mostly sky view and occupies 43,716 bytes, only 104th-largest; picture 346 shows the flying squirrel approaching the camera and occupies 46,222 bytes, 52nd-largest. The median is 40,186 bytes and maximum 143,171. GUNSMOKE used the unchanged 04ca33b checkout, production-equivalent to a4f2769, to compile a temporary observer around the current production frontend, parser, inverse quantizer, IDCT and intra reconstruction. All 449 pictures complete with 518,400 samples and 8,100 blocks each and no asserted reconstruction errors. This diagnostic excludes host transport, DDR persistence, presentation and pixel-oracle comparison; it is an optimistic decoder-cost profile, not a physical replay or new pixel-conformance test. Isolated costs are 33.667517 and 34.043583 milliseconds, ranking 104 and 52 of 449, with 148 pictures exceeding the nominal 2,002,000-cycle individual budget. Both parser pipeline-wait time of 1,628,100 clocks and IDCT transform-active time of 1,036,800 clocks are identical for every picture; variable cost lies outside those fixed stage counts, including compressed-bit parsing, not unusually long transforms at these two pictures. The retained Weave records measure 33.944600 and 34.321650 milliseconds from preceding reference completion to candidate readiness, against the nominal 33.366667-millisecond period. Previous-reference head starts are only 0.133300 and 0.870233 milliseconds, leaving the observed 0.444633 and 0.084750 milliseconds of lateness; Bob gives the same relationship with slightly different margins. Accepted-byte positions are 79 and 15 bytes before the respective access-unit ends in Weave, and 69 and 14 in Bob; these positions do not measure remaining arithmetic work. The evidence supports insufficient available decode/retirement lead at these deadlines rather than uniquely large or exceptional pictures, while the exact scheduler/retirement contribution remains unisolated. The isolated model must not be claimed to reproduce the two hardware misses. Evidence, exact observer, commands, full cost table, analysis and two decoded views are retained as .ai/current_results/entry597_*, with the full temporary build and six views on GUNSMOKE under /home/vash/mister-builds/entry597. No production source, deployed file, configuration or MiSTer lifecycle/playback action changed. Built refers to the diagnostic compilation; the existing strict hardware cadence gate remains unpassed.
+
+#### Next Steps:
+
+Use these measurements to scope a bounded decode/retirement throughput revision or a targeted integrated diagnostic, preserving exact picture identity, startup and presentation phase rather than treating either image as malformed or merely masking its deadline miss. Account for sustained workload and available reference-buffer lead; a picture's individual byte size or transform coefficient count alone cannot predict whether its display deadline is missed. Keep the exact 9.8 Mbps fixture and installed a4f2769 pair, preserve transport integrity checks, queues, startup, continuous sync and restoration copies, and obtain approval if the resulting production plan materially changes the accepted scope. Require zero missed slots on the ceiling fixture before the separate combined 10.08 Mbps/audio-and-timing gate; full DVD compatibility remains broader. Leave lifecycle and playback with the user, keep restricted core.md unchanged and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 596 COMMIT Unreleased feb50c2 2026-08-27T03:53:06-07:00
 
 #### Coming From:
@@ -1149,47 +1178,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 557 COMMIT Unreleased 31a87b6 2026-08-26T21:45:31-07:00
-
-#### Coming From:
-
-Unreleased 30d300a
-
-#### Purpose:
-
-Capture decoder-input and presentation readiness at missed native frame deadlines without changing playback behavior.
-
-#### Outcome:
-
-The user approved the passive diagnostic build proposed in entry 556. Source `31a87b6` implements schema nineteen using the unchanged sixty-four-word overlay geometry and common cadence/error counters, replacing the retired framebuffer-detail payload with full sixteen-bit picture/swap counts and the first three confirmed missed-deadline records. Each record retains the upcoming display ordinal, completed-reference count, exact window state, completion age, decoder-input starvation and writer-capacity stall counts, accepted byte position and subsequent candidate readiness delay. The observer samples the window bus coherently, waits one further clock for the scheduler's registered bank change, and retains a miss only if a later presentation confirms that the gap eventually ended. This avoids both an on-time swap being misclassified from its old bank and terminal idle consuming record slots. Availability is tapped directly before the decoder instead of inferred from the upstream HPS FIFO; writer-capacity blocking is observed separately from its acknowledgement pulse and DDR busy level. The continuous HDMI sync fix, raster, decoder arithmetic, scheduler admission/ownership, memory transactions and queue control are unchanged. The extended RTL test passes exact window-state retention, eleven measured input-starvation cycles, writer attribution, late and already-ready candidates, on-time swaps, ordinal 348, multiple windows in one gap, bounded record retention, terminal idle and session/mode reset. A saved RTL packet decodes correctly through a rendered screenshot with ordinals three, four and 348, and the Python suite also passes legacy layouts, full 449-picture counts/rate and saturation handling. Queue and writer tests prove the new availability taps against real retained bytes and a blocked two-bank drain. Retired framebuffer fields are explicitly unavailable in schema nineteen rather than decoded as errors. The unchanged native-video regression is still running; no official Quartus image has yet been built or deployed. The user's question about using simulation alone was answered with the remaining boundary: the integrated ideal-input/DDR simulation does not reproduce the hardware picture-348 delay, so measured hardware wait evidence is needed before claiming its cause.
-
-#### Next Steps:
-
-Implement the passive taps and event recorder, extend the existing profiler and screenshot-decoder tests for exact-boundary capture, late readiness, input-versus-writer attribution, ordinal wrap, on-time presentation, terminal idle and repeated-session reset, and retain the native sync regressions. Commit the validated source from the Pi and pull it into a clean GUNSMOKE build directory. Require a successful Quartus build with positive timing in every class before directly replacing the active MiSTer image under the standing authorization, verifying the complete image through independent FTP readback and leaving core reload to the user. Request one clean Bob playback for the new capture before exercising repeated loads or Bob/Weave changes.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_04.svh
-- MediaPlayer_top_07.svh
-- rtl/mpeg2_new/mpeg2_h262_clean_video_queue.sv
-- rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-- tools/streams/tb_h262_clean_video_queue.sv
-- tools/streams/tb_h262_ddram_store_overlap.sv
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/test_decode_hardware_cadence.py
-- tools/streams/run_native_480i_timing.sh
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
