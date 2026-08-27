@@ -49,8 +49,15 @@ share a compilation unit:
 2. Container: raw M2V pass-through or MPEG Program Stream/PES demultiplexing.
 3. Timeline: PTS extraction and FPGA in-band timestamp records, with future
    discontinuity events for title, cell and seek transitions.
-4. Audio codec: MPEG Layer II now; AC-3 and DVD LPCM later behind codec
-   selection rather than source-specific decode paths.
+4. Audio codec: MPEG Layer II on stream ids 0xC0-0xDF and AC-3 on private
+   stream 1 substreams 0x80-0x87, both behind codec selection rather than
+   source-specific decode paths. The codec is decided by the first audio PES
+   seen and the other is ignored for the rest of the session; only the first
+   AC-3 substream is played, because track switching needs the versioned
+   control channel protocol one omits. AC-3 is downmixed to stereo by liba52
+   using the stream's own coefficients. DVD LPCM is still later. Passing a
+   compressed bitstream through to S/PDIF is a separate output concern, not a
+   codec one: it would bypass this decode stage entirely.
 5. Outputs: one annotated H.262-plus-PCM transport to Main, with the FPGA owning
    the separate video and PCM sinks after record extraction.
 

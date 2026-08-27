@@ -3,6 +3,8 @@
 #define MINIMP3_NO_SIMD
 
 #include "minimp3.h"
+#include "a52.h"
+#include "mm_accel.h"
 #include "media_player_protocol.h"
 #include "media_source.h"
 
@@ -63,6 +65,23 @@
  */
 #define PCM_HOLD_DEFAULT_MS 4000u
 #define PCM_SAMPLE_RATE     48000u
+
+/*
+ * DVD carries AC-3 inside private stream 1.  Each such PES payload opens with
+ * a substream identifier, a frame count and a pointer to the first frame
+ * header in this packet; 0x80 through 0x87 are the eight AC-3 tracks.  A frame
+ * is always six blocks of 256 samples per channel, and every DVD AC-3 track is
+ * 48 kHz, so the existing PCM record path and its rate assumptions are
+ * unchanged.  a52_syncinfo needs the first seven bytes of a frame to report
+ * that frame's length.
+ */
+#define AC3_SUBSTREAM_FIRST 0x80u
+#define AC3_SUBSTREAM_LAST  0x87u
+#define AC3_PRIVATE_HEADER  4u
+#define AC3_SYNCINFO_BYTES  7u
+#define AC3_BLOCKS_PER_FRAME 6
+#define AC3_SAMPLES_PER_BLOCK 256
+#define AC3_SAMPLES_PER_FRAME (AC3_BLOCKS_PER_FRAME * AC3_SAMPLES_PER_BLOCK)
 
 struct video_chunk {
     struct video_chunk *next;
@@ -156,8 +175,23 @@ static void pts_scan_payload(struct output_state *output, const uint8_t *data,
     }
 }
 
+/*
+ * Codec selection follows ARCHITECTURE.md: the codec is chosen from the first
+ * audio PES seen and the other codec is ignored for the rest of the session,
+ * rather than branching on the source or container.
+ */
+enum audio_codec {
+    AUDIO_CODEC_NONE = 0,
+    AUDIO_CODEC_MP2,
+    AUDIO_CODEC_AC3
+};
+
 struct audio_state {
+    enum audio_codec codec;
     mp3dec_t decoder;
+    a52_state_t *a52;
+    int a52_substream;
+    int a52_synced;
     uint8_t *data;
     size_t size;
     size_t capacity;
@@ -674,8 +708,95 @@ static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
     return 0;
 }
 
-static int decode_audio_buffer(struct audio_state *audio,
-                               struct output_state *output, int at_eof)
+/*
+ * liba52 hands back one block of 256 sample_t per channel at a time, planar,
+ * with the channel count implied by the flags it accepted.  Requesting
+ * A52_STEREO makes it perform the 5.1 downmix itself using the coefficients
+ * carried in the stream, and A52_ADJUST_LEVEL keeps that downmix from
+ * clipping, so the helper never has to invent matrix coefficients of its own.
+ */
+static int decode_ac3_buffer(struct audio_state *audio,
+                             struct output_state *output, int at_eof)
+{
+    size_t original_size = audio->size;
+    size_t offset = 0;
+
+    while (original_size - offset >= AC3_SYNCINFO_BYTES) {
+        uint8_t *frame = audio->data + offset;
+        int flags = 0;
+        int sample_rate = 0;
+        int bit_rate = 0;
+        int length;
+        int block;
+        sample_t level = 1;
+        mp3d_sample_t pcm[AC3_SAMPLES_PER_FRAME * 2];
+
+        length = a52_syncinfo(frame, &flags, &sample_rate, &bit_rate);
+        if (length <= 0) {
+            /* Resynchronize a byte at a time rather than discarding the run. */
+            offset++;
+            audio->a52_synced = 0;
+            continue;
+        }
+        if ((size_t)length > original_size - offset)
+            break;
+        if (sample_rate != (int)PCM_SAMPLE_RATE) {
+            fprintf(stderr,
+                    "media_player_helper: unsupported AC-3 sample rate %d Hz "
+                    "(supported: %u Hz)\n",
+                    sample_rate, PCM_SAMPLE_RATE);
+            return -1;
+        }
+        flags = A52_STEREO | A52_ADJUST_LEVEL;
+        if (a52_frame(audio->a52, frame, &flags, &level, 0)) {
+            fprintf(stderr, "media_player_helper: undecodable AC-3 frame\n");
+            return -1;
+        }
+        audio->a52_synced = 1;
+        for (block = 0; block < AC3_BLOCKS_PER_FRAME; ++block) {
+            const sample_t *samples;
+            int i;
+
+            if (a52_block(audio->a52)) {
+                fprintf(stderr, "media_player_helper: undecodable AC-3 block\n");
+                return -1;
+            }
+            samples = a52_samples(audio->a52);
+            for (i = 0; i < AC3_SAMPLES_PER_BLOCK; ++i) {
+                int channel;
+                for (channel = 0; channel < 2; ++channel) {
+                    sample_t value = samples[channel * AC3_SAMPLES_PER_BLOCK + i];
+                    int scaled = (int)(value * 32767.0f +
+                                       (value >= 0 ? 0.5f : -0.5f));
+                    if (scaled > 32767)
+                        scaled = 32767;
+                    else if (scaled < -32768)
+                        scaled = -32768;
+                    pcm[(block * AC3_SAMPLES_PER_BLOCK + i) * 2 + channel] =
+                        (mp3d_sample_t)scaled;
+                }
+            }
+        }
+        offset += (size_t)length;
+        if (write_pcm(output, pcm, AC3_SAMPLES_PER_FRAME, 2, sample_rate) < 0)
+            return -1;
+    }
+    if (offset) {
+        memmove(audio->data, audio->data + offset, audio->size - offset);
+        audio->size -= offset;
+    }
+    if (at_eof && audio->size >= AC3_SYNCINFO_BYTES) {
+        fprintf(stderr,
+                "media_player_helper: truncated or undecodable AC-3 tail "
+                "(%zu bytes)\n",
+                audio->size);
+        return -1;
+    }
+    return 0;
+}
+
+static int decode_mp2_buffer(struct audio_state *audio,
+                             struct output_state *output, int at_eof)
 {
     size_t original_size = audio->size;
     size_t offset = 0;
@@ -737,6 +858,34 @@ static int decode_audio_buffer(struct audio_state *audio,
         return -1;
     }
     return 0;
+}
+
+/*
+ * Returns non-zero when this codec owns the session.  The first audio PES
+ * decides; anything else is ignored for the rest of the file, which is the
+ * same single-track rule the MPEG audio path already applied by stream id.
+ */
+static int claim_audio_codec(struct audio_state *audio, enum audio_codec codec)
+{
+    if (audio->codec == AUDIO_CODEC_NONE) {
+        audio->codec = codec;
+        return 1;
+    }
+    return audio->codec == codec;
+}
+
+static int decode_audio_buffer(struct audio_state *audio,
+                               struct output_state *output, int at_eof)
+{
+    switch (audio->codec) {
+    case AUDIO_CODEC_AC3:
+        return decode_ac3_buffer(audio, output, at_eof);
+    case AUDIO_CODEC_MP2:
+        return decode_mp2_buffer(audio, output, at_eof);
+    case AUDIO_CODEC_NONE:
+    default:
+        return 0;
+    }
 }
 
 static int append_audio(struct audio_state *audio, struct output_state *output,
@@ -1064,6 +1213,10 @@ static int process_pes(struct media_source *input, uint8_t code,
         pts_scan_payload(output, packet + payload_offset,
                          length - payload_offset);
     } else if ((code & 0xe0) == 0xc0) {
+        if (!claim_audio_codec(audio, AUDIO_CODEC_MP2)) {
+            result = 0;
+            goto done;
+        }
         if (output->silent_video_mode) {
             fprintf(stderr,
                     "media_player_helper: MPEG Layer II audio begins beyond "
@@ -1086,7 +1239,9 @@ done:
     return result;
 }
 
-static int process_private_pes(struct media_source *input)
+static int process_private_pes(struct media_source *input,
+                               struct audio_state *audio,
+                               struct output_state *output)
 {
     uint8_t length_bytes[2];
     uint8_t *packet;
@@ -1118,11 +1273,82 @@ static int process_private_pes(struct media_source *input)
         fprintf(stderr, "media_player_helper: invalid private PES header\n");
         goto done;
     }
-    if (payload_offset < length && packet[payload_offset] >= 0x80u &&
+    if (payload_offset + AC3_PRIVATE_HEADER <= length &&
+        packet[payload_offset] >= AC3_SUBSTREAM_FIRST &&
+        packet[payload_offset] <= AC3_SUBSTREAM_LAST) {
+        int substream = packet[payload_offset];
+        const uint8_t *payload = packet + payload_offset + AC3_PRIVATE_HEADER;
+        size_t size = length - payload_offset - AC3_PRIVATE_HEADER;
+        size_t first_frame;
+
+        if (!claim_audio_codec(audio, AUDIO_CODEC_AC3)) {
+            result = 0;
+            goto done;
+        }
+        if (!audio->a52) {
+            /* No accelerated IMDCT is compiled in; ask for the portable path. */
+            audio->a52 = a52_init(0);
+            if (!audio->a52) {
+                fprintf(stderr,
+                        "media_player_helper: AC-3 decoder init failed\n");
+                goto done;
+            }
+        }
+        if (audio->a52_substream < 0) {
+            audio->a52_substream = substream;
+            fprintf(stderr,
+                    "media_player_helper: AC-3 audio on private substream "
+                    "0x%02x\n",
+                    substream);
+        }
+        if (audio->a52_substream != substream) {
+            /* A further AC-3 track; protocol one plays the first one only. */
+            result = 0;
+            goto done;
+        }
+        if (output->silent_video_mode) {
+            fprintf(stderr,
+                    "media_player_helper: AC-3 audio begins beyond the "
+                    "bounded video lookahead\n");
+            goto done;
+        }
+        /*
+         * The two-byte pointer locates this packet's first frame header, one
+         * based, so it only matters before the decoder has synchronized; once
+         * synchronized the payload is simply contiguous.
+         */
+        first_frame = ((size_t)packet[payload_offset + 2] << 8) |
+                      packet[payload_offset + 3];
+        if (!audio->a52_synced && first_frame) {
+            size_t skip = first_frame - 1;
+            if (skip >= size) {
+                result = 0;
+                goto done;
+            }
+            payload += skip;
+            size -= skip;
+        } else if (!audio->a52_synced) {
+            /* No frame starts here and none has been decoded yet. */
+            result = 0;
+            goto done;
+        }
+        output->audio_pes_seen = 1;
+        if (has_pts && !output->have_audio_pts) {
+            output->first_audio_pts = pts;
+            output->have_audio_pts = 1;
+        }
+        if (append_audio(audio, output, payload, size) < 0 ||
+            (output->scheduler_enabled && scheduler_drain(output, 0) < 0))
+            goto done;
+        result = 0;
+        goto done;
+    }
+    if (payload_offset < length && packet[payload_offset] >= 0x88u &&
         packet[payload_offset] <= 0xafu) {
         fprintf(stderr,
                 "media_player_helper: unsupported Program Stream private "
-                "audio; MPEG Layer II is required\n");
+                "audio substream 0x%02x; MPEG Layer II or AC-3 is required\n",
+                packet[payload_offset]);
         goto done;
     }
     result = 0;
@@ -1171,7 +1397,7 @@ static int process_program_stream(struct media_source *input,
             continue;
         }
         if (code == 0xbd) {
-            if (process_private_pes(input) < 0)
+            if (process_private_pes(input, audio, output) < 0)
                 return -1;
             continue;
         }
@@ -1306,6 +1532,7 @@ int main(int argc, char **argv)
     output.hold_active = output.hold_limit != 0;
     output.scheduler_started = !output.hold_active;
     mp3dec_init(&audio.decoder);
+    audio.a52_substream = -1;
     if (read_exact(&input, signature, sizeof(signature)) < 0 ||
         media_source_rewind(&input) < 0) {
         fprintf(stderr, "media_player_helper: input is too short\n");
@@ -1349,6 +1576,8 @@ int main(int argc, char **argv)
                 output.video_peak_bytes, output.pcm_peak_frames,
                 (unsigned long long)output.pcm_emitted_frames);
 done:
+    if (audio.a52)
+        a52_free(audio.a52);
     free(audio.data);
     media_source_close(&input);
     output.hold_active = 0;

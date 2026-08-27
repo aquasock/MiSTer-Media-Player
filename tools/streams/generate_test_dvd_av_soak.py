@@ -59,7 +59,8 @@ def pack_clock(payload: bytes) -> tuple[int, int]:
     return base * 300 + extension, read(payload, 48, 22) * 400
 
 
-def verify_packs(path: Path) -> dict:
+def verify_packs(path: Path,
+                 stream_ids: tuple[int, ...] = (0xBB, 0xBE, 0xBF, 0xE0, 0xC0)) -> dict:
     """Check packet boundaries, mux signalling and SCR-paced pack arrivals.
 
     Allows two 90-kHz ticks of rounding in adjacent SCR values. This measures
@@ -91,7 +92,7 @@ def verify_packs(path: Path) -> dict:
                 dvd.require(offset + 4 == len(data), 'bytes after program end')
                 break
             else:
-                dvd.require(sid in (0xBB, 0xBE, 0xBF, 0xE0, 0xC0),
+                dvd.require(sid in stream_ids,
                             f'unexpected stream id {sid:#x}')
                 length = int.from_bytes(data[offset + 4:offset + 6], 'big')
                 dvd.require(length > 0, 'unbounded or empty packet')
