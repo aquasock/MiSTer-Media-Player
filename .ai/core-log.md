@@ -1,3 +1,32 @@
+## 575 COMMIT Unreleased deced5c 2026-08-27T00:44:54-07:00
+
+#### Coming From:
+
+Unreleased deced5c
+
+#### Purpose:
+
+Measure assertion-to-first-byte latency on a verified cold run using the instrumented `deced5c` binary and test the dead-time inference of entry 572.
+
+#### Outcome:
+
+The power cycle is verified by a single new syslogd start at 07:41:02 UTC replacing the 07:25:17 boot, the user played once and stopped, and the helper log survived at 205,355 bytes. The timestamped record format itself proves the instrumented binary is the one that ran. The run came up clean, with zero cadence outliers, zero missed deadlines, 449 pictures, 448 swaps, all 15,150,646 bytes accepted and zero error flags, and its cadence counters are indistinguishable from earlier uninstrumented clean runs, so no behavioural change is evident, though one sample cannot prove the instrumentation non-invasive. The measurement the boundary was built for reads `first_byte latency_us=37556 would_block=672`, or 37.6 milliseconds from download assertion to first submitted byte, which falls inside the 13.9 to 63.8 millisecond band entry 572 inferred and therefore confirms that inference by direct measurement. The timestamps also permit the delivery curve to be computed for the first time from all 3,699 read records rather than inferred from telemetry arithmetic, and it shows that delivery is not a constant-rate process. It bursts at about 1.43 times realtime, 1,442,776 bytes per second from 97 to 199 milliseconds and 1,446,123 from 199 to 298, then decays through 1.28 and 1.06 times realtime and settles at consumption-paced realtime, finishing the whole session at 1,017,538 bytes per second. Because the ordinal five and six deadlines fall at roughly 200 to 270 milliseconds, they sit inside the burst, so treating delivery as constant-rate is valid for the startup window that matters but not for the session as a whole. That measured burst rate of about 1,443,000 bytes per second supersedes the 1,392,000 figure derived arithmetically in entries 571 and 572, which was 3.7 percent low, and the correction is self-validating: recomputing warm dead times at the measured rate tightens their spread from plus or minus 1.2 milliseconds to plus or minus 0.35 across five independent sessions, constraining the rate to about one percent. This corrects entry 572, which stated that warm dead time is zero. It is not; warm dead time is a consistent 8.0 to 8.7 milliseconds, averaging about 8.3, and the apparent zero was an artefact of the low rate estimate absorbing the real warm latency. The cold-versus-warm separation is unaffected and in fact widens, with cold dead times recomputing to 21.9, 35.3, 68.1 and 68.7 milliseconds against that 8.3 baseline. The most important result, however, is negative and must not be smoothed over. Dead time does not predict the outcome. This run measured 37.6 milliseconds and was clean, while entry 568 gapped at 35.3 and block 1 run 1 gapped at 21.9, and block 3 run 1 missed twice at 68.1. Dead time is therefore necessary context but not a sufficient predictor of a missed deadline, exactly paralleling entry 569 where starvation magnitude also failed to predict the miss. The most likely remaining variable is phase alignment between byte arrival and where the cadence deadline falls, which no existing counter measures. Cold outcomes now stand at three gapped and two clean across five verified cold runs. The burst rate is measured from this one cold run and warm runs remain uninstrumented, so their burst rate is supported by the residual cluster rather than measured directly, and the measured-latency population is one. Evidence is `.ai/current_results/entry575_cold_arm_helper.log`, `entry575_cold_terminal.png` and `entry575_cold_capture.json`.
+
+#### Next Steps:
+
+Do not propose the helper-side priming correction yet, because the justification for it has weakened rather than strengthened. Priming would reduce dead time from tens of milliseconds toward the warm baseline, but a run at 37.6 milliseconds was clean while runs at 21.9 and 35.3 gapped, so reducing dead time alone is not established to eliminate the miss and could be built and deployed without fixing anything. Gather measured latencies paired with outcomes instead, which the instrument now makes cheap: repeat the verified power cycle, single playback and immediate log fetch several times for cold samples, and separately instrument warm runs by fetching the helper log after a replay, so both populations carry measured rather than assumed latency. Six to eight paired samples should show whether any latency threshold separates clean from gapped runs or whether the outcome is independent of latency, which would confirm phase alignment as the operative variable and move the boundary again. If latency proves not to separate the populations, the next instrumentation step is to record, at each early cadence deadline, the phase between the most recent byte arrival and the deadline itself, which is an FPGA-side counter rather than a host-side one and would require a Quartus build. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Do not raise the per-poll chunk budget, which entry 572 ruled out and which the measured burst curve confirms is not limiting during the window that matters. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 574 COMMIT Unreleased deced5c 2026-08-27T00:40:07-07:00
 
 #### Coming From:
@@ -1186,34 +1215,5 @@ Have the user restart the MiSTer, reload MediaPlayer and open its selector repea
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 535 COMMIT Unreleased 164c7e6 2026-08-26T05:12:51-07:00
-
-#### Coming From:
-
-Unreleased 1f80432
-
-#### Purpose:
-
-Record the first Big Buck Bunny Bob hardware result from the accepted-luma-write versus raw-DDR-read diagnostic.
-
-#### Outcome:
-
-The user completed `/media/fat/games/MediaPlayer/bbb_480i_tff_15s_8mbps.m2v` in Bob on the exact `164c7e6` diagnostic RBF and left its terminal image displayed before the separate MiSTer Main installation. The untouched screenshot `.ai/current_results/entry533_bbb_tff_bob_8mbps_terminal.png` was triggered and retrieved through ordinary authenticated FTP at 479,905 bytes and SHA-256 `6543b7be8fd03f65fdb15da628c8a89ab1e24d73089cd3556554ec4bdc61733a`. The core accepts all 15,150,646 source bytes and its wrapped counters reconstruct 449 framebuffer generations and displayed pictures with 448 publications and swaps. Those 448 presentation intervals span 919,176,899 decoder cycles or 15.319615 seconds, delivering 29.243555 pictures per second. Top-field-first is preserved, sequence end and presentation completion are present, the session freezes normally for quiet reason one and every aggregate, presentation, destination, cache-overlap, prefill, region and phase error is clear. Both field comparisons reach 255 valid samples in physical region zero with zero mismatches: the first-field accepted-write and raw-return fingerprints are both `25e325e3`, and the second-field pair are both `bdc0bdc0`. The diagnostic objective therefore passes and proves that the selected raw DDR data is byte-consistent with the accepted framebuffer writes for both parities during this real-content run; the user's visual verdict for this exact run remains to be recorded before choosing the next behavioral boundary.
-
-#### Next Steps:
-
-Obtain the user's visual report for this exact Bob playback, specifically whether old frames or horizontal lines remained. If the symptom remained, do not change DDR storage or readback: combine this equality with the existing correct line-cache fingerprints and the four-picture reconstruction result to review scheduler display-bank and generation selection against the accepted write provenance before proposing one bounded correction. Independently restart the MiSTer when convenient and validate the newly installed Main default-directory change recorded in entry 534.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
