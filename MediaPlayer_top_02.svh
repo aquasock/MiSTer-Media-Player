@@ -92,10 +92,10 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.vertical_size               (mpeg2_new_vertical_size),
 	.intra_dc_precision          (mpeg2_new_intra_dc_precision),
 	.intra_vlc_format            (mpeg2_new_intra_vlc_format),
-	// Entry 546: release the parser on writer capacity rather than on DDR
-	// completion.  Its only use down this chain is the ST_WAIT_PIPELINE gate,
-	// so a level meaning "a capture bank is free" cannot be missed the way a
-	// completion pulse could once capture and drain overlap.
+	// Entry 599: release ST_WAIT_PIPELINE with one capacity grant per completed
+	// capture, immediately when the alternate bank is free or after it drains.
+	// This is a completion-qualified pulse, not an idle capacity level; DDR
+	// persistence consumers continue to use block_stored separately.
 	.pipeline_block_done         (mpeg2_new_ddr_block_accepted),
 	.recon_block_complete        (mpeg2_new_recon_block_complete),
 	.p_persistence_complete      (mpeg2_new_pred_persisted_seen),

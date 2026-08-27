@@ -76,19 +76,21 @@ wire [28:0] off=dasc?(dascb?SCRATCH1:SCRATCH0):
 wire [28:0] first=(dac==Y)?YB+off+r90(doy)+{20'd0,dox[11:3]}:(dac==CB)?CBB+off+r45(doy)+{20'd0,dox[11:3]}:CRB+off+r45(doy)+{20'd0,dox[11:3]};
 wire [28:0] stride=(dac==Y)?90:45;
 
-// Capacity grant.  This must keep block_stored's pulse discipline, not be a
-// level: the parser enters its wait state as soon as it starts a block, long
-// before IQ/IDCT/reconstruction deliver that block here, so any level that is
-// high in the meantime lets it run on without waiting.  A pulse cannot be
-// missed for the same reason block_stored could not -- it is emitted strictly
-// after the parser is already waiting -- and it arrives one drain earlier.
+// Capacity grant remains a pulse for a completed capture, never an idle-ready
+// level. The parser is already waiting before reconstruction reaches here.
+// Entry 599: grant on the capture-completion edge when the alternate bank is
+// free, avoiding two registered acknowledgement clocks per block. If both
+// banks are occupied, retain exactly one request until the new capture bank
+// becomes free. DDR completion and all capture/drain state remain separate.
 wire room_available = !cap && !pend[cap_bank];
 // A completed capture cannot release the parser until the next bank is free.
 // Do not confuse normal active capture or the acknowledgement pulse with this.
 assign capture_blocked_debug = !cap && pend[cap_bank];
-reg  room_available_d;
-reg  accepted_pulse;
-assign block_accepted = accepted_pulse;
+reg grant_pending;
+wire capture_complete = block_complete && cap;
+wire early_grant = capture_complete && !pend[~cap_bank];
+wire delayed_grant = grant_pending && room_available;
+assign block_accepted = !reset && (early_grant || delayed_grant);
 assign ddram_burstcnt=writing?1:0;assign ddram_addr=writing?wa:0;assign ddram_rd=0;
 assign ddram_din=blk[drain_bank][wr];
 assign ddram_be=8'hff;assign ddram_we=writing;
@@ -133,7 +135,7 @@ integer rst_i;
 always @(posedge clk)begin
  if(reset)begin
   cap<=0;writing<=0;cap_bank<=0;drain_bank<=0;wr<=0;wa<=0;sh<=0;
-  room_available_d<=1;accepted_pulse<=0;
+  grant_pending<=0;
   block_stored<=0;write_seen<=0;store_error<=0;
   for(rst_i=0;rst_i<2;rst_i=rst_i+1)begin
    pend[rst_i]<=0;ac_b[rst_i]<=0;ab_b[rst_i]<=0;
@@ -142,9 +144,10 @@ always @(posedge clk)begin
  end
  else begin
   block_stored<=0;
-  // One grant each time a capture bank becomes free again.
-  room_available_d<=room_available;
-  accepted_pulse<=room_available&&!room_available_d;
+  // The normal grant is consumed on this same edge as block_complete.
+  // A delayed grant clears its request on the first edge with free capacity.
+  if(capture_complete)grant_pending<=!early_grant;
+  else if(delayed_grant)grant_pending<=0;
   if(block_start)begin
    // Only the target capture bank must be free.  A block still draining in
    // the other bank is no longer an error -- that overlap is the point.
