@@ -1,4 +1,115 @@
 # Applies to Main_MiSTer commit 0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f.
+diff --git a/fpga_io.cpp b/fpga_io.cpp
+index b64cfe5..2912a55 100644
+--- a/fpga_io.cpp
++++ b/fpga_io.cpp
+@@ -720,6 +720,82 @@ uint16_t fpga_spi(uint16_t word)
+ 	return (uint16_t)gpi;
+ }
+ 
++// Prepare little-endian words without alignment assumptions or an odd-tail read.
++static inline uint32_t fpga_spi_next_word(const uint8_t *&buf, uint32_t &len, int wide)
++{
++	uint32_t word = *buf++;
++	--len;
++	if (wide && len) { word |= (uint32_t)*buf++ << 8; --len; }
++	return word;
++}
++
++// MediaPlayer bulk writes retain BOTH ACK phases. Once ACK-high confirms the
++// current word, the falling edge can preload the next payload. ACK-low then
++// establishes the low phase before that payload's rising edge. This removes
++// the redundant low-data write between words, not the backpressure handshake.
++template<bool Profile>
++static void fpga_spi_write_ack_impl(const uint8_t *buf, uint32_t len, int wide,
++                                    fpga_spi_profile *profile)
++{
++	if (!len) return;
++	const uint32_t base = fpga_gpo_read() & ~(0xFFFF | SSPI_STROBE);
++	uint32_t gpo = base | fpga_spi_next_word(buf, len, wide);
++	fpga_gpo_write(gpo);
++	for (;;)
++	{
++		fpga_gpo_write(gpo | SSPI_STROBE);
++		uint64_t high_reads = 0, low_reads = 0;
++		int gpi;
++		do
++		{
++			gpi = fpga_gpi_read();
++			if (Profile) ++high_reads;
++			if (gpi < 0)
++			{
++				printf("GPI[31]==1. FPGA is uninitialized?\n");
++				if (Profile) ++profile->uninitialized;
++				fpga_wait_to_reset();
++				return;
++			}
++		} while (!(gpi & SSPI_ACK));
++
++		const bool more = len != 0;
++		if (more) gpo = base | fpga_spi_next_word(buf, len, wide);
++		fpga_gpo_write(gpo);
++		do
++		{
++			gpi = fpga_gpi_read();
++			if (Profile) ++low_reads;
++			if (gpi < 0)
++			{
++				printf("GPI[31]==1. FPGA is uninitialized?\n");
++				if (Profile) ++profile->uninitialized;
++				fpga_wait_to_reset();
++				return;
++			}
++		} while (gpi & SSPI_ACK);
++		if (Profile)
++		{
++			++profile->words;
++			profile->high_reads += high_reads;
++			profile->low_reads += low_reads;
++			profile->high_wait_words += high_reads > 1;
++			profile->low_wait_words += low_reads > 1;
++			if (high_reads > profile->high_max_reads) profile->high_max_reads = high_reads;
++			if (low_reads > profile->low_max_reads) profile->low_max_reads = low_reads;
++		}
++		if (!more) return;
++	}
++}
++
++void fpga_spi_write_ack(const uint8_t *buf, uint32_t len, int wide,
++                        fpga_spi_profile *profile)
++{
++	// Select once per chunk; the unsampled specialization has no counter updates.
++	if (profile) fpga_spi_write_ack_impl<true>(buf, len, wide, profile);
++	else fpga_spi_write_ack_impl<false>(buf, len, wide, NULL);
++}
++
+ uint16_t fpga_spi_fast(uint16_t word)
+ {
+ 	uint32_t gpo = (fpga_gpo_read() & ~(0xFFFF | SSPI_STROBE)) | word;
+diff --git a/fpga_io.h b/fpga_io.h
+index b912439..447b56d 100644
+--- a/fpga_io.h
++++ b/fpga_io.h
+@@ -11,6 +11,19 @@ int fpga_io_init();
+ 
+ void fpga_spi_en(uint32_t mask, uint32_t en);
+ uint16_t fpga_spi(uint16_t word);
++
++// Counts are collected only for explicitly sampled transfers; no per-word clock.
++struct fpga_spi_profile
++{
++	uint64_t words;
++	uint64_t high_reads, low_reads;
++	uint64_t high_wait_words, low_wait_words;
++	uint64_t high_max_reads, low_max_reads;
++	uint64_t uninitialized;
++};
++void fpga_spi_write_ack(const uint8_t *buf, uint32_t len, int wide,
++                        fpga_spi_profile *profile);
++
+ uint16_t fpga_spi_fast(uint16_t word);
+ 
+ void fpga_spi_fast_block_write(const uint16_t *buf, uint32_t length);
 diff --git a/menu.cpp b/menu.cpp
 index 0c74e21..473cfb0 100644
 --- a/menu.cpp
@@ -75,80 +186,12 @@ index 0c74e21..473cfb0 100644
  				user_io_status_reset();
  				char *filename = user_io_create_config_name(1);
  				printf("Saving config to %s\n", filename);
-diff --git a/user_io.cpp b/user_io.cpp
-index 511c7a4..3a44f53 100644
---- a/user_io.cpp
-+++ b/user_io.cpp
-@@ -42,6 +42,7 @@
- #include "frame_timer.h"
- #include "scaler.h"
- #include "support.h"
-+#include "support/mediaplayer/mediaplayer.h"
- 
- static char core_path[1024] = {};
- static char rbf_path[1024] = {};
-@@ -2076,6 +2077,30 @@ void user_io_file_tx_data(const uint8_t *addr, uint32_t len)
- 	DisableFpga();
- }
- 
-+// Only MediaPlayer's sampled chunks use this path. Command framing and every
-+// word retain the normal ACK handshake, including the padded odd-byte tail.
-+void user_io_file_tx_data_profiled(const uint8_t *addr, uint32_t len,
-+                                 fpga_spi_profile *profile)
-+{
-+	EnableFpga();
-+	spi8(FIO_FILE_TX_DAT);
-+	if (fio_size)
-+	{
-+		while (len >= 2)
-+		{
-+			fpga_spi_profiled((uint16_t)addr[0] | ((uint16_t)addr[1] << 8), profile);
-+			addr += 2;
-+			len -= 2;
-+		}
-+		if (len) fpga_spi_profiled(*addr, profile);
-+	}
-+	else
-+	{
-+		while (len--) fpga_spi_profiled(*addr++, profile);
-+	}
-+	DisableFpga();
-+}
-+
- void user_io_set_upload(unsigned char enable, int addr)
- {
- 	EnableFpga();
-@@ -3160,6 +3185,7 @@ void user_io_poll()
- 	// this is reduce risk of screenshot occurring while the scaler
- 	// is being updated and getting a corrupted image.
- 	add_frame_callback(screenshot_cb);
-+	mediaplayer_poll();
- 
- 	if ((core_type != CORE_TYPE_SHARPMZ) &&
- 		(core_type != CORE_TYPE_8BIT))
-diff --git a/support/mediaplayer/mediaplayer.h b/support/mediaplayer/mediaplayer.h
-new file mode 100644
-index 0000000..ca9fba0
---- /dev/null
-+++ b/support/mediaplayer/mediaplayer.h
-@@ -0,0 +1,11 @@
-+#ifndef MEDIAPLAYER_ARM_LOADER_H
-+#define MEDIAPLAYER_ARM_LOADER_H
-+
-+int mediaplayer_is_core();
-+int mediaplayer_handles_file(const char *path);
-+int mediaplayer_start(const char *path, unsigned char index);
-+int mediaplayer_start_source(const char *source_spec, unsigned char index);
-+void mediaplayer_poll();
-+void mediaplayer_stop();
-+
-+#endif
 diff --git a/support/mediaplayer/mediaplayer.cpp b/support/mediaplayer/mediaplayer.cpp
 new file mode 100644
-index 0000000..c33a4e0
+index 0000000..db82e00
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,420 @@
+@@ -0,0 +1,419 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -287,7 +330,7 @@ index 0000000..c33a4e0
 +	diagnostic_write("start source=%s index=%u core=%s alternate=%s\n",
 +	                 source_spec, (unsigned)index,
 +	                 user_io_get_core_name(), user_io_get_core_name(1));
-+	diagnostic_write("profile_version=1 ack_sample_every=64 "
++	diagnostic_write("profile_version=1 transport=ack_bulk_preload_v1 ack_sample_every=64 "
 +	                 "first_byte_means=first_chunk_complete "
 +	                 "interval_means=media_poll_entry_to_entry\n");
 +}
@@ -463,8 +506,7 @@ index 0000000..c33a4e0
 +				                 (unsigned long long)(read_end - download_assert_us),
 +				                 (int)count);
 +			const uint64_t tx_start = profiling ? monotonic_us() : 0;
-+			if (sampled) user_io_file_tx_data_profiled(buffer, (uint32_t)count, &ack);
-+			else user_io_file_tx_data(buffer, (uint32_t)count);
++			user_io_file_tx_data_ack(buffer, (uint32_t)count, sampled ? &ack : NULL);
 +			const uint64_t tx_end = profiling ? monotonic_us() : 0;
 +			const uint64_t tx_elapsed = tx_end - tx_start;
 +			if (profiling)
@@ -569,90 +611,62 @@ index 0000000..c33a4e0
 +	mediaplayer_poll_inner();
 +	profile_poll_finish();
 +}
-diff --git a/fpga_io.cpp b/fpga_io.cpp
-index b64cfe5..9094133 100644
---- a/fpga_io.cpp
-+++ b/fpga_io.cpp
-@@ -720,6 +720,54 @@ uint16_t fpga_spi(uint16_t word)
- 	return (uint16_t)gpi;
+diff --git a/support/mediaplayer/mediaplayer.h b/support/mediaplayer/mediaplayer.h
+new file mode 100644
+index 0000000..ca9fba0
+--- /dev/null
++++ b/support/mediaplayer/mediaplayer.h
+@@ -0,0 +1,11 @@
++#ifndef MEDIAPLAYER_ARM_LOADER_H
++#define MEDIAPLAYER_ARM_LOADER_H
++
++int mediaplayer_is_core();
++int mediaplayer_handles_file(const char *path);
++int mediaplayer_start(const char *path, unsigned char index);
++int mediaplayer_start_source(const char *source_spec, unsigned char index);
++void mediaplayer_poll();
++void mediaplayer_stop();
++
++#endif
+diff --git a/user_io.cpp b/user_io.cpp
+index 511c7a4..3293d38 100644
+--- a/user_io.cpp
++++ b/user_io.cpp
+@@ -42,6 +42,7 @@
+ #include "frame_timer.h"
+ #include "scaler.h"
+ #include "support.h"
++#include "support/mediaplayer/mediaplayer.h"
+ 
+ static char core_path[1024] = {};
+ static char rbf_path[1024] = {};
+@@ -2076,6 +2077,16 @@ void user_io_file_tx_data(const uint8_t *addr, uint32_t len)
+ 	DisableFpga();
  }
  
-+// Instrumented mirror of fpga_spi; the register and ACK sequence is unchanged.
-+uint16_t fpga_spi_profiled(uint16_t word, fpga_spi_profile *profile)
++// MediaPlayer-only acknowledged bulk path; ordinary file transfers are unchanged.
++void user_io_file_tx_data_ack(const uint8_t *addr, uint32_t len,
++                            fpga_spi_profile *profile)
 +{
-+	uint32_t gpo = (fpga_gpo_read() & ~(0xFFFF | SSPI_STROBE)) | word;
-+
-+	fpga_gpo_write(gpo);
-+	fpga_gpo_write(gpo | SSPI_STROBE);
-+
-+	uint64_t high_reads = 0, low_reads = 0;
-+	int gpi;
-+	do
-+	{
-+		gpi = fpga_gpi_read();
-+		++high_reads;
-+		if (gpi < 0)
-+		{
-+			printf("GPI[31]==1. FPGA is uninitialized?\n");
-+			++profile->uninitialized;
-+			fpga_wait_to_reset();
-+			return 0;
-+		}
-+	} while (!(gpi & SSPI_ACK));
-+
-+	fpga_gpo_write(gpo);
-+
-+	do
-+	{
-+		gpi = fpga_gpi_read();
-+		++low_reads;
-+		if (gpi < 0)
-+		{
-+			printf("GPI[31]==1. FPGA is uninitialized?\n");
-+			++profile->uninitialized;
-+			fpga_wait_to_reset();
-+			return 0;
-+		}
-+	} while (gpi & SSPI_ACK);
-+
-+	++profile->words;
-+	profile->high_reads += high_reads;
-+	profile->low_reads += low_reads;
-+	profile->high_wait_words += high_reads > 1;
-+	profile->low_wait_words += low_reads > 1;
-+	if (high_reads > profile->high_max_reads) profile->high_max_reads = high_reads;
-+	if (low_reads > profile->low_max_reads) profile->low_max_reads = low_reads;
-+	return (uint16_t)gpi;
++	EnableFpga();
++	spi8(FIO_FILE_TX_DAT);
++	fpga_spi_write_ack(addr, len, fio_size, profile);
++	DisableFpga();
 +}
 +
- uint16_t fpga_spi_fast(uint16_t word)
+ void user_io_set_upload(unsigned char enable, int addr)
  {
- 	uint32_t gpo = (fpga_gpo_read() & ~(0xFFFF | SSPI_STROBE)) | word;
-diff --git a/fpga_io.h b/fpga_io.h
-index b912439..b28995c 100644
---- a/fpga_io.h
-+++ b/fpga_io.h
-@@ -11,6 +11,18 @@ int fpga_io_init();
+ 	EnableFpga();
+@@ -3160,6 +3171,7 @@ void user_io_poll()
+ 	// this is reduce risk of screenshot occurring while the scaler
+ 	// is being updated and getting a corrupted image.
+ 	add_frame_callback(screenshot_cb);
++	mediaplayer_poll();
  
- void fpga_spi_en(uint32_t mask, uint32_t en);
- uint16_t fpga_spi(uint16_t word);
-+
-+// Counts are collected only for explicitly sampled transfers; no per-word clock.
-+struct fpga_spi_profile
-+{
-+	uint64_t words;
-+	uint64_t high_reads, low_reads;
-+	uint64_t high_wait_words, low_wait_words;
-+	uint64_t high_max_reads, low_max_reads;
-+	uint64_t uninitialized;
-+};
-+uint16_t fpga_spi_profiled(uint16_t word, fpga_spi_profile *profile);
-+
- uint16_t fpga_spi_fast(uint16_t word);
- 
- void fpga_spi_fast_block_write(const uint16_t *buf, uint32_t length);
+ 	if ((core_type != CORE_TYPE_SHARPMZ) &&
+ 		(core_type != CORE_TYPE_8BIT))
 diff --git a/user_io.h b/user_io.h
-index 648736f..6ec5aaf 100644
+index 648736f..925de4e 100644
 --- a/user_io.h
 +++ b/user_io.h
 @@ -229,6 +229,9 @@ void user_io_set_index(unsigned char index);
@@ -660,8 +674,8 @@ index 648736f..6ec5aaf 100644
  void user_io_set_download(unsigned char enable, int addr = 0);
  void user_io_file_tx_data(const uint8_t *addr, uint32_t len);
 +struct fpga_spi_profile;
-+void user_io_file_tx_data_profiled(const uint8_t *addr, uint32_t len,
-+                                 fpga_spi_profile *profile);
++void user_io_file_tx_data_ack(const uint8_t *addr, uint32_t len,
++                            fpga_spi_profile *profile);
  void user_io_set_upload(unsigned char enable, int addr = 0);
  void user_io_file_rx_data(uint8_t *addr, uint32_t len);
  void user_io_file_info(const char *ext);

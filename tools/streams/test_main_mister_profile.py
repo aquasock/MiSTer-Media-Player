@@ -3,14 +3,16 @@
 
 Run on the build PC with --main-source pointing at a Main_MiSTer checkout
 containing the pinned commit. No checkout is changed; no hardware is accessed.
-The compiler runs two harnesses: transfer trace equivalence against upstream,
-and the complete patched media loader with fake pipe, clock and log endpoints.
+The compiler runs transport equivalence against upstream and the complete media
+loader with fake pipe, clock and log endpoints. --rtl additionally exercises the
+real host functions against handshake/download blocks extracted from current RTL.
 This checks software invariants, not physical bridge throughput or timing.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -66,18 +68,28 @@ TRANSPORT_TESTS = r'''
 static void reset_io(const std::deque<int> &input) {
     responses = input; trace.clear(); resets = 0; gpo_copy = 0x80040000;
 }
+// Low-phase payload changes intentionally differ. Compare every rising-edge
+// payload, every ACK read and command/select framing, not those redundant writes.
+static std::vector<uint64_t> observable_trace() {
+    std::vector<uint64_t> result;
+    for (auto v : trace) if ((v >> 40) || (v & SSPI_STROBE)) result.push_back(v);
+    return result;
+}
+static unsigned writes() {
+    unsigned n = 0; for (auto v : trace) n += !(v >> 40); return n;
+}
 int main() {
     unsigned cases = 0;
-    for (int wide : {0, 1}) for (unsigned size : {0u, 1u, 2u, 3u, 17u, 16384u}) {
+    for (int wide : {0, 1}) for (unsigned size : {0u, 1u, 2u, 3u, 17u, 16383u, 16384u}) {
         fio_size = wide;
-        std::vector<uint8_t> bytes(size + 2);
-        for (unsigned i = 0; i < size; ++i) bytes[i] = uint8_t(i * 37 + 19);
+        std::vector<uint8_t> bytes(size), unaligned(size + 1);
+        for (unsigned i = 0; i < size; ++i) unaligned[i+1] = bytes[i] = uint8_t(i * 37 + 19);
         const unsigned words = wide ? (size + 1) / 2 : size;
         std::deque<int> input;
         uint64_t high = 0, low = 0, high_words = 0, low_words = 0;
         uint64_t max_high = 0, max_low = 0;
         for (unsigned w = 0; w < words; ++w) {
-            unsigned h = w % 4, l = (w * 3) % 5;
+            unsigned h = w % 4, l = w % 13 == 0 ? 97 : (w * 3) % 5;
             for (unsigned i = 0; i < h; ++i) input.push_back(0);
             input.push_back(SSPI_ACK | (w & 65535));
             for (unsigned i = 0; i < l; ++i) input.push_back(SSPI_ACK);
@@ -89,26 +101,40 @@ int main() {
         }
         reset_io(input);
         user_io_file_tx_data(bytes.data(), size);
-        assert(responses.empty()); const auto expected = trace;
-        reset_io(input); fpga_spi_profile profile = {};
-        user_io_file_tx_data_profiled(bytes.data(), size, &profile);
-        assert(responses.empty() && trace == expected && resets == 0);
-        assert(profile.words == words && profile.high_reads == high && profile.low_reads == low);
-        assert(profile.high_wait_words == high_words && profile.low_wait_words == low_words);
-        assert(profile.high_max_reads == max_high && profile.low_max_reads == max_low);
-        assert(profile.uninitialized == 0); ++cases;
+        assert(responses.empty() && writes() == 3 * words);
+        const auto expected = observable_trace(); const auto final_gpo = gpo_copy;
+        for (bool sampled : {false, true}) {
+            reset_io(input); fpga_spi_profile profile = {};
+            user_io_file_tx_data_ack(size ? unaligned.data()+1 : nullptr, size, sampled ? &profile : nullptr);
+            assert(responses.empty() && observable_trace() == expected && resets == 0);
+            assert(writes() == (words ? 2 * words + 1 : 0));
+            assert(gpo_copy == final_gpo && !(gpo_copy & SSPI_STROBE));
+            if (sampled) {
+                assert(profile.words == words && profile.high_reads == high && profile.low_reads == low);
+                assert(profile.high_wait_words == high_words && profile.low_wait_words == low_words);
+                assert(profile.high_max_reads == max_high && profile.low_max_reads == max_low);
+                assert(profile.uninitialized == 0);
+            } else assert(profile.words == 0 && profile.high_reads == 0 && profile.low_reads == 0);
+            ++cases;
+        }
     }
-    // Both ACK loops must preserve the upstream uninitialized-FPGA handling.
-    for (const auto &input : {std::deque<int>{-1}, std::deque<int>{int(SSPI_ACK), -1}}) {
-        reset_io(input); uint16_t expected_value = fpga_spi(0x1234);
-        const auto expected = trace; assert(resets == 1);
-        reset_io(input); fpga_spi_profile profile = {};
-        assert(fpga_spi_profiled(0x1234, &profile) == expected_value);
-        assert(trace == expected && resets == 1 && profile.uninitialized == 1);
+    // Abort the bulk loop if the reset handler unexpectedly returns in this mock.
+    // Cover either ACK phase at first, interior and final word without a further rise.
+    for (bool sampled : {false, true}) for (unsigned fault_word : {0u, 2u, 4u}) for (bool low_phase : {false, true}) {
+        std::deque<int> input;
+        for (unsigned i=0; i<fault_word; ++i) { input.push_back(SSPI_ACK); input.push_back(0); }
+        if (low_phase) input.push_back(SSPI_ACK);
+        input.push_back(-1); reset_io(input);
+        const uint8_t bytes[] = {1,2,3,4,5,6,7,8,9,10}; fpga_spi_profile profile = {};
+        fpga_spi_write_ack(bytes, sizeof(bytes), 1, sampled ? &profile : nullptr);
+        assert(resets == 1 && responses.empty());
+        unsigned rises=0; for (auto v:trace) rises += !(v >> 40) && (v & SSPI_STROBE) != 0;
+        assert(rises == fault_word + 1);
+        if (sampled) assert(profile.uninitialized == 1 && profile.words == fault_word);
         ++cases;
     }
-    puts("PASS transport: 14 cases; byte/word/framing/ACK traces match upstream, including delayed ACKs and odd tails");
-    assert(cases == 14);
+    assert(cases == 40);
+    puts("PASS transport: 40 cases; word/ACK/framing equivalence, 3N to 2N+1 writes, final GPO, unaligned/odd tails and reset exits");
 }
 '''
 
@@ -167,10 +193,12 @@ int mediaplayer_start_source(const char *, unsigned char);
 static void user_io_file_tx_data(const uint8_t *data, uint32_t size) {
     delivered.insert(delivered.end(), data, data + size); ++mock_tx_calls; fake_us += 11;
 }
-static void user_io_file_tx_data_profiled(const uint8_t *data, uint32_t size, fpga_spi_profile *p) {
-    sampled_events.push_back(mock_tx_calls + 1); p->words = (size + 1) / 2;
-    p->high_reads = p->words * 2; p->low_reads = p->words;
-    p->high_wait_words = p->words; p->high_max_reads = 2; p->low_max_reads = 1;
+static void user_io_file_tx_data_ack(const uint8_t *data, uint32_t size, fpga_spi_profile *p) {
+    if (p) {
+        sampled_events.push_back(mock_tx_calls + 1); p->words = (size + 1) / 2;
+        p->high_reads = p->words * 2; p->low_reads = p->words;
+        p->high_wait_words = p->words; p->high_max_reads = 2; p->low_max_reads = 1;
+    }
     user_io_file_tx_data(data, size);
 }
 #define clock_gettime fake_clock
@@ -221,6 +249,7 @@ int main() {
     assert(transfer_profile.polls == 18 && transfer_profile.data_polls == 17);
     assert(transfer_profile.intervals == 17 && !transfer_profile.poll_active);
     assert(releases == 1 && diagnostic_fd == -1 && helper_fd == -1);
+    assert(log_text.find("transport=ack_bulk_preload_v1") != std::string::npos);
     assert(occurrences("first_read latency_us=") == 1 && occurrences("first_byte latency_us=") == 1);
     assert(occurrences("profile_ack event=64 ") == 1 && occurrences("profile_summary ") == 1);
     assert(log_text.find("read event=66 count=3 submitted=1064963 read_us=3 tx_us=11 ack_sample=0") != std::string::npos);
@@ -259,7 +288,139 @@ int main() {
 '''
 
 
-def run(main_source: Path, compiler: str, sanitize: bool) -> dict:
+RTL_PRELUDE = r'''
+#include <cassert>
+#include <cstdint>
+#include <cstdio>
+#include <memory>
+#include <vector>
+#include <algorithm>
+#include "Vbridge.h"
+static const uint32_t SSPI_STROBE = 1u << 17, SSPI_ACK = 1u << 17;
+static const int FIO_FILE_TX_DAT = 0x54;
+static std::unique_ptr<Vbridge> dut;
+static uint32_t gpo_copy;
+static int fio_size = TEST_WIDE;
+static unsigned latency, stall_mode, occupancy, max_occupancy, reads, resets;
+static uint64_t cycles;
+static std::vector<uint16_t> accepted;
+static unsigned case_size;
+static bool case_bulk;
+#undef assert
+#define assert(c) do { if (!(c)) { fprintf(stderr, "RTL check failed: %s line=%d size=%u bulk=%d latency=%u stalls=%u cycle=%llu accepted=%zu occupancy=%u\n", #c, __LINE__, case_size, case_bulk, latency, stall_mode, (unsigned long long)cycles, accepted.size(), occupancy); abort(); } } while (0)
+static void tick() {
+    ++cycles;
+    // Two-word test sink: hold full until a deliberately slow consumer drains.
+    // Also vary wait independently, including the shared vs_wait gate.
+    dut->io_wait = stall_mode && (occupancy >= 2 || (stall_mode == 2 && cycles % 113 < 37));
+    dut->vs_wait = stall_mode == 2 && cycles % 211 < 29;
+    dut->clk_sys = 0; dut->eval();
+    const bool wr = dut->ioctl_wr;
+    const uint16_t data = dut->ioctl_dout;
+    dut->clk_sys = 1; dut->eval();
+    if (wr) {
+        accepted.push_back(data);
+        if (stall_mode) { ++occupancy; max_occupancy = std::max(max_occupancy, occupancy); assert(occupancy <= 2); }
+    }
+    if (occupancy && cycles % 97 == 0) --occupancy;
+}
+static void fpga_gpo_write(uint32_t v) {
+    gpo_copy = v; dut->gp_out = v;
+    for (unsigned i=0; i<latency; ++i) tick();
+}
+static uint32_t fpga_gpo_read() { return gpo_copy; }
+static int fpga_gpi_read() {
+    assert(++reads < 10000000);
+    for (unsigned i=0; i<latency; ++i) tick();
+    return dut->io_ack ? SSPI_ACK : 0;
+}
+static void fpga_wait_to_reset() { ++resets; assert(false); }
+static void EnableFpga() { fpga_gpo_write(gpo_copy | (1u << 18)); }
+static void DisableFpga() { fpga_gpo_write(gpo_copy & ~(1u << 18)); }
+uint16_t fpga_spi(uint16_t);
+static void spi8(int v) { fpga_spi(uint16_t(v)); }
+'''
+
+RTL_TESTS = r'''
+static void begin_session() {
+    dut.reset(new Vbridge); accepted.clear(); occupancy = max_occupancy = reads = resets = 0; cycles = 0;
+    gpo_copy = 0x80000000; dut->gp_out = gpo_copy;
+    for (int i=0; i<12; ++i) tick();
+    EnableFpga(); spi8(0x53); fpga_spi(1); DisableFpga();
+    for (int i=0; i<8; ++i) tick();
+    assert(dut->ioctl_download);
+}
+static std::vector<uint16_t> packed(const std::vector<uint8_t> &bytes) {
+    std::vector<uint16_t> result;
+    for (size_t i=0; i<bytes.size();) {
+        uint16_t v=bytes[i++]; if (TEST_WIDE && i<bytes.size()) v |= uint16_t(bytes[i++]) << 8;
+        result.push_back(v);
+    }
+    return result;
+}
+int main() {
+    unsigned cases=0, backpressured=0;
+    for (unsigned delay : {1u, 2u, 5u, 13u}) for (unsigned stalls : {0u, 1u, 2u})
+    for (unsigned size : {0u, 1u, 2u, 3u, 17u, 4097u, 16384u}) for (bool sample : {false, true}) {
+        latency=delay; stall_mode=stalls;
+        std::vector<uint8_t> bytes(size), tail(17);
+        for (unsigned i=0; i<size; ++i) bytes[i]=uint8_t(i*37+19);
+        for (unsigned i=0; i<tail.size(); ++i) tail[i]=uint8_t(i*13+77);
+        auto expected=packed(bytes); const auto ending=packed(tail);
+        expected.insert(expected.end(), ending.begin(), ending.end());
+        for (bool bulk : {false, true}) {
+            case_size = size; case_bulk = bulk;
+            begin_session(); fpga_spi_profile profile={};
+            for (const auto *chunk : {&bytes, &tail}) {
+                if (bulk) user_io_file_tx_data_ack(chunk->data(), chunk->size(), sample ? &profile : nullptr);
+                else user_io_file_tx_data(chunk->data(), chunk->size());
+            }
+            for (int i=0; i<8; ++i) tick();
+            assert(accepted == expected && resets == 0 && dut->ioctl_download);
+            assert(!(gpo_copy & SSPI_STROBE) && !dut->io_ack);
+            assert(dut->ioctl_addr == (expected.size()-1)*(TEST_WIDE ? 2 : 1));
+            if (bulk && sample) assert(profile.words == expected.size());
+            if (max_occupancy == 2) ++backpressured;
+            EnableFpga(); spi8(0x53); fpga_spi(0); DisableFpga();
+            for (int i=0; i<8; ++i) tick();
+            assert(!dut->ioctl_download && accepted == expected);
+        }
+        ++cases;
+    }
+    assert(cases == 168 && backpressured > 0);
+    dut.reset(); // Destroy the last model before Verilator's thread-local context.
+    printf("PASS RTL wide=%d: %u cases, upstream and bulk; four bridge latencies, full sink, independent waits, consecutive chunks, odd tails, download release\n", TEST_WIDE, cases);
+}
+'''
+
+
+def rtl_module() -> tuple[str, dict]:
+    """Extract existing production clock/ACK and FIO blocks, not a rewritten model."""
+    top = (ROOT / "sys/sys_top.v").read_text()
+    hps = (ROOT / "sys/hps_io.sv").read_text()
+    handshake = top[top.index("reg  io_ack;"):top.index("`ifdef MISTER_DUAL_SDRAM", top.index("reg  io_ack;"))]
+    fio = hps[hps.index("localparam FIO_FILE_TX      ="):hps.index("\nendmodule", hps.index("localparam FIO_FILE_TX      ="))]
+    # Move only the ACK declaration into the module port list.
+    handshake = handshake.replace("reg  io_ack;\n", "", 1)
+    header = '''module bridge #(parameter WIDE=1)(
+input clk_sys, input [31:0] gp_out, input io_wait, input vs_wait,
+output reg io_ack, output reg ioctl_wr, output reg ioctl_download,
+output reg [(WIDE ? 15 : 7):0] ioctl_dout, output reg [26:0] ioctl_addr);
+localparam DW = WIDE ? 15 : 7;
+wire [15:0] io_din = gp_outr[15:0];
+wire io_clk = gp_outr[17];
+wire fp_enable = ~gp_outr[19] & gp_outr[18];
+reg ioctl_upload, ioctl_rd;
+reg [31:0] ioctl_file_ext;
+reg [15:0] ioctl_index;
+wire [DW:0] ioctl_din = 0;
+'''
+    hashes = {"sys_top_handshake_sha256": hashlib.sha256(handshake.encode()).hexdigest(),
+              "hps_io_fio_block_sha256": hashlib.sha256(fio.encode()).hexdigest()}
+    return header + handshake + fio + "\nendmodule\n", hashes
+
+
+def run(main_source: Path, compiler: str, sanitize: bool, rtl: bool = False) -> dict:
     def upstream(name: str) -> str:
         return subprocess.check_output(["git", "-C", str(main_source), "show", f"{PIN}:{name}"], text=True)
 
@@ -275,14 +436,18 @@ def run(main_source: Path, compiler: str, sanitize: bool) -> dict:
         struct = re.search(r"struct fpga_spi_profile\n\{.*?\n\};", (work / "fpga_io.h").read_text(), re.S)[0]
         (work / "fpga_io.h").write_text("#pragma once\n#include <stdint.h>\n" + struct + "\n")
         ordinary = function(upstream("fpga_io.cpp"), "fpga_spi")
-        assert ordinary == function(fpga, "fpga_spi"), "Unsampled ACK path changed"
+        assert ordinary == function(fpga, "fpga_spi"), "Ordinary non-media ACK path changed"
+        assert function(upstream("user_io.cpp"), "user_io_file_tx_data") == function(io, "user_io_file_tx_data")
         transport = TRANSPORT_PRELUDE + struct + "\n" + ordinary
         transport += "static uint16_t spi_w(uint16_t w) { return fpga_spi(w); }\n"
         transport += "static uint8_t spi_b(uint8_t w) { return uint8_t(fpga_spi(w)); }\n"
         transport += function(upstream("spi.cpp"), "spi_write")
-        transport += function(fpga, "fpga_spi_profiled")
+        bulk = function(fpga, "fpga_spi_next_word")
+        bulk += "template<bool Profile>\n" + function(fpga, "fpga_spi_write_ack_impl")
+        bulk += function(fpga, "fpga_spi_write_ack")
+        transport += bulk
         transport += function(io, "user_io_file_tx_data")
-        transport += function(io, "user_io_file_tx_data_profiled") + TRANSPORT_TESTS
+        transport += function(io, "user_io_file_tx_data_ack") + TRANSPORT_TESTS
         loader = (work / "support/mediaplayer/mediaplayer.cpp").read_text()
         loader = re.sub(r"^#include .*\n", "", loader, flags=re.M)
         reports = {}
@@ -297,7 +462,32 @@ def run(main_source: Path, compiler: str, sanitize: bool) -> dict:
             result = subprocess.run([str(executable)], check=True, text=True, capture_output=True)
             reports[name] = result.stdout
             print(result.stdout, end="")
-        return {"pinned_main_commit": PIN, "compiler": compiler, "sanitizers": sanitize, "reports": reports}
+        rtl_hashes = {}
+        if rtl:
+            module, rtl_hashes = rtl_module()
+            (work / "bridge.sv").write_text(module)
+            source = RTL_PRELUDE + struct + "\n" + ordinary
+            source += "static uint16_t spi_w(uint16_t w) { return fpga_spi(w); }\n"
+            source += "static uint8_t spi_b(uint8_t w) { return uint8_t(fpga_spi(w)); }\n"
+            source += function(upstream("spi.cpp"), "spi_write") + bulk
+            source += function(io, "user_io_file_tx_data") + function(io, "user_io_file_tx_data_ack") + RTL_TESTS
+            (work / "bridge_test.cpp").write_text(source)
+            for wide in (0, 1):
+                obj = work / f"obj{wide}"
+                command = ["verilator", "--cc", "--exe", "--build", "-j", "4", "-Wno-fatal",
+                           "--top-module", "bridge", f"-GWIDE={wide}", "--Mdir", str(obj),
+                           "-CFLAGS", f"-std=c++14 -O2 -DTEST_WIDE={wide}",
+                           str(work / "bridge.sv"), str(work / "bridge_test.cpp")]
+                built = subprocess.run(command, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                if built.returncode:
+                    raise RuntimeError(built.stdout)
+                result = subprocess.run([str(obj / "Vbridge")], text=True, capture_output=True)
+                if result.returncode:
+                    raise RuntimeError(result.stdout + result.stderr)
+                reports[f"rtl_wide_{wide}"] = result.stdout
+                print(result.stdout, end="")
+        return {"pinned_main_commit": PIN, "compiler": compiler, "sanitizers": sanitize,
+                "rtl_blocks": rtl_hashes, "reports": reports}
 
 
 def main() -> int:
@@ -305,9 +495,10 @@ def main() -> int:
     ap.add_argument("--main-source", required=True, type=Path)
     ap.add_argument("--compiler", default="g++")
     ap.add_argument("--sanitize", action="store_true")
+    ap.add_argument("--rtl", action="store_true", help="also test against extracted RTL with Verilator (not sanitizer-instrumented)")
     ap.add_argument("--report", type=Path)
     args = ap.parse_args()
-    report = run(args.main_source.resolve(), args.compiler, args.sanitize)
+    report = run(args.main_source.resolve(), args.compiler, args.sanitize, args.rtl)
     if args.report:
         args.report.write_text(json.dumps(report, indent=2) + "\n")
     return 0
