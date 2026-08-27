@@ -1,3 +1,32 @@
+## 565 COMMIT Unreleased 2acabc5 2026-08-26T23:21:45-07:00
+
+#### Coming From:
+
+Unreleased 2acabc5
+
+#### Purpose:
+
+Record the current accepted build, recovery context and outstanding validation for an agent handover requested by the user.
+
+#### Outcome:
+
+The current production source is `2acabc5457171f342a06f93b1edfb1c361748ce8`, with all source changes committed on master; subsequent commits are project-memory updates. The installed and user-loaded `/media/fat/MediaPlayer.rbf` is the qualified 4,346,416-byte image with SHA-256 `fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347`. The user says playback looks perfect. Entry 564 is the latest hardware acceptance: the requested clean Bob run of `bbb_480i_tff_15s_8mbps.m2v` accepts all 15,150,646 bytes, displays all 449 pictures with 448 swaps, terminates quietly and reports zero errors, zero cadence outliers and zero missed deadlines. The previous misses at pictures six and 348 are absent, and the maximum post-first-swap interval is exactly 2,002,000 clocks, consistent with 29.970030-fps steady playback. The aggregate 29.870022-fps figure includes startup because schema nineteen timestamps first reference completion rather than first visibility; do not treat it as renewed slowness. The user accepts the now-black idle background, which is the RGB startup mask, not a new sync or raster change. Preserve the earlier continuous-HS/VS framebuffer fix from `30d300a`, the 64-KiB clean-video queue and the guarded readiness-based startup controller. The controller waits for another presentable picture or short-file sequence end, releases the first cached picture at a complete field-pair boundary, then observes the acknowledged window high and low before enabling swaps; this last guard is essential because the preceding `134b401` controller fails the deliberately skewed CDC test. Timestamp/PCM records, incompatible pictures and non-native sessions bypass the reserve. The final build uses seed 16 and has positive setup, hold, recovery, removal and pulse-width margins of 0.141, 0.249, 3.830, 0.531 and 0.925 ns, with 512 of 553 RAM blocks occupied. The eleven-scenario simulation matrix covers 540 matching reconstructed pictures, full-file and dense-pause cases, alternate phases, drained-FIFO warm sessions, short EOF and modeled DDR pressure; the native suite and updated skew test pass. These are not an exact physical host/HDMI replay, partial-transfer cancellation test or independent pixel oracle. Build, validation and deployment manifests are `.ai/current_results/entry562_build.json`, `entry562_validation.json` and `entry562_deployment.json`; the latest screenshot and complete hardware decode are `entry564_bob_terminal.png` and `entry564_bob_capture.json`. GUNSMOKE is available through the configured SSH alias `mister-build`; the clean official build and RBF are under `/home/vash/mister-builds/entry562-2acabc5`, final simulation reports under `/home/vash/mister-builds/entry562-results`, and the unchanged native-suite log under `/home/vash/mister-builds/entry561-results`. The simulation checkout `/home/vash/mister-builds/entry561-sim` has a historical detached HEAD and modified files whose final source identity was verified; use published GitHub source for subsequent official builds. The superseded `entry561-134b401` build was stopped and must not be deployed. The Pi repository has no outstanding tracked source edits; eleven older untracked diagnostic PNGs were deliberately left untouched. No new source change or build is pending. The user requested this handover before performing the remaining repeated-load/mode-switch checks, so their result must not be assumed.
+
+#### Next Steps:
+
+Follow `core.md` recovery policy and resume with the remaining hardware test, not another speculative fix: ask the user to replay the same file several times without rebooting and switch Bob/Weave, reporting any flicker, pacing or load problem and leaving final telemetry visible. Capture through ordinary FTP only at MiSTer `10.10.0.30`; delete only `/media/fat/screenshots/cadence_probe.png` before triggering a new screenshot to prevent stale-file reuse, then decode with the existing cadence tools. Do not remotely reload, reboot or launch through MGL. Standing authorization permits future direct active-RBF replacement only after a qualified build and fresh complete FTP readback, without backup or staging files. Keep HDMI at the user's existing 1080p configuration and keep analog diagnostics excluded. If repeated loads and Bob/Weave also pass, close the bounded all-I HDMI cadence correction and obtain approval for the next audio/PTS qualification or broader interlaced implementation boundary. Interlaced P/B, field pictures and field-DCT remain unsupported; partial-transfer cancellation and the old 6,529,996-versus-6,529,997 live-raster assertion drift remain unvalidated or unresolved. Do not reuse entry 550's unvalidated pixel harness as a passed oracle. Keep `core.md` unchanged, preserve the forty-entry log ring and publish future approved plans before editing production source.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 564 COMMIT Unreleased 2acabc5 2026-08-26T23:19:26-07:00
 
 #### Coming From:
@@ -1205,42 +1234,3 @@ None.
 - [ ] Passed
 
 ---
-## 525 COMMIT Unreleased 98ee2dc 2026-08-25T23:27:33-07:00
-
-#### Coming From:
-
-Unreleased 4e4db95
-
-#### Purpose:
-
-Distinguish incorrect native line-cache provenance from corruption of correctly selected cache content.
-
-#### Outcome:
-
-Commit `98ee2dc` implements schema sixteen without changing cache control or presentation behavior. Every completed native luma fill now publishes a stable per-bank raw fingerprint, physical row, bank and eight-bit framebuffer generation tag across a bundled-data toggle handshake; the video side latches the selected tag, fingerprints all seven hundred twenty returned cache bytes and reports mutually exclusive tag or content mismatch evidence per line. The profiler preserves the first tag and content mismatch separately for each authored field, adds four saturating mismatch counters, advances the overlay to sixty-one words and retains schema fifteen through legacy decoding. The initial clean TFF line test exposed a diagnostic-only startup gap in which the delayed publication qualifier omitted pixel zero of the first displayed line and left its tag at reset generation zero; the same source commit corrects that qualifier and all four directed controls then pass, with TFF and BFF equality, one injected byte producing content-only mismatch and a forced wrong bank producing tag-only mismatch. The complete native suite passes its established field-order, mapping, timing, presentation, refill, profiler and decoder gates; TFF, BFF and progressive reconstruction retain zero out-of-tolerance pixels at 7,926,459, 7,948,706 and 13,048,137 cycles, field-DCT rejection remains at 82,326 cycles and the canonical seventy-two-picture mixed I/P/B live raster remains exactly 6,529,997 cycles with twenty-five publications, forty-seven B pictures, seventy-one swaps and every error clear. A from-scratch Quartus Prime 17.0.2 build completes in ten minutes fifty seconds with zero errors and 143 established warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively positive 0.352, 0.245, 4.056, 0.590 and 0.925 nanoseconds with zero endpoint negative slack; focused decoder setup and recovery are positive 1.509 and 10.903 nanoseconds and focused video setup is positive 3.328 nanoseconds, all with zero violated paths. Only the established unmatched `RESET` filter remains, and timing-netlist probes find every sampled schema-sixteen generation, synchronized tag, provenance toggle, mismatch counter, metadata and fingerprint register group. The fit uses 30,748 ALMs, 48,766 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The 4,239,056-byte RBF has SHA-256 `ef78d18bb5f8fe974e1b132df73305878e1da99fd72f602a28c223fb295c8825`.
-
-#### Next Steps:
-
-Copy the exact `98ee2dc` RBF to the Raspberry Pi, directly replace only `/media/fat/MediaPlayer.rbf` on the MiSTer without creating backup, rollback or staging files and verify the active image by readback. Reload the core, prepare `_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i, then acquire a corrected fresh screenshot burst during playback and decode schema sixteen from the same run. A tag mismatch identifies wrong refill ownership, row, bank or generation; matching tags with a content mismatch identifies cache RAM write, address or byte-lane read corruption. Preserve generated Quartus state and use incremental builds for future cycles as directed by the user.
-
-#### Files Modified:
-
-- `MediaPlayer_top_06.svh`
-- `MediaPlayer_top_07.svh`
-- `MediaPlayer.sdc`
-- `rtl/mpeg2_luma_framebuffer.sv`
-- `rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv`
-- `tools/streams/decode_hardware_cadence.py`
-- `tools/streams/run_native_480i_timing.sh`
-- `tools/streams/tb_h262_hardware_cadence_profiler.sv`
-- `tools/streams/tb_interlaced_420_cache_mapping.sv`
-- `tools/streams/tb_native_480i_cache_refill.sv`
-- `tools/streams/test_decode_hardware_cadence.py`
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
