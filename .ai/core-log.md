@@ -1,3 +1,32 @@
+## 566 COMMIT Unreleased 2acabc5 2026-08-26T23:38:54-07:00
+
+#### Coming From:
+
+Unreleased 2acabc5
+
+#### Purpose:
+
+Record the hardware telemetry from the user's repeated-load Bob test of `2acabc5` after they reported playback appearing slower.
+
+#### Outcome:
+
+The user replayed the same file several times in Bob mode without rebooting, reported that after a few runs it seemed to run slowly, and left the final run's terminal telemetry on screen. The stale 476,291-byte `cadence_probe.png` was deleted through FTP and confirmed absent before a new screenshot was triggered, so this is a genuinely fresh capture at 476,509 bytes with SHA-256 `11955026d61bd37806f994b4ed784e8f69227622fc51b10f5e16e9987c898eee`. The captured session still accepts all 15,150,646 bytes, displays 449 pictures with 448 swaps, sees sequence end, completes presentation and terminates quietly with reason one, zero aggregate error flags, no cache-bank overlap, no presentation error, no audio underrun, no PCM protocol error and no timestamp advance or delay conflicts. Unlike the clean entry 564 run, however, both the ranked-gap and actual missed-deadline counters are one rather than zero. The single outlier and the single deadline record are the same event at display picture ordinal six, a 4,004,000-cycle interval of 66.7333 milliseconds, which is exactly two nominal intervals and therefore one frame held for an extra field pair. Ranked gaps two and three are exactly 2,002,000 cycles, so steady-state cadence away from that one hitch is nominal and the entry 559 miss at ordinal 348 does not recur. The ordinal-six deadline record is diagnostic: at 323,580 accepted bytes the decoder is ready, the candidate is not presentable, decoder input pending, upstream FIFO pending, writer busy and writer capacity blocked are all false, writer capacity blocked cycles since the previous swap is zero, candidate ready delay is 592,128 cycles and input starved cycles since the previous swap is 1,075,462, or about 17.9 milliseconds. That signature is upstream input starvation during early startup, not a decoder, writer or DDR capacity stall, and it is the same failure class as the legacy picture-six gap that the 64-KiB clean-video queue and guarded startup were meant to close. The startup guard itself did not regress: presentation hold total fell from 27,400,352 to 27,074,752 cycles and the residual non-gap cadence excess fell from 3,002,892 to 2,053,370 cycles, so of the 4,055,370-cycle total excess over 448 nominal intervals, 2,002,000 is the single dropped slot and the remainder is a slightly shorter guarded startup wait than the accepted run. The 29.835129-fps aggregate again starts at first reference completion and includes that startup hold, so it must not be read as steady-state slowness; the honest statement is one lost frame near the start, not a globally slower run. Schema nineteen telemetry is per-session and this snapshot covers only the most recent completed session, so the earlier repeats in which the user first noticed the problem are not captured and cannot be reconstructed, and neither Bob/Weave selection, loaded-file identity nor position within the repeat sequence is encoded in the snapshot. No reload, reboot, MGL launch, media change or configuration change was made during capture, and no source change or build was performed for this entry. Evidence is `.ai/current_results/entry566_bob_repeat_terminal.png` and `entry566_bob_repeat_capture.json`, the latter carrying the full decode, the entry 564 comparison, the interval arithmetic and these scope limits.
+
+#### Next Steps:
+
+Do not commit a speculative fix on one sample. Have the user repeat the load several times again and capture telemetry after each individual run rather than only the last, so the distribution of ordinal-six starvation across cold and warm loads is measured instead of inferred, and have them note which run number each capture belongs to along with whether the perceived slowness tracks the captured gap. Also ask whether the reported slowness persisted visually through a whole run or was a brief hitch near the start, since the telemetry supports only the latter. If repeated captures confirm that ordinal-six input starvation returns on warm reloads while the first load after core load is clean, the boundary to investigate is upstream ARM-side delivery rearm across successive sessions rather than the presentation scheduler or the startup guard, and the existing drained-FIFO warm-load simulation cases should be extended to model the measured 1,075,462-cycle starvation window before any RTL change is proposed. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Bob/Weave switching has still not been reported on and remains outstanding, analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 565 COMMIT Unreleased 2acabc5 2026-08-26T23:21:45-07:00
 
 #### Coming From:
@@ -1203,34 +1232,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 526 COMMIT Unreleased 98ee2dc 2026-08-26T00:56:34-07:00
-
-#### Coming From:
-
-Unreleased 98ee2dc
-
-#### Purpose:
-
-Install and verify the exact schema-sixteen image without creating any backup, rollback or staging file.
-
-#### Outcome:
-
-The exact 4,239,056-byte `98ee2dc` RBF was copied from the designated GUNSMOKE checkout to the Raspberry Pi and independently retained SHA-256 `ef78d18bb5f8fe974e1b132df73305878e1da99fd72f602a28c223fb295c8825`. Two initial `curl` uploads were rejected with FTP status 550 and changed nothing because curl interpreted the URL relative to the server login directory `/root`; the established Python `ftplib` absolute-path operation then wrote directly to `/media/fat/MediaPlayer.rbf` with no intermediate remote filename. An initial curl readback likewise fetched the unrelated historical `/root/MediaPlayer.rbf`, which exposed the path interpretation rather than an installation failure. Absolute-path `ftplib` readback of `/media/fat/MediaPlayer.rbf` returns exactly 4,239,056 bytes at the candidate hash and compares byte-identically with the local build. No backup, rollback or staging file was created or modified.
-
-#### Next Steps:
-
-Reload the Media Player core, prepare `_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i and reply ready. Start playback immediately when prompted while a corrected thirty-second burst deletes the prior screenshot before every trigger, then leave the terminal image loaded for absolute-path schema-sixteen capture and decoding. Report whether the first-field bar remains frozen and whether the grey line fragments remain visible.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
