@@ -1,3 +1,74 @@
+## 549 COMMIT Unreleased 127f576 2026-08-26T19:03:23-07:00
+
+#### Coming From:
+
+Unreleased ffd0496
+
+#### Purpose:
+
+Determine whether the fetched luma words reach the line cache, and locate the frozen first field once the whole read path is accounted for.
+
+#### Outcome:
+
+Commit `b15b251` adds the last missing read-path measurement. The framebuffer exports the cache write event where `y_cache_wr_en` is raised, carrying validity, the parity of the fetch in flight and the actual cache address, and the profiler counts words and sums addresses for each parity, latched per generation. Schema seventeen becomes schema eighteen at sixty-four words with both appended words exactly thirty-two bits and both overlay origins moved eight rows up to 344 and 224. The references are again computed rather than observed: a healthy generation writes two hundred forty-two by ninety, or 21,780, first-field words and two hundred forty by ninety, or 21,600, second-field words, with sixteen-bit address sums of 48,766 and 32,656. An address sum was chosen over the XOR used for rows because the expected XOR is zero for both parities, which is also what no writes at all would produce and so could not discriminate the case under investigation. A clean build completed in 11 minutes 23 seconds with zero errors and 148 warnings, global setup, hold, recovery, removal and minimum-pulse-width margins of positive 0.217, 0.192, 4.020, 0.621 and 0.925 nanoseconds, a fit of 31,673 ALMs and 50,112 registers with block-memory bits and RAM blocks unchanged, and a netlist probe confirming every accumulator survives. The hardware reading is unambiguous. A burst on the same run showed the first field frozen in twenty of twenty-four active transitions, the worst observed, one stretch spanning fifteen consecutive samples, while the terminal snapshot returned every value exactly at its expected figure: row XOR two and zero, no region change, two hundred forty-two and two hundred forty fetches, 21,780 and 21,600 cache writes, and address sums 48,766 and 32,656. The pre-existing write-read fingerprints agree as well, the first-field expected and raw values both reading 635,643,363 and the second-field pair both 3,183,525,312, with zero session-scoped content mismatches and zero tag mismatches. The whole chain from reconstruction through writer, DDR, fetch, cache and display is therefore verified faithful while the displayed first field is seconds old. Because the luma line cache holds two lines and is overwritten every scanline, a field cannot be frozen inside it, so the staleness must already exist in what the writer stored, and the writer cannot skip a parity since its eight-row blocks span four even and four odd rows. The defect is therefore upstream of the DDR write, in what reconstruction hands the writer. A coverage gap matching that conclusion exists and had never been noticed: pixel-accurate reconstruction is verified for interlaced I pictures by a testbench whose source list stops at `mpeg2_h262_intra_recon` and cannot decode a P picture at all, and for progressive mixed I/P/B by the soak's `MIXED_PIXEL_MODE`, whose oracle is hardwired to a one hundred twenty-eight by ninety-six, twenty-four picture raster. Interlaced P and B reconstruction at 480i, which is what the test programme stream actually contains, has never been checked by anything. Commit `127f576` adds the missing fixture generator. FFmpeg cannot be asked directly for the wanted combination, since requesting interlaced encoding produces field motion types, field DCT and f_code three, which the decoder rejects at the first P header with no P pictures reconstructed; the generator therefore encodes frame-DCT frame-motion MPEG-2 with a short GOP and small motion range and applies the all-I generator's signalling patch, yielding a 304,926-byte frame-coded interlaced sequence with picture order I P P P I P P P, f_code one by one and top-field-first. Replayed through the soak, which compiles the complete decoder, that fixture is not rejected: six picture headers, 1,304 macroblocks and 1,305 motion vectors are processed before the bench freezes having consumed the whole stream, which is consistent with an eight-picture fixture ending early rather than a proven defect. No conclusion about field content can be drawn, because the soak has no pixel oracle for this raster.
+
+#### Next Steps:
+
+Generalize the soak's `MIXED_PIXEL_MODE` oracle dimensions so it can accept a 720 by 480 interlaced fixture and compare reconstruction against an FFmpeg decode, then replay the new interlaced P fixture and assert that both field parities change between consecutive pictures. That work is bounded, entirely local to the build PC and needs no image, install or playback. Do not propose a correction before it reproduces: the read path is now exonerated by exact measurement, but the reconstruction hypothesis is still only the last remaining candidate rather than a demonstrated fault. Retain the observation that field-motion interlaced P is refused outright while frame-coded interlaced P decodes, since any future fixture must stay inside the supported subset to be meaningful.
+
+#### Files Modified:
+
+- MediaPlayer_top_06.svh
+- MediaPlayer_top_07.svh
+- rtl/mpeg2_luma_framebuffer.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/generate_test_interlaced_p_frames.py
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+- tools/streams/test_decode_hardware_cadence.py
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
+## 548 COMMIT Unreleased ffd0496 2026-08-26T19:02:46-07:00
+
+#### Coming From:
+
+Unreleased 008909d
+
+#### Purpose:
+
+Record the native luma fetch addresses and any mid-sweep display-region change, which no existing counter could observe.
+
+#### Outcome:
+
+Reading the live readout path found that the two facts every recent diagnosis rested on were weaker than they had been read. The region evidence added in entry 518 overwrites its latch on every fetch edge, so it preserves only each parity's last sample and the profiler compares those two survivors at the generation boundary; a bank change partway through the first field's own two hundred forty fetches is invisible whenever the final samples happen to agree, and a zero region-mismatch count therefore means only that the last fetch of each parity matched. The per-field fetch counters are attributed solely by `line_number[0]`, so a count of two hundred forty-two proves that many even-row fetches were launched and nothing about which rows; one stale row fetched two hundred forty-two times yields the identical figure and would look exactly like a frozen field. Commit `ffd0496` closes both. The framebuffer exports the raw fetch event as validity, parity and the nine-bit row, and the profiler accumulates a per-parity XOR of the row number across a generation together with a per-parity flag set when any later fetch in that generation disagrees with the region seen on the parity's first fetch. Accumulating in the profiler rather than the framebuffer keeps the generation boundary unambiguous, which is the correction entry 520 recorded. Schema sixteen becomes schema seventeen at sixty-two words with one appended word packed as nine, nine, one, one and twelve bits, verified to total exactly thirty-two after entry 519 shipped a thirty-bit word, and both overlay origins move four rows up to 352 and 232 so the final row stays flush with the diagnostic and native rasters. The expected values are computable rather than empirical: a healthy generation sweeps first-field rows zero through four hundred seventy-eight plus prefill rows zero and two, whose XOR is two, and second-field rows one through four hundred seventy-nine, whose XOR is zero. The decoder prints both against those expectations, the directed profiler regression encodes a first field with a wrong XOR and a changed region against a healthy second field, and the entry 516 overlay row-coverage check immediately caught the stale testbench origins after the layout moved, earning its place after being worthless in entry 519. A clean build completed in 11 minutes 14 seconds with zero errors and 148 warnings; global setup, hold, recovery, removal and minimum-pulse-width margins are positive 0.212, 0.247, 3.355, 0.556 and 0.925 nanoseconds, the fit uses 31,636 ALMs and 49,859 registers with block-memory bits and RAM blocks unchanged from baseline, and a netlist probe confirms every new accumulator survives. On hardware, a fifty-frame burst confirmed the first field froze during the very run measured, ten of twenty-four active transitions showing bit-identical even rows, while the terminal snapshot reported a first-field row XOR of exactly two, a second-field XOR of exactly zero, no region change on either parity, two hundred forty-two and two hundred forty fetches and region zero for both. The first field therefore fetched all two hundred forty distinct rows plus both prefill rows, in one sweep, from a single region, while displaying content seconds old. The read addressing is exonerated, which is the first evidence in this investigation pointing away from the framebuffer reader.
+
+#### Next Steps:
+
+Instrument the one remaining uninstrumented step between the DDR read and the screen: whether the returned words actually reach the line cache for that parity. Nothing counts cache writes today, so a fetch that issues correctly and returns correctly but never lands would read exactly as this capture does.
+
+#### Files Modified:
+
+- MediaPlayer_top_06.svh
+- MediaPlayer_top_07.svh
+- rtl/mpeg2_luma_framebuffer.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+- tools/streams/test_decode_hardware_cadence.py
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 547 COMMIT Unreleased 008909d 2026-08-26T17:07:17-07:00
 
 #### Coming From:
@@ -1183,65 +1254,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 509 COMMIT Unreleased 48c2c87 2026-08-25T07:29:58-07:00
-
-#### Coming From:
-
-Unreleased 48c2c87
-
-#### Purpose:
-
-Capture the terminal-drain hardware result and separate its accepted presentation completion from the remaining intermittent display-history ghost and faint moving-line artifact.
-
-#### Outcome:
-
-The user reloaded the installed `48c2c87` image and ran `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off, HDMI scaler deinterlacer Weave and Interlaced output Native 480i. Playback is materially better and the prior pervasive ghosting is almost gone, but one intermittent event near mid-run retained an old image for a noticeable interval, and the user can still barely see the transient short horizontal lines while the movie is moving; those lines are now gray. USER and POWER are solid and DISK blinks twice. The untouched terminal screenshot was triggered, retrieved and decoded entirely through ordinary FTP with the default `root` and `1` login and no SSH. `.ai/current_results/entry508_terminal_drain_hardware.png` is 11,909 bytes with SHA-256 `6db00f683783d9fbe2aea7579b9e30c228c82ecb47c6e182a2e534b27b593320`. Schema nine accepts all 5,007,304 bytes, and its wrapped reference, display and swap counts of 44, 44 and 43 represent exactly 300 decoded pictures, 300 displayed pictures and 299 swaps. The 299 presentation intervals span 599,109,027 decoder cycles or 9.985150 seconds and deliver 29.944466 pictures per second. Top-field-first remains correct, sequence end is seen, presentation completes, the session reaches quiet reason one and every aggregate, presentation, destination and cache-bank-overlap error is clear. The final raster contains the correct authored last-field weave at x=512 through x=543 and x=516 through x=547 rather than an old terminal position. Commit `48c2c87` therefore passes its bounded terminal-drain objective and eliminates the prior missing final picture. The clean swap count and cadence place the remaining intermittent stuck appearance below scheduler ownership; together with the previously analyzed pair-identical step-hold recording, its working classification remains downstream Weave or display field-history processing. The live-only gray dashes remain unresolved because the terminal still cannot retain them and the cache-bank overlap diagnostic excludes only the monitored same-bank refill collision.
-
-#### Next Steps:
-
-Keep the exact installed `48c2c87` image, Native timing pattern Off and Interlaced output Native 480i, change only HDMI scaler deinterlacer from Weave to Bob and run `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` three consecutive times. Report whether any old bar or image persists during any run, whether the faint gray horizontal dashes remain, and the final USER, DISK and POWER states, then leave the last terminal image displayed for another ordinary-FTP capture. Bob removes Weave's multi-field reconstruction history while retaining the decoder, scheduler, DDR frame banks and line-cache path: disappearance of the intermittent ghost with unchanged clean cadence will confirm the established downstream-history classification, while gray dashes in both modes will isolate the next cycle to line-cache delivery instrumentation. Do not change RTL or native timing before this comparison.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 508 COMMIT Unreleased 48c2c87 2026-08-25T04:26:41-07:00
-
-#### Coming From:
-
-Unreleased c78bd15
-
-#### Purpose:
-
-Guarantee that native all-I sequence end releases and presents the final queued picture across every completion, promotion and swap race.
-
-#### Outcome:
-
-The user approved a bounded terminal-drain correction after entry 507 materially improved playback but ended with USER and DISK off and POWER blinking once. The two Pixel 8 Pro recordings `.ai/current_results/PXL_20260825_111447318.mp4` and `.ai/current_results/PXL_20260825_111514313.mp4` are respectively 52,996,175 bytes over 12.844311 seconds at 59.715153 captured frames per second with SHA-256 `7beb985475df4639fb4606302445a24ac2b6ed558553c57b16d8744e84a3fa02`, and 56,185,455 bytes over 13.629356 seconds at 59.503914 captured frames per second with SHA-256 `cf15f7d59e07356dcd0fd92c74d790ebd18b42c6c5f63dc2b89caf9d41e598e1`. Both show the bright bar advancing and wrapping at the corrected rate while retaining the already classified downstream Weave/display-history ghosts. The untouched ordinary-FTP schema-nine capture `.ai/current_results/entry507_tff_light_secondary_queue.png` is 11,841 bytes with SHA-256 `d029cdd623391ff27611b014456e8bbcc2406b860a71f7d392d22408d7de503d`. It accepts all 5,007,304 bytes, decodes all 300 reference pictures as the wrapped count 44, but displays only 299 with 298 swaps as wrapped counts 43 and 42. Those 298 intervals span 597,055,088 decoder cycles and deliver 29.946985 pictures per second with zero aggregate or presentation error and sequence end seen, but terminal quiet remains false because one pending ordinary identity is valid and unreleased. Pixel inspection independently finds the penultimate authored field positions at x=504 and approximately x=508 rather than the final x=512 and x=516 positions. Commit `48c2c87` makes native ordinary sequence-end permission sticky until the primary and secondary identities drain, including terminal events before, coincident with and after secondary completion or promotion. The finite accelerated integration case decoded and presented all eight pictures and finished with no primary, secondary, terminal-latch or hold state. The official native suite passed with forty field ticks, twenty frame windows, the existing ten-picture serialized and thirteen-picture overlapped controls, twenty-one decoded and twenty presented accelerated pictures, ordinary and delayed cache refill, schema-nine cadence telemetry and decoder layout. The full scheduler regression also preserved all cadence rates, timestamp behavior, B-picture ordering and starvation handling. TFF and BFF reconstruction passed with zero out-of-tolerance pixels at 7,926,459 and 7,948,706 cycles, progressive passed at 13,048,137 cycles, field-DCT rejection passed at 82,326 cycles and canonical mixed I/P/B live-raster playback remained exactly 6,529,997 cycles with all error flags clear. A clean Quartus Prime 17.0.2 build completed in 10 minutes 44 seconds with zero errors and 144 established warnings. Global setup, hold, recovery, removal and minimum-pulse-width margins are respectively +0.160, +0.248, +2.959, +0.368 and +0.925 nanoseconds; focused decoder setup and recovery are +1.519 and +11.273 nanoseconds and focused video setup is +3.227 nanoseconds, all with zero violated paths. The fit uses 28,968 ALMs, 44,679 registers, 3,655,139 block-memory bits, 464 RAM blocks, 67 DSP blocks and three PLLs. The 4,151,600-byte RBF has SHA-256 `a4e7678719072f0790d8bce74f5c29e329eedb8ef5d6163245c2de8328756332`. Ordinary FTP with the default `root` and `1` login retrieved the active `c78bd15` image at its exact known `e8e71ce25ba6dd9d783bacb4b62a237bdd0de4d98a8891b00dd5bf82bb80636f` hash, preserved and round-trip verified it as `/media/fat/MediaPlayer.rbf.rollback-pre-48c2c87`, round-trip verified the staged candidate and then verified the promoted `/media/fat/MediaPlayer.rbf` at the exact candidate hash. The temporary stage is absent; helper, Main, media and MiSTer configuration are unchanged.
-
-#### Next Steps:
-
-Run a clean Quartus build and focused timing analysis, preserve `c78bd15` as rollback through ordinary FTP, install the byte-verified image and repeat `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off, HDMI scaler deinterlacer Weave and Interlaced output Native 480i. Acceptance requires all 300 pictures and 299 swaps, normal quiet completion, no aggregate or presentation error and passing LEDs.
-
-#### Files Modified:
-
-- `rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv`
-- `tools/streams/tb_native_ordinary_overlap_ownership.sv`
-- `tools/streams/tb_native_480i_presentation_integration.sv`
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
