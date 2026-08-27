@@ -1,3 +1,35 @@
+## 562 COMMIT Unreleased ??? 2026-08-26T22:55:24-07:00
+
+#### Coming From:
+
+Unreleased 134b401
+
+#### Purpose:
+
+Make the first complete visible field pair independent of relative synchronizer latency before qualifying the startup candidate for hardware.
+
+#### Outcome:
+
+Review of source 134b401 found that its initial swap exclusion depends on two separate clock crossings retaining their simulated relative arrival order: the raw frame-window edge precedes the shown acknowledgement by one decoder stage. Physical first-stage latency can differ, so phase-only simulation does not prove that ordering. The approved full-field-pair startup behavior requires an explicit guard: after visibility is acknowledged, observe the synchronized window high and then low before allowing any swap. This changes neither the intended presentation schedule nor the buffer, sync, ownership or timestamp policy. The directed test will inject additional window-crossing delay to expose the old condition and validate the guard. Initial candidate tests already pass the dense pause excerpt, three alternate phases, three drained-FIFO warm sessions, periodic DDR pressure and one/two-picture EOF cases with no gaps; the legacy 16-KiB control retains its expected picture-six gap. Its unfinished full simulation and build will not qualify the corrected source, and no hardware has been changed.
+
+#### Next Steps:
+
+Add the observed-window guard and deliberately skewed crossing regression, publish the correction, restart the full-file and scenario validation from that source and perform a fresh empty-state build. Preserve completed unchanged native tests only with exact source provenance and rerun the changed startup test. Require all five timing classes positive before direct replacement and independent complete FTP readback, then leave reload and the clean Bob run to the user.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_native_startup.sv
+- MediaPlayer_top_05.svh
+- tools/streams/tb_h262_native_startup.sv
+- tools/streams/tb_h262_input_cadence.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 561 COMMIT Unreleased 134b401 2026-08-26T22:44:26-07:00
 
 #### Coming From:
@@ -1219,35 +1251,6 @@ Reload the installed `4e4db95` image, run `MediaPlayer/_cadence/native_480i_tff_
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 522 COMMIT Unreleased bfb9361 2026-08-25T20:39:25-07:00
-
-#### Coming From:
-
-Unreleased bfb9361
-
-#### Purpose:
-
-Interpret the first schema-fourteen hardware result and define the next evidence boundary without mistaking session-wide variation for generation-correlated correctness.
-
-#### Outcome:
-
-After reloading the installed `bfb9361` image, the user ran `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` and reports that what appeared to be the second field was duplicated, with the established ghosting and tiny horizontal grey lines still visible during playback. The terminal screenshot `.ai/current_results/entry522_schema14_terminal.png` was triggered and retrieved through ordinary authenticated FTP at 12,278 bytes and SHA-256 `7803856948fb73b61b332a0525fbf89289ef90b3dd0c41d4dbec63567ce5cfc2`. Schema fourteen accepts all 5,007,304 source bytes and its wrapped counters reconstruct 300 reference and displayed pictures with 299 swaps across 599,290,215 cycles, or 29.935413 pictures per second. Sequence end, presentation completion and quiet reason one are present; all error flags are clear. The framebuffer reports 300 generation resets, 299 publications, zero unpublished resets, zero prefill misses, a 2,002,004-cycle maximum publication latency, 242 first-field and 240 second-field fetches in the terminal generation, region one for both fields, zero region mismatches and zero phase errors. Both session-wide varied flags are set and the first-field and second-field signatures are respectively `0x37` and `0x03`. This disproves only a parity returning one constant sampled byte for the entire session. Entries 520 and 521 stated the stronger inference too broadly: the current signature XORs only byte lane zero of each returned sixty-four-bit word and aggregates all generations, so activity outside the symptom-bearing interval can set varied and a terminal snapshot cannot prove that the correct position-dependent field content arrived during the duplicated or ghosted frame. The result therefore passes the schema-fourteen diagnostic objective but does not yet place the loss definitively on either side of the DDR return; it narrows the required correlation to the raw-return, line-cache write and displayed-cache-read boundary.
-
-#### Next Steps:
-
-Do not make a behavioral correction from the coarse signatures. Prepare a bounded schema-fifteen diagnostic that computes generation-correlated, position-sensitive luma fingerprints over all eight bytes of every raw DDR return and over the corresponding post-cache displayed luma samples for each field parity, transfers only completed stable fingerprints across the video-to-decoder clock boundary and counts raw-versus-displayed mismatches without feeding control logic. Retain the established fetch, region, phase, publication and error evidence, add directed tests that prove matching TFF and BFF fields compare equal and an intentionally corrupted cache word compares unequal, preserve schema-fourteen through legacy decoding and run the complete native, reconstruction and live-raster suites before any clean build. If timing closes, repeat the same fixture while an agent-triggered live screenshot burst captures the visible duplication and read the correlated fingerprints from that same run; a mismatch localizes the defect to cache write/readout, while equality moves the search after the cache output.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 
