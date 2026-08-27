@@ -1,3 +1,32 @@
+## 576 COMMIT Unreleased deced5c 2026-08-27T00:48:31-07:00
+
+#### Coming From:
+
+Unreleased deced5c
+
+#### Purpose:
+
+Record the user's revised diagnostic cadence and state the cold-boot behaviour of `2acabc5` as it currently stands.
+
+#### Outcome:
+
+The user has cut the diagnostic cadence and this supersedes the Next Steps of entry 575, which proposed collecting six to eight paired latency and outcome samples. That plan is withdrawn. Their instruction is that going forward the file is run once under different circumstances rather than repeatedly under the same one, on the grounds that each sample costs a manual power cycle, core load and playback and that varying the condition returns more per run than repeating it. Future hardware requests must therefore be designed as a single run that changes one condition and must state what that one run would discriminate; if a conclusion genuinely requires repetition, say so and let the user decide rather than scheduling the repeats. The user also asked directly whether the file plays perfectly on a cold boot, and on the present evidence it does not, though the defect is narrow. Across strictly verified cold boots, where the power cycle was confirmed from `/tmp/messages` or from a live FTP dropout rather than from recollection, block 1 run 1 and block 3 run 1 gapped with one and two missed deadlines while entries 572 and 575 were clean, giving two clean and two gapped; entry 568 also gapped but its reboot predates the syslog that was later checked and cannot be verified, which would make it three gapped of five. Cold boot therefore plays perfectly roughly half the time. What a failure costs is one or two dropped frames inside the first 270 milliseconds at display picture ordinals five and six, and nothing after. In every session ever measured, gapped or clean, the second and third ranked display gaps are exactly 2,002,000 cycles, so steady-state cadence past the startup region is nominal without exception, and every run completes with all 15,150,646 bytes accepted, 449 pictures, 448 swaps and zero error flags. Warm replays are clean in every sample except the block 1 series, where the media was still warming across successive runs. No source change, build or deployment was made for this entry. The installed FPGA image remains the qualified `2acabc5` bitstream with SHA-256 `fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347`, and the installed host binary remains the instrumented `deced5c` build with SHA-256 `bd182e9c26e91bb3bdb140835dbda40a0f0a8179060fa47939cbb6c073ecf1dd`, whose pre-deployment backup is held at `/home/vash/mister-builds/entry573-deced5c/`.
+
+#### Next Steps:
+
+Await the user's choice of the next single circumstance to test rather than proposing a sampling programme. The open question is unchanged and is stated in entry 575: measured first-byte latency does not predict whether a cold run gaps, since 37.6 milliseconds was clean while 21.9 and 35.3 milliseconds gapped, so phase alignment between byte arrival and the early cadence deadline remains the most likely operative variable and no current counter measures it. The single most discriminating circumstance available without a new build is playing the higher-bitrate `bbb_480i_tff_15s.m2v`, which is 34,919,166 bytes against 15,150,646 for the qualified file and therefore demands about 2,327,944 bytes per second, well above the 1,443,000 bytes per second burst rate measured in entry 575. If the defect is delivery-bound that file should fail consistently and severely rather than intermittently, and if it plays as well as the smaller file then delivery rate is not the operative constraint and the boundary moves to the FPGA side. Do not deploy the helper-side priming correction, which entry 575 showed is not yet justified. Do not raise the per-poll chunk budget. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 575 COMMIT Unreleased deced5c 2026-08-27T00:44:54-07:00
 
 #### Coming From:
@@ -1186,34 +1215,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 536 COMMIT Unreleased d566668 2026-08-26T05:21:07-07:00
-
-#### Coming From:
-
-Unreleased 1f80432
-
-#### Purpose:
-
-Force MediaPlayer's selector to open the canonical games directory after the generic resolver chose the legacy root-level directory.
-
-#### Outcome:
-
-The user reports that the exact entry 535 Big Buck Bunny Bob run still showed both old-frame ghosting and thin horizontal lines, so the visual defect remains failed despite clean accepted-write-versus-raw-DDR-read evidence; no additional FPGA diagnostic or behavioral change is included here. The separately installed Main directory change also failed its hardware objective. Read-only FTP inspection proves that both `/media/fat/MediaPlayer` and `/media/fat/games/MediaPlayer` exist, and static review shows `user_io_get_core_path(NULL, 1)` delegates to `findGamesDir`, whose compatibility search intentionally prefers the legacy root-level core directory before `games/MediaPlayer`. Commit `d566668` corrects only the pinned Main patch: MediaPlayer's selector invocation and its internal home boundary now both use canonical relative path `games/MediaPlayer`, which resolves to `/media/fat/games/MediaPlayer` in Main's storage namespace and prevents the generic legacy resolver or remembered `Selected_F` path from redirecting the initial view. The complete patch applies cleanly to pinned Main commit `0a8fb44`; other cores, the FPGA RBF and the ARM helper remain unchanged. Two clean builds with the checksum-verified official Arm GNU 10.2 toolchain are byte-identical, each producing a 1,166,244-byte ARM EABI5 executable at SHA-256 `5a6cbf7e85682ac301d57470b8b2c952d3bbfa42af55484bd70dd0d36724ae96`. Only `/media/fat/MiSTer` was directly deleted and rewritten in one ordinary-FTP session with automatic local recovery available, and independent readback matches the exact size and hash. No MiSTer backup, rollback or staging filename was created, and no restart was triggered.
-
-#### Next Steps:
-
-Have the user restart the MiSTer, reload MediaPlayer and open its selector repeatedly, including after entering a subdirectory and selecting a file. Hardware acceptance requires every opening to begin at `/media/fat/games/MediaPlayer` even while the legacy `/media/fat/MediaPlayer` directory remains present. After that narrow correction is accepted, resume the visual investigation from scheduler display-bank and generation selection without adding a new diagnostic layout.
-
-#### Files Modified:
-
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
