@@ -82,6 +82,12 @@ TESTS = [
 # inferred from the RTL.
 GOP_OVERRIDES = {'7_progressive_ipb': ('15', '2')}
 
+# Test seven also carries a rate floor. Without one, B pictures let the encoder
+# code the same content far more cheaply than the all-I test four, so the two
+# cannot be compared by eye: any softness might be the lower bitrate rather
+# than the decoder. Matching bits per frame makes the comparison mean something.
+RATE_FLOOR_TESTS = {'7_progressive_ipb'}
+
 
 def audio_args(codec: str, duration: float) -> tuple[list[str], list[str]]:
     """Returns (input/filter args, encoder args)."""
@@ -181,6 +187,7 @@ def build(name: str, video_filter: str, mode: str, tff, codec: str,
              # constant rate makes the encoder's rate control underflow. The
              # ceiling and soak fixtures elsewhere remain constant rate.
              '-b:v', str(video_rate),
+             *(('-minrate:v', str(video_rate)) if name in RATE_FLOOR_TESTS else ()),
              '-maxrate:v', str(video_rate), '-bufsize:v', str(dvd.BUFFER_BITS),
              '-qmin', '1', '-qmax', '31', '-sc_threshold', '1000000000',
              *a_enc, '-muxrate', str(MUX_RATE), '-packetsize', '2048',
