@@ -1,3 +1,32 @@
+## 570 COMMIT Unreleased 2acabc5 2026-08-27T00:14:52-07:00
+
+#### Coming From:
+
+Unreleased 2acabc5
+
+#### Purpose:
+
+Collect a second repeated-run block and establish whether the ordinal-six miss survives a fresh start.
+
+#### Outcome:
+
+All five block 2 sessions are clean, reporting zero cadence outliers and zero missed deadlines while accepting all 15,150,646 bytes and displaying 449 pictures with 448 swaps, zero error flags and quiet terminals. The interpretation, however, is not the one the user expected, and the difference matters more than the result. The user reports rebooting before these five runs, but the device evidence does not support a Linux reboot. Both `/tmp` and `/run` are tmpfs and are recreated empty at boot, and `/tmp/messages` is the syslog and begins at boot. That file's first line is `Aug 27 06:56:52 MiSTer syslog.info syslogd started`, it runs unbroken through 07:13:46, and it contains exactly one syslogd start, while every boot-time daemon pidfile carries an mtime of 06:56. `/tmp/CORENAME` and `/tmp/RBFNAME` were restamped at 07:09. The MiSTer clock runs UTC against the agent's America/Phoenix local time, so 06:56:52 UTC is 23:56:52 local and 07:09 UTC is 00:09 local. Linux therefore booted once, before block 1, and remained up continuously across both blocks; what preceded block 2 was a core reload at 07:09 UTC, which reconfigures the FPGA but does not restart Linux and does not clear the page cache. Block 2 consequently ran against a cache already warmed by block 1's five reads of the same file, which makes it the strongest support so far for the read-latency mechanism rather than evidence that a cold start is clean. The same timeline confirms the other direction: block 1 capture 1 was taken 82 seconds after the verified boot and is a genuine cold-after-boot sample, and it gapped with 1,103,135 starved cycles. One conflict is left open and must not be smoothed over. Block 1 capture 5 was warm and still lost the ordinal-six slot at the full 1.38 times realtime feed rate, while all five block 2 runs at equal or greater warmth are clean, so page-cache warmth alone does not explain the difference and core-reload freshness may be a second factor that the present data cannot separate. A new and previously unrecorded evidence source was found during this work: the ARM helper writes `/tmp/MediaPlayer_ARM.log`, rewritten per playback, and the final block 2 run's copy is archived. It shows the helper reading the file in uniform 4,096-byte chunks, 3,699 reads for the whole 15,150,646 bytes, finishing on end of file with child exit code zero. Its blocking behaviour is the significant part. All 190 would-block events occur before the first byte is submitted, since every logged instance carries a submitted count of zero and the highest logged power of two is 128 against a total of 190, and after the first read event the helper never blocks writing to the FPGA again. The FPGA-side input FIFO is therefore never full during steady delivery, which establishes that ARM-side file read throughput is the limiting factor and is consistent with the 1.38 times realtime ceiling measured in entry 569. The 4,096-byte read granularity is the first concrete delivery-side mechanism identified and is a candidate cause of that ceiling. No genuine power-cycle sample has been taken since entry 568, whose own reboot predates the current syslog and cannot now be verified. The helper log carries no timestamps, so it establishes granularity and blocking but not read latency, and page-cache state remains unmeasured. Per the user's decision, entry 564 is dropped as evidence because its load history is not recalled, and the entry 569 ordinal ambiguity is resolved in favour of five captures mapping to five runs. Evidence is `.ai/current_results/entry570_block2_run1` through `run5`, the consolidated `entry570_block2_series.json` and the archived `entry570_arm_helper.log`.
+
+#### Next Steps:
+
+Take the genuine cold sample that is still missing by having the user fully power-cycle the MiSTer at the wall rather than reloading the core or using a menu reset, then play the file five times, so a verified cold-after-power-cycle block can be compared against block 1's verified cold-after-boot capture and entry 568's unverifiable one. Confirm the reboot afterward from `/tmp/messages` rather than from recollection, since that check is cheap and has now twice contradicted the reported procedure. Then run the separation experiment the open conflict requires: after a warm block that has produced a gap, reload only the core without rebooting and replay, which isolates core-reload freshness from page-cache warmth as the operative variable. The planned FTP cache-warming test is now partly redundant for confirming that warmth helps and should be reserved for the case where the power-cycle block comes up cold and gapped, where it would still discriminate mechanism. Pursue the ARM helper log as a first-class evidence source in parallel, since it is the only view of the delivery side: determine from the helper source whether the 4,096-byte read size is fixed or configurable and whether a larger read or readahead would lift the 1.38 times realtime ceiling, and add timestamps to that log if a diagnostic change is later approved. Do not propose a source change until the cold and core-reload cases are separated. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 569 COMMIT Unreleased 2acabc5 2026-08-27T00:04:40-07:00
 
 #### Coming From:
@@ -1201,35 +1230,6 @@ Do not build or deploy `164c7e6` until the new commercial-DVD-rate Bob and Weave
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 530 COMMIT Unreleased 5de0e1d 2026-08-26T02:28:14-07:00
-
-#### Coming From:
-
-Unreleased 5de0e1d
-
-#### Purpose:
-
-Resolve the registered-cache-read alignment hardware run and identify the next evidence boundary for the remaining second-field and horizontal-line corruption.
-
-#### Outcome:
-
-The user reloaded the exact `5de0e1d` image and ran `_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i while the corrected burst acquired ninety-five fresh screenshots over thirty seconds. The user reports that the prior extra bar on the right is no longer visible while the left bar sweeps, so the registered-address correction materially improves the duplicated or frozen bar symptom, but explicitly reports that the second field is still visibly wrong and thin grey horizontal lines remain throughout moving content; the image is therefore not accepted. Schema sixteen accepts all 5,007,304 bytes, reaches sequence end, presentation completion and normal quiet reason one, and its wrapped counters represent 300 framebuffer resets, 299 publications, 300 displayed pictures and 299 swaps. Every aggregate, cache-overlap, prefill, region and phase error is clear. Both field tag-mismatch and content-mismatch counters are exactly zero across 255 reported fingerprints per field; the terminal first-field raw and displayed fingerprints are both `f964952b`, and the second-field pair are both `8c26df67`. This is the expected change from entry 527's saturated raw-versus-cache mismatches and proves the corrected cache RAM write and registered readout now preserve every fingerprinted luma line, but it does not prove that the luma bytes arriving from DDR were originally written correctly. The selected live evidence `.ai/current_results/entry530_schema16_live_lines.png` is 9,828 bytes with SHA-256 `2b307a525e8b808c61f09bfff0e3643611f6e4e6d63b43438739c61815c678a8` and preserves the reported horizontal fragments; `.ai/current_results/entry530_schema16_terminal.png` is 12,478 bytes with SHA-256 `162ef1bb6119d2423a675cff82e9b5955fc668c6eea4fbbc982f06258d033462` and contains blocky lower-left content absent from the authored terminal frame. The cache-alignment correction therefore passes its narrow raw-versus-cache objective, while the overall native hardware result remains failed and the next distinction is accepted framebuffer writes versus later raw DDR returns.
-
-#### Next Steps:
-
-Stop before another behavioral correction and obtain approval for a schema-seventeen write-to-read provenance diagnostic. Fingerprint each accepted luma DDR writer word with its physical bank, row and word position, retain completed per-line expected fingerprints by framebuffer generation, and compare them against the already observed raw DDR return for the same published bank, row and generation before the line enters the cache. Preserve schema sixteen through legacy decoding and add directed controls proving clean equality, one accepted-write or readback corruption as a content mismatch, and wrong bank, row or generation as provenance mismatches; run the complete native, reconstruction and canonical live-raster suites before an incremental Quartus build. A write-versus-read mismatch localizes the remaining corruption to writer packing, address acceptance, DDR storage or region ownership, while equality moves the boundary upstream into reconstructed pixels or downstream beyond the already-cleared cache and requires a separate output-coordinate discriminator. Continue direct verified replacement of only `/media/fat/MediaPlayer.rbf` with no backup, rollback or staging files.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
