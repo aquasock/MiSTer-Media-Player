@@ -1,3 +1,32 @@
+## 587 COMMIT Unreleased be8502b 2026-08-27T02:22:06-07:00
+
+#### Coming From:
+
+Unreleased be8502b
+
+#### Purpose:
+
+Measure the first hardware run of the acknowledged bulk preload path and determine whether its host-side savings resolve high-bitrate playback.
+
+#### Outcome:
+
+The user reports that everything looks the same and leaves the image ready. The helper log was collected first, followed by a freshly triggered screenshot and complete host/FPGA readbacks. A new Linux boot at 09:17:15 UTC and runtime `transport=ack_bulk_preload_v1` establish activation of `be8502b`; the complete installed host hash remains `da213d6bd9cc89a9af736a0bb029f9ebadd6e6a62382728ae1bacc07a381f909`, and FPGA `2acabc5` is unchanged. All 34,919,166 bytes, 449 pictures and 448 swaps complete with zero decoder error flags, normal helper exit and a quiet completed presentation. There is a real but insufficient measured gain over entry 585: matched completed-chunk delivery rises from 1,427,221 to 1,578,252 bytes per second, or 10.58 percent, while cadence improves from 18.315332 to 20.248749 fps and from 24.460381 to 22.124823 seconds. Delayed presentation intervals fall from 186 to 167, but the two largest retained holds remain 166.833 milliseconds, consistent with the user's lack of perceptible improvement. The median unsampled full 16 KiB transfer falls from 10,780 to 9,196 microseconds, confirming that the changed word loop saved time; complete transfer-call duration falls from 23.585322 to 21.202251 seconds. Transfers and ACK waits still consume 96.36 percent of measured media-poll time, whereas pipe reads consume 0.724867 seconds or 3.29 percent. All 590 EAGAIN events occur before the first completed chunk. The 533 data-bearing polls average 41.273 milliseconds, but the maximum poll remains 81.209 milliseconds; these are blocking exposure rather than direct UI latency. Across the same 270,336 sampled words, extended ACK-low polling now occurs in seven of thirty-three chunks rather than one, with a maximum of 76 GPI reads and no uninitialized indication. Faster delivery meeting downstream flow control more often is plausible, but samples do not measure total FIFO-wait duration or establish its precise cause. The first three retained delayed deadlines find decoder input ready but empty and upstream FIFO empty; their writer-capacity blocked counts are 22, zero and 255 cycles, not all zero. The aggregate decoder-stall counter increases, but RTL gates that count on input pending and decoder not ready, so greater input availability can change its coverage and this alone is not evidence of a decoder regression. Supply remains only 67.71 percent of the file's average demand, requiring another 47.68 percent increase merely to meet that average; the largest meadow picture still needs about 161 milliseconds of bytes at this mean rate against 33.367 milliseconds per nominal frame. Preserve the eight-bit largest-gap ordinal ambiguity: raw codes 95, 98 and 15 are not unique absolute positions in this 449-picture file. The old spikes problem remains historical progressive bring-up context, not the current comparison. Capture, helper log, full decode and checked analysis are stored as `.ai/current_results/entry587_*`; no source, deployed binary, media, configuration or lifecycle was changed. Hardware cadence acceptance still fails, and neither the qualified 8 Mbps regression nor a separate current menu assessment is claimed. The user also asks about another agent's alternative delivery path and a possible 10 MB/s rate. Entries 579 and 580 identify the likely reference as `spi_block_write` through `fpga_spi_fast_block_write`, which uses the same physical GPIO-style link but omits per-word ACK reads; entry 581 already explains why that cannot be substituted without FIFO flow control. The present preload path still waits for both ACK phases. The helper currently writes to a pipe and Main owns FPGA I/O, so this is a Main transport choice rather than an existing direct-helper mode. Main also has lightweight-bridge register access, but a dedicated receiver or shared-memory/DMA route would be a distinct implementation. No measured 10 MB/s result for this target was found in the reviewed evidence, and that figure must remain unverified.
+
+#### Next Steps:
+
+Do not repeat the same hardware condition or expect another minor host-loop reduction to provide the missing throughput. Prefer investigating the existing fast-block primitive with an explicitly approved coordinated host/FPGA transport change that amortizes acknowledgements across bounded bursts backed by conservatively reported ingest-FIFO capacity, with documented strobe ordering and drain guarantees, reset and legacy fallback behavior, and overflow plus byte-count verification. The existing ingest FIFO is a separate 32 KiB mixed-width FIFO; preserve the 64 KiB clean-video queue and do not confuse or enlarge the two as a substitute for transport work. Qualification must include protocol and clock-domain/backpressure tests, the full relevant FPGA regressions, a clean Quartus build and timing review before deployment; faster transport must not be promised to remove every downstream decoder limit. Obtain approval before implementing that material protocol revision, while retaining standing publication and qualified deployment permissions. Keep `be8502b` as the current measured comparison point, preserve startup, continuous HDMI sync and black idle behavior, leave reboot and playback to the user, and retain the outstanding 8 Mbps and unsupported-feature boundaries. Keep restricted `core.md` unchanged and preserve the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 586 COMMIT Unreleased be8502b 2026-08-27T02:05:53-07:00
 
 #### Coming From:
@@ -1172,35 +1201,6 @@ Instrument the one remaining uninstrumented step between the DDR read and the sc
 - tools/streams/decode_hardware_cadence.py
 - tools/streams/tb_h262_hardware_cadence_profiler.sv
 - tools/streams/test_decode_hardware_cadence.py
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 547 COMMIT Unreleased 008909d 2026-08-26T17:07:17-07:00
-
-#### Coming From:
-
-Unreleased 008909d
-
-#### Purpose:
-
-Characterize the residual playback flicker by sampling the live raster instead of relying on terminal captures and subjective description.
-
-#### Outcome:
-
-Fifty full-raster screenshots were triggered at 0.6-second intervals through the MiSTer's ordinary FTP view of `/dev/MiSTer_cmd` while the established Big Buck Bunny file played in Weave on the accepted `008909d` image, every target filename being deleted beforehand so a missed trigger reports as absent rather than returning a stale frame. Forty-eight arrived and captures nine through thirty-two span roughly fourteen seconds of live playback, the preceding and following captures being the identical pre-start and post-playback terminal rasters. Comparing each capture against its predecessor separately by field parity is decisive: across captures seventeen to twenty-one and again across twenty-three to thirty-one the even rows are bit-identical, a mean absolute difference of exactly zero, while the odd rows change by between 0.808 and 98.798 over the same intervals. The even field refreshed only twice in fourteen seconds, once after approximately 3.0 seconds and once after approximately 5.4 seconds, while the odd field changed at every sample. Top-field-first is set and the framebuffer derives its authored first field as the inverse of that flag, so the frozen parity is the first field. A displayed frame therefore weaves a live field against one up to several seconds old, which at field rate is the flicker the user reports and also explains the translucent second image visible in the retained evidence, where a pale disc and bird shapes from an older picture are interleaved line by line with the current scene. Retained captures are `.ai/current_results/entry546_weave_frozen_field_20.png` at 345,683 bytes with SHA-256 `04e99ef04be4146f3a7627ccc042e076e8a3fd4d156a4e5630e7d081351e44fc`, `entry546_weave_frozen_field_21.png` at 349,434 bytes with SHA-256 `261a7a9c27680c046eb3a835094ebb685c285aade8b3d774f0d284dc1dbc90fc`, which shares its even field bit-for-bit with the preceding capture, and `entry546_weave_frozen_field_22.png` at 349,936 bytes with SHA-256 `f46104e32a8d83ef9462fd60a1e5e4bb182188e801cc2ef0bd745eb612e68510`, the frame where that field finally updates. This is the same signature entries 515 through 519 pursued and never closed, and it is separate from the frame-slot misses of entry 546, since two dropped slots in 448 cannot hold a field static for seconds. The most important result is that every existing counter calls this run clean: the schema-sixteen terminal capture reports all bytes accepted, 449 pictures, 448 swaps, 242 first-field and 240 second-field line fetches from a single region, and zero region, phase, prefill, unpublished-reset, cache-overlap, presentation, audio, tag, content and accepted-write errors. The per-field instrumentation added across entries 516 to 519 does not detect a first field that has not changed in three seconds, and entry 519 already recorded that the content evidence shipped with a malformed thirty-bit snapshot word, so its clear content result has never been trustworthy.
-
-#### Next Steps:
-
-Do not propose a correction from this evidence alone. The measurement establishes what the defect is, that it is upstream of anything the present telemetry inspects, and that the telemetry cannot see it; it does not establish where the first field stops being refreshed. Before any behavioral change, re-establish trustworthy content evidence, since the existing content word was proven malformed and every subsequent clean reading from it is void. The decisive next measurement compares, per parity and per generation, whether the pixels delivered to the display actually change between consecutive published generations, which no current counter attempts. Prefer a burst of live captures over a terminal capture for any hardware check of this defect, because every terminal raster in this investigation has shown both fields correct while live frames were visibly wrong.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 

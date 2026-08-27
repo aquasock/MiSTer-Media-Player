@@ -1,0 +1,1350 @@
+{
+  "source_commit": "be8502b",
+  "fpga_source_commit": "2acabc5",
+  "analyzed": "2026-08-27T02:21:08-07:00",
+  "verdict": "Runtime activation and full decode verified. A modest measured throughput improvement is insufficient: high-bitrate cadence acceptance still FAILS and the user reports no perceptible improvement.",
+  "user_report": "Everything is the same. The image is up for collection after the requested cold be8502b test; no separate current menu assessment was supplied.",
+  "boot_evidence": {
+    "new": [
+      "Aug 27 09:17:15 MiSTer syslog.info syslogd started: BusyBox v1.33.1"
+    ],
+    "prior": "Aug 27 08:52:25 UTC",
+    "interpretation": "New boot corroborates requested reboot, but does not independently prove power removal or playback count."
+  },
+  "comparison": {
+    "baseline": {
+      "entry": 585,
+      "telemetry": {
+        "accepted_bytes": 34919166,
+        "display_pictures": 449,
+        "display_swaps": 448,
+        "error_flags": 0,
+        "cadence_seconds": 24.46038105,
+        "delivered_fps": 18.31533200910621,
+        "deadline_gap_count": 186,
+        "gap_outlier_count": 186,
+        "decoder_stall_cycles": 214276305
+      },
+      "helper": {
+        "summary": {
+          "t": 24508960,
+          "polls": 1019,
+          "poll_us": 24394209,
+          "poll_max_us": 80498,
+          "data_polls": 533,
+          "data_poll_us": 24389316,
+          "intervals": 1018,
+          "interval_us": 24506559,
+          "interval_max_us": 80571,
+          "read_calls": 2618,
+          "read_us": 730964,
+          "tx_calls": 2132,
+          "tx_us": 23585322,
+          "tx_max_us": 22381,
+          "ack_chunks": 33
+        },
+        "delivery_bytes_per_second": 1427221.1618191767,
+        "matched_endpoint_bytes": 34902782,
+        "matched_endpoint_us": 24455062,
+        "startup_eagain": 485,
+        "steady_eagain": 0,
+        "first_read": {
+          "t": 41770,
+          "latency_us": 39694,
+          "count": 16384
+        },
+        "first_chunk_complete_legacy_first_byte": {
+          "t": 53570,
+          "latency_us": 51494,
+          "would_block": 485,
+          "count": 16384
+        },
+        "mean_data_poll_us": 45758.566604127576,
+        "poll_time_fractions": {
+          "transfer": 0.9668410236216308,
+          "read": 0.029964652676379055,
+          "other": 0.0031943237019900913
+        },
+        "successful_read_us": {
+          "count": 2132,
+          "min": 15,
+          "median": 270.0,
+          "p95_nearest_rank": 779,
+          "max": 7258
+        },
+        "transfer_us": {
+          "count": 2132,
+          "min": 3197,
+          "median": 10780.0,
+          "p95_nearest_rank": 12313,
+          "max": 22381
+        },
+        "unsampled_full_chunk_tx_us": {
+          "count": 2098,
+          "min": 10754,
+          "median": 10780.0,
+          "p95_nearest_rank": 12313,
+          "max": 22381
+        },
+        "sampled_full_chunk_tx_us": {
+          "count": 33,
+          "min": 11169,
+          "median": 11175,
+          "p95_nearest_rank": 12315,
+          "max": 18276
+        }
+      },
+      "ack": {
+        "totals": {
+          "words": 270336,
+          "high_reads": 539226,
+          "low_reads": 578320,
+          "high_wait_words": 268890,
+          "low_wait_words": 269005,
+          "uninitialized": 0
+        },
+        "sampled_chunks": 33,
+        "max_two_reads_each_phase_chunks": 32,
+        "exceptional": [
+          {
+            "t": 9085692,
+            "event": 768,
+            "words": 8192,
+            "high_reads": 16335,
+            "low_reads": 55330,
+            "high_wait_words": 8143,
+            "low_wait_words": 8159,
+            "high_max_reads": 2,
+            "low_max_reads": 72,
+            "uninitialized": 0,
+            "read_record": {
+              "t": 9085669,
+              "event": 768,
+              "count": 16384,
+              "submitted": 12582912,
+              "read_us": 255,
+              "tx_us": 18276,
+              "ack_sample": 1
+            }
+          }
+        ],
+        "all_records": [
+          {
+            "t": 768949,
+            "event": 64,
+            "words": 8192,
+            "high_reads": 16352,
+            "low_reads": 16348,
+            "high_wait_words": 8160,
+            "low_wait_words": 8156,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 1495018,
+            "event": 128,
+            "words": 8192,
+            "high_reads": 16356,
+            "low_reads": 16351,
+            "high_wait_words": 8164,
+            "low_wait_words": 8159,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 2215098,
+            "event": 192,
+            "words": 8192,
+            "high_reads": 16217,
+            "low_reads": 16261,
+            "high_wait_words": 8025,
+            "low_wait_words": 8069,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 2939546,
+            "event": 256,
+            "words": 8192,
+            "high_reads": 16347,
+            "low_reads": 16353,
+            "high_wait_words": 8155,
+            "low_wait_words": 8161,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 3703654,
+            "event": 320,
+            "words": 8192,
+            "high_reads": 16340,
+            "low_reads": 16343,
+            "high_wait_words": 8148,
+            "low_wait_words": 8151,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 4419703,
+            "event": 384,
+            "words": 8192,
+            "high_reads": 16340,
+            "low_reads": 16345,
+            "high_wait_words": 8148,
+            "low_wait_words": 8153,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 5135449,
+            "event": 448,
+            "words": 8192,
+            "high_reads": 16344,
+            "low_reads": 16350,
+            "high_wait_words": 8152,
+            "low_wait_words": 8158,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 5851282,
+            "event": 512,
+            "words": 8192,
+            "high_reads": 16352,
+            "low_reads": 16354,
+            "high_wait_words": 8160,
+            "low_wait_words": 8162,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 6567246,
+            "event": 576,
+            "words": 8192,
+            "high_reads": 16353,
+            "low_reads": 16351,
+            "high_wait_words": 8161,
+            "low_wait_words": 8159,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 7285889,
+            "event": 640,
+            "words": 8192,
+            "high_reads": 16334,
+            "low_reads": 16353,
+            "high_wait_words": 8142,
+            "low_wait_words": 8161,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 8002037,
+            "event": 704,
+            "words": 8192,
+            "high_reads": 16348,
+            "low_reads": 16350,
+            "high_wait_words": 8156,
+            "low_wait_words": 8158,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 9085692,
+            "event": 768,
+            "words": 8192,
+            "high_reads": 16335,
+            "low_reads": 55330,
+            "high_wait_words": 8143,
+            "low_wait_words": 8159,
+            "high_max_reads": 2,
+            "low_max_reads": 72,
+            "uninitialized": 0
+          },
+          {
+            "t": 9821809,
+            "event": 832,
+            "words": 8192,
+            "high_reads": 16341,
+            "low_reads": 16347,
+            "high_wait_words": 8149,
+            "low_wait_words": 8155,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 10537657,
+            "event": 896,
+            "words": 8192,
+            "high_reads": 16344,
+            "low_reads": 16332,
+            "high_wait_words": 8152,
+            "low_wait_words": 8140,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 11253713,
+            "event": 960,
+            "words": 8192,
+            "high_reads": 16336,
+            "low_reads": 16354,
+            "high_wait_words": 8144,
+            "low_wait_words": 8162,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 11969842,
+            "event": 1024,
+            "words": 8192,
+            "high_reads": 16352,
+            "low_reads": 16335,
+            "high_wait_words": 8160,
+            "low_wait_words": 8143,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 12686008,
+            "event": 1088,
+            "words": 8192,
+            "high_reads": 16341,
+            "low_reads": 16349,
+            "high_wait_words": 8149,
+            "low_wait_words": 8157,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 13403838,
+            "event": 1152,
+            "words": 8192,
+            "high_reads": 16341,
+            "low_reads": 16355,
+            "high_wait_words": 8149,
+            "low_wait_words": 8163,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 14120001,
+            "event": 1216,
+            "words": 8192,
+            "high_reads": 16340,
+            "low_reads": 16348,
+            "high_wait_words": 8148,
+            "low_wait_words": 8156,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 14835769,
+            "event": 1280,
+            "words": 8192,
+            "high_reads": 16338,
+            "low_reads": 16345,
+            "high_wait_words": 8146,
+            "low_wait_words": 8153,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 15552034,
+            "event": 1344,
+            "words": 8192,
+            "high_reads": 16344,
+            "low_reads": 16341,
+            "high_wait_words": 8152,
+            "low_wait_words": 8149,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 16339806,
+            "event": 1408,
+            "words": 8192,
+            "high_reads": 16344,
+            "low_reads": 16340,
+            "high_wait_words": 8152,
+            "low_wait_words": 8148,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 17104235,
+            "event": 1472,
+            "words": 8192,
+            "high_reads": 16337,
+            "low_reads": 16349,
+            "high_wait_words": 8145,
+            "low_wait_words": 8157,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 17820131,
+            "event": 1536,
+            "words": 8192,
+            "high_reads": 16342,
+            "low_reads": 16350,
+            "high_wait_words": 8150,
+            "low_wait_words": 8158,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 18537984,
+            "event": 1600,
+            "words": 8192,
+            "high_reads": 16349,
+            "low_reads": 16335,
+            "high_wait_words": 8157,
+            "low_wait_words": 8143,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 19254087,
+            "event": 1664,
+            "words": 8192,
+            "high_reads": 16343,
+            "low_reads": 16351,
+            "high_wait_words": 8151,
+            "low_wait_words": 8159,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 19969894,
+            "event": 1728,
+            "words": 8192,
+            "high_reads": 16331,
+            "low_reads": 16339,
+            "high_wait_words": 8139,
+            "low_wait_words": 8147,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 20685571,
+            "event": 1792,
+            "words": 8192,
+            "high_reads": 16345,
+            "low_reads": 16344,
+            "high_wait_words": 8153,
+            "low_wait_words": 8152,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 21401994,
+            "event": 1856,
+            "words": 8192,
+            "high_reads": 16350,
+            "low_reads": 16343,
+            "high_wait_words": 8158,
+            "low_wait_words": 8151,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 22144994,
+            "event": 1920,
+            "words": 8192,
+            "high_reads": 16350,
+            "low_reads": 16348,
+            "high_wait_words": 8158,
+            "low_wait_words": 8156,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 22860993,
+            "event": 1984,
+            "words": 8192,
+            "high_reads": 16341,
+            "low_reads": 16342,
+            "high_wait_words": 8149,
+            "low_wait_words": 8150,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 23578559,
+            "event": 2048,
+            "words": 8192,
+            "high_reads": 16352,
+            "low_reads": 16338,
+            "high_wait_words": 8160,
+            "low_wait_words": 8146,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 24294760,
+            "event": 2112,
+            "words": 8192,
+            "high_reads": 16347,
+            "low_reads": 16346,
+            "high_wait_words": 8155,
+            "low_wait_words": 8154,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          }
+        ]
+      },
+      "retained_deadlines": [
+        {
+          "display_picture_ordinal": 6,
+          "decoder_ready": true,
+          "decoder_input_pending": false,
+          "upstream_fifo_pending": false,
+          "candidate_presentable": false,
+          "input_starved_cycles_since_previous_swap": 1069325,
+          "candidate_ready_delay_cycles": 1064647,
+          "writer_capacity_blocked_cycles_since_previous_swap": 0
+        },
+        {
+          "display_picture_ordinal": 7,
+          "decoder_ready": true,
+          "decoder_input_pending": false,
+          "upstream_fifo_pending": false,
+          "candidate_presentable": false,
+          "input_starved_cycles_since_previous_swap": 967295,
+          "candidate_ready_delay_cycles": 1784122,
+          "writer_capacity_blocked_cycles_since_previous_swap": 0
+        },
+        {
+          "display_picture_ordinal": 8,
+          "decoder_ready": true,
+          "decoder_input_pending": false,
+          "upstream_fifo_pending": false,
+          "candidate_presentable": false,
+          "input_starved_cycles_since_previous_swap": 992223,
+          "candidate_ready_delay_cycles": 2544963,
+          "writer_capacity_blocked_cycles_since_previous_swap": 9
+        }
+      ],
+      "largest_display_gaps": [
+        {
+          "raw_picture_ordinal_8bit": 93,
+          "possible_absolute_ordinals": [
+            93,
+            349
+          ],
+          "cycles": 10010000,
+          "seconds": 0.16683333333333333
+        },
+        {
+          "raw_picture_ordinal_8bit": 94,
+          "possible_absolute_ordinals": [
+            94,
+            350
+          ],
+          "cycles": 10010000,
+          "seconds": 0.16683333333333333
+        },
+        {
+          "raw_picture_ordinal_8bit": 95,
+          "possible_absolute_ordinals": [
+            95,
+            351
+          ],
+          "cycles": 10010000,
+          "seconds": 0.16683333333333333
+        }
+      ]
+    },
+    "current": {
+      "entry": 587,
+      "telemetry": {
+        "accepted_bytes": 34919166,
+        "display_pictures": 449,
+        "display_swaps": 448,
+        "error_flags": 0,
+        "cadence_seconds": 22.124823166666665,
+        "delivered_fps": 20.248749408083782,
+        "deadline_gap_count": 167,
+        "gap_outlier_count": 167,
+        "decoder_stall_cycles": 515458144
+      },
+      "helper": {
+        "summary": {
+          "t": 22161262,
+          "polls": 1124,
+          "poll_us": 22003401,
+          "poll_max_us": 81209,
+          "data_polls": 533,
+          "data_poll_us": 21998279,
+          "intervals": 1123,
+          "interval_us": 22158848,
+          "interval_max_us": 81335,
+          "read_calls": 2723,
+          "read_us": 724867,
+          "tx_calls": 2132,
+          "tx_us": 21202251,
+          "tx_max_us": 22484,
+          "ack_chunks": 33
+        },
+        "delivery_bytes_per_second": 1578251.9029306842,
+        "matched_endpoint_bytes": 34902782,
+        "matched_endpoint_us": 22114836,
+        "startup_eagain": 590,
+        "steady_eagain": 0,
+        "first_read": {
+          "t": 35936,
+          "latency_us": 33849,
+          "count": 16384
+        },
+        "first_chunk_complete_legacy_first_byte": {
+          "t": 46132,
+          "latency_us": 44046,
+          "would_block": 590,
+          "count": 16384
+        },
+        "mean_data_poll_us": 41272.568480300186,
+        "poll_time_fractions": {
+          "transfer": 0.963589719607437,
+          "read": 0.03294340724872487,
+          "other": 0.003466873143838082
+        },
+        "successful_read_us": {
+          "count": 2132,
+          "min": 15,
+          "median": 269.0,
+          "p95_nearest_rank": 774,
+          "max": 6940
+        },
+        "transfer_us": {
+          "count": 2132,
+          "min": 2721,
+          "median": 9196.0,
+          "p95_nearest_rank": 15242,
+          "max": 22484
+        },
+        "unsampled_full_chunk_tx_us": {
+          "count": 2098,
+          "min": 9179,
+          "median": 9196.0,
+          "p95_nearest_rank": 15245,
+          "max": 22484
+        },
+        "sampled_full_chunk_tx_us": {
+          "count": 33,
+          "min": 9597,
+          "median": 9622,
+          "p95_nearest_rank": 14448,
+          "max": 18508
+        }
+      },
+      "ack": {
+        "totals": {
+          "words": 270336,
+          "high_reads": 539512,
+          "low_reads": 661359,
+          "high_wait_words": 269176,
+          "low_wait_words": 269152,
+          "uninitialized": 0
+        },
+        "sampled_chunks": 33,
+        "max_two_reads_each_phase_chunks": 26,
+        "exceptional": [
+          {
+            "t": 6958799,
+            "event": 704,
+            "words": 8192,
+            "high_reads": 16353,
+            "low_reads": 22487,
+            "high_wait_words": 8161,
+            "low_wait_words": 8151,
+            "high_max_reads": 2,
+            "low_max_reads": 73,
+            "uninitialized": 0,
+            "read_record": {
+              "t": 6958774,
+              "event": 704,
+              "count": 16384,
+              "submitted": 11534336,
+              "read_us": 270,
+              "tx_us": 10733,
+              "ack_sample": 1
+            }
+          },
+          {
+            "t": 8078501,
+            "event": 768,
+            "words": 8192,
+            "high_reads": 16357,
+            "low_reads": 65171,
+            "high_wait_words": 8165,
+            "low_wait_words": 8173,
+            "high_max_reads": 2,
+            "low_max_reads": 73,
+            "uninitialized": 0,
+            "read_record": {
+              "t": 8078477,
+              "event": 768,
+              "count": 16384,
+              "submitted": 12582912,
+              "read_us": 274,
+              "tx_us": 18508,
+              "ack_sample": 1
+            }
+          },
+          {
+            "t": 10681406,
+            "event": 1024,
+            "words": 8192,
+            "high_reads": 16340,
+            "low_reads": 33734,
+            "high_wait_words": 8148,
+            "low_wait_words": 8155,
+            "high_max_reads": 2,
+            "low_max_reads": 73,
+            "uninitialized": 0,
+            "read_record": {
+              "t": 10681383,
+              "event": 1024,
+              "count": 16384,
+              "submitted": 16777216,
+              "read_us": 262,
+              "tx_us": 12818,
+              "ack_sample": 1
+            }
+          },
+          {
+            "t": 12029562,
+            "event": 1152,
+            "words": 8192,
+            "high_reads": 16351,
+            "low_reads": 24241,
+            "high_wait_words": 8159,
+            "low_wait_words": 8148,
+            "high_max_reads": 2,
+            "low_max_reads": 76,
+            "uninitialized": 0,
+            "read_record": {
+              "t": 12029539,
+              "event": 1152,
+              "count": 16384,
+              "submitted": 18874368,
+              "read_us": 260,
+              "tx_us": 11055,
+              "ack_sample": 1
+            }
+          },
+          {
+            "t": 12731327,
+            "event": 1216,
+            "words": 8192,
+            "high_reads": 16346,
+            "low_reads": 17760,
+            "high_wait_words": 8154,
+            "low_wait_words": 8154,
+            "high_max_reads": 2,
+            "low_max_reads": 72,
+            "uninitialized": 0,
+            "read_record": {
+              "t": 12731304,
+              "event": 1216,
+              "count": 16384,
+              "submitted": 19922944,
+              "read_us": 261,
+              "tx_us": 9868,
+              "ack_sample": 1
+            }
+          },
+          {
+            "t": 14204428,
+            "event": 1344,
+            "words": 8192,
+            "high_reads": 16349,
+            "low_reads": 30075,
+            "high_wait_words": 8157,
+            "low_wait_words": 8157,
+            "high_max_reads": 2,
+            "low_max_reads": 75,
+            "uninitialized": 0,
+            "read_record": {
+              "t": 14204404,
+              "event": 1344,
+              "count": 16384,
+              "submitted": 22020096,
+              "read_us": 258,
+              "tx_us": 12120,
+              "ack_sample": 1
+            }
+          },
+          {
+            "t": 19454664,
+            "event": 1856,
+            "words": 8192,
+            "high_reads": 16355,
+            "low_reads": 42840,
+            "high_wait_words": 8163,
+            "low_wait_words": 8155,
+            "high_max_reads": 2,
+            "low_max_reads": 73,
+            "uninitialized": 0,
+            "read_record": {
+              "t": 19454640,
+              "event": 1856,
+              "count": 16384,
+              "submitted": 30408704,
+              "read_us": 261,
+              "tx_us": 14448,
+              "ack_sample": 1
+            }
+          }
+        ],
+        "all_records": [
+          {
+            "t": 671377,
+            "event": 64,
+            "words": 8192,
+            "high_reads": 16351,
+            "low_reads": 16342,
+            "high_wait_words": 8159,
+            "low_wait_words": 8150,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 1345711,
+            "event": 128,
+            "words": 8192,
+            "high_reads": 16357,
+            "low_reads": 16354,
+            "high_wait_words": 8165,
+            "low_wait_words": 8162,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 1959766,
+            "event": 192,
+            "words": 8192,
+            "high_reads": 16362,
+            "low_reads": 16346,
+            "high_wait_words": 8170,
+            "low_wait_words": 8154,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 2574176,
+            "event": 256,
+            "words": 8192,
+            "high_reads": 16349,
+            "low_reads": 16340,
+            "high_wait_words": 8157,
+            "low_wait_words": 8148,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 3188263,
+            "event": 320,
+            "words": 8192,
+            "high_reads": 16350,
+            "low_reads": 16348,
+            "high_wait_words": 8158,
+            "low_wait_words": 8156,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 3802401,
+            "event": 384,
+            "words": 8192,
+            "high_reads": 16342,
+            "low_reads": 16351,
+            "high_wait_words": 8150,
+            "low_wait_words": 8159,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 4416923,
+            "event": 448,
+            "words": 8192,
+            "high_reads": 16342,
+            "low_reads": 16354,
+            "high_wait_words": 8150,
+            "low_wait_words": 8162,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 5044939,
+            "event": 512,
+            "words": 8192,
+            "high_reads": 16352,
+            "low_reads": 16352,
+            "high_wait_words": 8160,
+            "low_wait_words": 8160,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 5659117,
+            "event": 576,
+            "words": 8192,
+            "high_reads": 16354,
+            "low_reads": 16340,
+            "high_wait_words": 8162,
+            "low_wait_words": 8148,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 6273099,
+            "event": 640,
+            "words": 8192,
+            "high_reads": 16351,
+            "low_reads": 16346,
+            "high_wait_words": 8159,
+            "low_wait_words": 8154,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 6958799,
+            "event": 704,
+            "words": 8192,
+            "high_reads": 16353,
+            "low_reads": 22487,
+            "high_wait_words": 8161,
+            "low_wait_words": 8151,
+            "high_max_reads": 2,
+            "low_max_reads": 73,
+            "uninitialized": 0
+          },
+          {
+            "t": 8078501,
+            "event": 768,
+            "words": 8192,
+            "high_reads": 16357,
+            "low_reads": 65171,
+            "high_wait_words": 8165,
+            "low_wait_words": 8173,
+            "high_max_reads": 2,
+            "low_max_reads": 73,
+            "uninitialized": 0
+          },
+          {
+            "t": 8718694,
+            "event": 832,
+            "words": 8192,
+            "high_reads": 16349,
+            "low_reads": 16342,
+            "high_wait_words": 8157,
+            "low_wait_words": 8150,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 9334508,
+            "event": 896,
+            "words": 8192,
+            "high_reads": 16345,
+            "low_reads": 16343,
+            "high_wait_words": 8153,
+            "low_wait_words": 8151,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 9997465,
+            "event": 960,
+            "words": 8192,
+            "high_reads": 16343,
+            "low_reads": 16355,
+            "high_wait_words": 8151,
+            "low_wait_words": 8163,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 10681406,
+            "event": 1024,
+            "words": 8192,
+            "high_reads": 16340,
+            "low_reads": 33734,
+            "high_wait_words": 8148,
+            "low_wait_words": 8155,
+            "high_max_reads": 2,
+            "low_max_reads": 73,
+            "uninitialized": 0
+          },
+          {
+            "t": 11366295,
+            "event": 1088,
+            "words": 8192,
+            "high_reads": 16346,
+            "low_reads": 16351,
+            "high_wait_words": 8154,
+            "low_wait_words": 8159,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 12029562,
+            "event": 1152,
+            "words": 8192,
+            "high_reads": 16351,
+            "low_reads": 24241,
+            "high_wait_words": 8159,
+            "low_wait_words": 8148,
+            "high_max_reads": 2,
+            "low_max_reads": 76,
+            "uninitialized": 0
+          },
+          {
+            "t": 12731327,
+            "event": 1216,
+            "words": 8192,
+            "high_reads": 16346,
+            "low_reads": 17760,
+            "high_wait_words": 8154,
+            "low_wait_words": 8154,
+            "high_max_reads": 2,
+            "low_max_reads": 72,
+            "uninitialized": 0
+          },
+          {
+            "t": 13435278,
+            "event": 1280,
+            "words": 8192,
+            "high_reads": 16348,
+            "low_reads": 16357,
+            "high_wait_words": 8156,
+            "low_wait_words": 8165,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 14204428,
+            "event": 1344,
+            "words": 8192,
+            "high_reads": 16349,
+            "low_reads": 30075,
+            "high_wait_words": 8157,
+            "low_wait_words": 8157,
+            "high_max_reads": 2,
+            "low_max_reads": 75,
+            "uninitialized": 0
+          },
+          {
+            "t": 14993682,
+            "event": 1408,
+            "words": 8192,
+            "high_reads": 16355,
+            "low_reads": 16341,
+            "high_wait_words": 8163,
+            "low_wait_words": 8149,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 15733759,
+            "event": 1472,
+            "words": 8192,
+            "high_reads": 16351,
+            "low_reads": 16343,
+            "high_wait_words": 8159,
+            "low_wait_words": 8151,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 16348098,
+            "event": 1536,
+            "words": 8192,
+            "high_reads": 16345,
+            "low_reads": 16353,
+            "high_wait_words": 8153,
+            "low_wait_words": 8161,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 16962135,
+            "event": 1600,
+            "words": 8192,
+            "high_reads": 16340,
+            "low_reads": 16344,
+            "high_wait_words": 8148,
+            "low_wait_words": 8152,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 17576426,
+            "event": 1664,
+            "words": 8192,
+            "high_reads": 16345,
+            "low_reads": 16349,
+            "high_wait_words": 8153,
+            "low_wait_words": 8157,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 18190493,
+            "event": 1728,
+            "words": 8192,
+            "high_reads": 16344,
+            "low_reads": 16347,
+            "high_wait_words": 8152,
+            "low_wait_words": 8155,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 18804676,
+            "event": 1792,
+            "words": 8192,
+            "high_reads": 16348,
+            "low_reads": 16345,
+            "high_wait_words": 8156,
+            "low_wait_words": 8153,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 19454664,
+            "event": 1856,
+            "words": 8192,
+            "high_reads": 16355,
+            "low_reads": 42840,
+            "high_wait_words": 8163,
+            "low_wait_words": 8155,
+            "high_max_reads": 2,
+            "low_max_reads": 73,
+            "uninitialized": 0
+          },
+          {
+            "t": 20134776,
+            "event": 1920,
+            "words": 8192,
+            "high_reads": 16342,
+            "low_reads": 16350,
+            "high_wait_words": 8150,
+            "low_wait_words": 8158,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 20748915,
+            "event": 1984,
+            "words": 8192,
+            "high_reads": 16348,
+            "low_reads": 16347,
+            "high_wait_words": 8156,
+            "low_wait_words": 8155,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 21363084,
+            "event": 2048,
+            "words": 8192,
+            "high_reads": 16353,
+            "low_reads": 16358,
+            "high_wait_words": 8161,
+            "low_wait_words": 8166,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          },
+          {
+            "t": 21977441,
+            "event": 2112,
+            "words": 8192,
+            "high_reads": 16349,
+            "low_reads": 16353,
+            "high_wait_words": 8157,
+            "low_wait_words": 8161,
+            "high_max_reads": 2,
+            "low_max_reads": 2,
+            "uninitialized": 0
+          }
+        ]
+      },
+      "retained_deadlines": [
+        {
+          "display_picture_ordinal": 7,
+          "decoder_ready": true,
+          "decoder_input_pending": false,
+          "upstream_fifo_pending": false,
+          "candidate_presentable": false,
+          "input_starved_cycles_since_previous_swap": 777188,
+          "candidate_ready_delay_cycles": 980702,
+          "writer_capacity_blocked_cycles_since_previous_swap": 22
+        },
+        {
+          "display_picture_ordinal": 8,
+          "decoder_ready": true,
+          "decoder_input_pending": false,
+          "upstream_fifo_pending": false,
+          "candidate_presentable": false,
+          "input_starved_cycles_since_previous_swap": 1550996,
+          "candidate_ready_delay_cycles": 2302859,
+          "writer_capacity_blocked_cycles_since_previous_swap": 0
+        },
+        {
+          "display_picture_ordinal": 9,
+          "decoder_ready": true,
+          "decoder_input_pending": false,
+          "upstream_fifo_pending": false,
+          "candidate_presentable": false,
+          "input_starved_cycles_since_previous_swap": 783454,
+          "candidate_ready_delay_cycles": 442395,
+          "writer_capacity_blocked_cycles_since_previous_swap": 255
+        }
+      ],
+      "largest_display_gaps": [
+        {
+          "raw_picture_ordinal_8bit": 95,
+          "possible_absolute_ordinals": [
+            95,
+            351
+          ],
+          "cycles": 10010000,
+          "seconds": 0.16683333333333333
+        },
+        {
+          "raw_picture_ordinal_8bit": 98,
+          "possible_absolute_ordinals": [
+            98,
+            354
+          ],
+          "cycles": 10010000,
+          "seconds": 0.16683333333333333
+        },
+        {
+          "raw_picture_ordinal_8bit": 15,
+          "possible_absolute_ordinals": [
+            15,
+            271
+          ],
+          "cycles": 8008000,
+          "seconds": 0.13346666666666668
+        }
+      ]
+    }
+  },
+  "change_vs_entry585": {
+    "delivery_percent": 10.582153989294785,
+    "fps_percent": 10.556278193681079,
+    "cadence_duration_percent": -9.54832992404807,
+    "transfer_time_percent": -10.104042675355462,
+    "median_unsampled_full_chunk_time_percent": -14.693877551020407,
+    "delayed_intervals_change": -19
+  },
+  "demand": {
+    "required_average_bytes_per_second": 2330798.3330700477,
+    "delivered_fraction_of_average_demand": 0.6771293254066579,
+    "additional_delivery_gain_needed_percent": 47.68227611460165,
+    "largest_meadow_picture_span_bytes": 253632,
+    "largest_picture_supply_seconds_at_measured_mean": 0.16070438409041435,
+    "nominal_frame_seconds": 0.03336666666666667
+  },
+  "interpretation": [
+    "The host-only preload optimization worked in the narrow sense: median unsampled full-chunk transfer time falls from 10,780 to 9,196 us and delivered throughput rises about 10.6%. This does not satisfy the playback objective.",
+    "The measured 1.578 MB/s supply is still only about 67.7% of the clip average requirement. At this mean, the largest meadow picture needs about 161 ms of input against 33.37 ms per nominal frame, consistent with continued visible slow passages.",
+    "Longest retained presentation holds remain 166.833 ms. Thus the user report of everything looking the same is compatible with a modest improvement in whole-clip duration.",
+    "Extended ACK-low polling appears in 7 of 33 sampled chunks, versus 1 before; the new maximum is 76 reads. Faster delivery encountering downstream flow control more often is a plausible explanation, not a measured allocation of FIFO-wait duration. Preserve flow control.",
+    "The first three retained delayed deadlines still find decoder input ready but empty. Nonzero writer-capacity blocked cycles are 22, 0 and 255 and must not be described as zero.",
+    "decoder_stall_cycles increases from 214,276,305 to 515,458,144, but its RTL increments only when fifo_pending and not decoder_ready; it is not an unconditional decode-time measure. Greater input availability changes which busy cycles count, so this increase does not itself prove a decoder regression."
+  ],
+  "measurement_limits": [
+    "Delivery uses matched completed-chunk endpoints: subtract first submitted bytes as well as first timestamp; it is not a count-divided-by-total-time startup average.",
+    "One run per changed condition is not a controlled statistical effect-size estimate. No identical repeat is requested.",
+    "ACK counters cover only every 64th successful data chunk, exclude command-byte handshakes and report read counts rather than durations. More-than-one-read wait-word counts are mostly the ordinary two-read handshake.",
+    "Largest-gap picture identifiers are eight bits and ambiguous after 256 pictures. Do not place raw codes 95, 98 or 15 at unique absolute source positions.",
+    "deadline_gap_count counts delayed eventual presentation intervals, not every missed nominal frame slot.",
+    "Poll durations measure main-loop blocking exposure, not direct UI response. The user reports everything the same but does not separately assess current menu response.",
+    "Bob/Weave mode is not encoded here. The old spikes issue refers to historical progressive bring-up, not this comparison.",
+    "The qualified 8 Mbps regression, unsupported interlaced features, audio/PTS, partial-transfer cancellation and old live-raster assertion drift remain outstanding."
+  ],
+  "next_boundary": "Host-only removal of one register write per word is insufficient. Propose a coordinated core-specific host/FPGA transport mode that amortizes acknowledgement across bounded bursts backed by conservatively reported FIFO capacity, with explicit ordering/drain guarantees, reset/fallback behavior and overflow/byte-count verification. Read-only design work can proceed; implementation requires approval for this material protocol change and full RTL/Quartus/timing qualification. Do not simply drop existing ACK waits, enlarge the clean-video queue, change startup/sync or promise transport alone removes every decoder limit. Preserve the current qualified host as the comparison/restore point; no binary is changed in this evidence cycle.",
+  "production_changed": false,
+  "analysis_checks": "PASS",
+  "alternate_transport_question": {
+    "user_question": "Another agent mentioned a different delivery path that might give 10 MB/s or more.",
+    "identified_prior_recommendation": "Entries579/580 proposed spi_block_write -> fpga_spi_fast_block_write; entry581 corrected the unsafe assumption that it could replace acknowledged writes without FIFO flow control.",
+    "current_architecture": "MediaPlayer_Helper writes annotated bytes to stdout; Main reads the pipe and owns FPGA transfers. The helper does not currently talk directly to FPGA registers.",
+    "current_bulk_vs_fast": "be8502b removes one redundant GPO write per data word but retains both ACK phases. The pinned fast block loop has two GPO writes per word plus one final low write and no per-word ACK reads, through the same general-purpose-register link.",
+    "distinct_bridge_option": "Pinned Main also exposes fpga_core_write/read for the lightweight HPS-to-FPGA address window. A dedicated memory-mapped receiver or shared-memory/DMA design would be a separate FPGA transport implementation, not an existing MediaPlayer helper option.",
+    "speed_claim": "No measured 10 MB/s result for this MediaPlayer target was found in the reviewed evidence. Higher throughput from fewer synchronous round trips is plausible, but the number must be measured, and receiver limits remain.",
+    "next_choice": "Prefer investigating safely bounded fast-block bursts with conservatively reported FIFO capacity before a larger shared-memory/DMA redesign; preserve strobe delivery/order, final drain, reset and fallback checks. Implementation still requires the explicitly approved coordinated transport boundary.",
+    "sources": [
+      "host/arm/ARCHITECTURE.md",
+      "host/arm/media_player_helper.c:1289",
+      "host/main_mister/0001-mediaplayer-arm-loader.patch",
+      "pinned Main_MiSTer spi.cpp:spi_block_write",
+      "pinned Main_MiSTer fpga_io.cpp:fpga_spi_fast_block_write, fpga_core_write/read",
+      "rtl/mpeg2_stream_fifo.sv"
+    ]
+  }
+}
