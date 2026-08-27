@@ -1,0 +1,21 @@
+{
+  "unchanged_default_9800_gate": {
+    "arrival_bits_per_second": 9800000,
+    "capacity_bits": 1835008,
+    "initial_decode_seconds": 0.1404277551020408,
+    "maximum_occupancy_bits": 1834992.0,
+    "minimum_after_removal_bits": 0.0,
+    "maximum_delay_error_90khz_ticks": 1.6571428571428573,
+    "underflow_count": 0,
+    "overflow_count": 0,
+    "scope": "Constant-rate all-I witness with quantized vbv_delay; not a general VBV/application verifier.",
+    "sequence_headers": 449,
+    "frame_count": 449,
+    "average_bits_per_second": 9826800.905108254,
+    "min_30_frame_bits_per_second": 9116763.236763237,
+    "max_30_frame_bits_per_second": 10768967.032967033,
+    "maximum_access_unit_bytes": 143171
+  },
+  "wrong_rate_header_rejected": true,
+  "explicit_9600_gate_passed": true
+}

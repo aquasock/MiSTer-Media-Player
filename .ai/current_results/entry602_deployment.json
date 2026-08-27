@@ -1,0 +1,30 @@
+{
+  "deployed_at": "2026-08-27T05:21:31-07:00",
+  "test_device": "10.10.0.30",
+  "staged_readback": {
+    "path": "/media/fat/games/MediaPlayer/bbb_full_480i_tff_av_10080kbps.mpg.new",
+    "bytes": 739065873,
+    "sha256": "beb5c738910321fbbdf482220c19af36e7c2d2bb1913e8872f679eeb1f589642"
+  },
+  "active_readback": {
+    "path": "/media/fat/games/MediaPlayer/bbb_full_480i_tff_av_10080kbps.mpg",
+    "bytes": 739065873,
+    "sha256": "beb5c738910321fbbdf482220c19af36e7c2d2bb1913e8872f679eeb1f589642"
+  },
+  "installed_production_verified_unchanged": [
+    {
+      "path": "/media/fat/MiSTer",
+      "bytes": 1170340,
+      "sha256": "3841e2cc6eef4bfc9e46a7ffa075aff76b65d5405f81efb1355373292b35846f"
+    },
+    {
+      "path": "/media/fat/MediaPlayer.rbf",
+      "bytes": 4324340,
+      "sha256": "44606564ad40e3f9a74657fdd372a44fb6d0f74252e6d1000b2685768ca9cf01"
+    }
+  ],
+  "rebooted": false,
+  "core_reloaded": false,
+  "playback_started": false,
+  "hardware_acceptance": false
+}
