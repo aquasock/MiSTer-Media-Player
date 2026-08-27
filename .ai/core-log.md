@@ -1,3 +1,32 @@
+## 577 COMMIT Unreleased deced5c 2026-08-27T00:53:02-07:00
+
+#### Coming From:
+
+Unreleased deced5c
+
+#### Purpose:
+
+Play the higher-bitrate `bbb_480i_tff_15s.m2v` once to test whether the startup defect is delivery-bound.
+
+#### Outcome:
+
+The larger file is 34,919,166 bytes against 15,150,646 for the qualified file, carrying the same 449 pictures of the same 29.97 fps content at roughly 2.3 times the bitrate. No power cycle preceded this run; the syslog still shows the single 07:41:02 UTC boot, so it followed the entry 575 cold run on the same uptime. The user reports it played a lot slower, and the telemetry agrees emphatically. The session records 188 cadence outliers and 188 missed deadlines against the zero to two seen on the qualified file, a delivered rate of 18.1195 frames per second against a nominal 29.9700, and a cadence span of 1,483,483,716 cycles or 24.72 seconds for content that should occupy 15.0. The three largest gaps are 12,012,000, 10,010,000 and 10,010,000 cycles at ordinals 94, 93 and 95, six and five nominal intervals respectively, and the misses are spread through the session rather than confined to startup. The file nonetheless plays correctly and completely, accepting all 34,919,166 bytes, displaying all 449 pictures with 448 swaps, reaching sequence end and presentation completion with a quiet terminal and zero error flags; it is throttled, not corrupted. The instrumented helper log closes the mechanism completely. Delivery ran flat at the ceiling for the whole session, with segment rates between 1,393,653 and 1,442,109 bytes per second from 199 milliseconds through 24.7 seconds and no burst-then-decay shape, because demand exceeds supply throughout rather than only at startup. The whole-session delivery rate is 1,412,269 bytes per second across 8,526 reads. Dividing those reads by the four-chunk budget gives 2,132 polls over 24.726 seconds, an implied poll rate of 86.2 Hz, and four chunks of 4,096 bytes at 86.2 Hz is 1,412,404 bytes per second, agreeing with the measured delivery to 0.01 percent. The stream demands 2,330,798 bytes per second, giving a deficit ratio of 0.6059, and the observed frame rate ratio of 18.1195 over 29.9700 is 0.6046, agreeing to 0.2 percent. Playback is therefore throttled to exactly the delivery deficit. As before, all 384 would-block events carry a submitted count of zero and precede the first byte, so the helper always had data ready and the parent never saw EAGAIN during steady delivery, confirming that the parent's per-poll budget rather than the helper or the filesystem is the binding constraint. This corrects entry 572, which concluded that raising the four-chunk per-poll budget would not correct anything because steady throughput was never the limiting quantity, and listed that candidate as ruled out. That conclusion holds only for the qualified file, whose 1,010,157 bytes per second demand sits below the ceiling; it is false in general, and for any stream above roughly 1.41 megabytes per second the per-poll budget is precisely what throttles playback. A project-level consequence follows and should not be buried. The measured ceiling of about 1.41 megabytes per second is marginal for the stated long-term goal of commercial DVD playback, since DVD peak video bitrate is 9.8 Mbps or about 1.225 megabytes per second and a full program stream may reach 10.08 Mbps or about 1.26, leaving roughly twelve percent headroom, which is less than the startup dead time already consumes and takes no account of audio demultiplexing. Only three of the 188 deadline records are retained by the snapshot, at ordinals seven, eight and nine, and the 86.2 Hz poll rate remains inferred from read counts and elapsed time rather than measured inside MiSTer main, though it now agrees across two files with very different demands. Whether raising the per-poll budget is safe with respect to MiSTer main's other responsibilities has not been assessed and is not proposed here. Evidence is `.ai/current_results/entry577_bigfile_arm_helper.log`, `entry577_bigfile_terminal.png` and `entry577_bigfile_capture.json`.
+
+#### Next Steps:
+
+The user intends one further run of the same larger file, which is now a genuine test rather than a repeat, because the page cache holds the file after this run while the constraint identified here is the per-poll budget and not read latency. The prediction to be recorded before that data arrives is that warming will change nothing material: first-byte latency should fall from its 23,749 microseconds toward the warm baseline, but the delivery rate should stay near 1,412,000 bytes per second, the delivered frame rate should stay near 18.1 and the missed-deadline count should remain in the same order. If instead the warm run recovers substantially, the per-poll budget is not the whole constraint and this entry's arithmetic is wrong somewhere. After that, propose a bounded delivery-side change for approval rather than implementing it: raise the per-poll chunk count or the buffer size in `mediaplayer_poll()` within `host/main_mister/0001-mediaplayer-arm-loader.patch`, sized against DVD peak program-stream rate with real margin rather than against this one test file, and assess first whether spending longer in that function starves MiSTer main's other per-poll work, which is the obvious risk and has not been examined. That change would need no Quartus build and would be validated by replaying this same larger file and checking the delivery rate against the new budget arithmetic. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 576 COMMIT Unreleased deced5c 2026-08-27T00:48:31-07:00
 
 #### Coming From:
@@ -1181,35 +1210,6 @@ Do not modify the presentation scheduler or run Quartus from this result. The ne
 #### Files Modified:
 
 - tools/streams/tb_native_480i_presentation_integration.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 537 COMMIT Unreleased d566668 2026-08-26T05:29:56-07:00
-
-#### Coming From:
-
-Unreleased d566668
-
-#### Purpose:
-
-Accept the canonical MediaPlayer selector path and define the next bounded stale-generation investigation without adding hardware diagnostics.
-
-#### Outcome:
-
-After restarting into the independently verified 1,166,244-byte Main executable at SHA-256 `5a6cbf7e85682ac301d57470b8b2c952d3bbfa42af55484bd70dd0d36724ae96`, the user confirms that MediaPlayer now opens at the required `/media/fat/games/MediaPlayer` path, so commit `d566668` passes its hardware objective. The separate Big Buck Bunny result remains failed with both old-frame ghosting and thin horizontal lines. Existing evidence now clears real-content four-picture reconstruction, accepted framebuffer write versus raw DDR return, raw return versus line-cache output after the registered-address correction, presentation count, cadence and all monitored error flags. Static review identifies one remaining regression blind spot before a behavioral scheduler change: `tb_native_480i_presentation_integration.sv` counts changes of the two-bit display bank and verifies aggregate decoded and presented counts, but it does not tag each bank with its authored picture generation or assert monotonic displayed generation. The current test can therefore pass while a scheduler ownership race replays an older generation through a different bank, which matches the unresolved symptom class without requiring another hardware diagnostic layout.
-
-#### Next Steps:
-
-Obtain approval for one bounded scheduler cycle. Extend only the existing native 480i presentation integration model with generation identities carried by its three ordinary banks and assert that every presentation advances to the next authored generation under the measured three-field decoder latency, the accelerated one-field case and terminal drain. Run that test first against the current scheduler. If it exposes a replay or ordering failure, correct only the responsible ordinary-reference ownership transition and rerun the focused scheduler, native timing, framebuffer, complete reconstruction and canonical live-raster regressions before an incremental Quartus build. If generation order already passes, stop without changing RTL and return to the framebuffer publication boundary using the current diagnostic layout rather than adding another schema.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
