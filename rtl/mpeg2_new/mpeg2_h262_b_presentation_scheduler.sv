@@ -246,16 +246,18 @@ assign debug_state = {
     reorder_active
 };
 // A released ordinary reference normally occupies the scheduler's sole
-// pending slot.  Native untimestamped 30000/1001 all-I playback has three
+// pending slot.  Native 30000/1001 all-I playback has three
 // ordinary frame regions, so one proven I transaction may instead use the
 // third region while cadence consumes its predecessor.  Every other class
-// retains the serialized ownership rule.
+// retains the serialized ownership rule. Candidate timestamp validity changes
+// when classification releases a frame, so it must not govern queue capacity.
+// Each retained bank keeps its timestamp; presentation_slot still requires
+// both cadence credit and that candidate's due time before a swap.
 wire ordinary_reference_waiting=!reorder_active&&pending_frame_valid&&
     pending_frame_released&&
     (display_scratch||(pending_frame_bank!=display_frame_bank));
 wire ordinary_reference_overlap_safe=
     native_ordinary_overlap_enable&&
-    !timestamp_candidate_active&&
     (frame_rate_code==4'h4)&&
     !display_scratch&&
     !ordinary_secondary_valid&&
@@ -269,7 +271,7 @@ wire ordinary_reference_present_now=
     swap_window_pulse&&presentation_slot&&scheduled_frame_valid&&
     scheduled_frame_differs&&!scheduled_frame_scratch&&!future_waiting;
 wire ordinary_secondary_mode_safe=
-    native_ordinary_overlap_enable&&!timestamp_candidate_active&&
+    native_ordinary_overlap_enable&&
     (frame_rate_code==4'h4)&&!display_scratch&&!reorder_active;
 wire ordinary_secondary_release_now=
     ordinary_secondary_valid&&!ordinary_secondary_released&&
@@ -885,10 +887,10 @@ always @(posedge clk) begin
         end
 
         // The secondary ordinary slot is deliberately unavailable to every
-        // other picture class and timing mode.  Any such transition is an
+        // other picture class and native timing mode. Any such transition is an
         // ownership violation rather than an invitation to reuse a bank.
         if((ordinary_secondary_valid||ordinary_resume_pending)&&
-           (b_picture_start||p_picture_start||timestamp_candidate_active||
+           (b_picture_start||p_picture_start||
             !native_ordinary_overlap_enable||(frame_rate_code!=4'h4)||
             display_scratch))
             presentation_error<=1;
