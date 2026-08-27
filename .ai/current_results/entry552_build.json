@@ -1,0 +1,318 @@
+{
+  "source_commit": "30d300aa038efc03e49c247d4c7a21bcd41d73ec",
+  "build_directory": "/home/vash/mister-builds/entry552-30d300a",
+  "quartus_version": "17.0.2 Build 602 Lite",
+  "clean_build": true,
+  "seed": 16,
+  "compile_success": true,
+  "errors": 0,
+  "warnings": 148,
+  "elapsed_seconds": 685.7,
+  "started": "2026-08-26T20:42:16-07:00",
+  "timing_positive": true,
+  "worst_slack_ns": {
+    "hold": 0.216,
+    "minimum_pulse_width": 0.925,
+    "recovery": 3.908,
+    "removal": 0.536,
+    "setup": 0.127
+  },
+  "timing_rows": [
+    {
+      "type": "setup",
+      "clock": "pll_hdmi|pll_hdmi_inst|altera_pll_i|cyclonev_pll|counter[0].output_counter|divclk",
+      "slack_ns": 0.127,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "setup",
+      "clock": "emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 1.181,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "setup",
+      "clock": "sysmem|fpga_interfaces|clocks_resets|h2f_user0_clk",
+      "slack_ns": 1.508,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "setup",
+      "clock": "emu|pll|pll_inst|altera_pll_i|general[1].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 2.888,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "setup",
+      "clock": "spi_sck",
+      "slack_ns": 5.97,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "setup",
+      "clock": "FPGA_CLK1_50",
+      "slack_ns": 6.59,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "setup",
+      "clock": "FPGA_CLK2_50",
+      "slack_ns": 13.616,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "setup",
+      "clock": "pll_audio|pll_audio_inst|altera_pll_i|general[0].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 16.065,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "setup",
+      "clock": "emu|pll|pll_inst|altera_pll_i|general[0].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 40.456,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "hold",
+      "clock": "pll_hdmi|pll_hdmi_inst|altera_pll_i|cyclonev_pll|counter[0].output_counter|divclk",
+      "slack_ns": 0.216,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "hold",
+      "clock": "emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 0.249,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "hold",
+      "clock": "pll_audio|pll_audio_inst|altera_pll_i|general[0].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 0.252,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "hold",
+      "clock": "emu|pll|pll_inst|altera_pll_i|general[1].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 0.254,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "hold",
+      "clock": "FPGA_CLK2_50",
+      "slack_ns": 0.277,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "hold",
+      "clock": "sysmem|fpga_interfaces|clocks_resets|h2f_user0_clk",
+      "slack_ns": 0.391,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "hold",
+      "clock": "emu|pll|pll_inst|altera_pll_i|general[0].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 0.4,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "hold",
+      "clock": "FPGA_CLK1_50",
+      "slack_ns": 0.414,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "hold",
+      "clock": "spi_sck",
+      "slack_ns": 0.443,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "recovery",
+      "clock": "pll_hdmi|pll_hdmi_inst|altera_pll_i|cyclonev_pll|counter[0].output_counter|divclk",
+      "slack_ns": 3.908,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "recovery",
+      "clock": "sysmem|fpga_interfaces|clocks_resets|h2f_user0_clk",
+      "slack_ns": 6.859,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "recovery",
+      "clock": "emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 11.63,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "recovery",
+      "clock": "emu|pll|pll_inst|altera_pll_i|general[1].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 16.329,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "recovery",
+      "clock": "FPGA_CLK1_50",
+      "slack_ns": 16.408,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "recovery",
+      "clock": "pll_audio|pll_audio_inst|altera_pll_i|general[0].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 31.782,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "recovery",
+      "clock": "emu|pll|pll_inst|altera_pll_i|general[0].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 45.275,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "removal",
+      "clock": "pll_audio|pll_audio_inst|altera_pll_i|general[0].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 0.536,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "removal",
+      "clock": "emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 0.657,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "removal",
+      "clock": "pll_hdmi|pll_hdmi_inst|altera_pll_i|cyclonev_pll|counter[0].output_counter|divclk",
+      "slack_ns": 0.941,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "removal",
+      "clock": "emu|pll|pll_inst|altera_pll_i|general[0].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 1.023,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "removal",
+      "clock": "emu|pll|pll_inst|altera_pll_i|general[1].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 1.426,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "removal",
+      "clock": "FPGA_CLK1_50",
+      "slack_ns": 1.433,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "removal",
+      "clock": "sysmem|fpga_interfaces|clocks_resets|h2f_user0_clk",
+      "slack_ns": 1.782,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "minimum_pulse_width",
+      "clock": "emu|pll|pll_inst|altera_pll_i|general[0].gpll~FRACTIONAL_PLL|vcoph[0]",
+      "slack_ns": 0.925,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "minimum_pulse_width",
+      "clock": "pll_hdmi|pll_hdmi_inst|altera_pll_i|cyclonev_pll|fpll_0|fpll|vcoph[0]",
+      "slack_ns": 1.122,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "minimum_pulse_width",
+      "clock": "pll_audio|pll_audio_inst|altera_pll_i|general[0].gpll~FRACTIONAL_PLL|vcoph[0]",
+      "slack_ns": 1.196,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "minimum_pulse_width",
+      "clock": "pll_hdmi|pll_hdmi_inst|altera_pll_i|cyclonev_pll|counter[0].output_counter|divclk",
+      "slack_ns": 1.946,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "minimum_pulse_width",
+      "clock": "sysmem|fpga_interfaces|clocks_resets|h2f_user0_clk",
+      "slack_ns": 3.599,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "minimum_pulse_width",
+      "clock": "spi_sck",
+      "slack_ns": 4.252,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "minimum_pulse_width",
+      "clock": "emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 6.881,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "minimum_pulse_width",
+      "clock": "emu|pll|pll_inst|altera_pll_i|general[1].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 7.834,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "minimum_pulse_width",
+      "clock": "FPGA_CLK1_50",
+      "slack_ns": 9.202,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "minimum_pulse_width",
+      "clock": "FPGA_CLK2_50",
+      "slack_ns": 9.211,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "minimum_pulse_width",
+      "clock": "FPGA_CLK3_50",
+      "slack_ns": 9.73,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "minimum_pulse_width",
+      "clock": "pll_audio|pll_audio_inst|altera_pll_i|general[0].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 18.902,
+      "tns_ns": 0.0
+    },
+    {
+      "type": "minimum_pulse_width",
+      "clock": "emu|pll|pll_inst|altera_pll_i|general[0].gpll~PLL_OUTPUT_COUNTER|divclk",
+      "slack_ns": 23.579,
+      "tns_ns": 0.0
+    }
+  ],
+  "rbf_bytes": 4244104,
+  "rbf_sha256": "d676cb58cb22d991a0638bd0dab2885f7b1bcdd87d23e085910ab05dd1acec57",
+  "fitter_summary": [
+    "Fitter Status : Successful - Wed Aug 26 20:53:07 2026",
+    "Quartus Prime Version : 17.0.2 Build 602 07/19/2017 SJ Lite Edition",
+    "Revision Name : MediaPlayer",
+    "Top-level Entity Name : sys_top",
+    "Family : Cyclone V",
+    "Device : 5CSEBA6U23I7",
+    "Timing Models : Final",
+    "Logic utilization (in ALMs) : 31,653 / 41,910 ( 76 % )",
+    "Total registers : 50399",
+    "Total pins : 145 / 314 ( 46 % )",
+    "Total virtual pins : 0",
+    "Total block memory bits : 3,655,139 / 5,662,720 ( 65 % )",
+    "Total RAM Blocks : 464 / 553 ( 84 % )",
+    "Total DSP Blocks : 67 / 112 ( 60 % )",
+    "Total HSSI RX PCSs : 0",
+    "Total HSSI PMA RX Deserializers : 0",
+    "Total HSSI TX PCSs : 0",
+    "Total HSSI PMA TX Serializers : 0",
+    "Total PLLs : 3 / 6 ( 50 % )",
+    "Total DLLs : 0 / 4 ( 0 % )"
+  ],
+  "timing_summary_sha256": "d27bd316a764c456b1aba3dd805200a7ff5e9d45dc2aedf08b8d2b5284ce7ffe",
+  "build_log_sha256": "4f5f16ccdfdfecf6afdf70671a73d99fb509c922d9ba12489187e9956e5fd01a"
+}
