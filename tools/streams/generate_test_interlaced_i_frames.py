@@ -95,7 +95,7 @@ def patch_interlaced_signalling(
         if code != 0xB5 or offset + 5 >= len(data):
             continue
         payload_offset = offset + 4
-        extension_id = analyzer.read_bits(payload[payload_offset:], 0, 4)
+        extension_id = analyzer.read_bits(payload[payload_offset:payload_offset + 1], 0, 4)
         if extension_id == 1:
             set_payload_bit(data, payload_offset, 12, False)
             sequence_extensions += 1

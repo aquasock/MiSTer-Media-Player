@@ -126,7 +126,7 @@ def check_cbr(sizes: list[int], starts: list[int], delays: list[int],
             'scope': 'Constant-rate all-I witness with quantized vbv_delay; not a general VBV/application verifier.'}
 
 
-def verify_rate(data: bytes) -> dict:
+def verify_rate(data: bytes, rate: int = RATE) -> dict:
     require(data.endswith(interlaced.SEQUENCE_END), 'missing sequence end')
     codes = analyzer.start_codes(data)
     require(sum(code == 0xB7 for _, code in codes) == 1, 'multiple sequences')
@@ -134,7 +134,7 @@ def verify_rate(data: bytes) -> dict:
     for i, (_, code) in enumerate(codes):
         payload = analyzer.payload_between(data, codes, i)
         if code == 0xB3:
-            require(analyzer.read_bits(payload, 32, 18) * 400 == RATE,
+            require(analyzer.read_bits(payload, 32, 18) * 400 == rate,
                     'wrong bitrate header')
             require(analyzer.read_bits(payload, 50, 1) == 1, 'missing marker')
             require(analyzer.read_bits(payload, 51, 10) * 16384 == BUFFER_BITS,
@@ -151,10 +151,10 @@ def verify_rate(data: bytes) -> dict:
             extensions += 1
     require(headers > 0 and headers == extensions, 'inconsistent sequence headers')
     sizes, starts, delays = access_units(data)
-    result = check_cbr(sizes, starts, delays)
+    result = check_cbr(sizes, starts, delays, rate=rate)
     average = Fraction(len(data) * 8, len(sizes)) / PERIOD
     # Exercise sustained near-ceiling traffic, rather than just signaling it.
-    require(RATE * Fraction(98, 100) <= average <= RATE * Fraction(101, 100),
+    require(rate * Fraction(98, 100) <= average <= rate * Fraction(101, 100),
             f'fixture average is not near the ceiling: {float(average)}')
     windows = [float(Fraction(sum(sizes[i:i+30]), 30) / PERIOD)
                for i in range(len(sizes) - 29)]
