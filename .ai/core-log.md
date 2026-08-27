@@ -1,3 +1,32 @@
+## 596 COMMIT Unreleased feb50c2 2026-08-27T03:53:06-07:00
+
+#### Coming From:
+
+Unreleased feb50c2
+
+#### Purpose:
+
+Record the user's confirmation that the preceding DVD-ceiling run used Weave mode.
+
+#### Outcome:
+
+The user explicitly confirms that entry 594 was Weave, resolving the mode-attribution uncertainty recorded in entry 595. Entry 595 was Bob without rebooting, also explicitly reported by the user. The existing same-fixture, same-a4f2769-binary and same-Linux-boot captures can therefore be compared as user-confirmed Weave and Bob runs. Both display all 449 pictures with 448 swaps and zero decoder/transport errors, yet both retain the same two missed deadlines at full-width ordinals 167 and 346 and the same 66.733-millisecond maximum intervals. Bob's approximately 28.174-millisecond shorter aggregate span is startup-related, not removal of either steady-playback miss. Candidate readiness at the two deadlines changes from 0.444633 and 0.084750 milliseconds late in Weave to 0.390517 and 0.083600 milliseconds late in Bob. Both retain pending input, decoder not ready and zero input starvation at the missed slots. These observations strengthen the shared decode/retirement timing hypothesis and show that switching to Bob does not clear the fault; they do not prove every mode behavior identical or isolate a specific arithmetic stage. The confirmation is preserved in .ai/current_results/entry596_mode_confirmation.json and supersedes only the prior uncertainty about mode identity, leaving the settled captures and their numerical analysis unchanged. No new capture, source change, build, deployment or device action was performed. Strict DVD-ceiling cadence acceptance remains open.
+
+#### Next Steps:
+
+Use entry 594 as the confirmed Weave baseline and entry 595 as the confirmed warm Bob comparison. Focus the proposed GUNSMOKE decoder/reference-retirement investigation on the repeatable shared misses at pictures 167 and 346 rather than treating display-mode selection as a fix. Preserve the exact 9.8 Mbps fixture and installed a4f2769 pair, and require a bounded evidence-backed revision before further production changes. Keep the combined 10.08 Mbps audio/video gate separate, retain 18.65 Mbps only as optional stress evidence, preserve transport guards, queues, startup and sync, leave lifecycle/playback control with the user and maintain restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 595 COMMIT Unreleased feb50c2 2026-08-27T03:51:42-07:00
 
 #### Coming From:
@@ -1161,35 +1190,6 @@ Implement the passive taps and event recorder, extend the existing profiler and 
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 556 COMMIT Unreleased 30d300a 2026-08-26T21:40:34-07:00
-
-#### Coming From:
-
-Unreleased 30d300a
-
-#### Purpose:
-
-Compare a rebooted single Bob run with the warm-session cadence result and extend the reproduction through the production writer and publication scheduler.
-
-#### Outcome:
-
-The user rebooted the MiSTer, loaded the core, selected Bob and played the established clip once without reported playback interaction. A fresh FTP screenshot, obtained after deleting only the fixed old screenshot target, validates as schema eighteen and is preserved in `.ai/current_results/entry556_bob_cold_terminal.png`; its SHA-256 is `08c04b672a845736dd5f6f65f27225bc324676842abf7638d0a9d5790161d489`. All 15,150,646 bytes are accepted, sequence end and presentation completion are reached, and aggregate and framebuffer integrity error counters remain zero. The source's 449 pictures and the wrapped display counts plus 448 publications support 448 swaps over 15.053786 seconds, averaging 29.759956 pictures per second. Three doubled gaps contribute 100.100 milliseconds of excess duration, with another 5.419 milliseconds attributable to the initial reference-completion versus later-swap timestamp basis. The reset count is 449, not 448: generation reset includes native mode changes as well as swaps, so never substitute that counter as the swap count; one extra native-entry reset is consistent with the cold start but was not individually traced. Repeated loads and Bob/Weave switching are therefore not necessary to trigger the recurring gap. Entry 555's ordinal ambiguity can also be narrowed using the existing bank metadata: under ordered all-I presentation from bank zero, the previous display bank is the upcoming picture ordinal minus two modulo three. The stored display banks uniquely select pictures six, seven and 348 from their eight-bit ordinals six, seven and 92; the warm run similarly selects six and 348. This is a source-invariant inference, not a newly captured per-picture hardware trace. The FIFO-pending flag observes the upstream HPS FIFO, not the separate sixteen-kibibyte clean-video queue, so an empty flag alone does not prove decoder starvation. A temporary integrated observer on GUNSMOKE now executes the unchanged production frontend, three-bank publication shell, I reconstruction, two-bank DDR writer and native scheduler together, checking exact sample counts, all error flags, picture identity order and final store totals. With always-available decoder input, always-ready DDR writes and exact field/frame pulses, all 449 pictures and 29,095,200 accepted DDR words pass in 446.85 seconds. Only picture six has a doubled interval; picture 348 completes 1,003,299 clocks, or 16.722 milliseconds, before its presentation window. The expanded simulation thus reproduces the early decode overrun but neither the additional cold picture-seven gap nor the recurring hardware picture-348 gap. Physical host transfer, extraction/clean-queue availability, DDR arbitration/read contention and full raster behavior remain outside this simulation. An optimized observer agrees with ninety-three events from the initial slower observer before that superseded run was stopped; the stopped run is not reported as a pass. Capture analysis, simulation results and diagnostic hashes are preserved in the two entry-556 JSON files, with observer sources and full CSV logs under `/home/vash/mister-builds/entry556-cadence-analysis`. No production RTL, settings, constraints or active image changed, and the accepted HDMI flicker correction remains intact.
-
-#### Next Steps:
-
-Request approval for one passive cadence-telemetry build that records the full picture ordinal and readiness at the actual missed swap window, including decoder-side clean-queue availability, writer capacity and candidate publication timing, instead of relying on a later threshold snapshot or the upstream FIFO alone. Keep the accepted HDMI sync behavior and scheduler ownership unchanged, qualify the telemetry decoder and event capture in simulation, and require a successful build with positive timing before the already-authorized direct image replacement and independent readback. First repeat this clean Bob case; retain repeated loads and Bob/Weave switching as subsequent regression conditions rather than assuming they caused the cold-run gap. Do not claim that all remaining delay is explained or apply a playback-clock adjustment from these results.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
