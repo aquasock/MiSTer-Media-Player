@@ -1,3 +1,32 @@
+## 628 COMMIT Unreleased 2cb7246 2026-08-27T16:51:13-07:00
+
+#### Coming From:
+
+Unreleased 140a5b7
+
+#### Purpose:
+
+Establish whether the progressive path decodes P and B pictures, and identify the reported picture artifacts.
+
+#### Outcome:
+
+The capability question that blocked the release document is settled by playing a file rather than by reading RTL. Published source `2cb7246` adds a seventh hand test, progressive 480p with an ordinary fifteen picture GOP and two B pictures between references, built by extending the corrected suite generator rather than reviving the superseded one. It decodes: telemetry reports 121 reference pictures and 239 B pictures, all 360 displayed with 359 swaps, `error_flags` zero, sequence end, presentation complete, quiet snapshot, and a final picture type of three. The progressive path therefore handles I, P and B pictures, and the entry 609 description of the decoder as accepting I-pictures only was wrong; that restriction belongs to the interlaced 480i path, whose `phase1_supported` gate requires coding type one. B reordering costs 186,240,472 stall clocks, about 3.1 seconds of a twelve second clip, which is recorded as an observation rather than a fault. The user then reported poor picture quality, and the investigation separated two contributions. The first file was encoded at 22.3 kilobytes per frame against the all-I test four's 33.9, because B pictures let the encoder code the same content for a third fewer bits under a capped rate; the test was rebuilt with a rate floor to 33.6 kilobytes per frame so the two could be compared meaningfully. The artifacts persisted, and the user confirms test four looks identical to test seven, which rules out prediction drift and any P/B specific cause. The remaining artifacts were then measured rather than described. Screenshots at 800x600 capture the core's own output before the HDMI scaler, so they can be compared directly against an FFmpeg decode of the same frame; this is the first pixel comparison of actual playback in this project, every previous oracle having been applied in simulation. The active picture measures 720x480 placed one-to-one at offset 40 by 60 inside the 800x600 raster, so no resampling is involved and an early scaling hypothesis was wrong. At the yellow to blue band transition the reference decoder produces adjacent pixels of 252,254,0 and 1,0,254 with no intermediate value, while the hardware inserts one blended column of 199,196,255 between them, which is the reported thin vertical line. Decoding the reference again with full chroma interpolation and accurate rounding produces the same clean transition, so the difference is not an artefact of the reference's upsampling choice. No MiSTer.ini exists on the target, making a system video filter an unlikely explanation. The leading hypothesis is that horizontal chroma upsampling in the core's 4:2:0 to RGB path interpolates where the reference replicates, which would place exactly one blended column at each chroma transition. What is not established is whether that interpolation is correct for the intended chroma siting, or whether anything in the write or read path also contributes, and the left edge behaviour has not been separated from the telemetry overlay that occupies that corner.
+
+#### Next Steps:
+
+Decide whether the chroma edge behaviour is worth investigating before the release or recorded as a known characteristic, bearing in mind that it is visible on synthetic colour bars and much less so on ordinary material, and that it affects all progressive output rather than being new. If it is investigated, the targeted question is what the core does horizontally with 4:2:0 chroma when converting for display, and a useful control is an interlaced colour bar file played in native 480i, since that path differs from the 800x600 diagnostic output. The README can now be written, stating that the interlaced 480i subset is I-only, frame structured and frame DCT while the progressive path decodes I, P and B, and stating plainly that playback pixel accuracy has never been qualified, which this entry demonstrates is now measurable. Release notes should carry the entry 616 wording of one or two repeated frames at the picture 690 cut, the marginal scaler paths recovered by reseeding in entry 618, the audio capability split between measured and listened evidence, and the DTS subwoofer behaviour of entry 621 as a device observation. The interlaced gates of entry 609 remain open and out of scope. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+- tools/streams/generate_test_suite.py
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 627 COMMIT Unreleased 140a5b7 2026-08-27T16:32:05-07:00
 
 #### Coming From:
@@ -1152,41 +1181,6 @@ Have the user cold-power-cycle the MiSTer, load MediaPlayer and play `bbb_480i_t
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 588 COMMIT Unreleased a4f2769 2026-08-27T02:59:27-07:00
-
-#### Coming From:
-
-Unreleased be8502b
-
-#### Purpose:
-
-Enable bounded fast-block media transfers using FPGA FIFO credits and post-batch integrity checks while preserving the acknowledged legacy path.
-
-#### Outcome:
-
-The approved coordinated implementation is source `a4f2769`. Main remains the sole FPGA I/O owner and uses the existing fast-block primitive only after an opt-in status query grants conservative input-FIFO credit, capped at 4096 words; commands and status remain acknowledged. Coherent snapshots expose credit, accepted-word count, a rolling 16-bit rotate/XOR checksum and ready/overflow flags. Main verifies every batch before additional data, aborts on mismatches without retrying uncertain bytes, preserves legacy/narrow/unaligned/odd-tail handling and uses one acknowledged word of progress when credit is zero. Session state resets even when logging is unavailable, and runtime telemetry distinguishes fast bytes, slow bytes, batch/query totals and detailed fault observations with marker `transport=credit_fast_v1`. The checksum can collide and is not a cryptographic integrity guarantee. The vendor Cyclone V model exposed a real near-full hazard: after a partial-byte read, a wrapped zero write-used count could advertise empty capacity before the count caught up. Credit now trusts a zero count only when write-domain empty agrees. Both literal-default and Cyclone V vendor models pass 26,878 credit batches each, full and partial-byte transitions, asynchronous clock ratios, pointer wrap, reset readiness, sticky overflow attempts and exact byte/count/checksum checks; effective modeled full capacity is respectively 32,766 and 32,768 bytes. The existing 32-word nominal reserve remains, giving at least 31 words relative to the default model's effective capacity. Real-host/extracted handshake and FIO qualification passes 288 guarded cases across narrow, legacy-wide and capable-wide configurations at four modeled register delays, plus 168 original-versus-ACK-bulk cases in each of the three configurations and explicit zero/full-credit, counter-wrap, coherent-snapshot, lost/corrupt-word, reset, bad credit/count/digest/capability and no-second-batch fault cases. Forty native ACK transport cases and complete loader scenarios pass both normally and under ASan/UBSan; RTL simulations are not sanitizer-instrumented. These model timings are protocol stress conditions, not physical throughput estimates. GUNSMOKE pulled the exact Pi-published source, matched candidate files and repeated official qualification. The existing native-video suite passes startup, field order, presentation overlap, sync/reset, cache/fingerprint/generation and cadence packet checks; the clean-video queue test passes 85,696 bytes, four metadata records and three PCM samples. The clean ARM build using pinned Main `0a8fb44` and official GCC 10.2.1 completes in 4.43 seconds with zero warnings/errors, producing 1,170,340 bytes and SHA-256 `3841e2cc6eef4bfc9e46a7ffa075aff76b65d5405f81efb1355373292b35846f`. The clean Quartus 17.0.2 seed-16 build completes in 712.06 seconds with 0 errors and 208 warnings; reviewed worst slacks are setup 0.217 ns, hold 0.249 ns, recovery 3.559 ns, removal 0.574 ns, minimum pulse width 0.925 ns, all TNS are zero and no new ignored timing filters appear; normalized warning messages are identical to the baseline. FPGA output is 4,332,748 bytes with SHA-256 `15bc3057a4f16369bc4a3dac01e30f63e5fc563a43b1922214b5b478c17c66c2`. Deployment could not begin because the MiSTer at `10.10.0.30` was unreachable from the Pi; the attempted FTP connection failed before login or any remote write. No predecessor backup was collected this cycle and neither candidate was installed. The user was asked to power on or reconnect the MiSTer and leave it at the menu. Qualified candidates and reports remain under `/home/vash/mister-builds/entry588` on GUNSMOKE, with matching Pi copies under `/tmp/entry588-reports`. The previously deployed host remains the last verified `be8502b` and FPGA `2acabc5`; current device state has not been reverified. Evidence is retained as `.ai/current_results/entry588_*`. The ingest FIFO capacity, separate 64 KiB clean-video queue, startup controller, decoder arithmetic, continuous HDMI sync and black idle are unchanged. The user's earlier 10 MB/s figure remains only a guess, and decoder-bound playback remains a hypothesis. Hardware acceptance is not claimed.
-
-#### Next Steps:
-
-Once the user restores MiSTer connectivity at `10.10.0.30`, resume verified paired deployment under standing permission without changing source: retrieve and hash-check the active predecessors, retain fsynced local and persistent GUNSMOKE restoration copies, stage and independently read back both candidates, rename and independently verify the complete active files and permissions. Leave lifecycle control with the user, then request one cold run of `bbb_480i_tff_15s.m2v`. Collect its log before a fresh screenshot, require `transport=credit_fast_v1`, mode 2, nonzero fast bytes, no integrity fault and complete byte/picture counts, and compare delivery/cadence with entry 587. Capture that run before the outstanding qualified 8 Mbps regression; no speedup or decoder-bound claim is established yet. Retain prior unsupported interlaced P/B, field-picture/DCT, audio/PTS, cancellation and assertion-drift limitations, keep restricted `core.md` unchanged and maintain the forty-entry ring.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- host/arm/ARCHITECTURE.md
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- rtl/mpeg2_stream_fifo.sv
-- sys/hps_io.sv
-- tools/streams/tb_mpeg2_stream_fifo_burst.sv
-- tools/streams/test_main_mister_profile.py
 
 #### Status:
 
