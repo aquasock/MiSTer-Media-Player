@@ -30,7 +30,7 @@ MiSTer-Media-Player is being developed as a simple, compatibility-focused media 
 
 ## AI Agent Recovery Policy
 
-Read this core.md file first. Treat core.md is the primary project-level source of directives subject to active higher-priority and current user instructions. Read core-log.md second as historical engineering/build/transcript evidence and the primary project-level source of context, The online GitHub repository is the backup source for archival information.. Treat core.md as RESTRICTED, authoritative project core memory. Do not edit it automatically for any reason. Only edit core.md if the user explicitly asks for it. After you are caught up, request from the user the local IP addresses of the build PC and the test Mister. Also request the username and password for SSH access to the user build PC. These credentials are temporary and you are are to forget them after the session closes.
+Read this core.md file first. Treat core.md is the primary project-level source of directives subject to active higher-priority and current user instructions. Read core-log.md second as historical engineering/build/transcript evidence and the primary project-level source of context, The online GitHub repository is the backup source for archival information.. Treat core.md as RESTRICTED, authoritative project core memory. Do not edit it automatically for any reason. Only edit core.md if the user explicitly asks for it. After you are caught up, request from the user the local IP addresses of the build PC and the test Mister. SSH Credentials to access the build PC should already be set up.
 
 ---
 
