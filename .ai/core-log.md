@@ -1,3 +1,32 @@
+## 572 COMMIT Unreleased 2acabc5 2026-08-27T00:28:08-07:00
+
+#### Coming From:
+
+Unreleased 2acabc5
+
+#### Purpose:
+
+Capture the ARM helper log from a verified cold run before any replay overwrites it, and determine whether cold delivery is limited by the per-poll budget or by EAGAIN.
+
+#### Outcome:
+
+The power cycle is verified by a single new syslogd start at 07:25:17 UTC replacing the 07:16:20 boot, and the user played once and stopped so the helper log survived. The cold run itself came up clean, with zero cadence outliers, zero missed deadlines, 449 pictures, 448 swaps, all 15,150,646 bytes accepted and zero error flags, which establishes that cold is not deterministic: of four verified cold runs, three gapped and this one did not. The helper log answers the question it was fetched for. Cold records 670 would-block events against 190 in the warm entry 570 log, but in both files every logged instance carries a submitted count of zero and precedes the first byte, and after read event one neither log records another. EAGAIN therefore never occurs during steady delivery in either thermal state, the four-chunk per-poll budget is binding in both, and the entire cold penalty is concentrated before the first byte, where cold shows three and a half times as many blocked polls as warm. That result forced a re-examination of the telemetry, and it corrects entry 571. Comparing each deadline record's measured elapsed time against the time its accepted-byte count requires at the warm steady rate of 1,392,000 bytes per second isolates a residual dead time before delivery effectively begins. Across five independent warm sessions that residual is zero within plus or minus 1.2 milliseconds, which both validates the rate and shows that warm delivery starts immediately. Across the four cold deadline records the residual is 13.9, 27.8, 60.7 and 63.8 milliseconds, and it tracks severity, since 63.8 milliseconds produced two missed deadlines while 27.8 and 13.9 produced one each. Entry 571 stated that on a cold start the upstream feed runs at 0.94 times realtime and below the rate the stream requires. That is wrong and is superseded here. The feed does not run slow; steady delivery is 1,392,000 bytes per second in every measured state. The apparent 0.94 figure divided accepted bytes by elapsed time and thereby folded the pre-first-byte stall into an apparent rate. The defect is a late start, not a slow feed. The practical consequence is that raising the four-chunk per-poll budget or the buffer size in `mediaplayer_poll()` would not correct anything, because steady throughput was never the limiting quantity, and that candidate is now ruled out. Two candidates remain. The first is to reduce cold first-byte latency on the helper side, for example by priming or reading ahead in the media source before the download is asserted. The second is to absorb the dead time before the first cadence slot in the startup controller, noting that the 64-KiB clean video queue holds 64.9 milliseconds of stream at nominal rate and therefore only just covers the worst observed 63.8 milliseconds. The second candidate returns the boundary to the startup controller that entries 569 and 571 had ruled out, but now with a quantified requirement rather than the byte threshold that entry 569 correctly rejected. This entry's own cold run contributes no dead-time datapoint because it was clean, so its contribution is the would-block count alone, and cold sampling remains at four samples. The 85 Hz poll rate is inferred from throughput arithmetic rather than measured in MiSTer main, so the warm residuals validate the resulting rate but not its decomposition into chunk count and poll frequency, and the helper log still carries no timestamps, so the 670 blocked polls cannot be converted to a duration and the dead time is inferred from telemetry arithmetic rather than measured on the ARM side. Evidence is `.ai/current_results/entry572_cold_terminal.png`, `entry572_cold_arm_helper.log` and `entry572_cold_capture.json`.
+
+#### Next Steps:
+
+Obtain user approval for a delivery-side plan before any source change, since the evidence now supports a bounded correction and the standing workflow requires the plan on record first. The proposal is to instrument before correcting: add timestamps to the helper diagnostic log and record the elapsed time from download assertion to first submitted byte, which converts the inferred dead time into a measured one and costs nothing in the decode path, then confirm on one cold run that the measured first-byte latency matches the 13.9 to 63.8 millisecond band inferred here. With that confirmed, prefer the helper-side correction of priming the media source before asserting download, because it removes the dead time rather than hiding it and leaves the FPGA startup controller and the 64-KiB queue untouched. Hold the startup-absorption candidate in reserve for the case where first-byte latency proves irreducible, and note that it has almost no margin, since the queue covers 64.9 milliseconds against a worst observed 63.8. Do not raise the per-poll chunk budget. Gather at least two further verified cold samples alongside the instrumented run so the dead-time distribution has a usable tail rather than four points, verifying each power cycle from `/tmp/messages` rather than from recollection, and fetch the helper log after the first playback of each. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged until a plan is approved. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 571 COMMIT Unreleased 2acabc5 2026-08-27T00:23:26-07:00
 
 #### Coming From:
@@ -1177,35 +1206,6 @@ The scope review confirms that commit `164c7e6` adds one passive accepted-luma-w
 #### Next Steps:
 
 Reload the Media Player core, choose Bob, leave the native timing pattern Off and replay only `/media/fat/games/MediaPlayer/bbb_480i_tff_15s_8mbps.m2v`. Report whether old frames still reappear during otherwise smooth playback and leave the terminal image displayed. Retrieve and decode that terminal image through ordinary FTP. A write-versus-read mismatch places the stale content in accepted writer packing, physical DDR addressing, storage or readback; equality proves the selected framebuffer contains exactly what was written and moves the correction boundary to scheduler bank or generation selection without another diagnostic layout.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 532 COMMIT Unreleased 5de0e1d 2026-08-26T04:35:28-07:00
-
-#### Coming From:
-
-Unreleased 164c7e6
-
-#### Purpose:
-
-Establish the commercial-DVD-rate Bob and Weave behavior and verify real Big Buck Bunny I-picture reconstruction before another RTL change.
-
-#### Outcome:
-
-The exact fifteen-second 720x480 top-field-first all-I Big Buck Bunny fixture contains 449 pictures at 30000/1001 and 8 Mb/s target, 9 Mb/s maximum and 1,835 kb buffer settings; it is 15,150,646 bytes with SHA-256 `04758691e3e51c72ca2e7c3723b4dda2fbd473783425215df8ec2dcb5585cbe0`, and the signalling patch leaves FFmpeg's decoded YCbCr planes unchanged. On the active `5de0e1d` hardware, Bob accepts every byte and produces 449 displayed pictures and 448 swaps over 15.323544 seconds, or 29.236 pictures per second; Weave produces the same counts over 15.328045 seconds, or 29.227 pictures per second. The user reports both modes run at speed with a responsive MiSTer menu, but both retain old-frame ghosting; the apparent approximately 60 Hz Weave flicker is specifically old frames rapidly reappearing rather than a separate brightness or sync defect. Both terminal captures have every aggregate, decoder, cache-tag, cache-content, region, phase, prefill and overlap error clear. The selected Bob and Weave terminal evidence has SHA-256 `f6f1934392ef40ce4668319281d8fc64904af3b193622252aaf73e23e6ecd049` and `54c1771a2dc01f4dfd4c0fe6116e9fa4307a35ad7db0c169da0f07e8bf24d157`. A four-picture sequence-ended excerpt is 147,746 bytes with SHA-256 `32148a07ad51aaa9472bd4ffc6993cdee638d884e4e8903b5144054186a99654`; the existing complete parser, inverse-quantization, IDCT and reconstruction simulation on GUNSMOKE produces all 2,073,600 positioned YCbCr samples, has zero samples outside the established one-LSB transform tolerance and completes in 7,837,323 cycles below the 8,008,000-cycle four-picture real-time limit. The MPEG-2 I-picture decode and reconstruction path is therefore correct for this real content and the remaining stale-frame defect is later in framebuffer generation or presentation selection. The earlier accidental run of a different file is excluded from this result.
-
-#### Next Steps:
-
-Do not change the decoder or add another independently named diagnostic. Review the already committed but unbuilt accepted-write-versus-raw-read instrumentation at `164c7e6` against the newly isolated stale-frame presentation failure and reduce it if any signal does not directly distinguish framebuffer generation ownership from stale bank selection. Only after that scope review should the single consolidated diagnostic receive an incremental Quartus build and direct replacement of `/media/fat/MediaPlayer.rbf`; hardware acceptance remains smooth Bob and Weave without any old picture reappearing, while native bypass remains deferred for community validation after progressive presentation is correct.
 
 #### Files Modified:
 
