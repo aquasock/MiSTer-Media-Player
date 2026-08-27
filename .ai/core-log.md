@@ -1,3 +1,32 @@
+## 619 COMMIT Unreleased aa7f064 2026-08-27T08:35:53-07:00
+
+#### Coming From:
+
+Unreleased aa7f064
+
+#### Purpose:
+
+Accept AC-3 passthrough over S/PDIF on hardware.
+
+#### Outcome:
+
+The user reloaded the core, exercised both audio output settings and reports that S/PDIF AC-3 sounds correct through the soundbar, that the subwoofer was heard on its own channel for the first time, and that the HDMI and S/PDIF options both behave as specified. The decisive evidence is that low frequency channel rather than any indicator on the device: the AC-3 stereo downmix discards LFE entirely, so a discrete subwoofer channel can only exist if the compressed bitstream reached the soundbar and was decoded there as 5.1. The soundbar displayed no format indicator, which the user reports it never does over S/PDIF, so that absence carries no weight either way. This also settles empirically what entry 617 could only argue from clock arithmetic, namely that the path from the core samples to the S/PDIF pin is bit transparent; had the mixer, filter or DC blocker altered a single sample the receiver could not have decoded anything. Telemetry is clean. The installed RBF is the seed 17 build with SHA256 beginning `61a2fed2`, Main is the patched binary beginning `0ee87029`, and the sweep fixture is unchanged on the target. All 360 reference and display pictures complete with 359 swaps and 14,469,731 accepted video bytes, `error_flags` zero, sequence end seen, presentation complete, quiet snapshot, and zero deadline gaps or outliers. Audio underrun and PCM protocol error are clear at FIFO peak 127. Helper PID 753 submitted 16,958,580 transport bytes over 1,036 reads and exited zero, which is byte for byte the same volume as the decoded run of the same fixture in entry 614, confirming by measurement the design property that a burst occupies exactly the transport a decoded frame would have. One diagnostic weakness is recorded rather than hidden: the helper log names the AC-3 substream but never states which audio output mode it was launched with, so the log alone cannot distinguish a passthrough run from a decoded one, and this acceptance therefore rests on the user's listening report for that distinction. Scope is bounded. A 2.1 soundbar cannot verify discrete channel routing however convincingly it virtualizes, so front, centre and surround placement over passthrough remains unproven and needs the community test on real 5.1 hardware; only LFE is independently established, because its presence is impossible under the downmix. DTS passthrough is untested, a commercial AC-3 track with real dynamic range control is still uncompared, and the marginal scaler paths recovered by reseeding remain a risk for the next change that adds logic.
+
+#### Next Steps:
+
+Add a mode line to the helper's diagnostics so a future log proves on its own whether decoded stereo or passthrough was selected, since that gap forced this entry to rely on a listening report for a fact the log should carry. Write the community sound test from the sweep fixture, stating that in S/PDIF mode it exercises discrete channels through the listener's own decoder while in HDMI mode it exercises only the stereo downmix, and ask testers with real 5.1 hardware to report each two second slot by speaker. DTS passthrough is the same machinery with a different data type and burst length and is the cheapest remaining audio item. A commercial AC-3 track remains the honest gap in codec qualification. Before the release, decide whether the audio work is complete enough and prepare release notes carrying the entry 616 wording of one or two repeated frames at the picture 690 cut rather than entry 609's original phrasing. The interlaced video gates of entry 609, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, remain open and unstarted and are the larger question for a release that claims interlaced support. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 618 COMMIT Unreleased aa7f064 2026-08-27T08:28:45-07:00
 
 #### Coming From:
@@ -1153,35 +1182,6 @@ Resume at the pending validation, which the user has already been asked to perfo
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 579 COMMIT Unreleased ad364bf 2026-08-27T01:01:12-07:00
-
-#### Coming From:
-
-Unreleased deced5c
-
-#### Purpose:
-
-Raise the bytes moved per poll in `mediaplayer_poll()` by enlarging the read buffer from 4,096 to 16,384 bytes so the measured delivery ceiling rises above the rate a high-bitrate stream demands.
-
-#### Outcome:
-
-The approved plan is committed as `ad364bf`, built and deployed. Entries 577 and 578 established by three independent measurements that delivery is capped at four chunks of 4,096 bytes per poll at an implied 86.2 to 86.7 polls per second, matching measured throughput to about a hundredth of a percent each time, and that the cap binds because the helper always has data ready and the parent never sees EAGAIN during steady delivery. The change enlarges the buffer to 16,384 bytes while leaving the chunk count at four, which raises the arithmetic ceiling from about 1.42 to about 5.7 megabytes per second and moves the same bytes in a quarter as many read and transmit calls. Two checks were made before proposing it. `user_io_file_tx_data` performs no internal chunking, consisting only of `EnableFpga`, a command byte, `spi_write` and `DisableFpga`, so larger blocks are accepted and the per-call FPGA framing is amortised rather than repeated. The main loop in `main.cpp` is free-running with no sleep, calling `user_io_poll`, `frame_timer`, `input_poll`, `HandleUI` and `OsdUpdate` in sequence, so the poll rate is set by how long that work takes rather than by a timer, and spending longer in `mediaplayer_poll` necessarily slows every other item. That is the principal risk and it is not eliminated by this change, only bounded and measured. The relevant cost is that `spi_write` is a word-at-a-time loop calling `spi_w`, which resolves to `fpga_spi` and performs a read-back per sixteen-bit word, stalling on the HPS-to-FPGA bridge each time, so 4,096 bytes costs 2,048 bridge round trips and a full poll costs 8,192. Enlarging the buffer quadruples the bytes per poll but also quadruples that word-loop time, so the net gain depends on what fraction of the 11.5-millisecond poll period that loop currently occupies, which has not been measured. This makes the change a discriminating experiment as well as a correction: the instrumentation added in `deced5c` reports read counts and elapsed time, from which the poll rate is derived directly, so if the rate holds near 86 Hz the ceiling rises toward 5.7 megabytes per second, whereas if it collapses proportionally toward 22 Hz the word-loop dominates and the buffer size is not the operative constraint. In that second case the identified answer is already in hand and would be proposed separately: `spi_block_write` wraps `fpga_spi_fast_block_write`, which issues two posted register writes per word with no read-back, and it is already used for bulk transfers by the IDE, x86, CDTV and Akiko paths, while `user_io_file_tx_data` alone still uses the slow read-back loop. That change is deliberately not made here because it alters the FPGA transfer path rather than a local buffer size. No FPGA rebuild is required and the qualified `2acabc5` bitstream with SHA-256 `fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347` is unaffected. Deployment replaces the host-side MiSTer main binary again, and both prior binaries are retained for restoration, the pre-instrumentation original and the `deced5c` instrumented build, under `/home/vash/mister-builds/entry573-deced5c/`. The change is a single line, the buffer declaration in `mediaplayer_poll()`, and the hunk line count is unchanged at 304. `git apply --check` accepted it against pinned Main_MiSTer commit `0a8fb44` and the build completed with ARM GNU 10.2.1 20201103 reporting no errors, producing a 1,166,244-byte stripped ARM EABI5 binary with MD5 `295a3f2473360c46f4b946922fc1cbc2` and SHA-256 `a850ec3fc8c78b6ed72e3421858f9e3c40a5d2a4ff59a533d52dd0df47213a86`. Because the buffer is a stack allocation in a stripped image its size cannot be confirmed by string extraction, so verification is deferred to runtime, where the instrumented log's per-read `count` field must report 16,384 rather than 4,096. Deployment followed the established procedure and additionally confirmed before overwriting that the target held exactly the retained `deced5c` restore point rather than an unrecorded state. The staged upload was hash-verified before the rename and the active path was then read back in full over a fresh connection, returning 1,166,244 bytes with the matching SHA-256 and leaving no staging file. Three restore points are now retained under `/home/vash/mister-builds/entry573-deced5c/`: the pre-instrumentation original with SHA-256 `5a6cbf7e85682ac301d57470b8b2c952d3bbfa42af55484bd70dd0d36724ae96`, the instrumented `deced5c` build, and this one.
-
-#### Next Steps:
-
-Build with MiSTer's official ARM GNU 10.2 toolchain, never the distribution cross-compiler, confirm the patch applies cleanly to pinned Main_MiSTer commit `0a8fb44`, and deploy host-side with the existing staged-upload, verify, rename and full-readback procedure. Validation is a single replay of `bbb_480i_tff_15s.m2v`, whose 2,330,798 bytes per second demand exceeded the old ceiling and produced 187 to 188 missed deadlines at about 18.2 frames per second across two runs. Read the helper log first and derive the poll rate from read count and elapsed span, then compare measured delivery against the new budget arithmetic of four chunks of 16,384 bytes at the observed rate. Success is delivery above the file's demand with the delivered frame rate rising toward 29.97 and the missed-deadline count collapsing; a poll rate that falls proportionally instead indicates the read-back word loop dominates and moves the boundary to `spi_block_write`. Also confirm on the qualified 15,150,646-byte file that the change has not disturbed the previously accepted behaviour, and watch for any user-visible loss of interface responsiveness, since a longer `mediaplayer_poll` delays `HandleUI`, `OsdUpdate` and `input_poll` in the same loop. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
-
-#### Files Modified:
-
-- host/main_mister/0001-mediaplayer-arm-loader.patch
 
 #### Status:
 
