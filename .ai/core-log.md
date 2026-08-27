@@ -1,3 +1,42 @@
+## 557 COMMIT Unreleased ??? 2026-08-26T21:45:31-07:00
+
+#### Coming From:
+
+Unreleased 30d300a
+
+#### Purpose:
+
+Capture decoder-input and presentation readiness at missed native frame deadlines without changing playback behavior.
+
+#### Outcome:
+
+The user approved the passive diagnostic build proposed in entry 556. The planned schema nineteen retains the existing sixty-four-word overlay and common cadence/error counters, replacing the retired framebuffer-detail payload with full sixteen-bit picture/swap counts and the first three confirmed missed-deadline records. Each record will retain the upcoming display ordinal, completed-reference count, exact window state, completion age, decoder-input starvation and writer-capacity stall counts, accepted byte position and subsequent candidate readiness delay. Availability will be tapped directly before the decoder instead of inferred from the upstream HPS FIFO; writer capacity will be observed separately from its acknowledgement pulse and DDR busy level. Only gaps followed by an actual presentation will enter the retained records, avoiding terminal idle as a false missed picture. The continuous HDMI sync fix, raster, decoder arithmetic, scheduler admission/ownership, memory transactions and queue control remain unchanged. Existing legacy telemetry decoding will remain supported, and the retired framebuffer fields will be explicitly unavailable in schema nineteen rather than misinterpreted as errors. No new source or image has been built or deployed yet.
+
+#### Next Steps:
+
+Implement the passive taps and event recorder, extend the existing profiler and screenshot-decoder tests for exact-boundary capture, late readiness, input-versus-writer attribution, ordinal wrap, on-time presentation, terminal idle and repeated-session reset, and retain the native sync regressions. Commit the validated source from the Pi and pull it into a clean GUNSMOKE build directory. Require a successful Quartus build with positive timing in every class before directly replacing the active MiSTer image under the standing authorization, verifying the complete image through independent FTP readback and leaving core reload to the user. Request one clean Bob playback for the new capture before exercising repeated loads or Bob/Weave changes.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_04.svh
+- MediaPlayer_top_07.svh
+- rtl/mpeg2_new/mpeg2_h262_clean_video_queue.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+- tools/streams/decode_hardware_cadence.py
+- tools/streams/test_decode_hardware_cadence.py
+- tools/streams/run_native_480i_timing.sh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 556 COMMIT Unreleased 30d300a 2026-08-26T21:40:34-07:00
 
 #### Coming From:
@@ -1209,35 +1248,6 @@ Observe the luma content DDR returns for each parity, since every measurement so
 - `tools/streams/decode_hardware_cadence.py`
 - `tools/streams/tb_h262_hardware_cadence_profiler.sv`
 - `tools/streams/test_decode_hardware_cadence.py`
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 517 COMMIT Unreleased 3e91073 2026-08-25T18:48:23-07:00
-
-#### Coming From:
-
-Unreleased 3e91073
-
-#### Purpose:
-
-Read the new per-field evidence on hardware and determine whether framebuffer field readout is actually at fault.
-
-#### Outcome:
-
-The instrumented `3e91073` image was installed rollback-safe and run against `MediaPlayer/_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off, Interlaced output Native 480i and Bob, while a live burst sampled the core's raster at roughly 2.4 hertz. Schema eleven decoded on hardware for the first time at forty-three words from the moved native origin. Its verdict is that field readout is correct and entry 515's classification is superseded. The last generation was served 242 first-field and 240 second-field luma line fetches, presented 240 lines of each parity, and recorded zero generations of per-parity line imbalance and zero field-phase errors, while the established counters remained at 300 framebuffer resets, 299 publications, zero prefill misses and zero superseded generations. The 242 figure confirms the counter rather than contradicting it, because the two prefill luma lines are the sequence-zero and sequence-one rows and both therefore carry first-field parity by construction. The session itself was ordinary, with the complete 5,007,304-byte stream accepted, 300 decoded pictures, 300 displayed and 299 swaps across 599,116,647 cycles or 9.985277 seconds, top-field-first, sequence end seen, presentation complete, quiet reason one and every error clear. Against that, the burst shows the first field carrying no picture at all. Fourteen distinct live frames each place the moving bar on odd rows only, and the even rows sit at background level 24, which is the pre-playback screen rather than the fixture's level 19; a sweep found zero even-row pixels above background anywhere outside the reference rows and the telemetry overlay. Only the terminal frame shows both parities agreeing at the authored weave. The framebuffer therefore requests every first-field row, on the correct lines, in the correct field phase, and receives pre-playback content: the addresses are right and what they resolve to is wrong. Evidence is `.ai/current_results/entry517_stale_first_field_live.png` at 10,031 bytes with SHA-256 `a6ff293687eca203b3660e4881ffb0884e04676975aaeaab8633a090fcee566c` and `.ai/current_results/entry517_field_readout_counters.png` at 12,262 bytes with SHA-256 `bb02eca2ea6ce2364146f48a13c83ca14c487d579fec586abba117963d1a91d0`. A static read of the address path identifies the mechanism this evidence points at without proving it. The framebuffer emits a plain row address and the top level adds `mpeg2_new_display_frame_offset` combinationally at the instant each fetch is issued, selecting between five distinct DDR regions for bank zero, bank one, bank two and the two scratch areas. The framebuffer has no knowledge of which region its correct row lands in, and a native frame readout is uniquely exposed because its 480-entry sequence spans two vertical periods and can therefore straddle a display-bank swap, leaving the two fields resolved into different regions while every framebuffer counter still reads perfectly. No existing signal records which region a fetch resolved into, so this is invisible to all present telemetry. Commit `3e91073` passes its objective: the instrumentation was built to decide this question and it decided it against the standing hypothesis.
-
-#### Next Steps:
-
-Instrument the region a fetch actually resolves into, keeping every new observation inside the decoder clock domain so that none of it competes with the framework scaler for video-domain placement, which is what cost three rebuilds in the previous cycle. The display bank, display scratch and scratch bank levels already live on that clock, as do the two per-parity fetch toggles the framebuffer exports, so the top level can latch the region in effect on each first-field and each second-field fetch edge and compare them per generation. Retire the per-parity displayed-line counters, which have now demonstrably served their purpose by reading two hundred forty against two hundred forty with zero imbalance while the field carried no picture at all, and reuse their bits for the two observed regions and a count of generations whose two parities resolved differently. Publish this as schema twelve at the same forty-three words so the snapshot does not grow, update the telemetry decoder and its layout test for both schema twelve and the existing schema eleven and ten, extend the profiler regression with a directed case where the two parities disagree, then clean-build with focused timing and confirm by netlist probe that every new register survives and no timing exception is left unmatched before installing rollback-safe. Two differing regions localize the defect to the banked address path and justify a bounded correction there, while identical regions in every generation clear that path and move the investigation to whatever populates the first field's rows.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
