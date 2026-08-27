@@ -1,0 +1,29 @@
+{
+  "source_commit": "be8502bf579725a278f7d98b9a99487fb6c11f87",
+  "source_publication": "Published from Pi; build PC pulled exact source; both files match prepublication tested candidate.",
+  "main_mister_commit": "0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f",
+  "source_sha256": {
+    "host/main_mister/0001-mediaplayer-arm-loader.patch": "61d078fc1d45d1c39911bf7f147c8c4ccccde0fbbcb0cbc561a255c2f20fedab",
+    "tools/streams/test_main_mister_profile.py": "752e100f38aedfe88772bfbf12b1fc86884c2f6b50b3ad58dd7d5ce3ed3e9ccc"
+  },
+  "started": "2026-08-27T02:13:16-07:00",
+  "build_directory": "/home/vash/mister-builds/entry586/Main_MiSTer",
+  "deployment": false,
+  "compiler_version": "arm-none-linux-gnueabihf-gcc (GNU Toolchain for the A-profile Architecture 10.2-2020.11 (arm-10.16)) 10.2.1 20201103",
+  "generated_objects_before": 0,
+  "tests": "40 native transport cases plus loader scenarios pass with ASan/UBSan; 168 narrow and 168 wide extracted-RTL cases each exercise upstream and bulk, all pass. RTL runs are not sanitizer-instrumented.",
+  "build_exit_code": 0,
+  "elapsed_seconds": 4.165642875974299,
+  "build_log_sha256": "dc49fcce2ab7694b0f19619165bf0a2c7a3464fc9566bf5a15c3cb258e1ca005",
+  "compiler_warning_lines": [],
+  "compiler_error_lines": [],
+  "binary": {
+    "path": "/home/vash/mister-builds/entry586/Main_MiSTer/bin/MiSTer",
+    "bytes": 1166244,
+    "sha256": "da213d6bd9cc89a9af736a0bb029f9ebadd6e6a62382728ae1bacc07a381f909",
+    "file": "/home/vash/mister-builds/entry586/Main_MiSTer/bin/MiSTer: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-armhf.so.3, for GNU/Linux 3.2.0, stripped"
+  },
+  "runtime_marker_present": true,
+  "upstream_changes": "M fpga_io.cpp\n M fpga_io.h\n M menu.cpp\n M user_io.cpp\n M user_io.h\n?? support/mediaplayer/",
+  "finished": "2026-08-27T02:13:33-07:00"
+}
