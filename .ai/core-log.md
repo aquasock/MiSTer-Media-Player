@@ -1,3 +1,32 @@
+## 579 COMMIT Unreleased ??? 2026-08-27T01:01:12-07:00
+
+#### Coming From:
+
+Unreleased deced5c
+
+#### Purpose:
+
+Raise the bytes moved per poll in `mediaplayer_poll()` by enlarging the read buffer from 4,096 to 16,384 bytes so the measured delivery ceiling rises above the rate a high-bitrate stream demands.
+
+#### Outcome:
+
+This entry is the approved plan and its commit does not yet exist. Entries 577 and 578 established by three independent measurements that delivery is capped at four chunks of 4,096 bytes per poll at an implied 86.2 to 86.7 polls per second, matching measured throughput to about a hundredth of a percent each time, and that the cap binds because the helper always has data ready and the parent never sees EAGAIN during steady delivery. The change enlarges the buffer to 16,384 bytes while leaving the chunk count at four, which raises the arithmetic ceiling from about 1.42 to about 5.7 megabytes per second and moves the same bytes in a quarter as many read and transmit calls. Two checks were made before proposing it. `user_io_file_tx_data` performs no internal chunking, consisting only of `EnableFpga`, a command byte, `spi_write` and `DisableFpga`, so larger blocks are accepted and the per-call FPGA framing is amortised rather than repeated. The main loop in `main.cpp` is free-running with no sleep, calling `user_io_poll`, `frame_timer`, `input_poll`, `HandleUI` and `OsdUpdate` in sequence, so the poll rate is set by how long that work takes rather than by a timer, and spending longer in `mediaplayer_poll` necessarily slows every other item. That is the principal risk and it is not eliminated by this change, only bounded and measured. The relevant cost is that `spi_write` is a word-at-a-time loop calling `spi_w`, which resolves to `fpga_spi` and performs a read-back per sixteen-bit word, stalling on the HPS-to-FPGA bridge each time, so 4,096 bytes costs 2,048 bridge round trips and a full poll costs 8,192. Enlarging the buffer quadruples the bytes per poll but also quadruples that word-loop time, so the net gain depends on what fraction of the 11.5-millisecond poll period that loop currently occupies, which has not been measured. This makes the change a discriminating experiment as well as a correction: the instrumentation added in `deced5c` reports read counts and elapsed time, from which the poll rate is derived directly, so if the rate holds near 86 Hz the ceiling rises toward 5.7 megabytes per second, whereas if it collapses proportionally toward 22 Hz the word-loop dominates and the buffer size is not the operative constraint. In that second case the identified answer is already in hand and would be proposed separately: `spi_block_write` wraps `fpga_spi_fast_block_write`, which issues two posted register writes per word with no read-back, and it is already used for bulk transfers by the IDE, x86, CDTV and Akiko paths, while `user_io_file_tx_data` alone still uses the slow read-back loop. That change is deliberately not made here because it alters the FPGA transfer path rather than a local buffer size. No FPGA rebuild is required and the qualified `2acabc5` bitstream with SHA-256 `fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347` is unaffected. Deployment replaces the host-side MiSTer main binary again, and both prior binaries are retained for restoration, the pre-instrumentation original and the `deced5c` instrumented build, under `/home/vash/mister-builds/entry573-deced5c/`.
+
+#### Next Steps:
+
+Build with MiSTer's official ARM GNU 10.2 toolchain, never the distribution cross-compiler, confirm the patch applies cleanly to pinned Main_MiSTer commit `0a8fb44`, and deploy host-side with the existing staged-upload, verify, rename and full-readback procedure. Validation is a single replay of `bbb_480i_tff_15s.m2v`, whose 2,330,798 bytes per second demand exceeded the old ceiling and produced 187 to 188 missed deadlines at about 18.2 frames per second across two runs. Read the helper log first and derive the poll rate from read count and elapsed span, then compare measured delivery against the new budget arithmetic of four chunks of 16,384 bytes at the observed rate. Success is delivery above the file's demand with the delivered frame rate rising toward 29.97 and the missed-deadline count collapsing; a poll rate that falls proportionally instead indicates the read-back word loop dominates and moves the boundary to `spi_block_write`. Also confirm on the qualified 15,150,646-byte file that the change has not disturbed the previously accepted behaviour, and watch for any user-visible loss of interface responsiveness, since a longer `mediaplayer_poll` delays `HandleUI`, `OsdUpdate` and `input_poll` in the same loop. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 578 COMMIT Unreleased deced5c 2026-08-27T00:56:47-07:00
 
 #### Coming From:
@@ -1185,35 +1214,5 @@ Copy the exact `00267dc` RBF from the designated GUNSMOKE checkout to the Raspbe
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 539 COMMIT Unreleased 1439bf3 2026-08-26T05:50:53-07:00
-
-#### Coming From:
-
-Unreleased 018093a
-
-#### Purpose:
-
-Prove that framebuffer publication preserves one current authored generation across both native field caches before changing RTL.
-
-#### Outcome:
-
-Commits `19b417d` and `1439bf3` extend only the existing native cache-refill test and runner with authored framebuffer generations `2a`, `2b` and `2c`, generation-dependent position-varying DDR bytes and assertions from publication through every displayed luma cache line. The initial use of `+SLOW` correctly reproduced that mode's intentional cache-bank-overlap fault and could not serve as a clean full-frame discriminator, so `1439bf3` leaves that established fault case unchanged and adds a separate 512-cycle delayed-but-valid service case. On the untouched framebuffer RTL, ordinary TFF, ordinary BFF and delayed TFF each publish all three generations exactly once, complete 240 first-field and 240 second-field lines per generation and report zero generation, tag, content, cache, accepted-write-versus-read or byte-position mismatch. The complete native timing runner passes exact field timing, 4:2:0 mapping, Bob and Weave control, pattern isolation, scheduler ownership and monotonic generation order, ordinary service, intentional overlap, late prefill, clean and injected fingerprint classifications, all three new publication sequences, the luma writer fingerprint, the current hardware-profiler layout and retained decoder layouts. This clears scheduler-selected generation through framebuffer publication and both native luma field caches, so no framebuffer or scheduler RTL change, Quartus build, RBF deployment, hardware diagnostic layout, menu, decoder or host change was made.
-
-#### Next Steps:
-
-Do not modify the presentation scheduler or framebuffer publication logic and do not run Quartus from this result. The next bounded simulation should extend the same cache-refill regression across chroma-cache selection, BT.601 conversion and the registered framebuffer RGB output, using generation- and position-dependent Y, Cb and Cr content under ordinary TFF, ordinary BFF and valid delayed service. A reproduced output mismatch should authorize only the responsible chroma address, byte-lane or RGB-valid pipeline correction; exact equality moves the remaining investigation to the existing final mux and processed-HDMI boundary without adding another hardware telemetry schema.
-
-#### Files Modified:
-
-- tools/streams/tb_native_480i_cache_refill.sv
-- tools/streams/run_native_480i_timing.sh
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
