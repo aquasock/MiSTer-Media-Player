@@ -2,7 +2,7 @@
 
 An experimental media-player core for [MiSTer FPGA](https://github.com/MiSTer-devel/Main_MiSTer), with a standards-driven MPEG-2 Video / ITU-T H.262 decoder implemented primarily in FPGA logic.
 
-> **Development status:** active, pre-release, developer-oriented. **v0.7.0 is the current released milestone.** Unreleased work adds a bounded 720x480 interlaced frame-DCT all-I path and native 480i presentation while retaining the v0.7.0 Program Stream, audio, PTS, and ARM-helper foundation.
+> **Development status:** active, pre-release, developer-oriented. **v0.7.0 is the current released milestone.** Unreleased work adds a bounded 720x480 interlaced frame-DCT all-I path with native 480i presentation, AC-3 decode, and AC-3/DTS passthrough over S/PDIF, while retaining the v0.7.0 Program Stream, PTS, and ARM-helper foundation.
 
 ## Current status
 
@@ -19,19 +19,23 @@ The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`. v0.
 - continuous progressive 4:2:0 I/P/B decoding, retained DDR3 reference banks, separate B scratch storage, and coded-order/display-order presentation;
 - full 8-bit Y, Cb, and Cr reconstruction with limited-range BT.601 presentation;
 - clean Program Stream and raw-stream terminal handling, including reordered-picture flush and one explicit PCM end marker.
-- an unreleased 720x480 interlaced frame-picture, frame-DCT, all-I subset with preserved top- or bottom-field-first order and native 480i timing.
+- an unreleased 720x480 interlaced frame-picture, frame-DCT, all-I subset with preserved top- or bottom-field-first order and native 480i timing;
+- unreleased AC-3 decode to stereo, and AC-3 or DTS passthrough to S/PDIF as IEC 61937 bursts for an external decoder.
 
 The supported subset is intentionally bounded while the architecture is being proven. These are implementation limits, not limits of H.262 or H.222.0.
 
 | Area | Current implementation |
 | --- | --- |
 | Input | Raw MPEG-2 Video `.m2v`, or bounded MPEG-2 Program Stream `.mpg` / `.mpeg` through the ARM helper |
-| Video | Progressive 4:2:0 I/P/B through 720x480; unreleased bounded 720x480 interlaced frame-DCT all-I path |
-| Picture types | Continuous supported I/P/B decode and coded-order/display-order presentation |
+| Video, progressive | 4:2:0 I, P and B pictures through 720x480 |
+| Video, interlaced (unreleased) | 720x480 at 30000/1001 only, 4:2:0, **I-pictures only**, frame-structured, frame DCT and frame prediction only, top- or bottom-field-first, no `repeat_first_field` |
+| Picture types | Coded-order/display-order presentation with B reordering |
 | Presentation rates | H.262 frame-rate codes 1..5; codes 6..8 are rejected before transport |
 | Program Stream timing | Picture PTS on a 33-bit / 90 kHz FPGA timeline with cadence-floor enforcement |
 | Raw-stream timing | Synthetic 33-bit / 90 kHz cadence derived from H.262 frame-rate metadata |
-| Audio | MPEG Layer II decoded by the helper; 44.1 or 48 kHz; stereo hardware-qualified |
+| Audio | MPEG Layer II at 44.1 or 48 kHz, and AC-3 at 48 kHz, decoded by the helper to stereo. The AC-3 stereo downmix discards LFE, as the format specifies |
+| Audio passthrough (unreleased) | AC-3 and DTS carried to S/PDIF as IEC 61937 bursts for an external decoder. DTS is passthrough only; there is no DTS decoder |
+| Audio output (unreleased) | A menu option selects HDMI or S/PDIF. The unused output is muted, because both are fed from one stereo stream |
 | Audio buffering | Packed signed PCM records into an 8,192-frame stereo FPGA FIFO |
 | Frame storage | Two retained planar MiSTer DDR3 I/P banks plus a distinct B scratch region |
 | Video output | 800x600 progressive diagnostic output, or native 480i for supported interlaced input |
@@ -171,8 +175,13 @@ The build script pins the minimp3 revision, MiSTer Main revision, dependency has
 ## Known limitations
 
 - Program Stream support is bounded; MPEG Transport Stream, DVD/VOB navigation, private-stream audio, subpictures, and arbitrary systems-layer layouts are not supported.
-- Audio is MPEG Layer II only at 44.1 or 48 kHz. Other codecs and sample rates are rejected.
-- Progressive 4:2:0 video is released through 720x480. The unreleased interlaced path is deliberately limited to 720x480 4:2:0 frame pictures using frame DCT and all-I coding; field pictures and interlaced P/B pictures remain outside its envelope.
+- Decoded audio is MPEG Layer II at 44.1 or 48 kHz and AC-3 at 48 kHz. Other codecs and sample rates are rejected. Only the first audio track is played; track switching needs a control channel that protocol one does not implement.
+- AC-3 is downmixed to stereo for decoded output, which discards LFE by the format's own convention. Discrete surround requires passthrough and an external decoder.
+- Passthrough carries the bitstream untouched, so nothing may scale it. The audio output option therefore mutes the output it is not driving, and volume control does not apply to a passthrough stream.
+- Progressive 4:2:0 video is released through 720x480 and decodes I, P and B pictures. The unreleased interlaced path is far narrower: 720x480 at 30000/1001 only, I-pictures only, frame-structured, frame DCT and frame prediction only. Field pictures, field DCT, interlaced P and B pictures, `repeat_first_field` (3:2 pulldown), and 576i are all rejected before decode. Most commercial DVDs use several of these and will not play.
+- Playback pixel accuracy has never been qualified. Every pixel comparison in this project's history was performed in simulation; correctness of what actually reaches the screen rests on inspection.
+- Sharp colour transitions show one blended pixel column that an independent software decoder does not produce, consistent with horizontal chroma upsampling in the display path. It is obvious on synthetic colour bars and subtle on ordinary material, and it is not specific to any picture type.
+- On material whose peak coded picture is large enough, one or two display slots are missed at that picture, shown as a repeated frame rather than a dropped one. This is a property of input buffer depth against peak picture size, not of the stream; the qualified full-length fixture hits it once, at a scene cut.
 - H.262 frame-rate codes 6 through 8 (50, 59.94, and 60 fps) are rejected.
 - Seeking, scrubbing, pause/resume, DVD navigation, and optical-drive integration are not implemented.
 - Output offers two interlaced tiers. Normal processed HDMI sends native 480i timing into MiSTer's scaler and lets the `HDMI scaler deinterlacer` menu choose Weave or Bob. The external-processing tier preserves native 480i fields; truly unscaled HDMI additionally requires MiSTer's separate `direct_video` setting, which the core menu cannot enable.
@@ -199,6 +208,10 @@ its FIFO/host/DDR and field-window models are not a full HDMI hardware replay.
 
 Generated binary media remains local and is not included in the public release. The four release-gate Program Streams are reproducible through the committed generators and are identified by SHA-256 in the release notes.
 
+### Hand tests
+
+`tools/streams/generate_test_suite.py` builds seven short Program Streams meant to be watched and listened to rather than scored automatically. Each is chosen to make one failure mode obvious: a bar sweeping down the frame for interlaced top- and bottom-field-first order, scrolling bands that separate Weave from Bob, progressive all-I and progressive I/P/B, and AC-3 and DTS 5.1 channel sweeps that sound one channel at a time. The audio sweeps exercise discrete channels only in S/PDIF mode, where the listener's own decoder does the work; in HDMI mode they exercise the stereo downmix, in which LFE is absent by design.
+
 The USER LED is the top-level completion diagnostic. For successful v0.7.0 runs, USER and POWER remain solid while DISK may report its final progress code. Exact schema-nine telemetry and all three LEDs are captured for every release-gate run.
 
 ## Project layout
@@ -214,7 +227,7 @@ The USER LED is the top-level completion diagnostic. For successful v0.7.0 runs,
 
 ## Development roadmap
 
-Future work can extend the qualified envelope toward 50/59.94/60 fps, interlaced P/B and field-picture structures, broader Program Stream handling, additional audio codecs, improved chroma presentation, playback controls, seeking, DVD navigation, optical-drive integration, and qualification of native 480i through external HDMI-to-SDI hardware.
+Future work can extend the qualified envelope toward 50/59.94/60 fps, interlaced P/B and field-picture structures, field DCT, `repeat_first_field` and 576i, broader Program Stream handling, additional audio codecs and multi-track selection, qualification of playback pixel accuracy against a software decoder, improved chroma presentation, playback controls, seeking, DVD navigation, optical-drive integration, and qualification of native 480i through external HDMI-to-SDI hardware.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for completed milestones.
 
@@ -222,7 +235,9 @@ See [`CHANGELOG.md`](CHANGELOG.md) for completed milestones.
 
 Video syntax and decoding behavior are developed against **ITU-T H.262 / ISO/IEC 13818-2**. Program Stream, PES, and timing work uses **ITU-T H.222.0 / ISO/IEC 13818-1**. MPEG Layer II decode is performed by the pinned minimp3 dependency.
 
-Implementation constraints, qualification limits, and engineering diagnostics are implementation choices rather than MPEG standard requirements.
+AC-3 decode is performed by the pinned liba52 dependency, and IEC 61937 framing follows that standard for passthrough.
+
+Implementation constraints, qualification limits, and engineering diagnostics are implementation choices rather than MPEG standard requirements. In particular, the picture types and structures this core rejects are limits of this implementation, not of H.262.
 
 ## AI-assisted development
 

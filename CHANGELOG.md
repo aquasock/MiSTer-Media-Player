@@ -9,6 +9,13 @@ This project is still in active pre-release development. Published milestone rel
 - Added a bounded 720x480 4:2:0 interlaced all-I frame-picture path with frame DCT, consistent TFF/BFF preservation, and native 480i timing.
 - Added two explicit interlaced presentation tiers: MiSTer scaler processing with selectable Weave/Bob, and untouched native 480i for `direct_video`, external processing, and eventual HDMI-to-SDI conversion.
 - Removed a redundant 64-clock inverse-quantization block replay by streaming finalized coefficients directly into the idle IDCT, restoring full-D1 all-I throughput headroom for 29.97-fps material without changing decoded pixels.
+- Added AC-3 decode in the ARM helper through a pinned liba52 dependency, on DVD private stream 1 substreams `0x80`-`0x87`, downmixed to stereo using the stream's own coefficients. Verified against an independent decoder on both synthetic fixtures and a commercial DVD track, the latter confirming that dynamic range control is applied.
+- Added AC-3 and DTS passthrough to S/PDIF as IEC 61937 bursts, so an external decoder receives the original bitstream. Verified byte-identical on synthetic fixtures and a commercial DVD track. DTS is passthrough only; a DTS track selected for HDMI output is refused rather than played as silence.
+- Added an `Audio output` menu option selecting HDMI or S/PDIF, muting the output it does not drive, and forked the framework audio path so a passthrough burst reaches the S/PDIF pin unaltered and is announced as non-PCM.
+- Added a set of seven hand-test Program Streams covering interlaced TFF and BFF field order, Bob versus Weave deinterlacing, progressive all-I and progressive I/P/B, and AC-3 and DTS 5.1 channel sweeps.
+- Confirmed on hardware that the progressive path decodes I, P and B pictures, correcting an earlier description of the decoder as accepting I-pictures only; that restriction applies to the interlaced 480i path.
+- Reduced Main's media-transfer event-loop occupancy, which had reached about 160 ms per poll on low-bitrate material and made the menu sluggish; measured maximum poll time fell by roughly seventeen times and the acknowledged-write fallback disappeared.
+- Known limitation recorded: sharp colour transitions show one blended pixel column that an independent software decoder does not produce, and playback pixel accuracy remains unqualified.
 
 ## [0.7.0] - 2026-08-24 — Program Stream audio and PTS milestone
 
