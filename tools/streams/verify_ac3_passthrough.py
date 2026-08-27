@@ -26,33 +26,53 @@ from generate_test_dvd_ac3_av import extract_ac3
 
 PA = 0xF872
 PB = 0x4E1F
-DATA_TYPE_AC3 = 1
-SAMPLES_PER_PERIOD = 1536
-PERIOD_BYTES = SAMPLES_PER_PERIOD * 2 * 2
 HEADER_WORDS = 4
 
+# data type -> (burst period in samples, elementary sync word)
+BURSTS = {
+    1:  (1536, b'\x0b\x77'),   # AC-3
+    11: (512,  b'\x7f\xfe\x80\x01'),   # DTS type I
+    12: (1024, b'\x7f\xfe\x80\x01'),   # DTS type II
+    13: (2048, b'\x7f\xfe\x80\x01'),   # DTS type III
+}
 
-def parse_bursts(raw: bytes) -> tuple[list[dict], bytes, list[str]]:
+
+def parse_bursts(raw: bytes, expect_type: int) -> tuple[list[dict], bytes, list[str]]:
+    """Walk the stream one burst period at a time.
+
+    The period is not fixed: AC-3 always uses 1536 samples, but DTS chooses
+    512, 1024 or 2048 and announces which through its data type, so the period
+    is taken from the data type of each burst rather than assumed.
+    """
     problems: list[str] = []
     frames = bytearray()
     bursts: list[dict] = []
-    if len(raw) % PERIOD_BYTES:
-        problems.append(f'stream is {len(raw)} bytes, not a whole number of '
-                        f'{PERIOD_BYTES}-byte burst periods')
-    for index in range(len(raw) // PERIOD_BYTES):
-        block = raw[index * PERIOD_BYTES:(index + 1) * PERIOD_BYTES]
-        pa, pb, pc, pd = struct.unpack('<4H', block[:8])
+    index = 0
+    offset = 0
+    while offset + HEADER_WORDS * 2 <= len(raw):
+        pa, pb, pc, pd = struct.unpack('<4H', raw[offset:offset + 8])
         if pa != PA or pb != PB:
             problems.append(f'burst {index}: sync words {pa:#06x} {pb:#06x}')
-            continue
+            break
         data_type = pc & 0x1F
-        if data_type != DATA_TYPE_AC3:
-            problems.append(f'burst {index}: data type {data_type}, expected {DATA_TYPE_AC3}')
+        if data_type not in BURSTS:
+            problems.append(f'burst {index}: unknown data type {data_type}')
+            break
+        if data_type != expect_type:
+            problems.append(f'burst {index}: data type {data_type}, expected {expect_type}')
+        samples, sync = BURSTS[data_type]
+        period_bytes = samples * 2 * 2
+        if offset + period_bytes > len(raw):
+            problems.append(f'burst {index}: truncated period')
+            break
+        block = raw[offset:offset + period_bytes]
+        offset += period_bytes
         if pd % 8:
             problems.append(f'burst {index}: length {pd} bits is not whole bytes')
         length = pd // 8
-        if length <= 0 or HEADER_WORDS * 2 + length > PERIOD_BYTES:
+        if length <= 0 or HEADER_WORDS * 2 + length > period_bytes:
             problems.append(f'burst {index}: payload length {length} does not fit')
+            index += 1
             continue
         payload = block[HEADER_WORDS * 2:HEADER_WORDS * 2 + length]
         # Payload words are big-endian on the wire; undo the 16-bit swap.
@@ -61,14 +81,16 @@ def parse_bursts(raw: bytes) -> tuple[list[dict], bytes, list[str]]:
         swapped[1::2] = payload[0::2]
         if len(payload) & 1:
             swapped[-1] = payload[-1]
-        if swapped[:2] != b'\x0b\x77':
-            problems.append(f'burst {index}: payload is not an AC-3 sync frame')
+        if swapped[:len(sync)] != sync:
+            problems.append(f'burst {index}: payload does not start with the '
+                            f'expected sync word')
         stuffing = block[HEADER_WORDS * 2 + length:]
         if any(stuffing):
             problems.append(f'burst {index}: stuffing is not zero')
         frames += swapped
         bursts.append({'index': index, 'data_type': data_type,
-                       'length_bytes': length})
+                       'length_bytes': length, 'period_samples': samples})
+        index += 1
     return bursts, bytes(frames), problems
 
 
@@ -77,6 +99,9 @@ def main() -> int:
     parser.add_argument('--helper', required=True, type=Path)
     parser.add_argument('--fixture', required=True, type=Path)
     parser.add_argument('--substream', type=lambda v: int(v, 0), default=0x80)
+    parser.add_argument('--codec', choices=('ac3', 'dts'), default='ac3')
+    parser.add_argument('--data-type', type=int, default=None,
+                        help='expected IEC 61937 data type; defaults by codec')
     parser.add_argument('--report', type=Path, default=None)
     args = parser.parse_args()
 
@@ -92,7 +117,10 @@ def main() -> int:
             print(result.stderr[-4000:])
             raise SystemExit('helper failed in passthrough mode')
         raw = burst_pcm.read_bytes()
-        bursts, carried, problems = parse_bursts(raw)
+        expect = args.data_type
+        if expect is None:
+            expect = 11 if args.codec == 'dts' else 1
+        bursts, carried, problems = parse_bursts(raw, expect)
         source_frames = extract_ac3(args.fixture.read_bytes(), args.substream)
         identical = carried == source_frames
         if not identical:
@@ -102,20 +130,19 @@ def main() -> int:
         # the source frames: same decoder, so this is exact when bytes match.
         decoded = {}
         for name, payload in (('carried', carried), ('source', source_frames)):
-            es = temp / f'{name}.ac3'
+            es = temp / f'{name}.{args.codec}'
             es.write_bytes(payload)
             out = temp / f'{name}.s16le'
             subprocess.run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-xerror',
-                            '-f', 'ac3', '-i', str(es), '-ac', '2', '-ar', '48000',
+                            '-f', args.codec, '-i', str(es), '-ac', '2', '-ar', '48000',
                             '-f', 's16le', str(out)], check=True)
             decoded[name] = hashlib.sha256(out.read_bytes()).hexdigest()
 
         report = {
             'fixture': str(args.fixture), 'helper': str(args.helper),
-            'stream_bytes': len(raw), 'burst_periods': len(raw) // PERIOD_BYTES,
-            'bursts_parsed': len(bursts),
-            'burst_period_bytes': PERIOD_BYTES,
-            'samples_per_period': SAMPLES_PER_PERIOD,
+            'codec': args.codec, 'expected_data_type': expect,
+            'stream_bytes': len(raw), 'bursts_parsed': len(bursts),
+            'period_samples_seen': sorted({b['period_samples'] for b in bursts}),
             'frame_lengths_seen': sorted({b['length_bytes'] for b in bursts}),
             'carried_bytes': len(carried), 'source_bytes': len(source_frames),
             'frames_byte_identical': identical,

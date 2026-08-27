@@ -30,8 +30,14 @@ from generate_test_dvd_av_soak import replace_video_payloads, verify_packs, dige
 
 VIDEO_RATE = 9_600_000
 AUDIO_RATE = 448_000          # DVD's usual 5.1 AC-3 rate
+DTS_RATE = 1_509_000          # DVD's usual 5.1 DTS rate
+# DTS costs over a megabit more than AC-3, so the video rate has to come down
+# to keep the whole programme inside the same 10.08 Mbit/s DVD mux, which is
+# what real DTS discs do rather than raising the mux.
+DTS_VIDEO_RATE = 8_000_000
 MUX_RATE = 10_080_000
 AC3_SUBSTREAM = 0x80
+DTS_SUBSTREAM = 0x88
 
 # One tone per channel, in FFmpeg's native AC-3 channel order.
 TONES = ((220, 'FL'), (277, 'FR'), (330, 'FC'), (55, 'LFE'), (440, 'BL'), (554, 'BR'))
@@ -124,12 +130,16 @@ def main() -> int:
     parser.add_argument('--report', type=Path, default=None)
     parser.add_argument('--sweep', action='store_true',
                         help='sound each channel alone in turn instead of all at once')
+    parser.add_argument('--codec', choices=('ac3', 'dts'), default='ac3',
+                        help='DTS is passthrough only; the helper has no DTS decoder')
     args = parser.parse_args()
     duration = args.duration
     dvd.require(0.5 <= duration <= 600, 'invalid duration')
     output = args.output
     output.parent.mkdir(parents=True, exist_ok=True)
     commands: list[list[str]] = []
+
+    video_rate = DTS_VIDEO_RATE if args.codec == 'dts' else VIDEO_RATE
 
     def run(command: list[str]) -> None:
         commands.append(command)
@@ -147,10 +157,13 @@ def main() -> int:
              '-vf', 'tinterlace=mode=interleave_top,setsar=32/27',
              '-c:v', 'mpeg2video', '-pix_fmt', 'yuv420p', '-threads', '1',
              '-flags', '+bitexact', '-g', '1', '-bf', '0',
-             '-b:v', str(VIDEO_RATE), '-minrate:v', str(VIDEO_RATE),
-             '-maxrate:v', str(VIDEO_RATE), '-bufsize:v', str(dvd.BUFFER_BITS),
+             '-b:v', str(video_rate), '-minrate:v', str(video_rate),
+             '-maxrate:v', str(video_rate), '-bufsize:v', str(dvd.BUFFER_BITS),
              '-qmin', '1', '-qmax', '31', '-sc_threshold', '1000000000',
-             '-c:a', 'ac3', '-ar', '48000', '-ac', '6', '-b:a', str(AUDIO_RATE),
+             *(('-c:a', 'dca', '-strict', '-2', '-ar', '48000', '-ac', '6',
+                '-b:a', str(DTS_RATE))
+               if args.codec == 'dts' else
+               ('-c:a', 'ac3', '-ar', '48000', '-ac', '6', '-b:a', str(AUDIO_RATE))),
              '-muxrate', str(MUX_RATE), '-packetsize', '2048', '-f', 'vob', str(program)])
         finalize_program_stream(program)
         data, audio, ids = compatibility.demux_program_stream(program.read_bytes())
@@ -169,11 +182,13 @@ def main() -> int:
 
         # Independent reference decode of the muxed program, downmixed to stereo.
         elementary = temp / 'audio.ac3'
-        elementary.write_bytes(extract_ac3(program.read_bytes(), AC3_SUBSTREAM))
-        dvd.require(elementary.stat().st_size > 0, 'no AC-3 substream payload found')
+        substream = DTS_SUBSTREAM if args.codec == 'dts' else AC3_SUBSTREAM
+        elementary.write_bytes(extract_ac3(program.read_bytes(), substream))
+        dvd.require(elementary.stat().st_size > 0,
+                    f'no {args.codec} substream payload found')
         reference = temp / 'reference.s16le'
         run(['ffmpeg', '-hide_banner', '-loglevel', 'error', '-xerror',
-             '-f', 'ac3', '-i', str(elementary),
+             '-f', args.codec, '-i', str(elementary),
              '-ac', '2', '-ar', '48000', '-f', 's16le', str(reference)])
         dvd.require(reference.stat().st_size % 4 == 0, 'reference PCM is not stereo s16le')
         reference_frames = reference.stat().st_size // 4
@@ -182,7 +197,7 @@ def main() -> int:
         probe = json.loads(subprocess.check_output(
             ['ffprobe', '-hide_banner', '-loglevel', 'error', '-show_streams',
              '-select_streams', 'a:0', '-of', 'json', str(program)], text=True))['streams'][0]
-        dvd.require(probe['codec_name'] == 'ac3' and int(probe['sample_rate']) == 48000
+        dvd.require(probe['codec_name'] == args.codec and int(probe['sample_rate']) == 48000
                     and int(probe['channels']) == 6,
                     f'unexpected audio stream: {probe.get("codec_name")}')
         packs = verify_packs(program, stream_ids=(0xBB, 0xBE, 0xBF, 0xE0, 0xBD))
@@ -193,8 +208,9 @@ def main() -> int:
                   'video_sha256': digest(patched), 'decoded_yuv420p_sha256': pixels,
                   'audio_codec': probe['codec_name'], 'audio_channels': int(probe['channels']),
                   'audio_sample_rate': int(probe['sample_rate']),
-                  'audio_bits_per_second': AUDIO_RATE,
-                  'audio_private_substream': AC3_SUBSTREAM,
+                  'audio_bits_per_second': DTS_RATE if args.codec == 'dts' else AUDIO_RATE,
+                  'video_bits_per_second': video_rate,
+                  'audio_private_substream': substream,
                   'channel_tones_hz': {name: hz for hz, name in TONES},
                   'channel_mode': 'sweep' if args.sweep else 'simultaneous',
                   'sweep_slot_seconds': (duration / len(TONES)) if args.sweep else None,

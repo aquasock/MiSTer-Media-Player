@@ -55,11 +55,16 @@ share a compilation unit:
    seen and the other is ignored for the rest of the session; only the first
    AC-3 substream is played, because track switching needs the versioned
    control channel protocol one omits. AC-3 is downmixed to stereo by liba52
-   using the stream's own coefficients. DVD LPCM is still later.
+   using the stream's own coefficients. DTS on substreams 0x88-0x8F is
+   passthrough only, since no DTS decoder is present; a DTS track selected for
+   HDMI output is refused rather than played as silence. DVD LPCM is still
+   later.
 5. Audio output: `--audio-out hdmi` (default) emits that decoded stereo.
    `--audio-out spdif` bypasses the decode stage for AC-3 and emits IEC 61937
-   bursts instead, one per 1536-sample burst period, carried unchanged on the
-   existing PCM transport. The selection is made at launch because the decoder
+   bursts instead, carried unchanged on the existing PCM transport. AC-3 uses
+   a fixed 1536-sample burst period; DTS carries its own sample count and uses
+   512, 1024 or 2048 with the matching data type, so the period is read from
+   the frame rather than assumed. The selection is made at launch because the decoder
    runs here, so only this process can choose what to emit; MPEG Layer II is
    unaffected and still emits decoded stereo in either mode. A burst is only
    audible as surround if nothing downstream scales it: any gain, mix or filter

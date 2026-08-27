@@ -93,8 +93,25 @@
 #define IEC61937_PA 0xF872u
 #define IEC61937_PB 0x4E1Fu
 #define IEC61937_DATA_TYPE_AC3 0x0001u
-#define IEC61937_BURST_BYTES (AC3_SAMPLES_PER_FRAME * 2 * 2)
 #define IEC61937_HEADER_WORDS 4
+
+/*
+ * DTS also arrives on private stream 1, on substreams 0x88 to 0x8F. Its frame
+ * carries its own sample count, and IEC 61937 gives each count its own data
+ * type: 512 samples is type 11, 1024 is type 12 and 2048 is type 13. The burst
+ * period is that sample count, so unlike AC-3 the period is not fixed.
+ *
+ * There is no DTS decoder here, so DTS is passthrough only. A DTS track
+ * selected for HDMI output is refused rather than played as silence.
+ */
+#define DTS_SUBSTREAM_FIRST 0x88u
+#define DTS_SUBSTREAM_LAST  0x8Fu
+#define DTS_HEADER_BYTES 8
+#define DTS_MAX_SAMPLES_PER_FRAME 2048
+#define IEC61937_DATA_TYPE_DTS1 0x000Bu
+#define IEC61937_DATA_TYPE_DTS2 0x000Cu
+#define IEC61937_DATA_TYPE_DTS3 0x000Du
+#define IEC61937_MAX_BURST_SAMPLES DTS_MAX_SAMPLES_PER_FRAME
 
 struct video_chunk {
     struct video_chunk *next;
@@ -196,7 +213,8 @@ static void pts_scan_payload(struct output_state *output, const uint8_t *data,
 enum audio_codec {
     AUDIO_CODEC_NONE = 0,
     AUDIO_CODEC_MP2,
-    AUDIO_CODEC_AC3
+    AUDIO_CODEC_AC3,
+    AUDIO_CODEC_DTS
 };
 
 /*
@@ -212,6 +230,7 @@ enum audio_output {
 struct audio_state {
     enum audio_codec codec;
     enum audio_output output;
+    int dts_substream;
     mp3dec_t decoder;
     a52_state_t *a52;
     int a52_substream;
@@ -748,24 +767,27 @@ static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
  * zero stuffed. Nothing may scale these samples afterwards: any gain, mix or
  * filter turns the burst into noise for the receiver.
  */
-static int emit_ac3_burst(struct output_state *output,
-                          const uint8_t *frame, int length)
+static int emit_burst(struct output_state *output, const uint8_t *frame,
+                      int length, unsigned data_type, int samples_per_period,
+                      const char *what)
 {
-    mp3d_sample_t burst[AC3_SAMPLES_PER_FRAME * 2];
+    mp3d_sample_t burst[IEC61937_MAX_BURST_SAMPLES * 2];
+    size_t period_bytes = (size_t)samples_per_period * 2u * 2u;
     int words = length / 2;
     int i;
 
-    if (length <= 0 ||
-        (size_t)length + IEC61937_HEADER_WORDS * 2u > IEC61937_BURST_BYTES) {
+    if (length <= 0 || samples_per_period <= 0 ||
+        samples_per_period > IEC61937_MAX_BURST_SAMPLES ||
+        (size_t)length + IEC61937_HEADER_WORDS * 2u > period_bytes) {
         fprintf(stderr,
-                "media_player_helper: AC-3 frame of %d bytes does not fit a "
-                "burst period\n", length);
+                "media_player_helper: %s frame of %d bytes does not fit a "
+                "%d-sample burst period\n", what, length, samples_per_period);
         return -1;
     }
-    memset(burst, 0, sizeof(burst));
+    memset(burst, 0, period_bytes);
     burst[0] = (mp3d_sample_t)(int16_t)IEC61937_PA;
     burst[1] = (mp3d_sample_t)(int16_t)IEC61937_PB;
-    burst[2] = (mp3d_sample_t)(int16_t)IEC61937_DATA_TYPE_AC3;
+    burst[2] = (mp3d_sample_t)(int16_t)data_type;
     burst[3] = (mp3d_sample_t)(int16_t)(unsigned)(length * 8);
     for (i = 0; i < words; ++i)
         burst[IEC61937_HEADER_WORDS + i] =
@@ -774,8 +796,85 @@ static int emit_ac3_burst(struct output_state *output,
     if (length & 1)
         burst[IEC61937_HEADER_WORDS + words] =
             (mp3d_sample_t)(int16_t)(uint16_t)(frame[length - 1] << 8);
-    return write_pcm(output, burst, AC3_SAMPLES_PER_FRAME, 2,
+    return write_pcm(output, burst, samples_per_period, 2,
                      (int)PCM_SAMPLE_RATE);
+}
+
+static int emit_ac3_burst(struct output_state *output,
+                          const uint8_t *frame, int length)
+{
+    return emit_burst(output, frame, length, IEC61937_DATA_TYPE_AC3,
+                      AC3_SAMPLES_PER_FRAME, "AC-3");
+}
+
+/*
+ * Read a 16-bit big-endian DTS core header. FSIZE and NBLKS give the frame's
+ * own length and sample count, which together choose the burst period and its
+ * IEC 61937 data type. Other bit widths and endiannesses exist and are refused
+ * rather than guessed at.
+ */
+static int dts_frame_info(const uint8_t *data, size_t available,
+                          int *length, int *samples, unsigned *data_type)
+{
+    unsigned nblks, fsize;
+
+    if (available < DTS_HEADER_BYTES) return 0;
+    if (!(data[0] == 0x7F && data[1] == 0xFE &&
+          data[2] == 0x80 && data[3] == 0x01))
+        return -1;
+    nblks = ((unsigned)(data[4] & 0x01u) << 6) | (unsigned)(data[5] >> 2);
+    fsize = ((unsigned)(data[5] & 0x03u) << 12) |
+            ((unsigned)data[6] << 4) | (unsigned)(data[7] >> 4);
+    *samples = (int)(nblks + 1u) * 32;
+    *length = (int)fsize + 1;
+    switch (*samples) {
+    case 512:  *data_type = IEC61937_DATA_TYPE_DTS1; break;
+    case 1024: *data_type = IEC61937_DATA_TYPE_DTS2; break;
+    case 2048: *data_type = IEC61937_DATA_TYPE_DTS3; break;
+    default:
+        fprintf(stderr,
+                "media_player_helper: unsupported DTS frame of %d samples\n",
+                *samples);
+        return -1;
+    }
+    return 1;
+}
+
+static int decode_dts_buffer(struct audio_state *audio,
+                             struct output_state *output, int at_eof)
+{
+    size_t original_size = audio->size;
+    size_t offset = 0;
+
+    while (original_size - offset >= DTS_HEADER_BYTES) {
+        int length = 0, samples = 0, ready;
+        unsigned data_type = 0;
+
+        ready = dts_frame_info(audio->data + offset, original_size - offset,
+                               &length, &samples, &data_type);
+        if (ready < 0) {
+            /* Not a frame header here; resynchronize a byte at a time. */
+            offset++;
+            continue;
+        }
+        if (!ready) break;
+        if ((size_t)length > original_size - offset) break;
+        if (emit_burst(output, audio->data + offset, length, data_type,
+                       samples, "DTS") < 0)
+            return -1;
+        offset += (size_t)length;
+    }
+    if (offset) {
+        memmove(audio->data, audio->data + offset, audio->size - offset);
+        audio->size -= offset;
+    }
+    if (at_eof && audio->size >= DTS_HEADER_BYTES) {
+        fprintf(stderr,
+                "media_player_helper: truncated or undecodable DTS tail "
+                "(%zu bytes)\n", audio->size);
+        return -1;
+    }
+    return 0;
 }
 
 static int decode_ac3_buffer(struct audio_state *audio,
@@ -949,6 +1048,8 @@ static int decode_audio_buffer(struct audio_state *audio,
                                struct output_state *output, int at_eof)
 {
     switch (audio->codec) {
+    case AUDIO_CODEC_DTS:
+        return decode_dts_buffer(audio, output, at_eof);
     case AUDIO_CODEC_AC3:
         return decode_ac3_buffer(audio, output, at_eof);
     case AUDIO_CODEC_MP2:
@@ -1414,11 +1515,72 @@ static int process_private_pes(struct media_source *input,
         result = 0;
         goto done;
     }
-    if (payload_offset < length && packet[payload_offset] >= 0x88u &&
+    if (payload_offset + AC3_PRIVATE_HEADER <= length &&
+        packet[payload_offset] >= DTS_SUBSTREAM_FIRST &&
+        packet[payload_offset] <= DTS_SUBSTREAM_LAST) {
+        int substream = packet[payload_offset];
+        const uint8_t *payload = packet + payload_offset + AC3_PRIVATE_HEADER;
+        size_t size = length - payload_offset - AC3_PRIVATE_HEADER;
+        size_t first_frame;
+
+        if (audio->output != AUDIO_OUT_SPDIF) {
+            fprintf(stderr,
+                    "media_player_helper: DTS requires --audio-out spdif; "
+                    "there is no DTS decoder for HDMI output\n");
+            goto done;
+        }
+        if (!claim_audio_codec(audio, AUDIO_CODEC_DTS)) {
+            result = 0;
+            goto done;
+        }
+        if (audio->dts_substream < 0) {
+            audio->dts_substream = substream;
+            fprintf(stderr,
+                    "media_player_helper: DTS audio on private substream "
+                    "0x%02x\n", substream);
+        }
+        if (audio->dts_substream != substream) {
+            result = 0;
+            goto done;
+        }
+        if (output->silent_video_mode) {
+            fprintf(stderr,
+                    "media_player_helper: DTS audio begins beyond the bounded "
+                    "video lookahead\n");
+            goto done;
+        }
+        first_frame = ((size_t)packet[payload_offset + 2] << 8) |
+                      packet[payload_offset + 3];
+        if (!audio->a52_synced && first_frame) {
+            size_t skip = first_frame - 1;
+            if (skip >= size) {
+                result = 0;
+                goto done;
+            }
+            payload += skip;
+            size -= skip;
+            audio->a52_synced = 1;
+        } else if (!audio->a52_synced) {
+            result = 0;
+            goto done;
+        }
+        output->audio_pes_seen = 1;
+        if (has_pts && !output->have_audio_pts) {
+            output->first_audio_pts = pts;
+            output->have_audio_pts = 1;
+        }
+        if (append_audio(audio, output, payload, size) < 0 ||
+            (output->scheduler_enabled && scheduler_drain(output, 0) < 0))
+            goto done;
+        result = 0;
+        goto done;
+    }
+    if (payload_offset < length && packet[payload_offset] >= 0x90u &&
         packet[payload_offset] <= 0xafu) {
         fprintf(stderr,
                 "media_player_helper: unsupported Program Stream private "
-                "audio substream 0x%02x; MPEG Layer II or AC-3 is required\n",
+                "audio substream 0x%02x; MPEG Layer II, AC-3 or DTS is "
+                "required\n",
                 packet[payload_offset]);
         goto done;
     }
@@ -1616,6 +1778,15 @@ int main(int argc, char **argv)
     output.scheduler_started = !output.hold_active;
     mp3dec_init(&audio.decoder);
     audio.a52_substream = -1;
+    audio.dts_substream = -1;
+    /*
+     * Record the mode so a log proves on its own which path ran. Entry 619
+     * had to rely on a listening report for exactly this fact.
+     */
+    fprintf(stderr, "media_player_helper: audio output %s\n",
+            audio.output == AUDIO_OUT_SPDIF
+                ? "spdif (IEC 61937 passthrough for AC-3 and DTS)"
+                : "hdmi (decoded stereo PCM)");
     if (read_exact(&input, signature, sizeof(signature)) < 0 ||
         media_source_rewind(&input) < 0) {
         fprintf(stderr, "media_player_helper: input is too short\n");
