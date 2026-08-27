@@ -1,0 +1,29 @@
+{
+  "case": "opening",
+  "fixture": "opening",
+  "source_commit": "d466bed3031908b5f5ffa3360cf8a594d711a1cc",
+  "command": [
+    "/home/vash/mister-builds/entry604/integrated_obj/integrated",
+    "+HEX=/home/vash/mister-builds/entry604/opening.hex",
+    "+LEN=3946660",
+    "+PICTURES=100",
+    "+PTS_COUNT=100",
+    "+POSITIONS=/home/vash/mister-builds/entry604/opening_positions.hex",
+    "+TIMESTAMPS=/home/vash/mister-builds/entry604/opening_pts.hex",
+    "+REPORT=/home/vash/mister-builds/entry604/opening_events.csv",
+    "+METRICS=/home/vash/mister-builds/entry604/opening_metrics.csv",
+    "+CONTROL=0",
+    "+PHASE=301711",
+    "+FIRST_SWAP=0",
+    "+BUSY_PERIOD=0",
+    "+BUSY_LENGTH=0"
+  ],
+  "exit_code": 0,
+  "seconds": 124.9013542640023,
+  "completed": 100,
+  "presented": 100,
+  "expected": 100,
+  "missed_slots": [],
+  "capacity_blocked_cycles": 0,
+  "log_tail": "INTEGRATED_PROGRESS pictures=32 cycles=63070156\nINTEGRATED_PROGRESS pictures=64 cycles=126656380\nINTEGRATED_PROGRESS pictures=96 cycles=190476767\nINTEGRATED_PASS writer=1 phase=301711 displayed=100 gaps=0 elapsed_seconds=3.313794 words=6480000 stores=810000\n- /home/vash/mister-builds/entry604/tb_entry604_i_pts.sv:358: Verilog $finish\n- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01\n- Verilator: $finish at 2s; walltime 124.839 s; speed 16.061 ms/s\n- Verilator: cpu 124.837 s on 1 threads; alloced 281 MB\n"
+}

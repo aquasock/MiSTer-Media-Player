@@ -1,0 +1,32 @@
+{
+  "host": "10.10.0.30",
+  "prepared": "2026-08-27T05:46:58-07:00",
+  "source_commit": "d466bed3031908b5f5ffa3360cf8a594d711a1cc",
+  "backups": {
+    "MiSTer": {
+      "target": "/media/fat/MiSTer",
+      "stage": "/media/fat/MiSTer.new",
+      "local": "/tmp/entry604-deployment/MiSTer.pred466bed",
+      "bytes": 1170340,
+      "sha256": "3841e2cc6eef4bfc9e46a7ffa075aff76b65d5405f81efb1355373292b35846f",
+      "listing": [
+        "-rwxr-xr-x   1 root     root      1170340 Aug 27 10:06 /media/fat/MiSTer"
+      ]
+    },
+    "MediaPlayer.rbf": {
+      "target": "/media/fat/MediaPlayer.rbf",
+      "stage": "/media/fat/MediaPlayer.rbf.new",
+      "local": "/tmp/entry604-deployment/MediaPlayer.rbf.pred466bed",
+      "bytes": 4324340,
+      "sha256": "44606564ad40e3f9a74657fdd372a44fb6d0f74252e6d1000b2685768ca9cf01",
+      "listing": [
+        "-rwxr-xr-x   1 root     root      4324340 Aug 27 11:53 /media/fat/MediaPlayer.rbf"
+      ]
+    }
+  },
+  "operations": [
+    "Full readback and fsynced local backup of /media/fat/MiSTer",
+    "Full readback and fsynced local backup of /media/fat/MediaPlayer.rbf"
+  ],
+  "deployed": false
+}

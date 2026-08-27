@@ -1,0 +1,18 @@
+{
+  "source_commit": "d466bed3031908b5f5ffa3360cf8a594d711a1cc",
+  "all_expected_failures_observed": true,
+  "cases": [
+    {
+      "case": "old_scheduler",
+      "expected_failure": "timestamped secondary completion",
+      "returncode": 1,
+      "output": "FATAL: /run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_native_ordinary_overlap_ownership.sv:285: timestamped secondary completion lost ownership or raised error\n       Time: 206000  Scope: tb_native_ordinary_pts_ownership.prepare_secondary\n"
+    },
+    {
+      "case": "unsafe_timestamp_gate",
+      "expected_failure": "future PTS presented early",
+      "returncode": 1,
+      "output": "FATAL: /run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_native_ordinary_overlap_ownership.sv:297: future PTS presented early\n       Time: 30326000  Scope: tb_native_ordinary_pts_ownership\n"
+    }
+  ]
+}
