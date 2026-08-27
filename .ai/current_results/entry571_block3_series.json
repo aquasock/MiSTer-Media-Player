@@ -1,0 +1,272 @@
+{
+ "source_commit": "2acabc5457171f342a06f93b1edfb1c361748ce8",
+ "captured": "2026-08-27T00:18:27-07:00 onward",
+ "block": "block3",
+ "user_report": "User power-cycled at the wall, played five files, then continued replaying without rebooting.",
+ "power_cycle_verified": true,
+ "power_cycle_evidence": {
+  "detected_live": "the still-running block 2 poller logged 'mister unreachable (TimeoutError)' at 00:16:27 local - the FTP dropout absent from both previously claimed reboots",
+  "syslog_first_line": "Aug 27 07:16:20 MiSTer syslog.info syslogd started: BusyBox v1.33.1",
+  "syslogd_start_count_in_file": 1,
+  "previous_boot_utc": "06:56:52",
+  "new_boot_utc": "07:16:20",
+  "tmpfs_wiped": "/tmp/MediaPlayer_ARM.log absent after boot, confirming tmpfs and page cache cleared",
+  "corename_at_boot": "CORENAME and RBFNAME 4 bytes at 07:16 - menu core, MediaPlayer not yet loaded"
+ },
+ "capture_note": "a poller restart was required mid-block after an over-broad pkill pattern terminated it; run numbering continues unbroken and no session was lost, verified by a direct probe showing the screen still holding run 4 at the time",
+ "runs": [
+  {
+   "run": 1,
+   "checksum": 4113344598,
+   "gap_outlier_count": 2,
+   "deadline_gap_count": 2,
+   "delivered_fps": 29.69873907340935,
+   "accepted_bytes": 15150646,
+   "display_pictures": 449,
+   "display_swaps": 448,
+   "error_flags": 0,
+   "cadence_cycles": 905088931,
+   "cadence_excess_cycles": 8192931,
+   "presentation_hold_total_cycles": 27509701,
+   "gaps": [
+    {
+     "rank": 1,
+     "cycles": 6006000,
+     "ordinal": 6
+    },
+    {
+     "rank": 2,
+     "cycles": 4004000,
+     "ordinal": 5
+    },
+    {
+     "rank": 3,
+     "cycles": 2002000,
+     "ordinal": 3
+    }
+   ],
+   "deadline_records": [
+    {
+     "ordinal": 5,
+     "deadline_session_cycle": 12066520,
+     "accepted_bytes_at_deadline": 191088,
+     "input_starved_cycles": 599960,
+     "candidate_ready_delay_cycles": 147073,
+     "feed_bytes_per_s": 950173,
+     "feed_x_realtime": 0.941,
+     "decoder_ready": true,
+     "decoder_input_pending": false,
+     "upstream_fifo_pending": false,
+     "writer_busy": true,
+     "writer_capacity_blocked": false
+    },
+    {
+     "ordinal": 6,
+     "deadline_session_cycle": 16070520,
+     "accepted_bytes_at_deadline": 288276,
+     "input_starved_cycles": 1082732,
+     "candidate_ready_delay_cycles": 2088986,
+     "feed_bytes_per_s": 1076291,
+     "feed_x_realtime": 1.065,
+     "decoder_ready": true,
+     "decoder_input_pending": false,
+     "upstream_fifo_pending": false,
+     "writer_busy": false,
+     "writer_capacity_blocked": false
+    }
+   ]
+  },
+  {
+   "run": 2,
+   "checksum": 4222695340,
+   "gap_outlier_count": 0,
+   "deadline_gap_count": 0,
+   "delivered_fps": 29.86989676411396,
+   "accepted_bytes": 15150646,
+   "display_pictures": 449,
+   "display_swaps": 448,
+   "error_flags": 0,
+   "cadence_cycles": 899902675,
+   "cadence_excess_cycles": 3006675,
+   "presentation_hold_total_cycles": 26948135,
+   "gaps": [
+    {
+     "rank": 1,
+     "cycles": 2002000,
+     "ordinal": 3
+    },
+    {
+     "rank": 2,
+     "cycles": 2002000,
+     "ordinal": 4
+    },
+    {
+     "rank": 3,
+     "cycles": 2002000,
+     "ordinal": 5
+    }
+   ],
+   "deadline_records": []
+  },
+  {
+   "run": 3,
+   "checksum": 4222501390,
+   "gap_outlier_count": 0,
+   "deadline_gap_count": 0,
+   "delivered_fps": 29.869954120628346,
+   "accepted_bytes": 15150646,
+   "display_pictures": 449,
+   "display_swaps": 448,
+   "error_flags": 0,
+   "cadence_cycles": 899900947,
+   "cadence_excess_cycles": 3004947,
+   "presentation_hold_total_cycles": 27576219,
+   "gaps": [
+    {
+     "rank": 1,
+     "cycles": 2002000,
+     "ordinal": 3
+    },
+    {
+     "rank": 2,
+     "cycles": 2002000,
+     "ordinal": 4
+    },
+    {
+     "rank": 3,
+     "cycles": 2002000,
+     "ordinal": 5
+    }
+   ],
+   "deadline_records": []
+  },
+  {
+   "run": 4,
+   "checksum": 4222294121,
+   "gap_outlier_count": 0,
+   "deadline_gap_count": 0,
+   "delivered_fps": 29.866413499034905,
+   "accepted_bytes": 15150646,
+   "display_pictures": 449,
+   "display_swaps": 448,
+   "error_flags": 0,
+   "cadence_cycles": 900007629,
+   "cadence_excess_cycles": 3111629,
+   "presentation_hold_total_cycles": 27698755,
+   "gaps": [
+    {
+     "rank": 1,
+     "cycles": 2002000,
+     "ordinal": 3
+    },
+    {
+     "rank": 2,
+     "cycles": 2002000,
+     "ordinal": 4
+    },
+    {
+     "rank": 3,
+     "cycles": 2002000,
+     "ordinal": 5
+    }
+   ],
+   "deadline_records": []
+  },
+  {
+   "run": 5,
+   "checksum": 4220019879,
+   "gap_outlier_count": 0,
+   "deadline_gap_count": 0,
+   "delivered_fps": 29.881230911418363,
+   "accepted_bytes": 15150646,
+   "display_pictures": 449,
+   "display_swaps": 448,
+   "error_flags": 0,
+   "cadence_cycles": 899561336,
+   "cadence_excess_cycles": 2665336,
+   "presentation_hold_total_cycles": 26908692,
+   "gaps": [
+    {
+     "rank": 1,
+     "cycles": 2002000,
+     "ordinal": 3
+    },
+    {
+     "rank": 2,
+     "cycles": 2002000,
+     "ordinal": 4
+    },
+    {
+     "rank": 3,
+     "cycles": 2002000,
+     "ordinal": 5
+    }
+   ],
+   "deadline_records": []
+  },
+  {
+   "run": 6,
+   "checksum": 4222721231,
+   "gap_outlier_count": 0,
+   "deadline_gap_count": 0,
+   "delivered_fps": 29.87167186443203,
+   "accepted_bytes": 15150646,
+   "display_pictures": 449,
+   "display_swaps": 448,
+   "error_flags": 0,
+   "cadence_cycles": 899849199,
+   "cadence_excess_cycles": 2953199,
+   "presentation_hold_total_cycles": 26837438,
+   "gaps": [
+    {
+     "rank": 1,
+     "cycles": 2002000,
+     "ordinal": 3
+    },
+    {
+     "rank": 2,
+     "cycles": 2002000,
+     "ordinal": 4
+    },
+    {
+     "rank": 3,
+     "cycles": 2002000,
+     "ordinal": 5
+    }
+   ],
+   "deadline_records": []
+  }
+ ],
+ "delivery_mechanism": {
+  "location": "host/main_mister/0001-mediaplayer-arm-loader.patch, mediaplayer_poll()",
+  "code": "uint8_t buffer[4096]; while (chunks++ < 4) { read(helper_fd, buffer, sizeof(buffer)); ... }",
+  "bytes_per_poll": 16384,
+  "implied_poll_rate_hz": 84.96,
+  "measured_warm_ceiling_bytes_per_s": 1392000,
+  "measured_warm_ceiling_x_realtime": 1.38,
+  "stream_nominal_bytes_per_s": 1010157,
+  "binding_proof": "after startup the parent never receives EAGAIN; all 190 would-block events in the archived helper log carry submitted=0 and occur before the first byte is submitted. The read loop therefore always exits by exhausting its four-chunk budget rather than by running out of data, so the cap binds on every poll.",
+  "cross_check": "3,699 reads at four per poll is about 925 polls across a roughly 10.9 second delivery window for a 15.0 second stream - 85 polls per second, 1.38 times realtime, matching every warm measurement"
+ },
+ "findings": [
+  "The power cycle is verified by three independent signals: a live FTP dropout logged by the still-running block 2 poller, a new single syslogd start at 07:16:20 UTC replacing the 06:56:52 boot, and the disappearance of /tmp/MediaPlayer_ARM.log with the tmpfs wipe.",
+  "The verified cold run is the worst session on record: two missed deadlines rather than one, at ordinals 5 and 6, gaps of 4,004,000 and 6,006,000 cycles, total cadence excess 8,192,931 cycles or 136.5 ms.",
+  "The first miss moved earlier, to ordinal 5, which no previous session showed.",
+  "At the ordinal-5 deadline the upstream feed is 950,173 bytes per second - 0.94 times realtime, below the 1,010,157 bytes per second the stream requires. The decoder cannot keep up because the data is not arriving fast enough.",
+  "By the ordinal-6 deadline the feed has recovered to 1,076,291 bytes per second (1.07x), and by run 2 the session is clean.",
+  "Every run after the first is clean, so a single replay is enough to leave the failing region.",
+  "The delivery ceiling is structural and now located: mediaplayer_poll() reads at most four 4,096-byte chunks per poll, 16,384 bytes, which at the implied 85 polls per second yields exactly the 1.38 times realtime ceiling measured warm.",
+  "That cap is proven binding rather than incidental because the parent never receives EAGAIN after startup, so the loop always exits on its chunk budget and never on absence of data.",
+  "Writer and DDR remain clean in both cold deadline records: writer_capacity_blocked false, upstream_fifo_pending false."
+ ],
+ "scope_limitations": [
+  "The ARM helper log for the cold run was overwritten by subsequent runs before it could be captured, so it is not known whether cold delivery is limited by read latency inside the four-chunk budget or by EAGAIN against a slower helper. That single measurement discriminates the two and must be taken immediately after run 1 of the next cold block.",
+  "The implied 85 Hz poll rate is derived from throughput arithmetic, not measured directly from MiSTer main.",
+  "input_starved_cycles_since_previous_swap remains cumulative rather than contiguous.",
+  "Page-cache state is still not directly measured.",
+  "delivered_fps includes the startup hold in every run.",
+  "Runs after the first were played without rebooting and are warm samples only."
+ ],
+ "session_count": 6,
+ "run_provenance": "run 1 is the verified cold-after-power-cycle sample; runs 2 through 6 are warm replays with no reboot between them"
+}

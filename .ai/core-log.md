@@ -1,3 +1,32 @@
+## 571 COMMIT Unreleased 2acabc5 2026-08-27T00:23:26-07:00
+
+#### Coming From:
+
+Unreleased 2acabc5
+
+#### Purpose:
+
+Capture a verified cold-after-power-cycle block and identify the mechanism behind the delivery ceiling measured in entries 569 and 570.
+
+#### Outcome:
+
+The power cycle is verified by three independent signals rather than by recollection, which matters because the two previously reported reboots were not reboots. The still-running block 2 poller logged an FTP timeout at 00:16:27 local, exactly the dropout absent both earlier times; `/tmp/messages` restarted with a single syslogd entry at 07:16:20 UTC replacing the 06:56:52 boot; and `/tmp/MediaPlayer_ARM.log` disappeared with the tmpfs wipe, confirming the page cache was cleared. Six sessions were captured, the first genuinely cold and the remaining five warm replays with no reboot between them. The cold run is the worst session recorded to date and the first with more than one missed deadline. It reports two cadence outliers and two missed deadlines, at display picture ordinals five and six, with gaps of 4,004,000 and 6,006,000 cycles and a total cadence excess of 8,192,931 cycles, or 136.5 milliseconds. The first miss moved earlier to ordinal five, which no previous session showed. The decisive number is the feed rate at that ordinal-five deadline: 191,088 bytes had been delivered by 12,066,520 session cycles, which is 950,173 bytes per second, or 0.94 times realtime against the 1,010,157 bytes per second the stream requires. On a cold start the upstream feed is running below realtime, so the decoder cannot keep up because the data is not arriving fast enough, and the miss is a genuine delivery shortfall rather than a scheduler or writer fault. By the ordinal-six deadline the feed has recovered to 1,076,291 bytes per second, or 1.07 times realtime, and every run after the first is clean, so one replay is enough to leave the failing region. All six sessions still accept all 15,150,646 bytes and display 449 pictures with 448 swaps at zero error flags, and writer capacity blocked and upstream FIFO pending are false in both cold deadline records, so the writer and DDR path remain clean throughout. The delivery ceiling itself has now been located in source rather than inferred. `mediaplayer_poll()` in `host/main_mister/0001-mediaplayer-arm-loader.patch` reads into a 4,096-byte buffer under `while (chunks++ < 4)`, so it moves at most 16,384 bytes per poll. At the implied 85 polls per second that is 1,392,000 bytes per second, precisely the 1.38 times realtime ceiling measured warm in entries 566, 567 and 569. That cap is binding rather than incidental, and the archived helper log proves it: after startup the parent never receives EAGAIN, since all 190 would-block events carry a submitted count of zero and occur before the first byte is sent, so the read loop always exits by exhausting its four-chunk budget and never by running out of data. The cross-check agrees, with 3,699 reads at four per poll giving about 925 polls across a roughly 10.9 second delivery window for a 15.0 second stream. The delivery path therefore has about 38 percent headroom over realtime when warm and falls below realtime when cold, and that band is where the startup race is decided. One capture defect is recorded: an over-broad `pkill` pattern terminated the poller mid-block and had to be restarted, though a direct probe confirmed the screen still held run four at that moment and no session was lost. The single most important missing measurement is the helper log for a cold run, which was overwritten by the subsequent replays before it could be fetched; without it, it is not known whether cold delivery is limited by read latency inside the four-chunk budget or by EAGAIN against a slower helper, and those two point at different fixes. Evidence is `.ai/current_results/entry571_block3_run1` through `run6` and the consolidated `entry571_block3_series.json`.
+
+#### Next Steps:
+
+Take one more verified power cycle and fetch `/tmp/MediaPlayer_ARM.log` immediately after the first playback and before any replay, since that single file discriminates between a read-latency limit inside the four-chunk budget and an EAGAIN limit against a slower helper, and the two imply different corrections. Confirm the power cycle from `/tmp/messages` as was done here rather than from recollection. With that measurement in hand, propose a bounded delivery-side plan for user approval before touching source: if the budget is binding while cold, raising the per-poll chunk count or the buffer size in `mediaplayer_poll()` lifts the ceiling directly and is a small, contained change to the MiSTer main patch; if EAGAIN dominates while cold, the correction belongs in the helper's own read path or in readahead instead, and raising the poll budget would achieve nothing. Do not change the FPGA startup controller, which entries 569 and 571 together have now shown is not the operative boundary, and do not commit any source change until the plan is approved. Consider adding timestamps to the helper diagnostic log as part of whichever change is approved, since its present lack of timing is the main limit on the delivery evidence. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 570 COMMIT Unreleased 2acabc5 2026-08-27T00:14:52-07:00
 
 #### Coming From:
@@ -1185,51 +1214,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 531 COMMIT Unreleased 164c7e6 2026-08-26T02:39:38-07:00
-
-#### Coming From:
-
-Unreleased 5de0e1d
-
-#### Purpose:
-
-Maintain one consolidated current hardware diagnostic while distinguishing accepted luma framebuffer writes from the raw DDR data later returned for display.
-
-#### Outcome:
-
-Commit `164c7e6` implements the accepted-write-versus-raw-read diagnostic in the single current hardware layout, including position-sensitive fingerprints, physical-region and generation validity, first-mismatch evidence and directed clean, corrupted-data and invalid-provenance controls. The implementation changed seventeen source and regression files with 892 insertions and 60 deletions. Focused decoder, unit, native and reconstruction simulations passed, but the canonical seventy-two-picture live-raster run was interrupted before completion and no Quartus build or MiSTer deployment was performed. The active MiSTer image therefore remains the exact `5de0e1d` build. The user subsequently raised a valid scope concern because the passive diagnostic touched substantially more files than expected for the remaining visual defect, so this commit is recorded but parked pending a scope review rather than treated as authorization to build or deploy it.
-
-#### Next Steps:
-
-Do not build or deploy `164c7e6` until the new commercial-DVD-rate Bob and Weave evidence is recorded and the instrumentation scope is reviewed against the now clearer stale-frame symptom. Retain one current diagnostic layout and remove or defer any signal that does not directly distinguish accepted framebuffer content and generation ownership from later raw reads and displayed bank selection.
-
-#### Files Modified:
-
-- MediaPlayer_top_03.svh
-- MediaPlayer_top_04.svh
-- MediaPlayer_top_06.svh
-- MediaPlayer_top_07.svh
-- files.qip
-- rtl/mpeg2_luma_framebuffer.sv
-- rtl/mpeg2_new/mpeg2_h262_ddram_arbiter.sv
-- rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- rtl/mpeg2_new/mpeg2_h262_luma_write_fingerprint.sv
-- tools/streams/decode_hardware_cadence.py
-- tools/streams/run_native_480i_timing.sh
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-- tools/streams/tb_h262_luma_write_fingerprint.sv
-- tools/streams/tb_interlaced_420_cache_mapping.sv
-- tools/streams/tb_native_480i_cache_refill.sv
-- tools/streams/test_decode_hardware_cadence.py
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
