@@ -8,10 +8,11 @@ module mpeg2_h262_native_startup (
     input wire native_request, input wire [3:0] frame_rate_code,
     input wire first_picture_complete, input wire candidate_presentable,
     input wire sequence_end_seen, input wire bypass_event,
-    input wire frame_window,
+    input wire frame_window, input wire swap_window_active,
     output wire swaps_enabled, output wire video_blank
 );
 reg decided, bypass, show_request;
+reg first_window_observed, first_window_finished;
 (* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
 reg [2:0] bypass_sync, show_request_sync, shown_sync;
 reg shown, frame_window_d;
@@ -22,8 +23,17 @@ always @(posedge clk_mpeg2) begin
         bypass <= 1'b0;
         show_request <= 1'b0;
         shown_sync <= 3'b000;
+        first_window_observed <= 1'b0;
+        first_window_finished <= 1'b0;
     end else begin
         shown_sync <= {shown_sync[1:0], shown};
+        // The shown and window crossings may resolve on different clocks.
+        // Observe the acknowledged window, then its end, instead of relying
+        // on which independent synchronizer delivers its rising edge first.
+        if (show_request && shown_sync[2] && swap_window_active)
+            first_window_observed <= 1'b1;
+        if (first_window_observed && !swap_window_active)
+            first_window_finished <= 1'b1;
         // Bypass is sticky until download rearm; mode changes never restart a
         // running session. Metadata is observed at extraction, before queuing.
         if (bypass_event || (decided && !native_request))
@@ -58,8 +68,8 @@ always @(posedge clk_video) begin
     end
 end
 
-// The raw swap-window edge crosses separately. It arrives before shown's
-// acknowledgement, so the first visible bank remains for a complete pair.
-assign swaps_enabled = bypass || (show_request && shown_sync[2]);
+// Only a later window can swap away from the first visible bank. No relative
+// latency assumption is made about the two independent clock crossings.
+assign swaps_enabled = bypass || first_window_finished;
 assign video_blank = !bypass_sync[2] && !shown;
 endmodule

@@ -13,6 +13,8 @@ reg [7:0] raster=0;
 wire frame_window=(raster>=220);
 reg window_d=0,window_video=0;
 reg [2:0] window_sync=0;
+reg [7:0] delayed_window=0;
+reg skew=0;
 wire raw_swap=window_sync[1]&&!window_sync[2];
 wire enabled,blank,hdmi_bob;
 integer boundaries=0,shown_boundary=-1,first_swap_boundary=-1;
@@ -25,14 +27,16 @@ mpeg2_h262_native_startup dut(.clk_mpeg2(clk),.reset_mpeg2(decode_reset),
     .frame_rate_code(rate),.first_picture_complete(first),
     .candidate_presentable(candidate),.sequence_end_seen(eos),
     .bypass_event(bypass_event),.frame_window(frame_window),
+    .swap_window_active(window_sync[2]),
     .swaps_enabled(enabled),.video_blank(blank));
 mpeg2_hdmi_deinterlace_control deint(.clk(video_clk),.reset(reset),
     .native_interlaced(native_request),.bob_selected_async(bob),.hdmi_bob_deint(hdmi_bob));
 always @(posedge video_clk) begin
-    if(reset)begin raster<=0;window_d<=0;window_video<=0;boundaries=0;end
+    if(reset)begin raster<=0;window_d<=0;window_video<=0;delayed_window<=0;boundaries=0;end
     else begin
         raster <= raster==239 ? 0 : raster+1;
         window_d<=frame_window;window_video<=frame_window;
+        delayed_window<={delayed_window[6:0],window_video};
         if(frame_window&&!window_d)boundaries=boundaries+1;
     end
 end
@@ -46,7 +50,9 @@ end
 always @(posedge clk)begin
     if(decode_reset)window_sync<=0;
     else begin
-        window_sync<={window_sync[1:0],window_video};
+        // Deliberately make the window crossing arrive well after the shown
+        // acknowledgement. This exposes an unsafe relative-latency reliance.
+        window_sync<={window_sync[1:0],skew ? delayed_window[5] : window_video};
         if(monitor&&raw_swap&&enabled&&first_swap_boundary<0)begin
             first_swap_boundary=boundaries;
             if(shown_boundary<0 || boundaries!=shown_boundary+1)
@@ -79,7 +85,7 @@ initial begin
     // Sweep readiness on both sides of the video blanking edge, with clocks
     // neither identical nor aligned. Restart uses the real eight-cycle rearm.
     for(phase=0;phase<24;phase=phase+1)begin
-        warm_start();monitor=1;first=1;
+        warm_start();skew=phase%2;monitor=1;first=1;
         repeat(300)@(negedge clk);
         if(enabled||!blank)$fatal(1,"first picture alone released startup");
         wait(raster==phase*10);@(negedge clk);candidate=1;
@@ -101,7 +107,7 @@ initial begin
     // the next download, even though the video timing keeps running.
     warm_start();first=1;candidate=1;repeat(2)@(negedge clk);
     warm_start();monitor=1;first=1;eos=1;complete_start();
-    $display("PASS native startup: 24 readiness phases, full first pair, EOF, warm rearm, interrupted reserve, bypass, Bob/Weave");
+    $display("PASS native startup: 24 readiness phases with crossing skew, full first pair, EOF, warm rearm, interrupted reserve, bypass, Bob/Weave");
     $finish;
 end
 initial begin #2000000;$fatal(1,"startup timeout scenario=%0d",scenario);end

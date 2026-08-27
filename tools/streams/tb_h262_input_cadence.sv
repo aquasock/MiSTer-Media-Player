@@ -111,7 +111,8 @@ module tb_h262_input_cadence;
         .native_request(phase1_supported&&!progressive_sequence),.frame_rate_code(frame_rate_code),
         .first_picture_complete(first_parsed),.candidate_presentable(presentable),
         .sequence_end_seen(end_seen),.bypass_event(metadata_valid||pcm_valid),
-        .frame_window(video_frame_window),.swaps_enabled(startup_enabled),.video_blank(video_blank));
+        .frame_window(video_frame_window),.swap_window_active(swap_sync[2]),
+        .swaps_enabled(startup_enabled),.video_blank(video_blank));
     always #5.555 clk_video=~clk_video; // 54 MHz versus 60 MHz decoder (scaled)
     always @(posedge clk_video) begin
         if(global_reset)swap_video<=0;else swap_video<=video_frame_window;

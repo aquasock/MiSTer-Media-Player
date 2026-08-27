@@ -118,6 +118,7 @@ mpeg2_h262_native_startup mpeg2_h262_native_startup (
         (mpeg2_new_picture_header_classified_now && !mpeg2_new_i_picture_start_now) ||
         mpeg2_new_syntax_error || mpeg2_new_phase1_probe_error),
     .frame_window(display_frame_window),
+    .swap_window_active(mpeg2_new_swap_window_sync[2]),
     .swaps_enabled(mpeg2_new_startup_swaps_enabled),
     .video_blank(mpeg2_new_startup_video_blank)
 );
