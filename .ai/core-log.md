@@ -1,3 +1,32 @@
+## 618 COMMIT Unreleased aa7f064 2026-08-27T08:28:45-07:00
+
+#### Coming From:
+
+Unreleased 6c273b3
+
+#### Purpose:
+
+Recover timing closure for the S/PDIF passthrough candidate by reseeding the fitter once.
+
+#### Outcome:
+
+The user authorized a single reseed and directed that the scaler be fixed if it failed. Published source `aa7f064` moves the pinned fitter seed from 16 to 17 and nothing else, so the netlist is unchanged and only placement and routing differ; synthesis produces the identical 137 warnings as the failing build, which confirms that. The reseed succeeds and does so with more margin than the accepted baseline: worst setup is positive 0.243 nanoseconds against positive 0.083 for `d466bed` and negative 0.070 at seed 16, with hold 0.251, recovery 2.865, removal 0.564 and minimum pulse width 0.925, and every reported total negative slack is zero. The `ascal` horizontal accumulator paths that failed are no longer critical. The warning set is identical to accepted `d466bed`, with the same twenty-one distinct warning identifiers at the same counts, none new and none missing, including the pre-existing invalid Fitter assignments warning; the timing violation warning present at seed 16 is gone. Logic utilization is 31,464 ALMs against 31,394 for the baseline, and M10K stays at 512 of 553, so the whole audio feature still costs no block memory. The 4,332,740-byte RBF has SHA256 `61a2fed28425a461c8b886bdf809e3ef76a320e5688bb22a816135c36ef981ce`. All three artifacts were deployed together, because the OSD bit is meaningless unless the core routes on it, Main passes it to the helper and the helper can act on it. Every target was backed up first under the entry 618 backup directory, capturing the accepted `d466bed` RBF, the previous Main and the AC-3 helper from entry 611, and each file was then uploaded to a staged name, hash checked while staged, renamed, and read back on a fresh connection, with all three readbacks matching exactly. Media and settings are untouched and no reboot, core reload or playback was performed. What this entry establishes is a timing-qualified build and a verified installation, not working passthrough. Bit transparency from the core samples to the S/PDIF pin is still argued from clock arithmetic rather than measured, no receiver has been shown to lock onto a burst, and the reseed recovers this build without making the underlying scaler paths any less marginal, so the next change of comparable size may expose them again.
+
+#### Next Steps:
+
+Have the user reload the MediaPlayer core so the new RBF and Main take effect, set the new Audio output option to S/PDIF AC-3, and play games/MediaPlayer/ac3_channel_sweep_12s.mpg, reporting whether the soundbar shows a format indicator and whether each two second slot is audible, including the low frequency slot which the stereo downmix always discarded and which should now be present. Selecting HDMI mutes S/PDIF by design, so a silent test in that mode on a system whose only speakers are on S/PDIF is expected behaviour and not a fault. Retrieve the helper log first and confirm it records the selected mode, then take a fresh telemetry screenshot from the terminal screen rather than during playback. If the soundbar stays silent in S/PDIF mode, suspect the transparency of the path to the pin before suspecting the bursts, which are already verified byte exact, and check the channel status non audio bit before anything else. Do not describe a 2.1 soundbar locking onto a burst as proof of discrete channel routing; that still needs the community test on real 5.1 hardware. The marginal `ascal` accumulator paths remain a known risk to record before the next feature that adds logic. A commercial AC-3 track with real dynamic range control remains uncompared, and the interlaced video gates of entry 609 remain open and unstarted. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 617 COMMIT Unreleased 6c273b3 2026-08-27T08:12:47-07:00
 
 #### Coming From:
@@ -1158,35 +1187,6 @@ Build with MiSTer's official ARM GNU 10.2 toolchain, never the distribution cros
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 578 COMMIT Unreleased deced5c 2026-08-27T00:56:47-07:00
-
-#### Coming From:
-
-Unreleased deced5c
-
-#### Purpose:
-
-Replay the larger file warm to test entry 577's recorded prediction that page-cache warming would not relieve a stream whose demand exceeds the per-poll delivery ceiling.
-
-#### Outcome:
-
-No power cycle preceded this run and the syslog still shows the single 07:41:02 UTC boot, so the page cache retained the larger file from entry 577. The prediction recorded before the run is confirmed on every term. Delivery was predicted at about 1,412,000 bytes per second and measured 1,420,655, a change of 0.6 percent; the delivered rate was predicted near 18.1 frames per second and measured 18.2343; the missed-deadline count was predicted to remain in the same order as 188 and measured 187; and first-byte latency was predicted to fall and did, from 23,749 to 14,560 microseconds. The warming itself is unmistakable and behaved exactly as page-cache warming should, halving the blocked polls that precede the first byte from 384 to 185 and cutting 9.2 milliseconds from first-byte latency, yet none of that reached the outcome. The session still accepts all 34,919,166 bytes and displays 449 pictures with 448 swaps at zero error flags, still runs 24.57 seconds for 15.0 seconds of content, and still shows its three largest gaps at 12,012,000, 10,010,000 and 10,010,000 cycles around ordinals 93 to 96. The separation this establishes is clean and is the point of the run: read latency governs startup only, and the per-poll budget governs steady throughput, so warming a file that demands more than the ceiling changes when playback begins and nothing about how it proceeds. The delivery arithmetic closes for a third time. This run implies 86.7 polls per second against 86.2 in entry 577, and four chunks of 4,096 bytes at 86.7 Hz is 1,420,791 bytes per second against a measured 1,420,655, agreeing to 0.010 percent. Across three independent measurements now, spanning two files whose demands differ by a factor of 2.3 and two thermal states, the implied poll rate sits between 86.2 and 86.7 Hz and the four-chunk budget arithmetic matches measured delivery to about a hundredth of a percent each time. The delivery ceiling is therefore established as a property of the per-poll budget rather than of the media, the filesystem, the helper or the FPGA, and entry 572's ruling-out of that candidate, already corrected in entry 577, is now contradicted by direct measurement under two thermal conditions. One risk remains entirely unassessed and must gate any correction: `mediaplayer_poll()` is called from `user_io_poll()`, so spending longer inside it delays every other responsibility of the MiSTer main loop, and nothing in this work has examined what that costs. Per the user's diagnostic cadence this is one run per condition, only three of the 187 deadline records are retained by the snapshot, and the poll rate is still inferred from read counts and elapsed time rather than measured inside MiSTer main. Evidence is `.ai/current_results/entry578_bigfile_warm_arm_helper.log`, `entry578_bigfile_warm_terminal.png` and `entry578_bigfile_warm_capture.json`.
-
-#### Next Steps:
-
-Seek user approval for a bounded delivery-side change before implementing it. The proposal is to raise the bytes moved per poll in `mediaplayer_poll()` within `host/main_mister/0001-mediaplayer-arm-loader.patch` by enlarging the read buffer from 4,096 to 16,384 bytes while leaving the chunk count at four, which raises the ceiling from about 1.42 to about 5.7 megabytes per second and, because it moves the same bytes in a quarter as many read and transmit calls, should reduce rather than increase the per-byte time spent in the function. Size the target against DVD peak program-stream rate of 10.08 Mbps or about 1.26 megabytes per second with real margin rather than against this one test file, since the present twelve percent headroom over DVD peak is less than startup dead time already consumes. Before proposing the edit, examine whether `user_io_file_tx_data` accepts larger blocks without internal chunking that would negate the benefit, and estimate the added worst-case time per `user_io_poll` call against whatever else that loop must service, because that is the principal risk and is currently unexamined. No Quartus build is required and the qualified `2acabc5` bitstream is unaffected. Validation would be a single replay of this same larger file, checking measured delivery against the new budget arithmetic and confirming the delivered frame rate rises toward nominal. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 
