@@ -1,3 +1,32 @@
+## 585 COMMIT Unreleased 32ba178 2026-08-27T01:59:36-07:00
+
+#### Coming From:
+
+Unreleased 32ba178
+
+#### Purpose:
+
+Validate the first cold profiling run and identify whether helper reads, acknowledged FPGA transfers or other main-loop work dominate high-bitrate playback.
+
+#### Outcome:
+
+After the user reported the screen ready, the helper log was fetched before a fresh terminal screenshot. Syslog records a new Linux boot at 08:52:25 UTC versus entry 581's 08:23:32; it corroborates the requested reboot but does not independently prove power removal or playback count. The runtime log contains `profile_version=1`, and full host and FPGA readbacks retain entry 584's expected hashes, establishing that host source `32ba178` is now running against unchanged FPGA `2acabc5`. All 34,919,166 bytes and 449 pictures complete, with 448 swaps, zero decoder error flags, normal helper exit and quiet completed presentation. Cadence still fails: 24.460381 seconds, 18.315332 fps and 186 delayed presentation intervals, compared with entry 581's 18.335712 fps and 185 intervals. Matched completed-chunk endpoints yield 1,427,221 bytes per second, only 0.049 percent below the prior run and far below the file's 2,330,798-byte-per-second average demand. Profiling directly separates the cost: 2,132 transfers consume 23.585322 seconds, or 96.68 percent of 24.394209 seconds inside media polls; all pipe reads consume 0.730964 seconds, or 3.00 percent, and other measured in-poll work accounts for 0.077923 seconds. The 485 EAGAIN events all precede the first successful chunk. Actual accounting records 533 data-bearing polls, averaging 45.759 milliseconds with an 80.498-millisecond maximum across all polls; these are blocking exposure, not direct UI latency. Thirty-three sampled chunks cover 270,336 words. In 32 chunks both ACK phases require at most two GPI reads per word, with nearly two reads typical; high or low wait-word counts merely mean more than one read and must not be mislabeled FIFO-full stalls. Sample event 768 is exceptional: ACK-low takes up to 72 reads, totaling 55,330 low-phase reads across 8,192 words, and nearby unsampled transfers also slow. This confirms actual extended ACK polling while leaving the cause and unsampled wait distribution unresolved. The ordinary handshake and bridge path therefore remain the useful optimization target, but eliminating flow control is unsafe. The first successful read occurs 39.694 milliseconds after download assertion and the first entire chunk completes at 51.494 milliseconds, keeping the legacy first-byte label distinct. Sampled full chunks have a 3.66 percent higher median transfer cost than unsampled chunks; these are unpaired measurements, and one nearly unchanged aggregate run cannot quantify instrumentation overhead. The retained first three delayed deadlines show ready-but-empty decoder input and empty upstream FIFO, with writer-capacity blocking of zero, zero and nine cycles. The user's earlier responsive-menu observation belongs to entry 581; current menu responsiveness remains unreported. The user subsequently identified the meadow as the current worst section and clarified that the spikes comparison refers to old progressive bring-up, not another recent run. Build-PC frame extraction from the hash-verified fixture identifies picture 350 as dense ground foliage viewed from above, with the clip's largest encoded span of 253,632 bytes, requiring about 178 milliseconds at measured mean supply against 33.367 milliseconds per nominal frame. This supports the reported meadow slowdown without establishing a relation to the old progressive issue. A source-review correction is also required: the largest-gap metadata holds only an eight-bit picture ordinal, so raw codes 93, 94 and 95 are ambiguous between pictures 93 through 95 and 349 through 351 in this 449-picture clip; the wrapped candidates coincide with the largest pictures and reported meadow scene, but the snapshot alone cannot prove that mapping. The three retained largest intervals are each 166.833 milliseconds. Capture, decode, helper log and checked analysis are retained as `.ai/current_results/entry585_*`. No production source, deployed binary, configuration or lifecycle was changed; the profiling works as a diagnostic, but smooth-playback acceptance and the qualified 8 Mbps regression remain outstanding.
+
+#### Next Steps:
+
+Prepare the next approved implementation boundary around a flow-controlled bulk transfer path that reduces per-word bridge overhead while preserving ACK/backpressure, byte order, odd tails, core readiness and reset handling, and ordinary non-media transports. Do not increase buffers again or substitute unchecked fast writes. Establish protocol and byte-trace equivalence plus delayed-backpressure tests and build with the official ARM toolchain before qualified host deployment; if adequate headroom requires an FPGA transport-protocol change, obtain approval for that material revision before implementing it. Retain the user's standing evidence/source publication and host-deployment permissions without repeating those questions, while keeping backup, staging and independent readback safeguards. Do not request another identical hardware run merely for statistics. After a changed candidate is available, validate one high-bitrate run and the outstanding qualified 8 Mbps case, and confirm whether the meadow slowdown improves and obtain a current menu-responsiveness report. Keep the existing startup controller, 64 KiB clean-video queue, continuous HDMI sync and black idle behavior unchanged, leave reboot and playback to the user, preserve restricted `core.md` and the forty-entry ring, and retain the unresolved interlaced, audio/PTS, cancellation and assertion-drift limitations from prior entries.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 584 COMMIT Unreleased 32ba178 2026-08-27T01:52:36-07:00
 
 #### Coming From:
@@ -1176,36 +1205,6 @@ Treat the residual two doubled gaps as a smaller, separate throughput question a
 - MediaPlayer_top_04.svh
 - rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
 - tools/streams/tb_h262_ddram_store_overlap.sv
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-
-## 545 COMMIT Unreleased 7cdfcec 2026-08-26T15:04:12-07:00
-
-#### Coming From:
-
-Unreleased 7cdfcec
-
-#### Purpose:
-
-Record the seed-fifteen Bob comparison and determine whether the remaining visual artifact follows decoder cadence or field reconstruction cadence.
-
-#### Outcome:
-
-The user reran the same Big Buck Bunny test file on the exact `7cdfcec` image with HDMI scaler deinterlacer changed only from Weave to Bob. Playback frame rate still appears correct and Bob looks better overall, while both the visible flicker and the residual ghosting appear at approximately twice the Weave cadence, like the same artifact running at double speed without speeding up the movie. The user judges that the decoder is keeping up and error-free but old frames remain visibly sticky in both Bob and Weave. The fixed remote screenshot filename was deleted before triggering, so `.ai/current_results/entry545_seed15_bob_terminal.png` is a genuinely fresh Bob capture; it is 479,897 bytes with SHA-256 `e917c5ef0c9cd00f7d72509e1360b63e3f89f76b1b6c3845578d2c93d2914ddf`. Schema sixteen accepts all 15,150,646 source bytes, reaches sequence end, presentation completion and normal quiet reason one, and its wrapped counters represent 449 displayed pictures and 448 publications and swaps. The terminal generation fetches 242 first-field and 240 second-field lines from region zero with zero region, phase, prefill, unpublished-reset, cache-overlap, presentation, audio, tag, content or accepted-write-versus-raw-return errors. The Bob presentation span is 920,029,226 decoder cycles versus 921,157,194 in the preceding Weave run, a difference of only 18.799 milliseconds across the complete file, confirming that the doubled artifact cadence is not doubled decoder or scheduler speed. The result instead ties the visible rate change to Bob exposing individual fields at field cadence while Weave combines field history at frame cadence; it does not by itself establish whether the remaining severity is expected deinterlacing behavior or an additional field-content defect.
-
-#### Next Steps:
-
-Retain Bob as the current preferred processed-HDMI mode and make no decoder, scheduler or raster-control change from this terminal evidence. Use one short, direct visual discriminator before another build: compare the same moving interval against a software Bob and Weave reference made from the exact interlaced test stream, focusing on whether MiSTer shows only the expected Bob line-doubling and Weave motion combing or retains an older field beyond one field interval. If MiSTer matches the reference, treat the residual difference as the normal Bob-versus-Weave tradeoff; if it retains older content, propose one bounded correction at the first proven divergent field boundary.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 

@@ -1,0 +1,46 @@
+{
+  "captured": "2026-08-27T01:54:03-07:00",
+  "host": "10.10.0.30",
+  "user_report": "Screen ready following the request for one cold high-bitrate profiling run; no new visual or UI assessment provided.",
+  "files": {
+    "/tmp/MediaPlayer_ARM.log": {
+      "local": "/home/vash/MiSTer-Media-Player/.ai/current_results/entry585_cold_arm_helper.log",
+      "bytes": 208235,
+      "sha256": "7582539d6a8bbb04fd1b13ff867b8ffad456d96abe42188c8f15252fad749271"
+    },
+    "/tmp/messages": {
+      "local": "/tmp/entry585-capture/messages",
+      "bytes": 37945,
+      "sha256": "37376281114a8e399dde9e8a05b93acf9952944936afa0b2f428b61185e3b7c3"
+    },
+    "/media/fat/screenshots/cadence_probe.png": {
+      "local": "/home/vash/MiSTer-Media-Player/.ai/current_results/entry585_cold_terminal.png",
+      "bytes": 522727,
+      "sha256": "c644a7dcc4154181a25f03ca71b0017ab263689f6d0a37181ce4c38ceaaeaa79"
+    },
+    "/media/fat/MiSTer": {
+      "local": "/tmp/entry585-capture/MiSTer",
+      "bytes": 1166244,
+      "sha256": "1aae53b0209e873b1edfe20f60bad10c2c4cd5ce1e21f7f40eea81be313facb9"
+    },
+    "/media/fat/MediaPlayer.rbf": {
+      "local": "/tmp/entry585-capture/MediaPlayer.rbf",
+      "bytes": 4346416,
+      "sha256": "fb5f61b5b9ad934a7e19a6a9ee7cedcbd537747c2722b618902039b3698a1347"
+    }
+  },
+  "operations": [
+    "RETR /tmp/MediaPlayer_ARM.log",
+    "RETR /tmp/messages",
+    "DELE /media/fat/screenshots/cadence_probe.png",
+    "STOR screenshot command only",
+    "RETR /media/fat/screenshots/cadence_probe.png",
+    "RETR /media/fat/MiSTer",
+    "RETR /media/fat/MediaPlayer.rbf"
+  ],
+  "syslog_boot_lines": [
+    "Aug 27 08:52:25 MiSTer syslog.info syslogd started: BusyBox v1.33.1"
+  ],
+  "unchanged_target_state": "No reload, reboot, launch, media/config edit or deployment; only the fixed screenshot was replaced.",
+  "user_followup_report": "The user reports that the current run was slowest over the meadow. Their reference to worse playback approaching the spikes concerns historical progressive bring-up, not entry581 or another recent run. Current menu responsiveness was not separately reported."
+}
