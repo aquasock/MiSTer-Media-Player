@@ -1,3 +1,38 @@
+## 588 COMMIT Unreleased ??? 2026-08-27T02:30:00-07:00
+
+#### Coming From:
+
+Unreleased be8502b
+
+#### Purpose:
+
+Enable bounded fast-block media transfers using FPGA FIFO credits and post-batch integrity checks while preserving the acknowledged legacy path.
+
+#### Outcome:
+
+The user explicitly approves trying the coordinated host/FPGA fast path and reports the prior agent's expectation that decode will again become the bottleneck; that remains a hardware hypothesis, and the earlier 10 MB/s number was only a guess rather than a requirement or measured result. The approved design exposes write-domain capacity from the existing 32 KiB mixed-width ingest FIFO, reserving headroom for in-flight writes and limiting each fast batch to 4096 words. An opt-in MediaPlayer status command returns protocol magic/version, a coherent credit snapshot, accepted-word count, a lightweight rolling data checksum and ready/overflow flags. Main remains the sole FPGA I/O owner and the helper/stdout boundary is unchanged. It probes once per session, retains the current acknowledged path for older or narrow cores and unsupported alignment, and uses acknowledged single-word progress when advertised credit is zero. A capable core must pass word-count/checksum checks after each bounded fast batch before additional data is submitted; mismatch, reset or overflow aborts rather than retries an uncertain partial transfer. Commands and status reads remain acknowledged, and the bounded data section uses the existing fast-block primitive without per-word ACK waits. Both FIFO sizes, startup, HDMI sync, decoder arithmetic and display timing remain unchanged. No production source has changed yet.
+
+#### Next Steps:
+
+Implement the FIFO credit/integrity outputs, opt-in status command, Main session state and guarded burst dispatch with runtime telemetry distinguishing fast bytes, acknowledged fallback bytes, batch/query counts and faults, and document the transport ABI in the existing helper architecture document. Extend the real-host/extracted-RTL regression for legacy discovery, coherent snapshots, zero/full credits, narrow and odd or unaligned input, register ordering, minimum modeled strobe spacing, count/checksum mismatch, resets and no retransmission after failure. Add a focused FIFO test against the installed Quartus mixed-width FIFO simulation model to qualify write-used-word latency, partial-byte reads, asynchronous clocks, reset readiness and conservative headroom. Run all work on GUNSMOKE, including the existing native-video regression and host sanitizer checks. Publish exact source from the Pi, pull it on the build PC, build the official ARM host and a clean Quartus FPGA image using the existing seed and constraints, review timing and warnings, and deploy only qualified artifacts with retained restoration data, staging and independent full readbacks under standing permission. Leave reboot and playback to the user; request one cold high-bitrate run, capture it before the separate 8 Mbps regression, and compare fast-path activation, integrity, byte/picture completion, feed rate, cadence and menu response. Do not claim a decoder-bound result until hardware supports it, and do not silently broaden this boundary into DMA/shared-memory work or remove flow control.
+
+#### Files Modified:
+
+- MediaPlayer_top_00.svh
+- rtl/mpeg2_stream_fifo.sv
+- sys/hps_io.sv
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- host/arm/ARCHITECTURE.md
+- tools/streams/test_main_mister_profile.py
+- tools/streams/tb_mpeg2_stream_fifo_burst.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 587 COMMIT Unreleased be8502b 2026-08-27T02:22:06-07:00
 
 #### Coming From:
@@ -1164,41 +1199,6 @@ Generalize the soak's `MIXED_PIXEL_MODE` oracle dimensions so it can accept a 72
 - rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
 - tools/streams/decode_hardware_cadence.py
 - tools/streams/generate_test_interlaced_p_frames.py
-- tools/streams/tb_h262_hardware_cadence_profiler.sv
-- tools/streams/test_decode_hardware_cadence.py
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 548 COMMIT Unreleased ffd0496 2026-08-26T19:02:46-07:00
-
-#### Coming From:
-
-Unreleased 008909d
-
-#### Purpose:
-
-Record the native luma fetch addresses and any mid-sweep display-region change, which no existing counter could observe.
-
-#### Outcome:
-
-Reading the live readout path found that the two facts every recent diagnosis rested on were weaker than they had been read. The region evidence added in entry 518 overwrites its latch on every fetch edge, so it preserves only each parity's last sample and the profiler compares those two survivors at the generation boundary; a bank change partway through the first field's own two hundred forty fetches is invisible whenever the final samples happen to agree, and a zero region-mismatch count therefore means only that the last fetch of each parity matched. The per-field fetch counters are attributed solely by `line_number[0]`, so a count of two hundred forty-two proves that many even-row fetches were launched and nothing about which rows; one stale row fetched two hundred forty-two times yields the identical figure and would look exactly like a frozen field. Commit `ffd0496` closes both. The framebuffer exports the raw fetch event as validity, parity and the nine-bit row, and the profiler accumulates a per-parity XOR of the row number across a generation together with a per-parity flag set when any later fetch in that generation disagrees with the region seen on the parity's first fetch. Accumulating in the profiler rather than the framebuffer keeps the generation boundary unambiguous, which is the correction entry 520 recorded. Schema sixteen becomes schema seventeen at sixty-two words with one appended word packed as nine, nine, one, one and twelve bits, verified to total exactly thirty-two after entry 519 shipped a thirty-bit word, and both overlay origins move four rows up to 352 and 232 so the final row stays flush with the diagnostic and native rasters. The expected values are computable rather than empirical: a healthy generation sweeps first-field rows zero through four hundred seventy-eight plus prefill rows zero and two, whose XOR is two, and second-field rows one through four hundred seventy-nine, whose XOR is zero. The decoder prints both against those expectations, the directed profiler regression encodes a first field with a wrong XOR and a changed region against a healthy second field, and the entry 516 overlay row-coverage check immediately caught the stale testbench origins after the layout moved, earning its place after being worthless in entry 519. A clean build completed in 11 minutes 14 seconds with zero errors and 148 warnings; global setup, hold, recovery, removal and minimum-pulse-width margins are positive 0.212, 0.247, 3.355, 0.556 and 0.925 nanoseconds, the fit uses 31,636 ALMs and 49,859 registers with block-memory bits and RAM blocks unchanged from baseline, and a netlist probe confirms every new accumulator survives. On hardware, a fifty-frame burst confirmed the first field froze during the very run measured, ten of twenty-four active transitions showing bit-identical even rows, while the terminal snapshot reported a first-field row XOR of exactly two, a second-field XOR of exactly zero, no region change on either parity, two hundred forty-two and two hundred forty fetches and region zero for both. The first field therefore fetched all two hundred forty distinct rows plus both prefill rows, in one sweep, from a single region, while displaying content seconds old. The read addressing is exonerated, which is the first evidence in this investigation pointing away from the framebuffer reader.
-
-#### Next Steps:
-
-Instrument the one remaining uninstrumented step between the DDR read and the screen: whether the returned words actually reach the line cache for that parity. Nothing counts cache writes today, so a fetch that issues correctly and returns correctly but never lands would read exactly as this capture does.
-
-#### Files Modified:
-
-- MediaPlayer_top_06.svh
-- MediaPlayer_top_07.svh
-- rtl/mpeg2_luma_framebuffer.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/streams/decode_hardware_cadence.py
 - tools/streams/tb_h262_hardware_cadence_profiler.sv
 - tools/streams/test_decode_hardware_cadence.py
 
