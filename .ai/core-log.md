@@ -1,3 +1,32 @@
+## 607 COMMIT Unreleased d466bed 2026-08-27T06:33:10-07:00
+
+#### Coming From:
+
+Unreleased d466bed
+
+#### Purpose:
+
+Explain the deterministic missed display slot at picture 692 from the fixture itself, without new hardware runs.
+
+#### Outcome:
+
+Offline parsing of the delivered fixture reproduces its structure exactly, recovering all 17,876 pictures and all 715,713,077 video bytes across 360,872 packs, so the analysis operates on the same bytes the hardware accepted. The mux rate field is a single constant value of 25,200, equal to 10.08 Mbps, with zero SCR regressions, so there is no pack schedule discontinuity or transport anomaly anywhere near the failure point. The declared sequence header carries a 9,600,000 bit per second video rate and a 1,835,008-bit VBV, giving exactly 40,040 bytes of delivery per frame period; the encoder holds most pictures at precisely that size, so the stream is genuinely constant rate and only cuts produce spikes. Picture 690 is 150,316 bytes, the single largest coded picture in the entire film and 3.754 frame periods of delivery at the declared rate, immediately followed by picture 691 at 95,308 bytes, or 2.380 frame periods. Those two pictures alone carry 245,624 bytes where the constant rate supplies 80,080, and they sit at the scene cut around 23.05 seconds. A constant-arrival VBV trace over the whole film shows zero underflow, confirming the stream is legal, but occupancy falls from a steady 82.544 percent to 34.467 percent at picture 690 and 10.372 percent at picture 691, which is where the hardware missed its slot with 691 references completed. The simple explanation that the trough alone causes the miss does not survive the whole-film trace, and this entry records that correction rather than the partial result. The global minimum is picture 13255 at 10.368 percent, marginally deeper than picture 691, and twenty-six pictures fall below twenty percent occupancy across the film, including a cluster at 13253 through 13257. Hardware missed exactly one slot in both runs and nothing at 13256, so VBV depth by itself does not predict the failure and twenty-five comparably thin points were absorbed. The feature unique to the failure is peak single-picture delivery burden rather than trough depth: picture 690 needs 3.754 frame periods of constant-rate delivery against 3.118 for the 124,846-byte picture 13253, and no other picture in the film exceeds it. The working hypothesis is therefore that the pipeline's effective read-ahead covers roughly three frame periods of worst-case single-picture delivery and picture 690 alone exceeds it, which is consistent with the recorded eleven and a half milliseconds of input starvation, the writer still busy at the deadline and the absence of any presentation, ownership, timestamp or capacity fault in either capture. This remains an inference from stream structure and existing telemetry; the read-ahead depth has not been measured directly in RTL or simulation, and no production change is justified by this entry alone. Evidence and the exact probe and trace drivers are retained as `.ai/current_results/entry607_*`. The entry 605 and 606 commits were pushed to the online repository after the user granted push permission from the build PC, and no source, deployed file, setting or playback was touched by this analysis.
+
+#### Next Steps:
+
+Measure the pipeline's actual input read-ahead in frame periods, in simulation against the real bytes rather than by inspection, and compare it with the 3.754 frame period worst case that picture 690 imposes and the 3.118 frame period second worst at picture 13253. If the measured depth falls between those two figures the hypothesis is confirmed and the useful production boundary is to deepen upstream buffering toward the declared 1,835,008-bit VBV, sized in frame periods of worst-case delivery, leaving presentation queues, clocks, startup and throughput untouched. If the measured depth is well above 3.754 frame periods the hypothesis is wrong and helper delivery timing during the spike becomes the next suspect, in which case the existing helper profile records should be examined before any RTL work. Either way, define the acceptance criteria before editing RTL, prefer a bounded simulation using the actual 690 spike over another full-length physical run, and keep AC-3, interlaced P/B, navigation and disk-source work as separately scoped gates. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 606 COMMIT Unreleased d466bed 2026-08-27T06:28:14-07:00
 
 #### Coming From:
@@ -1133,35 +1162,6 @@ The user rebooted the MiSTer, loaded the core, loaded the file and let it finish
 #### Next Steps:
 
 The boundary is now initial prefill depth ahead of the first cadence deadline, not delivery rearm and not the presentation scheduler, so the remaining evidence needed is the size of the deficit rather than more mode or reload permutations. Have the user take two or three further cold runs, each after a full reboot, and two or three further warm replays, capturing telemetry after every single one and stating which is which, so the cold and warm starvation windows acquire a range instead of one sample each and so it can be established whether any run still reaches zero gaps under known conditions. Ask specifically whether the entry 564 run was preceded by a reboot, since reclassifying it would settle whether a clean run is reachable at all on this build. With that range in hand the fix boundary can be sized directly: the guarded startup controller currently releases the first picture on readiness alone, and the measured 27.66-millisecond cold starvation window against a 33.37-millisecond cadence slot indicates the release gate needs a minimum accepted-bytes or queue-occupancy condition in addition to readiness, which is a bounded change to the startup controller rather than to the queue depth or the scheduler. Extend the existing drained-FIFO warm-load simulation cases to model both measured starvation windows before proposing that change, and do not commit source until the user approves the revised plan. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged in the meantime. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 567 COMMIT Unreleased 2acabc5 2026-08-26T23:43:47-07:00
-
-#### Coming From:
-
-Unreleased 2acabc5
-
-#### Purpose:
-
-Record the hardware telemetry from the user's Weave-mode run of `2acabc5` to determine whether the entry 566 ordinal-six gap depends on deinterlace mode.
-
-#### Outcome:
-
-The user accepted the entry 566 result, played a file in Weave mode and left the terminal telemetry on screen. The stale 476,509-byte probe from entry 566 was deleted through FTP and confirmed absent before triggering, and the new capture is 476,501 bytes with SHA-256 `57f242d044e927970686a0534a8b2a0ce859558b4a72921a0aae54900d17ed65`; its checksum of 4,099,361,451 and session length of 903,162,447 cycles both differ from entry 566, so this is a distinct session and not a stale re-read. The Weave run is functionally identical to the Bob run in every acceptance term. It accepts all 15,150,646 bytes, displays 449 pictures with 448 swaps, sees sequence end, completes presentation and terminates quietly with reason one, reporting zero error flags, no cache-bank overlap, no presentation error, no audio underrun, no PCM protocol error and no timestamp advance or delay conflicts. It also reproduces the defect exactly: one cadence outlier and one missed deadline, again at display picture ordinal six, again a 4,004,000-cycle interval of 66.7333 milliseconds that is precisely two nominal intervals, with ranked gaps two and three at exactly 2,002,000 cycles so that steady-state cadence away from the hitch is nominal. The ordinal-six deadline record carries the same upstream starvation signature as entry 566. Input starved cycles since the previous swap is 1,070,840 against 1,075,462 in Bob, a difference of only 4,622 cycles or 0.077 milliseconds, and in both runs the candidate is not presentable while upstream FIFO pending, writer busy and writer capacity blocked are all false with zero capacity-blocked cycles and a last reference completion age of about 3,912,352 cycles after five completed references. The micro-state differs only in which side of the same starvation is sampled: this run shows decoder ready false with decoder input pending true, whereas entry 566 showed decoder ready true with decoder input pending false, and the candidate ready delay is 271,690 rather than 592,128 cycles. Two independent sessions in opposite deinterlace modes producing the same ordinal, the same gap magnitude and the same starvation window establish that the defect is reproducible and that Bob versus Weave is not the variable; the failure is upstream delivery during early startup, not the presentation scheduler, the writer, DDR capacity or the deinterlacer. Total cadence excess over 448 nominal intervals is 4,393,879 cycles, of which 2,002,000 is the lost slot and 2,391,879 is the guarded startup hold, which sits between entry 566's 2,053,370 and the clean entry 564 run's 3,002,892 and therefore shows no startup regression. The 29.823923-fps aggregate again begins at first reference completion and includes that hold, so it is not a steady-state rate. Deinterlace mode is not encoded in the snapshot, so the Weave attribution rests on the user's report, and it is not known whether this was a cold first load or a warm reload. Two samples establish reproducibility rather than a rate, and entry 564 remains a clean counter-example under the same source. No reload, reboot, MGL launch, media change or configuration change was made during capture, and no source change or build was performed for this entry. Evidence is `.ai/current_results/entry567_weave_terminal.png` and `entry567_weave_capture.json`, the latter carrying the full decode, the entry 564 and 566 comparisons, the ordinal-six record diff and these scope limits.
-
-#### Next Steps:
-
-Stop collecting mode variations, because mode has been eliminated as a factor, and instead determine whether the ordinal-six starvation correlates with load history. Have the user power-cycle or reload the core and capture telemetry after the very first playback of a fresh core load, then after each of several successive replays without reloading, recording the run ordinal alongside each capture, so it can be established whether entry 564's clean result was specifically a cold first run and whether the starvation appears only on warm rearm. That distribution is the missing evidence needed to choose a boundary. If cold runs are clean and warm runs starve, the investigation belongs in ARM-side delivery rearm across successive sessions and the existing drained-FIFO warm-load simulation cases should be extended to model the measured 1,070,840-to-1,075,462-cycle starvation window before any RTL change is proposed; if cold runs starve too, the boundary is initial prefill depth ahead of the first cadence slot instead. Do not propose a source change until that data exists. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
 
 #### Files Modified:
 

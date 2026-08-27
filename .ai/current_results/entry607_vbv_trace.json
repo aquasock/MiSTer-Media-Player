@@ -1,0 +1,148 @@
+{
+ "bit_rate_value": 24000,
+ "video_bit_rate": 9600000,
+ "vbv_buffer_size_value": 112,
+ "vbv_buffer_bits": 1835008,
+ "pictures_traced": 1013,
+ "underflows": 0,
+ "overflow_clips": 2,
+ "min_occupancy_bits": 190336.0,
+ "min_occupancy_picture": 691,
+ "min_fill_pct": 10.372,
+ "max_occupancy_bits": 1835008,
+ "max_occupancy_picture": 0,
+ "entry602_recorded_max_occupancy_bits": 1834917.333,
+ "entry602_recorded_vbv_bits": 1835008,
+ "bytes_per_second": 1200000.0,
+ "picture690_delivery_seconds": 0.12526333333333334,
+ "frame_period_s": 0.03336666666666667,
+ "picture690_frame_periods_to_deliver": 3.7541458541458543,
+ "trace_680_700": [
+  {
+   "picture": 680,
+   "coded_bytes": 40040,
+   "occupancy_bits_after_removal": 1514688.0,
+   "fill_pct": 82.544
+  },
+  {
+   "picture": 681,
+   "coded_bytes": 40040,
+   "occupancy_bits_after_removal": 1514688.0,
+   "fill_pct": 82.544
+  },
+  {
+   "picture": 682,
+   "coded_bytes": 40040,
+   "occupancy_bits_after_removal": 1514688.0,
+   "fill_pct": 82.544
+  },
+  {
+   "picture": 683,
+   "coded_bytes": 40040,
+   "occupancy_bits_after_removal": 1514688.0,
+   "fill_pct": 82.544
+  },
+  {
+   "picture": 684,
+   "coded_bytes": 40040,
+   "occupancy_bits_after_removal": 1514688.0,
+   "fill_pct": 82.544
+  },
+  {
+   "picture": 685,
+   "coded_bytes": 40040,
+   "occupancy_bits_after_removal": 1514688.0,
+   "fill_pct": 82.544
+  },
+  {
+   "picture": 686,
+   "coded_bytes": 40040,
+   "occupancy_bits_after_removal": 1514688.0,
+   "fill_pct": 82.544
+  },
+  {
+   "picture": 687,
+   "coded_bytes": 40040,
+   "occupancy_bits_after_removal": 1514688.0,
+   "fill_pct": 82.544
+  },
+  {
+   "picture": 688,
+   "coded_bytes": 40040,
+   "occupancy_bits_after_removal": 1514688.0,
+   "fill_pct": 82.544
+  },
+  {
+   "picture": 689,
+   "coded_bytes": 40040,
+   "occupancy_bits_after_removal": 1514688.0,
+   "fill_pct": 82.544
+  },
+  {
+   "picture": 690,
+   "coded_bytes": 150316,
+   "occupancy_bits_after_removal": 632480.0,
+   "fill_pct": 34.467
+  },
+  {
+   "picture": 691,
+   "coded_bytes": 95308,
+   "occupancy_bits_after_removal": 190336.0,
+   "fill_pct": 10.372
+  },
+  {
+   "picture": 692,
+   "coded_bytes": 33582,
+   "occupancy_bits_after_removal": 242000.0,
+   "fill_pct": 13.188
+  },
+  {
+   "picture": 693,
+   "coded_bytes": 26536,
+   "occupancy_bits_after_removal": 350032.0,
+   "fill_pct": 19.075
+  },
+  {
+   "picture": 694,
+   "coded_bytes": 29632,
+   "occupancy_bits_after_removal": 433296.0,
+   "fill_pct": 23.613
+  },
+  {
+   "picture": 695,
+   "coded_bytes": 33161,
+   "occupancy_bits_after_removal": 488328.0,
+   "fill_pct": 26.612
+  },
+  {
+   "picture": 696,
+   "coded_bytes": 32656,
+   "occupancy_bits_after_removal": 547400.0,
+   "fill_pct": 29.831
+  },
+  {
+   "picture": 697,
+   "coded_bytes": 32607,
+   "occupancy_bits_after_removal": 606864.0,
+   "fill_pct": 33.071
+  },
+  {
+   "picture": 698,
+   "coded_bytes": 37216,
+   "occupancy_bits_after_removal": 629456.0,
+   "fill_pct": 34.303
+  },
+  {
+   "picture": 699,
+   "coded_bytes": 37711,
+   "occupancy_bits_after_removal": 648088.0,
+   "fill_pct": 35.318
+  },
+  {
+   "picture": 700,
+   "coded_bytes": 43942,
+   "occupancy_bits_after_removal": 616872.0,
+   "fill_pct": 33.617
+  }
+ ]
+}
