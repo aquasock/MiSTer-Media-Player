@@ -1,3 +1,32 @@
+## 569 COMMIT Unreleased 2acabc5 2026-08-27T00:04:40-07:00
+
+#### Coming From:
+
+Unreleased 2acabc5
+
+#### Purpose:
+
+Collect a repeated-run series from a single reboot to establish the starvation range and determine whether a zero-gap run is reachable on this build.
+
+#### Outcome:
+
+The user rebooted, loaded the core and played the same file in Weave repeatedly, reporting five runs since that reboot. Capture was automated by polling the FTP screenshot trigger and archiving any completed quiet session whose telemetry checksum had not been seen before. Before trusting the series the capture path itself was controlled: six consecutive probes of a static post-run screen returned byte-identical PNGs and identical decoded telemetry, so the capture is deterministic and the five distinct checksums recorded are five distinct sessions rather than repeated reads of one. The poller has one defect worth recording, which is that it exited on reaching a preset four-sample target while the user was still running, so the fifth session was recovered only by a manual probe; the sample cap must be removed before the next block. Absolute run ordinals remain unconfirmed. The user believes the first run was missed, but five distinct sessions were captured and no FTP dropout was logged during the window, which means no reboot occurred inside it, so either the five captures are runs one through five or run one was missed and a sixth run occurred. Capture order is certain and every trend below is order-based and unaffected by that ambiguity. All five sessions pass every acceptance term, accepting all 15,150,646 bytes and displaying 449 pictures with 448 swaps, zero error flags, quiet terminal and presentation complete. The central result is that a zero-gap run is reachable on this build: the fourth capture reported zero cadence outliers and zero missed deadlines, matching entry 564 and establishing that the defect is intermittent rather than universal. Across the capture order, starvation at the ordinal-six deadline falls monotonically through 1,103,135, 1,079,350 and 1,043,165 cycles, then the clean run with no record, then 555,422 cycles, while bytes accepted at that deadline rise monotonically through 312,328, 324,224, 335,258 and 379,200. That is the warming signature the cold-versus-warm inference predicted. The feed rate, however, does not warm continuously; it saturates at about 1.38 times realtime, roughly 1,392,000 bytes per second, with captures two, three and five all at 1.38 exactly as entries 566 and 567 were, and only the colder captures below it at 1.30 and 1.22. That is a ceiling of the delivery path rather than a continuum. Most importantly, warming does not prevent the miss. The fifth capture had the least starvation of any gapped run at 9.26 milliseconds and the highest byte delivery at 379,200, and still lost the ordinal-six slot by the same 4,004,000 cycles. Starvation magnitude therefore does not predict whether the slot is lost, and the ordinal-six miss is a marginal timing race against one specific deadline rather than a simple bandwidth deficit. This materially revises the entry 568 reading that framed the problem as prefill depth alone. Every gap in this block is exactly 4,004,000 cycles, two nominal intervals, leaving entry 568's 6,006,000-cycle gap still the only one of its size, and the writer and DDR path stays clean in every gapped capture with upstream FIFO pending, writer busy and writer capacity blocked all false. Cold sampling remains weak at two samples across all work to date, and those two disagree substantially at 1,659,347 and 1,103,135 cycles. Evidence is the five capture pairs under `.ai/current_results` named `entry569_block1_run1` through `run4` and `entry569_block1_onscreen`, with the consolidated series, capture-method validation and scope limits in `entry569_block1_series.json`.
+
+#### Next Steps:
+
+Resolve the run-ordinal ambiguity with the user before treating the first capture as a cold sample, since that single value is what separates the two competing cold figures. Then run at least two further blocks with the sample cap removed, each a full reboot followed by five uninterrupted replays, so cold sampling reaches a usable count and the zero-gap rate can be estimated rather than inferred from two isolated clean runs. Because starvation magnitude has now been shown not to predict the miss, the more valuable experiment is the one already proposed but not yet run: reboot, load the core, read the media file over FTP to populate the page cache, then play once, which tests the read-latency mechanism directly instead of by correlation. That still requires the media path on the MiSTer, which the user has not yet supplied and which was not found under the obvious locations. Also obtain whether entry 564 was preceded by a reboot, or drop it as evidence. Do not propose a source change yet. The marginal-race result means a release gate conditioned on accepted bytes or queue occupancy alone would not have saved the fifth capture, so any startup-controller boundary must be sized against the deadline timing rather than against a byte threshold, and the delivery ceiling of 1.38 times realtime should be characterised before deciding whether the correct boundary is the startup controller or the ARM-side feed. Keep the accepted continuous HDMI sync fix, the 64-KiB clean video queue, the guarded readiness-based startup controller and the black startup background unchanged. Analog diagnostics remain excluded, and interlaced P/B, field pictures, field DCT, partial-transfer cancellation and the live-raster assertion drift all remain outside this entry.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 568 COMMIT Unreleased 2acabc5 2026-08-26T23:48:12-07:00
 
 #### Coming From:
@@ -1193,35 +1222,6 @@ The user reloaded the exact `5de0e1d` image and ran `_cadence/native_480i_tff_li
 #### Next Steps:
 
 Stop before another behavioral correction and obtain approval for a schema-seventeen write-to-read provenance diagnostic. Fingerprint each accepted luma DDR writer word with its physical bank, row and word position, retain completed per-line expected fingerprints by framebuffer generation, and compare them against the already observed raw DDR return for the same published bank, row and generation before the line enters the cache. Preserve schema sixteen through legacy decoding and add directed controls proving clean equality, one accepted-write or readback corruption as a content mismatch, and wrong bank, row or generation as provenance mismatches; run the complete native, reconstruction and canonical live-raster suites before an incremental Quartus build. A write-versus-read mismatch localizes the remaining corruption to writer packing, address acceptance, DDR storage or region ownership, while equality moves the boundary upstream into reconstructed pixels or downstream beyond the already-cleared cache and requires a separate output-coordinate discriminator. Continue direct verified replacement of only `/media/fat/MediaPlayer.rbf` with no backup, rollback or staging files.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 529 COMMIT Unreleased 5de0e1d 2026-08-26T02:19:45-07:00
-
-#### Coming From:
-
-Unreleased 5de0e1d
-
-#### Purpose:
-
-Install and verify the exact registered-cache-read alignment image without creating any backup, rollback or staging file.
-
-#### Outcome:
-
-The exact 4,252,684-byte `5de0e1d` RBF was copied from the designated GUNSMOKE checkout to the Raspberry Pi and independently retained SHA-256 `9260f3c36d4515f03bee4f0ecb24af6c7dc9e4dfb4ff387ec5e841bca39ad96c`. Python `ftplib` used an absolute `STOR /media/fat/MediaPlayer.rbf` command to directly replace only the active image, then a new FTP session independently retrieved the same absolute path. Candidate and readback are both 4,252,684 bytes, carry the exact expected hash and compare byte-for-byte with exit zero. A directory check finds no filename containing backup, rollback or stage, so deployment created no auxiliary remote file and did not change helper, media, Main or MiSTer configuration.
-
-#### Next Steps:
-
-Reload the Media Player core, prepare `_cadence/native_480i_tff_light_10s.m2v` with Native timing pattern Off and Interlaced output Native 480i and reply ready. Start playback immediately when prompted while the corrected thirty-second burst deletes the prior screenshot before every trigger, then leave the terminal image displayed for schema-sixteen capture. Report whether both field bars now move together with the authored four-pixel separation and whether the many horizontal grey fragments are gone; acceptance also requires zero schema-sixteen tag and content mismatch counts, 300 pictures, 299 swaps and every aggregate, overlap, prefill, phase and region error clear.
 
 #### Files Modified:
 
