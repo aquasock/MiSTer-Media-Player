@@ -1,3 +1,32 @@
+## 642 COMMIT Unreleased 2045c34 2026-08-27T19:45:33-07:00
+
+#### Coming From:
+
+Unreleased 2045c34
+
+#### Purpose:
+
+Validate test three's requested Bob and HDMI playback on the Buildroot beta.
+
+#### Outcome:
+
+The user reports test three passes. Helper-first retrieval and a fresh screenshot identify the scrolling-band fixture and provide valid schema-19 telemetry with 360 reference and displayed pictures, zero B pictures, 359 swaps and 12,073,185 accepted video bytes. Decoder and presentation errors, audio underrun, PCM protocol faults, timestamp conflicts, native deadline gaps and gap outliers are absent. All three largest recorded display intervals are 2,002,000 clocks, with sequence end, completed presentation and quiet termination asserted. Helper exit is zero and all pipe reads reconcile to 14,562,019 completed transport bytes, without acknowledged fallback payload. HDMI decoded output is confirmed; Bob was requested and the user accepts that run, but telemetry does not independently identify the scaler selection or LED colors. The helper reports 576,000 emitted PCM frames. Independent readback confirms the fixture and unchanged Main, helper, RBF and kernel. Passed is scoped to the requested Bob test; no new build occurs, so Built stays unchecked. No deployment, mode change, reload, reboot or playback is initiated by the agent. Raw data remains in ignored local results and only .ai/current_results/entry642_buildroot_test3_bob_status.json is published.
+
+#### Next Steps:
+
+Switch HDMI scaler deinterlacer to Weave and replay test_3_deinterlace_bob_weave.mpg with HDMI audio, preserving a separate helper log and fresh terminal screenshot afterward. The user must judge the deinterlacing appearance because the terminal telemetry does not identify the HDMI scaler mode. Then complete the progressive all-I test four and separate AC-3 HDMI, AC-3 S/PDIF and DTS S/PDIF runs. Keep the storage dirty-flag warning as a separate unresolved check and leave overall beta qualification open until the matrix is complete. Preserve runtime identities, user control of hardware lifecycle, local-only raw captures, restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [x] Passed
+
+---
+
 ## 641 COMMIT Unreleased 2045c34 2026-08-27T19:42:33-07:00
 
 #### Coming From:
@@ -1156,38 +1185,6 @@ The next useful production boundary is to make the bounded native all-I ordinary
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 602 COMMIT Unreleased 6669b70 2026-08-27T05:10:55-07:00
-
-#### Coming From:
-
-Unreleased f615ce0
-
-#### Purpose:
-
-Prepare a reproducible full-movie native-480i audio/video endurance fixture near the DVD combined-rate target.
-
-#### Outcome:
-
-Published fixture source 6669b70 adds the deterministic full-source native-480i/MP2 generator, parameterizes the existing CBR checker without changing its 9.8 Mbps default, bounds the signalling-patch extension read and extends the existing tests. GUNSMOKE pulls that exact source and passes all eleven focused tests, a clean native build of the unchanged helper and a regression of the exact accepted 449-picture 9.8 Mbps fixture, including rejection of a wrong bitrate header. A first candidate remux produced timestamp warnings; the final generator instead encodes the Program Stream directly, then changes only equal-length video payload signalling while preserving its PES headers, timestamps, audio and packet schedule. A four-second candidate passes before full generation. The complete 596.458333-second source AVI, SHA256 4fc75fa403994e7c313da139d93a5aebdbda27cc951616aa4e480db6877c9850, produces 17,876 supported 720x480 TFF all-I frame-DCT pictures at 30000/1001 covering 596.462533 seconds, with the original soundtrack transcoded to 192 kbps 48 kHz stereo MP2. The output bbb_full_480i_tff_av_10080kbps.mpg is 739,065,873 bytes, SHA256 beb5c738910321fbbdf482220c19af36e7c2d2bb1913e8872f679eeb1f589642. All decoded YUV planes are equal before and after the signalling patch; the program demuxes to the exact 715,713,077-byte qualified video and unchanged MP2 payload. The 9.6 Mbps video averages 9,599,437.175 bit/s, with zero underflow/overflow in the existing narrow constant-arrival VBV witness and maximum occupancy 1,834,917.333 of 1,835,008 bits. Every one of 360,872 pack headers signals the 10.08 Mbps mux target, adjacent SCR-paced arrivals satisfy the declared rate check and the whole pack span averages 9,906,567.467 bit/s. Picture-consumption windows may exceed the arrival rate using VBV buffering; this is not a full T-STD or DVD application-conformance certificate. The generic v0.7 compatibility checker has an obsolete native-interlaced rejection and is not claimed as a passing gate. Full helper scheduling preserves exact video/PTS and PCM hashes across explicit and in-band modes, emits 839,409,548 transport bytes and all 28,628,352 stereo PCM frames, has initial/steady batches of 5,504/2,048 frames, a 4,048-byte maximum steady PCM-free video gap, zero measured audio deficit and one PCM end marker. An initial diagnostic incorrectly required one PTS record per picture; the corrected exact byte-position mapping proves all 17,776 emitted timestamps refer to the proper picture, all intervals are 3,003 or 6,006 ticks and only 100 individual pictures lack a separate timestamp. No picture bytes are lost, and first/last mappings cover the full movie. Comparing all 57,256,704 signed sample values against an independent FFmpeg decode yields maximum difference two, RMS 0.503652 and correlation 0.999999979, with exact sample-count agreement and 596.424 seconds of audio. The new media is deployed through a unique stage and full independent readback hashes before and after rename; the installed Main and f615ce0 RBF match their prior hashes before and after transfer. No source RTL, production helper/Main/RBF, settings, reboot, reload or playback is changed. Reproducible media stays off Git; manifests, checks and exact diagnostic/deployment drivers are retained as .ai/current_results/entry602_*, with full media under /home/vash/mister-builds/entry602. Built reflects software generation and helper compilation, not a new FPGA build. Hardware Passed remains unchecked.
-
-#### Next Steps:
-
-Have the user select Bob and play games/MediaPlayer/bbb_full_480i_tff_av_10080kbps.mpg once in its entirety without rebooting or reloading, checking audible sound, A/V sync through the end, visible slowdown or corruption and menu response during and after playback, then leave the terminal telemetry ready. Retrieve the helper log first and acquire a fresh parity/checksum-valid screenshot. Require all 17,876 reference/display pictures, expected swaps and exact transport completion, inspect native deadline gaps and audio error/underflow state, and distinguish final audio-tail behavior from steady faults. The 32-bit 60 MHz session timer wraps every 71.582788 seconds, so do not use terminal aggregate FPS or elapsed time without wrap accounting; full picture counters, modular per-frame gaps, helper completion and user observations remain the useful evidence. Audio frame telemetry is also not an unsaturated whole-film sample total. Record the chosen mode and lifecycle explicitly. This single combined high-rate physical soak does not qualify the other mode, AC-3, interlaced P/B or field DCT, navigation, ISO/disk playback or full commercial-DVD compatibility. Preserve accepted f615ce0 and its restoration artifacts, restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-- tools/streams/generate_test_dvd_av_soak.py
-- tools/streams/generate_test_dvd_ceiling.py
-- tools/streams/generate_test_interlaced_i_frames.py
-- tools/streams/test_dvd_ceiling.py
 
 #### Status:
 

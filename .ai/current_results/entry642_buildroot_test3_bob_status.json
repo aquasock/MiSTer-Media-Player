@@ -1,0 +1,41 @@
+{
+  "source_commit": "2045c34",
+  "scope": "Minimal public status; raw captures remain local.",
+  "test": "test_3_deinterlace_bob_weave.mpg",
+  "user_report": "Everything passes.",
+  "requested_modes": {
+    "deinterlacer": "Bob",
+    "audio": "HDMI"
+  },
+  "mode_evidence": "HDMI confirmed in helper log; Bob requested and the requested run accepted by the user, not independently attested by telemetry.",
+  "telemetry_valid": true,
+  "pictures_displayed": 360,
+  "display_swaps": 359,
+  "accepted_video_bytes": 12073185,
+  "decoder_errors": 0,
+  "presentation_error": false,
+  "audio_underrun": false,
+  "pcm_protocol_error": false,
+  "deadline_gaps": 0,
+  "gap_outliers": 0,
+  "timestamp_conflicts": 0,
+  "largest_recorded_display_intervals_clocks": [
+    2002000,
+    2002000,
+    2002000
+  ],
+  "sequence_end_and_quiet": true,
+  "helper_exit": 0,
+  "transport_bytes_reconciled": 14562019,
+  "runtime_kernel_and_fixture_hashes_match": true,
+  "this_test_accepted": true,
+  "overall_beta_compatibility_accepted": false,
+  "remaining_matrix": [
+    "Test 3 Weave",
+    "Test 4 progressive all-I",
+    "Test 5 AC-3 HDMI decode",
+    "Test 5 AC-3 S/PDIF passthrough",
+    "Test 6 DTS S/PDIF passthrough"
+  ],
+  "separate_unresolved_issue": "Storage dirty-flag warning has not been checked by a filesystem scan."
+}
