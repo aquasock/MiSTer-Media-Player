@@ -118,9 +118,11 @@ acceptance; the original-audio replay still requires observation on MiSTer.
 Ordinary native I/P decode may use the existing free third reference bank
 while its predecessor waits to display. A completed secondary reference stays
 separate from the primary pending picture. Another I/P header can release it,
-but payload waits for a bank to become free. A following B header is retained
-until the older primary picture displays; only then is the secondary bound as
-the B run's future reference. `ORDINARY_B_OVERLAP` checks I/P-to-B transitions
+but payload waits for a bank to become free. A following B header waits only
+for its secondary reference to complete, then B may decode into free scratch
+while the older primary picture retains first presentation priority. A further
+I/P payload is held until that primary presents and frees its old display bank.
+`ORDINARY_B_OVERLAP` checks I/P-to-B transitions
 before, with and after completion, including completion after primary display.
 The native ownership tests retain mode, alias, timestamp and terminal guards.
 No frame regions, decoder arithmetic, clocks or timing constraints are changed.
