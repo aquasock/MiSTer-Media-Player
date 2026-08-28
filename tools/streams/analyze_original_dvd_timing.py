@@ -30,6 +30,22 @@ def analyze(fixture, rows):
                 'coded': coded, 'pts': record['pts'],
                 'difference_from_authored_ticks': record['pts'] - pts_origin - cumulative_fields[coded] * 1501.5,
             })
+    authored_pts = {r['next_coded_picture']: r['pts'] for r in fixture['pts_records']
+                    if r['next_coded_picture'] in pictures}
+    descriptor_mismatches = []
+    pts_mismatches = []
+    for row in published:
+        picture = pictures[row['id']]
+        if row['tff'] != int(picture['top_field_first']) or row['rff'] != int(picture['repeat_first_field']):
+            descriptor_mismatches.append({'coded': row['id'], 'cycle': row['cycle'],
+                'expected_tff': int(picture['top_field_first']), 'expected_rff': int(picture['repeat_first_field']),
+                'actual_tff': row['tff'], 'actual_rff': row['rff']})
+        expected_pts = authored_pts.get(row['id'])
+        if bool(row['display_pts_valid']) != (expected_pts is not None) or (
+                expected_pts is not None and row['display_pts'] != expected_pts):
+            pts_mismatches.append({'coded': row['id'], 'cycle': row['cycle'],
+                'expected_pts': expected_pts, 'actual_pts': row['display_pts'],
+                'actual_valid': bool(row['display_pts_valid'])})
     gaps = []
     for previous, current in zip(published, published[1:]):
         picture = pictures[previous['id']]
@@ -55,6 +71,8 @@ def analyze(fixture, rows):
         'authored_total_fields': total_fields,
         'authored_duration_seconds': total_fields * 1001 / 60000,
         'pts_alignment': pts_alignment,
+        'publication_descriptor_mismatches': descriptor_mismatches,
+        'publication_pts_mismatches': pts_mismatches,
         'starts': len(events.get('START', [])), 'ready': len(events.get('READY', [])),
         'publications': len(published), 'unique_publications': len(counts),
         'missing_coded_pictures': sorted(set(pictures) - set(counts)),
