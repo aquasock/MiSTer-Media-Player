@@ -184,6 +184,11 @@ H262-032: "Frame-DCT and frame-prediction subset"
 H262-033: "Interlaced-frame repeat and 4:2:0 signalling"
 H262-034: "Interlaced sequence field-period output"
 H262-035: "Interlaced 4:2:0 sample organization"
+H262-036: "Stream-defined quantization matrices"
+H262-037: "Weighted inverse quantization"
+H262-038: "Progressive film frame field duration"
+H262-039: "Quantized non-intra B macroblock types"
+H262-040: "Motion predictor reset after intra"
 H222-001: "Program Stream framing and end code"
 H222-002: "Pack header, SCR, mux rate and stuffing"
 H222-003: "System-header framing and length"
@@ -387,6 +392,36 @@ All records in this section are `VERIFIED`, `HIGH` confidence, and apply to the 
   source_reference: "6.1.1.8; Figures 6-1 through 6-3"
   controlled_conclusion: "In 4:2:0 interlaced frames, chrominance has half the frame width and height; its samples retain the same spatial frame locations whether the interlaced frame is represented by one frame picture or two field pictures, and their vertical relation to field luminance differs from progressive-frame sampling."
   conformance_effect: "Native field presentation must use interlaced 4:2:0 chroma expansion and cannot reuse progressive vertical chroma pairing without qualification."
+- record_id: H262-036
+  source_id: H262
+  source_reference: "H.262 (02/2000), 6.3.11; 7.3.1"
+  controlled_conclusion: "Sequence headers reset both matrices; extensions preserve unloaded matrices. Downloads use default zigzag order. For 4:2:0, luma and chroma share weights."
+  conformance_effect: "Load generic weights before their dependent transform transactions."
+
+- record_id: H262-037
+  source_id: H262
+  source_reference: "H.262 (02/2000), 7.4.2.3; 7.4.3; 7.4.4"
+  controlled_conclusion: "Non-DC reconstruction uses ((2QF+k)*W*scale)/32, truncating toward zero; k is zero for intra and sign(QF) otherwise. Saturation precedes mismatch control."
+  conformance_effect: "Preserve DC handling and both scan and scale modes."
+
+- record_id: H262-038
+  source_id: H262
+  source_reference: "H.262 (02/2000), 6.3.10; 7.1"
+  controlled_conclusion: "In interlaced sequences, progressive frames output two fields, or three when repeat_first_field is set; top_field_first identifies the first field, repeated third."
+  conformance_effect: "Retain order, duration and progressive chroma per picture."
+
+- record_id: H262-039
+  source_id: H262
+  source_reference: "H.262 (02/2000), Table B-4"
+  controlled_conclusion: "Non-intra B codes 00010, 000011 and 000010 carry quantizer and pattern, using bidirectional, forward and backward prediction respectively."
+  conformance_effect: "Parse quantizer changes before the existing motion and residual syntax."
+
+- record_id: H262-040
+  source_id: H262
+  source_reference: "H.262 (02/2000), 7.6.3.4"
+  controlled_conclusion: "An intra macroblock without concealment motion vectors resets all motion-vector predictors to zero."
+  conformance_effect: "Clear forward and backward components before subsequent prediction."
+
 ```
 
 ---
