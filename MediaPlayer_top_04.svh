@@ -96,8 +96,10 @@ wire [1:0] mpeg2_new_display_frame_bank;
 wire      mpeg2_new_display_scratch;
 wire      mpeg2_new_display_scratch_bank;
 wire [2:0] mpeg2_new_framebuffer_swap_reset_count;
-(* async_reg = "true" *) reg [1:0] mpeg2_new_film_mode_video_sync;
-(* async_reg = "true" *) reg [2:0] mpeg2_new_native_field_sync;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [1:0] mpeg2_new_film_mode_video_sync;
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [2:0] mpeg2_new_native_field_sync;
 always @(posedge clk_video) begin
     if(reset_video) mpeg2_new_film_mode_video_sync<=0;
     else mpeg2_new_film_mode_video_sync<={mpeg2_new_film_mode_video_sync[0],mpeg2_new_native_film_mode};

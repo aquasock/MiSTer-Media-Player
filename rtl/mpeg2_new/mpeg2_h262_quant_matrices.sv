@@ -156,6 +156,7 @@ assign update_now=stream_valid && (sequence_reset_pending || write_enable);
 // At most one weight completes per byte. A byte can also contain adjacent
 // load flags (including the two forbidden chroma flags for 4:2:0).
 always @* begin
+    b=0;
     ns=state; nk=skip_bits; ne=element; nm=matrix_id;
     nb=weight_bits; nw=weight_shift;
     write_enable=0; write_value=0; write_matrix=0; write_index=0;
