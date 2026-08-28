@@ -2147,7 +2147,8 @@ module tb_h262_live_raster_soak #(
                     publication.p_controller.wide_general_probe.parse_hold,
                     publication.p_controller.wide_general_probe.row_waiting);
             end
-            if(publication.p_controller.wide_general_probe.picture_capture&&
+            if((!NATIVE_PRESENTATION||stream_valid)&&
+               publication.p_controller.wide_general_probe.picture_capture&&
                publication.p_controller.wide_general_probe.picture_count)
                 $display("PICEVAL cycle=%0d hdr=%0d type=%0d geom=%0d is_p=%0d wide_mode=%0d gen_mode=%0d",
                     row_event_cycle,publication.p_header_count,

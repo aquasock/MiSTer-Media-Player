@@ -229,11 +229,11 @@ generate if(NATIVE_PRESENTATION) begin: native_presentation
         end
         if(native_swap)begin field_number<=field_number+1;trace_event("FIELD",selected_id);end
         if(cache_error||mismatch)$fatal(1,"native cache/field-order error");
-        if(quiet_cycles==4004000)begin
-            trace_event("END",selected_id);
-            $display("NATIVE_RESULT publications=%0d bank_swaps=%0d decoded=%0d pts_records=%0d associated=%0d fields=%0d cache_error=%0d overlap=%0d",publications,display_swaps,published_references+b_pictures,pts_index,associated,field_number,cache_error,overlap_error);
-            $fflush(trace_fd);
-        end
+    end
+    final begin
+        trace_event("END",selected_id);
+        $display("NATIVE_RESULT publications=%0d bank_swaps=%0d decoded=%0d pts_records=%0d associated=%0d fields=%0d cache_error=%0d overlap=%0d",publications,display_swaps,published_references+b_pictures,pts_index,associated,field_number,cache_error,overlap_error);
+        $fclose(trace_fd);
     end
 end else begin: synthetic_presentation
     assign native_reader_burst=0;assign native_reader_addr=0;assign native_reader_rd=0;
