@@ -1,0 +1,24 @@
+{
+  "map": {
+    "added": [
+      "Warning (10036): Verilog HDL or VHDL warning at mpeg2_h262_b_presentation_scheduler.sv(LINE): object \"last_bound_reference_count\" assigned a value but never read"
+    ],
+    "removed": [],
+    "baseline_count": 98,
+    "candidate_count": 99
+  },
+  "fit": {
+    "added": [],
+    "removed": [],
+    "baseline_count": 22,
+    "candidate_count": 22
+  },
+  "sta": {
+    "added": [
+      "Critical Warning (332148): Timing requirements not met"
+    ],
+    "removed": [],
+    "baseline_count": 17,
+    "candidate_count": 18
+  }
+}

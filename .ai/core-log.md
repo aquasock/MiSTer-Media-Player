@@ -1,3 +1,32 @@
+## 680 COMMIT Unreleased c124aa5 2026-08-28T12:54:31-07:00
+
+#### Coming From:
+
+Unreleased c124aa5
+
+#### Purpose:
+
+Record the approved seed-19 rebuild and its remaining HDMI setup violation.
+
+#### Outcome:
+
+Source c124aa5 changes exactly one assignment, Quartus seed 18 to 19, with all functional sources, simulation inputs, clocks and timing constraints unchanged. The build PC pulls the published source into a fresh checkout and revalidates all retained native, paired and focused evidence hashes; both native analyzers reproduce their qualified results using only the approved terminal-cut exception, and all six qualification tests pass. One clean Quartus 17.0.2 seed-19 compile finishes in 763.2 seconds with zero errors and 206 warnings, but fails setup timing on csync_hdmi csync_vs to hs in the HDMI domain at minus 0.013 ns slack and TNS. This is a different path from seed 18's minus 0.002 ns scaler RAM-output failure. MPEG setup passes at plus 1.186 ns and video setup at plus 2.953 ns; every other timing category passes, with minimum hold plus 0.246 ns, recovery plus 3.492 ns, removal plus 0.629 ns and pulse width plus 0.925 ns. Resources are 33,005 ALMs, 52,220 registers, 4,054,267 RAM bits, 514 of 553 M10Ks and 67 DSPs. All four eight-bit inverse-quantization weight boundaries and expected film CDC endpoints remain present. Warning sets are unchanged from seed 18, including the existing unused last_bound_reference_count and timing-failure warnings. The rejected RBF is 4,373,716 bytes with SHA256 7b47518c472e52c4953cc516fdea316072b4438a6be84c6fb9e92d69d34b6b98 and stays on the build PC without packaging or installation. The MiSTer is reachable this turn, and read-only FTP hashes confirm Main, helper, original opening and existing dated and undated cores match the recorded files; no device write, reload or playback occurs. Complete build data remains at /home/vash/mister-builds/entry679/FPGA, with local reports under output_files/entry679 and committed evidence under .ai/current_results/entry680_*. No second reseed is attempted.
+
+#### Next Steps:
+
+Pause after this single authorized reseed and obtain renewed approval before another build or any logic or timing-constraint change. Compare HDMI placement and margins across the retained seed-18 and seed-19 paths: the negative slack moved from the scaler RAM output to sync control, while MPEG decode remains positive. Preserve all qualification evidence and the unchanged strict timing gate. Do not install either rejected image; original-audio hardware validation awaits a timing-passing candidate.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 679 COMMIT Unreleased c124aa5 2026-08-28T12:38:01-07:00
 
 #### Coming From:
@@ -1219,35 +1248,6 @@ The user reports that corrected test two passes. Helper-first collection and a f
 #### Next Steps:
 
 Run test_3_deinterlace_bob_weave.mpg with Bob and HDMI first, retain its helper log and terminal screenshot, then repeat in Weave with separate captures. Finish test four's progressive all-I control and the AC-3 HDMI, AC-3 S/PDIF and DTS S/PDIF runs before claiming the full seven-fixture compatibility matrix. Keep the filesystem dirty-flag warning as a separate unresolved check and do not treat single-run timing values as performance qualification. Preserve the tested beta and runtime identities, user control of hardware lifecycle, local-only raw reports, restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [x] Passed
-
----
-
-## 640 COMMIT Unreleased 2045c34 2026-08-27T19:39:38-07:00
-
-#### Coming From:
-
-Unreleased 2045c34
-
-#### Purpose:
-
-Validate the corrected interlaced TFF playback fixture on the Buildroot beta against the recorded standard-MiSTer result.
-
-#### Outcome:
-
-The user reports that corrected test one now passes. Helper-first collection and a fresh uniquely named screenshot confirm that exact file completed under the unchanged released runtime. Valid schema-19 telemetry records 360 reference and displayed pictures, zero B pictures, 359 swaps, 3,068,039 accepted video bytes, no decoder or presentation error, no audio underrun or PCM protocol fault, zero timestamp conflicts, zero missed native display deadlines and no gap outliers. Each of the three recorded largest display intervals is the nominal 2,002,000 clocks. Sequence end, presentation completion and quiet termination are set. Helper exit is zero and all pipe reads reconcile to 5,556,849 completed transport bytes. HDMI decoded audio is confirmed by the helper; Bob was the requested setting and the user reports passing that run, but the telemetry does not independently attest the scaler setting or LED colors. Independent readback confirms the corrected fixture, RBF, Main, helper and kernel identities. Completion, error and native-cadence indicators match the recorded standard-MiSTer test-one result. Combined with entry 639, this establishes successful bounded interlaced all-I and progressive I/P/B runs on the beta; it is not the full compatibility matrix. No build, deployment, mode change, reload, reboot or playback is initiated by the agent. Built stays unchecked because no new build occurs; Passed records only this user-accepted TFF test. Raw captures and detailed comparison remain local, with only .ai/current_results/entry640_buildroot_test1_status.json published.
-
-#### Next Steps:
-
-Continue with corrected test_2_interlace_bff.mpg under the same requested Bob and HDMI settings, capture it before another file overwrites its helper log, then qualify Bob versus Weave and the AC-3 decode, AC-3 passthrough and DTS passthrough modes separately. Keep the initial single-frame progressive pixel comparison distinct from comprehensive video quality and do not infer performance improvements from one run's timing values. The storage dirty-flag warning remains a separate unresolved check. Preserve the known runtime and beta identities, user control of hardware lifecycle, local-only raw reports, restricted core.md and the forty-entry ring.
 
 #### Files Modified:
 
