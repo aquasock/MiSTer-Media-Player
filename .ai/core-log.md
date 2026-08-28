@@ -1,4 +1,4 @@
-## 681 COMMIT Unreleased ??? 2026-08-28T12:58:58-07:00
+## 681 COMMIT Unreleased 83c138e 2026-08-28T12:58:58-07:00
 
 #### Coming From:
 
@@ -10,7 +10,7 @@ Perform one additional approved seed-only rebuild using seed 20.
 
 #### Outcome:
 
-The user explicitly authorizes one more reseed after seed 19 fails HDMI sync setup timing. Change only the seed assignment from 19 to 20 in MediaPlayer.qsf; preserve all logic, clocks, timing constraints, physical buffers, Main, helper and qualification rules. Verify the seed-only source difference and recheck the retained native, paired and focused qualification evidence, including the narrowly approved terminal-cut exception. Use a new clean build directory at /home/vash/mister-builds/entry681/FPGA, preserving both earlier failed builds. This authorization covers exactly one additional compile and no automatic retries.
+The user explicitly authorizes one more reseed after seed 19 fails HDMI sync setup timing. Source 83c138e is published with the verified single seed-assignment change; the build has not yet started. Change only the seed assignment from 19 to 20 in MediaPlayer.qsf; preserve all logic, clocks, timing constraints, physical buffers, Main, helper and qualification rules. Verify the seed-only source difference and recheck the retained native, paired and focused qualification evidence, including the narrowly approved terminal-cut exception. Use a new clean build directory at /home/vash/mister-builds/entry681/FPGA, preserving both earlier failed builds. This authorization covers exactly one additional compile and no automatic retries.
 
 #### Next Steps:
 
