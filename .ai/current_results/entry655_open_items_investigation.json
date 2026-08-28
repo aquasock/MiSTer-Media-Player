@@ -1,0 +1,52 @@
+{
+  "source_commit": "4777c59",
+  "scope": "Read-only investigation of three items carried open from the field-DCT cycle.",
+  "logic_decrease": {
+    "question": "Logic fell 372 ALMs and 912 registers while a feature was added.",
+    "method": "Analysis and Synthesis run on the pre-change source at 3e89189 and compared with the field-DCT build.",
+    "analysis_synthesis_registers_baseline": 46832,
+    "analysis_synthesis_registers_field_dct": 46846,
+    "analysis_synthesis_delta": 14,
+    "fitter_registers_baseline": 50273,
+    "fitter_registers_field_dct": 49361,
+    "fitter_delta": -912,
+    "fitter_added_over_synthesis_baseline": 3441,
+    "fitter_added_over_synthesis_field_dct": 2515,
+    "resolution": "No logic was pruned. Synthesis produced the fourteen registers the change calls for. The decrease is a fitter effect: register duplication for fanout and packing differed between placements.",
+    "consequence": "The apparent saving is not real and must not be banked; a different seed or the next feature will move it again.",
+    "status": "resolved"
+  },
+  "hdmi_setup_margin": {
+    "question": "Setup slack fell 0.117 ns to +0.126 ns.",
+    "hdmi_setup_slack_ns": 0.126,
+    "next_worst_domain_slack_ns": 1.382,
+    "hdmi_fmax_mhz": 151.38,
+    "hdmi_clock_mhz": 148.5,
+    "headroom_percent": 1.9,
+    "resolution": "Placement pressure from added logic on the one domain with almost no headroom, which is the mechanism entry 370 documented and measured at about two percent.",
+    "correction": "An earlier reading of general[1] Fmax at 60.7 MHz as alarming was wrong; that domain's slack is +2.043 ns. The Fmax column is restricted by other constraints and is not headroom.",
+    "response": "Reseed rather than restructure if a later change pushes this category negative.",
+    "status": "explained; margin remains the binding constraint"
+  },
+  "capture_variation": {
+    "question": "Screenshot variation first recorded in entry 644 and unisolated.",
+    "signature": {
+      "columns": 90,
+      "column_spacing": 8,
+      "first_column_x": 41,
+      "video_coordinate_rule": "x mod 8 == 1",
+      "rows_affected": 480,
+      "row_span": "60..539, the full active area",
+      "delta_range": [1, 255],
+      "character": "Content dependent and chroma dominated; sampled pairs show red unchanged while green swings fully."
+    },
+    "localisation": "Readback or display path on one byte lane of each 64-bit word. Not decode and not framebuffer content: counters are identical between captures and one capture of an unchanged frame matched a released-bitstream baseline exactly.",
+    "measured_on": ["test_4_progressive.mpg", "test_7_progressive_ipb.mpg"],
+    "magnitudes": {"test_4": 4144, "test_7": 7640, "entry_644_recorded": 4418},
+    "playback_impact": "No evidence. The user reports both fixtures play perfectly, and these are the most detailed fixtures where the deltas are largest.",
+    "actual_cost": "Reliability of the pixel-comparison regression method. Entry 644 nearly recorded a false regression and entry 653 nearly repeated it.",
+    "mitigation": "Capture the completed frame twice and compare the best of the two. Proven on two fixtures, costs seconds.",
+    "recommendation": "Do not spend a development cycle on the root cause. Revisit only if visible shimmer is reported on real content, at which point it becomes a quality question rather than a measurement one.",
+    "status": "characterised and mitigated; root cause deliberately not pursued"
+  }
+}

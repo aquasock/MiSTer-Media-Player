@@ -1,3 +1,32 @@
+## 655 COMMIT Unreleased 4777c59 2026-08-27T22:47:56-07:00
+
+#### Coming From:
+
+Unreleased 4777c59
+
+#### Purpose:
+
+Resolve the three items carried open from the field-DCT cycle.
+
+#### Outcome:
+
+All three are investigated read-only, with no source, build, deployment or hardware change. The unexplained logic decrease is resolved and was never a correctness signal. Running Analysis and Synthesis alone on the pre-change source at `3e89189` and comparing with the field-DCT build shows 46,832 registers against 46,846, a rise of exactly fourteen, which is what the change calls for: the `dct_type` register, the three-bit capture row counter, the two per-bank field flags, the six bits gained by no longer truncating the block origin across two banks, and a little plumbing. Nothing was pruned. The decrease is entirely a fitter effect, because the fitter adds registers over synthesis through duplication for fanout and packing and added 3,441 in the baseline against 2,515 here, simply choosing less duplication for a different placement; the ALM decrease follows from the same cause. The consequence is recorded so it is not misused: the apparent saving is not real, must not be banked against future features, and will move again with a different seed or the next change. The HDMI setup margin needs no separate mechanism. Its slack of positive 0.126 nanoseconds sits an order of magnitude below the next worst domain at positive 1.382, and its Fmax of 151.38 megahertz against a 148.5 megahertz clock is about 1.9 percent of headroom, matching the roughly two percent entry 370 measured. The 0.117 nanosecond erosion is placement pressure from added logic on the one domain with no room to absorb it, which is exactly that entry's finding, and the recorded response of reseeding rather than restructuring stands. One earlier reading is corrected: the `general[1]` Fmax of 60.7 megahertz was briefly treated as alarming, but that domain's slack is positive 2.043 nanoseconds and the restricted Fmax column does not represent headroom. The capture variation is characterised far enough to act on and then deliberately left alone. Between two captures of an identical unchanged frame the differences occupy ninety columns spaced exactly eight apart from x equal to 41, across all 480 rows of the active area; since 720-wide content is centred in an 800-wide display from x equal to 40, this is x modulo eight equal to one in video coordinates, the second pixel of each eight-pixel group and one byte lane of each 64-bit word. Magnitudes run from one to 255, are content dependent and chroma dominated, with sampled pairs showing red unchanged while green swings fully. With entry 653's finding that one capture matched a released-bitstream baseline exactly while counters stayed identical, this is a readback or display-path instability on a fixed byte lane rather than decode or framebuffer content. It is recorded as costing measurement reliability rather than picture quality: there is no evidence it affects playback, the user reports both affected fixtures play perfectly and they are the most detailed fixtures where the deltas are largest, while entry 644 nearly recorded a false regression from it and entry 653 nearly repeated that. The mitigation of capturing a completed frame twice and comparing the best of the two is proven on two fixtures and costs seconds.
+
+#### Next Steps:
+
+Do not spend a development cycle on the capture variation's root cause; use the two-capture method for every raster comparison and revisit only if visible shimmer is reported on real content, at which point it becomes a quality question rather than a measurement one. Do not treat the reduced ALM and register figures as headroom when scoping the next feature, because they are a placement artifact rather than a saving; the 41 free block-memory blocks recorded in entry 609 remain the real memory budget. Keep the HDMI setup margin visible as the binding timing constraint and reseed rather than restructure if a later change pushes that category negative. With these three closed, the field-DCT cycle has no open technical items, though a release-grade regression would still want tests two, three, five and six replayed. The next decoder milestone remains unapproved and unscoped: interlaced P and B is the gate that would make commercial discs play, and the deferred field-picture gate needs either a non-ffmpeg generator or a real disc sample because ffmpeg cannot encode field pictures, which is a choice for the user. Preserve restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 654 COMMIT Unreleased 4777c59 2026-08-27T22:39:00-07:00
 
 #### Coming From:
@@ -1157,38 +1186,6 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 615 COMMIT Unreleased e2bf23f 2026-08-27T07:52:18-07:00
-
-#### Coming From:
-
-Unreleased 9623fa7
-
-#### Purpose:
-
-Pack AC-3 frames into IEC 61937 bursts in the helper behind an audio output selection.
-
-#### Outcome:
-
-Published source `e2bf23f` adds `--audio-out`, defaulting to `hdmi`, and emits IEC 61937 bursts instead of decoded stereo when `spdif` is selected. One AC-3 frame is 1536 samples and one burst period is 1536 stereo frames, so a frame fills a period exactly and the bursts ride the existing PCM transport with no rate conversion, no new record type and no FPGA memory, which matters at 93 percent M10K. Each burst carries the `0xF872` and `0x4E1F` sync words, data type one, the length in bits, the frame written as big-endian sixteen bit words so bytes reach the line in order, and zero stuffing for the remainder. liba52 is not initialized at all in passthrough, since nothing is decoded. Verification is offline and byte exact: the emitted stream is 2,304,000 bytes forming 375 whole burst periods, every one parses with correct sync words, data type, whole-byte length and zero stuffing, every payload begins with the AC-3 sync word, all frames are the expected 1792 bytes, and the 672,000 bytes carried are byte identical to the AC-3 extracted from the source. An independent decoder produces the same SHA256 from the carried frames as from the source frames. The decoded paths are unchanged: AC-3 stereo still matches its reference at maximum difference three and correlation 0.999999971, the channel sweep still places all six channels correctly, and the MPEG Layer II movie produces identical output in both `hdmi` and `spdif` modes, byte for byte, since passthrough applies to AC-3 only. A build defect was found and fixed rather than worked around: native and cross builds shared one liba52 object directory, so switching compilers produced a confusing wrong-format link error; objects are now kept per compiler. The helper cross-compiles clean under `-Werror` with ARM GNU 10.2 to a static binary with SHA256 `f07e4ce2bb2a431802f9c8631a228bb70c363455954315883776f58ce87a75db`. What this does not establish is as important: it proves the bytes are correct, not that any receiver locks onto them, and not that the path from the helper to the S/PDIF pin is bit transparent. It is not deployed, and it cannot work on hardware until the second boundary lands, because nothing yet selects the mode, mutes the unused output, bypasses the framework mixer's attenuation, boost, mix and filter, or sets the S/PDIF non audio channel status bit that is currently hardwired to zero. Built therefore refers to the helper only and Passed remains unchecked.
-
-#### Next Steps:
-
-Start the second boundary, which is the integration the user described: an OSD option choosing S/PDIF or HDMI audio, the unused output muted, a bit transparent path proven rather than assumed, the framework fork the user approved for the channel status bit and the mixer bypass, and a Main patch line so the launch passes the selected mode. Define the option name, the muting mechanism and the transparency proof before editing RTL. When it reaches hardware, the existing channel sweep fixture is the six channel sound test with no new fixture needed, and LFE becomes audible for the first time because the stereo downmix discards it. Do not describe the user's 2.1 soundbar locking onto a burst as proof of discrete channel routing; that needs the community test on real 5.1 hardware. A commercial AC-3 track with real dynamic range control remains uncompared. The interlaced video gates of entry 609 remain open and unstarted. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- host/arm/Makefile
-- host/arm/ARCHITECTURE.md
-- tools/streams/verify_ac3_passthrough.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
 
