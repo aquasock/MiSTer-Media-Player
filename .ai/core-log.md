@@ -1,3 +1,48 @@
+## 656 COMMIT Unreleased ??? 2026-08-27T23:13:11-07:00
+
+#### Coming From:
+
+Unreleased 4777c59
+
+#### Purpose:
+
+Enable the original twelve-second DVD opening with AC-3 as a bounded native film-frame playback milestone.
+
+#### Outcome:
+
+The user approves this cycle after a read-only title-set inventory and source audit. Two streaming passes across the seven main-title VOB files produce identical elementary-video hashes and 168,848 picture headers, with no extractor or demuxer errors. The predominant content is progressive frame-coded film in an interlaced sequence with repeated-field cadence; 1,938 B pictures require f_code six, beyond the current five-bit-range gate, and the first occurs at coded-picture index 143. Twenty-three later interlaced-frame pictures and one inconsistent final chroma flag remain outside this boundary, as do IFO title selection, direct ISO input and DVD menus. The approved implementation will retain original compressed video and the first AC-3 track, extend B motion widths and residual handling end to end, admit the bounded film-frame subset, retain field-order, repeat and progressive-chroma metadata with each physical picture bank, and present two or three fields per picture while preserving timestamp anchoring and ownership. Preparation and verification tooling will be deterministic and committed; film-derived media stays local. The old interlaced-P pixel runner is explicitly unvalidated and cannot establish correctness until its progressive control passes. No source implementation, build or hardware acceptance exists at proposal time. The retained numeric inventory is title-set header evidence, not macroblock qualification or proof of IFO playback order.
+
+#### Next Steps:
+
+Prepare and verify the original twelve-second opening and synthetic boundary fixtures, establish a working pixel oracle, and implement reconstruction and presentation together for this hardware boundary. Require signed B-vector wrap, residual and frame-edge tests, reference pixel comparisons, per-picture field order and two/three-field duration checks, timestamp and AC-3 synchronization, safe terminal and replay handling, and existing regressions. Publish source only from the Raspberry Pi, pull exact published source on GUNSMOKE, then perform a clean Quartus build with all timing categories positive and a resource comparison against 512 of 553 M10K; the accepted HDMI setup margin is only positive 0.126 nanoseconds and placement savings are not headroom. Preserve fail-closed checks outside the approved subset, existing local artifacts, user control of deployment and playback, restricted core.md and the forty-entry ring. Record actual source files and results when the implementation commit exists, and do not describe the opening as complete DVD support.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_frontend.sv
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+- rtl/mpeg2_new/mpeg2_h262_picture_timestamp.sv
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- rtl/mpeg2_new/mpeg2_h262_native_field_order.sv
+- rtl/mpeg2_luma_framebuffer.sv
+- rtl/mpeg2_video_output_timing.sv
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_05.svh
+- MediaPlayer_top_06.svh
+- tools/streams/generate_test_b_f_code_range.py
+- tools/streams/h262common.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 655 COMMIT Unreleased 4777c59 2026-08-27T22:47:56-07:00
 
 #### Coming From:
@@ -1157,35 +1202,6 @@ Decide how to recover timing before anything is deployed, and record the choice 
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 616 COMMIT Unreleased e2bf23f 2026-08-27T07:52:18-07:00
-
-#### Coming From:
-
-Unreleased e2bf23f
-
-#### Purpose:
-
-Capture the outstanding MPEG Layer II hardware regression on the AC-3 helper.
-
-#### Outcome:
-
-The full movie replay on the new helper is finally captured with its own log, closing the gap entries 613 and 614 left open. Completion is exact: all 17,876 reference and display pictures, 17,875 swaps, 715,713,077 accepted video bytes, `error_flags` zero, presentation error clear, sequence end seen, presentation complete, quiet snapshot, audio underrun and PCM protocol clear, both timestamp conflict counters zero, and helper PID 3477 submitting all 839,409,548 transport bytes over 51,234 reads with exit zero. The accepted MPEG Layer II path therefore survives codec selection on hardware, which host testing had suggested but not proven. One measured quantity did change and is reported rather than smoothed over: this run missed two display slots where entries 605 and 606 each missed one. The deadline records place them at displayed pictures 691 and 692, adjacent and at the same scene cut as before, with two 4,004,000-clock intervals whose eight bit gap ordinals 179 and 180 alias to those pictures. Both records show no presentable candidate with the decoder not ready and the upstream FIFO pending, presentation error and the timestamp signals clear, and input starvation of 1,009,994 and 727,897 clocks. The new helper is not implicated by the evidence available. Delivery timing is materially identical across all three movie runs, with median inter-read gaps of 11,463, 11,468 and 11,475 microseconds, ninety-ninth percentiles of 20,986, 20,966 and 20,931, maxima of 41,289, 41,309 and 41,304, and the same 23.5 millisecond worst gap in the window around the cut, while the MPEG Layer II PCM output was already proven byte identical on the host in both output modes. What the extra slot exposes is a flaw in the entry 608 and 609 model rather than a new fault. That model tested each picture independently against a full buffer, which is why it predicted exactly one miss, but after picture 690 overruns the buffer is not refilled to full, so picture 691 at 95,308 bytes is then also uncovered. Taking the pair together, 245,624 bytes must arrive against 98,304 bytes of buffer plus two frame periods of delivery, a deficit of about 67,240 bytes or roughly 1.7 slots, so one or two lost slots at this cut are both consistent with the mechanism and the exact count depends on phase. Entry 609's known limitation stands but its wording of exactly one repeated frame is too strong and is corrected here to one or two at that cut. The user reports the movie plays perfectly, which is consistent: two repeated frames at a scene cut in a ten minute film are not perceptible. No source change is made in this entry, so Built and Passed refer to `e2bf23f`, with Passed covering the MPEG Layer II regression.
-
-#### Next Steps:
-
-Treat the MPEG Layer II regression as closed and do not repeat the full replay to observe the missed slot count again, since a single run per circumstance is the standing practice and the mechanism is now understood. If that judder is ever to be removed, the fix remains the deeper input buffer costed in entry 608 at roughly 26 M10K against 41 free, and the cascade behaviour means the buffer must cover consecutive large pictures rather than only the single largest, which makes that fix less attractive rather than more. Carry the corrected wording, being one or two repeated frames at the picture 690 cut, into release notes rather than entry 609's original phrasing. The audio work continues at the second passthrough boundary described in entry 615. A commercial AC-3 track with real dynamic range control remains uncompared, and the interlaced video gates of entry 609 remain open and unstarted. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 
