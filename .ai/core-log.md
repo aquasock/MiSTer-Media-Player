@@ -1,3 +1,32 @@
+## 644 COMMIT Unreleased 2045c34 2026-08-27T19:55:50-07:00
+
+#### Coming From:
+
+Unreleased 2045c34
+
+#### Purpose:
+
+Validate progressive all-I test four with user-reported Weave and HDMI audio on the Buildroot beta.
+
+#### Outcome:
+
+The user reports everything passes in Weave. Helper-first retrieval and a fresh screenshot confirm the correct fixture and valid schema-19 telemetry: 360 reference and displayed pictures, zero B pictures, 359 swaps, 12,057,601 accepted video bytes, zero decoder or presentation errors, no audio underrun or PCM protocol fault, sequence end and quiet completion. Six timestamp-advance conflicts, zero delay conflicts and zero native deadline-gap and gap-outlier counters match entry 628's standard-MiSTer test-four rerun. Largest display intervals are about 49.7 milliseconds on both systems; zero native deadline-gap counters do not establish perfect progressive cadence. The helper confirms HDMI decoded output, 576,000 emitted PCM samples and exit zero; all 888 pipe reads reconcile to 14,546,422 completed transport bytes without acknowledged fallback payload. Readback verifies the unchanged runtime, kernel and fixture, and the comparator's Main, RBF and fixture identities match. An additional final-raster comparison is inconclusive: outside telemetry, the first screenshot differs from the standard baseline at 8,820 of 433,920 pixels, all at x modulo eight equal to one. A second screenshot without replay differs from the first at 4,418 pixels and from the standard at 8,816, with unchanged telemetry and helper log. The source of this variation is not isolated, so neither pixel equivalence nor a Buildroot regression is established. Weave selection and appearance rely on the user's report. Passed records functional acceptance only; Built remains unchecked because no new build occurs. No deployment, mode change, replay, reload or reboot is initiated. Raw captures remain local; only .ai/current_results/entry644_buildroot_test4_status.json is published.
+
+#### Next Steps:
+
+Run test_5_audio_ac3_51.mpg with Bob and HDMI audio, then retain the completed screen for collection before testing AC-3 S/PDIF and DTS S/PDIF separately. Confirm the expected audible channel sweep; the HDMI downmix intentionally omits LFE. Keep overall beta qualification open pending the remaining audio matrix, and retain the unisolated test-four screenshot variation as a separate video-quality caveat alongside the unresolved filesystem dirty-flag check. Do not begin a source fix or attribute either observation to Buildroot without evidence and approval for a revised investigation. Preserve runtime identities, user control of hardware lifecycle, local-only raw data, restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [x] Passed
+
+---
+
 ## 643 COMMIT Unreleased 2045c34 2026-08-27T19:51:27-07:00
 
 #### Coming From:
@@ -1159,37 +1188,6 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 604 COMMIT Unreleased d466bed 2026-08-27T05:41:11-07:00
-
-#### Coming From:
-
-Unreleased 6669b70
-
-#### Purpose:
-
-Allow timestamped native all-I playback to use the bounded ordinary frame queue without false ownership aborts.
-
-#### Outcome:
-
-Published source d466bed removes the per-candidate timestamp-active restriction from native all-I overlap admission and secondary retention, while preserving the three-bank ownership and capacity guards, P/B and mode exclusions, cadence floor and timestamp-due gate. The existing native ownership test gains a second top with production timestamp association and timeline modules, connected through the existing runner. Before the user's scope change, its ten timestamp/ownership cases and the legacy ownership case pass; the old scheduler fails the new case and a mutant bypassing timestamp-due fails the future-PTS check as expected. The exact first 100 full-movie access units with helper timestamps complete all 100 pictures with zero errors or missed slots in the modeled video pipeline; this excludes physical PCM, HPS, scaler and CDC behavior. Nine completed focused/reconstruction regression jobs and the shared P/B raster test also pass. The user then explicitly skips A/V simulations and narrows this run to an RBF build and timing checks, retaining deployment responsibility. Remaining long A/V, pressure, two ceiling simulations and the unfinished native suite are stopped; none is claimed as a completed pass, and the original full qualification plan is not fulfilled. GUNSMOKE pulls exact published source d466bed into a clean build directory and completes Quartus 17.0.2 seed 16 in 730.0 seconds with 0 errors and 208 warnings. The normalized warning set has no additions versus accepted f615ce0 and there are no newly ignored timing filters. Worst reported setup is +0.083 ns, hold +0.240 ns, recovery +3.088 ns, removal +0.456 ns and minimum pulse width +0.925 ns, with every reported TNS zero. The 4,354,700-byte RBF has SHA256 d46f80061a3270c1fed07a089517e70b413d3353858dc0d8937ac1bb0070aa6a; its Pi copy at output_files/entry604/MediaPlayer.rbf is independently hash-verified. No candidate is uploaded to the MiSTer, activated or played by the agent. Earlier read-only backups of the installed f615ce0 RBF and retained Main are verified and persisted under /home/vash/mister-builds/entry604-backup; Main, media and settings remain untouched by this cycle. Bounded build reports, completed evidence, cancellation scope and reproducible drivers are retained as .ai/current_results/entry604_*, with raw logs compressed losslessly. Built is checked; hardware Passed remains unchecked.
-
-#### Next Steps:
-
-The user will deploy the supplied RBF and reload the MediaPlayer core, then replay the unchanged games/MediaPlayer/bbb_full_480i_tff_av_10080kbps.mpg with audio. Record the selected Bob/Weave mode and reload lifecycle explicitly, observe whether playback passes the former opening freeze and continues through the end with sound, sync and a responsive menu, and leave telemetry ready. On the next report, retrieve the helper log first and a fresh checksum-valid screenshot, verify the installed candidate hash and inspect presentation and audio errors, counts and deadline records. Hardware acceptance and long A/V simulation remain open; do not describe positive FPGA timing or the completed opening model as proof that the full movie or commercial DVDs play correctly. Use modular per-frame timing and full picture/transport counts because the 32-bit 60 MHz session timer wraps during the full film. Retain restoration artifacts, restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- tools/streams/tb_native_ordinary_overlap_ownership.sv
-- tools/streams/run_native_480i_timing.sh
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
 
