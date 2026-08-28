@@ -41,6 +41,40 @@ must not be used to accept unexplained errors or a failed isolated comparison.
 Neither diagnostic changes synthesizable RTL or substitutes oracle pictures in
 the hardware core.
 
+## Native timing diagnosis
+
+The numerical soak above uses fast synthetic swap windows, with film cadence
+and PTS admission disabled. Its reconstruction pass does not establish smooth
+hardware presentation. The opt-in timing runner connects the same decoder to
+the production native timing generator, DDR writer/arbiter, timestamp owner,
+presentation timeline and framebuffer. It preserves the default numerical mode.
+
+```sh
+bash tools/streams/run_original_dvd_timing.sh simulation/dvd_opening \
+    host/arm/media_player_helper simulation/dvd_timing
+```
+
+The helper's video bytes must match the prepared elementary stream (allowing
+only an explicitly recorded terminal sequence-end suffix). Sparse PTS records
+retain their clean-byte offsets; no timestamps are synthesized for missing
+pictures. The runner retains real reconstructed references and checks the
+existing measured propagation bounds, which still require the paired numerical
+qualification for acceptance.
+
+`native.csv` distinguishes decode readiness, scheduler selection, field windows
+and actual framebuffer publication. Picture identities exceed eight bits so
+the complete 289-picture opening cannot wrap. `analysis.json` reports missing
+or duplicate publications and gaps relative to each picture's authored two or
+three fields; extra fields require interpretation against original PTS, including
+the known final timestamp gap. A completed diagnostic is not a timing pass.
+
+`NATIVE_MEMORY_LATENCY` controls ordered DDR response latency (default 1 decoder
+cycle). `NATIVE_BUSY_PERIOD` and `NATIVE_BUSY_CYCLES` add deterministic command
+backpressure (default 0). Display and prediction reads contend in the real
+arbiter. These are sensitivity cases, not measured MiSTer DDR timings. The
+clean-byte source is continuously available; host scheduling, PCM extraction
+and the HDMI scaler are outside this isolation boundary.
+
 ## Focused regressions
 
 ```sh

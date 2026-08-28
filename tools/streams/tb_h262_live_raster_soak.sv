@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+`timescale 1ns/1fs
 
 `ifndef H262_PREDICTION_DESCRIPTOR_DEPTH
 `define H262_PREDICTION_DESCRIPTOR_DEPTH 4
@@ -22,6 +22,11 @@ module tb_h262_live_raster_soak #(
     parameter integer PIXEL_HEIGHT=96,
     parameter integer PIXEL_PICTURES=24,
     parameter integer MEMORY_READ_LATENCY=1,
+    // Entry 669: opt-in integrated native-film diagnosis. Defaults retain
+    // the numerical soak's original fast synthetic presentation exactly.
+    parameter integer NATIVE_PRESENTATION=0,
+    parameter integer MEMORY_BUSY_PERIOD=0,
+    parameter integer MEMORY_BUSY_CYCLES=0,
     parameter integer SWAP_WINDOW_CYCLES=10000,
     parameter integer FREEZE_TRACE_CYCLES=2000000,
     parameter integer STALL_TRACE_CYCLES=0,
@@ -74,7 +79,7 @@ module tb_h262_live_raster_soak #(
     reg [1023:0] pixel_report_path;
     integer intra_samples=0,intra_mismatches=0,intra_max_delta=0;
     integer intra_index,intra_delta;
-    wire i_recon_done,i_recon_valid,i_iq_error,i_idct_error,i_recon_error,i_matrix_error;
+    wire i_recon_done,i_recon_start,i_recon_valid,i_iq_error,i_idct_error,i_recon_error,i_matrix_error;
     wire [1:0] i_component;
     wire [11:0] i_x,i_y;
     wire [7:0] i_value;
@@ -309,8 +314,8 @@ module tb_h262_live_raster_soak #(
     reg display_scratch_d=0,display_scratch_bank_d=0;
     reg [7:0] reference_identity[0:2];
     reg [7:0] scratch_identity[0:1];
-    reg [7:0] picture_trace_reference_id[0:2];
-    reg [7:0] picture_trace_scratch_id[0:1];
+    integer picture_trace_reference_id[0:2];
+    integer picture_trace_scratch_id[0:1];
     reg [2:0] picture_trace_reference_type[0:2];
     reg [2:0] picture_trace_scratch_type[0:1];
     reg [9:0] picture_trace_reference_tr[0:2];
@@ -326,7 +331,9 @@ module tb_h262_live_raster_soak #(
     wire stream_ready=decoder_ready&&!presentation_hold&&
         !destination_ownership_hold;
 
-    always #5 clk=~clk;
+    always #(NATIVE_PRESENTATION ? 8.333333 : 5) clk=~clk;
+
+    `include "tools/streams/tb_h262_live_native_presentation.svh"
 
 
     reg [5:0] b_state_previous=0;
@@ -360,7 +367,8 @@ module tb_h262_live_raster_soak #(
         .intra_dc_precision(intra_dc_precision),
         .intra_vlc_format(intra_vlc_format),
         .frame_pred_frame_dct(frontend.frame_pred_frame_dct),
-        .pipeline_block_done(MIXED_PIXEL_MODE==2 ? i_recon_done : 1'b1),
+        .pipeline_block_done(NATIVE_PRESENTATION ? native_writer_accepted :
+                             (MIXED_PIXEL_MODE==2 ? i_recon_done : 1'b1)),
         .recon_block_complete(MIXED_PIXEL_MODE==2 ? i_recon_done : 1'b1),
         .p_persistence_complete(pred_persisted),
         .p_row_persistence_complete(pred_row_persisted),
@@ -411,10 +419,11 @@ module tb_h262_live_raster_soak #(
             .block_index(publication.qfs_block_index),.dct_type(publication.dct_type),
             .sample_valid(iv),.sample_index(ii),.sample_value(ivalue),.idct_block_complete(idone),
             .pixel_valid(i_recon_valid),.pixel_component(i_component),.pixel_x(i_x),.pixel_y(i_y),
-            .pixel_value(i_value),.block_start(),.block_complete(i_recon_done),
+            .pixel_value(i_value),.block_start(i_recon_start),.block_complete(i_recon_done),
             .macroblock_420_complete(),.recon_error(i_recon_error));
     end else begin
         assign i_recon_done=1'b1;
+        assign i_recon_start=1'b0;
         assign i_recon_valid=0;
         assign i_iq_error=0;assign i_matrix_error=0;assign i_idct_error=0;assign i_recon_error=0;
         assign i_component=0;assign i_x=0;assign i_y=0;assign i_value=0;
@@ -460,10 +469,15 @@ module tb_h262_live_raster_soak #(
     // compiled top level presents them.
     mpeg2_h262_ddram_store writer(
         .clk(clk),.reset(reset),.frame_bank(active_bank),
-        .pixel_value(pred_store_value),.pixel_component(2'd0),
-        .pixel_x(pred_store_x),.pixel_y(pred_store_y),
-        .pixel_valid(pred_store_valid),.block_start(pred_store_start),
-        .block_complete(pred_store_complete),.block_stored(writer_stored),
+        .field_dct(NATIVE_PRESENTATION && !pred_store_select && publication.dct_type),
+        .pixel_value(native_use_intra ? i_value : pred_store_value),
+        .pixel_component(native_use_intra ? i_component : 2'd0),
+        .pixel_x(native_use_intra ? i_x : pred_store_x),
+        .pixel_y(native_use_intra ? i_y : pred_store_y),
+        .pixel_valid(native_use_intra ? i_recon_valid : pred_store_valid),
+        .block_start(native_use_intra ? i_recon_start : pred_store_start),
+        .block_complete(native_use_intra ? i_recon_done : pred_store_complete),
+        .block_stored(writer_stored),.block_accepted(native_writer_accepted),
         .write_seen(writer_seen),.store_error(writer_error),
         .ddram_busy(writer_busy),.ddram_burstcnt(writer_burstcnt),
         .ddram_addr(writer_addr),.ddram_rd(writer_rd),
@@ -473,40 +487,49 @@ module tb_h262_live_raster_soak #(
         .clk(clk),.reset(reset),.writer_burstcnt(writer_burstcnt),
         .writer_addr(writer_addr),.writer_rd(writer_rd),
         .writer_din(writer_din),.writer_be(writer_be),.writer_we(writer_we),
-        .writer_busy(writer_busy),.reader_burstcnt(8'd0),.reader_addr(29'd0),
-        .reader_rd(1'b0),.prediction_burstcnt(pred_burstcnt),
+        .writer_busy(writer_busy),.reader_burstcnt(native_reader_burst),
+        .reader_addr(native_reader_addr),.reader_rd(native_reader_rd),
+        .reader_busy(native_reader_busy),.reader_dout_ready(native_reader_valid),
+        .prediction_burstcnt(pred_burstcnt),
         .prediction_addr(pred_addr),.prediction_rd(pred_rd),
         .prediction_busy(pred_busy),.prediction_dout_ready(pred_dout_ready),
-        .ddram_busy(1'b0),.ddram_dout_ready(memory_dout_ready),
+        .ddram_busy(native_memory_busy),.ddram_dout_ready(memory_dout_ready),
         .ddram_burstcnt(memory_burstcnt),.ddram_addr(memory_addr),
         .ddram_rd(memory_rd),.ddram_din(memory_din),.ddram_be(memory_be),
         .ddram_we(memory_we));
 
     mpeg2_h262_b_presentation_scheduler scheduler(
-        .native_film_mode(1'b0),
-        .native_field(1'b0),
-        .display_picture_present(1'b0),
-        .display_repeat_first_field(1'b0),
-        .candidate_top_field_first(1'b1),
-        .clk(clk),.reset(reset),.swap_window_pulse(swap_window_pulse),
-        .cadence_tick_pulse(swap_window_pulse),
-        .frame_rate_code(4'h3),
-        .timestamp_candidate_active(1'b0),
-        .timestamp_candidate_due(1'b0),
-        .native_ordinary_overlap_enable(1'b0),
+        .native_film_mode(native_film_mode),
+        .native_field(native_field),
+        .display_picture_present(native_picture_present),
+        .display_repeat_first_field(native_display_rff),
+        .candidate_top_field_first(native_candidate_tff),
+        .clk(clk),.reset(reset),
+        .swap_window_pulse(NATIVE_PRESENTATION ? native_swap : swap_window_pulse),
+        .cadence_tick_pulse(NATIVE_PRESENTATION ? native_cadence : swap_window_pulse),
+        .frame_rate_code(NATIVE_PRESENTATION ? frontend.frame_rate_code : 4'h3),
+        .timestamp_candidate_active(native_pts_active),
+        .timestamp_candidate_due(native_pts_due),
+        .native_ordinary_overlap_enable(native_active),
         .active_frame_bank(active_bank),
         .frame_waiting(frame_waiting),.completed_frame_bank(completed_bank),
-        .reference_frame_bank(reference_bank),.b_picture_start(b_picture_start),
+        .reference_frame_bank(reference_bank),
+        .b_picture_start(NATIVE_PRESENTATION ? native_header_now&&stream_data[5:3]==3 : b_picture_start),
         .reference_promotion_count(reference_promotion_count),
-        .non_b_picture_start(non_b_picture_start),
-        .i_picture_start(i_picture_start),
-        .p_picture_start(p_picture_start),.sequence_end(sequence_end),
+        .non_b_picture_start(NATIVE_PRESENTATION ? native_header_now&&stream_data[5:3]!=3 : non_b_picture_start),
+        .i_picture_start(NATIVE_PRESENTATION ? native_header_now&&stream_data[5:3]==1 : i_picture_start),
+        .p_picture_start(NATIVE_PRESENTATION ? native_header_now&&stream_data[5:3]==2 : p_picture_start),
+        .sequence_end(NATIVE_PRESENTATION ? stream_valid&&picture_window_next==32'h000001b7 : sequence_end),
         .b_user_success(b_success),.b_decode_error(probe_error||pred_error),
         .display_frame_bank(display_frame_bank),.display_scratch(display_scratch),
         .display_scratch_bank(display_scratch_bank),
         .decode_scratch_bank(decode_scratch_bank),
-        .candidate_frame_valid(),.candidate_frame_scratch(),
-        .candidate_scratch_bank(),.candidate_frame_bank(),
+        .candidate_frame_valid(native_candidate_valid),
+        .candidate_frame_scratch(native_candidate_scratch),
+        .candidate_scratch_bank(native_candidate_sb),
+        .candidate_frame_bank(native_candidate_bank),
+        .candidate_presentable_debug(native_candidate_ready),
+        .cadence_slot_debug(native_cadence_slot),.debug_state(native_scheduler_state),
         .framebuffer_swap_reset_count(framebuffer_swap_reset_count),
         .reference_overlap_header(reference_overlap_header),
         .presentation_hold(presentation_hold),
@@ -750,7 +773,9 @@ module tb_h262_live_raster_soak #(
             stream_data<=0;
         end
         else if(stream_index<stream_len)begin
-            if(stream_ready)begin
+            if(native_metadata_pending)begin
+                stream_valid<=0;
+            end else if(stream_ready)begin
                 stream_data<=stream_mem[stream_index];
                 stream_valid<=1;
                 stream_index<=stream_index+1;
@@ -1203,9 +1228,9 @@ module tb_h262_live_raster_soak #(
                 end
                 // Exercise real reconstruction and subsequent prediction. The
                 // independent I writer's bus packing is tested in its own suite.
-                if(i_component==0)
+                if(!NATIVE_PRESENTATION && i_component==0)
                     ddr_mem[reference_frame_offset(active_bank)+i_y*90+(i_x>>3)][(i_x&7)*8+:8]=i_value;
-                else
+                else if(!NATIVE_PRESENTATION)
                     ddr_mem[reference_frame_offset(active_bank)+(i_component==1?18'h0a8c0:18'h0d2f0)+i_y*45+(i_x>>3)][(i_x&7)*8+:8]=i_value;
             end
         end
@@ -1288,6 +1313,7 @@ module tb_h262_live_raster_soak #(
         if((MEMORY_READ_LATENCY<1)||
            (MEMORY_READ_LATENCY>MAX_MEMORY_READ_LATENCY))
             $fatal(1,"unsupported memory latency %0d",MEMORY_READ_LATENCY);
+        if(!NATIVE_PRESENTATION)begin
         memory_dout_ready<=read_valid_pipe[read_pipe_pointer];
         if(read_valid_pipe[read_pipe_pointer])
             memory_dout<=ddr_mem[
@@ -1303,7 +1329,8 @@ module tb_h262_live_raster_soak #(
             read_pipe_pointer<=0;
         else
             read_pipe_pointer<=read_pipe_pointer+1;
-        if(memory_we)begin
+        end
+        if(memory_we&&!native_memory_busy)begin
             if((memory_addr<DDR_BASE)||((memory_addr-DDR_BASE)>=DDR_WORDS))
                 $fatal(1,"DDR write outside frame regions: %h",memory_addr);
             ddr_mem[memory_addr-DDR_BASE]<=memory_din;
@@ -1646,7 +1673,7 @@ module tb_h262_live_raster_soak #(
 
         if((stream_index==stream_len)&&sequence_end_seen&&!pred_active&&
            !presentation_hold&&!destination_ownership_hold&&!writer.writing&&
-           !arbiter.read_outstanding&&!read_pending)
+           (NATIVE_PRESENTATION || (!arbiter.read_outstanding&&!read_pending)))
             quiet_cycles<=quiet_cycles+1;
         else quiet_cycles<=0;
 
@@ -1680,7 +1707,7 @@ module tb_h262_live_raster_soak #(
                    scheduler.display_frame_bank,frame_waiting,
                    probe_error,writer_error,pred_error,presentation_error);
 
-        if(quiet_cycles==30000)begin
+        if(quiet_cycles==(NATIVE_PRESENTATION ? 4004000 : 30000))begin
             $display("LIVE_RASTER_RESULT bytes=%0d p_rows=%0d p=%0d b_rows=%0d b=%0d published=%0d pictures=%0d promotions=%0d display_identity=%0d swaps=%0d last_p_temporal=%0d ref_writes=%0d bank2_ref_writes=%0d scratch0_writes=%0d scratch1_writes=%0d ddr_reads=%0d cache=%0d/%0d/%0d cycles=%0d read=%0d recon=%0d presentation=%0d queued=%0d promoted=%0d error=%0d/%0d/%0d/%0d",
                      stream_index,p_rows,p_pictures,b_rows,b_pictures,
                      published_references,picture_count,reference_promotion_count,
@@ -1848,7 +1875,8 @@ module tb_h262_live_raster_soak #(
                    publication.b_persist_count!=b_pictures||
                    picture_count!=published_references||
                    reference_promotion_count!=published_references||
-                   (display_swaps+1)!=(published_references+b_pictures)||
+                   (!NATIVE_PRESENTATION &&
+                    (display_swaps+1)!=(published_references+b_pictures))||
                    !writer_seen||!pred_read_observed||
                    !pred_reconstructed_observed||!presentation_complete||
                    probe_error||pred_error||writer_error||presentation_error)
