@@ -60,7 +60,7 @@ share a compilation unit:
    HDMI output is refused rather than played as silence. DVD LPCM is still
    later.
 5. Audio output: `--audio-out hdmi` (default) emits that decoded stereo.
-   `--audio-out spdif` bypasses the decode stage for AC-3 and emits IEC 61937
+   `--audio-out spdif` bypasses the decode stage for AC-3 and DTS and emits IEC 61937
    bursts instead, carried unchanged on the existing PCM transport. AC-3 uses
    a fixed 1536-sample burst period; DTS carries its own sample count and uses
    512, 1024 or 2048 with the matching data type, so the period is read from
@@ -80,9 +80,12 @@ container, codec or output ownership above.
 ## Deferred DVD scope
 
 Recognizing `dvd:` in protocol one is an architectural reservation, not DVD
-support. Mounting the connected disc, navigating titles, handling encryption,
-decoding AC-3 or LPCM, rendering subpictures and supporting interlaced content
-remain separate approved development phases after embedded file audio works.
+support. v0.8.0 already supports file-based AC-3 decode and AC-3/DTS passthrough,
+plus a bounded interlaced all-I video path in the FPGA. Mounting a disc,
+navigating titles, handling encryption, DVD LPCM, subpictures, track switching
+and broader interlaced decoding remain deferred. These require separately
+approved development scopes; accepting some DVD audio payloads does not make
+the current source backend or video decoder DVD-compatible.
 
 ## Main to FPGA guarded fast-block transport
 
@@ -164,7 +167,12 @@ retain fast/slow bytes, batch counts, queries and mode (0 probe, 1 legacy,
 2 guarded). Sum all pipe-read counts and compare with the final submitted total
 on successful EOF; do not treat sampled transfer records as a complete byte log
 or parse these logs with the historical version-one read-record analyzer.
-Hardware menu response and sustained A/V delivery still require measurement.
+On the corrected test-one fixture, the installed version-two Main reduced
+maximum measured media-poll occupancy from 160,937 to 9,287 microseconds, with
+zero acknowledged payload bytes and all 360 pictures displayed. The user
+reported normal menu response. This is one measured workload, not a hard
+2,000-microsecond latency bound or a sustained-throughput guarantee for every
+source. Broader changes still require their own hardware qualification.
 
 On the build PC, run `tools/streams/test_main_mister_profile.py --main-source
 <Main_MiSTer checkout> --rtl`, then repeat with `--sanitize`. The RTL mode uses

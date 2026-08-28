@@ -1,5 +1,7 @@
 # New MPEG-2 / H.262 decoder
 
+> **Historical design and milestone notes.** This document records early decoder development, including planned work and phase-specific diagnostics. It is not the current capability list or hardware acceptance procedure. The clean decoder is now the active implementation and MPEG2FPGA is frozen reference code. Use [the current architecture](ARCHITECTURE.md), [v0.8.0 release notes](RELEASE_NOTES_v0.8.0.md), and [current hardware tests](TEST_INSTRUCTIONS.md#v080-hand-tests) for the released state. The phase descriptions below are preserved as history.
+
 This directory tracks the clean-room MiSTer-oriented decoder being developed in
 parallel with the existing MPEG2FPGA integration.
 

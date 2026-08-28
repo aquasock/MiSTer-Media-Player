@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Generate the six hand-test files for a release.
+"""Generate the seven hand-test files for a release.
 
 Example:
   python3 tools/streams/generate_test_suite.py --output-dir /tmp/suite
 
-Each file stays inside what the decoder actually accepts: 4:2:0, I-pictures
-only, frame structured, frame DCT and frame prediction only, 720x480 at
-30000/1001. They are meant to be watched and listened to, not scored
+Each file uses 4:2:0 at 720x480 and 30000/1001. The interlaced files are
+I-pictures only, frame structured, with frame DCT and frame prediction only.
+Progressive test seven uses I, P and B pictures; the other tests are all-I.
+They are meant to be watched and listened to, not scored
 automatically, so the content of each is chosen to make its own failure mode
 obvious rather than to look pleasant. Media stays local; only this generator
 is committed.
@@ -76,8 +77,8 @@ TESTS = [
      'exercised. Every other test in this set is all-I.'),
 ]
 
-# Every test above is all-I, which is what the interlaced path accepts. Test
-# seven deliberately is not: it carries P and B pictures so the progressive
+# Tests one through six are all-I, which is what the interlaced path accepts.
+# Test seven carries P and B pictures so the progressive
 # path's picture-type support can be established by playing it rather than
 # inferred from the RTL.
 GOP_OVERRIDES = {'7_progressive_ipb': ('15', '2')}
@@ -257,8 +258,9 @@ def main() -> int:
         entries.append(build(name, vf, mode, tff, codec, note,
                              args.duration, args.output_dir))
     manifest = {'tests': entries,
-                'accepted_video': '4:2:0, I-pictures only, frame structured, '
-                                  'frame DCT and frame prediction only, 720x480 at 30000/1001',
+                'accepted_video': '4:2:0, 720x480 at 30000/1001; interlaced: I-pictures only, '
+                                  'frame structured, frame DCT and frame prediction only; '
+                                  'progressive: all-I and I/P/B',
                 'ffmpeg_version': subprocess.check_output(['ffmpeg', '-version'], text=True).splitlines()[0],
                 'scope': 'Hand tests to be watched and listened to. Not an automatic gate '
                          'and not a DVD conformance suite.'}

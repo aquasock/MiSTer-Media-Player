@@ -6,24 +6,28 @@ MiSTer Media Player is being developed as a standards-driven media decoder for M
 
 ### HPS / host side
 
-The host currently supplies media bytes through the existing MiSTer data path. Longer-term host responsibilities are expected to include filesystem access, buffering, program-stream demux, timestamp/control handling, audio coordination, and DVD/optical-drive integration.
+The ARM helper opens file sources, demultiplexes bounded MPEG-2 Program Streams, extracts picture PTS, decodes MPEG Layer II or AC-3 to stereo, and packs AC-3 or DTS passthrough bursts. Patched MiSTer Main launches the helper with the selected audio mode and brokers its annotated byte stream through guarded, resumable transfers. Main remains the sole FPGA SPI owner; the helper does not access that bridge directly.
+
+DVD/ISO source navigation, optical-device integration and playback-control commands remain deferred. See the [helper architecture](../host/arm/ARCHITECTURE.md) for the source and transport contracts.
 
 ### FPGA side
 
 The active FPGA pipeline performs:
 
 1. asynchronous input buffering and clock-domain crossing;
-2. H.262 byte/bit reading with backpressure;
+2. separation of video, picture-PTS and PCM-or-burst records, followed by H.262 byte/bit reading with backpressure;
 3. picture/slice/macroblock/block parsing;
 4. MPEG-2 DCT VLC decoding;
 5. inverse quantization;
 6. fixed-point two-pass 8x8 IDCT;
-7. intra reconstruction;
+7. intra reconstruction and supported P/B motion compensation and residual reconstruction;
 8. planar Y/Cb/Cr frame storage in DDR3;
 9. DDR3 readback through small ping-pong line caches;
 10. 4:2:0 chroma expansion;
 11. limited-range BT.601 YCbCr-to-RGB conversion;
-12. selectable 800x600 diagnostic or native 480i timing and MiSTer presentation.
+12. cadence-floor and picture-PTS scheduling with selectable 800x600 diagnostic or native 480i presentation.
+
+Audio records enter an 8,192-frame stereo FIFO. The selected output routes decoded PCM to HDMI or S/PDIF, or sends AC-3/DTS bursts through a bit-preserving S/PDIF path that bypasses gain, mixing and filtering. The unused output is muted. Video decoder backpressure is isolated by the separate 64 KiB clean-video queue; the ingress FIFO adds 32 KiB of compressed read-ahead.
 
 ## Active decoder
 
@@ -33,7 +37,7 @@ The older `rtl/mpeg2fpga/` implementation is retained only as a frozen reference
 
 ## Current supported implementation path
 
-The released path covers continuous progressive 4:2:0 I/P/B frame pictures through 720x480. The unreleased interlaced path accepts a deliberately bounded 720x480 4:2:0 all-I subset: frame pictures, frame DCT, no repeat-first-field, and a consistent authored top- or bottom-field-first order.
+v0.8.0 covers continuous progressive 4:2:0 I/P/B frame pictures through 720x480. Its interlaced path accepts a deliberately bounded 720x480 at 30000/1001, 4:2:0 all-I subset: frame pictures, frame DCT and frame prediction only, no repeat-first-field, and consistent authored top- or bottom-field-first order. Field pictures, field DCT, interlaced P/B, repeat-first-field and 576i remain unsupported.
 
 These limits describe the current implementation only. They are not restrictions imposed by H.262.
 
@@ -62,7 +66,7 @@ Full-frame storage is kept in DDR3 rather than M10K memory. The display side use
 
 This architecture reduced on-chip memory pressure dramatically and restored full 8-bit chroma storage/presentation.
 
-Chroma expansion is currently nearest-neighbor 4:2:0 replication. This is sufficient for decoder validation but is known to produce visible color fringing on fine anti-aliased text. Better chroma positioning/interpolation is planned as a presentation-quality improvement.
+The display path expands 4:2:0 chroma for RGB presentation. A targeted comparison of a hardware screenshot against the same software-decoded frame found one blended column at a sharp colour transition. Chroma upsampling is a hypothesis for that difference, not an established root cause; the write/read path and chroma siting have not been fully isolated. Reconstruction has simulation comparisons, but comprehensive playback pixel accuracy remains unqualified. The finding is documented rather than scheduled for correction in v0.8.0.
 
 ### Two interlaced output tiers
 
@@ -93,16 +97,17 @@ quartus_sta -t tools/phase1p_timing.tcl
 
 ## Successive-picture architecture
 
-The decoder currently uses one hardware-proven parser for consecutive pictures.
+The released decoder reconstructs and stores successive pictures in DDR, retaining I/P references and separate B scratch storage. Publication and blanking-aligned presentation preserve coded-order versus display-order dependencies and prevent writes into a display-owned region. End-of-stream handling flushes the pending reordered reference.
 
-After picture 1 completes, the wrapper:
+Native all-I playback can overlap reconstruction and presentation through a bounded three-region ordinary frame queue, including timestamped playback. Capacity and bank-ownership guards remain active. Writer completion grants advance on the capture-completion edge only when the alternate capture bank is free; otherwise one pending grant waits for capacity.
 
-1. latches picture-1 diagnostics;
-2. applies a local parser re-arm/reset cycle;
-3. allows the same parser to locate and decode picture 2;
-4. changes the downstream completion handshake so picture 2 can advance after reconstruction rather than DDR persistence.
+Picture PTS may delay presentation but cannot bypass the encoded cadence floor. Raw streams use the synthetic H.262-derived timeline. The native raw all-I startup reserve and its telemetry caveats are described in the [README](../README.md#native-elementary-stream-startup).
 
-The next phase will replace this diagnostic-only second-picture path with alternate-bank DDR storage and a controlled display-frame swap.
+## Resource and qualification limits
+
+The v0.8.0 seed-17 build uses 512 of 553 M10K blocks (93%) and 31,464 ALMs (75%), with +0.243 ns worst setup and zero reported total negative slack. The framework scaler's horizontal accumulator previously failed setup at seed 16; reseeding closed that build but did not eliminate the path's margin risk.
+
+Large coded pictures can exhaust the available input lead and repeat one or two display slots at a scene cut. Increasing buffering was deferred to preserve memory headroom. These are measured implementation limitations, not input-format limits. See the [release notes](RELEASE_NOTES_v0.8.0.md) for the exact binaries, qualification scope and outstanding package-install confirmation.
 
 ## Standards boundary
 

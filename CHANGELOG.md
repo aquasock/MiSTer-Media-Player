@@ -6,11 +6,17 @@ This project is still in active pre-release development. Published milestone rel
 
 ## Unreleased
 
+### Changed
+
+- Reconciled current release, build, architecture and test guidance with the published v0.8.0 package; labelled older design and regression instructions as historical.
+- Corrected v0.8.0 tag provenance, compressed ZIP size, the role of patched Main, and the distinction between a targeted hardware pixel comparison and comprehensive playback qualification. Runtime code, the release tag and packaged binaries are unchanged.
+
 ## [0.8.0] - 2026-08-27 — Interlaced 480i, AC-3 and passthrough milestone
 
 Bounded 720x480 interlaced all-I playback with native 480i presentation, AC-3 decode, and AC-3/DTS passthrough to S/PDIF.
 
-- Release FPGA source baseline: `2f1d32c`. Later release-documentation commits do not alter these binaries.
+- Published as a pre-release on 2026-08-27 at 17:41:16 America/Phoenix. Annotated tag `v0.8.0` resolves to `af43de2`; all three runtime binaries use source baseline `2f1d32c`. The standalone release notes were added in later documentation commit `035807a`, without changing the tagged runtime source.
+- Public package: `MiSTer_Media_Player_v0.8.0.zip`, 2,867,028 compressed bytes, SHA-256 `5f55b49eb863f74a777b548b4f42b744a9130b4161f176b687ca297deeffcaf3`. Its uncompressed members total 5,948,567 bytes. The downloaded ZIP and payload hashes match the qualified package.
 - A clean from-scratch Quartus Prime 17.0.2 build reproduced the tested RBF byte-for-byte: 4,332,740 bytes, SHA-256 `61a2fed28425a461c8b886bdf809e3ef76a320e5688bb22a816135c36ef981ce`, fitter seed 17.
 - The clean fit uses 31,464 ALMs (75%), 50,273 registers, 4,048,355 block-memory bits (71%), 512 RAM blocks (93%), 67 DSP blocks, and 3 PLLs.
 - Timing is positive in every required category with zero total negative slack: +0.243 ns setup, +0.251 ns hold, +2.865 ns recovery, +0.564 ns removal, +0.925 ns minimum pulse width.
@@ -32,6 +38,8 @@ Bounded 720x480 interlaced all-I playback with native 480i presentation, AC-3 de
 - Confirmed on hardware that the progressive path decodes I, P and B pictures, correcting an earlier description of the decoder as accepting I-pictures only; that restriction applies to the interlaced 480i path.
 - Reduced Main's media-transfer event-loop occupancy, which had reached about 160 ms per poll on low-bitrate material and made the menu sluggish; measured maximum poll time fell by roughly seventeen times and the acknowledged-write fallback disappeared.
 - Known limitation recorded: sharp colour transitions show one blended pixel column that an independent software decoder does not produce, and playback pixel accuracy remains unqualified.
+- A targeted hardware-screenshot pixel comparison measured that chroma-edge difference; earlier wording that all pixel comparisons were simulated was incorrect. Comprehensive playback pixel qualification remains open.
+- The hand tests used the released RBF/helper hashes; the final Main was separately exercised after the initial six-test capture. A confirmation run after installation from the final package remains unrecorded. Publication and package verification do not close that gate.
 
 ## [0.7.0] - 2026-08-24 — Program Stream audio and PTS milestone
 

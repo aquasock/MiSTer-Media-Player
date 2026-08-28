@@ -6,10 +6,10 @@ An experimental media-player core for [MiSTer FPGA](https://github.com/MiSTer-de
 
 ## Current status
 
-The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`. v0.7.0 provides:
+The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`. v0.8.0 provides:
 
 - raw MPEG-2 Video elementary-stream playback and a bounded H.222.0 MPEG-2 Program Stream path for `.mpg` and `.mpeg` files;
-- a matching ARM helper that demultiplexes Program Streams, decodes MPEG Layer II audio to signed stereo PCM, and transports video, picture PTS, and PCM to the FPGA;
+- a matching ARM helper that demultiplexes Program Streams, decodes MPEG Layer II or AC-3 audio to signed stereo PCM, and transports video, picture PTS, and PCM or passthrough bursts to the FPGA;
 - byte-exact raw `.m2v` pass-through with a synthetic 90 kHz fallback timeline;
 - Program Stream picture PTS driving the FPGA 90 kHz presentation timeline;
 - cadence as a mandatory floor: PTS may delay a picture but never presents it earlier than its encoded H.262 frame cadence;
@@ -18,7 +18,7 @@ The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`. v0.
 - a clean-video queue so decoder backpressure cannot prevent timely PCM delivery;
 - continuous progressive 4:2:0 I/P/B decoding, retained DDR3 reference banks, separate B scratch storage, and coded-order/display-order presentation;
 - full 8-bit Y, Cb, and Cr reconstruction with limited-range BT.601 presentation;
-- clean Program Stream and raw-stream terminal handling, including reordered-picture flush and one explicit PCM end marker.
+- clean Program Stream and raw-stream terminal handling, including reordered-picture flush and one explicit PCM end marker;
 - a 720x480 interlaced frame-picture, frame-DCT, all-I subset with preserved top- or bottom-field-first order and native 480i timing;
 - AC-3 decode to stereo, and AC-3 or DTS passthrough to S/PDIF as IEC 61937 bursts for an external decoder.
 
@@ -33,57 +33,44 @@ The supported subset is intentionally bounded while the architecture is being pr
 | Presentation rates | H.262 frame-rate codes 1..5; codes 6..8 are rejected before transport |
 | Program Stream timing | Picture PTS on a 33-bit / 90 kHz FPGA timeline with cadence-floor enforcement |
 | Raw-stream timing | Synthetic 33-bit / 90 kHz cadence derived from H.262 frame-rate metadata |
-| Audio | MPEG Layer II at 44.1 or 48 kHz, and AC-3 at 48 kHz, decoded by the helper to stereo. The AC-3 stereo downmix discards LFE, as the format specifies |
+| Audio | MPEG Layer II at 44.1 or 48 kHz, and AC-3 at 48 kHz, decoded by the helper to stereo. The AC-3 stereo downmix discards LFE |
 | Audio passthrough | AC-3 and DTS carried to S/PDIF as IEC 61937 bursts for an external decoder. DTS is passthrough only; there is no DTS decoder |
 | Audio output | A menu option selects HDMI or S/PDIF. The unused output is muted, because both are fed from one stereo stream |
 | Audio buffering | Packed signed PCM records into an 8,192-frame stereo FPGA FIFO |
-| Frame storage | Two retained planar MiSTer DDR3 I/P banks plus a distinct B scratch region |
+| Frame storage | Retained planar MiSTer DDR3 I/P banks and separate B scratch storage; native all-I overlap uses a bounded three-region ordinary frame queue |
 | Video output | 800x600 progressive diagnostic output, or native 480i for supported interlaced input |
 
 The frozen `rtl/mpeg2fpga/` tree remains historical reference material and is not part of the active Quartus build.
 
 ## Installation
 
-v0.8.0 requires three matching runtime files. Back up the existing files before replacing them.
+Download the [v0.8.0 pre-release](https://github.com/aquasock/MiSTer-Media-Player/releases/tag/v0.8.0). It requires three matching runtime files. Back up the existing files before replacing them, and verify the unpacked files against the package's `SHA256SUMS`.
 
 | Release file | MiSTer destination | SHA-256 |
 | --- | --- | --- |
 | `MediaPlayer_20260827.rbf` | `/media/fat/MediaPlayer_20260827.rbf` | `61a2fed28425a461c8b886bdf809e3ef76a320e5688bb22a816135c36ef981ce` |
 | `MiSTer` | `/media/fat/MiSTer` | `01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9` |
-| `MediaPlayer_Helper` | `/media/fat/linux/MediaPlayer_Helper` | `f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8` |
+| `linux/MediaPlayer_Helper` | `/media/fat/linux/MediaPlayer_Helper` | `f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8` |
 
-`MiSTer` is a patched Main and is not optional: without it there is no `Audio output` menu option, and media transfers hold the event loop long enough to make the menu sluggish on low-bitrate files. The helper must be executable. Reboot after installing Main. Mixing v0.8.0 components with a different Main, helper, or RBF is unsupported.
+`MiSTer` is a patched Main and is not optional: it passes the core's `Audio output` selection to the helper and yields during backpressured media transfers to keep the menu responsive. An older Main may display the core's option without passing its selection to the helper. The helper must be executable. Reboot after installing Main. Mixing v0.8.0 components with a different Main, helper, or RBF is unsupported.
 
 ## Release qualification
 
-The qualified FPGA source baseline is commit `9a5eea3`; the host/helper source baseline is commit `acdbf8b`. Later release-documentation commits do not alter those binaries.
+All three v0.8.0 runtime binaries reproduced byte for byte from source baseline `2f1d32c`. The published annotated tag points to `af43de2`; later documentation commits do not change the qualified binaries.
 
-A clean Quartus Prime 17.0.2 build reproduced the already accepted RBF byte-for-byte:
+The clean Quartus Prime Lite 17.0.2 build used fitter seed 17 and produced the RBF listed above:
 
-- size: 4,184,380 bytes;
-- SHA-256: `484328e51c6e764890bf2bdcd947448e2eaaaac2c603e93da28009475e44dafc`;
-- Quartus errors: 0;
-- global setup: +0.311 ns;
-- global hold: +0.238 ns;
-- global recovery: +3.365 ns;
-- global removal: +0.497 ns;
-- minimum pulse width: +1.122 ns;
-- decoder setup: +1.782 ns with no violations;
-- decoder recovery: +11.294 ns with no violations;
-- video setup: +8.284 ns with no violations.
+- RBF size: 4,332,740 bytes; 0 errors and 208 warnings, with the same warning identifier set as the accepted build;
+- fit: 31,464 ALMs (75%), 50,273 registers, 512 of 553 M10K blocks (93%), and 67 DSP blocks;
+- setup +0.243 ns, hold +0.251 ns, recovery +2.865 ns, removal +0.564 ns, and minimum pulse width +0.925 ns; all reported total negative slack is zero.
 
-Two independent ARM helper builds were byte-identical at 361,452 bytes with SHA-256 `c99237246416ecd8278d90ff6e15e7a00cd8ab1d49c960b8c77fbe00f4ba0483`. Two independent patched-Main builds were byte-identical at 1,166,244 bytes with SHA-256 `16517a9927c659616796b45c8e2488da2a26f0595c91418ed09dc0eb7a5787aa`.
+The helper is 399,340 bytes and patched Main is 1,170,340 bytes, with the hashes in the installation table. Both reproduced using ARM GNU 10.2; Main uses pinned upstream `0a8fb44`.
 
-Native and sanitized host qualification covers exact video preservation, PTS placement, 44.1/48 kHz PCM output, video-only input, unsupported input rejection, clean terminal behavior, recovery without reboot, bounded batching, and the full 14,315-picture audio-video soak.
+Recorded host regressions cover cadence telemetry, eleven DVD-ceiling tests, guarded Main transfers and fault handling, AC-3 decode/downmix, byte-identical AC-3/DTS passthrough, and the unchanged full-length MPEG Layer II PCM output. The corrected seven hand tests completed all 360 pictures each. Progressive I/P/B playback is supported by a run with 121 reference and 239 B pictures. Native interlaced tests had no deadline gaps; the native deadline counters are not a progressive cadence qualification.
 
-The final four-file MiSTer release gate passed on the exact release binaries:
+The Main responsiveness fix was measured separately: maximum media-poll occupancy on test one fell from 160,937 to 9,287 microseconds, and the user reported normal menu response. The 2,000-microsecond work budget is not a hard latency guarantee. Full-movie interlaced testing is recorded separately and retains the known one-or-two-slot repeat at a large-picture scene cut.
 
-1. `00_good_480p_48k.mpg` — normal 48 kHz audio-video startup.
-2. `02_good_video_only.mpg` — video-only Program Stream.
-3. `01_good_480p_44k.mpg` — 44.1 kHz recovery immediately after silent playback.
-4. `20_bbb_full_48k.mpg` — complete audio-video cadence and endurance soak.
-
-All four runs ended with USER and POWER solid, DISK blinking its normal eleven-count progress code, sequence end, presentation completion, and zero aggregate, decoder, presentation, PCM protocol, or underrun errors. The complete soak delivered all 14,315 pictures and 14,314 swaps with zero credits-window cadence outliers; the user reported smooth playback and credits with no remaining jump.
+The public ZIP and all three runtime hashes match the qualified package. A confirmation hardware run after installation from that final package remains unrecorded; publication and binary identity do not supply that missing evidence. See the [v0.8.0 release notes](docs/RELEASE_NOTES_v0.8.0.md) for the qualification scope and remaining limits.
 
 ## Releases
 
@@ -91,13 +78,14 @@ Milestone releases use semantic-version tags on GitHub. RBF assets retain the no
 
 Current milestone:
 
-- **v0.7.0** — bounded Program Stream input, real picture PTS, MPEG Layer II audio through the ARM helper, native 23.976/24/25/29.97/30-fps cadence, clean video/PCM queuing, and full-length audio-video playback; binary `MediaPlayer_20260824.rbf`.
+- **[v0.8.0](https://github.com/aquasock/MiSTer-Media-Player/releases/tag/v0.8.0)** — bounded native 480i all-I playback, AC-3 decode, AC-3/DTS passthrough, and responsive Main media transfers; binary `MediaPlayer_20260827.rbf`.
 
-Previous milestone:
+Previous milestones:
 
+- **v0.7.0** — bounded Program Stream input, real picture PTS, MPEG Layer II audio, and full-length audio-video playback; binary `MediaPlayer_20260824.rbf`.
 - **v0.6.0** — sustained progressive 720x480 real-stream I/P/B playback with native 23.976/24/25-fps cadence; binary `MediaPlayer_20260822.rbf`.
 
-See [the v0.7.0 release notes](docs/RELEASE_NOTES_v0.7.0.md) for asset hashes, qualification details, and known limits.
+See [the v0.8.0 release notes](docs/RELEASE_NOTES_v0.8.0.md) for package size, hashes and publication provenance. Historical qualification remains in each version's notes and the [changelog](CHANGELOG.md).
 
 ## Converting media with FFmpeg
 
@@ -228,10 +216,11 @@ MiSTer Main file selection
           |
           v
 MediaPlayer_Helper
-Program Stream demux / MP2 decode / picture PTS
+Program Stream demux / picture PTS
+MP2 or AC-3 decode / AC-3 or DTS burst packing
           |
           v
-packed video + PTS + PCM transport
+packed video + PTS + PCM-or-burst transport
           |
           +-----------------------+
           |                       |
@@ -239,7 +228,7 @@ packed video + PTS + PCM transport
 clean-video queue          8,192-frame PCM FIFO
           |                       |
           v                       v
-H.262 FPGA decoder       MiSTer stereo audio output
+H.262 FPGA decoder       selected HDMI PCM or S/PDIF output
           |
           v
 DDR reference/B-scratch storage
@@ -271,18 +260,19 @@ ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc host/build_arm_stack.sh --arm
 ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc host/build_arm_stack.sh --main
 ```
 
-The build script pins the minimp3 revision, MiSTer Main revision, dependency hashes, and Main patch. Release candidates require reproducible FPGA, helper, and Main binaries plus host and MiSTer regression evidence.
+The build script pins minimp3, liba52, MiSTer Main, dependency hashes, and the Main patch. Release candidates require reproducible FPGA, helper, and Main binaries plus host and MiSTer regression evidence. See [building and testing](docs/BUILDING.md) for the current workflow.
 
 ## Known limitations
 
-- Program Stream support is bounded; MPEG Transport Stream, DVD/VOB navigation, private-stream audio, subpictures, and arbitrary systems-layer layouts are not supported.
+- Program Stream support is bounded; MPEG Transport Stream, DVD/VOB navigation, DVD LPCM, subpictures, and arbitrary systems-layer layouts are not supported. DVD private stream 1 supports AC-3 decode/passthrough and DTS passthrough.
 - Decoded audio is MPEG Layer II at 44.1 or 48 kHz and AC-3 at 48 kHz. Other codecs and sample rates are rejected. Only the first audio track is played; track switching needs a control channel that protocol one does not implement.
-- AC-3 is downmixed to stereo for decoded output, which discards LFE by the format's own convention. Discrete surround requires passthrough and an external decoder.
+- AC-3 is downmixed to stereo for decoded output, which discards LFE. Discrete surround requires passthrough and an external decoder.
 - Passthrough carries the bitstream untouched, so nothing may scale it. The audio output option therefore mutes the output it is not driving, and volume control does not apply to a passthrough stream.
 - Progressive 4:2:0 video is released through 720x480 and decodes I, P and B pictures. The interlaced path is far narrower: 720x480 at 30000/1001 only, I-pictures only, frame-structured, frame DCT and frame prediction only. Field pictures, field DCT, interlaced P and B pictures, `repeat_first_field` (3:2 pulldown), and 576i are all rejected before decode. Most commercial DVDs use several of these and will not play.
-- Playback pixel accuracy has never been qualified. Every pixel comparison in this project's history was performed in simulation; correctness of what actually reaches the screen rests on inspection.
+- Comprehensive playback pixel accuracy remains unqualified. Simulation comparisons cover decoder reconstruction, and a targeted hardware-screenshot comparison found the chroma-edge difference below; that comparison is not a full playback pixel-validation suite.
 - Sharp colour transitions show one blended pixel column that an independent software decoder does not produce, consistent with horizontal chroma upsampling in the display path. It is obvious on synthetic colour bars and subtle on ordinary material, and it is not specific to any picture type.
 - On material whose peak coded picture is large enough, one or two display slots are missed at that picture, shown as a repeated frame rather than a dropped one. This is a property of input buffer depth against peak picture size, not of the stream; the qualified full-length fixture hits it once, at a scene cut.
+- The framework scaler has little timing margin: seed 16 missed setup by 0.070 ns after audio routing changed; the seed-17 release has +0.243 ns worst setup. Future logic changes may expose the path again, and 93% M10K usage limits buffering headroom.
 - H.262 frame-rate codes 6 through 8 (50, 59.94, and 60 fps) are rejected.
 - Seeking, scrubbing, pause/resume, DVD navigation, and optical-drive integration are not implemented.
 - Output offers two interlaced tiers. Normal processed HDMI sends native 480i timing into MiSTer's scaler and lets the `HDMI scaler deinterlacer` menu choose Weave or Bob. The external-processing tier preserves native 480i fields; truly unscaled HDMI additionally requires MiSTer's separate `direct_video` setting, which the core menu cannot enable.
@@ -307,13 +297,13 @@ its FIFO/host/DDR and field-window models are not a full HDMI hardware replay.
 
 ## Diagnostic streams
 
-Generated binary media remains local and is not included in the public release. The four release-gate Program Streams are reproducible through the committed generators and are identified by SHA-256 in the release notes.
+Generated binary media remains local and is not included in the public release. Use the current [v0.8.0 hardware instructions](docs/TEST_INSTRUCTIONS.md#v080-hand-tests) and retain the generator's file hashes with each run. Older regression packs and their checksums remain historical controls, not the current release package.
 
 ### Hand tests
 
-`tools/streams/generate_test_suite.py` builds seven short Program Streams meant to be watched and listened to rather than scored automatically. Each is chosen to make one failure mode obvious: a bar sweeping down the frame for interlaced top- and bottom-field-first order, scrolling bands that separate Weave from Bob, progressive all-I and progressive I/P/B, and AC-3 and DTS 5.1 channel sweeps that sound one channel at a time. The audio sweeps exercise discrete channels only in S/PDIF mode, where the listener's own decoder does the work; in HDMI mode they exercise the stereo downmix, in which LFE is absent by design.
+`tools/streams/generate_test_suite.py` builds seven short Program Streams meant to be watched and listened to rather than scored automatically. Each is chosen to make one failure mode obvious: a bar sweeping down the frame for interlaced top- and bottom-field-first order, scrolling bands that separate Weave from Bob, progressive all-I and progressive I/P/B, and AC-3 and DTS 5.1 channel sweeps that sound one channel at a time. AC-3 exercises stereo downmix without LFE in HDMI mode and passthrough in S/PDIF mode. DTS requires S/PDIF; HDMI selection is rejected. Discrete channel placement requires an external decoder and suitable speakers.
 
-The USER LED is the top-level completion diagnostic. For successful v0.7.0 runs, USER and POWER remain solid while DISK may report its final progress code. Exact schema-nine telemetry and all three LEDs are captured for every release-gate run.
+Record all three LEDs, the selected output/deinterlace mode, and the reboot/reload lifecycle. Retrieve `/tmp/MediaPlayer_ARM.log` before another playback overwrites it, then collect a fresh checksum-valid schema-19 terminal screenshot. The current Main emits profile version two (`credit_step_v1`); older version-one log analyzers must not be used unchanged. LED appearance alone does not establish picture counts, cadence, transport integrity or audio completion.
 
 ## Project layout
 
