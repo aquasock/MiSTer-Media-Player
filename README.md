@@ -158,6 +158,69 @@ patch the signalling with `generate_test_interlaced_i_frames.patch_interlaced_si
 interlaced files. It remains a valid gate for progressive streams; for
 interlaced ones, use the structure check the generator performs instead.
 
+### Audio
+
+Three audio paths exist, and which one runs is decided by the track's codec and
+by the `Audio output` menu option together:
+
+| Track | HDMI selected | S/PDIF selected |
+| --- | --- | --- |
+| MPEG Layer II, 44.1 or 48 kHz | decoded to stereo | decoded to stereo |
+| AC-3, 48 kHz | decoded to stereo, LFE discarded | passed through as IEC 61937 for your receiver to decode |
+| DTS | refused, with a message in the helper log | passed through as IEC 61937 |
+
+The option mutes the output it is not driving, because both are fed from one
+stereo stream. So selecting HDMI silences S/PDIF and vice versa; a silent
+receiver in HDMI mode is the option working, not a fault. Passthrough carries
+the bitstream untouched, so volume and any mixing must not be applied to it, and
+DTS has no decoder here at all.
+
+Build audio test material with the same generator the hand tests use. `--sweep`
+sounds one channel at a time for two seconds, in the order FL, FR, FC, LFE, BL,
+BR, which is what makes a channel problem audible rather than a matter of
+opinion:
+
+```bash
+python3 tools/streams/generate_test_dvd_ac3_av.py --output /tmp/ac3_sweep.mpg \
+  --duration 12 --sweep --report /tmp/ac3_sweep.json
+python3 tools/streams/generate_test_dvd_ac3_av.py --output /tmp/dts_sweep.mpg \
+  --duration 12 --sweep --codec dts --report /tmp/dts_sweep.json
+```
+
+Play the AC-3 sweep in each output mode. With **HDMI** selected you are hearing
+the stereo downmix, so expect left, right, both equally, **silence**, left,
+right: the silent fourth slot is LFE and its absence is correct, because the
+AC-3 stereo downmix discards it. With **S/PDIF** selected your receiver decodes
+the original 5.1, so each slot should come from its own speaker and the fourth
+should reach the subwoofer. Then play the DTS sweep, which requires S/PDIF.
+
+Two cautions when interpreting what you hear. A 2.1 or virtualizing soundbar
+cannot demonstrate discrete channel routing however convincing it sounds, so
+front, centre and surround placement over passthrough needs a real 5.1 decoder.
+And receivers differ between codecs: one soundbar tested here reproduces LFE
+from AC-3 but not from DTS, even though the transmitted DTS provably carries it.
+
+The audio paths can also be checked on the build PC without hardware, which is
+faster and more precise than listening:
+
+```bash
+python3 tools/streams/verify_ac3_pcm.py --helper host/build/media_player_helper.native \
+  --fixture /tmp/ac3_sweep.mpg
+python3 tools/streams/analyze_ac3_downmix.py --helper host/build/media_player_helper.native \
+  --fixture /tmp/ac3_sweep.mpg --report-in /tmp/ac3_sweep.json
+python3 tools/streams/verify_ac3_passthrough.py --helper host/build/media_player_helper.native \
+  --fixture /tmp/dts_sweep.mpg --codec dts --substream 0x88
+```
+
+The first compares the helper's decode against an independent decoder, the
+second measures where each channel lands in the downmix, and the third checks
+that passthrough bursts carry the source frames byte for byte. Pass `--report`
+to any of them to keep the numbers.
+
+On the MiSTer, `/tmp/MediaPlayer_ARM.log` records the selected output mode and
+the chosen audio substream, so a log proves which path ran. It is a single fixed
+path, so retrieve it before playing anything else or the next file overwrites it.
+
 ## Architecture
 
 ```text
