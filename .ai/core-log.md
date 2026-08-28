@@ -1,3 +1,32 @@
+## 681 COMMIT Unreleased ??? 2026-08-28T12:58:58-07:00
+
+#### Coming From:
+
+Unreleased c124aa5
+
+#### Purpose:
+
+Perform one additional approved seed-only rebuild using seed 20.
+
+#### Outcome:
+
+The user explicitly authorizes one more reseed after seed 19 fails HDMI sync setup timing. Change only the seed assignment from 19 to 20 in MediaPlayer.qsf; preserve all logic, clocks, timing constraints, physical buffers, Main, helper and qualification rules. Verify the seed-only source difference and recheck the retained native, paired and focused qualification evidence, including the narrowly approved terminal-cut exception. Use a new clean build directory at /home/vash/mister-builds/entry681/FPGA, preserving both earlier failed builds. This authorization covers exactly one additional compile and no automatic retries.
+
+#### Next Steps:
+
+Publish the exact seed-20 source, pull it on the build PC, verify retained qualification and compile once from scratch. Require positive setup, hold, recovery, removal and pulse-width margins with zero TNS, and review warnings, resources and retained register and CDC boundaries. If all gates pass, use the existing installation authorization to preserve the old core and install the dated RBF with FTP readback verification, leaving loading and playback to the user. Otherwise retain the evidence and pause without installation or another seed.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 680 COMMIT Unreleased c124aa5 2026-08-28T12:54:31-07:00
 
 #### Coming From:
@@ -1219,35 +1248,6 @@ The user reports test three passes. Helper-first retrieval and a fresh screensho
 #### Next Steps:
 
 Switch HDMI scaler deinterlacer to Weave and replay test_3_deinterlace_bob_weave.mpg with HDMI audio, preserving a separate helper log and fresh terminal screenshot afterward. The user must judge the deinterlacing appearance because the terminal telemetry does not identify the HDMI scaler mode. Then complete the progressive all-I test four and separate AC-3 HDMI, AC-3 S/PDIF and DTS S/PDIF runs. Keep the storage dirty-flag warning as a separate unresolved check and leave overall beta qualification open until the matrix is complete. Preserve runtime identities, user control of hardware lifecycle, local-only raw captures, restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [x] Passed
-
----
-
-## 641 COMMIT Unreleased 2045c34 2026-08-27T19:42:33-07:00
-
-#### Coming From:
-
-Unreleased 2045c34
-
-#### Purpose:
-
-Validate corrected interlaced BFF playback on the Buildroot beta.
-
-#### Outcome:
-
-The user reports that corrected test two passes. Helper-first collection and a fresh uniquely named screenshot identify that exact run, with valid schema-19 telemetry confirming bottom-field-first signalling, 360 reference and displayed pictures, zero B pictures, 359 swaps and 3,067,813 accepted video bytes. Decoder and presentation errors, audio underrun, PCM protocol faults, timestamp conflicts, native deadline gaps and gap outliers are all absent. The three largest recorded display intervals are each the nominal 2,002,000 clocks, and sequence end, completed presentation and quiet termination are asserted. Helper exit is zero; pipe reads reconcile to all 5,556,652 completed transport bytes, with no acknowledged fallback payload. The helper confirms HDMI decoded audio and reports 576,000 emitted PCM frames. Bob was requested and the user accepts the requested run, but telemetry does not independently identify the scaler selection or LED colors. Read-only verification confirms the corrected fixture and unchanged Main, helper, RBF and kernel hashes. Together with entry 640, both interlaced field orders now have accepted bounded playback runs on the beta, alongside entry 639's progressive I/P/B result. No source, build, deployment, mode change, reload, reboot or playback is initiated by the agent. Built remains unchecked because no new build occurs; Passed is scoped to this BFF clip. Raw captures remain local and only .ai/current_results/entry641_buildroot_test2_status.json is published.
-
-#### Next Steps:
-
-Run test_3_deinterlace_bob_weave.mpg with Bob and HDMI first, retain its helper log and terminal screenshot, then repeat in Weave with separate captures. Finish test four's progressive all-I control and the AC-3 HDMI, AC-3 S/PDIF and DTS S/PDIF runs before claiming the full seven-fixture compatibility matrix. Keep the filesystem dirty-flag warning as a separate unresolved check and do not treat single-run timing values as performance qualification. Preserve the tested beta and runtime identities, user control of hardware lifecycle, local-only raw reports, restricted core.md and the forty-entry ring.
 
 #### Files Modified:
 
