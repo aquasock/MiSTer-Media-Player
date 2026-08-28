@@ -13,9 +13,13 @@ field-to-field vertical detail and is what makes field DCT worth choosing.
 
 What this script cannot establish: no ffmpeg command reports whether the
 encoder actually set `dct_type` on any macroblock. `-debug mb_type` prints only
-an intra marker. The decoder's own field-DCT macroblock counter is the oracle
-for that, and a non-zero count is an acceptance criterion in entry 650. The
+an intra marker. Entry 650 settles that on hardware instead, by comparing the
+decoded raster against ffmpeg's decode of this same file: a decoder that
+ignored `dct_type` would scramble exactly the macroblocks that used it. The
 control encode below shows only that `+ildct` changed the bitstream.
+
+Note: `-top 1` is deprecated in current ffmpeg but still functional, and the
+resulting top_field_first is verified from the bitstream below.
 """
 
 from __future__ import annotations
@@ -44,14 +48,18 @@ def require(condition: bool, message: str) -> None:
         raise SystemExit(f"verification failed: {message}")
 
 
-def run(command: list[str]) -> None:
-    proc = subprocess.run(command, capture_output=True, text=True)
-    require(proc.returncode == 0, f"{command[0]} failed: {proc.stderr.strip()[:400]}")
+def run(command: list[str], stage: str) -> None:
+    # stdin is closed so ffmpeg can never block on a prompt, and stderr is left
+    # attached so a slow stage shows progress instead of looking hung.
+    print(f"  {stage} ...", flush=True)
+    proc = subprocess.run(command, stdin=subprocess.DEVNULL)
+    require(proc.returncode == 0, f"{stage} failed with status {proc.returncode}")
 
 
 def encode(output: Path, field_dct: bool) -> list[str]:
     command = [
-        "ffmpeg", "-hide_banner", "-loglevel", "warning", "-xerror", "-threads", "1",
+        "ffmpeg", "-hide_banner", "-loglevel", "warning", "-stats", "-xerror",
+        "-y", "-threads", "1",
         "-f", "lavfi", "-i", BAR.format(d=f"{DURATION:.6f}"),
         "-vf", "tinterlace=mode=interleave_top,setsar=32/27",
         "-frames:v", str(FRAMES), "-an",
@@ -63,7 +71,7 @@ def encode(output: Path, field_dct: bool) -> list[str]:
         "-qmin", "1", "-qmax", "31", "-sc_threshold", "1000000000",
         "-f", "mpeg2video", str(output),
     ]
-    run(command)
+    run(command, "encoding " + ("field-DCT fixture" if field_dct else "frame-DCT control"))
     return command
 
 
@@ -146,7 +154,9 @@ def check_motion(path: Path, frames: int) -> dict:
                "-pix_fmt", "yuv420p", "-f", "rawvideo", "-"]
     hashes, decoded = set(), 0
     with tempfile.TemporaryFile() as errors:
-        proc = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=errors)
+        print("  decoding independently ...", flush=True)
+        proc = subprocess.Popen(command, stdin=subprocess.DEVNULL,
+                                stdout=subprocess.PIPE, stderr=errors)
         assert proc.stdout is not None
         try:
             while True:
@@ -201,8 +211,8 @@ def main() -> None:
     print(f"  motion: {motion['decoded_frames']} decoded, "
           f"{motion['distinct_decoded_frames']} distinct")
     print("  control: +ildct bitstream differs from the frame-DCT encode")
-    print("  NOT established here: that any macroblock set dct_type. The decoder's")
-    print("  field-DCT counter is the oracle; entry 650 requires it to be non-zero.")
+    print("  NOT established here: that any macroblock set dct_type. Compare the")
+    print("  hardware raster against ffmpeg's decode of this file to settle that.")
 
 
 if __name__ == "__main__":
