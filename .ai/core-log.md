@@ -1,3 +1,33 @@
+## 630 COMMIT Unreleased 6b92a19 2026-08-27T17:14:36-07:00
+
+#### Coming From:
+
+Unreleased ad56579
+
+#### Purpose:
+
+Build and document the release candidate for the next version from a clean tree.
+
+#### Outcome:
+
+The user set the version to 0.8.0, asked for the chroma finding to be documented rather than investigated, and asked for a from-scratch build. The build was made from a pristine export of tracked files only, so no incremental database or untracked artifact could influence it, and it reproduced the tested RBF byte for byte at SHA256 `61a2fed28425a461c8b886bdf809e3ef76a320e5688bb22a816135c36ef981ce`, 4,332,740 bytes, at fitter seed 17. That is the strongest reproducibility evidence this project has recorded for an FPGA binary. Zero errors and 208 warnings, with the warning identifier set identical to the accepted build, none new and none missing. The fit uses 31,464 ALMs at 75 percent, 50,273 registers, 4,048,355 block memory bits at 71 percent, 512 of 553 M10K blocks at 93 percent, 67 DSPs and three PLLs. Timing is positive everywhere with zero total negative slack: setup 0.243, hold 0.251, recovery 2.865, removal 0.564 and minimum pulse width 0.925 nanoseconds. Host regressions pass on the release binaries, covering the cadence decoder layout, eleven DVD ceiling tests, and the Main integration profile with 168 RTL cases, 96 burst cases, 20 step resume cases and the guarded fault cases. Audio regressions pass on the release helper: AC-3 decode against an independent decoder at maximum sample difference three and correlation 0.999999972, correct downmix placement for all six channels including the deliberate LFE absence, 375 byte-identical passthrough bursts, and the unchanged MPEG Layer II PCM hash on the full-length fixture. The helper itself rebuilt byte-identically from a clean dependency fetch. A packaging error was caught and corrected rather than shipped: the first package picked up the older Main from the local build directory instead of the patched Main that is installed and tested, which would have shipped without the audio output option and without the event-loop fix. All three packaged binaries were then compared against the target by independent readback and match exactly, so the package is the tested configuration rather than a rebuild of it. A factual slip in the release notes, a minimum pulse width written as 1.925 rather than 0.925 nanoseconds, was corrected in a follow-up commit. Documentation now describes 0.8.0 rather than unreleased work, the installation table lists all three runtime files with hashes and states that the patched Main is required rather than optional, and the chroma edge column is recorded under known limitations alongside the unqualified state of playback pixel accuracy. What this entry does not establish is a hardware regression pass on these exact packaged binaries; the six hand tests and the seventh progressive file were run against the same installed hashes, but no run was performed after packaging, and no release has been tagged.
+
+#### Next Steps:
+
+The user creates the annotated tag and GitHub release from the exact commit, as core.md requires, marking it pre-release because the project remains before 1.0. The package is at the rc080 package directory with a checksum file and installation notes; generated media stays out of it, so the seven hand tests are reproduced from the committed generator rather than shipped. Release notes should carry the repeated frame behaviour on high peak pictures, the scaler margin recovered by the seed change and its status as a known risk for the next change that adds logic, the audio split between measured and listened evidence, the DTS subwoofer behaviour as a device observation, and the two unqualified areas being playback pixel accuracy and the blended column at sharp colour transitions. If a final confirmation run is wanted before tagging, reinstall from the package and replay one interlaced and one audio test, which would also close the gap that no run has occurred after packaging. The chroma investigation and the interlaced gates of entry 609, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, remain open and out of scope for this release. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+- README.md
+- CHANGELOG.md
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 629 COMMIT Unreleased ad56579 2026-08-27T17:05:22-07:00
 
 #### Coming From:
@@ -1158,35 +1188,6 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 590 COMMIT Unreleased a4f2769 2026-08-27T03:13:17-07:00
-
-#### Coming From:
-
-Unreleased a4f2769
-
-#### Purpose:
-
-Verify guarded fast-block activation and measure the first high-bitrate hardware run against the acknowledged baseline.
-
-#### Outcome:
-
-The user reports no visible slowdown. The helper log was retrieved first, followed by a freshly triggered screenshot and complete host/FPGA readbacks; both installed hashes match qualified `a4f2769`, and a new Linux boot at 10:08:35 UTC plus runtime `transport=credit_fast_v1` and mode 2 corroborate activation. All 34,919,166 bytes, 449 pictures and 448 swaps complete with zero decoder error flags, normal helper exit, sequence end and quiet terminal presentation. There is no transport integrity abort, and all 2,132 logged chunk byte/count/checksum completions and batch/query totals reconcile. Fast transfers carry 34,896,748 bytes, or 99.9358 percent; the remaining 22,418 bytes use acknowledged single-word progress at zero credit. Compared with entry 587, matched completed-chunk delivery rises from 1,578,252 to 1,988,891 B/s, a 26.02 percent gain, and cadence rises from 20.248749 to 25.507040 fps. The first-to-last presentation span falls from 22.124823 to 17.563778 seconds, while complete transfer-call time falls from 21.202251 to 16.624084 seconds. Delayed eventual presentation intervals fall from 167 to 77, and the three longest retained gaps are now 66.733 milliseconds instead of a maximum 166.833 milliseconds, a 60 percent reduction consistent with the user's improved perception. Strict 30000/1001 cadence is still not met: 448 intervals would take 14.948267 seconds at nominal rate, 2.615512 seconds less than observed. The cause visible in retained deadlines has changed: the first three delayed deadlines, full-width picture ordinals 8, 11 and 14, now have both decoder input and upstream FIFO input pending, decoder not ready, zero input-starvation cycles and no presentation/destination hold; their writer-capacity blocked counts are 127, 36 and 215 cycles. Prior retained misses had ready-but-empty decoder input. The gated upstream-pending/decoder-not-ready counter covers 95.8468 percent of captured session cycles, supporting a shift toward decoder-side processing or backpressure, but it does not identify a specific arithmetic stage or exclude internal waits. Only three delayed-deadline records are retained, so their cause must not be assigned to all 77 late intervals. Host grants are predominantly small after initial 8 KiB batches: 791,350 fast batches average 44.10 bytes, with 804,691 status queries containing 5,632,837 acknowledged status-word transactions. FIFO consumption now governs small grants, and query overhead may matter; the log does not separate raw bus time, status time and downstream wait time. The 1.989 MB/s consumption-limited average is not a raw link-capacity measurement, and no 10 MB/s claim is established. All 587 helper EAGAIN events precede first delivery. Mean data-bearing poll duration improves to 32.768 milliseconds, but the maximum remains 81.485 milliseconds; these are blocking exposure rather than measured UI response, and current menu responsiveness has not been separately reported. The eight-bit largest-gap ordinals remain ambiguous after 256 pictures; do not confuse them with full-width deadline ordinals. Capture, decoded packet, helper log and checked comparison are stored as `.ai/current_results/entry590_*`. No production source, installed binary, configuration, reboot, reload or playback was changed during collection. Transport functionality and substantial improvement are verified, but full high-bitrate cadence acceptance and the separate 8 Mbps regression remain outstanding.
-
-#### Next Steps:
-
-With this high-bitrate evidence preserved, ask the user to play `bbb_480i_tff_15s_8mbps.m2v` once using the same installed pair and display mode, leave telemetry displayed, and report whether the menu remains responsive. Collect its helper log before another playback, then a fresh screenshot and image checks; verify mode 2, complete byte/picture counts, no integrity/decoder errors and cadence. Keep the guarded credit and integrity protocol, both FIFO capacities, startup controller, continuous HDMI sync and black idle unchanged. Before any further decoder or transport revision, propose a focused boundary and obtain approval; the current evidence points toward downstream processing/backpressure but does not yet isolate an internal stage or justify removing safeguards. Preserve the restoration copies and outstanding unsupported interlaced P/B, field-picture/DCT, audio/PTS, cancellation and historical assertion-drift limits. Keep restricted `core.md` unchanged, retain the forty-entry ring and do not mark nominal-cadence acceptance passed from the user's visual report alone.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
 
