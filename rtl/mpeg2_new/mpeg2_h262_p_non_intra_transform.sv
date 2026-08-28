@@ -248,13 +248,17 @@ wire signed [12:0] iq_qf = qfs[iq_qfs_index_reg];
 wire signed [14:0] iq_qf_extended = {{2{iq_qf[12]}}, iq_qf};
 wire [7:0] iq_qscale =
     quantiser_scale_value(iq_q_scale_type, iq_quantiser_scale_code);
-wire [7:0] iq_intra_weight, iq_non_intra_weight;
+wire [7:0] matrix_intra_weight, matrix_non_intra_weight;
+wire [5:0] iq_weight_read_index;
+// Keep a real data-register boundary after the matrix lookup. Prefetching
+// during the existing commit phase preserves all coefficient/output cycles.
+(* preserve, dont_retime *) reg [7:0] iq_intra_weight, iq_non_intra_weight;
 wire matrix_non_intra_default, matrix_error, matrix_update;
 reg iq_default_non_intra;
 wire iq_fast_non_intra = !iq_intra_block && iq_default_non_intra;
 mpeg2_h262_quant_matrices matrices (
     .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),
-    .read_index(iq_index),.intra_weight(iq_intra_weight),.non_intra_weight(iq_non_intra_weight),
+    .read_index(iq_weight_read_index),.intra_weight(matrix_intra_weight),.non_intra_weight(matrix_non_intra_weight),
     .intra_default(),.non_intra_default(matrix_non_intra_default),
     .syntax_error(matrix_error),.update_now(matrix_update)
 );
@@ -275,6 +279,9 @@ reg signed [31:0] iq_unclipped;
 reg signed [11:0] iq_saturated;
 reg signed [11:0] iq_final_value;
 reg               iq_parity_with_current;
+
+assign iq_weight_read_index = !iq_active ? 6'd0 :
+    (iq_stage_pending && iq_index!=6'd63) ? iq_index+6'd1 : iq_index;
 
 always @* begin
     if (iq_qf > 13'sd0)
@@ -373,6 +380,8 @@ assign residual_sample_value       = idct_sample_value;
 
 always @(posedge clk) begin
     if (reset) begin
+        iq_intra_weight <= 8'd8;
+        iq_non_intra_weight <= 8'd16;
         iq_default_non_intra <= 1'b1;
         capture_active         <= 1'b0;
         active_block_index     <= 2'd0;
@@ -404,6 +413,8 @@ always @(posedge clk) begin
             qfs[i] <= 13'sd0;
     end
     else begin
+        iq_intra_weight <= matrix_intra_weight;
+        iq_non_intra_weight <= matrix_non_intra_weight;
         idct_coeff_block_start <= 1'b0;
         idct_coeff_valid       <= 1'b0;
         idct_coeff_block_end   <= 1'b0;
