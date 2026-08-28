@@ -1,3 +1,32 @@
+## 649 COMMIT Unreleased 5fb7d5d 2026-08-27T21:27:18-07:00
+
+#### Coming From:
+
+Unreleased 5fb7d5d
+
+#### Purpose:
+
+Record that widening the residual coefficient memories recovers no M10K because synthesis strips the unused bit.
+
+#### Outcome:
+
+The entry 648 plan is disproven by a clean from-scratch build of `5fb7d5d` after removing `db` and `incremental_db`. The compile is successful with zero errors, and every figure is identical to the shipped v0.8.0 baseline: 31,464 ALMs, 50,273 registers, 512 of 553 M10K, and setup, hold, recovery, removal and minimum pulse width at positive 0.243, 0.251, 2.865, 0.564 and 0.925 nanoseconds with all total negative slack zero. The RBF is byte-identical to the released `61a2fed28425a461`, which alone establishes that the netlist did not change. The fitter report explains why: both coefficient memories still infer at 32,768 by 19 with 622,592 implementation bits, and the generated altsyncram's internal multiplexer is nineteen bits wide. Nothing writes bit nineteen because the write expressions are nineteen bits and zero-extend, and nothing reads it because every consumer slices bits eighteen down to thirteen and twelve down to zero, so the bit is constant and synthesis removes it. Declaring a wider array cannot select the twenty-bit mode; the twentieth bit must carry live data. The underlying measurement from entry 648 stands and is unaffected: an M10K reaches 10,240 bits only in the five, ten and twenty bit modes, our own build shows widths of twenty and forty achieving that against 8,192 for widths of one, sixteen, nineteen and thirty-five, and the existing twenty-bit `residual_block_mem` remains the one memory at full efficiency. What is disproven is the padding shortcut, not the efficiency finding. The consequence differs per path. The B path has nothing to place in the new bit because its own comment records that it already folded its last-flag into a pointer, so no saving is available there by this route. The P path can still gain roughly sixteen blocks by folding the separate one-bit `residual_coeff_last_mem` into bit nineteen, which both makes the bit live and deletes a four-block memory, taking 80 blocks to 64; that requires handling the retroactive write at address `count` minus one and is design work rather than padding. The harder repacking candidates are unaffected because repacking uses the extra bits by construction. This build also corrects a stale figure: the Aug 26 report used during investigation showed 464 blocks because `clean_video_queue` was then 16,384 by 8 at 16 blocks and is now 65,536 by 8 at 64, which accounts for the whole difference to 512. Two operational errors are recorded rather than hidden. A first compile launched detached was wrongly judged killed, a second was started against the same project, and the resulting database contention failed analysis and synthesis with zero errors reported; both were stopped and the intermediates removed before the clean run. A `pkill` pattern also matched the agent's own shell and terminated a command mid-sequence. Neither touched tracked source, the repository or the baselines. Nothing is deployed because the bitstream is identical to what is already installed, so no hardware test is possible or meaningful, and the free-block position is unchanged at 41 with the entry 608 buffer deepening still costed at roughly twenty-six blocks and the picture 690 repeated-frame limitation still accepted.
+
+#### Next Steps:
+
+Decide whether to revert `5fb7d5d`, which is recommended because the widened declarations are inert and a future reader could mistake them for a working optimization, and whether to scope the P path merge as its own cycle for roughly sixteen blocks. Do not attempt the same padding on any other memory, and treat width alone as insufficient evidence for any future M10K estimate; only a change that makes the extra bits carry data will move the block count. If more memory is wanted after that, the repacking candidates remain, being the 65,536 by 16 `shared_residual_store` at roughly twenty-five blocks, `stream_fifo` at six and `video_fifo` at three, each requiring address arithmetic rather than declaration changes, and the two identical 32,768 by 19 controller stores remain the largest single prize at seventy-six blocks if they are ever shown not to be simultaneously live. Keep the interlaced gates of field pictures, field DCT, interlaced P and B, `repeat_first_field` and 576i unstarted and unscoped until a memory budget exists, since those gates are what any recovered blocks would fund. Preserve restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 648 COMMIT Unreleased 5fb7d5d 2026-08-27T21:08:11-07:00
 
 #### Coming From:
@@ -1160,35 +1189,6 @@ Deploy the new helper and have the user play the generated AC-3 fixture once, re
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 609 COMMIT Unreleased d466bed 2026-08-27T06:42:34-07:00
-
-#### Coming From:
-
-Unreleased d466bed
-
-#### Purpose:
-
-Record the user's decision to accept the picture 690 repeated frame as a known limitation rather than deepen the input FIFO.
-
-#### Outcome:
-
-The user rejected the entry 608 proposal to raise `mpeg2_stream_fifo` from 16,384 to 32,768 sixteen-bit words and directed that the defect be logged as a known limitation, so no RTL change is made and the memory headroom of 41 free M10K blocks is preserved for future work. The accepted limitation is stated precisely so a future agent does not rediscover it as a fault: with 98,304 bytes of compressed read-ahead and consumption-paced transport, any coded picture larger than 138,344 bytes cannot be fully buffered ahead of its own decode and costs one display slot, which the hardware shows as a single frame repeated for two slot periods rather than a dropped frame. In the qualified full-movie fixture this affects exactly one picture, number 690 at 150,316 bytes at the scene cut near 23.09 seconds, producing one 66.733333-millisecond interval, roughly 33.4 milliseconds of added running time and no error flag, no dropped picture and no audio effect. The user watched both Bob and Weave runs in full and did not perceive it. This limitation is a property of buffer depth against peak coded picture size, not of the film, so other sources with a picture above the threshold will show the same single-slot repeat at that picture, and sources whose peak stays below it will not. The threshold is not a standards limit and must never be described as one; ITU-T H.262 and H.222.0 impose no such constraint, and the fixture itself is legal with zero VBV underflow throughout. The margin to the runner-up picture is only 1,994 bytes, so the exact threshold should be treated as approximate and re-derived rather than quoted as exact if the buffer depth, declared rate or decode timing assumption ever changes. The known fix, if the trade is ever worth making, is recorded in entry 608 along with its estimated cost of roughly 26 M10K blocks and its fit and timing risk at 93 percent utilization. No source, build, deployment, setting or playback changed in this cycle, and the Built and Passed marks refer to the unchanged, already-accepted `d466bed`.
-
-#### Next Steps:
-
-Treat `d466bed` as the current accepted baseline with the picture 690 limitation documented, and do not reopen it as a defect without new evidence such as a source that misses more than one slot or a run whose miss count exceeds the model's prediction. Carry the limitation into release notes when a version boundary is next prepared, since it is user-visible behavior on high-peak sources. The remaining qualification gates are unchanged and each needs scope and acceptance criteria agreed before work starts: Bob and Weave coverage beyond this single fixture, AC-3 audio, interlaced P and B pictures and field DCT, navigation, and ISO or disk-sourced playback. Await the user's direction on which gate to open next rather than selecting one unilaterally. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 
