@@ -1,3 +1,32 @@
+## 646 COMMIT Unreleased 2045c34 2026-08-27T20:14:53-07:00
+
+#### Coming From:
+
+Unreleased 2045c34
+
+#### Purpose:
+
+Validate DTS S/PDIF passthrough on the Buildroot beta against the recorded standard-MiSTer result.
+
+#### Outcome:
+
+The user reports test six works perfectly and clarifies that the woofer did not play. Helper-first retrieval preserved a log distinct from the test five capture, followed by a fresh uniquely named screenshot. The helper identifies the correct fixture, reports `spdif` IEC 61937 passthrough for AC-3 and DTS, locates DTS on private substream `0x88`, carries 1125 audio frames, exits zero on end of file, and reconciles all 340 pipe reads to 5,556,868 completed transport bytes with no acknowledged fallback payload and zero slow-path bytes. Valid schema-19 telemetry records 360 reference and displayed pictures, zero B pictures, 359 swaps, 3,068,038 accepted video bytes, top-field-first signalling, zero decoder and presentation errors, no audio underrun or PCM protocol fault at FIFO peak 127, zero timestamp conflicts of either kind, zero native deadline gaps, zero gap outliers, three largest display intervals each at the nominal 2,002,000 clocks, and sequence end with quiet completion. Comparison against the standard-MiSTer capture in entry 626 matches on every completion, error, cadence and audio counter, including identical video bytes, DTS frame count, emitted sample count, transport bytes and pipe reads; only delivered frames per second differs, by under two thousandths of a frame per second. As with entry 645, entry 626 predates the current Main and reports profile version one `credit_fast_v1` against this run's version two `credit_step_v1`, so transport-layer timing figures between them are not comparable while the counters are. The final raster is pixel-identical to the standard baseline across all 280,064 pixels outside the telemetry overlay. This entry corrects a prediction stated before the run: passthrough was expected to emit no PCM, but IEC 61937 carries the compressed bursts inside the PCM stream, so the 576,000 emitted samples are the burst carrier rather than decoded audio, and the standard baseline reports the identical figure. The absent woofer is the receiver behaviour already recorded in entries 621 and 626, where measurement established LFE present in the emitted bursts at 1267.3 RMS, so it remains a device observation rather than a core limitation or a Buildroot regression. Passed records this functional test only; Built remains unchecked because no new build occurs. No deployment, mode change, replay, reload or reboot is initiated. Raw captures remain local and only `.ai/current_results/entry646_buildroot_test6_dts_spdif_status.json` is published.
+
+#### Next Steps:
+
+The core is already in S/PDIF, so replay test_5_audio_ac3_51.mpg in that mode to close the last untested path in the seven-fixture matrix, retaining its helper log before another file overwrites it and taking a separate uniquely named screenshot; entry 627 holds the standard-MiSTer AC-3 S/PDIF baseline. Expect the helper to report passthrough on substream `0x80` rather than the decoded stereo mode of entry 645, and expect a non-zero emitted sample count as the IEC 61937 carrier. Progressive is already covered by entry 639 for I/P/B and entry 644 for all-I and needs no replay. Once that run is accepted the user may declare the matrix accepted, which should be recorded as acceptance of the seven fixtures only, with the unisolated test-four screenshot variation and the unchecked filesystem dirty flag carried forward as separate open items explicitly outside that scope. Preserve runtime identities, user control of hardware lifecycle, local-only raw data, restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [x] Passed
+
+---
+
 ## 645 COMMIT Unreleased 2045c34 2026-08-27T20:03:12-07:00
 
 #### Coming From:
@@ -1150,35 +1179,6 @@ Offline parsing of the delivered fixture reproduces its structure exactly, recov
 #### Next Steps:
 
 Measure the pipeline's actual input read-ahead in frame periods, in simulation against the real bytes rather than by inspection, and compare it with the 3.754 frame period worst case that picture 690 imposes and the 3.118 frame period second worst at picture 13253. If the measured depth falls between those two figures the hypothesis is confirmed and the useful production boundary is to deepen upstream buffering toward the declared 1,835,008-bit VBV, sized in frame periods of worst-case delivery, leaving presentation queues, clocks, startup and throughput untouched. If the measured depth is well above 3.754 frame periods the hypothesis is wrong and helper delivery timing during the spike becomes the next suspect, in which case the existing helper profile records should be examined before any RTL work. Either way, define the acceptance criteria before editing RTL, prefer a bounded simulation using the actual 690 spike over another full-length physical run, and keep AC-3, interlaced P/B, navigation and disk-source work as separately scoped gates. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 606 COMMIT Unreleased d466bed 2026-08-27T06:28:14-07:00
-
-#### Coming From:
-
-Unreleased d466bed
-
-#### Purpose:
-
-Close the remaining mode gap by replaying the full-movie fixture in Bob on the accepted candidate.
-
-#### Outcome:
-
-The user played the same film once in Bob as a warm replay with no core reload and no reboot, reporting picture and sound indistinguishable from the Weave run. The single syslog boot line remains 12:51:01 UTC, so this is a genuine same-boot comparison against entry 605 rather than a fresh-session repeat. The installed RBF still hashes to `d46f80061a3270c1fed07a089517e70b413d3353858dc0d8937ac1bb0070aa6a` for source `d466bed`, Main and the 739,065,873-byte fixture are unchanged, and a new helper PID 1339, a fresh helper log beginning at its own start line rather than extending the Weave capture, and packet checksum 1370572003 identify a distinct run. Bob matches Weave on every acceptance quantity: 17,876 reference pictures, 17,876 displayed pictures, 17,875 swaps, 715,713,077 accepted video bytes, `error_flags` zero, presentation error clear, sequence end seen, presentation complete, quiet snapshot and zero timestamp conflicts, with all 839,409,548 transport bytes submitted over 51,235 reads, 800 sampled ACK records and helper exit zero at 596.431673 seconds. Audio underrun and PCM protocol error are clear at FIFO peak 127, and the same saturated `pcm_sample_count` and `associated_count` fields again prevent any independent whole-film audio count. The important new result is that Bob reproduces the single missed display slot at exactly the same place as Weave: one 4,004,000-clock interval, 66.733333 milliseconds, at displayed picture 692 of 17,876, about 23.09 seconds in, with 691 completed references at both deadlines and accepted-byte positions of 27,778,070 in Bob against 27,772,349 in Weave, a difference of only 5,721 bytes. Both records show the writer busy without capacity blocking, no presentable candidate, the upstream FIFO pending and comparable input starvation of 699,593 clocks in Bob and 677,670 in Weave, with presentation hold, presentation error and both timestamp candidate signals false in each; the modes differ only in `decoder_ready`, false in Bob and true in Weave, and in candidate ready delay, 1,489,404 against 1,721,347 clocks. Two independent runs missing the same slot at the same bitstream position establish this as a deterministic, content-locked upstream delivery event rather than ambient jitter, and it remains outside the ownership and timestamp logic repaired this cycle. Deinterlacing mode has no measurable effect on delivery: helper would-block totals differ, 320 in Bob against 574 in Weave, as does first delivery at 23.465 against 42.017 milliseconds, but both are startup-phase effects and the reconstructed spans agree closely at 596.479325 and 596.476807 seconds against the 596.462533-second fixture, both after eight wraps of the 32-bit session timer, giving 29.967510 and 29.967636 true aggregate FPS. Reported cadence and FPS remain wrapping artifacts and must not be read directly. Picture and sound quality, synchronization and menu behavior are accepted from the user's report in both modes without independent measurement, and no pixel oracle was applied. This closes mode coverage for `d466bed` on this fixture; it does not qualify AC-3, interlaced P/B or field DCT, navigation, ISO or disk playback, or general commercial-DVD compatibility. Evidence and the exact capture and analysis drivers are retained as `.ai/current_results/entry606_*`, with the helper log stored losslessly under its original hash. Sixty-eight stale untracked result images from entries already outside the ring were deleted at the user's instruction, and the entry 605 commit remains unpushed because the environment refused the push operation. No production source, deployed file, setting, reboot, reload or playback occurred during collection; only the fixed screenshot was replaced.
-
-#### Next Steps:
-
-Both modes are now accepted for this fixture, so no further full-length replay is needed to compare them. The next boundary is to explain the picture 692 slot, which is cheap to attack offline because it is deterministic: measure the coded picture sizes and pack arrival schedule of the fixture in the neighbourhood of video byte 27.77 million and displayed picture 692, and determine whether an oversized picture, a rate spike or a pack-schedule discontinuity starves the decoder for the observed eleven and a half milliseconds. Only after that measurement should any production change be considered, and queue sizes, clocks, startup and throughput must not be tuned on the strength of one missed slot in 17,875. Because saturated audio counters cannot prove whole-film audio integrity, define acceptable audio evidence before any audio-focused cycle. Keep AC-3, interlaced P/B, navigation and disk-source work as separately scoped gates with acceptance criteria agreed in advance, leave lifecycle and playback under user control, preserve restricted core.md and maintain the forty-entry ring.
 
 #### Files Modified:
 

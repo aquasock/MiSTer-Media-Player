@@ -1,0 +1,70 @@
+{
+  "source_commit": "2045c34",
+  "scope": "Minimal public functional playback status; raw captures remain local.",
+  "test": "test_6_audio_dts_51.mpg",
+  "user_report": "DTS works perfectly; the woofer did not play, which is the expected receiver behavior.",
+  "requested_modes": {
+    "deinterlacer": "not attested by telemetry",
+    "audio": "S/PDIF"
+  },
+  "mode_evidence": "Helper log reports spdif IEC 61937 passthrough for AC-3 and DTS, and locates DTS on private substream 0x88.",
+  "fixture_identified_by_helper": "file:/media/fat/games/MediaPlayer/Buildroot_beta/test_6_audio_dts_51.mpg",
+  "telemetry_valid": true,
+  "pictures_displayed": 360,
+  "reference_pictures": 360,
+  "b_pictures": 0,
+  "display_swaps": 359,
+  "accepted_video_bytes": 3068038,
+  "top_field_first": 1,
+  "decoder_errors": 0,
+  "presentation_error": false,
+  "audio_underrun": false,
+  "pcm_protocol_error": false,
+  "pcm_fifo_peak": 127,
+  "deadline_gaps": 0,
+  "gap_outliers": 0,
+  "timestamp_advance_conflicts": 0,
+  "timestamp_delay_conflicts": 0,
+  "largest_recorded_display_intervals_clocks": [
+    2002000,
+    2002000,
+    2002000
+  ],
+  "sequence_end_and_quiet": true,
+  "helper_exit": 0,
+  "helper_finish_reason": "eof",
+  "transport_bytes_reconciled": 5556868,
+  "pipe_reads": 340,
+  "pipe_read_bytes_sum": 5556868,
+  "acknowledged_fallback_payload": false,
+  "slow_path_bytes": 0,
+  "dts_frames": 1125,
+  "pcm_samples_emitted": 576000,
+  "passthrough_sample_count_note": "IEC 61937 carries the compressed bursts inside the PCM stream, so a non-zero emitted sample count is the burst carrier rather than decoded audio. The standard-MiSTer baseline reports the identical figure.",
+  "lfe_audible": false,
+  "lfe_note": "The receiver did not reproduce DTS LFE, matching entries 621 and 626. Entry 621 measured LFE present in the emitted bursts at 1267.3 RMS, so this is a logged device observation and neither a core limitation nor a Buildroot result.",
+  "standard_baseline_entry": 626,
+  "baseline_comparison": {
+    "video_bytes_match": true,
+    "dts_frames_and_emitted_samples_match": true,
+    "transport_bytes_and_pipe_reads_match": true,
+    "completion_error_and_cadence_counters_match": true,
+    "transport_profile_differs": "Entry 626 was captured under profile_version=1 credit_fast_v1; this run is profile_version=2 credit_step_v1, so transport-layer timing figures are not comparable.",
+    "delivered_fps_standard": 29.941376078372056,
+    "delivered_fps_buildroot": 29.939672976708035
+  },
+  "terminal_pixel_comparison": {
+    "result": "Pixel-identical outside the telemetry overlay rectangle.",
+    "mismatches": 0,
+    "compared_pixels": 280064
+  },
+  "this_functional_test_accepted": true,
+  "overall_beta_compatibility_accepted": false,
+  "remaining_matrix": [
+    "Test 5 AC-3 S/PDIF passthrough"
+  ],
+  "separate_unresolved_issues": [
+    "Storage dirty-flag warning has not been checked by a filesystem scan.",
+    "Test 4 screenshot variation has not been isolated."
+  ]
+}
