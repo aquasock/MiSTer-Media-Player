@@ -63,9 +63,9 @@ localparam integer MAX_COEFF_EVENTS = 32768;
 // pointer, eliminating a separate last-flag RAM.  Neither capacity is an
 // H.262 syntax limit.
 (* ramstyle = "M10K" *) reg [35:0] residual_block_mem [0:2047];
-(* ramstyle = "M10K" *) reg [18:0] residual_coeff_mem [0:32767];
+(* ramstyle = "M10K" *) reg [19:0] residual_coeff_mem [0:32767];
 reg [35:0] residual_block_word;
-reg [18:0] residual_coeff_word;
+reg [19:0] residual_coeff_word;
 reg [11:0] residual_count;
 reg [15:0] residual_coeff_count;
 reg [10:0] pending_residual_mb;
