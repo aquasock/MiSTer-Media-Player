@@ -1,0 +1,41 @@
+{
+  "checked_at": "2026-08-27T18:37:08-07:00",
+  "source_commit": "036252a4f7b30574acd0204caba729fea4981230",
+  "checks": {
+    "markdown_files": 8,
+    "local_links_and_anchors": 20,
+    "bash_blocks_syntax_checked": 18,
+    "generator_syntax": "pass",
+    "generation_AST": "unchanged except module docstring and descriptive manifest literal",
+    "manifest_expression": "pass, metadata only; no media generated",
+    "documented_package_hashes_and_sizes": "match public ZIP audit",
+    "published_tag_and_core_md": "unchanged",
+    "historical_release_notes_and_regression_identities": "unchanged"
+  },
+  "release_notes_url": "https://github.com/aquasock/MiSTer-Media-Player/releases/tag/v0.8.0",
+  "release_body_matches_versioned_notes_plus_preserved_changelog_link": true,
+  "release_body_before_sha256": "cb3d6f91d78ceb724e577939fa58185398961771077ed84c42d44cb3ac9f9135",
+  "release_body_after_sha256": "e0dacedfc0a31f8eab3be1e07c34c2a93a1d8d08569f06a01c4c00941949619d",
+  "release_non_body_metadata_and_assets_unchanged": true,
+  "remote_tag_object_verified": "0a4c1007cf22aa94152a043f9b2a86433fb9b4ce",
+  "remote_tag_commit_verified": "af43de27b2a08893838ea69ce176ef03ad5e3433",
+  "document_hashes": {
+    "CHANGELOG.md": "bdc07f5d99a5d33faa7856a84918c5cdb013479fe81f4790bfb6d5d6c0a22817",
+    "README.md": "6c21bd9b7b5430a668d11a8fa98b7a9eda78c7cfdbe53ff5fd44ed3ed9bf588d",
+    "docs/ARCHITECTURE.md": "058e2638ffd1442ede394cf2d43f9d468ad465ff8f378b1b009c27690b62ea53",
+    "docs/BUILDING.md": "e8913e61715f0756d50f2a964a2055259d76ea9f8627145efb1c05905cd5f83b",
+    "docs/MPEG2_NEW_DECODER.md": "abb336edcd45d85831915c8dc9bcc817c57150850817a1933675df8a27774164",
+    "docs/RELEASE_NOTES_v0.8.0.md": "1726d73394dac75bc8bde8091a248f3b91edcca77305b0485485d943f3389ce7",
+    "docs/TEST_INSTRUCTIONS.md": "292675f5134dbaf0b4ce16340390c354cc41d2e8408ba5b971124f64cec8879e",
+    "host/arm/ARCHITECTURE.md": "766d54aa39abda658e01ea899a36d468cb8e1e7ceb4f2a43235446162e8dbd32",
+    "tools/streams/generate_test_suite.py": "be31a8c50652aa9b95841289495183f076110e5976b9e5a9f2401c91284ec28f"
+  },
+  "not_performed": [
+    "Quartus rebuild",
+    "runtime helper/Main rebuild",
+    "media generation",
+    "MiSTer deployment or playback",
+    "new hardware acceptance"
+  ],
+  "core_syntax": "40 entries; exact six sections; retained historical entries unchanged; no unresolved proposal after completion"
+}

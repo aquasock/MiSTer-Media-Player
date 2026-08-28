@@ -1,4 +1,4 @@
-## 635 COMMIT Unreleased ??? 2026-08-27T18:29:23-07:00
+## 635 COMMIT Unreleased 036252a 2026-08-27T18:37:08-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Reconcile the current documentation and published release text with the verified
 
 #### Outcome:
 
-The user requests documentation cleanup before further development. The approved scope replaces stale current-version, build, qualification, architecture and test guidance, corrects release provenance and ZIP sizing, and removes claims contradicted by existing evidence without changing runtime behavior. The planned file set includes the suite generator's documentation strings and comments only; its executable syntax must remain unchanged. Historical release notes and regression identities remain intact, while historical design and test sections are explicitly labelled. The GitHub release body will be synchronized from the corrected versioned notes after the documentation commit is published, retaining its Full Changelog link, title, tag, pre-release state and assets. No hardware gate is newly accepted and no RBF, helper or Main rebuild is needed for these documentation changes.
+Published documentation commit 036252a reconciles the README, changelog, current build and architecture guides, v0.8.0 release notes and hardware instructions with the actual release. It replaces stale v0.7.0 qualification figures, labels older design and regression procedures as historical, corrects the tag and ZIP-size descriptions, and records the current seven-test and profile-version-two collection workflow. Historical versioned notes, old regression checksums and retained settled log entries remain unchanged. The suite generator changes only its module documentation, comments and descriptive accepted_video manifest label so progressive test seven is no longer described as all-I; an AST comparison confirms that media-generation logic is unchanged. Main is correctly described as passing the core's audio mode to the helper, rather than creating the core menu option. The unsupported-private-audio claim is removed for the supported AC-3/DTS paths, and synthetic AC-3 comparison figures are distinguished from the commercial-track results. The documentation now acknowledges entry 628's measured hardware-screenshot pixel comparison while leaving comprehensive playback pixel qualification and the chroma root cause open. It also narrows entry 634's shorthand about tested runtime hashes: tests one through six were initially captured with older Main, while the final Main was tested separately on test one and subsequent progressive runs; RBF/helper hashes match throughout. Twenty local links and anchors and eighteen shell blocks pass structural or syntax checks, Python syntax and the actual manifest expression pass, and documented runtime/ZIP hashes and sizes match the public-package audit. GitHub release text is updated from the committed notes with its Full Changelog destination retained, and a fresh readback matches exactly after newline normalization. Title, publication time, tag, pre-release flags and asset metadata are unchanged, and remote tag object and target remain the original values. The forty-entry core-syntax audit passes with no unresolved proposal. No new media, runtime binaries, build, device capture, deployment or playback is produced. Built refers to the existing reproduced binaries and successful Python syntax check, not a new Quartus run; hardware Passed remains unchecked. Bounded verification evidence is retained as .ai/current_results/entry635_documentation_audit.json.
 
 #### Next Steps:
 
-Update the listed guides, check source claims against retained results and the current implementation, validate local links and package hashes, compare the generator AST before and after, and run the core-syntax.md audit with exactly forty entries. Commit and push the documentation on master from the Raspberry Pi, update only the release prose and read it back, then resolve this placeholder to the documentation commit with the verification results. Preserve core.md, all settled entries remaining in the ring, untracked screenshots, the published tag and binaries, and user control of hardware lifecycle.
+Documentation cleanup and publication recording are complete. Confirm with the user whether the final package-install hardware run occurred before recording that gate as passed; do not infer a run from identical binary hashes. The next development milestone remains unapproved and should be scoped separately, with the broader interlaced decoding gaps, memory headroom and scaler timing risk visible. Leave the published v0.8.0 tag and ZIP intact, keep the current Unreleased changelog section for subsequent work, preserve restricted core.md and the forty-entry ring, and retain user control of deployment and hardware lifecycle.
 
 #### Files Modified:
 
@@ -30,7 +30,7 @@ Update the listed guides, check source claims against retained results and the c
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
