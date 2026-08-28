@@ -63,7 +63,7 @@ endtask
 task commit_reference;
  begin
   @(negedge clk);completed=active;reference=active;active=(active==2)?0:active+1'b1;
-  promoted=promoted+1'b1;waiting=(completed!=display);
+  promoted=promoted+1'b1;waiting=scratch||(completed!=display);
   @(negedge clk);waiting=0;repeat(4)@(negedge clk);
  end
 endtask
@@ -264,8 +264,9 @@ initial begin
   ordinary_overlap=1;
   // Entry 669: the original opening can complete the allowed overlapping
   // reference on the same edge as the following P header. Once the second
-  // scratch picture is displayed, a free scratch bank is NOT permission to
-  // decode that P: the sole pending reference slot still owns its predecessor.
+  // scratch picture is displayed, a free scratch bank is not permission to
+  // overwrite the pending reference. A distinct ordinary decode destination
+  // and retained secondary identity are required for the new drain overlap.
   // The following header must also release that predecessor once it retires.
   repeat(4)@(negedge clk);reset=0;
   picture(0,1,1,1,90000,1);commit_reference();
@@ -284,7 +285,10 @@ initial begin
    hold,scheduler.pending_frame_valid,scheduler.pending_frame_bank,
    scheduler.pending_frame_released,scheduler.queued_header_capacity,
    scheduler.run_closed,scheduler.overlap_decode_open);
-  if(!hold)$fatal(1,"following P payload admitted with pending reference slot occupied during B drain");
+  if(hold||!scheduler.ordinary_reference_decode_open||
+     !scheduler.ordinary_drain_overlap||scheduler.ordinary_reference_decode_bank!=0||
+     scheduler.pending_frame_bank!=2||scheduler.future_frame_bank!=1)
+   $fatal(1,"following P lacked distinct decode/pending/future ownership during B drain");
   if(!scheduler.pending_frame_released)
    $fatal(1,"coincident following P header failed to release predecessor");
   field_end(1,1,0,0,1);field_end(1,1,0,0,1);field_end(0,0,1,1,0);
