@@ -1,3 +1,32 @@
+## 636 COMMIT Unreleased ??? 2026-08-27T19:05:44-07:00
+
+#### Coming From:
+
+Unreleased 036252a
+
+#### Purpose:
+
+Prepare an isolated Buildroot MiSTer compatibility experiment using the unchanged v0.8.0 runtime.
+
+#### Outcome:
+
+The user prioritizes this experiment over further development, supplies the removable card mounted at /media/vash/MiSTer_Data and explicitly authorizes clearing its old SuperStation installation without a backup. The approved scope is to assess the pinned v2026.08.25-beta release on the build PC, clear only that card's data-partition contents, retain its partition layout and low-level bootloader, and install the normal Linux 6.18.46 image with the matched v0.8.0 runtime and existing seven hand-test fixtures. Add a bounded environment and helper-log capture script for the user-controlled hardware test. Do not execute the upstream installer, updater, updateboot or fresh-image first-boot repartitioner, and do not modify or reboot the running MiSTer. Hardware compatibility is not established by userspace emulation; both status boxes remain unchecked at proposal time. No backup of the old card is requested or to be made.
+
+#### Next Steps:
+
+Verify release hashes, actual ARM library loading, helper smoke tests, kernel access settings and source fixture manifests; preserve the current MiSTer's boot identity and menu by read-only FTP, without carrying the old card's ConsoleMode redirect. Prepare the minimal card with a checksum manifest and instructions, verify destination readback, unmount it safely, and record the source commit and bounded results. The user then powers down the QMTech, swaps cards and reports boot, network and playback results; test one first, followed by the remaining interlaced, progressive and audio matrix only after basic bring-up succeeds. Preserve the existing production installation and published v0.8.0 package, leave broader decoder development out of scope, and retain the forty-entry ring and restricted core.md.
+
+#### Files Modified:
+
+- tools/streams/capture_buildroot_environment.sh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 635 COMMIT Unreleased 036252a 2026-08-27T18:37:08-07:00
 
 #### Coming From:
@@ -1157,35 +1186,6 @@ The profiler's full-width ordinals are one-based, corroborated by completed-refe
 #### Next Steps:
 
 Use these measurements to scope a bounded decode/retirement throughput revision or a targeted integrated diagnostic, preserving exact picture identity, startup and presentation phase rather than treating either image as malformed or merely masking its deadline miss. Account for sustained workload and available reference-buffer lead; a picture's individual byte size or transform coefficient count alone cannot predict whether its display deadline is missed. Keep the exact 9.8 Mbps fixture and installed a4f2769 pair, preserve transport integrity checks, queues, startup, continuous sync and restoration copies, and obtain approval if the resulting production plan materially changes the accepted scope. Require zero missed slots on the ceiling fixture before the separate combined 10.08 Mbps/audio-and-timing gate; full DVD compatibility remains broader. Leave lifecycle and playback with the user, keep restricted core.md unchanged and maintain the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 596 COMMIT Unreleased feb50c2 2026-08-27T03:53:06-07:00
-
-#### Coming From:
-
-Unreleased feb50c2
-
-#### Purpose:
-
-Record the user's confirmation that the preceding DVD-ceiling run used Weave mode.
-
-#### Outcome:
-
-The user explicitly confirms that entry 594 was Weave, resolving the mode-attribution uncertainty recorded in entry 595. Entry 595 was Bob without rebooting, also explicitly reported by the user. The existing same-fixture, same-a4f2769-binary and same-Linux-boot captures can therefore be compared as user-confirmed Weave and Bob runs. Both display all 449 pictures with 448 swaps and zero decoder/transport errors, yet both retain the same two missed deadlines at full-width ordinals 167 and 346 and the same 66.733-millisecond maximum intervals. Bob's approximately 28.174-millisecond shorter aggregate span is startup-related, not removal of either steady-playback miss. Candidate readiness at the two deadlines changes from 0.444633 and 0.084750 milliseconds late in Weave to 0.390517 and 0.083600 milliseconds late in Bob. Both retain pending input, decoder not ready and zero input starvation at the missed slots. These observations strengthen the shared decode/retirement timing hypothesis and show that switching to Bob does not clear the fault; they do not prove every mode behavior identical or isolate a specific arithmetic stage. The confirmation is preserved in .ai/current_results/entry596_mode_confirmation.json and supersedes only the prior uncertainty about mode identity, leaving the settled captures and their numerical analysis unchanged. No new capture, source change, build, deployment or device action was performed. Strict DVD-ceiling cadence acceptance remains open.
-
-#### Next Steps:
-
-Use entry 594 as the confirmed Weave baseline and entry 595 as the confirmed warm Bob comparison. Focus the proposed GUNSMOKE decoder/reference-retirement investigation on the repeatable shared misses at pictures 167 and 346 rather than treating display-mode selection as a fix. Preserve the exact 9.8 Mbps fixture and installed a4f2769 pair, and require a bounded evidence-backed revision before further production changes. Keep the combined 10.08 Mbps audio/video gate separate, retain 18.65 Mbps only as optional stress evidence, preserve transport guards, queues, startup and sync, leave lifecycle/playback control with the user and maintain restricted core.md and the forty-entry ring.
 
 #### Files Modified:
 
