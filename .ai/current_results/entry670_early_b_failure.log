@@ -1,0 +1,3 @@
+EARLY_B_REFERENCE_STATE future=1 pending=0 descriptor=0 reference=2 promoted=3 bound_count=2
+FATAL: tools/streams/tb_h262_film_reorder_timestamp.sv:113: early B header lost retiring I reference identity or metadata
+       Time: 45810000  Scope: tb_h262_film_reorder_timestamp

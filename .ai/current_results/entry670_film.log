@@ -1,0 +1,32 @@
+FILM_CADENCE_PASS two/three fields, changing TFF, PTS floor, parity, invisible startup
+/run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_film_cadence.sv:52: $finish called at 1520000 (1ps)
+FILM_REORDER_TIMESTAMP_PASS I_B_B_P fields=3/2/3/2 missing_PTS terminal replay
+/run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_film_reorder_timestamp.sv:110: $finish called at 303560000 (1ps)
+RESULT stable_tff=PASS change_rejected=PASS reset_bff=PASS film_variable_tff=PASS mixed_rejected=PASS
+/run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_native_field_order.sv:44: $finish called at 260000 (1ps)
+H262_PICTURE_TIMESTAMP_PASS reference=1 scratch=2 reorder=1 unannotated=reference/b delayed=1 coincident=1 candidate_query=1 count_after_reset=0
+/run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_picture_timestamp.sv:176: $finish called at 990000 (1ps)
+FILM_CACHE_RGB_PASS repeated_field=0 pixels=345600
+NATIVE_CACHE_FINGERPRINT_PASS order=TFF corrupted=0 completed=2 mismatches=0
+- /run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_native_480i_cache_refill.sv:911: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01
+- Verilator: $finish at 31ms; walltime 1.296 s; speed 23.556 ms/s
+- Verilator: cpu 1.296 s on 1 threads; alloced 217 MB
+FILM_CACHE_RGB_PASS repeated_field=0 pixels=345600
+NATIVE_CACHE_FINGERPRINT_PASS order=BFF corrupted=0 completed=2 mismatches=0
+- /run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_native_480i_cache_refill.sv:911: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01
+- Verilator: $finish at 31ms; walltime 1.299 s; speed 23.492 ms/s
+- Verilator: cpu 1.299 s on 1 threads; alloced 217 MB
+FILM_CACHE_RGB_PASS repeated_field=1 pixels=518400
+NATIVE_CACHE_FINGERPRINT_PASS order=TFF corrupted=0 completed=2 mismatches=0
+- /run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_native_480i_cache_refill.sv:911: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01
+- Verilator: $finish at 46ms; walltime 1.943 s; speed 23.553 ms/s
+- Verilator: cpu 1.944 s on 1 threads; alloced 217 MB
+FILM_CACHE_RGB_PASS repeated_field=1 pixels=518400
+NATIVE_CACHE_FINGERPRINT_PASS order=BFF corrupted=0 completed=2 mismatches=0
+- /run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_native_480i_cache_refill.sv:911: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01
+- Verilator: $finish at 46ms; walltime 1.946 s; speed 23.522 ms/s
+- Verilator: cpu 1.946 s on 1 threads; alloced 217 MB

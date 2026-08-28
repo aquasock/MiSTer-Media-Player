@@ -1,3 +1,32 @@
+## 670 COMMIT Unreleased c8bd628 2026-08-28T03:19:40-07:00
+
+#### Coming From:
+
+Unreleased 77859f9
+
+#### Purpose:
+
+Record full native-film reproduction of the original DVD stutter and isolate reference-admission and metadata-retirement failures.
+
+#### Outcome:
+
+The approved diagnostic completes on GUNSMOKE without changing production RTL, Main, helper, clocks, constraints, placement seed or the MiSTer. Native trace binaries use source e029f4f, numerical controls use 94b60b2, reduced regressions use 5548e4e and final analysis uses c8bd628. Both complete 289-picture runs, with one-cycle DDR reads and with sixteen-cycle reads plus sixteen busy cycles per 256-cycle period, produce 280 framebuffer publications, 279 bank swaps and 278 unique pictures: eleven decoded pictures are skipped and coded pictures 71 and 95 are repeated. The three largest bank-selection gaps match hardware ordinals 57, 71 and 89 and durations 116.815, 100.100 and 83.448 milliseconds to within one decoder clock. Both runs also match the hardware's 24 associated timestamps. The unique-picture counts are simulation evidence; the hardware barcode itself does not identify each picture. Seventeen published I-pictures carry stale TFF/RFF flags and the first picture loses PTS validity. A reduced admission test fails because a following P payload is permitted while the pending reference slot remains occupied during B drain. A second reduced test fails when a B header arrives one clock before its I-reference completion: the scheduler retains an older P bank and the metadata owner drops the retiring I descriptor. Both default controls pass. The full paired reconstruction qualification passes all 149,817,600 samples per run with unchanged source fingerprints; its CSVs and both native real-reference CSVs match entry 665 exactly, preserving maximum isolated error one, maximum real-reference error five, 102 samples above the old fixed-two bound and zero measured propagation-bound violations. Native cache, phase and overlap error flags remain clear. All twenty-five helper timestamps agree with authored cadence within 2.5 ticks, so the earlier terminal-gap caveat must not be applied to this actual transport as an explanation for the pauses. Initial harness attempts exposed a missing test RAM model, excessive legacy logging and a fast-soak watchdog limit of 10,000 cycles; the model is reused, logging bounded and native waits given a four-field diagnostic watchdog while the old default limit remains unchanged. Detailed traces, reduced failures, passing controls, source fingerprints and analysis are retained under .ai/current_results/entry670_* and output_files/entry669; PC working evidence remains in /home/vash/mister-builds/entry669. No new Quartus build or hardware acceptance is claimed.
+
+#### Next Steps:
+
+Obtain approval for a production fix that preserves retiring picture identity, PTS and field descriptors across the following-header handoff, blocks following P/I payloads when reference capacity is occupied, and binds early B headers to the actual completing reference. Require both reduced regressions to pass and all 289 pictures to publish once in order with correct metadata and authored film cadence under both memory cases, while retaining the paired numerical bounds. Only then perform a clean timing-audited FPGA build and retest original audio playback; additional shared audio-delivery coupling remains unexcluded. Do not change buffers, clocks or placement seeds speculatively.
+
+#### Files Modified:
+
+- tools/streams/analyze_original_dvd_timing.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 669 COMMIT Unreleased 77859f9 2026-08-28T02:38:57-07:00
 
 #### Coming From:
@@ -1216,36 +1245,6 @@ The release candidate is unchanged by this documentation work and remains ready 
 #### Files Modified:
 
 - README.md
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 630 COMMIT Unreleased 6b92a19 2026-08-27T17:14:36-07:00
-
-#### Coming From:
-
-Unreleased ad56579
-
-#### Purpose:
-
-Build and document the release candidate for the next version from a clean tree.
-
-#### Outcome:
-
-The user set the version to 0.8.0, asked for the chroma finding to be documented rather than investigated, and asked for a from-scratch build. The build was made from a pristine export of tracked files only, so no incremental database or untracked artifact could influence it, and it reproduced the tested RBF byte for byte at SHA256 `61a2fed28425a461c8b886bdf809e3ef76a320e5688bb22a816135c36ef981ce`, 4,332,740 bytes, at fitter seed 17. That is the strongest reproducibility evidence this project has recorded for an FPGA binary. Zero errors and 208 warnings, with the warning identifier set identical to the accepted build, none new and none missing. The fit uses 31,464 ALMs at 75 percent, 50,273 registers, 4,048,355 block memory bits at 71 percent, 512 of 553 M10K blocks at 93 percent, 67 DSPs and three PLLs. Timing is positive everywhere with zero total negative slack: setup 0.243, hold 0.251, recovery 2.865, removal 0.564 and minimum pulse width 0.925 nanoseconds. Host regressions pass on the release binaries, covering the cadence decoder layout, eleven DVD ceiling tests, and the Main integration profile with 168 RTL cases, 96 burst cases, 20 step resume cases and the guarded fault cases. Audio regressions pass on the release helper: AC-3 decode against an independent decoder at maximum sample difference three and correlation 0.999999972, correct downmix placement for all six channels including the deliberate LFE absence, 375 byte-identical passthrough bursts, and the unchanged MPEG Layer II PCM hash on the full-length fixture. The helper itself rebuilt byte-identically from a clean dependency fetch. A packaging error was caught and corrected rather than shipped: the first package picked up the older Main from the local build directory instead of the patched Main that is installed and tested, which would have shipped without the audio output option and without the event-loop fix. All three packaged binaries were then compared against the target by independent readback and match exactly, so the package is the tested configuration rather than a rebuild of it. A factual slip in the release notes, a minimum pulse width written as 1.925 rather than 0.925 nanoseconds, was corrected in a follow-up commit. Documentation now describes 0.8.0 rather than unreleased work, the installation table lists all three runtime files with hashes and states that the patched Main is required rather than optional, and the chroma edge column is recorded under known limitations alongside the unqualified state of playback pixel accuracy. What this entry does not establish is a hardware regression pass on these exact packaged binaries; the six hand tests and the seventh progressive file were run against the same installed hashes, but no run was performed after packaging, and no release has been tagged.
-
-#### Next Steps:
-
-The user creates the annotated tag and GitHub release from the exact commit, as core.md requires, marking it pre-release because the project remains before 1.0. The package is at the rc080 package directory with a checksum file and installation notes; generated media stays out of it, so the seven hand tests are reproduced from the committed generator rather than shipped. Release notes should carry the repeated frame behaviour on high peak pictures, the scaler margin recovered by the seed change and its status as a known risk for the next change that adds logic, the audio split between measured and listened evidence, the DTS subwoofer behaviour as a device observation, and the two unqualified areas being playback pixel accuracy and the blended column at sharp colour transitions. If a final confirmation run is wanted before tagging, reinstall from the package and replay one interlaced and one audio test, which would also close the gap that no run has occurred after packaging. The chroma investigation and the interlaced gates of entry 609, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, remain open and out of scope for this release. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-- README.md
-- CHANGELOG.md
 
 #### Status:
 

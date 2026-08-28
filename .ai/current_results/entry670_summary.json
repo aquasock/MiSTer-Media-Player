@@ -1,0 +1,284 @@
+{
+  "recorded": "2026-08-28T03:19:40-07:00",
+  "diagnostic_source": "c8bd628084a2c8cc6ca55e9e8fc7d7cecf26abd0",
+  "production_source": "6c1b621",
+  "production_rtl_main_helper_and_constraints_unchanged": true,
+  "native_cases": {
+    "ideal": {
+      "producer_source": "e029f4f",
+      "analyzer_source": "c8bd628084a2c8cc6ca55e9e8fc7d7cecf26abd0",
+      "memory_latency_cycles": 1,
+      "memory_busy_period_cycles": 0,
+      "memory_busy_cycles": 0,
+      "decoded": 289,
+      "publications": 280,
+      "unique_publications": 278,
+      "missing_coded": [
+        31,
+        36,
+        48,
+        55,
+        60,
+        64,
+        68,
+        72,
+        88,
+        96,
+        112
+      ],
+      "duplicates": {
+        "71": 2,
+        "95": 2
+      },
+      "descriptor_mismatches": 17,
+      "pts_mismatches": 1,
+      "associated_timestamps": 24,
+      "largest_selection_gaps": [
+        {
+          "cycles": 7008907,
+          "milliseconds": 116.81511666666667,
+          "display_ordinal": 57,
+          "previous_coded": 59,
+          "coded": 62,
+          "hardware_cycles": 7008906
+        },
+        {
+          "cycles": 6006000,
+          "milliseconds": 100.1,
+          "display_ordinal": 71,
+          "previous_coded": 76,
+          "coded": 78,
+          "hardware_cycles": 6006000
+        },
+        {
+          "cycles": 5006906,
+          "milliseconds": 83.44843333333333,
+          "display_ordinal": 89,
+          "previous_coded": 95,
+          "coded": 97,
+          "hardware_cycles": 5006906
+        }
+      ],
+      "authored_fields": 722,
+      "authored_duration_seconds": 12.045366666666666,
+      "extra_field_gaps": 51,
+      "pixel_report_matches_previous_chain": true,
+      "wall_seconds": 1155.975
+    },
+    "contended": {
+      "producer_source": "e029f4f",
+      "analyzer_source": "c8bd628084a2c8cc6ca55e9e8fc7d7cecf26abd0",
+      "memory_latency_cycles": 16,
+      "memory_busy_period_cycles": 256,
+      "memory_busy_cycles": 16,
+      "decoded": 289,
+      "publications": 280,
+      "unique_publications": 278,
+      "missing_coded": [
+        31,
+        36,
+        48,
+        55,
+        60,
+        64,
+        68,
+        72,
+        88,
+        96,
+        112
+      ],
+      "duplicates": {
+        "71": 2,
+        "95": 2
+      },
+      "descriptor_mismatches": 17,
+      "pts_mismatches": 1,
+      "associated_timestamps": 24,
+      "largest_selection_gaps": [
+        {
+          "cycles": 7008907,
+          "milliseconds": 116.81511666666667,
+          "display_ordinal": 57,
+          "previous_coded": 59,
+          "coded": 62,
+          "hardware_cycles": 7008906
+        },
+        {
+          "cycles": 6006000,
+          "milliseconds": 100.1,
+          "display_ordinal": 71,
+          "previous_coded": 76,
+          "coded": 78,
+          "hardware_cycles": 6006000
+        },
+        {
+          "cycles": 5006906,
+          "milliseconds": 83.44843333333333,
+          "display_ordinal": 89,
+          "previous_coded": 95,
+          "coded": 97,
+          "hardware_cycles": 5006906
+        }
+      ],
+      "authored_fields": 722,
+      "authored_duration_seconds": 12.045366666666666,
+      "extra_field_gaps": 51,
+      "pixel_report_matches_previous_chain": true,
+      "wall_seconds": 1161.418
+    }
+  },
+  "numerical_controls": {
+    "source": "94b60b2",
+    "paired_pass": true,
+    "unchanged_source_fingerprint": true,
+    "isolated_and_chain_csv_match_entry665": true,
+    "samples_per_run": 149817600,
+    "isolated_max_error": 1,
+    "chain_max_error": 5,
+    "chain_fixed_two_exceedances": 102,
+    "chain_bound_violations": 0
+  },
+  "reduced_tests": {
+    "default_film_reorder": "passes",
+    "OVERLAP_REFERENCE_ADMISSION": "fails as expected: following P payload admitted with occupied pending reference slot during B drain",
+    "EARLY_B_REFERENCE": "fails as expected: old bank 1 bound instead of retiring bank 2; bank-2 descriptor not committed",
+    "source": "5548e4e"
+  },
+  "interpretation": [
+    "The video-only RTL model reproduces the hardware selection-gap durations and ordinals, total display counter and associated timestamp count; no audio, host scheduling or HDMI scaler model is needed for this reproduction.",
+    "Hardware telemetry alone still does not encode unique picture identity. The eleven skipped and two repeated picture counts are proven in simulation; the matching net total is supporting hardware evidence, not a unique-picture hardware capture.",
+    "Reference admission during B drain accepts a following reference without retaining capacity. Completion/header timing also loses release information. Full traces show ignored or overwritten pending references.",
+    "A B header can precede its I reference completion by one decoder clock. The scheduler binds a previously displayed P and ignores the actual I completion; the metadata owner has already changed current_is_b and drops the retiring I descriptor.",
+    "Published pictures also expose seventeen stale TFF/RFF descriptors and one lost initial PTS-valid flag. Fixing only the display counter or admitting the right bank would be insufficient.",
+    "All twenty-five helper timestamps agree with authored field cadence within 2.5 ticks (27.8 microseconds). This helper stream has no large final timestamp hold to excuse the measured pauses; earlier remarks about a terminal timestamp gap must not be applied to this transport without evidence.",
+    "The DDR cases are sensitivity tests, not measured device timing. Additional audio coupling is not excluded and must be checked after correcting video ownership and cadence."
+  ],
+  "proposed_fix_pending_approval": "Make reference retirement and following-header admission explicit across the scheduler and timestamp owner. Preserve the retiring picture identity, PTS and TFF/RFF/progressive descriptor; keep a following P/I payload blocked when its reference slot is occupied; bind early B headers to the reference actually completing, not an older promotion. Require both reduced tests to pass and all 289 pictures to publish once in display order with exact descriptors/PTS and authored film cadence in the integrated ideal/contended runs. Preserve paired pixel bounds, then propose a clean timing-audited FPGA build and original audio hardware retest. Do not change clocks, seeds or buffer sizes speculatively.",
+  "attempts_before_full_runs": [
+    {
+      "source": "77859f9",
+      "result": "missing altsyncram simulation model; fixed by reusing existing cache-test model"
+    },
+    {
+      "source": "eff0f0a",
+      "result": "stopped to bound legacy per-cycle PICEVAL logging; partial evidence retained on PC"
+    },
+    {
+      "source": "94b60b2",
+      "result": "old 10000-cycle fast-soak liveness limit stopped native field waits; retained threshold evidence, added native four-field bound while leaving default limit unchanged"
+    }
+  ],
+  "quartus_build_started": false,
+  "mister_changed": false,
+  "hardware_acceptance": false,
+  "evidence": {
+    "entry670_ideal_analysis.json": {
+      "bytes": 249427,
+      "sha256": "fab3b539672be338b5951fa77922bb208961b3f81c03cfc997b29c20821f3eaf"
+    },
+    "entry670_ideal_native.csv": {
+      "bytes": 255563,
+      "sha256": "27157149ec2f19e67ce168b144514cfa8120bbfd368691d28f9bb23e9c975eaa"
+    },
+    "entry670_ideal_pictures.csv": {
+      "bytes": 31083,
+      "sha256": "829e7bd395486defdd072e25e8133928170f0ead2a1d7866bc614af3b0ea585d"
+    },
+    "entry670_ideal_pixels.csv": {
+      "bytes": 5189,
+      "sha256": "ef836c310cb24f9a7ff15be6368c4661e576f20348ef5559889be22057155f92"
+    },
+    "entry670_ideal_run.log": {
+      "bytes": 324989,
+      "sha256": "4220675a31839fc6cf559a765f9dea6430db0019cc5bd450c73bca85f49abc41"
+    },
+    "entry670_ideal_build.log": {
+      "bytes": 15565,
+      "sha256": "a65035889fc9d72ff9473e6a5f94ee78b81310fcd1aff8051f9d18f737a9c695"
+    },
+    "entry670_contended_analysis.json": {
+      "bytes": 249387,
+      "sha256": "c557aa2c2868b636e5431a8a4cf68c400dc9e668cb5e52d75e104638140aff5d"
+    },
+    "entry670_contended_native.csv": {
+      "bytes": 254699,
+      "sha256": "e0e5235a4ecff766f33090fb67bb658e52cf0cc07d244e8174a70b8d457a4924"
+    },
+    "entry670_contended_pictures.csv": {
+      "bytes": 31041,
+      "sha256": "a06b8aaa293041adbc5c228bbaeb577b4a3d8a753a854bc8f33936c3514528ae"
+    },
+    "entry670_contended_pixels.csv": {
+      "bytes": 5189,
+      "sha256": "ef836c310cb24f9a7ff15be6368c4661e576f20348ef5559889be22057155f92"
+    },
+    "entry670_contended_run.log": {
+      "bytes": 324441,
+      "sha256": "d6542ffe08513514814bcd538f7d5e44bf97023a7434b09c9699bd45c8a5752d"
+    },
+    "entry670_contended_build.log": {
+      "bytes": 15573,
+      "sha256": "333ee6cb7475eb8c1cbf6ce71ba100de8b7f0a81abe144477fe682ecccf48507"
+    },
+    "entry670_timing_fixture.json": {
+      "bytes": 194933,
+      "sha256": "85e745d25a66ea77c36c03bf5e8fea2511ba646d7af7660d778947876b912e74"
+    },
+    "entry670_pts.hex": {
+      "bytes": 450,
+      "sha256": "a941e10a314c44c4b74bcc5e6ea57b451509e6434e7794451c42bc249a5a022f"
+    },
+    "entry670_control.log": {
+      "bytes": 14076,
+      "sha256": "d0e7a49da6dc4882a98d71ccc2df7e66d42c4662a827ff50b8144fae84a5a788"
+    },
+    "entry670_film.log": {
+      "bytes": 2567,
+      "sha256": "248e2d6505b39235299df8dcbd618445cfcd8fafd4c8aa5dbaee6e664d3de310"
+    },
+    "entry670_paired.log": {
+      "bytes": 89,
+      "sha256": "f9d062886910bae935de469ee45e619602af2c6d02ee252fafbea4ef9863cbcf"
+    },
+    "entry670_overlap_default.log": {
+      "bytes": 166,
+      "sha256": "6099fbc2b53198514afde8d8704da596b772d789471541413e6e360e5e051c3b"
+    },
+    "entry670_overlap_failure.log": {
+      "bytes": 302,
+      "sha256": "7f816e903d4ccc5146e744b37aceb85d1594a8ecd02d9df64c69300529b688c4"
+    },
+    "entry670_early_b_default.log": {
+      "bytes": 166,
+      "sha256": "c43899ffb43f49e22d6346445762b1bdf8e339e964ad5aeafb2943e9453dce91"
+    },
+    "entry670_early_b_failure.log": {
+      "bytes": 276,
+      "sha256": "48fe34b5d101974811bc948f18a511c1acf7ba511014620a81cd82d8060a808b"
+    },
+    "entry670_qualification_chain.log": {
+      "bytes": 315145,
+      "sha256": "53c022657541302683c9d63b0b3abce5a7cc2d6dae49facc94f10db8b2f57204"
+    },
+    "entry670_qualification_isolated.log": {
+      "bytes": 314048,
+      "sha256": "6bdaefe040eee44fad1929237c6f18472f583f5a8d582048e4024c032f178a32"
+    },
+    "entry670_qualification_chain.csv": {
+      "bytes": 5189,
+      "sha256": "ef836c310cb24f9a7ff15be6368c4661e576f20348ef5559889be22057155f92"
+    },
+    "entry670_qualification_isolated.csv": {
+      "bytes": 5142,
+      "sha256": "526be36d62dc666181f0fe5445470d12f10b53331258825912493178173ced76"
+    },
+    "entry670_qualification_source.before.sha256": {
+      "bytes": 21985,
+      "sha256": "10b08c7932eb66e6a9a6be837b711eb4163607e0180f32204da77c115d18d81b"
+    },
+    "entry670_qualification_source.after.sha256": {
+      "bytes": 21985,
+      "sha256": "10b08c7932eb66e6a9a6be837b711eb4163607e0180f32204da77c115d18d81b"
+    }
+  }
+}
