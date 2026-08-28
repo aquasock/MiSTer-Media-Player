@@ -75,6 +75,19 @@ arbiter. These are sensitivity cases, not measured MiSTer DDR timings. The
 clean-byte source is continuously available; host scheduling, PCM extraction
 and the HDMI scaler are outside this isolation boundary.
 
+The reduced reference-admission regression reuses the film reorder test:
+
+```sh
+bash tools/streams/run_film_presentation.sh
+vvp simulation/film_presentation/reorder +OVERLAP_REFERENCE_ADMISSION
+```
+
+At diagnostic source `33ade0f`, the default film test passes and this opt-in
+case fails: after an overlapping reference completes with the following P
+header, scratch-bank availability lets that P payload proceed while the
+pending reference slot remains occupied. Keep the failure as the fix's
+regression boundary; do not describe it as a passing timing qualification.
+
 ## Focused regressions
 
 ```sh
