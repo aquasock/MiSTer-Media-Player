@@ -1,3 +1,32 @@
+## 645 COMMIT Unreleased 2045c34 2026-08-27T20:03:12-07:00
+
+#### Coming From:
+
+Unreleased 2045c34
+
+#### Purpose:
+
+Validate AC-3 5.1 decode to HDMI on the Buildroot beta against the recorded standard-MiSTer result.
+
+#### Outcome:
+
+The user reports test five passes everything. Helper-first retrieval preserved the log before any further playback, followed by a fresh uniquely named screenshot. The helper identifies the correct fixture at `games/MediaPlayer/Buildroot_beta/test_5_audio_ac3_51.mpg`, reports HDMI decoded stereo PCM, locates AC-3 on private substream `0x80`, decodes 375 audio frames to 576,000 samples and emits all 576,000, exits zero on end of file, and reconciles all 340 pipe reads to 5,556,835 completed transport bytes with no acknowledged fallback payload and no slow-path bytes. Valid schema-19 telemetry records 360 reference and displayed pictures, zero B pictures, 359 swaps, 3,068,039 accepted video bytes, top-field-first signalling, zero decoder and presentation errors, no audio underrun or PCM protocol fault, zero timestamp advance and delay conflicts, zero native deadline gaps, zero gap outliers, three largest display intervals each at the nominal 2,002,000 clocks, and sequence end with quiet completion. The fixture shares test one's bar video by design, which is why its accepted video byte count matches entry 640 exactly; that is the generator's definition rather than a repeat of the entry 639 stale-fixture error. Comparison against the standard-MiSTer capture in entry 626 matches on every completion, error, cadence and audio counter, including identical video bytes, AC-3 frame count, emitted samples, transport bytes and pipe reads; only delivered frames per second and cadence seconds differ, by about 1.3 milliseconds across a twelve second run. Entry 626 was captured under the older profile version one `credit_fast_v1` transport while this run uses profile version two `credit_step_v1`, so transport-layer timing figures between them are not comparable. The final raster is pixel-identical to the standard baseline across all 280,064 pixels outside the telemetry overlay; this is a single-frame comparison on static bar content and does not isolate the entry 644 progressive screenshot variation nor establish full playback pixel qualification. Independent read-only readback confirms the unchanged Main, helper, RBF, kernel and this fixture against the card manifest. Bob was the requested deinterlacer and the audible channel sweep relies on the user's report, since telemetry attests neither. The user hears the channel sweep reproduce correctly and reports the soundbar's woofer working properly, which confirms that low frequency content survives the downmix. It does not establish LFE delivery over HDMI: the AC-3 stereo downmix discards LFE by design, so the woofer output is the soundbar's own bass management applied to the stereo pair, and discrete LFE remains a question for the S/PDIF passthrough run. Passed records this functional test only; Built remains unchecked because no new build occurs. No deployment, mode change, replay, reload or reboot is initiated. Raw captures remain local and only `.ai/current_results/entry645_buildroot_test5_ac3_hdmi_status.json` is published.
+
+#### Next Steps:
+
+Switch the core's audio mode to S/PDIF and replay test_5_audio_ac3_51.mpg as an AC-3 passthrough run, retaining its helper log before another file overwrites it and taking a separate uniquely named screenshot; entry 627 holds the standard-MiSTer S/PDIF baseline for that comparison. Then run test_6_audio_dts_51.mpg as DTS S/PDIF passthrough to close the seven-fixture matrix. Expect the passthrough runs to report no decoded PCM, so do not treat an absent sample count as a fault. Keep overall beta qualification open until both remaining audio runs are accepted, and retain the unisolated test-four screenshot variation and the unresolved filesystem dirty-flag check as separate open items rather than folding either into this result. Do not begin a source fix or attribute anything to Buildroot without evidence and approval for a revised plan. Preserve runtime identities, user control of hardware lifecycle, local-only raw data, restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [x] Passed
+
+---
+
 ## 644 COMMIT Unreleased 2045c34 2026-08-27T19:55:50-07:00
 
 #### Coming From:
@@ -1150,35 +1179,6 @@ The user played the same film once in Bob as a warm replay with no core reload a
 #### Next Steps:
 
 Both modes are now accepted for this fixture, so no further full-length replay is needed to compare them. The next boundary is to explain the picture 692 slot, which is cheap to attack offline because it is deterministic: measure the coded picture sizes and pack arrival schedule of the fixture in the neighbourhood of video byte 27.77 million and displayed picture 692, and determine whether an oversized picture, a rate spike or a pack-schedule discontinuity starves the decoder for the observed eleven and a half milliseconds. Only after that measurement should any production change be considered, and queue sizes, clocks, startup and throughput must not be tuned on the strength of one missed slot in 17,875. Because saturated audio counters cannot prove whole-film audio integrity, define acceptable audio evidence before any audio-focused cycle. Keep AC-3, interlaced P/B, navigation and disk-source work as separately scoped gates with acceptance criteria agreed in advance, leave lifecycle and playback under user control, preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 605 COMMIT Unreleased d466bed 2026-08-27T06:12:39-07:00
-
-#### Coming From:
-
-Unreleased d466bed
-
-#### Purpose:
-
-Validate the timestamp-aware native overlap fix against the full-movie 480i audio/video endurance fixture on hardware.
-
-#### Outcome:
-
-The user deployed the entry 604 candidate, reloaded from a clean reboot, selected Weave and played the full film once, reporting correct audio, video, sync and menu behavior throughout with no freeze. The helper log was retrieved first, then the fixed screenshot was deleted, regenerated and re-fetched, and installed artifacts were read back on a fresh connection. The installed 4,354,700-byte RBF is SHA256 `d46f80061a3270c1fed07a089517e70b413d3353858dc0d8937ac1bb0070aa6a`, matching published source `d466bed` exactly; Main remains `3841e2cc6eef4bfc9e46a7ffa075aff76b65d5405f81efb1355373292b35846f`, identical to the entry 604 pre-deployment backup, and the fixture is still 739,065,873 bytes at `beb5c738910321fbbdf482220c19af36e7c2d2bb1913e8872f679eeb1f589642`. The single syslog boot line at 12:51:01 UTC is consistent with the reported clean reboot. Schema-nineteen telemetry decodes with valid parity and checksum 1372493136 and reports 17,876 reference pictures, 17,876 displayed pictures and 17,875 swaps, exactly the entry 602 fixture count, with `error_flags` zero, `presentation_error` clear, sequence end seen, presentation complete, quiet snapshot reason and zero timestamp advance or delay conflicts. Accepted video is 715,713,077 bytes, byte-exact against the qualified demuxed payload. Helper PID 907 submitted all 839,409,548 expected transport bytes over 51,234 reads with 800 sampled ACK records, 837,544,742 fast and 1,864,806 acknowledged bytes reconciling to the total, EOF at 596.439564 seconds and exit code zero, so the entry 603 fatal drain signature does not recur. The entry 603 freeze at 81 displayed pictures and 2.740979 seconds is cleared. One deadline gap and one outlier are recorded: a single 4,004,000-clock interval, 66.733333 milliseconds, at displayed picture 692 of 17,876, roughly 3.9 percent into the film; the gap record's ordinal field is only eight bits and its value 180 aliases to that same picture. At that deadline the decoder was ready but no candidate was presentable, the writer was busy without capacity blocking, the upstream FIFO was pending and 677,670 clocks of input starvation had accumulated since the previous swap with a 1,721,347-clock candidate ready delay at 27,772,349 accepted bytes, while presentation hold, presentation error and both timestamp candidate signals were false. That identifies one source-delivery starvation slot, not the ownership or timestamp guard this cycle repaired, and it cost 33.366667 milliseconds across the whole film. The 32-bit 60 MHz session timer wrapped eight times, so the reported 23.814501-second cadence and 750.593107 aggregate FPS are wrapping artifacts; the reconstructed span is 35,788,608,404 clocks or 596.476807 seconds against the 596.462533-second fixture, giving 29.967636 true aggregate FPS versus the 29.970030 nominal rate, with a 856,404-clock residual over 17,875 intervals. Audio underrun and PCM protocol error are clear with PCM FIFO peak 127, but `pcm_sample_count` at 16,383 and `associated_count` at 255 are saturated fields and are not whole-film totals, so telemetry does not independently count audio frames. Sync, sound and menu response are accepted from the user's report without independent measurement, and no pixel oracle was applied to playback; the retained still is the telemetry packet itself, not a video frame. Of 574 total helper would-block events, only eleven are individually logged at power-of-two gates, all before first delivery at 42.017 milliseconds with nothing submitted, so a complete absence of steady would-block is not proven. This accepts `d466bed` for one Weave full-movie combined-rate soak from a clean reboot; it does not qualify Bob, warm replay, AC-3, interlaced P/B or field DCT, navigation, ISO or disk playback, or general commercial-DVD compatibility. Evidence and the exact capture and analysis drivers are retained as `.ai/current_results/entry605_*`, with the helper log stored losslessly compressed under its original hash. No production source, deployed file, setting, reboot, reload or playback occurred during collection; only the fixed screenshot was replaced.
-
-#### Next Steps:
-
-Retain `d466bed` as the accepted baseline and preserve the entry 604 restoration pair. No further identical Weave replay is needed to reconfirm this result. The next useful boundaries, in order, are a Bob full-movie run of the same fixture to close the mode gap, then an investigation of the single starvation slot at picture 692 to decide whether helper delivery or upstream buffering deserves a production change, using the existing telemetry rather than new instrumentation if possible. Do not tune throughput, clocks, startup or queue sizes on the strength of one missed slot in 17,875. Because saturated audio counters cannot prove whole-film audio integrity, define what would constitute acceptable audio evidence before any audio-focused cycle, and keep AC-3, interlaced P/B, navigation and disk-source work as separately scoped gates with acceptance criteria set in advance. Leave lifecycle and playback under user control, preserve restricted core.md and maintain the forty-entry ring.
 
 #### Files Modified:
 
