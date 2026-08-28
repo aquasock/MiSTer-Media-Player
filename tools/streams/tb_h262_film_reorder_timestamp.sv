@@ -62,7 +62,7 @@ task picture(input bit b,input bit i,input bit first,input bit repeat_field,
 endtask
 task commit_reference;
  begin
-  @(negedge clk);completed=active;reference=active;active=active+1'b1;
+  @(negedge clk);completed=active;reference=active;active=(active==2)?0:active+1'b1;
   promoted=promoted+1'b1;waiting=(completed!=display);
   @(negedge clk);waiting=0;repeat(4)@(negedge clk);
  end
