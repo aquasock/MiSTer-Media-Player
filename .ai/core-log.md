@@ -1,3 +1,32 @@
+## 686 COMMIT Unreleased 83c138e 2026-08-28T13:43:04-07:00
+
+#### Coming From:
+
+Unreleased 83c138e
+
+#### Purpose:
+
+Investigate reproducible early S/PDIF audio starvation on the unchanged seed-20 opening baseline.
+
+#### Outcome:
+
+The user approves investigation after entries 684 and 685 reproduce the audible dropout and FPGA FIFO underrun near 1.8 seconds with original AC-3, including a run with S/PDIF held fixed. Record this approved scope before executing it: compare unchanged HDMI and passthrough helper outputs, trace startup scheduling, in-band transport and FPGA audio consumption, and run bounded diagnostic analysis or simulations on the build PC using the exact opening. Preserve raw evidence and original compressed audio bytes. Diagnostic scripts or isolated instrumentation may be used to establish causality, but no production correction, Quartus compile, reseed, deployment or hardware playback is authorized in this cycle. Source 83c138e remains the installed, built baseline; the unchecked hardware status concerns the unresolved S/PDIF opening test and does not revoke entry 683 HDMI acceptance.
+
+#### Next Steps:
+
+Publish this scope and synchronize the build PC, identify existing helper and audio-path regression infrastructure, and reproduce or bound starvation with controls that separate payload contents, schedule and transport pacing. Document what is proved and what remains model-dependent, then propose the smallest evidence-supported correction for approval before changing production behavior or building a new core. Do not mask the underrun flag or increase buffering without measuring the failing boundary.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 685 COMMIT Unreleased 83c138e 2026-08-28T13:40:25-07:00
 
 #### Coming From:
@@ -1219,35 +1248,6 @@ The user reports the run was perfect and the woofer channel audible. Helper-firs
 #### Next Steps:
 
 Decide whether the findings report should be committed to the repository or remain a private communication, since it currently exists only outside version control. If the collaboration proceeds, re-running this matrix against future beta drops is cheap because the fixtures and capture script are deterministic and committed. The unisolated test-four screenshot variation and the filesystem dirty-flag warning remain open and should each be scoped as their own investigation with user approval rather than folded into any future acceptance. The longer-term question of retiring the ARM helper by moving source, demux, timeline and audio codec responsibilities onto the platform stays a discussion item and not approved work. The next MediaPlayer development milestone remains unapproved and should be scoped separately, with the interlaced decoding gaps of entry 609 still open and out of scope. Preserve runtime identities, user control of hardware lifecycle, local-only raw data, restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [x] Passed
-
----
-
-## 646 COMMIT Unreleased 2045c34 2026-08-27T20:14:53-07:00
-
-#### Coming From:
-
-Unreleased 2045c34
-
-#### Purpose:
-
-Validate DTS S/PDIF passthrough on the Buildroot beta against the recorded standard-MiSTer result.
-
-#### Outcome:
-
-The user reports test six works perfectly and clarifies that the woofer did not play. Helper-first retrieval preserved a log distinct from the test five capture, followed by a fresh uniquely named screenshot. The helper identifies the correct fixture, reports `spdif` IEC 61937 passthrough for AC-3 and DTS, locates DTS on private substream `0x88`, carries 1125 audio frames, exits zero on end of file, and reconciles all 340 pipe reads to 5,556,868 completed transport bytes with no acknowledged fallback payload and zero slow-path bytes. Valid schema-19 telemetry records 360 reference and displayed pictures, zero B pictures, 359 swaps, 3,068,038 accepted video bytes, top-field-first signalling, zero decoder and presentation errors, no audio underrun or PCM protocol fault at FIFO peak 127, zero timestamp conflicts of either kind, zero native deadline gaps, zero gap outliers, three largest display intervals each at the nominal 2,002,000 clocks, and sequence end with quiet completion. Comparison against the standard-MiSTer capture in entry 626 matches on every completion, error, cadence and audio counter, including identical video bytes, DTS frame count, emitted sample count, transport bytes and pipe reads; only delivered frames per second differs, by under two thousandths of a frame per second. As with entry 645, entry 626 predates the current Main and reports profile version one `credit_fast_v1` against this run's version two `credit_step_v1`, so transport-layer timing figures between them are not comparable while the counters are. The final raster is pixel-identical to the standard baseline across all 280,064 pixels outside the telemetry overlay. This entry corrects a prediction stated before the run: passthrough was expected to emit no PCM, but IEC 61937 carries the compressed bursts inside the PCM stream, so the 576,000 emitted samples are the burst carrier rather than decoded audio, and the standard baseline reports the identical figure. The absent woofer is the receiver behaviour already recorded in entries 621 and 626, where measurement established LFE present in the emitted bursts at 1267.3 RMS, so it remains a device observation rather than a core limitation or a Buildroot regression. Passed records this functional test only; Built remains unchecked because no new build occurs. No deployment, mode change, replay, reload or reboot is initiated. Raw captures remain local and only `.ai/current_results/entry646_buildroot_test6_dts_spdif_status.json` is published.
-
-#### Next Steps:
-
-The core is already in S/PDIF, so replay test_5_audio_ac3_51.mpg in that mode to close the last untested path in the seven-fixture matrix, retaining its helper log before another file overwrites it and taking a separate uniquely named screenshot; entry 627 holds the standard-MiSTer AC-3 S/PDIF baseline. Expect the helper to report passthrough on substream `0x80` rather than the decoded stereo mode of entry 645, and expect a non-zero emitted sample count as the IEC 61937 carrier. Progressive is already covered by entry 639 for I/P/B and entry 644 for all-I and needs no replay. Once that run is accepted the user may declare the matrix accepted, which should be recorded as acceptance of the seven fixtures only, with the unisolated test-four screenshot variation and the unchecked filesystem dirty flag carried forward as separate open items explicitly outside that scope. Preserve runtime identities, user control of hardware lifecycle, local-only raw data, restricted core.md and the forty-entry ring.
 
 #### Files Modified:
 
