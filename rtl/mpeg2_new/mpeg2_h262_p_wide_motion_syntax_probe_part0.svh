@@ -87,10 +87,10 @@ localparam [15:0] MAX_COEFF_EVENTS = 16'd32768;
 // replaces the flattened ALM-heavy 16-block/32-event buses without duplicating
 // inverse-quantisation or IDCT hardware.
 (* ramstyle = "M10K" *) reg [19:0] residual_block_mem [0:2047];
-(* ramstyle = "M10K" *) reg [19:0] residual_coeff_mem [0:32767];
+(* ramstyle = "M10K" *) reg [18:0] residual_coeff_mem [0:32767];
 (* ramstyle = "M10K" *) reg residual_coeff_last_mem [0:32767];
 reg [19:0] residual_block_read_word;
-reg [19:0] residual_coeff_read_word;
+reg [18:0] residual_coeff_read_word;
 reg residual_coeff_read_last_reg;
 assign residual_block_read_mb=residual_block_read_word[10:0];
 assign residual_block_read_index=residual_block_read_word[13:11];
