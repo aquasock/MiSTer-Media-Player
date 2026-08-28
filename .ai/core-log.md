@@ -1,3 +1,32 @@
+## 658 COMMIT Unreleased 4777c59 2026-08-27T23:24:29-07:00
+
+#### Coming From:
+
+Unreleased 4777c59
+
+#### Purpose:
+
+Record approval to add stream-defined quantization matrices to the original DVD-opening cycle.
+
+#### Outcome:
+
+The user approves the matrix expansion identified in entry 657 and directs implementation to proceed. Entry 656 remains the single open source proposal, now including generic intra and non-intra matrix loading, initialization, persistence, inverse-scan addressing and use by all I/P/B inverse-quantization consumers. This approval does not extend the twelve-second original-video and first-track AC-3 boundary to whole-title qualification, rare interlaced macroblock syntax or DVD navigation. The untested B-motion draft and harness connection remain local and no new implementation has been made since the pause. No build or hardware result is claimed.
+
+#### Next Steps:
+
+Verify the controlled H.262 matrix semantics, implement and test matrix handling without hardcoded film weights, then complete the approved film admission, B-vector range and per-picture field-cadence and chroma work. Require synthetic matrix and motion boundaries, original opening pixel comparisons, AC-3 and timestamp checks, existing regressions and a clean build from published source on GUNSMOKE before handing files to the user for hardware testing. Preserve user control of deployment and playback, restricted core.md, pre-existing artifacts and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 657 COMMIT Unreleased 4777c59 2026-08-27T23:19:49-07:00
 
 #### Coming From:
