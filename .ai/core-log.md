@@ -1,4 +1,4 @@
-## 669 COMMIT Unreleased ??? 2026-08-28T02:38:57-07:00
+## 669 COMMIT Unreleased 77859f9 2026-08-28T02:38:57-07:00
 
 #### Coming From:
 
@@ -10,7 +10,7 @@ Trace the complete original DVD opening with native film timing and original tim
 
 #### Outcome:
 
-The user approves the proposed simulation and diagnosis before another FPGA build. Extend the existing full-opening raster test with an opt-in native presentation path using the production timing generator, picture timestamp owner, presentation timeline and framebuffer publication feedback, keeping the production RTL unchanged. Preserve original elementary bytes and sparse timestamp positions through deterministic fixture preparation, add unique picture identity and readiness/publication traces, and exercise shared display/prediction memory service with explicit model parameters. Retain the default reconstruction regression and its measured error bounds. Treat any discrepancy first as either a harness fidelity issue or a production behavior to isolate, not automatic proof of the hardware root cause. The diagnostic development runs on GUNSMOKE; no MiSTer replay, configuration change, deployment, Quartus compile or seed change is approved in this boundary.
+Diagnostic source 77859f9 is published after the user approves simulation and diagnosis before another FPGA build. The source extends the existing full-opening raster test with an opt-in native presentation path using the production timing generator, picture timestamp owner, presentation timeline and framebuffer publication feedback, keeping the production RTL unchanged. Preserve original elementary bytes and sparse timestamp positions through deterministic fixture preparation, add unique picture identity and readiness/publication traces, and exercise shared display/prediction memory service with explicit model parameters. Retain the default reconstruction regression and its measured error bounds. Treat any discrepancy first as either a harness fidelity issue or a production behavior to isolate, not automatic proof of the hardware root cause. The diagnostic development runs on GUNSMOKE; no MiSTer replay, configuration change, deployment, Quartus compile or seed change is approved in this boundary.
 
 #### Next Steps:
 
