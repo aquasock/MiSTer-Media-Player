@@ -1,3 +1,32 @@
+## 652 COMMIT Unreleased 4777c59 2026-08-27T22:30:33-07:00
+
+#### Coming From:
+
+Unreleased 4777c59
+
+#### Purpose:
+
+Confirm the field-DCT bitstream leaves frame-DCT reconstruction unchanged on the first existing fixture.
+
+#### Outcome:
+
+The user replayed test one and reports it looked perfect; two independent comparisons agree and close the first part of the regression entry 651 left open. Helper-first collection preserved a log distinct from the field-DCT capture, verified by hash before the screenshot, and identifies `test_1_interlace_tff.mpg` with 3,071,260 bytes of video, 500 audio frames and 576,000 emitted samples, exit zero, and all 340 pipe reads reconciling to 5,556,849 completed transport bytes with no fallback and zero slow-path bytes, which is byte for byte the transport entry 640 recorded for the same fixture. Valid schema-19 telemetry records 360 reference and displayed pictures, 359 swaps, 3,068,039 accepted video bytes, top-field-first signalling, zero decoder and presentation errors, no audio underrun or PCM protocol fault, zero native deadline gaps and gap outliers, three largest display intervals each at the nominal 2,002,000 clocks, and sequence end with quiet completion, all matching the entry 640 record exactly. The raster is the substantive check because the writer's capture-row counter and untruncated block origin affect frame-DCT blocks as well as field-DCT ones, and a reconstruction fault would corrupt pixels while every counter stayed clean. Against ffmpeg's decode of the same file, 279,072 compared pixels outside the telemetry overlay and image column zero give 270,444 exact matches and 8,628 differing by one unit of luma rounding, with none differing by more than one. Against entry 645's capture, which was taken on the released `61a2fed2` bitstream and carries the same bar video content, 279,552 compared pixels give zero mismatches, so this fixture's output is pixel-identical to what the released bitstream produced. The entry 640 screenshot itself was not available for comparison because it was written to the Buildroot beta card, which is no longer installed; the released-bitstream comparison substitutes for it and is the stronger test since it isolates the bitstream change rather than the operating system. Column zero was excluded from the reference comparison on the same basis as entry 651, where identical blanking was shown on the released bitstream. Passed records this regression only. Six fixtures remain unreplayed, and the two items carried from the build remain open: the unexplained decrease of 372 ALMs and 912 registers, and the HDMI setup margin at positive 0.126 nanoseconds.
+
+#### Next Steps:
+
+Replay tests two through seven on this bitstream, prioritising test seven because it is the only fixture exercising P and B pictures and test four because it is the progressive all-I control, and compare each against its reference decode rather than against a beta-card screenshot that no longer exists. Only when those pass should the field-DCT gate be treated as closed. Continue to suspect the capture counter and the untruncated origin before the field mapping if anything regresses. Resolve the unexplained logic decrease before starting the next feature rather than banking it, and keep the reduced HDMI setup margin visible, reseeding rather than restructuring if a later change pushes that category negative. Interlaced P and B remain the gate that would make commercial discs play and are unstarted; the deferred field-picture gate still needs either a non-ffmpeg generator or a real disc sample, and that choice needs the user's direction. Preserve restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [x] Passed
+
+---
+
 ## 651 COMMIT Unreleased 4777c59 2026-08-27T22:23:27-07:00
 
 #### Coming From:
@@ -1160,36 +1189,6 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 612 COMMIT Unreleased 9623fa7 2026-08-27T07:22:37-07:00
-
-#### Coming From:
-
-Unreleased 67aaf7f
-
-#### Purpose:
-
-Capture the first AC-3 hardware run and establish which channels the stereo downmix actually carries.
-
-#### Outcome:
-
-The user played the ten second AC-3 fixture and reported hearing mixed tones from an AV receiver over S/PDIF but nothing from HDMI, on a 2.1 system fed by a portable monitor whose only outputs are two small speakers and a headphone jack. Telemetry is clean: the installed candidate and fixture hash as deployed, all 300 reference and display pictures complete with 299 swaps, `error_flags` zero, sequence end seen, presentation complete, quiet snapshot, and zero deadline gaps or outliers, with 12,066,264 accepted video bytes. Audio underrun and PCM protocol error are clear at FIFO peak 127, though `pcm_sample_count` remains a saturated field. Helper PID 2820 submitted 14,143,620 transport bytes over 865 reads and exited zero at 9.930 seconds. This is the first AC-3 audio heard from the core. A misconception in the request is corrected rather than worked around: nothing sends 5.1 anywhere, because the helper downmixes AC-3 to two channels and the framework emits linear PCM on both HDMI and S/PDIF, so the user's subwoofer is their receiver's own bass management of that stereo pair and not a channel the core produces. Discrete surround requires the separate IEC 61937 passthrough boundary. liba52 is asked for `A52_STEREO` without `A52_LFE`, so LFE is decoded and then discarded exactly as the stereo downmix convention requires; the fixture's 55 Hz LFE tone is therefore absent from the output by design and is not a fault. Proving three channels was thus not possible as posed, since only two exist in the signal, but the underlying question was answered completely by a different route. A new sweep fixture mode sounds one source channel at a time so placement is measurable without a 5.1 monitoring rig, and a new analyzer measures each slot. The first sweep exposed a defect in the fixture rather than the decoder: FFmpeg's join filter assigns inputs positionally and that order does not follow the 5.1 layout, so the first three channels were mislabelled, which is also why entry 610's tone check was unreadable and why both the helper and the reference appeared to disagree with the labels. Binding every tone to a named channel fixes it. With that corrected, all six channels land exactly where the downmix specifies: front left at 220 Hz appears only on the left and front right at 277 Hz only on the right at equal level, centre at 330 Hz appears equally in both at 4.52 dB below the fronts, the surrounds at 440 and 554 Hz appear only on their own side at 6.02 dB below the fronts, and LFE is silent in both. The entry 610 channel assignment question is therefore closed, and closed against measurement rather than labels. The silence over HDMI is unexplained and is not yet attributed, since the framework feeds HDMI and S/PDIF from the same stereo PCM; a monitor with small speakers is a plausible but unverified cause and no MiSTer audio setting has been inspected. The sweep fixture was deployed after backing up the installed Main and RBF, staged and renamed with an independent readback that matches. No RTL, FPGA build, Main, RBF, settings, reboot, reload or playback change was made, so Built refers to host tools only and Passed remains unchecked pending a listening result on the sweep.
-
-#### Next Steps:
-
-Have the user play games/MediaPlayer/ac3_channel_sweep_12s.mpg once through the receiver and report, for each two second slot in order, whether the tone appears on the left, the right, in both or not at all, expecting left, right, both, silence, left, right. Headphones on the monitor's jack are the cheapest way to separate a genuine HDMI audio fault from small speakers, and MiSTer's audio configuration should be checked before treating HDMI silence as a core defect. That listening result is what the community sound test should be built from, and any community request should say plainly that it exercises the stereo downmix, not discrete surround, so testers are not asked to judge channels the core does not yet emit. Replay the MPEG Layer II movie to confirm codec selection did not disturb the accepted path on hardware, which is still only regression tested on the host. A commercial AC-3 track with real dynamic range control and dialogue normalization remains uncompared. AC-3 and DTS passthrough over S/PDIF remain the separate later boundary, and the confirmed live S/PDIF port is a useful precondition for it. The interlaced video gates of entry 609 remain open and unstarted. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-- tools/streams/generate_test_dvd_ac3_av.py
-- tools/streams/analyze_ac3_downmix.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
 
