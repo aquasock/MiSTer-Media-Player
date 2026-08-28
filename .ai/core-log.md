@@ -1,3 +1,32 @@
+## 631 COMMIT Unreleased 2c03075 2026-08-27T17:20:44-07:00
+
+#### Coming From:
+
+Unreleased 6b92a19
+
+#### Purpose:
+
+Bring the media conversion guide up to the current capability and document how to test audio.
+
+#### Outcome:
+
+The user noticed that the conversion guide still described the previous release, and it did: a single progressive recipe with MPEG Layer II, predating interlaced 480i, AC-3 and passthrough entirely. Published source `2c03075` splits it by the two shapes that actually play and adds an audio section. The interlaced guidance is the part most likely to save someone a wasted afternoon, because the obvious approach fails: FFmpeg's own interlacing flags select field DCT and field prediction, both of which this decoder rejects before decode, so the supported route is ordinary frame-DCT coding of woven field pairs with the interlaced signalling applied afterwards, which is what the committed generator does. The guide points at that generator and describes the sequence its build function uses. It also warns that the compatibility checker predates the interlaced path and rejects native interlaced files while remaining valid for progressive ones, so a rejection there is not evidence of a bad file. The audio section states what each codec does under each output setting in a small table, explains that the option mutes the output it is not driving because both are fed from one stereo stream, and gives the expected result of the AC-3 channel sweep in each mode, including that the silent fourth slot is correct because the stereo downmix discards LFE. It records two cautions learned this cycle: a 2.1 or virtualizing soundbar cannot demonstrate discrete channel routing however convincing it sounds, and receivers differ between codecs, with the device tested here reproducing LFE from AC-3 but not from DTS despite the transmitted DTS provably carrying it. The host-side checks are included because they are faster and more precise than listening. Every command in the new sections was run as written rather than composed from memory, which caught a real defect: the generator invocation did not write the report file that the downmix check reads, so the documented sequence would have failed at the second step. That was corrected and the corrected sequence was then run end to end successfully. The AC-3 decode, downmix placement and passthrough checks all pass on the release helper as documented.
+
+#### Next Steps:
+
+The release candidate is unchanged by this documentation work and remains ready for the user to tag. Nothing here alters the binaries, whose hashes are recorded in entry 630 and in the changelog. If a confirmation run is wanted before tagging, reinstall from the package and replay one interlaced and one audio test, which would also close the gap that no hardware run has occurred since packaging. The chroma edge column stays documented rather than investigated, at the user's direction, and the interlaced gates of entry 609, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, remain open and out of scope. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+- README.md
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 630 COMMIT Unreleased 6b92a19 2026-08-27T17:14:36-07:00
 
 #### Coming From:
@@ -1159,35 +1188,6 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 591 COMMIT Unreleased a4f2769 2026-08-27T03:21:12-07:00
-
-#### Coming From:
-
-Unreleased a4f2769
-
-#### Purpose:
-
-Validate the guarded transport on the qualified 8 Mbps elementary stream after a warm file load.
-
-#### Outcome:
-
-The user reports running the requested file without rebooting and says playback looked good. The helper log identifies `bbb_480i_tff_15s_8mbps.m2v`, runtime `transport=credit_fast_v1` and mode 2; its new child/session data and the unchanged 10:08:35 UTC Linux boot corroborate a new run without an intervening system reboot. This does not independently establish whether a core reload or mode switch occurred. The log was collected before a fresh screenshot, and complete host/FPGA readbacks retain both qualified `a4f2769` hashes. All 15,150,646 bytes, 449 reference/display pictures and 448 swaps complete with zero aggregate errors, no transport integrity abort, normal helper exit, sequence end and quiet terminal presentation. All 925 chunk byte totals, fast/slow counts, batch/query totals and fourteen payload-ACK samples reconcile. Fast transfers carry 15,029,026 bytes, or 99.1973 percent; 121,620 bytes use acknowledged single-word progress. There are zero actual post-startup deadline misses, zero cadence outliers and no retained missed-deadline records. The three largest measured post-first-swap intervals are exactly 2,002,000 decoder clocks, or 33.366667 milliseconds, matching steady 29.970030-fps cadence and the qualified entry-564 8 Mbps acceptance. The raw aggregate is 29.891489 fps across 14.987544 seconds because schema nineteen assigns its starting timestamp on first reference completion, before visible release, so it includes startup reserve and raster alignment; its 39.277-millisecond excess over 448 nominal intervals is not evidence of steady slowdown. This also corrects entry 590's description of its aggregate as first-to-last presentation and its implication that the entire excess duration was cadence delay: those aggregate measurements include startup, but that run's 77 actual post-startup missed intervals and 66.733-millisecond maximum gaps still independently establish remaining high-bitrate lateness. Matched delivery averages 1,016,885 B/s, paced by this smaller stream's downstream consumption rather than establishing raw link capacity. The host issues 885,783 fast batches averaging 16.967 bytes and 947,518 status queries; this confirms small available-credit grants under steady consumption, not a throughput regression compared with the larger file. All 340 helper EAGAIN events occur before first delivery. Data-bearing polls average 64.028 milliseconds and peak at 114.117 milliseconds; these measure Main-loop blocking exposure, and current menu responsiveness is still not separately confirmed by the user's visual report. Capture, complete decode, checked analysis and prior qualified-file comparison are preserved as `.ai/current_results/entry591_*`. No source, deployed binary, configuration, lifecycle or playback action was changed during collection. This entry passes the scoped warm 8 Mbps hardware regression and preserves its prior steady cadence; it does not pass the high-bitrate fixture, all display modes, arbitrary cancellation or the remaining unsupported feature set.
-
-#### Next Steps:
-
-Retain `a4f2769` and the restoration pair as the tested guarded-transport baseline, with entry 590 preserving the larger-file improvement and entry 591 closing the requested warm 8 Mbps regression. Obtain a separate report of menu responsiveness during playback without requesting another identical file run unless a new diagnostic question requires it. For further performance work, propose and obtain approval for a focused investigation of the remaining high-bitrate decoder-side processing/backpressure, using the retained ready/input/writer evidence to distinguish internal decode waits from output pressure and status-query overhead before changing production behavior. Preserve credit and integrity checks, both FIFO sizes, guarded startup, continuous HDMI sync and black idle. Keep unsupported interlaced P/B, field-picture/DCT, audio/PTS, mode-switch/cancellation coverage and historical assertion drift explicitly outside this acceptance, leave reboot/playback control with the user, keep restricted `core.md` unchanged and maintain the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 
