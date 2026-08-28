@@ -1,0 +1,42 @@
+{
+  "recorded": "2026-08-28T13:15:33-07:00",
+  "source_commit": "83c138ebd2492e6b81dfcc1f0256cecae2afce79",
+  "previous_source_commit": "c124aa516d7280432a63562d5e3f6a9973c32579",
+  "source_change": "Only MediaPlayer.qsf SEED 19 -> 20",
+  "build_directory": "/home/vash/mister-builds/entry681/FPGA",
+  "build_attempts_this_authorization": 1,
+  "seed": 20,
+  "compile_success": true,
+  "timing_accepted": true,
+  "qualification_accepted": true,
+  "installed": true,
+  "installation_verified": true,
+  "hardware_accepted": false,
+  "core_reloaded": false,
+  "playback_started": false,
+  "worst_slack_ns": {
+    "removal": 0.572,
+    "recovery": 3.968,
+    "minimum_pulse_width": 0.925,
+    "hold": 0.25,
+    "setup": 0.269
+  },
+  "all_tns_zero": true,
+  "mpeg_setup_slack_ns": 1.401,
+  "video_setup_slack_ns": 3.15,
+  "prior_seed18_setup_ns": -0.002,
+  "prior_seed19_setup_ns": -0.013,
+  "weight_register_boundaries_retained": true,
+  "film_cdc_endpoints_retained": true,
+  "warning_review": "No new warnings versus seed 19; the timing-failure warning is removed. Versus the older timing-passing baseline, only the previously reviewed assigned-but-unused last_bound_reference_count warning remains.",
+  "qualification_note": "Full retained native, paired and focused hashes reverified. Both native analyzers rerun under the approved fixture-pinned terminal-cut exception, with strict raw mismatch retained; all six qualification tests pass. No functional or simulation input changed.",
+  "installed_path": "/media/fat/MediaPlayer_20260828.rbf",
+  "rbf_sha256": "a403d224ee98d192994fccf8116d59eef26933351216c66a14d044748a86171c",
+  "previous_core_backup": {
+    "path": "/media/fat/_MediaPlayer_Backups/MediaPlayer_20260828_2e834957fed5_20260828T131423.rbf",
+    "bytes": 4392652,
+    "sha256": "2e834957fed5bbb246074d975d44247b9e81508eab04ea27445aa6a935ed916c"
+  },
+  "protected_files_unchanged": true,
+  "next_action": "Explicitly reload MediaPlayer_20260828.rbf, then play games/MediaPlayer/dvd_opening_original.mpg with original audio in Weave using HDMI stereo. Observe startup and interior stutters in video/audio and leave 2DID and helper log available for collection. Hardware acceptance remains pending user feedback."
+}

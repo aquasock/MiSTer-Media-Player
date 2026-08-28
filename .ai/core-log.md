@@ -1,3 +1,32 @@
+## 682 COMMIT Unreleased 83c138e 2026-08-28T13:15:33-07:00
+
+#### Coming From:
+
+Unreleased 83c138e
+
+#### Purpose:
+
+Record the timing-passing seed-20 build and verified installation for original-audio hardware testing.
+
+#### Outcome:
+
+Source 83c138e changes only the fitter seed from 19 to 20. The complete source comparison proves all logic, clocks, timing constraints and simulation inputs unchanged; retained native, paired and focused evidence hashes reverify, both native analyzers reproduce qualification under the approved fixture-pinned terminal-cut exception, and all six qualification tests pass. One fresh Quartus 17.0.2 seed-20 compile completes in 745.3 seconds with zero errors and 205 warnings. Every timing category passes with zero TNS: minimum setup plus 0.269 ns in HDMI, hold plus 0.250 ns, recovery plus 3.968 ns, removal plus 0.572 ns and pulse width plus 0.925 ns. MPEG setup is plus 1.401 ns and video setup is plus 3.150 ns. Resources are 32,962 ALMs, 52,275 registers, 4,054,267 RAM bits, 514 of 553 M10Ks and 67 DSPs. All four eight-bit inverse-quantization weight boundaries and expected film CDC endpoints remain present. No warning is added versus seed 19, and the timing-failure warning is removed; the previously reviewed unused last_bound_reference_count warning is the only addition relative to the older passing baseline. The 4,369,004-byte RBF has SHA256 a403d224ee98d192994fccf8116d59eef26933351216c66a14d044748a86171c and is packaged locally as output_files/entry681/MediaPlayer_20260828.rbf. Using the existing installation authorization, FTP staging and final readback verify that exact binary at /media/fat/MediaPlayer_20260828.rbf on 10.10.0.30. The prior dated core is downloaded locally and preserved with matching hash at /media/fat/_MediaPlayer_Backups/MediaPlayer_20260828_2e834957fed5_20260828T131423.rbf. Before-and-after hashes prove Main, helper, original DVD clip, undated core and other existing core unchanged. No core reload or playback occurs, and hardware acceptance remains pending. The build stays at /home/vash/mister-builds/entry681/FPGA, with full local evidence under output_files/entry681 and committed reports under .ai/current_results/entry682_*; generated binaries are not committed.
+
+#### Next Steps:
+
+Have the user explicitly reload MediaPlayer_20260828.rbf and play games/MediaPlayer/dvd_opening_original.mpg with original audio in Weave mode over HDMI stereo. Observe startup and interior video and audio stutters, and retain the 2DID screen and helper log for collection. Review those hardware results before accepting the decoder improvements; software qualification and positive FPGA timing alone do not constitute hardware acceptance. Preserve the prior core backup and both failed seed builds for comparison.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 681 COMMIT Unreleased 83c138e 2026-08-28T12:58:58-07:00
 
 #### Coming From:
@@ -1219,35 +1248,6 @@ The user explicitly reports completing Weave with everything passing. Helper-fir
 #### Next Steps:
 
 Run test_4_progressive.mpg with HDMI audio and preserve its completed screen for separate helper-first collection. Then complete AC-3 HDMI decode, AC-3 S/PDIF passthrough and DTS S/PDIF passthrough as separate runs. Keep overall beta qualification open until the remaining matrix is accepted and the storage dirty-flag warning as a separate unresolved filesystem check. Preserve unchanged runtime identities, user control of hardware lifecycle, local-only raw data, restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [x] Passed
-
----
-
-## 642 COMMIT Unreleased 2045c34 2026-08-27T19:45:33-07:00
-
-#### Coming From:
-
-Unreleased 2045c34
-
-#### Purpose:
-
-Validate test three's requested Bob and HDMI playback on the Buildroot beta.
-
-#### Outcome:
-
-The user reports test three passes. Helper-first retrieval and a fresh screenshot identify the scrolling-band fixture and provide valid schema-19 telemetry with 360 reference and displayed pictures, zero B pictures, 359 swaps and 12,073,185 accepted video bytes. Decoder and presentation errors, audio underrun, PCM protocol faults, timestamp conflicts, native deadline gaps and gap outliers are absent. All three largest recorded display intervals are 2,002,000 clocks, with sequence end, completed presentation and quiet termination asserted. Helper exit is zero and all pipe reads reconcile to 14,562,019 completed transport bytes, without acknowledged fallback payload. HDMI decoded output is confirmed; Bob was requested and the user accepts that run, but telemetry does not independently identify the scaler selection or LED colors. The helper reports 576,000 emitted PCM frames. Independent readback confirms the fixture and unchanged Main, helper, RBF and kernel. Passed is scoped to the requested Bob test; no new build occurs, so Built stays unchecked. No deployment, mode change, reload, reboot or playback is initiated by the agent. Raw data remains in ignored local results and only .ai/current_results/entry642_buildroot_test3_bob_status.json is published.
-
-#### Next Steps:
-
-Switch HDMI scaler deinterlacer to Weave and replay test_3_deinterlace_bob_weave.mpg with HDMI audio, preserving a separate helper log and fresh terminal screenshot afterward. The user must judge the deinterlacing appearance because the terminal telemetry does not identify the HDMI scaler mode. Then complete the progressive all-I test four and separate AC-3 HDMI, AC-3 S/PDIF and DTS S/PDIF runs. Keep the storage dirty-flag warning as a separate unresolved check and leave overall beta qualification open until the matrix is complete. Preserve runtime identities, user control of hardware lifecycle, local-only raw captures, restricted core.md and the forty-entry ring.
 
 #### Files Modified:
 

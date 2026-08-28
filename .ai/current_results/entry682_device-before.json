@@ -1,0 +1,40 @@
+{
+  "root_media_player_files": [
+    "MediaPlayer.rbf",
+    "MediaPlayer_20260828.rbf",
+    "MediaPlayer_OLD.rbf"
+  ],
+  "opening_already_present": true,
+  "protected_files": [
+    {
+      "path": "/media/fat/MiSTer",
+      "bytes": 1170340,
+      "sha256": "01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9"
+    },
+    {
+      "path": "/media/fat/linux/MediaPlayer_Helper",
+      "bytes": 399340,
+      "sha256": "f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8"
+    },
+    {
+      "path": "/media/fat/games/MediaPlayer/dvd_opening_original.mpg",
+      "bytes": 11145233,
+      "sha256": "218d3a8eab32efceb6263d884be1b589b75e598ae25eeb465d14e4b430dfdc21"
+    },
+    {
+      "path": "/media/fat/MediaPlayer.rbf",
+      "bytes": 4309784,
+      "sha256": "9730e0ba61adbcd5319a42b9d270f30083947487f156cc17a1ce277d96a7dc18"
+    },
+    {
+      "path": "/media/fat/MediaPlayer_20260828.rbf",
+      "bytes": 4392652,
+      "sha256": "2e834957fed5bbb246074d975d44247b9e81508eab04ea27445aa6a935ed916c"
+    },
+    {
+      "path": "/media/fat/MediaPlayer_OLD.rbf",
+      "bytes": 4278588,
+      "sha256": "5895917446f140bc53130fcf4b93226fa507cd9c6b9f335c00660c7428711365"
+    }
+  ]
+}

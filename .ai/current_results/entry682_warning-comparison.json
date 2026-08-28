@@ -1,0 +1,22 @@
+{
+  "map": {
+    "added": [],
+    "removed": [],
+    "baseline_count": 99,
+    "candidate_count": 99
+  },
+  "fit": {
+    "added": [],
+    "removed": [],
+    "baseline_count": 22,
+    "candidate_count": 22
+  },
+  "sta": {
+    "added": [],
+    "removed": [
+      "Critical Warning (332148): Timing requirements not met"
+    ],
+    "baseline_count": 18,
+    "candidate_count": 17
+  }
+}

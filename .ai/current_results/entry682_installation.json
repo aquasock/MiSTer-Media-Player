@@ -1,0 +1,87 @@
+{
+  "source_commit": "83c138ebd2492e6b81dfcc1f0256cecae2afce79",
+  "device": "10.10.0.30",
+  "started": "2026-08-28T13:14:23-07:00",
+  "target": "/media/fat/MediaPlayer_20260828.rbf",
+  "stage": "/media/fat/MediaPlayer_20260828.rbf.upload-entry681-20260828T131423",
+  "installation_verified": true,
+  "core_reloaded": false,
+  "playback_started": false,
+  "hardware_accepted": false,
+  "protected_before": [
+    {
+      "path": "/media/fat/MiSTer",
+      "bytes": 1170340,
+      "sha256": "01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9"
+    },
+    {
+      "path": "/media/fat/linux/MediaPlayer_Helper",
+      "bytes": 399340,
+      "sha256": "f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8"
+    },
+    {
+      "path": "/media/fat/games/MediaPlayer/dvd_opening_original.mpg",
+      "bytes": 11145233,
+      "sha256": "218d3a8eab32efceb6263d884be1b589b75e598ae25eeb465d14e4b430dfdc21"
+    },
+    {
+      "path": "/media/fat/MediaPlayer.rbf",
+      "bytes": 4309784,
+      "sha256": "9730e0ba61adbcd5319a42b9d270f30083947487f156cc17a1ce277d96a7dc18"
+    },
+    {
+      "path": "/media/fat/MediaPlayer_OLD.rbf",
+      "bytes": 4278588,
+      "sha256": "5895917446f140bc53130fcf4b93226fa507cd9c6b9f335c00660c7428711365"
+    }
+  ],
+  "previous_target": {
+    "path": "/media/fat/MediaPlayer_20260828.rbf",
+    "bytes": 4392652,
+    "sha256": "2e834957fed5bbb246074d975d44247b9e81508eab04ea27445aa6a935ed916c"
+  },
+  "staged_readback": {
+    "path": "/media/fat/MediaPlayer_20260828.rbf.upload-entry681-20260828T131423",
+    "bytes": 4369004,
+    "sha256": "a403d224ee98d192994fccf8116d59eef26933351216c66a14d044748a86171c"
+  },
+  "backup": {
+    "path": "/media/fat/_MediaPlayer_Backups/MediaPlayer_20260828_2e834957fed5_20260828T131423.rbf",
+    "bytes": 4392652,
+    "sha256": "2e834957fed5bbb246074d975d44247b9e81508eab04ea27445aa6a935ed916c"
+  },
+  "final_readback": {
+    "path": "/media/fat/MediaPlayer_20260828.rbf",
+    "bytes": 4369004,
+    "sha256": "a403d224ee98d192994fccf8116d59eef26933351216c66a14d044748a86171c"
+  },
+  "protected_after": [
+    {
+      "path": "/media/fat/MiSTer",
+      "bytes": 1170340,
+      "sha256": "01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9"
+    },
+    {
+      "path": "/media/fat/linux/MediaPlayer_Helper",
+      "bytes": 399340,
+      "sha256": "f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8"
+    },
+    {
+      "path": "/media/fat/games/MediaPlayer/dvd_opening_original.mpg",
+      "bytes": 11145233,
+      "sha256": "218d3a8eab32efceb6263d884be1b589b75e598ae25eeb465d14e4b430dfdc21"
+    },
+    {
+      "path": "/media/fat/MediaPlayer.rbf",
+      "bytes": 4309784,
+      "sha256": "9730e0ba61adbcd5319a42b9d270f30083947487f156cc17a1ce277d96a7dc18"
+    },
+    {
+      "path": "/media/fat/MediaPlayer_OLD.rbf",
+      "bytes": 4278588,
+      "sha256": "5895917446f140bc53130fcf4b93226fa507cd9c6b9f335c00660c7428711365"
+    }
+  ],
+  "protected_files_unchanged": true,
+  "finished": "2026-08-28T13:14:26-07:00"
+}
