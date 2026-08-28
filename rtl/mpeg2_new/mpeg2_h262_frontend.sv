@@ -250,7 +250,11 @@ assign phase1_supported =
     (chroma_format == 2'b01) &&
     (picture_coding_type == 3'b001) &&
     (picture_structure == 2'b11) &&
-    frame_pred_frame_dct &&
+    // Entry 650: frame_pred_frame_dct gates field DCT and field prediction
+    // together.  It is no longer required, because picture_coding_type above
+    // still admits only I pictures, so field prediction cannot arise; the
+    // macroblock layer's dct_type bit is parsed and honoured instead.
+    // Field pictures remain refused by the picture_structure term.
     !concealment_motion_vectors &&
     (phase1_progressive_i_frame || phase1_native_480i_i_frame) &&
     phase1_i_f_code_state_valid &&

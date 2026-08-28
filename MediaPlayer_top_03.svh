@@ -77,6 +77,7 @@ mpeg2_h262_intra_recon mpeg2_h262_intra_recon
 	.slice_start                        (mpeg2_new_slice_start),
 	.macroblock_start                   (mpeg2_new_luma_macroblock_start),
 	.block_index                        (mpeg2_new_qfs_block_index),
+	.dct_type                           (mpeg2_new_dct_type),
 	.sample_valid                       (mpeg2_new_idct_sample_valid),
 	.sample_index                       (mpeg2_new_idct_sample_index),
 	.sample_value                       (mpeg2_new_idct_sample_value),
@@ -106,6 +107,9 @@ mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 	.clk             (clk_mpeg2),
 	.reset           (reset_mpeg2),
 	.frame_bank      (mpeg2_new_active_frame_bank),
+	// Entry 650: only the reconstruction path carries field-DCT blocks;
+	// the P store path is frame-ordered.
+	.field_dct       (!mpeg2_new_p_store_select && mpeg2_new_dct_type),
 	.pixel_value     (mpeg2_new_p_store_select ?
 	                  mpeg2_new_p_store_pixel_value :
 	                  mpeg2_new_recon_pixel_value),

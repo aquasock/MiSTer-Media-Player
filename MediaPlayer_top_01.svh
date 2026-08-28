@@ -76,6 +76,8 @@ wire [2:0]  mpeg2_new_picture_coding_type;
 wire [1:0]  mpeg2_new_intra_dc_precision;
 wire [1:0]  mpeg2_new_picture_structure;
 wire        mpeg2_new_frame_pred_frame_dct;
+// Entry 650: field-ordered luma blocks for the macroblock being submitted.
+wire        mpeg2_new_dct_type;
 wire        mpeg2_new_concealment_motion_vectors;
 wire        mpeg2_new_q_scale_type;
 wire        mpeg2_new_intra_vlc_format;

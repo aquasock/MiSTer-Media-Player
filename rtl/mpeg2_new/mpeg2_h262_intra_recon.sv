@@ -44,6 +44,8 @@ module mpeg2_h262_intra_recon
     // Legacy parser module exposes the current H.262 4:2:0 block number.
     // It remains stable from qfs_block_start through this block_complete.
     input  wire [2:0]         block_index,
+    // Entry 650: field-ordered luma blocks for this macroblock.
+    input  wire               dct_type,
 
     input  wire               sample_valid,
     input  wire [5:0]         sample_index,
@@ -106,7 +108,8 @@ wire coordinate_state_valid =
 //       Y0 Y1       Cb and Cr each contain one 8x8 block
 //       Y2 Y3       for the same 16x16 luma macroblock.
 wire [3:0] luma_block_x_offset = block_index[0] ? 4'd8 : 4'd0;
-wire [3:0] luma_block_y_offset = block_index[1] ? 4'd8 : 4'd0;
+wire [3:0] luma_block_y_offset =
+    block_index[1] ? (dct_type ? 4'd1 : 4'd8) : 4'd0;
 wire       current_block_is_luma = (block_index < 3'd4);
 wire [1:0] current_component = current_block_is_luma ? 2'd0 :
                                (block_index == 3'd4) ? 2'd1 : 2'd2;

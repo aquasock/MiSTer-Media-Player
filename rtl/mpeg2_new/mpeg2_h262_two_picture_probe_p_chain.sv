@@ -10,7 +10,7 @@
 module mpeg2_h262_two_picture_probe
 (
     input wire clk,input wire reset,input wire[7:0] stream_data,input wire stream_valid,output wire stream_ready,
-    input wire phase1_supported,input wire[13:0] vertical_size,input wire[1:0] intra_dc_precision,input wire intra_vlc_format,
+    input wire phase1_supported,input wire[13:0] vertical_size,input wire[1:0] intra_dc_precision,input wire intra_vlc_format,input wire frame_pred_frame_dct,
     input wire pipeline_block_done,input wire recon_block_complete,input wire p_persistence_complete,
     input wire p_row_persistence_complete,
     output wire slice_header_seen,output wire macroblock_address_seen,output wire first_i_macroblock_seen,
@@ -19,6 +19,7 @@ module mpeg2_h262_two_picture_probe
     output wire[1:0] completed_frame_bank,output wire[7:0] picture_count,output wire reference_frame_valid,
     output wire[1:0] reference_frame_bank,output wire[1:0] previous_reference_frame_bank,
     output wire[7:0] reference_promotion_count,
+    output wire dct_type,
     output wire p_macroblock_type_seen,output wire p_forward_vector_valid,output wire signed[12:0] p_forward_vector_x,
     output wire signed[12:0] p_forward_vector_y,output wire p_residual_required,output wire p_residual_success,
     output wire p_first_residual_sample_valid,output wire signed[15:0] p_first_residual_sample_value,
@@ -51,7 +52,7 @@ wire[7:0] base_picture_count;wire base_reference_frame_valid,base_reference_fram
 
 mpeg2_h262_picture_bookkeeper bookkeeper(
  .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.parser_stream_ready(parser_ready),
- .phase1_supported(phase1_supported),.vertical_size(vertical_size),.intra_dc_precision(intra_dc_precision),.intra_vlc_format(intra_vlc_format),
+ .phase1_supported(phase1_supported),.vertical_size(vertical_size),.intra_dc_precision(intra_dc_precision),.intra_vlc_format(intra_vlc_format),.frame_pred_frame_dct(frame_pred_frame_dct),.dct_type(dct_type),
  .pipeline_block_done(pipeline_block_done),.recon_block_complete(recon_block_complete),.p_picture_expected(p_picture_expected),
  .slice_header_seen(slice_header_seen),.macroblock_address_seen(macroblock_address_seen),.first_i_macroblock_seen(first_i_macroblock_seen),
  .first_luma_dc_seen(first_luma_dc_seen),.first_luma_block_complete(first_luma_block_complete),.first_picture_420_parsed(first_picture_420_parsed),

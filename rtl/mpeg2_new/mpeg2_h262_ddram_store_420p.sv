@@ -7,6 +7,8 @@ module mpeg2_h262_ddram_store(
  input wire clk,input wire reset,input wire[1:0] frame_bank,input wire [7:0] pixel_value,
  input wire [1:0] pixel_component,input wire [11:0] pixel_x,input wire [11:0] pixel_y,
  input wire pixel_valid,input wire block_start,input wire block_complete,
+ // Entry 650: this block's eight rows land on alternate frame lines.
+ input wire field_dct,
  output reg block_stored,output wire block_accepted,
  output wire capture_blocked_debug,
  output reg write_seen,output reg store_error,
@@ -60,6 +62,11 @@ reg [1:0]  ab_b   [0:1];
 reg [1:0]  ac_b   [0:1];
 reg [11:0] ox_b   [0:1];
 reg [11:0] oy_b   [0:1];
+reg        fd_b   [0:1];
+// Entry 650: the capture row index was pixel_y[2:0], which assumes eight
+// consecutive rows.  Field-DCT rows are two apart, so those low bits alias.
+// A sequential counter is equivalent for frame DCT and correct for both.
+reg [2:0]  cap_row;
 reg [2:0] wr;reg [28:0] wa;
 
 // Drain-side view: every address, bound and debug value describes the bank
@@ -70,11 +77,13 @@ wire        dasc = asc_b[drain_bank];
 wire        dascb= ascb_b[drain_bank];
 wire [11:0] dox  = ox_b[drain_bank];
 wire [11:0] doy  = oy_b[drain_bank];
-wire good=((dac==Y)&&(dox<720)&&(doy<480))||(((dac==CB)||(dac==CR))&&(dox<360)&&(doy<240));
+wire        dfd  = fd_b[drain_bank];
+wire [11:0] dlast = doy + (dfd ? 12'd14 : 12'd7);
+wire good=((dac==Y)&&(dox<720)&&(dlast<480))||(((dac==CB)||(dac==CR))&&(dox<360)&&(doy<240));
 wire [28:0] off=dasc?(dascb?SCRATCH1:SCRATCH0):
                  (dab==2'd1)?BANK:(dab==2'd2)?29'h00040000:29'd0;
 wire [28:0] first=(dac==Y)?YB+off+r90(doy)+{20'd0,dox[11:3]}:(dac==CB)?CBB+off+r45(doy)+{20'd0,dox[11:3]}:CRB+off+r45(doy)+{20'd0,dox[11:3]};
-wire [28:0] stride=(dac==Y)?90:45;
+wire [28:0] stride=(dac==Y)?(dfd?29'd180:29'd90):29'd45;
 
 // Capacity grant remains a pulse for a completed capture, never an idle-ready
 // level. The parser is already waiting before reconstruction reaches here.
@@ -134,12 +143,12 @@ assign luma_position_fingerprint_debug=position_fingerprint_word(
 integer rst_i;
 always @(posedge clk)begin
  if(reset)begin
-  cap<=0;writing<=0;cap_bank<=0;drain_bank<=0;wr<=0;wa<=0;sh<=0;
+  cap<=0;writing<=0;cap_bank<=0;drain_bank<=0;wr<=0;wa<=0;sh<=0;cap_row<=0;
   grant_pending<=0;
   block_stored<=0;write_seen<=0;store_error<=0;
   for(rst_i=0;rst_i<2;rst_i=rst_i+1)begin
    pend[rst_i]<=0;ac_b[rst_i]<=0;ab_b[rst_i]<=0;
-   asc_b[rst_i]<=0;ascb_b[rst_i]<=0;ox_b[rst_i]<=0;oy_b[rst_i]<=0;
+   asc_b[rst_i]<=0;ascb_b[rst_i]<=0;ox_b[rst_i]<=0;oy_b[rst_i]<=0;fd_b[rst_i]<=0;
   end
  end
  else begin
@@ -154,12 +163,14 @@ always @(posedge clk)begin
    if(cap||pend[cap_bank])store_error<=1;
    cap<=1;ac_b[cap_bank]<=ec;ab_b[cap_bank]<=frame_bank;
    asc_b[cap_bank]<=scratch_tag;ascb_b[cap_bank]<=wide_bs1;
-   ox_b[cap_bank]<={ex[11:3],3'b000};oy_b[cap_bank]<={ey[11:3],3'b000};
+   ox_b[cap_bank]<={ex[11:3],3'b000};oy_b[cap_bank]<=ey;
+   fd_b[cap_bank]<=field_dct&&(ec==Y);cap_row<=3'd0;
    if(scratch_tag&&(bsc==2'b11))store_error<=1;
   end
   if(pixel_valid)begin
    if(!(cap||block_start))store_error<=1;
-   else begin sh<=shn;if(pixel_x[2:0]==7)blk[cap_bank][pixel_y[2:0]]<=shn;end
+   else begin sh<=shn;
+    if(pixel_x[2:0]==7)begin blk[cap_bank][cap_row]<=shn;cap_row<=cap_row+3'd1;end end
   end
   if(block_complete)begin
    if(!cap)store_error<=1;

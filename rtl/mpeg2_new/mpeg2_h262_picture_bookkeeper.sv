@@ -18,10 +18,12 @@ module mpeg2_h262_picture_bookkeeper
     input  wire [13:0] vertical_size,
     input  wire [1:0]  intra_dc_precision,
     input  wire        intra_vlc_format,
+    input  wire        frame_pred_frame_dct,
     input  wire        pipeline_block_done,
     input  wire        recon_block_complete,
 
     output wire        p_picture_expected,
+    output wire        dct_type,
 
     output wire        slice_header_seen,
     output wire        macroblock_address_seen,
@@ -248,6 +250,8 @@ mpeg2_h262_luma4_probe picture_probe
     .vertical_size               (vertical_size),
     .intra_dc_precision          (intra_dc_precision),
     .intra_vlc_format            (intra_vlc_format),
+    .frame_pred_frame_dct        (frame_pred_frame_dct),
+    .dct_type                    (dct_type),
     .pipeline_block_done         (pipeline_block_done),
     .slice_header_seen           (parser_slice_header_seen),
     .macroblock_address_seen     (parser_macroblock_address_seen),

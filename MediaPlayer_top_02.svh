@@ -90,6 +90,8 @@ mpeg2_h262_two_picture_probe mpeg2_h262_two_picture_probe
 	.stream_ready                (mpeg2_new_decoder_stream_ready),
 	.phase1_supported            (mpeg2_new_phase1_supported),
 	.vertical_size               (mpeg2_new_vertical_size),
+	.frame_pred_frame_dct        (mpeg2_new_frame_pred_frame_dct),
+	.dct_type                    (mpeg2_new_dct_type),
 	.intra_dc_precision          (mpeg2_new_intra_dc_precision),
 	.intra_vlc_format            (mpeg2_new_intra_vlc_format),
 	// Entry 599: release ST_WAIT_PIPELINE with one capacity grant per completed
