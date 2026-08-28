@@ -1,3 +1,32 @@
+## 651 COMMIT Unreleased 4777c59 2026-08-27T22:23:27-07:00
+
+#### Coming From:
+
+Unreleased 4777c59
+
+#### Purpose:
+
+Record hardware acceptance of the field-DCT gate against the reference decode.
+
+#### Outcome:
+
+The user reports the fixture played perfectly and the reference-decode comparison confirms it. The generator was first corrected: it lacked `-y`, so a second run blocked on ffmpeg's overwrite prompt while `capture_output` hid the prompt, which presented as a hang; commit `ceadfd2` adds `-y`, gives ffmpeg no stdin, prints a banner per stage and passes `-stats`, and the fixed script reproduces the fixture byte-identically in about four seconds. Source `4777c59` was built and deployed as RBF `9730e0ba61adbcd5`, replacing the released `61a2fed28425a461` after the installed copy was verified as the expected release, backed up to the card and to the build PC, staged under a temporary name, hash-checked while staged, renamed and read back on a fresh connection; Main and the helper were not touched because this commit changes no software. Helper-first collection confirms the correct fixture at `games/MediaPlayer/test_field_dct.m2v`, video of 3,028,039 bytes exactly matching the generated file, no audio, exit zero and all 185 pipe reads reconciling to the completed transport with no fallback and zero slow-path bytes. Valid schema-19 telemetry records 360 reference and displayed pictures, zero B pictures, 359 swaps, 3,028,040 accepted video bytes, top-field-first signalling, zero decoder and presentation errors, no audio underrun or PCM protocol fault, zero timestamp conflicts, zero native deadline gaps and gap outliers, three largest display intervals each at the nominal 2,002,000 clocks, and sequence end with quiet completion. The decisive evidence is the raster. The released bitstream refused this stream outright because `phase1_supported` required `frame_pred_frame_dct`, so playing at all establishes the gate is open, and comparison against ffmpeg's decode of the same file establishes it is correct rather than merely accepted. Across 279,072 compared pixels, excluding the telemetry overlay with its one-column left edge and image column zero, 272,780 match exactly, 6,292 differ by one unit of luma rounding and none differ by more than one. The woven bar occupies the non-contiguous rows 40, 42, 44, 45, 46, 47, 49 and 51 in both, which is the structure a mishandled `dct_type` would destroy since the two interpretations differ precisely where the bit is set. One difference is real and is not attributable to this change: image column zero is black in hardware where the reference is bright, on those eight bar rows only, with column one onward matching. Entries 645 and 646, captured on the released bitstream with the same bar content, show identical column-zero blanking, so it is a pre-existing display-path left-edge behaviour. Two items from the build remain open and are carried rather than closed: logic fell 372 ALMs and 912 registers while a feature was added, which is unexplained, and setup slack fell 0.117 nanoseconds to positive 0.126 on the HDMI domain. Passed records this fixture only. The seven existing fixtures have not been replayed on this bitstream, so the regression that the writer's capture-counter and untruncated-origin changes demand is outstanding, and field DCT decoding does not make commercial discs play because interlaced P and B remain the gate that does.
+
+#### Next Steps:
+
+Replay the seven existing fixtures on this bitstream and confirm their final rasters remain pixel-identical to the recorded baselines, because the capture row counter and the untruncated block origin affect frame-DCT blocks as well and a reconstruction fault corrupts pixels while every counter stays clean; suspect those two changes before the field mapping if anything regresses. Until that regression passes, do not treat the field-DCT gate as closed or prepare any release. Resolve the unexplained logic decrease before the next feature rather than banking it as a saving, and keep the reduced HDMI setup margin visible, reseeding rather than restructuring if a later change pushes that category negative. The deferred field-picture gate still needs either a non-ffmpeg generator or a real disc sample because ffmpeg cannot encode field pictures, and that choice needs the user's direction. Interlaced P and B, `repeat_first_field` and 576i remain unstarted and unscoped. Preserve restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [x] Passed
+
+---
+
 ## 650 COMMIT Unreleased 4777c59 2026-08-27T22:08:18-07:00
 
 #### Coming From:
