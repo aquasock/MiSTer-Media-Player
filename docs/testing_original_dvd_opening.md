@@ -80,6 +80,7 @@ The reduced reference-admission regression reuses the film reorder test:
 ```sh
 bash tools/streams/run_film_presentation.sh
 vvp simulation/film_presentation/reorder +OVERLAP_REFERENCE_ADMISSION
+vvp simulation/film_presentation/reorder +EARLY_B_REFERENCE
 ```
 
 At diagnostic source `33ade0f`, the default film test passes and this opt-in
@@ -87,6 +88,9 @@ case fails: after an overlapping reference completes with the following P
 header, scratch-bank availability lets that P payload proceed while the
 pending reference slot remains occupied. Keep the failure as the fix's
 regression boundary; do not describe it as a passing timing qualification.
+The early-B case separately checks the one-clock handoff between the following
+B header and completion of its I reference. The current scheduler can bind an
+older displayed P, while the timestamp owner loses the retiring I descriptor.
 
 ## Focused regressions
 

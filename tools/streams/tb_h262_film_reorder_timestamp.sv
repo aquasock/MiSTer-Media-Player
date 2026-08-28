@@ -7,6 +7,7 @@ reg [32:0] pts=0;
 reg tff=1,rff=0,tick90=0,tick_field=0,swap=0,field=0;
 reg [1:0] active=0,completed=0,reference=0;
 reg waiting=0,seqend=0,is_i=0;
+reg ordinary_overlap=0;
 reg [7:0] promoted=0;
 wire [1:0] display,candidate_bank;
 wire scratch,scratch_bank,decode_bank,candidate_valid,candidate_scratch,candidate_sb;
@@ -38,7 +39,7 @@ mpeg2_h262_b_presentation_scheduler scheduler(
  .frame_rate_code(4'd4),.native_film_mode(1'b1),.native_field(field),
  .display_picture_present(descriptor_valid),.display_repeat_first_field(display_rff),
  .candidate_top_field_first(candidate_tff),.timestamp_candidate_active(pts_active),
- .timestamp_candidate_due(pts_due),.native_ordinary_overlap_enable(1'b0),
+ .timestamp_candidate_due(pts_due),.native_ordinary_overlap_enable(ordinary_overlap),
  .active_frame_bank(active),.frame_waiting(waiting),.completed_frame_bank(completed),
  .reference_frame_bank(reference),.reference_promotion_count(promoted),
  .b_picture_start(start&&is_b),.non_b_picture_start(start&&!is_b),
@@ -90,6 +91,28 @@ task field_end(input bit expected_scratch,input bit expected_sb,input [1:0] expe
  end
 endtask
 initial begin
+ if($test$plusargs("EARLY_B_REFERENCE"))begin
+  // Native trace: the B classification can precede its I reference's public
+  // completion by one clock after an ordinary P has already been displayed.
+  // Neither scheduler binding nor metadata retirement may select that old P.
+  ordinary_overlap=1;
+  repeat(4)@(negedge clk);reset=0;
+  picture(0,1,1,1,90000,1);commit_reference();
+  picture(0,0,0,0,94504,1);commit_reference();
+  picture(0,1,0,1,97507,1);
+  field_end(0,0,0,1,1);field_end(0,0,0,1,1);field_end(0,0,1,0,0);
+  @(negedge clk);start=1;is_b=1;is_i=0;
+  @(negedge clk);start=0;completed=active;reference=active;active=0;
+  promoted=promoted+1'b1;waiting=1;
+  @(negedge clk);waiting=0;repeat(4)@(negedge clk);
+  $display("EARLY_B_REFERENCE_STATE future=%0d pending=%0d descriptor=%0d reference=%0d promoted=%0d bound_count=%0d",
+   scheduler.future_frame_bank,scheduler.future_reference_pending,
+   metadata_owner.frame_bank_descriptor_valid[2],reference,promoted,scheduler.last_bound_reference_count);
+  if(scheduler.future_frame_bank!=2||scheduler.future_reference_pending||
+     !metadata_owner.frame_bank_descriptor_valid[2])
+   $fatal(1,"early B header lost retiring I reference identity or metadata");
+  $display("EARLY_B_REFERENCE_PASS");$finish;
+ end
  if($test$plusargs("OVERLAP_REFERENCE_ADMISSION"))begin
   // Entry 669: the original opening can complete the allowed overlapping
   // reference on the same edge as the following P header. Once the second
