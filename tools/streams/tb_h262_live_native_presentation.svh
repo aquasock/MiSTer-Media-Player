@@ -227,7 +227,25 @@ generate if(NATIVE_PRESENTATION) begin: native_presentation
         if(native_picture_present&&!present_d)begin
             publications<=publications+1;trace_event("PUBLISH",selected_id);
         end
-        if(native_swap)begin field_number<=field_number+1;trace_event("FIELD",selected_id);end
+        if(native_swap)begin
+            field_number<=field_number+1;trace_event("FIELD",selected_id);$fflush(trace_fd);
+        end
+        if(prediction_no_progress_cycles==10000)begin
+            trace_event("WAIT",coded_picture);$fflush(trace_fd);
+            $display("NATIVE_WAIT cycle=%0d coded=%0d type=%0d byte=%0d ready=%0d phold=%0d dhold=%0d writer=%0d/%0d/%0d reader_region=%0d active_bank=%0d p_parse=%0d p_replay=%0d p_row=%0d b_parse=%0d b_replay=%0d b_row=%0d pred=%0d/%0d",
+                total_cycles,coded_picture,picture_coding_type,stream_index,decoder_ready,
+                presentation_hold,destination_ownership_hold,writer.writing,writer_we,writer_busy,
+                arbiter.reader_frame_region,active_bank,
+                publication.p_controller.wide_general_probe.parse_active,
+                publication.p_controller.mixed_replay_active,
+                publication.p_controller.wide_general_probe.row_waiting,
+                publication.b_controller.parse_active,publication.b_controller.replay_active,
+                publication.b_controller.row_waiting,prediction.mixed_active,prediction.b_active);
+            $fflush;
+        end
+        if(prediction_no_progress_cycles>10000&&
+           (!pred_active||pred_store_valid||memory_rd||memory_dout_ready||writer_stored))
+            trace_event("WAIT_RELEASE",coded_picture);
         if(cache_error||mismatch)$fatal(1,"native cache/field-order error");
     end
     final begin

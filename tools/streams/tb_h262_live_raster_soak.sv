@@ -1074,7 +1074,10 @@ module tb_h262_live_raster_soak #(
             else
                 prediction_no_progress_cycles<=
                     prediction_no_progress_cycles+1;
-            if(prediction_no_progress_cycles==10000)
+            // Native display ownership may deliberately retain a bank for
+            // three fields. Keep the old fast-soak limit unchanged; record
+            // its threshold in the native trace and retain a four-field bound.
+            if(prediction_no_progress_cycles==(NATIVE_PRESENTATION ? 4004000 : 10000))
                 $fatal(1,"prediction liveness failed engine=%0d/%0d/%0d tap=%0d ei=%0d cache=%0d/%0d addr=%h arb=%0d/%0d/%0d mem=%0d/%0d/%0d pblock=%0d/%0d/%0d/%0d base=%0d fetch=%0d/%0d/%0d/%0d valid=%h",
                        prediction.mixed_probe.req,
                        prediction.mixed_probe.waitresp,
