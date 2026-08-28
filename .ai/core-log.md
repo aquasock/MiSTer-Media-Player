@@ -1,3 +1,32 @@
+## 653 COMMIT Unreleased 4777c59 2026-08-27T22:34:30-07:00
+
+#### Coming From:
+
+Unreleased 4777c59
+
+#### Purpose:
+
+Confirm P and B picture decoding is unchanged on the field-DCT bitstream and localise the entry 644 screenshot variation.
+
+#### Outcome:
+
+The user replayed test seven, the only fixture exercising P and B pictures, and reports it looks and sounds perfect. Helper-first collection preserved a log distinct from the test one capture and identifies `test_7_progressive_ipb.mpg` with 11,954,879 bytes of video, 500 audio frames and 576,000 emitted samples, exit zero, and all 882 pipe reads reconciling to 14,439,298 completed transport bytes. Every schema-19 counter matches the entry 628 capture taken on the released `61a2fed2` bitstream, including 11,954,645 accepted video bytes, 121 reference and 239 B pictures, 360 displayed pictures, 359 swaps, final picture type three, zero decoder and presentation errors, no audio underrun or PCM protocol fault, zero deadline gaps, and the distinctive twenty-four timestamp advance conflicts and single gap outlier that fixture has always produced; only the largest recorded gap differs, by two clocks. The raster comparison produced the more valuable result. The first capture differed from the released-bitstream baseline at 7,640 of 382,992 compared pixels, every one at x modulo eight equal to one, which is exactly the signature entry 644 recorded and could not isolate. A second screenshot taken without replaying anything, with the core counters verified identical between the two captures, is pixel-identical to that baseline with zero mismatches, while differing from the first capture at the same 7,640 positions. An unchanged completed frame therefore yields both a pixel-exact capture and a differing one. That establishes two things entry 644 left open: the decoded content on this bitstream is identical to what the released bitstream produced, so P and B reconstruction is unaffected by the writer's capture-counter and untruncated-origin changes; and the variation lies in the screenshot capture or readback path rather than in the decoder or the framebuffer content, since neither changed between the two captures. The mechanism within that path is still not identified and the observation remains open on that narrower basis. Entry 644's conclusion that the variation must not be attributed to the operating system or to any source change is confirmed rather than overturned. Passed records this regression only. Tests one and seven have now passed on this bitstream; tests two through six remain unreplayed, and the two items carried from the build remain open, being the unexplained decrease of 372 ALMs and 912 registers and the HDMI setup margin at positive 0.126 nanoseconds.
+
+#### Next Steps:
+
+Treat the raster comparison for progressive content as requiring a repeat capture, because a single screenshot can differ from an identical frame; compare the best of two captures rather than reporting the first as a regression. Replay test four, the progressive all-I control, and optionally tests two, three, five and six, though those carry the same bar and line content already covered by test one's pixel-identical result. Only when the remaining fixtures pass should the field-DCT gate be treated as closed and any release considered. Investigate the capture-path variation as its own scoped question rather than inside a decoder cycle, since it now has a specific signature of every eighth pixel column and a reproducible test of capturing the same frame twice. Resolve the unexplained logic decrease before starting the next feature, and keep the reduced HDMI setup margin visible, reseeding rather than restructuring if a later change pushes that category negative. Interlaced P and B for interlaced streams remain the gate that would make commercial discs play and are unstarted; the deferred field-picture gate still needs either a non-ffmpeg generator or a real disc sample. Preserve restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [x] Passed
+
+---
+
 ## 652 COMMIT Unreleased 4777c59 2026-08-27T22:30:33-07:00
 
 #### Coming From:
@@ -1151,35 +1180,6 @@ The capture requested as the MPEG Layer II regression is in fact the AC-3 channe
 #### Next Steps:
 
 The MPEG Layer II regression needs one dedicated replay with nothing played afterwards, capturing the helper log before anything else is started, and requiring all 17,876 pictures, the exact 839,409,548 transport bytes and the entry 605 and 606 error and deadline state, allowing for the one known repeated frame at picture 692 recorded in entry 609. The user has asked for real surround over S/PDIF before release, which is the passthrough boundary and is scoped but not started. Its shape is now known from the framework: an AC-3 frame is 1536 samples at 48 kHz and an IEC 61937 burst occupies exactly the same period, so the helper can pack the bursts on the ARM and send them down the existing PCM transport without a new transport or any decoder in fabric. Three obstacles are real and must be settled before work starts. The framework's mixer applies attenuation, boost, mix and a biquad filter to every sample, and passthrough requires a bit-transparent path because any non-unity gain destroys the burst. The S/PDIF encoder hardwires the channel status non-audio bit to zero, so the stream always declares linear PCM, and setting it means editing framework code this project has otherwise left alone. HDMI would carry the same burst data as if it were PCM, which is loud noise on speakers, so a mode selection and an HDMI audio decision are required rather than optional. DTS passthrough is the same machinery with a different data type and burst length. A commercial AC-3 track with real dynamic range control is still uncompared, and the interlaced video gates of entry 609 remain open and unstarted. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 613 COMMIT Unreleased 9623fa7 2026-08-27T07:30:48-07:00
-
-#### Coming From:
-
-Unreleased 9623fa7
-
-#### Purpose:
-
-Accept AC-3 stereo decode on hardware from the channel sweep listening result.
-
-#### Outcome:
-
-The user played the channel sweep fixture and reports hearing the expected pattern correctly, and on both outputs rather than only one. The earlier HDMI silence of entry 612 is resolved and was not a core defect: the monitor's volume was turned down. HDMI and S/PDIF are therefore both confirmed to carry the decoded stereo, which matches the framework feeding both from the same PCM and removes the only unexplained observation from the previous entry. Combined with the exact host measurement in entry 612, where front left and right appear only on their own sides, centre appears equally in both at 4.52 dB below the fronts, the surrounds appear on their own sides at 6.02 dB below, and LFE is correctly absent, AC-3 stereo decode and downmix are accepted on hardware for this fixture. The user separately reports that the accepted MPEG Layer II movie also plays perfectly on the new helper, which is the hardware confirmation entry 611 and 612 asked for, but its telemetry is not captured here and that claim rests on the user's report alone. A capture attempted immediately after the report landed mid-playback: the helper log shows the full movie running with only 8,241,152 of 839,409,548 transport bytes submitted at 5.73 seconds, and the screenshot returned a 529 by 240 live video frame rather than the telemetry packet, which the decoder correctly refused as an unsupported layout. That capture is retained as a partial record and is not evidence of completion. The sweep run's own helper log is unrecoverable because the subsequent movie run overwrote it, so the sweep is accepted on the listening result and the entry 612 host measurement rather than on its own transport log; this is a consequence of the single fixed log path and is worth remembering before asking for two runs in succession. The installed RBF still hashes to accepted `d466bed`, the sweep fixture is unchanged on the target, and the Linux boot is still the same session. No source change is made in this entry, so Built and Passed refer to the accepted AC-3 helper at `9623fa7`, with Passed covering AC-3 stereo decode and downmix placement only.
-
-#### Next Steps:
-
-Let the movie finish, then capture the helper log first and a fresh telemetry screenshot to record the MPEG Layer II hardware regression properly, requiring all 17,876 pictures, the exact 839,409,548 transport bytes and the entry 605 and 606 error and deadline state, and remembering the one known repeated frame at picture 692 recorded in entry 609. Only then is codec selection proven not to have disturbed the accepted path on hardware. Ask the user to take the screenshot while the terminal telemetry screen is showing rather than during playback. A community sound test can now be written from the sweep fixture, and it must state plainly that it exercises the stereo downmix rather than discrete surround, since the core emits two channels. A commercial AC-3 track with real dynamic range control and dialogue normalization is still uncompared and remains the honest gap in this codec's qualification. AC-3 and DTS passthrough over S/PDIF remain the separate later boundary, now with both outputs confirmed working for linear PCM. The interlaced video gates of entry 609, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, remain open and unstarted. Preserve restricted core.md and maintain the forty-entry ring.
 
 #### Files Modified:
 
