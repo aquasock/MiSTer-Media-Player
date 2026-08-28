@@ -184,6 +184,7 @@ initial begin
   $display("EARLY_B_REFERENCE_PASS");$finish;
  end
  if($test$plusargs("OVERLAP_REFERENCE_ADMISSION"))begin
+  ordinary_overlap=1;
   // Entry 669: the original opening can complete the allowed overlapping
   // reference on the same edge as the following P header. Once the second
   // scratch picture is displayed, a free scratch bank is NOT permission to
