@@ -1,3 +1,32 @@
+## 664 COMMIT Unreleased ??? 2026-08-28T01:44:41-07:00
+
+#### Coming From:
+
+Unreleased 3e287b3
+
+#### Purpose:
+
+Reseed the unchanged decoder after weight prefetch closes MPEG timing and only the known HDMI scaler path remains negative.
+
+#### Outcome:
+
+The clean source-3e287b3 build completes in 781.6 seconds with zero errors and 205 warnings. Decoder setup improves to positive 1.486 nanoseconds and video setup to positive 2.775, but HDMI setup remains negative 0.274 with total negative slack of 6.576 on the existing ascal vertical-address path. Hold, recovery, removal and minimum pulse width are positive 0.253, 3.368, 0.529 and 0.925. Fitted resources are 32,856 ALMs, 52,359 registers, 4,054,267 memory bits, 514 of 553 RAM blocks and 67 DSP blocks. TimeQuest finds all four eight-bit prefetched weight banks, input setup at least positive 4.798 and output setup at least positive 2.853; all film CDC endpoints match and subsequent synchronizer stages have positive 15.531 setup. Both exact-source opening checks pass all 289 pictures and 149,817,600 samples, preserving the isolated one-level and measured real-reference propagation bounds, with no decoder or ownership errors. The failed RBF is not packaged or deployed. Entry 655's recorded response for marginal HDMI placement applies: change only the fitter seed from 17 to 18, leaving all RTL, clocks and timing constraints unchanged, publish that source and perform another clean build. Reports and the failed image remain under /home/vash/mister-builds/entry663.
+
+#### Next Steps:
+
+Commit the seed-only correction from the Pi, pull exact source on GUNSMOKE, rerun the clean build and paired opening checks, and audit every timing category, warning difference, register boundary and synchronization endpoint again. Package only a fully timing-positive candidate with a locally verified checksum, preserve the known-good core and leave deployment and playback to the user. No decoder feature or acceptance bound is expanded.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 663 COMMIT Unreleased 3e287b3 2026-08-28T01:24:48-07:00
 
 #### Coming From:
@@ -1218,38 +1247,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 624 COMMIT Unreleased 140a5b7 2026-08-27T09:27:04-07:00
-
-#### Coming From:
-
-Unreleased 44ee05a
-
-#### Purpose:
-
-Restore valid motion regressions and keep Main responsive during backpressured media transfers.
-
-#### Outcome:
-
-Published source 140a5b7 implements the approved fixture and Main responsiveness boundary without changing FPGA or helper codec source. The uncommitted GUNSMOKE draft and checker edit are backed up under entry624/draft-backup and left untouched in their original checkout; development and official qualification use separate directories. The suite now advances its bar from a per-frame source index and uses interleave_top or interleave_bottom to establish actual TFF/BFF temporal order before signalling is patched. Independent decoded-pixel checks validate all 720 temporal fields in each of the four bar fixtures and reject both original stationary files and a deliberately wrong field-order interpretation. All six twelve-second clips contain 360 pictures and have identical hashes across two generations. Main retains a 16 KiB pending buffer and uses verified-credit steps of at most 2048 source bytes, returns immediately at zero credits, and limits each poll to eight steps and one pipe read with a 2000-microsecond budget checked between steps. This is not a hard latency bound: one transaction, OS scheduling, logging and unchanged terminal child cleanup can extend a call, and legacy acknowledged-only cores retain their existing handshake waits. Unaligned data is packed locally, odd short reads retain their final byte until a partner or true EOF, and only the terminal byte is padded. Count, digest, capability and flags are verified before and after each batch; uncertain transfers abort without retry. Native and address/undefined-sanitized loader tests pass, including one hundred consecutive zero-credit yields, bounded progress, exact bytes, odd reads across EAGAIN/EINTR, EOF blocked on credits, fault/cancel/core-change cleanup, warm restart, unavailable diagnostics and twenty-four seeded short-read/credit sequences. Actual production bridge tests retain the legacy and original burst coverage and add twenty bounded-step resume cases, unaligned and odd tails, post-yield validation, corruption/reset rejection and counter wrap. A control that discards pending data on yield fails the regression as intended. Existing ceiling-generator tests pass. The unchanged helper preserves each new fixture's clean video exactly, emits the expected 576,000 PCM frames or equivalent burst periods, keeps MP2 identical across output modes and preserves the exact original MP2 elementary audio in tests one and two. AC-3 stereo matches independent decoding with maximum sample differences two and one by channel, and AC-3/DTS passthrough carries byte-identical source frames; unsupported DTS HDMI output remains rejected. GUNSMOKE pulls exact published source before qualification and builds Main from pinned upstream 0a8fb44 with ARM GNU 10.2, zero build warnings and no reused checkout object files. The 1,170,340-byte Main is SHA256 01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9. No new RBF or Quartus timing claim is needed; accepted seed-17 aa7f064 and helper 078d36b are retained. Host logging is version two, credit_step_v1: pipe_read entries cover all source reads while transfer entries are sampled, so historical version-one analyzers must not be applied unchanged. Fresh Main, RBF, helper and six-media backups are independently verified under /home/vash/mister-builds/entry624-backup. The local output_files/entry624/MediaPlayer_140a5b7_regression_update.zip contains Main and all six fixtures with instructions and checksums; its 12,662,276 bytes have SHA256 faa79844d7af3d6de039bcdf1b4d3667f50488241bda5785325d42e0ac880103, and every local archive member and unpacked payload matches its build hash. Evidence and reproducible drivers are retained as .ai/current_results/entry624_*. Nothing is deployed, reloaded, rebooted or played by the agent. Hardware menu response, corrected-fixture playback and sustained throughput remain unaccepted.
-
-#### Next Steps:
-
-The user will install the supplied Main and six test files, keeping the existing RBF and helper, then reboot once to activate Main and load MediaPlayer. Select Bob and run corrected test_1_interlace_tff.mpg once, observing the downward-moving bar, audible tone and menu response during and after playback; leave the terminal screen and helper log available before playing anything else. Collect the version-two log first and a fresh checksum-valid screenshot, verify installed hashes and require all 360 pictures, zero decoder/transport/audio errors and expected cadence while measuring media-poll duration against entry 623. Then capture corrected BFF and remaining regressions separately, and retain a bounded high-rate check before treating the new polling budget as throughput-qualified. Do not conflate software integrity tests or the 2 ms work budget with measured UI latency, and do not declare a release accepted until hardware regressions pass. The full-movie repeated-frame limitation, scaler margin risk and unsupported DVD syntax remain unchanged. Preserve user deployment/lifecycle control, restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- host/arm/ARCHITECTURE.md
-- tools/streams/test_main_mister_profile.py
-- tools/streams/generate_test_suite.py
-- tools/streams/generate_test_dvd_ceiling.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
