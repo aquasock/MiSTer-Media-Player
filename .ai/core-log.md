@@ -1,3 +1,32 @@
+## 684 COMMIT Unreleased 83c138e 2026-08-28T13:36:33-07:00
+
+#### Coming From:
+
+Unreleased 83c138e
+
+#### Purpose:
+
+Record repeated opening playback, live deinterlacer switching and the S/PDIF startup-dropout evidence.
+
+#### Outcome:
+
+The user reports repeated playback, visible differences when switching Bob and Weave during playback, and working S/PDIF output, then clarifies that one S/PDIF run briefly stuttered at startup and resumed without sounding distorted; the impression of soundbar rejection is an observation, not an established cause. Helper-first collection confirms latest AC-3 IEC 61937 passthrough, all 375 audio frames and 576,000 carrier samples emitted, exit zero and all 783 pipe reads reconciling to 12,818,502 completed transport bytes with no slow-path bytes. Two complete, byte-identical screenshots decode to matching checksum-valid schema-19 snapshots with error flags 0x0400, audio underrun, latched at 1.803186 seconds. No other error bits are set. The generic fatal_or_no_progress reason is triggered by this audio flag; early counts of 368,134 accepted video bytes, 24 reference and 20 B pictures are not terminal playback totals. Full helper completion does not erase the early underrun or prove uninterrupted output. The captured artifacts do not preserve every run or mode-switch chronology, so they cannot tie the reported dropout to a specific transition or distinguish receiver lock behavior from core starvation. Entry 683 HDMI opening acceptance is preserved, while clean S/PDIF qualification remains pending. FTP hashes match the installed seed-20 RBF, original clip and unchanged Main, helper and undated core. Legacy cadence counters and saturated PCM fields remain unmodified and do not establish exact cadence or full sample totals. Raw evidence stays local under output_files/entry684; scoped analysis, decoded snapshot, helper summary and hashes are published under .ai/current_results/entry684_*. No production change, build, deployment, mode change, reload or playback is initiated by the agent.
+
+#### Next Steps:
+
+Have the user select S/PDIF before playback, hold one deinterlacer mode fixed and replay the original opening once without changing modes, then leave 2DID and the latest helper log intact for collection before another replay. Compare that controlled capture with this early-underrun result before deciding whether startup needs investigation. Preserve the accepted HDMI baseline and original backup; do not start a new build or longer clip preparation from this evidence alone.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 683 COMMIT Unreleased 83c138e 2026-08-28T13:25:50-07:00
 
 #### Coming From:
@@ -1219,35 +1248,6 @@ The user reports test five passes everything. Helper-first retrieval preserved t
 #### Next Steps:
 
 Switch the core's audio mode to S/PDIF and replay test_5_audio_ac3_51.mpg as an AC-3 passthrough run, retaining its helper log before another file overwrites it and taking a separate uniquely named screenshot; entry 627 holds the standard-MiSTer S/PDIF baseline for that comparison. Then run test_6_audio_dts_51.mpg as DTS S/PDIF passthrough to close the seven-fixture matrix. Expect the passthrough runs to report no decoded PCM, so do not treat an absent sample count as a fault. Keep overall beta qualification open until both remaining audio runs are accepted, and retain the unisolated test-four screenshot variation and the unresolved filesystem dirty-flag check as separate open items rather than folding either into this result. Do not begin a source fix or attribute anything to Buildroot without evidence and approval for a revised plan. Preserve runtime identities, user control of hardware lifecycle, local-only raw data, restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [x] Passed
-
----
-
-## 644 COMMIT Unreleased 2045c34 2026-08-27T19:55:50-07:00
-
-#### Coming From:
-
-Unreleased 2045c34
-
-#### Purpose:
-
-Validate progressive all-I test four with user-reported Weave and HDMI audio on the Buildroot beta.
-
-#### Outcome:
-
-The user reports everything passes in Weave. Helper-first retrieval and a fresh screenshot confirm the correct fixture and valid schema-19 telemetry: 360 reference and displayed pictures, zero B pictures, 359 swaps, 12,057,601 accepted video bytes, zero decoder or presentation errors, no audio underrun or PCM protocol fault, sequence end and quiet completion. Six timestamp-advance conflicts, zero delay conflicts and zero native deadline-gap and gap-outlier counters match entry 628's standard-MiSTer test-four rerun. Largest display intervals are about 49.7 milliseconds on both systems; zero native deadline-gap counters do not establish perfect progressive cadence. The helper confirms HDMI decoded output, 576,000 emitted PCM samples and exit zero; all 888 pipe reads reconcile to 14,546,422 completed transport bytes without acknowledged fallback payload. Readback verifies the unchanged runtime, kernel and fixture, and the comparator's Main, RBF and fixture identities match. An additional final-raster comparison is inconclusive: outside telemetry, the first screenshot differs from the standard baseline at 8,820 of 433,920 pixels, all at x modulo eight equal to one. A second screenshot without replay differs from the first at 4,418 pixels and from the standard at 8,816, with unchanged telemetry and helper log. The source of this variation is not isolated, so neither pixel equivalence nor a Buildroot regression is established. Weave selection and appearance rely on the user's report. Passed records functional acceptance only; Built remains unchecked because no new build occurs. No deployment, mode change, replay, reload or reboot is initiated. Raw captures remain local; only .ai/current_results/entry644_buildroot_test4_status.json is published.
-
-#### Next Steps:
-
-Run test_5_audio_ac3_51.mpg with Bob and HDMI audio, then retain the completed screen for collection before testing AC-3 S/PDIF and DTS S/PDIF separately. Confirm the expected audible channel sweep; the HDMI downmix intentionally omits LFE. Keep overall beta qualification open pending the remaining audio matrix, and retain the unisolated test-four screenshot variation as a separate video-quality caveat alongside the unresolved filesystem dirty-flag check. Do not begin a source fix or attribute either observation to Buildroot without evidence and approval for a revised investigation. Preserve runtime identities, user control of hardware lifecycle, local-only raw data, restricted core.md and the forty-entry ring.
 
 #### Files Modified:
 
