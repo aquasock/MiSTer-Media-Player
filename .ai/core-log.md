@@ -1,3 +1,32 @@
+## 638 COMMIT Unreleased 2045c34 2026-08-27T19:26:03-07:00
+
+#### Coming From:
+
+Unreleased 2045c34
+
+#### Purpose:
+
+Record the user's input clarification and prepare the first isolated playback check on the Buildroot beta.
+
+#### Outcome:
+
+The user attributes the startup input difficulty to local device selection and reports that the MiSTer worked normally, so the earlier input warnings are not recorded as a confirmed beta regression. The user requests a single-file playback experiment. Read-only preflight confirms that test_1_interlace_tff.mpg still matches its existing generation manifest and contains the expected 360-picture, approximately twelve-second test. The selected boundary is the unchanged released runtime, Bob deinterlacing and HDMI audio, with synthetic audio and native timing patterns disabled. No playback is started remotely and no new playback result or helper capture is available at this point. No source, runtime, kernel or filesystem changes are made, no build occurs, and hardware playback acceptance remains open.
+
+#### Next Steps:
+
+The user loads MediaPlayer_20260827.rbf, selects the agreed modes and plays only test_1_interlace_tff.mpg from games/MediaPlayer/Buildroot_beta. After completion, leave the core loaded and do not start another file or reload it; report motion, sound, menu response and all three LEDs. Retrieve the helper log before it is overwritten and obtain a fresh terminal screenshot while the completed core state still exists, before returning to Scripts or otherwise changing cores. Review the 360-picture completion, transport accounting and cadence before widening the test matrix. Keep the filesystem warning as a separate unresolved check, keep raw device reports local, and preserve user control of hardware lifecycle and restricted core.md.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 637 COMMIT Unreleased 2045c34 2026-08-27T19:21:47-07:00
 
 #### Coming From:
@@ -1161,35 +1190,6 @@ Have the user reload MediaPlayer to activate f615ce0, replay the unchanged bbb_4
 - rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
 - MediaPlayer_top_02.svh
 - tools/streams/tb_h262_ddram_store_overlap.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 598 COMMIT Unreleased feb50c2 2026-08-27T04:21:04-07:00
-
-#### Coming From:
-
-Unreleased feb50c2
-
-#### Purpose:
-
-Isolate processing, writer handoff and presentation-release costs behind the DVD-ceiling cadence misses.
-
-#### Outcome:
-
-The user authorizes investigation, with production and MiSTer lifecycle unchanged. GUNSMOKE pulled the published 39f0875 checkout and compiled a temporary observer containing the current production frontend, full publication shell, I parser/IQ/IDCT/reconstruction, two-bank writer and presentation scheduler. The exact 449-picture ceiling fixture is supplied without input starvation, and DDR writes are always ready; actual HPS transport, queues, arbiter/read contention, scaler and startup/video clock crossings are excluded. Raster phase and first permitted swap are derived from the two hardware captures, so startup is calibrated rather than independently reproduced. Both baseline phases complete all 449 picture identities, 448 swaps, 29,095,200 DDR words and 3,636,900 blocks without asserted errors, but retain late intervals: Weave-phase ordinals [181, 348] and Bob-phase ordinals [181, 348]. These ideal-memory positions are not the physical 167/346 positions and must not be represented as an exact hardware replay. Every baseline picture has exactly 203 parser wait clocks per block, versus 201 in entry 597. From coefficient-end to reconstruction is 200 clocks, while actual writer acknowledgement takes 202. Subtracting measured presentation holds reproduces every isolated per-picture cost plus exactly 16,200 writer clocks, with only the expected one-clock first-publication-shell offset. The normal handoff therefore adds 0.270000 milliseconds per picture even when memory never blocks. Next-header release is 37 clocks at the observed target publication boundaries. Adding isolated interval cost, the fixed writer overhead, that release delay and the saved hardware capacity-block count exactly reconstructs both Weave reference-to-ready intervals and Bob picture 167; Bob picture 346 differs by only 26 clocks, or 0.433 microseconds. The hardware capacity counter and reference interval have slightly different starting boundaries, so this close accounting is supporting evidence rather than a full physical stall trace. Across this fixture, processing with the fixed writer handoff averages 33.529155 milliseconds per picture against the 33.366667-millisecond budget, approximately 29.824790 fps of processing capacity, and exceeds 449 nominal budgets by 72.957150 milliseconds before real-memory delays. Buffering alone cannot hide a sustained deficit indefinitely. An ideal-memory testbench control releases the parser directly on reconstruction completion while leaving the actual writer running; it displays all 449 identities with the same word/block totals and late intervals []. This control is not a deployable fix because it bypasses capacity when both writer banks are occupied, and no new pixel-value oracle was run. The existing unchanged writer-overlap regression separately passes sixteen writes and two grants while enforcing full-bank backpressure. Evidence and exact observer/commands are retained as .ai/current_results/entry598_*, with full builds under /home/vash/mister-builds/entry598. No production source, deployed binary, clock, cadence, queue, startup setting or MiSTer action changed; Built refers to diagnostic compilation and strict hardware acceptance remains open.
-
-#### Next Steps:
-
-Use a bounded capacity-safe writer-grant retiming as the first production candidate: remove both normal handoff clocks only when the alternate capture bank is actually free, retain exactly one delayed grant when full, and preserve block_stored, DDR address/payload/order, bank ownership, reset and error behavior. Do not deploy the direct-reconstruction diagnostic bypass or weaken the next-header release barrier, and do not change clock, cadence, startup, transport guards or queue sizes. Extend the existing writer-overlap regression for immediate versus delayed grants, duplicate/premature-grant rejection, sustained and random backpressure, reset and complete word/lane equivalence; then run the supported reconstruction, writer/presentation integration and P/B-client regressions before official Quartus timing/build qualification. Recheck the exact ceiling clip in both user-controlled modes and a longer run to establish sustained margin, keeping the warm 8 Mbps regression and restoration pair. The separate 10.08 Mbps combined audio/video gate and remaining DVD features remain outside this result. Preserve user lifecycle/playback control, restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
