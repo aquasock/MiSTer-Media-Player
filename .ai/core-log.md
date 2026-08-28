@@ -1,3 +1,33 @@
+## 662 COMMIT Unreleased ??? 2026-08-28T00:55:35-07:00
+
+#### Coming From:
+
+Unreleased 4a27f80
+
+#### Purpose:
+
+Close the matrix parser byte-path timing and constrain the three verified film synchronization inputs.
+
+#### Outcome:
+
+The clean source-4a27f80 build completes in 807.9 seconds with zero compilation errors but fails timing, so its RBF is not a test candidate. It uses 32,741 ALMs, 49,045 registers, 4,056,315 memory bits, 518 of 553 RAM blocks and 67 DSP blocks. Hold, recovery, removal and minimum pulse width are positive at 0.246, 3.346, 0.445 and 0.925 nanoseconds; worst decoder setup is negative 6.587, video setup negative 1.494 and HDMI setup positive 0.002. Detailed TimeQuest reports locate the dominant failure on a 19-level path from the clean-video FIFO output to the matrix observer's FLAG state and matrix write address. The byte-wide interface currently expands an eight-bit state-machine walk combinationally, which must be replaced by direct byte assembly and bounded load-flag handling without adding byte-acceptance latency. Separate failing paths are the registered film-mode level to film_mode_video_sync stage zero, progressive_chroma_mem to progressive_chroma_r1, and registered native field/active levels to native_field_sync stage zero. These are the first sampling stages of the newly implemented synchronization and stable-descriptor transfers, and the correction will mirror existing narrowly scoped source-to-first-stage exceptions while preserving all later-stage and decoder timing. Both earlier synthesis-warning defects are gone. The paired numerical runner passes on exact published 4a27f80, and its isolated and real-reference CSV files are byte-identical to 0c17678: all 289 pictures and 149,817,600 samples, isolated maximum difference one, real-reference maximum five with 102 samples above the old fixed-two threshold and no measured propagation-bound violations. Delayed-DDR film generation tests pass in both field orders. Complete failed-build reports and path audits remain under /home/vash/mister-builds/entry661/results; no deployment or hardware acceptance occurs. This is timing closure of the approved matrix and film implementation, not an expanded playback feature.
+
+#### Next Steps:
+
+Implement byte-wise matrix parsing with the existing accepted-byte and matrix-write contract, add differential comparison against source 4a27f80 plus the matrix and full-opening regressions, and add only the three proven first-stage CDC exceptions. Require matched constraint endpoints, no hidden later-stage paths, positive timing in every category, and a clean build from newly published exact source on GUNSMOKE before packaging. Do not reseed as a substitute for repairing the 19-level parser path or use a timing-failing RBF. Preserve restricted core.md, existing evidence and user control of the MiSTer.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_quant_matrices.sv
+- MediaPlayer.sdc
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 661 COMMIT Unreleased 4a27f80 2026-08-28T00:35:47-07:00
 
 #### Coming From:
@@ -1215,34 +1245,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 622 COMMIT Unreleased 44ee05a 2026-08-27T09:00:58-07:00
-
-#### Coming From:
-
-Unreleased 078d36b
-
-#### Purpose:
-
-Close the commercial AC-3 gap by qualifying decode and passthrough against a real DVD track.
-
-#### Outcome:
-
-The user confirmed that a DVD image already on the build PC exists for this purpose, so the last honest gap in AC-3 qualification is closed against real programme material rather than synthetic tones. The image is an unencrypted standard VIDEO_TS structure and no protection was circumvented; one title VOB was extracted locally and nothing derived from the film is committed, with only numeric results retained. That VOB carries three real AC-3 tracks, being 5.1 at 448 kbit/s, stereo at 192 kbit/s and 5.1 at 384 kbit/s, and the helper selects the first as designed. Over 55,414,272 stereo frames, or 1154.5 seconds, the helper's decode against an independent FFmpeg decode of the same track gives maximum absolute difference 299, RMS difference 2.60 and correlation 0.999976, with overall level matching at 376.17 against 376.18 RMS. That is a much larger deviation than the synthetic fixture's maximum difference of three and correlation of 0.999999971, which is the expected consequence of real dynamic range control and dialogue normalization being exercised for the first time, and the residual sits 43.2 dB below the signal. The cause was confirmed rather than assumed by a control: decoding the reference again with dynamic range compression disabled makes the match far worse, at maximum difference 4123, RMS difference 79.17 and correlation 0.989129, and raises the reference level to 428.72 RMS, which is 1.14 dB above the compressed result. That establishes both that the disc carries substantial dynamic range metadata and that the helper applies it, matching the reference decoder's default behaviour, since liba52 enables dynamic range by default and neither decoder applies dialogue normalization. The remaining difference is decoder implementation, not a metadata mismatch. Passthrough was qualified on the same real track: the helper emitted 36,077 bursts, every one a 1536-sample period carrying a 1792-byte frame as expected for constant-rate 448 kbit/s, and all 64,649,984 bytes carried are byte identical to the AC-3 extracted from the disc, with an independent decoder producing matching output. One tool change was needed and is deliberately narrow. A VOB from a multi-file title ends mid-frame by construction, so the helper correctly refuses its truncated tail; rather than loosen the helper or the default gate, the verifier gained an explicit opt-in that accepts exactly that case and ignores the source's trailing 672-byte partial frame. An earlier attempt at the comparison exhausted memory and took the machine down, because it loaded both 212-megabyte captures as double precision and then copied them again; the retained driver streams in chunks and never holds more than a few megabytes.
-
-#### Next Steps:
-
-Audio qualification is complete for this release, covering MPEG Layer II, AC-3 decode and AC-3 and DTS passthrough, against both synthetic fixtures and a real commercial track. Prepare the release next. The README must state plainly what the decoder accepts, being 4:2:0 I-pictures only, frame structured, frame DCT and frame prediction only, 720 by 480 at 30000/1001 with no repeat first field, and must not imply general interlaced MPEG-2 or DVD compatibility; it should describe audio separately, since audio support is genuinely broader than video and includes passthrough for material the core cannot decode itself. Release notes should carry the entry 616 wording of one or two repeated frames at the picture 690 cut, the marginal scaler paths recovered by reseeding in entry 618, and an honest split of which audio claims are measured and which rest on listening. The community sound test should ask for AC-3 and DTS separately with LFE called out, since entry 621 showed the same device treating them differently. The interlaced video gates of entry 609 remain open and explicitly out of scope. Note for any future disc work that this image is a usable real-world Program Stream source, but that the core cannot decode its video, which uses picture types and structures outside the supported set. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-- tools/streams/verify_ac3_passthrough.py
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
