@@ -109,7 +109,11 @@ initial begin
    scheduler.future_frame_bank,scheduler.future_reference_pending,
    metadata_owner.frame_bank_descriptor_valid[2],reference,promoted,scheduler.last_bound_reference_count);
   if(scheduler.future_frame_bank!=2||scheduler.future_reference_pending||
-     !metadata_owner.frame_bank_descriptor_valid[2])
+     !metadata_owner.frame_bank_descriptor_valid[2]||
+     metadata_owner.frame_bank_top_field_first[2]||
+     !metadata_owner.frame_bank_repeat[2]||
+     !metadata_owner.frame_bank_progressive[2]||
+     !metadata_owner.frame_bank_valid[2]||metadata_owner.frame_bank_pts[2]!=97507)
    $fatal(1,"early B header lost retiring I reference identity or metadata");
   $display("EARLY_B_REFERENCE_PASS");$finish;
  end
@@ -118,7 +122,7 @@ initial begin
   // reference on the same edge as the following P header. Once the second
   // scratch picture is displayed, a free scratch bank is NOT permission to
   // decode that P: the sole pending reference slot still owns its predecessor.
-  // This regression is intentionally red on the diagnosed production RTL.
+  // The following header must also release that predecessor once it retires.
   repeat(4)@(negedge clk);reset=0;
   picture(0,1,1,1,90000,1);commit_reference();
   picture(0,0,1,0,102012,1);commit_reference();
@@ -137,6 +141,12 @@ initial begin
    scheduler.pending_frame_released,scheduler.queued_header_capacity,
    scheduler.run_closed,scheduler.overlap_decode_open);
   if(!hold)$fatal(1,"following P payload admitted with pending reference slot occupied during B drain");
+  if(!scheduler.pending_frame_released)
+   $fatal(1,"coincident following P header failed to release predecessor");
+  field_end(1,1,0,0,1);field_end(1,1,0,0,1);field_end(0,0,1,1,0);
+  if(!hold)$fatal(1,"following P escaped ordinary pending ownership");
+  field_end(0,0,1,1,0);field_end(0,0,2,1,0);
+  if(hold||error)$fatal(1,"following P did not resume after predecessor presentation");
   $display("OVERLAP_REFERENCE_ADMISSION_PASS");$finish;
  end
  for(session=0;session<2;session=session+1)begin

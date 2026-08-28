@@ -67,6 +67,56 @@ module tb_h262_picture_timestamp;
               repeat(2) @(posedge clk); end
     endtask
 
+    // Exercise classification after, with, and before retirement, including
+    // the next PCE arriving while the old reference descriptor is retained.
+    task handoff_case(input bit next_b, input integer lead,
+                      input bit old_annotated, input bit new_annotated);
+        begin
+            @(negedge clk); reset=1; picture_start=0; metadata_valid=0;
+            picture_coding_extension_valid=0; b_picture_complete=0;
+            active_frame_bank=0; picture_is_b=0; display_scratch=0;
+            display_frame_bank=0; decode_scratch_bank=0;
+            @(negedge clk); reset=0;
+            if(old_annotated) record(90000);
+            start_picture(); field_order(0);
+            if(new_annotated) record(94504);
+            if(lead<0) begin
+                @(negedge clk); active_frame_bank=1;
+                repeat(2) @(negedge clk);
+            end
+            @(negedge clk); picture_start=1; picture_is_b=next_b;
+            if(lead==0) active_frame_bank=1;
+            @(negedge clk); picture_start=0;
+            picture_coding_extension_valid=1;
+            picture_top_field_first=1; picture_repeat=0; picture_progressive=1;
+            if(lead>0) begin
+                repeat(lead-1) @(negedge clk);
+                active_frame_bank=1;
+            end
+            @(negedge clk); picture_coding_extension_valid=0;
+            repeat(2) @(negedge clk);
+            if(!descriptor_valid||display_top_field_first||!display_repeat||
+               !display_progressive||display_pts_valid!=old_annotated||
+               (old_annotated&&display_pts!=90000))
+                $fatal(1,"retiring reference descriptor lost next_b=%0d lead=%0d",next_b,lead);
+            if(next_b) begin
+                complete_b();
+                @(negedge clk); display_scratch=1; display_scratch_bank=0;
+            end else begin
+                @(negedge clk); active_frame_bank=2;
+                repeat(2) @(negedge clk); display_frame_bank=1;
+            end
+            @(negedge clk);
+            if(!descriptor_valid||!display_top_field_first||display_repeat||
+               !display_progressive||display_pts_valid!=new_annotated||
+               (new_annotated&&display_pts!=94504)||
+               associated_count!=integer'(old_annotated)+integer'(new_annotated))
+                $fatal(1,"following descriptor lost next_b=%0d lead=%0d",next_b,lead);
+        end
+    endtask
+
+    integer next_class, lead, annotations;
+
     initial begin
         repeat(3) @(posedge clk); reset=0; @(posedge clk);
 
@@ -167,6 +217,11 @@ module tb_h262_picture_timestamp;
             $fatal(1,"unannotated B inherited scratch timestamp");
         if (associated_count !== 8'd6)
             $fatal(1,"unannotated B changed association count");
+
+        for(next_class=0;next_class<2;next_class=next_class+1)
+            for(lead=-1;lead<=4;lead=lead+1)
+                for(annotations=0;annotations<4;annotations=annotations+1)
+                    handoff_case(next_class,lead,annotations[0],annotations[1]);
 
         @(negedge clk);reset=1;@(negedge clk);reset=0;
         if(descriptor_valid||display_repeat||display_progressive||candidate_pts_valid)

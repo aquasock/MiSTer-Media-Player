@@ -85,6 +85,10 @@ reg overlap_decode_open,overlap_frame_pending;
 // The classification byte is retained here while presentation backpressure
 // prevents any B payload from reaching the decoder without both resources.
 reg deferred_queued_b_start;
+// A free scratch bank admits a B header, not a second reference payload.
+// Retain a following I/P classification until the occupied reference slot
+// leaves the draining run. This also preserves a header before completion.
+reg deferred_reference_payload;
 
 // Entry 269: while one closed run is being presented, retain the following
 // run in a distinct logical generation.  Both generations still share the
@@ -297,7 +301,7 @@ assign presentation_hold=(ordinary_reference_waiting&&
                           ordinary_secondary_released)||
                          (reorder_active&&run_closed&&
                           !presentation_complete&&!presentation_error&&
-                          (deferred_queued_b_start||
+                          (deferred_reference_payload||deferred_queued_b_start||
                            (!overlap_decode_open&&!queued_decode_inflight&&
                             (promotion_pending||!queued_header_capacity))));
 
@@ -313,6 +317,7 @@ always @(posedge clk) begin
         future_reference_pending<=0;scratch_presented<=0;
         overlap_decode_open<=0;overlap_frame_pending<=0;
         deferred_queued_b_start<=0;
+        deferred_reference_payload<=0;
         queued_run_active<=0;queued_run_closed<=0;
         queued_decode_inflight<=0;
         queued_scratch0_pending<=0;queued_scratch1_pending<=0;
@@ -336,6 +341,11 @@ always @(posedge clk) begin
         native_fields_elapsed<=0;
     end else begin
         b_user_success_d<=b_user_success;
+        if(!reorder_active||presentation_error)
+            deferred_reference_payload<=0;
+        else if(non_b_picture_start&&run_closed&&
+                !(queued_run_active&&!queued_run_closed))
+            deferred_reference_payload<=1;
         cadence_rate_code_q<=frame_rate_code;
         if(!native_film_mode) native_fields_elapsed<=0;
         else if(cadence_tick_pulse && display_picture_present && native_fields_elapsed!=3)
@@ -392,7 +402,9 @@ always @(posedge clk) begin
            !deferred_queued_b_start)begin
             pending_frame_valid<=1;
             pending_frame_bank<=completed_frame_bank;
-            pending_frame_released<=0;
+            pending_frame_released<=non_b_picture_start||
+                                    deferred_reference_payload||sequence_end||
+                                    terminal_boundary_pending;
             overlap_frame_pending<=1;
             overlap_decode_open<=0;
         end
@@ -404,7 +416,9 @@ always @(posedge clk) begin
            queued_overlap_decode_open)begin
             pending_frame_valid<=1;
             pending_frame_bank<=completed_frame_bank;
-            pending_frame_released<=0;
+            pending_frame_released<=non_b_picture_start||
+                                    deferred_reference_payload||sequence_end||
+                                    terminal_boundary_pending;
             queued_overlap_frame_pending<=1;
             queued_overlap_decode_open<=0;
         end
@@ -547,11 +561,12 @@ always @(posedge clk) begin
                     last_bound_reference_valid<=1;
                     last_bound_reference_bank<=pending_frame_bank;
                     last_bound_reference_count<=reference_promotion_count;
-                end else if((!display_scratch&&
-                             (display_frame_bank!=reference_frame_bank))||
-                            (last_bound_reference_valid&&
-                             (reference_promotion_count!=
-                              last_bound_reference_count)))begin
+                // A promotion since the last B run may be an ordinary P
+                // already on screen. It cannot be this B's future reference.
+                // With no retained publication, only a distinct physical
+                // reference can be bound; otherwise await its completion.
+                end else if(!display_scratch&&
+                            (display_frame_bank!=reference_frame_bank))begin
                     future_frame_bank<=reference_frame_bank;
                     future_reference_pending<=0;
                     last_bound_reference_valid<=1;
