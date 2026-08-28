@@ -1,0 +1,44 @@
+FILM_CADENCE_PASS two/three fields, changing TFF, PTS floor, parity, invisible startup
+/home/vash/mister-builds/entry675/source/tools/streams/tb_h262_film_cadence.sv:52: $finish called at 1520000 (1ps)
+FILM_REORDER_TIMESTAMP_PASS I_B_B_P fields=3/2/3/2 missing_PTS terminal replay
+/home/vash/mister-builds/entry675/source/tools/streams/tb_h262_film_reorder_timestamp.sv:319: $finish called at 303560000 (1ps)
+OVERLAP_REFERENCE_STATE hold=0 pending=1/2 released=1 queued_capacity=1 run_closed=1 overlap_open=0
+OVERLAP_REFERENCE_ADMISSION_PASS
+/home/vash/mister-builds/entry675/source/tools/streams/tb_h262_film_reorder_timestamp.sv:300: $finish called at 151890000 (1ps)
+EARLY_B_REFERENCE_STATE future=2 pending=0 descriptor=1 reference=2 promoted=3 bound_count=3
+EARLY_B_REFERENCE_PASS
+/home/vash/mister-builds/entry675/source/tools/streams/tb_h262_film_reorder_timestamp.sv:261: $finish called at 45810000 (1ps)
+EARLY_P_RELEASE_PASS
+/home/vash/mister-builds/entry675/source/tools/streams/tb_h262_film_reorder_timestamp.sv:235: $finish called at 76040000 (1ps)
+ORDINARY_B_OVERLAP_PASS I/P to B before/same/after completion order=I/P/B/reference
+/home/vash/mister-builds/entry675/source/tools/streams/tb_h262_film_reorder_timestamp.sv:216: $finish called at 1215200000 (1ps)
+FILM_DRAIN_REFERENCE_OVERLAP_PASS following=I/P/B/end display_guard=1 capacity=3 ordered=1
+/home/vash/mister-builds/entry675/source/tools/streams/tb_h262_film_reorder_timestamp.sv:158: $finish called at 699380000 (1ps)
+RESULT stable_tff=PASS change_rejected=PASS reset_bff=PASS film_variable_tff=PASS mixed_rejected=PASS
+/home/vash/mister-builds/entry675/source/tools/streams/tb_native_field_order.sv:44: $finish called at 260000 (1ps)
+H262_PICTURE_TIMESTAMP_PASS reference=1 scratch=2 reorder=1 unannotated=reference/b delayed=1 coincident=1 candidate_query=1 count_after_reset=0
+/home/vash/mister-builds/entry675/source/tools/streams/tb_h262_picture_timestamp.sv:231: $finish called at 10110000 (1ps)
+FILM_CACHE_RGB_PASS repeated_field=0 pixels=345600
+NATIVE_CACHE_FINGERPRINT_PASS order=TFF corrupted=0 completed=2 mismatches=0
+- /home/vash/mister-builds/entry675/source/tools/streams/tb_native_480i_cache_refill.sv:911: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01
+- Verilator: $finish at 31ms; walltime 1.302 s; speed 23.451 ms/s
+- Verilator: cpu 1.302 s on 1 threads; alloced 217 MB
+FILM_CACHE_RGB_PASS repeated_field=0 pixels=345600
+NATIVE_CACHE_FINGERPRINT_PASS order=BFF corrupted=0 completed=2 mismatches=0
+- /home/vash/mister-builds/entry675/source/tools/streams/tb_native_480i_cache_refill.sv:911: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01
+- Verilator: $finish at 31ms; walltime 1.302 s; speed 23.444 ms/s
+- Verilator: cpu 1.302 s on 1 threads; alloced 217 MB
+FILM_CACHE_RGB_PASS repeated_field=1 pixels=518400
+NATIVE_CACHE_FINGERPRINT_PASS order=TFF corrupted=0 completed=2 mismatches=0
+- /home/vash/mister-builds/entry675/source/tools/streams/tb_native_480i_cache_refill.sv:911: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01
+- Verilator: $finish at 46ms; walltime 1.949 s; speed 23.494 ms/s
+- Verilator: cpu 1.949 s on 1 threads; alloced 217 MB
+FILM_CACHE_RGB_PASS repeated_field=1 pixels=518400
+NATIVE_CACHE_FINGERPRINT_PASS order=BFF corrupted=0 completed=2 mismatches=0
+- /home/vash/mister-builds/entry675/source/tools/streams/tb_native_480i_cache_refill.sv:911: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01
+- Verilator: $finish at 46ms; walltime 1.959 s; speed 23.363 ms/s
+- Verilator: cpu 1.960 s on 1 threads; alloced 217 MB

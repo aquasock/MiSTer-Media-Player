@@ -1,3 +1,32 @@
+## 676 COMMIT Unreleased e876bf3 2026-08-28T05:22:54-07:00
+
+#### Coming From:
+
+Unreleased e9041b2
+
+#### Purpose:
+
+Record complete drain-overlap qualification and the verified terminal-cut exception requiring approval before a build.
+
+#### Outcome:
+
+Production e9041b2 and final test source e876bf3 complete both ideal and contended native opening runs with all 289 pictures once in display order, 288 swaps, all 25 associated timestamps, correct complete descriptors, clear cache/phase/overlap flags and zero interior cadence mismatches. The formerly late B116 now completes 101,729 decoder clocks before its selection boundary in the contended case. Focused I/P/B/end drain ownership, earlier completion and timestamp cases, broad scheduler, native integration and mixed-raster controls pass. The film fixture is corrected to assert reference completion when scratch is displayed, matching the production top-level wiring; the prior admission assertion now requires distinct future, primary and decode identities instead of forbidding the newly bounded transaction. Paired reconstruction passes all 149,817,600 samples per case with unchanged source fingerprint 3548c9a1f2489b0ba37c77d27367e0143c8434598667a06866126434317429e8 and pixel CSVs identical to entry 665, preserving isolated maximum one, real-reference maximum five, 102 old fixed-two exceedances and zero measured propagation-bound violations. The unchanged strict cadence gate still rejects both runs because the final P285-to-I288 transition takes four fields instead of three. An exact-prefix comparison against the source VOB proves the 12-second cut stops after open-GOP I288 with temporal reference two and omits following coded B289 and B290, which belong before that I in display order. Those omitted pictures carry five authored fields; removing them creates the only field-parity discontinuity in the fixture. I288 is already decoded well before the boundary and waits one additional physical field to preserve its bottom-first descriptor. H.262 clauses 6.3.10 and 7.12 are rechecked against the existing official controlled edition; this hold is a display recovery for the edited cut, not a general standard allowance. The user has been asked to approve only that verified one-field terminal exception while retaining every other gate, and has not yet responded. No exception is applied, no Quartus build has started and no MiSTer write occurs. Two read-only FTP attempts to 10.10.0.30 fail with no route to host. Detailed evidence and source-check scripts are retained under .ai/current_results/entry676_* and output_files/entry675; all test processes have completed on the build PC.
+
+#### Next Steps:
+
+Wait for explicit approval before changing the qualification boundary for the one-field terminal-cut adjustment. Preserve strict raw analysis as failing and keep this verified fixture exception separate from actual deadline misses; do not waive any interior gap, missing picture, metadata, timestamp, cache or numerical failure. If approved, encode and test a narrow reproducible exception, publish the exact final build source, then perform the single clean seed-18 Quartus build with timing, resource and warning audits. Prepared build scripts are under /home/vash/mister-builds/entry675 but have not run. Pause on build failure without seed retries. Install only after qualification and timing pass and the MiSTer is reachable, preserving old cores with FTP readback verification, and leave original-audio replay and hardware acceptance to the user. If the exception is declined, obtain an approved complete-GOP fixture boundary before proceeding.
+
+#### Files Modified:
+
+- tools/streams/tb_h262_film_reorder_timestamp.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 675 COMMIT Unreleased e9041b2 2026-08-28T04:58:36-07:00
 
 #### Coming From:
@@ -1219,35 +1248,6 @@ Confirm the final working input device and use that stable configuration for the
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 636 COMMIT Unreleased 2045c34 2026-08-27T19:05:44-07:00
-
-#### Coming From:
-
-Unreleased 036252a
-
-#### Purpose:
-
-Prepare an isolated Buildroot MiSTer compatibility experiment using the unchanged v0.8.0 runtime.
-
-#### Outcome:
-
-Source 2045c34 adds the bounded environment and helper-log capture script, which passes host shell syntax and syntax under the actual beta image's ARM BusyBox shell. The isolated build-PC investigation pins mcfbytes/Buildroot_MiSTer v2026.08.25-beta at 1f15c25, verifies its archive, rootfs, kernel and configuration hashes, and selects normal Linux 6.18.46 with glibc 2.43 rather than RT. The unchanged released v0.8.0 Main passes all fifteen upstream ABI checks with zero failures or skips: its twelve libraries resolve, and unprivileged QEMU startup reaches the expected denied /dev/mem access. A separate loader trace succeeds, and the released static ARM helper successfully processes the existing AC-3 HDMI and DTS passthrough fixtures under QEMU. These are userspace checks against the build PC's kernel, not execution of the beta kernel or FPGA validation. At the user's explicit direction, all old files on the identified removable card's data partition are removed without backup; the existing partition layout and raw bootloader partition are not rewritten. The clean card receives the pinned rootfs and kernel, the three unchanged release binaries, the current MiSTer's menu and boot MAC copied by read-only FTP, default settings without the old ConsoleMode redirect, all seven hash-verified 360-picture fixtures, the capture script, provenance and instructions. After a fresh read-only remount, all twenty-eight files totaling 606,264,008 bytes match their prepared hashes, partition boundaries are unchanged, no unexpected files remain, and the card is safely unmounted. Pre-boot checks include linux.img; runtime checks exclude that image and editable boot/display settings because a login remounts the rootfs writable. No installer, updater, updateboot, repartitioner, production write, reboot or playback is performed. No new FPGA or ARM build occurs and hardware acceptance remains open, so both status boxes are unchecked. Detailed hashes, ABI output, helper results and card verification are retained in .ai/current_results/entry636_buildroot_compatibility.json.
-
-#### Next Steps:
-
-The user powers down the QMTech, inserts the prepared card and boots it, then runs Scripts/Buildroot_Compatibility.sh to retain the environment report and confirm kernel 6.18.46, mem=511M, runtime hashes and network access. Start MediaPlayer_20260827.rbf with test_1_interlace_tff.mpg from games/MediaPlayer/Buildroot_beta, HDMI audio and Bob mode, recording menu response, motion, sound and all three LEDs; preserve its helper log and a fresh terminal screenshot before another playback. Only after basic bring-up succeeds continue the remaining TFF/BFF, Bob/Weave, progressive I/P/B, AC-3 decode and AC-3/DTS passthrough matrix. The real FPGA bridges, memory reservation, cadence, peripheral behavior and QMTech-specific boot remain unqualified despite the userspace pass. Keep ordinary update scripts out of this experiment because they may overwrite patched Main or Linux; rollback is a powered-off swap to the untouched original working card. Record subsequent hardware evidence in a new entry, retain the forty-entry ring and restricted core.md, and leave broader decoder development out of scope.
-
-#### Files Modified:
-
-- tools/streams/capture_buildroot_environment.sh
 
 #### Status:
 
