@@ -1,3 +1,32 @@
+## 667 COMMIT Unreleased 6c1b621 2026-08-28T02:26:37-07:00
+
+#### Coming From:
+
+Unreleased 6c1b621
+
+#### Purpose:
+
+Capture original-opening playback with correlated audio/video stutter and prepare an unchanged-video silent comparison.
+
+#### Outcome:
+
+Following the instruction to load the dated candidate, the user reports that the original opening plays and the picture looks good when motion is smooth, but video stutters roughly every second and audio becomes scratchy at the same moments; the diagnostic overlay appears during playback and at the end. Two screenshots are byte-identical and show the Universal opening image. Checksum-valid schema-19 telemetry is an early latched error snapshot at 1.79571835 decoder-session seconds, not final playback totals: 327,302 accepted video bytes, 41 displayed pictures, 40 swaps, 23 reference and 20 B pictures, frame-rate code four, and error flags 0x0400 for audio underrun alone. Syntax, decode, reconstruction, buffer-ownership, PCM protocol and presentation error bits are clear at that instant, which does not prove the remainder of playback error-free or quantify image accuracy. The overlay profiler captures any nonzero error flag immediately and cannot update its totals afterward, explaining its appearance before playback finishes. PCM sample count 16,383 and FIFO-peak value 127 are saturated diagnostic fields, not actual buffer capacity; the PCM FIFO has 8,192 stereo samples. The 39 native deadline events use a fixed 29.97-frame expectation and cannot be treated as film-cadence failures without adapting interpretation to two/three-field pictures. The helper identifies the original clip and HDMI stereo PCM, transfers all 12,818,502 bytes in about 12.854 seconds, exits zero and reports no slow-path bytes; maximum poll occupancy is 7,558 microseconds and maximum poll-entry interval 20,867. Regenerated native transport matches the prior SHA256 exactly. Mapping its record positions onto sampled Main receipts finds uneven PCM delivery, including a 136.389-millisecond sampled interval containing 1,120 stereo frames against 6,547 frames of nominal consumption; this is not a gap with no transfers, not an audio-FIFO occupancy trace, and does not determine which side of the shared path caused starvation. Source inspection confirms that a pending blocked video byte or a full PCM sink can both stop the common extractor, so audio/video coupling is a plausible hypothesis, not yet the root cause. A separate silent Program Stream replaces 334 audio PES packets with equal-length padding while preserving all 5,109 video PES packets, their timestamps and pack positions. Original and silent helper outputs match all 10,334,393 video-plus-PTS bytes exactly, FFprobe finds only MPEG-2 video, and silent PCM output is empty. The new dvd_opening_video_only.mpg is installed with staged and final FTP readback SHA256 f30a2c7fb1f8e4a1647f8c49375ca72b21375195a2d0f15723c82539e8ecb4e5. No core, Main, helper, setting, source or build change is made and no replay is started by the agent. Capture, timing analysis and diagnostic generation/deployment manifests are retained under .ai/current_results/entry667_*, with local diagnostic reproduction material in output_files/entry667 and build-PC evidence in /home/vash/mister-builds/entry667. Hardware acceptance remains open.
+
+#### Next Steps:
+
+Have the user play dvd_opening_video_only.mpg once on the same dated candidate in Weave, expect silence, compare the stutter, and leave the final screen and helper log intact for capture. Smooth silent playback would implicate the audio/shared-delivery interaction; persisting stutter would require examining video decode and film presentation independently as well. The comparison preserves video and timestamps but intentionally selects the helper's silent scheduling path, so it does not by itself separate AC-3 computation from PCM scheduling or FIFO coupling. Preserve this first-underrun evidence and avoid another FPGA build or speculative buffer change until the comparison guides a proposed fix.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 666 COMMIT Unreleased 6c1b621 2026-08-28T02:14:41-07:00
 
 #### Coming From:
@@ -1213,35 +1242,6 @@ Decide whether the chroma edge behaviour is worth investigating before the relea
 #### Files Modified:
 
 - tools/streams/generate_test_suite.py
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 627 COMMIT Unreleased 140a5b7 2026-08-27T16:32:05-07:00
-
-#### Coming From:
-
-Unreleased 140a5b7
-
-#### Purpose:
-
-Install entry 624's Main and confirm on hardware that it removes the reported menu lag.
-
-#### Outcome:
-
-Two results are recorded. First, the AC-3 passthrough gap in the hand-test set is closed: the user re-ran test five with the output option set to S/PDIF, and its own log line confirms passthrough mode on AC-3 substream 0x80 rather than the decoded stereo mode the earlier run used. That capture completes 360 reference and display pictures with 359 swaps, `error_flags` zero, sequence end, presentation complete, quiet snapshot, zero deadline gaps and outliers, all three largest intervals at the nominal 2,002,000 clocks, audio underrun and PCM protocol clear at FIFO peak 127, and helper exit zero. An earlier attempt to capture that run collected a stale log which was still test six, identified by identical checksum, transport byte count and DTS substream line, and was discarded rather than reported. Second, entry 624's Main is now installed. It was backed up first, staged, hash checked while staged, renamed and read back on a fresh connection, giving SHA256 `01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9`; the previous Main is retained under the entry 627 backup directory, and the RBF, helper, media and settings were left untouched. After the user's reboot the helper log independently confirms it is running, reporting profile version two with `credit_step_v1`, a 2000 microsecond poll budget, 2048-byte steps and a step limit of eight, where every previous capture this session reported version one. The effect on the same test one file is decisive. Maximum media-poll occupancy falls from 160,937 to 9,287 microseconds, a factor of 17.3, and maximum poll-entry interval from 170,928 to 20,910. The acknowledged-write fallback disappears entirely: 677,119 slow bytes become zero, with all 5,556,849 bytes delivered in fast mode across 42,367 polls instead of 257. The user reports the menu is now perfect, which matches the measurement, and this run is one of the four low bitrate files that were reliably laggy before, so it is the correct subject rather than a case that was never affected. Playback is unchanged: 360 reference and display pictures, 359 swaps, 3,068,039 accepted video bytes, zero errors, zero deadline gaps and outliers, and the same nominal intervals. One honest qualification: the observed 9,287 microsecond maximum still exceeds the 2000 microsecond work budget, which entry 624 explicitly declined to present as a hard bound, and no button-response latency was measured, so the menu verdict remains a user report supported by occupancy rather than a latency measurement. Version two logging also changes record semantics, with pipe reads covering all source reads and transfer entries sampled, so version one counts are not directly comparable except for the occupancy figures used here.
-
-#### Next Steps:
-
-The menu issue is closed on this evidence and needs no further replay. The remaining blocker for the release document is unchanged and is now the only one: no test exercises P or B pictures, so generate one progressive file with an ordinary GOP using the corrected suite generator and have the user play it, which decides whether the README says progressive I-only or progressive I/P/B. Consider also whether the test set should carry that file permanently, since a release that ships hand tests should exercise the picture types it claims. Then write the README capability section and release notes, carrying the entry 616 wording of one or two repeated frames at the picture 690 cut, the marginal scaler paths recovered by reseeding in entry 618, the audio capability split between measured and listened evidence, and the DTS subwoofer behaviour of entry 621 as a device observation rather than a core limitation. The interlaced gates of entry 609, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, remain open and out of scope for this release. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 

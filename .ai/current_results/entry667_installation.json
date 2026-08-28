@@ -1,0 +1,20 @@
+{
+  "installed": "2026-08-28T02:25:10-07:00",
+  "test_device": "10.10.0.30",
+  "staged_readback": {
+    "path": "/media/fat/games/MediaPlayer/dvd_opening_video_only.mpg.upload-entry667",
+    "bytes": 11145233,
+    "sha256": "f30a2c7fb1f8e4a1647f8c49375ca72b21375195a2d0f15723c82539e8ecb4e5"
+  },
+  "final_readback": {
+    "path": "/media/fat/games/MediaPlayer/dvd_opening_video_only.mpg",
+    "bytes": 11145233,
+    "sha256": "f30a2c7fb1f8e4a1647f8c49375ca72b21375195a2d0f15723c82539e8ecb4e5"
+  },
+  "video_and_timestamps_unchanged": true,
+  "core_changed": false,
+  "main_or_helper_changed": false,
+  "settings_changed": false,
+  "playback_started": false,
+  "reloaded": false
+}
