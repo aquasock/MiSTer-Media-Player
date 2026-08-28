@@ -115,6 +115,28 @@ the authored two/three-field intervals including the final hold, and clear
 cache/phase/overlap flags. `simulation_timing_pass` is distinct from hardware
 acceptance; the original-audio replay still requires observation on MiSTer.
 
+The exact 12-second opening has a verified terminal cut: coded I288 starts an
+open GOP, but its following coded B289/B290, which display before that I, are
+outside the cut. Removing their five fields leaves a parity discontinuity
+between P285 and I288. Entry 676 retains the source-prefix proof. The approved
+fixture exception is opt-in:
+
+```sh
+python3 tools/streams/analyze_original_dvd_timing.py \
+  simulation/original_dvd_timing/timing_fixture.json \
+  simulation/original_dvd_timing/native.csv \
+  simulation/original_dvd_timing/terminal_qualification.json \
+  --allow-dvd-opening-terminal-cut --require-pass
+```
+
+This pins the full fixture manifest and permits exactly one additional field
+at that final transition, only when the final candidate was already ready and
+timestamp-eligible at the original boundary. It preserves the raw mismatch and
+`simulation_timing_pass=false`; the separate `qualification_pass` records the
+approved exception. Unknown fixtures, other gaps and all integrity failures
+still fail. It is a recovery allowance for this edited fixture, not a standards
+conformance or hardware-acceptance claim. Keep raw analysis files unchanged.
+
 Ordinary native I/P decode may use the existing free third reference bank
 while its predecessor waits to display. A completed secondary reference stays
 separate from the primary pending picture. Another I/P header can release it,
@@ -125,6 +147,11 @@ I/P payload is held until that primary presents and frees its old display bank.
 `ORDINARY_B_OVERLAP` checks I/P-to-B transitions
 before, with and after completion, including completion after primary display.
 The native ownership tests retain mode, alias, timestamp and terminal guards.
+After all B prediction work is complete, a second ordinary successor may also
+use the old reference region once scratch presentation frees it. The retained
+future and primary frames remain distinct from this secondary completion.
+`DRAIN_REFERENCE_OVERLAP` covers following I/P/B/end classification, full
+capacity backpressure and ordered resume without overwriting a displayed bank.
 No frame regions, decoder arithmetic, clocks or timing constraints are changed.
 
 ## Focused regressions
