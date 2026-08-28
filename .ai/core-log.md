@@ -1,3 +1,38 @@
+## 671 COMMIT Unreleased ??? 2026-08-28T04:04:55-07:00
+
+#### Coming From:
+
+Unreleased c8bd628
+
+#### Purpose:
+
+Correct DVD picture admission and completion metadata ownership before qualifying and installing a new playback candidate.
+
+#### Outcome:
+
+The user approves the production fix, focused and full-opening validation, one clean timing-audited FPGA build and verified installation. Entry 670 establishes reference over-admission during B drain and an early following-header race in reference binding and metadata retirement. Preserve retiring picture identity, timestamp validity and field descriptors until persistence; distinguish accepted header classification from payload capacity; retain same-edge release events and bind an early B header to its actual completing reference. Keep decoder arithmetic, physical buffers, clocks, constraints, Main, helper and placement seed unchanged. Development and commits remain on the Pi master branch, with resource-intensive checks and compilation on the build PC at 10.10.0.42. Installation on MiSTer 10.10.0.30 is conditional on passing simulation and timing, and playback remains user controlled.
+
+#### Next Steps:
+
+Publish this approved proposal, implement the scheduler and metadata-owner correction, and require both reduced failures to pass alongside existing film, timestamp and ownership regressions. Run the full 289-picture original opening under both documented memory-service cases, requiring each picture once in display order with its own metadata and authored cadence, plus unchanged paired numerical bounds. Only after these gates pass, publish the exact build source and perform one clean Quartus build with timing, resource and warning review. If the build fails, pause for reevaluation without seed retries. If it passes, preserve the installed candidates, transfer and hash-verify the new core without changing Main or helper, and provide original-audio replay instructions and recorded evidence. Stop for approval if new findings materially change this boundary.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- rtl/mpeg2_new/mpeg2_h262_picture_timestamp.sv
+- tools/streams/tb_h262_film_reorder_timestamp.sv
+- tools/streams/tb_h262_picture_timestamp.sv
+- tools/streams/run_film_presentation.sh
+- tools/streams/analyze_original_dvd_timing.py
+- docs/testing_original_dvd_opening.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 670 COMMIT Unreleased c8bd628 2026-08-28T03:19:40-07:00
 
 #### Coming From:
@@ -1224,31 +1259,3 @@ The user installs from the package and performs the confirmation hardware run, t
 
 ---
 
-## 631 COMMIT Unreleased 2c03075 2026-08-27T17:20:44-07:00
-
-#### Coming From:
-
-Unreleased 6b92a19
-
-#### Purpose:
-
-Bring the media conversion guide up to the current capability and document how to test audio.
-
-#### Outcome:
-
-The user noticed that the conversion guide still described the previous release, and it did: a single progressive recipe with MPEG Layer II, predating interlaced 480i, AC-3 and passthrough entirely. Published source `2c03075` splits it by the two shapes that actually play and adds an audio section. The interlaced guidance is the part most likely to save someone a wasted afternoon, because the obvious approach fails: FFmpeg's own interlacing flags select field DCT and field prediction, both of which this decoder rejects before decode, so the supported route is ordinary frame-DCT coding of woven field pairs with the interlaced signalling applied afterwards, which is what the committed generator does. The guide points at that generator and describes the sequence its build function uses. It also warns that the compatibility checker predates the interlaced path and rejects native interlaced files while remaining valid for progressive ones, so a rejection there is not evidence of a bad file. The audio section states what each codec does under each output setting in a small table, explains that the option mutes the output it is not driving because both are fed from one stereo stream, and gives the expected result of the AC-3 channel sweep in each mode, including that the silent fourth slot is correct because the stereo downmix discards LFE. It records two cautions learned this cycle: a 2.1 or virtualizing soundbar cannot demonstrate discrete channel routing however convincing it sounds, and receivers differ between codecs, with the device tested here reproducing LFE from AC-3 but not from DTS despite the transmitted DTS provably carrying it. The host-side checks are included because they are faster and more precise than listening. Every command in the new sections was run as written rather than composed from memory, which caught a real defect: the generator invocation did not write the report file that the downmix check reads, so the documented sequence would have failed at the second step. That was corrected and the corrected sequence was then run end to end successfully. The AC-3 decode, downmix placement and passthrough checks all pass on the release helper as documented.
-
-#### Next Steps:
-
-The release candidate is unchanged by this documentation work and remains ready for the user to tag. Nothing here alters the binaries, whose hashes are recorded in entry 630 and in the changelog. If a confirmation run is wanted before tagging, reinstall from the package and replay one interlaced and one audio test, which would also close the gap that no hardware run has occurred since packaging. The chroma edge column stays documented rather than investigated, at the user's direction, and the interlaced gates of entry 609, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, remain open and out of scope. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-- README.md
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
