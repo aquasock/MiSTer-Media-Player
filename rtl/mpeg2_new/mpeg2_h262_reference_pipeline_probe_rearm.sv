@@ -63,7 +63,9 @@ always @(posedge clk)begin
  end
 end
 
-wire b_direction_word=(p_residual_sample_index==6'h38)||(p_residual_sample_index==6'h39)||(p_residual_sample_index==6'h3a);
+// The first B macroblock may be intra (0x37), with no prediction direction.
+// It still starts a B transport transaction and must retain its geometry word.
+wire b_direction_word=(p_residual_sample_index==6'h37)||(p_residual_sample_index==6'h38)||(p_residual_sample_index==6'h39)||(p_residual_sample_index==6'h3a);
 wire b_detect_now=b_motion_transport&&p_residual_sample_valid&&b_direction_word&&p_forward_vector_valid&&
  general_p_f_code_supported&&
  general_geometry_supported&&!p_implicit_reconstruct_request;
@@ -317,7 +319,7 @@ mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
 mpeg2_h262_b_bidirectional_raster_engine b_probe(
  .clk(clk),.reset(b_reset),.capture_enable(b_select),.request(b_select),
  .sideband_valid(p_residual_sample_valid&&b_select),.sideband_index(p_residual_sample_index),.sideband_value(p_residual_sample_value),
- .motion_vector_x(p_forward_vector_x[8:0]),.motion_vector_y(p_forward_vector_y[8:0]),
+ .motion_vector_x(p_forward_vector_x[9:0]),.motion_vector_y(p_forward_vector_y[9:0]),
  .residual_store_write(b_residual_store_write),
  .residual_store_write_address(b_residual_store_write_address),
  .residual_store_write_data(b_residual_store_write_data),

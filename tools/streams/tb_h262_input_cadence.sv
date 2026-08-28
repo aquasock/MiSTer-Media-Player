@@ -266,6 +266,11 @@ module tb_h262_input_cadence;
         .store_error(writer_error),.ddram_busy(writer_busy),.ddram_we(writer_we),
         .ddram_addr(writer_addr),.block_stored(writer_stored));
     mpeg2_h262_b_presentation_scheduler scheduler(
+        .native_film_mode(1'b0),
+        .native_field(1'b0),
+        .display_picture_present(1'b0),
+        .display_repeat_first_field(1'b0),
+        .candidate_top_field_first(1'b1),
         .clk(clk),.reset(reset),.swap_window_pulse(scheduler_swap),.cadence_tick_pulse(tick),
         .frame_rate_code(frame_rate_code),.timestamp_candidate_active(1'b0),
         .timestamp_candidate_due(1'b0),.native_ordinary_overlap_enable(1'b1),

@@ -23,6 +23,8 @@
 
 mpeg2_h262_inverse_quant mpeg2_h262_inverse_quant
 (
+    .stream_data(mpeg2_stream_data),
+    .stream_valid(mpeg2_new_decode_stream_valid),
 	.clk                         (clk_mpeg2),
 	.reset                       (reset_mpeg2),
 	.block_start                 (mpeg2_new_qfs_block_start),

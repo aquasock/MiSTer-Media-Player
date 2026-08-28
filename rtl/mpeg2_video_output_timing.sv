@@ -29,6 +29,7 @@ module mpeg2_video_output_timing
     output wire        v_sync,
     output wire        field,
     output wire        field_window,
+    output wire        field_swap_window,
     output wire        frame_window
 );
 
@@ -107,6 +108,7 @@ assign v_sync = native_active ? !native_vsync_low :
     ((diag_v >= 12'd601) && (diag_v < 12'd605));
 
 assign field = native_active && native_field;
+assign field_swap_window = native_active && native_tail_window && native_tail_window_d;
 assign field_window = native_active ? native_tail_window :
     (diag_v >= DIAG_V_ACTIVE);
 assign frame_window = native_active ?

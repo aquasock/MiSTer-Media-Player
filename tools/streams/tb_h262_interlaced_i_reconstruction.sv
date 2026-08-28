@@ -4,9 +4,9 @@
 // The authored field order is header metadata at this stage; reconstruction
 // must produce the same full-frame Y/Cb/Cr planes for either TFF or BFF before
 // native field presentation is allowed to consume those planes.
-module tb_h262_interlaced_i_reconstruction;
+module tb_h262_interlaced_i_reconstruction #(parameter integer FRAME_COUNT=4);
     localparam integer MAX_STREAM_BYTES = 1048576;
-    localparam integer FRAME_COUNT = 4;
+
     localparam integer LUMA_BYTES = 720*480;
     localparam integer CHROMA_BYTES = 360*240;
     localparam integer FRAME_BYTES = LUMA_BYTES + 2*CHROMA_BYTES;
@@ -25,9 +25,11 @@ module tb_h262_interlaced_i_reconstruction;
     integer reconstructed_picture=0,pixel_samples=0,pixel_differences=0;
     integer pixel_mismatches=0;
     integer max_pixel_delta=0,pixel_delta,pixel_index;
+    integer physical_y;
     reg phase1_seen=0,interlaced_seen=0,progressive_seen=0,field_order_seen=0;
     reg expected_tff=0;
-    reg expect_progressive=0,expect_reject=0;
+    reg expect_progressive=0,expect_reject=0,expect_film=0;
+    wire dct_type;
 
     wire parser_ready,frontend_ready,phase1_supported,syntax_error;
     wire [13:0] horizontal_size,vertical_size;
@@ -95,6 +97,7 @@ module tb_h262_interlaced_i_reconstruction;
         .phase1_supported(phase1_supported),.vertical_size(vertical_size),
         .intra_dc_precision(intra_dc_precision),
         .intra_vlc_format(intra_vlc_format),
+        .frame_pred_frame_dct(frame_pred_frame_dct),.dct_type(dct_type),
         .pipeline_block_done(recon_block_complete),
         .recon_block_complete(recon_block_complete),
         .picture_420_complete(picture_complete),.picture_count(picture_count),
@@ -111,7 +114,7 @@ module tb_h262_interlaced_i_reconstruction;
         .qfs_write_value(qfs_write_value),.qfs_block_end(qfs_block_end));
 
     mpeg2_h262_inverse_quant inverse_quant(
-        .clk(clk),.reset(reset),.block_start(qfs_block_start),
+        .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.block_start(qfs_block_start),
         .coeff_write_en(qfs_write_en),.coeff_write_index(qfs_write_index),
         .coeff_write_value(qfs_write_value),.block_end(qfs_block_end),
         .intra_quant_matrix_default(intra_quant_matrix_default),
@@ -139,7 +142,7 @@ module tb_h262_interlaced_i_reconstruction;
         .slice_vertical_position_extension(slice_vertical_position_extension),
         .macroblock_address_increment(macroblock_address_increment),
         .slice_start(slice_start),.macroblock_start(macroblock_start),
-        .block_index(qfs_block_index),.sample_valid(idct_sample_valid),
+        .block_index(qfs_block_index),.dct_type(dct_type),.sample_valid(idct_sample_valid),
         .sample_index(idct_sample_index),.sample_value(idct_sample_value),
         .idct_block_complete(idct_complete),.pixel_valid(recon_pixel_valid),
         .pixel_component(recon_pixel_component),.pixel_x(recon_pixel_x),
@@ -154,6 +157,7 @@ module tb_h262_interlaced_i_reconstruction;
         expected_tff=$test$plusargs("TFF");
         expect_progressive=$test$plusargs("PROGRESSIVE");
         expect_reject=$test$plusargs("REJECT");
+        expect_film=$test$plusargs("FILM");
         if(!expect_reject)begin
             if(!$value$plusargs("PIXELS=%s",pixel_path))$fatal(1,"missing +PIXELS");
             $readmemh(pixel_path,pixel_oracle,0,ORACLE_BYTES-1);
@@ -191,24 +195,31 @@ module tb_h262_interlaced_i_reconstruction;
                 field_order_seen<=top_field_first;
                 if(horizontal_size!=720||vertical_size!=480||frame_rate_code!=4||
                    chroma_format!=1||picture_coding_type!=1||picture_structure!=3||
-                   !frame_pred_frame_dct||concealment_motion_vectors||
-                   progressive_frame||chroma_420_type||repeat_first_field||
+                   concealment_motion_vectors||
+                   (expect_film ? (!progressive_frame||!chroma_420_type||!frame_pred_frame_dct) :
+                    (progressive_frame||chroma_420_type||repeat_first_field))||
                    top_field_first!=expected_tff)
                     $fatal(1,"interlaced capability gate admitted wrong state");
             end
         end
         if(syntax_error||probe_error||iq_error||unsupported_matrix||idct_error||recon_error)
-            $fatal(1,"pipeline error syntax=%0d probe=%0d iq=%0d matrix=%0d idct=%0d recon=%0d",
-                   syntax_error,probe_error,iq_error,unsupported_matrix,idct_error,recon_error);
+            $fatal(1,"pipeline error syntax=%0d source=%0d byte=%0d probe=%0d iq=%0d matrix=%0d idct=%0d recon=%0d",
+                   syntax_error,frontend.syntax_error_source,stream_index,probe_error,iq_error,unsupported_matrix,idct_error,recon_error);
 
         if(recon_pixel_valid&&!expect_reject)begin
+            // recon emits contiguous block samples. The production writer
+            // scatters field-DCT luma rows at stride two; mirror that address
+            // convention here (writer bus packing has separate regressions).
+            physical_y=recon_pixel_y;
+            if(dct_type && recon_pixel_component==0)
+                physical_y=recon.block_origin_y+2*(recon_pixel_y-recon.block_origin_y);
             if(reconstructed_picture>=FRAME_COUNT)
                 $fatal(1,"pixel after final picture");
             if(recon_pixel_component==0)begin
-                if(recon_pixel_x>=720||recon_pixel_y>=480)
+                if(recon_pixel_x>=720||physical_y>=480)
                     $fatal(1,"luma coordinate %0d,%0d",recon_pixel_x,recon_pixel_y);
                 pixel_index=reconstructed_picture*FRAME_BYTES+
-                    recon_pixel_y*720+recon_pixel_x;
+                    physical_y*720+recon_pixel_x;
             end else if(recon_pixel_component==1)begin
                 if(recon_pixel_x>=360||recon_pixel_y>=240)
                     $fatal(1,"Cb coordinate %0d,%0d",recon_pixel_x,recon_pixel_y);

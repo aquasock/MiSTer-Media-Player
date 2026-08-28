@@ -130,6 +130,12 @@ mpeg2_h262_picture_timestamp mpeg2_h262_picture_timestamp
     .metadata_pts            (mpeg2_new_inband_pts_90k),
     .picture_coding_extension_valid(mpeg2_new_picture_coding_extension_valid),
     .picture_top_field_first (mpeg2_new_picture_coding_extension_top_field_first),
+    .picture_repeat_first_field(mpeg2_new_pce_repeat_first_field),
+    .picture_progressive_frame(mpeg2_new_pce_progressive_frame),
+    .display_repeat_first_field(mpeg2_new_display_repeat_first_field),
+    .display_progressive_frame(mpeg2_new_display_progressive_frame),
+    .display_descriptor_valid(mpeg2_new_display_descriptor_valid),
+    .candidate_top_field_first(mpeg2_new_candidate_top_field_first),
     .picture_start           (mpeg2_new_picture_header_classified_now),
     .picture_is_b            (mpeg2_new_b_picture_start_now),
     .decode_scratch_bank     (mpeg2_new_b_decode_scratch_bank),
@@ -167,6 +173,11 @@ mpeg2_h262_pts_presentation_timeline mpeg2_h262_pts_presentation_timeline
 
 mpeg2_h262_b_presentation_scheduler mpeg2_h262_b_presentation_scheduler
 (
+    .native_film_mode(mpeg2_new_native_film_mode && mpeg2_new_native_active_mpeg2),
+    .native_field(mpeg2_new_native_field_sync[2]),
+    .display_picture_present(mpeg2_new_framebuffer_picture_present_sync[2]),
+    .display_repeat_first_field(mpeg2_new_display_repeat_first_field),
+    .candidate_top_field_first(mpeg2_new_candidate_top_field_first),
     .clk                         (clk_mpeg2),
     .reset                       (reset_mpeg2),
     .swap_window_pulse           (mpeg2_new_swap_window_pulse &&

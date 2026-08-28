@@ -1,10 +1,12 @@
 `timescale 1ns/1ps
 module tb_native_field_order;
 reg clk=0,reset=1,pce=0,progressive=0,tff=1;
-wire locked,locked_tff,mismatch;
+wire locked,locked_tff,mismatch,film_mode;
+reg film=0;
 always #5 clk=~clk;
 
 mpeg2_h262_native_field_order dut(
+        .picture_progressive_frame(film),.film_mode(film_mode),
     .clk(clk),.reset(reset),
     .picture_coding_extension_valid(pce),
     .progressive_sequence(progressive),
@@ -33,7 +35,12 @@ initial begin
     @(negedge clk);reset=1;@(negedge clk);reset=0;
     picture(0,0);
     if(!locked||locked_tff||mismatch)$fatal(1,"BFF rearm failed");
-    $display("RESULT stable_tff=PASS change_rejected=PASS reset_bff=PASS");
+    @(negedge clk);reset=1;@(negedge clk);reset=0;film=1;
+    picture(0,1);picture(0,0);picture(0,1);
+    if(!film_mode||mismatch||!locked_tff)$fatal(1,"film field-order changes rejected");
+    film=0;picture(0,1);
+    if(!mismatch)$fatal(1,"mixed film/interlaced session not guarded");
+    $display("RESULT stable_tff=PASS change_rejected=PASS reset_bff=PASS film_variable_tff=PASS mixed_rejected=PASS");
     $finish;
 end
 endmodule

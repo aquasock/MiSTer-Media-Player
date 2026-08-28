@@ -107,7 +107,7 @@ MCODE = {
 
 
 def delta_for(target: int, pred: int, f_code: int = 3) -> int:
-    if not (1 <= f_code <= 5):
+    if not (1 <= f_code <= 6):
         raise ValueError(f_code)
     f = 1 << (f_code - 1)
     low, high, span = -16 * f, 16 * f - 1, 32 * f
@@ -338,12 +338,12 @@ def patch_picture(data: bytes, pic_index: int, is_b: bool,
     if pce is None:
         raise SystemExit(f"picture {pic_index} type {ptype}: missing picture_coding_extension")
     f_code_h, f_code_v = forward_f_code
-    if not (1 <= f_code_h <= 5 and 1 <= f_code_v <= 5):
+    if not (1 <= f_code_h <= 6 and 1 <= f_code_v <= 6):
         raise ValueError(forward_f_code)
     b[pce + 4] = (b[pce + 4] & 0xF0) | f_code_h
     if is_b:
         backward_f_code_h, backward_f_code_v = backward_f_code
-        if not (1 <= backward_f_code_h <= 5 and 1 <= backward_f_code_v <= 5):
+        if not (1 <= backward_f_code_h <= 6 and 1 <= backward_f_code_v <= 6):
             raise ValueError(backward_f_code)
         b[pce + 5] = (f_code_v << 4) | backward_f_code_h
         b[pce + 6] = (b[pce + 6] & 0x0F) | (backward_f_code_v << 4)

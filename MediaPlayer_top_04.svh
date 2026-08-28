@@ -96,6 +96,16 @@ wire [1:0] mpeg2_new_display_frame_bank;
 wire      mpeg2_new_display_scratch;
 wire      mpeg2_new_display_scratch_bank;
 wire [2:0] mpeg2_new_framebuffer_swap_reset_count;
+(* async_reg = "true" *) reg [1:0] mpeg2_new_film_mode_video_sync;
+(* async_reg = "true" *) reg [2:0] mpeg2_new_native_field_sync;
+always @(posedge clk_video) begin
+    if(reset_video) mpeg2_new_film_mode_video_sync<=0;
+    else mpeg2_new_film_mode_video_sync<={mpeg2_new_film_mode_video_sync[0],mpeg2_new_native_film_mode};
+end
+always @(posedge clk_mpeg2) begin
+    if(reset_mpeg2) mpeg2_new_native_field_sync<=0;
+    else mpeg2_new_native_field_sync<={mpeg2_new_native_field_sync[1:0],display_field};
+end
 reg       mpeg2_new_swap_window_video;
 reg       mpeg2_new_cadence_window_video;
 wire      mpeg2_new_b_presentation_complete;
@@ -113,7 +123,8 @@ always @(posedge clk_video) begin
     if (reset_video)
         mpeg2_new_swap_window_video <= 1'b0;
     else
-        mpeg2_new_swap_window_video <= display_frame_window;
+        mpeg2_new_swap_window_video <= mpeg2_new_film_mode_video_sync[1] ?
+            display_field_swap_window : display_frame_window;
 
     if (reset_video)
         mpeg2_new_cadence_window_video <= 1'b0;

@@ -34,7 +34,7 @@ wire [6:0] mba_bits_next={mba_bits[5:0],parser_current_bit};
 wire [2:0] mba_len_next=mba_len+1'b1;
 wire [10:0] motion_bits_next={motion_bits[9:0],parser_current_bit};
 wire [3:0] motion_len_next=motion_len+1'b1;
-wire [3:0] motion_residual_next={motion_residual_shift[2:0],parser_current_bit};
+wire [4:0] motion_residual_next={motion_residual_shift[3:0],parser_current_bit};
 wire [5:0] mbtype_bits_next={mbtype_bits[4:0],parser_current_bit};
 wire [2:0] mbtype_len_next=mbtype_len+1'b1;
 wire [8:0] cbp_bits_next={cbp_bits[7:0],parser_current_bit};
@@ -106,10 +106,15 @@ function automatic [5:0] match_b_mbtype;
         endcase
         3'd5: case(bits[4:0])
             5'b00011:match_b_mbtype={1'b1,1'b0,1'b1,2'd0,1'b0};
+            5'b00010:match_b_mbtype={1'b1,1'b1,1'b0,2'd3,1'b1};
             default:;
         endcase
-        3'd6:if(bits[5:0]==6'b000001)
-            match_b_mbtype={1'b1,1'b1,1'b1,2'd0,1'b0};
+        3'd6:case(bits[5:0])
+            6'b000001:match_b_mbtype={1'b1,1'b1,1'b1,2'd0,1'b0};
+            6'b000011:match_b_mbtype={1'b1,1'b1,1'b0,2'd1,1'b1};
+            6'b000010:match_b_mbtype={1'b1,1'b1,1'b0,2'd2,1'b1};
+            default:;
+        endcase
         default:;
         endcase
     end

@@ -30,6 +30,8 @@ module mpeg2_h262_p_non_intra_transform
 (
     input  wire        clk,
     input  wire        reset,
+    input  wire [7:0]  stream_data,
+    input  wire        stream_valid,
 
     input  wire [1:0]  qfs_block_index,
     input  wire        qfs_block_start,
@@ -246,7 +248,16 @@ wire signed [12:0] iq_qf = qfs[iq_qfs_index_reg];
 wire signed [14:0] iq_qf_extended = {{2{iq_qf[12]}}, iq_qf};
 wire [7:0] iq_qscale =
     quantiser_scale_value(iq_q_scale_type, iq_quantiser_scale_code);
-wire [7:0] iq_intra_weight = default_intra_weight(iq_index);
+wire [7:0] iq_intra_weight, iq_non_intra_weight;
+wire matrix_non_intra_default, matrix_error, matrix_update;
+reg iq_default_non_intra;
+wire iq_fast_non_intra = !iq_intra_block && iq_default_non_intra;
+mpeg2_h262_quant_matrices matrices (
+    .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),
+    .read_index(iq_index),.intra_weight(iq_intra_weight),.non_intra_weight(iq_non_intra_weight),
+    .intra_default(),.non_intra_default(matrix_non_intra_default),
+    .syntax_error(matrix_error),.update_now(matrix_update)
+);
 wire [3:0] iq_dc_multiplier =
     (iq_intra_dc_precision==2'd0) ? 4'd8 :
     (iq_intra_dc_precision==2'd1) ? 4'd4 :
@@ -276,11 +287,15 @@ always @* begin
     iq_multiplier_a = 24'sd0;
     iq_multiplier_b = 9'sd0;
     iq_unclipped = 32'sd0;
-    if (iq_stage_pending && iq_intra_block && (iq_index != 6'd0)) begin
+    if (iq_stage_pending && ((iq_intra_block && (iq_index != 6'd0)) || (!iq_intra_block && !iq_default_non_intra))) begin
         iq_multiplier_a = iq_stage_product[23:0];
         iq_multiplier_b = $signed({1'b0, iq_qscale});
-        // H.262 7.4.2.3: (QF * W * quantiser_scale * 2) / 32.
-        iq_unclipped = $signed(iq_multiplier_result) / 32'sd16;
+        // H262-037: retain signed truncation toward zero with constant
+        // divisors, avoiding a variable-divisor circuit in synthesis.
+        if (iq_intra_block)
+            iq_unclipped = $signed(iq_multiplier_result) / 32'sd16;
+        else
+            iq_unclipped = $signed(iq_multiplier_result) / 32'sd32;
     end
     else if (iq_intra_block && (iq_index == 6'd0)) begin
         iq_multiplier_a = {{11{iq_qf[12]}},iq_qf};
@@ -295,7 +310,7 @@ always @* begin
     end
     else begin
         iq_multiplier_a = {{9{iq_precondition[14]}},iq_precondition};
-        iq_multiplier_b = $signed({1'b0, iq_qscale});
+        iq_multiplier_b = $signed({1'b0, iq_default_non_intra ? iq_qscale : iq_non_intra_weight});
         if (iq_stage_pending)
             iq_unclipped = iq_stage_product / 32'sd2;
     end
@@ -358,6 +373,7 @@ assign residual_sample_value       = idct_sample_value;
 
 always @(posedge clk) begin
     if (reset) begin
+        iq_default_non_intra <= 1'b1;
         capture_active         <= 1'b0;
         active_block_index     <= 2'd0;
         iq_active              <= 1'b0;
@@ -396,6 +412,8 @@ always @(posedge clk) begin
         if (idct_error)
             probe_error <= 1'b1;
 
+        if (matrix_error || (matrix_update && transform_busy)) probe_error <= 1'b1;
+
         if (qfs_block_start) begin
             if (capture_active || transform_busy)
                 probe_error <= 1'b1;
@@ -430,6 +448,7 @@ always @(posedge clk) begin
                 iq_q_scale_type         <= q_scale_type;
                 iq_alternate_scan       <= alternate_scan;
                 iq_intra_block          <= intra_block;
+                iq_default_non_intra    <= matrix_non_intra_default;
                 iq_intra_dc_precision   <= intra_dc_precision;
                 iq_stage_pending        <= 1'b0;
             end
@@ -440,7 +459,7 @@ always @(posedge clk) begin
                 iq_stage_product <= iq_multiplier_result[31:0];
                 iq_stage_qf_seven <= (iq_qf == 13'sd7);
                 iq_stage_pending <= 1'b1;
-                if (!iq_intra_block && (iq_index != 6'd63))
+                if (iq_fast_non_intra && (iq_index != 6'd63))
                     iq_qfs_index_reg <= scan_index(
                         iq_alternate_scan, iq_index + 6'd1);
             end
@@ -469,7 +488,7 @@ always @(posedge clk) begin
                     iq_active <= 1'b0;
                     iq_stage_pending <= 1'b0;
                 end
-                else if (!iq_intra_block) begin
+                else if (iq_fast_non_intra) begin
                     iq_stage_product <= iq_multiplier_result[31:0];
                     iq_stage_qf_seven <= (iq_qf == 13'sd7);
                     iq_stage_pending <= 1'b1;

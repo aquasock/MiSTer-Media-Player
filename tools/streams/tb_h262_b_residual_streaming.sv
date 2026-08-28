@@ -27,7 +27,7 @@ module tb_h262_b_residual_streaming #(
     wire sideband_valid,first_valid,core_error;
     wire [5:0] sideband_index;
     wire signed [15:0] sideband_value,first_value;
-    wire signed [8:0] motion_vector_x,motion_vector_y;
+    wire signed [9:0] motion_vector_x,motion_vector_y;
 
     wire residual_store_write;
     wire [15:0] residual_store_write_address;

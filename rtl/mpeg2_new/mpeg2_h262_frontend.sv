@@ -38,8 +38,9 @@ module mpeg2_h262_frontend
 
     output wire        frontend_ready,
     output wire        phase1_supported,
+    output wire        native_film_supported,
     output reg         syntax_error,
-    // Commit 188 observability: stable first assertion site, 1..21.
+    // Commit 188 observability: stable first assertion site, 1..22.
     output reg  [4:0]  syntax_error_source,
 
     output reg         sequence_seen,
@@ -49,6 +50,8 @@ module mpeg2_h262_frontend
     output reg         picture_coding_extension_seen,
     output wire        picture_coding_extension_valid,
     output wire        picture_coding_extension_top_field_first,
+    output wire        picture_coding_extension_repeat_first_field,
+    output wire        picture_coding_extension_progressive_frame,
     output reg         slice_seen,
     output reg         sequence_end_seen,
 
@@ -103,10 +106,17 @@ module mpeg2_h262_frontend
     output reg  [32:0] timing_picture_time_90k,
     output reg  [9:0]  timing_picture_temporal_reference,
 
-    // kate - Phase 1D currently implements the normative default intra
-    // quantisation matrix.  A downloaded matrix is valid H.262 but is kept
-    // as a separate capability boundary until matrix download support lands.
-    output reg         intra_quant_matrix_default
+    // Expose default/downloaded state for observer-consistency diagnostics.
+    // Both default and stream-defined 4:2:0 matrices are supported.
+    output wire        intra_quant_matrix_default
+);
+
+wire matrix_syntax_error;
+mpeg2_h262_quant_matrices matrices (
+    .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),
+    .read_index(6'd0),.intra_weight(),.non_intra_weight(),
+    .intra_default(intra_quant_matrix_default),.non_intra_default(),
+    .syntax_error(matrix_syntax_error),.update_now()
 );
 
 localparam [7:0]
@@ -200,6 +210,9 @@ assign picture_coding_extension_valid =
     (active_extension_id == EXT_PICTURE_CODING) &&
     (payload_byte_index == 4);
 assign picture_coding_extension_top_field_first = payload_next[15];
+assign picture_coding_extension_repeat_first_field = payload_next[9];
+assign picture_coding_extension_progressive_frame = payload_next[7];
+
 
 // kate - Phase 1T-b keeps the registered motion-vector control fields in the
 // active I-picture support gate so the existing hardware regression proves that
@@ -214,10 +227,9 @@ wire phase1_i_f_code_state_valid =
     (backward_f_code_vertical   == 4'hF);
 
 // These are capability limits, not H.262 syntax-validity rules.  The
-// native-interlaced I subset deliberately reuses only frame-DCT/frame-predicted
-// complete frame pictures; field pictures, field DCT/motion and repeated fields
-// remain outside the gate.  concealment_motion_vectors is likewise excluded
-// until the intra-macroblock motion-vector syntax is implemented.
+// I-picture admission includes progressive frames, interlaced frames with
+// frame or field DCT, and progressive film frames in a 480i sequence.
+// Field pictures and concealment motion vectors remain outside this gate.
 assign frontend_ready =
     sequence_seen &&
     sequence_extension_seen &&
@@ -244,6 +256,22 @@ wire phase1_native_480i_i_frame =
     (vertical_size == 14'd480) &&
     (frame_rate_code == 4'h4);
 
+// Film frames in a 480i sequence retain progressive chroma; RFF controls
+// later field presentation, never transform coordinates.
+wire phase1_native_film_i_frame =
+    !progressive_sequence && progressive_frame && chroma_420_type &&
+    frame_pred_frame_dct && (horizontal_size == 14'd720) &&
+    (vertical_size == 14'd480) && (frame_rate_code == 4'h4);
+
+// Presentation eligibility must remain asserted across admitted I/P/B film
+// pictures, while preserving the same sequence, syntax and timing guards.
+assign native_film_supported =
+    frontend_ready && !sequence_scalable_extension_seen &&
+    (chroma_format == 2'b01) && (picture_structure == 2'b11) &&
+    (picture_coding_type >= 3'd1) && (picture_coding_type <= 3'd3) &&
+    !concealment_motion_vectors && phase1_native_film_i_frame &&
+    !timing_unsupported && !timing_error;
+
 assign phase1_supported =
     frontend_ready &&
     !sequence_scalable_extension_seen &&
@@ -256,7 +284,7 @@ assign phase1_supported =
     // macroblock layer's dct_type bit is parsed and honoured instead.
     // Field pictures remain refused by the picture_structure term.
     !concealment_motion_vectors &&
-    (phase1_progressive_i_frame || phase1_native_480i_i_frame) &&
+    (phase1_progressive_i_frame || phase1_native_480i_i_frame || phase1_native_film_i_frame) &&
     phase1_i_f_code_state_valid &&
     !timing_unsupported &&
     !timing_error;
@@ -325,10 +353,9 @@ always @(posedge clk) begin
         timing_next_time_quarters           <= 35'd0;
         timing_last_picture_time_90k        <= 33'd0;
         timing_picture_count                <= 8'd0;
-
-        intra_quant_matrix_default           <= 1'b1;
     end
-    else if (stream_valid) begin
+    else begin
+      if (stream_valid) begin
         byte_window <= byte_window_next;
 
         if (start_code_now) begin
@@ -361,7 +388,6 @@ always @(posedge clk) begin
                     // H.262 6.3.11: every sequence header resets all
                     // quantisation matrices to their default values before
                     // any optional matrix download in that header.
-                    intra_quant_matrix_default   <= 1'b1;
                 end
 
                 PICTURE_START_CODE: begin
@@ -393,7 +419,10 @@ always @(posedge clk) begin
         end
         else if (active_start_code_valid) begin
             payload_shift      <= payload_next;
-            payload_byte_index <= payload_byte_index + 1'b1;
+            // A sequence header with both matrices exceeds 128 bytes.
+            // Saturate: wrapping would parse matrix bytes as fixed fields.
+            if (payload_byte_index != 7'd127)
+                payload_byte_index <= payload_byte_index + 1'b1;
 
             // sequence_header(): first 64 payload bits contain all fixed
             // fields through load_intra_quantiser_matrix.
@@ -415,13 +444,9 @@ always @(posedge clk) begin
                     if (!syntax_error) syntax_error_source <= 5'd4;
                 end
 
-                // H.262 6.2.2.1/6.3.11: after the fixed sequence-header
-                // fields, load_intra_quantiser_matrix is the 63rd payload
-                // bit.  The 64-bit window places it at payload_next[1].
-                // A value of one is fully valid H.262; Phase 1D simply does
-                // not yet implement the downloaded matrix values.
-                if (payload_next[1])
-                    intra_quant_matrix_default <= 1'b0;
+                // H262-036: the matrix observer parses the remaining
+                // unaligned flags and downloads independently of this window.
+
             end
 
             // extension_start_code_identifier is the first four payload bits.
@@ -448,12 +473,9 @@ always @(posedge clk) begin
                 if (stream_data[7:4] == EXT_SEQUENCE_SCALABLE)
                     sequence_scalable_extension_seen <= 1'b1;
 
-                // Conservatively treat any quant_matrix_extension as a
-                // Phase 1D matrix-download capability boundary.  The
-                // extension itself is valid H.262 and is not a syntax error.
-                // Later phases will parse its individual load flags/matrices.
-                if (stream_data[7:4] == EXT_QUANT_MATRIX)
-                    intra_quant_matrix_default <= 1'b0;
+                // H262-036: matrix extensions retain unloaded matrices.
+                // Their individual flags and weights belong to the observer.
+
             end
 
             // sequence_extension(): 48 payload bits.
@@ -660,6 +682,11 @@ always @(posedge clk) begin
                     if (!syntax_error) syntax_error_source <= 5'd21;
                 end
             end
+        end
+      end
+        if (matrix_syntax_error) begin
+            syntax_error <= 1'b1;
+            if (!syntax_error) syntax_error_source <= 5'd22;
         end
     end
 end

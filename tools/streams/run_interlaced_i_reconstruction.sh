@@ -12,6 +12,7 @@ mkdir -p "$WORK"
 python3 "$ROOT/tools/streams/generate_test_interlaced_i_frames.py"
 
 sources=(
+    "$ROOT/rtl/mpeg2_new/mpeg2_h262_quant_matrices.sv"
     "$ROOT/rtl/mpeg2_new/mpeg2_h262_frontend.sv"
     "$ROOT/rtl/mpeg2_new/mpeg2_h262_dct_vlc.sv"
     "$ROOT/rtl/mpeg2_new/mpeg2_h262_bitreader.sv"
@@ -61,15 +62,18 @@ echo "run     : progressive control"
 "$obj/interlaced_i" "+HEX=$progressive_hex" "+LEN=$progressive_len" \
     "+PIXELS=$progressive_pixels" +PROGRESSIVE
 
-# A valid interlaced frame picture using field DCT/motion syntax is outside
-# this milestone and must never raise phase1_supported or reconstruct pixels.
-reject="$WORK/test_interlaced_field_dct_reject.m2v"
+# Field-DCT I pictures have been supported since entry 650. Verify their
+# reconstruction rather than retaining the older, now-invalid rejection test.
+field_dct="$WORK/test_interlaced_field_dct.m2v"
 ffmpeg -hide_banner -loglevel error -y \
-    -f lavfi -i 'testsrc2=size=720x480:rate=60000/1001,tinterlace=mode=interleave_top' \
-    -frames:v 2 -an -c:v mpeg2video -pix_fmt yuv420p -threads 1 \
-    -flags +bitexact+ildct -g 1 -bf 0 -q:v 2 -f mpeg2video "$reject"
-reject_hex="$WORK/test_interlaced_field_dct_reject.hex"
-xxd -c1 -p "$reject" > "$reject_hex"
-reject_len=$(stat -c%s "$reject")
-echo "run     : field-DCT rejection control"
-"$obj/interlaced_i" "+HEX=$reject_hex" "+LEN=$reject_len" +REJECT
+    -f lavfi -i "color=c=black:s=720x480:r=60000/1001,geq=lum='16+219*gte(Y,mod(N*4,472))*lt(Y,mod(N*4,472)+8)':cb=128:cr=128,tinterlace=mode=interleave_top" \
+    -frames:v 4 -an -c:v mpeg2video -pix_fmt yuv420p -threads 1 \
+    -flags +bitexact+ildct -top 1 -g 1 -bf 0 -q:v 2 -f mpeg2video "$field_dct"
+python3 -c 'import sys; from pathlib import Path; p=Path(sys.argv[1]); d=p.read_bytes(); end=bytes.fromhex("000001b7"); p.write_bytes(d if d.endswith(end) else d+end)' "$field_dct"
+xxd -c1 -p "$field_dct" > "$WORK/field_dct.hex"
+ffmpeg -hide_banner -loglevel error -y -threads 1 -i "$field_dct" \
+    -frames:v 4 -an -f rawvideo -pix_fmt yuv420p "$WORK/field_dct.yuv"
+xxd -c1 -p "$WORK/field_dct.yuv" > "$WORK/field_dct_pixels.hex"
+echo "run     : field-DCT reconstruction control"
+"$obj/interlaced_i" "+HEX=$WORK/field_dct.hex" "+LEN=$(stat -c%s "$field_dct")" \
+    "+PIXELS=$WORK/field_dct_pixels.hex" +TFF

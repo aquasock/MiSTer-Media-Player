@@ -746,6 +746,7 @@ wire        display_v_sync;
 wire        display_field;
 wire        display_field_window;
 wire        display_frame_window;
+wire        display_field_swap_window;
 wire        display_native_interlaced;
 wire        display_native_timing_pattern;
 wire        display_native_timing_pattern_moving;

@@ -110,6 +110,11 @@ module tb_h262_dense_publication_order;
     );
 
     mpeg2_h262_b_presentation_scheduler scheduler(
+        .native_film_mode(1'b0),
+        .native_field(1'b0),
+        .display_picture_present(1'b0),
+        .display_repeat_first_field(1'b0),
+        .candidate_top_field_first(1'b1),
         .clk(clk),.reset(reset),.swap_window_pulse(swap_window_pulse),
         .cadence_tick_pulse(swap_window_pulse),
         .frame_rate_code(4'h3),

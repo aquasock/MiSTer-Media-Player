@@ -32,6 +32,7 @@ module mpeg2_luma_framebuffer
     input  wire [13:0] horizontal_size,
     input  wire [13:0] vertical_size,
     input  wire        native_interlaced,
+    input  wire        progressive_chroma,
     input  wire        top_field_first,
     input  wire [7:0]  framebuffer_generation,
     // Entry 531: passive expected fingerprints retained from accepted DDR
@@ -228,6 +229,7 @@ reg [10:0] picture_height_mem;
 reg [10:0] chroma_height_mem;
 reg [11:0] picture_width_mem;
 reg        native_interlaced_mem;
+reg        progressive_chroma_mem;
 reg        first_field_mem;
 
 reg [1:0]  mem_state;
@@ -495,21 +497,27 @@ wire [10:0] progressive_c_refill_line =
 wire [10:0] y_refill_line = native_interlaced_mem ?
     interlaced_luma_row(interlaced_future_y_sequence, first_field_mem) :
     progressive_y_refill_line;
+// A progressive 4:2:0 film frame consumes a DIFFERENT chroma row on every
+// field line: luma row 2*n+parity uses chroma row n. Interlaced 4:2:0 instead
+// consumes one parity-matched chroma row per pair of field lines.
+wire [10:0] film_c_refill_line = interlaced_future_y_sequence>=9'd240 ?
+    {2'd0,interlaced_future_y_sequence}-11'd240 : {2'd0,interlaced_future_y_sequence};
 wire [10:0] c_refill_line = native_interlaced_mem ?
-    interlaced_chroma_row(interlaced_future_c_pair, first_field_mem) :
+    (progressive_chroma_mem ? film_c_refill_line :
+     interlaced_chroma_row(interlaced_future_c_pair, first_field_mem)) :
     progressive_c_refill_line;
 wire y_refill_bank = native_interlaced_mem ?
     interlaced_future_y_sequence[0] : y_refill_line[0];
 wire c_refill_bank = native_interlaced_mem ?
-    interlaced_future_c_pair[0] : c_refill_line[0];
+    (progressive_chroma_mem ? interlaced_future_y_sequence[0] : interlaced_future_c_pair[0]) : c_refill_line[0];
 
 wire [10:0] prefill_y0 = native_interlaced_mem ?
     interlaced_luma_row(9'd0, first_field_mem) : 11'd0;
 wire [10:0] prefill_y1 = native_interlaced_mem ?
     interlaced_luma_row(9'd1, first_field_mem) : 11'd1;
-wire [10:0] prefill_c0 = native_interlaced_mem ?
+wire [10:0] prefill_c0 = native_interlaced_mem && !progressive_chroma_mem ?
     interlaced_chroma_row(8'd0, first_field_mem) : 11'd0;
-wire [10:0] prefill_c1 = native_interlaced_mem ?
+wire [10:0] prefill_c1 = native_interlaced_mem && !progressive_chroma_mem ?
     interlaced_chroma_row(8'd1, first_field_mem) : 11'd1;
 
 task automatic launch_fetch;
@@ -579,6 +587,7 @@ always @(posedge mem_clk) begin
         chroma_height_mem     <= 11'd0;
         picture_width_mem     <= 12'd0;
         native_interlaced_mem <= 1'b0;
+        progressive_chroma_mem <= 1'b0;
         first_field_mem       <= 1'b0;
 
         mem_state             <= MEM_IDLE;
@@ -881,6 +890,7 @@ always @(posedge mem_clk) begin
                 picture_height_mem    <= vertical_size[10:0];
                 chroma_height_mem     <= (vertical_size[10:0] + 11'd1) >> 1;
                 native_interlaced_mem <= native_interlaced;
+                progressive_chroma_mem <= progressive_chroma;
                 first_field_mem       <= ~top_field_first;
                 prefill_step          <= 3'd0;
                 prefill_done          <= 1'b0;
@@ -1082,7 +1092,7 @@ always @(posedge mem_clk) begin
                             end
                             else if (refill_active) begin
                                 if (refill_phase == 2'd0) begin
-                                    if (refill_event_line[0]) begin
+                                    if (refill_event_line[0] || (native_interlaced_mem && progressive_chroma_mem)) begin
                                         refill_phase <= 2'd1;
                                     end
                                     else begin
@@ -1283,6 +1293,7 @@ reg [10:0] picture_height_r1;
 reg [10:0] picture_height_r2;
 reg        native_interlaced_r1;
 reg        native_interlaced_r2;
+reg        progressive_chroma_r1,progressive_chroma_r2;
 reg        first_field_r1;
 reg        first_field_r2;
 reg [7:0]  framebuffer_generation_r1;
@@ -1371,6 +1382,7 @@ always @(posedge rd_clk) begin
         picture_height_r2    <= 11'd0;
         native_interlaced_r1  <= 1'b0;
         native_interlaced_r2  <= 1'b0;
+        progressive_chroma_r1<=0;progressive_chroma_r2<=0;
         first_field_r1        <= 1'b0;
         first_field_r2        <= 1'b0;
         framebuffer_generation_r1 <= 8'd0;
@@ -1454,6 +1466,8 @@ always @(posedge rd_clk) begin
         picture_height_r2 <= picture_height_r1;
         native_interlaced_r1 <= native_interlaced_mem;
         native_interlaced_r2 <= native_interlaced_r1;
+        progressive_chroma_r1<=progressive_chroma_mem;
+        progressive_chroma_r2<=progressive_chroma_r1;
         first_field_r1       <= first_field_mem;
         first_field_r2       <= first_field_r1;
         framebuffer_generation_r1 <= framebuffer_generation;
@@ -1512,7 +1526,7 @@ always @(posedge rd_clk) begin
             cache_scan_y_bank_rd <=
                 native_interlaced_r2 ? source_y[1] : source_y[0];
             cache_scan_c_bank_rd <=
-                native_interlaced_r2 ? source_y[2] : source_y[1];
+                native_interlaced_r2 && !progressive_chroma_r2 ? source_y[2] : source_y[1];
 
             // Publish at the first active line of the authored first field, or
             // at the legacy progressive frame origin.
@@ -1697,7 +1711,7 @@ assign y_cache_rd_addr =
         8'd90 : 8'd0) + {1'b0, y_word_index_d};
 
 assign c_cache_rd_addr =
-    ((native_interlaced_r2 ? source_y_d[2] : source_y_d[1]) ?
+    ((native_interlaced_r2 && !progressive_chroma_r2 ? source_y_d[2] : source_y_d[1]) ?
         7'd45 : 7'd0) + {1'b0, c_word_index_d};
 
 wire [2:0] y_byte_lane = source_x[2:0];

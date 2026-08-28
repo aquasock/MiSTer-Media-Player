@@ -14,6 +14,11 @@ module mpeg2_h262_b_presentation_scheduler
     input  wire swap_window_pulse,
     input  wire cadence_tick_pulse,
     input  wire [3:0] frame_rate_code,
+    input  wire native_film_mode,
+    input  wire native_field,
+    input  wire display_picture_present,
+    input  wire display_repeat_first_field,
+    input  wire candidate_top_field_first,
     // Entry 470: cadence is the mandatory floor for every retained picture.
     // A timestamp may hold its candidate beyond that slot but may never admit
     // it early; untimestamped candidates use the exact-rate cadence alone.
@@ -137,6 +142,8 @@ localparam [25:0] CADENCE_LIMIT_30FPS = 26'd40000000;
 localparam [25:0] CADENCE_STEP_30FPS  = 26'd19895040;
 localparam [25:0] CADENCE_DUE_30FPS =
     CADENCE_LIMIT_30FPS-CADENCE_STEP_30FPS;
+reg [1:0] native_fields_elapsed;
+wire [1:0] native_field_duration=display_repeat_first_field ? 2'd3 : 2'd2;
 reg [25:0] cadence_credit;
 reg [3:0] cadence_rate_code_q;
 
@@ -178,8 +185,10 @@ wire [25:0] cadence_due=cadence_24000_1001?CADENCE_DUE_24000_1001:
 wire cadence_scale_changed=
     (cadence_24000_1001!=(cadence_rate_code_q==4'h1))||
     (cadence_30000_1001!=(cadence_rate_code_q==4'h4));
-wire cadence_slot=!cadence_scale_changed&&
-                  (!cadence_supported||(cadence_credit>=cadence_due));
+wire cadence_slot=native_film_mode ?
+    ((native_fields_elapsed>=native_field_duration) &&
+     (candidate_top_field_first==native_field)) :
+    (!cadence_scale_changed && (!cadence_supported||(cadence_credit>=cadence_due)));
 wire presentation_slot=cadence_slot&&
                        (!timestamp_candidate_active||timestamp_candidate_due);
 assign candidate_frame_valid=scheduled_frame_valid;
@@ -324,9 +333,13 @@ always @(posedge clk) begin
         ordinary_terminal_drain_pending<=0;
         run_picture_count<=0;presentation_complete<=1;presentation_error<=0;
         cadence_credit<=CADENCE_DUE_24FPS;cadence_rate_code_q<=0;
+        native_fields_elapsed<=0;
     end else begin
         b_user_success_d<=b_user_success;
         cadence_rate_code_q<=frame_rate_code;
+        if(!native_film_mode) native_fields_elapsed<=0;
+        else if(cadence_tick_pulse && display_picture_present && native_fields_elapsed!=3)
+            native_fields_elapsed<=native_fields_elapsed+1'b1;
 
         // Seed the generation comparison from the first published reference.
         // Thereafter only a B future binding advances it, so a later bank wrap
@@ -738,6 +751,7 @@ always @(posedge clk) begin
             // cadence credit as an untimestamped presentation.
             if(cadence_supported)
                 cadence_credit<=cadence_credit+cadence_step-cadence_limit;
+            native_fields_elapsed<=0;
             display_scratch<=scheduled_frame_scratch;
             if(scheduled_frame_scratch)display_scratch_bank<=scheduled_scratch_bank;
             else display_frame_bank<=scheduled_frame_bank;

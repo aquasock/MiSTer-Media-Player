@@ -57,7 +57,7 @@ wire consume_bit=parse_active&&parser_consumes_bit&&!parser_at_end;
 reg t_start,t_we,t_end,t_intra; reg [5:0] t_widx; reg signed [12:0] t_wval; reg [4:0] t_qscale;
 wire t_done,t_first_valid,t_valid,t_error; wire signed [15:0] t_first_value,t_value; wire [1:0] t_unused_block; wire [5:0] t_index;
 mpeg2_h262_p_non_intra_transform b_transform(
-    .clk(clk),.reset(reset),.qfs_block_index(2'd1),.qfs_block_start(t_start),.qfs_write_en(t_we),
+    .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.qfs_block_index(2'd1),.qfs_block_start(t_start),.qfs_write_en(t_we),
     .qfs_write_index(t_widx),.qfs_write_value(t_wval),.qfs_block_end(t_end),
     .quantiser_scale_code(t_qscale),.q_scale_type(q_scale_type),.alternate_scan(alternate_scan),
     .intra_block(t_intra),.intra_dc_precision(b_intra_dc_precision),
@@ -248,7 +248,7 @@ always @(posedge clk) begin
             end
             S_MB_QSCALE: begin
                 if(parser_at_end)state<=S_ERROR;
-                else begin qscale_shift<=qscale_next;if(field_bit_count==4)begin field_bit_count<=0;if(qscale_next==0)state<=S_ERROR;else begin current_qscale<=qscale_next;if(current_intra)begin current_cbp<=6'h3f;current_block_index<=0;state<=S_BLOCK;end else state<=S_ERROR;end end else field_bit_count<=field_bit_count+1'b1;end
+                else begin qscale_shift<=qscale_next;if(field_bit_count==4)begin field_bit_count<=0;if(qscale_next==0)state<=S_ERROR;else begin current_qscale<=qscale_next;if(current_intra)begin current_cbp<=6'h3f;current_block_index<=0;state<=S_BLOCK;end else if(current_direction==2'd2)state<=S_BX;else state<=S_FX;end end else field_bit_count<=field_bit_count+1'b1;end
             end
             S_FX: begin
                 if(parser_at_end)state<=S_ERROR;
@@ -265,7 +265,7 @@ always @(posedge clk) begin
                 if(parser_at_end)state<=S_ERROR;
                 else begin
                     motion_residual_shift<=motion_residual_next;
-                    if({2'b00,motion_residual_count}==(b_forward_f_code_horizontal-4'd2))begin
+                    if({1'b0,motion_residual_count}==(b_forward_f_code_horizontal-4'd2))begin
                         cur_fx<=reconstruct_mv(fpx,motion_code_pending,motion_residual_next,b_forward_f_code_horizontal);
                         motion_residual_count<=0;motion_bits<=0;motion_len<=0;state<=S_FY;
                     end else motion_residual_count<=motion_residual_count+1'b1;

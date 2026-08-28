@@ -46,6 +46,7 @@ module tb_hdmi_scaler_stimulus #(parameter TRACE_ONLY = 1);
     wire framebuffer_reset = reset || (swap_resets &&
         ((swap_reset_count!=0) || (native_sync[1]!=native_sync[2])));
     mpeg2_luma_framebuffer framebuffer (
+        .progressive_chroma(1'b0),
         .reset(framebuffer_reset), .mem_clk(mem_clk), .picture_complete(1'b0),
         .horizontal_size(14'd720), .vertical_size(14'd480),
         .native_interlaced(native_active), .top_field_first(tff),

@@ -31,6 +31,7 @@ reg [63:0] fingerprint_word_1;
 always #5 clk=~clk;
 
 mpeg2_luma_framebuffer dut(
+        .progressive_chroma(1'b0),
  .reset(1'b1),.mem_clk(clk),.picture_complete(1'b0),
  .horizontal_size(14'd720),.vertical_size(14'd480),
  .native_interlaced(1'b1),.top_field_first(1'b1),
@@ -109,6 +110,7 @@ initial begin
  end
 
  force dut.native_interlaced_mem=1'b1;
+ force dut.progressive_chroma_mem=1'b0;
  force dut.first_field_mem=1'b0;
  force dut.refill_event_line=11'd0;#1;
  if(dut.y_refill_line!==11'd4||dut.y_refill_bank!==1'b0)
@@ -126,6 +128,15 @@ initial begin
  force dut.refill_event_line=11'd479;#1;
  if(dut.y_refill_line!==11'd3||dut.c_refill_line!==11'd3)
    $fatal(1,"BFF frame-wrap refill wrong");
+
+ // Film chroma walks all 240 rows once per field, regardless of parity.
+ force dut.progressive_chroma_mem=1'b1;
+ for(i=0;i<480;i=i+1)begin
+   force dut.refill_event_line=i;#1;
+   if(dut.c_refill_line!==((i+2)%240)||dut.c_refill_bank!==((i+2)%2))
+     $fatal(1,"film chroma row/bank at sequence %0d",i);
+ end
+ if(dut.prefill_c0!==0||dut.prefill_c1!==1)$fatal(1,"film chroma prefill");
 
  check_fingerprint(1'b0);
  check_fingerprint(1'b1);

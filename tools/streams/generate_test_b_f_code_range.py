@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a 720x480 B-picture f_code 1..5 regression.
+"""Generate a 720x480 B-picture f_code 1..5 (optionally six) regression.
 
 Coded order is I/P/B/P/B.  B0 uses forward (1,2) and backward (3,4);
 B1 uses forward (5,3) and backward (2,1), so every admitted value appears
@@ -15,6 +15,7 @@ are checked pixel-exact against the shared software prediction model.
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import tempfile
 from pathlib import Path
@@ -27,6 +28,7 @@ ROW_INDEPENDENT = 14
 ROW_WRAP = 20
 
 # coded picture index -> (forward H/V, backward H/V)
+EXTENDED = False
 F_CODES = {
     2: ((1, 2), (3, 4)),
     4: ((5, 3), (2, 1)),
@@ -57,6 +59,12 @@ def emit_mb(bits: str, fp: list[int], bp: list[int], fwd_vec, bwd_vec,
 
 
 def feature_vectors(pic_index: int):
+    if EXTENDED:
+        if pic_index == 2:
+            return ((-260, 31), (127, -17), (480, -33), (-127, 49),
+                    ((-512, -256), (255, -63)), ((511, 255), (-256, 63)))
+        return ((-130, 63), (290, -31), (180, -65), (-449, 63),
+                ((-256, -63), (-512, -256)), ((255, 63), (511, 255)))
     if pic_index == 2:
         signed_fwd, signed_bwd = (5, 2), (3, -6)
         independent_fwd, independent_bwd = (-7, 5), (9, -11)
@@ -110,9 +118,16 @@ def build_picture(pic_index: int):
 
 
 def main() -> None:
+    global EXTENDED, F_CODES
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--f-code-six', action='store_true')
+    args = parser.parse_args()
+    EXTENDED = args.f_code_six
+    if EXTENDED:
+        F_CODES = {2: ((6, 5), (5, 6)), 4: ((5, 6), (6, 5))}
     ffmpeg = h.require_tool("ffmpeg")
     ffprobe = h.require_tool("ffprobe")
-    out = Path(__file__).resolve().parent / "test_b_f_code_range.m2v"
+    out = Path(__file__).resolve().parent / ("test_b_f_code_six.m2v" if EXTENDED else "test_b_f_code_range.m2v")
 
     def p_row() -> bytes:
         bits = format(SLICE_QSCALE, "05b") + "0"
@@ -166,9 +181,10 @@ def main() -> None:
     print("geometry: 45x30 macroblocks (720x480, 1350 per B picture)")
     print(f"bytes: {out.stat().st_size}")
     print(f"sha256: {digest}")
-    print("B0 f_code: forward=(1,2), backward=(3,4)")
-    print("B1 f_code: forward=(5,3), backward=(2,1)")
-    print("coverage: signed 9-bit residuals, predictor reuse/independence, four-component wraparound")
+    print(f"B0 f_code: {F_CODES[2]}; B1 f_code: {F_CODES[4]}")
+    print("coverage: signed residuals, predictor reuse/independence, wraparound")
+    if EXTENDED:
+        print("f_code six: all header components; full horizontal wrap; vertical in-frame residuals")
     print("verification: both B pictures pixel-exact against the shared reference model")
 
 

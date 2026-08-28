@@ -10,6 +10,11 @@ always #5 clk=~clk;
 
 mpeg2_h262_b_presentation_scheduler dut
 (
+        .native_film_mode(1'b0),
+        .native_field(1'b0),
+        .display_picture_present(1'b0),
+        .display_repeat_first_field(1'b0),
+        .candidate_top_field_first(1'b1),
     .clk(clk),.reset(reset),.swap_window_pulse(swap),
     .cadence_tick_pulse(cadence),.frame_rate_code(4'h4),
     .timestamp_candidate_active(1'b0),.timestamp_candidate_due(1'b0),
@@ -200,6 +205,8 @@ integer checks=0;
 always #5 clk=~clk;
 
 mpeg2_h262_picture_timestamp ownership(
+        .picture_repeat_first_field(1'b0),
+        .picture_progressive_frame(1'b0),
  .clk(clk),.reset(reset),.metadata_valid(metadata),.metadata_pts(metadata_pts),
  .picture_coding_extension_valid(1'b0),.picture_top_field_first(1'b1),
  .picture_start(i_start||p_start||b_start),.picture_is_b(b_start),
@@ -214,6 +221,11 @@ mpeg2_h262_pts_presentation_timeline timeline(
  .candidate_valid(candidate_pts_valid),.candidate_pts(candidate_pts),.anchored(anchored),
  .stc_90k(stc),.candidate_active(pts_active),.candidate_due(pts_due));
 mpeg2_h262_b_presentation_scheduler dut(
+        .native_film_mode(1'b0),
+        .native_field(1'b0),
+        .display_picture_present(1'b0),
+        .display_repeat_first_field(1'b0),
+        .candidate_top_field_first(1'b1),
  .clk(clk),.reset(reset),.swap_window_pulse(swap),.cadence_tick_pulse(cadence),
  .frame_rate_code(rate_code),.timestamp_candidate_active(pts_active),.timestamp_candidate_due(pts_due),
  .native_ordinary_overlap_enable(native_enable),.active_frame_bank(active_bank),

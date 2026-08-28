@@ -3,9 +3,9 @@
 //
 // The first native milestone presents complete frame pictures as two fields.
 // Physical 480i timing must alternate top and bottom fields, so a session that
-// changes its authored first-field order cannot be presented by this bounded
-// path without an additional repeat/drop policy. Lock the first interlaced
-// picture's order and withdraw native eligibility on any later mismatch.
+// changes its authored first-field order needs per-picture field admission.
+// Film mode enables that path; ordinary interlaced frames retain fixed order.
+// A mixed film/interlaced session remains outside the film milestone.
 //============================================================================
 module mpeg2_h262_native_field_order
 (
@@ -14,6 +14,8 @@ module mpeg2_h262_native_field_order
     input  wire picture_coding_extension_valid,
     input  wire progressive_sequence,
     input  wire picture_top_field_first,
+    input  wire picture_progressive_frame,
+    output reg film_mode,
     output reg  locked,
     output reg  top_field_first,
     output reg  mismatch
@@ -22,15 +24,18 @@ module mpeg2_h262_native_field_order
 always @(posedge clk) begin
     if (reset) begin
         locked          <= 1'b0;
+        film_mode       <= 1'b0;
         top_field_first <= 1'b1;
         mismatch        <= 1'b0;
     end
     else if (picture_coding_extension_valid && !progressive_sequence) begin
         if (!locked) begin
             locked          <= 1'b1;
+            film_mode       <= picture_progressive_frame;
             top_field_first <= picture_top_field_first;
         end
-        else if (top_field_first != picture_top_field_first) begin
+        else if ((!film_mode && top_field_first != picture_top_field_first) ||
+                 (film_mode && !picture_progressive_frame)) begin
             mismatch <= 1'b1;
         end
     end

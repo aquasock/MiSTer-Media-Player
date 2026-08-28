@@ -13,6 +13,7 @@ mpeg2_video_output_timing mpeg2_video_output_timing
 	.v_sync                  (display_v_sync),
 	.field                   (display_field),
 	.field_window            (display_field_window),
+	.field_swap_window       (display_field_swap_window),
 	.frame_window            (display_frame_window)
 );
 
@@ -84,9 +85,11 @@ wire        mpeg2_new_intra_vlc_format;
 wire        mpeg2_new_alternate_scan;
 wire        mpeg2_new_progressive_frame;
 wire        mpeg2_new_chroma_420_type;
-// Entry 365: extracted for interlaced operation and 3:2 pulldown; carried
-// into the cadence snapshot only, not yet consumed by presentation.
+// Picture field-order and repeat metadata feed native film presentation.
 wire        mpeg2_new_top_field_first;
+wire        mpeg2_new_native_film_mode;
+wire        mpeg2_new_native_film_supported;
+wire        mpeg2_new_pce_repeat_first_field, mpeg2_new_pce_progressive_frame;
 wire        mpeg2_new_native_field_order_locked;
 wire        mpeg2_new_native_top_field_first;
 wire        mpeg2_new_native_field_order_mismatch;
@@ -98,6 +101,8 @@ mpeg2_h262_native_field_order mpeg2_h262_native_field_order
 	.picture_coding_extension_valid (mpeg2_new_picture_coding_extension_valid),
 	.progressive_sequence           (mpeg2_new_progressive_sequence),
 	.picture_top_field_first        (mpeg2_new_picture_coding_extension_top_field_first),
+	.picture_progressive_frame      (mpeg2_new_pce_progressive_frame),
+	.film_mode                      (mpeg2_new_native_film_mode),
 	.locked                         (mpeg2_new_native_field_order_locked),
 	.top_field_first                (mpeg2_new_native_top_field_first),
 	.mismatch                       (mpeg2_new_native_field_order_mismatch)
@@ -105,7 +110,8 @@ mpeg2_h262_native_field_order mpeg2_h262_native_field_order
 
 wire mpeg2_new_native_480i_request =
 	!status[120] &&
-	mpeg2_new_phase1_supported &&
+    (mpeg2_new_phase1_supported ||
+     (mpeg2_new_native_film_mode && mpeg2_new_native_film_supported)) &&
 	!mpeg2_new_progressive_sequence &&
 	mpeg2_new_native_field_order_locked &&
 	!mpeg2_new_native_field_order_mismatch;
@@ -123,6 +129,8 @@ wire [7:0]  mpeg2_new_inband_count;
 wire [32:0] mpeg2_new_display_pts;
 wire        mpeg2_new_display_pts_valid;
 wire        mpeg2_new_display_top_field_first;
+wire        mpeg2_new_display_repeat_first_field, mpeg2_new_display_progressive_frame;
+wire        mpeg2_new_display_descriptor_valid, mpeg2_new_candidate_top_field_first;
 wire [7:0]  mpeg2_new_associated_count;
 // Entry 389: timestamp-driven candidate presentation.  The scheduler exports
 // only its already-stable next identity; timestamp ownership supplies the

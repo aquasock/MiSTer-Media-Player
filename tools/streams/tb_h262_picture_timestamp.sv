@@ -8,6 +8,8 @@ module tb_h262_picture_timestamp;
     reg clk=0, reset=1;
     reg metadata_valid=0; reg [32:0] metadata_pts=0;
     reg picture_coding_extension_valid=0, picture_top_field_first=1;
+    reg picture_repeat=0,picture_progressive=0;
+    wire display_repeat,display_progressive,descriptor_valid,candidate_tff;
     reg picture_start=0, picture_is_b=0, decode_scratch_bank=0;
     reg b_picture_complete=0;
     reg [1:0] active_frame_bank=0, display_frame_bank=0;
@@ -20,7 +22,9 @@ module tb_h262_picture_timestamp;
 
     always #5 clk=~clk;
 
-    mpeg2_h262_picture_timestamp dut(.clk(clk),.reset(reset),
+    mpeg2_h262_picture_timestamp dut(
+        .picture_repeat_first_field(picture_repeat),
+        .picture_progressive_frame(picture_progressive),.clk(clk),.reset(reset),
         .metadata_valid(metadata_valid),.metadata_pts(metadata_pts),
         .picture_coding_extension_valid(picture_coding_extension_valid),
         .picture_top_field_first(picture_top_field_first),
@@ -37,6 +41,8 @@ module tb_h262_picture_timestamp;
         .candidate_frame_bank(candidate_frame_bank),
         .display_pts(display_pts),.display_pts_valid(display_pts_valid),
         .display_top_field_first(display_top_field_first),
+        .display_repeat_first_field(display_repeat),.display_progressive_frame(display_progressive),
+        .display_descriptor_valid(descriptor_valid),.candidate_top_field_first(candidate_tff),
         .candidate_pts(candidate_pts),.candidate_pts_valid(candidate_pts_valid),
         .associated_count(associated_count));
 
@@ -47,7 +53,7 @@ module tb_h262_picture_timestamp;
     task start_picture; begin @(negedge clk); picture_start=1;
               @(negedge clk); picture_start=0; end endtask
     task field_order(input tff);
-        begin @(negedge clk); picture_top_field_first=tff;
+        begin @(negedge clk); picture_top_field_first=tff;picture_repeat=!tff;picture_progressive=1;
               picture_coding_extension_valid=1;
               @(negedge clk); picture_coding_extension_valid=0; end
     endtask
@@ -73,12 +79,12 @@ module tb_h262_picture_timestamp;
         @(negedge clk); display_frame_bank=2'd0; @(posedge clk);
         if (display_pts !== 33'h0_0007_7EF2 || !display_pts_valid)
             $fatal(1,"bank0 pts %h valid %b, expected 00077ef2",display_pts,display_pts_valid);
-        if (!display_top_field_first)
+        if (!display_top_field_first || display_repeat || !display_progressive || !descriptor_valid)
             $fatal(1,"bank0 lost TFF ownership");
         @(negedge clk); display_frame_bank=2'd1; @(posedge clk);
         if (display_pts !== 33'h0_0007_8AC0)
             $fatal(1,"bank1 pts %h, expected 00078ac0",display_pts);
-        if (display_top_field_first)
+        if (display_top_field_first || !display_repeat || !display_progressive || !descriptor_valid)
             $fatal(1,"bank1 lost BFF ownership");
         if (associated_count !== 8'd2)
             $fatal(1,"associated %0d, expected 2",associated_count);
@@ -127,12 +133,12 @@ module tb_h262_picture_timestamp;
         @(posedge clk);
         if (display_pts !== 33'h0_0000_2000 || !display_pts_valid)
             $fatal(1,"scratch0 pts %h valid %b",display_pts,display_pts_valid);
-        if (!display_top_field_first)
+        if (!display_top_field_first || display_repeat || !display_progressive || !descriptor_valid)
             $fatal(1,"scratch0 lost TFF ownership");
         @(negedge clk); display_scratch_bank=1; @(posedge clk);
         if (display_pts !== 33'h0_0000_1000 || !display_pts_valid)
             $fatal(1,"scratch1 pts %h valid %b",display_pts,display_pts_valid);
-        if (display_top_field_first)
+        if (display_top_field_first || !display_repeat || !display_progressive || !descriptor_valid)
             $fatal(1,"scratch1 lost BFF ownership");
 
         // Candidate order is independent of decode order: ask for scratch 1,
@@ -140,7 +146,7 @@ module tb_h262_picture_timestamp;
         @(negedge clk); candidate_frame_valid=1;
         candidate_frame_scratch=1; candidate_scratch_bank=1;
         @(posedge clk);
-        if (candidate_pts !== 33'h0_0000_1000 || !candidate_pts_valid)
+        if (candidate_pts !== 33'h0_0000_1000 || !candidate_pts_valid || candidate_tff)
             $fatal(1,"scratch candidate query lost reordered timestamp");
         @(negedge clk); candidate_frame_scratch=0; candidate_frame_bank=1;
         @(posedge clk);
@@ -162,7 +168,10 @@ module tb_h262_picture_timestamp;
         if (associated_count !== 8'd6)
             $fatal(1,"unannotated B changed association count");
 
-        $display("H262_PICTURE_TIMESTAMP_PASS reference=1 scratch=2 reorder=1 unannotated=reference/b delayed=1 coincident=1 candidate_query=1 count=%0d",
+        @(negedge clk);reset=1;@(negedge clk);reset=0;
+        if(descriptor_valid||display_repeat||display_progressive||candidate_pts_valid)
+            $fatal(1,"replay inherited picture metadata");
+        $display("H262_PICTURE_TIMESTAMP_PASS reference=1 scratch=2 reorder=1 unannotated=reference/b delayed=1 coincident=1 candidate_query=1 count_after_reset=%0d",
                  associated_count);
         $finish;
     end

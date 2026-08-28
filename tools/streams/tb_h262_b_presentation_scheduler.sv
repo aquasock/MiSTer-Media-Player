@@ -17,6 +17,11 @@ module tb_h262_b_presentation_scheduler;
 
     always #5 clk=~clk;
     mpeg2_h262_b_presentation_scheduler dut(
+        .native_film_mode(1'b0),
+        .native_field(1'b0),
+        .display_picture_present(1'b0),
+        .display_repeat_first_field(1'b0),
+        .candidate_top_field_first(1'b1),
         .clk(clk),.reset(reset),.swap_window_pulse(swap),
         .cadence_tick_pulse(cadence_tick),
         .frame_rate_code(frame_rate_code),

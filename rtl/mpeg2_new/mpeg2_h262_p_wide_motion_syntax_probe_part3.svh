@@ -341,7 +341,11 @@
 
             if(pce_capture) begin
                 pce_shift<=pce_next;
-                if(pce_count==4) begin
+                // Other extension types (including quant matrices) must not
+                // overwrite the last picture-coding extension's controls.
+                if((pce_count==0)&&(stream_data[7:4]!=4'h8))begin
+                    pce_capture<=0;pce_count<=0;
+                end else if(pce_count==4) begin
                     pce_capture<=0;
                     pce_count<=0;
                     q_scale_type<=pce_next[12];

@@ -22,15 +22,16 @@
 //   - 7.4.3 saturation
 //   - 7.4.4 mismatch control
 //
-// Phase 1D capability boundary:
-//   The normative default intra matrix is implemented.  Downloaded custom
-//   matrices are valid H.262, but are reported as unsupported until matrix
-//   download storage is implemented in a later phase.
+// Stream-defined intra weights are loaded from the accepted ES. The legacy
+// default flag remains a guard against a disconnected matrix byte observer.
 //============================================================================
 module mpeg2_h262_inverse_quant
 (
     input  wire               clk,
     input  wire               reset,
+
+    input  wire [7:0]         stream_data,
+    input  wire               stream_valid,
 
     input  wire               block_start,
     input  wire               coeff_write_en,
@@ -280,7 +281,14 @@ endfunction
 wire [5:0] qfs_read_index =
     scan_index(latched_alternate_scan, physical_index);
 wire signed [12:0] qfs_current = qfs[qfs_read_index];
-wire [7:0] weight_current = default_intra_weight(physical_index);
+wire [7:0] weight_current;
+wire matrix_default, matrix_error, matrix_update;
+mpeg2_h262_quant_matrices matrices (
+    .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),
+    .read_index(physical_index),.intra_weight(weight_current),.non_intra_weight(),
+    .intra_default(matrix_default),.non_intra_default(),
+    .syntax_error(matrix_error),.update_now(matrix_update)
+);
 
 // kate - Preserve the original H.262 arithmetic expression exactly, but start
 // it from a registered second-multiply result.  The *2 and /32 operations are
@@ -371,6 +379,10 @@ always @(posedge clk) begin
         coeff_out_valid       <= 1'b0;
         coeff_out_block_end   <= 1'b0;
 
+        // Matrix writes must never race a live transform. Fail closed if a
+        // future parser change violates the header/row retirement contract.
+        if (matrix_error || (matrix_update && busy)) iq_error <= 1'b1;
+
         // Pipeline valid flow.  Stage 1 is explicitly asserted only when a
         // physical coefficient is issued below.
         iq_s1_valid <= 1'b0;
@@ -404,8 +416,8 @@ always @(posedge clk) begin
             if (busy || (quantiser_scale_code == 5'd0)) begin
                 iq_error <= 1'b1;
             end
-            else if (!intra_quant_matrix_default) begin
-                // Valid H.262, but outside the current implementation subset.
+            else if (!intra_quant_matrix_default && matrix_default) begin
+                // The frontend saw a download that this observer missed.
                 unsupported_matrix <= 1'b1;
             end
             else begin

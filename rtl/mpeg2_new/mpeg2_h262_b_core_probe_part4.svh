@@ -3,7 +3,7 @@
                 if(parser_at_end)state<=S_ERROR;
                 else begin
                     motion_residual_shift<=motion_residual_next;
-                    if({2'b00,motion_residual_count}==(b_forward_f_code_vertical-4'd2))begin
+                    if({1'b0,motion_residual_count}==(b_forward_f_code_vertical-4'd2))begin
                         cur_fy<=reconstruct_mv(fpy,motion_code_pending,motion_residual_next,b_forward_f_code_vertical);
                         motion_residual_count<=0;motion_bits<=0;motion_len<=0;
                         if(current_direction==2'd3)state<=S_BX;
@@ -27,7 +27,7 @@
                 if(parser_at_end)state<=S_ERROR;
                 else begin
                     motion_residual_shift<=motion_residual_next;
-                    if({2'b00,motion_residual_count}==(b_backward_f_code_horizontal-4'd2))begin
+                    if({1'b0,motion_residual_count}==(b_backward_f_code_horizontal-4'd2))begin
                         cur_bx<=reconstruct_mv(bpx,motion_code_pending,motion_residual_next,b_backward_f_code_horizontal);
                         motion_residual_count<=0;motion_bits<=0;motion_len<=0;state<=S_BY;
                     end else motion_residual_count<=motion_residual_count+1'b1;
@@ -51,7 +51,7 @@
                 if(parser_at_end)state<=S_ERROR;
                 else begin
                     motion_residual_shift<=motion_residual_next;
-                    if({2'b00,motion_residual_count}==(b_backward_f_code_vertical-4'd2))begin
+                    if({1'b0,motion_residual_count}==(b_backward_f_code_vertical-4'd2))begin
                         cur_by<=reconstruct_mv(bpy,motion_code_pending,motion_residual_next,b_backward_f_code_vertical);
                         motion_residual_count<=0;
                         if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end else state<=S_MB_DONE;
@@ -173,9 +173,16 @@
             end
             S_MB_B: begin
                 sideband_valid<=1;sideband_index<=6'h3b;sideband_value<=0;motion_vector_x<=cur_bx;motion_vector_y<=cur_by;
-                if(current_direction[0])begin fpx<=cur_fx;fpy<=cur_fy;end
-                if(current_direction[1])begin bpx<=cur_bx;bpy<=cur_by;end
-                if(!current_intra)last_direction<=current_direction;row_has_coded_mb<=1;
+                // H.262 7.6.3.4: intra without concealment resets ALL PMVs.
+                // Concealment vectors remain excluded by picture admission.
+                if(current_intra)begin
+                    fpx<=0;fpy<=0;bpx<=0;bpy<=0;last_direction<=0;
+                end else begin
+                    if(current_direction[0])begin fpx<=cur_fx;fpy<=cur_fy;end
+                    if(current_direction[1])begin bpx<=cur_bx;bpy<=cur_by;end
+                    last_direction<=current_direction;
+                end
+                row_has_coded_mb<=1;
                 // kate - Commit 173: current_col becomes the next uncovered
                 // column after every coded endpoint. S_MBA then either parses
                 // another in-slice MBA or recognizes the buffered zero tail.

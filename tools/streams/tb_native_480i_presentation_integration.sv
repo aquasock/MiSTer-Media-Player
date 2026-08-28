@@ -187,6 +187,11 @@ native_all_i_feeder #(.DECODE_FIELDS(1),.FRAME_LIMIT(8)) terminal_feeder
 
 mpeg2_h262_b_presentation_scheduler baseline_scheduler
 (
+        .native_film_mode(1'b0),
+        .native_field(1'b0),
+        .display_picture_present(1'b0),
+        .display_repeat_first_field(1'b0),
+        .candidate_top_field_first(1'b1),
     .clk(clk_mpeg2),.reset(reset_mpeg2),
     .swap_window_pulse(swap_window_pulse),
     .cadence_tick_pulse(cadence_tick_pulse),.frame_rate_code(4'h4),
@@ -203,6 +208,11 @@ mpeg2_h262_b_presentation_scheduler baseline_scheduler
 );
 mpeg2_h262_b_presentation_scheduler overlap_scheduler
 (
+        .native_film_mode(1'b0),
+        .native_field(1'b0),
+        .display_picture_present(1'b0),
+        .display_repeat_first_field(1'b0),
+        .candidate_top_field_first(1'b1),
     .clk(clk_mpeg2),.reset(reset_mpeg2),
     .swap_window_pulse(swap_window_pulse),
     .cadence_tick_pulse(cadence_tick_pulse),.frame_rate_code(4'h4),
@@ -219,6 +229,11 @@ mpeg2_h262_b_presentation_scheduler overlap_scheduler
 );
 mpeg2_h262_b_presentation_scheduler accelerated_scheduler
 (
+        .native_film_mode(1'b0),
+        .native_field(1'b0),
+        .display_picture_present(1'b0),
+        .display_repeat_first_field(1'b0),
+        .candidate_top_field_first(1'b1),
     .clk(clk_mpeg2),.reset(reset_mpeg2),
     .swap_window_pulse(swap_window_pulse),
     .cadence_tick_pulse(cadence_tick_pulse),.frame_rate_code(4'h4),
@@ -239,6 +254,11 @@ mpeg2_h262_b_presentation_scheduler accelerated_scheduler
 );
 mpeg2_h262_b_presentation_scheduler terminal_scheduler
 (
+        .native_film_mode(1'b0),
+        .native_field(1'b0),
+        .display_picture_present(1'b0),
+        .display_repeat_first_field(1'b0),
+        .candidate_top_field_first(1'b1),
     .clk(clk_mpeg2),.reset(reset_mpeg2),
     .swap_window_pulse(swap_window_pulse),
     .cadence_tick_pulse(cadence_tick_pulse),.frame_rate_code(4'h4),

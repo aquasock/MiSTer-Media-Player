@@ -47,8 +47,11 @@ reg picture_complete = 1'b0;
 reg running = 1'b0;
 reg [1:0] ce_div = 2'd0;
 reg [11:0] h_pos = 12'd0;
-reg [8:0] sequence_line = 9'd0;
+reg [9:0] sequence_line = 10'd0;
+wire repeat_field=$test$plusargs("REPEAT_FIELD");
+wire [8:0] cyclic_line=sequence_line>=480 ? sequence_line-480 : sequence_line[8:0];
 reg fingerprint_mode = 1'b0;
+wire film_mode=$test$plusargs("FILM");
 reg bff_mode = 1'b0;
 reg generation_mode = 1'b0;
 reg sync_reset_mode = 1'b0;
@@ -60,9 +63,9 @@ always #9.259 rd_clk = ~rd_clk;
 
 wire pixel_ce = (ce_div == 2'd3);
 wire pixel_en = running && (h_pos < 12'd720);
-wire [8:0] field_line = (sequence_line < 9'd240) ?
-    sequence_line : (sequence_line - 9'd240);
-wire field_parity = (sequence_line < 9'd240) ?
+wire [8:0] field_line = (cyclic_line < 9'd240) ?
+    cyclic_line : (cyclic_line - 9'd240);
+wire field_parity = (cyclic_line < 9'd240) ?
     bff_mode : ~bff_mode;
 wire [11:0] v_pos = {2'd0,field_line,1'b0} + field_parity;
 
@@ -116,6 +119,7 @@ wire stimulus_vs = !((sequence_line >= 9'd3) &&
 
 mpeg2_luma_framebuffer dut
 (
+        .progressive_chroma(film_mode),
     .reset              (reset),
     .mem_clk            (mem_clk),
     .picture_complete   (picture_complete),
@@ -249,7 +253,8 @@ endfunction
 function automatic [10:0] chroma_row_for_luma;
     input [10:0] luma_row;
     begin
-        chroma_row_for_luma = {3'd0,luma_row[8:2],luma_row[0]};
+        chroma_row_for_luma = film_mode ? (luma_row >> 1) :
+            {3'd0,luma_row[8:2],luma_row[0]};
     end
 endfunction
 
@@ -364,7 +369,7 @@ always @(posedge rd_clk) begin
         end
 
         if (pixel_ce) begin
-            output_check_pending <= generation_mode && running;
+            output_check_pending <= (generation_mode || film_mode) && running;
             output_active_pending <= dut.decoded_picture_window_d;
             output_x_pending <= dut.source_x_d;
             output_y_pending <= dut.source_y_d;
@@ -399,7 +404,7 @@ always @(posedge rd_clk) begin
                 expected_video_g <= expected_rgb_value[15:8];
                 expected_video_b <= expected_rgb_value[7:0];
 
-                if (generation_mode &&
+                if ((generation_mode || film_mode) &&
                     ((dut.y_rd_data !== expected_luma_byte) ||
                      (dut.cb_rd_data !== expected_cb_byte) ||
                      (dut.cr_rd_data !== expected_cr_byte))) begin
@@ -594,13 +599,13 @@ always @(posedge rd_clk) begin
     if (reset && !sync_reset_mode) begin
         ce_div <= 2'd0;
         h_pos <= 12'd0;
-        sequence_line <= 9'd0;
+        sequence_line <= 10'd0;
     end
     else if (pixel_ce && running) begin
         if (h_pos == 12'd857) begin
             h_pos <= 12'd0;
-            sequence_line <= sequence_line + 9'd1;
-            if (sequence_line == (fingerprint_mode ? 9'd479 : 9'd11))
+            sequence_line <= sequence_line + 10'd1;
+            if (sequence_line == (fingerprint_mode ? (repeat_field ? 10'd719 : 10'd479) : 10'd11))
                 running <= 1'b0;
         end
         else begin
@@ -821,10 +826,10 @@ initial begin
         else if (position_mismatch_count != 0)
             $fatal(1,"matching cache produced %0d position mismatches",
                    position_mismatch_count);
-        if (provenance_count != 480)
+        if (provenance_count != (repeat_field ? 720 : 480))
             $fatal(1,"expected 480 line provenance events, got %0d",
                    provenance_count);
-        if ((first_field_provenance_count != 240) ||
+        if ((first_field_provenance_count != (repeat_field ? 480 : 240)) ||
             (second_field_provenance_count != 240))
             $fatal(1,"field provenance imbalance %0d/%0d",
                    first_field_provenance_count,second_field_provenance_count);
@@ -866,6 +871,14 @@ initial begin
         else if (write_read_mismatch_count != 0)
             $fatal(1,"matching accepted writes/readback produced %0d mismatches",
                    write_read_mismatch_count);
+        if(film_mode)begin
+            if(rgb_component_mismatch_count||rgb_output_mismatch_count||output_control_mismatch_count||
+               rgb_active_pixel_count!=(repeat_field ? 518400 : 345600)||cache_error||bank_overlap_error)
+                $fatal(1,"film RGB/component/control errors=%0d/%0d/%0d pixels=%0d cache=%0d/%0d",
+                    rgb_component_mismatch_count,rgb_output_mismatch_count,output_control_mismatch_count,
+                    rgb_active_pixel_count,cache_error,bank_overlap_error);
+            $display("FILM_CACHE_RGB_PASS repeated_field=%0d pixels=%0d",repeat_field,rgb_active_pixel_count);
+        end
         $display("NATIVE_CACHE_FINGERPRINT_PASS order=%s corrupted=%0d completed=%0d mismatches=%0d",
                  bff_mode?"BFF":"TFF",$test$plusargs("CORRUPT"),
                  fingerprint_count,fingerprint_mismatch_count);

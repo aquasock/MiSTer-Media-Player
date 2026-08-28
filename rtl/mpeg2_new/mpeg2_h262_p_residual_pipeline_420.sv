@@ -104,6 +104,7 @@ mpeg2_h262_p_non_intra_transform transform
 (
     .clk(clk),
     .reset(reset),
+    .stream_data(stream_data),.stream_valid(stream_valid),
     .qfs_block_index(2'd1),
     .qfs_block_start(gstart),
     .qfs_write_en(gwe),

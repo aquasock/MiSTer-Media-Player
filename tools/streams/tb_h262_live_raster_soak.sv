@@ -58,6 +58,26 @@ module tb_h262_live_raster_soak #(
     reg [1023:0] hex_path,pixel_path,prediction_trace_path,row_trace_path;
     reg [1023:0] b_block_trace_path;
     reg [1023:0] picture_trace_path;
+    reg [31:0] coded_to_display[0:PIXEL_PICTURES-1];
+    reg [1023:0] map_path;
+    integer coded_picture=-1,source_pixel_picture;
+    integer reference_coded_picture[0:2];
+    integer reference_max_error[0:2];
+    integer reference_error_picture[0:2];
+    integer prediction_error_bound,chain_bound_mismatches=0;
+    reg chain_bound=0;
+    reg refresh_references=0;
+    reg [1:0] refresh_active_bank_d=0;
+    integer delta_histogram[0:255];
+    integer picture_max_delta[0:PIXEL_PICTURES-1];
+    integer pixel_report_fd=0;
+    reg [1023:0] pixel_report_path;
+    integer intra_samples=0,intra_mismatches=0,intra_max_delta=0;
+    integer intra_index,intra_delta;
+    wire i_recon_done,i_recon_valid,i_iq_error,i_idct_error,i_recon_error,i_matrix_error;
+    wire [1:0] i_component;
+    wire [11:0] i_x,i_y;
+    wire [7:0] i_value;
     integer stream_len,stream_index=0,quiet_cycles=0;
     integer i,p_rows=0,b_rows=0,p_pictures=0,b_pictures=0;
     integer published_references=0,display_swaps=0;
@@ -309,6 +329,20 @@ module tb_h262_live_raster_soak #(
     always #5 clk=~clk;
 
 
+    reg [5:0] b_state_previous=0;
+    always @(posedge clk) begin
+        b_state_previous<=publication.b_controller.state;
+        if(publication.b_controller.state==23 && b_state_previous!=23)
+            $display("B_PARSE_FAILURE coded=%0d previous_state=%0d byte=%0d slice=%0d col=%0d bitpos=%0d/%0d at_end=%0d mbtype_bits=%b len=%0d quant=%0d intra=%0d qscale=%0d coeff_count=%0d",
+                coded_picture,b_state_previous,stream_index,
+                publication.b_controller.slice_row_number,publication.b_controller.current_col,
+                publication.b_controller.parse_byte_index,publication.b_controller.parse_bit_index,
+                publication.b_controller.parser_at_end,publication.b_controller.mbtype_bits,
+                publication.b_controller.mbtype_len,publication.b_controller.current_quant,
+                publication.b_controller.current_intra,publication.b_controller.current_qscale,
+                publication.b_controller.residual_coeff_count);
+    end
+
     mpeg2_h262_frontend frontend(
         .clk(clk),.reset(reset),.stream_data(stream_data),
         .stream_valid(stream_valid),.frontend_ready(frontend_ready),
@@ -325,7 +359,9 @@ module tb_h262_live_raster_soak #(
         .phase1_supported(phase1_supported),.vertical_size(vertical_size),
         .intra_dc_precision(intra_dc_precision),
         .intra_vlc_format(intra_vlc_format),
-        .pipeline_block_done(1'b1),.recon_block_complete(1'b1),
+        .frame_pred_frame_dct(frontend.frame_pred_frame_dct),
+        .pipeline_block_done(MIXED_PIXEL_MODE==2 ? i_recon_done : 1'b1),
+        .recon_block_complete(MIXED_PIXEL_MODE==2 ? i_recon_done : 1'b1),
         .p_persistence_complete(pred_persisted),
         .p_row_persistence_complete(pred_row_persisted),
         .picture_420_complete(picture_complete),
@@ -344,6 +380,45 @@ module tb_h262_live_raster_soak #(
         .publication_error_detail(publication_error_detail),
         .p_wide_probe_error_detail(p_wide_probe_error_detail),
         .b_user_success(b_success));
+
+    generate if(MIXED_PIXEL_MODE==2) begin: real_intra
+        wire qs,qe,qv,iv;
+        wire [5:0] qi,ii;
+        wire signed [11:0] qvalue;
+        wire signed [15:0] ivalue;
+        wire idone;
+        mpeg2_h262_inverse_quant iq(
+            .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),
+            .block_start(publication.qfs_block_start),.coeff_write_en(publication.qfs_write_en),
+            .coeff_write_index(publication.qfs_write_index),.coeff_write_value(publication.qfs_write_value),
+            .block_end(publication.qfs_block_end),.intra_quant_matrix_default(frontend.intra_quant_matrix_default),
+            .intra_dc_precision(intra_dc_precision),
+            .quantiser_scale_code(publication.macroblock_quant ? publication.macroblock_quantiser_scale_code : publication.quantiser_scale_code),
+            .q_scale_type(frontend.q_scale_type),.alternate_scan(frontend.alternate_scan),
+            .block_complete(),.iq_error(i_iq_error),.unsupported_matrix(i_matrix_error),
+            .first_luma_f00(),.first_luma_f77(),.coeff_out_block_start(qs),
+            .coeff_out_valid(qv),.coeff_out_index(qi),.coeff_out_value(qvalue),.coeff_out_block_end(qe));
+        mpeg2_h262_idct idct(
+            .clk(clk),.reset(reset),.coeff_block_start(qs),.coeff_valid(qv),.coeff_index(qi),
+            .coeff_value(qvalue),.coeff_block_end(qe),.block_complete(idone),.idct_error(i_idct_error),
+            .sample_valid(iv),.sample_index(ii),.sample_value(ivalue),.first_luma_sample00(),.first_luma_sample77());
+        mpeg2_h262_intra_recon recon(
+            .clk(clk),.reset(reset),.horizontal_size(horizontal_size),.vertical_size(vertical_size),
+            .slice_vertical_position(publication.slice_vertical_position),
+            .slice_vertical_position_extension(publication.slice_vertical_position_extension),
+            .macroblock_address_increment(publication.macroblock_address_increment),
+            .slice_start(publication.slice_start),.macroblock_start(publication.luma_macroblock_start),
+            .block_index(publication.qfs_block_index),.dct_type(publication.dct_type),
+            .sample_valid(iv),.sample_index(ii),.sample_value(ivalue),.idct_block_complete(idone),
+            .pixel_valid(i_recon_valid),.pixel_component(i_component),.pixel_x(i_x),.pixel_y(i_y),
+            .pixel_value(i_value),.block_start(),.block_complete(i_recon_done),
+            .macroblock_420_complete(),.recon_error(i_recon_error));
+    end else begin
+        assign i_recon_done=1'b1;
+        assign i_recon_valid=0;
+        assign i_iq_error=0;assign i_matrix_error=0;assign i_idct_error=0;assign i_recon_error=0;
+        assign i_component=0;assign i_x=0;assign i_y=0;assign i_value=0;
+    end endgenerate
 
     mpeg2_h262_reference_read_probe prediction(
         .clk(clk),.reset(reset),.horizontal_size(horizontal_size),
@@ -408,6 +483,11 @@ module tb_h262_live_raster_soak #(
         .ddram_we(memory_we));
 
     mpeg2_h262_b_presentation_scheduler scheduler(
+        .native_film_mode(1'b0),
+        .native_field(1'b0),
+        .display_picture_present(1'b0),
+        .display_repeat_first_field(1'b0),
+        .candidate_top_field_first(1'b1),
         .clk(clk),.reset(reset),.swap_window_pulse(swap_window_pulse),
         .cadence_tick_pulse(swap_window_pulse),
         .frame_rate_code(4'h3),
@@ -510,6 +590,22 @@ module tb_h262_live_raster_soak #(
                 $fatal(1,"cannot open picture trace");
             $fdisplay(picture_trace_fd,
                 "cycle,event,id,type,temporal_reference,bank,hold_total");
+        end
+        if(MIXED_PIXEL_MODE==2)begin
+            refresh_references=$test$plusargs("REFRESH_REFERENCES");
+            chain_bound=$test$plusargs("CHAIN_ERROR_BOUND");
+            if(chain_bound&&refresh_references)$fatal(1,"chain proof requires real RTL references");
+            for(i=0;i<3;i=i+1)begin
+                reference_max_error[i]=0;reference_error_picture[i]=-1;
+            end
+            for(i=0;i<256;i=i+1)delta_histogram[i]=0;
+            for(i=0;i<PIXEL_PICTURES;i=i+1)picture_max_delta[i]=0;
+            if($value$plusargs("PIXEL_REPORT=%s",pixel_report_path))begin
+                pixel_report_fd=$fopen(pixel_report_path,"w");
+                if(pixel_report_fd==0)$fatal(1,"cannot write pixel report");
+            end
+            if(!$value$plusargs("MAP=%s",map_path))$fatal(1,"missing +MAP");
+            $readmemh(map_path,coded_to_display,0,PIXEL_PICTURES-1);
         end
         if(MIXED_PIXEL_MODE)begin
             if(!$value$plusargs("PIXELS=%s",pixel_path))
@@ -1077,8 +1173,47 @@ module tb_h262_live_raster_soak #(
                 profile_writer<=profile_writer+1;
             if(presentation_hold)profile_presentation<=profile_presentation+1;
         end
+        if(MIXED_PIXEL_MODE==2)begin
+            if(b_picture_start||non_b_picture_start) coded_picture=coded_picture+1;
+            if(i_iq_error||i_idct_error||i_recon_error||i_matrix_error||frontend.syntax_error)
+                $fatal(1,"original stream error coded=%0d iq=%0d idct=%0d recon=%0d matrix=%0d syntax=%0d/%0d",
+                    coded_picture,i_iq_error,i_idct_error,i_recon_error,i_matrix_error,
+                    frontend.syntax_error,frontend.syntax_error_source);
+            if(i_recon_valid)begin
+                reference_coded_picture[active_bank]=coded_picture;
+                if(coded_picture<0||coded_picture>=PIXEL_PICTURES)$fatal(1,"I picture index");
+                intra_index=coded_to_display[coded_picture]*PIXEL_PICBYTES;
+                if(i_component==0)intra_index=intra_index+i_y*PIXEL_WIDTH+i_x;
+                else if(i_component==1)intra_index=intra_index+PIXEL_CB_BASE+i_y*PIXEL_CWIDTH+i_x;
+                else if(i_component==2)intra_index=intra_index+PIXEL_CR_BASE+i_y*PIXEL_CWIDTH+i_x;
+                else $fatal(1,"I component");
+                intra_delta=$signed({1'b0,i_value})-$signed({1'b0,pixel_oracle[intra_index]});
+                if(intra_delta<0)intra_delta=-intra_delta;
+                if(reference_error_picture[active_bank]!=coded_picture)begin
+                    reference_error_picture[active_bank]=coded_picture;
+                    reference_max_error[active_bank]=0;
+                end
+                if(intra_delta>reference_max_error[active_bank])reference_max_error[active_bank]=intra_delta;
+                if(intra_delta>picture_max_delta[coded_picture])picture_max_delta[coded_picture]=intra_delta;
+                intra_samples=intra_samples+1;
+                if(intra_delta>intra_max_delta)intra_max_delta=intra_delta;
+                if(intra_delta>1)begin
+                    if(intra_mismatches==0)$display("I_FIRST coded=%0d display=%0d c=%0d x=%0d y=%0d rtl=%0d ref=%0d",coded_picture,coded_to_display[coded_picture],i_component,i_x,i_y,i_value,pixel_oracle[intra_index]);
+                    intra_mismatches=intra_mismatches+1;
+                end
+                // Exercise real reconstruction and subsequent prediction. The
+                // independent I writer's bus packing is tested in its own suite.
+                if(i_component==0)
+                    ddr_mem[reference_frame_offset(active_bank)+i_y*90+(i_x>>3)][(i_x&7)*8+:8]=i_value;
+                else
+                    ddr_mem[reference_frame_offset(active_bank)+(i_component==1?18'h0a8c0:18'h0d2f0)+i_y*45+(i_x>>3)][(i_x&7)*8+:8]=i_value;
+            end
+        end
+        source_pixel_picture=MIXED_PIXEL_MODE==2 ? coded_to_display[coded_picture] : temporal_reference;
         if(MIXED_PIXEL_MODE&&pred_store_valid)begin
-            if(temporal_reference>=PIXEL_PICTURES||pixel_component>=3||
+            if(MIXED_PIXEL_MODE==2&&!pixel_scratch_tag)
+                reference_coded_picture[active_bank]=coded_picture;
+            if(source_pixel_picture>=PIXEL_PICTURES||pixel_component>=3||
                (pixel_component==0&&
                 (pixel_x>=PIXEL_WIDTH||pixel_y>=PIXEL_HEIGHT))||
                (pixel_component!=0&&
@@ -1093,7 +1228,7 @@ module tb_h262_live_raster_soak #(
                        prediction.b_probe.ei,
                        prediction.b_probe.block_consumer_bank,
                        prediction.b_probe.block_prefetch_valid);
-            pixel_index=temporal_reference*PIXEL_PICBYTES;
+            pixel_index=source_pixel_picture*PIXEL_PICBYTES;
             if(pixel_component==0)
                 pixel_index=pixel_index+pixel_y*PIXEL_WIDTH+pixel_x;
             else if(pixel_component==1)
@@ -1106,21 +1241,46 @@ module tb_h262_live_raster_soak #(
                 $signed({1'b0,pixel_oracle[pixel_index]});
             if(pixel_delta<0)pixel_delta=-pixel_delta;
             pixel_samples=pixel_samples+1;
+            if(MIXED_PIXEL_MODE==2)begin
+                delta_histogram[pixel_delta]=delta_histogram[pixel_delta]+1;
+                if(pixel_delta>picture_max_delta[coded_picture])picture_max_delta[coded_picture]=pixel_delta;
+                // Interpolation/averaging and clipping cannot magnify the
+                // largest input error. A transform may add one LSB, separately
+                // verified by the paired oracle-reference run. Use MEASURED
+                // errors of the actual referenced banks, not a loose GOP cap.
+                if(pixel_scratch_tag)begin
+                    prediction_error_bound=reference_max_error[prediction.b_probe.past_bank_latched];
+                    if(reference_max_error[prediction.b_probe.future_bank_latched]>prediction_error_bound)
+                        prediction_error_bound=reference_max_error[prediction.b_probe.future_bank_latched];
+                end else prediction_error_bound=reference_max_error[prediction.mixed_probe.reference_bank_latched];
+                prediction_error_bound=prediction_error_bound+1;
+                if(pixel_delta>prediction_error_bound)begin
+                    if(chain_bound_mismatches==0)$display("CHAIN_BOUND_FIRST coded=%0d delta=%0d bound=%0d",coded_picture,pixel_delta,prediction_error_bound);
+                    chain_bound_mismatches=chain_bound_mismatches+1;
+                end
+                if(!pixel_scratch_tag)begin
+                    if(reference_error_picture[active_bank]!=coded_picture)begin
+                        reference_error_picture[active_bank]=coded_picture;
+                        reference_max_error[active_bank]=0;
+                    end
+                    if(pixel_delta>reference_max_error[active_bank])reference_max_error[active_bank]=pixel_delta;
+                end
+            end
             if(pixel_component==0)begin
                 if(pixel_y[0]) pixel_odd_samples=pixel_odd_samples+1;
                 else pixel_even_samples=pixel_even_samples+1;
             end
             if(pixel_delta>max_pixel_delta)max_pixel_delta=pixel_delta;
-            if(pixel_delta>2)begin
+            if(pixel_delta>(refresh_references ? 1 : 2))begin
                 pixel_mismatches=pixel_mismatches+1;
                 if(pixel_component==0)begin
                     if(pixel_y[0]) pixel_odd_mismatches=pixel_odd_mismatches+1;
                     else pixel_even_mismatches=pixel_even_mismatches+1;
                 end
-                if(!first_pixel_mismatch)begin
+                if(!first_pixel_mismatch || (MIXED_PIXEL_MODE==2 && pixel_mismatches<16))begin
                     first_pixel_mismatch=1;
-                    $display("MIXED_PIXEL_FIRST tr=%0d c=%0d x=%0d y=%0d rtl=%0d oracle=%0d delta=%0d",
-                             temporal_reference,pixel_component,pixel_x,pixel_y,
+                    $display("MIXED_PIXEL_FIRST coded=%0d tr=%0d c=%0d x=%0d y=%0d rtl=%0d oracle=%0d delta=%0d",
+                             coded_picture,temporal_reference,pixel_component,pixel_x,pixel_y,
                              pred_store_value,pixel_oracle[pixel_index],pixel_delta);
                 end
             end
@@ -1161,7 +1321,7 @@ module tb_h262_live_raster_soak #(
         // intra framebuffer writer.  Seed an accepted I picture into the same
         // fixed-stride DDR layout so the following P/B samples are checked
         // against real reference content instead of the historical zero fill.
-        if(MIXED_PIXEL_MODE&&picture_complete&&
+        if(MIXED_PIXEL_MODE==1&&picture_complete&&
            picture_coding_type==3'b001)begin
             for(pixel_row=0;pixel_row<PIXEL_HEIGHT;pixel_row=pixel_row+1)
                 for(pixel_word=0;pixel_word<PIXEL_LUMA_WORDS;
@@ -1190,6 +1350,40 @@ module tb_h262_live_raster_soak #(
                                          pixel_word*8+pixel_lane];
                     end
         end
+        // Diagnostic isolation: prevent legal IDCT rounding differences from
+        // accumulating through successive predicted references. Never enabled
+        // for the ordinary complete-chain qualification run.
+        // Replace only after persistence changes the active bank; the parser's
+        // picture_complete pulse can precede completed_bank registration.
+        if(MIXED_PIXEL_MODE==2&&refresh_references&&active_bank!=refresh_active_bank_d)begin
+            for(pixel_row=0;pixel_row<PIXEL_HEIGHT;pixel_row=pixel_row+1)
+                for(pixel_word=0;pixel_word<PIXEL_LUMA_WORDS;
+                    pixel_word=pixel_word+1)
+                    for(pixel_lane=0;pixel_lane<8;pixel_lane=pixel_lane+1)
+                        ddr_mem[reference_frame_offset(refresh_active_bank_d)+
+                                pixel_row*90+pixel_word]
+                            [pixel_lane*8 +: 8]=
+                            pixel_oracle[coded_to_display[reference_coded_picture[refresh_active_bank_d]]*PIXEL_PICBYTES+pixel_row*PIXEL_WIDTH+
+                                         pixel_word*8+pixel_lane];
+            for(pixel_row=0;pixel_row<PIXEL_CHEIGHT;pixel_row=pixel_row+1)
+                for(pixel_word=0;pixel_word<PIXEL_CHROMA_WORDS;
+                    pixel_word=pixel_word+1)
+                    for(pixel_lane=0;pixel_lane<8;pixel_lane=pixel_lane+1)begin
+                        ddr_mem[reference_frame_offset(refresh_active_bank_d)+
+                                18'h0a8c0+pixel_row*45+pixel_word]
+                            [pixel_lane*8 +: 8]=
+                            pixel_oracle[coded_to_display[reference_coded_picture[refresh_active_bank_d]]*PIXEL_PICBYTES+PIXEL_CB_BASE+
+                                         pixel_row*PIXEL_CWIDTH+
+                                         pixel_word*8+pixel_lane];
+                        ddr_mem[reference_frame_offset(refresh_active_bank_d)+
+                                18'h0d2f0+pixel_row*45+pixel_word]
+                            [pixel_lane*8 +: 8]=
+                            pixel_oracle[coded_to_display[reference_coded_picture[refresh_active_bank_d]]*PIXEL_PICBYTES+PIXEL_CR_BASE+
+                                         pixel_row*PIXEL_CWIDTH+
+                                         pixel_word*8+pixel_lane];
+                    end
+        end
+        refresh_active_bank_d<=active_bank;
     end
 
     always @(posedge clk) begin
@@ -1368,6 +1562,31 @@ module tb_h262_live_raster_soak #(
         display_scratch_bank_d<=display_scratch_bank;
 
         if(probe_error||pred_error||writer_error||presentation_error) begin
+            $display("B_ERROR_DETAIL parser=%0d replay=%0d matrix=%0d transform=%0d state=%0d coded=%0d samples=%0d/%0d mismatches=%0d/%0d",
+                publication.b_controller.parser_error,publication.b_controller.replay_error,
+                publication.b_controller.b_transform.matrix_error,
+                publication.b_controller.b_transform.probe_error,publication.b_controller.state,
+                coded_picture,intra_samples,pixel_samples,intra_mismatches,pixel_mismatches);
+            $display("B_RASTER_DETAIL mbi=%0d col=%0d row=%0d blk=%0d ei=%0d dir=%0d residual=%0d desc=%h fmv=%0d/%0d bmv=%0d/%0d phase=%0d bounds=%0d/%0d/%0d source=%0d/%0d last=%0d/%0d size=%0d/%0d",
+                prediction.b_probe.mbi,prediction.b_probe.col,prediction.b_probe.mrow,
+                prediction.b_probe.blk,prediction.b_probe.ei,prediction.b_probe.exec_direction,
+                prediction.b_probe.residual_hit,prediction.b_probe.desc_word,
+                $signed(prediction.b_probe.exec_fmvx),$signed(prediction.b_probe.exec_fmvy),
+                $signed(prediction.b_probe.exec_bmvx),$signed(prediction.b_probe.exec_bmvy),
+                prediction.b_probe.phase_backward,prediction.b_probe.phase_bounds_ok,
+                prediction.b_probe.block_phase0_bounds_ok,prediction.b_probe.block_phase1_bounds_ok,
+                $signed(prediction.b_probe.src_base_x),$signed(prediction.b_probe.src_base_y),
+                $signed(prediction.b_probe.src_last_x),$signed(prediction.b_probe.src_last_y),
+                prediction.b_probe.plane_width,prediction.b_probe.plane_height);
+            if(pixel_report_fd!=0)begin
+                $fdisplay(pixel_report_fd,"kind,index,value");
+                for(i=0;i<256;i=i+1)if(delta_histogram[i]!=0)
+                    $fdisplay(pixel_report_fd,"delta,%0d,%0d",i,delta_histogram[i]);
+                for(i=0;i<=coded_picture;i=i+1)
+                    $fdisplay(pixel_report_fd,"picture_max,%0d,%0d",i,picture_max_delta[i]);
+                $fclose(pixel_report_fd);
+                pixel_report_fd=0;
+            end
             // Error source 10 is the row-execution watchdog: the engine
             // started a row and never observed persistence.  The fatal above
             // reports the surrounding shell but not the engine's own position,
@@ -1534,7 +1753,7 @@ module tb_h262_live_raster_soak #(
                      pred_read_observed,pred_reconstructed_observed,
                      presentation_complete,probe_error,pred_error,
                      writer_error,presentation_error);
-            if(MIXED_PIXEL_MODE)begin
+            if(MIXED_PIXEL_MODE==1)begin
                 $display("MIXED_PIXEL_RESULT samples=%0d mismatches=%0d max_delta=%0d even=%0d/%0d odd=%0d/%0d",
                          pixel_samples,pixel_mismatches,max_pixel_delta,
                          pixel_even_mismatches,pixel_even_samples,
@@ -1570,10 +1789,11 @@ module tb_h262_live_raster_soak #(
                    profile_b_replay_twrite!=26591||
                    profile_b_replay_coeff_writes!=26591||
                    profile_b_replay_coeff_wait!=0||
+                   // The connected frame_pred_frame_dct path adds one clock.
                    ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
-                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1239996))||
+                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1239997))||
                    ((EXPECTED_DESCRIPTOR_DEPTH==4)&&
-                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1239996))||
+                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1239997))||
                    pixel_samples!=423936||pixel_mismatches!=0||
                    !writer_seen||!pred_read_observed||
                    !pred_reconstructed_observed||!presentation_complete||
@@ -1600,6 +1820,26 @@ module tb_h262_live_raster_soak #(
                 $finish;
             end
             else if(generic_stream)begin
+                if(MIXED_PIXEL_MODE==2)begin
+                    if(pixel_report_fd!=0)begin
+                        $fdisplay(pixel_report_fd,"kind,index,value");
+                        for(i=0;i<256;i=i+1)if(delta_histogram[i]!=0)
+                            $fdisplay(pixel_report_fd,"delta,%0d,%0d",i,delta_histogram[i]);
+                        for(i=0;i<PIXEL_PICTURES;i=i+1)
+                            $fdisplay(pixel_report_fd,"picture_max,%0d,%0d",i,picture_max_delta[i]);
+                        $fclose(pixel_report_fd);
+                    end
+                    $display("ORIGINAL_PIXEL_RESULT coded=%0d I=%0d P_B=%0d I_mismatch=%0d P_B_mismatch=%0d max_I=%0d max_P_B=%0d",
+                        coded_picture+1,intra_samples,pixel_samples,intra_mismatches,pixel_mismatches,intra_max_delta,max_pixel_delta);
+                    $display("CHAIN_ERROR_BOUND_RESULT enabled=%0d mismatches=%0d oracle_references=%0d",
+                        chain_bound,chain_bound_mismatches,refresh_references);
+                    if(coded_picture+1!=PIXEL_PICTURES||
+                       pixel_samples!=(p_pictures+b_pictures)*PIXEL_PICBYTES||
+                       intra_samples!=(published_references-p_pictures)*PIXEL_PICBYTES||
+                       intra_samples+pixel_samples!=PIXEL_PICTURES*PIXEL_PICBYTES||
+                       intra_mismatches!=0||(chain_bound ? chain_bound_mismatches!=0 : pixel_mismatches!=0))
+                        $fatal(1,"original pixel regression failed");
+                end
                 if(stream_index!=stream_len||
                    p_rows!=(p_pictures*30)||b_rows!=(b_pictures*30)||
                    publication.p_header_count!=p_pictures||

@@ -210,7 +210,7 @@ mpeg2_h262_p_diagnostic_controller p_controller(
 
 wire b_candidate,b_seen,b_complete_now,b_parse_hold,b_replay_active,b_sideband_valid,b_first_valid,b_error;
 wire[5:0] b_sideband_index;wire signed[15:0] b_sideband_value,b_first_value;
-wire signed[8:0] b_motion_vector_x,b_motion_vector_y;
+wire signed[9:0] b_motion_vector_x,b_motion_vector_y;
 mpeg2_h262_b_core_probe b_controller(
  .clk(clk),.reset(reset),.stream_data(stream_data),.stream_valid(stream_valid),.row_retired(p_row_persistence_complete),.b_candidate(b_candidate),.b_seen(b_seen),
  .b_complete_now(b_complete_now),.parse_hold(b_parse_hold),.replay_active(b_replay_active),.sideband_valid(b_sideband_valid),
@@ -224,8 +224,8 @@ wire b_transport=b_replay_active||b_sideband_valid;
 assign b_motion_transport=b_transport;
 assign p_macroblock_type_seen=b_final_success?1'b1:p_macroblock_type_seen_raw;
 assign p_forward_vector_valid=b_transport?1'b1:p_forward_vector_valid_raw;
-assign p_forward_vector_x=b_transport?{{4{b_motion_vector_x[8]}},b_motion_vector_x}:p_forward_vector_x_raw;
-assign p_forward_vector_y=b_transport?{{4{b_motion_vector_y[8]}},b_motion_vector_y}:p_forward_vector_y_raw;
+assign p_forward_vector_x=b_transport?{{3{b_motion_vector_x[9]}},b_motion_vector_x}:p_forward_vector_x_raw;
+assign p_forward_vector_y=b_transport?{{3{b_motion_vector_y[9]}},b_motion_vector_y}:p_forward_vector_y_raw;
 assign p_residual_required=b_transport?b_first_valid:p_residual_required_raw;
 assign p_residual_success=b_transport?1'b1:p_residual_success_raw;
 assign p_first_residual_sample_valid=b_transport?b_first_valid:p_first_residual_sample_valid_raw;

@@ -204,14 +204,15 @@ mpeg2_luma_framebuffer mpeg2_luma_framebuffer
 (
     .reset          (mpeg2_new_framebuffer_reset),
     .mem_clk        (clk_mpeg2),
-    .picture_complete(mpeg2_new_first_picture_420_parsed),
+    .picture_complete(mpeg2_new_first_picture_420_parsed && mpeg2_new_display_descriptor_valid),
     .horizontal_size(mpeg2_new_horizontal_size),
     .vertical_size  (mpeg2_new_vertical_size),
     // Use the fully synchronized presentation-mode level on the memory side.
     // The framebuffer carries this descriptor back through its existing
     // video-domain descriptor synchronizers with the published picture.
     .native_interlaced(mpeg2_new_native_active_sync[2]),
-    .top_field_first(mpeg2_new_native_top_field_first),
+    .top_field_first(mpeg2_new_display_top_field_first),
+    .progressive_chroma(mpeg2_new_display_progressive_frame),
     .framebuffer_generation(mpeg2_new_framebuffer_generation),
     .write_read_expected_region(mpeg2_new_display_physical_region),
     .write_read_expected_valid(mpeg2_new_luma_writer_expected_valid),
