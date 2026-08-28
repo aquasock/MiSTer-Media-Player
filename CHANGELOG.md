@@ -15,8 +15,10 @@ Bounded 720x480 interlaced all-I playback with native 480i presentation, AC-3 de
 - The clean fit uses 31,464 ALMs (75%), 50,273 registers, 4,048,355 block-memory bits (71%), 512 RAM blocks (93%), 67 DSP blocks, and 3 PLLs.
 - Timing is positive in every required category with zero total negative slack: +0.243 ns setup, +0.251 ns hold, +2.865 ns recovery, +0.564 ns removal, +0.925 ns minimum pulse width.
 - The fitter seed moved from 16 to 17. At seed 16 the framework scaler's horizontal accumulator missed setup by 0.070 ns once the audio routing added logic; that path retains little margin and is a known risk for future changes.
-- The ARM helper rebuilt byte-identically from a clean dependency fetch: SHA-256 `f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8`.
+- All three binaries were rebuilt from source baseline `2f1d32c` and reproduced byte for byte: the RBF from a clean export of tracked files only, and the helper and Main from a wiped dependency directory with a freshly extracted toolchain.
+- ARM helper SHA-256 `f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8`.
 - Patched Main SHA-256 `01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9`, built from pinned upstream `0a8fb44` with ARM GNU 10.2.
+- Added liba52 0.7.4 as a pinned dependency for AC-3 decode, fetched by `host/build_arm_stack.sh` with its archive SHA-256 verified, and shipped its licence alongside minimp3's.
 - Host regressions pass on the release binaries: cadence decoder layout, eleven DVD ceiling tests, and the Main integration profile including 168 RTL cases, 96 burst cases, 20 step-resume cases and guarded fault cases.
 - Audio regressions pass on the release helper: AC-3 decode against an independent decoder at maximum sample difference 3 and correlation 0.999999972, correct downmix placement for all six channels including LFE absence, byte-identical passthrough bursts, and the unchanged MPEG Layer II PCM hash on the full-length fixture.
 
