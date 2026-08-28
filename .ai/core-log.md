@@ -1,3 +1,32 @@
+## 666 COMMIT Unreleased 6c1b621 2026-08-28T02:14:41-07:00
+
+#### Coming From:
+
+Unreleased 6c1b621
+
+#### Purpose:
+
+Record verified candidate installation and preserve the first Weave capture while the loaded core remains unconfirmed.
+
+#### Outcome:
+
+The user explicitly authorizes installation, and the agent adds MediaPlayer_20260828.rbf and games/MediaPlayer/dvd_opening_original.mpg over FTP using separate staging names, hash-verified readback and rename. Final readback matches the qualified candidate and original opening exactly. Existing MediaPlayer.rbf remains the known-good 4777c59 image, and Main, helper and MediaPlayer_OLD.rbf remain byte-identical; no reload or playback is initiated by the agent. The user then reports transferring the files and seeing no playback in Weave mode, asks for a screenshot, and subsequently says the wrong file may have been run. Two captured screenshots are byte-identical and show a blank picture with the diagnostic overlay. Checksum-valid schema-19 telemetry reports fatal_or_no_progress after 141 accepted video bytes and 1,639 session cycles, error flags 1, frame-rate code 8, zero pictures, swaps and PCM samples, and PCM FIFO peak 127. The helper log identifies dvd_opening_original.mpg with HDMI decoded stereo, completes all 12,818,502 transport bytes and exits zero; both files on the SD card still match the package. The logical RBFNAME and CORENAME records both say MediaPlayer, but Main derives them from the core configuration string, so they cannot distinguish the preserved core from the dated candidate or prove which bitstream was running. This is an unconfirmed-core failed run, not acceptance or a confirmed regression of source 6c1b621. Installation, screenshots, decoded telemetry, helper log and capture manifest are retained under .ai/current_results/entry666_*. No source change, rebuild, replay or configuration change is made during capture.
+
+#### Next Steps:
+
+Have the user explicitly load MediaPlayer_20260828.rbf and then select dvd_opening_original.mpg once, keeping Weave and HDMI decoded stereo for a comparable test. No file recopy is needed. Preserve the next helper log and terminal state before replay and collect a new two-screenshot capture. Confirm the loaded candidate before attributing the early rejection to decoder logic or proposing changes; keep the narrow HDMI timing margin visible and preserve user control of playback.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 665 COMMIT Unreleased 6c1b621 2026-08-28T02:00:43-07:00
 
 #### Coming From:
@@ -1209,35 +1238,6 @@ Two results are recorded. First, the AC-3 passthrough gap in the hand-test set i
 #### Next Steps:
 
 The menu issue is closed on this evidence and needs no further replay. The remaining blocker for the release document is unchanged and is now the only one: no test exercises P or B pictures, so generate one progressive file with an ordinary GOP using the corrected suite generator and have the user play it, which decides whether the README says progressive I-only or progressive I/P/B. Consider also whether the test set should carry that file permanently, since a release that ships hand tests should exercise the picture types it claims. Then write the README capability section and release notes, carrying the entry 616 wording of one or two repeated frames at the picture 690 cut, the marginal scaler paths recovered by reseeding in entry 618, the audio capability split between measured and listened evidence, and the DTS subwoofer behaviour of entry 621 as a device observation rather than a core limitation. The interlaced gates of entry 609, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, remain open and out of scope for this release. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 626 COMMIT Unreleased 140a5b7 2026-08-27T16:02:11-07:00
-
-#### Coming From:
-
-Unreleased 140a5b7
-
-#### Purpose:
-
-Capture the remaining three hand tests and establish what the reported menu lag actually tracks.
-
-#### Outcome:
-
-All six hand tests now play correctly on the accepted installation. Tests four, five and six each complete 360 reference and display pictures with 359 swaps, `error_flags` zero, presentation error clear, sequence end seen, presentation complete, quiet snapshot, zero deadline gaps and outliers, and audio underrun and PCM protocol error clear, with helper exit zero. Accepted video is 12,057,601, 3,068,039 and 3,068,038 bytes. Test four confirms the progressive path works and its telemetry reports final picture type one, so it is an all-I file and exercises no P or B pictures; the progressive picture type question therefore remains open and still blocks the README. Test four also shows its three largest display intervals at 2,984,256 clocks rather than the 2,002,000 every interlaced test reports, while averaging 359 swaps across 11.96 seconds, so the progressive path paces differently with jitter that averages out rather than dropping pictures; whether that is expected is not established, and the deadline logic is scoped to native timing so its zero count is not evidence either way. Test five ran in HDMI decoded stereo mode according to its own log line, so it exercised the downmix rather than passthrough, while test six ran in S/PDIF passthrough mode on DTS substream 0x88 as required, since DTS has no decoder here. The menu question is now settled as far as measurement can take it. Lag separates cleanly on accepted video bytes rather than file size: the four runs the user found laggy each carry about 3.068 megabytes of video and hold the event loop for 151,366 to 160,937 microseconds with an acknowledged-write share of 12.0 to 12.4 percent, while the two responsive runs carry about 12.06 megabytes and hold it for 63,506 and 89,592 microseconds with shares of 3.5 and 0.9 percent. Test six is the larger file of the two audio tests yet still laggy, because its extra size is DTS audio rather than video, which is what distinguishes video bitrate from file size as the driver. Six subjective reports match the measurement without exception. The mechanism is the one already diagnosed: low bitrate video drains the FPGA slowly, transport credits run out more often, and Main falls back to acknowledged writes inside a single poll instead of yielding. This is event-loop occupancy from the helper's own profile and not a measured button-response latency. Entry 624's Main, which contains the yield fix, is still not installed, confirmed again by every log reporting profile version one. The user also observed the subwoofer present on AC-3 through S/PDIF but absent on DTS, and asked whether the receiver simply does not accept DTS surround. The evidence says it does accept and decode DTS, because the other five channels were audible in both this run and entry 621; what it does not do is deliver that stream's LFE. Entry 621 already established by measurement that the DTS bursts this core emits contain LFE at 1267.3 RMS decoded back from the helper's own output, byte identical to the source, so the omission remains downstream. A plausible unverified explanation is that the device downmixes DTS internally rather than applying bass management, and the standard DTS stereo downmix discards LFE exactly as this core's own AC-3 stereo downmix does.
-
-#### Next Steps:
-
-Install entry 624's Main and repeat one low bitrate test, being test one, two, five or six, to confirm that poll occupancy falls; that is the direct check and no further evidence gathering on the menu is needed first. Generate one progressive file with an ordinary GOP using the corrected suite generator rather than the superseded one, and have the user play it, because the difference between progressive I-only and progressive I/P/B is the last fact blocking the README and no test in this set exercises it. Consider also re-running test five in S/PDIF mode so this set covers AC-3 passthrough as well as the downmix. Do not pursue the DTS subwoofer further without different hardware, since the transmitted bytes are proven correct and no change here can alter what that device does; a tester with a discrete 5.1 DTS decoder settles it as a byproduct of the community test. When capability is established, write the README capability section and release notes carrying the entry 616 wording of one or two repeated frames at the picture 690 cut, the marginal scaler paths recovered by reseeding in entry 618, and an honest split of measured versus listened audio claims. The interlaced gates of entry 609 remain open and out of scope. Preserve restricted core.md and maintain the forty-entry ring.
 
 #### Files Modified:
 
