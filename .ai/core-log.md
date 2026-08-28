@@ -1,3 +1,32 @@
+## 632 COMMIT Unreleased a26791f 2026-08-27T17:26:18-07:00
+
+#### Coming From:
+
+Unreleased 2c03075
+
+#### Purpose:
+
+Package the release candidate in the previous release's layout and verify every binary reproduces.
+
+#### Outcome:
+
+An unverified claim is corrected first, because it reached the changelog. Entry 630 stated that the helper rebuilt byte-identically from a clean dependency fetch. It had not. The ARM toolchain had been extracted under a temporary directory that the earlier machine crash and reboot cleared, the build script exited reporting only that the compiler was missing, that message contains neither the word error nor warning so the grep used to check it returned zero, and the hash printed afterwards belonged to the previously built binary still sitting in the output directory. The lesson is that a build was judged by a keyword count instead of its exit status. The toolchain has now been extracted to a persistent location and the work redone properly. With the dependency directory and prior helper binary deleted outright, the helper rebuilds to exactly `f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8`, and Main rebuilds from the same tree against pinned upstream `0a8fb44` to exactly `01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9`. Together with the RBF, which entry 630 had already reproduced byte for byte from a clean export, all three binaries now demonstrably reproduce from source baseline `2f1d32c`, and the changelog says so with the correction folded in. The package follows the v0.7.0 layout exactly, with the RBF named for its build date, Main at the root, the helper under a linux directory, checksums covering every file, installation and provenance notes, and licences for the project, minimp3 and now liba52. The installation notes state that Main is not optional and summarise the bounded video envelope so a user does not report a rejected DVD as a defect. The provenance notes record both toolchains, the upstream Main commit, and the pinned minimp3 and liba52 baselines with their archive hashes. The archive is 5,948,567 bytes with SHA256 `5f55b49eb863f74a777b548b4f42b744a9130b4161f176b687ca297deeffcaf3`, written beside the previous release. Its three runtime binaries are identical to what is installed on the target and what every hand test in entries 625 through 628 exercised, so the package is the tested configuration rather than a rebuild of it.
+
+#### Next Steps:
+
+The user installs from the package and performs the confirmation hardware run, then creates the annotated tag and GitHub release from commit `a26791f`, marking it pre-release because the project remains before 1.0. Until that run happens the release remains unaccepted, and the entry 630 caveat stands that no hardware run has occurred since packaging, although the binaries are bit-identical to those already tested. Release notes should carry the repeated frame behaviour on high peak pictures, the scaler margin recovered by the seed change and its status as a risk for the next change that adds logic, the audio split between measured and listened evidence, the DTS subwoofer behaviour as a device observation, and the two unqualified areas being playback pixel accuracy and the blended column at sharp colour transitions. The chroma investigation and the interlaced gates of entry 609 remain open and out of scope. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+- CHANGELOG.md
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 631 COMMIT Unreleased 2c03075 2026-08-27T17:20:44-07:00
 
 #### Coming From:
@@ -1154,35 +1183,6 @@ Ask the user to play bbb_480i_tff_15s_9800kbps.m2v once from games/MediaPlayer u
 
 - tools/streams/generate_test_dvd_ceiling.py
 - tools/streams/test_dvd_ceiling.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 592 COMMIT Unreleased a4f2769 2026-08-27T03:29:04-07:00
-
-#### Coming From:
-
-Unreleased a4f2769
-
-#### Purpose:
-
-Refocus performance acceptance on DVD-Video bitrate ceilings rather than the higher-rate diagnostic fixture.
-
-#### Outcome:
-
-The user clarifies that proper commercial DVD playback is the objective and asks to validate the maximum bitrate a DVD can deliver. This supersedes entry 591's proposed priority of further optimization for the 18.65 Mbps file: that file is retained as optional stress evidence, not a required DVD acceptance gate. The working SD DVD-Video targets are 9.8 Mbps for video, or 1,225,000 bytes per second, and 10.08 Mbps for the combined program stream, or 1,260,000 bytes per second. The combined rate is a shared budget, not an allowance added to video. The project reference was consulted first; it explicitly defers exact DVD application constraints to authorized DVD FLLC Part 2 and Part 3 books, which were not available. Adobe's primary DVD authoring primer, Japanese March-2004 edition, page 14, independently supports these two numerical targets at `https://www.adobe.com/jp/motion/pdfs/DVD_Primer.pdf#page=14`. This is supporting vendor guidance, not a substitute for the controlled DVD books or a formal application-conformance claim, so the restricted core and controlled reference remain unchanged. Scope, citation and validation criteria are retained in `.ai/current_results/entry592_dvd_rate_scope.json`. Entry 591 establishes clean steady playback of the 8 Mbps fixture only; neither the 9.8 Mbps video ceiling nor the 10.08 Mbps combined ceiling has been validated. Bitrate alone also does not bound decoder work or prove support for every DVD picture structure. The compressed disc-input budget must not become a hard cap on the internal helper-to-FPGA path, which can carry protocol framing and expanded decoded audio. No new fixture, source change, build, deployment, reboot, reload or playback was performed in this scope review. The qualified a4f2769 pair and restoration copies remain the baseline; Built refers to its existing qualification and Passed remains unchecked for the new ceiling target.
-
-#### Next Steps:
-
-Prepare a deterministic near-ceiling 9.8 Mbps video regression on GUNSMOKE within the currently supported picture subset, preserving a committed generation recipe and checking actual encoded rate, headers, buffering constraints and software decode rather than relying on the filename or encoder target alone. Validate steady nominal cadence, complete picture/byte counts, zero decoder and transport errors, startup and warm-load behavior, and menu responsiveness on hardware, leaving lifecycle and playback control with the user. Then qualify the 10.08 Mbps combined-stream budget with supported audio and timing when that boundary is ready, accounting for internal framing and decoded PCM traffic and retaining reasonable measured margin. Keep full commercial-DVD compatibility separate from this rate gate: interlaced P/B, field-picture/DCT, NTSC/PAL and film cadence, audio/PTS, navigation and other pending application features require their own coverage. Do not resume production optimization solely to pass the 18.65 Mbps stress file. If an in-scope ceiling test identifies a defect, propose a bounded revision based on that evidence while preserving credits, integrity checks, queue capacities, guarded startup, continuous HDMI sync and black idle. Keep core.md unchanged and maintain the forty-entry ring.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 

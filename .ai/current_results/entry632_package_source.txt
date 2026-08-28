@@ -1,0 +1,44 @@
+MiSTer Media Player v0.8.0 binary provenance
+=============================================
+
+Repository:
+https://github.com/aquasock/MiSTer-Media-Player
+
+Qualified source baseline for all three binaries:
+2f1d32c
+
+Every binary in this package was rebuilt from that tree and reproduced
+byte for byte: the RBF from a clean export of tracked files only, and the
+helper and Main from a wiped dependency directory and a freshly extracted
+toolchain.
+
+FPGA toolchain:
+Quartus Prime Lite 17.0.2 Build 602
+Fitter seed 17
+
+ARM toolchain:
+gcc-arm-10.2-2020.11-x86_64-arm-none-linux-gnueabihf
+Archive SHA-256:
+102825ae56c9e00142d06f35d2bdd3299edb6060e84a275a25b095e66fd3fc2a
+
+MiSTer Main upstream baseline:
+0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f
+
+MiSTer Main patch:
+host/main_mister/0001-mediaplayer-arm-loader.patch
+
+minimp3 baseline:
+ea99364f61c14656440e8d77e9c233ccf3124633
+
+minimp3.h SHA-256:
+57e437c5c1f0e8b243885d3929c8973b5e6c778451e0100ab4251d19915cb3ad
+
+liba52 baseline:
+0.7.4
+
+liba52 source archive SHA-256:
+a21d724ab3b3933330194353687df82c475b5dfb997513eef4c25de6c865ec33
+
+Later release-documentation and metadata commits do not alter the qualified
+FPGA, helper, or Main binaries. The annotated v0.8.0 tag identifies the exact
+published documentation state.
