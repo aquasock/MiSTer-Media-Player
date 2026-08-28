@@ -1,3 +1,34 @@
+## 678 COMMIT Unreleased e6ca129 2026-08-28T12:35:54-07:00
+
+#### Coming From:
+
+Unreleased e6ca129
+
+#### Purpose:
+
+Record the single approved seed-18 build and pause on its HDMI setup timing failure.
+
+#### Outcome:
+
+Both retained full native traces qualify at e6ca129 with the explicitly approved fixture-pinned one-field terminal-cut exception, while their strict raw cadence results remain false and every interior cadence, metadata, timestamp, cache and paired numerical check remains intact. The gate verifies simulation and synthesis inputs unchanged from e876bf3, and all six exception tests pass locally and on the build PC. One clean Quartus 17.0.2 seed-18 compile from the published e6ca129 source finishes in 975.0 seconds with zero errors and 206 warnings. Quartus internally increases routing optimization after two initially unrouted signals and ultimately fits within this same invocation; no manual retry occurs. The build fails timing on one HDMI scaler RAM-output-to-o_hpixs.g[1] path at minus 0.002 ns setup and minus 0.002 ns TNS, with neighboring paths at plus 0.003 and plus 0.015 ns. MPEG setup is plus 1.374 ns and video setup is plus 2.498 ns. All other timing categories pass, with minimum hold plus 0.172 ns, recovery plus 4.000 ns, removal plus 0.548 ns and pulse width plus 0.925 ns. Resources are 32,924 ALMs, 52,170 registers, 4,054,267 RAM bits, 514 of 553 M10Ks and 67 DSPs. All four eight-bit inverse-quantization weight boundaries and expected film CDC endpoints remain present. Warning comparison adds only the assigned-but-unused last_bound_reference_count warning and the timing-failure warning; fitter warnings are unchanged. The rejected RBF is 4,383,728 bytes with SHA256 9a61f9f8becce917a0941a196e1fa2d0134d52d658c68cf221843decfc137e84 and remains on the build PC without packaging or deployment. Evidence is retained under .ai/current_results/entry678_* and output_files/entry675, with the complete build at /home/vash/mister-builds/entry675/FPGA. The earlier read-only MiSTer preflight again returned no route to host; no device writes, core loads or playback occur. Work pauses at the timing gate as requested, with no seed retry, timing waiver or further source change.
+
+#### Next Steps:
+
+Reevaluate the HDMI scaler RAM-output path and its neighboring low-margin paths before proposing a further approved timing-closure cycle. The observed failure is in unchanged scaler logic rather than the MPEG decode clock domain, but the tiny negative slack remains a failure and must not be waived. Preserve the qualified decoder source and all raw simulation evidence. Do not install this RBF or start another build without renewed approval. Hardware playback of the original opening with audio remains pending a timing-passing candidate and a reachable MiSTer.
+
+#### Files Modified:
+
+- tools/streams/analyze_original_dvd_timing.py
+- tools/streams/test_original_dvd_timing.py
+- docs/testing_original_dvd_opening.md
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 677 COMMIT Unreleased e6ca129 2026-08-28T12:14:27-07:00
 
 #### Coming From:
@@ -1217,35 +1248,6 @@ The user reports stationary bars in tests one and two, then leaves test seven di
 #### Next Steps:
 
 Replay only corrected test_1_interlace_tff.mpg with Bob deinterlacing and HDMI audio, leaving synthetic audio and native timing patterns off, and retain the completed core state for helper-first collection and a fresh terminal screenshot. Confirm moving fields, audible tone, menu response and all three LEDs before widening the matrix. The corrected file requires only the supported interlaced all-I path; interlaced P/B remains unsupported and out of scope. Preserve the beta and original-runtime identities, the separate unresolved filesystem warning, local-only raw reports, restricted core.md and the forty-entry ring. Do not misclassify the stale-fixture observation as a new OS or FPGA regression or claim comprehensive compatibility from one progressive clip.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 638 COMMIT Unreleased 2045c34 2026-08-27T19:26:03-07:00
-
-#### Coming From:
-
-Unreleased 2045c34
-
-#### Purpose:
-
-Record the user's input clarification and prepare the first isolated playback check on the Buildroot beta.
-
-#### Outcome:
-
-The user attributes the startup input difficulty to local device selection and reports that the MiSTer worked normally, so the earlier input warnings are not recorded as a confirmed beta regression. The user requests a single-file playback experiment. Read-only preflight confirms that test_1_interlace_tff.mpg still matches its existing generation manifest and contains the expected 360-picture, approximately twelve-second test. The selected boundary is the unchanged released runtime, Bob deinterlacing and HDMI audio, with synthetic audio and native timing patterns disabled. No playback is started remotely and no new playback result or helper capture is available at this point. No source, runtime, kernel or filesystem changes are made, no build occurs, and hardware playback acceptance remains open.
-
-#### Next Steps:
-
-The user loads MediaPlayer_20260827.rbf, selects the agreed modes and plays only test_1_interlace_tff.mpg from games/MediaPlayer/Buildroot_beta. After completion, leave the core loaded and do not start another file or reload it; report motion, sound, menu response and all three LEDs. Retrieve the helper log before it is overwritten and obtain a fresh terminal screenshot while the completed core state still exists, before returning to Scripts or otherwise changing cores. Review the 360-picture completion, transport accounting and cadence before widening the test matrix. Keep the filesystem warning as a separate unresolved check, keep raw device reports local, and preserve user control of hardware lifecycle and restricted core.md.
 
 #### Files Modified:
 

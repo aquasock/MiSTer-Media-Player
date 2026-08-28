@@ -1,0 +1,261 @@
+----------------
+; Command Info ;
+----------------
+Report Timing: Found 2 setup paths (0 violated).  Worst case slack is 4.843 
+
+Tcl Command:
+    report_timing -setup -file /home/vash/mister-builds/entry675/results/b_transform_iq_non_intra_weight_input.rpt -to [get_registers {*|mpeg2_h262_p_non_intra_transform:b_transform|iq_non_intra_weight*}] -npaths 2 -detail full_path
+
+Options:
+    -to [get_registers {*|mpeg2_h262_p_non_intra_transform:b_transform|iq_non_intra_weight*}] 
+    -setup 
+    -npaths 2 
+    -detail full_path 
+    -file {/home/vash/mister-builds/entry675/results/b_transform_iq_non_intra_weight_input.rpt} 
+
+Delay Model:
+    Slow 1100mV 100C Model
+
++---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Summary of Paths                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  ;
++-------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------+------------+------------+
+; Slack ; From Node                                                                                                                                                       ; To Node                                                                                                                                                                    ; Launch Clock                                                            ; Latch Clock                                                             ; Relationship ; Clock Skew ; Data Delay ;
++-------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------+------------+------------+
+; 4.843 ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_index[1] ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_non_intra_weight[5] ; emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk ; emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk ; 16.666       ; -0.110     ; 11.593     ;
+; 4.867 ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_index[1] ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_non_intra_weight[0] ; emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk ; emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk ; 16.666       ; -0.112     ; 11.567     ;
++-------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+-------------------------------------------------------------------------+-------------------------------------------------------------------------+--------------+------------+------------+
+
+Path #1: Setup slack is 4.843 
+===============================================================================
++-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Path Summary                                                                                                                                                                                    ;
++--------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Property           ; Value                                                                                                                                                                      ;
++--------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; From Node          ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_index[1]            ;
+; To Node            ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_non_intra_weight[5] ;
+; Launch Clock       ; emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk                                                                                                    ;
+; Latch Clock        ; emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk                                                                                                    ;
+; Data Arrival Time  ; 16.230                                                                                                                                                                     ;
+; Data Required Time ; 21.073                                                                                                                                                                     ;
+; Slack              ; 4.843                                                                                                                                                                      ;
++--------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
++--------------------------------------------------------------------------------------+
+; Statistics                                                                           ;
++------------------------+--------+-------+-------------+------------+--------+--------+
+; Property               ; Value  ; Count ; Total Delay ; % of Total ; Min    ; Max    ;
++------------------------+--------+-------+-------------+------------+--------+--------+
+; Setup Relationship     ; 16.666 ;       ;             ;            ;        ;        ;
+; Clock Skew             ; -0.110 ;       ;             ;            ;        ;        ;
+; Data Delay             ; 11.593 ;       ;             ;            ;        ;        ;
+; Number of Logic Levels ;        ; 7     ;             ;            ;        ;        ;
+; Physical Delays        ;        ;       ;             ;            ;        ;        ;
+;  Arrival Path          ;        ;       ;             ;            ;        ;        ;
+;   Clock                ;        ;       ;             ;            ;        ;        ;
+;    IC                  ;        ; 6     ; 4.687       ; 56         ; 0.000  ; 2.313  ;
+;    Cell                ;        ; 5     ; 3.718       ; 44         ; 0.304  ; 1.746  ;
+;    PLL Compensation    ;        ; 1     ; -3.768      ; 0          ; -3.768 ; -3.768 ;
+;   Data                 ;        ;       ;             ;            ;        ;        ;
+;    IC                  ;        ; 8     ; 8.391       ; 72         ; 0.258  ; 1.876  ;
+;    Cell                ;        ; 9     ; 3.202       ; 28         ; 0.000  ; 0.559  ;
+;    uTco                ;        ; 1     ; 0.000       ; 0          ; 0.000  ; 0.000  ;
+;  Required Path         ;        ;       ;             ;            ;        ;        ;
+;   Clock                ;        ;       ;             ;            ;        ;        ;
+;    IC                  ;        ; 6     ; 3.965       ; 54         ; 0.000  ; 1.886  ;
+;    Cell                ;        ; 5     ; 3.329       ; 46         ; 0.279  ; 1.468  ;
+;    PLL Compensation    ;        ; 1     ; -4.932      ; 0          ; -4.932 ; -4.932 ;
++------------------------+--------+-------+-------------+------------+--------+--------+
+Note: Negative delays are omitted from totals when calculating percentages
+
++----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Data Arrival Path                                                                                                                                                                                                                                  ;
++----------+----------+----+------+--------+----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Total    ; Incr     ; RF ; Type ; Fanout ; Location                   ; Element                                                                                                                                                                    ;
++----------+----------+----+------+--------+----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; 0.000    ; 0.000    ;    ;      ;        ;                            ; launch edge time                                                                                                                                                           ;
+; 4.637    ; 4.637    ;    ;      ;        ;                            ; clock path                                                                                                                                                                 ;
+;   0.000  ;   0.000  ;    ;      ;        ;                            ; source latency                                                                                                                                                             ;
+;   0.000  ;   0.000  ;    ;      ; 1      ; PIN_Y13                    ; FPGA_CLK2_50                                                                                                                                                               ;
+;   0.000  ;   0.000  ; RR ; IC   ; 1      ; IOIBUF_X56_Y0_N1           ; FPGA_CLK2_50~input|i                                                                                                                                                       ;
+;   0.761  ;   0.761  ; RR ; CELL ; 2      ; IOIBUF_X56_Y0_N1           ; FPGA_CLK2_50~input|o                                                                                                                                                       ;
+;   2.096  ;   1.335  ; RR ; IC   ; 1      ; PLLREFCLKSELECT_X89_Y7_N0  ; emu|pll|pll_inst|altera_pll_i|general[0].gpll~PLL_REFCLK_SELECT|clkin[0]                                                                                                   ;
+;   2.429  ;   0.333  ; RR ; CELL ; 1      ; PLLREFCLKSELECT_X89_Y7_N0  ; emu|pll|pll_inst|altera_pll_i|general[0].gpll~PLL_REFCLK_SELECT|clkout                                                                                                     ;
+;   2.429  ;   0.000  ; RR ; IC   ; 10     ; FRACTIONALPLL_X89_Y1_N0    ; emu|pll|pll_inst|altera_pll_i|general[0].gpll~FRACTIONAL_PLL|refclkin                                                                                                      ;
+;   -1.339 ;   -3.768 ; RR ; COMP ; 3      ; FRACTIONALPLL_X89_Y1_N0    ; emu|pll|pll_inst|altera_pll_i|general[0].gpll~FRACTIONAL_PLL|vcoph[0]                                                                                                      ;
+;   -1.339 ;   0.000  ; RR ; IC   ; 1      ; PLLOUTPUTCOUNTER_X89_Y6_N1 ; emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|vco0ph[0]                                                                                                 ;
+;   0.407  ;   1.746  ; RR ; CELL ; 1      ; PLLOUTPUTCOUNTER_X89_Y6_N1 ; emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk                                                                                                    ;
+;   1.446  ;   1.039  ; RR ; IC   ; 1      ; CLKCTRL_G6                 ; emu|pll|pll_inst|altera_pll_i|outclk_wire[2]~CLKENA0|inclk                                                                                                                 ;
+;   1.750  ;   0.304  ; RR ; CELL ; 36211  ; CLKCTRL_G6                 ; emu|pll|pll_inst|altera_pll_i|outclk_wire[2]~CLKENA0|outclk                                                                                                                ;
+;   4.063  ;   2.313  ; RR ; IC   ; 1      ; FF_X28_Y4_N50              ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_index[1]|clk                                                                                                  ;
+;   4.637  ;   0.574  ; RR ; CELL ; 1      ; FF_X28_Y4_N50              ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_index[1]            ;
+; 16.230   ; 11.593   ;    ;      ;        ;                            ; data path                                                                                                                                                                  ;
+;   4.637  ;   0.000  ;    ; uTco ; 1      ; FF_X28_Y4_N50              ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_index[1]            ;
+;   4.637  ;   0.000  ; FF ; CELL ; 27     ; FF_X28_Y4_N50              ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_index[1]|q                                                                                                    ;
+;   5.372  ;   0.735  ; FF ; IC   ; 1      ; MLABCELL_X28_Y4_N45        ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_weight_read_index~0|datac                                                                                     ;
+;   5.854  ;   0.482  ; FF ; CELL ; 7      ; MLABCELL_X28_Y4_N45        ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_weight_read_index~0|combout                                                                                   ;
+;   7.152  ;   1.298  ; FF ; IC   ; 1      ; LABCELL_X37_Y4_N3          ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_weight_read_index~1|dataf                                                                                     ;
+;   7.249  ;   0.097  ; FR ; CELL ; 6      ; LABCELL_X37_Y4_N3          ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_weight_read_index~1|combout                                                                                   ;
+;   7.507  ;   0.258  ; RR ; IC   ; 1      ; LABCELL_X37_Y4_N15         ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_weight_read_index[0]~2|datad                                                                                  ;
+;   7.868  ;   0.361  ; RF ; CELL ; 118    ; LABCELL_X37_Y4_N15         ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_weight_read_index[0]~2|combout                                                                                ;
+;   9.352  ;   1.484  ; FF ; IC   ; 1      ; LABCELL_X42_Y5_N15         ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|matrices|non_intra_mem~624|datad                                                                                 ;
+;   9.858  ;   0.506  ; FF ; CELL ; 1      ; LABCELL_X42_Y5_N15         ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|matrices|non_intra_mem~624|combout                                                                               ;
+;   10.864 ;   1.006  ; FF ; IC   ; 1      ; LABCELL_X48_Y5_N36         ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|matrices|non_intra_mem~625|datab                                                                                 ;
+;   11.423 ;   0.559  ; FF ; CELL ; 1      ; LABCELL_X48_Y5_N36         ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|matrices|non_intra_mem~625|combout                                                                               ;
+;   12.612 ;   1.189  ; FF ; IC   ; 1      ; MLABCELL_X39_Y5_N30        ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|matrices|non_intra_mem~636|dataa                                                                                 ;
+;   13.171 ;   0.559  ; FF ; CELL ; 1      ; MLABCELL_X39_Y5_N30        ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|matrices|non_intra_mem~636|combout                                                                               ;
+;   15.047 ;   1.876  ; FF ; IC   ; 1      ; LABCELL_X30_Y2_N12         ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_non_intra_weight~4|dataf                                                                                      ;
+;   15.128 ;   0.081  ; FF ; CELL ; 1      ; LABCELL_X30_Y2_N12         ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_non_intra_weight~4|combout                                                                                    ;
+;   15.673 ;   0.545  ; FF ; IC   ; 1      ; FF_X31_Y2_N31              ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_non_intra_weight[5]|asdata                                                                                    ;
+;   16.230 ;   0.557  ; FF ; CELL ; 1      ; FF_X31_Y2_N31              ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_non_intra_weight[5] ;
++----------+----------+----+------+--------+----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
++----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Data Required Path                                                                                                                                                                                                                                 ;
++----------+----------+----+------+--------+----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Total    ; Incr     ; RF ; Type ; Fanout ; Location                   ; Element                                                                                                                                                                    ;
++----------+----------+----+------+--------+----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; 16.666   ; 16.666   ;    ;      ;        ;                            ; latch edge time                                                                                                                                                            ;
+; 21.193   ; 4.527    ;    ;      ;        ;                            ; clock path                                                                                                                                                                 ;
+;   16.666 ;   0.000  ;    ;      ;        ;                            ; source latency                                                                                                                                                             ;
+;   16.666 ;   0.000  ;    ;      ; 1      ; PIN_Y13                    ; FPGA_CLK2_50                                                                                                                                                               ;
+;   16.666 ;   0.000  ; RR ; IC   ; 1      ; IOIBUF_X56_Y0_N1           ; FPGA_CLK2_50~input|i                                                                                                                                                       ;
+;   17.427 ;   0.761  ; RR ; CELL ; 2      ; IOIBUF_X56_Y0_N1           ; FPGA_CLK2_50~input|o                                                                                                                                                       ;
+;   18.598 ;   1.171  ; RR ; IC   ; 1      ; PLLREFCLKSELECT_X89_Y7_N0  ; emu|pll|pll_inst|altera_pll_i|general[0].gpll~PLL_REFCLK_SELECT|clkin[0]                                                                                                   ;
+;   18.906 ;   0.308  ; RR ; CELL ; 1      ; PLLREFCLKSELECT_X89_Y7_N0  ; emu|pll|pll_inst|altera_pll_i|general[0].gpll~PLL_REFCLK_SELECT|clkout                                                                                                     ;
+;   18.906 ;   0.000  ; RR ; IC   ; 10     ; FRACTIONALPLL_X89_Y1_N0    ; emu|pll|pll_inst|altera_pll_i|general[0].gpll~FRACTIONAL_PLL|refclkin                                                                                                      ;
+;   13.974 ;   -4.932 ; RR ; COMP ; 3      ; FRACTIONALPLL_X89_Y1_N0    ; emu|pll|pll_inst|altera_pll_i|general[0].gpll~FRACTIONAL_PLL|vcoph[0]                                                                                                      ;
+;   13.974 ;   0.000  ; RR ; IC   ; 1      ; PLLOUTPUTCOUNTER_X89_Y6_N1 ; emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|vco0ph[0]                                                                                                 ;
+;   15.442 ;   1.468  ; RR ; CELL ; 1      ; PLLOUTPUTCOUNTER_X89_Y6_N1 ; emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk                                                                                                    ;
+;   16.350 ;   0.908  ; RR ; IC   ; 1      ; CLKCTRL_G6                 ; emu|pll|pll_inst|altera_pll_i|outclk_wire[2]~CLKENA0|inclk                                                                                                                 ;
+;   16.629 ;   0.279  ; RR ; CELL ; 36211  ; CLKCTRL_G6                 ; emu|pll|pll_inst|altera_pll_i|outclk_wire[2]~CLKENA0|outclk                                                                                                                ;
+;   18.515 ;   1.886  ; RR ; IC   ; 1      ; FF_X31_Y2_N31              ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_non_intra_weight[5]|clk                                                                                       ;
+;   19.028 ;   0.513  ; RR ; CELL ; 1      ; FF_X31_Y2_N31              ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_non_intra_weight[5] ;
+;   21.193 ;   2.165  ;    ;      ;        ;                            ; clock pessimism removed                                                                                                                                                    ;
+; 21.073   ; -0.120   ;    ;      ;        ;                            ; clock uncertainty                                                                                                                                                          ;
+; 21.073   ; 0.000    ;    ; uTsu ; 1      ; FF_X31_Y2_N31              ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_non_intra_weight[5] ;
++----------+----------+----+------+--------+----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+----------------------------
+; Extra Fitter Information ;
+----------------------------
+HTML report is unavailable in plain text report export.
+
+
+Path #2: Setup slack is 4.867 
+===============================================================================
++-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Path Summary                                                                                                                                                                                    ;
++--------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Property           ; Value                                                                                                                                                                      ;
++--------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; From Node          ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_index[1]            ;
+; To Node            ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_non_intra_weight[0] ;
+; Launch Clock       ; emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk                                                                                                    ;
+; Latch Clock        ; emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk                                                                                                    ;
+; Data Arrival Time  ; 16.204                                                                                                                                                                     ;
+; Data Required Time ; 21.071                                                                                                                                                                     ;
+; Slack              ; 4.867                                                                                                                                                                      ;
++--------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
++--------------------------------------------------------------------------------------+
+; Statistics                                                                           ;
++------------------------+--------+-------+-------------+------------+--------+--------+
+; Property               ; Value  ; Count ; Total Delay ; % of Total ; Min    ; Max    ;
++------------------------+--------+-------+-------------+------------+--------+--------+
+; Setup Relationship     ; 16.666 ;       ;             ;            ;        ;        ;
+; Clock Skew             ; -0.112 ;       ;             ;            ;        ;        ;
+; Data Delay             ; 11.567 ;       ;             ;            ;        ;        ;
+; Number of Logic Levels ;        ; 7     ;             ;            ;        ;        ;
+; Physical Delays        ;        ;       ;             ;            ;        ;        ;
+;  Arrival Path          ;        ;       ;             ;            ;        ;        ;
+;   Clock                ;        ;       ;             ;            ;        ;        ;
+;    IC                  ;        ; 6     ; 4.687       ; 56         ; 0.000  ; 2.313  ;
+;    Cell                ;        ; 5     ; 3.718       ; 44         ; 0.304  ; 1.746  ;
+;    PLL Compensation    ;        ; 1     ; -3.768      ; 0          ; -3.768 ; -3.768 ;
+;   Data                 ;        ;       ;             ;            ;        ;        ;
+;    IC                  ;        ; 8     ; 8.533       ; 74         ; 0.000  ; 2.172  ;
+;    Cell                ;        ; 9     ; 3.034       ; 26         ; 0.000  ; 0.564  ;
+;    uTco                ;        ; 1     ; 0.000       ; 0          ; 0.000  ; 0.000  ;
+;  Required Path         ;        ;       ;             ;            ;        ;        ;
+;   Clock                ;        ;       ;             ;            ;        ;        ;
+;    IC                  ;        ; 6     ; 3.965       ; 54         ; 0.000  ; 1.886  ;
+;    Cell                ;        ; 5     ; 3.327       ; 46         ; 0.279  ; 1.468  ;
+;    PLL Compensation    ;        ; 1     ; -4.932      ; 0          ; -4.932 ; -4.932 ;
++------------------------+--------+-------+-------------+------------+--------+--------+
+Note: Negative delays are omitted from totals when calculating percentages
+
++----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Data Arrival Path                                                                                                                                                                                                                                  ;
++----------+----------+----+------+--------+----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Total    ; Incr     ; RF ; Type ; Fanout ; Location                   ; Element                                                                                                                                                                    ;
++----------+----------+----+------+--------+----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; 0.000    ; 0.000    ;    ;      ;        ;                            ; launch edge time                                                                                                                                                           ;
+; 4.637    ; 4.637    ;    ;      ;        ;                            ; clock path                                                                                                                                                                 ;
+;   0.000  ;   0.000  ;    ;      ;        ;                            ; source latency                                                                                                                                                             ;
+;   0.000  ;   0.000  ;    ;      ; 1      ; PIN_Y13                    ; FPGA_CLK2_50                                                                                                                                                               ;
+;   0.000  ;   0.000  ; RR ; IC   ; 1      ; IOIBUF_X56_Y0_N1           ; FPGA_CLK2_50~input|i                                                                                                                                                       ;
+;   0.761  ;   0.761  ; RR ; CELL ; 2      ; IOIBUF_X56_Y0_N1           ; FPGA_CLK2_50~input|o                                                                                                                                                       ;
+;   2.096  ;   1.335  ; RR ; IC   ; 1      ; PLLREFCLKSELECT_X89_Y7_N0  ; emu|pll|pll_inst|altera_pll_i|general[0].gpll~PLL_REFCLK_SELECT|clkin[0]                                                                                                   ;
+;   2.429  ;   0.333  ; RR ; CELL ; 1      ; PLLREFCLKSELECT_X89_Y7_N0  ; emu|pll|pll_inst|altera_pll_i|general[0].gpll~PLL_REFCLK_SELECT|clkout                                                                                                     ;
+;   2.429  ;   0.000  ; RR ; IC   ; 10     ; FRACTIONALPLL_X89_Y1_N0    ; emu|pll|pll_inst|altera_pll_i|general[0].gpll~FRACTIONAL_PLL|refclkin                                                                                                      ;
+;   -1.339 ;   -3.768 ; RR ; COMP ; 3      ; FRACTIONALPLL_X89_Y1_N0    ; emu|pll|pll_inst|altera_pll_i|general[0].gpll~FRACTIONAL_PLL|vcoph[0]                                                                                                      ;
+;   -1.339 ;   0.000  ; RR ; IC   ; 1      ; PLLOUTPUTCOUNTER_X89_Y6_N1 ; emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|vco0ph[0]                                                                                                 ;
+;   0.407  ;   1.746  ; RR ; CELL ; 1      ; PLLOUTPUTCOUNTER_X89_Y6_N1 ; emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk                                                                                                    ;
+;   1.446  ;   1.039  ; RR ; IC   ; 1      ; CLKCTRL_G6                 ; emu|pll|pll_inst|altera_pll_i|outclk_wire[2]~CLKENA0|inclk                                                                                                                 ;
+;   1.750  ;   0.304  ; RR ; CELL ; 36211  ; CLKCTRL_G6                 ; emu|pll|pll_inst|altera_pll_i|outclk_wire[2]~CLKENA0|outclk                                                                                                                ;
+;   4.063  ;   2.313  ; RR ; IC   ; 1      ; FF_X28_Y4_N50              ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_index[1]|clk                                                                                                  ;
+;   4.637  ;   0.574  ; RR ; CELL ; 1      ; FF_X28_Y4_N50              ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_index[1]            ;
+; 16.204   ; 11.567   ;    ;      ;        ;                            ; data path                                                                                                                                                                  ;
+;   4.637  ;   0.000  ;    ; uTco ; 1      ; FF_X28_Y4_N50              ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_index[1]            ;
+;   4.637  ;   0.000  ; FF ; CELL ; 27     ; FF_X28_Y4_N50              ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_index[1]|q                                                                                                    ;
+;   5.372  ;   0.735  ; FF ; IC   ; 1      ; MLABCELL_X28_Y4_N45        ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_weight_read_index~0|datac                                                                                     ;
+;   5.854  ;   0.482  ; FF ; CELL ; 7      ; MLABCELL_X28_Y4_N45        ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_weight_read_index~0|combout                                                                                   ;
+;   7.152  ;   1.298  ; FF ; IC   ; 1      ; LABCELL_X37_Y4_N3          ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_weight_read_index~1|dataf                                                                                     ;
+;   7.249  ;   0.097  ; FR ; CELL ; 6      ; LABCELL_X37_Y4_N3          ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_weight_read_index~1|combout                                                                                   ;
+;   7.499  ;   0.250  ; RR ; IC   ; 1      ; LABCELL_X37_Y4_N57         ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_weight_read_index[4]~6|dataa                                                                                  ;
+;   8.063  ;   0.564  ; RF ; CELL ; 124    ; LABCELL_X37_Y4_N57         ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_weight_read_index[4]~6|combout                                                                                ;
+;   10.235 ;   2.172  ; FF ; IC   ; 1      ; LABCELL_X45_Y2_N54         ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|matrices|non_intra_mem~512|datac                                                                                 ;
+;   10.743 ;   0.508  ; FF ; CELL ; 1      ; LABCELL_X45_Y2_N54         ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|matrices|non_intra_mem~512|combout                                                                               ;
+;   12.248 ;   1.505  ; FF ; IC   ; 1      ; LABCELL_X40_Y4_N48         ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|matrices|non_intra_mem~516|dataa                                                                                 ;
+;   12.811 ;   0.563  ; FF ; CELL ; 1      ; LABCELL_X40_Y4_N48         ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|matrices|non_intra_mem~516|combout                                                                               ;
+;   13.442 ;   0.631  ; FF ; IC   ; 1      ; LABCELL_X42_Y4_N0          ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|matrices|non_intra_mem~532|dataf                                                                                 ;
+;   13.523 ;   0.081  ; FF ; CELL ; 1      ; LABCELL_X42_Y4_N0          ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|matrices|non_intra_mem~532|combout                                                                               ;
+;   15.465 ;   1.942  ; FF ; IC   ; 1      ; LABCELL_X31_Y2_N42         ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_non_intra_weight~0|datac                                                                                      ;
+;   15.942 ;   0.477  ; FF ; CELL ; 1      ; LABCELL_X31_Y2_N42         ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_non_intra_weight~0|combout                                                                                    ;
+;   15.942 ;   0.000  ; FF ; IC   ; 1      ; FF_X31_Y2_N44              ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_non_intra_weight[0]|d                                                                                         ;
+;   16.204 ;   0.262  ; FF ; CELL ; 1      ; FF_X31_Y2_N44              ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_non_intra_weight[0] ;
++----------+----------+----+------+--------+----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
++----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Data Required Path                                                                                                                                                                                                                                 ;
++----------+----------+----+------+--------+----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; Total    ; Incr     ; RF ; Type ; Fanout ; Location                   ; Element                                                                                                                                                                    ;
++----------+----------+----+------+--------+----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+; 16.666   ; 16.666   ;    ;      ;        ;                            ; latch edge time                                                                                                                                                            ;
+; 21.191   ; 4.525    ;    ;      ;        ;                            ; clock path                                                                                                                                                                 ;
+;   16.666 ;   0.000  ;    ;      ;        ;                            ; source latency                                                                                                                                                             ;
+;   16.666 ;   0.000  ;    ;      ; 1      ; PIN_Y13                    ; FPGA_CLK2_50                                                                                                                                                               ;
+;   16.666 ;   0.000  ; RR ; IC   ; 1      ; IOIBUF_X56_Y0_N1           ; FPGA_CLK2_50~input|i                                                                                                                                                       ;
+;   17.427 ;   0.761  ; RR ; CELL ; 2      ; IOIBUF_X56_Y0_N1           ; FPGA_CLK2_50~input|o                                                                                                                                                       ;
+;   18.598 ;   1.171  ; RR ; IC   ; 1      ; PLLREFCLKSELECT_X89_Y7_N0  ; emu|pll|pll_inst|altera_pll_i|general[0].gpll~PLL_REFCLK_SELECT|clkin[0]                                                                                                   ;
+;   18.906 ;   0.308  ; RR ; CELL ; 1      ; PLLREFCLKSELECT_X89_Y7_N0  ; emu|pll|pll_inst|altera_pll_i|general[0].gpll~PLL_REFCLK_SELECT|clkout                                                                                                     ;
+;   18.906 ;   0.000  ; RR ; IC   ; 10     ; FRACTIONALPLL_X89_Y1_N0    ; emu|pll|pll_inst|altera_pll_i|general[0].gpll~FRACTIONAL_PLL|refclkin                                                                                                      ;
+;   13.974 ;   -4.932 ; RR ; COMP ; 3      ; FRACTIONALPLL_X89_Y1_N0    ; emu|pll|pll_inst|altera_pll_i|general[0].gpll~FRACTIONAL_PLL|vcoph[0]                                                                                                      ;
+;   13.974 ;   0.000  ; RR ; IC   ; 1      ; PLLOUTPUTCOUNTER_X89_Y6_N1 ; emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|vco0ph[0]                                                                                                 ;
+;   15.442 ;   1.468  ; RR ; CELL ; 1      ; PLLOUTPUTCOUNTER_X89_Y6_N1 ; emu|pll|pll_inst|altera_pll_i|general[2].gpll~PLL_OUTPUT_COUNTER|divclk                                                                                                    ;
+;   16.350 ;   0.908  ; RR ; IC   ; 1      ; CLKCTRL_G6                 ; emu|pll|pll_inst|altera_pll_i|outclk_wire[2]~CLKENA0|inclk                                                                                                                 ;
+;   16.629 ;   0.279  ; RR ; CELL ; 36211  ; CLKCTRL_G6                 ; emu|pll|pll_inst|altera_pll_i|outclk_wire[2]~CLKENA0|outclk                                                                                                                ;
+;   18.515 ;   1.886  ; RR ; IC   ; 1      ; FF_X31_Y2_N44              ; emu|mpeg2_h262_two_picture_probe|b_controller|b_transform|iq_non_intra_weight[0]|clk                                                                                       ;
+;   19.026 ;   0.511  ; RR ; CELL ; 1      ; FF_X31_Y2_N44              ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_non_intra_weight[0] ;
+;   21.191 ;   2.165  ;    ;      ;        ;                            ; clock pessimism removed                                                                                                                                                    ;
+; 21.071   ; -0.120   ;    ;      ;        ;                            ; clock uncertainty                                                                                                                                                          ;
+; 21.071   ; 0.000    ;    ; uTsu ; 1      ; FF_X31_Y2_N44              ; emu:emu|mpeg2_h262_two_picture_probe:mpeg2_h262_two_picture_probe|mpeg2_h262_b_core_probe:b_controller|mpeg2_h262_p_non_intra_transform:b_transform|iq_non_intra_weight[0] ;
++----------+----------+----+------+--------+----------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+----------------------------
+; Extra Fitter Information ;
+----------------------------
+HTML report is unavailable in plain text report export.
+
+
