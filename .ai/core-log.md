@@ -1,4 +1,4 @@
-## 671 COMMIT Unreleased ??? 2026-08-28T04:04:55-07:00
+## 671 COMMIT Unreleased 024158a 2026-08-28T04:04:55-07:00
 
 #### Coming From:
 
@@ -10,7 +10,7 @@ Correct DVD picture admission and completion metadata ownership before qualifyin
 
 #### Outcome:
 
-The user approves the production fix, focused and full-opening validation, one clean timing-audited FPGA build and verified installation. Entry 670 establishes reference over-admission during B drain and an early following-header race in reference binding and metadata retirement. Preserve retiring picture identity, timestamp validity and field descriptors until persistence; distinguish accepted header classification from payload capacity; retain same-edge release events and bind an early B header to its actual completing reference. Keep decoder arithmetic, physical buffers, clocks, constraints, Main, helper and placement seed unchanged. Development and commits remain on the Pi master branch, with resource-intensive checks and compilation on the build PC at 10.10.0.42. Installation on MiSTer 10.10.0.30 is conditional on passing simulation and timing, and playback remains user controlled.
+The user approves the production fix, focused and full-opening validation, one clean timing-audited FPGA build and verified installation. Initial implementation 024158a retains a separate retiring descriptor, blocks a following reference payload during B drain, preserves its release classification and removes stale promotion-count permission to bind an already displayed reference. Focused validation is in progress; no FPGA build or installation is yet performed. Entry 670 establishes reference over-admission during B drain and an early following-header race in reference binding and metadata retirement. Preserve retiring picture identity, timestamp validity and field descriptors until persistence; distinguish accepted header classification from payload capacity; retain same-edge release events and bind an early B header to its actual completing reference. Keep decoder arithmetic, physical buffers, clocks, constraints, Main, helper and placement seed unchanged. Development and commits remain on the Pi master branch, with resource-intensive checks and compilation on the build PC at 10.10.0.42. Installation on MiSTer 10.10.0.30 is conditional on passing simulation and timing, and playback remains user controlled.
 
 #### Next Steps:
 
@@ -23,8 +23,6 @@ Publish this approved proposal, implement the scheduler and metadata-owner corre
 - tools/streams/tb_h262_film_reorder_timestamp.sv
 - tools/streams/tb_h262_picture_timestamp.sv
 - tools/streams/run_film_presentation.sh
-- tools/streams/analyze_original_dvd_timing.py
-- docs/testing_original_dvd_opening.md
 
 #### Status:
 
@@ -1258,4 +1256,3 @@ The user installs from the package and performs the confirmation hardware run, t
 - [ ] Passed
 
 ---
-
