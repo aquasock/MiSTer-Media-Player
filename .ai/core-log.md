@@ -1,3 +1,35 @@
+## 650 COMMIT Unreleased ??? 2026-08-27T21:33:30-07:00
+
+#### Coming From:
+
+Unreleased 3e89189
+
+#### Purpose:
+
+Open the field-picture gate by accepting and reconstructing I/I field pairs at 720 by 480.
+
+#### Outcome:
+
+This entry is written as a plan and its commit does not exist yet. The inert width change of entry 648 is reverted by `3e89189`, whose two files now match the v0.8.0 source exactly, and optimization work is closed with the free-block position unchanged at 41. Field pictures are today refused by one term, `picture_structure` equal to `2'b11`, in the `phase1_supported` predicate at `mpeg2_h262_frontend.sv` line 252, with matching guards in `mpeg2_h262_p_syntax_probe.sv` at lines 526 and 609 and `mpeg2_h262_p_residual_parser_420.sv` at line 377. Removing that term is trivial and everything behind it is the work, which falls into two parts. Reconstruction addressing is the smaller: `mpeg2_h262_ddram_store_420p.sv` line 77 fixes a luma stride of 90 words and a chroma stride of 45, one full row per step across 480 rows, whereas a field picture codes 240 lines that land on alternate frame lines and therefore needs a doubled stride and a base offset selected by field parity. That is an addressing change rather than a capacity change and is currently expected to cost little or no additional block memory, which matters because none was recovered. Picture-to-frame bookkeeping is the larger: two coded pictures now form one displayed frame, so `mpeg2_h262_picture_bookkeeper` must accumulate both fields into one frame bank and assert `picture_420_complete` only on the second field, leaving picture counting, reference publication, presentation swap and the cadence telemetry consistent with one displayed frame per pair rather than per coded picture. The bounded scope is I pictures in both fields, 720 by 480, frame rate code four, 4:2:0, no `repeat_first_field`, with every other current restriction retained; field DCT, interlaced P and B, `repeat_first_field` and 576i stay rejected. One expectation is recorded so it is not mistaken later for a defect: a typical commercial DVD codes the two fields of an I frame as I then P, so this gate unlocks the coded structure but does not by itself make commercial discs play, and interlaced P remains the gate that does. Validation needs a fixture that does not exist yet, to be produced by a committed deterministic script under `tools/streams/` and generated locally by the user in the manner of the seven-test suite. Acceptance requires the new fixture to complete every picture with correct field parity and no swapped or doubled lines, zero decoder and presentation errors, sequence end and quiet completion, and it equally requires the existing seven fixtures to be unaffected, with identical accepted byte counts and picture counts and final rasters still pixel-identical to their recorded baselines. The build must close timing in every category and any block-memory increase must fit inside the 41 free blocks. Nothing is built or changed yet, so both status boxes are unchecked.
+
+#### Next Steps:
+
+Write the fixture generator first so the target is testable before the decoder changes, then relax the frontend predicate under the bounded conditions, then add field-parity addressing to the DDR store, then pair fields in the bookkeeper, keeping the cadence snapshot backward compatible so the existing decode tool continues to read schema nineteen rather than breaking every recorded baseline. Establish the ALM and block-memory cost from the first successful fit before adding any further logic, and check the weakest margin across all clocks rather than the decoder alone, reseeding rather than restructuring if the HDMI domain is the category that fails. Regression must cover the seven existing fixtures as well as the new one, because a reconstruction addressing change can corrupt frame-picture output silently while every counter stays identical, exactly as the entry 649 analysis showed telemetry cannot detect coefficient corruption. Do not widen scope to field DCT or interlaced P inside this cycle even if the structure appears to allow it. Preserve restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+- tools/streams/generate_test_field_pictures.py
+- rtl/mpeg2_new/mpeg2_h262_frontend.sv
+- rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
+- rtl/mpeg2_new/mpeg2_h262_picture_bookkeeper.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 649 COMMIT Unreleased 5fb7d5d 2026-08-27T21:27:18-07:00
 
 #### Coming From:
@@ -1148,42 +1180,6 @@ Have the user select the MediaPlayer core and play games/MediaPlayer/ac3_480i_tf
 #### Files Modified:
 
 - tools/streams/generate_test_dvd_ac3_av.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 610 COMMIT Unreleased ff6c03f 2026-08-27T07:09:10-07:00
-
-#### Coming From:
-
-Unreleased d466bed
-
-#### Purpose:
-
-Decode DVD AC-3 audio to stereo PCM in the ARM helper on the same path MPEG Layer II already uses.
-
-#### Outcome:
-
-Published source `ff6c03f` routes private stream 1 substreams 0x80 through 0x87 to liba52 and downmixes to the existing 48 kHz stereo PCM transport, so no RTL, FPGA memory or timing budget is touched and the 41 free M10K blocks are untouched. `process_private_pes` previously discarded exactly these packets. It now reads the substream identifier, frame count and first access unit pointer, honours that pointer only until the decoder has synchronized, and appends the remainder. Codec selection follows the helper's own architecture note: the first audio PES decides between MPEG Layer II and AC-3 and the other codec is ignored for the session, with the chosen substream identifier logged and further AC-3 tracks skipped because track switching needs the versioned control channel protocol one omits. liba52 is asked for `A52_STEREO` with `A52_ADJUST_LEVEL`, so the stream's own downmix coefficients are used and the helper invents no matrix of its own, and the decoder is initialized lazily so Layer II files neither allocate it nor inherit its startup message. Two planning errors are corrected here. Entry 610's proposal said the liba52 sources would be committed under the helper dependency directory, but that directory is gitignored by existing policy and dependencies are pinned by `build_arm_stack.sh` instead, as README already describes for minimp3; liba52 0.7.4 is therefore fetched from a pinned tarball with SHA256 `a21d724ab3b3933330194353687df82c475b5dfb997513eef4c25de6c865ec33`, extracted to the same place, and only the hand-written replacement for its autoconf `config.h` is tracked. A scoping remark that GPL would contaminate the project was also wrong and is corrected: liba52 is GPL-2 and so is this project. The AC-3 fixture uses private stream 1, which the soak generator's pack checker rejected, so that checker gains a stream identifier parameter while its MPEG Layer II default is unchanged. A new deterministic generator produces a five second 720x480 TFF all-I fixture carrying 448 kbit/s AC-3 5.1, keeping the accepted video path unchanged so the fixture isolates the audio codec; the generated media stays local and only the generator is committed. Against an independent FFmpeg decode of the same program, the helper produces exactly 241,152 stereo frames, matching the reference frame for frame, with maximum absolute difference three, RMS difference 0.4257 left and 0.4509 right, and correlation 0.999999971 and 0.999999967. That is comparable to the accepted Layer II qualification and is deliberately not a bit-exactness claim, since liba52 and FFmpeg differ in downmix coefficients, dynamic range handling and rounding. The fixture's per-channel tone labels do not match the layout the generator assumed, and the reference decode shows the same mapping, so channel assignment is not independently verified by this evidence and only decode equivalence is; that check remains open. The MPEG Layer II path is unchanged, reproducing the exact 28,628,352 PCM samples and 17,776 timestamp records entry 602 recorded for the full movie, where the video output byte count exceeds the 715,713,077-byte payload by precisely those records. The helper cross-compiles cleanly under `-Werror` with MiSTer's official ARM GNU 10.2 toolchain to a 399,340-byte static binary with SHA256 `100a3c1f97e9a0d0e77e3992bfc6db8584d17081798fc2e1dbeb365faf2269c4`, and the dependency fetch, extraction and build were exercised from an empty dependency directory. GUNSMOKE has no qemu-arm, so that ARM binary is compiled but unexecuted and all decode evidence comes from a native build of identical sources. The user separately confirmed that the MiSTer S/PDIF port is live and already carries stereo audio synchronized with HDMI, which is useful for the later passthrough boundary but is not evidence about AC-3. No FPGA build, deployment or hardware run occurred, so Built refers to the helper only and Passed remains unchecked.
-
-#### Next Steps:
-
-Deploy the new helper and have the user play the generated AC-3 fixture once, reporting sound, synchronization and menu behavior, then capture the helper log first and a fresh telemetry screenshot as usual and confirm the substream selection line appears. Before that, generate the fixture locally, since it is deliberately not committed. Resolve the open channel assignment question by decoding each channel separately rather than relying on the downmixed tone labels, and only then claim correct 5.1 channel identity. Consider whether a real commercial AC-3 track, which uses dynamic range control and dialogue normalization far more aggressively than a synthetic tone fixture, deserves its own comparison before this is called finished. AC-3 passthrough over S/PDIF and DTS passthrough remain the separate later boundary, needing IEC 61937 packing and a neutral gain and filter chain rather than any decoder change, and the framework's S/PDIF encoder carries linear PCM only. The interlaced video gates of entry 609, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, remain open and unstarted. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- host/arm/Makefile
-- host/arm/liba52_config.h
-- host/arm/ARCHITECTURE.md
-- host/build_arm_stack.sh
-- tools/streams/generate_test_dvd_ac3_av.py
-- tools/streams/verify_ac3_pcm.py
-- tools/streams/generate_test_dvd_av_soak.py
 
 #### Status:
 
