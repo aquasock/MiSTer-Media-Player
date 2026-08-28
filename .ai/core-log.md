@@ -1,3 +1,32 @@
+## 641 COMMIT Unreleased 2045c34 2026-08-27T19:42:33-07:00
+
+#### Coming From:
+
+Unreleased 2045c34
+
+#### Purpose:
+
+Validate corrected interlaced BFF playback on the Buildroot beta.
+
+#### Outcome:
+
+The user reports that corrected test two passes. Helper-first collection and a fresh uniquely named screenshot identify that exact run, with valid schema-19 telemetry confirming bottom-field-first signalling, 360 reference and displayed pictures, zero B pictures, 359 swaps and 3,067,813 accepted video bytes. Decoder and presentation errors, audio underrun, PCM protocol faults, timestamp conflicts, native deadline gaps and gap outliers are all absent. The three largest recorded display intervals are each the nominal 2,002,000 clocks, and sequence end, completed presentation and quiet termination are asserted. Helper exit is zero; pipe reads reconcile to all 5,556,652 completed transport bytes, with no acknowledged fallback payload. The helper confirms HDMI decoded audio and reports 576,000 emitted PCM frames. Bob was requested and the user accepts the requested run, but telemetry does not independently identify the scaler selection or LED colors. Read-only verification confirms the corrected fixture and unchanged Main, helper, RBF and kernel hashes. Together with entry 640, both interlaced field orders now have accepted bounded playback runs on the beta, alongside entry 639's progressive I/P/B result. No source, build, deployment, mode change, reload, reboot or playback is initiated by the agent. Built remains unchecked because no new build occurs; Passed is scoped to this BFF clip. Raw captures remain local and only .ai/current_results/entry641_buildroot_test2_status.json is published.
+
+#### Next Steps:
+
+Run test_3_deinterlace_bob_weave.mpg with Bob and HDMI first, retain its helper log and terminal screenshot, then repeat in Weave with separate captures. Finish test four's progressive all-I control and the AC-3 HDMI, AC-3 S/PDIF and DTS S/PDIF runs before claiming the full seven-fixture compatibility matrix. Keep the filesystem dirty-flag warning as a separate unresolved check and do not treat single-run timing values as performance qualification. Preserve the tested beta and runtime identities, user control of hardware lifecycle, local-only raw reports, restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [x] Passed
+
+---
+
 ## 640 COMMIT Unreleased 2045c34 2026-08-27T19:39:38-07:00
 
 #### Coming From:
@@ -1164,35 +1193,6 @@ Have the user select Bob and play games/MediaPlayer/bbb_full_480i_tff_av_10080kb
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 601 COMMIT Unreleased f615ce0 2026-08-27T05:04:37-07:00
-
-#### Coming From:
-
-Unreleased f615ce0
-
-#### Purpose:
-
-Confirm the DVD-ceiling cadence result in Bob and resolve the preceding run's Weave attribution.
-
-#### Outcome:
-
-The user explicitly confirms that the new run is Bob and entry 600 was Weave, resolving that entry's mode uncertainty without rewriting its historical record. The Bob helper log is retrieved first, followed by a newly generated parity/checksum-valid schema-nineteen screenshot and full Main/RBF/media readbacks. The installed f615ce0 RBF, retained Main and exact 18,402,691-byte ceiling fixture match entry 600 byte-for-byte. New helper PID 1568, helper hash a34a6fdc1f960654ced490c2e2392f956d8131b83fc1a576a1656410446c3a54 and telemetry checksum 4215072064 identify a distinct run, while the same 11:26:59 UTC Linux boot establishes no system reboot between the captures. The packet does not encode the mode or running bitstream hash, and no independent absence-of-core-reload proof is claimed. All 1,124 chunks and seventeen sampled ACK records reconcile; all 18,402,691 source bytes arrive with the expected single padded byte giving 18,402,692 FPGA-accepted bytes, no transport fault and helper exit zero. Both confirmed modes complete 449 reference/display pictures and 448 swaps with zero error flags, zero deadline gaps, zero outliers, no deadline records and normal EOF/quiet completion. Each mode's three largest steady intervals are exactly 2,002,000 clocks, or 33.366667 milliseconds. The old a4f2769 extra intervals at 167 and 346 remain absent in both new runs. Bob's startup-inclusive span is 14.996120 seconds at 29.874393 aggregate fps versus Weave's 14.991394 seconds at 29.883811; the 4.726100-millisecond difference lies in initial admission and does not indicate recurring Bob lateness. Bob's presentation hold is 5,529,868 cycles versus 5,246,150, and writer wait is 15,288,984 versus 15,282,414. All 165 Bob EAGAIN events precede first delivery, with no steady EAGAIN. Credit-fast transport carries 18,373,724 fast bytes and 28,967 acknowledged bytes in 902,794 bursts and 918,402 queries, with all guarded accounting intact; these consumption-paced statistics are not a maximum bus-bandwidth measurement. The fresh still shows the expected final foliage/spikes scene without an obvious large artifact; full-playback visual or pixel correctness is not inferred from it. The earlier Weave menu report remains valid, while this message does not separately report Bob menu behavior or playback appearance. The capacity-safe writer-retirement fix is accepted for this bounded two-mode 9.8 Mbps video-ceiling fixture and same-boot replay. Passed does not imply a long physical soak, combined audio/video qualification or complete DVD compatibility. Evidence and exact collection/analysis drivers are retained as .ai/current_results/entry601_*. No production source, deployed files, settings, reboot, core reload or playback is changed during collection; only the fixed screenshot is replaced.
-
-#### Next Steps:
-
-Retain f615ce0 as the accepted baseline for the measured ceiling-cadence fix and preserve the independently verified a4f2769 restoration artifacts. No further identical short replay is required merely to reconfirm the cleared 167/346 misses. The next useful qualification boundary is longer physical playback and the separate 10.08 Mbps combined-stream/audio/PTS and remaining DVD syntax/features, with scope and acceptance criteria defined before new production work. Keep mode-specific UI and visual claims limited to user reports, leave lifecycle/playback under user control, preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 

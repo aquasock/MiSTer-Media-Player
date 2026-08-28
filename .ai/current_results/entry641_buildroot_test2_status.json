@@ -1,0 +1,41 @@
+{
+  "source_commit": "2045c34",
+  "scope": "Minimal public result; raw device captures remain in ignored local results.",
+  "test": "corrected test_2_interlace_bff.mpg",
+  "user_report": "Everything passes.",
+  "requested_modes": {
+    "deinterlacer": "Bob",
+    "audio": "HDMI"
+  },
+  "mode_evidence": "BFF confirmed by telemetry and HDMI by the helper; Bob requested and the requested run accepted by the user, not independently attested by telemetry.",
+  "telemetry_valid": true,
+  "top_field_first": false,
+  "pictures_displayed": 360,
+  "display_swaps": 359,
+  "accepted_video_bytes": 3067813,
+  "decoder_errors": 0,
+  "presentation_error": false,
+  "audio_underrun": false,
+  "pcm_protocol_error": false,
+  "deadline_gaps": 0,
+  "gap_outliers": 0,
+  "timestamp_conflicts": 0,
+  "largest_recorded_display_intervals_clocks": [
+    2002000,
+    2002000,
+    2002000
+  ],
+  "sequence_end_and_quiet": true,
+  "helper_exit": 0,
+  "transport_bytes_reconciled": 5556652,
+  "runtime_kernel_and_fixture_hashes_match": true,
+  "this_test_accepted": true,
+  "overall_beta_compatibility_accepted": false,
+  "remaining_matrix": [
+    "Test 3 Bob and Weave, separately captured",
+    "Test 4 progressive all-I",
+    "Test 5 AC-3 HDMI decode and S/PDIF passthrough, separately captured",
+    "Test 6 DTS S/PDIF passthrough"
+  ],
+  "separate_unresolved_issue": "Storage dirty-flag warning has not been checked by a filesystem scan."
+}
