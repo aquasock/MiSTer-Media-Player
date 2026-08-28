@@ -1,3 +1,34 @@
+## 663 COMMIT Unreleased ??? 2026-08-28T01:24:48-07:00
+
+#### Coming From:
+
+Unreleased 3828608
+
+#### Purpose:
+
+Register prefetched P/B quantization weights to close the remaining matrix-RAM timing path without changing transform cadence.
+
+#### Outcome:
+
+Source 3828608 passes the complete paired original-opening qualification and completes a clean Quartus build in 704.7 seconds with zero errors, but remains blocked from deployment by negative 1.100-nanosecond decoder setup. The byte-parser and three CDC corrections resolve their prior failures; video setup is positive 2.136 and HDMI setup positive 0.310. Hold, recovery, removal and minimum pulse width are positive 0.246, 3.813, 0.418 and 0.925. Fitted resources are 31,301 ALMs, 48,891 registers, 4,056,315 memory bits, 518 of 553 RAM blocks and 67 DSP blocks. Detailed TimeQuest paths now start at the B transform's intra-matrix RAM and pass through the shared inverse-quantization result logic. The correction will preload weight zero while idle and the next natural-index weight during each coefficient's existing commit phase, using preserved data registers protected from retiming. The default non-intra fast path and the custom/intra two-phase schedule must keep their existing cycles and values. No extra timing exception, clock reduction, feature expansion, deployment or hardware acceptance is proposed. The failed build and reports remain under /home/vash/mister-builds/entry662/results.
+
+#### Next Steps:
+
+Implement the weight prefetch registers, verify the independent coefficient vectors and cycle-level equivalence against source 3828608, and rerun matrix-transition and full original-opening checks. Publish the qualified source from the Pi, pull exact source on GUNSMOKE and build cleanly again. Require all timing categories positive and retained register-stage evidence before packaging any RBF; keep all prior failures visible and preserve restricted core.md and user control of the MiSTer.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
+- tools/streams/run_quant_transform_equivalence.sh
+- docs/testing_original_dvd_opening.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 662 COMMIT Unreleased 3828608 2026-08-28T00:55:35-07:00
 
 #### Coming From:
@@ -1215,35 +1246,6 @@ The user will install the supplied Main and six test files, keeping the existing
 - tools/streams/test_main_mister_profile.py
 - tools/streams/generate_test_suite.py
 - tools/streams/generate_test_dvd_ceiling.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 623 COMMIT Unreleased 44ee05a 2026-08-27T09:24:06-07:00
-
-#### Coming From:
-
-Unreleased 44ee05a
-
-#### Purpose:
-
-Separate faulty motion fixtures from the reported slow menu in regression tests one and two.
-
-#### Outcome:
-
-The user reports that tests one and two leave the top bar stationary and make the MiSTer menu very slow. The target listing and an uncommitted GUNSMOKE generator identify test_1_interlace_tff.mpg and test_2_interlace_bff.mpg. Both exact target files are read back and independently decoded with FFmpeg on GUNSMOKE: each contains 360 identical decoded frames, with the white bar fixed at rows zero through seven, and both share decoded-frame MD5 30809417f1caba5a06194ea6f01bd4da. Their compressed hashes differ only as separate fixtures and are retained in the evidence. The stationary bar is therefore authored into the test files, not evidence that the core froze, and these files cannot qualify motion or field order. The generator uses a suspect drawbox position expression, always interleave_top for both field orders and a later signalling patch; fixing motion must also establish correct BFF temporal field placement rather than just changing the flag. The generator and its companion check_structure edit exist only as uncommitted GUNSMOKE work and are preserved untouched. Initial helper log collection precedes the screenshot, but the fixed log has already been overwritten by test_5_audio_ac3_51.mpg, explicitly logged in HDMI decoded-stereo mode. That capture has checksum 2300824580, all 360 reference/display pictures and 359 swaps, zero errors and deadline gaps, sequence end and quiet completion, and helper exit zero after 4,443,979 transport bytes. It is not a capture of either failed run and does not qualify the other tests. Installed RBF, Main and helper match the accepted seed-17 aa7f064, patched Main and 078d36b helper hashes. The menu complaint has separate supporting evidence: test five records a maximum Main media-poll duration of 189,354 microseconds and a maximum single transfer of 58,356 microseconds. Main performs up to four complete 16 KB transfers per poll, and the credit API drains each whole chunk, falling back to acknowledged writes at zero credit instead of yielding to the UI. The user then explicitly leaves test one on screen, allowing a separate helper-first capture of test_1_interlace_tff.mpg with PID 909 and checksum 2300351100. It completes all 360 reference/display pictures and 359 swaps, with zero errors, underruns, timestamp conflicts, deadline gaps or outliers, sequence end and quiet completion. All 272 read records reconcile to 4,443,951 submitted bytes and helper exit zero; the installed Main and RBF hashes remain unchanged. Its own profile confirms a 189,409-microsecond maximum media-poll call, 204,524 microseconds between poll entries and a 62,454-microsecond maximum single transfer. This directly documents long event-loop occupancy on test one and supports the reported menu sluggishness without inventing a measured button-response latency. The stationary file is played to completion rather than freezing in this run. Test two still lacks dedicated hardware telemetry, and no Bob/Weave selection or reboot/reload lifecycle is inferred. No production source, build, deployment, setting, reboot, reload or playback changes occur; only the fixed screenshot is regenerated. Exact capture, frame identities, generator snapshot and analysis are retained as .ai/current_results/entry623_*, with full diagnostic media off Git under /home/vash/mister-builds/regression_failure_20260827_092037. Built refers to the unchanged accepted installation; these regression tests remain unaccepted.
-
-#### Next Steps:
-
-Correct and publish the fixture generator from the preserved draft in coordination with its existing uncommitted work, requiring independently decoded motion at successive fields, correct TFF and BFF temporal ordering, supported syntax and preserved audio before replacing test media. The separate Main responsiveness fix should use resumable bounded transfer progress that returns to the event loop when credits are unavailable, preserves unsent bytes and count/digest checks, and handles EOF, cancellation, reset and odd byte tails without loss or premature completion. Scope and qualify that host change before deployment; do not weaken transport checks or alter FPGA clocks, queues or decode logic to hide a fixture defect. Test one needs no further identical replay: the fixture defect and long host-poll occupancy are already established. Test two remains without a dedicated hardware capture, but the same stationary-content defect is independently proven in its file. Capture each corrected test before a later run overwrites its log. Do not declare release regression complete on the strength of entry 622 audio acceptance. Preserve user control of lifecycle and deployment, restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
