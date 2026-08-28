@@ -1,3 +1,32 @@
+## 685 COMMIT Unreleased 83c138e 2026-08-28T13:40:25-07:00
+
+#### Coming From:
+
+Unreleased 83c138e
+
+#### Purpose:
+
+Record the repeated S/PDIF opening dropout with the audio mode held fixed and clarify the underrun signal meaning.
+
+#### Outcome:
+
+The user reports the same dropout at the same passage while remaining on S/PDIF, and asks whether the loud brassy opening causes it. New helper-first collection confirms AC-3 passthrough and exit zero, with 375 frames, 576,000 carrier samples and all 783 pipe reads reconciling to 12,818,502 completed transport bytes. Two complete byte-identical screenshots produce matching checksum-valid schema-19 snapshots with only audio-underrun bit 0x0400 set, now latched at 1.827818 seconds versus entry 684 at 1.803186 seconds. New helper and screenshot hashes and different counters distinguish this replay; exact failing cycle and picture are not identical. The early snapshot has 408,434 accepted video bytes, 25 reference plus 20 B pictures, 44 bank-derived displays and 43 swaps, not terminal playback totals. Source tracing clarifies entries 684 and 685: this flag comes from the FPGA audio output adapter after its FIFO empties during playback and later non-end data resumes, not from a soundbar or clipping detector. The capture time therefore follows the empty interval rather than measuring its onset or duration. Fixed-mode recurrence removes an audio-mode transition as a necessary trigger; the exact upstream cause and receiver response remain unisolated. The passthrough branch bypasses audio decoding and emits fixed 1536-sample carrier periods, so musical amplitude alone is not supported as the cause. All installed file hashes match the prior verified baseline. Entry 683 HDMI acceptance remains intact, but S/PDIF opening qualification remains pending. Raw captures stay under output_files/entry685, with scoped evidence and hashes under .ai/current_results/entry685_*. No production change, simulation, build, deployment, mode change, core reload or playback is initiated by the agent.
+
+#### Next Steps:
+
+Propose tracing delivery of the original opening through the helper scheduler, in-band transport and FPGA audio FIFO around the early starvation interval on the build PC. Preserve the original AC-3 data, passing HDMI build and prior core backup, and obtain approval before starting that development and simulation cycle or modifying instrumentation. Do not perform another reseed, mask the underrun flag or attribute the interruption to loudness without evidence; another identical user replay is not needed to establish recurrence.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 684 COMMIT Unreleased 83c138e 2026-08-28T13:36:33-07:00
 
 #### Coming From:
@@ -1219,35 +1248,6 @@ The user reports test six works perfectly and clarifies that the woofer did not 
 #### Next Steps:
 
 The core is already in S/PDIF, so replay test_5_audio_ac3_51.mpg in that mode to close the last untested path in the seven-fixture matrix, retaining its helper log before another file overwrites it and taking a separate uniquely named screenshot; entry 627 holds the standard-MiSTer AC-3 S/PDIF baseline. Expect the helper to report passthrough on substream `0x80` rather than the decoded stereo mode of entry 645, and expect a non-zero emitted sample count as the IEC 61937 carrier. Progressive is already covered by entry 639 for I/P/B and entry 644 for all-I and needs no replay. Once that run is accepted the user may declare the matrix accepted, which should be recorded as acceptance of the seven fixtures only, with the unisolated test-four screenshot variation and the unchecked filesystem dirty flag carried forward as separate open items explicitly outside that scope. Preserve runtime identities, user control of hardware lifecycle, local-only raw data, restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [x] Passed
-
----
-
-## 645 COMMIT Unreleased 2045c34 2026-08-27T20:03:12-07:00
-
-#### Coming From:
-
-Unreleased 2045c34
-
-#### Purpose:
-
-Validate AC-3 5.1 decode to HDMI on the Buildroot beta against the recorded standard-MiSTer result.
-
-#### Outcome:
-
-The user reports test five passes everything. Helper-first retrieval preserved the log before any further playback, followed by a fresh uniquely named screenshot. The helper identifies the correct fixture at `games/MediaPlayer/Buildroot_beta/test_5_audio_ac3_51.mpg`, reports HDMI decoded stereo PCM, locates AC-3 on private substream `0x80`, decodes 375 audio frames to 576,000 samples and emits all 576,000, exits zero on end of file, and reconciles all 340 pipe reads to 5,556,835 completed transport bytes with no acknowledged fallback payload and no slow-path bytes. Valid schema-19 telemetry records 360 reference and displayed pictures, zero B pictures, 359 swaps, 3,068,039 accepted video bytes, top-field-first signalling, zero decoder and presentation errors, no audio underrun or PCM protocol fault, zero timestamp advance and delay conflicts, zero native deadline gaps, zero gap outliers, three largest display intervals each at the nominal 2,002,000 clocks, and sequence end with quiet completion. The fixture shares test one's bar video by design, which is why its accepted video byte count matches entry 640 exactly; that is the generator's definition rather than a repeat of the entry 639 stale-fixture error. Comparison against the standard-MiSTer capture in entry 626 matches on every completion, error, cadence and audio counter, including identical video bytes, AC-3 frame count, emitted samples, transport bytes and pipe reads; only delivered frames per second and cadence seconds differ, by about 1.3 milliseconds across a twelve second run. Entry 626 was captured under the older profile version one `credit_fast_v1` transport while this run uses profile version two `credit_step_v1`, so transport-layer timing figures between them are not comparable. The final raster is pixel-identical to the standard baseline across all 280,064 pixels outside the telemetry overlay; this is a single-frame comparison on static bar content and does not isolate the entry 644 progressive screenshot variation nor establish full playback pixel qualification. Independent read-only readback confirms the unchanged Main, helper, RBF, kernel and this fixture against the card manifest. Bob was the requested deinterlacer and the audible channel sweep relies on the user's report, since telemetry attests neither. The user hears the channel sweep reproduce correctly and reports the soundbar's woofer working properly, which confirms that low frequency content survives the downmix. It does not establish LFE delivery over HDMI: the AC-3 stereo downmix discards LFE by design, so the woofer output is the soundbar's own bass management applied to the stereo pair, and discrete LFE remains a question for the S/PDIF passthrough run. Passed records this functional test only; Built remains unchecked because no new build occurs. No deployment, mode change, replay, reload or reboot is initiated. Raw captures remain local and only `.ai/current_results/entry645_buildroot_test5_ac3_hdmi_status.json` is published.
-
-#### Next Steps:
-
-Switch the core's audio mode to S/PDIF and replay test_5_audio_ac3_51.mpg as an AC-3 passthrough run, retaining its helper log before another file overwrites it and taking a separate uniquely named screenshot; entry 627 holds the standard-MiSTer S/PDIF baseline for that comparison. Then run test_6_audio_dts_51.mpg as DTS S/PDIF passthrough to close the seven-fixture matrix. Expect the passthrough runs to report no decoded PCM, so do not treat an absent sample count as a fault. Keep overall beta qualification open until both remaining audio runs are accepted, and retain the unisolated test-four screenshot variation and the unresolved filesystem dirty-flag check as separate open items rather than folding either into this result. Do not begin a source fix or attribute anything to Buildroot without evidence and approval for a revised plan. Preserve runtime identities, user control of hardware lifecycle, local-only raw data, restricted core.md and the forty-entry ring.
 
 #### Files Modified:
 

@@ -1,0 +1,10 @@
+t=2 start source=file:/media/fat/games/MediaPlayer/dvd_opening_original.mpg index=65 core=MediaPlayer alternate=MediaPlayer
+t=39 profile_version=2 transport=credit_step_v1 ack_sample_every=64 first_byte_means=first_verified_step interval_means=media_poll_entry_to_entry poll_budget_us=2000 step_bytes=2048 step_limit=8
+media_player_helper: audio output spdif (IEC 61937 passthrough for AC-3 and DTS)
+media_player_helper: AC-3 audio on private substream 0x80
+media_player_helper: video=10334393 bytes, pts=25, audio=375 frames/576000 samples
+media_player_helper: scheduler video_peak=460560 bytes, pcm_peak=15360 samples, pcm_emitted=576000 samples
+t=12011764 finish reason=eof fd=14 download=1 submitted=12818502 reads=783 would_block=159
+t=12011880 child wait=2569 status=0x0 wait_errno=0 exited=1 exit_code=0 signaled=0 signal=0
+t=12011899 transfer complete submitted=12818502 reads=783
+t=12011921 profile_summary polls=89116 poll_us=8875051 poll_max_us=3145 data_polls=25861 data_poll_us=7930722 intervals=89115 interval_us=12008855 interval_max_us=10798 read_calls=943 read_us=310524 tx_calls=188378 tx_us=7763317 tx_max_us=1194 ack_chunks=2943 fast_bytes=12818502 slow_bytes=0 burst_calls=188378 status_queries=443198 transport_mode=2
