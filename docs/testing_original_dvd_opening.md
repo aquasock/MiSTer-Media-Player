@@ -92,6 +92,25 @@ The early-B case separately checks the one-clock handoff between the following
 B header and completion of its I reference. The current scheduler can bind an
 older displayed P, while the timestamp owner loses the retiring I descriptor.
 
+The entry-671 fix makes both reduced cases mandatory in
+`run_film_presentation.sh`. The metadata test also sweeps following I/P-class
+and B headers before, with and after retirement, including missing timestamps
+and an early following PCE. Require the full native trace to pass separately:
+
+```sh
+python3 tools/streams/test_original_dvd_timing.py
+python3 tools/streams/analyze_original_dvd_timing.py \
+  simulation/original_dvd_timing/timing_fixture.json \
+  simulation/original_dvd_timing/native.csv \
+  simulation/original_dvd_timing/analysis.json --require-pass
+```
+
+Use the actual output directory for each memory case. The gate requires a
+complete trace, each picture once in display order, correct TFF/RFF and PTS,
+the authored two/three-field intervals including the final hold, and clear
+cache/phase/overlap flags. `simulation_timing_pass` is distinct from hardware
+acceptance; the original-audio replay still requires observation on MiSTer.
+
 ## Focused regressions
 
 ```sh

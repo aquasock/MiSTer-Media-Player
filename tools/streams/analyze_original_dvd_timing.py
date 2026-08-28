@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Summarize a diagnostic native-field trace without accepting playback."""
+"""Check native-field simulation timing; never claim hardware acceptance."""
 import argparse
 from collections import Counter
 import csv
@@ -81,10 +81,25 @@ def analyze(fixture, rows):
         'display_order': [pictures[r['id']]['display'] for r in published],
         'largest_publication_gaps': sorted(gaps, key=lambda g: g['milliseconds'], reverse=True)[:12],
         'gaps_with_extra_fields': [g for g in gaps if g['extra_fields'] > 0],
+        'cadence_mismatches': [g for g in gaps if g['extra_fields'] != 0],
         'end_record': events.get('END', []),
         'cache_flags_seen': {k: sum(r[k] != 0 for r in rows) for k in ('prefill_miss', 'phase_error', 'overlap_error')},
         'timing_accepted': False,
     }
+    expected_order = sorted(p['display'] for p in pictures.values())
+    complete_trace = (report['complete_decode_trace'] and
+                      report['starts'] == len(pictures) and report['ready'] == len(pictures) and
+                      len(events.get('END', [])) == 1 and rows[-1]['event'] == 'END' and
+                      all(a['cycle'] <= b['cycle'] for a, b in zip(rows, rows[1:])))
+    final_hold_complete = bool(published and events.get('END')) and (
+        events['END'][-1]['field'] - published[-1]['field'] >=
+        2 + int(pictures[published[-1]['id']]['repeat_first_field']))
+    report['simulation_timing_pass'] = bool(
+        complete_trace and report['display_order'] == expected_order and
+        not descriptor_mismatches and not pts_mismatches and
+        not report['cadence_mismatches'] and final_hold_complete and
+        not any(report['cache_flags_seen'].values()))
+    report['final_authored_hold_complete'] = final_hold_complete
     return report
 
 
@@ -93,13 +108,17 @@ def main():
     parser.add_argument('fixture', type=Path)
     parser.add_argument('trace', type=Path)
     parser.add_argument('output', type=Path)
+    parser.add_argument('--require-pass', action='store_true',
+                        help='fail unless the complete trace passes simulation timing checks')
     args = parser.parse_args()
     fixture = json.loads(args.fixture.read_text())
     with args.trace.open() as handle:
         rows = [{k: v if k == 'event' else int(v) for k, v in r.items()} for r in csv.DictReader(handle)]
     report = analyze(fixture, rows)
     args.output.write_text(json.dumps(report, indent=2) + '\n')
-    print(json.dumps({k: report[k] for k in ('complete_decode_trace', 'expected_pictures', 'starts', 'ready', 'publications', 'unique_publications', 'missing_coded_pictures', 'duplicate_publications', 'cache_flags_seen')}))
+    print(json.dumps({k: report[k] for k in ('simulation_timing_pass', 'complete_decode_trace', 'expected_pictures', 'starts', 'ready', 'publications', 'unique_publications', 'missing_coded_pictures', 'duplicate_publications', 'cache_flags_seen')}))
+    if args.require_pass and not report['simulation_timing_pass']:
+        raise SystemExit('Native simulation timing qualification failed; see saved report')
 
 
 if __name__ == '__main__':
