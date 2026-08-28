@@ -1,3 +1,36 @@
+## 673 COMMIT Unreleased ??? 2026-08-28T04:19:48-07:00
+
+#### Coming From:
+
+Unreleased dd0dc52
+
+#### Purpose:
+
+Extend ordinary reference decode overlap to P pictures using existing frame banks with explicit I/P/B transition ownership.
+
+#### Outcome:
+
+The user explicitly approves the expanded overlap boundary after the full-opening trace exposes ordinary P serialization missing authored field slots despite repaired metadata ownership. Preserve the existing three ordinary reference regions and two scratch regions, permit a P transaction only when its destination is distinct from every retained or displayed ordinary frame, and retain completed primary and secondary identities until classification and presentation permit their retirement. Handle following I, P, B and sequence-end events across early, coincident and late completion without overwriting pending references or binding the wrong future reference. Prepare transition tests while the refined retirement runs finish; keep fixed-source numerical evidence separate from subsequent source changes. Clocks, physical buffers, timing constraints, placement seed, decoder arithmetic, Main and helper remain unchanged. No new build or installation is yet performed.
+
+#### Next Steps:
+
+Publish this approved expansion, finish the active checks, implement and exercise explicit reference-slot admission and secondary-to-B ownership handoff, and retain strict display-bank protection and terminal draining. Re-run focused ownership, timestamp and film tests, both complete 289-picture native memory cases and the paired reconstruction qualification on the final source. Require each picture once in display order, complete per-picture metadata and authored cadence before one clean Quartus build and full timing and warning review. Install only a verified timing-passing candidate with backup and FTP readback hashes, leave replay user controlled, and pause without speculative seed changes if build qualification fails.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/streams/tb_native_ordinary_overlap_ownership.sv
+- tools/streams/tb_h262_film_reorder_timestamp.sv
+- tools/streams/run_film_presentation.sh
+- docs/testing_original_dvd_opening.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 672 COMMIT Unreleased dd0dc52 2026-08-28T04:19:05-07:00
 
 #### Coming From:
@@ -1222,35 +1255,6 @@ Complete the user-requested documentation cleanup, describing the actual publish
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 633 COMMIT Unreleased 035807a 2026-08-27T17:31:09-07:00
-
-#### Coming From:
-
-Unreleased a26791f
-
-#### Purpose:
-
-Write the release notes for the version the user is publishing.
-
-#### Outcome:
-
-Published source `035807a` adds the release notes under docs, following the structure of previous releases so the set reads consistently: highlights, the matched runtime files with sizes and hashes, the supported subset, known limitations, reproducible qualification, Quartus and timing, host and audio regressions, hardware evidence, and packaging. Two departures from the previous release's notes are deliberate. The supported subset is stated as two separate paths rather than one, because progressive decodes I, P and B pictures while the interlaced path is restricted to I-pictures only at 720x480 and `30000/1001`, frame structured with frame DCT, and presenting them as a single envelope would misdescribe both. The limitations section names what is rejected before decode, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, and states the consequence plainly, that most commercial DVDs use several of these and will not play. Four things are recorded that a release document could easily have omitted: that playback pixel accuracy has never been qualified because every previous comparison ran in simulation, that sharp colour transitions carry one blended column an independent decoder does not produce, that the repeated frame on high peak pictures is a buffer depth property rather than a stream fault, and that the framework scaler retains little setup margin and may be exposed again by the next change of comparable size. The hardware evidence section separates measured claims from reported ones, so decoder comparison figures and user listening reports are not conflated, and records the receiver that reproduces LFE from AC-3 but not DTS as a device observation rather than a core limitation. The notes are a documentation commit and do not alter any binary, which the provenance file already states; the tag should nevertheless point at this commit rather than an earlier one so the published documentation state includes them.
-
-#### Next Steps:
-
-The user tags and publishes from commit `035807a`, marking the release pre-release because the project remains before 1.0, then performs the confirmation hardware run from the installed package. Until that run happens the release remains unaccepted in this log, although the packaged binaries are bit-identical to those every hand test exercised. After publication, record the tag and release outcome and reset the changelog's unreleased section for the next cycle. The chroma edge column stays documented rather than investigated, at the user's direction. The interlaced gates of entry 609, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, remain open and are the natural scope for the next milestone, since they are what stands between this core and ordinary DVD material. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-- docs/RELEASE_NOTES_v0.8.0.md
 
 #### Status:
 
