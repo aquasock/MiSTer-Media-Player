@@ -1,3 +1,34 @@
+## 677 COMMIT Unreleased ??? 2026-08-28T12:14:27-07:00
+
+#### Coming From:
+
+Unreleased e876bf3
+
+#### Purpose:
+
+Apply the approved narrow terminal-cut qualification exception and perform one clean seed-18 FPGA build.
+
+#### Outcome:
+
+The user approves proceeding with the build after the request to accept only the verified one-field adjustment at the artificial clip ending. Preserve the strict simulation result and all raw mismatches, add an explicit opt-in qualification result pinned to the tested fixture and final P285-to-I288 transition, and require that the final picture was already ready at the missed boundary. Missing or duplicate pictures, metadata and timestamp errors, incomplete terminal hold, cache errors, other cadence gaps, larger terminal gaps and unknown fixtures must still fail. Validate the exception against the complete retained traces and negative mutations. Production RTL, simulation inputs, clocks, physical buffers, constraints, Main, helper and seed remain identical to the fully simulated e876bf3 boundary. Reuse the verified native and paired numerical evidence only after confirming all simulation and synthesis inputs are unchanged. No FPGA build has yet started.
+
+#### Next Steps:
+
+Publish the approved qualification change and its exact final source hash, verify both existing complete traces with the explicit exception, then pull that source on the build PC and perform the single fresh seed-18 Quartus compile using the prepared entry675 build directory. Audit all setup, hold, recovery, removal and pulse-width categories, warning changes, resources and retained register/CDC boundaries. Stop without seed retries if compilation or timing fails. Package only a qualified timing-passing RBF; installation remains authorized only with backup and FTP readback verification when the MiSTer is reachable, and playback remains user controlled.
+
+#### Files Modified:
+
+- tools/streams/analyze_original_dvd_timing.py
+- tools/streams/test_original_dvd_timing.py
+- docs/testing_original_dvd_opening.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 676 COMMIT Unreleased e876bf3 2026-08-28T05:22:54-07:00
 
 #### Coming From:
@@ -1215,35 +1246,6 @@ The user attributes the startup input difficulty to local device selection and r
 #### Next Steps:
 
 The user loads MediaPlayer_20260827.rbf, selects the agreed modes and plays only test_1_interlace_tff.mpg from games/MediaPlayer/Buildroot_beta. After completion, leave the core loaded and do not start another file or reload it; report motion, sound, menu response and all three LEDs. Retrieve the helper log before it is overwritten and obtain a fresh terminal screenshot while the completed core state still exists, before returning to Scripts or otherwise changing cores. Review the 360-picture completion, transport accounting and cadence before widening the test matrix. Keep the filesystem warning as a separate unresolved check, keep raw device reports local, and preserve user control of hardware lifecycle and restricted core.md.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 637 COMMIT Unreleased 2045c34 2026-08-27T19:21:47-07:00
-
-#### Coming From:
-
-Unreleased 2045c34
-
-#### Purpose:
-
-Record the first QMTech boot capture under the pinned Buildroot beta and identify the remaining compatibility gates.
-
-#### Outcome:
-
-The user boots the prepared card and runs the capture script. Read-only retrieval confirms the pinned Linux 6.18.46 kernel, the expected memory limit, network reachability and all twenty-three runtime-manifest checks; independent readback matches the prepared Main, helper, RBF, kernel and manifest. No playback evidence is present. The script's zero status covers its narrow checks and does not classify kernel warnings. A dirty-volume warning remains uninvestigated by a filesystem scan and does not by itself establish corruption. Input initialization warnings occurred while the user was switching USB controllers and keyboards to find a working device, so the capture is not a controlled peripheral regression test and no final working input combination is confirmed. Raw device and network details remain in ignored local results; only a minimal summary is published as .ai/current_results/entry637_buildroot_boot_status.json. No device writes, repairs, reboot, source changes or new build are performed. Basic OS bring-up is established, while hardware playback acceptance remains unchecked.
-
-#### Next Steps:
-
-Confirm the final working input device and use that stable configuration for the agreed first playback: test_1_interlace_tff.mpg with HDMI audio and Bob mode. Preserve the helper log and a fresh terminal screenshot before another playback, and record selected modes, LEDs, sound, motion and menu response. Keep the dirty-volume warning open for a separately controlled filesystem check; do not repair a mounted filesystem or trigger a reboot automatically. MediaPlayer FPGA transport, cadence and audio/video correctness remain unqualified until playback evidence is reviewed. Keep raw device reports local unless the user explicitly approves publication, preserve the original working card and user control of hardware lifecycle, and maintain restricted core.md and the forty-entry ring.
 
 #### Files Modified:
 
