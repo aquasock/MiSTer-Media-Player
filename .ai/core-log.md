@@ -1,3 +1,32 @@
+## 657 COMMIT Unreleased 4777c59 2026-08-27T23:19:49-07:00
+
+#### Coming From:
+
+Unreleased 4777c59
+
+#### Purpose:
+
+Pause the approved DVD-opening cycle after discovering unsupported custom quantization matrices in its first sequence header.
+
+#### Outcome:
+
+The approved entry 656 plan is published as 75c3410 and GUNSMOKE pulls it before an isolated test export is created. The first original DVD sequence header sets both load_intra_quantiser_matrix and load_non_intra_quantiser_matrix. An exact bit-offset probe verifies sixty-four intra weights ranging from eight to twenty-one and sixty-four non-intra weights all equal to eight, rather than the decoder's default matrices. Entry 656's header inventory did not inspect these fields, so its proposed scope was incomplete. The frontend marks downloaded matrices unsupported, the I inverse-quantizer rejects them, and the P/B transform path uses hardcoded default weights. Original compressed playback therefore needs matrix parsing, lifetime handling and programmable weights through every relevant transform consumer, which materially expands the approved work and requires user approval under core.md. Implementation stops on that finding. Local uncommitted drafts widen the B-motion parser, transport and raster arithmetic and update the shared authoring helper; they are untested and are not pushed or copied over the active build checkout. The only simulation run uses the existing progressive fixture and the testbench's missing frame_pred_frame_dct connection repaired, with no B-width changes. It compares 423,936 predicted samples with zero differences above the existing tolerance and maximum difference two, and all completion and error counters match the baseline, but exits nonzero because 1,239,997 cycles differs from the fixture's hardcoded 1,239,996 assertion. This establishes a useful pixel control, not a passing regression suite or an intra reconstruction proof, because that bench seeds reference I pictures from the oracle. No original-film excerpt is generated, no Quartus build occurs, and no deployment or playback is performed. The open proposal remains entry 656 with its single placeholder; restricted core.md and pre-existing artifacts are untouched.
+
+#### Next Steps:
+
+Obtain approval to add stream-defined intra and non-intra quantization matrices to the same original twelve-second video and AC-3 milestone before continuing implementation. If approved, first extend the source inventory to matrix loads and changes, check the controlled H.262 matrix rules, and test default initialization, sequence and extension updates, intra and non-intra weights, inverse-scan indexing and matrix ownership through pipelined I/P/B reconstruction. Preserve generic matrix handling rather than hardcoding this film's tables or changing its encoded video. Resume the B-range, per-picture pulldown and chroma work only inside the approved expanded plan, repair the test harness with explicit coverage for its actual boundary, and require the originally agreed regression, clean-build and hardware gates. Keep whole-title, rare interlaced syntax and DVD navigation outside the opening scope. Do not claim any of the uncommitted drafts or the failed cycle-count assertion as qualified source; preserve the local draft for continuation, user hardware control and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 656 COMMIT Unreleased ??? 2026-08-27T23:13:11-07:00
 
 #### Coming From:
@@ -1167,40 +1196,6 @@ Have the user reload the MediaPlayer core so the new RBF and Main take effect, s
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 617 COMMIT Unreleased 6c273b3 2026-08-27T08:12:47-07:00
-
-#### Coming From:
-
-Unreleased e2bf23f
-
-#### Purpose:
-
-Route IEC 61937 bursts to the S/PDIF pin under an audio output option, with the unused output muted.
-
-#### Outcome:
-
-Published source `6c273b3` implements the integration the user specified and approved, including the framework fork. The S/PDIF encoder gains a non audio channel status input driving bit one, so a burst stops declaring itself linear PCM; `audio_out` gains a passthrough route feeding S/PDIF straight from the core samples while skipping the interpolating filter, the DC blocker and the attenuation, boost and mix stages, because each alters sample values and any alteration destroys a burst; I2S is muted in that mode and S/PDIF is muted outside it. A new emu port carries the selection from the core through `sys_top`, a new OSD option on status bit 126 drives it, and the Main patch reads the same bit in the parent before forking to pass `--audio-out` to the helper, so one bit drives both routing and the helper's decode or pass through decision. Main builds cleanly against the pinned commit at 1,170,340 bytes with SHA256 `0ee87029f0a00a50731707e8114363fc7019ae4c1200de85d90533c9163b5241`, which also proves the corrected patch hunk applies and that `user_io_status_get` is the right interface at that revision; an earlier edit had left that hunk's line count stale and it was recomputed rather than guessed. The build does not qualify. Quartus 17.0.2 at the pinned seed 16 completes in 11 minutes 33 seconds with zero errors, but worst setup slack is negative 0.070 nanoseconds against the accepted `d466bed` figure of positive 0.083, with total negative slack of the same 0.070. Hold, recovery, removal and minimum pulse width all improve slightly at 0.248, 3.158, 0.488 and 0.925 nanoseconds. The 4,298,348-byte RBF is therefore not usable and is not deployed. The failure is diagnosed rather than assumed: both violated paths run between bits 9 and 13 of the `o_hacc_next` register inside the `ascal` scaler on the HDMI pixel clock, entirely inside the framework scaler's horizontal accumulator, with the next path at positive 0.076 nanoseconds, so this is a cluster of marginal arithmetic paths in framework video logic rather than anything in the audio change, which lives in the audio clock domain. Resource movement is consistent with that reading: ALMs rise from 31,394 to 31,488, a 94 ALM increase that perturbs placement, while M10K stays at 512 of 553, block memory bits and DSPs are unchanged, so the audio work costs no memory as designed. The only new warning across the whole flow is 332148, the timing violation itself; every other warning matches the accepted baseline exactly, with none disappearing. The honest conclusion is that this design has been running on roughly 0.08 nanoseconds of setup margin in the HDMI domain all along, and any change of comparable size could have exposed it. Built is left unchecked because a candidate that misses timing is not a usable build under this project's own standard, even though it compiled without errors.
-
-#### Next Steps:
-
-Decide how to recover timing before anything is deployed, and record the choice rather than quietly re-rolling until a build passes. The cheapest option is a different fitter seed, which is a tracked source change because seed 16 is pinned in the project file, and it is legitimate provided the new seed is recorded and kept for later comparability; it does not make the underlying path less marginal. The durable option is to attack the `ascal` horizontal accumulator path itself, which would benefit every future change rather than this one, but it means modifying framework video logic beyond the audio fork the user approved and should be scoped separately. Reducing the audio routing logic is unlikely to help, since the failing path is not in it. Whichever is chosen, require a clean seed-qualified build with a warning comparison against `d466bed` before deploying, and deploy the RBF, Main and helper together, because the mode bit is meaningless unless all three change as a set. On hardware the existing channel sweep is the six channel sound test, LFE becomes audible for the first time, and selecting HDMI will silence S/PDIF by design, which must not be mistaken for a fault on a system whose only speakers are on S/PDIF. Bit transparency from the core samples to the pin remains argued from the clock arithmetic rather than measured, and it is the most likely cause if a receiver fails to lock. Do not describe a 2.1 soundbar locking onto a burst as proof of discrete channel routing. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-- sys/spdif.v
-- sys/audio_out.sv
-- sys/emu_ports.vh
-- sys/sys_top.v
-- MediaPlayer_top_00.svh
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
