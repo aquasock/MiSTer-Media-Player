@@ -1,3 +1,32 @@
+## 633 COMMIT Unreleased 035807a 2026-08-27T17:31:09-07:00
+
+#### Coming From:
+
+Unreleased a26791f
+
+#### Purpose:
+
+Write the release notes for the version the user is publishing.
+
+#### Outcome:
+
+Published source `035807a` adds the release notes under docs, following the structure of previous releases so the set reads consistently: highlights, the matched runtime files with sizes and hashes, the supported subset, known limitations, reproducible qualification, Quartus and timing, host and audio regressions, hardware evidence, and packaging. Two departures from the previous release's notes are deliberate. The supported subset is stated as two separate paths rather than one, because progressive decodes I, P and B pictures while the interlaced path is restricted to I-pictures only at 720x480 and `30000/1001`, frame structured with frame DCT, and presenting them as a single envelope would misdescribe both. The limitations section names what is rejected before decode, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, and states the consequence plainly, that most commercial DVDs use several of these and will not play. Four things are recorded that a release document could easily have omitted: that playback pixel accuracy has never been qualified because every previous comparison ran in simulation, that sharp colour transitions carry one blended column an independent decoder does not produce, that the repeated frame on high peak pictures is a buffer depth property rather than a stream fault, and that the framework scaler retains little setup margin and may be exposed again by the next change of comparable size. The hardware evidence section separates measured claims from reported ones, so decoder comparison figures and user listening reports are not conflated, and records the receiver that reproduces LFE from AC-3 but not DTS as a device observation rather than a core limitation. The notes are a documentation commit and do not alter any binary, which the provenance file already states; the tag should nevertheless point at this commit rather than an earlier one so the published documentation state includes them.
+
+#### Next Steps:
+
+The user tags and publishes from commit `035807a`, marking the release pre-release because the project remains before 1.0, then performs the confirmation hardware run from the installed package. Until that run happens the release remains unaccepted in this log, although the packaged binaries are bit-identical to those every hand test exercised. After publication, record the tag and release outcome and reset the changelog's unreleased section for the next cycle. The chroma edge column stays documented rather than investigated, at the user's direction. The interlaced gates of entry 609, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, remain open and are the natural scope for the next milestone, since they are what stands between this core and ordinary DVD material. Preserve restricted core.md and maintain the forty-entry ring.
+
+#### Files Modified:
+
+- docs/RELEASE_NOTES_v0.8.0.md
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 632 COMMIT Unreleased a26791f 2026-08-27T17:26:18-07:00
 
 #### Coming From:
@@ -1153,36 +1182,6 @@ Keep the exact feb50c2-generated 9.8 Mbps fixture and installed a4f2769 pair as 
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 593 COMMIT Unreleased feb50c2 2026-08-27T03:34:43-07:00
-
-#### Coming From:
-
-Unreleased a4f2769
-
-#### Purpose:
-
-Prepare and qualify a reproducible DVD-ceiling video fixture for the unchanged guarded-transport hardware pair.
-
-#### Outcome:
-
-The user-approved diagnostic source is feb50c2; it changes only the new generator and its focused tests, with no production difference from a4f2769. GUNSMOKE pulled that exact Pi-published source and generated the same 449-picture 720x480 TFF all-I scene twice using FFmpeg 8.0.1-3ubuntu2. The retained 34,919,166-byte source has SHA-256 90976c09e12dfe03243d5c8daccf65ecc98b4d0008cb5489e96c73f667434979. Both official outputs are bit-identical and match the candidate: 18,402,691 bytes, SHA-256 3e0a850a7dbbbbd05747208f97f436c8bae8120e124f05e78b8467c555a4b065. Both full software decodes produce identical YCbCr hashes, and the existing interlaced-signalling patch does not change any decoded plane. All 449 pictures remain within the admitted frame-DCT interlaced all-I structure. Encoder rate, minimum and maximum are 9,800,000 bits per second, with a 1,835,008-bit buffer matching FFmpeg's DVD-target setting. Every repeated sequence header is checked, including Main Profile/Main Level, bitrate, buffer and frame-rate extension. A narrow constant-arrival buffer witness based on H.262 6.3.9 and Annex C supplies data at exactly 9.8 Mbps, starts decoding after 140.428 milliseconds, and removes complete access units at 30000/1001 cadence. It records no underflow or overflow; peak occupancy is 1,834,992 bits, and header-delay disagreement is at most 1.657 ticks at 90 kHz, within the check's two-tick quantization allowance. The file's coded bits divided by its 14.981633-second picture duration average 9.826801 Mbps; this is not the arrival rate because initial buffering supplies bits before the first decode. Thirty-frame coded-demand windows range from 9.116763 to 10.768967 Mbps, and the largest access unit is 143,171 bytes; the buffer trajectory checks these bursts rather than incorrectly requiring every frame/window to fit a flat rate. Seven focused tests pass, covering exact cadence and EOF, underflow, overflow, delay drift and quantization, invalid inputs and access-unit prefix/end accounting. This is a scoped engineering buffering check, not a general MPEG VBV verifier or formal DVD application-conformance test. No new RTL simulation, FPGA build or ARM build was performed because production behavior is unchanged. The qualified file was staged at /media/fat/games/MediaPlayer/bbb_480i_tff_15s_9800kbps.m2v.new, completely read back on a separate FTP connection, renamed to bbb_480i_tff_15s_9800kbps.m2v and independently read back again with matching size/hash; staging absence was confirmed. Complete installed Main/RBF reads still match the qualified a4f2769 hashes. Existing media and binaries were not overwritten, and no reboot, core reload, configuration change or playback was performed. Evidence is .ai/current_results/entry593_fixture.json, entry593_qualification.json, entry593_tests.log and entry593_deployment.json; durable source, both generated copies and logs are on GUNSMOKE under /home/vash/mister-builds/entry593. Built denotes successful diagnostic generation/qualification; hardware acceptance is still pending.
-
-#### Next Steps:
-
-Ask the user to play bbb_480i_tff_15s_9800kbps.m2v once from games/MediaPlayer using the same installed core and display mode, without needing a reboot, and to check menu responsiveness during playback before leaving terminal telemetry displayed. Retrieve the helper log first, then a freshly triggered screenshot and full decode. Require runtime credit_fast_v1 and mode 2, all 18,402,691 source bytes delivered, all 449 pictures and 448 swaps, no transport integrity/decoder errors, normal EOF and quiet completion, zero post-startup missed deadlines/outliers and steady 2,002,000-clock intervals at 60 MHz. This fixture has an odd byte count: the final payload byte uses an acknowledged word with zero padding, so reconcile ACK words with rounded-up byte counts and distinguish any observed final transport padding from source bytes instead of reusing entry 591's all-even-chunk assumptions. Interpret schema nineteen aggregate timestamps as startup-inclusive and evaluate actual post-first-swap deadline/gap telemetry for cadence. Preserve the first run before any cold/warm follow-up, then scope the 10.08 Mbps combined-stream/audio-and-timing gate separately; passing this clip will not establish full DVD compatibility. Keep the 18.65 Mbps file optional, leave production at a4f2769, preserve its restoration copies and credit/integrity/startup/sync protections, retain user control of lifecycle and playback, keep core.md unchanged and maintain the forty-entry ring.
-
-#### Files Modified:
-
-- tools/streams/generate_test_dvd_ceiling.py
-- tools/streams/test_dvd_ceiling.py
 
 #### Status:
 
