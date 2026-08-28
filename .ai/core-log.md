@@ -1,4 +1,4 @@
-## 675 COMMIT Unreleased ??? 2026-08-28T04:58:36-07:00
+## 675 COMMIT Unreleased e9041b2 2026-08-28T04:58:36-07:00
 
 #### Coming From:
 
@@ -10,7 +10,7 @@ Complete the approved third-bank reference ownership work across a closed B-run 
 
 #### Outcome:
 
-The 18d9189 full-opening comparisons remain unchanged while running. Both retain every observed picture and descriptor, and ideal memory has no cadence mismatch so far, but contended memory exposes coded B115-to-B116 taking four fields instead of two. B116 completes 4,845 decoder clocks after its required selection boundary, while the ideal case completes 18,194 clocks before it. Neither B transaction has presentation hold; the preceding P112 was held for 2,699,879 clocks while a completed B run still presented its scratch and future frames. Refine the already approved I/P/B overlap ownership without adding physical banks: once all old B prediction work is complete, allow the next ordinary reference into a bank distinct from the retained future, primary pending and actual displayed ordinary frame, while retaining its completion in the existing secondary slot. Preserve display protection until scratch presentation releases the old bank, block any further reference payload at full capacity, and retain a following B classification until the old future retires. New I/P/B/end transition checks must cover the retained three-bank identities and ordered resume. No arithmetic, clock, constraint, seed, Main, helper or device change is planned, and no FPGA build has started.
+Implementation e9041b2 adds the guarded drain transaction and I/P/B/end ownership tests; focused validation is starting. The 18d9189 full-opening comparisons remain unchanged while running. Both retain every observed picture and descriptor, and ideal memory has no cadence mismatch so far, but contended memory exposes coded B115-to-B116 taking four fields instead of two. B116 completes 4,845 decoder clocks after its required selection boundary, while the ideal case completes 18,194 clocks before it. Neither B transaction has presentation hold; the preceding P112 was held for 2,699,879 clocks while a completed B run still presented its scratch and future frames. Refine the already approved I/P/B overlap ownership without adding physical banks: once all old B prediction work is complete, allow the next ordinary reference into a bank distinct from the retained future, primary pending and actual displayed ordinary frame, while retaining its completion in the existing secondary slot. Preserve display protection until scratch presentation releases the old bank, block any further reference payload at full capacity, and retain a following B classification until the old future retires. New I/P/B/end transition checks must cover the retained three-bank identities and ordered resume. No arithmetic, clock, constraint, seed, Main, helper or device change is planned, and no FPGA build has started.
 
 #### Next Steps:
 
@@ -1255,4 +1255,3 @@ The user powers down the QMTech, inserts the prepared card and boots it, then ru
 - [ ] Passed
 
 ---
-
