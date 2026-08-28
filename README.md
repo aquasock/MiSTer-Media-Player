@@ -2,7 +2,7 @@
 
 An experimental media-player core for [MiSTer FPGA](https://github.com/MiSTer-devel/Main_MiSTer), with a standards-driven MPEG-2 Video / ITU-T H.262 decoder implemented primarily in FPGA logic.
 
-> **Development status:** active, pre-release, developer-oriented. **v0.7.0 is the current released milestone.** Unreleased work adds a bounded 720x480 interlaced frame-DCT all-I path with native 480i presentation, AC-3 decode, and AC-3/DTS passthrough over S/PDIF, while retaining the v0.7.0 Program Stream, PTS, and ARM-helper foundation.
+> **Development status:** active, pre-release, developer-oriented. **v0.8.0 is the current milestone**, adding a bounded 720x480 interlaced frame-DCT all-I path with native 480i presentation, AC-3 decode, and AC-3/DTS passthrough over S/PDIF, on the v0.7.0 Program Stream, PTS, and ARM-helper foundation.
 
 ## Current status
 
@@ -19,8 +19,8 @@ The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`. v0.
 - continuous progressive 4:2:0 I/P/B decoding, retained DDR3 reference banks, separate B scratch storage, and coded-order/display-order presentation;
 - full 8-bit Y, Cb, and Cr reconstruction with limited-range BT.601 presentation;
 - clean Program Stream and raw-stream terminal handling, including reordered-picture flush and one explicit PCM end marker.
-- an unreleased 720x480 interlaced frame-picture, frame-DCT, all-I subset with preserved top- or bottom-field-first order and native 480i timing;
-- unreleased AC-3 decode to stereo, and AC-3 or DTS passthrough to S/PDIF as IEC 61937 bursts for an external decoder.
+- a 720x480 interlaced frame-picture, frame-DCT, all-I subset with preserved top- or bottom-field-first order and native 480i timing;
+- AC-3 decode to stereo, and AC-3 or DTS passthrough to S/PDIF as IEC 61937 bursts for an external decoder.
 
 The supported subset is intentionally bounded while the architecture is being proven. These are implementation limits, not limits of H.262 or H.222.0.
 
@@ -28,14 +28,14 @@ The supported subset is intentionally bounded while the architecture is being pr
 | --- | --- |
 | Input | Raw MPEG-2 Video `.m2v`, or bounded MPEG-2 Program Stream `.mpg` / `.mpeg` through the ARM helper |
 | Video, progressive | 4:2:0 I, P and B pictures through 720x480 |
-| Video, interlaced (unreleased) | 720x480 at 30000/1001 only, 4:2:0, **I-pictures only**, frame-structured, frame DCT and frame prediction only, top- or bottom-field-first, no `repeat_first_field` |
+| Video, interlaced | 720x480 at 30000/1001 only, 4:2:0, **I-pictures only**, frame-structured, frame DCT and frame prediction only, top- or bottom-field-first, no `repeat_first_field` |
 | Picture types | Coded-order/display-order presentation with B reordering |
 | Presentation rates | H.262 frame-rate codes 1..5; codes 6..8 are rejected before transport |
 | Program Stream timing | Picture PTS on a 33-bit / 90 kHz FPGA timeline with cadence-floor enforcement |
 | Raw-stream timing | Synthetic 33-bit / 90 kHz cadence derived from H.262 frame-rate metadata |
 | Audio | MPEG Layer II at 44.1 or 48 kHz, and AC-3 at 48 kHz, decoded by the helper to stereo. The AC-3 stereo downmix discards LFE, as the format specifies |
-| Audio passthrough (unreleased) | AC-3 and DTS carried to S/PDIF as IEC 61937 bursts for an external decoder. DTS is passthrough only; there is no DTS decoder |
-| Audio output (unreleased) | A menu option selects HDMI or S/PDIF. The unused output is muted, because both are fed from one stereo stream |
+| Audio passthrough | AC-3 and DTS carried to S/PDIF as IEC 61937 bursts for an external decoder. DTS is passthrough only; there is no DTS decoder |
+| Audio output | A menu option selects HDMI or S/PDIF. The unused output is muted, because both are fed from one stereo stream |
 | Audio buffering | Packed signed PCM records into an 8,192-frame stereo FPGA FIFO |
 | Frame storage | Two retained planar MiSTer DDR3 I/P banks plus a distinct B scratch region |
 | Video output | 800x600 progressive diagnostic output, or native 480i for supported interlaced input |
@@ -44,15 +44,15 @@ The frozen `rtl/mpeg2fpga/` tree remains historical reference material and is no
 
 ## Installation
 
-v0.7.0 requires three matching runtime files. Back up the existing files before replacing them.
+v0.8.0 requires three matching runtime files. Back up the existing files before replacing them.
 
-| Release file | MiSTer destination |
-| --- | --- |
-| `MediaPlayer_20260824.rbf` | `/media/fat/MediaPlayer_20260824.rbf` |
-| `MiSTer` | `/media/fat/MiSTer` |
-| `linux/MediaPlayer_Helper` | `/media/fat/linux/MediaPlayer_Helper` |
+| Release file | MiSTer destination | SHA-256 |
+| --- | --- | --- |
+| `MediaPlayer_20260827.rbf` | `/media/fat/MediaPlayer_20260827.rbf` | `61a2fed28425a461c8b886bdf809e3ef76a320e5688bb22a816135c36ef981ce` |
+| `MiSTer` | `/media/fat/MiSTer` | `01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9` |
+| `MediaPlayer_Helper` | `/media/fat/linux/MediaPlayer_Helper` | `f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8` |
 
-The helper must be executable. Reboot after installing the matching Main executable. Mixing v0.7.0 components with a different Main, helper, or RBF is unsupported.
+`MiSTer` is a patched Main and is not optional: without it there is no `Audio output` menu option, and media transfers hold the event loop long enough to make the menu sluggish on low-bitrate files. The helper must be executable. Reboot after installing Main. Mixing v0.8.0 components with a different Main, helper, or RBF is unsupported.
 
 ## Release qualification
 
@@ -178,7 +178,7 @@ The build script pins the minimp3 revision, MiSTer Main revision, dependency has
 - Decoded audio is MPEG Layer II at 44.1 or 48 kHz and AC-3 at 48 kHz. Other codecs and sample rates are rejected. Only the first audio track is played; track switching needs a control channel that protocol one does not implement.
 - AC-3 is downmixed to stereo for decoded output, which discards LFE by the format's own convention. Discrete surround requires passthrough and an external decoder.
 - Passthrough carries the bitstream untouched, so nothing may scale it. The audio output option therefore mutes the output it is not driving, and volume control does not apply to a passthrough stream.
-- Progressive 4:2:0 video is released through 720x480 and decodes I, P and B pictures. The unreleased interlaced path is far narrower: 720x480 at 30000/1001 only, I-pictures only, frame-structured, frame DCT and frame prediction only. Field pictures, field DCT, interlaced P and B pictures, `repeat_first_field` (3:2 pulldown), and 576i are all rejected before decode. Most commercial DVDs use several of these and will not play.
+- Progressive 4:2:0 video is released through 720x480 and decodes I, P and B pictures. The interlaced path is far narrower: 720x480 at 30000/1001 only, I-pictures only, frame-structured, frame DCT and frame prediction only. Field pictures, field DCT, interlaced P and B pictures, `repeat_first_field` (3:2 pulldown), and 576i are all rejected before decode. Most commercial DVDs use several of these and will not play.
 - Playback pixel accuracy has never been qualified. Every pixel comparison in this project's history was performed in simulation; correctness of what actually reaches the screen rests on inspection.
 - Sharp colour transitions show one blended pixel column that an independent software decoder does not produce, consistent with horizontal chroma upsampling in the display path. It is obvious on synthetic colour bars and subtle on ordinary material, and it is not specific to any picture type.
 - On material whose peak coded picture is large enough, one or two display slots are missed at that picture, shown as a repeated frame rather than a dropped one. This is a property of input buffer depth against peak picture size, not of the stream; the qualified full-length fixture hits it once, at a scene cut.
@@ -187,7 +187,7 @@ The build script pins the minimp3 revision, MiSTer Main revision, dependency has
 - Output offers two interlaced tiers. Normal processed HDMI sends native 480i timing into MiSTer's scaler and lets the `HDMI scaler deinterlacer` menu choose Weave or Bob. The external-processing tier preserves native 480i fields; truly unscaled HDMI additionally requires MiSTer's separate `direct_video` setting, which the core menu cannot enable.
 - Files should be opened through the normal MiSTer file menu; MGL injection is not a qualified loading method.
 
-### Native elementary-stream startup (unreleased)
+### Native elementary-stream startup
 
 The clean-video queue holds up to 64 KiB. For native 29.97-fps all-I video
 without PTS or PCM records, the first cached picture stays black until a second
