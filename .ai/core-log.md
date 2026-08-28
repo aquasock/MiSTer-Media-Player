@@ -1,3 +1,32 @@
+## 659 COMMIT Unreleased 4777c59 2026-08-28T00:02:07-07:00
+
+#### Coming From:
+
+Unreleased 4777c59
+
+#### Purpose:
+
+Record implementation progress and remaining qualification gates for the approved original DVD-opening cycle.
+
+#### Outcome:
+
+The approved drafts remain uncommitted on the Raspberry Pi and are tested in an isolated export at /home/vash/mister-builds/entry656/dev on GUNSMOKE; the active checkout and MiSTer are not modified. Preparation preserves the selected compressed video and first AC-3 track byte for byte and produces 289 coded pictures. Generic matrix parsing and inverse quantization pass 384 matrix-state checks and 384 coefficient cases, while the first original I picture matches all 518,400 reference samples exactly. Motion arithmetic passes 1,441,440 signed reconstruction cases and 1,024 chroma cases. Full-raster synthetic f_code-six and quantized B fixtures pass with maximum pixel difference one. Original playback first exposes three omitted legal quantized non-intra B macroblock types, then an existing failure to reset all B motion predictors after intra macroblocks, which sends a prediction outside the frame at coded picture 107. The latter has a focused synthetic reproducer that fails before the reset and passes after it, with all 1,555,200 I/P/B samples within one level of FFmpeg; these complete existing quantizer and motion behavior inside the approved opening boundary. Native 480i regressions and focused film cadence, progressive-chroma cache, metadata and field-order tests pass, but integrated original-film presentation is not yet qualified. Both AC-3 passthrough and software PCM comparison pass; PCM has 576,000 stereo frames, maximum differences 17 and 20, and correlations above 0.99999. These are software results, not listening or synchronization acceptance. Earlier original-stream runs contain unresolved pixel deviations, and an attempted oracle-reference refresh diagnostic is not accepted as decoder evidence. The full original run with real RTL reference pictures and the predictor fix is now running. An added field-DCT harness test initially misinterprets the writer's row-stride contract and omits sequence end; the corrected harness is being verified. No source commit, Quartus build, deployment or hardware acceptance is claimed. Entry 656 remains the single open proposal.
+
+#### Next Steps:
+
+Finish the original pixel comparison without relaxing tolerances to hide defects, complete integrated per-picture film cadence and timestamp ownership, matrix-change lifetime and terminal/replay checks, and rerun affected controls. Retain numeric results under the isolated PC results directory and commit deterministic generators rather than movie-derived media. Once the source and regressions qualify, publish from the Pi, resolve entry 656, pull exact published source on GUNSMOKE and perform the required clean Quartus 17 build and timing/resource audit before asking the user to deploy. Preserve restricted core.md, old artifacts, the forty-entry ring and user control of the MiSTer.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 658 COMMIT Unreleased 4777c59 2026-08-27T23:24:29-07:00
 
 #### Coming From:
@@ -1168,35 +1197,6 @@ Have the user select S/PDIF AC-3 in the OSD and play games/MediaPlayer/dts_chann
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 619 COMMIT Unreleased aa7f064 2026-08-27T08:35:53-07:00
-
-#### Coming From:
-
-Unreleased aa7f064
-
-#### Purpose:
-
-Accept AC-3 passthrough over S/PDIF on hardware.
-
-#### Outcome:
-
-The user reloaded the core, exercised both audio output settings and reports that S/PDIF AC-3 sounds correct through the soundbar, that the subwoofer was heard on its own channel for the first time, and that the HDMI and S/PDIF options both behave as specified. The decisive evidence is that low frequency channel rather than any indicator on the device: the AC-3 stereo downmix discards LFE entirely, so a discrete subwoofer channel can only exist if the compressed bitstream reached the soundbar and was decoded there as 5.1. The soundbar displayed no format indicator, which the user reports it never does over S/PDIF, so that absence carries no weight either way. This also settles empirically what entry 617 could only argue from clock arithmetic, namely that the path from the core samples to the S/PDIF pin is bit transparent; had the mixer, filter or DC blocker altered a single sample the receiver could not have decoded anything. Telemetry is clean. The installed RBF is the seed 17 build with SHA256 beginning `61a2fed2`, Main is the patched binary beginning `0ee87029`, and the sweep fixture is unchanged on the target. All 360 reference and display pictures complete with 359 swaps and 14,469,731 accepted video bytes, `error_flags` zero, sequence end seen, presentation complete, quiet snapshot, and zero deadline gaps or outliers. Audio underrun and PCM protocol error are clear at FIFO peak 127. Helper PID 753 submitted 16,958,580 transport bytes over 1,036 reads and exited zero, which is byte for byte the same volume as the decoded run of the same fixture in entry 614, confirming by measurement the design property that a burst occupies exactly the transport a decoded frame would have. One diagnostic weakness is recorded rather than hidden: the helper log names the AC-3 substream but never states which audio output mode it was launched with, so the log alone cannot distinguish a passthrough run from a decoded one, and this acceptance therefore rests on the user's listening report for that distinction. Scope is bounded. A 2.1 soundbar cannot verify discrete channel routing however convincingly it virtualizes, so front, centre and surround placement over passthrough remains unproven and needs the community test on real 5.1 hardware; only LFE is independently established, because its presence is impossible under the downmix. DTS passthrough is untested, a commercial AC-3 track with real dynamic range control is still uncompared, and the marginal scaler paths recovered by reseeding remain a risk for the next change that adds logic.
-
-#### Next Steps:
-
-Add a mode line to the helper's diagnostics so a future log proves on its own whether decoded stereo or passthrough was selected, since that gap forced this entry to rely on a listening report for a fact the log should carry. Write the community sound test from the sweep fixture, stating that in S/PDIF mode it exercises discrete channels through the listener's own decoder while in HDMI mode it exercises only the stereo downmix, and ask testers with real 5.1 hardware to report each two second slot by speaker. DTS passthrough is the same machinery with a different data type and burst length and is the cheapest remaining audio item. A commercial AC-3 track remains the honest gap in codec qualification. Before the release, decide whether the audio work is complete enough and prepare release notes carrying the entry 616 wording of one or two repeated frames at the picture 690 cut rather than entry 609's original phrasing. The interlaced video gates of entry 609, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, remain open and unstarted and are the larger question for a release that claims interlaced support. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 
