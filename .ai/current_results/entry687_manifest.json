@@ -1,0 +1,16 @@
+{
+  "entry687_helper_horizon.json": "cbcaf6907aa5b43172d9310b38bcb1336208cc4ce9df24bfe0f7afda05bf4ab8",
+  "entry687_investigation.json": "9a8b559f4ed0f038b249d0e2e012de21dbfc0860353d4a49338dd7726c2e0b68",
+  "entry687_passthrough_verification.json": "8da03decc760f516429f7b5ee8ddd0fd606c6f5f4dff618bf8ed77364a29f24a",
+  "entry687_raw_evidence_hashes.json": "5699556d838094cd4b36c294cb8323226ab8ef28ebdd90ab1cd27fcd1eabc75b",
+  "entry687_reproduction/README.md": "0dab7c54195699a9292a9da8815118f199ed2de39cc2a826f314142482b1ea47",
+  "entry687_reproduction/entry686_audio.svh": "97c538228eac3aea6a8930358475cc18c09f189d6a86dfeaa50dc336b755f42e",
+  "entry687_reproduction/entry686_compare.py": "14410ea9255a065c897af5aad4fade8a6b87637a1f06f644f8cd9498f6623dc8",
+  "entry687_reproduction/entry686_horizon.py": "c6ae09a7a814f823c43972e2ab97eb8825702e0ae63d400c24554ec75006de09",
+  "entry687_reproduction/entry686_setup_sim.py": "202041fee1378c95e24f5c64972d80a6e7ce729ecd73297365d224b878d4fbf1",
+  "entry687_reproduction/entry686_summarize.py": "ae67c9687c8179bc9fa12ccadec8bcb8bcc238949c9b9981ce04afbf45e97736",
+  "entry687_reproduction/sim_build_command.json": "1fbc15f92cdda3a0dab0a2c13b7fa4a5df583858cde2169e2ece1f2e50337fee",
+  "entry687_reproduction/sim_hdmi_stride15_command.json": "dadc387d6ad75cee570fb7dadca4be3c840a8b7ed55b1336742b107833945915",
+  "entry687_reproduction/sim_run_command.json": "c89e986c718e5016c92e6017b2bb0c7600c506ee62d3f1d84f32a6d44b1f7882",
+  "entry687_transport_comparison.json": "b62a0f7a6634953fe87a0b4604ac23c9f22277e03e0900455b185e37c5ac514c"
+}

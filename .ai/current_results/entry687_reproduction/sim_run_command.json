@@ -1,0 +1,16 @@
+[
+  "/home/vash/mister-builds/entry686/obj/audio_timing",
+  "+HEX=/home/vash/mister-builds/entry656/fixtures/dvd_opening_original.hex",
+  "+LEN=10334168",
+  "+PIXELS=/home/vash/mister-builds/entry656/fixtures/dvd_opening_original_pixels.hex",
+  "+MAP=/home/vash/mister-builds/entry656/fixtures/dvd_opening_map.hex",
+  "+PTS=/home/vash/mister-builds/entry673/ideal_v2/pts.hex",
+  "+PTS_COUNT=25",
+  "+NATIVE_TRACE=/home/vash/mister-builds/entry686/output/native_spdif.csv",
+  "+AUDIO_TRACE=/home/vash/mister-builds/entry686/output/audio_spdif.csv",
+  "+TRANSPORT=/home/vash/mister-builds/entry686/output/spdif.hex",
+  "+TRANSPORT_LEN=12818502",
+  "+GENERIC_STREAM",
+  "+CHAIN_ERROR_BOUND",
+  "+PROGRESS=10000000"
+]

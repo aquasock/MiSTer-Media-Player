@@ -1,3 +1,32 @@
+## 687 COMMIT Unreleased 83c138e 2026-08-28T13:58:39-07:00
+
+#### Coming From:
+
+Unreleased 83c138e
+
+#### Purpose:
+
+Record the reproduced opening audio-starvation mechanism and propose a helper scheduling correction.
+
+#### Outcome:
+
+The approved investigation runs on the build PC with production source unchanged from 83c138e and the exact original opening hash preserved. Native HDMI and S/PDIF transports have identical video, timestamp and audio-record positions; only audio payload differs. All 375 passthrough bursts contain the original AC-3 bytes, have constant 1536-sample periods and 1792-byte payloads, and independently decode identically to the source. Both transports satisfy the existing byte-schedule metric bounds, exposing their lack of FIFO-consumption timing coverage. An isolated native-decoder harness connects the production extractor, 65536-byte clean-video queue, 8192-frame audio FIFO and audio adapter, using behavioral vendor FIFO models and ideal DDR. The completed three-second ideal-source S/PDIF prefix reproduces the first underrun at video byte 368,134, exactly matching entry 684, and at 1.802375 seconds versus hardware 1.803186 seconds. Fifteen empty/refill intervals total 27.375 milliseconds of modeled missing sample slots; the first empty interval lasts 12.25 milliseconds, and every empty transition has a full clean-video queue and blocked extractor. A completed 2.1-second decoded-audio case with a 4 MB/s source cap also underruns at 1.802438 seconds, with sixteen intervals totaling 18.75 milliseconds; this changes payload and timing together and is a sensitivity case, not a replay or rejection of entry 683 HDMI acceptance. Log-only helper instrumentation preserves output byte-for-byte and shows a 76,168-sample horizon at video byte 121,392, followed largely by 128-sample guard refills until the horizon advances at byte 493,708. During this interval queued video prevents extraction of enough later audio; starvation ends as the next larger refill becomes reachable. Actual S/PDIF logs report no new pipe would-block events after first transfer, and ideal-source reproduction proves slow source supply is not necessary. The evidence supports insufficient audio delivery ahead of blocking video rather than burst corruption or musical loudness. Exact receiver behavior and physical timing remain unmeasured. Reports, hashes and small reproduction scripts are published under .ai/current_results/entry687_*; full traces, generated transports and isolated sources remain in output_files/entry686 and /home/vash/mister-builds/entry686. No production correction, Quartus compile, reseed, deployment, reload or playback occurs.
+
+#### Next Steps:
+
+Obtain approval for a helper scheduling correction that supplies sufficient audio before queued video blocks extraction, preserving original video and compressed audio bytes and existing physical FIFO sizes. Add this integrated audio/video failure as a regression and require zero underruns through the full opening in both output modes and paced-source cases, without introducing video stalls or A/V drift. Prefer a verified helper-only correction; do not mask flags, add an arbitrary startup delay or start another Quartus reseed. Keep entry 683 HDMI acceptance and the installed seed-20 build intact until a replacement is separately validated.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 686 COMMIT Unreleased 83c138e 2026-08-28T13:43:04-07:00
 
 #### Coming From:
@@ -1228,34 +1257,5 @@ Make the four declaration changes, commit them as the source commit for this cyc
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 647 COMMIT Unreleased 2045c34 2026-08-27T20:26:43-07:00
-
-#### Coming From:
-
-Unreleased 2045c34
-
-#### Purpose:
-
-Close the seven-fixture Buildroot beta matrix with AC-3 S/PDIF passthrough and record the user's acceptance.
-
-#### Outcome:
-
-The user reports the run was perfect and the woofer channel audible. Helper-first retrieval preserved a log distinct from both the entry 645 decode run and the entry 646 DTS run, verified by hash before the screenshot was taken. The helper identifies the correct fixture, reports `spdif` IEC 61937 passthrough, locates AC-3 on private substream `0x80` rather than the decoded stereo mode of entry 645, carries 375 audio frames and 576,000 emitted samples as the burst carrier, exits zero on end of file, and reconciles all 340 pipe reads to 5,556,835 completed transport bytes with no acknowledged fallback payload and zero slow-path bytes. Valid schema-19 telemetry records 360 reference and displayed pictures, zero B pictures, 359 swaps, 3,068,039 accepted video bytes, top-field-first signalling, zero decoder and presentation errors, no audio underrun or PCM protocol fault at FIFO peak 127, zero timestamp conflicts of either kind, zero native deadline gaps, zero gap outliers, three largest display intervals each at the nominal 2,002,000 clocks, and sequence end with quiet completion. Every one of those counters matches the standard-MiSTer capture in entry 627, including identical video bytes, AC-3 frame count, emitted samples, transport bytes and pipe reads, and the final raster is pixel-identical across all 280,064 pixels outside the telemetry overlay. Only delivered frames per second differs. Entry 627 captured this run before installing the current Main and reports profile version one `credit_fast_v1` against this run's version two, so transport-layer timing figures are not comparable while the counters are. The audible LFE matches AC-3 S/PDIF behaviour on standard MiSTer recorded in entries 621 and 626 and contrasts with entry 646, where the same receiver does not reproduce DTS LFE despite measured content in the bursts, confirming that observation as a device property rather than an output-path fault. With this run the matrix is complete and the user accepts it. That acceptance covers the seven fixtures and their modes on the pinned beta using unchanged v0.8.0 binaries, and nothing further: the unisolated test-four screenshot variation, the unchecked filesystem dirty flag, the uncontrolled boot-time input warnings, the single-frame scope of every pixel comparison, and the older-Main provenance of the entry 626 and 627 audio baselines all remain explicitly outside it. A one-page findings report was written for the Buildroot maintainer and moved by the user to a local path for private delivery; it is not committed to the repository and states these same limits. Built remains unchecked because no new build occurs.
-
-#### Next Steps:
-
-Decide whether the findings report should be committed to the repository or remain a private communication, since it currently exists only outside version control. If the collaboration proceeds, re-running this matrix against future beta drops is cheap because the fixtures and capture script are deterministic and committed. The unisolated test-four screenshot variation and the filesystem dirty-flag warning remain open and should each be scoped as their own investigation with user approval rather than folded into any future acceptance. The longer-term question of retiring the ARM helper by moving source, demux, timeline and audio codec responsibilities onto the platform stays a discussion item and not approved work. The next MediaPlayer development milestone remains unapproved and should be scoped separately, with the interlaced decoding gaps of entry 609 still open and out of scope. Preserve runtime identities, user control of hardware lifecycle, local-only raw data, restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [x] Passed
 
 ---

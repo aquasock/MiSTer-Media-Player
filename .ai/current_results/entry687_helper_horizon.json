@@ -1,0 +1,1066 @@
+[
+  {
+    "video_bytes": 28672,
+    "video_pts": 103558,
+    "first_audio_pts": 48003,
+    "target": 33726,
+    "emitted": 4096,
+    "available": 11264
+  },
+  {
+    "video_bytes": 30336,
+    "video_pts": 138092,
+    "first_audio_pts": 48003,
+    "target": 52144,
+    "emitted": 18432,
+    "available": 0
+  },
+  {
+    "video_bytes": 34388,
+    "video_pts": 148603,
+    "first_audio_pts": 48003,
+    "target": 57750,
+    "emitted": 51200,
+    "available": 1024
+  },
+  {
+    "video_bytes": 105223,
+    "video_pts": 175629,
+    "first_audio_pts": 48003,
+    "target": 72164,
+    "emitted": 59926,
+    "available": 1514
+  },
+  {
+    "video_bytes": 121392,
+    "video_pts": 183138,
+    "first_audio_pts": 48003,
+    "target": 76168,
+    "emitted": 72548,
+    "available": 1180
+  },
+  {
+    "video_bytes": 493708,
+    "video_pts": 220673,
+    "first_audio_pts": 48003,
+    "target": 96187,
+    "emitted": 87816,
+    "available": 1272
+  },
+  {
+    "video_bytes": 511928,
+    "video_pts": 228183,
+    "first_audio_pts": 48003,
+    "target": 100192,
+    "emitted": 96699,
+    "available": 1605
+  },
+  {
+    "video_bytes": 582740,
+    "video_pts": 231186,
+    "first_audio_pts": 48003,
+    "target": 101794,
+    "emitted": 102368,
+    "available": 544
+  },
+  {
+    "video_bytes": 655590,
+    "video_pts": 243198,
+    "first_audio_pts": 48003,
+    "target": 108200,
+    "emitted": 104672,
+    "available": 1312
+  },
+  {
+    "video_bytes": 833661,
+    "video_pts": 268723,
+    "first_audio_pts": 48003,
+    "target": 121814,
+    "emitted": 113704,
+    "available": 1496
+  },
+  {
+    "video_bytes": 868041,
+    "video_pts": 273228,
+    "first_audio_pts": 48003,
+    "target": 124216,
+    "emitted": 122838,
+    "available": 42
+  },
+  {
+    "video_bytes": 953021,
+    "video_pts": 276231,
+    "first_audio_pts": 48003,
+    "target": 125818,
+    "emitted": 126776,
+    "available": 712
+  },
+  {
+    "video_bytes": 971241,
+    "video_pts": 280736,
+    "first_audio_pts": 48003,
+    "target": 128221,
+    "emitted": 127416,
+    "available": 72
+  },
+  {
+    "video_bytes": 1066346,
+    "video_pts": 291246,
+    "first_audio_pts": 48003,
+    "target": 133826,
+    "emitted": 131165,
+    "available": 931
+  },
+  {
+    "video_bytes": 1086563,
+    "video_pts": 295751,
+    "first_audio_pts": 48003,
+    "target": 136229,
+    "emitted": 134338,
+    "available": 830
+  },
+  {
+    "video_bytes": 1216076,
+    "video_pts": 313768,
+    "first_audio_pts": 48003,
+    "target": 145838,
+    "emitted": 140197,
+    "available": 1115
+  },
+  {
+    "video_bytes": 1254504,
+    "video_pts": 325780,
+    "first_audio_pts": 48003,
+    "target": 152244,
+    "emitted": 146990,
+    "available": 466
+  },
+  {
+    "video_bytes": 1485193,
+    "video_pts": 336290,
+    "first_audio_pts": 48003,
+    "target": 157850,
+    "emitted": 159412,
+    "available": 332
+  },
+  {
+    "video_bytes": 1513524,
+    "video_pts": 340795,
+    "first_audio_pts": 48003,
+    "target": 160252,
+    "emitted": 160308,
+    "available": 972
+  },
+  {
+    "video_bytes": 1645043,
+    "video_pts": 351305,
+    "first_audio_pts": 48003,
+    "target": 165858,
+    "emitted": 164532,
+    "available": 2892
+  },
+  {
+    "video_bytes": 1673374,
+    "video_pts": 355809,
+    "first_audio_pts": 48003,
+    "target": 168260,
+    "emitted": 166626,
+    "available": 798
+  },
+  {
+    "video_bytes": 1703711,
+    "video_pts": 370825,
+    "first_audio_pts": 48003,
+    "target": 176268,
+    "emitted": 169156,
+    "available": 1340
+  },
+  {
+    "video_bytes": 2209610,
+    "video_pts": 415870,
+    "first_audio_pts": 48003,
+    "target": 200292,
+    "emitted": 192140,
+    "available": 2932
+  },
+  {
+    "video_bytes": 2391705,
+    "video_pts": 418873,
+    "first_audio_pts": 48003,
+    "target": 201894,
+    "emitted": 205924,
+    "available": 2972
+  },
+  {
+    "video_bytes": 2418012,
+    "video_pts": 423378,
+    "first_audio_pts": 48003,
+    "target": 204296,
+    "emitted": 206820,
+    "available": 2076
+  },
+  {
+    "video_bytes": 2509069,
+    "video_pts": 430885,
+    "first_audio_pts": 48003,
+    "target": 208300,
+    "emitted": 209636,
+    "available": 796
+  },
+  {
+    "video_bytes": 2537382,
+    "video_pts": 433888,
+    "first_audio_pts": 48003,
+    "target": 209902,
+    "emitted": 210532,
+    "available": 1436
+  },
+  {
+    "video_bytes": 2636535,
+    "video_pts": 441395,
+    "first_audio_pts": 48003,
+    "target": 213906,
+    "emitted": 213732,
+    "available": 1308
+  },
+  {
+    "video_bytes": 2664866,
+    "video_pts": 445899,
+    "first_audio_pts": 48003,
+    "target": 216308,
+    "emitted": 214674,
+    "available": 366
+  },
+  {
+    "video_bytes": 2697227,
+    "video_pts": 460915,
+    "first_audio_pts": 48003,
+    "target": 224316,
+    "emitted": 217204,
+    "available": 908
+  },
+  {
+    "video_bytes": 3033128,
+    "video_pts": 475929,
+    "first_audio_pts": 48003,
+    "target": 232324,
+    "emitted": 234812,
+    "available": 1732
+  },
+  {
+    "video_bytes": 3059417,
+    "video_pts": 478932,
+    "first_audio_pts": 48003,
+    "target": 233925,
+    "emitted": 235708,
+    "available": 836
+  },
+  {
+    "video_bytes": 3150474,
+    "video_pts": 486439,
+    "first_audio_pts": 48003,
+    "target": 237929,
+    "emitted": 238524,
+    "available": 1092
+  },
+  {
+    "video_bytes": 3176781,
+    "video_pts": 490943,
+    "first_audio_pts": 48003,
+    "target": 240331,
+    "emitted": 239420,
+    "available": 196
+  },
+  {
+    "video_bytes": 3203088,
+    "video_pts": 505960,
+    "first_audio_pts": 48003,
+    "target": 248340,
+    "emitted": 241099,
+    "available": 53
+  },
+  {
+    "video_bytes": 3395303,
+    "video_pts": 508963,
+    "first_audio_pts": 48003,
+    "target": 249942,
+    "emitted": 254356,
+    "available": 620
+  },
+  {
+    "video_bytes": 3423634,
+    "video_pts": 513468,
+    "first_audio_pts": 48003,
+    "target": 252344,
+    "emitted": 255252,
+    "available": 1260
+  },
+  {
+    "video_bytes": 3506595,
+    "video_pts": 520975,
+    "first_audio_pts": 48003,
+    "target": 256348,
+    "emitted": 257812,
+    "available": 236
+  },
+  {
+    "video_bytes": 3534908,
+    "video_pts": 523978,
+    "first_audio_pts": 48003,
+    "target": 257950,
+    "emitted": 258708,
+    "available": 876
+  },
+  {
+    "video_bytes": 3621917,
+    "video_pts": 531485,
+    "first_audio_pts": 48003,
+    "target": 261954,
+    "emitted": 261524,
+    "available": 2668
+  },
+  {
+    "video_bytes": 3650248,
+    "video_pts": 535989,
+    "first_audio_pts": 48003,
+    "target": 264356,
+    "emitted": 262722,
+    "available": 1470
+  },
+  {
+    "video_bytes": 3680585,
+    "video_pts": 551005,
+    "first_audio_pts": 48003,
+    "target": 272364,
+    "emitted": 265252,
+    "available": 476
+  },
+  {
+    "video_bytes": 3854602,
+    "video_pts": 554008,
+    "first_audio_pts": 48003,
+    "target": 273966,
+    "emitted": 277740,
+    "available": 276
+  },
+  {
+    "video_bytes": 3880909,
+    "video_pts": 558513,
+    "first_audio_pts": 48003,
+    "target": 276368,
+    "emitted": 278636,
+    "available": 916
+  },
+  {
+    "video_bytes": 3976014,
+    "video_pts": 566020,
+    "first_audio_pts": 48003,
+    "target": 280372,
+    "emitted": 281580,
+    "available": 1044
+  },
+  {
+    "video_bytes": 4008375,
+    "video_pts": 569023,
+    "first_audio_pts": 48003,
+    "target": 281974,
+    "emitted": 282604,
+    "available": 20
+  },
+  {
+    "video_bytes": 4113600,
+    "video_pts": 576530,
+    "first_audio_pts": 48003,
+    "target": 285978,
+    "emitted": 285932,
+    "available": 1300
+  },
+  {
+    "video_bytes": 4150009,
+    "video_pts": 581034,
+    "first_audio_pts": 48003,
+    "target": 288380,
+    "emitted": 287002,
+    "available": 230
+  },
+  {
+    "video_bytes": 4184412,
+    "video_pts": 596050,
+    "first_audio_pts": 48003,
+    "target": 296388,
+    "emitted": 289404,
+    "available": 900
+  },
+  {
+    "video_bytes": 4396867,
+    "video_pts": 599053,
+    "first_audio_pts": 48003,
+    "target": 297990,
+    "emitted": 303044,
+    "available": 1084
+  },
+  {
+    "video_bytes": 4429246,
+    "video_pts": 603558,
+    "first_audio_pts": 48003,
+    "target": 300392,
+    "emitted": 304068,
+    "available": 60
+  },
+  {
+    "video_bytes": 4518261,
+    "video_pts": 611065,
+    "first_audio_pts": 48003,
+    "target": 304396,
+    "emitted": 306884,
+    "available": 316
+  },
+  {
+    "video_bytes": 4546592,
+    "video_pts": 614068,
+    "first_audio_pts": 48003,
+    "target": 305998,
+    "emitted": 307780,
+    "available": 956
+  },
+  {
+    "video_bytes": 4633601,
+    "video_pts": 621575,
+    "first_audio_pts": 48003,
+    "target": 310002,
+    "emitted": 310468,
+    "available": 1340
+  },
+  {
+    "video_bytes": 4661932,
+    "video_pts": 626079,
+    "first_audio_pts": 48003,
+    "target": 312404,
+    "emitted": 311364,
+    "available": 444
+  },
+  {
+    "video_bytes": 4690245,
+    "video_pts": 641095,
+    "first_audio_pts": 48003,
+    "target": 320412,
+    "emitted": 313172,
+    "available": 172
+  },
+  {
+    "video_bytes": 4876406,
+    "video_pts": 644098,
+    "first_audio_pts": 48003,
+    "target": 322014,
+    "emitted": 326172,
+    "available": 996
+  },
+  {
+    "video_bytes": 4902695,
+    "video_pts": 648603,
+    "first_audio_pts": 48003,
+    "target": 324416,
+    "emitted": 327068,
+    "available": 100
+  },
+  {
+    "video_bytes": 4993752,
+    "video_pts": 656110,
+    "first_audio_pts": 48003,
+    "target": 328420,
+    "emitted": 329884,
+    "available": 356
+  },
+  {
+    "video_bytes": 5026131,
+    "video_pts": 659113,
+    "first_audio_pts": 48003,
+    "target": 330022,
+    "emitted": 330908,
+    "available": 868
+  },
+  {
+    "video_bytes": 5125284,
+    "video_pts": 666620,
+    "first_audio_pts": 48003,
+    "target": 334026,
+    "emitted": 334108,
+    "available": 740
+  },
+  {
+    "video_bytes": 5159669,
+    "video_pts": 671124,
+    "first_audio_pts": 48003,
+    "target": 336428,
+    "emitted": 335132,
+    "available": 1252
+  },
+  {
+    "video_bytes": 5196096,
+    "video_pts": 686140,
+    "first_audio_pts": 48003,
+    "target": 344436,
+    "emitted": 337452,
+    "available": 468
+  },
+  {
+    "video_bytes": 5374143,
+    "video_pts": 689143,
+    "first_audio_pts": 48003,
+    "target": 346038,
+    "emitted": 349940,
+    "available": 268
+  },
+  {
+    "video_bytes": 5402474,
+    "video_pts": 693648,
+    "first_audio_pts": 48003,
+    "target": 348440,
+    "emitted": 350836,
+    "available": 908
+  },
+  {
+    "video_bytes": 5497579,
+    "video_pts": 701155,
+    "first_audio_pts": 48003,
+    "target": 352444,
+    "emitted": 353908,
+    "available": 908
+  },
+  {
+    "video_bytes": 5527916,
+    "video_pts": 704158,
+    "first_audio_pts": 48003,
+    "target": 354046,
+    "emitted": 354804,
+    "available": 12
+  },
+  {
+    "video_bytes": 5633141,
+    "video_pts": 711665,
+    "first_audio_pts": 48003,
+    "target": 358050,
+    "emitted": 358132,
+    "available": 1292
+  },
+  {
+    "video_bytes": 5665502,
+    "video_pts": 716169,
+    "first_audio_pts": 48003,
+    "target": 360452,
+    "emitted": 359156,
+    "available": 268
+  },
+  {
+    "video_bytes": 5699905,
+    "video_pts": 731185,
+    "first_audio_pts": 48003,
+    "target": 368460,
+    "emitted": 361476,
+    "available": 1020
+  },
+  {
+    "video_bytes": 5886066,
+    "video_pts": 734188,
+    "first_audio_pts": 48003,
+    "target": 370062,
+    "emitted": 374220,
+    "available": 2100
+  },
+  {
+    "video_bytes": 5914379,
+    "video_pts": 738693,
+    "first_audio_pts": 48003,
+    "target": 372464,
+    "emitted": 375116,
+    "available": 1204
+  },
+  {
+    "video_bytes": 6009484,
+    "video_pts": 746200,
+    "first_audio_pts": 48003,
+    "target": 376468,
+    "emitted": 378188,
+    "available": 1204
+  },
+  {
+    "video_bytes": 6039839,
+    "video_pts": 749203,
+    "first_audio_pts": 48003,
+    "target": 378070,
+    "emitted": 379084,
+    "available": 308
+  },
+  {
+    "video_bytes": 6138992,
+    "video_pts": 756710,
+    "first_audio_pts": 48003,
+    "target": 382074,
+    "emitted": 382284,
+    "available": 180
+  },
+  {
+    "video_bytes": 6171371,
+    "video_pts": 761214,
+    "first_audio_pts": 48003,
+    "target": 384476,
+    "emitted": 383308,
+    "available": 692
+  },
+  {
+    "video_bytes": 6205756,
+    "video_pts": 776230,
+    "first_audio_pts": 48003,
+    "target": 392484,
+    "emitted": 385500,
+    "available": 36
+  },
+  {
+    "video_bytes": 6406085,
+    "video_pts": 779233,
+    "first_audio_pts": 48003,
+    "target": 394086,
+    "emitted": 398756,
+    "available": 604
+  },
+  {
+    "video_bytes": 6436422,
+    "video_pts": 783738,
+    "first_audio_pts": 48003,
+    "target": 396488,
+    "emitted": 399652,
+    "available": 1244
+  },
+  {
+    "video_bytes": 6529503,
+    "video_pts": 791245,
+    "first_audio_pts": 48003,
+    "target": 400492,
+    "emitted": 402596,
+    "available": 1372
+  },
+  {
+    "video_bytes": 6557834,
+    "video_pts": 794248,
+    "first_audio_pts": 48003,
+    "target": 402094,
+    "emitted": 403492,
+    "available": 476
+  },
+  {
+    "video_bytes": 6654963,
+    "video_pts": 801755,
+    "first_audio_pts": 48003,
+    "target": 406098,
+    "emitted": 406564,
+    "available": 476
+  },
+  {
+    "video_bytes": 6683276,
+    "video_pts": 806259,
+    "first_audio_pts": 48003,
+    "target": 408500,
+    "emitted": 407460,
+    "available": 1116
+  },
+  {
+    "video_bytes": 6711607,
+    "video_pts": 821275,
+    "first_audio_pts": 48003,
+    "target": 416508,
+    "emitted": 409268,
+    "available": 844
+  },
+  {
+    "video_bytes": 6917990,
+    "video_pts": 824278,
+    "first_audio_pts": 48003,
+    "target": 418110,
+    "emitted": 422908,
+    "available": 1028
+  },
+  {
+    "video_bytes": 6948345,
+    "video_pts": 828783,
+    "first_audio_pts": 48003,
+    "target": 420512,
+    "emitted": 423932,
+    "available": 4
+  },
+  {
+    "video_bytes": 7043450,
+    "video_pts": 836290,
+    "first_audio_pts": 48003,
+    "target": 424516,
+    "emitted": 426876,
+    "available": 132
+  },
+  {
+    "video_bytes": 7071763,
+    "video_pts": 839293,
+    "first_audio_pts": 48003,
+    "target": 426118,
+    "emitted": 427772,
+    "available": 772
+  },
+  {
+    "video_bytes": 7164844,
+    "video_pts": 846800,
+    "first_audio_pts": 48003,
+    "target": 430122,
+    "emitted": 430716,
+    "available": 900
+  },
+  {
+    "video_bytes": 7191151,
+    "video_pts": 851304,
+    "first_audio_pts": 48003,
+    "target": 432524,
+    "emitted": 431612,
+    "available": 4
+  },
+  {
+    "video_bytes": 7217440,
+    "video_pts": 866320,
+    "first_audio_pts": 48003,
+    "target": 440532,
+    "emitted": 433292,
+    "available": 1396
+  },
+  {
+    "video_bytes": 7433943,
+    "video_pts": 869323,
+    "first_audio_pts": 48003,
+    "target": 442134,
+    "emitted": 447316,
+    "available": 1196
+  },
+  {
+    "video_bytes": 7462274,
+    "video_pts": 873828,
+    "first_audio_pts": 48003,
+    "target": 444536,
+    "emitted": 448212,
+    "available": 300
+  },
+  {
+    "video_bytes": 7555355,
+    "video_pts": 881335,
+    "first_audio_pts": 48003,
+    "target": 448540,
+    "emitted": 451156,
+    "available": 428
+  },
+  {
+    "video_bytes": 7581662,
+    "video_pts": 884338,
+    "first_audio_pts": 48003,
+    "target": 450142,
+    "emitted": 451924,
+    "available": 1196
+  },
+  {
+    "video_bytes": 7672719,
+    "video_pts": 891845,
+    "first_audio_pts": 48003,
+    "target": 454146,
+    "emitted": 454868,
+    "available": 1324
+  },
+  {
+    "video_bytes": 7699026,
+    "video_pts": 896349,
+    "first_audio_pts": 48003,
+    "target": 456548,
+    "emitted": 455636,
+    "available": 556
+  },
+  {
+    "video_bytes": 7725333,
+    "video_pts": 911365,
+    "first_audio_pts": 48003,
+    "target": 464556,
+    "emitted": 457316,
+    "available": 1948
+  },
+  {
+    "video_bytes": 7947926,
+    "video_pts": 914368,
+    "first_audio_pts": 48003,
+    "target": 466158,
+    "emitted": 471468,
+    "available": 1620
+  },
+  {
+    "video_bytes": 7974215,
+    "video_pts": 918873,
+    "first_audio_pts": 48003,
+    "target": 468560,
+    "emitted": 472364,
+    "available": 724
+  },
+  {
+    "video_bytes": 8065272,
+    "video_pts": 926380,
+    "first_audio_pts": 48003,
+    "target": 472564,
+    "emitted": 475180,
+    "available": 980
+  },
+  {
+    "video_bytes": 8091579,
+    "video_pts": 929383,
+    "first_audio_pts": 48003,
+    "target": 474166,
+    "emitted": 476076,
+    "available": 84
+  },
+  {
+    "video_bytes": 8178588,
+    "video_pts": 936890,
+    "first_audio_pts": 48003,
+    "target": 478170,
+    "emitted": 478764,
+    "available": 468
+  },
+  {
+    "video_bytes": 8204877,
+    "video_pts": 941394,
+    "first_audio_pts": 48003,
+    "target": 480572,
+    "emitted": 479660,
+    "available": 1108
+  },
+  {
+    "video_bytes": 8231184,
+    "video_pts": 956410,
+    "first_audio_pts": 48003,
+    "target": 488580,
+    "emitted": 481340,
+    "available": 964
+  },
+  {
+    "video_bytes": 8449711,
+    "video_pts": 959413,
+    "first_audio_pts": 48003,
+    "target": 490182,
+    "emitted": 495364,
+    "available": 764
+  },
+  {
+    "video_bytes": 8476018,
+    "video_pts": 963918,
+    "first_audio_pts": 48003,
+    "target": 492584,
+    "emitted": 496260,
+    "available": 1404
+  },
+  {
+    "video_bytes": 8567075,
+    "video_pts": 971425,
+    "first_audio_pts": 48003,
+    "target": 496588,
+    "emitted": 499076,
+    "available": 1660
+  },
+  {
+    "video_bytes": 8593364,
+    "video_pts": 974428,
+    "first_audio_pts": 48003,
+    "target": 498190,
+    "emitted": 499972,
+    "available": 764
+  },
+  {
+    "video_bytes": 8680373,
+    "video_pts": 981935,
+    "first_audio_pts": 48003,
+    "target": 502194,
+    "emitted": 502660,
+    "available": 1148
+  },
+  {
+    "video_bytes": 8706680,
+    "video_pts": 986439,
+    "first_audio_pts": 48003,
+    "target": 504596,
+    "emitted": 503556,
+    "available": 252
+  },
+  {
+    "video_bytes": 8732969,
+    "video_pts": 1001455,
+    "first_audio_pts": 48003,
+    "target": 512604,
+    "emitted": 505364,
+    "available": 1516
+  },
+  {
+    "video_bytes": 8949490,
+    "video_pts": 1004458,
+    "first_audio_pts": 48003,
+    "target": 514206,
+    "emitted": 519388,
+    "available": 1316
+  },
+  {
+    "video_bytes": 8975779,
+    "video_pts": 1008963,
+    "first_audio_pts": 48003,
+    "target": 516608,
+    "emitted": 520156,
+    "available": 548
+  },
+  {
+    "video_bytes": 9066836,
+    "video_pts": 1016470,
+    "first_audio_pts": 48003,
+    "target": 520612,
+    "emitted": 523100,
+    "available": 676
+  },
+  {
+    "video_bytes": 9095167,
+    "video_pts": 1019473,
+    "first_audio_pts": 48003,
+    "target": 522214,
+    "emitted": 523996,
+    "available": 1316
+  },
+  {
+    "video_bytes": 9186224,
+    "video_pts": 1026980,
+    "first_audio_pts": 48003,
+    "target": 526218,
+    "emitted": 526812,
+    "available": 1572
+  },
+  {
+    "video_bytes": 9212513,
+    "video_pts": 1031484,
+    "first_audio_pts": 48003,
+    "target": 528620,
+    "emitted": 527708,
+    "available": 676
+  },
+  {
+    "video_bytes": 9238820,
+    "video_pts": 1046500,
+    "first_audio_pts": 48003,
+    "target": 536628,
+    "emitted": 529388,
+    "available": 532
+  },
+  {
+    "video_bytes": 9439131,
+    "video_pts": 1049503,
+    "first_audio_pts": 48003,
+    "target": 538230,
+    "emitted": 542900,
+    "available": 844
+  },
+  {
+    "video_bytes": 9467462,
+    "video_pts": 1054008,
+    "first_audio_pts": 48003,
+    "target": 540632,
+    "emitted": 543796,
+    "available": 1484
+  },
+  {
+    "video_bytes": 9558537,
+    "video_pts": 1061515,
+    "first_audio_pts": 48003,
+    "target": 544636,
+    "emitted": 546612,
+    "available": 204
+  },
+  {
+    "video_bytes": 9586850,
+    "video_pts": 1064518,
+    "first_audio_pts": 48003,
+    "target": 546238,
+    "emitted": 547508,
+    "available": 844
+  },
+  {
+    "video_bytes": 9683979,
+    "video_pts": 1072025,
+    "first_audio_pts": 48003,
+    "target": 550242,
+    "emitted": 550580,
+    "available": 844
+  },
+  {
+    "video_bytes": 9712310,
+    "video_pts": 1076529,
+    "first_audio_pts": 48003,
+    "target": 552644,
+    "emitted": 551476,
+    "available": 1484
+  },
+  {
+    "video_bytes": 9742647,
+    "video_pts": 1091545,
+    "first_audio_pts": 48003,
+    "target": 560652,
+    "emitted": 553540,
+    "available": 956
+  },
+  {
+    "video_bytes": 9945000,
+    "video_pts": 1094548,
+    "first_audio_pts": 48003,
+    "target": 562254,
+    "emitted": 566924,
+    "available": 1396
+  },
+  {
+    "video_bytes": 9971289,
+    "video_pts": 1099053,
+    "first_audio_pts": 48003,
+    "target": 564656,
+    "emitted": 567820,
+    "available": 500
+  },
+  {
+    "video_bytes": 10064370,
+    "video_pts": 1106560,
+    "first_audio_pts": 48003,
+    "target": 568660,
+    "emitted": 570764,
+    "available": 628
+  },
+  {
+    "video_bytes": 10094725,
+    "video_pts": 1109563,
+    "first_audio_pts": 48003,
+    "target": 570262,
+    "emitted": 571660,
+    "available": 1268
+  },
+  {
+    "video_bytes": 10191854,
+    "video_pts": 1117070,
+    "first_audio_pts": 48003,
+    "target": 574266,
+    "emitted": 574732,
+    "available": 1268
+  },
+  {
+    "video_bytes": 10220185,
+    "video_pts": 1121574,
+    "first_audio_pts": 48003,
+    "target": 576668,
+    "emitted": 575628,
+    "available": 372
+  },
+  {
+    "video_bytes": 10248516,
+    "video_pts": 1136590,
+    "first_audio_pts": 48003,
+    "target": 584676,
+    "emitted": 576000,
+    "available": 0
+  }
+]
