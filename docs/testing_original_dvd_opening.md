@@ -65,8 +65,9 @@ qualification for acceptance.
 and actual framebuffer publication. Picture identities exceed eight bits so
 the complete 289-picture opening cannot wrap. `analysis.json` reports missing
 or duplicate publications and gaps relative to each picture's authored two or
-three fields; extra fields require interpretation against original PTS, including
-the known final timestamp gap. A completed diagnostic is not a timing pass.
+three fields. Compare extra holds against the original PTS records: the actual
+helper transport's 25 records match authored cadence within 2.5 ticks and do
+not prescribe a long terminal hold. A completed diagnostic is not a timing pass.
 
 `NATIVE_MEMORY_LATENCY` controls ordered DDR response latency (default 1 decoder
 cycle). `NATIVE_BUSY_PERIOD` and `NATIVE_BUSY_CYCLES` add deterministic command
@@ -81,6 +82,8 @@ The reduced reference-admission regression reuses the film reorder test:
 bash tools/streams/run_film_presentation.sh
 vvp simulation/film_presentation/reorder +OVERLAP_REFERENCE_ADMISSION
 vvp simulation/film_presentation/reorder +EARLY_B_REFERENCE
+vvp simulation/film_presentation/reorder +EARLY_P_RELEASE
+vvp simulation/film_presentation/reorder +ORDINARY_B_OVERLAP
 ```
 
 At diagnostic source `33ade0f`, the default film test passes and this opt-in
@@ -106,10 +109,21 @@ python3 tools/streams/analyze_original_dvd_timing.py \
 ```
 
 Use the actual output directory for each memory case. The gate requires a
-complete trace, each picture once in display order, correct TFF/RFF and PTS,
+complete trace, each picture once in display order, valid descriptors with
+correct TFF/RFF/progressive flags and PTS,
 the authored two/three-field intervals including the final hold, and clear
 cache/phase/overlap flags. `simulation_timing_pass` is distinct from hardware
 acceptance; the original-audio replay still requires observation on MiSTer.
+
+Ordinary native I/P decode may use the existing free third reference bank
+while its predecessor waits to display. A completed secondary reference stays
+separate from the primary pending picture. Another I/P header can release it,
+but payload waits for a bank to become free. A following B header is retained
+until the older primary picture displays; only then is the secondary bound as
+the B run's future reference. `ORDINARY_B_OVERLAP` checks I/P-to-B transitions
+before, with and after completion, including completion after primary display.
+The native ownership tests retain mode, alias, timestamp and terminal guards.
+No frame regions, decoder arithmetic, clocks or timing constraints are changed.
 
 ## Focused regressions
 
