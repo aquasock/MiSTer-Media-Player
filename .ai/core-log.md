@@ -1,3 +1,32 @@
+## 654 COMMIT Unreleased 4777c59 2026-08-27T22:39:00-07:00
+
+#### Coming From:
+
+Unreleased 4777c59
+
+#### Purpose:
+
+Confirm progressive all-I decoding is unchanged on the field-DCT bitstream and close the practical regression.
+
+#### Outcome:
+
+The user replayed test four and reports video and audio are good. Helper-first collection preserved a log distinct from the test seven capture and identifies `test_4_progressive.mpg` with 12,060,823 bytes of video, 500 audio frames and 576,000 emitted samples, exit zero, and all 888 pipe reads reconciling to 14,546,422 completed transport bytes, which is byte for byte the transport entry 644 recorded. Every schema-19 counter matches that entry exactly, including 12,057,601 accepted video bytes, 360 reference and displayed pictures, zero B pictures, 359 swaps, zero decoder and presentation errors, no audio underrun or PCM protocol fault, zero deadline gaps and gap outliers, and the distinctive six timestamp advance conflicts this fixture has always produced; the three largest recorded intervals differ by at most one clock. Raster equality is deliberately not claimed for this fixture and the reason is recorded rather than glossed. Entry 644's capture was written to the Buildroot card, which is no longer installed, so no local baseline raster exists; and these captures are 800 by 600 scaled from 720 by 480, so the reference-decode comparison used for test one cannot apply without replicating the scaler. What was measured instead is capture stability, and it reproduces the entry 653 finding on the fixture where entry 644 first saw it: two screenshots of the same completed frame, taken without replaying anything, differ at 4,144 of 382,992 compared pixels, every one at x modulo eight equal to one, against the 4,418 entry 644 recorded for the same fixture. Acceptance therefore rests on counter and transport equality with entry 644 plus the user's visual report, and on the coverage argument that test one's interlaced all-I and test seven's progressive I/P/B both produced pixel-exact matches against released-bitstream baselines and together bracket the paths this fixture exercises. Three fixtures have now passed on this bitstream. Tests two, three, five and six remain unreplayed but carry the same bar and line content that test one already matched pixel for pixel, so the practical regression for the writer's capture-counter and untruncated-origin changes is complete. Three items remain open and none is resolved by this entry: the unexplained decrease of 372 ALMs and 912 registers, the HDMI setup margin at positive 0.126 nanoseconds, and the capture-path variation whose mechanism is still unidentified.
+
+#### Next Steps:
+
+The field-DCT gate can be treated as functionally accepted for development purposes on the strength of tests one, four and seven, while remembering that this gate decodes field DCT and does not make commercial discs play. Do not prepare a release on this basis: the unexplained logic decrease should be understood first, because a release should not ship a resource change nobody can account for, and tests two, three, five and six would need replaying for a release-grade regression. Investigate the capture-path variation as its own scoped question, since it now has a specific signature of every eighth pixel column, a reproducible test of capturing an unchanged frame twice, and consistent magnitudes across two fixtures. Keep the reduced HDMI setup margin visible and reseed rather than restructure if a later change pushes that category negative. The next decoder milestone remains unapproved and unscoped; interlaced P and B is the gate that would make commercial discs play, and the deferred field-picture gate still needs either a non-ffmpeg generator or a real disc sample because ffmpeg cannot encode field pictures. Preserve restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [x] Passed
+
+---
+
 ## 653 COMMIT Unreleased 4777c59 2026-08-27T22:34:30-07:00
 
 #### Coming From:
@@ -1160,35 +1189,6 @@ Start the second boundary, which is the integration the user described: an OSD o
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 614 COMMIT Unreleased 9623fa7 2026-08-27T07:34:33-07:00
-
-#### Coming From:
-
-Unreleased 9623fa7
-
-#### Purpose:
-
-Record the channel sweep run's own hardware telemetry and transport log.
-
-#### Outcome:
-
-The capture requested as the MPEG Layer II regression is in fact the AC-3 channel sweep run, which the helper log identifies unambiguously by source path, so it is recorded as what it is rather than as the regression it was expected to be. That is a useful outcome anyway, because entry 613 had to accept the sweep without its own transport log after the movie overwrote the previous one; this capture supplies it. The sweep completes cleanly with all 360 reference and display pictures, 359 swaps, 14,469,731 accepted video bytes, `error_flags` zero, presentation error clear, sequence end seen, presentation complete, quiet snapshot, and zero deadline gaps and outliers, with all three largest display intervals at exactly the nominal 2,002,000 clocks. Audio underrun and PCM protocol error are clear at FIFO peak 127, and both timestamp conflict counters are zero. Helper PID 3257 submitted 16,958,580 transport bytes over 1,036 reads with 16 sampled ACK records and exited zero at 11.931 seconds. The installed RBF still hashes to accepted `d466bed`, Main is unchanged, and the full movie fixture is still present and byte-exact at 739,065,873 bytes, so the AC-3 work has disturbed nothing on the target. The MPEG Layer II hardware regression therefore remains uncaptured: its log was overwritten by this sweep run exactly as the single fixed log path implies, and the user's report that the movie plays perfectly still stands without telemetry behind it. That gap is stated rather than closed. This entry makes no source change, so Built and Passed refer to the accepted helper at `9623fa7`, with Passed covering the sweep run's own clean completion.
-
-#### Next Steps:
-
-The MPEG Layer II regression needs one dedicated replay with nothing played afterwards, capturing the helper log before anything else is started, and requiring all 17,876 pictures, the exact 839,409,548 transport bytes and the entry 605 and 606 error and deadline state, allowing for the one known repeated frame at picture 692 recorded in entry 609. The user has asked for real surround over S/PDIF before release, which is the passthrough boundary and is scoped but not started. Its shape is now known from the framework: an AC-3 frame is 1536 samples at 48 kHz and an IEC 61937 burst occupies exactly the same period, so the helper can pack the bursts on the ARM and send them down the existing PCM transport without a new transport or any decoder in fabric. Three obstacles are real and must be settled before work starts. The framework's mixer applies attenuation, boost, mix and a biquad filter to every sample, and passthrough requires a bit-transparent path because any non-unity gain destroys the burst. The S/PDIF encoder hardwires the channel status non-audio bit to zero, so the stream always declares linear PCM, and setting it means editing framework code this project has otherwise left alone. HDMI would carry the same burst data as if it were PCM, which is loud noise on speakers, so a mode selection and an HDMI audio decision are required rather than optional. DTS passthrough is the same machinery with a different data type and burst length. A commercial AC-3 track with real dynamic range control is still uncompared, and the interlaced video gates of entry 609 remain open and unstarted. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
 
