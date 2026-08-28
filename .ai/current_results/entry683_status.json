@@ -1,0 +1,120 @@
+{
+  "recorded": "2026-08-28T13:25:50-07:00",
+  "source_commit": "83c138ebd2492e6b81dfcc1f0256cecae2afce79",
+  "seed": 20,
+  "user_report": "everything looks and sounds perfect now. the image is ready for you.",
+  "hardware_passed": true,
+  "acceptance_scope": "User-observed smooth original 12-second DVD opening with original AC-3 decoded stereo over HDMI, supported by clean terminal telemetry and complete transport. Not full-title/DVD navigation, general conformance, or frame-perfect hardware timing acceptance.",
+  "requested_deinterlacer": "Weave",
+  "deinterlacer_observation": "Requested in the prior handoff and accepted by the user response; not independently encoded in this telemetry.",
+  "image_observation": "Final Universal opening frame and 2DID overlay visible; image viewed locally. Audible quality and motion assessed by the user, not from the still image.",
+  "captures_identical": true,
+  "complete_png_verified": true,
+  "telemetry_checksum_valid": true,
+  "observed": {
+    "schema_version": 19,
+    "accepted_bytes": 10334168,
+    "reference_pictures": 128,
+    "b_pictures": 161,
+    "display_pictures": 289,
+    "display_swaps": 288,
+    "associated_count": 25,
+    "error_flags": 0,
+    "audio_underrun": false,
+    "pcm_protocol_error": false,
+    "cache_bank_overlap_error": false,
+    "snapshot_reason": "quiet",
+    "sequence_end_seen": true,
+    "session_quiet": true,
+    "presentation_complete": true,
+    "cadence_seconds": 12.140087233333333,
+    "delivered_fps": 23.72305853035647,
+    "pcm_sample_count": 16383,
+    "pcm_fifo_peak": 127,
+    "timestamp_delay_conflicts": 0,
+    "timestamp_advance_conflicts": 26,
+    "deadline_gap_count": 287,
+    "gap_outlier_count": 145
+  },
+  "largest_bank_change_gaps": [
+    {
+      "cycles": 5006907,
+      "milliseconds": 83.44845,
+      "display_picture_ordinal": 73
+    },
+    {
+      "cycles": 5003093,
+      "milliseconds": 83.38488333333333,
+      "display_picture_ordinal": 83
+    },
+    {
+      "cycles": 4004000,
+      "milliseconds": 66.73333333333333,
+      "display_picture_ordinal": 72
+    }
+  ],
+  "helper": {
+    "video_plus_pts_bytes": 10334393,
+    "pts_records": 25,
+    "audio_mode": "HDMI decoded stereo PCM",
+    "codec": "AC-3",
+    "audio_frames": 375,
+    "decoded_samples": 576000,
+    "emitted_samples": 576000,
+    "transport_bytes": 12818502,
+    "pipe_reads": 784,
+    "pipe_read_bytes_sum": 12818502,
+    "completion_log_seconds": 12.016557,
+    "exit_code": 0,
+    "profile": {
+      "t": 12016581,
+      "polls": 83976,
+      "poll_us": 9039796,
+      "poll_max_us": 7092,
+      "data_polls": 25472,
+      "data_poll_us": 8170927,
+      "intervals": 83975,
+      "interval_us": 12013789,
+      "interval_max_us": 20888,
+      "read_calls": 1172,
+      "read_us": 623328,
+      "tx_calls": 185495,
+      "tx_us": 7643651,
+      "tx_max_us": 5708,
+      "ack_chunks": 2898,
+      "fast_bytes": 12818502,
+      "slow_bytes": 0,
+      "burst_calls": 185495,
+      "status_queries": 432228,
+      "transport_mode": 2
+    }
+  },
+  "installed_rbf_sha256": "a403d224ee98d192994fccf8116d59eef26933351216c66a14d044748a86171c",
+  "provenance": "Installed dated RBF, Main, helper, original clip and undated core verified by FTP readback. Running bitstream identity relies on the user following the explicit reload handoff; telemetry has no exact source-hash attestation.",
+  "limitations": [
+    "Display pictures and swaps are derived from first-reference completion and bank/scratch selection changes; their agreement with 289 decoded pictures is not a unique-publication trace.",
+    "Legacy deadline and outlier counts remain nonzero (287 and 145). The observer does not account for authored two/three-field film cadence; the raw 83.44845, 83.384883 and 66.733333 ms bank-change intervals are retained without declaring each legal or each a dropped-frame event. Hardware cadence is not fully characterized by this capture.",
+    "The 26 timestamp-advance conflicts count due candidates seen when cadence_slot is false, not observed early publications; zero timestamp-delay conflicts is retained.",
+    "The PCM count 16383 and peak 127 are saturated diagnostic fields; the helper log establishes 576000 emitted samples. Neither field alone states FIFO capacity.",
+    "Prior full native simulations qualify with the narrowly approved terminal-cut exception, not an unrestricted cadence waiver.",
+    "The first PNG download raced screenshot completion and was truncated. The same remote screenshot was retrieved again, complete PNG validation passed, and both finished captures are byte-identical. No image repair or pixel editing was used.",
+    "Only this opening and audio output were accepted. Replay, Bob, passthrough, longer content, whole-title playback and ISO/IFO navigation require separate scoped validation."
+  ],
+  "source_references": [
+    "rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv:296",
+    "rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv:404",
+    "rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv:1138",
+    "rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv:1182"
+  ],
+  "raw_capture_directory": "/home/vash/MiSTer-Media-Player/output_files/entry683/capture",
+  "raw_capture_publication": "PNG, binary, movie and full raw logs retained locally; only telemetry, summary and capture hashes published.",
+  "agent_actions": {
+    "screenshots_requested": 2,
+    "core_reloaded": false,
+    "playback_started": false,
+    "production_source_changed": false,
+    "build_started": false,
+    "core_or_runtime_files_written": false
+  },
+  "next_step": "Preserve this passed opening baseline. Agree on a longer content or replay validation boundary before starting additional work; no release or broad DVD compatibility claim is made."
+}

@@ -1,3 +1,32 @@
+## 683 COMMIT Unreleased 83c138e 2026-08-28T13:25:50-07:00
+
+#### Coming From:
+
+Unreleased 83c138e
+
+#### Purpose:
+
+Record the accepted original-DVD-opening hardware test with original audio on the seed-20 candidate.
+
+#### Outcome:
+
+The user reports that everything looks and sounds perfect after the seed-20 installation and explicit reload handoff. Helper-first collection identifies dvd_opening_original.mpg with HDMI decoded stereo AC-3, all 375 audio frames and 576,000 samples decoded and emitted, and exit zero after 12,818,502 completed transport bytes; all 784 pipe reads reconcile to that total and no slow-path bytes are reported. Two completed screenshots are byte-identical, show the final Universal opening frame and produce matching checksum-valid schema-19 telemetry. The first download raced screenshot writing and was truncated; retrieving the same remote file after completion fixes collection without changing pixels or replaying. Telemetry reaches quiet sequence end with presentation complete, 128 reference plus 161 B pictures, 289 bank-derived display pictures, 288 swaps, all 25 associated timestamps and 10,334,168 accepted video bytes. Error flags are zero, including no recorded audio underrun, PCM protocol fault, presentation fault or cache-bank overlap error. FTP readback matches the installed 83c138e seed-20 RBF, original clip and unchanged Main, helper and undated core. Functional hardware acceptance is scoped to this original opening and audio test; Weave was requested in the handoff, while motion and audible quality rely on the user report. Legacy diagnostics remain visible: 287 deadline events, 145 outliers, largest bank-change intervals of 83.44845, 83.384883 and 66.733333 milliseconds, 26 timestamp-advance conflicts and zero delay conflicts. These counters do not account for authored film cadence or directly trace unique publications; the timestamp-advance counter records due candidates outside a cadence slot rather than early publications. They neither negate the reported functional pass nor prove perfect hardware cadence, and the raw values are retained without being waived. Saturated PCM telemetry fields are not full sample totals. Existing simulation qualification retains its narrow terminal-cut exception. Raw images, binaries, movie and full logs remain local under output_files/entry683; decoded telemetry, scoped analysis, helper summary and hashes are published under .ai/current_results/entry683_*. No production change, build, deployment, mode change, core reload or playback is initiated by the agent.
+
+#### Next Steps:
+
+Preserve 83c138e seed 20 as the passed original-opening hardware baseline and retain the old core backup. Agree on the next validation boundary before additional work, such as replay or a longer continuous segment with original audio, while keeping Bob, passthrough, full-title playback and ISO/IFO navigation outside this acceptance. Do not infer broad DVD compatibility, exact hardware cadence or release qualification from this single successful opening test.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 682 COMMIT Unreleased 83c138e 2026-08-28T13:15:33-07:00
 
 #### Coming From:
@@ -1219,35 +1248,6 @@ The user reports everything passes in Weave. Helper-first retrieval and a fresh 
 #### Next Steps:
 
 Run test_5_audio_ac3_51.mpg with Bob and HDMI audio, then retain the completed screen for collection before testing AC-3 S/PDIF and DTS S/PDIF separately. Confirm the expected audible channel sweep; the HDMI downmix intentionally omits LFE. Keep overall beta qualification open pending the remaining audio matrix, and retain the unisolated test-four screenshot variation as a separate video-quality caveat alongside the unresolved filesystem dirty-flag check. Do not begin a source fix or attribute either observation to Buildroot without evidence and approval for a revised investigation. Preserve runtime identities, user control of hardware lifecycle, local-only raw data, restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [x] Passed
-
----
-
-## 643 COMMIT Unreleased 2045c34 2026-08-27T19:51:27-07:00
-
-#### Coming From:
-
-Unreleased 2045c34
-
-#### Purpose:
-
-Validate test three's separate Weave and HDMI playback on the Buildroot beta.
-
-#### Outcome:
-
-The user explicitly reports completing Weave with everything passing. Helper-first retrieval preserves a log distinct from the Bob run, followed by a fresh uniquely named screenshot. Valid schema-19 telemetry confirms 360 reference and displayed pictures, zero B pictures, 359 swaps and 12,073,185 accepted video bytes. Decoder and presentation errors, audio underrun, PCM protocol faults, timestamp conflicts, native deadline gaps and gap outliers are absent; the three largest recorded display intervals are each 2,002,000 clocks. Sequence end, completed presentation and quiet termination are asserted. Helper exit is zero, all 889 pipe reads reconcile to 14,562,019 completed transport bytes, and no acknowledged fallback payload is reported. HDMI decoded output and 576,000 emitted PCM samples are confirmed. Completion, error and cadence counters match the Bob run; scaler selection and appearance rely on the user's report rather than telemetry. Readback verifies the unchanged Main, helper, RBF, kernel and fixture. Both requested test-three modes now have separately captured accepted runs. Passed is scoped to Weave; Built remains unchecked because no new build occurs. No deployment, playback, mode change, reload or reboot is initiated by the agent. Raw captures stay local; only .ai/current_results/entry643_buildroot_test3_weave_status.json is published.
-
-#### Next Steps:
-
-Run test_4_progressive.mpg with HDMI audio and preserve its completed screen for separate helper-first collection. Then complete AC-3 HDMI decode, AC-3 S/PDIF passthrough and DTS S/PDIF passthrough as separate runs. Keep overall beta qualification open until the remaining matrix is accepted and the storage dirty-flag warning as a separate unresolved filesystem check. Preserve unchanged runtime identities, user control of hardware lifecycle, local-only raw data, restricted core.md and the forty-entry ring.
 
 #### Files Modified:
 
