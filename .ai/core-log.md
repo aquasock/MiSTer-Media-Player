@@ -1,3 +1,69 @@
+## 635 COMMIT Unreleased ??? 2026-08-27T18:29:23-07:00
+
+#### Coming From:
+
+v0.8.0 af43de2
+
+#### Purpose:
+
+Reconcile the current documentation and published release text with the verified v0.8.0 state.
+
+#### Outcome:
+
+The user requests documentation cleanup before further development. The approved scope replaces stale current-version, build, qualification, architecture and test guidance, corrects release provenance and ZIP sizing, and removes claims contradicted by existing evidence without changing runtime behavior. The planned file set includes the suite generator's documentation strings and comments only; its executable syntax must remain unchanged. Historical release notes and regression identities remain intact, while historical design and test sections are explicitly labelled. The GitHub release body will be synchronized from the corrected versioned notes after the documentation commit is published, retaining its Full Changelog link, title, tag, pre-release state and assets. No hardware gate is newly accepted and no RBF, helper or Main rebuild is needed for these documentation changes.
+
+#### Next Steps:
+
+Update the listed guides, check source claims against retained results and the current implementation, validate local links and package hashes, compare the generator AST before and after, and run the core-syntax.md audit with exactly forty entries. Commit and push the documentation on master from the Raspberry Pi, update only the release prose and read it back, then resolve this placeholder to the documentation commit with the verification results. Preserve core.md, all settled entries remaining in the ring, untracked screenshots, the published tag and binaries, and user control of hardware lifecycle.
+
+#### Files Modified:
+
+- README.md
+- CHANGELOG.md
+- docs/RELEASE_NOTES_v0.8.0.md
+- docs/ARCHITECTURE.md
+- docs/BUILDING.md
+- docs/TEST_INSTRUCTIONS.md
+- docs/MPEG2_NEW_DECODER.md
+- host/arm/ARCHITECTURE.md
+- tools/streams/generate_test_suite.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
+## 634 VERSION v0.8.0 af43de2 2026-08-27T18:29:23-07:00
+
+#### Coming From:
+
+Unreleased 035807a
+
+#### Purpose:
+
+Record the published v0.8.0 pre-release and verify its public package against the qualified artifacts.
+
+#### Outcome:
+
+GitHub reports MiSTer Media Player v0.8.0 published at 2026-08-27T17:41:16-07:00 as a non-draft pre-release. Its annotated tag resolves to af43de2, not the 035807a documentation commit requested by entry 633; the intervening source difference is only the release-notes file and project log, with no runtime change. The public ZIP downloads successfully, passes its CRC checks and has SHA256 5f55b49eb863f74a777b548b4f42b744a9130b4161f176b687ca297deeffcaf3, matching entry 632. Its compressed size is 2,867,028 bytes; entry 632's 5,948,567-byte figure is the total uncompressed member size, not the archive size. All eight payload and documentation hashes match entry 632, and the internal SHA256SUMS file matches its retained copy exactly. The RBF, Main and helper therefore match the qualified source baseline 2f1d32c. Publication is verified separately from hardware acceptance: the existing hand tests used these runtime hashes, but a confirmation run following installation from the final package remains unrecorded. No new build, device capture, deployment or playback is performed. Built refers to the previously reproduced runtime artifacts and Passed remains unchecked for that outstanding confirmation. Evidence is retained in .ai/current_results/entry634_release_audit.json; the published tag and assets are preserved.
+
+#### Next Steps:
+
+Complete the user-requested documentation cleanup, describing the actual published tag and source baseline without moving the tag or replacing assets, and record corrections in new log entries rather than rewriting settled history. Update current guides that still describe v0.7.0 or completed features as future work, distinguish the entry 628 hardware pixel comparison from comprehensive pixel qualification, and preserve unsupported-feature and timing limitations. Confirm the final package-install hardware run with the user before claiming that gate passed. Leave the next development milestone unapproved and maintain restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 633 COMMIT Unreleased 035807a 2026-08-27T17:31:09-07:00
 
 #### Coming From:
@@ -1120,64 +1186,6 @@ The user explicitly confirms that entry 594 was Weave, resolving the mode-attrib
 #### Next Steps:
 
 Use entry 594 as the confirmed Weave baseline and entry 595 as the confirmed warm Bob comparison. Focus the proposed GUNSMOKE decoder/reference-retirement investigation on the repeatable shared misses at pictures 167 and 346 rather than treating display-mode selection as a fix. Preserve the exact 9.8 Mbps fixture and installed a4f2769 pair, and require a bounded evidence-backed revision before further production changes. Keep the combined 10.08 Mbps audio/video gate separate, retain 18.65 Mbps only as optional stress evidence, preserve transport guards, queues, startup and sync, leave lifecycle/playback control with the user and maintain restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 595 COMMIT Unreleased feb50c2 2026-08-27T03:51:42-07:00
-
-#### Coming From:
-
-Unreleased feb50c2
-
-#### Purpose:
-
-Compare the user-reported warm Bob-mode DVD-ceiling run with the preceding hardware capture.
-
-#### Outcome:
-
-The user explicitly reports Bob mode and no reboot. The helper log was collected first, followed by a fresh checksum-valid schema-nineteen screenshot and complete media/Main/RBF readbacks. The qualified 9.8 Mbps fixture and installed a4f2769 hashes are unchanged; the same 10:08:35 UTC Linux boot corroborates no system reboot, while new helper PID 1730, log hash and telemetry checksum confirm a distinct run. Bob attribution comes from the user because the packet does not encode the selected deinterlace mode. Entry 594's mode was not explicitly confirmed, so this must not be described as a controlled Bob-versus-Weave comparison. Completion and steady timing are unchanged: all 18,402,691 source bytes, the expected padded FPGA count of 18,402,692, 449 reference/display pictures and 448 swaps, zero errors or transport integrity aborts, normal EOF and quiet completion. There are again exactly two deadline misses and two outliers at full-width picture ordinals 167 and 346, both with 66.733-millisecond intervals; other intervals remain nominal. The second ranked-gap ordinal is the expected wrapped value 90. Both missed deadlines again show input and upstream data waiting, decoder not ready, no input-starvation cycles and no presentation/destination hold. Candidate readiness improves slightly from 0.444633 to 0.390517 milliseconds late at 167 and from 0.084750 to 0.083600 milliseconds late at 346, but both still miss their slots. Writer-capacity blocked time is 236 and 525 cycles. The startup-inclusive aggregate rises from 29.704965 to 29.760561 fps because the aggregate span is 28.174 milliseconds shorter; presentation hold falls by 28.073 milliseconds, consistent with different startup hold/alignment rather than improved steady cadence. Both runs still add 66.733 milliseconds from the same two extra frame periods. The transport remains credit_fast_v1 mode 2, with all 1,124 chunk totals and seventeen ACK samples reconciled. Fast payload is 18,385,038 bytes, or 99.9041 percent, across 916,130 batches averaging 20.068 bytes and 926,081 queries. All 164 EAGAIN events are before first delivery. Consumption-paced delivery is 1,226,799 bytes per second versus 1,224,493 previously; mean data-bearing poll time is 53.234 versus 53.262 milliseconds, and maximum is 77.614 versus 79.040 milliseconds. These small transport variations do not establish a mode-dependent speedup or raw link capacity. No new menu-response report was provided; the preceding report established after-playback response only. Recurrence at the same two picture ordinals with the same ready/input signature strengthens the case for a repeatable content-linked downstream margin issue without identifying a particular arithmetic stage. Full capture and checked comparison are retained as .ai/current_results/entry595_*. No production source, binary, configuration, reboot, reload or playback changed during collection. Strict DVD-ceiling cadence acceptance remains open.
-
-#### Next Steps:
-
-Retain both ceiling captures and the exact feb50c2-generated clip, and prioritize a focused GUNSMOKE investigation of decode and reference-retirement timing at pictures 167 and 346 before proposing a production revision. Do not infer a Bob/Weave cause from the unconfirmed prior mode or treat the aggregate FPS increase as removal of steady lateness. Another identical hardware replay should have a specific new diagnostic question; the current two captures already establish repeatability at both ordinals. Keep the 9.8 Mbps video gate and later 10.08 Mbps combined-stream/audio-and-timing gate separate, retain 18.65 Mbps only as optional stress evidence, and preserve current production a4f2769 with its transport guards, queue sizes, startup/sync behavior and restoration copies. Keep user control of lifecycle and playback, restricted core.md unchanged and the forty-entry ring intact.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 594 COMMIT Unreleased feb50c2 2026-08-27T03:48:08-07:00
-
-#### Coming From:
-
-Unreleased feb50c2
-
-#### Purpose:
-
-Verify completion and presentation timing of the first DVD-ceiling video hardware run.
-
-#### Outcome:
-
-The user says playback looked perfect and the menu remains responsive after playback; this does not confirm menu response during playback. The helper log identifies bbb_480i_tff_15s_9800kbps.m2v, runtime credit_fast_v1 and transport mode 2. The log was retrieved before replacing the fixed screenshot and collecting a fresh checksum-valid schema-nineteen packet. Complete media and installed Main/RBF readbacks retain the qualified fixture and a4f2769 hashes, and the same 10:08:35 UTC Linux boot confirms no intervening system reboot since the prior warm run; core reload and display-mode selection are not independently encoded. All 18,402,691 source bytes, 449 reference/display pictures and 448 swaps complete with zero aggregate decoder errors, no transport integrity fault, normal helper exit, sequence end and quiet presentation completion. All 1,124 chunks and seventeen sampled ACK records reconcile with cumulative counters. The final 3,459-byte chunk consists of 3,458 fast bytes and one acknowledged tail byte; its wide-word zero padding explains the FPGA count of 18,402,692 accepted bytes, with no missing source byte. Fast blocks carry 18,385,220 bytes or 99.9051 percent; acknowledged payload accounts for 17,471 bytes in 8,736 words, including the single padded tail. There are 913,967 fast batches averaging 20.116 bytes and 923,827 status queries. Matched completed-chunk delivery is 1,224,493 bytes per second, consumption-paced rather than a raw capacity measurement. All 169 EAGAIN events precede first delivery. Data-bearing polls average 53.262 milliseconds and peak at 79.040 milliseconds; these are blocking exposure, not measured UI latency. Strict cadence does not pass: two actual post-startup deadline misses and two outliers correspond to 66.733-millisecond intervals, while the third-largest interval is nominal 33.366667 milliseconds. All pictures are displayed; two preceding pictures are held for an extra nominal period, totaling 66.733 milliseconds of added hold. Both missed deadlines are retained at full-width ordinals 167 and 346; the second largest-gap ordinal wraps to 90 and must not be mistaken for picture 90. At both deadlines input and upstream data are pending, decoder_ready is false, the candidate is not presentable, interval input-starvation is zero and neither presentation nor destination hold is asserted. The candidates become presentable 26,678 and 5,085 decoder cycles after the deadline, or 0.444633 and 0.084750 milliseconds. Writer-capacity blocked time is only 353 and 412 cycles, respectively, but the evidence does not isolate a particular arithmetic stage or exclude internal waits. These are downstream processing/retirement margin misses rather than observed empty-input delivery stalls. The raw 29.704965-fps aggregate spans 15.081654 seconds and includes startup; after subtracting the two known extra intervals, its remaining excess over nominal is 66.654 milliseconds of startup-inclusive timing, not further steady slowdown. Evidence is retained as .ai/current_results/entry594_*; no source, deployment, configuration, reboot, reload or playback changed during collection. This run is complete and visually accepted by the user but does not meet the agreed zero-deadline-miss ceiling gate, so Passed remains unchecked.
-
-#### Next Steps:
-
-Keep the exact feb50c2-generated 9.8 Mbps fixture and installed a4f2769 pair as the baseline. Propose a focused investigation of decoder and reference-retirement timing around the two retained misses, using the exact stream and existing GUNSMOKE simulation harnesses to distinguish decode work, internal waits and final publication latency before a production revision. Preserve full-rate cadence rather than masking missed deadlines in telemetry. Do not raise the test bitrate or return to making the optional 18.65 Mbps stress file an acceptance requirement. Clear these two in-scope late intervals, then validate the separate 10.08 Mbps combined-stream gate with supported audio and timing; current video completion does not pass that integration boundary or the remaining DVD feature set. If another hardware run is needed, give it a specific diagnostic purpose and preserve its helper log before replay. Keep after-playback and during-playback menu reports distinct. Preserve credits and integrity checks, both queue capacities, guarded startup, continuous HDMI sync, black idle and restoration copies, leave lifecycle/playback control with the user, keep restricted core.md unchanged and maintain the forty-entry ring.
 
 #### Files Modified:
 

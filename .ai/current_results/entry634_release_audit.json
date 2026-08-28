@@ -1,0 +1,98 @@
+{
+  "checked_at": "2026-08-27T18:29:23-07:00",
+  "release": {
+    "assets": [
+      {
+        "apiUrl": "https://api.github.com/repos/aquasock/MiSTer-Media-Player/releases/assets/533055465",
+        "contentType": "application/zip",
+        "createdAt": "2026-08-28T00:41:01Z",
+        "downloadCount": 1,
+        "id": "RA_kwDOTzjvfM4fxcfp",
+        "label": "",
+        "name": "MiSTer_Media_Player_v0.8.0.zip",
+        "size": 2867028,
+        "state": "uploaded",
+        "updatedAt": "2026-08-28T00:41:02Z",
+        "url": "https://github.com/aquasock/MiSTer-Media-Player/releases/download/v0.8.0/MiSTer_Media_Player_v0.8.0.zip"
+      }
+    ],
+    "isDraft": false,
+    "isPrerelease": true,
+    "name": "MiSTer Media Player v0.8.0",
+    "publishedAt": "2026-08-28T00:41:16Z",
+    "tagName": "v0.8.0",
+    "targetCommitish": "master",
+    "url": "https://github.com/aquasock/MiSTer-Media-Player/releases/tag/v0.8.0"
+  },
+  "release_body_before_sha256": "cb3d6f91d78ceb724e577939fa58185398961771077ed84c42d44cb3ac9f9135",
+  "tag_object": "0a4c1007cf22aa94152a043f9b2a86433fb9b4ce",
+  "tag_commit": "af43de27b2a08893838ea69ce176ef03ad5e3433",
+  "binary_source_baseline": "2f1d32c",
+  "archive": {
+    "name": "MiSTer_Media_Player_v0.8.0.zip",
+    "bytes": 2867028,
+    "sha256": "5f55b49eb863f74a777b548b4f42b744a9130b4161f176b687ca297deeffcaf3",
+    "uncompressed_member_bytes": 5948567,
+    "zip_integrity": "pass",
+    "internal_checksums_match_entry632": true,
+    "members": [
+      {
+        "path": "MediaPlayer_20260827.rbf",
+        "bytes": 4332740,
+        "sha256": "61a2fed28425a461c8b886bdf809e3ef76a320e5688bb22a816135c36ef981ce",
+        "matches_entry632": true
+      },
+      {
+        "path": "MiSTer",
+        "bytes": 1170340,
+        "sha256": "01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9",
+        "matches_entry632": true
+      },
+      {
+        "path": "linux/MediaPlayer_Helper",
+        "bytes": 399340,
+        "sha256": "f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8",
+        "matches_entry632": true
+      },
+      {
+        "path": "SHA256SUMS",
+        "bytes": 647,
+        "sha256": "55479ff82d2959d02ff973c2fa4c7b61c2721aec0e38b60a5d3a4b79ab80696d",
+        "matches_entry632": null
+      },
+      {
+        "path": "INSTALL.txt",
+        "bytes": 1588,
+        "sha256": "25c2f03c82ef69b7c764991e5e5e3fec1de06eb29f0c6fbeecdc8ef2bdf1c657",
+        "matches_entry632": true
+      },
+      {
+        "path": "SOURCE.txt",
+        "bytes": 1257,
+        "sha256": "5974a8b01465689a82e310833b0485412797112472b19416380ad58b86e4df89",
+        "matches_entry632": true
+      },
+      {
+        "path": "LICENSE",
+        "bytes": 18092,
+        "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+        "matches_entry632": true
+      },
+      {
+        "path": "LICENSE.minimp3",
+        "bytes": 6556,
+        "sha256": "6a1ee543e5282cd9061881edf462e6fdab181f328da71fc2c9a6950a80e94d01",
+        "matches_entry632": true
+      },
+      {
+        "path": "LICENSE.liba52",
+        "bytes": 18007,
+        "sha256": "dcc100d4161cc0b7177545ab6e47216f84857cda3843847c792a25289852dcaa",
+        "matches_entry632": true
+      }
+    ]
+  },
+  "hardware_confirmation_after_packaging": "not recorded; no new hardware test performed",
+  "tag_difference": "035807a adds the release-notes file after tagged af43de2; intervening changes are documentation and project log only",
+  "operations": "Read-only GitHub metadata, tag inspection and public ZIP verification; no tag, binary, deployment, settings or playback changes."
+}
