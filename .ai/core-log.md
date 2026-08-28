@@ -1,4 +1,4 @@
-## 673 COMMIT Unreleased ??? 2026-08-28T04:19:48-07:00
+## 673 COMMIT Unreleased 30f3c6d 2026-08-28T04:19:48-07:00
 
 #### Coming From:
 
@@ -10,7 +10,7 @@ Extend ordinary reference decode overlap to P pictures using existing frame bank
 
 #### Outcome:
 
-The user explicitly approves the expanded overlap boundary after the full-opening trace exposes ordinary P serialization missing authored field slots despite repaired metadata ownership. Preserve the existing three ordinary reference regions and two scratch regions, permit a P transaction only when its destination is distinct from every retained or displayed ordinary frame, and retain completed primary and secondary identities until classification and presentation permit their retirement. Handle following I, P, B and sequence-end events across early, coincident and late completion without overwriting pending references or binding the wrong future reference. Prepare transition tests while the refined retirement runs finish; keep fixed-source numerical evidence separate from subsequent source changes. Clocks, physical buffers, timing constraints, placement seed, decoder arithmetic, Main and helper remain unchanged. No new build or installation is yet performed.
+Implementation 30f3c6d extends the existing ordinary overlap to I/P headers, retains early B classification until the older ordinary reference presents, then binds the secondary reference before admitting B payload. Focused validation is starting in a separate checkout while comparison runs remain unchanged. The user explicitly approves the expanded overlap boundary after the full-opening trace exposes ordinary P serialization missing authored field slots despite repaired metadata ownership. Preserve the existing three ordinary reference regions and two scratch regions, permit a P transaction only when its destination is distinct from every retained or displayed ordinary frame, and retain completed primary and secondary identities until classification and presentation permit their retirement. Handle following I, P, B and sequence-end events across early, coincident and late completion without overwriting pending references or binding the wrong future reference. Prepare transition tests while the refined retirement runs finish; keep fixed-source numerical evidence separate from subsequent source changes. Clocks, physical buffers, timing constraints, placement seed, decoder arithmetic, Main and helper remain unchanged. No new build or installation is yet performed.
 
 #### Next Steps:
 
@@ -22,7 +22,6 @@ Publish this approved expansion, finish the active checks, implement and exercis
 - tools/streams/tb_native_ordinary_overlap_ownership.sv
 - tools/streams/tb_h262_film_reorder_timestamp.sv
 - tools/streams/run_film_presentation.sh
-- docs/testing_original_dvd_opening.md
 
 #### Status:
 
