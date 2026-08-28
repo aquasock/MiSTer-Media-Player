@@ -101,7 +101,14 @@ See [the v0.7.0 release notes](docs/RELEASE_NOTES_v0.7.0.md) for asset hashes, q
 
 ## Converting media with FFmpeg
 
-The preferred v0.7.0 format is a bounded MPEG-2 Program Stream containing progressive 720x480 4:2:0 MPEG-2 Video and MPEG Layer II stereo audio. This exact-24-fps, 48 kHz recipe is a suitable starting point:
+Two shapes play: a progressive Program Stream, and the narrower interlaced 480i
+subset. Pick by what you want on screen, and read Known limitations first — most
+material that fails does so because of picture structure, not encoding quality.
+
+### Progressive
+
+Progressive 720x480 4:2:0 with I, P and B pictures, plus MPEG Layer II or AC-3
+audio. This exact-24-fps, 48 kHz recipe is a suitable starting point:
 
 ```bash
 ffmpeg -hide_banner -y \
@@ -118,7 +125,38 @@ python3 tools/streams/finalize_program_stream.py "output.mpg"
 python3 tools/streams/check_media_compatibility.py "output.mpg"
 ```
 
-Use `-an` and omit the audio codec options for a video-only Program Stream. Raw `.m2v` elementary streams remain supported. The finalizer supplies the required H.262 sequence-end and Program Stream end markers when absent; the compatibility checker must pass before copying a file to the MiSTer.
+Use `-an` and omit the audio codec options for a video-only Program Stream. Raw
+`.m2v` elementary streams remain supported. The finalizer supplies the required
+H.262 sequence-end and Program Stream end markers when absent.
+
+For AC-3 instead, replace the audio options with `-c:a ac3 -ar 48000 -ac 6 -b:a
+448k`. A 5.1 track is only heard as 5.1 through S/PDIF passthrough; in HDMI mode
+it is downmixed to stereo and its LFE is discarded.
+
+### Interlaced 480i
+
+The interlaced path is deliberately narrow: 720x480 at 30000/1001, 4:2:0,
+**I-pictures only**, frame-structured, frame DCT and frame prediction only.
+
+FFmpeg's interlacing flags will not produce it. `-flags +ildct` selects field
+DCT and `+ilme` selects field prediction, and both are rejected before decode.
+The supported shape is ordinary frame-DCT coding of woven field pairs, with the
+interlaced signalling applied afterwards. Use the committed generator, which
+does exactly that and verifies the result:
+
+```bash
+python3 tools/streams/generate_test_suite.py --output-dir /tmp/suite --duration 12
+```
+
+It also builds the seven hand tests described under Diagnostic streams. To
+convert your own material, follow the same sequence its `build` function uses:
+encode at 60000/1001, weave with `tinterlace=mode=interleave_top` (or
+`interleave_bottom` for bottom-field-first), encode all-I with `-g 1 -bf 0`, then
+patch the signalling with `generate_test_interlaced_i_frames.patch_interlaced_signalling`.
+
+`check_media_compatibility.py` predates the interlaced path and rejects native
+interlaced files. It remains a valid gate for progressive streams; for
+interlaced ones, use the structure check the generator performs instead.
 
 ## Architecture
 
