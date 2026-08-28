@@ -1,3 +1,32 @@
+## 660 COMMIT Unreleased 0c17678 2026-08-28T00:30:28-07:00
+
+#### Coming From:
+
+Unreleased 4777c59
+
+#### Purpose:
+
+Record full original-opening numerical qualification and publish the approved film-frame source for a clean build.
+
+#### Outcome:
+
+Both full-opening simulations complete all 289 coded pictures and 149,817,600 reconstructed samples, with 25 I, 103 P and 161 B pictures, exact publication and ownership checks, and zero decoder errors. The isolated run replaces only already-compared, persisted reference pictures with FFmpeg samples and bounds every I/P/B sample to one level; its maximum difference is one. The real-reference run retains all RTL pictures: 102 predicted samples exceed the old fixed two-level comparison, the maximum difference is five, and none exceeds the measured maximum error of the actual reference bank plus the independently verified one-level transform allowance. This is a paired propagation check, not a claim that the old fixed-two comparison passed or that oracle references represent hardware playback. Interpolation, averaging and clipping cannot amplify the largest integer input error; the retained-reference error is measured rather than assigned a growing arbitrary GOP tolerance. The new paired runner requires both checks and unchanged source. A final synthesis precaution makes the two signed divisions explicit constant-divisor branches; the 384-case coefficient suite and matrix-transition and progressive pixel controls pass again afterward, and the exact published source will receive another complete paired run. Focused tests cover all downloaded-matrix states, 36,864 I/P/B coefficients, 1,441,440 motion combinations, 1,024 chroma cases, f_code-six reconstruction, quantized B types, intra predictor reset, and first-intra B routing. The latter reproduces an existing missing-descriptor failure at coded picture 284 and passes after the fix. Matrix changes across I/P/B and a new sequence pass all 3,110,400 samples within one level. Field-DCT and existing I controls pass; native regressions pass. Integrated film scheduler, bank metadata and 90-kHz timeline tests prove I/B/B/P reorder, 3/2/3/2 fields, missing PTS, terminal drain and replay. Strengthened RGB assertions pass 345,600 samples over two fields and 518,400 over three fields for both orders; earlier luma fingerprints alone were not RGB proof. Ordinary generation controls also complete with zero simulator exit status; their Verilator concatenated-format messages print as decimal text, so a grep for PASS incorrectly returns nonzero and is not a functional failure. AC-3 passthrough is byte exact, PCM has 576,000 stereo frames with maximum differences 17/20 and correlations above 0.99999, and transport preserves 10,334,168 clean video bytes, 25 PTS records and all PCM with queue bounds passing. The twelve-second copy retains a later final reference picture, giving 722 film fields and a terminal PTS gap; this is kept rather than altering encoded content. Detailed logs remain on GUNSMOKE under /home/vash/mister-builds/entry656/results. No Quartus build, deployment, listening, physical cadence or A/V synchronization acceptance is claimed.
+
+#### Next Steps:
+
+Complete the exact-published-source paired rerun and clean Quartus 17 build, audit warnings and all timing categories, then prepare a checksummed candidate and original opening for user-controlled testing. If timing fails on the marginal HDMI domain, follow the recorded reseed policy rather than assume placement savings are headroom. Keep the old fixed comparison and failed diagnostics visible, retain first-failure reproducers, and record build and hardware results in new entries without rewriting this checkpoint.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 659 COMMIT Unreleased 4777c59 2026-08-28T00:02:07-07:00
 
 #### Coming From:
@@ -85,7 +114,7 @@ None.
 
 ---
 
-## 656 COMMIT Unreleased ??? 2026-08-27T23:13:11-07:00
+## 656 COMMIT Unreleased 0c17678 2026-08-27T23:13:11-07:00
 
 #### Coming From:
 
@@ -97,31 +126,80 @@ Enable the original twelve-second DVD opening with AC-3 as a bounded native film
 
 #### Outcome:
 
-The user approves this cycle after a read-only title-set inventory and source audit. Two streaming passes across the seven main-title VOB files produce identical elementary-video hashes and 168,848 picture headers, with no extractor or demuxer errors. The predominant content is progressive frame-coded film in an interlaced sequence with repeated-field cadence; 1,938 B pictures require f_code six, beyond the current five-bit-range gate, and the first occurs at coded-picture index 143. Twenty-three later interlaced-frame pictures and one inconsistent final chroma flag remain outside this boundary, as do IFO title selection, direct ISO input and DVD menus. The approved implementation will retain original compressed video and the first AC-3 track, extend B motion widths and residual handling end to end, admit the bounded film-frame subset, retain field-order, repeat and progressive-chroma metadata with each physical picture bank, and present two or three fields per picture while preserving timestamp anchoring and ownership. Preparation and verification tooling will be deterministic and committed; film-derived media stays local. The old interlaced-P pixel runner is explicitly unvalidated and cannot establish correctness until its progressive control passes. No source implementation, build or hardware acceptance exists at proposal time. The retained numeric inventory is title-set header evidence, not macroblock qualification or proof of IFO playback order.
+The approved cycle is implemented as source 0c17678, including the matrix expansion approved in entry 658. Generic sequence and extension matrix downloads feed I and shared P/B inverse quantization, with default reset, persistence, natural-index addressing and fail-closed validation. B motion supports f_code six end to end, the three legal quantized non-intra B macroblock types are decoded, all B motion predictors reset after an intra macroblock, and an intra first B macroblock selects the B engine before its descriptor is consumed. P/B header capture preserves picture coding controls across quantization-matrix extensions. The frontend admits the bounded progressive-film subset in a 480i sequence; physical picture banks retain top-field-first, repeat-first-field and progressive-chroma metadata independently of PTS, and the scheduler presents two or three fields while respecting candidate parity and timestamp floors. The framebuffer selects progressive chroma rows for film and keeps ordinary interlaced mapping. Deterministic preparation, numerical comparison and focused regressions are committed; no movie-derived media is published. Source is committed and pushed only from the Pi. Qualification details and the explicit numerical comparison limits are recorded in entry 660. Whole-title playback, arbitrary interlaced P/B syntax, ISO/IFO navigation and menus remain outside scope. A clean Quartus build and hardware acceptance are still pending.
 
 #### Next Steps:
 
-Prepare and verify the original twelve-second opening and synthetic boundary fixtures, establish a working pixel oracle, and implement reconstruction and presentation together for this hardware boundary. Require signed B-vector wrap, residual and frame-edge tests, reference pixel comparisons, per-picture field order and two/three-field duration checks, timestamp and AC-3 synchronization, safe terminal and replay handling, and existing regressions. Publish source only from the Raspberry Pi, pull exact published source on GUNSMOKE, then perform a clean Quartus build with all timing categories positive and a resource comparison against 512 of 553 M10K; the accepted HDMI setup margin is only positive 0.126 nanoseconds and placement savings are not headroom. Preserve fail-closed checks outside the approved subset, existing local artifacts, user control of deployment and playback, restricted core.md and the forty-entry ring. Record actual source files and results when the implementation commit exists, and do not describe the opening as complete DVD support.
+Pull exact published source on GUNSMOKE, repeat paired original-opening qualification, and perform a clean Quartus 17 build with every timing category positive and a comparison against 512 of 553 M10K and the previous positive 0.126-nanosecond HDMI setup margin. Record build results in a new entry and hand verified files to the user for deployment and playback; do not infer hardware acceptance from simulations. Preserve restricted core.md, existing artifacts and user control of the MiSTer.
 
 #### Files Modified:
 
-- rtl/mpeg2_new/mpeg2_h262_frontend.sv
+- MediaPlayer_top_00.svh
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_02.svh
+- MediaPlayer_top_03.svh
+- MediaPlayer_top_04.svh
+- MediaPlayer_top_05.svh
+- MediaPlayer_top_06.svh
+- docs/testing_original_dvd_opening.md
+- files.qip
+- rtl/mpeg2_luma_framebuffer.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part1.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
 - rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
-- rtl/mpeg2_new/mpeg2_h262_picture_timestamp.sv
 - rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- rtl/mpeg2_new/mpeg2_h262_frontend.sv
+- rtl/mpeg2_new/mpeg2_h262_inverse_quant.sv
 - rtl/mpeg2_new/mpeg2_h262_native_field_order.sv
-- rtl/mpeg2_luma_framebuffer.sv
+- rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
+- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_picture_timestamp.sv
+- rtl/mpeg2_new/mpeg2_h262_quant_matrices.sv
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
 - rtl/mpeg2_video_output_timing.sv
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_05.svh
-- MediaPlayer_top_06.svh
+- tools/streams/generate_quant_matrix_vectors.py
 - tools/streams/generate_test_b_f_code_range.py
+- tools/streams/generate_test_b_intra_motion_reset.py
+- tools/streams/generate_test_b_quantized.py
+- tools/streams/generate_test_matrix_transitions.py
 - tools/streams/h262common.py
+- tools/streams/prepare_frame_pixel_oracle.py
+- tools/streams/prepare_original_dvd_opening.py
+- tools/streams/run_b_motion_math.sh
+- tools/streams/run_film_presentation.sh
+- tools/streams/run_full_frame_pixels.sh
+- tools/streams/run_interlaced_i_reconstruction.sh
+- tools/streams/run_mixed_raster_pixels.sh
+- tools/streams/run_original_dvd_i.sh
+- tools/streams/run_original_dvd_pixels.sh
+- tools/streams/run_original_dvd_qualification.sh
+- tools/streams/run_quant_matrices.sh
+- tools/streams/tb_h262_b_motion_math.sv
+- tools/streams/tb_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_b_residual_streaming.sv
+- tools/streams/tb_h262_dense_publication_order.sv
+- tools/streams/tb_h262_film_cadence.sv
+- tools/streams/tb_h262_film_reorder_timestamp.sv
+- tools/streams/tb_h262_input_cadence.sv
+- tools/streams/tb_h262_interlaced_i_reconstruction.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/tb_h262_picture_timestamp.sv
+- tools/streams/tb_h262_quant_matrices.sv
+- tools/streams/tb_h262_quant_matrix_iq.sv
+- tools/streams/tb_hdmi_scaler_stimulus.sv
+- tools/streams/tb_interlaced_420_cache_mapping.sv
+- tools/streams/tb_native_480i_cache_refill.sv
+- tools/streams/tb_native_480i_presentation_integration.sv
+- tools/streams/tb_native_field_order.sv
+- tools/streams/tb_native_ordinary_overlap_ownership.sv
 
 #### Status:
 
@@ -1167,36 +1245,3 @@ None.
 - [x] Passed
 
 ---
-
-## 620 COMMIT Unreleased 078d36b 2026-08-27T08:43:19-07:00
-
-#### Coming From:
-
-Unreleased aa7f064
-
-#### Purpose:
-
-Pass DTS through to S/PDIF and record the selected audio output in the helper log.
-
-#### Outcome:
-
-Published source `078d36b` adds DTS passthrough and closes the diagnostic gap entry 619 recorded. The helper now states its audio output mode at startup, so a log proves on its own which path ran rather than leaving that to a listening report. DTS arrives on private stream 1 substreams 0x88 through 0x8F and differs from AC-3 in a way that matters: it carries its own sample count in its frame header, so the burst period is read from each frame and mapped to data type 11, 12 or 13 for 512, 1024 or 2048 samples, where AC-3 is always 1536. The burst emitter is generalized over data type and period accordingly, and only 16-bit big-endian DTS is accepted, with other widths and endiannesses refused rather than guessed at. There is no DTS decoder here, so DTS is passthrough only and a DTS track selected for HDMI output is refused with a clear message instead of playing silence, which is checked and behaves as intended. The fixture generator gains a codec choice. Generating DTS exposed a real constraint rather than a defect: at the usual 1509 kbit/s, DTS plus 9.6 Mbit/s video overruns the 10.08 Mbit/s DVD mux and the muxer reports buffer underflow, so the generator now lowers video to 8 Mbit/s for DTS, which is what real DTS discs do rather than raising the mux. The verifier is extended to walk periods of any supported length and to check each payload against its own codec's sync word. Verification is byte exact: the DTS stream produces 1,125 bursts, every one a 512-sample period at data type 11 with correct sync words, whole-byte length, zero stuffing and a valid DTS sync word in the payload, and the 2,263,500 bytes carried are byte identical to the DTS extracted from the source, with an independent decoder producing the same SHA256 from the carried frames as from the originals. Every existing path is unchanged: AC-3 passthrough still produces 375 correct 1536-sample bursts with identical frames, AC-3 decoded still matches its reference at maximum difference three, the channel sweep still places all six channels correctly, and the MPEG Layer II movie still produces the same 28,628,352 samples with the same PCM hash. The helper cross-compiles clean under `-Werror` with ARM GNU 10.2 to a 399,340-byte static binary with SHA256 `f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8`. Only the helper and a new DTS fixture were deployed, each backed up, staged, hash checked and read back on a fresh connection with matching results; the RBF and Main were read back and confirmed still the accepted seed 17 and patched binaries, and no FPGA build was needed because DTS changes nothing in fabric. Built refers to the helper, and Passed is unchecked because nothing has been listened to.
-
-#### Next Steps:
-
-Have the user select S/PDIF AC-3 in the OSD and play games/MediaPlayer/dts_channel_sweep_12s.mpg once, reporting whether the soundbar produces sound and whether the low frequency slot is present, and confirm from the helper log that it now names both the audio output mode and the DTS substream. The soundbar advertises DTS Virtual:X so it should decode DTS, but as with AC-3 it cannot verify discrete channel routing on 2.1 hardware, and its lack of a format indicator remains uninformative. Note that the DTS fixture deliberately uses 8 Mbit/s video, so it is not a rate-ceiling test. After that, the remaining audio item is a commercial AC-3 track with real dynamic range control and dialogue normalization, which is the honest gap in codec qualification and cannot be closed with synthetic tones. Then prepare the release: the user has accepted the current video capability as the release scope, so the README must state plainly what the decoder accepts, being 4:2:0 I-pictures only, frame structured, frame DCT and frame prediction only, 720 by 480 at 30000/1001 with no repeat first field, and must not imply general interlaced MPEG-2 or DVD support. Release notes should carry the entry 616 wording of one or two repeated frames at the picture 690 cut and the marginal scaler paths recovered by reseeding. The interlaced video gates of entry 609 remain open and are explicitly out of scope for this release. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-- host/arm/ARCHITECTURE.md
-- tools/streams/generate_test_dvd_ac3_av.py
-- tools/streams/verify_ac3_passthrough.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
