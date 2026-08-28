@@ -34,12 +34,19 @@ def analyze(fixture, rows):
                     if r['next_coded_picture'] in pictures}
     descriptor_mismatches = []
     pts_mismatches = []
+    descriptor_coverage = bool(published) and all(
+        'progressive' in r and 'descriptor_valid' in r for r in published)
     for row in published:
         picture = pictures[row['id']]
         if row['tff'] != int(picture['top_field_first']) or row['rff'] != int(picture['repeat_first_field']):
             descriptor_mismatches.append({'coded': row['id'], 'cycle': row['cycle'],
                 'expected_tff': int(picture['top_field_first']), 'expected_rff': int(picture['repeat_first_field']),
                 'actual_tff': row['tff'], 'actual_rff': row['rff']})
+        if descriptor_coverage and (not row['descriptor_valid'] or
+                row['progressive'] != int(picture['progressive_frame'])):
+            descriptor_mismatches.append({'coded': row['id'], 'cycle': row['cycle'],
+                'expected_progressive': int(picture['progressive_frame']),
+                'actual_progressive': row['progressive'], 'descriptor_valid': row['descriptor_valid']})
         expected_pts = authored_pts.get(row['id'])
         if bool(row['display_pts_valid']) != (expected_pts is not None) or (
                 expected_pts is not None and row['display_pts'] != expected_pts):
@@ -72,6 +79,7 @@ def analyze(fixture, rows):
         'authored_duration_seconds': total_fields * 1001 / 60000,
         'pts_alignment': pts_alignment,
         'publication_descriptor_mismatches': descriptor_mismatches,
+        'publication_descriptor_coverage_complete': descriptor_coverage,
         'publication_pts_mismatches': pts_mismatches,
         'starts': len(events.get('START', [])), 'ready': len(events.get('READY', [])),
         'publications': len(published), 'unique_publications': len(counts),
@@ -95,7 +103,7 @@ def analyze(fixture, rows):
         events['END'][-1]['field'] - published[-1]['field'] >=
         2 + int(pictures[published[-1]['id']]['repeat_first_field']))
     report['simulation_timing_pass'] = bool(
-        complete_trace and report['display_order'] == expected_order and
+        complete_trace and descriptor_coverage and report['display_order'] == expected_order and
         not descriptor_mismatches and not pts_mismatches and
         not report['cadence_mismatches'] and final_hold_complete and
         not any(report['cache_flags_seen'].values()))

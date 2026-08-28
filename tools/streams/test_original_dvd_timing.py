@@ -10,14 +10,15 @@ class NativeTraceTests(unittest.TestCase):
     def setUp(self):
         self.fixture = {
             'pictures': [
-                {'coded': 0, 'display': 0, 'top_field_first': True, 'repeat_first_field': True},
-                {'coded': 1, 'display': 1, 'top_field_first': False, 'repeat_first_field': False},
+                {'coded': 0, 'display': 0, 'top_field_first': True, 'repeat_first_field': True, 'progressive_frame': True},
+                {'coded': 1, 'display': 1, 'top_field_first': False, 'repeat_first_field': False, 'progressive_frame': True},
             ],
             'pts_records': [{'next_coded_picture': 0, 'pts': 90000}],
         }
         def row(event, coded, cycle, field):
             return dict(event=event, id=coded, cycle=cycle, field=field,
                         tff=int(coded == 0), rff=int(coded == 0),
+                        progressive=1, descriptor_valid=1,
                         display_pts=90000, display_pts_valid=int(coded == 0),
                         prefill_miss=0, phase_error=0, overlap_error=0)
         self.rows = [row('START', 0, 0, 0), row('READY', 0, 1, 0),
@@ -40,6 +41,7 @@ class NativeTraceTests(unittest.TestCase):
         for index, key, value in [(2, 'tff', 0), (2, 'rff', 0),
                                   (2, 'display_pts_valid', 0), (2, 'display_pts', 90001),
                                   (5, 'display_pts_valid', 1), (5, 'field', 2),
+                                  (5, 'progressive', 0), (5, 'descriptor_valid', 0),
                                   (5, 'field', 4), (6, 'field', 4),
                                   (5, 'prefill_miss', 1), (5, 'phase_error', 1),
                                   (5, 'overlap_error', 1)]:

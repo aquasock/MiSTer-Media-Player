@@ -197,12 +197,15 @@ generate if(NATIVE_PRESENTATION) begin: native_presentation
     wire [31:0] candidate_id=native_candidate_scratch?
         picture_trace_scratch_id[native_candidate_sb]:picture_trace_reference_id[native_candidate_bank];
     task trace_event(input string event_name,input integer id);
-        $fdisplay(trace_fd,"%0d,%s,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d",
+        $fdisplay(trace_fd,"%0d,%s,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d",
             total_cycles,event_name,id,field_number,stream_index,selected_id,candidate_id,
             native_candidate_ready,native_cadence_slot,native_pts_active,native_pts_due,
             stc,display_pts,display_pts_valid,display_tff,native_display_rff,
             native_picture_present,generation,decoder_wait,presentation_wait,destination_wait,writer_wait,
-            native_scheduler_state,decoder_ready,cache_ready,prefill_miss,phase_error,overlap_error);
+            native_scheduler_state,decoder_ready,cache_ready,prefill_miss,phase_error,overlap_error,
+            display_progressive,descriptor_valid,active_bank,display_frame_bank,
+            scheduler.pending_frame_bank,scheduler.ordinary_secondary_valid,
+            scheduler.ordinary_secondary_bank,scheduler.ordinary_reference_decode_open);
     endtask
     initial begin
         if(!$value$plusargs("PTS=%s",pts_path)||!$value$plusargs("PTS_COUNT=%d",pts_count)||
@@ -210,10 +213,16 @@ generate if(NATIVE_PRESENTATION) begin: native_presentation
         if(pts_count<1||pts_count>1024)$fatal(1,"PTS count bounds");
         $readmemh(pts_path,pts_records,0,pts_count-1);
         trace_fd=$fopen(trace_path,"w");if(!trace_fd)$fatal(1,"native trace open");
-        $fdisplay(trace_fd,"cycle,event,id,field,byte,selected_id,candidate_id,candidate_ready,cadence_slot,pts_active,pts_due,stc,display_pts,display_pts_valid,tff,rff,present,generation,decoder_wait,presentation_wait,destination_wait,writer_wait,state,decoder_ready,cache_ready,prefill_miss,phase_error,overlap_error");
+        $fdisplay(trace_fd,"cycle,event,id,field,byte,selected_id,candidate_id,candidate_ready,cadence_slot,pts_active,pts_due,stc,display_pts,display_pts_valid,tff,rff,present,generation,decoder_wait,presentation_wait,destination_wait,writer_wait,state,decoder_ready,cache_ready,prefill_miss,phase_error,overlap_error,progressive,descriptor_valid,active_bank,display_bank,pending_bank,secondary_valid,secondary_bank,ordinary_decode_open");
         $display("NATIVE_MODEL decoder_hz=60000000 video_hz=54000000 latency=%0d busy_period=%0d busy_cycles=%0d",MEMORY_READ_LATENCY,MEMORY_BUSY_PERIOD,MEMORY_BUSY_CYCLES);
     end
     always @(posedge clk)if(!reset)begin
+        if(native_header_now&&metadata_owner.current_owned&&
+           metadata_owner.retiring_owned&&!metadata_owner.picture_committed)
+            $fatal(1,"native metadata retirement capacity exceeded");
+        if(native_header_now&&stream_data[5:3]!=3&&
+           scheduler.reference_headers_inflight==2&&!scheduler.reference_completed)
+            $fatal(1,"native reference header retirement capacity exceeded");
         if(stream_index<stream_len&&!decoder_ready)decoder_wait<=decoder_wait+1;
         if(presentation_hold)presentation_wait<=presentation_wait+1;
         if(destination_ownership_hold)destination_wait<=destination_wait+1;
