@@ -1,3 +1,32 @@
+## 668 COMMIT Unreleased 6c1b621 2026-08-28T02:36:27-07:00
+
+#### Coming From:
+
+Unreleased 6c1b621
+
+#### Purpose:
+
+Capture silent original-opening stutter and identify the remaining native-film timing coverage gap.
+
+#### Outcome:
+
+The user reports several severe stutters near the beginning of the silent comparison, improving toward the end, with the diagnostic overlay available. The helper log confirms dvd_opening_video_only.mpg, and FTP readback verifies the unchanged silent stream, dated candidate, preserved undated core and Main. Two screenshots are byte-identical and produce matching checksum-valid schema-19 telemetry. Unlike entry 667's early audio-underrun snapshot, this run reaches quiet sequence end with presentation complete, zero error flags, zero PCM samples, 128 reference pictures and 161 B pictures, accounting for all 289 coded pictures. Stutter therefore persists without audio; audio processing is not a necessary cause, although additional coupling in the original run remains possible. The profiler reports 280 display pictures and 279 swaps over 12.8823 seconds, but source inspection shows these are derived from first-reference completion and bank/scratch selection changes rather than unique picture publications, so the difference does not establish nine dropped pictures. Its three largest bank-change gaps are 116.8151, 100.1 and 83.4484 milliseconds at recorded ordinals 57, 71 and 89. Their retained threshold-crossing states show upstream data pending, decoder not ready, no presentable candidate and neither presentation nor destination hold; these samples prioritize video readiness and ownership/cadence investigation without proving one cause or the state throughout each gap. The fixed-29.97-frame deadline and outlier counts are not valid failure totals for two/three-field film pictures. Main completes all 10,334,393 video-plus-PTS bytes at log time 12.758744 seconds, with helper exit zero and no slow-path bytes. Review of the full-opening numerical runner reveals that its scheduler ties native film, field/publication feedback and timestamp inputs off and uses synthetic 10,000-cycle swap windows; that reconstruction pass does not cover integrated hardware film timing. Existing focused film tests remain valid within their narrower scope. Capture, helper log, decoded telemetry and source-grounded analysis are retained under .ai/current_results/entry668_*. No production source, device configuration, build or playback action is changed, and hardware acceptance remains open.
+
+#### Next Steps:
+
+Obtain approval to extend the existing simulation coverage for the complete original opening with native field cadence, original timestamps, publication feedback and realistic memory contention, tracing unique picture identity, decode readiness, ownership holds, cadence eligibility and actual publication. Reproduce and isolate the video stall before selecting a production fix or another FPGA build; distinguish legal three-field holds and the known terminal timestamp gap from real misses, and reconcile the bank-derived counters against actual publications. Preserve the numerical reconstruction bounds and then retest the original audio path. No new files or user replay are needed for the evidence already collected.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 667 COMMIT Unreleased 6c1b621 2026-08-28T02:26:37-07:00
 
 #### Coming From:
@@ -1218,34 +1247,5 @@ The release itself is not prepared and needs the user's decision on scope and ti
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 628 COMMIT Unreleased 2cb7246 2026-08-27T16:51:13-07:00
-
-#### Coming From:
-
-Unreleased 140a5b7
-
-#### Purpose:
-
-Establish whether the progressive path decodes P and B pictures, and identify the reported picture artifacts.
-
-#### Outcome:
-
-The capability question that blocked the release document is settled by playing a file rather than by reading RTL. Published source `2cb7246` adds a seventh hand test, progressive 480p with an ordinary fifteen picture GOP and two B pictures between references, built by extending the corrected suite generator rather than reviving the superseded one. It decodes: telemetry reports 121 reference pictures and 239 B pictures, all 360 displayed with 359 swaps, `error_flags` zero, sequence end, presentation complete, quiet snapshot, and a final picture type of three. The progressive path therefore handles I, P and B pictures, and the entry 609 description of the decoder as accepting I-pictures only was wrong; that restriction belongs to the interlaced 480i path, whose `phase1_supported` gate requires coding type one. B reordering costs 186,240,472 stall clocks, about 3.1 seconds of a twelve second clip, which is recorded as an observation rather than a fault. The user then reported poor picture quality, and the investigation separated two contributions. The first file was encoded at 22.3 kilobytes per frame against the all-I test four's 33.9, because B pictures let the encoder code the same content for a third fewer bits under a capped rate; the test was rebuilt with a rate floor to 33.6 kilobytes per frame so the two could be compared meaningfully. The artifacts persisted, and the user confirms test four looks identical to test seven, which rules out prediction drift and any P/B specific cause. The remaining artifacts were then measured rather than described. Screenshots at 800x600 capture the core's own output before the HDMI scaler, so they can be compared directly against an FFmpeg decode of the same frame; this is the first pixel comparison of actual playback in this project, every previous oracle having been applied in simulation. The active picture measures 720x480 placed one-to-one at offset 40 by 60 inside the 800x600 raster, so no resampling is involved and an early scaling hypothesis was wrong. At the yellow to blue band transition the reference decoder produces adjacent pixels of 252,254,0 and 1,0,254 with no intermediate value, while the hardware inserts one blended column of 199,196,255 between them, which is the reported thin vertical line. Decoding the reference again with full chroma interpolation and accurate rounding produces the same clean transition, so the difference is not an artefact of the reference's upsampling choice. No MiSTer.ini exists on the target, making a system video filter an unlikely explanation. The leading hypothesis is that horizontal chroma upsampling in the core's 4:2:0 to RGB path interpolates where the reference replicates, which would place exactly one blended column at each chroma transition. What is not established is whether that interpolation is correct for the intended chroma siting, or whether anything in the write or read path also contributes, and the left edge behaviour has not been separated from the telemetry overlay that occupies that corner.
-
-#### Next Steps:
-
-Decide whether the chroma edge behaviour is worth investigating before the release or recorded as a known characteristic, bearing in mind that it is visible on synthetic colour bars and much less so on ordinary material, and that it affects all progressive output rather than being new. If it is investigated, the targeted question is what the core does horizontally with 4:2:0 chroma when converting for display, and a useful control is an interlaced colour bar file played in native 480i, since that path differs from the 800x600 diagnostic output. The README can now be written, stating that the interlaced 480i subset is I-only, frame structured and frame DCT while the progressive path decodes I, P and B, and stating plainly that playback pixel accuracy has never been qualified, which this entry demonstrates is now measurable. Release notes should carry the entry 616 wording of one or two repeated frames at the picture 690 cut, the marginal scaler paths recovered by reseeding in entry 618, the audio capability split between measured and listened evidence, and the DTS subwoofer behaviour of entry 621 as a device observation. The interlaced gates of entry 609 remain open and out of scope. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-- tools/streams/generate_test_suite.py
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
