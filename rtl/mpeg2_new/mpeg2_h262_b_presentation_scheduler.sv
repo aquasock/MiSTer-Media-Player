@@ -101,6 +101,10 @@ wire reference_completed = frame_waiting || (active_frame_bank != active_frame_b
 // the older ordinary candidate must still be presented before the scratch.
 reg deferred_ordinary_b_start;
 reg ordinary_reference_before_b;
+// Once a closed B run has no prediction work left, its old reference bank
+// can hold a second ordinary successor while scratch/future presentation
+// drains. Keep that transaction distinct from the run's first successor.
+reg ordinary_drain_overlap;
 
 // Entry 269: while one closed run is being presented, retain the following
 // run in a distinct logical generation.  Both generations still share the
@@ -163,9 +167,9 @@ wire [1:0] native_field_duration=display_repeat_first_field ? 2'd3 : 2'd2;
 reg [25:0] cadence_credit;
 reg [3:0] cadence_rate_code_q;
 
-wire ordinary_b_header_wait=!reorder_active&&pending_frame_valid&&
+wire ordinary_b_header_wait=pending_frame_valid&&
     (ordinary_secondary_valid||ordinary_reference_decode_open);
-wire ordinary_b_header_ready=deferred_ordinary_b_start&&
+wire ordinary_b_header_ready=deferred_ordinary_b_start&&!reorder_active&&
     !ordinary_reference_decode_open&&(ordinary_secondary_valid||pending_frame_valid);
 wire admitted_b_picture_start=(b_picture_start&&!ordinary_b_header_wait)||
     ordinary_b_header_ready;
@@ -302,12 +306,26 @@ wire ordinary_reference_overlap_safe=
     (pending_frame_bank!=display_frame_bank)&&
     (active_frame_bank!=display_frame_bank)&&
     (active_frame_bank!=pending_frame_bank);
+wire ordinary_drain_mode_safe=
+    native_ordinary_overlap_enable&&(frame_rate_code==4'h4)&&
+    reorder_active&&run_closed&&!decode_inflight&&!queued_run_active&&
+    !deferred_queued_b_start&&!promotion_pending&&
+    future_frame_pending&&!future_reference_pending;
+wire ordinary_drain_overlap_safe=ordinary_drain_mode_safe&&
+    overlap_frame_pending&&!overlap_decode_open&&
+    pending_frame_valid&&(pending_frame_released||non_b_picture_start)&&
+    !ordinary_secondary_valid&&!ordinary_resume_pending&&
+    (display_scratch||(active_frame_bank!=display_frame_bank))&&
+    (active_frame_bank!=future_frame_bank)&&
+    (active_frame_bank!=pending_frame_bank);
 wire ordinary_reference_present_now=
     swap_window_pulse&&presentation_slot&&scheduled_frame_valid&&
     scheduled_frame_differs&&!scheduled_frame_scratch&&!future_waiting;
 wire ordinary_secondary_mode_safe=
     native_ordinary_overlap_enable&&
-    (frame_rate_code==4'h4)&&!display_scratch&&!reorder_active;
+    (frame_rate_code==4'h4)&&
+    ((!display_scratch&&!reorder_active)||
+     (ordinary_drain_overlap&&ordinary_drain_mode_safe));
 wire ordinary_secondary_release_now=
     ordinary_secondary_valid&&!ordinary_secondary_released&&
     (sequence_end||ordinary_terminal_drain_pending||
@@ -325,8 +343,9 @@ assign presentation_hold=deferred_ordinary_b_start||
                           ordinary_secondary_released)||
                          (reorder_active&&run_closed&&
                           !presentation_complete&&!presentation_error&&
-                          (deferred_reference_payload||deferred_queued_b_start||
-                           (!overlap_decode_open&&!queued_decode_inflight&&
+                          ((deferred_reference_payload&&!ordinary_reference_decode_open)||
+                           deferred_queued_b_start||
+                           (!overlap_decode_open&&!ordinary_reference_decode_open&&!queued_decode_inflight&&
                             (promotion_pending||!queued_header_capacity))));
 
 always @(posedge clk) begin
@@ -347,6 +366,7 @@ always @(posedge clk) begin
         early_reference_release<=0;
         deferred_ordinary_b_start<=0;
         ordinary_reference_before_b<=0;
+        ordinary_drain_overlap<=0;
         queued_run_active<=0;queued_run_closed<=0;
         queued_decode_inflight<=0;
         queued_scratch0_pending<=0;queued_scratch1_pending<=0;
@@ -375,6 +395,7 @@ always @(posedge clk) begin
         else if(ordinary_b_header_ready)
             deferred_ordinary_b_start<=0;
         active_frame_bank_q<=active_frame_bank;
+        if(!reorder_active)ordinary_drain_overlap<=0;
         case ({non_b_picture_start,reference_completed})
             2'b10: if(reference_headers_inflight!=2)
                        reference_headers_inflight<=reference_headers_inflight+1'b1;
@@ -490,11 +511,12 @@ always @(posedge clk) begin
         // The header which releases that predecessor also fixes the new decode
         // class. A header accepted before completion or behind a draining B
         // run may use the same proof once its predecessor occupies this slot.
-        if((i_picture_start||p_picture_start||
-            (!reorder_active&&(reference_headers_inflight!=0)))&&ordinary_reference_overlap_safe&&
+        if((i_picture_start||p_picture_start||(reference_headers_inflight!=0))&&
+           (ordinary_reference_overlap_safe||ordinary_drain_overlap_safe)&&
            !ordinary_reference_decode_open)begin
             ordinary_reference_decode_open<=1;
             ordinary_reference_decode_bank<=active_frame_bank;
+            if(ordinary_drain_overlap_safe)ordinary_drain_overlap<=1;
         end
 
         // When all three ordinary banks are owned, admit exactly the next I/P
@@ -512,7 +534,9 @@ always @(posedge clk) begin
         // displayed or waiting bank to be overwritten silently.
         if(ordinary_reference_decode_open&&!frame_waiting&&
            ((active_frame_bank!=ordinary_reference_decode_bank)||
-            (active_frame_bank==display_frame_bank)))begin
+            (!display_scratch&&(active_frame_bank==display_frame_bank))||
+            (ordinary_drain_overlap&&reorder_active&&
+             (!ordinary_drain_mode_safe||(active_frame_bank==future_frame_bank)))))begin
             ordinary_reference_decode_open<=0;
             presentation_error<=1;
         end
@@ -524,7 +548,9 @@ always @(posedge clk) begin
             else if(pending_frame_valid&&!ordinary_reference_present_now)begin
                 if(ordinary_secondary_valid||
                    (completed_frame_bank==pending_frame_bank)||
-                   (completed_frame_bank==display_frame_bank))
+                   (!display_scratch&&(completed_frame_bank==display_frame_bank))||
+                   (ordinary_drain_overlap&&reorder_active&&
+                    (completed_frame_bank==future_frame_bank)))
                     presentation_error<=1;
                 else begin
                     ordinary_secondary_valid<=1;
@@ -989,7 +1015,7 @@ always @(posedge clk) begin
         // ordinary display ownership used to admit its transaction.
         if((ordinary_secondary_valid||ordinary_resume_pending)&&
            (!native_ordinary_overlap_enable||(frame_rate_code!=4'h4)||
-            display_scratch))
+            (display_scratch&&!(ordinary_drain_overlap&&ordinary_drain_mode_safe))))
             presentation_error<=1;
         if(ordinary_secondary_valid&&frame_waiting&&
            !ordinary_reference_decode_open)
@@ -998,6 +1024,7 @@ always @(posedge clk) begin
         if(presentation_error)begin
             deferred_ordinary_b_start<=0;
             ordinary_reference_before_b<=0;
+            ordinary_drain_overlap<=0;
             deferred_queued_b_start<=0;
             ordinary_reference_decode_open<=0;
             ordinary_secondary_valid<=0;

@@ -16,6 +16,7 @@ vvp "$WORK/reorder" +OVERLAP_REFERENCE_ADMISSION
 vvp "$WORK/reorder" +EARLY_B_REFERENCE
 vvp "$WORK/reorder" +EARLY_P_RELEASE
 vvp "$WORK/reorder" +ORDINARY_B_OVERLAP
+vvp "$WORK/reorder" +DRAIN_REFERENCE_OVERLAP
 iverilog -g2012 -s tb_native_field_order -o "$WORK/field_order" \
  "$ROOT/rtl/mpeg2_new/mpeg2_h262_native_field_order.sv" "$ROOT/tools/streams/tb_native_field_order.sv"
 vvp "$WORK/field_order"

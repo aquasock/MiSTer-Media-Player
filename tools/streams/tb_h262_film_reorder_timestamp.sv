@@ -91,6 +91,72 @@ task field_end(input bit expected_scratch,input bit expected_sb,input [1:0] expe
  end
 endtask
 initial begin
+ if($test$plusargs("DRAIN_REFERENCE_OVERLAP"))begin
+  ordinary_overlap=1;
+  for(overlap_class=0;overlap_class<4;overlap_class=overlap_class+1)begin
+   @(negedge clk);reset=1;active=0;completed=0;reference=0;promoted=0;
+   start=0;success=0;seqend=0;metadata=0;pce=0;waiting=0;field=0;field_number=0;
+   repeat(4)@(negedge clk);reset=0;
+   picture(0,1,1,0,90000,1);commit_reference();
+   picture(0,0,1,0,99009,1);commit_reference();
+   picture(1,0,1,0,93003,1);commit_b();
+   picture(1,0,1,0,96006,1);commit_b();
+   picture(0,0,1,0,102012,1);commit_reference();
+   if(error||scheduler.pending_frame_bank!=2||active!=0)
+    $fatal(1,"draining-run first successor was not retained");
+   // The next reference cannot overwrite I0 while it is still displayed.
+   picture(0,0,1,0,(overlap_class==2)?108018:105015,1);
+   if(error||!hold||scheduler.ordinary_reference_decode_open)
+    $fatal(1,"drain overlap overwrote the displayed reference");
+   field_end(0,0,0,1,0);field_end(1,0,0,1,0);
+   if(error||hold||!scheduler.ordinary_reference_decode_open||
+      !scheduler.ordinary_drain_overlap||scheduler.ordinary_reference_decode_bank!=0)
+    $fatal(1,"free old reference did not admit second successor during B drain");
+   commit_reference();
+   if(error||!scheduler.ordinary_secondary_valid||scheduler.ordinary_secondary_bank!=0||
+      scheduler.pending_frame_bank!=2||scheduler.future_frame_bank!=1)
+    $fatal(1,"draining-run secondary overwrote a retained identity");
+   if(overlap_class==2)picture(1,0,1,0,105015,1);
+   else if(overlap_class==3)begin
+    @(negedge clk);seqend=1;@(negedge clk);seqend=0;repeat(3)@(negedge clk);
+   end else picture(0,overlap_class==0,1,0,108018,1);
+   if(error||!hold||scheduler.ordinary_reference_decode_open)
+    $fatal(1,"full drain capacity failed to hold following payload");
+   if(overlap_class==2&&!scheduler.deferred_ordinary_b_start)
+    $fatal(1,"B classification was not retained across old-run drain");
+   field_end(1,0,0,1,0);field_end(1,1,0,1,0);
+   field_end(1,1,0,1,0);field_end(0,0,1,1,0);
+   if(overlap_class==2)begin
+    if(error||hold||scheduler.future_frame_bank!=0||
+       !scheduler.ordinary_reference_before_b||scheduler.pending_frame_bank!=2)
+     $fatal(1,"drained B header did not bind secondary behind primary");
+    commit_b();
+    @(negedge clk);seqend=1;@(negedge clk);seqend=0;
+   end else if(error||!hold||scheduler.pending_frame_bank!=2||
+               !scheduler.ordinary_secondary_valid)
+    $fatal(1,"future presentation lost primary/secondary ownership");
+   field_end(0,0,1,1,0);field_end(0,0,2,1,0);
+   if(overlap_class<2)begin
+    if(error||hold||!scheduler.ordinary_reference_decode_open||
+       scheduler.ordinary_reference_decode_bank!=1)
+     $fatal(1,"next reference failed to resume in freed future bank");
+    commit_reference();
+    @(negedge clk);seqend=1;@(negedge clk);seqend=0;
+   end
+   field_end(0,0,2,1,0);
+   if(overlap_class==2)begin
+    field_end(1,0,0,1,0);field_end(1,0,0,1,0);field_end(0,0,0,1,0);
+   end else begin
+    field_end(0,0,0,1,0);
+    if(overlap_class<2)begin field_end(0,0,0,1,0);field_end(0,0,1,1,0);end
+   end
+   if(error||scheduler.pending_frame_valid||scheduler.ordinary_secondary_valid||
+      scheduler.deferred_ordinary_b_start||scheduler.ordinary_reference_decode_open)
+    $fatal(1,"drain overlap did not retire all retained identities class=%0d",overlap_class);
+  end
+  $display("FILM_DRAIN_REFERENCE_OVERLAP_PASS following=I/P/B/end display_guard=1 capacity=3 ordered=1");
+  $finish;
+ end
  if($test$plusargs("ORDINARY_B_OVERLAP"))begin
   ordinary_overlap=1;
   for(overlap_class=0;overlap_class<2;overlap_class=overlap_class+1)
