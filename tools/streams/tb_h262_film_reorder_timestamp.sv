@@ -90,6 +90,32 @@ task field_end(input bit expected_scratch,input bit expected_sb,input [1:0] expe
  end
 endtask
 initial begin
+ if($test$plusargs("OVERLAP_REFERENCE_ADMISSION"))begin
+  // Entry 669: the original opening can complete the allowed overlapping
+  // reference on the same edge as the following P header. Once the second
+  // scratch picture is displayed, a free scratch bank is NOT permission to
+  // decode that P: the sole pending reference slot still owns its predecessor.
+  // This regression is intentionally red on the diagnosed production RTL.
+  repeat(4)@(negedge clk);reset=0;
+  picture(0,1,1,1,90000,1);commit_reference();
+  picture(0,0,1,0,102012,1);commit_reference();
+  picture(1,0,0,0,94504,1);commit_b();
+  picture(1,0,0,1,97507,1);commit_b();
+  picture(0,0,1,0,105015,1);
+  @(negedge clk);completed=active;reference=active;active=0;
+  promoted=promoted+1'b1;waiting=1;start=1;is_b=0;is_i=0;
+  @(negedge clk);waiting=0;start=0;repeat(4)@(negedge clk);
+  if(!scheduler.pending_frame_valid||scheduler.pending_frame_bank!=2)
+   $fatal(1,"overlap fixture failed to retain predecessor");
+  field_end(0,0,0,1,1);field_end(0,0,0,1,1);field_end(1,0,0,0,0);
+  field_end(1,0,0,0,0);field_end(1,1,0,0,1);
+  $display("OVERLAP_REFERENCE_STATE hold=%0d pending=%0d/%0d released=%0d queued_capacity=%0d run_closed=%0d overlap_open=%0d",
+   hold,scheduler.pending_frame_valid,scheduler.pending_frame_bank,
+   scheduler.pending_frame_released,scheduler.queued_header_capacity,
+   scheduler.run_closed,scheduler.overlap_decode_open);
+  if(!hold)$fatal(1,"following P payload admitted with pending reference slot occupied during B drain");
+  $display("OVERLAP_REFERENCE_ADMISSION_PASS");$finish;
+ end
  for(session=0;session<2;session=session+1)begin
   @(negedge clk);reset=1;active=0;completed=0;reference=0;promoted=0;
   field=0;field_number=0;seqend=0;
