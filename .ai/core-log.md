@@ -1,4 +1,4 @@
-## 679 COMMIT Unreleased ??? 2026-08-28T12:38:01-07:00
+## 679 COMMIT Unreleased c124aa5 2026-08-28T12:38:01-07:00
 
 #### Coming From:
 
@@ -10,7 +10,7 @@ Perform one approved seed-only rebuild after seed 18 missed HDMI setup timing.
 
 #### Outcome:
 
-The user authorizes a reseed following entry 678. Change only the Quartus fitter seed from 18 to 19 in MediaPlayer.qsf, preserving production RTL, clocks, timing constraints, physical buffers, Main, helper, test fixtures and the approved terminal-cut qualification boundary. Verify the complete source difference and retain the already qualified native and paired numerical evidence because no functional or simulation input changes. Use a separate clean build directory at /home/vash/mister-builds/entry679/FPGA and retain the failed seed-18 build intact. This authorization covers one new compile, not an automatic seed sweep; if compilation or any timing category fails, pause again without installation or further retries.
+The user authorizes a reseed following entry 678. Source c124aa5 changes only the seed assignment from 18 to 19; the single-line diff is verified and published, and the build has not yet started. Change only the Quartus fitter seed from 18 to 19 in MediaPlayer.qsf, preserving production RTL, clocks, timing constraints, physical buffers, Main, helper, test fixtures and the approved terminal-cut qualification boundary. Verify the complete source difference and retain the already qualified native and paired numerical evidence because no functional or simulation input changes. Use a separate clean build directory at /home/vash/mister-builds/entry679/FPGA and retain the failed seed-18 build intact. This authorization covers one new compile, not an automatic seed sweep; if compilation or any timing category fails, pause again without installation or further retries.
 
 #### Next Steps:
 
