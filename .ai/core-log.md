@@ -1,3 +1,32 @@
+## 665 COMMIT Unreleased 6c1b621 2026-08-28T02:00:43-07:00
+
+#### Coming From:
+
+Unreleased 6c1b621
+
+#### Purpose:
+
+Record clean-build qualification and prepare the original DVD opening for user-controlled hardware testing.
+
+#### Outcome:
+
+Seed-only source 6c1b621 retains the qualified decoder from 3e287b3 and changes only placement seed 17 to 18. Source 6c1b621 is pulled from GitHub on GUNSMOKE and built from a fresh checkout with Quartus 17.0.2, seed 18, without reused build databases. Compilation completes in 770.6 seconds with zero errors and 204 warnings. Every timing category is positive with zero total negative slack: setup 0.065, hold 0.193, recovery 4.424, removal 0.634 and minimum pulse width 0.925 nanoseconds. HDMI remains the binding setup category at positive 0.065 nanoseconds, while decoder and video setup are positive 1.414 and 2.420; this narrow margin is kept visible rather than treated as ample headroom. The user requested a pause if seed 18 failed; it passes, and no further seed attempt is run. Resource use is 32,983 ALMs, 52,424 registers, 4,054,267 block-memory bits, 514 of 553 RAM blocks and 67 DSP blocks; the previous accepted source used 512 RAM blocks and had positive 0.126-nanosecond worst HDMI setup slack. The loop-index latch and ignored async_reg warnings are absent after the correction; normalized synthesis-warning differences against the verified 4777c59 baseline are widened motion arithmetic covered by exhaustive tests and renamed open-drain buffer nodes. TimeQuest confirms the protected intra and non-intra weight register banks survive in both P and B transforms, with their input and output paths timed. The prefetch correction matches 122,992 cycles across 384 coefficient cases and preserves transform throughput. The unchanged-source paired runner completes on this exact published source: all 289 pictures and 149,817,600 samples are checked, isolated comparison has maximum difference 1, and real decoded references have maximum predicted difference 5 with 102 samples above the old fixed-two comparison but no measured propagation-bound violation. This does not claim bit-exact reconstruction or a pass under the old fixed-two threshold. Exact publication, ownership and error checks pass. Film-cache generation changes also pass in both field orders with 512-cycle DDR response latency. Entry 660's focused reconstruction, film presentation, audio and transport checks remain applicable; the direct-byte parser matches the previous qualified parser cycle by cycle for gapped and continuous input, and the three new CDC exceptions are limited to verified source-to-first-stage paths with all later stages still timed. The RBF has 4,392,652 bytes and SHA256 2e834957fed5bbb246074d975d44247b9e81508eab04ea27445aa6a935ed916c. The locally verified output_files/entry664/MediaPlayer_6c1b621_dvd_opening_test.zip contains the dated candidate core and original compressed opening, with unchanged Main and helper omitted, manual test instructions and per-file checksums; the archive has 12,778,976 bytes and SHA256 822783066af325680b81a6813185c2a5af697458b6965638ded2f35c8009956d. Numeric build, qualification and package evidence is retained under .ai/current_results/entry665_*. The Pi and GitHub source are synchronized. No file is deployed to the MiSTer and no reload, playback, listening, physical field-cadence or A/V synchronization acceptance is claimed.
+
+#### Next Steps:
+
+Have the user preserve the known-good core, copy and load the dated candidate, copy dvd_opening_original.mpg to games/MediaPlayer, and play it once with HDMI decoded stereo PCM while keeping the current Bob/Weave selection. Collect the helper log and terminal telemetry before any replay or different file overwrites them, and record visible motion, music, field stability and menu response. The requested twelve-second stream copy retains a later reference picture and a terminal timestamp gap, so distinguish a final hold from a mid-stream failure. After the first capture, test replay, the other Bob/Weave setting and AC-3 passthrough separately. Hardware acceptance remains open, as do whole-title playback, arbitrary interlaced P/B syntax, ISO/IFO navigation and menus. Preserve restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 664 COMMIT Unreleased 6c1b621 2026-08-28T01:44:41-07:00
 
 #### Coming From:
@@ -1209,35 +1238,6 @@ All six hand tests now play correctly on the accepted installation. Tests four, 
 #### Next Steps:
 
 Install entry 624's Main and repeat one low bitrate test, being test one, two, five or six, to confirm that poll occupancy falls; that is the direct check and no further evidence gathering on the menu is needed first. Generate one progressive file with an ordinary GOP using the corrected suite generator rather than the superseded one, and have the user play it, because the difference between progressive I-only and progressive I/P/B is the last fact blocking the README and no test in this set exercises it. Consider also re-running test five in S/PDIF mode so this set covers AC-3 passthrough as well as the downmix. Do not pursue the DTS subwoofer further without different hardware, since the transmitted bytes are proven correct and no change here can alter what that device does; a tester with a discrete 5.1 DTS decoder settles it as a byproduct of the community test. When capability is established, write the README capability section and release notes carrying the entry 616 wording of one or two repeated frames at the picture 690 cut, the marginal scaler paths recovered by reseeding in entry 618, and an honest split of measured versus listened audio claims. The interlaced gates of entry 609 remain open and out of scope. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 625 COMMIT Unreleased 140a5b7 2026-08-27T15:48:33-07:00
-
-#### Coming From:
-
-Unreleased 140a5b7
-
-#### Purpose:
-
-Capture hardware results for the first three corrected hand tests and identify what the reported menu lag tracks.
-
-#### Outcome:
-
-Three duplicated efforts are resolved first. Another agent independently authored the same test suite generator, found real defects in this agent's version and corrected them, and the user directed that their files be used. Those defects were genuine: a `drawbox` position expression that was evaluated once rather than per frame, leaving a stationary bar in four of six files, and the use of top field interleaving for both field orders with only the signalling flag patched afterwards, so the bottom field first file never carried genuinely bottom-first temporal content. This agent's structural and hash checks could not have caught either, because neither verified that the picture moved. Two local commits carrying the superseded generator and a colliding entry number were discarded at the user's instruction and the published tree taken as-is; the user has since given this agent sole control of core-log.md. The three installed fixtures all play correctly. Each completes 360 reference and display pictures with 359 swaps, `error_flags` zero, presentation error clear, sequence end seen, presentation complete, quiet snapshot, zero deadline gaps and outliers, and all three largest display intervals at exactly the nominal 2,002,000 clocks, with audio underrun and PCM protocol error clear and helper exit zero. Accepted video is 3,068,039, 3,067,813 and 12,073,185 bytes respectively. The top and bottom field first files hash differently rather than differing only by a flag, which is what the other agent's interleaving fix was for, and the user reports both look correct. An installation fact matters for interpreting all of this: entry 624's Main is not installed. The running Main is still `0ee87029f0a00a50731707e8114363fc7019ae4c1200de85d90533c9163b5241` from the earlier cycle, confirmed independently by the helper log reporting profile version one rather than the version two logging that Main introduces, so none of these runs exercises its polling budget. The reported menu behaviour is nevertheless explained by measurement rather than left as an impression. Maximum media-poll occupancy is 160,937 microseconds on test one and 153,112 on test two, both of which the user found laggy, against 63,506 microseconds on test three, which the user found responsive. The acknowledged-write share of transport moves the same way, at 12.2 and 12.1 percent for tests one and two against 3.5 percent for test three. The mechanism is consistent with the other agent's diagnosis: low bitrate content drains the FPGA slowly, so transport credits run out more often and Main falls back to acknowledged writes inside a single poll instead of yielding, and the two low-rate files are 3.4 megabytes against test three's 12.5. This is event-loop occupancy measured from the helper's own profile, not a measured button-response latency, and no such latency is claimed. Tests four through six remain unrun.
-
-#### Next Steps:
-
-Capture the remaining three hand tests as the user runs them, taking the helper log before anything else is played, and expect the two small audio sweep files to show the same long poll occupancy as tests one and two for the same reason. Do not treat the menu question as open evidence-gathering: it is understood, entry 624's Main contains the fix, and the useful next step is installing that Main and repeating a low bitrate test to confirm occupancy falls. Keep the release README unwritten until the progressive picture type question is settled, since no test in this set exercises P or B pictures and the difference between progressive I-only and progressive I/P/B is exactly what the document must state correctly. When capability is established, carry the entry 616 wording of one or two repeated frames at the picture 690 cut, the marginal scaler paths recovered by reseeding in entry 618, and an honest split of measured versus listened audio claims. The interlaced gates of entry 609 remain open and out of scope for this release. Preserve restricted core.md and maintain the forty-entry ring.
 
 #### Files Modified:
 
