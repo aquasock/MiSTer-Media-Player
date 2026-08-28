@@ -1,3 +1,32 @@
+## 643 COMMIT Unreleased 2045c34 2026-08-27T19:51:27-07:00
+
+#### Coming From:
+
+Unreleased 2045c34
+
+#### Purpose:
+
+Validate test three's separate Weave and HDMI playback on the Buildroot beta.
+
+#### Outcome:
+
+The user explicitly reports completing Weave with everything passing. Helper-first retrieval preserves a log distinct from the Bob run, followed by a fresh uniquely named screenshot. Valid schema-19 telemetry confirms 360 reference and displayed pictures, zero B pictures, 359 swaps and 12,073,185 accepted video bytes. Decoder and presentation errors, audio underrun, PCM protocol faults, timestamp conflicts, native deadline gaps and gap outliers are absent; the three largest recorded display intervals are each 2,002,000 clocks. Sequence end, completed presentation and quiet termination are asserted. Helper exit is zero, all 889 pipe reads reconcile to 14,562,019 completed transport bytes, and no acknowledged fallback payload is reported. HDMI decoded output and 576,000 emitted PCM samples are confirmed. Completion, error and cadence counters match the Bob run; scaler selection and appearance rely on the user's report rather than telemetry. Readback verifies the unchanged Main, helper, RBF, kernel and fixture. Both requested test-three modes now have separately captured accepted runs. Passed is scoped to Weave; Built remains unchecked because no new build occurs. No deployment, playback, mode change, reload or reboot is initiated by the agent. Raw captures stay local; only .ai/current_results/entry643_buildroot_test3_weave_status.json is published.
+
+#### Next Steps:
+
+Run test_4_progressive.mpg with HDMI audio and preserve its completed screen for separate helper-first collection. Then complete AC-3 HDMI decode, AC-3 S/PDIF passthrough and DTS S/PDIF passthrough as separate runs. Keep overall beta qualification open until the remaining matrix is accepted and the storage dirty-flag warning as a separate unresolved filesystem check. Preserve unchanged runtime identities, user control of hardware lifecycle, local-only raw data, restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [x] Passed
+
+---
+
 ## 642 COMMIT Unreleased 2045c34 2026-08-27T19:45:33-07:00
 
 #### Coming From:
@@ -1156,35 +1185,6 @@ The user will deploy the supplied RBF and reload the MediaPlayer core, then repl
 - rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 - tools/streams/tb_native_ordinary_overlap_ownership.sv
 - tools/streams/run_native_480i_timing.sh
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 603 COMMIT Unreleased 6669b70 2026-08-27T05:37:49-07:00
-
-#### Coming From:
-
-Unreleased 6669b70
-
-#### Purpose:
-
-Diagnose the abrupt early native-480i audio/video freeze reported in both Bob and Weave.
-
-#### Outcome:
-
-The user reports that both modes stop near the beginning, with audible initial audio, good-looking video at the correct speed until an instant freeze and a responsive menu. Only the most recent run remains available; its mode is not specified and is not encoded in schema nineteen, so do not assign this capture to either mode or infer identical counters for both. The helper log is captured first, followed by a fresh checksum/parity-valid telemetry image and Main/RBF readbacks. The sole error flag is 0x0200, presentation_error, with 83 references decoded, 81 pictures displayed and 80 swaps. The fatal snapshot occurs at 164,458,727 decoder clocks, or 2.740979 seconds, with a 2.679818-second startup-inclusive presentation span, no deadline gaps or outliers and three largest steady intervals of 2,002,001 clocks. Decoder, reconstruction, writer, PCM protocol and audio-underrun error bits are clear at that snapshot. The 32-bit timer has not wrapped. Sequence end is absent and the session is not quiet; presentation_complete being high only describes the idle B-reorder transaction, not completion of this all-I movie. The retained image shows the opening cloud/trees scene. The source media still reads back as exactly 739,065,873 bytes with SHA256 beb5c738910321fbbdf482220c19af36e7c2d2bb1913e8872f679eeb1f589642, and installed Main/f615ce0 RBF hashes are unchanged. A later helper log is an exact extension of the first capture and preserves PID 2210 through successful EOF after 213.060 seconds. All 51,234 reads, 800 sampled ACK records and 839,409,548 expected helper transport bytes reconcile without transport fault. This is the documented fail-open drain after a fatal scheduler error, not evidence that the remaining movie played; the snapshot accepted-byte count remains latched at 3,265,982. The same Linux boot as the prior captures is retained, without independently asserting absence of a core reload between the user's two mode tests. Inspection identifies an inconsistent native ordinary-queue policy: overlap admission uses timestamp_candidate_active as if it were a session-mode indicator, but that signal is false before a pending reference is released even in an anchored A/V session. The next I header both admits overlap and releases the old candidate, activating its timestamp; if the next frame completes before the old candidate presents, a legitimate third-bank secondary is retained and the timestamp/secondary guard then raises the fatal presentation error. Unmodified production timestamp ownership, timeline and scheduler modules reproduce that transition with all three bank identities distinct; raw and serialized controls avoid it. An integrated real I-decoder, reconstruction, writer, publication and timestamp/scheduler observer then uses the exact first 100 movie access units and helper timestamps, appending only a terminal sequence end. It reproduces the same guard at 80 decoded and 78 displayed pictures, with every other pipeline error clear. That is three pictures earlier than hardware, not an exact physical-cycle replay: source delivery, DDR readiness, 90 kHz ticks and swap phase are modeled and PCM/HPS/scaler/CDC timing is excluded. The same 100-picture video with timestamps removed completes all 6,480,000 DDR words and 810,000 blocks, preserves every display identity and has zero missed slots. Disabling overlap in the timestamped control also completes correctly, but produces six 4,004,000-clock intervals at displayed ordinals 49, 53, 54, 58, 59 and 63, adding 0.2002 seconds. It is therefore an inadequate smooth-playback fix. Every first-100 timestamp is present; the first omitted explicit timestamp in full-file qualification is zero-based picture 681 and cannot explain this early freeze. The full A/V hardware test fails while the previously accepted bounded video-only ceiling result remains valid. Exact logs are stored losslessly compressed with original hashes, alongside screenshots, analyses and reproduction drivers as .ai/current_results/entry603_*; the complete diagnostic workspace is /home/vash/mister-builds/entry603. No production source, media, installed file, mode, reboot, reload or playback is changed during investigation; only the fixed screenshot is replaced. Built reflects the unchanged baseline and compiled diagnostic models, and hardware Passed remains unchecked.
-
-#### Next Steps:
-
-The next useful production boundary is to make the bounded native all-I ordinary frame queue timestamp-aware while preserving its three-bank ownership, P/B exclusions, cadence floor and timestamp due gate. Do not merely suppress presentation_error, drop timestamp records, disable timestamps/audio or serialize native A/V, since the controls show either lost protection or renewed missed slots. Before editing RTL, record the precise fix and regression plan, then extend existing ownership/presentation tests with real timestamp association and timeline transitions, pending/secondary publication races, early and late timestamps, missing records, reset/new-file behavior and ordered terminal drain. Require the actual opening prefix and a longer combined stream to complete without errors or extra slots, retain the exact video-only ceiling and supported P/B regressions, then obtain a clean timing-qualified RBF and verify backups and staged deployment before the user's next run. Keep the current installation and full-movie fixture available as the reproducible failing baseline. No further identical Bob/Weave replay is needed to identify this fault; mode-specific hardware acceptance and the full physical A/V soak remain open. Preserve restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
