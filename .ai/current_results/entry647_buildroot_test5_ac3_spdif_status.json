@@ -1,0 +1,76 @@
+{
+  "source_commit": "2045c34",
+  "scope": "Minimal public functional playback status and matrix acceptance; raw captures remain local.",
+  "test": "test_5_audio_ac3_51.mpg",
+  "user_report": "Ran perfect; the woofer channel was audible.",
+  "requested_modes": {
+    "audio": "S/PDIF"
+  },
+  "mode_evidence": "Helper log reports spdif IEC 61937 passthrough and AC-3 on private substream 0x80, distinct from the decode-mode run in entry 645.",
+  "telemetry_valid": true,
+  "pictures_displayed": 360,
+  "reference_pictures": 360,
+  "b_pictures": 0,
+  "display_swaps": 359,
+  "accepted_video_bytes": 3068039,
+  "top_field_first": 1,
+  "decoder_errors": 0,
+  "presentation_error": false,
+  "audio_underrun": false,
+  "pcm_protocol_error": false,
+  "pcm_fifo_peak": 127,
+  "deadline_gaps": 0,
+  "gap_outliers": 0,
+  "timestamp_advance_conflicts": 0,
+  "timestamp_delay_conflicts": 0,
+  "largest_recorded_display_intervals_clocks": [2002000, 2002000, 2002000],
+  "sequence_end_and_quiet": true,
+  "helper_exit": 0,
+  "transport_bytes_reconciled": 5556835,
+  "pipe_reads": 340,
+  "pipe_read_bytes_sum": 5556835,
+  "acknowledged_fallback_payload": false,
+  "slow_path_bytes": 0,
+  "ac3_frames": 375,
+  "pcm_samples_emitted": 576000,
+  "lfe_audible": true,
+  "lfe_note": "The user heard the LFE channel, matching AC-3 S/PDIF behavior on standard MiSTer in entries 621 and 626, and contrasting with the DTS run in entry 646 where the same receiver does not reproduce LFE.",
+  "standard_baseline_entry": 627,
+  "baseline_comparison": {
+    "video_bytes_match": true,
+    "ac3_frames_and_emitted_samples_match": true,
+    "transport_bytes_and_pipe_reads_match": true,
+    "completion_error_and_cadence_counters_match": true,
+    "transport_profile_differs": "Entry 627 captured this run under profile_version=1 credit_fast_v1 before installing the current Main; this run is profile_version=2 credit_step_v1, so transport-layer timing figures are not comparable.",
+    "delivered_fps_standard": 29.946043777203833,
+    "delivered_fps_buildroot": 29.926371996927294
+  },
+  "terminal_pixel_comparison": {
+    "result": "Pixel-identical outside the telemetry overlay rectangle.",
+    "mismatches": 0,
+    "compared_pixels": 280064
+  },
+  "this_functional_test_accepted": true,
+  "matrix_acceptance": {
+    "accepted": true,
+    "scope": "The seven-fixture compatibility matrix on Buildroot_MiSTer v2026.08.25-beta at commit 1f15c25, using unchanged v0.8.0 release binaries.",
+    "accepted_runs": {
+      "test_1_interlace_tff": 640,
+      "test_2_interlace_bff": 641,
+      "test_3_deinterlace_bob": 642,
+      "test_3_deinterlace_weave": 643,
+      "test_4_progressive": 644,
+      "test_5_ac3_hdmi_decode": 645,
+      "test_5_ac3_spdif_passthrough": 647,
+      "test_6_dts_spdif_passthrough": 646,
+      "test_7_progressive_ipb": 639
+    },
+    "explicitly_outside_this_acceptance": [
+      "Test 4 screenshot variation remains unisolated and unattributed.",
+      "Storage dirty-flag warning has never been checked by a filesystem scan.",
+      "Boot-time input-device warnings occurred during uncontrolled controller swapping and are not a peripheral regression test.",
+      "Pixel comparisons are single-frame on completed output, not full playback video-quality qualification.",
+      "Audio-path baselines in entries 626 and 627 predate the current Main, so those comparisons cover counters rather than transport-layer timing."
+    ]
+  }
+}

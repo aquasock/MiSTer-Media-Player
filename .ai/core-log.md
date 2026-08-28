@@ -1,3 +1,32 @@
+## 647 COMMIT Unreleased 2045c34 2026-08-27T20:26:43-07:00
+
+#### Coming From:
+
+Unreleased 2045c34
+
+#### Purpose:
+
+Close the seven-fixture Buildroot beta matrix with AC-3 S/PDIF passthrough and record the user's acceptance.
+
+#### Outcome:
+
+The user reports the run was perfect and the woofer channel audible. Helper-first retrieval preserved a log distinct from both the entry 645 decode run and the entry 646 DTS run, verified by hash before the screenshot was taken. The helper identifies the correct fixture, reports `spdif` IEC 61937 passthrough, locates AC-3 on private substream `0x80` rather than the decoded stereo mode of entry 645, carries 375 audio frames and 576,000 emitted samples as the burst carrier, exits zero on end of file, and reconciles all 340 pipe reads to 5,556,835 completed transport bytes with no acknowledged fallback payload and zero slow-path bytes. Valid schema-19 telemetry records 360 reference and displayed pictures, zero B pictures, 359 swaps, 3,068,039 accepted video bytes, top-field-first signalling, zero decoder and presentation errors, no audio underrun or PCM protocol fault at FIFO peak 127, zero timestamp conflicts of either kind, zero native deadline gaps, zero gap outliers, three largest display intervals each at the nominal 2,002,000 clocks, and sequence end with quiet completion. Every one of those counters matches the standard-MiSTer capture in entry 627, including identical video bytes, AC-3 frame count, emitted samples, transport bytes and pipe reads, and the final raster is pixel-identical across all 280,064 pixels outside the telemetry overlay. Only delivered frames per second differs. Entry 627 captured this run before installing the current Main and reports profile version one `credit_fast_v1` against this run's version two, so transport-layer timing figures are not comparable while the counters are. The audible LFE matches AC-3 S/PDIF behaviour on standard MiSTer recorded in entries 621 and 626 and contrasts with entry 646, where the same receiver does not reproduce DTS LFE despite measured content in the bursts, confirming that observation as a device property rather than an output-path fault. With this run the matrix is complete and the user accepts it. That acceptance covers the seven fixtures and their modes on the pinned beta using unchanged v0.8.0 binaries, and nothing further: the unisolated test-four screenshot variation, the unchecked filesystem dirty flag, the uncontrolled boot-time input warnings, the single-frame scope of every pixel comparison, and the older-Main provenance of the entry 626 and 627 audio baselines all remain explicitly outside it. A one-page findings report was written for the Buildroot maintainer and moved by the user to a local path for private delivery; it is not committed to the repository and states these same limits. Built remains unchecked because no new build occurs.
+
+#### Next Steps:
+
+Decide whether the findings report should be committed to the repository or remain a private communication, since it currently exists only outside version control. If the collaboration proceeds, re-running this matrix against future beta drops is cheap because the fixtures and capture script are deterministic and committed. The unisolated test-four screenshot variation and the filesystem dirty-flag warning remain open and should each be scoped as their own investigation with user approval rather than folded into any future acceptance. The longer-term question of retiring the ARM helper by moving source, demux, timeline and audio codec responsibilities onto the platform stays a discussion item and not approved work. The next MediaPlayer development milestone remains unapproved and should be scoped separately, with the interlaced decoding gaps of entry 609 still open and out of scope. Preserve runtime identities, user control of hardware lifecycle, local-only raw data, restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [x] Passed
+
+---
+
 ## 646 COMMIT Unreleased 2045c34 2026-08-27T20:14:53-07:00
 
 #### Coming From:
@@ -1150,35 +1179,6 @@ The read-ahead is fixed by two declarations and needed no simulation to measure.
 #### Next Steps:
 
 Obtain user approval before any RTL change, since the defect is one repeated frame in a ten-minute film and the only credible fix consumes most of the remaining memory headroom. The proposal to approve or reject is to raise `mpeg2_stream_fifo` from 16,384 to 32,768 sixteen-bit words, taking the stream FIFO from 32,768 to 65,536 bytes and total read-ahead to 131,072 bytes, or 3.2741 frame periods, which lifts the miss threshold to 171,112 bytes and clears the film's largest picture by 20,796 bytes. The estimated cost is roughly 26 additional M10K blocks against 41 free, taking utilization from 93 percent toward 98 percent, so fit and timing closure are the real risks and a clean build with a warning comparison against `d466bed` must gate acceptance. Growing the clean video queue instead is worse, because doubling it needs about 103 blocks and does not fit, and a non-power-of-two depth is riskier than the dual-clock alternative. Before building, extend the existing overlap and queue tests to cover the deeper FIFO and add a bounded simulation driven by the actual picture 690 bytes at consumption pace, requiring the missed slot to disappear at the new depth and to persist at the old one. If fit or timing fails, the fallback is to accept the single repeated frame and record it as a known limitation rather than to trade away presentation or prediction memory. Keep AC-3, interlaced P/B, navigation and disk-source work as separately scoped gates, preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 607 COMMIT Unreleased d466bed 2026-08-27T06:33:10-07:00
-
-#### Coming From:
-
-Unreleased d466bed
-
-#### Purpose:
-
-Explain the deterministic missed display slot at picture 692 from the fixture itself, without new hardware runs.
-
-#### Outcome:
-
-Offline parsing of the delivered fixture reproduces its structure exactly, recovering all 17,876 pictures and all 715,713,077 video bytes across 360,872 packs, so the analysis operates on the same bytes the hardware accepted. The mux rate field is a single constant value of 25,200, equal to 10.08 Mbps, with zero SCR regressions, so there is no pack schedule discontinuity or transport anomaly anywhere near the failure point. The declared sequence header carries a 9,600,000 bit per second video rate and a 1,835,008-bit VBV, giving exactly 40,040 bytes of delivery per frame period; the encoder holds most pictures at precisely that size, so the stream is genuinely constant rate and only cuts produce spikes. Picture 690 is 150,316 bytes, the single largest coded picture in the entire film and 3.754 frame periods of delivery at the declared rate, immediately followed by picture 691 at 95,308 bytes, or 2.380 frame periods. Those two pictures alone carry 245,624 bytes where the constant rate supplies 80,080, and they sit at the scene cut around 23.05 seconds. A constant-arrival VBV trace over the whole film shows zero underflow, confirming the stream is legal, but occupancy falls from a steady 82.544 percent to 34.467 percent at picture 690 and 10.372 percent at picture 691, which is where the hardware missed its slot with 691 references completed. The simple explanation that the trough alone causes the miss does not survive the whole-film trace, and this entry records that correction rather than the partial result. The global minimum is picture 13255 at 10.368 percent, marginally deeper than picture 691, and twenty-six pictures fall below twenty percent occupancy across the film, including a cluster at 13253 through 13257. Hardware missed exactly one slot in both runs and nothing at 13256, so VBV depth by itself does not predict the failure and twenty-five comparably thin points were absorbed. The feature unique to the failure is peak single-picture delivery burden rather than trough depth: picture 690 needs 3.754 frame periods of constant-rate delivery against 3.118 for the 124,846-byte picture 13253, and no other picture in the film exceeds it. The working hypothesis is therefore that the pipeline's effective read-ahead covers roughly three frame periods of worst-case single-picture delivery and picture 690 alone exceeds it, which is consistent with the recorded eleven and a half milliseconds of input starvation, the writer still busy at the deadline and the absence of any presentation, ownership, timestamp or capacity fault in either capture. This remains an inference from stream structure and existing telemetry; the read-ahead depth has not been measured directly in RTL or simulation, and no production change is justified by this entry alone. Evidence and the exact probe and trace drivers are retained as `.ai/current_results/entry607_*`. The entry 605 and 606 commits were pushed to the online repository after the user granted push permission from the build PC, and no source, deployed file, setting or playback was touched by this analysis.
-
-#### Next Steps:
-
-Measure the pipeline's actual input read-ahead in frame periods, in simulation against the real bytes rather than by inspection, and compare it with the 3.754 frame period worst case that picture 690 imposes and the 3.118 frame period second worst at picture 13253. If the measured depth falls between those two figures the hypothesis is confirmed and the useful production boundary is to deepen upstream buffering toward the declared 1,835,008-bit VBV, sized in frame periods of worst-case delivery, leaving presentation queues, clocks, startup and throughput untouched. If the measured depth is well above 3.754 frame periods the hypothesis is wrong and helper delivery timing during the spike becomes the next suspect, in which case the existing helper profile records should be examined before any RTL work. Either way, define the acceptance criteria before editing RTL, prefer a bounded simulation using the actual 690 spike over another full-length physical run, and keep AC-3, interlaced P/B, navigation and disk-source work as separately scoped gates. Preserve restricted core.md and maintain the forty-entry ring.
 
 #### Files Modified:
 
