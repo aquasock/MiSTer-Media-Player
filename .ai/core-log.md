@@ -1,3 +1,34 @@
+## 672 COMMIT Unreleased dd0dc52 2026-08-28T04:19:05-07:00
+
+#### Coming From:
+
+Unreleased 024158a
+
+#### Purpose:
+
+Record the refined early-reference release correction and the full native qualification gate while simulation remains in progress.
+
+#### Outcome:
+
+Initial production fix 024158a passes both entry-670 reduced failures, the metadata handoff matrix, film cache cases and the broad scheduler regression. Its native runs expose a further instance of the same classification-retirement failure: an early P header one clock before I-picture 60 completes fails to release that I, allowing its pending identity to be overwritten. Refined production source 197338a retains reference-header completion permission, and the new EARLY_P_RELEASE regression plus all existing film and scheduler controls pass. Test source dd0dc52 adds full descriptor and ordinary-bank ownership tracing, bounded retirement assertions and a strict simulation gate for complete ordered publication, metadata and authored cadence. The two superseded native runs are stopped by targeted SIGTERM after retaining their failures; no complete-run pass is claimed for them. Replacement ideal and contended runs use dd0dc52 in /home/vash/mister-builds/entry671/ideal_v2 and contended_v2 from the separate /home/vash/mister-builds/entry669/native_source checkout. Paired numerical and broader native controls continue on the unchanged 024158a source in the main build-PC checkout, which must not be pulled until their fingerprint check completes. A distinct cadence limitation is also measured in the first run: ordinary P decoding is serialized until predecessor presentation, and picture 41 completes 12,105 decoder clocks after its due window, causing two extra fields; other P and reference-plus-B readiness misses recur. Extending ordinary third-bank overlap beyond its deliberate I-only rule has been proposed to the user and is not yet approved. No Quartus build, clock, buffer, constraint, seed, Main, helper or MiSTer change occurs.
+
+#### Next Steps:
+
+Finish the refined full-opening tests and numerical controls, retain exact source versions and evidence, and correct any remaining admission or retirement failures within the approved boundary. Do not accept a run merely because all pictures decode: require unique ordered publication, full descriptors, timestamps and authored cadence. Obtain explicit approval before extending the ordinary overlap rule to P pictures with I/P/B transition ownership tests. Keep the FPGA build and installation blocked until all qualification gates pass; if an approved clean build later fails, pause without seed retries.
+
+#### Files Modified:
+
+- tools/streams/tb_h262_live_native_presentation.svh
+- tools/streams/analyze_original_dvd_timing.py
+- tools/streams/test_original_dvd_timing.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 671 COMMIT Unreleased 024158a 2026-08-28T04:04:55-07:00
 
 #### Coming From:
@@ -1220,35 +1251,6 @@ The user tags and publishes from commit `035807a`, marking the release pre-relea
 #### Files Modified:
 
 - docs/RELEASE_NOTES_v0.8.0.md
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 632 COMMIT Unreleased a26791f 2026-08-27T17:26:18-07:00
-
-#### Coming From:
-
-Unreleased 2c03075
-
-#### Purpose:
-
-Package the release candidate in the previous release's layout and verify every binary reproduces.
-
-#### Outcome:
-
-An unverified claim is corrected first, because it reached the changelog. Entry 630 stated that the helper rebuilt byte-identically from a clean dependency fetch. It had not. The ARM toolchain had been extracted under a temporary directory that the earlier machine crash and reboot cleared, the build script exited reporting only that the compiler was missing, that message contains neither the word error nor warning so the grep used to check it returned zero, and the hash printed afterwards belonged to the previously built binary still sitting in the output directory. The lesson is that a build was judged by a keyword count instead of its exit status. The toolchain has now been extracted to a persistent location and the work redone properly. With the dependency directory and prior helper binary deleted outright, the helper rebuilds to exactly `f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8`, and Main rebuilds from the same tree against pinned upstream `0a8fb44` to exactly `01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9`. Together with the RBF, which entry 630 had already reproduced byte for byte from a clean export, all three binaries now demonstrably reproduce from source baseline `2f1d32c`, and the changelog says so with the correction folded in. The package follows the v0.7.0 layout exactly, with the RBF named for its build date, Main at the root, the helper under a linux directory, checksums covering every file, installation and provenance notes, and licences for the project, minimp3 and now liba52. The installation notes state that Main is not optional and summarise the bounded video envelope so a user does not report a rejected DVD as a defect. The provenance notes record both toolchains, the upstream Main commit, and the pinned minimp3 and liba52 baselines with their archive hashes. The archive is 5,948,567 bytes with SHA256 `5f55b49eb863f74a777b548b4f42b744a9130b4161f176b687ca297deeffcaf3`, written beside the previous release. Its three runtime binaries are identical to what is installed on the target and what every hand test in entries 625 through 628 exercised, so the package is the tested configuration rather than a rebuild of it.
-
-#### Next Steps:
-
-The user installs from the package and performs the confirmation hardware run, then creates the annotated tag and GitHub release from commit `a26791f`, marking it pre-release because the project remains before 1.0. Until that run happens the release remains unaccepted, and the entry 630 caveat stands that no hardware run has occurred since packaging, although the binaries are bit-identical to those already tested. Release notes should carry the repeated frame behaviour on high peak pictures, the scaler margin recovered by the seed change and its status as a risk for the next change that adds logic, the audio split between measured and listened evidence, the DTS subwoofer behaviour as a device observation, and the two unqualified areas being playback pixel accuracy and the blended column at sharp colour transitions. The chroma investigation and the interlaced gates of entry 609 remain open and out of scope. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-- CHANGELOG.md
 
 #### Status:
 
