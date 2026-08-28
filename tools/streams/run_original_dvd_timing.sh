@@ -17,6 +17,7 @@ mapfile -t sources < <(sed -n 's/^set_global_assignment -name SYSTEMVERILOG_FILE
  -GMEMORY_READ_LATENCY="${NATIVE_MEMORY_LATENCY:-1}" \
  -GMEMORY_BUSY_PERIOD="${NATIVE_BUSY_PERIOD:-0}" -GMEMORY_BUSY_CYCLES="${NATIVE_BUSY_CYCLES:-0}" \
  --Mdir "$WORK/obj" -o original_timing tools/streams/tb_h262_live_raster_soak.sv \
+ tools/streams/tb_native_480i_cache_refill.sv \
  rtl/mpeg2_luma_framebuffer.sv rtl/mpeg2_video_output_timing.sv "${sources[@]}") > "$WORK/build.log" 2>&1
 "$WORK/obj/original_timing" "+HEX=$FIXTURES/dvd_opening_original.hex" "+LEN=$(stat -c%s "$FIXTURES/dvd_opening_original.m2v")" \
  "+PIXELS=$FIXTURES/dvd_opening_original_pixels.hex" "+MAP=$FIXTURES/dvd_opening_map.hex" \
