@@ -1,4 +1,4 @@
-## 677 COMMIT Unreleased ??? 2026-08-28T12:14:27-07:00
+## 677 COMMIT Unreleased e6ca129 2026-08-28T12:14:27-07:00
 
 #### Coming From:
 
@@ -10,7 +10,7 @@ Apply the approved narrow terminal-cut qualification exception and perform one c
 
 #### Outcome:
 
-The user approves proceeding with the build after the request to accept only the verified one-field adjustment at the artificial clip ending. Preserve the strict simulation result and all raw mismatches, add an explicit opt-in qualification result pinned to the tested fixture and final P285-to-I288 transition, and require that the final picture was already ready at the missed boundary. Missing or duplicate pictures, metadata and timestamp errors, incomplete terminal hold, cache errors, other cadence gaps, larger terminal gaps and unknown fixtures must still fail. Validate the exception against the complete retained traces and negative mutations. Production RTL, simulation inputs, clocks, physical buffers, constraints, Main, helper and seed remain identical to the fully simulated e876bf3 boundary. Reuse the verified native and paired numerical evidence only after confirming all simulation and synthesis inputs are unchanged. No FPGA build has yet started.
+The user approves proceeding with the build after the request to accept only the verified one-field adjustment at the artificial clip ending. Source e6ca129 adds the explicit fixture-pinned exception, negative mutations and documentation; all six analyzer tests pass locally. The strict result and raw mismatch remain unchanged while the separate qualification result records the opt-in exception. Preserve the strict simulation result and all raw mismatches, add an explicit opt-in qualification result pinned to the tested fixture and final P285-to-I288 transition, and require that the final picture was already ready at the missed boundary. Missing or duplicate pictures, metadata and timestamp errors, incomplete terminal hold, cache errors, other cadence gaps, larger terminal gaps and unknown fixtures must still fail. Validate the exception against the complete retained traces and negative mutations. Production RTL, simulation inputs, clocks, physical buffers, constraints, Main, helper and seed remain identical to the fully simulated e876bf3 boundary. Reuse the verified native and paired numerical evidence only after confirming all simulation and synthesis inputs are unchanged. No FPGA build has yet started.
 
 #### Next Steps:
 
