@@ -1,3 +1,32 @@
+## 637 COMMIT Unreleased 2045c34 2026-08-27T19:21:47-07:00
+
+#### Coming From:
+
+Unreleased 2045c34
+
+#### Purpose:
+
+Record the first QMTech boot capture under the pinned Buildroot beta and identify the remaining compatibility gates.
+
+#### Outcome:
+
+The user boots the prepared card and runs the capture script. Read-only retrieval confirms the pinned Linux 6.18.46 kernel, the expected memory limit, network reachability and all twenty-three runtime-manifest checks; independent readback matches the prepared Main, helper, RBF, kernel and manifest. No playback evidence is present. The script's zero status covers its narrow checks and does not classify kernel warnings. A dirty-volume warning remains uninvestigated by a filesystem scan and does not by itself establish corruption. Input initialization warnings occurred while the user was switching USB controllers and keyboards to find a working device, so the capture is not a controlled peripheral regression test and no final working input combination is confirmed. Raw device and network details remain in ignored local results; only a minimal summary is published as .ai/current_results/entry637_buildroot_boot_status.json. No device writes, repairs, reboot, source changes or new build are performed. Basic OS bring-up is established, while hardware playback acceptance remains unchecked.
+
+#### Next Steps:
+
+Confirm the final working input device and use that stable configuration for the agreed first playback: test_1_interlace_tff.mpg with HDMI audio and Bob mode. Preserve the helper log and a fresh terminal screenshot before another playback, and record selected modes, LEDs, sound, motion and menu response. Keep the dirty-volume warning open for a separately controlled filesystem check; do not repair a mounted filesystem or trigger a reboot automatically. MediaPlayer FPGA transport, cadence and audio/video correctness remain unqualified until playback evidence is reviewed. Keep raw device reports local unless the user explicitly approves publication, preserve the original working card and user control of hardware lifecycle, and maintain restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 636 COMMIT Unreleased 2045c34 2026-08-27T19:05:44-07:00
 
 #### Coming From:
@@ -1157,35 +1186,6 @@ The user authorizes investigation, with production and MiSTer lifecycle unchange
 #### Next Steps:
 
 Use a bounded capacity-safe writer-grant retiming as the first production candidate: remove both normal handoff clocks only when the alternate capture bank is actually free, retain exactly one delayed grant when full, and preserve block_stored, DDR address/payload/order, bank ownership, reset and error behavior. Do not deploy the direct-reconstruction diagnostic bypass or weaken the next-header release barrier, and do not change clock, cadence, startup, transport guards or queue sizes. Extend the existing writer-overlap regression for immediate versus delayed grants, duplicate/premature-grant rejection, sustained and random backpressure, reset and complete word/lane equivalence; then run the supported reconstruction, writer/presentation integration and P/B-client regressions before official Quartus timing/build qualification. Recheck the exact ceiling clip in both user-controlled modes and a longer run to establish sustained margin, keeping the warm 8 Mbps regression and restoration pair. The separate 10.08 Mbps combined audio/video gate and remaining DVD features remain outside this result. Preserve user lifecycle/playback control, restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 597 COMMIT Unreleased feb50c2 2026-08-27T04:02:24-07:00
-
-#### Coming From:
-
-Unreleased feb50c2
-
-#### Purpose:
-
-Identify the content and decoder workload associated with the repeatable missed pictures 167 and 346.
-
-#### Outcome:
-
-The profiler's full-width ordinals are one-based, corroborated by completed-reference counts 166 and 345 at the two deadlines, so the exact file indices are 166 and 345 at 5.538867 and 11.511500 seconds. All 449 pictures have the same I-picture coding extension, thirty slices, 1,350 macroblocks and 8,100 blocks; neither target is a special picture type or header-mode transition. Picture 167 shows dense foliage immediately before a cut to a mostly sky view and occupies 43,716 bytes, only 104th-largest; picture 346 shows the flying squirrel approaching the camera and occupies 46,222 bytes, 52nd-largest. The median is 40,186 bytes and maximum 143,171. GUNSMOKE used the unchanged 04ca33b checkout, production-equivalent to a4f2769, to compile a temporary observer around the current production frontend, parser, inverse quantizer, IDCT and intra reconstruction. All 449 pictures complete with 518,400 samples and 8,100 blocks each and no asserted reconstruction errors. This diagnostic excludes host transport, DDR persistence, presentation and pixel-oracle comparison; it is an optimistic decoder-cost profile, not a physical replay or new pixel-conformance test. Isolated costs are 33.667517 and 34.043583 milliseconds, ranking 104 and 52 of 449, with 148 pictures exceeding the nominal 2,002,000-cycle individual budget. Both parser pipeline-wait time of 1,628,100 clocks and IDCT transform-active time of 1,036,800 clocks are identical for every picture; variable cost lies outside those fixed stage counts, including compressed-bit parsing, not unusually long transforms at these two pictures. The retained Weave records measure 33.944600 and 34.321650 milliseconds from preceding reference completion to candidate readiness, against the nominal 33.366667-millisecond period. Previous-reference head starts are only 0.133300 and 0.870233 milliseconds, leaving the observed 0.444633 and 0.084750 milliseconds of lateness; Bob gives the same relationship with slightly different margins. Accepted-byte positions are 79 and 15 bytes before the respective access-unit ends in Weave, and 69 and 14 in Bob; these positions do not measure remaining arithmetic work. The evidence supports insufficient available decode/retirement lead at these deadlines rather than uniquely large or exceptional pictures, while the exact scheduler/retirement contribution remains unisolated. The isolated model must not be claimed to reproduce the two hardware misses. Evidence, exact observer, commands, full cost table, analysis and two decoded views are retained as .ai/current_results/entry597_*, with the full temporary build and six views on GUNSMOKE under /home/vash/mister-builds/entry597. No production source, deployed file, configuration or MiSTer lifecycle/playback action changed. Built refers to the diagnostic compilation; the existing strict hardware cadence gate remains unpassed.
-
-#### Next Steps:
-
-Use these measurements to scope a bounded decode/retirement throughput revision or a targeted integrated diagnostic, preserving exact picture identity, startup and presentation phase rather than treating either image as malformed or merely masking its deadline miss. Account for sustained workload and available reference-buffer lead; a picture's individual byte size or transform coefficient count alone cannot predict whether its display deadline is missed. Keep the exact 9.8 Mbps fixture and installed a4f2769 pair, preserve transport integrity checks, queues, startup, continuous sync and restoration copies, and obtain approval if the resulting production plan materially changes the accepted scope. Require zero missed slots on the ceiling fixture before the separate combined 10.08 Mbps/audio-and-timing gate; full DVD compatibility remains broader. Leave lifecycle and playback with the user, keep restricted core.md unchanged and maintain the forty-entry ring.
 
 #### Files Modified:
 

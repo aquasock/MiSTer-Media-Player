@@ -1,0 +1,14 @@
+{
+  "source_commit": "2045c34",
+  "scope": "Public summary only; raw device/network report retained in ignored local results.",
+  "booted_kernel": "6.18.46",
+  "expected_memory_limit_present": true,
+  "network_reachable": true,
+  "runtime_manifest_checks_passed": 23,
+  "independent_readback_hashes_matched": 5,
+  "capture_script_status": 0,
+  "playback_evidence_available": false,
+  "storage_warning": "Dirty-volume flag observed; no filesystem scan or repair performed, and corruption has not been established.",
+  "input_warning": "Initialization warnings observed while the user was switching input devices. Final working device and functional input remain unconfirmed.",
+  "hardware_playback_accepted": false
+}
