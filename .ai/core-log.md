@@ -1,4 +1,4 @@
-## 661 COMMIT Unreleased ??? 2026-08-28T00:35:47-07:00
+## 661 COMMIT Unreleased 4a27f80 2026-08-28T00:35:47-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Correct Quartus 17 synthesis annotations and the matrix parser loop-index initia
 
 #### Outcome:
 
-The first clean build of published source 0c17678 completes Analysis and Synthesis but exposes two avoidable warnings. The new film-mode and field synchronizers use async_reg, which Quartus 17 explicitly ignores; the correction uses the same Altera SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS attribute already applied to neighboring synchronization chains. The matrix observer's combinational loop index is unassigned on its start-code bypass path, so it receives a default value before the loop; all functional parser outputs already have defaults, and the loop overwrites its index before use. Neither edit changes decoder arithmetic, syntax admission or field scheduling. The superseded fitter is stopped deliberately rather than qualifying an image with the ignored attributes. Its successful synthesis reports 47,251 registers, 4,056,315 memory bits and 67 DSP blocks; these are not fitted resource or timing acceptance. The source-0c17678 paired DVD rerun remains isolated and may finish for evidence, but the corrected source requires its own clean build and final numerical check. No deployment or hardware result is claimed, and this correction remains within the approved opening scope.
+Source correction 4a27f80 is committed and published from the Pi after all 384 parser-state checks and 36,864 coefficient comparisons pass again. The first clean build of published source 0c17678 completes Analysis and Synthesis but exposes two avoidable warnings. The new film-mode and field synchronizers use async_reg, which Quartus 17 explicitly ignores; the correction uses the same Altera SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS attribute already applied to neighboring synchronization chains. The matrix observer's combinational loop index is unassigned on its start-code bypass path, so it receives a default value before the loop; all functional parser outputs already have defaults, and the loop overwrites its index before use. Neither edit changes decoder arithmetic, syntax admission or field scheduling. The superseded fitter is stopped deliberately rather than qualifying an image with the ignored attributes. Its successful synthesis reports 47,251 registers, 4,056,315 memory bits and 67 DSP blocks; these are not fitted resource or timing acceptance. The source-0c17678 paired DVD rerun remains isolated and may finish for evidence, but the corrected source requires its own clean build and final numerical check. No deployment or hardware result is claimed, and this correction remains within the approved opening scope.
 
 #### Next Steps:
 
-Run the matrix regression after initialization cleanup, publish the two-file correction from the Pi, pull it on GUNSMOKE and use a fresh exact-source checkout for a clean Quartus 17 build and paired opening qualification. Confirm both new warning classes disappear, inspect remaining warnings against the verified 4777c59 baseline, require all timing categories positive, and only then package the original opening and candidate RBF for user-controlled testing. Preserve the superseded reports and restricted core.md.
+Pull the published correction on GUNSMOKE and use a fresh exact-source checkout for a clean Quartus 17 build and paired opening qualification. Confirm both new warning classes disappear, inspect remaining warnings against the verified 4777c59 baseline, require all timing categories positive, and only then package the original opening and candidate RBF for user-controlled testing. Preserve the superseded reports and restricted core.md.
 
 #### Files Modified:
 
