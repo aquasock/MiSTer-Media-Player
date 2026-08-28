@@ -91,6 +91,24 @@ task field_end(input bit expected_scratch,input bit expected_sb,input [1:0] expe
  end
 endtask
 initial begin
+ if($test$plusargs("EARLY_P_RELEASE"))begin
+  ordinary_overlap=1;
+  repeat(4)@(negedge clk);reset=0;
+  picture(0,1,1,1,90000,1);commit_reference();
+  picture(0,0,0,0,94504,1);commit_reference();
+  picture(0,1,0,1,97507,1);
+  field_end(0,0,0,1,1);field_end(0,0,0,1,1);field_end(0,0,1,0,0);
+  @(negedge clk);start=1;is_b=0;is_i=0;
+  @(negedge clk);start=0;completed=active;reference=active;active=0;
+  promoted=promoted+1'b1;waiting=1;
+  @(negedge clk);waiting=0;repeat(4)@(negedge clk);
+  if(!scheduler.pending_frame_valid||scheduler.pending_frame_bank!=2||
+     !scheduler.pending_frame_released||!hold||error)
+   $fatal(1,"early P header did not retain release and capacity for retiring I");
+  field_end(0,0,1,0,0);field_end(0,0,2,0,1);
+  if(hold||error)$fatal(1,"early P payload failed to resume after I presentation");
+  $display("EARLY_P_RELEASE_PASS");$finish;
+ end
  if($test$plusargs("EARLY_B_REFERENCE"))begin
   // Native trace: the B classification can precede its I reference's public
   // completion by one clock after an ordinary P has already been displayed.

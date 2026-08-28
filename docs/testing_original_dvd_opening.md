@@ -89,7 +89,7 @@ header, scratch-bank availability lets that P payload proceed while the
 pending reference slot remains occupied. Keep the failure as the fix's
 regression boundary; do not describe it as a passing timing qualification.
 The early-B case separately checks the one-clock handoff between the following
-B header and completion of its I reference. The current scheduler can bind an
+B header and completion of its I reference. The diagnosed pre-fix scheduler can bind an
 older displayed P, while the timestamp owner loses the retiring I descriptor.
 
 The entry-671 fix makes both reduced cases mandatory in

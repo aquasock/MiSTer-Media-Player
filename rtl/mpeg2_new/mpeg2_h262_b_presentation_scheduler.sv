@@ -89,6 +89,13 @@ reg deferred_queued_b_start;
 // Retain a following I/P classification until the occupied reference slot
 // leaves the draining run. This also preserves a header before completion.
 reg deferred_reference_payload;
+// A following reference header may arrive before the preceding reference's
+// public completion. Keep its classification permission with that completion
+// instead of leaving the new pending slot unreleased and overwritable.
+reg [1:0] reference_headers_inflight;
+reg [1:0] active_frame_bank_q;
+reg early_reference_release;
+wire reference_completed = frame_waiting || (active_frame_bank != active_frame_bank_q);
 
 // Entry 269: while one closed run is being presented, retain the following
 // run in a distinct logical generation.  Both generations still share the
@@ -318,6 +325,9 @@ always @(posedge clk) begin
         overlap_decode_open<=0;overlap_frame_pending<=0;
         deferred_queued_b_start<=0;
         deferred_reference_payload<=0;
+        reference_headers_inflight<=0;
+        active_frame_bank_q<=0;
+        early_reference_release<=0;
         queued_run_active<=0;queued_run_closed<=0;
         queued_decode_inflight<=0;
         queued_scratch0_pending<=0;queued_scratch1_pending<=0;
@@ -341,6 +351,20 @@ always @(posedge clk) begin
         native_fields_elapsed<=0;
     end else begin
         b_user_success_d<=b_user_success;
+        active_frame_bank_q<=active_frame_bank;
+        case ({non_b_picture_start,reference_completed})
+            2'b10: if(reference_headers_inflight!=2)
+                       reference_headers_inflight<=reference_headers_inflight+1'b1;
+            2'b01: if(reference_headers_inflight!=0)
+                       reference_headers_inflight<=reference_headers_inflight-1'b1;
+            2'b11: if(reference_headers_inflight==0)
+                       reference_headers_inflight<=1;
+            default: begin end
+        endcase
+        if(reference_completed)
+            early_reference_release<=0;
+        else if(non_b_picture_start&&(reference_headers_inflight!=0))
+            early_reference_release<=1;
         if(!reorder_active||presentation_error)
             deferred_reference_payload<=0;
         else if(non_b_picture_start&&run_closed&&
@@ -391,6 +415,7 @@ always @(posedge clk) begin
             pending_frame_released<=sequence_end||
                                     ordinary_terminal_drain_pending||
                                     terminal_boundary_pending||
+                                    early_reference_release||
                                     non_b_picture_start;
             terminal_boundary_pending<=0;
         end
@@ -403,7 +428,7 @@ always @(posedge clk) begin
             pending_frame_valid<=1;
             pending_frame_bank<=completed_frame_bank;
             pending_frame_released<=non_b_picture_start||
-                                    deferred_reference_payload||sequence_end||
+                                    deferred_reference_payload||early_reference_release||sequence_end||
                                     terminal_boundary_pending;
             overlap_frame_pending<=1;
             overlap_decode_open<=0;
@@ -417,7 +442,7 @@ always @(posedge clk) begin
             pending_frame_valid<=1;
             pending_frame_bank<=completed_frame_bank;
             pending_frame_released<=non_b_picture_start||
-                                    deferred_reference_payload||sequence_end||
+                                    deferred_reference_payload||early_reference_release||sequence_end||
                                     terminal_boundary_pending;
             queued_overlap_frame_pending<=1;
             queued_overlap_decode_open<=0;
@@ -480,7 +505,8 @@ always @(posedge clk) begin
                     ordinary_secondary_valid<=1;
                     ordinary_secondary_bank<=completed_frame_bank;
                     ordinary_secondary_released<=sequence_end||
-                                                   ordinary_terminal_drain_pending;
+                                                   ordinary_terminal_drain_pending||
+                                                   early_reference_release||non_b_picture_start;
                     ordinary_resume_pending<=0;
                 end
             end
@@ -838,6 +864,7 @@ always @(posedge clk) begin
                     pending_frame_released<=sequence_end||
                                             ordinary_terminal_drain_pending||
                                             terminal_boundary_pending||
+                                            early_reference_release||
                                             non_b_picture_start;
                     terminal_boundary_pending<=0;
                 end else begin
