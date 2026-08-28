@@ -7,6 +7,7 @@ wire [7:0] iw,nw;
 wire idef,ndef,error;
 reg [7:0] pending=0;
 integer bits=0,checks=0;
+wire continuous_bytes=$test$plusargs("CONTINUOUS");
 integer j,k;
 reg [7:0] expect_i[0:63],expect_n[0:63];
 reg [5:0] zz[0:63];
@@ -17,9 +18,11 @@ mpeg2_h262_quant_matrices dut(.clk(clk),.reset(reset),.stream_data(data),
 task automatic byte_out(input [7:0] v);
  begin
   @(negedge clk); data=v; valid=1;
-  @(negedge clk); valid=0;
-  // Deliberate gaps prove byte acceptance, not clock counting.
-  repeat(v[1:0]) @(negedge clk);
+  if(!continuous_bytes) begin
+   @(negedge clk); valid=0;
+   // Deliberate gaps prove byte acceptance, not clock counting.
+   repeat(v[1:0]) @(negedge clk);
+  end
  end
 endtask
 task automatic bit_out(input bit v);
@@ -29,7 +32,10 @@ task automatic bit_out(input bit v);
  end
 endtask
 task automatic finish_bits;
- begin while(bits!=0) bit_out(0); end
+ begin
+  while(bits!=0) bit_out(0);
+  if(continuous_bytes) begin @(negedge clk);valid=0;end
+ end
 endtask
 task automatic start_code(input [7:0] v);
  begin finish_bits();byte_out(0);byte_out(0);byte_out(1);byte_out(v);end

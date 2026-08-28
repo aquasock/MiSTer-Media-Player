@@ -45,6 +45,7 @@ the hardware core.
 
 ```sh
 bash tools/streams/run_quant_matrices.sh
+bash tools/streams/run_quant_matrix_equivalence.sh
 bash tools/streams/run_b_motion_math.sh
 python3 tools/streams/generate_test_b_f_code_range.py --f-code-six
 bash tools/streams/run_full_frame_pixels.sh tools/streams/test_b_f_code_six.m2v

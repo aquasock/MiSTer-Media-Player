@@ -39,6 +39,11 @@ set_false_path \
 set_false_path \
     -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|native_interlaced_mem}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|native_interlaced_r1}]
+# Film chroma uses the same stable descriptor/cache_ready handshake. Only
+# its first sampling register is asynchronous; r1 -> r2 remains fully timed.
+set_false_path \
+    -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|progressive_chroma_mem}] \
+    -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|progressive_chroma_r1}]
 set_false_path \
     -from [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|first_field_mem}] \
     -to   [get_keepers {*|mpeg2_luma_framebuffer:mpeg2_luma_framebuffer|first_field_r1}]
@@ -103,6 +108,17 @@ set_false_path \
 set_false_path \
     -from [get_keepers {*|mpeg2_new_cadence_window_video}] \
     -to   [get_keepers {*|mpeg2_new_cadence_window_sync[0]}]
+
+# Film mode is a session-stable decoder level. Physical field/active are
+# video-domain registers sampled before the delayed field swap window.
+# Cut only these source -> first-stage crossings, matching the existing
+# native-control convention. No later-stage or decoder path is excepted.
+set_false_path \
+    -from [get_keepers {*|mpeg2_h262_native_field_order:*|film_mode*}] \
+    -to   [get_keepers {*|mpeg2_new_film_mode_video_sync[0]}]
+set_false_path \
+    -from [get_keepers {*|mpeg2_video_output_timing:*|native_field *|mpeg2_video_output_timing:*|native_active*}] \
+    -to   [get_keepers {*|mpeg2_new_native_field_sync[0]}]
 
 # Native presentation mode is requested from the 60 MHz decoder domain and
 # acknowledged back from the 54 MHz timing domain through explicit two/three

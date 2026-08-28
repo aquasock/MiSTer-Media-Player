@@ -37,7 +37,9 @@ reg [7:0] nw, write_value;
 reg write_enable, bad, mark_complete;
 reg [1:0] write_matrix;
 reg [5:0] write_index;
-integer b;
+integer flag_step;
+reg [3:0] available_bits;
+wire [15:0] assembled_weight = {weight_shift,stream_data} >> weight_bits;
 function automatic [7:0] default_intra_weight;
     input [5:0] linear;
     begin
@@ -153,50 +155,58 @@ assign intra_weight=intra_default ? default_intra_weight(read_index) : intra_mem
 assign non_intra_weight=non_intra_default ? 8'd16 : non_intra_mem[read_index];
 assign update_now=stream_valid && (sequence_reset_pending || write_enable);
 
-// At most one weight completes per byte. A byte can also contain adjacent
-// load flags (including the two forbidden chroma flags for 4:2:0).
+// Every weight has eight bits, so an accepted byte in WEIGHT completes
+// exactly one weight and preserves the partial-byte bit count. Handle that
+// assembly directly instead of cascading eight state-machine transitions.
+// Only adjacent load flags need a bounded walk (at most four per extension).
 always @* begin
-    b=0;
+    flag_step=0; available_bits=0;
     ns=state; nk=skip_bits; ne=element; nm=matrix_id;
     nb=weight_bits; nw=weight_shift;
     write_enable=0; write_value=0; write_matrix=0; write_index=0;
     bad=0; mark_complete=0;
     if (!start_code) begin
-        if (state==EXT) begin
-            if (stream_data[7:4]==4'h3) begin ns=FLAG; nk=0; nm=0; end
-            else ns=IDLE;
-        end
-        for (b=7;b>=0;b=b-1) begin
-            if ((state!=EXT)||(b<4)) begin
-                case(ns)
-                    SEQ: begin
-                        if(nk==1) begin ns=FLAG; nk=0; end
-                        else nk=nk-1'b1;
+        case(state)
+            SEQ: begin
+                if(skip_bits>6'd8) nk=skip_bits-6'd8;
+                else begin
+                    available_bits=4'd8-{1'b0,skip_bits[2:0]};
+                    // An exact byte boundary leaves no flag bits this byte.
+                    if(skip_bits==6'd8) available_bits=0;
+                    nk=0; ns=FLAG;
+                end
+            end
+            EXT: begin
+                if(stream_data[7:4]==4'h3) begin
+                    ns=FLAG; nk=0; nm=0; available_bits=4;
+                end else ns=IDLE;
+            end
+            FLAG: available_bits=8;
+            WEIGHT: begin
+                write_enable=1; write_value=assembled_weight[7:0];
+                write_matrix=matrix_id; write_index=zigzag(element);
+                nw=stream_data;
+                if(write_value==0 || (!matrix_id[0] && element==0 && write_value!=8)) bad=1;
+                if(element==63) begin
+                    mark_complete=1;
+                    if((sequence_header && matrix_id==1)||matrix_id==3) ns=IDLE;
+                    else begin
+                        ns=FLAG; nm=matrix_id+1'b1;
+                        available_bits={1'b0,weight_bits};
                     end
-                    FLAG: begin
-                        if(stream_data[b]) begin
-                            if(nm[1]) bad=1;
-                            ns=WEIGHT; ne=0; nb=0; nw=0;
-                        end else if ((sequence_header && nm==1)||nm==3)
-                            ns=IDLE;
-                        else nm=nm+1'b1;
-                    end
-                    WEIGHT: begin
-                        nw={nw[6:0],stream_data[b]};
-                        if(nb==7) begin
-                            write_enable=1; write_value=nw;
-                            write_matrix=nm; write_index=zigzag(ne);
-                            if(nw==0 || (!nm[0] && ne==0 && nw!=8)) bad=1;
-                            if(ne==63) begin
-                                mark_complete=1;
-                                if((sequence_header && nm==1)||nm==3) ns=IDLE;
-                                else begin ns=FLAG; nm=nm+1'b1; end
-                            end else ne=ne+1'b1;
-                            nb=0;
-                        end else nb=nb+1'b1;
-                    end
-                    default: ;
-                endcase
+                end else ne=element+1'b1;
+            end
+            default: ;
+        endcase
+        for(flag_step=0;flag_step<4;flag_step=flag_step+1) begin
+            if(ns==FLAG && available_bits!=0) begin
+                available_bits=available_bits-1'b1;
+                if(stream_data[available_bits]) begin
+                    if(nm[1]) bad=1;
+                    ns=WEIGHT; ne=0;
+                    nb=available_bits[2:0]; nw=stream_data;
+                end else if((sequence_header && nm==1)||nm==3) ns=IDLE;
+                else nm=nm+1'b1;
             end
         end
     end
