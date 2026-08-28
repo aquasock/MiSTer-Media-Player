@@ -1,3 +1,37 @@
+## 669 COMMIT Unreleased ??? 2026-08-28T02:38:57-07:00
+
+#### Coming From:
+
+Unreleased 6c1b621
+
+#### Purpose:
+
+Trace the complete original DVD opening with native film timing and original timestamps to isolate silent playback stutter.
+
+#### Outcome:
+
+The user approves the proposed simulation and diagnosis before another FPGA build. Extend the existing full-opening raster test with an opt-in native presentation path using the production timing generator, picture timestamp owner, presentation timeline and framebuffer publication feedback, keeping the production RTL unchanged. Preserve original elementary bytes and sparse timestamp positions through deterministic fixture preparation, add unique picture identity and readiness/publication traces, and exercise shared display/prediction memory service with explicit model parameters. Retain the default reconstruction regression and its measured error bounds. Treat any discrepancy first as either a harness fidelity issue or a production behavior to isolate, not automatic proof of the hardware root cause. The diagnostic development runs on GUNSMOKE; no MiSTer replay, configuration change, deployment, Quartus compile or seed change is approved in this boundary.
+
+#### Next Steps:
+
+Publish the diagnostic source from the Pi, pull it on the build PC, run the complete 289-picture opening with native field cadence and original PTS, and compare controlled memory-service conditions. Trace decode completion, candidate readiness, ownership holds, field eligibility and actual framebuffer publication using identities wider than the old eight-bit counters. Separate legal two/three-field holds and the terminal timestamp gap from missed presentation opportunities, verify the old numerical checks still apply, and record a reproducible explanation or remaining evidence gap before proposing a production fix.
+
+#### Files Modified:
+
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/tb_h262_live_native_presentation.svh
+- tools/streams/prepare_original_dvd_timing.py
+- tools/streams/run_original_dvd_timing.sh
+- tools/streams/analyze_original_dvd_timing.py
+- docs/testing_original_dvd_opening.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 668 COMMIT Unreleased 6c1b621 2026-08-28T02:36:27-07:00
 
 #### Coming From:
@@ -1207,36 +1241,6 @@ The user set the version to 0.8.0, asked for the chroma finding to be documented
 #### Next Steps:
 
 The user creates the annotated tag and GitHub release from the exact commit, as core.md requires, marking it pre-release because the project remains before 1.0. The package is at the rc080 package directory with a checksum file and installation notes; generated media stays out of it, so the seven hand tests are reproduced from the committed generator rather than shipped. Release notes should carry the repeated frame behaviour on high peak pictures, the scaler margin recovered by the seed change and its status as a known risk for the next change that adds logic, the audio split between measured and listened evidence, the DTS subwoofer behaviour as a device observation, and the two unqualified areas being playback pixel accuracy and the blended column at sharp colour transitions. If a final confirmation run is wanted before tagging, reinstall from the package and replay one interlaced and one audio test, which would also close the gap that no run has occurred after packaging. The chroma investigation and the interlaced gates of entry 609, being field pictures, field DCT, interlaced P and B, repeat first field and 576i, remain open and out of scope for this release. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-- README.md
-- CHANGELOG.md
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 629 COMMIT Unreleased ad56579 2026-08-27T17:05:22-07:00
-
-#### Coming From:
-
-Unreleased 2cb7246
-
-#### Purpose:
-
-State the decoder's actual capability and its unqualified areas in the README and changelog.
-
-#### Outcome:
-
-Published source `ad56579` rewrites the capability description now that measurement rather than inference supports it. The two video paths are described separately because they differ sharply, which the previous single row obscured: the progressive path decodes I, P and B pictures through 720x480, while the interlaced path is 720x480 at 30000/1001 only, 4:2:0, I-pictures only, frame structured, frame DCT and frame prediction only, either field order, with no `repeat_first_field`. Field pictures, field DCT, interlaced P and B, pulldown and 576i are named as rejected before decode, together with the plain consequence that most commercial DVDs use several of these and will not play. Audio is described as decoded MPEG Layer II and AC-3 with an explicit note that the AC-3 stereo downmix discards LFE by the format's convention, alongside AC-3 and DTS passthrough as IEC 61937 bursts, the passthrough-only status of DTS, the audio output option and why it mutes the output it does not drive, and the single-track limit. Four unqualified areas are recorded rather than left implicit: playback pixel accuracy has never been qualified because every previous comparison ran in simulation; sharp colour transitions carry one blended column an independent decoder does not produce; material with a large enough peak coded picture repeats one or two frames at that picture as a property of buffer depth rather than of the stream; and passthrough cannot be scaled, so volume does not apply to it. The changelog gains the AC-3, passthrough, audio output, hand test, progressive picture type, Main responsiveness and known limitation entries for the unreleased section, and the README gains a hand test section describing what each of the seven files is for and noting that the audio sweeps exercise discrete channels only in S/PDIF mode. The standards section now credits liba52 and IEC 61937 and states that the rejected picture types are limits of this implementation rather than of H.262. Nothing in the release qualification or installation sections was touched, since those describe the published v0.7.0 binaries and no new release has been prepared.
-
-#### Next Steps:
-
-The release itself is not prepared and needs the user's decision on scope and timing. If it proceeds, the outstanding work is a full regression pass on a clean build, a decision on whether the chroma edge column is investigated first or shipped as a documented characteristic, a version number, and the tag and GitHub release created by the user from the exact commit, with the binaries and hand tests packaged and identified by hash. The installation section still describes three v0.7.0 runtime files and will need a fourth line if the release ships the patched Main, since the audio output option is meaningless without it. Release notes should carry the repeated frame wording, the marginal scaler paths recovered by reseeding, the audio split between measured and listened evidence, and the DTS subwoofer behaviour as a device observation rather than a core limitation. The chroma investigation, if wanted, should ask what the core does horizontally with 4:2:0 chroma when converting for display, with an interlaced colour bar file in native 480i as the control. The interlaced gates of entry 609 remain open and out of scope. Preserve restricted core.md and maintain the forty-entry ring.
 
 #### Files Modified:
 
