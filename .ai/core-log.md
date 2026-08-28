@@ -1,3 +1,32 @@
+## 679 COMMIT Unreleased ??? 2026-08-28T12:38:01-07:00
+
+#### Coming From:
+
+Unreleased e6ca129
+
+#### Purpose:
+
+Perform one approved seed-only rebuild after seed 18 missed HDMI setup timing.
+
+#### Outcome:
+
+The user authorizes a reseed following entry 678. Change only the Quartus fitter seed from 18 to 19 in MediaPlayer.qsf, preserving production RTL, clocks, timing constraints, physical buffers, Main, helper, test fixtures and the approved terminal-cut qualification boundary. Verify the complete source difference and retain the already qualified native and paired numerical evidence because no functional or simulation input changes. Use a separate clean build directory at /home/vash/mister-builds/entry679/FPGA and retain the failed seed-18 build intact. This authorization covers one new compile, not an automatic seed sweep; if compilation or any timing category fails, pause again without installation or further retries.
+
+#### Next Steps:
+
+Publish the seed-only source, pull it on the build PC, verify retained qualification and run one fresh seed-19 compile. Audit every timing category, warning changes, resources and retained weight-register and film CDC boundaries. If every gate passes, package the dated RBF and use the existing installation authorization only after preserving the old core and verifying FTP readback on the reachable MiSTer. Leave core loading, original-audio playback and hardware acceptance to the user. Record the outcome and pause on any build or timing failure.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 678 COMMIT Unreleased e6ca129 2026-08-28T12:35:54-07:00
 
 #### Coming From:
@@ -1228,34 +1257,5 @@ None.
 
 - [ ] Built
 - [x] Passed
-
----
-
-## 639 COMMIT Unreleased 2045c34 2026-08-27T19:36:01-07:00
-
-#### Coming From:
-
-Unreleased 2045c34
-
-#### Purpose:
-
-Capture the beta's progressive playback result and correct the stale bar fixtures mistakenly selected during card preparation.
-
-#### Outcome:
-
-The user reports stationary bars in tests one and two, then leaves test seven displayed and describes behavior as matching standard MiSTer. Helper-first collection and a uniquely named screenshot preserve that run without a reload. Valid schema-19 telemetry shows all 360 progressive pictures displayed, comprising 121 reference and 239 B pictures, with 359 swaps, zero decoder or presentation error, no audio underrun or PCM protocol fault, sequence end and quiet completion. Helper exit is zero and the pipe reads reconcile exactly to the completed transport. Comparison with the recorded standard-MiSTer run uses the same test-seven file and runtime hashes: completion indicators, the existing timestamp-conflict count and gap-outlier count agree, while individual timing measurements differ. The final raster is pixel-identical outside the telemetry rectangle, which is a single-frame comparison rather than full playback pixel qualification or a performance benchmark. The stationary bars are an agent preparation error: entry 636 copied superseded pre-fix files, and entry 638 checked their hashes against the stale manifest instead of verifying corrected content. Both old tests contain 360 identical decoded frames and 360 I-pictures, so the defect is authored content, not a requirement for interlaced P/B support. The already-qualified corrected files from source 140a5b7 are rechecked against entry 624's manifest, including every temporal field position for each bar fixture, and only tests one, two, five and six plus their manifest and explanatory metadata are replaced through verified staging and fresh readback. Tests three, four and seven and all runtime/OS binaries remain unchanged; all twenty-three current manifest checks pass and the captured test-seven helper log remains unchanged. The historical pre-boot manifest is retained and explicitly labeled as predating this correction. No new source, build, reboot, reload or playback is performed by the agent. Raw captures and detailed diagnostics remain in ignored local results; only .ai/current_results/entry639_buildroot_playback_status.json is published. The progressive compatibility result is positive, but overall hardware acceptance stays open pending corrected interlaced and remaining audio tests.
-
-#### Next Steps:
-
-Replay only corrected test_1_interlace_tff.mpg with Bob deinterlacing and HDMI audio, leaving synthetic audio and native timing patterns off, and retain the completed core state for helper-first collection and a fresh terminal screenshot. Confirm moving fields, audible tone, menu response and all three LEDs before widening the matrix. The corrected file requires only the supported interlaced all-I path; interlaced P/B remains unsupported and out of scope. Preserve the beta and original-runtime identities, the separate unresolved filesystem warning, local-only raw reports, restricted core.md and the forty-entry ring. Do not misclassify the stale-fixture observation as a new OS or FPGA regression or claim comprehensive compatibility from one progressive clip.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
 
 ---
