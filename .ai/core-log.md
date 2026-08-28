@@ -1,3 +1,32 @@
+## 674 COMMIT Unreleased 18d9189 2026-08-28T04:44:23-07:00
+
+#### Coming From:
+
+Unreleased 30f3c6d
+
+#### Purpose:
+
+Record complete retirement-fix evidence and qualify corrected B lookahead before the authorized FPGA build.
+
+#### Outcome:
+
+Both full retirement-only native runs at dd0dc52 finish with 289 unique ordered publications, 288 swaps, all 25 associated timestamps, no descriptor or timestamp mismatches, clear cache/phase/overlap flags and pixel reports byte-identical to entry 665. They still have nineteen cadence delays totaling forty-one extra fields and are not timing passes. The approved P-overlap source 30f3c6d removes the initial ordinary-P delays, but its later full traces expose a remaining P80-to-B82 miss because B payload waits unnecessarily for primary presentation; those runs are stopped with their partial failure evidence retained. Production refinement d70b18f allows B scratch decode after the secondary reference completes while keeping the older ordinary reference first in presentation order, and holds any following I/P payload until that older presentation frees the display bank. Focused I/P-to-B cases before, with and after completion, late completion after primary display, full-slot backpressure, following-I protection, timestamps, film cache, scheduler rates and native timing integration pass at c4aec5e. Two test-fixture corrections enable native overlap explicitly and wrap the physical reference bank over three regions; neither weakens the ownership assertions. Paired reconstruction runs on 024158a and d5274d7 both pass with unchanged source fingerprints and CSVs identical to entry 665, preserving isolated maximum error one, real-reference maximum five, 102 old fixed-two exceedances and zero measured propagation-bound violations. Final source 18d9189 changes only documentation after the latest tested RTL. Full final native runs and paired reconstruction are next, using /home/vash/mister-builds/entry673. No Quartus build or MiSTer write has occurred. A read-only FTP attempt to 10.10.0.30 returns no route to host; the user has been asked to power it on for eventual installation.
+
+#### Next Steps:
+
+Pull the final source into both build-PC checkouts, run ideal_v2 and contended_v2 with the strict full-trace gate and repeat paired reconstruction without changing its source during execution. Require all 289 pictures once in order, correct complete descriptors and timestamps, zero authored-cadence mismatches and preserved pixel bounds. Only after every gate passes perform the single clean seed-18 Quartus build and timing/resource/warning audit, then preserve existing cores and install by verified FTP readback if the MiSTer is reachable. Pause on build failure without seed retries, and leave loading and original-audio playback to the user.
+
+#### Files Modified:
+
+- docs/testing_original_dvd_opening.md
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 673 COMMIT Unreleased 30f3c6d 2026-08-28T04:19:48-07:00
 
 #### Coming From:
@@ -1225,35 +1254,6 @@ Documentation cleanup and publication recording are complete. Confirm with the u
 - docs/MPEG2_NEW_DECODER.md
 - host/arm/ARCHITECTURE.md
 - tools/streams/generate_test_suite.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 634 VERSION v0.8.0 af43de2 2026-08-27T18:29:23-07:00
-
-#### Coming From:
-
-Unreleased 035807a
-
-#### Purpose:
-
-Record the published v0.8.0 pre-release and verify its public package against the qualified artifacts.
-
-#### Outcome:
-
-GitHub reports MiSTer Media Player v0.8.0 published at 2026-08-27T17:41:16-07:00 as a non-draft pre-release. Its annotated tag resolves to af43de2, not the 035807a documentation commit requested by entry 633; the intervening source difference is only the release-notes file and project log, with no runtime change. The public ZIP downloads successfully, passes its CRC checks and has SHA256 5f55b49eb863f74a777b548b4f42b744a9130b4161f176b687ca297deeffcaf3, matching entry 632. Its compressed size is 2,867,028 bytes; entry 632's 5,948,567-byte figure is the total uncompressed member size, not the archive size. All eight payload and documentation hashes match entry 632, and the internal SHA256SUMS file matches its retained copy exactly. The RBF, Main and helper therefore match the qualified source baseline 2f1d32c. Publication is verified separately from hardware acceptance: the existing hand tests used these runtime hashes, but a confirmation run following installation from the final package remains unrecorded. No new build, device capture, deployment or playback is performed. Built refers to the previously reproduced runtime artifacts and Passed remains unchecked for that outstanding confirmation. Evidence is retained in .ai/current_results/entry634_release_audit.json; the published tag and assets are preserved.
-
-#### Next Steps:
-
-Complete the user-requested documentation cleanup, describing the actual published tag and source baseline without moving the tag or replacing assets, and record corrections in new log entries rather than rewriting settled history. Update current guides that still describe v0.7.0 or completed features as future work, distinguish the entry 628 hardware pixel comparison from comprehensive pixel qualification, and preserve unsupported-feature and timing limitations. Confirm the final package-install hardware run with the user before claiming that gate passed. Leave the next development milestone unapproved and maintain restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
