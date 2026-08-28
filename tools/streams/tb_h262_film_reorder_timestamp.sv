@@ -14,7 +14,7 @@ wire scratch,scratch_bank,decode_bank,candidate_valid,candidate_scratch,candidat
 wire [32:0] display_pts,candidate_pts,stc;
 wire display_pts_valid,display_tff,display_rff,display_progressive,descriptor_valid;
 wire candidate_pts_valid,candidate_tff,anchored,pts_active,pts_due,hold,done,error;
-integer field_number=0,session,clock_tick;
+integer field_number=0,session,clock_tick,overlap_class,header_lead;
 always #5 clk=~clk;
 mpeg2_h262_picture_timestamp metadata_owner(
  .clk(clk),.reset(reset),.metadata_valid(metadata),.metadata_pts(pts),
@@ -91,6 +91,53 @@ task field_end(input bit expected_scratch,input bit expected_sb,input [1:0] expe
  end
 endtask
 initial begin
+ if($test$plusargs("ORDINARY_B_OVERLAP"))begin
+  ordinary_overlap=1;
+  for(overlap_class=0;overlap_class<2;overlap_class=overlap_class+1)
+   for(header_lead=-1;header_lead<=2;header_lead=header_lead+1)begin
+    @(negedge clk);reset=1;active=0;completed=0;reference=0;promoted=0;
+    start=0;success=0;seqend=0;metadata=0;pce=0;waiting=0;field=0;field_number=0;
+    repeat(4)@(negedge clk);reset=0;
+    picture(0,1,1,1,90000,1);commit_reference();
+    picture(0,0,0,0,94504,1);commit_reference();
+    picture(0,overlap_class,1,0,102012,1);
+    if(!scheduler.ordinary_reference_decode_open||hold||error)
+     $fatal(1,"ordinary I/P overlap was not admitted class=%0d",overlap_class);
+    @(negedge clk);metadata=1;pts=97507;
+    @(negedge clk);metadata=0;
+    if(header_lead<0)commit_reference();
+    @(negedge clk);start=1;is_b=1;is_i=0;
+    if(header_lead==0)begin
+     completed=active;reference=active;active=0;promoted=promoted+1'b1;waiting=1;
+    end
+    @(negedge clk);start=0;waiting=0;tff=0;rff=1;pce=1;
+    if(header_lead==1)begin
+     completed=active;reference=active;active=0;promoted=promoted+1'b1;waiting=1;
+    end
+    @(negedge clk);pce=0;waiting=0;repeat(4)@(negedge clk);
+    if(!hold||error||!scheduler.deferred_ordinary_b_start||
+       scheduler.pending_frame_bank!=1||
+       (header_lead<2&&(!scheduler.ordinary_secondary_valid||scheduler.ordinary_secondary_bank!=2)))
+     $fatal(1,"B header lost predecessor/secondary class=%0d lead=%0d",overlap_class,header_lead);
+    field_end(0,0,0,1,1);field_end(0,0,0,1,1);field_end(0,0,1,0,0);
+    if(header_lead==2)begin
+     if(!hold||error||!scheduler.deferred_ordinary_b_start)
+      $fatal(1,"deferred B escaped before late reference completion");
+     commit_reference();
+    end
+    if(hold||error||!scheduler.reorder_active||scheduler.future_frame_bank!=2||
+       scheduler.future_reference_pending||scheduler.ordinary_secondary_valid)
+     $fatal(1,"deferred B did not bind actual secondary reference");
+    commit_b();
+    @(negedge clk);seqend=1;@(negedge clk);seqend=0;
+    field_end(0,0,1,0,0);field_end(1,0,1,0,1);
+    if(!display_pts_valid||display_pts!=97507)$fatal(1,"deferred B timestamp");
+    field_end(1,0,1,0,1);field_end(1,0,1,0,1);field_end(0,0,2,1,0);
+    if(!display_pts_valid||display_pts!=102012||!done||hold||error)
+     $fatal(1,"secondary reference timestamp/order/terminal");
+   end
+  $display("ORDINARY_B_OVERLAP_PASS I/P to B before/same/after completion order=I/P/B/reference");$finish;
+ end
  if($test$plusargs("EARLY_P_RELEASE"))begin
   ordinary_overlap=1;
   repeat(4)@(negedge clk);reset=0;
@@ -103,7 +150,8 @@ initial begin
   promoted=promoted+1'b1;waiting=1;
   @(negedge clk);waiting=0;repeat(4)@(negedge clk);
   if(!scheduler.pending_frame_valid||scheduler.pending_frame_bank!=2||
-     !scheduler.pending_frame_released||!hold||error)
+     !scheduler.pending_frame_released||hold||
+     !scheduler.ordinary_reference_decode_open||error)
    $fatal(1,"early P header did not retain release and capacity for retiring I");
   field_end(0,0,1,0,0);field_end(0,0,2,0,1);
   if(hold||error)$fatal(1,"early P payload failed to resume after I presentation");
@@ -162,7 +210,9 @@ initial begin
   if(!scheduler.pending_frame_released)
    $fatal(1,"coincident following P header failed to release predecessor");
   field_end(1,1,0,0,1);field_end(1,1,0,0,1);field_end(0,0,1,1,0);
-  if(!hold)$fatal(1,"following P escaped ordinary pending ownership");
+  if(hold||!scheduler.ordinary_reference_decode_open||
+     !scheduler.pending_frame_valid||scheduler.pending_frame_bank!=2)
+   $fatal(1,"following P did not use free third bank after B retirement");
   field_end(0,0,1,1,0);field_end(0,0,2,1,0);
   if(hold||error)$fatal(1,"following P did not resume after predecessor presentation");
   $display("OVERLAP_REFERENCE_ADMISSION_PASS");$finish;
@@ -186,5 +236,5 @@ initial begin
  end
  $display("FILM_REORDER_TIMESTAMP_PASS I_B_B_P fields=3/2/3/2 missing_PTS terminal replay");$finish;
 end
-initial begin #1000000;$fatal(1,"timeout");end
+initial begin #2000000;$fatal(1,"timeout");end
 endmodule

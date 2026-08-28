@@ -95,12 +95,23 @@ end
 endtask
 
 initial begin
-    // A P picture may never enter the native all-I exception.
+    // A P picture can use the free third bank under the same ownership proof.
     reset_case(); publish_bank1();
     p_start=1; non_b_start=1;
     @(posedge clk); #1; p_start=0; non_b_start=0;
-    if (dut.ordinary_reference_decode_open || !hold || error)
-        $fatal(1,"P header escaped ordinary serialization");
+    if (!dut.ordinary_reference_decode_open || hold || error)
+        $fatal(1,"safe P overlap did not open");
+    completed_bank=2; frame_waiting=1;
+    @(posedge clk); #1; frame_waiting=0; active_bank=0;
+    p_start=1; non_b_start=1;
+    @(posedge clk); #1; p_start=0; non_b_start=0;
+    if(!dut.ordinary_secondary_valid||!dut.ordinary_secondary_released||
+       !dut.ordinary_resume_pending||!hold||error)
+        $fatal(1,"P successor escaped full reference capacity");
+    pulse_swap();
+    if(display_bank!=1||dut.pending_frame_bank!=2||
+       !dut.ordinary_reference_decode_open||dut.ordinary_reference_decode_bank!=0||hold||error)
+        $fatal(1,"P successor did not resume in newly freed bank");
 
     // Changing the decode destination to the displayed bank is fatal.
     reset_case(); publish_bank1(); header_i();
@@ -180,7 +191,7 @@ initial begin
         $fatal(1,"post-promotion sequence end was lost");
     require_terminal_empty();
 
-    $display({"NATIVE_ORDINARY_OWNERSHIP_PASS p_serial=1 display_guard=1 ",
+    $display({"NATIVE_ORDINARY_OWNERSHIP_PASS p_overlap=1 display_guard=1 ",
               "secondary_queue=1 ordered_resume=1 duplicate_guard=1 ",
               "terminal=before/completion/promotion/after"});
     $finish;
@@ -359,11 +370,25 @@ initial begin
  if(display_bank!=0||error)$fatal(1,"coincident completion terminal failed");
  checks=checks+1;
 
- // Timestamp support must not relax picture-class, mode or alias guards.
+ // A P releases the secondary but waits until the primary frees a bank.
  prepare_secondary();p_start=1;cycle();p_start=0;cycle();
- if(!error)$fatal(1,"P transition escaped secondary ownership guard");
+ if(error||!hold||!dut.ordinary_secondary_released||!dut.ordinary_resume_pending)
+  $fatal(1,"P transition lost secondary ownership");
+ accrue();advance_to(93003);pulse_swap();
+ if(error||hold||display_bank!=1||candidate_bank!=2||candidate_pts!=96006||
+    !dut.ordinary_reference_decode_open||dut.ordinary_reference_decode_bank!=0)
+  $fatal(1,"P transition resumed without freed-bank/timestamp ownership");
+ // A B belongs to the secondary future reference, but the primary must
+ // display first. Its early header cannot discard that older picture.
  prepare_secondary();b_start=1;cycle();b_start=0;cycle();
- if(!error)$fatal(1,"B transition escaped secondary ownership guard");
+ if(error||!hold||!dut.deferred_ordinary_b_start||dut.pending_frame_bank!=1)
+  $fatal(1,"B transition discarded ordinary predecessor");
+ accrue();advance_to(93003);pulse_swap();repeat(3)cycle();
+ if(error||hold||display_bank!=1||!dut.reorder_active||
+    dut.future_frame_bank!=2||dut.future_reference_pending||
+    dut.pending_frame_valid||dut.ordinary_secondary_valid)
+  $fatal(1,"B transition did not bind secondary after predecessor presentation");
+ // Mode and alias guards still apply to every reference class.
  prepare_secondary();native_enable=0;cycle();
  if(!error)$fatal(1,"native-mode transition escaped secondary ownership guard");
  prepare_secondary();rate_code=3;cycle();

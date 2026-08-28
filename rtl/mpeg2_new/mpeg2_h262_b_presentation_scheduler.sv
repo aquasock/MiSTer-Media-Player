@@ -25,9 +25,9 @@ module mpeg2_h262_b_presentation_scheduler
     input  wire timestamp_candidate_active,
     input  wire timestamp_candidate_due,
     // Native full-frame presentation has one safe swap boundary every two
-    // fields.  The ordinary-reference overlap below may decode one I picture
+    // fields.  The ordinary-reference overlap below may decode one I/P picture
     // into the already existing third frame region while its predecessor
-    // waits for that boundary.  Other modes and picture types retain the
+    // waits for that boundary. Other modes retain the
     // established serialized ownership path.
     input  wire native_ordinary_overlap_enable,
     input  wire [1:0] active_frame_bank,
@@ -96,6 +96,10 @@ reg [1:0] reference_headers_inflight;
 reg [1:0] active_frame_bank_q;
 reg early_reference_release;
 wire reference_completed = frame_waiting || (active_frame_bank != active_frame_bank_q);
+// A B header following an overlapped reference belongs to the secondary
+// bank. Preserve the older ordinary candidate until it presents, then replay
+// the retained classification into the B scheduler before admitting payload.
+reg deferred_ordinary_b_start;
 
 // Entry 269: while one closed run is being presented, retain the following
 // run in a distinct logical generation.  Both generations still share the
@@ -158,13 +162,19 @@ wire [1:0] native_field_duration=display_repeat_first_field ? 2'd3 : 2'd2;
 reg [25:0] cadence_credit;
 reg [3:0] cadence_rate_code_q;
 
+wire ordinary_b_header_wait=!reorder_active&&pending_frame_valid&&
+    (ordinary_secondary_valid||ordinary_reference_decode_open);
+wire ordinary_b_header_ready=deferred_ordinary_b_start&&
+    !ordinary_secondary_valid&&!ordinary_reference_decode_open&&pending_frame_valid;
+wire admitted_b_picture_start=(b_picture_start&&!ordinary_b_header_wait)||
+    ordinary_b_header_ready;
 wire b_user_success_edge=b_user_success&&!b_user_success_d;
 wire scratch_waiting=next_present_scratch_bank?scratch1_pending:scratch0_pending;
 wire future_waiting=future_frame_pending&&run_closed&&!decode_inflight&&
                     !future_reference_pending&&
                     !scratch0_pending&&!scratch1_pending&&scratch_presented;
 wire scheduled_frame_valid=scratch_waiting||future_waiting||
-    (!reorder_active&&!b_picture_start&&pending_frame_valid&&
+    (!reorder_active&&!admitted_b_picture_start&&pending_frame_valid&&
      pending_frame_released);
 wire scheduled_frame_scratch=scratch_waiting;
 wire scheduled_scratch_bank=next_present_scratch_bank;
@@ -266,10 +276,9 @@ assign debug_state = {
     reorder_active
 };
 // A released ordinary reference normally occupies the scheduler's sole
-// pending slot.  Native 30000/1001 all-I playback has three
-// ordinary frame regions, so one proven I transaction may instead use the
-// third region while cadence consumes its predecessor.  Every other class
-// retains the serialized ownership rule. Candidate timestamp validity changes
+// pending slot. Native 30000/1001 playback has three ordinary frame regions,
+// so one proven I/P transaction may use the third region while cadence
+// consumes its predecessor. Candidate timestamp validity changes
 // when classification releases a frame, so it must not govern queue capacity.
 // Each retained bank keeps its timestamp; presentation_slot still requires
 // both cadence credit and that candidate's due time before a swap.
@@ -279,6 +288,7 @@ wire ordinary_reference_waiting=!reorder_active&&pending_frame_valid&&
 wire ordinary_reference_overlap_safe=
     native_ordinary_overlap_enable&&
     (frame_rate_code==4'h4)&&
+    !reorder_active&&
     !display_scratch&&
     !ordinary_secondary_valid&&
     !ordinary_resume_pending&&
@@ -296,11 +306,12 @@ wire ordinary_secondary_mode_safe=
 wire ordinary_secondary_release_now=
     ordinary_secondary_valid&&!ordinary_secondary_released&&
     (sequence_end||ordinary_terminal_drain_pending||
-     (i_picture_start&&ordinary_secondary_mode_safe));
+     ((i_picture_start||p_picture_start)&&ordinary_secondary_mode_safe));
 wire ordinary_secondary_resume_now=
     ordinary_secondary_valid&&!ordinary_secondary_released&&
-    i_picture_start&&ordinary_secondary_mode_safe;
-assign presentation_hold=(ordinary_reference_waiting&&
+    (i_picture_start||p_picture_start)&&ordinary_secondary_mode_safe;
+assign presentation_hold=deferred_ordinary_b_start||
+                         (ordinary_reference_waiting&&
                           !ordinary_reference_decode_open&&
                           !(ordinary_secondary_valid&&
                             !ordinary_secondary_released))||
@@ -328,6 +339,7 @@ always @(posedge clk) begin
         reference_headers_inflight<=0;
         active_frame_bank_q<=0;
         early_reference_release<=0;
+        deferred_ordinary_b_start<=0;
         queued_run_active<=0;queued_run_closed<=0;
         queued_decode_inflight<=0;
         queued_scratch0_pending<=0;queued_scratch1_pending<=0;
@@ -351,6 +363,10 @@ always @(posedge clk) begin
         native_fields_elapsed<=0;
     end else begin
         b_user_success_d<=b_user_success;
+        if(b_picture_start&&ordinary_b_header_wait)
+            deferred_ordinary_b_start<=1;
+        else if(ordinary_b_header_ready)
+            deferred_ordinary_b_start<=0;
         active_frame_bank_q<=active_frame_bank;
         case ({non_b_picture_start,reference_completed})
             2'b10: if(reference_headers_inflight!=2)
@@ -406,7 +422,7 @@ always @(posedge clk) begin
         if(sequence_end&&!pending_frame_valid)
             terminal_boundary_pending<=1;
 
-        if(frame_waiting&&!reorder_active&&!b_picture_start&&
+        if(frame_waiting&&!reorder_active&&!admitted_b_picture_start&&
            !b_user_success_edge&&
            !(ordinary_reference_decode_open&&pending_frame_valid&&
              !ordinary_reference_present_now))begin
@@ -462,17 +478,19 @@ always @(posedge clk) begin
                 !ordinary_reference_decode_open&&!frame_waiting)
             ordinary_terminal_drain_pending<=0;
 
-        // A native all-I stream may use the third ordinary frame region while
+        // A native I/P stream may use the third ordinary frame region while
         // the preceding completed reference waits for its full-frame boundary.
         // The header which releases that predecessor also fixes the new decode
-        // class, so no P/B path is admitted through this exception.
-        if(i_picture_start&&ordinary_reference_overlap_safe&&
+        // class. A header accepted before completion or behind a draining B
+        // run may use the same proof once its predecessor occupies this slot.
+        if((i_picture_start||p_picture_start||
+            (!reorder_active&&(reference_headers_inflight!=0)))&&ordinary_reference_overlap_safe&&
            !ordinary_reference_decode_open)begin
             ordinary_reference_decode_open<=1;
             ordinary_reference_decode_bank<=active_frame_bank;
         end
 
-        // When all three ordinary banks are owned, admit exactly the next I
+        // When all three ordinary banks are owned, admit exactly the next I/P
         // classification boundary but hold its payload.  That header releases
         // the completed secondary frame; decode resumes only after the primary
         // pending frame presents and frees its old display bank.
@@ -537,7 +555,7 @@ always @(posedge clk) begin
             overlap_decode_open<=0;
         end
 
-        if(deferred_queued_b_start&&!b_picture_start&&
+        if(deferred_queued_b_start&&!admitted_b_picture_start&&
            (pending_frame_valid||frame_waiting)&&
            queued_scratch_available)begin
             queued_run_active<=1;queued_run_closed<=0;
@@ -563,7 +581,7 @@ always @(posedge clk) begin
             deferred_queued_b_start<=0;
         end
 
-        if(b_picture_start)begin
+        if(admitted_b_picture_start)begin
             if(!reorder_active)begin
                 reorder_active<=1;run_closed<=0;decode_inflight<=1;
                 decode_scratch_bank<=0;scratch0_pending<=0;scratch1_pending<=0;
@@ -926,7 +944,7 @@ always @(posedge clk) begin
             end
         end
 
-        if(reorder_active&&b_decode_error)begin
+        if((reorder_active||deferred_ordinary_b_start)&&b_decode_error)begin
             reorder_active<=0;run_closed<=0;decode_inflight<=0;
             scratch0_pending<=0;scratch1_pending<=0;future_frame_pending<=0;
             future_reference_pending<=0;
@@ -942,12 +960,10 @@ always @(posedge clk) begin
             presentation_error<=1;
         end
 
-        // The secondary ordinary slot is deliberately unavailable to every
-        // other picture class and native timing mode. Any such transition is an
-        // ownership violation rather than an invitation to reuse a bank.
+        // The secondary ordinary slot still requires the native timing and
+        // ordinary display ownership used to admit its transaction.
         if((ordinary_secondary_valid||ordinary_resume_pending)&&
-           (b_picture_start||p_picture_start||
-            !native_ordinary_overlap_enable||(frame_rate_code!=4'h4)||
+           (!native_ordinary_overlap_enable||(frame_rate_code!=4'h4)||
             display_scratch))
             presentation_error<=1;
         if(ordinary_secondary_valid&&frame_waiting&&
@@ -955,6 +971,7 @@ always @(posedge clk) begin
             presentation_error<=1;
 
         if(presentation_error)begin
+            deferred_ordinary_b_start<=0;
             deferred_queued_b_start<=0;
             ordinary_reference_decode_open<=0;
             ordinary_secondary_valid<=0;
