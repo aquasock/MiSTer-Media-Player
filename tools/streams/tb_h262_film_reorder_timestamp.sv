@@ -115,10 +115,17 @@ initial begin
      completed=active;reference=active;active=0;promoted=promoted+1'b1;waiting=1;
     end
     @(negedge clk);pce=0;waiting=0;repeat(4)@(negedge clk);
-    if(!hold||error||!scheduler.deferred_ordinary_b_start||
-       scheduler.pending_frame_bank!=1||
-       (header_lead<2&&(!scheduler.ordinary_secondary_valid||scheduler.ordinary_secondary_bank!=2)))
-     $fatal(1,"B header lost predecessor/secondary class=%0d lead=%0d",overlap_class,header_lead);
+    if(error||scheduler.pending_frame_bank!=1)
+     $fatal(1,"B header lost predecessor class=%0d lead=%0d",overlap_class,header_lead);
+    if(header_lead<2)begin
+     if(hold||!scheduler.ordinary_reference_before_b||
+        !scheduler.reorder_active||scheduler.future_frame_bank!=2||scheduler.ordinary_secondary_valid)
+      $fatal(1,"ready reference did not admit B scratch decode ahead of primary display");
+     commit_b();picture(0,1,1,1,105015,1);
+     if(!hold||!scheduler.overlap_decode_open)
+      $fatal(1,"following I payload escaped still-displayed reference bank");
+    end else if(!hold||!scheduler.deferred_ordinary_b_start)
+     $fatal(1,"B payload escaped unfinished secondary reference");
     field_end(0,0,0,1,1);field_end(0,0,0,1,1);field_end(0,0,1,0,0);
     if(header_lead==2)begin
      if(!hold||error||!scheduler.deferred_ordinary_b_start)
@@ -128,13 +135,17 @@ initial begin
     if(hold||error||!scheduler.reorder_active||scheduler.future_frame_bank!=2||
        scheduler.future_reference_pending||scheduler.ordinary_secondary_valid)
      $fatal(1,"deferred B did not bind actual secondary reference");
-    commit_b();
+    if(header_lead==2)begin commit_b();picture(0,1,1,1,105015,1);end
+    commit_reference();
     @(negedge clk);seqend=1;@(negedge clk);seqend=0;
     field_end(0,0,1,0,0);field_end(1,0,1,0,1);
     if(!display_pts_valid||display_pts!=97507)$fatal(1,"deferred B timestamp");
     field_end(1,0,1,0,1);field_end(1,0,1,0,1);field_end(0,0,2,1,0);
-    if(!display_pts_valid||display_pts!=102012||!done||hold||error)
+    if(!display_pts_valid||display_pts!=102012||!done||error)
      $fatal(1,"secondary reference timestamp/order/terminal");
+    field_end(0,0,2,1,0);field_end(0,0,0,1,1);
+    if(!display_pts_valid||display_pts!=105015||hold||error)
+     $fatal(1,"following I ownership/timestamp/terminal");
    end
   $display("ORDINARY_B_OVERLAP_PASS I/P to B before/same/after completion order=I/P/B/reference");$finish;
  end

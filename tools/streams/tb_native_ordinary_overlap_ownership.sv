@@ -378,10 +378,11 @@ initial begin
  if(error||hold||display_bank!=1||candidate_bank!=2||candidate_pts!=96006||
     !dut.ordinary_reference_decode_open||dut.ordinary_reference_decode_bank!=0)
   $fatal(1,"P transition resumed without freed-bank/timestamp ownership");
- // A B belongs to the secondary future reference, but the primary must
- // display first. Its early header cannot discard that older picture.
+ // A B can decode into scratch using the secondary future reference, but
+ // its early header cannot discard the primary's presentation priority.
  prepare_secondary();b_start=1;cycle();b_start=0;cycle();
- if(error||!hold||!dut.deferred_ordinary_b_start||dut.pending_frame_bank!=1)
+ if(error||hold||!dut.ordinary_reference_before_b||dut.pending_frame_bank!=1||
+    !dut.reorder_active||dut.future_frame_bank!=2||candidate_pts!=93003)
   $fatal(1,"B transition discarded ordinary predecessor");
  accrue();advance_to(93003);pulse_swap();repeat(3)cycle();
  if(error||hold||display_bank!=1||!dut.reorder_active||

@@ -97,9 +97,10 @@ reg [1:0] active_frame_bank_q;
 reg early_reference_release;
 wire reference_completed = frame_waiting || (active_frame_bank != active_frame_bank_q);
 // A B header following an overlapped reference belongs to the secondary
-// bank. Preserve the older ordinary candidate until it presents, then replay
-// the retained classification into the B scheduler before admitting payload.
+// bank. Its payload may use scratch as soon as that reference completes, but
+// the older ordinary candidate must still be presented before the scratch.
 reg deferred_ordinary_b_start;
+reg ordinary_reference_before_b;
 
 // Entry 269: while one closed run is being presented, retain the following
 // run in a distinct logical generation.  Both generations still share the
@@ -165,20 +166,24 @@ reg [3:0] cadence_rate_code_q;
 wire ordinary_b_header_wait=!reorder_active&&pending_frame_valid&&
     (ordinary_secondary_valid||ordinary_reference_decode_open);
 wire ordinary_b_header_ready=deferred_ordinary_b_start&&
-    !ordinary_secondary_valid&&!ordinary_reference_decode_open&&pending_frame_valid;
+    !ordinary_reference_decode_open&&(ordinary_secondary_valid||pending_frame_valid);
 wire admitted_b_picture_start=(b_picture_start&&!ordinary_b_header_wait)||
     ordinary_b_header_ready;
+wire new_b_retains_primary=admitted_b_picture_start&&!reorder_active&&
+    ordinary_secondary_valid&&pending_frame_valid;
+wire ordinary_before_b_waiting=(ordinary_reference_before_b||new_b_retains_primary)&&
+    pending_frame_valid&&pending_frame_released;
 wire b_user_success_edge=b_user_success&&!b_user_success_d;
 wire scratch_waiting=next_present_scratch_bank?scratch1_pending:scratch0_pending;
 wire future_waiting=future_frame_pending&&run_closed&&!decode_inflight&&
                     !future_reference_pending&&
                     !scratch0_pending&&!scratch1_pending&&scratch_presented;
-wire scheduled_frame_valid=scratch_waiting||future_waiting||
+wire scheduled_frame_valid=ordinary_before_b_waiting||scratch_waiting||future_waiting||
     (!reorder_active&&!admitted_b_picture_start&&pending_frame_valid&&
      pending_frame_released);
-wire scheduled_frame_scratch=scratch_waiting;
+wire scheduled_frame_scratch=!ordinary_before_b_waiting&&scratch_waiting;
 wire scheduled_scratch_bank=next_present_scratch_bank;
-wire [1:0] scheduled_frame_bank=future_waiting?future_frame_bank:
+wire [1:0] scheduled_frame_bank=(future_waiting&&!ordinary_before_b_waiting)?future_frame_bank:
                                 pending_frame_bank;
 wire scheduled_frame_differs=scheduled_frame_scratch?
     (!display_scratch||(scheduled_scratch_bank!=display_scratch_bank)):
@@ -311,6 +316,7 @@ wire ordinary_secondary_resume_now=
     ordinary_secondary_valid&&!ordinary_secondary_released&&
     (i_picture_start||p_picture_start)&&ordinary_secondary_mode_safe;
 assign presentation_hold=deferred_ordinary_b_start||
+                         (ordinary_reference_before_b&&run_closed)||
                          (ordinary_reference_waiting&&
                           !ordinary_reference_decode_open&&
                           !(ordinary_secondary_valid&&
@@ -340,6 +346,7 @@ always @(posedge clk) begin
         active_frame_bank_q<=0;
         early_reference_release<=0;
         deferred_ordinary_b_start<=0;
+        ordinary_reference_before_b<=0;
         queued_run_active<=0;queued_run_closed<=0;
         queued_decode_inflight<=0;
         queued_scratch0_pending<=0;queued_scratch1_pending<=0;
@@ -593,7 +600,21 @@ always @(posedge clk) begin
                 overlap_decode_open<=0;overlap_frame_pending<=0;
                 deferred_queued_b_start<=0;
                 decode_generation_queued<=0;
-                if(frame_waiting)begin
+                if(ordinary_secondary_valid)begin
+                    // Decode B into scratch now, while the older ordinary
+                    // picture still owns first presentation priority.
+                    future_frame_bank<=ordinary_secondary_bank;
+                    future_reference_pending<=0;
+                    ordinary_reference_before_b<=1;
+                    pending_frame_valid<=1;
+                    pending_frame_released<=1;
+                    ordinary_secondary_valid<=0;
+                    ordinary_secondary_released<=0;
+                    ordinary_resume_pending<=0;
+                    last_bound_reference_valid<=1;
+                    last_bound_reference_bank<=ordinary_secondary_bank;
+                    last_bound_reference_count<=reference_promotion_count;
+                end else if(frame_waiting)begin
                     future_frame_bank<=completed_frame_bank;
                     future_reference_pending<=0;
                     last_bound_reference_valid<=1;
@@ -815,7 +836,11 @@ always @(posedge clk) begin
             if(scheduled_frame_scratch)display_scratch_bank<=scheduled_scratch_bank;
             else display_frame_bank<=scheduled_frame_bank;
             framebuffer_swap_reset_count<=4;
-            if(scratch_waiting)begin
+            if(ordinary_before_b_waiting)begin
+                pending_frame_valid<=0;
+                pending_frame_released<=0;
+                ordinary_reference_before_b<=0;
+            end else if(scratch_waiting)begin
                 if(next_present_scratch_bank)scratch1_pending<=0;
                 else scratch0_pending<=0;
                 next_present_scratch_bank<=!next_present_scratch_bank;
@@ -972,6 +997,7 @@ always @(posedge clk) begin
 
         if(presentation_error)begin
             deferred_ordinary_b_start<=0;
+            ordinary_reference_before_b<=0;
             deferred_queued_b_start<=0;
             ordinary_reference_decode_open<=0;
             ordinary_secondary_valid<=0;
