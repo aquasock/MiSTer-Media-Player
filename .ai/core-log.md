@@ -1,3 +1,32 @@
+## 639 COMMIT Unreleased 2045c34 2026-08-27T19:36:01-07:00
+
+#### Coming From:
+
+Unreleased 2045c34
+
+#### Purpose:
+
+Capture the beta's progressive playback result and correct the stale bar fixtures mistakenly selected during card preparation.
+
+#### Outcome:
+
+The user reports stationary bars in tests one and two, then leaves test seven displayed and describes behavior as matching standard MiSTer. Helper-first collection and a uniquely named screenshot preserve that run without a reload. Valid schema-19 telemetry shows all 360 progressive pictures displayed, comprising 121 reference and 239 B pictures, with 359 swaps, zero decoder or presentation error, no audio underrun or PCM protocol fault, sequence end and quiet completion. Helper exit is zero and the pipe reads reconcile exactly to the completed transport. Comparison with the recorded standard-MiSTer run uses the same test-seven file and runtime hashes: completion indicators, the existing timestamp-conflict count and gap-outlier count agree, while individual timing measurements differ. The final raster is pixel-identical outside the telemetry rectangle, which is a single-frame comparison rather than full playback pixel qualification or a performance benchmark. The stationary bars are an agent preparation error: entry 636 copied superseded pre-fix files, and entry 638 checked their hashes against the stale manifest instead of verifying corrected content. Both old tests contain 360 identical decoded frames and 360 I-pictures, so the defect is authored content, not a requirement for interlaced P/B support. The already-qualified corrected files from source 140a5b7 are rechecked against entry 624's manifest, including every temporal field position for each bar fixture, and only tests one, two, five and six plus their manifest and explanatory metadata are replaced through verified staging and fresh readback. Tests three, four and seven and all runtime/OS binaries remain unchanged; all twenty-three current manifest checks pass and the captured test-seven helper log remains unchanged. The historical pre-boot manifest is retained and explicitly labeled as predating this correction. No new source, build, reboot, reload or playback is performed by the agent. Raw captures and detailed diagnostics remain in ignored local results; only .ai/current_results/entry639_buildroot_playback_status.json is published. The progressive compatibility result is positive, but overall hardware acceptance stays open pending corrected interlaced and remaining audio tests.
+
+#### Next Steps:
+
+Replay only corrected test_1_interlace_tff.mpg with Bob deinterlacing and HDMI audio, leaving synthetic audio and native timing patterns off, and retain the completed core state for helper-first collection and a fresh terminal screenshot. Confirm moving fields, audible tone, menu response and all three LEDs before widening the matrix. The corrected file requires only the supported interlaced all-I path; interlaced P/B remains unsupported and out of scope. Preserve the beta and original-runtime identities, the separate unresolved filesystem warning, local-only raw reports, restricted core.md and the forty-entry ring. Do not misclassify the stale-fixture observation as a new OS or FPGA regression or claim comprehensive compatibility from one progressive clip.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 638 COMMIT Unreleased 2045c34 2026-08-27T19:26:03-07:00
 
 #### Coming From:
@@ -1164,37 +1193,6 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 599 COMMIT Unreleased f615ce0 2026-08-27T04:53:39-07:00
-
-#### Coming From:
-
-Unreleased feb50c2
-
-#### Purpose:
-
-Remove the normal two-clock writer acknowledgement delay while preserving capture-bank capacity protection.
-
-#### Outcome:
-
-The approved source f615ce0 emits a completion-qualified grant on the capture-completion edge only when the alternate bank is free; a single pending request waits for real capacity when both banks are occupied. It preserves block_stored, all capture/drain data and addresses, reset/error handling and capacity telemetry, and corrects the stale top-level level-versus-pulse comment. The expanded writer contract passes 2,016 complete DDR words and 252 retired blocks across immediate/delayed grants, prolonged and random stalls, all byte lanes and supported frame/scratch encodings, reset and malformed input. It rejects both the old delayed implementation and an unsafe unconditional-grant control. GUNSMOKE pulled the Pi-published exact source before official qualification. Native startup, field order, presentation, cache/fingerprint/generation and telemetry regressions pass, as do supported reconstruction, scheduler, prediction fetch/cache and an authored 720x480 I/P/B shared-writer persistence test. Two auxiliary legacy tests fail identically on the prior source: scratch-tag assertions bind removed internal names, and the B error-sideband test expects an obsolete result; these are retained as existing test-maintenance limitations, not claimed passes. A separate writer-connected FFmpeg oracle verifies 12 TFF/BFF/progressive pictures and all 6,220,800 accepted DDR bytes within the established one-level IDCT tolerance with DDR busy for 600 of every 997 clocks. Its initial inherited ready-memory throughput assertion fails under this deliberate saturation; the temporary observer separates saturation correctness from realtime qualification, while the unmodified reconstruction and separate cadence gates remain enforced. Actual new-writer cadence tests complete 2,694 ordered pictures across both saved 449-picture ceiling phases, a ceiling run with 500 busy clocks per 1,000,003, an 898-picture repeated ceiling run under that pressure, and the qualified 449-picture 8 Mbps fixture. Every post-admission display interval is exactly 2,002,000 clocks, with zero missed windows, all expected DDR words/blocks and no asserted errors. Normal coefficient-end-to-ack latency is 200 clocks instead of 202, saving 16,200 clocks or 0.27 ms per picture; all first-449 cost residuals match isolated decode cost plus measured holds and grant delays, apart from the documented one-clock initial-shell offset. These calibrated-phase simulations exclude physical HPS transport, real DDR/read contention, scaler and startup CDC and are not hardware acceptance or full-disc qualification. The clean seed-16 Quartus build completes with zero errors and 208 warnings, the same normalized warning set as installed a4f2769, and no new ignored timing filters. Worst setup/hold/recovery/removal/minimum-pulse margins are 0.243/0.109/2.944/0.605/0.925 ns, all TNS zero. After fresh backups of the current a4f2769 Main/RBF pair and independent persistent verification under /home/vash/mister-builds/entry599-backup, only MediaPlayer.rbf is deployed using staged transfer and full fresh-connection readbacks; its 4,324,340-byte SHA256 is 44606564ad40e3f9a74657fdd372a44fb6d0f74252e6d1000b2685768ca9cf01. Main remains 3841e2cc6eef4bfc9e46a7ffa075aff76b65d5405f81efb1355373292b35846f. No reboot, core reload, playback or configuration action is performed. Evidence and exact temporary drivers are retained as .ai/current_results/entry599_*, with full builds under /home/vash/mister-builds/entry599. Hardware Passed remains unchecked.
-
-#### Next Steps:
-
-Have the user reload MediaPlayer to activate f615ce0, replay the unchanged bbb_480i_tff_15s_9800kbps.m2v in a known mode, check the menu during and after playback and retain the terminal telemetry screen. Retrieve the helper log before any later playback overwrites it, acquire a fresh screenshot with parity/checksum validation, and require all picture identities, transport integrity, zero errors and zero missed display slots before accepting this candidate. Compare both hardware modes and warm replay afterward while preserving restoration copies. Keep the separate 10.08 Mbps combined audio/video, broader DVD syntax/features and longer physical soak gates open. Leave lifecycle and playback under user control, preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
-- MediaPlayer_top_02.svh
-- tools/streams/tb_h262_ddram_store_overlap.sv
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
 

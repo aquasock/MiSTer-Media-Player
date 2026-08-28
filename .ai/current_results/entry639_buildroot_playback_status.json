@@ -1,0 +1,50 @@
+{
+  "source_commit": "2045c34",
+  "scope": "Public result summary only; raw captures and detailed diagnostics remain in ignored local results.",
+  "user_report": "Tests 1 and 2 showed a stationary bar; test 7 was left displayed; behavior was reported as matching standard MiSTer.",
+  "test7": {
+    "telemetry_valid": true,
+    "reference_pictures": 121,
+    "b_pictures": 239,
+    "displayed_pictures": 360,
+    "swaps": 359,
+    "decoder_error_flags": 0,
+    "presentation_error": false,
+    "audio_underrun": false,
+    "pcm_protocol_error": false,
+    "sequence_end_and_quiet": true,
+    "helper_exit": 0,
+    "transport_bytes_reconciled": 14439298,
+    "completion_and_error_indicators_match_standard": true,
+    "known_timestamp_and_gap_indicators_match_standard": true,
+    "individual_timings_identical": false,
+    "final_frame_pixels_identical_outside_telemetry": true,
+    "pixel_comparison_scope": "Final frame only, full 800x600 raster excluding telemetry rectangle x<180,y>=344; no resampling or alignment",
+    "performance_or_full_video_quality_qualification": false
+  },
+  "fixture_error": {
+    "cause": "Agent selected superseded pre-fix bar fixtures during card preparation. Checks against the stale manifest verified bytes, not corrected content.",
+    "old_tests_1_and_2_decoded_frames_each": 360,
+    "old_tests_1_and_2_distinct_decoded_frames_each": 1,
+    "old_and_corrected_tests_1_and_2_picture_types": "360 I-pictures each; no interlaced P/B requirement.",
+    "corrected_source": "140a5b7",
+    "corrected_fixture_numbers": [
+      1,
+      2,
+      5,
+      6
+    ],
+    "independently_checked_temporal_fields_per_corrected_bar_fixture": 720,
+    "fixture_numbers_unchanged": [
+      3,
+      4,
+      7
+    ],
+    "installed_and_readback_verified": true,
+    "current_runtime_manifest_checks": 23,
+    "runtime_and_os_unchanged": true,
+    "reboot_reload_or_playback_started_by_agent": false
+  },
+  "overall_beta_compatibility_accepted": false,
+  "next_gate": "Replay corrected test 1 in Bob/HDMI mode and capture before starting another file."
+}
