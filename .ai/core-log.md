@@ -1,3 +1,33 @@
+## 648 COMMIT Unreleased ??? 2026-08-27T21:08:11-07:00
+
+#### Coming From:
+
+Unreleased 2045c34
+
+#### Purpose:
+
+Recover M10K blocks by widening the P and B residual coefficient memories to the Cyclone V native twenty-bit mode.
+
+#### Outcome:
+
+This entry is written as a plan and its commit does not exist yet. Investigation of the Aug 26 fitter report establishes that block-memory efficiency in this design is governed by data width rather than by capacity. A Cyclone V M10K holds 10,240 bits but reaches that only in the five, ten and twenty bit modes that use the parity bits; narrower widths cap at 8,192. Measured across every inferred memory in our own build, widths of twenty and forty achieve 10,240 bits per block while widths of one, sixteen, nineteen and thirty-five achieve exactly 8,192, and the existing twenty-bit `residual_block_mem` is the one memory already at full efficiency. Two memories dominate: `residual_coeff_mem` in the P path and its counterpart in the B path, each declared nineteen bits deep by 32,768 entries and each costing 76 blocks against a theoretical 64. Padding both to twenty bits is expected to recover roughly twelve blocks each, about twenty-four in total, against the 41 free blocks recorded in entry 609. The change is a pure width change with no functional effect: both paths store a six-bit coefficient index in bits eighteen down to thirteen and a signed thirteen-bit level in bits twelve down to zero, every consumer slices those fields explicitly, and the nineteen-bit write expressions zero-extend into the wider word. Four declarations change, being each memory and its read register, and no consumer is touched. Two candidates found during the same investigation are deliberately excluded. The audio `pcm_fifo` would yield only three blocks and would require padding and slicing a `dcfifo` on an audio path already qualified and shipped in v0.8.0, which is a poor trade against re-qualification. Folding the P path's separate one-bit `residual_coeff_last_mem` into the new bit nineteen would eliminate a further four-block memory, but that flag is written retroactively at address `count` minus one, decoupled from the coefficient write, so it needs a read-modify-write or a second port and is design work rather than padding. Both remain available later. Nothing is built or changed yet, so both status boxes are unchecked, and the recovery figure is a prediction from the report rather than a measured fit result.
+
+#### Next Steps:
+
+Make the four declaration changes, commit them as the source commit for this cycle, and replace this entry's placeholder hash. Then build on the build PC and compare the fitter report against the shipped v0.8.0 figures of 31,464 ALMs, 512 of 553 M10K and positive 0.243 nanoseconds setup, confirming that M10K falls by approximately twenty-four blocks, that the two memories now report 10,240 bits per block, and that no timing category regresses. Treat an unchanged block count as the inference not selecting twenty-bit mode rather than as a disproven finding, and inspect the implementation width before making any further change. Because HDMI setup has roughly two percent headroom and responds to placement, a negative setup result should be met with a reseed rather than a restructure, consistent with the position recorded in the entry 370 cycle. Hardware validation needs a decode regression proving the residual path is unaffected, since a mis-sliced coefficient would corrupt picture content rather than raise an error flag. Keep the recovered blocks unallocated until interlaced sub-gate scoping decides what they fund; the entry 608 buffer deepening at roughly twenty-six blocks and the remaining interlaced gates of entry 609 are both candidates and neither is approved. Preserve restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 647 COMMIT Unreleased 2045c34 2026-08-27T20:26:43-07:00
 
 #### Coming From:
@@ -1150,35 +1180,6 @@ The user rejected the entry 608 proposal to raise `mpeg2_stream_fifo` from 16,38
 #### Next Steps:
 
 Treat `d466bed` as the current accepted baseline with the picture 690 limitation documented, and do not reopen it as a defect without new evidence such as a source that misses more than one slot or a run whose miss count exceeds the model's prediction. Carry the limitation into release notes when a version boundary is next prepared, since it is user-visible behavior on high-peak sources. The remaining qualification gates are unchanged and each needs scope and acceptance criteria agreed before work starts: Bob and Weave coverage beyond this single fixture, AC-3 audio, interlaced P and B pictures and field DCT, navigation, and ISO or disk-sourced playback. Await the user's direction on which gate to open next rather than selecting one unilaterally. Preserve restricted core.md and maintain the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 608 COMMIT Unreleased d466bed 2026-08-27T06:39:56-07:00
-
-#### Coming From:
-
-Unreleased d466bed
-
-#### Purpose:
-
-Measure the pipeline's compressed read-ahead and test whether it explains the single missed slot.
-
-#### Outcome:
-
-The read-ahead is fixed by two declarations and needed no simulation to measure. The dual-clock `mpeg2_stream_fifo` holds 16,384 sixteen-bit words, exactly 32,768 bytes, and the `mpeg2_h262_clean_video_queue` holds a 65,536-byte eight-bit `scfifo`, giving 98,304 bytes of compressed storage ahead of the decoder, or 2.4551 frame periods at the declared 40,040 bytes per frame period. That falsifies the entry 607 hypothesis, which predicted a depth between 3.118 and 3.754 frame periods; the real depth is below both, so trough depth and read-ahead alone cannot discriminate picture 690 from the twenty-five comparably thin points the hardware absorbed. Following the pre-registered branch, helper delivery timing was examined next. An initial attempt to locate the failure by program-stream file offset was wrong and is recorded here as a correction: the helper demuxes on the HPS and its submitted counter aggregates video, PCM and metadata, so it cannot be indexed by file offsets, and the first mapping pointed at 20.2 seconds instead of the true 23.09-second event. Repeating the measurement in wall time shows delivery is steady and rules out a transport stall. Both runs move 839,409,548 transport bytes at 1,407,367 and 1,407,386 bytes per second, with median inter-read gaps of 11.463 and 11.468 milliseconds, ninety-ninth percentile gaps of 20.986 and 20.966, and maxima of 41.289 and 41.309 milliseconds occurring at 404.57 seconds in both runs rather than near the failure. No gap in either run approaches the 81.92 milliseconds needed to drain the buffer at the declared rate, and the largest gap in the whole 22-to-24-second window is 23.511 milliseconds in Weave and 20.889 in Bob, ordinary against their own percentiles. Delivery is therefore consumption-paced and rate-matched, which is the missing term. Because the transport never runs a large lead, a picture bigger than the buffer must stream in while it is being decoded, and the slot is missed when that streaming time exceeds one frame period, giving a threshold of 138,344 bytes. Applied to all 17,876 pictures, exactly one picture in the film exceeds it: picture 690 at 150,316 bytes, predicting 9.977 milliseconds of starvation against 11.295 measured in Weave and 11.660 in Bob, and predicting exactly one missed slot per run, which is what both runs recorded. The model also explains the non-events, since picture 7602 at 136,350 bytes and picture 13253 at 124,846 bytes fall below the threshold despite 13253 sitting at a deeper VBV trough. This fit should be treated as strong but not settled, because the margin between the one predicted miss and the runner-up is only 1,994 bytes, about 1.4 percent, so a modest error in the assumed consumption rate or in the one-frame-period decode assumption would change the prediction to two misses or none. The relevant headroom for any fix is memory rather than logic: the accepted build uses 512 of 553 M10K blocks at 93 percent, with block memory bits at 71 percent and ALMs at 75 percent, so only 41 M10K blocks remain. This entry performs no build and no hardware run, and its Built and Passed marks refer to the unchanged, already-accepted `d466bed`. Evidence and the exact drivers are retained as `.ai/current_results/entry608_*`.
-
-#### Next Steps:
-
-Obtain user approval before any RTL change, since the defect is one repeated frame in a ten-minute film and the only credible fix consumes most of the remaining memory headroom. The proposal to approve or reject is to raise `mpeg2_stream_fifo` from 16,384 to 32,768 sixteen-bit words, taking the stream FIFO from 32,768 to 65,536 bytes and total read-ahead to 131,072 bytes, or 3.2741 frame periods, which lifts the miss threshold to 171,112 bytes and clears the film's largest picture by 20,796 bytes. The estimated cost is roughly 26 additional M10K blocks against 41 free, taking utilization from 93 percent toward 98 percent, so fit and timing closure are the real risks and a clean build with a warning comparison against `d466bed` must gate acceptance. Growing the clean video queue instead is worse, because doubling it needs about 103 blocks and does not fit, and a non-power-of-two depth is riskier than the dual-clock alternative. Before building, extend the existing overlap and queue tests to cover the deeper FIFO and add a bounded simulation driven by the actual picture 690 bytes at consumption pace, requiring the missed slot to disappear at the new depth and to persist at the old one. If fit or timing fails, the fallback is to accept the single repeated frame and record it as a known limitation rather than to trade away presentation or prediction memory. Keep AC-3, interlaced P/B, navigation and disk-source work as separately scoped gates, preserve restricted core.md and maintain the forty-entry ring.
 
 #### Files Modified:
 
