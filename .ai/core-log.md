@@ -1,3 +1,34 @@
+## 675 COMMIT Unreleased ??? 2026-08-28T04:58:36-07:00
+
+#### Coming From:
+
+Unreleased 18d9189
+
+#### Purpose:
+
+Complete the approved third-bank reference ownership work across a closed B-run drain.
+
+#### Outcome:
+
+The 18d9189 full-opening comparisons remain unchanged while running. Both retain every observed picture and descriptor, and ideal memory has no cadence mismatch so far, but contended memory exposes coded B115-to-B116 taking four fields instead of two. B116 completes 4,845 decoder clocks after its required selection boundary, while the ideal case completes 18,194 clocks before it. Neither B transaction has presentation hold; the preceding P112 was held for 2,699,879 clocks while a completed B run still presented its scratch and future frames. Refine the already approved I/P/B overlap ownership without adding physical banks: once all old B prediction work is complete, allow the next ordinary reference into a bank distinct from the retained future, primary pending and actual displayed ordinary frame, while retaining its completion in the existing secondary slot. Preserve display protection until scratch presentation releases the old bank, block any further reference payload at full capacity, and retain a following B classification until the old future retires. New I/P/B/end transition checks must cover the retained three-bank identities and ordered resume. No arithmetic, clock, constraint, seed, Main, helper or device change is planned, and no FPGA build has started.
+
+#### Next Steps:
+
+Publish and exercise the drain refinement with focused timestamp, scheduler, native and mixed controls. Let the fixed-source 18d9189 runs finish as comparison evidence and preserve their numerical fingerprints before pulling the build-PC checkout. Require replacement complete ideal and contended native traces to satisfy the unchanged strict cadence gate and repeat paired numerical qualification on the final source before the single clean seed-18 FPGA build. If those gates or the build do not pass, do not install or retry seeds; retain the evidence and reevaluate any further change against the approved boundary.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
+- tools/streams/tb_h262_film_reorder_timestamp.sv
+- tools/streams/run_film_presentation.sh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 674 COMMIT Unreleased 18d9189 2026-08-28T04:44:23-07:00
 
 #### Coming From:
@@ -1225,39 +1256,3 @@ The user powers down the QMTech, inserts the prepared card and boots it, then ru
 
 ---
 
-## 635 COMMIT Unreleased 036252a 2026-08-27T18:37:08-07:00
-
-#### Coming From:
-
-v0.8.0 af43de2
-
-#### Purpose:
-
-Reconcile the current documentation and published release text with the verified v0.8.0 state.
-
-#### Outcome:
-
-Published documentation commit 036252a reconciles the README, changelog, current build and architecture guides, v0.8.0 release notes and hardware instructions with the actual release. It replaces stale v0.7.0 qualification figures, labels older design and regression procedures as historical, corrects the tag and ZIP-size descriptions, and records the current seven-test and profile-version-two collection workflow. Historical versioned notes, old regression checksums and retained settled log entries remain unchanged. The suite generator changes only its module documentation, comments and descriptive accepted_video manifest label so progressive test seven is no longer described as all-I; an AST comparison confirms that media-generation logic is unchanged. Main is correctly described as passing the core's audio mode to the helper, rather than creating the core menu option. The unsupported-private-audio claim is removed for the supported AC-3/DTS paths, and synthetic AC-3 comparison figures are distinguished from the commercial-track results. The documentation now acknowledges entry 628's measured hardware-screenshot pixel comparison while leaving comprehensive playback pixel qualification and the chroma root cause open. It also narrows entry 634's shorthand about tested runtime hashes: tests one through six were initially captured with older Main, while the final Main was tested separately on test one and subsequent progressive runs; RBF/helper hashes match throughout. Twenty local links and anchors and eighteen shell blocks pass structural or syntax checks, Python syntax and the actual manifest expression pass, and documented runtime/ZIP hashes and sizes match the public-package audit. GitHub release text is updated from the committed notes with its Full Changelog destination retained, and a fresh readback matches exactly after newline normalization. Title, publication time, tag, pre-release flags and asset metadata are unchanged, and remote tag object and target remain the original values. The forty-entry core-syntax audit passes with no unresolved proposal. No new media, runtime binaries, build, device capture, deployment or playback is produced. Built refers to the existing reproduced binaries and successful Python syntax check, not a new Quartus run; hardware Passed remains unchecked. Bounded verification evidence is retained as .ai/current_results/entry635_documentation_audit.json.
-
-#### Next Steps:
-
-Documentation cleanup and publication recording are complete. Confirm with the user whether the final package-install hardware run occurred before recording that gate as passed; do not infer a run from identical binary hashes. The next development milestone remains unapproved and should be scoped separately, with the broader interlaced decoding gaps, memory headroom and scaler timing risk visible. Leave the published v0.8.0 tag and ZIP intact, keep the current Unreleased changelog section for subsequent work, preserve restricted core.md and the forty-entry ring, and retain user control of deployment and hardware lifecycle.
-
-#### Files Modified:
-
-- README.md
-- CHANGELOG.md
-- docs/RELEASE_NOTES_v0.8.0.md
-- docs/ARCHITECTURE.md
-- docs/BUILDING.md
-- docs/TEST_INSTRUCTIONS.md
-- docs/MPEG2_NEW_DECODER.md
-- host/arm/ARCHITECTURE.md
-- tools/streams/generate_test_suite.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
