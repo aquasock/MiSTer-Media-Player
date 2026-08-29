@@ -145,7 +145,11 @@
                         (pce_next[31:28]>=4'd1)&&(pce_next[31:28]<=4'd6)&&
                         (pce_next[27:24]>=4'd1)&&(pce_next[27:24]<=4'd6)&&
                         (pce_next[23:20]>=4'd1)&&(pce_next[23:20]<=4'd6)&&
-                        (pce_next[17:16]==2'b11)&&pce_next[14]&&!pce_next[13];
+                        (pce_next[17:16]==2'b11)&&
+`ifndef H262_TEST_FIELD_MOTION
+                        pce_next[14]&&
+`endif
+                        !pce_next[13];
                 end else pce_count<=pce_count+1'b1;
             end else if(current_picture_is_b&&start_code_now&&(start_code_value==EXTENSION_START_CODE))begin pce_capture<=1;pce_count<=0;pce_shift<=0;end
 

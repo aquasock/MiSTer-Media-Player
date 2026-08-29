@@ -136,14 +136,20 @@ reg block_fetch_start;
 reg block_fetch_start_bank,block_fetch_start_prefetch;
 reg block_consumer_bank,block_prefetch_valid,block_current_prefetched;
 reg block_current_started;
+// Entry 701: field-bidirectional blocks use the otherwise idle alternate
+// fetcher for their backward pair.  The two fetches share the DDR port, so the
+// backward pair starts only after the forward pair completes.
+reg field_second_fetch_pending,field_second_fetch_launch;
+reg field_second_fetch_started;
+reg field_fetch_backward;
 reg [2:0] block_phase0_base_byte,block_phase1_base_byte;
 // Entry 695: a field macroblock fetches four rectangles, each with its own
 // horizontal vector and therefore its own byte origin.
 reg [2:0] block_phase2_base_byte,block_phase3_base_byte;
 wire fast_pixel_advance,slow_pixel_advance,precompute_after_advance;
 wire block_lookup_request;
-// Entry 695: two bits, so a bidirectional field macroblock can name one of
-// four rectangles: direction in the high bit, destination parity in the low.
+// Two bits remain at the fetcher boundary for the frame-mode direction phase;
+// field mode uses only the low parity bit in each of two physical fetchers.
 wire [1:0] block_lookup_phase;
 wire [3:0] block_lookup_row;
 wire block_lookup_column;

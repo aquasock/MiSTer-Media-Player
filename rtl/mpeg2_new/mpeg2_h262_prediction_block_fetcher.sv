@@ -6,7 +6,7 @@
 // block may use two such phases.  This module assigns eighteen direct slots to
 // each phase, generates every rectangle address once, keeps a bounded number
 // of ordered reads in flight, and associates each ordered response with its
-// destination slot.  Production defaults to four; simulation may override the
+// destination slot.  Production defaults to four outstanding reads; simulation may override the
 // shared macro to measure a deeper end-to-end command path before committing
 // more hardware capacity.
 // Pixel engines consume the retained words by phase/row/column, avoiding an
@@ -16,10 +16,9 @@
 `define H262_PREDICTION_DESCRIPTOR_DEPTH 4
 `endif
 
-// Entry 695: bidirectional field prediction needs four source rectangles for
-// one block -- a forward and a backward field per destination field -- where
-// frame prediction needs at most two.  PHASES stays at two for every existing
-// instance, so only the B engine pays for the wider store.
+// Entry 701: every instance retains at most two rectangles.  Bidirectional
+// field prediction distributes its forward and backward parity pairs across
+// the B engine's two existing instances instead of widening both stores.
 module mpeg2_h262_prediction_block_fetcher #(
     parameter integer PHASES=2
 )

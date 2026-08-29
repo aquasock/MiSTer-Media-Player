@@ -36,6 +36,9 @@
             residual_load<=0;residual_load_wait<=0;persisted_seen<=0;
             block_prefetch_valid<=0;block_current_prefetched<=0;
             block_current_started<=0;
+            field_second_fetch_pending<=0;field_second_fetch_launch<=0;
+            field_second_fetch_started<=0;
+            field_fetch_backward<=0;
             if(!reference_valid||!geometry_ok||(motion_count==0)||
                (past_reference_bank==future_reference_bank)||
                (past_reference_bank==2'd3)||(future_reference_bank==2'd3))begin error<=1;if(!error)error_source<=5'd8;active<=0;persisted_seen<=1;timeout<=0;motion_load<=0;end
@@ -81,7 +84,8 @@
         if(residual_load_wait)begin
             residual_load_wait<=0;pred_sum<=0;tap_index<=0;pixel_setup<=1;
             phase_base_addr<=computed_phase_base_addr;
-            phase_base_byte<=exec_field?field_first_base_byte
+            phase_base_byte<=exec_field?
+                (field_pair0_base_x[2:0]+ei[2:0])
                                        :src_base_x[2:0];
             phase_row_words<=(blk<4)?7'd90:7'd45;
             phase_bounds_ok<=source_bounds_ok;
@@ -93,15 +97,56 @@
                     block_fetch_start_bank<=block_consumer_bank;
                     block_fetch_start_prefetch<=0;
                     block_current_started<=1;
+                    field_fetch_backward<=0;
+                    field_second_fetch_launch<=0;
+                    field_second_fetch_started<=0;
+                    field_second_fetch_pending<=
+                        exec_field&&(exec_direction==2'd3);
                 end
-                block_phase0_base_byte<=exec_field?field_phase0_base_x[2:0]
+                block_phase0_base_byte<=exec_field?field_pair0_base_x[2:0]
                                                   :block_phase0_src_x[2:0];
-                block_phase1_base_byte<=exec_field?field_phase1_base_x[2:0]
+                block_phase1_base_byte<=exec_field?field_pair1_base_x[2:0]
                                                   :block_backward_src_x[2:0];
-                block_phase2_base_byte<=field_phase2_base_x[2:0];
-                block_phase3_base_byte<=field_phase3_base_x[2:0];
             end
         end
+
+        // A field-bidirectional block owns both existing fetchers.  Start the
+        // backward parity pair only after the forward pair has released the
+        // single DDR request port.
+        if(!residual_load_wait&&!block_fetch_start&&
+           field_second_fetch_pending&&block_fetch_complete)begin
+            field_fetch_backward<=1;
+            field_second_fetch_pending<=0;
+            field_second_fetch_launch<=1;
+        end
+
+        // The direction register above selects the backward pair before any
+        // of its address, span or bounds arithmetic is evaluated.
+        if(!block_fetch_start&&field_second_fetch_launch)begin
+            field_second_fetch_launch<=0;
+            if(field_pair_bounds_ok)begin
+                block_fetch_start<=1;
+                block_fetch_start_bank<=~block_consumer_bank;
+                block_fetch_start_prefetch<=0;
+                field_second_fetch_started<=1;
+                block_phase2_base_byte<=field_pair0_base_x[2:0];
+                block_phase3_base_byte<=field_pair1_base_x[2:0];
+            end else begin
+                error<=1;
+                if(!error)error_source<=5'd11;
+                active<=0;
+                persisted_seen<=1;
+                timeout<=0;
+            end
+        end
+
+        // If the forward pixel completed before the alternate pair was
+        // launched, refresh its byte origin after the launch captured the
+        // serialized backward bases.  Lookup validity is suppressed throughout
+        // this start cycle, so no stale origin can be consumed.
+        if(block_fetch_start&&field_fetch_backward&&pred_direction)
+            phase_base_byte<=
+                (ei[3]?block_phase3_base_byte:block_phase2_base_byte)+ei[2:0];
 
         // Once the current footprint is complete, the shared request port is
         // idle and the released alternate bank may produce exactly one
@@ -272,6 +317,10 @@
                     block_prefetch_valid<=0;
                     block_current_prefetched<=0;
                     block_current_started<=0;
+                    field_second_fetch_pending<=0;
+                    field_second_fetch_launch<=0;
+                    field_second_fetch_started<=0;
+                    field_fetch_backward<=0;
                 end
             end else begin
                 if(block_prefetch_valid)begin
@@ -285,6 +334,10 @@
                     block_current_prefetched<=0;
                     block_current_started<=0;
                 end
+                field_second_fetch_pending<=0;
+                field_second_fetch_launch<=0;
+                field_second_fetch_started<=0;
+                field_fetch_backward<=0;
                 blk<=blk+1'b1;ei<=0;pred_direction<=0;residual_load<=1;
             end
         end
