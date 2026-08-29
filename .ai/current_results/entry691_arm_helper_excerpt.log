@@ -1,0 +1,74 @@
+# entry691 helper log excerpt - full log retained on build PC at /home/vash/mister-builds/entry691/arm_helper.log
+# full log: 39230255 bytes sha256 92e08c7322842071cbb997a84f20b5da62bc4c50d304d70d75946db0843a8ce0
+# --- first 30 lines ---
+t=3 start source=file:/media/fat/games/MediaPlayer/my_test.mpg index=65 core=MediaPlayer alternate=MediaPlayer
+t=40 profile_version=2 transport=credit_step_v1 ack_sample_every=64 first_byte_means=first_verified_step interval_means=media_poll_entry_to_entry poll_budget_us=2000 step_bytes=2048 step_limit=8
+t=2025 helper forked pid=1802 read_fd=15
+t=2127 download asserted index=65 pid=1802
+t=2290 would_block count=1 submitted=0
+t=2311 profile_poll polls=1 elapsed_us=35 interval_us=0 chunks=0
+t=2507 would_block count=2 submitted=0
+t=2528 profile_poll polls=2 elapsed_us=32 interval_us=221 chunks=0
+t=2634 would_block count=3 submitted=0
+t=2654 profile_poll polls=3 elapsed_us=27 interval_us=130 chunks=0
+t=2713 would_block count=4 submitted=0
+t=2727 profile_poll polls=4 elapsed_us=19 interval_us=81 chunks=0
+t=2904 would_block count=8 submitted=0
+t=3243 would_block count=16 submitted=0
+t=3953 would_block count=32 submitted=0
+t=5290 would_block count=64 submitted=0
+t=5307 profile_poll polls=64 elapsed_us=22 interval_us=40 chunks=0
+t=7934 would_block count=128 submitted=0
+t=7950 profile_poll polls=128 elapsed_us=21 interval_us=39 chunks=0
+media_player_helper: audio output spdif (IEC 61937 passthrough for AC-3 and DTS)
+media_player_helper: AC-3 audio on private substream 0x80
+t=13544 pipe_read event=1 count=4096 read_us=35 buffered=4096
+t=14058 first_byte latency_us=11932 would_block=167 count=2048
+t=14076 transfer event=1 count=2048 submitted=2048 tx_us=455 fast_bytes=2048 slow_bytes=0 queries=2
+t=14545 transfer event=2 count=2048 submitted=4096 tx_us=452 fast_bytes=2048 slow_bytes=0 queries=2
+t=15931 profile_poll polls=192 elapsed_us=6 interval_us=42 chunks=0
+t=18692 profile_poll polls=256 elapsed_us=7 interval_us=43 chunks=0
+t=18758 would_block count=256 submitted=4096
+t=20670 pipe_read event=2 count=12288 read_us=44 buffered=12288
+t=21155 transfer event=3 count=2048 submitted=6144 tx_us=454 fast_bytes=2048 slow_bytes=0 queries=2
+# --- all non-routine lines (excludes profile_poll/transfer/pipe_read) ---
+t=3 start source=file:/media/fat/games/MediaPlayer/my_test.mpg index=65 core=MediaPlayer alternate=MediaPlayer
+t=40 profile_version=2 transport=credit_step_v1 ack_sample_every=64 first_byte_means=first_verified_step interval_means=media_poll_entry_to_entry poll_budget_us=2000 step_bytes=2048 step_limit=8
+t=2025 helper forked pid=1802 read_fd=15
+t=2127 download asserted index=65 pid=1802
+t=2290 would_block count=1 submitted=0
+t=2507 would_block count=2 submitted=0
+t=2634 would_block count=3 submitted=0
+t=2713 would_block count=4 submitted=0
+t=2904 would_block count=8 submitted=0
+t=3243 would_block count=16 submitted=0
+t=3953 would_block count=32 submitted=0
+t=5290 would_block count=64 submitted=0
+t=7934 would_block count=128 submitted=0
+media_player_helper: audio output spdif (IEC 61937 passthrough for AC-3 and DTS)
+media_player_helper: AC-3 audio on private substream 0x80
+t=14058 first_byte latency_us=11932 would_block=167 count=2048
+t=18758 would_block count=256 submitted=4096
+media_player_helper: video=890994119 bytes, pts=2363, audio=35625 frames/54720000 samples
+media_player_helper: scheduler video_peak=473960 bytes, pcm_peak=15360 samples, pcm_emitted=54720000 samples
+t=1140546491 helper stdout eof
+t=1140546528 finish reason=eof fd=15 download=1 submitted=1126974123 reads=68787 would_block=275
+t=1140546571 download released
+t=1140546681 child wait=1802 status=0x0 wait_errno=0 exited=1 exit_code=0 signaled=0 signal=0
+t=1140546725 profile_summary polls=11661112 poll_us=734089497 poll_max_us=4484 data_polls=1830395 data_poll_us=587214017 intervals=11661111 interval_us=1140544094 interval_max_us=20862 read_calls=69063 read_us=36184764 tx_calls=11784874 tx_us=623525041 tx_max_us=1768 ack_chunks=184138 fast_bytes=1126974123 slow_bytes=0 burst_calls=11784874 status_queries=33887203 transport_mode=2
+# --- last 15 lines ---
+t=1140524969 profile_poll polls=11660800 elapsed_us=15 interval_us=47 chunks=0
+t=1140529480 profile_poll polls=11660864 elapsed_us=14 interval_us=48 chunks=0
+t=1140529771 transfer event=11784832 count=94 submitted=1126957056 tx_us=42 fast_bytes=94 slow_bytes=0 queries=2
+t=1140529821 pipe_read event=68786 count=16384 read_us=30 buffered=16384
+t=1140533978 profile_poll polls=11660928 elapsed_us=15 interval_us=47 chunks=0
+t=1140538246 profile_poll polls=11660992 elapsed_us=15 interval_us=47 chunks=0
+t=1140542545 profile_poll polls=11661056 elapsed_us=15 interval_us=47 chunks=0
+t=1140546038 pipe_read event=68787 count=683 read_us=10 buffered=683
+t=1140546491 helper stdout eof
+t=1140546528 finish reason=eof fd=15 download=1 submitted=1126974123 reads=68787 would_block=275
+t=1140546571 download released
+t=1140546681 child wait=1802 status=0x0 wait_errno=0 exited=1 exit_code=0 signaled=0 signal=0
+t=1140546701 transfer complete submitted=1126974123 reads=68787
+t=1140546714 profile_poll polls=11661112 elapsed_us=344 interval_us=405 chunks=4
+t=1140546725 profile_summary polls=11661112 poll_us=734089497 poll_max_us=4484 data_polls=1830395 data_poll_us=587214017 intervals=11661111 interval_us=1140544094 interval_max_us=20862 read_calls=69063 read_us=36184764 tx_calls=11784874 tx_us=623525041 tx_max_us=1768 ack_chunks=184138 fast_bytes=1126974123 slow_bytes=0 burst_calls=11784874 status_queries=33887203 transport_mode=2

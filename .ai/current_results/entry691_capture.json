@@ -1,0 +1,60 @@
+{
+  "captured": "2026-08-28T19:45:25-07:00",
+  "host": "10.10.0.30",
+  "user_report": "video looked perfect. audio cut out a few times total. audio and video sync was perfect throughout. the file is done, I believe it completed successfully.",
+  "files": {
+    "/tmp/MediaPlayer_ARM.log": {
+      "local": "arm_helper_after.log",
+      "bytes": 39230255,
+      "sha256": "92e08c7322842071cbb997a84f20b5da62bc4c50d304d70d75946db0843a8ce0"
+    },
+    "/media/fat/screenshots/entry691_longrun_20260828T194525_1.png": {
+      "local": "screen_1.png",
+      "bytes": 356111,
+      "sha256": "8390826e9cec90cefe25e95c4840acb6a8904a55f5b18f40ffa1b3e7082ab48d",
+      "complete_png_verified": true
+    },
+    "/media/fat/screenshots/entry691_longrun_20260828T194525_2.png": {
+      "local": "screen_2.png",
+      "bytes": 356111,
+      "sha256": "8390826e9cec90cefe25e95c4840acb6a8904a55f5b18f40ffa1b3e7082ab48d",
+      "complete_png_verified": true
+    },
+    "/media/fat/MiSTer": {
+      "local": "MiSTer",
+      "bytes": 1170340,
+      "sha256": "01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9"
+    },
+    "/media/fat/linux/MediaPlayer_Helper": {
+      "local": "MediaPlayer_Helper",
+      "bytes": 399340,
+      "sha256": "fefaeb18b8c9e091a9cd9e97258e86264683f374f9663cb3ea6b99bafb81977a"
+    },
+    "/media/fat/MediaPlayer.rbf": {
+      "local": "MediaPlayer.rbf",
+      "bytes": 4309784,
+      "sha256": "9730e0ba61adbcd5319a42b9d270f30083947487f156cc17a1ce277d96a7dc18"
+    }
+  },
+  "operations": [
+    "RETR /tmp/MediaPlayer_ARM.log",
+    "STOR MiSTer_cmd: screenshot entry691_longrun_20260828T194525_1.png",
+    "RETR /media/fat/screenshots/entry691_longrun_20260828T194525_1.png",
+    "STOR MiSTer_cmd: screenshot entry691_longrun_20260828T194525_2.png",
+    "RETR /media/fat/screenshots/entry691_longrun_20260828T194525_2.png",
+    "RETR /media/fat/MiSTer",
+    "RETR /media/fat/linux/MediaPlayer_Helper",
+    "RETR /media/fat/MediaPlayer.rbf",
+    "RETR /tmp/MediaPlayer_ARM.log"
+  ],
+  "errors": [],
+  "helper_log_unchanged_during_capture": true,
+  "screenshots": [
+    "entry691_longrun_20260828T194525_1.png",
+    "entry691_longrun_20260828T194525_2.png"
+  ],
+  "reloaded": false,
+  "playback_started": false,
+  "finished": "2026-08-28T19:45:31-07:00",
+  "full_helper_log_retained": "/home/vash/mister-builds/entry691/arm_helper.log"
+}

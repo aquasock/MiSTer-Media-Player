@@ -1,3 +1,32 @@
+## 691 COMMIT Unreleased 8423f20 2026-08-28T19:48:00-07:00
+
+#### Coming From:
+
+Unreleased 8423f20
+
+#### Purpose:
+
+Record the extended S/PDIF hardware run that shows audio underrun still occurring after the entry 688 correction.
+
+#### Outcome:
+
+The user plays `games/MediaPlayer/my_test.mpg` over S/PDIF to completion and reports perfect video and perfect audio/video sync throughout with audio cutting out a few times in total, and the captured telemetry contradicts the entry 690 conclusion for long duration. The installed helper still reads back as `fefaeb18b8c9e091a9cd9e97258e86264683f374f9663cb3ea6b99bafb81977a`, with the MiSTer Main executable and `MediaPlayer.rbf` unchanged, so this is the entry 688 correction running against the accepted bitstream. The helper delivered the whole file: end of file with child exit status zero, 1,126,974,123 transport bytes submitted across 68,787 reads, 1,126,974,123 fast bytes, zero slow bytes, and only ten would-block events in a 1,140.5-second session, so host supply is not the limiting factor and the delivery path never stalled. The schema 19 snapshot nevertheless reports `audio_underrun` true with `error_flags` 0x0400, the sole set flag, which is the same bit the decoder exports as audio underrun, and `validation_failures` therefore lists only that condition; `pcm_protocol_error`, `presentation_error` and every other error remain clear. The snapshot is latched by the profiler on the first nonzero error flag rather than at end of playback, so it freezes the state at the first underrun and cannot count later ones. That first underrun is placed at approximately 83.5 seconds into playback by three independent measures that agree: 1,998 displayed pictures at 24000/1001 gives 83.33 seconds, the separate STC field reads 83 seconds, and the presentation cycle counter reconciles to 83.47 seconds once its single 32-bit wrap at 71.58 seconds is accounted for. With that wrap corrected the run delivered 1,997 intervals at 23.93 fps against frame rate code 4, consistent with correct film cadence right up to the underrun and with the user's report of perfect video and sync. The raw `cadence_seconds` of 11.884442 and `delivered_fps` of 168.03 in the snapshot are the uncorrected wrapped values and must not be quoted as measurements. As in entry 690, `pcm_sample_count` 16,383 and `pcm_fifo_peak` 127 are counter saturation values and bound nothing useful. The entry 688 correction therefore holds for the twelve-second opening but does not hold at longer duration, the failure is not the entry 687 startup horizon at 1.8 seconds, and commit `8423f20` is not accepted for general playback. Full telemetry is published under .ai/current_results/entry691_*; the 39,230,255-byte helper log with SHA-256 `92e08c7322842071cbb997a84f20b5da62bc4c50d304d70d75946db0843a8ce0` is retained on the build PC at /home/vash/mister-builds/entry691 and only an excerpt is committed.
+
+#### Next Steps:
+
+Diagnose why audio delivery falls behind at approximately 83 seconds when the host is demonstrably not starved, before proposing any correction. The immediate question is whether the interpolated delivery horizon added in entry 688 degrades once source bitrate or timestamp spacing varies over a long title, in a way the twelve-second opening cannot exercise, and the existing isolated harness should be extended with a long paced case built from a deterministic script rather than from the user's media so the failure can be reproduced off hardware. Instrumenting the helper in log-only form again, as entry 687 did, is the cheapest way to see the horizon and the guard refills at the failure point without changing output bytes. The profiler latching on the first error flag is a diagnostic limitation for recurring faults and should be considered for a counted rather than latched underrun record, but that is an FPGA change and must not be bundled with a helper correction. Do not enlarge FIFOs, add arbitrary startup delay, or relax error criteria. Entry 690 remains valid for the bounded opening over S/PDIF, and the HDMI session of the opening still has no telemetry on record.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 690 COMMIT Unreleased 8423f20 2026-08-28T19:24:00-07:00
 
 #### Coming From:
@@ -1216,35 +1245,6 @@ The user replayed test one and reports it looked perfect; two independent compar
 #### Next Steps:
 
 Replay tests two through seven on this bitstream, prioritising test seven because it is the only fixture exercising P and B pictures and test four because it is the progressive all-I control, and compare each against its reference decode rather than against a beta-card screenshot that no longer exists. Only when those pass should the field-DCT gate be treated as closed. Continue to suspect the capture counter and the untruncated origin before the field mapping if anything regresses. Resolve the unexplained logic decrease before starting the next feature rather than banking it, and keep the reduced HDMI setup margin visible, reseeding rather than restructuring if a later change pushes that category negative. Interlaced P and B remain the gate that would make commercial discs play and are unstarted; the deferred field-picture gate still needs either a non-ffmpeg generator or a real disc sample, and that choice needs the user's direction. Preserve restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [x] Passed
-
----
-
-## 651 COMMIT Unreleased 4777c59 2026-08-27T22:23:27-07:00
-
-#### Coming From:
-
-Unreleased 4777c59
-
-#### Purpose:
-
-Record hardware acceptance of the field-DCT gate against the reference decode.
-
-#### Outcome:
-
-The user reports the fixture played perfectly and the reference-decode comparison confirms it. The generator was first corrected: it lacked `-y`, so a second run blocked on ffmpeg's overwrite prompt while `capture_output` hid the prompt, which presented as a hang; commit `ceadfd2` adds `-y`, gives ffmpeg no stdin, prints a banner per stage and passes `-stats`, and the fixed script reproduces the fixture byte-identically in about four seconds. Source `4777c59` was built and deployed as RBF `9730e0ba61adbcd5`, replacing the released `61a2fed28425a461` after the installed copy was verified as the expected release, backed up to the card and to the build PC, staged under a temporary name, hash-checked while staged, renamed and read back on a fresh connection; Main and the helper were not touched because this commit changes no software. Helper-first collection confirms the correct fixture at `games/MediaPlayer/test_field_dct.m2v`, video of 3,028,039 bytes exactly matching the generated file, no audio, exit zero and all 185 pipe reads reconciling to the completed transport with no fallback and zero slow-path bytes. Valid schema-19 telemetry records 360 reference and displayed pictures, zero B pictures, 359 swaps, 3,028,040 accepted video bytes, top-field-first signalling, zero decoder and presentation errors, no audio underrun or PCM protocol fault, zero timestamp conflicts, zero native deadline gaps and gap outliers, three largest display intervals each at the nominal 2,002,000 clocks, and sequence end with quiet completion. The decisive evidence is the raster. The released bitstream refused this stream outright because `phase1_supported` required `frame_pred_frame_dct`, so playing at all establishes the gate is open, and comparison against ffmpeg's decode of the same file establishes it is correct rather than merely accepted. Across 279,072 compared pixels, excluding the telemetry overlay with its one-column left edge and image column zero, 272,780 match exactly, 6,292 differ by one unit of luma rounding and none differ by more than one. The woven bar occupies the non-contiguous rows 40, 42, 44, 45, 46, 47, 49 and 51 in both, which is the structure a mishandled `dct_type` would destroy since the two interpretations differ precisely where the bit is set. One difference is real and is not attributable to this change: image column zero is black in hardware where the reference is bright, on those eight bar rows only, with column one onward matching. Entries 645 and 646, captured on the released bitstream with the same bar content, show identical column-zero blanking, so it is a pre-existing display-path left-edge behaviour. Two items from the build remain open and are carried rather than closed: logic fell 372 ALMs and 912 registers while a feature was added, which is unexplained, and setup slack fell 0.117 nanoseconds to positive 0.126 on the HDMI domain. Passed records this fixture only. The seven existing fixtures have not been replayed on this bitstream, so the regression that the writer's capture-counter and untruncated-origin changes demand is outstanding, and field DCT decoding does not make commercial discs play because interlaced P and B remain the gate that does.
-
-#### Next Steps:
-
-Replay the seven existing fixtures on this bitstream and confirm their final rasters remain pixel-identical to the recorded baselines, because the capture row counter and the untruncated block origin affect frame-DCT blocks as well and a reconstruction fault corrupts pixels while every counter stays clean; suspect those two changes before the field mapping if anything regresses. Until that regression passes, do not treat the field-DCT gate as closed or prepare any release. Resolve the unexplained logic decrease before the next feature rather than banking it as a saving, and keep the reduced HDMI setup margin visible, reseeding rather than restructuring if a later change pushes that category negative. The deferred field-picture gate still needs either a non-ffmpeg generator or a real disc sample because ffmpeg cannot encode field pictures, and that choice needs the user's direction. Interlaced P and B, `repeat_first_field` and 576i remain unstarted and unscoped. Preserve restricted core.md and the forty-entry ring.
 
 #### Files Modified:
 
