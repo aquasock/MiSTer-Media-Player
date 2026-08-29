@@ -288,7 +288,10 @@ def sample_field(src: bytes, plane_base: int, plane_w: int, plane_h: int,
 
 
 def apply_field_macroblock(out: bytearray, mb_row: int, mb_col: int, ref: bytes,
-                           mvs: tuple[tuple[int, int, int], tuple[int, int, int]]) -> None:
+                           mvs: tuple[tuple[int, int, int], tuple[int, int, int]],
+                           bwd_ref: bytes | None = None,
+                           bwd_mvs: tuple[tuple[int, int, int], tuple[int, int, int]] | None = None
+                           ) -> None:
     """Write one field-predicted macroblock's motion-compensated pixels.
 
     mvs[d] = (field_select, vx, vy) for destination field d, where d 0 is the
@@ -296,21 +299,40 @@ def apply_field_macroblock(out: bytearray, mb_row: int, mb_col: int, ref: bytes,
     half-pel in field lines.  Each destination field half is 16x8 luma and 8x4
     chroma, which is what makes this different from a frame-predicted
     macroblock rather than merely a differently addressed one.
+
+    Passing `bwd_ref` and `bwd_mvs` makes the macroblock bidirectional: each
+    destination field averages its own forward and backward field predictions,
+    so one macroblock draws on four independently selected reference fields.
+    Each direction keeps its own field select per destination field.
     """
     for d in (0, 1):
         sel, vx, vy = mvs[d]
+        if bwd_mvs is not None:
+            bsel, bvx, bvy = bwd_mvs[d]
         for j in range(8):
             for xx in range(16):
                 px = mb_col * 16 + xx
-                out[(mb_row * 16 + 2 * j + d) * WIDTH + px] = sample_field(
-                    ref, 0, WIDTH, HEIGHT, px, mb_row * 8 + j, vx, vy, sel)
+                val = sample_field(ref, 0, WIDTH, HEIGHT, px,
+                                   mb_row * 8 + j, vx, vy, sel)
+                if bwd_ref is not None:
+                    val = bidir_average(val, sample_field(
+                        bwd_ref, 0, WIDTH, HEIGHT, px,
+                        mb_row * 8 + j, bvx, bvy, bsel))
+                out[(mb_row * 16 + 2 * j + d) * WIDTH + px] = val
         cvx, cvy = trunc2(vx), trunc2(vy)
+        if bwd_mvs is not None:
+            cbvx, cbvy = trunc2(bvx), trunc2(bvy)
         for plane_index, plane_base in ((0, Y_SIZE), (1, Y_SIZE + C_SIZE)):
             for j in range(4):
                 for xx in range(8):
                     px = mb_col * 8 + xx
-                    out[plane_base + (mb_row * 8 + 2 * j + d) * CW + px] = sample_field(
-                        ref, plane_base, CW, CH, px, mb_row * 4 + j, cvx, cvy, sel)
+                    val = sample_field(ref, plane_base, CW, CH, px,
+                                       mb_row * 4 + j, cvx, cvy, sel)
+                    if bwd_ref is not None:
+                        val = bidir_average(val, sample_field(
+                            bwd_ref, plane_base, CW, CH, px,
+                            mb_row * 4 + j, cbvx, cbvy, bsel))
+                    out[plane_base + (mb_row * 8 + 2 * j + d) * CW + px] = val
 
 
 class FieldMotionPredictor:
