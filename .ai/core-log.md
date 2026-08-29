@@ -1,3 +1,205 @@
+## 701 COMMIT Unreleased ??? 2026-08-29T02:45:25-07:00
+
+#### Coming From:
+
+Unreleased c2097e3
+
+#### Purpose:
+
+Recover the near-complete interlaced P and B field-prediction work by removing replicated fetch storage and parallel footprint logic while preserving accepted consumer audio and the pending S/PDIF correction.
+
+#### Outcome:
+
+The failed fitter run is useful evidence that the near-final interlaced implementation has unacceptable structural cost, but its database is not an exact qualification of `784ae0b`: mapping began before that final source commit existed, and the shared build checkout was subsequently advanced.  The arithmetic and parser repairs are retained because the focused P, B and mixed-raster evidence identifies concrete defects and pixel-exact results, but those claims will be reproduced from published source through a bounded test-only admission mechanism before production gates move.  The B engine will return both prediction fetchers to two retained phases and use the otherwise idle prefetch instance for the backward pair during a field macroblock, while active request footprint arithmetic will be selected before address, span and bounds computation instead of instantiating four complete combinational paths.  Field DCT, production admission gates and unrelated decoder expansion remain outside this recovery until a clean exact-source fit establishes usable margin.  The accepted MP3, WAV and FLAC helper paths and the `c2097e3` decoded-PCM S/PDIF routing must remain behaviorally unchanged.
+
+#### Next Steps:
+
+Implement and measure the fetch-storage and footprint reductions separately, reproduce the P, B and mixed-raster simulations from the committed tree, and rerun the consumer-audio and S/PDIF transport regressions.  Then publish the exact source and perform one clean Quartus build in a fresh isolated checkout, requiring a successful fit, positive timing and resource comparison against both the 32,355-ALM baseline and the failed near-final report before considering field DCT or opening production admission gates.  Do not reuse the stale shared build database or install any helper or RBF during this cycle.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
+- tools/streams/run_b_field_motion.sh
+- tools/streams/run_interlaced_field_motion.sh
+- tools/streams/tb_h262_b_field_motion_pixels.sv
+- tools/streams/tb_h262_interlaced_field_motion_pixels.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
+## 700 COMMIT Unreleased c2097e3 2026-08-29T02:45:24-07:00
+
+#### Coming From:
+
+Unreleased c39ebdc
+
+#### Purpose:
+
+Route decoded stereo PCM to the selected S/PDIF output while preserving IEC 61937 AC-3 and DTS passthrough as non-audio.
+
+#### Outcome:
+
+The accepted standalone formats were silent under the S/PDIF menu choice because the framework treated output selection and the IEC 60958 non-audio bit as the same state, sending raw words and marking every selected S/PDIF stream non-audio.  Source `c2097e3` reserves transport mode bit seven for IEC 61937 records, has only the helper's compressed-burst writer set it, preserves it through the in-band extractor, and separates `spdif_enable` from `spdif_non_audio` in the framework.  Selected decoded MP3, WAV, FLAC and Program Stream audio now use processed stereo PCM with ordinary audio channel status, while AC-3 and DTS passthrough retain raw byte-exact bursts and non-audio status; HDMI remains the alternate exclusive output and Main needs no code change.  Native and exact-checkout helper matrices pass, focused extractor and router simulations cover all four output states, decoded WAV, MP3 and FLAC carry no non-audio flag, and all 375 AC-3 plus 1,125 DTS bursts carry it and remain byte-identical.  The exact static ARM helper is 629,056 bytes with SHA-256 `02d1df98c62ee00169585db990b6bd48c3769eca20c3e1d594f2318c362eb00f`.  No Quartus build or installation occurred, so the helper is intentionally retained rather than installed without its matching FPGA image.
+
+#### Next Steps:
+
+Carry this correction unchanged through entry 701's clean FPGA build, then require a matched helper and RBF installation under separate authorization and physical MP3, WAV and FLAC listening over S/PDIF while preserving HDMI PCM and AC-3 and DTS receiver lock.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- MediaPlayer_top_00.svh
+- README.md
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
+- sys/audio_out.sv
+- sys/emu_ports.vh
+- sys/sys_top.v
+- tools/streams/analyze_arm_av_transport.py
+- tools/streams/run_audio_output_routing.sh
+- tools/streams/strip_inband_pcm.py
+- tools/streams/tb_audio_spdif_route.sv
+- tools/streams/tb_h262_inband_metadata.sv
+- tools/streams/verify_ac3_passthrough.py
+- tools/streams/verify_arm_av_pipeline.py
+- tools/streams/verify_consumer_flac.py
+- tools/streams/verify_consumer_wav.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
+## 699 COMMIT Unreleased c39ebdc 2026-08-29T02:45:23-07:00
+
+#### Coming From:
+
+Unreleased 1ee2b93
+
+#### Purpose:
+
+Add FLAC as a separately built and hardware-tested consumer format through the existing helper-only PCM path.
+
+#### Outcome:
+
+Source `c39ebdc` enables the pinned miniaudio 0.11.25 native FLAC decoder inside the single static helper and adds case-insensitive `.flac` selection to Main without a runtime FFmpeg dependency or FPGA change.  The helper accepts ordinary 16- and 24-bit mono, stereo and multichannel files, converts them to signed 16-bit stereo at 44.1 or 48 kHz through the established audio-only transport, and preserves one clean end token.  Format, sanitizer, Main-loader, MP2, MP3, WAV, AC-3 and DTS regressions pass.  The exact 629,056-byte static ARM helper and patched Main were transactionally installed with backups and hash readback, and the user played the selected FLAC sample on hardware and reported that it ran perfectly.  The later S/PDIF silence reproduced after a complete zero-error FLAC decode and belongs to the shared routing defect recorded by entry 700, not the codec.
+
+#### Next Steps:
+
+Keep FLAC accepted and preserve it through the interlaced recovery and S/PDIF build; Ogg Vorbis and M4A with AAC-LC remain later independent consumer-format cycles.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- host/arm/ARCHITECTURE.md
+- host/arm/consumer_audio.c
+- host/arm/consumer_audio.h
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/streams/test_main_mister_profile.py
+- tools/streams/verify_arm_av_pipeline.py
+- tools/streams/verify_consumer_flac.py
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
+## 698 COMMIT Unreleased 1ee2b93 2026-08-29T02:45:22-07:00
+
+#### Coming From:
+
+Unreleased 60159bd
+
+#### Purpose:
+
+Add ordinary WAV playback as a separately built and hardware-tested consumer format through the existing helper-only PCM path.
+
+#### Outcome:
+
+Sources `a335de1` and `1ee2b93` pin miniaudio 0.11.25, compile only its WAV decoder and conversion support into the static helper, and add case-insensitive `.wav` selection to Main without a runtime FFmpeg dependency or FPGA change.  Ordinary integer and float mono, stereo and multichannel WAV files are converted to signed 16-bit stereo at 44.1 or 48 kHz through the established audio-only transport.  Native format, sanitizer, Main-loader, MP2, MP3, AC-3 and DTS regressions pass, including byte-exact direct signed-16 decode.  The exact static helper and patched Main were transactionally installed with verified backups, and the user played both the selected WAV sample and its MP3 derivative on hardware and reported that they sounded perfect.
+
+#### Next Steps:
+
+Keep WAV and MP3 accepted and preserve both paths through later format and FPGA work.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- docs/BUILDING.md
+- host/arm/ARCHITECTURE.md
+- host/arm/Makefile
+- host/arm/consumer_audio.c
+- host/arm/consumer_audio.h
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- host/arm/media_source.c
+- host/arm/media_source.h
+- host/build_arm_stack.sh
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/streams/test_main_mister_profile.py
+- tools/streams/verify_arm_av_pipeline.py
+- tools/streams/verify_consumer_wav.py
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
+## 697 COMMIT Unreleased 60159bd 2026-08-29T02:45:21-07:00
+
+#### Coming From:
+
+Unreleased 784ae0b
+
+#### Purpose:
+
+Add basic standalone MP3 playback through the existing MediaPlayer picker and PCM transport without changing the FPGA.
+
+#### Outcome:
+
+Sources `c1d7da7`, `2445324` and `60159bd` compile pinned minimp3 directly into the static helper, add case-insensitive `.mp3` selection to Main and decode MPEG-1 Layer III mono or stereo at 44.1 or 48 kHz into the existing signed stereo PCM records with one clean end token and no video requirement.  The implementation bounds ID3 metadata handling, rejects unsupported rates and malformed or renamed input, preserves byte-identical video and accepted MP2, AC-3 and DTS behavior, and passes the native codec, transport and sanitized Main-loader matrices.  The exact static helper and patched Main were installed transactionally with verified backups; after the WAV cycle the user played the selected MP3 derivative on hardware and reported that it sounded perfect, and the retained session shows all 263,808 stereo frames, helper exit zero and normal completion.
+
+#### Next Steps:
+
+Keep MP3 accepted and preserve its helper and Main behavior through later format and FPGA work.
+
+#### Files Modified:
+
+- README.md
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+- host/arm/media_player_protocol.h
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/streams/generate_arm_av_test.py
+- tools/streams/test_main_mister_profile.py
+- tools/streams/verify_arm_av_pipeline.py
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 696 COMMIT Unreleased 784ae0b 2026-08-29T02:34:10-07:00
 
 #### Coming From:
@@ -1064,152 +1266,6 @@ Pull the published timing correction on GUNSMOKE, perform a new clean build and 
 - tools/streams/run_quant_matrices.sh
 - tools/streams/run_quant_matrix_equivalence.sh
 - tools/streams/tb_h262_quant_matrices.sv
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 661 COMMIT Unreleased 4a27f80 2026-08-28T00:35:47-07:00
-
-#### Coming From:
-
-Unreleased 0c17678
-
-#### Purpose:
-
-Correct Quartus 17 synthesis annotations and the matrix parser loop-index initialization before hardware qualification.
-
-#### Outcome:
-
-Source correction 4a27f80 is committed and published from the Pi after all 384 parser-state checks and 36,864 coefficient comparisons pass again. The first clean build of published source 0c17678 completes Analysis and Synthesis but exposes two avoidable warnings. The new film-mode and field synchronizers use async_reg, which Quartus 17 explicitly ignores; the correction uses the same Altera SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS attribute already applied to neighboring synchronization chains. The matrix observer's combinational loop index is unassigned on its start-code bypass path, so it receives a default value before the loop; all functional parser outputs already have defaults, and the loop overwrites its index before use. Neither edit changes decoder arithmetic, syntax admission or field scheduling. The superseded fitter is stopped deliberately rather than qualifying an image with the ignored attributes. Its successful synthesis reports 47,251 registers, 4,056,315 memory bits and 67 DSP blocks; these are not fitted resource or timing acceptance. The source-0c17678 paired DVD rerun remains isolated and may finish for evidence, but the corrected source requires its own clean build and final numerical check. No deployment or hardware result is claimed, and this correction remains within the approved opening scope.
-
-#### Next Steps:
-
-Pull the published correction on GUNSMOKE and use a fresh exact-source checkout for a clean Quartus 17 build and paired opening qualification. Confirm both new warning classes disappear, inspect remaining warnings against the verified 4777c59 baseline, require all timing categories positive, and only then package the original opening and candidate RBF for user-controlled testing. Preserve the superseded reports and restricted core.md.
-
-#### Files Modified:
-
-- MediaPlayer_top_04.svh
-- rtl/mpeg2_new/mpeg2_h262_quant_matrices.sv
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 660 COMMIT Unreleased 0c17678 2026-08-28T00:30:28-07:00
-
-#### Coming From:
-
-Unreleased 4777c59
-
-#### Purpose:
-
-Record full original-opening numerical qualification and publish the approved film-frame source for a clean build.
-
-#### Outcome:
-
-Both full-opening simulations complete all 289 coded pictures and 149,817,600 reconstructed samples, with 25 I, 103 P and 161 B pictures, exact publication and ownership checks, and zero decoder errors. The isolated run replaces only already-compared, persisted reference pictures with FFmpeg samples and bounds every I/P/B sample to one level; its maximum difference is one. The real-reference run retains all RTL pictures: 102 predicted samples exceed the old fixed two-level comparison, the maximum difference is five, and none exceeds the measured maximum error of the actual reference bank plus the independently verified one-level transform allowance. This is a paired propagation check, not a claim that the old fixed-two comparison passed or that oracle references represent hardware playback. Interpolation, averaging and clipping cannot amplify the largest integer input error; the retained-reference error is measured rather than assigned a growing arbitrary GOP tolerance. The new paired runner requires both checks and unchanged source. A final synthesis precaution makes the two signed divisions explicit constant-divisor branches; the 384-case coefficient suite and matrix-transition and progressive pixel controls pass again afterward, and the exact published source will receive another complete paired run. Focused tests cover all downloaded-matrix states, 36,864 I/P/B coefficients, 1,441,440 motion combinations, 1,024 chroma cases, f_code-six reconstruction, quantized B types, intra predictor reset, and first-intra B routing. The latter reproduces an existing missing-descriptor failure at coded picture 284 and passes after the fix. Matrix changes across I/P/B and a new sequence pass all 3,110,400 samples within one level. Field-DCT and existing I controls pass; native regressions pass. Integrated film scheduler, bank metadata and 90-kHz timeline tests prove I/B/B/P reorder, 3/2/3/2 fields, missing PTS, terminal drain and replay. Strengthened RGB assertions pass 345,600 samples over two fields and 518,400 over three fields for both orders; earlier luma fingerprints alone were not RGB proof. Ordinary generation controls also complete with zero simulator exit status; their Verilator concatenated-format messages print as decimal text, so a grep for PASS incorrectly returns nonzero and is not a functional failure. AC-3 passthrough is byte exact, PCM has 576,000 stereo frames with maximum differences 17/20 and correlations above 0.99999, and transport preserves 10,334,168 clean video bytes, 25 PTS records and all PCM with queue bounds passing. The twelve-second copy retains a later final reference picture, giving 722 film fields and a terminal PTS gap; this is kept rather than altering encoded content. Detailed logs remain on GUNSMOKE under /home/vash/mister-builds/entry656/results. No Quartus build, deployment, listening, physical cadence or A/V synchronization acceptance is claimed.
-
-#### Next Steps:
-
-Complete the exact-published-source paired rerun and clean Quartus 17 build, audit warnings and all timing categories, then prepare a checksummed candidate and original opening for user-controlled testing. If timing fails on the marginal HDMI domain, follow the recorded reseed policy rather than assume placement savings are headroom. Keep the old fixed comparison and failed diagnostics visible, retain first-failure reproducers, and record build and hardware results in new entries without rewriting this checkpoint.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 659 COMMIT Unreleased 4777c59 2026-08-28T00:02:07-07:00
-
-#### Coming From:
-
-Unreleased 4777c59
-
-#### Purpose:
-
-Record implementation progress and remaining qualification gates for the approved original DVD-opening cycle.
-
-#### Outcome:
-
-The approved drafts remain uncommitted on the Raspberry Pi and are tested in an isolated export at /home/vash/mister-builds/entry656/dev on GUNSMOKE; the active checkout and MiSTer are not modified. Preparation preserves the selected compressed video and first AC-3 track byte for byte and produces 289 coded pictures. Generic matrix parsing and inverse quantization pass 384 matrix-state checks and 384 coefficient cases, while the first original I picture matches all 518,400 reference samples exactly. Motion arithmetic passes 1,441,440 signed reconstruction cases and 1,024 chroma cases. Full-raster synthetic f_code-six and quantized B fixtures pass with maximum pixel difference one. Original playback first exposes three omitted legal quantized non-intra B macroblock types, then an existing failure to reset all B motion predictors after intra macroblocks, which sends a prediction outside the frame at coded picture 107. The latter has a focused synthetic reproducer that fails before the reset and passes after it, with all 1,555,200 I/P/B samples within one level of FFmpeg; these complete existing quantizer and motion behavior inside the approved opening boundary. Native 480i regressions and focused film cadence, progressive-chroma cache, metadata and field-order tests pass, but integrated original-film presentation is not yet qualified. Both AC-3 passthrough and software PCM comparison pass; PCM has 576,000 stereo frames, maximum differences 17 and 20, and correlations above 0.99999. These are software results, not listening or synchronization acceptance. Earlier original-stream runs contain unresolved pixel deviations, and an attempted oracle-reference refresh diagnostic is not accepted as decoder evidence. The full original run with real RTL reference pictures and the predictor fix is now running. An added field-DCT harness test initially misinterprets the writer's row-stride contract and omits sequence end; the corrected harness is being verified. No source commit, Quartus build, deployment or hardware acceptance is claimed. Entry 656 remains the single open proposal.
-
-#### Next Steps:
-
-Finish the original pixel comparison without relaxing tolerances to hide defects, complete integrated per-picture film cadence and timestamp ownership, matrix-change lifetime and terminal/replay checks, and rerun affected controls. Retain numeric results under the isolated PC results directory and commit deterministic generators rather than movie-derived media. Once the source and regressions qualify, publish from the Pi, resolve entry 656, pull exact published source on GUNSMOKE and perform the required clean Quartus 17 build and timing/resource audit before asking the user to deploy. Preserve restricted core.md, old artifacts, the forty-entry ring and user control of the MiSTer.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 658 COMMIT Unreleased 4777c59 2026-08-27T23:24:29-07:00
-
-#### Coming From:
-
-Unreleased 4777c59
-
-#### Purpose:
-
-Record approval to add stream-defined quantization matrices to the original DVD-opening cycle.
-
-#### Outcome:
-
-The user approves the matrix expansion identified in entry 657 and directs implementation to proceed. Entry 656 remains the single open source proposal, now including generic intra and non-intra matrix loading, initialization, persistence, inverse-scan addressing and use by all I/P/B inverse-quantization consumers. This approval does not extend the twelve-second original-video and first-track AC-3 boundary to whole-title qualification, rare interlaced macroblock syntax or DVD navigation. The untested B-motion draft and harness connection remain local and no new implementation has been made since the pause. No build or hardware result is claimed.
-
-#### Next Steps:
-
-Verify the controlled H.262 matrix semantics, implement and test matrix handling without hardcoded film weights, then complete the approved film admission, B-vector range and per-picture field-cadence and chroma work. Require synthetic matrix and motion boundaries, original opening pixel comparisons, AC-3 and timestamp checks, existing regressions and a clean build from published source on GUNSMOKE before handing files to the user for hardware testing. Preserve user control of deployment and playback, restricted core.md, pre-existing artifacts and the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 657 COMMIT Unreleased 4777c59 2026-08-27T23:19:49-07:00
-
-#### Coming From:
-
-Unreleased 4777c59
-
-#### Purpose:
-
-Pause the approved DVD-opening cycle after discovering unsupported custom quantization matrices in its first sequence header.
-
-#### Outcome:
-
-The approved entry 656 plan is published as 75c3410 and GUNSMOKE pulls it before an isolated test export is created. The first original DVD sequence header sets both load_intra_quantiser_matrix and load_non_intra_quantiser_matrix. An exact bit-offset probe verifies sixty-four intra weights ranging from eight to twenty-one and sixty-four non-intra weights all equal to eight, rather than the decoder's default matrices. Entry 656's header inventory did not inspect these fields, so its proposed scope was incomplete. The frontend marks downloaded matrices unsupported, the I inverse-quantizer rejects them, and the P/B transform path uses hardcoded default weights. Original compressed playback therefore needs matrix parsing, lifetime handling and programmable weights through every relevant transform consumer, which materially expands the approved work and requires user approval under core.md. Implementation stops on that finding. Local uncommitted drafts widen the B-motion parser, transport and raster arithmetic and update the shared authoring helper; they are untested and are not pushed or copied over the active build checkout. The only simulation run uses the existing progressive fixture and the testbench's missing frame_pred_frame_dct connection repaired, with no B-width changes. It compares 423,936 predicted samples with zero differences above the existing tolerance and maximum difference two, and all completion and error counters match the baseline, but exits nonzero because 1,239,997 cycles differs from the fixture's hardcoded 1,239,996 assertion. This establishes a useful pixel control, not a passing regression suite or an intra reconstruction proof, because that bench seeds reference I pictures from the oracle. No original-film excerpt is generated, no Quartus build occurs, and no deployment or playback is performed. The open proposal remains entry 656 with its single placeholder; restricted core.md and pre-existing artifacts are untouched.
-
-#### Next Steps:
-
-Obtain approval to add stream-defined intra and non-intra quantization matrices to the same original twelve-second video and AC-3 milestone before continuing implementation. If approved, first extend the source inventory to matrix loads and changes, check the controlled H.262 matrix rules, and test default initialization, sequence and extension updates, intra and non-intra weights, inverse-scan indexing and matrix ownership through pipelined I/P/B reconstruction. Preserve generic matrix handling rather than hardcoding this film's tables or changing its encoded video. Resume the B-range, per-picture pulldown and chroma work only inside the approved expanded plan, repair the test harness with explicit coverage for its actual boundary, and require the originally agreed regression, clean-build and hardware gates. Keep whole-title, rare interlaced syntax and DVD navigation outside the opening scope. Do not claim any of the uncommitted drafts or the failed cycle-count assertion as qualified source; preserve the local draft for continuation, user hardware control and the forty-entry ring.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
