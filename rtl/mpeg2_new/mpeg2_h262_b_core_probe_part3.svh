@@ -261,15 +261,22 @@ always @(posedge clk) begin
                     current_field_dct<=0;
                     cur_fsel0<=0;cur_fsel1<=0;cur_bsel0<=0;cur_bsel1<=0;
                     cur_fx1<=0;cur_fy1<=0;cur_bx1<=0;cur_by1<=0;
-                    if(mbtype_match[4])begin qscale_shift<=0;field_bit_count<=0;state<=S_MB_QSCALE;end
-                    else if(mbtype_match[3])begin current_cbp<=6'h3f;current_block_index<=0;state<=b_frame_pred_frame_dct?S_BLOCK:S_DCT_TYPE;end
-                    else if(!b_frame_pred_frame_dct)state<=S_MOTION_TYPE;
+                    // H.262 macroblock_modes() precedes macroblock_quant's
+                    // quantiser_scale_code.  For interlaced frame pictures,
+                    // consume motion_type and dct_type before the scale.
+                    if(mbtype_match[3])begin
+                        current_cbp<=6'h3f;current_block_index<=0;
+                        if(!b_frame_pred_frame_dct)state<=S_DCT_TYPE;
+                        else if(mbtype_match[4])begin qscale_shift<=0;field_bit_count<=0;state<=S_MB_QSCALE;end
+                        else state<=S_BLOCK;
+                    end else if(!b_frame_pred_frame_dct)state<=S_MOTION_TYPE;
+                    else if(mbtype_match[4])begin qscale_shift<=0;field_bit_count<=0;state<=S_MB_QSCALE;end
                     else if(mbtype_match[2:1]==2'd2)state<=S_BX;else state<=S_FX;
                 end else if(mbtype_len_next>=6)state<=S_ERROR;else begin mbtype_bits<=mbtype_bits_next;mbtype_len<=mbtype_len_next;end
             end
             S_MB_QSCALE: begin
                 if(parser_at_end)state<=S_ERROR;
-                else begin qscale_shift<=qscale_next;if(field_bit_count==4)begin field_bit_count<=0;if(qscale_next==0)state<=S_ERROR;else begin current_qscale<=qscale_next;if(current_intra)begin current_cbp<=6'h3f;current_block_index<=0;state<=b_frame_pred_frame_dct?S_BLOCK:S_DCT_TYPE;end else if(!b_frame_pred_frame_dct)state<=S_MOTION_TYPE;else if(current_direction==2'd2)state<=S_BX;else state<=S_FX;end end else field_bit_count<=field_bit_count+1'b1;end
+                else begin qscale_shift<=qscale_next;if(field_bit_count==4)begin field_bit_count<=0;if(qscale_next==0)state<=S_ERROR;else begin current_qscale<=qscale_next;if(current_intra)state<=S_BLOCK;else if(current_direction!=0)state<=field_motion?((current_direction==2'd2)?S_BSEL:S_FSEL):((current_direction==2'd2)?S_BX:S_FX);else if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end else state<=S_MB_DONE;end end else field_bit_count<=field_bit_count+1'b1;end
             end
             // Entry 695: with frame_pred_frame_dct clear, frame_motion_type
             // follows macroblock_type for every macroblock carrying motion.
@@ -282,13 +289,13 @@ always @(posedge clk) begin
                     motion_type_shift<=motion_type_next;
                     if(motion_type_count==1'b1)begin
                         motion_type_count<=0;current_motion_type<=motion_type_next;motion_slot<=0;
-                        case(motion_type_next)
-                            2'b01: state<=current_pattern?S_DCT_TYPE:
-                                ((current_direction==2'd2)?S_BSEL:S_FSEL);
-                            2'b10: state<=current_pattern?S_DCT_TYPE:
-                                ((current_direction==2'd2)?S_BX:S_FX);
-                            default: state<=S_ERROR;
-                        endcase
+                        if((motion_type_next!=2'b01)&&
+                           (motion_type_next!=2'b10))state<=S_ERROR;
+                        else if(current_pattern)state<=S_DCT_TYPE;
+                        else if(current_quant)begin qscale_shift<=0;field_bit_count<=0;state<=S_MB_QSCALE;end
+                        else state<=(motion_type_next==2'b01)?
+                            ((current_direction==2'd2)?S_BSEL:S_FSEL):
+                            ((current_direction==2'd2)?S_BX:S_FX);
                     end else motion_type_count<=motion_type_count+1'b1;
                 end
             end
@@ -296,7 +303,8 @@ always @(posedge clk) begin
                 if(parser_at_end)state<=S_ERROR;
                 else begin
                     current_field_dct<=parser_current_bit;
-                    if(current_intra)state<=S_BLOCK;
+                    if(current_quant)begin qscale_shift<=0;field_bit_count<=0;state<=S_MB_QSCALE;end
+                    else if(current_intra)state<=S_BLOCK;
                     else if(current_direction!=0)
                         state<=field_motion?
                             ((current_direction==2'd2)?S_BSEL:S_FSEL):
