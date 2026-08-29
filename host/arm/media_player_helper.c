@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define AUDIO_BUFFER_LIMIT (256u * 1024u)
 #define VIDEO_QUEUE_LIMIT  (512u * 1024u)
@@ -159,6 +160,9 @@ struct output_state {
     unsigned pictures_since_pts;
     int pts_boundary_seen;    /* sequence or group header since last record */
     int pts_emitted;
+    uint64_t sched_log_start_us;  /* monotonic instant of the first report  */
+    uint64_t sched_log_next_us;   /* next report due                        */
+    unsigned sched_log_poll;      /* divider: clock reads are not free      */
 };
 
 /*
@@ -670,6 +674,65 @@ static size_t startup_video_size(const struct output_state *output,
 }
 
 /*
+ * Entry 692: the sink consumes PCM at exactly 48 kHz (CLK_AUDIO 24.576 MHz,
+ * one sample per 512 clocks) while delivery is paced from video timestamps.
+ * A systematic shortfall between those two clocks drains the fixed startup
+ * reserve and starves audio long after startup, which is consistent with the
+ * entry 691 hardware underrun at approximately 85 seconds and with the twelve
+ * second opening never reaching it.  Report both clocks once per second so
+ * the deficit rate, and whether it exists in the helper at all, can be read
+ * off one short hardware run.  This writes to stderr only: no output byte,
+ * delivery order, record grouping or scheduling decision changes.
+ */
+static uint64_t monotonic_us(void)
+{
+    struct timespec ts;
+
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+        return 0;
+    return (uint64_t)ts.tv_sec * 1000000u + (uint64_t)ts.tv_nsec / 1000u;
+}
+
+static void scheduler_log_progress(struct output_state *output)
+{
+    uint64_t now;
+    uint64_t elapsed_us;
+    uint64_t expected;
+    uint64_t target;
+    int rate_hz = output->hold_rate_hz ? output->hold_rate_hz : 48000;
+
+    if ((++output->sched_log_poll & 0xffu) != 0u)
+        return;
+    now = monotonic_us();
+    if (!now)
+        return;
+    if (!output->sched_log_start_us) {
+        output->sched_log_start_us = now;
+        output->sched_log_next_us = now + 1000000u;
+        return;
+    }
+    if (now < output->sched_log_next_us)
+        return;
+    output->sched_log_next_us = now + 1000000u;
+    elapsed_us = now - output->sched_log_start_us;
+    expected = elapsed_us * (uint64_t)rate_hz / 1000000u;
+    target = scheduler_pcm_delivery_target(output, output->max_video_pts);
+    fprintf(stderr,
+            "media_player_helper: sched elapsed_us=%llu emitted=%llu "
+            "expected=%llu delta=%lld target=%llu max_video_pts=%llu "
+            "held=%zu queued_video=%zu video_bytes=%llu\n",
+            (unsigned long long)elapsed_us,
+            (unsigned long long)output->pcm_emitted_frames,
+            (unsigned long long)expected,
+            (long long)expected - (long long)output->pcm_emitted_frames,
+            (unsigned long long)target,
+            (unsigned long long)output->max_video_pts,
+            hold_available(output),
+            output->video_queued_bytes,
+            (unsigned long long)output->video_bytes);
+}
+
+/*
  * Program Stream packet order is not a delivery schedule: a mux may place
  * several pictures between audio PES packets.  Once startup is released, keep
  * video in a bounded lookahead queue and admit each timestamped chunk only
@@ -757,6 +820,8 @@ static int scheduler_drain(struct output_state *output, int at_eof)
         if (due && hold_emit_frames(output, due) < 0)
             return -1;
     }
+    if (output->scheduler_started && !output->hold_active)
+        scheduler_log_progress(output);
     return 0;
 }
 
