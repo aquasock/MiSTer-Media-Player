@@ -365,12 +365,8 @@ module tb_h262_dense_publication_order;
                        dut.b_candidate,dut.b_seen);
         end
 
-        // I reconstruction completion is modeled as immediately acknowledged,
-        // while the real front end still drives the per-picture I capability
-        // window. The compiled shell gates the legacy observer after the first
-        // B header; enforce every error from that point forward, including all
-        // publication-order checks.
-        if(probe_error&&dut.b_picture_observed)
+        // Every owned I/P/B parser error is visible for the whole stream.
+        if(probe_error)
             $fatal(1,"publication sequence error source=%0d detail=%0d byte=%0d p_headers=%0d p_publications=%0d b_headers=%0d b_persist=%0d active=%0d completed=%0d reference_valid=%0d reference=%0d pictures=%0d promotions=%0d",
                    probe_error_source,publication_error_detail,stream_index,
                    dut.p_header_count,dut.p_publication_count,

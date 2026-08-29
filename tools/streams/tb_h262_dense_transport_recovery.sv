@@ -7,6 +7,7 @@ module tb_h262_b_transport_abort;
     reg [7:0] stream_data=0;
     integer accepted=0,stall_cycles=0,index;
     wire stream_ready,probe_error;
+    wire [3:0] probe_error_source;
 
     always #5 clk=~clk;
 
@@ -18,7 +19,7 @@ module tb_h262_b_transport_abort;
         .pipeline_block_done(1'b1),.recon_block_complete(1'b1),
         .p_persistence_complete(1'b0),
         .p_row_persistence_complete(1'b0),
-        .probe_error(probe_error)
+        .probe_error(probe_error),.probe_error_source(probe_error_source)
     );
 
     task automatic send_byte(input [7:0] value);
@@ -62,8 +63,17 @@ module tb_h262_b_transport_abort;
         if(stall_cycles!=0)$fatal(1,"post-abort drain stalled %0d cycles",stall_cycles);
         release dut.b_error;
 
-        $display("TRANSPORT_RECOVERY_RESULT accepted=%0d stalls=%0d inflight=%0d ready=%0d error=%0d",
-                 accepted,stall_cycles,dut.b_picture_inflight,stream_ready,probe_error);
+        // A B transaction must not permanently suppress a later I/P parser
+        // failure.  Model that later owned error at the wrapper boundary and
+        // require both the aggregate flag and its source code.
+        force dut.bookkeeper_error=1'b1;
+        repeat(2)@(posedge clk);
+        if(!probe_error||probe_error_source!=4'd1)
+            $fatal(1,"post-B I error was hidden source=%0d",probe_error_source);
+        release dut.bookkeeper_error;
+
+        $display("TRANSPORT_RECOVERY_RESULT accepted=%0d stalls=%0d inflight=%0d ready=%0d post_b_i_error_visible=1",
+                 accepted,stall_cycles,dut.b_picture_inflight,stream_ready);
         $finish;
     end
 

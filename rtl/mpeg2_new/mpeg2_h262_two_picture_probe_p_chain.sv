@@ -84,7 +84,7 @@ wire picture_start_now=(picture_window_next==32'h00000100);reg picture_header_ca
 // Preserve every P/B header and persistence event through the complete stream;
 // saturation at 3/7 made the first B of the second GOP indistinguishable from
 // the already-settled first-GOP state.
-reg[7:0] p_header_count;reg consecutive_candidate_seen;reg b_picture_observed,b_picture_inflight,b_persistence_verified;
+reg[7:0] p_header_count;reg consecutive_candidate_seen;reg b_picture_inflight,b_persistence_verified;
 reg[7:0] b_header_count,b_persist_count;
 wire b_header_now=stream_valid&&picture_header_capture&&picture_header_second_byte&&(stream_data[5:3]==3'b011);
 wire persistence_edge=p_persistence_complete&&!p_persistence_d;
@@ -110,7 +110,7 @@ always @(posedge clk)begin
   b_reference_publication_pending<=0;p_persistence_d<=0;p_publication_count<=0;publication_error<=0;publication_error_detail_reg<=0;picture_complete_pulse<=0;active_frame_bank_reg<=0;completed_frame_bank_reg<=0;
   picture_count_reg<=0;reference_frame_valid_reg<=0;reference_frame_bank_reg<=0;previous_reference_frame_bank_reg<=0;reference_promotion_count_reg<=0;
   picture_window<=0;picture_header_capture<=0;picture_header_second_byte<=0;p_header_count<=0;consecutive_candidate_seen<=0;
-  b_picture_observed<=0;b_picture_inflight<=0;b_persistence_verified<=0;b_header_count<=0;b_persist_count<=0;
+  b_picture_inflight<=0;b_persistence_verified<=0;b_header_count<=0;b_persist_count<=0;
  end else begin
   p_persistence_d<=p_persistence_complete;picture_complete_pulse<=0;
 
@@ -125,7 +125,7 @@ always @(posedge clk)begin
       if(p_header_count!=8'hff)p_header_count<=p_header_count+1'b1;
       if(p_header_count>=1)consecutive_candidate_seen<=1;
      end else if(stream_data[5:3]==3'b011)begin
-      b_picture_observed<=1;b_picture_inflight<=1;b_persistence_verified<=0;
+      b_picture_inflight<=1;b_persistence_verified<=0;
       if(b_header_count!=8'hff)b_header_count<=b_header_count+1'b1;
       // In coded order the future reference P precedes each B.  Do not accept
       // a B transaction if an observed P header has not actually persisted.
@@ -243,23 +243,20 @@ wire b_persistence_wait=b_picture_inflight&&b_seen&&!b_persistence_verified&&!b_
 assign stream_ready=(b_picture_inflight?1'b1:parser_ready)&&!p_hold_effective&&!b_parse_hold&&!b_persistence_wait;
 wire b_accept_error=b_error||publication_error||reference_progress_error;
 assign b_user_success=b_final_success&&!b_accept_error;
-// Entry 289: p_error_raw is gated by b_picture_observed because a controlled
-// pattern observer's subset rejection may still be owned by another observer.
-// p_unsupported_raw is not such a rejection: it means no engine claimed the
-// picture, so it must reach acceptance ungated or the stream hangs instead of
-// reporting.
-assign probe_error=(b_picture_observed?1'b0:bookkeeper_error)||
-                   (b_picture_observed?1'b0:p_error_raw)||
+// The P controller now exports only functional failures and unsupported
+// pictures; its historical unowned subset rejections are already removed at
+// their source.  Report both I and P errors for the whole stream.  The former
+// sticky b_picture_observed mask hid every I/P failure after the first B.
+assign probe_error=bookkeeper_error||
+                   p_error_raw||
                    p_unsupported_raw||
                    b_error||publication_error||reference_progress_error;
 
 // kate - Commit 179 observability only.  Priority order matches the OR above.
-wire bookkeeper_error_gated=b_picture_observed?1'b0:bookkeeper_error;
-wire p_error_gated=b_picture_observed?1'b0:p_error_raw;
 assign probe_error_source=
     p_unsupported_raw         ? 4'd10 :
-    bookkeeper_error_gated    ? 4'd1 :
-    p_error_gated             ? 4'd2 :
+    bookkeeper_error          ? 4'd1 :
+    p_error_raw               ? 4'd2 :
     b_error                   ? 4'd3 :
     publication_error         ? 4'd4 :
     reference_progress_error  ? 4'd5 : 4'd0;
