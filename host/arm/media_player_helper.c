@@ -1507,16 +1507,27 @@ static int preflight_mp3(struct media_source *input)
     uint8_t prefix[10];
     size_t prefix_size = 0;
     size_t count;
+    size_t read_count;
     size_t offset = 0;
     mp3dec_t decoder;
 
     if (read_mp3_prefix(input, prefix, &prefix_size) < 0)
         return -1;
     memcpy(buffer, prefix, prefix_size);
-    count = prefix_size + media_source_read(
+    read_count = media_source_read(
         input, buffer + prefix_size, sizeof(buffer) - prefix_size);
+    count = prefix_size + read_count;
     if (media_source_error(input))
         return -1;
+    /*
+     * If this bounded read reached EOF, remove terminal ID3v1 before asking
+     * minimp3 to validate its following-frame chain. Otherwise a short file
+     * with exactly ten MPEG frames can make the tag look like a failed
+     * eleventh sync candidate even though every audio frame is complete.
+     */
+    if (read_count < sizeof(buffer) - prefix_size && count >= 128u &&
+        !memcmp(buffer + count - 128u, "TAG", 3))
+        count -= 128u;
     mp3dec_init(&decoder);
     while (offset < count) {
         mp3dec_frame_info_t info;
