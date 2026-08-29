@@ -1,3 +1,32 @@
+## 711 COMMIT Unreleased ??? 2026-08-29T16:48:02-07:00
+
+#### Coming From:
+
+Unreleased 17336f8
+
+#### Purpose:
+
+Perform one user-authorized seed-17 rebuild of the simulation-qualified interlaced decoder after seed 20 narrowly misses HDMI setup timing.
+
+#### Outcome:
+
+The user explicitly authorizes one reseed and delegates the seed choice after exact source `17336f8` fits normally but fails the full-chip HDMI PLL output-clock setup gate by 0.048 ns.  Seed 17 is selected from project evidence: the v0.8.0 timing-sensitive HDMI/scaler build improved from a 0.070 ns seed-16 failure to positive 0.243 ns at seed 17 and used that result for release, while seed 20 has already been exercised on the current source.  Change only the fitter seed assignment from 20 to 17, preserving production RTL, clocks, timing constraints, Main, helper and all simulation-qualified behavior.  Retain the rejected seed-20 build and use a separate clean exact-source checkout for one seed-17 compile; this is not authorization for a seed sweep, constraint waiver, installation or hardware playback.
+
+#### Next Steps:
+
+Publish the seed-only source change, verify that `MediaPlayer.qsf` is its only functional difference from `17336f8`, and perform one clean Quartus Prime 17.0.2 compile.  Audit packed resources and all full, decoder and video timing categories against both the accepted `b9c2657` seed-20 baseline and rejected `17336f8` seed-20 build.  Preserve a timing-clean RBF as the sole candidate without installing it; if seed 17 fails compilation or any required timing category, stop without another reseed.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 710 COMMIT Unreleased 17336f8 2026-08-29T06:55:07-07:00
 
 #### Coming From:
@@ -1267,39 +1296,6 @@ Finish the refined full-opening tests and numerical controls, retain exact sourc
 - tools/streams/tb_h262_live_native_presentation.svh
 - tools/streams/analyze_original_dvd_timing.py
 - tools/streams/test_original_dvd_timing.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 671 COMMIT Unreleased 024158a 2026-08-28T04:04:55-07:00
-
-#### Coming From:
-
-Unreleased c8bd628
-
-#### Purpose:
-
-Correct DVD picture admission and completion metadata ownership before qualifying and installing a new playback candidate.
-
-#### Outcome:
-
-The user approves the production fix, focused and full-opening validation, one clean timing-audited FPGA build and verified installation. Initial implementation 024158a retains a separate retiring descriptor, blocks a following reference payload during B drain, preserves its release classification and removes stale promotion-count permission to bind an already displayed reference. Focused validation is in progress; no FPGA build or installation is yet performed. Entry 670 establishes reference over-admission during B drain and an early following-header race in reference binding and metadata retirement. Preserve retiring picture identity, timestamp validity and field descriptors until persistence; distinguish accepted header classification from payload capacity; retain same-edge release events and bind an early B header to its actual completing reference. Keep decoder arithmetic, physical buffers, clocks, constraints, Main, helper and placement seed unchanged. Development and commits remain on the Pi master branch, with resource-intensive checks and compilation on the build PC at 10.10.0.42. Installation on MiSTer 10.10.0.30 is conditional on passing simulation and timing, and playback remains user controlled.
-
-#### Next Steps:
-
-Publish this approved proposal, implement the scheduler and metadata-owner correction, and require both reduced failures to pass alongside existing film, timestamp and ownership regressions. Run the full 289-picture original opening under both documented memory-service cases, requiring each picture once in display order with its own metadata and authored cadence, plus unchanged paired numerical bounds. Only after these gates pass, publish the exact build source and perform one clean Quartus build with timing, resource and warning review. If the build fails, pause for reevaluation without seed retries. If it passes, preserve the installed candidates, transfer and hash-verify the new core without changing Main or helper, and provide original-audio replay instructions and recorded evidence. Stop for approval if new findings materially change this boundary.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- rtl/mpeg2_new/mpeg2_h262_picture_timestamp.sv
-- tools/streams/tb_h262_film_reorder_timestamp.sv
-- tools/streams/tb_h262_picture_timestamp.sv
-- tools/streams/run_film_presentation.sh
 
 #### Status:
 
