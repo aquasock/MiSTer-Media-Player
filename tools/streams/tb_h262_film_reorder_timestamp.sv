@@ -105,6 +105,7 @@ initial begin
   scheduler.last_bound_reference_bank=0;
   scheduler.last_bound_reference_count=8'd10;
   scheduler.reference_headers_inflight=0;
+  scheduler.reference_header_count=8'd11;
   @(negedge clk);start=1;is_b=1;is_i=0;
   @(negedge clk);start=0;repeat(3)@(negedge clk);
   if(error||!scheduler.reorder_active||
@@ -268,7 +269,10 @@ initial begin
   picture(0,1,0,1,97507,1);
   field_end(0,0,0,1,1);field_end(0,0,0,1,1);field_end(0,0,1,0,0);
   @(negedge clk);start=1;is_b=1;is_i=0;
-  @(negedge clk);start=0;completed=active;reference=active;active=0;
+  @(negedge clk);start=0;
+  if(scheduler.reference_header_count==promoted)
+   $fatal(1,"early B lost unpublished reference generation");
+  completed=active;reference=active;active=0;
   promoted=promoted+1'b1;waiting=1;
   @(negedge clk);waiting=0;repeat(4)@(negedge clk);
   $display("EARLY_B_REFERENCE_STATE future=%0d pending=%0d descriptor=%0d reference=%0d promoted=%0d bound_count=%0d",

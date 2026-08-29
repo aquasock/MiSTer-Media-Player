@@ -93,6 +93,10 @@ reg deferred_reference_payload;
 // public completion. Keep its classification permission with that completion
 // instead of leaving the new pending slot unreleased and overwritable.
 reg [1:0] reference_headers_inflight;
+// Exact modulo generation of accepted I/P headers.  Comparing it with the
+// publication counter distinguishes a genuinely unpublished successor from
+// the conservative two-bit overlap occupancy above.
+reg [7:0] reference_header_count;
 reg [1:0] active_frame_bank_q;
 reg early_reference_release;
 wire reference_completed = frame_waiting || (active_frame_bank != active_frame_bank_q);
@@ -362,6 +366,7 @@ always @(posedge clk) begin
         deferred_queued_b_start<=0;
         deferred_reference_payload<=0;
         reference_headers_inflight<=0;
+        reference_header_count<=0;
         active_frame_bank_q<=0;
         early_reference_release<=0;
         deferred_ordinary_b_start<=0;
@@ -396,6 +401,8 @@ always @(posedge clk) begin
             deferred_ordinary_b_start<=0;
         active_frame_bank_q<=active_frame_bank;
         if(!reorder_active)ordinary_drain_overlap<=0;
+        if(non_b_picture_start)
+            reference_header_count<=reference_header_count+1'b1;
         case ({non_b_picture_start,reference_completed})
             2'b10: if(reference_headers_inflight!=2)
                        reference_headers_inflight<=reference_headers_inflight+1'b1;
@@ -655,15 +662,16 @@ always @(posedge clk) begin
                 // A newer promoted generation may already be on screen when
                 // presentation releases the compressed stream immediately
                 // before this B header.  It is the future reference only when
-                // no still-unpublished I/P header can supersede it.  The
-                // inflight guard retains the early-B protection where the
-                // displayed reference is deliberately the older generation.
+                // the accepted-header generation equals the publication
+                // generation, proving no still-unpublished I/P can supersede
+                // it.  Unequal generations retain the early-B protection.
                 end else if(!display_scratch&&
                             ((display_frame_bank!=reference_frame_bank)||
                              (last_bound_reference_valid&&
                               (reference_promotion_count!=
                                last_bound_reference_count)&&
-                              (reference_headers_inflight==0))))begin
+                              (reference_header_count==
+                               reference_promotion_count))))begin
                     future_frame_bank<=reference_frame_bank;
                     future_reference_pending<=0;
                     last_bound_reference_valid<=1;
