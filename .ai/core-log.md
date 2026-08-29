@@ -1,4 +1,4 @@
-## 692 COMMIT Unreleased ??? 2026-08-28T19:55:35-07:00
+## 692 COMMIT Unreleased ??? 2026-08-28T20:39:32-07:00
 
 #### Coming From:
 
@@ -6,23 +6,19 @@ Unreleased 8423f20
 
 #### Purpose:
 
-Reproduce the entry 691 long-duration audio underrun off hardware and instrument the helper delivery horizon without changing output bytes.
+Instrument helper PCM delivery against the sink clock so the entry 691 audio deficit can be measured on one short hardware run.
 
 #### Outcome:
 
-This entry is the approved plan for the cycle and its commit does not exist yet. Analysis of the entry 691 source on the build PC shows the media is unremarkable at the failure point: steady twenty-four frame per second three-two pulldown film, sustained 7.4 to 8.1 megabit per second video from second eight through second ninety-five with second eighty-three no higher than its neighbours, no group of pictures or timestamp discontinuity, AC-3 spaced at a uniform thirty-two milliseconds with only twenty-four sixty-four millisecond doubles spread evenly from second six onward, and a maximum audio interleave gap of 88,064 source bytes occurring at seconds forty-two, forty-seven, fifty-three, seventy-two, one hundred twenty-three and one hundred forty-four but not at eighty-three. The helper delivered smoothly across the failure, submitting approximately 1.1 megabytes per second continuously with 88,892,588 bytes at eighty seconds, 92,264,006 at eighty-three and 95,643,304 at eighty-six, and all 275 would-block events confined to the first nineteen milliseconds of startup. The trigger is therefore neither a stream event nor host supply, and the missing measurement is the audio-versus-video composition of the helper's own submission over time, which the current log reports only as a total. The wrap of the thirty-two bit presentation counter at 71.58 seconds is noted as a coincidence with the 83.5 second failure but is not the working hypothesis, because a wrap cause would recur roughly every 71.58 seconds and produce approximately sixteen dropouts across the nineteen minute run rather than the few the user reports. The plan adds log-only instrumentation to the helper covering the delivery horizon, guard refills and the audio and video byte split, proven to leave output bytes unchanged as entry 687 established; adds a deterministic generator under tools/streams that synthesizes a multi-minute transport matching the measured profile so no movie-derived media is committed and the user can regenerate it locally; and drives the existing isolated harness with that stream to reproduce the starvation off hardware. Success is a deterministic off-hardware reproduction of an audio underrun in a long paced case, or a demonstrated absence of one that justifies a single instrumented hardware run instead. No correction is designed in this cycle, and FIFO sizes, startup behavior, timestamp format, video bytes and FPGA production logic are not to be touched.
+This entry is the approved plan for the cycle and its commit does not exist yet; it replaces an earlier and wider plan for the same number that proposed a synthetic long-stream generator and harness reproduction, which the following evidence made unnecessary. A second lap-timed hardware run of the same file underran first at approximately 85.4 seconds, against 83.5 seconds in entry 691, measured the same three independent ways, so the failure reproduces within two seconds and the test loop is ninety seconds rather than nineteen minutes. The user's stopwatch record of at least nine cutouts confirms recurrence but its coverage varies with attention, so it is treated as a lower bound on frequency and not as a map of where the fault lies. Full-file analysis of the source shows no event to blame: mean video rate 6.25 megabits per second with a maximum of 8.26, all 234 audio interleave gaps at or under 88,082 bytes with none above one hundred thousand, and second eighty-four in no way distinguished from its neighbours. The audio sink is exact, since CLK_AUDIO is 24.576 megahertz and forty-eight kilohertz is one sample per 512 clocks, so consumption cannot drift; delivery, however, is paced from video timestamps, because the delivery target is the video presentation timestamp converted to frames plus a fixed 4,096 frame reserve. A systematic shortfall of roughly fifty to one hundred frames per second against that reserve empties it in the observed time and cannot be reached by a twelve second clip. The tempting explanation, that video presents slow at a measured 23.93 frames per second against 23.976 nominal, is deliberately not adopted: that figure is computed against a declared sixty megahertz profiler constant rather than a measured clock, and a genuine error of that size would drift lip sync about two seconds across nineteen minutes, which the user's observation of perfect sync contradicts. The cycle therefore measures rather than assumes, adding a once-per-second stderr report of elapsed monotonic time, frames actually emitted, frames the sink will have consumed at its exact rate, the signed difference, the current delivery target, the video timeline and the queue depths. Equivalence is proven rather than asserted: baseline and instrumented native helpers produce byte-identical 12,818,397 byte transports in both HDMI and S/PDIF modes, and a throttled run at approximately hardware transport rate reproduces that identical transport while emitting the new report. Both binaries build clean under -Wall -Wextra -Werror, and the ARM helper is built with MiSTer's official ARM GNU 10.2 toolchain.
 
 #### Next Steps:
 
-Implement the instrumentation and the generator, run the long paced case in the harness, and record what the horizon and guard refills do at the point audio runs dry. If the reproduction succeeds, design the correction against the deterministic case in a following cycle and keep it as a regression. If it does not reproduce, put the instrumented helper on the MiSTer for one run of the same file and read the horizon at the failure point rather than widening the harness further. The profiler latching its snapshot on the first nonzero error flag hides recurrence and may need a counted underrun record, but that is an FPGA change and must not be bundled with a helper correction. The HDMI session of the bounded opening still has no telemetry on record and remains outstanding from entry 690.
+Install the instrumented helper after user authorization, with backup and readback hash and the accepted bitstream untouched, then play the same file over S/PDIF for about two minutes, past the eighty-five second failure, and capture the log while the session is still resident. If the reported difference grows steadily at the rate the reserve requires, the deficit is in the helper's own delivery and the correction belongs in its pacing; if emitted tracks the sink clock and the difference stays flat while the hardware still flags underrun, the deficit is downstream of the helper and the next cycle moves to the FPGA audio path instead. Design no correction before that number is read. The profiler latching its snapshot on the first nonzero error flag still hides recurrence and may need a counted underrun record, which is an FPGA change and must not be bundled with a helper correction. The HDMI session of the bounded opening remains outstanding from entry 690.
 
 #### Files Modified:
 
 - host/arm/media_player_helper.c
-- tools/streams/generate_long_paced_transport.py
-- tools/streams/run_long_paced_audio_delivery.sh
-- tools/streams/analyze_long_paced_audio_delivery.py
-- tools/streams/tb_h262_live_audio_transport.svh
 
 #### Status:
 
@@ -1220,6 +1216,35 @@ The user replayed test four and reports video and audio are good. Helper-first c
 #### Next Steps:
 
 The field-DCT gate can be treated as functionally accepted for development purposes on the strength of tests one, four and seven, while remembering that this gate decodes field DCT and does not make commercial discs play. Do not prepare a release on this basis: the unexplained logic decrease should be understood first, because a release should not ship a resource change nobody can account for, and tests two, three, five and six would need replaying for a release-grade regression. Investigate the capture-path variation as its own scoped question, since it now has a specific signature of every eighth pixel column, a reproducible test of capturing an unchanged frame twice, and consistent magnitudes across two fixtures. Keep the reduced HDMI setup margin visible and reseed rather than restructure if a later change pushes that category negative. The next decoder milestone remains unapproved and unscoped; interlaced P and B is the gate that would make commercial discs play, and the deferred field-picture gate still needs either a non-ffmpeg generator or a real disc sample because ffmpeg cannot encode field pictures. Preserve restricted core.md and the forty-entry ring.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [x] Passed
+
+---
+
+## 653 COMMIT Unreleased 4777c59 2026-08-27T22:34:30-07:00
+
+#### Coming From:
+
+Unreleased 4777c59
+
+#### Purpose:
+
+Confirm P and B picture decoding is unchanged on the field-DCT bitstream and localise the entry 644 screenshot variation.
+
+#### Outcome:
+
+The user replayed test seven, the only fixture exercising P and B pictures, and reports it looks and sounds perfect. Helper-first collection preserved a log distinct from the test one capture and identifies `test_7_progressive_ipb.mpg` with 11,954,879 bytes of video, 500 audio frames and 576,000 emitted samples, exit zero, and all 882 pipe reads reconciling to 14,439,298 completed transport bytes. Every schema-19 counter matches the entry 628 capture taken on the released `61a2fed2` bitstream, including 11,954,645 accepted video bytes, 121 reference and 239 B pictures, 360 displayed pictures, 359 swaps, final picture type three, zero decoder and presentation errors, no audio underrun or PCM protocol fault, zero deadline gaps, and the distinctive twenty-four timestamp advance conflicts and single gap outlier that fixture has always produced; only the largest recorded gap differs, by two clocks. The raster comparison produced the more valuable result. The first capture differed from the released-bitstream baseline at 7,640 of 382,992 compared pixels, every one at x modulo eight equal to one, which is exactly the signature entry 644 recorded and could not isolate. A second screenshot taken without replaying anything, with the core counters verified identical between the two captures, is pixel-identical to that baseline with zero mismatches, while differing from the first capture at the same 7,640 positions. An unchanged completed frame therefore yields both a pixel-exact capture and a differing one. That establishes two things entry 644 left open: the decoded content on this bitstream is identical to what the released bitstream produced, so P and B reconstruction is unaffected by the writer's capture-counter and untruncated-origin changes; and the variation lies in the screenshot capture or readback path rather than in the decoder or the framebuffer content, since neither changed between the two captures. The mechanism within that path is still not identified and the observation remains open on that narrower basis. Entry 644's conclusion that the variation must not be attributed to the operating system or to any source change is confirmed rather than overturned. Passed records this regression only. Tests one and seven have now passed on this bitstream; tests two through six remain unreplayed, and the two items carried from the build remain open, being the unexplained decrease of 372 ALMs and 912 registers and the HDMI setup margin at positive 0.126 nanoseconds.
+
+#### Next Steps:
+
+Treat the raster comparison for progressive content as requiring a repeat capture, because a single screenshot can differ from an identical frame; compare the best of two captures rather than reporting the first as a regression. Replay test four, the progressive all-I control, and optionally tests two, three, five and six, though those carry the same bar and line content already covered by test one's pixel-identical result. Only when the remaining fixtures pass should the field-DCT gate be treated as closed and any release considered. Investigate the capture-path variation as its own scoped question rather than inside a decoder cycle, since it now has a specific signature of every eighth pixel column and a reproducible test of capturing the same frame twice. Resolve the unexplained logic decrease before starting the next feature, and keep the reduced HDMI setup margin visible, reseeding rather than restructuring if a later change pushes that category negative. Interlaced P and B for interlaced streams remain the gate that would make commercial discs play and are unstarted; the deferred field-picture gate still needs either a non-ffmpeg generator or a real disc sample. Preserve restricted core.md and the forty-entry ring.
 
 #### Files Modified:
 
