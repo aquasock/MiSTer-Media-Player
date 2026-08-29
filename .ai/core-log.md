@@ -1,4 +1,4 @@
-## 703 COMMIT Unreleased ??? 2026-08-29T03:31:55-07:00
+## 703 COMMIT Unreleased 8404035 2026-08-29T03:31:55-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Adopt the U.S. National Archives MPD-D2 DVD-from-film profile as the project's c
 
 #### Outcome:
 
-The official NARA MPD-D2 web profile will be added to the active source catalog and controlled records as the project's release media baseline.  The target carries MPEG-2 Main Profile at Main Level in VOB and Program Stream form, temporary approximately eight-megabit-per-second standard-definition source, 720 by 480 constant-bit-rate video at 29.97 frames per second, interlaced top-field-first single-pass encoding, and two-channel constant-bit-rate AC-3 at 256 kilobits per second, 48 kilohertz and a listed sixteen-bit sample size.  The record will preserve the page's December 22, 2023 review date and distinguish this adopted distribution profile from the normative H.262 and H.222.0 decode rules and from the separately controlled DVD filesystem, navigation, menu and CSS boundaries.
+Controlled reference commit `8404035` adds the official NARA MPD-D2 web profile to the active source catalog, routing table and fast index as record `NARA-001`, and adopts it as the project's release media baseline.  The target carries MPEG-2 Main Profile at Main Level in VOB and Program Stream form, temporary eight-megabit-per-second standard-definition source, 720 by 480 constant-bit-rate video at 29.97 frames per second, interlaced top-field-first single-pass encoding, and two-channel constant-bit-rate AC-3 at 256 kilobits per second, 48 kilohertz and a listed sixteen-bit sample size.  The controlled source preserves NARA's December 22, 2023 page-review date and the August 29, 2026 verification date.  It explicitly does not replace the normative H.262, H.222.0, DVD application, filesystem, navigation, menu or CSS sources, and it records that MPD-D2 does not constrain `picture_structure`, `motion_type`, macroblock `dct_type`, GOP design or quantization matrices, so a frame-picture-only subset cannot be inferred from the profile.  No RTL, helper, RBF or MiSTer state changed.
 
 #### Next Steps:
 
-Add one tightly coupled NARA profile record, active source-catalog entry, routing reference and fast index entry to `core-reference.md`, update its verification date and official-page list, and audit every core file against `core-syntax.md`.  Do not change decoder RTL, helper behavior, the built RBF or the MiSTer during this reference-only cycle; subsequent release qualification must construct or retain a conforming target stream and verify each observable property independently.
+Use `NARA-001` as the controlling media baseline when defining release fixtures and acceptance language.  Retain conforming streams that exercise the implemented H.262 syntax envelope and verify complete playback, top-field-first cadence, decoded HDMI stereo and AC-3 S/PDIF passthrough, while declaring any profile-permitted syntax not covered by those streams as an explicit limitation.  The fit-qualified RBF and matching helper remain ready for a separately authorized regression and S/PDIF hardware checkpoint before field DCT and production interlaced P/B admission are added.
 
 #### Files Modified:
 
