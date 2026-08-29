@@ -1,3 +1,63 @@
+## 707 COMMIT Unreleased d89c02b 2026-08-29T04:29:02-07:00
+
+#### Coming From:
+
+Unreleased 736f64f
+
+#### Purpose:
+
+Complete interlaced frame-picture P/B field-DCT reconstruction and open the qualified field-motion and field-DCT paths for production decoding.
+
+#### Outcome:
+
+Published source `d89c02b` completes the field-DCT parser, metadata, raster and DDR-store path begun in `e7d4a10`, corrects prediction fetches to follow field-ordered luma rows, and applies the macroblock `dct_type` layout to coded and uncoded luma blocks alike so frame-ordered prediction cannot overwrite neighboring field rows.  P field-DCT prediction uses doubled-stride rectangles and a second parity rectangle only for frame-motion vertical half samples.  B field-DCT prediction reuses the two existing fetchers by direction, with up to two vertical-parity phases per direction, and the combined field-motion case selects the correct destination-field vector and reference-field parity without adding block memory.  The production P and B parser restrictions on clear `frame_pred_frame_dct` are removed, and the frontend now keeps native 480i ownership eligible across admitted interlaced I, P and B frame pictures.  Deterministic fixtures independently checked against FFmpeg cover P and B frame motion with field DCT, integer and horizontal, vertical and diagonal half samples, all luma layouts, chroma residuals, pure field motion, and the combined field-motion plus field-DCT case.  Each of the four production-path simulations compiles without the former test define and compares every reconstructed sample exactly, totaling 518,400 samples for the P-field fixture and 1,036,800 samples in each P/B fixture, with zero parser, raster, writer or presentation errors.  The unchanged progressive mixed-raster control compares 423,936 samples with zero mismatches above its established two-level tolerance, and the interlaced TFF, BFF, progressive and field-DCT I-picture controls retain zero out-of-tolerance pixels.  No Quartus build, RBF installation or MiSTer playback is claimed yet.
+
+#### Next Steps:
+
+Pull exact published source `d89c02b` into a fresh isolated build-PC checkout, run the broader decoder and native-presentation regression set, and then perform one clean Quartus Prime 17.0.2 build with the focused timing report.  Require a successful fit, positive timing in every required category and resource comparison against the 34,163-ALM, 532-RAM-block recovery baseline before producing a candidate RBF.  If those gates pass, generate a real interlaced National Archives profile Program Stream that exercises admitted P/B syntax for a controlled MiSTer playback test; keep field pictures, `repeat_first_field`, 576i and DVD navigation explicitly outside this checkpoint.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- MediaPlayer_top_01.svh
+- MediaPlayer_top_02.svh
+- MediaPlayer_top_03.svh
+- MediaPlayer_top_04.svh
+- README.md
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+- rtl/mpeg2_new/mpeg2_h262_frontend.sv
+- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
+- tools/streams/generate_test_field_motion_field_dct.py
+- tools/streams/generate_test_interlaced_field_dct_residual.py
+- tools/streams/h262common.py
+- tools/streams/run_b_field_motion.sh
+- tools/streams/run_field_motion_field_dct.sh
+- tools/streams/run_interlaced_field_dct_residual.sh
+- tools/streams/run_interlaced_field_motion.sh
+- tools/streams/tb_h262_field_motion_field_dct_pixels.sv
+- tools/streams/tb_h262_interlaced_field_dct_residual_pixels.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 706 COMMIT Unreleased 736f64f 2026-08-29T03:55:11-07:00
 
 #### Coming From:
@@ -1225,64 +1285,6 @@ The user reports several severe stutters near the beginning of the silent compar
 #### Next Steps:
 
 Obtain approval to extend the existing simulation coverage for the complete original opening with native field cadence, original timestamps, publication feedback and realistic memory contention, tracing unique picture identity, decode readiness, ownership holds, cadence eligibility and actual publication. Reproduce and isolate the video stall before selecting a production fix or another FPGA build; distinguish legal three-field holds and the known terminal timestamp gap from real misses, and reconcile the bank-derived counters against actual publications. Preserve the numerical reconstruction bounds and then retest the original audio path. No new files or user replay are needed for the evidence already collected.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 667 COMMIT Unreleased 6c1b621 2026-08-28T02:26:37-07:00
-
-#### Coming From:
-
-Unreleased 6c1b621
-
-#### Purpose:
-
-Capture original-opening playback with correlated audio/video stutter and prepare an unchanged-video silent comparison.
-
-#### Outcome:
-
-Following the instruction to load the dated candidate, the user reports that the original opening plays and the picture looks good when motion is smooth, but video stutters roughly every second and audio becomes scratchy at the same moments; the diagnostic overlay appears during playback and at the end. Two screenshots are byte-identical and show the Universal opening image. Checksum-valid schema-19 telemetry is an early latched error snapshot at 1.79571835 decoder-session seconds, not final playback totals: 327,302 accepted video bytes, 41 displayed pictures, 40 swaps, 23 reference and 20 B pictures, frame-rate code four, and error flags 0x0400 for audio underrun alone. Syntax, decode, reconstruction, buffer-ownership, PCM protocol and presentation error bits are clear at that instant, which does not prove the remainder of playback error-free or quantify image accuracy. The overlay profiler captures any nonzero error flag immediately and cannot update its totals afterward, explaining its appearance before playback finishes. PCM sample count 16,383 and FIFO-peak value 127 are saturated diagnostic fields, not actual buffer capacity; the PCM FIFO has 8,192 stereo samples. The 39 native deadline events use a fixed 29.97-frame expectation and cannot be treated as film-cadence failures without adapting interpretation to two/three-field pictures. The helper identifies the original clip and HDMI stereo PCM, transfers all 12,818,502 bytes in about 12.854 seconds, exits zero and reports no slow-path bytes; maximum poll occupancy is 7,558 microseconds and maximum poll-entry interval 20,867. Regenerated native transport matches the prior SHA256 exactly. Mapping its record positions onto sampled Main receipts finds uneven PCM delivery, including a 136.389-millisecond sampled interval containing 1,120 stereo frames against 6,547 frames of nominal consumption; this is not a gap with no transfers, not an audio-FIFO occupancy trace, and does not determine which side of the shared path caused starvation. Source inspection confirms that a pending blocked video byte or a full PCM sink can both stop the common extractor, so audio/video coupling is a plausible hypothesis, not yet the root cause. A separate silent Program Stream replaces 334 audio PES packets with equal-length padding while preserving all 5,109 video PES packets, their timestamps and pack positions. Original and silent helper outputs match all 10,334,393 video-plus-PTS bytes exactly, FFprobe finds only MPEG-2 video, and silent PCM output is empty. The new dvd_opening_video_only.mpg is installed with staged and final FTP readback SHA256 f30a2c7fb1f8e4a1647f8c49375ca72b21375195a2d0f15723c82539e8ecb4e5. No core, Main, helper, setting, source or build change is made and no replay is started by the agent. Capture, timing analysis and diagnostic generation/deployment manifests are retained under .ai/current_results/entry667_*, with local diagnostic reproduction material in output_files/entry667 and build-PC evidence in /home/vash/mister-builds/entry667. Hardware acceptance remains open.
-
-#### Next Steps:
-
-Have the user play dvd_opening_video_only.mpg once on the same dated candidate in Weave, expect silence, compare the stutter, and leave the final screen and helper log intact for capture. Smooth silent playback would implicate the audio/shared-delivery interaction; persisting stutter would require examining video decode and film presentation independently as well. The comparison preserves video and timestamps but intentionally selects the helper's silent scheduling path, so it does not by itself separate AC-3 computation from PCM scheduling or FIFO coupling. Preserve this first-underrun evidence and avoid another FPGA build or speculative buffer change until the comparison guides a proposed fix.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 666 COMMIT Unreleased 6c1b621 2026-08-28T02:14:41-07:00
-
-#### Coming From:
-
-Unreleased 6c1b621
-
-#### Purpose:
-
-Record verified candidate installation and preserve the first Weave capture while the loaded core remains unconfirmed.
-
-#### Outcome:
-
-The user explicitly authorizes installation, and the agent adds MediaPlayer_20260828.rbf and games/MediaPlayer/dvd_opening_original.mpg over FTP using separate staging names, hash-verified readback and rename. Final readback matches the qualified candidate and original opening exactly. Existing MediaPlayer.rbf remains the known-good 4777c59 image, and Main, helper and MediaPlayer_OLD.rbf remain byte-identical; no reload or playback is initiated by the agent. The user then reports transferring the files and seeing no playback in Weave mode, asks for a screenshot, and subsequently says the wrong file may have been run. Two captured screenshots are byte-identical and show a blank picture with the diagnostic overlay. Checksum-valid schema-19 telemetry reports fatal_or_no_progress after 141 accepted video bytes and 1,639 session cycles, error flags 1, frame-rate code 8, zero pictures, swaps and PCM samples, and PCM FIFO peak 127. The helper log identifies dvd_opening_original.mpg with HDMI decoded stereo, completes all 12,818,502 transport bytes and exits zero; both files on the SD card still match the package. The logical RBFNAME and CORENAME records both say MediaPlayer, but Main derives them from the core configuration string, so they cannot distinguish the preserved core from the dated candidate or prove which bitstream was running. This is an unconfirmed-core failed run, not acceptance or a confirmed regression of source 6c1b621. Installation, screenshots, decoded telemetry, helper log and capture manifest are retained under .ai/current_results/entry666_*. No source change, rebuild, replay or configuration change is made during capture.
-
-#### Next Steps:
-
-Have the user explicitly load MediaPlayer_20260828.rbf and then select dvd_opening_original.mpg once, keeping Weave and HDMI decoded stereo for a comparable test. No file recopy is needed. Preserve the next helper log and terminal state before replay and collect a new two-screenshot capture. Confirm the loaded candidate before attributing the early rejection to decoder logic or proposing changes; keep the narrow HDMI timing margin visible and preserve user control of playback.
 
 #### Files Modified:
 
