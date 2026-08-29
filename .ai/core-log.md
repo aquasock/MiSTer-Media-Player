@@ -1,3 +1,32 @@
+## 710 COMMIT Unreleased ??? 2026-08-29T06:55:07-07:00
+
+#### Coming From:
+
+Unreleased b9c2657
+
+#### Purpose:
+
+Prevent a following P picture from injecting motion records into an earlier P picture that has not yet persisted.
+
+#### Outcome:
+
+The approved correction is bounded by an exact hardware and simulation reproduction of the Coming to America field-picture test failure.  After the unique timing-qualified `b9c2657` RBF is explicitly loaded, hardware displays 63 pictures and freezes a checksum-valid schema-20 snapshot at clean-video byte 204,101 with error flags `0x0004`; the physical LEDs report USER 3, POWER 2 and DISK 7, identifying the generalized P prediction raster's row-terminator assertion.  An exact production-path replay reaches the same byte and assertion under both hardware-rate and fast presentation.  The failing row begins with motion base 675 and must receive 45 records, but receives 51: macroblocks 675 through 680 from the current P picture are followed by macroblocks 0 through 44 from the next P picture before the current row terminator arrives.  All 30,072 presented motion events are captured and none are dropped, excluding transport loss, and the parser, B engine, writer and presentation paths remain error-free.  The planned source change adds a P-overlap hold to the shared decoder shell after the following P header is classified whenever an earlier P header remains unpublished, then releases it on that earlier P persistence edge; it does not add a frame store, change syntax admission, alter clocks or touch helper or Main.
+
+#### Next Steps:
+
+Implement the header-bounded hold in `mpeg2_h262_two_picture_probe_p_chain.sv`, rerun the exact 6,751,008-byte failure stream through the production path and require all 361 pictures to complete with no prediction or publication error, then run the established mixed, field-motion, field-DCT and original DVD regressions.  If those gates pass, perform one clean Quartus seed-20 build with focused decoder and video timing audit; if timing fails, stop without retrying or reseeding.  Install and hardware-test a resulting timing-clean RBF only after readback verification.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 709 COMMIT Unreleased b9c2657 2026-08-29T06:09:31-07:00
 
 #### Coming From:
@@ -1260,35 +1289,6 @@ Publish this approved proposal, implement the scheduler and metadata-owner corre
 - tools/streams/tb_h262_film_reorder_timestamp.sv
 - tools/streams/tb_h262_picture_timestamp.sv
 - tools/streams/run_film_presentation.sh
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 670 COMMIT Unreleased c8bd628 2026-08-28T03:19:40-07:00
-
-#### Coming From:
-
-Unreleased 77859f9
-
-#### Purpose:
-
-Record full native-film reproduction of the original DVD stutter and isolate reference-admission and metadata-retirement failures.
-
-#### Outcome:
-
-The approved diagnostic completes on GUNSMOKE without changing production RTL, Main, helper, clocks, constraints, placement seed or the MiSTer. Native trace binaries use source e029f4f, numerical controls use 94b60b2, reduced regressions use 5548e4e and final analysis uses c8bd628. Both complete 289-picture runs, with one-cycle DDR reads and with sixteen-cycle reads plus sixteen busy cycles per 256-cycle period, produce 280 framebuffer publications, 279 bank swaps and 278 unique pictures: eleven decoded pictures are skipped and coded pictures 71 and 95 are repeated. The three largest bank-selection gaps match hardware ordinals 57, 71 and 89 and durations 116.815, 100.100 and 83.448 milliseconds to within one decoder clock. Both runs also match the hardware's 24 associated timestamps. The unique-picture counts are simulation evidence; the hardware barcode itself does not identify each picture. Seventeen published I-pictures carry stale TFF/RFF flags and the first picture loses PTS validity. A reduced admission test fails because a following P payload is permitted while the pending reference slot remains occupied during B drain. A second reduced test fails when a B header arrives one clock before its I-reference completion: the scheduler retains an older P bank and the metadata owner drops the retiring I descriptor. Both default controls pass. The full paired reconstruction qualification passes all 149,817,600 samples per run with unchanged source fingerprints; its CSVs and both native real-reference CSVs match entry 665 exactly, preserving maximum isolated error one, maximum real-reference error five, 102 samples above the old fixed-two bound and zero measured propagation-bound violations. Native cache, phase and overlap error flags remain clear. All twenty-five helper timestamps agree with authored cadence within 2.5 ticks, so the earlier terminal-gap caveat must not be applied to this actual transport as an explanation for the pauses. Initial harness attempts exposed a missing test RAM model, excessive legacy logging and a fast-soak watchdog limit of 10,000 cycles; the model is reused, logging bounded and native waits given a four-field diagnostic watchdog while the old default limit remains unchanged. Detailed traces, reduced failures, passing controls, source fingerprints and analysis are retained under .ai/current_results/entry670_* and output_files/entry669; PC working evidence remains in /home/vash/mister-builds/entry669. No new Quartus build or hardware acceptance is claimed.
-
-#### Next Steps:
-
-Obtain approval for a production fix that preserves retiring picture identity, PTS and field descriptors across the following-header handoff, blocks following P/I payloads when reference capacity is occupied, and binds early B headers to the actual completing reference. Require both reduced regressions to pass and all 289 pictures to publish once in order with correct metadata and authored film cadence under both memory cases, while retaining the paired numerical bounds. Only then perform a clean timing-audited FPGA build and retest original audio playback; additional shared audio-delivery coupling remains unexcluded. Do not change buffers, clocks or placement seeds speculatively.
-
-#### Files Modified:
-
-- tools/streams/analyze_original_dvd_timing.py
 
 #### Status:
 
