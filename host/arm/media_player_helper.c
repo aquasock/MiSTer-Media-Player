@@ -174,6 +174,7 @@ struct output_state {
     int audio_pes_seen;
     int silent_video_mode;
     int audio_only_mode;
+    int pcm_non_audio;       /* IEC 61937 burst records, never decoded PCM */
     int scheduler_enabled;
     int scheduler_started;
     uint32_t pts_window;      /* start-code scanner across queued payloads */
@@ -249,8 +250,8 @@ enum audio_codec {
  * is therefore made at launch rather than during playback.
  */
 enum audio_output {
-    AUDIO_OUT_HDMI = 0,     /* decoded stereo PCM, the accepted behaviour */
-    AUDIO_OUT_SPDIF         /* IEC 61937 bursts for an external decoder */
+    AUDIO_OUT_HDMI = 0,
+    AUDIO_OUT_SPDIF         /* PCM, or IEC 61937 only for AC-3/DTS */
 };
 
 struct audio_state {
@@ -426,17 +427,24 @@ static int emit_pcm_run(struct output_state *output,
      * only ever needed carrying here.  Records are always emitted stereo; a
      * mono frame is duplicated into both channels by write_pcm.
      *
-     * Entry 462: the mode byte's upper six bits carry how many frames follow,
+     * Entry 462: the mode byte carries how many frames follow,
      * so one record delivers a run instead of a single sample.  At one frame
      * per record the audio was three quarters of everything crossing the
      * shared path, and hardware measured a cost per record in late
      * presentations.
+     *
+     * Entry 699: bit seven distinguishes IEC 61937 bursts from decoded PCM.
+     * The output selection alone cannot make this decision: both kinds may be
+     * routed to S/PDIF, but only a burst may set IEC 60958 non-audio status.
+     * Five count bits still cover the helper's bounded sixteen-frame records.
      */
     record[0] = 0;
     record[1] = 0;
     record[2] = 1;
     record[3] = MEDIA_PLAYER_PCM_MARKER_CODE;
     record[4] = (uint8_t)((count << 2) | MEDIA_PLAYER_PCM_MODE_STEREO |
+                          (output->pcm_non_audio ?
+                              MEDIA_PLAYER_PCM_MODE_NON_AUDIO : 0) |
                           (rate_hz == 48000 ? MEDIA_PLAYER_PCM_MODE_48K : 0));
     for (i = 0; i < count; ++i) {
         uint16_t left_bits = (uint16_t)frames[i * 2u];
@@ -1002,6 +1010,7 @@ static int emit_burst(struct output_state *output, const uint8_t *frame,
     if (length & 1)
         burst[IEC61937_HEADER_WORDS + words] =
             (mp3d_sample_t)(int16_t)(uint16_t)(frame[length - 1] << 8);
+    output->pcm_non_audio = 1;
     return write_pcm(output, burst, samples_per_period, 2,
                      (int)PCM_SAMPLE_RATE);
 }
@@ -2138,7 +2147,7 @@ int main(int argc, char **argv)
      */
     fprintf(stderr, "media_player_helper: audio output %s\n",
             audio.output == AUDIO_OUT_SPDIF
-                ? "spdif (IEC 61937 passthrough for AC-3 and DTS)"
+                ? "spdif (decoded PCM; IEC 61937 for AC-3/DTS)"
                 : "hdmi (decoded stereo PCM)");
     if (read_exact(&input, signature, sizeof(signature)) < 0 ||
         media_source_rewind(&input) < 0) {

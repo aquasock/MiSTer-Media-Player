@@ -116,9 +116,9 @@ def analyze_inband(stream, sample_rate: int) -> dict[str, int | str | list[int]]
             if marker == PCM_MARKER:
                 if len(buffer) - position < 5:
                     break
-                # Entry 462: the mode byte's upper six bits carry the frame
-                # count, and zero is the earlier encoding of a single frame.
-                pcm_record_frames = (buffer[position + 4] >> 2) or 1
+                # Entry 699 reserves bit seven for IEC 61937 non-audio
+                # framing; bits six through two carry the frame count.
+                pcm_record_frames = ((buffer[position + 4] >> 2) & 0x1F) or 1
                 pcm_record_size = 5 + 4 * pcm_record_frames
                 if len(buffer) - position < pcm_record_size:
                     break

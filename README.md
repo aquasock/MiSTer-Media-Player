@@ -155,11 +155,13 @@ by the `Audio output` menu option together:
 | --- | --- | --- |
 | MPEG Layer II, 44.1 or 48 kHz | decoded to stereo | decoded to stereo |
 | Standalone MPEG-1 Layer III, 44.1 or 48 kHz | decoded to stereo | decoded to stereo |
+| WAV PCM, 44.1 or 48 kHz | decoded to stereo | decoded to stereo |
+| FLAC, 44.1 or 48 kHz | decoded to stereo | decoded to stereo |
 | AC-3, 48 kHz | decoded to stereo, LFE discarded | passed through as IEC 61937 for your receiver to decode |
 | DTS | refused, with a message in the helper log | passed through as IEC 61937 |
 
-The option mutes the output it is not driving, because both are fed from one
-stereo stream. So selecting HDMI silences S/PDIF and vice versa; a silent
+The option mutes the digital output it is not driving, because both are fed
+from one stream. So selecting HDMI silences S/PDIF and vice versa; a silent
 receiver in HDMI mode is the option working, not a fault. Passthrough carries
 the bitstream untouched, so volume and any mixing must not be applied to it, and
 DTS has no decoder here at all.

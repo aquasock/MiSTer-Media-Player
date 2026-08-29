@@ -23,6 +23,7 @@ import tempfile
 from pathlib import Path
 
 from generate_test_dvd_ac3_av import extract_ac3
+from verify_arm_av_pipeline import strip_records
 
 PA = 0xF872
 PB = 0x4E1F
@@ -123,6 +124,26 @@ def main() -> int:
             print(result.stderr[-4000:])
             raise SystemExit('helper failed in passthrough mode')
         raw = burst_pcm.read_bytes()
+
+        # The installed path uses the annotated stdout transport, not
+        # --pcm-out. Verify that every burst record carries the independent
+        # non-audio flag and that stripping those records reproduces the
+        # already byte-checked explicit burst stream.
+        transported = subprocess.run(
+            [str(args.helper), '--protocol', '1', '--audio-out', 'spdif',
+             '--source', f'file:{args.fixture.resolve()}'],
+            capture_output=True)
+        transport_stderr = transported.stderr.decode(errors='replace')
+        transport_tail_only = (args.allow_truncated_tail and
+                               'truncated or undecodable' in transport_stderr and
+                               bool(transported.stdout))
+        if transported.returncode and not transport_tail_only:
+            print(transport_stderr[-4000:])
+            raise SystemExit('helper failed in annotated passthrough mode')
+        _, _, inband_pcm, inband_end = strip_records(
+            transported.stdout, 48000, expected_non_audio=True)
+        inband_matches_explicit = inband_pcm == raw
+
         expect = args.data_type
         if expect is None:
             expect = 11 if args.codec == 'dts' else 1
@@ -154,6 +175,9 @@ def main() -> int:
             'fixture': str(args.fixture), 'helper': str(args.helper),
             'codec': args.codec, 'expected_data_type': expect,
             'stream_bytes': len(raw), 'bursts_parsed': len(bursts),
+            'inband_non_audio_marked': bool(inband_pcm),
+            'inband_end_records': inband_end,
+            'inband_matches_explicit': inband_matches_explicit,
             'period_samples_seen': sorted({b['period_samples'] for b in bursts}),
             'frame_lengths_seen': sorted({b['length_bytes'] for b in bursts}),
             'carried_bytes': len(carried), 'source_bytes': len(source_frames),
@@ -168,7 +192,9 @@ def main() -> int:
                      'the S/PDIF pin is bit transparent, both of which need '
                      'hardware.'}
         report['passed'] = (not problems and identical
-                            and report['decodes_match'] and bursts != [])
+                            and report['decodes_match'] and bursts != []
+                            and report['inband_non_audio_marked']
+                            and inband_end == 1 and inband_matches_explicit)
     if args.report:
         args.report.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))

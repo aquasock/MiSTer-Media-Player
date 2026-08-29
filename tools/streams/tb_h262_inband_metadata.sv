@@ -20,7 +20,7 @@ module tb_h262_inband_metadata;
     reg         metadata_ready = 1;
     wire [7:0]  metadata_count;
     wire [15:0] pcm_left,pcm_right;
-    wire pcm_stereo,pcm_rate_48k,pcm_valid,pcm_end;
+    wire pcm_stereo,pcm_rate_48k,pcm_non_audio,pcm_valid,pcm_end;
     reg pcm_ready = 1;
     wire [13:0] pcm_sample_count;
     wire pcm_protocol_error;
@@ -39,7 +39,8 @@ module tb_h262_inband_metadata;
         .metadata_valid(metadata_valid),.metadata_ready(metadata_ready),
         .metadata_count(metadata_count),
         .pcm_left(pcm_left),.pcm_right(pcm_right),.pcm_stereo(pcm_stereo),
-        .pcm_rate_48k(pcm_rate_48k),.pcm_valid(pcm_valid),.pcm_end(pcm_end),
+        .pcm_rate_48k(pcm_rate_48k),.pcm_non_audio(pcm_non_audio),
+        .pcm_valid(pcm_valid),.pcm_end(pcm_end),
         .pcm_ready(pcm_ready),.pcm_sample_count(pcm_sample_count),
         .pcm_protocol_error(pcm_protocol_error));
 
@@ -182,7 +183,7 @@ module tb_h262_inband_metadata;
             $fatal(1,"PCM records altered video output");
         if (pcm_seen !== 1 || pcm_end_seen !== 1 ||
             last_pcm_left !== 16'h1234 || last_pcm_right !== 16'hFEDC ||
-            !pcm_stereo || !pcm_rate_48k)
+            !pcm_stereo || !pcm_rate_48k || pcm_non_audio)
             $fatal(1,"PCM record decode failed");
 
         // ---- 7. final PCM byte waits for FIFO readiness without duplication ----
@@ -207,7 +208,7 @@ module tb_h262_inband_metadata;
         got_n = 0; pcm_seen = 0; pcm_end_seen = 0;
         send(8'hC3);
         send(8'h00); send(8'h00); send(8'h01); send(8'hB1);
-        send(8'h0F);                                   // 3 frames, 48k, stereo
+        send(8'h8F);                       // non-audio, 3 frames, 48k, stereo
         send(8'h00); send(8'h11); send(8'h22); send(8'h33);
         send(8'h44); send(8'h55); send(8'h66); send(8'h77);
         send(8'h88); send(8'h99); send(8'hAA); send(8'hBB);
@@ -216,7 +217,8 @@ module tb_h262_inband_metadata;
         if (got_n !== 2 || got[0] !== 8'hC3 || got[1] !== 8'h3C)
             $fatal(1,"multi-frame PCM record altered video output");
         if (pcm_seen !== 3 || last_pcm_left !== 16'h8899 ||
-            last_pcm_right !== 16'hAABB || !pcm_stereo || !pcm_rate_48k)
+            last_pcm_right !== 16'hAABB || !pcm_stereo || !pcm_rate_48k ||
+            !pcm_non_audio)
             $fatal(1,"multi-frame PCM decode failed seen=%0d l=%h r=%h",
                    pcm_seen, last_pcm_left, last_pcm_right);
         if (pcm_sample_count !== 14'd5)
@@ -238,6 +240,8 @@ module tb_h262_inband_metadata;
             last_pcm_right !== 16'h0708 || pcm_stereo !== 1'b1 ||
             pcm_rate_48k !== 1'b0)
             $fatal(1,"run backpressure lost or duplicated a frame seen=%0d",pcm_seen);
+        if (pcm_non_audio)
+            $fatal(1,"decoded PCM record did not clear non-audio state");
         if (pcm_sample_count !== 14'd7 || pcm_protocol_error)
             $fatal(1,"run telemetry wrong count=%0d error=%0d",
                    pcm_sample_count,pcm_protocol_error);

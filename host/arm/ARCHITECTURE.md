@@ -62,14 +62,15 @@ share a compilation unit:
    passthrough only, since no DTS decoder is present; a DTS track selected for
    HDMI output is refused rather than played as silence. DVD LPCM is still
    later.
-5. Audio output: `--audio-out hdmi` (default) emits that decoded stereo.
-   `--audio-out spdif` bypasses the decode stage for AC-3 and DTS and emits IEC 61937
-   bursts instead, carried unchanged on the existing PCM transport. AC-3 uses
+5. Audio output: `--audio-out hdmi` (default) sends decoded stereo to HDMI.
+   `--audio-out spdif` sends decoded MP2, MP3, WAV and FLAC stereo as ordinary
+   S/PDIF PCM. For AC-3 and DTS it bypasses the decode stage and emits IEC 61937
+   bursts instead, carried unchanged on the existing PCM transport and marked
+   by the transport's independent non-audio flag. AC-3 uses
    a fixed 1536-sample burst period; DTS carries its own sample count and uses
    512, 1024 or 2048 with the matching data type, so the period is read from
    the frame rather than assumed. The selection is made at launch because the decoder
-   runs here, so only this process can choose what to emit; MPEG Layers II and
-   III are unaffected and still emit decoded stereo in either mode. A burst is only
+   runs here, so only this process can choose what to emit. A burst is only
    audible as surround if nothing downstream scales it: any gain, mix or filter
    between here and the S/PDIF pin destroys it.
 6. Outputs: one annotated H.262-plus-PCM transport to Main, with the FPGA owning

@@ -88,7 +88,7 @@ def require_rejected_without_output(
 
 
 def strip_records(
-    data: bytes, expected_sample_rate: int,
+    data: bytes, expected_sample_rate: int, expected_non_audio: bool = False,
 ) -> tuple[bytes, list[int], bytes, int]:
     clean = bytearray()
     timestamps: list[int] = []
@@ -113,9 +113,14 @@ def strip_records(
                     f"PCM record mode 0x{mode:02x} does not identify "
                     f"{expected_sample_rate} Hz stereo (expected 0x{expected_mode:02x})"
                 )
-            # Entry 462: the mode byte's upper six bits carry the frame count,
-            # and zero is the earlier encoding of a single frame.
-            frames = (mode >> 2) or 1
+            if bool(mode & 0x80) != expected_non_audio:
+                raise RuntimeError(
+                    f"PCM record mode 0x{mode:02x} has unexpected "
+                    f"non-audio flag (expected {expected_non_audio})"
+                )
+            # Entry 699 reserves bit seven for IEC 61937 non-audio framing;
+            # bits six through two retain the bounded frame count.
+            frames = ((mode >> 2) & 0x1F) or 1
             size = 5 + 4 * frames
             if position + size > len(data):
                 raise RuntimeError("truncated PCM record")
@@ -184,7 +189,8 @@ def verify_mp3_transport(
 ) -> tuple[int, int, float]:
     """Verify audio-only MP3 through in-band, explicit, and legacy outputs."""
     transported = subprocess.run(
-        [str(helper), "--protocol", "1", "--source", f"file:{source}"],
+        [str(helper), "--protocol", "1", "--audio-out", "spdif",
+         "--source", f"file:{source}"],
         capture_output=True,
     )
     if transported.returncode:

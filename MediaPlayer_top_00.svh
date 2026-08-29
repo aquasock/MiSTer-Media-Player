@@ -54,12 +54,9 @@ assign AUDIO_L = audio_pcm_output_l;
 assign AUDIO_R = audio_pcm_output_r;
 assign AUDIO_MIX = 2'd0;
 
-// Entry 617: S/PDIF AC-3 passthrough. The helper packs IEC 61937 bursts and
-// sends them down the ordinary PCM path, so the only thing this bit changes in
-// fabric is routing: the bursts must reach the S/PDIF pin unaltered and HDMI
-// must be muted rather than fed noise. Main reads the same status bit to pass
-// --audio-out to the helper, because the decoder runs there and only it can
-// choose whether to decode or pass through.
+// Entry 699: this remains the user's exclusive HDMI/S/PDIF output selection.
+// A separate in-band flag below distinguishes decoded PCM from IEC 61937
+// bursts so ordinary audio is not incorrectly announced as non-audio.
 assign AUDIO_SPDIF_MODE = status[126];
 
 // kate - Commit 180 displaces the LED_DISK file-load indicator again so it can
@@ -88,7 +85,7 @@ localparam CONF_STR = {
 	"O[125],Native pattern motion,Static,Moving;",
 	"O[120],Interlaced output,Native 480i,800x600 Diagnostic;",
 	"O[3:1],Audio test,Off,44.1k Mono,44.1k Stereo,48k Mono,48k Stereo;",
-	"O[126],Audio output,HDMI,S/PDIF AC-3;",
+	"O[126],Audio output,HDMI,S/PDIF;",
 	"-;",
 	"T[0],Reset;",
 	"R[0],Reset and close OSD;",
@@ -446,12 +443,27 @@ wire [15:0]        mpeg2_new_inband_pcm_left;
 wire [15:0]        mpeg2_new_inband_pcm_right;
 wire               mpeg2_new_inband_pcm_stereo;
 wire               mpeg2_new_inband_pcm_rate_48k;
+wire               mpeg2_new_inband_pcm_non_audio;
 wire               mpeg2_new_inband_pcm_ready;
 wire [13:0]        mpeg2_new_inband_pcm_sample_count;
 wire               mpeg2_new_inband_pcm_protocol_error;
 
 wire audio_embedded_mode = (audio_mode_src == 3'd0);
 wire audio_pcm_accepted = audio_pcm_valid && audio_pcm_ready;
+
+(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
+reg [1:0] audio_pcm_non_audio_sync;
+
+always @(posedge CLK_AUDIO) begin
+	if (reset_audio_out)
+		audio_pcm_non_audio_sync <= 2'b00;
+	else
+		audio_pcm_non_audio_sync <=
+			{audio_pcm_non_audio_sync[0],
+			 audio_embedded_mode && mpeg2_new_inband_pcm_non_audio};
+end
+
+assign AUDIO_SPDIF_NONAUDIO = audio_pcm_non_audio_sync[1];
 
 reg audio_pcm_session_seen;
 reg audio_pcm_source_ended;
@@ -717,6 +729,7 @@ mpeg2_h262_inband_metadata mpeg2_h262_inband_metadata
 	.pcm_right          (mpeg2_new_inband_pcm_right),
 	.pcm_stereo         (mpeg2_new_inband_pcm_stereo),
 	.pcm_rate_48k       (mpeg2_new_inband_pcm_rate_48k),
+	.pcm_non_audio      (mpeg2_new_inband_pcm_non_audio),
 	.pcm_valid          (mpeg2_new_inband_pcm_valid),
 	.pcm_end            (mpeg2_new_inband_pcm_end),
 	.pcm_ready          (mpeg2_new_inband_pcm_ready),

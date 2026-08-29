@@ -131,7 +131,7 @@ def main() -> int:
             raise RuntimeError("24-bit FLAC coverage was not generated")
         transport_source = temporary / "s16_stereo_44100.flac"
         transported = run([
-            str(args.helper), "--protocol", "1", "--source",
+            str(args.helper), "--protocol", "1", "--audio-out", "spdif", "--source",
             f"file:{transport_source}",
         ], capture_output=True)
         transport_pcm, end_count = strip_transport(transported.stdout, 44100)

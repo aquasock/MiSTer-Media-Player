@@ -102,7 +102,9 @@ def aligned_correlation(
     return max(scores)
 
 
-def strip_transport(data: bytes, rate: int) -> tuple[bytes, int]:
+def strip_transport(
+    data: bytes, rate: int, expected_non_audio: bool = False,
+) -> tuple[bytes, int]:
     pcm = bytearray()
     ends = 0
     position = 0
@@ -115,7 +117,11 @@ def strip_transport(data: bytes, rate: int) -> tuple[bytes, int]:
             mode = data[position + 4]
             if mode & 3 != expected_mode:
                 raise RuntimeError(f"wrong PCM transport mode 0x{mode:02x}")
-            frames = (mode >> 2) or 1
+            if bool(mode & 0x80) != expected_non_audio:
+                raise RuntimeError(
+                    f"wrong PCM non-audio flag in mode 0x{mode:02x}"
+                )
+            frames = ((mode >> 2) & 0x1F) or 1
             size = 5 + frames * 4
             if position + size > len(data):
                 raise RuntimeError("truncated PCM transport payload")
@@ -188,7 +194,7 @@ def main() -> int:
 
         transport_source = temporary / "s16_stereo_44100.wav"
         transported = run([
-            str(args.helper), "--protocol", "1", "--source",
+            str(args.helper), "--protocol", "1", "--audio-out", "spdif", "--source",
             f"file:{transport_source}",
         ], capture_output=True)
         transport_pcm, end_count = strip_transport(transported.stdout, 44100)

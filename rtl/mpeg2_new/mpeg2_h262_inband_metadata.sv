@@ -22,13 +22,18 @@
 //  Entry 462: one frame per record put 48,000 records and 422 KiB/s of audio on
 //  a path carrying 138 KiB/s of video, three quarters of everything crossing,
 //  and hardware measured a cost per record in late presentations.  The mode
-//  byte's six unused bits now carry a frame count, so one record can deliver a
-//  run of frames: {count[5:0],rate_48k,stereo} then count frames of
+//  byte carries a frame count, so one record can deliver a run of frames:
+//  {non_audio,count[4:0],rate_48k,stereo} then count frames of
 //  {left[15:8],left[7:0],right[15:8],right[7:0]}.  A count of zero means one
 //  frame, which is exactly the encoding streams used before this change, so
 //  older transports decode unchanged.  Each frame's final byte still waits for
 //  the audio sink, so backpressure reaches the producer at frame granularity
 //  rather than record granularity.
+//
+//  Entry 699: non_audio is one only for helper-built IEC 61937 AC-3/DTS burst
+//  records. Decoded PCM and compressed bursts share the sample transport, but
+//  IEC 60958 channel status must distinguish them when S/PDIF is selected.
+//  Five count bits still cover the helper's bounded sixteen-frame records.
 //
 //  Detection uses a four-byte sliding window.  A byte is only emitted once it
 //  has fallen out of the window without completing a marker, which costs three
@@ -68,6 +73,7 @@ module mpeg2_h262_inband_metadata
     output reg  [15:0] pcm_right,
     output reg         pcm_stereo,
     output reg         pcm_rate_48k,
+    output reg         pcm_non_audio,
     output reg         pcm_valid,           // one-cycle pulse
     output reg         pcm_end,             // one-cycle pulse
     input  wire        pcm_ready,
@@ -79,7 +85,7 @@ localparam [31:0] PTS_MARKER     = 32'h000001B0;
 localparam [31:0] PCM_MARKER     = 32'h000001B1;
 localparam [31:0] PCM_END_MARKER = 32'h000001B6;
 localparam integer PAYLOAD_BYTES = 5;
-localparam [5:0]   MAX_PCM_FRAMES = 6'd32;
+localparam [4:0]   MAX_PCM_FRAMES = 5'd16;
 
 localparam [2:0] S_FILL        = 3'd0,
                  S_STREAM      = 3'd1,
@@ -153,6 +159,7 @@ always @(posedge clk) begin
         pcm_right          <= 16'd0;
         pcm_stereo         <= 1'b0;
         pcm_rate_48k       <= 1'b0;
+        pcm_non_audio      <= 1'b0;
         pcm_valid          <= 1'b0;
         pcm_end            <= 1'b0;
         pcm_sample_count   <= 14'd0;
@@ -253,7 +260,7 @@ always @(posedge clk) begin
                     payload_index <= payload_index + 3'd1;
             end
 
-        // A PCM record is {count,rate,stereo} followed by count frames of
+        // A PCM record is {non_audio,count,rate,stereo}, then count frames of
         // {left[15:8],left[7:0],right[15:8],right[7:0]}.  The final byte of
         // each frame is not consumed until the audio FIFO can accept the
         // assembled sample, extending existing file-channel backpressure all
@@ -263,20 +270,21 @@ always @(posedge clk) begin
                 if (!pcm_mode_seen) begin
                     pcm_rate_48k   <= input_data[1];
                     pcm_stereo     <= input_data[0];
+                    pcm_non_audio  <= input_data[7];
                     pcm_mode_seen  <= 1'b1;
                     pcm_byte_index <= 2'd0;
                     // A count of zero is the pre-entry-462 encoding of one
                     // frame.  A count past the supported run is reported and
                     // treated as one, which consumes the same five bytes a
                     // malformed record consumed before.
-                    if (input_data[7:2] > MAX_PCM_FRAMES) begin
+                    if (input_data[6:2] > MAX_PCM_FRAMES) begin
                         pcm_protocol_error <= 1'b1;
                         pcm_frames_left    <= 6'd1;
                     end
-                    else if (input_data[7:2] == 6'd0)
+                    else if (input_data[6:2] == 5'd0)
                         pcm_frames_left <= 6'd1;
                     else
-                        pcm_frames_left <= input_data[7:2];
+                        pcm_frames_left <= {1'b0, input_data[6:2]};
                 end
                 else begin
                     pcm_frame <= {pcm_frame[15:0], input_data};

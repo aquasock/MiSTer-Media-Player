@@ -47,12 +47,11 @@ module audio_out
 	input [15:0] core_l,
 	input [15:0] core_r,
 
-	// MediaPlayer fork: when high, S/PDIF carries core samples untouched for
-	// IEC 61937 passthrough and I2S is muted; when low, I2S carries the mixed
-	// audio as before and S/PDIF is muted. The passthrough path deliberately
-	// skips the filter, DC blocker and mixer, because each of those alters
-	// sample values and any alteration destroys a burst.
-	input        spdif_passthrough,
+	// MediaPlayer fork: output selection is independent of IEC 60958 framing.
+	// Decoded PCM uses the mixed samples on either selected output. IEC 61937
+	// AC-3/DTS bursts use raw core samples and set the non-audio channel bit.
+	input        spdif_enable,
+	input        spdif_non_audio,
 
 	input [15:0] alsa_l,
 	input [15:0] alsa_r,
@@ -100,6 +99,27 @@ always @(posedge clk) begin
 	end
 end
 
+wire [15:0] routed_i2s_l;
+wire [15:0] routed_i2s_r;
+wire [15:0] routed_spdif_l;
+wire [15:0] routed_spdif_r;
+wire        routed_spdif_non_audio;
+
+audio_spdif_route audio_spdif_route
+(
+	.spdif_enable(spdif_enable),
+	.spdif_non_audio(spdif_non_audio),
+	.processed_l(al),
+	.processed_r(ar),
+	.raw_l(core_l),
+	.raw_r(core_r),
+	.i2s_l(routed_i2s_l),
+	.i2s_r(routed_i2s_r),
+	.spdif_l(routed_spdif_l),
+	.spdif_r(routed_spdif_r),
+	.spdif_channel_non_audio(routed_spdif_non_audio)
+);
+
 i2s i2s
 (
 	.reset(reset),
@@ -111,12 +131,9 @@ i2s i2s
 	.lrclk(i2s_lrclk),
 	.sdata(i2s_data),
 
-	.left_chan(spdif_passthrough ? 16'd0 : al),
-	.right_chan(spdif_passthrough ? 16'd0 : ar)
+	.left_chan(routed_i2s_l),
+	.right_chan(routed_i2s_r)
 );
-
-wire [15:0] spdif_l = spdif_passthrough ? core_l : 16'd0;
-wire [15:0] spdif_r = spdif_passthrough ? core_r : 16'd0;
 
 spdif toslink
 (
@@ -125,9 +142,9 @@ spdif toslink
 	.clk_i(clk),
 	.bit_out_en_i(mclk_ce),
 
-	.non_audio_i(spdif_passthrough),
+	.non_audio_i(routed_spdif_non_audio),
 
-	.sample_i({spdif_r,spdif_l}),
+	.sample_i({routed_spdif_r,routed_spdif_l}),
 	.spdif_o(spdif)
 );
 
@@ -287,6 +304,33 @@ aud_mix_top audmix_r
 	.pre_out(audio_r_pre),
 	.out(ar)
 );
+
+endmodule
+
+// Keep the route policy combinational and separately testable. A stray
+// non-audio indication is ignored unless S/PDIF is selected.
+module audio_spdif_route
+(
+	input        spdif_enable,
+	input        spdif_non_audio,
+	input [15:0] processed_l,
+	input [15:0] processed_r,
+	input [15:0] raw_l,
+	input [15:0] raw_r,
+	output [15:0] i2s_l,
+	output [15:0] i2s_r,
+	output [15:0] spdif_l,
+	output [15:0] spdif_r,
+	output       spdif_channel_non_audio
+);
+
+wire passthrough = spdif_enable && spdif_non_audio;
+
+assign i2s_l = spdif_enable ? 16'd0 : processed_l;
+assign i2s_r = spdif_enable ? 16'd0 : processed_r;
+assign spdif_l = spdif_enable ? (passthrough ? raw_l : processed_l) : 16'd0;
+assign spdif_r = spdif_enable ? (passthrough ? raw_r : processed_r) : 16'd0;
+assign spdif_channel_non_audio = passthrough;
 
 endmodule
 
