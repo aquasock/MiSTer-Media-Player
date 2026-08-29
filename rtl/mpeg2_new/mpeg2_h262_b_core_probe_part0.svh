@@ -242,7 +242,11 @@ wire [7:0] mba_escape_min_target_q={2'b00,current_col}+mba_escape_accum_next_q;
 
 reg [5:0] mbtype_bits; reg [2:0] mbtype_len; reg [1:0] current_direction,last_direction;
 reg current_pattern,current_intra,current_quant;
-reg signed [9:0] fpx,fpy,bpx,bpy,cur_fx,cur_fy,cur_bx,cur_by;
+// Entry 695: the vertical predictors live in fpy_frame/bpy_frame, which hold
+// frame units.  The former fpy/bpy are gone rather than left dead, because
+// 4bd6869 moved every update to the frame-unit pair but left two readers and
+// all four slice-start resets pointing at the old names.
+reg signed [9:0] fpx,bpx,cur_fx,cur_fy,cur_bx,cur_by;
 // Entry 695: field motion state.  frame_motion_type 2'b01 selects field
 // prediction, 2'b10 frame prediction; 2'b11 is dual prime and 2'b00 is
 // reserved, both refused as an implementation limit of this decoder rather

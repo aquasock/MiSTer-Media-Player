@@ -126,7 +126,7 @@ always @(posedge clk) begin
         parse_byte_limit<=0;parse_byte_index<=0;parse_bit_index<=7;
         state<=S_QSCALE;field_bit_count<=0;qscale_shift<=0;current_qscale<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;skip_remaining<=0;geometry_sent<=0;
         mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;mba_symbol_escape_q<=0;mba_symbol_value_q<=0;mbtype_bits<=0;mbtype_len<=0;current_direction<=0;last_direction<=0;current_pattern<=0;current_intra<=0;current_quant<=0;
-        fpx<=0;fpy<=0;bpx<=0;bpy<=0;cur_fx<=0;cur_fy<=0;cur_bx<=0;cur_by<=0;
+        fpx<=0;bpx<=0;cur_fx<=0;cur_fy<=0;cur_bx<=0;cur_by<=0;
         fpy_frame<=0;bpy_frame<=0;fpx1<=0;fpy1_frame<=0;bpx1<=0;bpy1_frame<=0;
         current_motion_type<=2'b10;motion_type_shift<=0;motion_type_count<=0;motion_slot<=0;
         cur_fsel0<=0;cur_fsel1<=0;cur_bsel0<=0;cur_bsel1<=0;
@@ -233,10 +233,10 @@ always @(posedge clk) begin
             end
             S_SKIP_A: begin
                 if(last_direction==0)state<=S_ERROR;
-                else begin dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;sideband_valid<=1;sideband_index<=direction_index(last_direction);sideband_value<=0;motion_vector_x<=fpx;motion_vector_y<=fpy;state<=S_SKIP_B;end
+                else begin dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;sideband_valid<=1;sideband_index<=direction_index(last_direction);sideband_value<=0;motion_vector_x<=fpx;motion_vector_y<=$signed(fpy_frame[9:0]);state<=S_SKIP_B;end
             end
             S_SKIP_B: begin
-                sideband_valid<=1;sideband_index<=6'h3b;sideband_value<=0;motion_vector_x<=bpx;motion_vector_y<=bpy;current_col<=current_col+1'b1;
+                sideband_valid<=1;sideband_index<=6'h3b;sideband_value<=0;motion_vector_x<=bpx;motion_vector_y<=$signed(bpy_frame[9:0]);current_col<=current_col+1'b1;
                 if(skip_remaining==1)begin skip_remaining<=0;state<=S_MBTYPE;end
                 else begin skip_remaining<=skip_remaining-1'b1;state<=S_SKIP_A;end
             end
