@@ -1,0 +1,49 @@
+{
+  "captured": "2026-08-29T03:46:17-07:00",
+  "host": "10.10.0.30",
+  "source_commit": "736f64f1631c6c6f20d4fb7ecf38b862699476c1",
+  "user_report": "Everything looked perfect.",
+  "session": {
+    "file": "/media/fat/games/MediaPlayer/dvd_opening_original.mpg",
+    "audio_output": "HDMI decoded stereo PCM",
+    "core_reload_reported": true,
+    "playback_user_controlled": true
+  },
+  "files": {
+    "/tmp/MediaPlayer_ARM.log": {
+      "local": "output_files/entry704/capture/MediaPlayer_ARM.log",
+      "bytes": 389223,
+      "sha256": "faf1fcb51e75a08f0b73f6882d9aa33e2e03b7d02ee31a1ce673ec585dc188ba"
+    },
+    "/tmp/messages": {
+      "local": "output_files/entry704/capture/messages.log",
+      "bytes": 55623,
+      "sha256": "22f4ea633d774dbd37c493cb3ce27340a423f1a93c1535b5b316ab6adb92fc1e"
+    },
+    "/media/fat/screenshots/cadence_probe.png": {
+      "local_first": "output_files/entry704/capture/terminal_1.png",
+      "local_second": "output_files/entry704/capture/terminal_2.png",
+      "bytes": 316435,
+      "sha256": "7190b018a403c2d90fe26c02c7a1390a03a552aa4af84cb44fe815abe37e8c80",
+      "captures_identical": true,
+      "complete_png_verified": true
+    },
+    "/media/fat/MediaPlayer_20260829.rbf": {
+      "bytes": 4459744,
+      "sha256": "3f66a5eb38bcff783472b977764bc34366a07570b01278822e705718edf224fa"
+    },
+    "/media/fat/linux/MediaPlayer_Helper": {
+      "bytes": 629056,
+      "sha256": "02d1df98c62ee00169585db990b6bd48c3769eca20c3e1d594f2318c362eb00f"
+    }
+  },
+  "operations": [
+    "STOR /dev/MiSTer_cmd: screenshot cadence_probe.png",
+    "RETR /media/fat/screenshots/cadence_probe.png twice",
+    "RETR /tmp/MediaPlayer_ARM.log",
+    "RETR /tmp/messages",
+    "RETR /media/fat/MediaPlayer_20260829.rbf",
+    "RETR /media/fat/linux/MediaPlayer_Helper"
+  ],
+  "errors": []
+}

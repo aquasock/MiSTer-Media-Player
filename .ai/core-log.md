@@ -1,3 +1,32 @@
+## 705 COMMIT Unreleased 736f64f 2026-08-29T03:46:17-07:00
+
+#### Coming From:
+
+Unreleased 736f64f
+
+#### Purpose:
+
+Record hardware acceptance of the fit-recovered candidate's original-DVD-opening regression over HDMI decoded stereo PCM.
+
+#### Outcome:
+
+The user explicitly loads `MediaPlayer_20260829.rbf`, plays `dvd_opening_original.mpg` over HDMI decoded stereo PCM and reports that everything looks perfect.  Two fresh completed screenshots are byte-identical, show the final Universal frame, decode as checksum-valid schema 20 quiet snapshots and pass the exact expected 289-picture and 10,334,169-byte gate with no validation failure.  Telemetry reaches sequence end and presentation completion with 289 displayed pictures, 288 swaps, 128 reference plus 161 B pictures, all 25 timestamps, zero error flags, no audio underrun, no PCM protocol or presentation error and no cache-bank overlap error.  The helper identifies AC-3 private substream `0x80`, emits 375 frames and 576,000 decoded stereo samples, reaches EOF and child exit zero, and reconciles all 12,818,397 submitted bytes across 784 pipe reads with every byte on the fast path and none on the slow path.  FTP readback reproduces the qualified RBF and helper hashes.  Legacy observational counters remain visible at 287 deadline records, 144 outliers, 20 timestamp-advance conflicts and zero delay conflicts; they are not the acceptance gate and do not negate the clean functional result.  This accepts the existing original-opening HDMI regression only; production field prediction remains closed and no S/PDIF mode is exercised by this run.
+
+#### Next Steps:
+
+Continue the same loaded candidate with MP3 over S/PDIF first, followed by WAV and FLAC over S/PDIF, AC-3 passthrough over S/PDIF and one known progressive video.  Report each audible and visible result, and leave the latest helper log and terminal screen intact before replay if any dropout, receiver unlock, protocol fault or visual regression occurs.  Treat the recovered RBF as an accepted existing-video baseline while keeping the decoded-PCM S/PDIF correction and production field-prediction path open until their own hardware checks complete.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 704 COMMIT Unreleased 736f64f 2026-08-29T03:35:47-07:00
 
 #### Coming From:
@@ -1225,35 +1254,6 @@ The user explicitly authorizes installation, and the agent adds MediaPlayer_2026
 #### Next Steps:
 
 Have the user explicitly load MediaPlayer_20260828.rbf and then select dvd_opening_original.mpg once, keeping Weave and HDMI decoded stereo for a comparable test. No file recopy is needed. Preserve the next helper log and terminal state before replay and collect a new two-screenshot capture. Confirm the loaded candidate before attributing the early rejection to decoder logic or proposing changes; keep the narrow HDMI timing margin visible and preserve user control of playback.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 665 COMMIT Unreleased 6c1b621 2026-08-28T02:00:43-07:00
-
-#### Coming From:
-
-Unreleased 6c1b621
-
-#### Purpose:
-
-Record clean-build qualification and prepare the original DVD opening for user-controlled hardware testing.
-
-#### Outcome:
-
-Seed-only source 6c1b621 retains the qualified decoder from 3e287b3 and changes only placement seed 17 to 18. Source 6c1b621 is pulled from GitHub on GUNSMOKE and built from a fresh checkout with Quartus 17.0.2, seed 18, without reused build databases. Compilation completes in 770.6 seconds with zero errors and 204 warnings. Every timing category is positive with zero total negative slack: setup 0.065, hold 0.193, recovery 4.424, removal 0.634 and minimum pulse width 0.925 nanoseconds. HDMI remains the binding setup category at positive 0.065 nanoseconds, while decoder and video setup are positive 1.414 and 2.420; this narrow margin is kept visible rather than treated as ample headroom. The user requested a pause if seed 18 failed; it passes, and no further seed attempt is run. Resource use is 32,983 ALMs, 52,424 registers, 4,054,267 block-memory bits, 514 of 553 RAM blocks and 67 DSP blocks; the previous accepted source used 512 RAM blocks and had positive 0.126-nanosecond worst HDMI setup slack. The loop-index latch and ignored async_reg warnings are absent after the correction; normalized synthesis-warning differences against the verified 4777c59 baseline are widened motion arithmetic covered by exhaustive tests and renamed open-drain buffer nodes. TimeQuest confirms the protected intra and non-intra weight register banks survive in both P and B transforms, with their input and output paths timed. The prefetch correction matches 122,992 cycles across 384 coefficient cases and preserves transform throughput. The unchanged-source paired runner completes on this exact published source: all 289 pictures and 149,817,600 samples are checked, isolated comparison has maximum difference 1, and real decoded references have maximum predicted difference 5 with 102 samples above the old fixed-two comparison but no measured propagation-bound violation. This does not claim bit-exact reconstruction or a pass under the old fixed-two threshold. Exact publication, ownership and error checks pass. Film-cache generation changes also pass in both field orders with 512-cycle DDR response latency. Entry 660's focused reconstruction, film presentation, audio and transport checks remain applicable; the direct-byte parser matches the previous qualified parser cycle by cycle for gapped and continuous input, and the three new CDC exceptions are limited to verified source-to-first-stage paths with all later stages still timed. The RBF has 4,392,652 bytes and SHA256 2e834957fed5bbb246074d975d44247b9e81508eab04ea27445aa6a935ed916c. The locally verified output_files/entry664/MediaPlayer_6c1b621_dvd_opening_test.zip contains the dated candidate core and original compressed opening, with unchanged Main and helper omitted, manual test instructions and per-file checksums; the archive has 12,778,976 bytes and SHA256 822783066af325680b81a6813185c2a5af697458b6965638ded2f35c8009956d. Numeric build, qualification and package evidence is retained under .ai/current_results/entry665_*. The Pi and GitHub source are synchronized. No file is deployed to the MiSTer and no reload, playback, listening, physical field-cadence or A/V synchronization acceptance is claimed.
-
-#### Next Steps:
-
-Have the user preserve the known-good core, copy and load the dated candidate, copy dvd_opening_original.mpg to games/MediaPlayer, and play it once with HDMI decoded stereo PCM while keeping the current Bob/Weave selection. Collect the helper log and terminal telemetry before any replay or different file overwrites them, and record visible motion, music, field stability and menu response. The requested twelve-second stream copy retains a later reference picture and a terminal timestamp gap, so distinguish a final hold from a mid-stream failure. After the first capture, test replay, the other Bob/Weave setting and AC-3 passthrough separately. Hardware acceptance remains open, as do whole-title playback, arbitrary interlaced P/B syntax, ISO/IFO navigation and menus. Preserve restricted core.md and the forty-entry ring.
 
 #### Files Modified:
 
