@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 
 #define AUDIO_BUFFER_LIMIT (256u * 1024u)
@@ -34,6 +35,8 @@
 #define PCM_STARTUP_VIDEO_BYTES     28672u
 #define PCM_RECORD_FRAMES           16u
 #define VIDEO_SLICE_BYTES           256u
+#define MP3_PROBE_BYTES             (64u * 1024u)
+#define ID3V2_TAG_LIMIT             (64u * 1024u * 1024u)
 
 /*
  * Entry 429: the FPGA gates its whole in-band byte path on the PCM sink, so a
@@ -169,6 +172,7 @@ struct output_state {
     int have_video_pts;
     int audio_pes_seen;
     int silent_video_mode;
+    int audio_only_mode;
     int scheduler_enabled;
     int scheduler_started;
     uint32_t pts_window;      /* start-code scanner across queued payloads */
@@ -233,6 +237,7 @@ static void pts_scan_payload(struct output_state *output, const uint8_t *data,
 enum audio_codec {
     AUDIO_CODEC_NONE = 0,
     AUDIO_CODEC_MP2,
+    AUDIO_CODEC_MP3,
     AUDIO_CODEC_AC3,
     AUDIO_CODEC_DTS
 };
@@ -299,6 +304,59 @@ static int skip_bytes(struct media_source *source, size_t size)
         size -= chunk;
     }
     return 0;
+}
+
+static int has_suffix_case(const char *text, const char *suffix)
+{
+    size_t text_length = text ? strlen(text) : 0;
+    size_t suffix_length = strlen(suffix);
+
+    return text_length >= suffix_length &&
+           !strcasecmp(text + text_length - suffix_length, suffix);
+}
+
+/*
+ * Return the first bytes after any leading ID3v2 tags. The tag body is opaque
+ * to playback, but its synchsafe size is validated and bounded before it is
+ * skipped. ID3v2.4's optional footer follows the declared body.
+ */
+static int read_mp3_prefix(struct media_source *input,
+                           uint8_t prefix[10], size_t *prefix_size)
+{
+    for (;;) {
+        uint32_t body_size;
+        size_t skip;
+
+        if (media_source_read(input, prefix, 10) != 10) {
+            fprintf(stderr, "media_player_helper: MP3 input is too short\n");
+            return -1;
+        }
+        if (memcmp(prefix, "ID3", 3)) {
+            *prefix_size = 10;
+            return 0;
+        }
+        if ((prefix[6] | prefix[7] | prefix[8] | prefix[9]) & 0x80u) {
+            fprintf(stderr, "media_player_helper: invalid ID3v2 synchsafe size\n");
+            return -1;
+        }
+        body_size = ((uint32_t)prefix[6] << 21) |
+                    ((uint32_t)prefix[7] << 14) |
+                    ((uint32_t)prefix[8] << 7) |
+                    (uint32_t)prefix[9];
+        if (body_size > ID3V2_TAG_LIMIT) {
+            fprintf(stderr,
+                    "media_player_helper: ID3v2 tag exceeds %u-byte limit\n",
+                    (unsigned)ID3V2_TAG_LIMIT);
+            return -1;
+        }
+        skip = body_size;
+        if (prefix[3] == 4 && (prefix[5] & 0x10u))
+            skip += 10u;
+        if (skip_bytes(input, skip) < 0) {
+            fprintf(stderr, "media_player_helper: truncated ID3v2 tag\n");
+            return -1;
+        }
+    }
 }
 
 static int find_start_code(struct media_source *source, uint8_t *code)
@@ -870,7 +928,12 @@ static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
         output->hold_rate_hz = rate_hz;
         if (hold_push(output, source, samples_per_channel) < 0)
             return -1;
-        if (output->hold_active &&
+        if (output->audio_only_mode) {
+            output->hold_active = 0;
+            output->scheduler_started = 1;
+            if (hold_flush(output, 0) < 0)
+                return -1;
+        } else if (output->hold_active &&
             (startup_lead_complete(output) ||
              hold_available(output) >= output->hold_limit)) {
             output->hold_active = 0;
@@ -1097,11 +1160,12 @@ static int decode_ac3_buffer(struct audio_state *audio,
     return 0;
 }
 
-static int decode_mp2_buffer(struct audio_state *audio,
-                             struct output_state *output, int at_eof)
+static int decode_mpeg_audio_buffer(struct audio_state *audio,
+                                    struct output_state *output, int at_eof)
 {
     size_t original_size = audio->size;
     size_t offset = 0;
+    int required_layer = audio->codec == AUDIO_CODEC_MP3 ? 3 : 2;
 
     while (offset < original_size) {
         mp3dec_t decoder_before = audio->decoder;
@@ -1131,11 +1195,18 @@ static int decode_mp2_buffer(struct audio_state *audio,
         offset += (size_t)info.frame_bytes;
         if (offset > original_size)
             offset = original_size;
-        if (!samples)
+        if (!samples) {
+            if (at_eof && audio->codec == AUDIO_CODEC_MP3) {
+                fprintf(stderr,
+                        "media_player_helper: truncated or undecodable MP3 tail\n");
+                return -1;
+            }
             continue;
-        if (info.layer != 2) {
-            fprintf(stderr, "media_player_helper: unsupported MPEG audio layer %d\n",
-                    info.layer);
+        }
+        if (info.layer != required_layer) {
+            fprintf(stderr,
+                    "media_player_helper: MPEG audio layer %d found where layer %d is required\n",
+                    info.layer, required_layer);
             return -1;
         }
         if ((info.hz != 48000 && info.hz != 44100) ||
@@ -1185,7 +1256,8 @@ static int decode_audio_buffer(struct audio_state *audio,
     case AUDIO_CODEC_AC3:
         return decode_ac3_buffer(audio, output, at_eof);
     case AUDIO_CODEC_MP2:
-        return decode_mp2_buffer(audio, output, at_eof);
+    case AUDIO_CODEC_MP3:
+        return decode_mpeg_audio_buffer(audio, output, at_eof);
     case AUDIO_CODEC_NONE:
     default:
         return 0;
@@ -1426,6 +1498,59 @@ static int preflight_elementary_stream(struct media_source *input)
     if (media_source_error(input))
         return -1;
     fprintf(stderr, "media_player_helper: no H.262 sequence header found\n");
+    return -1;
+}
+
+static int preflight_mp3(struct media_source *input)
+{
+    uint8_t buffer[MP3_PROBE_BYTES];
+    uint8_t prefix[10];
+    size_t prefix_size = 0;
+    size_t count;
+    size_t offset = 0;
+    mp3dec_t decoder;
+
+    if (read_mp3_prefix(input, prefix, &prefix_size) < 0)
+        return -1;
+    memcpy(buffer, prefix, prefix_size);
+    count = prefix_size + media_source_read(
+        input, buffer + prefix_size, sizeof(buffer) - prefix_size);
+    if (media_source_error(input))
+        return -1;
+    mp3dec_init(&decoder);
+    while (offset < count) {
+        mp3dec_frame_info_t info;
+        mp3d_sample_t pcm[MINIMP3_MAX_SAMPLES_PER_FRAME];
+        int samples = mp3dec_decode_frame(
+            &decoder, buffer + offset, (int)(count - offset), pcm, &info);
+
+        if (!info.frame_bytes)
+            break;
+        offset += (size_t)info.frame_bytes;
+        if (!samples)
+            continue;
+        if (info.layer != 3) {
+            fprintf(stderr,
+                    "media_player_helper: raw .mp3 source contains MPEG audio layer %d\n",
+                    info.layer);
+            return -1;
+        }
+        if ((info.hz != 44100 && info.hz != 48000) ||
+            (info.channels != 1 && info.channels != 2)) {
+            fprintf(stderr,
+                    "media_player_helper: unsupported MP3 format: %d Hz, %d channels "
+                    "(supported: 44100 or 48000 Hz, 1 or 2 channels)\n",
+                    info.hz, info.channels);
+            return -1;
+        }
+        if (media_source_rewind(input) < 0) {
+            fprintf(stderr,
+                    "media_player_helper: cannot rewind MP3 input after preflight\n");
+            return -1;
+        }
+        return 0;
+    }
+    fprintf(stderr, "media_player_helper: no MPEG-1 Layer III frame found\n");
     return -1;
 }
 
@@ -1791,6 +1916,36 @@ static int process_elementary_stream(struct media_source *input,
     return media_source_error(input) ? -1 : 0;
 }
 
+static int process_mp3_stream(struct media_source *input,
+                              struct audio_state *audio,
+                              struct output_state *output)
+{
+    uint8_t prefix[10];
+    uint8_t buffer[16384];
+    size_t prefix_size = 0;
+    size_t count;
+
+    if (!claim_audio_codec(audio, AUDIO_CODEC_MP3) ||
+        read_mp3_prefix(input, prefix, &prefix_size) < 0)
+        return -1;
+    output->audio_only_mode = 1;
+    output->hold_active = 0;
+    output->scheduler_started = 1;
+    if (prefix_size && append_audio(audio, output, prefix, prefix_size) < 0)
+        return -1;
+    while ((count = media_source_read(input, buffer, sizeof(buffer))) != 0) {
+        if (append_audio(audio, output, buffer, count) < 0)
+            return -1;
+    }
+    if (media_source_error(input))
+        return -1;
+    /* ID3v1 is an exact 128-byte terminal tag and is not decoder input. */
+    if (audio->size >= 128u &&
+        !memcmp(audio->data + audio->size - 128u, "TAG", 3))
+        audio->size -= 128u;
+    return decode_audio_buffer(audio, output, 1);
+}
+
 static int finish_output(struct output_state *output, int success)
 {
     if (output->video && fflush(output->video) == EOF)
@@ -1818,6 +1973,7 @@ int main(int argc, char **argv)
     char source_error[512];
     uint8_t signature[4];
     int is_program_stream;
+    int is_mp3;
     int i;
     int success = 0;
 
@@ -1924,11 +2080,20 @@ int main(int argc, char **argv)
         fprintf(stderr, "media_player_helper: input is too short\n");
         goto done;
     }
-    is_program_stream = !memcmp(signature, "\x00\x00\x01\xba", 4);
-    if (preflight_input(&input, is_program_stream) < 0)
+    is_mp3 = has_suffix_case(source_specification, ".mp3");
+    is_program_stream = !is_mp3 &&
+                        !memcmp(signature, "\x00\x00\x01\xba", 4);
+    if (is_mp3) {
+        if (preflight_mp3(&input) < 0)
+            goto done;
+    } else if (preflight_input(&input, is_program_stream) < 0) {
         goto done;
+    }
     output.scheduler_enabled = is_program_stream && !output.pcm;
-    if (is_program_stream) {
+    if (is_mp3) {
+        if (process_mp3_stream(&input, &audio, &output) < 0)
+            goto done;
+    } else if (is_program_stream) {
         if (process_program_stream(&input, &audio, &output) < 0)
             goto done;
         if (!output.audio_pes_seen) {
@@ -1942,8 +2107,12 @@ int main(int argc, char **argv)
     } else if (process_elementary_stream(&input, &output) < 0) {
         goto done;
     }
-    if (!output.video_bytes) {
+    if (!is_mp3 && !output.video_bytes) {
         fprintf(stderr, "media_player_helper: no H.262 video stream found\n");
+        goto done;
+    }
+    if (is_mp3 && !output.audio_frames) {
+        fprintf(stderr, "media_player_helper: no MPEG-1 Layer III audio found\n");
         goto done;
     }
     if (is_program_stream && output.audio_pes_seen && !output.audio_frames) {

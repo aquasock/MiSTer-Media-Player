@@ -140,7 +140,7 @@ index 0c74e21..473cfb0 100644
  
  						if (p[idx] >= '0' && p[idx] <= '9') ioctl_index = p[idx] - '0';
  						substrcpy(ext, p, 1);
-+						if (mediaplayer_is_core()) strcpy(ext, "M2VMPG");
++						if (mediaplayer_is_core()) strcpy(ext, "M2VMPGMP3");
  						if (is_gba() && FileExists(user_io_make_filepath(HomeDir(), "goomba.rom"))) strcat(ext, "GB GBC");
  						while (strlen(ext) % 3) strcat(ext, " ");
  
@@ -366,7 +366,8 @@ index 0000000..663f7b0
 +	const char *extension = path ? strrchr(path, '.') : NULL;
 +	return extension && (!strcasecmp(extension, ".m2v") ||
 +	                     !strcasecmp(extension, ".mpg") ||
-+	                     !strcasecmp(extension, ".mpeg"));
++	                     !strcasecmp(extension, ".mpeg") ||
++	                     !strcasecmp(extension, ".mp3"));
 +}
 +
 +static void finish_download(const char *reason)

@@ -49,10 +49,13 @@ share a compilation unit:
 2. Container: raw M2V pass-through or MPEG Program Stream/PES demultiplexing.
 3. Timeline: PTS extraction and FPGA in-band timestamp records, with future
    discontinuity events for title, cell and seek transitions.
-4. Audio codec: MPEG Layer II on stream ids 0xC0-0xDF and AC-3 on private
-   stream 1 substreams 0x80-0x87, both behind codec selection rather than
-   source-specific decode paths. The codec is decided by the first audio PES
-   seen and the other is ignored for the rest of the session; only the first
+4. Audio codec: MPEG Layer II on stream ids 0xC0-0xDF, standalone MPEG-1
+   Layer III files, and AC-3 on private stream 1 substreams 0x80-0x87, all
+   behind codec selection rather than output-specific decode paths. MPEG audio
+   is decoded by the pinned minimp3 source compiled directly into the static
+   helper binary; MP3 support adds no runtime library. A Program Stream codec
+   is decided by the first audio PES seen and the other is ignored for the
+   rest of the session; only the first
    AC-3 substream is played, because track switching needs the versioned
    control channel protocol one omits. AC-3 is downmixed to stereo by liba52
    using the stream's own coefficients. DTS on substreams 0x88-0x8F is
@@ -65,12 +68,19 @@ share a compilation unit:
    a fixed 1536-sample burst period; DTS carries its own sample count and uses
    512, 1024 or 2048 with the matching data type, so the period is read from
    the frame rather than assumed. The selection is made at launch because the decoder
-   runs here, so only this process can choose what to emit; MPEG Layer II is
-   unaffected and still emits decoded stereo in either mode. A burst is only
+   runs here, so only this process can choose what to emit; MPEG Layers II and
+   III are unaffected and still emit decoded stereo in either mode. A burst is only
    audible as surround if nothing downstream scales it: any gain, mix or filter
    between here and the S/PDIF pin destroys it.
 6. Outputs: one annotated H.262-plus-PCM transport to Main, with the FPGA owning
    the separate video and PCM sinks after record extraction.
+
+Standalone `.mp3` is an audio-only use of the same output contract: the helper
+skips bounded ID3v2 and terminal ID3v1 metadata, decodes MPEG-1 Layer III mono
+or stereo at 44.1 or 48 kHz, and emits PCM records followed by the ordinary
+audio-end token. No H.262 bytes or picture timestamps are required. CBR and VBR
+share this path. MPEG-1 32 kHz and MPEG-2/2.5 lower-rate extensions are refused
+until a separately qualified helper-side resampler exists.
 
 Future play, pause, seek, title, chapter, angle, audio-track and subtitle-track
 commands require a versioned control channel. They are intentionally not

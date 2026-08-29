@@ -15,8 +15,9 @@
 
 #define MEDIA_PLAYER_CAPABILITIES \
     "protocol=1 sources=file reserved_sources=dvd " \
-    "containers=m2v,mpeg-ps video=h262 " \
-    "audio=mp2-s16le-44100,mp2-s16le-48000 " \
+    "containers=m2v,mpeg-ps,mp3 video=h262 " \
+    "audio=mp2-s16le-44100,mp2-s16le-48000," \
+    "mp3-s16le-44100,mp3-s16le-48000 " \
     "transport=inband-pcm-v1"
 
 #endif

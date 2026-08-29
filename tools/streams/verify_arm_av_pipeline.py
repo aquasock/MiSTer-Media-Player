@@ -174,6 +174,71 @@ def pcm_frame_boundary_jumps(path: Path) -> tuple[int, int]:
     return maximum[0], maximum[1]
 
 
+def verify_mp3_transport(
+    helper: Path,
+    source: Path,
+    reference_pcm: Path,
+    sample_rate: int,
+    temporary: Path,
+    label: str,
+) -> tuple[int, int, float]:
+    """Verify audio-only MP3 through in-band, explicit, and legacy outputs."""
+    transported = subprocess.run(
+        [str(helper), "--protocol", "1", "--source", f"file:{source}"],
+        capture_output=True,
+    )
+    if transported.returncode:
+        raise RuntimeError(
+            f"{label} failed: "
+            + transported.stderr.decode(errors="replace").strip()
+        )
+    video, timestamps, inband_pcm, end_count = strip_records(
+        transported.stdout, sample_rate
+    )
+    if video or timestamps or not inband_pcm or end_count != 1:
+        raise RuntimeError(
+            f"{label} transport is not audio-only: video={len(video)} "
+            f"timestamps={timestamps} pcm={len(inband_pcm)} end={end_count}"
+        )
+    inband_path = temporary / f"{label}_inband.s16le"
+    inband_path.write_bytes(inband_pcm)
+    maximum, rms, correlation = pcm_metrics(inband_path, reference_pcm)
+    if correlation < 0.97:
+        raise RuntimeError(
+            f"{label} PCM mismatch: max={maximum}, rms={rms:.4f}, "
+            f"correlation={correlation:.6f}"
+        )
+
+    explicit_video = temporary / f"{label}_explicit.transport"
+    explicit_pcm = temporary / f"{label}_explicit.s16le"
+    explicit = subprocess.run(
+        [str(helper), "--protocol", "1", "--source", f"file:{source}",
+         "--video-out", str(explicit_video), "--pcm-out", str(explicit_pcm)],
+        capture_output=True,
+    )
+    if explicit.returncode:
+        raise RuntimeError(
+            f"{label} explicit output failed: "
+            + explicit.stderr.decode(errors="replace").strip()
+        )
+    if explicit_video.read_bytes():
+        raise RuntimeError(f"{label} explicit output emitted video bytes")
+    if explicit_pcm.read_bytes() != inband_pcm:
+        raise RuntimeError(f"{label} explicit and in-band PCM differ")
+
+    legacy_video = temporary / f"{label}_legacy.transport"
+    legacy_pcm = temporary / f"{label}_legacy.s16le"
+    legacy = subprocess.run(
+        [str(helper), "--video-out", str(legacy_video),
+         "--pcm-out", str(legacy_pcm), str(source)],
+        capture_output=True,
+    )
+    if (legacy.returncode or legacy_video.read_bytes() or
+            legacy_pcm.read_bytes() != explicit_pcm.read_bytes()):
+        raise RuntimeError(f"{label} legacy path and file URI differ")
+    return len(inband_pcm) // 4, maximum, correlation
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("helper", type=Path)
@@ -213,8 +278,9 @@ def main() -> int:
     )
     expected_capabilities = (
         "protocol=1 sources=file reserved_sources=dvd "
-        "containers=m2v,mpeg-ps video=h262 "
-        "audio=mp2-s16le-44100,mp2-s16le-48000 "
+        "containers=m2v,mpeg-ps,mp3 video=h262 "
+        "audio=mp2-s16le-44100,mp2-s16le-48000,"
+        "mp3-s16le-44100,mp3-s16le-48000 "
         "transport=inband-pcm-v1"
     )
     if capabilities.returncode or capabilities.stdout.strip() != expected_capabilities:
@@ -305,6 +371,65 @@ def main() -> int:
         if (legacy.returncode or legacy_video.read_bytes() != helper_video.read_bytes()
                 or legacy_pcm.read_bytes() != helper_pcm.read_bytes()):
             raise RuntimeError("legacy path and protocol-one file source differ")
+
+        mp3_cbr = args.test_dir / (
+            f"03_arm_mp3_cbr_stereo_id3{rate_suffix}.mp3"
+        )
+        mp3_cbr_reference = args.test_dir / (
+            f"reference_mp3_cbr_stereo{rate_suffix}.s16le"
+        )
+        mp3_vbr = args.test_dir / f"04_arm_mp3_vbr_mono{rate_suffix}.mp3"
+        mp3_vbr_reference = args.test_dir / (
+            f"reference_mp3_vbr_mono{rate_suffix}.s16le"
+        )
+        mp3_cbr_result = verify_mp3_transport(
+            args.helper, mp3_cbr, mp3_cbr_reference, args.sample_rate,
+            temp, "mp3_cbr_stereo",
+        )
+        mp3_vbr_result = verify_mp3_transport(
+            args.helper, mp3_vbr, mp3_vbr_reference, args.sample_rate,
+            temp, "mp3_vbr_mono",
+        )
+
+        unsupported_mp3 = args.test_dir / "bad_mp3_32000.mp3"
+        unsupported = subprocess.run(
+            [str(args.helper), "--protocol", "1", "--source",
+             f"file:{unsupported_mp3}"], capture_output=True,
+        )
+        if (unsupported.returncode == 0 or unsupported.stdout or
+                b"unsupported MP3 format: 32000 Hz" not in unsupported.stderr):
+            raise RuntimeError(
+                "32 kHz MP3 was not rejected before transport: "
+                + unsupported.stderr.decode(errors="replace").strip()
+            )
+
+        malformed_id3 = temp / "malformed_id3.mp3"
+        malformed_id3.write_bytes(b"ID3\x04\x00\x00\x00\x00\x01\x00short")
+        malformed = subprocess.run(
+            [str(args.helper), "--protocol", "1", "--source",
+             f"file:{malformed_id3}"], capture_output=True,
+        )
+        if malformed.returncode == 0 or malformed.stdout:
+            raise RuntimeError("truncated ID3v2 MP3 was accepted or emitted output")
+
+        fake_mp3 = temp / "raw_video.mp3"
+        fake_mp3.write_bytes(raw_video.read_bytes())
+        fake = subprocess.run(
+            [str(args.helper), "--protocol", "1", "--source", f"file:{fake_mp3}"],
+            capture_output=True,
+        )
+        if fake.returncode == 0 or fake.stdout:
+            raise RuntimeError("H.262 renamed to MP3 was accepted or emitted output")
+
+        truncated_mp3 = temp / "truncated.mp3"
+        mp3_source = mp3_cbr.read_bytes()
+        truncated_mp3.write_bytes(mp3_source[:-200])
+        truncated_audio = subprocess.run(
+            [str(args.helper), "--protocol", "1", "--source",
+             f"file:{truncated_mp3}"], capture_output=True,
+        )
+        if truncated_audio.returncode == 0:
+            raise RuntimeError("truncated MP3 frame was accepted")
 
         truncated = temp / "truncated.mpg"
         source = program.read_bytes()
@@ -491,6 +616,13 @@ def main() -> int:
         f"correlation {inband_correlation:.6f}"
     )
     print("errors: truncated Program Stream rejected")
+    print(
+        "mp3: CBR stereo+ID3 "
+        f"{mp3_cbr_result[0]} frames/correlation {mp3_cbr_result[2]:.6f}; "
+        "VBR mono->stereo "
+        f"{mp3_vbr_result[0]} frames/correlation {mp3_vbr_result[2]:.6f}"
+    )
+    print("mp3 errors: 32 kHz, malformed ID3, fake and truncated input rejected")
     print("rates: H.262 codes 1-5 accepted; 6-8 rejected before transport")
     print("rates: cross-PES and compatibility-envelope rejection passed")
     print(

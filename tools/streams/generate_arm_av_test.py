@@ -62,6 +62,7 @@ def main() -> int:
             f"sine=frequency=660:sample_rate={args.sample_rate}:duration=0.20"
         )
         audio_filter = "[1:a][2:a]amerge=inputs=2[a]"
+        mp3_audio_filter = "[0:a][1:a]amerge=inputs=2[a]"
     else:
         program = args.output_dir / f"02_arm_mp2_faded_tones{rate_suffix}.mpg"
         demuxed_video = (
@@ -80,6 +81,10 @@ def main() -> int:
         envelope = "afade=t=in:st=0.25:d=0.25,afade=t=out:st=2.50:d=0.25"
         audio_filter = (
             f"[1:a]{envelope}[left];[2:a]{envelope}[right];"
+            "[left][right]amerge=inputs=2[a]"
+        )
+        mp3_audio_filter = (
+            f"[0:a]{envelope}[left];[1:a]{envelope}[right];"
             "[left][right]amerge=inputs=2[a]"
         )
 
@@ -104,9 +109,51 @@ def main() -> int:
         "-map", "0:a:0", "-f", "s16le", "-acodec", "pcm_s16le",
         "-ar", str(args.sample_rate), "-ac", "2", str(reference_pcm),
     ])
+
+    mp3_cbr = args.output_dir / f"03_arm_mp3_cbr_stereo_id3{rate_suffix}.mp3"
+    mp3_cbr_pcm = args.output_dir / f"reference_mp3_cbr_stereo{rate_suffix}.s16le"
+    mp3_vbr = args.output_dir / f"04_arm_mp3_vbr_mono{rate_suffix}.mp3"
+    mp3_vbr_pcm = args.output_dir / f"reference_mp3_vbr_mono{rate_suffix}.s16le"
+    run([
+        ffmpeg, "-hide_banner", "-loglevel", "fatal", "-y",
+        "-f", "lavfi", "-i", left_source,
+        "-f", "lavfi", "-i", right_source,
+        "-filter_complex", mp3_audio_filter,
+        "-map", "[a]", "-t", duration,
+        "-c:a", "libmp3lame", "-b:a", "192k", "-ar", str(args.sample_rate),
+        "-ac", "2", "-write_xing", "0", "-id3v2_version", "3",
+        "-write_id3v1", "1", "-metadata", "title=MiSTer MP3 CBR fixture",
+        str(mp3_cbr),
+    ])
+    run([
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(mp3_cbr),
+        "-f", "s16le", "-acodec", "pcm_s16le", "-ar", str(args.sample_rate),
+        "-ac", "2", str(mp3_cbr_pcm),
+    ])
+    run([
+        ffmpeg, "-hide_banner", "-loglevel", "fatal", "-y",
+        "-f", "lavfi", "-i", left_source, "-t", duration,
+        "-c:a", "libmp3lame", "-q:a", "4", "-ar", str(args.sample_rate),
+        "-ac", "1", "-write_xing", "0", "-id3v2_version", "3",
+        "-metadata", "title=MiSTer MP3 VBR mono fixture", str(mp3_vbr),
+    ])
+    run([
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(mp3_vbr),
+        "-f", "s16le", "-acodec", "pcm_s16le", "-ar", str(args.sample_rate),
+        "-ac", "2", str(mp3_vbr_pcm),
+    ])
+    unsupported_mp3 = args.output_dir / "bad_mp3_32000.mp3"
+    run([
+        ffmpeg, "-hide_banner", "-loglevel", "fatal", "-y",
+        "-f", "lavfi", "-i", "sine=frequency=550:sample_rate=32000:duration=0.20",
+        "-c:a", "libmp3lame", "-b:a", "96k", "-ar", "32000", "-ac", "1",
+        "-write_xing", "0", str(unsupported_mp3),
+    ])
     print(f"profile: {args.profile}")
     print(f"rate: {args.sample_rate} Hz")
     print(program)
+    print(mp3_cbr)
+    print(mp3_vbr)
     return 0
 
 
