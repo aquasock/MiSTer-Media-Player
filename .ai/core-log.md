@@ -1,3 +1,32 @@
+## 689 COMMIT Unreleased ??? 2026-08-28T18:30:50-07:00
+
+#### Coming From:
+
+Unreleased 8423f20
+
+#### Purpose:
+
+Install the corrected helper for controlled HDMI and S/PDIF hardware playback validation.
+
+#### Outcome:
+
+The user explicitly authorizes installing and testing the helper-only correction from entry 688 on the MiSTer at 10.10.0.30. Use the stripped, statically linked ARM EABI5 artifact built from clean source commit 8423f20 with expected SHA-256 fefaeb18b8c9e091a9cd9e97258e86264683f374f9663cb3ea6b99bafb81977a. Preserve the currently installed helper in a timestamped backup before replacement, stage the candidate separately, verify its hash before and after the final rename, and confirm the RBF, Main executable and test media are unchanged. This authorization covers helper installation, readback verification and collection of the resulting playback evidence; it does not authorize an FPGA rebuild, RBF replacement, Main replacement, relaxed error criteria or unrelated file changes.
+
+#### Next Steps:
+
+Publish this approved scope, transfer the exact build-PC artifact to the MiSTer, verify backup and final hashes, and then have the user replay the original DVD opening over S/PDIF and HDMI without changing deinterlacer mode during either run. Prefer extending S/PDIF to the prior eighteen-minute observation window if the prepared file permits it, and collect the latest helper log plus completed 2DID telemetry after each run. Accept the correction only if the user reports clean playback and telemetry shows no audio underrun or protocol fault; otherwise preserve the evidence and stop before further production changes.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 688 COMMIT Unreleased 8423f20 2026-08-28T17:22:05-07:00
 
 #### Coming From:
@@ -1228,35 +1257,6 @@ Deploy this RBF only, since no software changed, backing up the installed `Media
 - MediaPlayer_top_01.svh
 - MediaPlayer_top_02.svh
 - MediaPlayer_top_03.svh
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 649 COMMIT Unreleased 5fb7d5d 2026-08-27T21:27:18-07:00
-
-#### Coming From:
-
-Unreleased 5fb7d5d
-
-#### Purpose:
-
-Record that widening the residual coefficient memories recovers no M10K because synthesis strips the unused bit.
-
-#### Outcome:
-
-The entry 648 plan is disproven by a clean from-scratch build of `5fb7d5d` after removing `db` and `incremental_db`. The compile is successful with zero errors, and every figure is identical to the shipped v0.8.0 baseline: 31,464 ALMs, 50,273 registers, 512 of 553 M10K, and setup, hold, recovery, removal and minimum pulse width at positive 0.243, 0.251, 2.865, 0.564 and 0.925 nanoseconds with all total negative slack zero. The RBF is byte-identical to the released `61a2fed28425a461`, which alone establishes that the netlist did not change. The fitter report explains why: both coefficient memories still infer at 32,768 by 19 with 622,592 implementation bits, and the generated altsyncram's internal multiplexer is nineteen bits wide. Nothing writes bit nineteen because the write expressions are nineteen bits and zero-extend, and nothing reads it because every consumer slices bits eighteen down to thirteen and twelve down to zero, so the bit is constant and synthesis removes it. Declaring a wider array cannot select the twenty-bit mode; the twentieth bit must carry live data. The underlying measurement from entry 648 stands and is unaffected: an M10K reaches 10,240 bits only in the five, ten and twenty bit modes, our own build shows widths of twenty and forty achieving that against 8,192 for widths of one, sixteen, nineteen and thirty-five, and the existing twenty-bit `residual_block_mem` remains the one memory at full efficiency. What is disproven is the padding shortcut, not the efficiency finding. The consequence differs per path. The B path has nothing to place in the new bit because its own comment records that it already folded its last-flag into a pointer, so no saving is available there by this route. The P path can still gain roughly sixteen blocks by folding the separate one-bit `residual_coeff_last_mem` into bit nineteen, which both makes the bit live and deletes a four-block memory, taking 80 blocks to 64; that requires handling the retroactive write at address `count` minus one and is design work rather than padding. The harder repacking candidates are unaffected because repacking uses the extra bits by construction. This build also corrects a stale figure: the Aug 26 report used during investigation showed 464 blocks because `clean_video_queue` was then 16,384 by 8 at 16 blocks and is now 65,536 by 8 at 64, which accounts for the whole difference to 512. Two operational errors are recorded rather than hidden. A first compile launched detached was wrongly judged killed, a second was started against the same project, and the resulting database contention failed analysis and synthesis with zero errors reported; both were stopped and the intermediates removed before the clean run. A `pkill` pattern also matched the agent's own shell and terminated a command mid-sequence. Neither touched tracked source, the repository or the baselines. Nothing is deployed because the bitstream is identical to what is already installed, so no hardware test is possible or meaningful, and the free-block position is unchanged at 41 with the entry 608 buffer deepening still costed at roughly twenty-six blocks and the picture 690 repeated-frame limitation still accepted.
-
-#### Next Steps:
-
-Decide whether to revert `5fb7d5d`, which is recommended because the widened declarations are inert and a future reader could mistake them for a working optimization, and whether to scope the P path merge as its own cycle for roughly sixteen blocks. Do not attempt the same padding on any other memory, and treat width alone as insufficient evidence for any future M10K estimate; only a change that makes the extra bits carry data will move the block count. If more memory is wanted after that, the repacking candidates remain, being the 65,536 by 16 `shared_residual_store` at roughly twenty-five blocks, `stream_fifo` at six and `video_fifo` at three, each requiring address arithmetic rather than declaration changes, and the two identical 32,768 by 19 controller stores remain the largest single prize at seventy-six blocks if they are ever shown not to be simultaneously live. Keep the interlaced gates of field pictures, field DCT, interlaced P and B, `repeat_first_field` and 576i unstarted and unscoped until a memory budget exists, since those gates are what any recovered blocks would fund. Preserve restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
