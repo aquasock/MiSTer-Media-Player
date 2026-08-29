@@ -1,3 +1,32 @@
+## 696 COMMIT Unreleased 784ae0b 2026-08-29T02:34:10-07:00
+
+#### Coming From:
+
+Unreleased 784ae0b
+
+#### Purpose:
+
+Record that the entry 695 tree does not fit the device.
+
+#### Outcome:
+
+A full Quartus compilation of `784ae0b` failed after forty-eight minutes with `Error (11802): Can't fit design in device`.  Logic utilization reached 39,702 ALMs of 41,910, ninety-five percent, against the 32,355 and seventy-seven percent this cycle started from, with registers at 55,017 against 48,619 and RAM blocks at 532 of 553.  The field prediction work therefore costs roughly 7,350 ALMs and 6,400 registers, a twenty-three percent increase in logic, and the design no longer fits.  The long fit was the symptom: placement on a device this full runs far past the thirty minutes a healthy build of this project has always taken, and that signal was correctly identified by the user and wrongly dismissed during the cycle on the strength of a synthesis RAM-segment count that grew only four and a half percent, which is not a proxy for logic.  Two costs dominate and both are structural rather than incidental.  The prediction fetcher's retained word store doubled from thirty-six to seventy-two words of sixty-four bits on each of the two B engine instances, which is roughly nine thousand bits of randomly indexed storage that cannot infer as block memory.  Each engine also now computes four complete phase footprints in parallel, every one carrying its own base address through the shift-add row multiply in `pixel_addr`, its own word span and its own bounds comparison, where frame prediction computed one or two.  Neither cost is required by the standard; both follow from choosing to widen the fetcher rather than reuse the second instance, and from computing all four footprints combinationally rather than sequencing them.  Simulation correctness is unaffected and remains proven: the P fixture, the B fixture and the mixed raster control all reconstruct exactly.
+
+#### Next Steps:
+
+Reduce logic before anything else in this cycle proceeds, because `dct_type` and the admission gates will only add more.  The first lever is the one rejected when the fetcher was widened: give the B engine its four rectangles by reusing the second fetcher instance, which exists as a prefetch double buffer, instead of doubling the retained store on both instances.  A field macroblock already forgoes prefetch, so that instance is idle exactly when the extra phases are needed, and this reclaims the larger of the two costs without changing the phase indexing the engines now use.  The second lever is to stop computing four phase footprints at once.  Only the phase being fetched and the phase being looked up are ever live, so the base address, word span and bounds can be selected from the slot and direction first and computed once, which removes three of every four `pixel_addr` multiplies and bounds comparisons in both engines.  Measure each lever with a fit rather than by synthesis estimates, since this cycle demonstrated that synthesis counts do not predict logic utilization.  Do not attempt hardware until the design fits with margin; ninety-five percent is not a place to add features.  The build configuration is a separate matter worth measuring once the design fits: the project sets maximum fitter effort, high performance optimization mode and five physical synthesis passes including register retiming, and a compile long enough to exceed the engineering it validates is not a workable iteration loop, but reducing effort must be measured against the 0.170 nanosecond slack rather than assumed safe.
+
+#### Files Modified:
+
+- None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 695 COMMIT Unreleased 784ae0b 2026-08-29T02:25:48-07:00
 
 #### Coming From:
@@ -1181,100 +1210,6 @@ Obtain approval to add stream-defined intra and non-intra quantization matrices 
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 656 COMMIT Unreleased 0c17678 2026-08-27T23:13:11-07:00
-
-#### Coming From:
-
-Unreleased 4777c59
-
-#### Purpose:
-
-Enable the original twelve-second DVD opening with AC-3 as a bounded native film-frame playback milestone.
-
-#### Outcome:
-
-The approved cycle is implemented as source 0c17678, including the matrix expansion approved in entry 658. Generic sequence and extension matrix downloads feed I and shared P/B inverse quantization, with default reset, persistence, natural-index addressing and fail-closed validation. B motion supports f_code six end to end, the three legal quantized non-intra B macroblock types are decoded, all B motion predictors reset after an intra macroblock, and an intra first B macroblock selects the B engine before its descriptor is consumed. P/B header capture preserves picture coding controls across quantization-matrix extensions. The frontend admits the bounded progressive-film subset in a 480i sequence; physical picture banks retain top-field-first, repeat-first-field and progressive-chroma metadata independently of PTS, and the scheduler presents two or three fields while respecting candidate parity and timestamp floors. The framebuffer selects progressive chroma rows for film and keeps ordinary interlaced mapping. Deterministic preparation, numerical comparison and focused regressions are committed; no movie-derived media is published. Source is committed and pushed only from the Pi. Qualification details and the explicit numerical comparison limits are recorded in entry 660. Whole-title playback, arbitrary interlaced P/B syntax, ISO/IFO navigation and menus remain outside scope. A clean Quartus build and hardware acceptance are still pending.
-
-#### Next Steps:
-
-Pull exact published source on GUNSMOKE, repeat paired original-opening qualification, and perform a clean Quartus 17 build with every timing category positive and a comparison against 512 of 553 M10K and the previous positive 0.126-nanosecond HDMI setup margin. Record build results in a new entry and hand verified files to the user for deployment and playback; do not infer hardware acceptance from simulations. Preserve restricted core.md, existing artifacts and user control of the MiSTer.
-
-#### Files Modified:
-
-- MediaPlayer_top_00.svh
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_03.svh
-- MediaPlayer_top_04.svh
-- MediaPlayer_top_05.svh
-- MediaPlayer_top_06.svh
-- docs/testing_original_dvd_opening.md
-- files.qip
-- rtl/mpeg2_luma_framebuffer.sv
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- rtl/mpeg2_new/mpeg2_h262_frontend.sv
-- rtl/mpeg2_new/mpeg2_h262_inverse_quant.sv
-- rtl/mpeg2_new/mpeg2_h262_native_field_order.sv
-- rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
-- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_picture_timestamp.sv
-- rtl/mpeg2_new/mpeg2_h262_quant_matrices.sv
-- rtl/mpeg2_new/mpeg2_h262_reference_pipeline_probe_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
-- rtl/mpeg2_video_output_timing.sv
-- tools/streams/generate_quant_matrix_vectors.py
-- tools/streams/generate_test_b_f_code_range.py
-- tools/streams/generate_test_b_intra_motion_reset.py
-- tools/streams/generate_test_b_quantized.py
-- tools/streams/generate_test_matrix_transitions.py
-- tools/streams/h262common.py
-- tools/streams/prepare_frame_pixel_oracle.py
-- tools/streams/prepare_original_dvd_opening.py
-- tools/streams/run_b_motion_math.sh
-- tools/streams/run_film_presentation.sh
-- tools/streams/run_full_frame_pixels.sh
-- tools/streams/run_interlaced_i_reconstruction.sh
-- tools/streams/run_mixed_raster_pixels.sh
-- tools/streams/run_original_dvd_i.sh
-- tools/streams/run_original_dvd_pixels.sh
-- tools/streams/run_original_dvd_qualification.sh
-- tools/streams/run_quant_matrices.sh
-- tools/streams/tb_h262_b_motion_math.sv
-- tools/streams/tb_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_b_residual_streaming.sv
-- tools/streams/tb_h262_dense_publication_order.sv
-- tools/streams/tb_h262_film_cadence.sv
-- tools/streams/tb_h262_film_reorder_timestamp.sv
-- tools/streams/tb_h262_input_cadence.sv
-- tools/streams/tb_h262_interlaced_i_reconstruction.sv
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/streams/tb_h262_picture_timestamp.sv
-- tools/streams/tb_h262_quant_matrices.sv
-- tools/streams/tb_h262_quant_matrix_iq.sv
-- tools/streams/tb_hdmi_scaler_stimulus.sv
-- tools/streams/tb_interlaced_420_cache_mapping.sv
-- tools/streams/tb_native_480i_cache_refill.sv
-- tools/streams/tb_native_480i_presentation_integration.sv
-- tools/streams/tb_native_field_order.sv
-- tools/streams/tb_native_ordinary_overlap_ownership.sv
 
 #### Status:
 
