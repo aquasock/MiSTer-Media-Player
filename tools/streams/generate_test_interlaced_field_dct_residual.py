@@ -199,13 +199,17 @@ def main() -> None:
         data = h.patch_pictures(
             skeleton.read_bytes(), [1, 2, 3],
             {0: (False, i_rows), 1: (False, p_rows), 2: (True, b_rows)},
+            forward_f_codes={0: (15, 15)},
             interlaced={
                 0: {"frame_pred_frame_dct": False,
-                    "progressive_frame": False, "top_field_first": True},
+                    "progressive_frame": False, "top_field_first": True,
+                    "chroma_420_type": False},
                 1: {"frame_pred_frame_dct": False,
-                    "progressive_frame": False, "top_field_first": True},
+                    "progressive_frame": False, "top_field_first": True,
+                    "chroma_420_type": False},
                 2: {"frame_pred_frame_dct": False,
-                    "progressive_frame": False, "top_field_first": True},
+                    "progressive_frame": False, "top_field_first": True,
+                    "chroma_420_type": False},
             },
         )
         out.write_bytes(clear_progressive_sequence(data))

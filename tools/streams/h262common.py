@@ -420,7 +420,8 @@ def patch_picture(data: bytes, pic_index: int, is_b: bool,
                   backward_f_code: tuple[int, int] = (3, 3),
                   frame_pred_frame_dct: bool = True,
                   progressive_frame: bool | None = None,
-                  top_field_first: bool | None = None) -> bytes:
+                  top_field_first: bool | None = None,
+                  chroma_420_type: bool | None = None) -> bytes:
     """row_groups[row] is a tuple of one or more same-row slice payloads (already packed bytes)."""
     b = bytearray(data)
     pics = pictures(b)
@@ -434,7 +435,11 @@ def patch_picture(data: bytes, pic_index: int, is_b: bool,
     if pce is None:
         raise SystemExit(f"picture {pic_index} type {ptype}: missing picture_coding_extension")
     f_code_h, f_code_v = forward_f_code
-    if not (1 <= f_code_h <= 6 and 1 <= f_code_v <= 6):
+    valid_forward_f_code = (
+        (1 <= f_code_h <= 6 and 1 <= f_code_v <= 6) or
+        (ptype == 1 and (f_code_h, f_code_v) == (15, 15))
+    )
+    if not valid_forward_f_code:
         raise ValueError(forward_f_code)
     b[pce + 4] = (b[pce + 4] & 0xF0) | f_code_h
     if is_b:
@@ -467,6 +472,8 @@ def patch_picture(data: bytes, pic_index: int, is_b: bool,
         b[pce + 7] = (b[pce + 7] | 0x80) if top_field_first else (b[pce + 7] & ~0x80)
     if progressive_frame is not None:
         b[pce + 8] = (b[pce + 8] | 0x80) if progressive_frame else (b[pce + 8] & ~0x80)
+    if chroma_420_type is not None:
+        b[pce + 7] = (b[pce + 7] | 0x01) if chroma_420_type else (b[pce + 7] & ~0x01)
 
     codes = start_codes(b)
     pics = pictures(b)
@@ -503,7 +510,8 @@ def patch_pictures(data: bytes, coded_types: list[int],
                           backward_f_codes.get(pic_index, (3, 3)),
                           shape.get("frame_pred_frame_dct", True),
                           shape.get("progressive_frame"),
-                          shape.get("top_field_first"))
+                          shape.get("top_field_first"),
+                          shape.get("chroma_420_type"))
     return b
 
 
