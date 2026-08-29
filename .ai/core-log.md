@@ -1,4 +1,4 @@
-## 702 COMMIT Unreleased ??? 2026-08-29T03:10:56-07:00
+## 702 COMMIT Unreleased 736f64f 2026-08-29T03:10:56-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Qualify the published interlaced prediction recovery and pending decoded-PCM S/P
 
 #### Outcome:
 
-This cycle is build qualification only.  A fresh isolated checkout will be created from published source `736f64f` with no reused Quartus database, generated output or uncommitted patch.  Quartus Prime Lite 17.0.2 will run the complete configured flow followed by the focused timing report.  Acceptance requires fitter completion, positive setup, hold, recovery, removal and minimum-pulse timing, no hidden source mismatch, and resource comparison against the 32,355-ALM pre-field baseline and the 39,702-ALM failed near-final report.  The already passing P-field, B-field, progressive-control, helper-codec and S/PDIF routing regressions remain the functional evidence for this exact source.  No production admission gate, field DCT, codec expansion, MiSTer installation or hardware playback is included.
+An isolated fresh GitHub clone was verified at exact published source `736f64f` with no tracked mismatch or reused Quartus database, and Quartus Prime Lite 17.0.2 completed the full configured flow in fourteen minutes twenty-three seconds with zero errors and 218 warnings.  The fitter succeeds at 34,163 of 41,910 ALMs, eighty-two percent, with 52,455 registers, 4,178,743 memory bits, 532 of 553 RAM blocks and 67 DSP blocks.  This reclaims 5,539 ALMs and 2,562 registers from the failed near-final report and leaves field prediction only 1,808 ALMs above the 32,355-ALM pre-field baseline instead of 7,347; RAM remains the binding resource at ninety-six percent.  One routing-congestion warning is emitted while the router converges, but routing completes in the same invocation and no critical or timing-failure warning occurs.  Every reported timing category has zero TNS and positive slack: minimum setup plus 0.100 nanoseconds in the sixty-megahertz MPEG domain, hold plus 0.243, recovery plus 3.086, removal plus 0.404 and minimum pulse width plus 0.925; the focused report independently finds zero violated decoder or video paths, with video setup plus 2.885 nanoseconds.  The 4,459,744-byte RBF has SHA-256 `3f66a5eb38bcff783472b977764bc34366a07570b01278822e705718edf224fa`, and complete build and focused timing evidence remains under `/home/vash/mister-builds/entry702/source_0313` on GUNSMOKE.  No production admission gate, field DCT, MiSTer installation or hardware playback occurred, so hardware acceptance remains open.
 
 #### Next Steps:
 
-Pull and verify exact commit `736f64f` on GUNSMOKE, run the clean flow without incremental databases, inspect fitter and TimeQuest reports, hash any timing-positive RBF and preserve the complete reports under the isolated entry directory.  If the design still does not fit or any timing category is negative, stop without packaging or deployment and record the exact failing paths and resources rather than reseeding or expanding scope.
+Preserve this exact source, reports and RBF as the fit-qualified recovery baseline.  Under separate authorization, deploy the matching RBF and static helper together after backing up the installed files, then physically verify MP3, WAV and FLAC over S/PDIF while preserving HDMI decoded PCM and AC-3 and DTS receiver lock.  For the next DVD RTL cycle, add and fixture-test inter-macroblock field DCT before opening the P, B and frontend production admission gates; avoid new block memories because only twenty-one RAM blocks remain, and require the complete progressive and interlaced regression set before another clean build.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ None.
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
