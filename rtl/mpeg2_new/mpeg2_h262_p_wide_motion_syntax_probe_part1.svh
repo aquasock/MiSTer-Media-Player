@@ -353,8 +353,8 @@ always @(posedge clk) begin
         motion_event_y<=0;
         motion_event_intra<=0;
         motion_event_second<=0;
-        motion_event_field<=0;
-        motion_event_fsel<=0;
+        motion_event_fsel0<=0;
+        motion_event_fsel1<=0;
         residual_block_read_word<=0;
         residual_block_count<=0;
         residual_present<=0;

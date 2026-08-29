@@ -50,8 +50,8 @@ module mpeg2_h262_p_wide_motion_syntax_probe
     // slot 1 vector rides a second event.  The engine commits the macroblock
     // on the slot 0 event, so the slot 1 event is emitted first.
     output reg         motion_event_second,
-    output reg         motion_event_field,
-    output reg         motion_event_fsel,
+    output reg         motion_event_fsel0,
+    output reg         motion_event_fsel1,
 
     output reg [5:0]   picture_mb_width,
     output reg [5:0]   picture_mb_height,

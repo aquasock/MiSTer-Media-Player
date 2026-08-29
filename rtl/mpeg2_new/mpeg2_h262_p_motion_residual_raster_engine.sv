@@ -200,8 +200,10 @@ endfunction
 reg [10:0] motion_count;
 reg [55:0] motion_word;
 // Entry 695: the second field vector arrives as its own sideband record.
-reg signed [12:0] p_pending_mvx0,p_pending_mvy0;
-reg p_pending_field,p_pending_fsel0,p_pending_intra;
+// Entry 695: the ordinary record's slot 0 is retained so the field record
+// behind it can amend the entry without reading block RAM back.
+reg signed [12:0] p_last_mvx,p_last_mvy;
+reg p_last_intra;
 wire mb_field=motion_word[55];
 wire mb_fsel0=motion_word[54];
 wire mb_fsel1=motion_word[53];
@@ -257,10 +259,11 @@ reg emit_block_start, emit_block_complete;
 reg [28:0] next_prelaunch_addr;
 reg next_prelaunch_valid;
 reg block_fetch_start;
-reg [2:0] block_base_byte;
+reg [2:0] block_base_byte,block_base_byte1;
 wire fast_pixel_advance, slow_pixel_advance, precompute_after_advance;
 wire block_lookup_request;
 wire [3:0] block_lookup_row;
+wire block_lookup_phase;
 wire block_lookup_column;
 wire block_lookup_ready,block_lookup_valid;
 wire [63:0] block_lookup_data;
@@ -274,14 +277,45 @@ wire [28:0] roff=(reference_bank_latched==2'd1)?BANK_OFF:
                  (reference_bank_latched==2'd2)?29'h00040000:29'd0;
 wire [2:0] er=ei[5:3], el=ei[2:0];
 
-wire signed [12:0] exec_mvx =
-    (blk<4)?mb_mvx:chroma_half_vector(mb_mvx);
-wire signed [12:0] exec_mvy =
-    (blk<4)?mb_mvy:chroma_half_vector(mb_mvy);
+// Entry 695: field prediction carries one vector per destination field.  The
+// destination parity is the block row's low bit for luma and chroma alike,
+// because the macroblock origin and the block origin are both even.  Chroma
+// takes the same truncation toward zero that frame prediction already uses,
+// which is what h262common's field model applies.
+wire signed [12:0] slot0_mv_x=(blk<4)?mb_mvx :chroma_half_vector(mb_mvx);
+wire signed [12:0] slot0_mv_y=(blk<4)?mb_mvy :chroma_half_vector(mb_mvy);
+wire signed [12:0] slot1_mv_x=(blk<4)?mb_mvx1:chroma_half_vector(mb_mvx1);
+wire signed [12:0] slot1_mv_y=(blk<4)?mb_mvy1:chroma_half_vector(mb_mvy1);
+wire dest_slot=mb_field?er[0]:1'b0;
+wire slot_fsel=dest_slot?mb_fsel1:mb_fsel0;
+
+wire signed [12:0] exec_mvx=dest_slot?slot1_mv_x:slot0_mv_x;
+wire signed [12:0] exec_mvy=dest_slot?slot1_mv_y:slot0_mv_y;
 wire signed [12:0] exec_int_x=$signed(exec_mvx)>>>1;
 wire signed [12:0] exec_int_y=$signed(exec_mvy)>>>1;
 wire half_x=exec_mvx[0];
 wire half_y=exec_mvy[0];
+
+// Per-phase block origins.  Phase d serves destination field d for the whole
+// block, so its rectangle is four field rows tall.
+wire [11:0] block_dest_x0=(blk<4)?(({6'd0,col}<<4)+{8'd0,blk[0],3'd0})
+                                 :({6'd0,col}<<3);
+wire [11:0] block_dest_y0=(blk<4)?(({6'd0,mrow}<<4)+{8'd0,blk[1],3'd0})
+                                 :({6'd0,mrow}<<3);
+wire signed [13:0] block_field_row0=$signed({2'b00,block_dest_y0[11:1]});
+wire signed [13:0] slot0_int_x=$signed({slot0_mv_x[12],slot0_mv_x})>>>1;
+wire signed [13:0] slot0_int_y=$signed({slot0_mv_y[12],slot0_mv_y})>>>1;
+wire signed [13:0] slot1_int_x=$signed({slot1_mv_x[12],slot1_mv_x})>>>1;
+wire signed [13:0] slot1_int_y=$signed({slot1_mv_y[12],slot1_mv_y})>>>1;
+wire slot0_half_x=slot0_mv_x[0],slot0_half_y=slot0_mv_y[0];
+wire slot1_half_x=slot1_mv_x[0],slot1_half_y=slot1_mv_y[0];
+wire signed [13:0] phase0_base_x=$signed({2'b00,block_dest_x0})+slot0_int_x;
+wire signed [13:0] phase1_base_x=$signed({2'b00,block_dest_x0})+slot1_int_x;
+// A field row maps back to a frame line through the selected field's parity.
+wire signed [13:0] phase0_base_y=
+    ((block_field_row0+slot0_int_y)<<<1)+$signed({13'd0,mb_fsel0});
+wire signed [13:0] phase1_base_y=
+    ((block_field_row0+slot1_int_y)<<<1)+$signed({13'd0,mb_fsel1});
 
 wire [11:0] luma_x=({6'd0,col}<<4)+{8'd0,blk[0],el};
 wire [11:0] luma_y=({6'd0,mrow}<<4)+{8'd0,blk[1],er};
@@ -291,8 +325,15 @@ wire [11:0] dest_x=(blk<4)?luma_x:chroma_x;
 wire [11:0] dest_y=(blk<4)?luma_y:chroma_y;
 wire signed [13:0] src_base_x=
     $signed({1'b0,dest_x})+$signed(exec_int_x);
+// Field prediction indexes the reference in field lines: the destination's own
+// field row plus the vector, mapped back to a frame line through the selected
+// field's parity.  Frame prediction is unchanged.
+wire signed [13:0] dest_field_row=$signed({2'b00,dest_y[11:1]});
 wire signed [13:0] src_base_y=
-    $signed({1'b0,dest_y})+$signed(exec_int_y);
+    mb_field?
+        (((dest_field_row+$signed({exec_int_y[12],exec_int_y}))<<<1)+
+         $signed({13'd0,slot_fsel})):
+        ($signed({1'b0,dest_y})+$signed(exec_int_y));
 wire [11:0] plane_width =
     (blk<4)?padded_luma_width:padded_chroma_width;
 wire [11:0] plane_height =
@@ -300,7 +341,7 @@ wire [11:0] plane_height =
 wire signed [13:0] src_last_x=
     src_base_x+(half_x?14'sd1:14'sd0);
 wire signed [13:0] src_last_y=
-    src_base_y+(half_y?14'sd1:14'sd0);
+    src_base_y+(half_y?(mb_field?14'sd2:14'sd1):14'sd0);
 wire signed [13:0] plane_width_s=
     $signed({2'b00,plane_width});
 wire signed [13:0] plane_height_s=
@@ -312,24 +353,52 @@ wire signed [13:0] block_src_last_x=src_base_x+14'sd7+
     (half_x?14'sd1:14'sd0);
 wire signed [13:0] block_src_last_y=src_base_y+14'sd7+
     (half_y?14'sd1:14'sd0);
-wire block_source_bounds_ok=(src_base_x>=0)&&(src_base_y>=0)&&
-    (block_src_last_x<plane_width_s)&&(block_src_last_y<plane_height_s);
+// Both phases are fetched, so both must be in range.  A phase spans four field
+// rows, which is six frame lines, plus two more for a vertical half sample.
+wire phase0_bounds_ok=
+    (phase0_base_x>=0)&&(phase0_base_y>=0)&&
+    ((phase0_base_x+14'sd7+(slot0_half_x?14'sd1:14'sd0))<plane_width_s)&&
+    ((phase0_base_y+14'sd6+(slot0_half_y?14'sd2:14'sd0))<plane_height_s);
+wire phase1_bounds_ok=
+    (phase1_base_x>=0)&&(phase1_base_y>=0)&&
+    ((phase1_base_x+14'sd7+(slot1_half_x?14'sd1:14'sd0))<plane_width_s)&&
+    ((phase1_base_y+14'sd6+(slot1_half_y?14'sd2:14'sd0))<plane_height_s);
+wire block_source_bounds_ok=
+    mb_field?(phase0_bounds_ok&&phase1_bounds_ok)
+            :((src_base_x>=0)&&(src_base_y>=0)&&
+              (block_src_last_x<plane_width_s)&&
+              (block_src_last_y<plane_height_s));
 wire [3:0] block_word_span=
     {1'b0,src_base_x[2:0]}+4'd7+{3'd0,half_x};
+wire [3:0] phase0_word_span=
+    {1'b0,phase0_base_x[2:0]}+4'd7+{3'd0,slot0_half_x};
+wire [3:0] phase1_word_span=
+    {1'b0,phase1_base_x[2:0]}+4'd7+{3'd0,slot1_half_x};
+wire [28:0] phase0_addr=pixel_addr(
+    roff,blk,phase0_base_x[11:0],phase0_base_y[11:0]);
+wire [28:0] phase1_addr=pixel_addr(
+    roff,blk,phase1_base_x[11:0],phase1_base_y[11:0]);
 wire [28:0] block_phase0_base_addr=pixel_addr(
     roff,blk,src_base_x[11:0],src_base_y[11:0]);
 wire [7:0] block_row_words=(blk<4)?8'd90:8'd45;
 
 mpeg2_h262_prediction_block_fetcher block_fetcher(
     .clk(clk),.reset(reset),.start(block_fetch_start),
-    .phase_count(2'd1),.phase0_base_addr(block_phase0_base_addr),
-    .phase1_base_addr(29'd0),
-    .phase0_two_words(block_word_span[3]),.phase1_two_words(1'b0),
-    .phase0_rows(4'd8+{3'd0,half_y}),.phase1_rows(4'd1),
-    .row_words(block_row_words),.memory_busy(ddram_busy),
+    // Entry 695: field prediction fetches one rectangle per destination field.
+    .phase_count(mb_field?2'd2:2'd1),
+    .phase0_base_addr(mb_field?phase0_addr:block_phase0_base_addr),
+    .phase1_base_addr(mb_field?phase1_addr:29'd0),
+    .phase0_two_words(mb_field?phase0_word_span[3]:block_word_span[3]),
+    .phase1_two_words(mb_field?phase1_word_span[3]:1'b0),
+    .phase0_rows(mb_field?(4'd4+{3'd0,slot0_half_y}):(4'd8+{3'd0,half_y})),
+    .phase1_rows(mb_field?(4'd4+{3'd0,slot1_half_y}):4'd1),
+    // A doubled stride makes each fetched row step one field line, which is
+    // also what lets the vertical half sample interpolate between field lines.
+    .row_words(mb_field?{block_row_words[6:0],1'b0}:block_row_words),
+    .memory_busy(ddram_busy),
     .memory_dout(ddram_dout),.memory_dout_ready(ddram_dout_ready),
     .memory_addr(block_fetch_addr),.memory_rd(block_fetch_rd),
-    .lookup_request(block_lookup_request),.lookup_phase(1'b0),
+    .lookup_request(block_lookup_request),.lookup_phase(block_lookup_phase),
     .lookup_row(block_lookup_row),.lookup_column(block_lookup_column),
     .lookup_ready(block_lookup_ready),.lookup_valid(block_lookup_valid),
     .lookup_data(block_lookup_data),.active(block_fetch_active),
@@ -359,14 +428,33 @@ wire [11:0] next_pixel_dest_x=
     (blk<4)?next_pixel_luma_x:next_pixel_chroma_x;
 wire [11:0] next_pixel_dest_y=
     (blk<4)?next_pixel_luma_y:next_pixel_chroma_y;
+// The following pixel may belong to the other destination field, so it takes
+// its own slot's vector rather than the current pixel's.
+wire next_pixel_dest_slot=mb_field?next_pixel_er[0]:1'b0;
+wire signed [12:0] next_pixel_mv_x=
+    next_pixel_dest_slot?slot1_mv_x:slot0_mv_x;
+wire signed [12:0] next_pixel_mv_y=
+    next_pixel_dest_slot?slot1_mv_y:slot0_mv_y;
+wire signed [12:0] next_pixel_int_x=$signed(next_pixel_mv_x)>>>1;
+wire signed [12:0] next_pixel_int_y=$signed(next_pixel_mv_y)>>>1;
+wire next_pixel_half_x=next_pixel_mv_x[0];
+wire next_pixel_half_y=next_pixel_mv_y[0];
+wire next_pixel_fsel=next_pixel_dest_slot?mb_fsel1:mb_fsel0;
+wire signed [13:0] next_pixel_dest_field_row=
+    $signed({2'b00,next_pixel_dest_y[11:1]});
 wire signed [13:0] next_pixel_src_base_x=
-    $signed({1'b0,next_pixel_dest_x})+$signed(exec_int_x);
+    $signed({1'b0,next_pixel_dest_x})+$signed(next_pixel_int_x);
 wire signed [13:0] next_pixel_src_base_y=
-    $signed({1'b0,next_pixel_dest_y})+$signed(exec_int_y);
+    mb_field?
+        (((next_pixel_dest_field_row+
+           $signed({next_pixel_int_y[12],next_pixel_int_y}))<<<1)+
+         $signed({13'd0,next_pixel_fsel})):
+        ($signed({1'b0,next_pixel_dest_y})+$signed(next_pixel_int_y));
 wire signed [13:0] next_pixel_src_last_x=
-    next_pixel_src_base_x+(half_x?14'sd1:14'sd0);
+    next_pixel_src_base_x+(next_pixel_half_x?14'sd1:14'sd0);
 wire signed [13:0] next_pixel_src_last_y=
-    next_pixel_src_base_y+(half_y?14'sd1:14'sd0);
+    next_pixel_src_base_y+
+    (next_pixel_half_y?(mb_field?14'sd2:14'sd1):14'sd0);
 wire next_pixel_source_bounds_ok=
     (next_pixel_src_base_x>=0)&&(next_pixel_src_base_y>=0)&&
     (next_pixel_src_last_x<plane_width_s)&&
@@ -501,11 +589,18 @@ wire block_request_tap_dx=
 wire block_request_tap_dy=
     (half_x&&half_y)?block_request_tap[1]:
     (half_y?block_request_tap[0]:1'b0);
+wire [2:0] block_request_base_byte=
+    (mb_field&&block_request_ei[3])?block_base_byte1:block_base_byte;
 wire [4:0] block_request_byte=
-    {2'd0,block_base_byte}+{2'd0,block_request_ei[2:0]}+
+    {2'd0,block_request_base_byte}+{2'd0,block_request_ei[2:0]}+
     {4'd0,block_request_tap_dx};
+// Entry 695: a field phase holds this block's four rows of one parity, so the
+// row within the phase is the block row halved.
 assign block_lookup_row=
-    {1'b0,block_request_ei[5:3]}+block_request_tap_dy;
+    mb_field?({2'd0,block_request_ei[5:4]}+{3'd0,block_request_tap_dy})
+            :({1'b0,block_request_ei[5:3]}+block_request_tap_dy);
+// The phase to read is the destination parity of the pixel being requested.
+assign block_lookup_phase=mb_field?block_request_ei[3]:1'b0;
 assign block_lookup_column=block_request_byte[3];
 assign block_lookup_request=
     (prediction_lookup&&!(pixel_setup&&(ei==0)))||
@@ -532,18 +627,21 @@ wire descriptor_order_error=
     ({wide_desc_mb,residual_value[2:0]} <=
      {capture_last_desc_word[14:4],capture_last_desc_word[2:0]});
 
-// Entry 695: one macroblock's committed motion word.  Frame prediction commits
-// on its single record with both slots equal.  Field prediction commits on the
-// 0x35 record that follows the ordinary one, combining the slot 0 vector held
-// from that earlier record with this record's slot 1.
+// One macroblock's committed motion word: both slots equal, no field.  This is
+// what every P path writes, and its meaning is unchanged from before entry 695.
 wire [55:0] motion_commit_word=
-    p_pending_field?
-        {1'b1,p_pending_fsel0,residual_value[0],p_pending_intra,
-         p_pending_mvx0,p_pending_mvy0,
-         motion_vector_x,motion_vector_y}:
-        {3'b000,(residual_index==6'h3b),
-         motion_vector_x,motion_vector_y,
-         motion_vector_x,motion_vector_y};
+    {3'b000,(residual_index==6'h3b),
+     motion_vector_x,motion_vector_y,
+     motion_vector_x,motion_vector_y};
+// Entry 695: the field record's amendment of the entry just written.  Only the
+// wide parser emits 6'h35, so only there does the record value carry a
+// payload; on every other path this value is the residual channel and its bits
+// mean something else, which is why the ordinary record must not be read for
+// field information.
+wire [55:0] motion_field_amend_word=
+    {1'b1,residual_value[0],residual_value[1],p_last_intra,
+     p_last_mvx,p_last_mvy,
+     motion_vector_x,motion_vector_y};
 
 wire new_picture_metadata=
     capture_enable&&residual_valid&&!desc_active&&
@@ -573,8 +671,7 @@ always @(posedge clk) begin
     if(reset) begin
         motion_count<=0;
         motion_word<=0;
-        p_pending_mvx0<=0;p_pending_mvy0<=0;
-        p_pending_field<=0;p_pending_fsel0<=0;p_pending_intra<=0;
+        p_last_mvx<=0;p_last_mvy<=0;p_last_intra<=0;
         bank_desc_count[0]<=0;
         bank_desc_count[1]<=0;
         bank_last_desc_word[0]<=0;
@@ -647,17 +744,11 @@ always @(posedge clk) begin
         if(new_picture_metadata) begin
             persisted_seen<=0;
             progress_stage<=4'd1;
-            motion_count<=residual_value[1]?11'd0:11'd1;
-            if(residual_value[1]) begin
-                p_pending_field<=1'b1;
-                p_pending_fsel0<=residual_value[0];
-                p_pending_mvx0<=motion_vector_x;
-                p_pending_mvy0<=motion_vector_y;
-                p_pending_intra<=(residual_index==6'h3b);
-            end else begin
-                motion_mem[0]<=motion_commit_word;
-                p_pending_field<=0;p_pending_fsel0<=0;p_pending_intra<=0;
-            end
+            motion_count<=11'd1;
+            motion_mem[0]<=motion_commit_word;
+            p_last_mvx<=motion_vector_x;
+            p_last_mvy<=motion_vector_y;
+            p_last_intra<=(residual_index==6'h3b);
             bank_desc_count[0]<=0;
             bank_desc_count[1]<=0;
             bank_last_desc_word[0]<=0;
@@ -688,6 +779,7 @@ always @(posedge clk) begin
             next_prelaunch_valid<=0;
             block_fetch_start<=0;
             block_base_byte<=0;
+            block_base_byte1<=0;
             wait_store<=0;
             pixel_setup<=0;
             motion_load<=0;
@@ -715,18 +807,15 @@ always @(posedge clk) begin
                     end
                 end
             end else if(residual_index==6'h35) begin
-                // Entry 695: field prediction's second record carries slot 1
-                // and completes the macroblock.  The ordinary record ahead of
-                // it armed this capture and left slot 0 pending.
-                if(bank_ready[capture_bank] ||
-                   !p_pending_field ||
-                   (motion_count>=MAX_MB)) begin
+                // Entry 695: field prediction's second record amends the entry
+                // the ordinary record just wrote, adding slot 1 and both field
+                // selects.  Capture and execution are disjoint phases, so that
+                // entry is still writable here.
+                if(bank_ready[capture_bank]||(motion_count==0)) begin
                     error<=1;
                     if(!error) error_source<=5'd19;
                 end else begin
-                    motion_mem[motion_count]<=motion_commit_word;
-                    motion_count<=motion_count+1'b1;
-                    p_pending_field<=0;p_pending_fsel0<=0;p_pending_intra<=0;
+                    motion_mem[motion_count-1'b1]<=motion_field_amend_word;
                 end
             end else if((residual_index==6'h3e)||
                         (residual_index==6'h3b)) begin
@@ -736,17 +825,12 @@ always @(posedge clk) begin
                    (motion_count>=MAX_MB)) begin
                     error<=1;
                     if(!error) error_source<=5'd2;
-                // Entry 695: the field flag says a second record follows, so
-                // hold slot 0 rather than committing a half macroblock.
-                end else if(residual_value[1]) begin
-                    p_pending_field<=1'b1;
-                    p_pending_fsel0<=residual_value[0];
-                    p_pending_mvx0<=motion_vector_x;
-                    p_pending_mvy0<=motion_vector_y;
-                    p_pending_intra<=(residual_index==6'h3b);
                 end else begin
                     motion_mem[motion_count]<=motion_commit_word;
                     motion_count<=motion_count+1'b1;
+                    p_last_mvx<=motion_vector_x;
+                    p_last_mvy<=motion_vector_y;
+                    p_last_intra<=(residual_index==6'h3b);
                 end
             end else if(residual_index==6'h3c) begin
                 if(bank_ready[capture_bank] ||
@@ -929,7 +1013,9 @@ always @(posedge clk) begin
             end else begin
                 if(ei==0)begin
                     block_fetch_start<=1;
-                    block_base_byte<=src_base_x[2:0];
+                    block_base_byte<=mb_field?phase0_base_x[2:0]
+                                             :src_base_x[2:0];
+                    block_base_byte1<=phase1_base_x[2:0];
                 end
                 if(half_x||half_y) half_sample_seen<=1;
                 lookup_wait<=1;

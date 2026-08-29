@@ -1795,6 +1795,14 @@ module tb_h262_live_raster_soak #(
                          pixel_samples,pixel_mismatches,max_pixel_delta,
                          pixel_even_mismatches,pixel_even_samples,
                          pixel_odd_mismatches,pixel_odd_samples);
+                // Entry 695: every count below is the 128x96 fixture's own
+                // golden value -- sample and cycle counts, B replay and tap
+                // profiles, reference and scratch write totals.  A fixture
+                // with different geometry or no B pictures cannot satisfy
+                // them however correct its pixels are, so it is held to the
+                // fixture-independent conditions in the else branch instead.
+                if((PIXEL_WIDTH==128)&&(PIXEL_HEIGHT==96)&&
+                   (PIXEL_PICTURES==24))begin
                 if(stream_index!=stream_len||p_rows!=48||p_pictures!=8||
                    b_rows!=90||b_pictures!=15||published_references!=9||
                    picture_count!=9||reference_promotion_count!=9||
@@ -1836,6 +1844,13 @@ module tb_h262_live_raster_soak #(
                    !pred_reconstructed_observed||!presentation_complete||
                    probe_error||pred_error||writer_error||presentation_error)
                     $fatal(1,"mixed raster pixel regression failed");
+                end else begin
+                    if(pixel_mismatches!=0||!writer_seen||
+                       !pred_read_observed||!pred_reconstructed_observed||
+                       !presentation_complete||probe_error||pred_error||
+                       writer_error||presentation_error)
+                        $fatal(1,"mixed raster pixel regression failed");
+                end
                 if(prediction_trace_fd!=0)begin
                     if(prediction_trace_hits!=
                            prediction.reference_cache.cache_hit_count||

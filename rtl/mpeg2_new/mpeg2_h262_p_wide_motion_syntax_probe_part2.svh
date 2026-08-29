@@ -211,8 +211,8 @@
                 motion_event_y<=0;
                 motion_event_intra<=0;
                 motion_event_second<=0;
-                motion_event_field<=0;
-                motion_event_fsel<=0;
+                motion_event_fsel0<=0;
+                motion_event_fsel1<=0;
                 if(skip_remaining==1) begin
                     skip_remaining<=0;
                     parser_state<=R_MBTYPE;
