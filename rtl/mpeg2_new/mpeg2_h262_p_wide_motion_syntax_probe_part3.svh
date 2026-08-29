@@ -168,23 +168,59 @@
             end
 
             R_MB_DONE: begin
-                motion_event_valid<=1;
-                motion_event_index<=current_mb_index;
-                motion_event_x<=current_motion_x;
-                motion_event_y<=current_motion_y;
-                motion_event_intra<=current_is_intra;
-                if(current_has_motion) begin
-                    predictor_x<=current_motion_x;
-                    predictor_y<=current_motion_y;
-                end
-                row_has_coded_mb<=1;
-                if(current_col==(picture_mb_width-1'b1)) begin
-                    parser_state<=R_STUFF;
+                // Entry 695: field prediction emits the slot 1 vector on its
+                // own record first, because the raster engine commits the
+                // macroblock on the slot 0 record.  This state consumes no
+                // bit, so holding it for the extra cycle costs no syntax.
+                if(field_motion&&!motion_second_sent) begin
+                    motion_event_valid<=1;
+                    motion_event_index<=current_mb_index;
+                    motion_event_x<=current_motion_x;
+                    motion_event_y<=current_motion_y;
+                    motion_event_intra<=1'b0;
+                    motion_event_second<=1'b1;
+                    motion_event_field<=1'b1;
+                    motion_event_fsel<=current_fsel1;
+                    motion_second_sent<=1'b1;
                 end else begin
-                    mba_vlc_bits<=0;
-                    mba_vlc_len<=0;
-                    mba_escape_accum<=0;
-                    parser_state<=R_MBA;
+                    motion_event_valid<=1;
+                    motion_event_index<=current_mb_index;
+                    motion_event_x<=current_motion_x1_or_x;
+                    motion_event_y<=current_motion_y1_or_y;
+                    motion_event_intra<=current_is_intra;
+                    motion_event_second<=1'b0;
+                    motion_event_field<=field_motion;
+                    motion_event_fsel<=current_fsel0;
+                    motion_second_sent<=1'b0;
+                    if(current_has_motion) begin
+                        // H.262 7.6.3.1: every vertical predictor is kept in frame
+                        // units, so a field vertical vector is stored doubled.
+                        // Field prediction leaves slot 0 in current_motion_*1 and
+                        // slot 1 in current_motion_*, because the second slot
+                        // reuses the vector states.
+                        if(field_motion) begin
+                            predictor_x<=current_motion_x1;
+                            predictor_y_frame<=$signed({current_motion_y1,1'b0});
+                            predictor_x1<=current_motion_x;
+                            predictor_y1_frame<=$signed({current_motion_y,1'b0});
+                        end else begin
+                            predictor_x<=current_motion_x;
+                            predictor_y_frame<=
+                                $signed({current_motion_y[12],current_motion_y});
+                            predictor_x1<=current_motion_x;
+                            predictor_y1_frame<=
+                                $signed({current_motion_y[12],current_motion_y});
+                        end
+                    end
+                    row_has_coded_mb<=1;
+                    if(current_col==(picture_mb_width-1'b1)) begin
+                        parser_state<=R_STUFF;
+                    end else begin
+                        mba_vlc_bits<=0;
+                        mba_vlc_len<=0;
+                        mba_escape_accum<=0;
+                        parser_state<=R_MBA;
+                    end
                 end
             end
 
@@ -353,6 +389,7 @@
                     p_intra_vlc_format<=pce_next[11];
                     p_forward_f_code_horizontal<=pce_next[35:32];
                     p_forward_f_code_vertical<=pce_next[31:28];
+                    p_frame_pred_frame_dct<=pce_next[14];
                     wide_candidate<=
                         geometry_supported &&
                         current_picture_is_p &&

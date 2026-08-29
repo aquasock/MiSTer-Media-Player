@@ -57,6 +57,12 @@ assign wide_probe_error_detail=wide_error_detail;
 wire wide_row_complete_now,wide_row_final;
 wire wide_motion_valid;
 wire wide_motion_intra;
+// Entry 695: field prediction's slot 1 vector arrives as its own event, and
+// the field flag with that slot's motion_vertical_field_select rides the
+// record value, which was always zero for motion records before.
+wire wide_motion_second;
+wire wide_motion_field;
+wire wide_motion_fsel;
 wire[10:0] wide_motion_index;
 wire signed[12:0] wide_motion_x,wide_motion_y;
 wire[5:0] wide_mb_width,wide_mb_height;
@@ -133,13 +139,15 @@ wire raster_complete_now=four_mb_complete_now||legacy_complete_now||wide_complet
 // after the complete picture has been parsed and transformed.
 wire wide_sideband_valid = wide_motion_valid || residual_valid_raw;
 wire [5:0] wide_sideband_index =
-    wide_motion_valid ? (wide_motion_intra ? 6'h3b : 6'h3e) :
+    wide_motion_valid ? (wide_motion_second ? 6'h35 :
+                         wide_motion_intra ? 6'h3b : 6'h3e) :
                         residual_index_raw;
 wire signed [15:0] wide_sideband_value =
     // Entry 304: the packed form cannot hold two 13-bit components; the
-    // engine now takes vectors on the dedicated channel and this value is
-    // only a placeholder for motion records.
-    wide_motion_valid ? 16'sd0 :
+    // engine takes vectors on the dedicated channel.  Entry 695: the value
+    // is no longer a placeholder for motion records, carrying the field flag
+    // and this slot's motion_vertical_field_select in its low two bits.
+    wide_motion_valid ? $signed({14'd0,wide_motion_field,wide_motion_fsel}) :
                         residual_value_raw;
 wire wide_row_produced=wide_mode&&residual_valid_raw&&
     (residual_index_raw==6'h3f)&&
@@ -380,6 +388,9 @@ mpeg2_h262_p_wide_motion_syntax_probe wide_general_probe
  .row_complete_now(wide_row_complete_now),.row_final(wide_row_final),
  .motion_event_valid(wide_motion_valid),
  .motion_event_intra(wide_motion_intra),
+ .motion_event_second(wide_motion_second),
+ .motion_event_field(wide_motion_field),
+ .motion_event_fsel(wide_motion_fsel),
  .motion_event_index(wide_motion_index),
  .motion_event_x(wide_motion_x),.motion_event_y(wide_motion_y),
  .picture_mb_width(wide_mb_width),.picture_mb_height(wide_mb_height),

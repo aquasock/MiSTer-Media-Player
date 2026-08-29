@@ -46,6 +46,12 @@ module mpeg2_h262_p_wide_motion_syntax_probe
     output reg signed [12:0] motion_event_x,
     output reg signed [12:0] motion_event_y,
     output reg         motion_event_intra,
+    // Entry 695: field prediction codes two vectors per macroblock, so the
+    // slot 1 vector rides a second event.  The engine commits the macroblock
+    // on the slot 0 event, so the slot 1 event is emitted first.
+    output reg         motion_event_second,
+    output reg         motion_event_field,
+    output reg         motion_event_fsel,
 
     output reg [5:0]   picture_mb_width,
     output reg [5:0]   picture_mb_height,
@@ -137,6 +143,10 @@ wire [39:0] pce_next = {pce_shift[31:0], stream_data};
 reg [3:0] p_forward_f_code_horizontal;
 reg [3:0] p_forward_f_code_vertical;
 reg p_intra_vlc_format;
+// Entry 695: clearing frame_pred_frame_dct is what introduces frame_motion_type
+// and the macroblock dct_type bit together.  Defaults to the frame-predicted
+// shape at reset, which is what every picture this probe claims today carries.
+reg p_frame_pred_frame_dct;
 
 // Commit 420: the row window lives in block memory with a registered read.
 // Entries 0 and 1 stay in registers so the chunk rollover needs neither a
@@ -191,6 +201,14 @@ localparam [5:0]
 localparam [5:0]
     R_DC_SIZE        = 6'd23,
     R_DC_DIFF        = 6'd24;
+// Entry 695: with frame_pred_frame_dct clear a macroblock carrying motion
+// codes frame_motion_type, and field prediction then codes two vectors, each
+// preceded by its own motion_vertical_field_select.  The existing vector
+// states are iterated through a slot rather than duplicated.
+localparam [5:0]
+    R_MOTION_TYPE    = 6'd25,
+    R_FSEL           = 6'd26,
+    R_FDONE          = 6'd27;
 reg [5:0] parser_state;
 reg [5:0] parser_state_previous;
 
@@ -214,8 +232,42 @@ reg current_is_intra;
 
 // Entry 304: f_code 1..9 needs a 13-bit vector.  r_size is f_code-1, so the
 // H.262 range is +/-(16<<r_size), which reaches +/-4096 at f_code 9.
-reg signed [12:0] predictor_x, predictor_y;
+// Entry 695: H.262 7.6.3.1 keeps every vertical predictor in frame units, so a
+// field vertical vector is stored doubled and halved toward zero before use;
+// one extra bit carries that doubling.  Two slots are kept because field
+// prediction in a frame picture always codes two vectors.
+reg signed [12:0] predictor_x, predictor_x1;
+reg signed [13:0] predictor_y_frame, predictor_y1_frame;
 reg signed [12:0] current_motion_x, current_motion_y;
+reg signed [12:0] current_motion_x1, current_motion_y1;
+reg [1:0] current_motion_type;
+reg [1:0] motion_type_shift;
+reg       motion_type_count;
+reg       motion_slot;
+reg       current_fsel0, current_fsel1;
+reg       motion_second_sent;
+wire field_motion = (current_motion_type == 2'b01);
+wire [1:0] motion_type_next = {motion_type_shift[0], parser_current_bit};
+// Field prediction parses slot 1 last, so slot 0 sits in current_motion_*1;
+// frame prediction has only the one vector.
+wire signed [12:0] current_motion_x1_or_x =
+    field_motion ? current_motion_x1 : current_motion_x;
+wire signed [12:0] current_motion_y1_or_y =
+    field_motion ? current_motion_y1 : current_motion_y;
+wire signed [12:0] predictor_x_sel = motion_slot ? predictor_x1 : predictor_x;
+wire signed [13:0] predictor_y_frame_sel =
+    motion_slot ? predictor_y1_frame : predictor_y_frame;
+// Truncation toward zero, which is what H.262 DIV specifies.
+function automatic signed [12:0] half_toward_zero;
+    input signed [13:0] value;
+    begin
+        half_toward_zero = value[13] ? -$signed((-value) >>> 1)
+                                     : $signed(value >>> 1);
+    end
+endfunction
+wire signed [12:0] predictor_y_sel =
+    field_motion ? half_toward_zero(predictor_y_frame_sel)
+                 : $signed(predictor_y_frame_sel[12:0]);
 reg signed [5:0] motion_code_pending;
 reg [10:0] motion_vlc_bits;
 reg [3:0] motion_vlc_len;
@@ -300,6 +352,8 @@ wire parser_state_consumes_bit =
     (parser_state == R_MBA) ||
     (parser_state == R_MBTYPE) ||
     (parser_state == R_MB_QSCALE) ||
+    (parser_state == R_MOTION_TYPE) ||
+    (parser_state == R_FSEL) ||
     (parser_state == R_MOTION_X) ||
     (parser_state == R_MOTION_X_RES) ||
     (parser_state == R_MOTION_Y) ||
