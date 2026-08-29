@@ -1,3 +1,37 @@
+## 688 COMMIT Unreleased ??? 2026-08-28T17:22:05-07:00
+
+#### Coming From:
+
+Unreleased 83c138e
+
+#### Purpose:
+
+Correct helper audio delivery across blocking video intervals and add the reproduced underrun as a regression.
+
+#### Outcome:
+
+The user approves fixing the entry 687 mechanism and reports that approximately eighteen minutes of the same file produced visually perfect video with only minor recurring audio underruns. Treat this as valuable user-observed long-play video evidence, not a clean audio pass, full-title telemetry capture or broad DVD qualification. Change the helper scheduler only where measured evidence requires it: supply sufficient bounded audio before queued video can prevent the extractor from reaching later audio, while preserving the original compressed video and audio bytes, current physical FIFO sizes, timestamp semantics and existing startup behavior. Promote the isolated audio-delivery test into deterministic build-PC regression coverage for the exact opening and rate sensitivity, and retain the accepted HDMI baseline. Do not change FPGA production logic, timing constraints, fitter seed, Main transport behavior or error reporting in this correction. No Quartus build, device installation or playback is included until helper-only validation proves the correction safe.
+
+#### Next Steps:
+
+Implement the smallest bounded helper scheduling correction and a regression that fails at video byte 368,134 on the old source. Verify unchanged video and AC-3 payloads, helper compilation, existing transport and audio checks, full-opening behavior in HDMI and S/PDIF forms, rate sensitivity, absence of simulated underruns, video stalls and protocol faults, and preserved end-of-stream completion. Publish the source only after these gates pass, then build the ARM helper for MiSTer and request separate installation and hardware-test authorization; stop for approval if evidence requires FPGA changes, buffer enlargement, arbitrary delay or relaxed error criteria.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/tb_h262_live_native_presentation.svh
+- tools/streams/tb_h262_live_audio_transport.svh
+- tools/streams/run_original_dvd_audio_delivery.sh
+- tools/streams/analyze_original_audio_delivery.py
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 687 COMMIT Unreleased 83c138e 2026-08-28T13:58:39-07:00
 
 #### Coming From:
@@ -1226,36 +1260,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 648 COMMIT Unreleased 5fb7d5d 2026-08-27T21:08:11-07:00
-
-#### Coming From:
-
-Unreleased 2045c34
-
-#### Purpose:
-
-Recover M10K blocks by widening the P and B residual coefficient memories to the Cyclone V native twenty-bit mode.
-
-#### Outcome:
-
-This entry is written as a plan and its commit does not exist yet. Investigation of the Aug 26 fitter report establishes that block-memory efficiency in this design is governed by data width rather than by capacity. A Cyclone V M10K holds 10,240 bits but reaches that only in the five, ten and twenty bit modes that use the parity bits; narrower widths cap at 8,192. Measured across every inferred memory in our own build, widths of twenty and forty achieve 10,240 bits per block while widths of one, sixteen, nineteen and thirty-five achieve exactly 8,192, and the existing twenty-bit `residual_block_mem` is the one memory already at full efficiency. Two memories dominate: `residual_coeff_mem` in the P path and its counterpart in the B path, each declared nineteen bits deep by 32,768 entries and each costing 76 blocks against a theoretical 64. Padding both to twenty bits is expected to recover roughly twelve blocks each, about twenty-four in total, against the 41 free blocks recorded in entry 609. The change is a pure width change with no functional effect: both paths store a six-bit coefficient index in bits eighteen down to thirteen and a signed thirteen-bit level in bits twelve down to zero, every consumer slices those fields explicitly, and the nineteen-bit write expressions zero-extend into the wider word. Four declarations change, being each memory and its read register, and no consumer is touched. Two candidates found during the same investigation are deliberately excluded. The audio `pcm_fifo` would yield only three blocks and would require padding and slicing a `dcfifo` on an audio path already qualified and shipped in v0.8.0, which is a poor trade against re-qualification. Folding the P path's separate one-bit `residual_coeff_last_mem` into the new bit nineteen would eliminate a further four-block memory, but that flag is written retroactively at address `count` minus one, decoupled from the coefficient write, so it needs a read-modify-write or a second port and is design work rather than padding. Both remain available later. Nothing is built or changed yet, so both status boxes are unchecked, and the recovery figure is a prediction from the report rather than a measured fit result.
-
-#### Next Steps:
-
-Make the four declaration changes, commit them as the source commit for this cycle, and replace this entry's placeholder hash. Then build on the build PC and compare the fitter report against the shipped v0.8.0 figures of 31,464 ALMs, 512 of 553 M10K and positive 0.243 nanoseconds setup, confirming that M10K falls by approximately twenty-four blocks, that the two memories now report 10,240 bits per block, and that no timing category regresses. Treat an unchanged block count as the inference not selecting twenty-bit mode rather than as a disproven finding, and inspect the implementation width before making any further change. Because HDMI setup has roughly two percent headroom and responds to placement, a negative setup result should be met with a reseed rather than a restructure, consistent with the position recorded in the entry 370 cycle. Hardware validation needs a decode regression proving the residual path is unaffected, since a mis-sliced coefficient would corrupt picture content rather than raise an error flag. Keep the recovered blocks unallocated until interlaced sub-gate scoping decides what they fund; the entry 608 buffer deepening at roughly twenty-six blocks and the remaining interlaced gates of entry 609 are both candidates and neither is approved. Preserve restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
