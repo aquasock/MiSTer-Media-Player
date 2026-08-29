@@ -273,6 +273,68 @@ def sample_plane(src: bytes, base: int, stride: int, w: int, h: int, x: int, y: 
             + src[base + (sy + 1) * stride + sx + 1] + 2) // 4
 
 
+def sample_field(src: bytes, plane_base: int, plane_w: int, plane_h: int,
+                 x: int, field_y: int, vx: int, vy: int, parity: int) -> int:
+    """Sample one field of a frame plane.
+
+    Field `parity` of a frame plane is the set of frame lines with that parity,
+    so it is the same buffer read with the parity as an extra base offset,
+    double the stride and half the height.  `field_y` and the vertical vector
+    are both in field lines, which is what H.262 field motion vectors carry in
+    a frame picture.
+    """
+    return sample_plane(src, plane_base + parity * plane_w, 2 * plane_w,
+                        plane_w, plane_h // 2, x, field_y, vx, vy)
+
+
+def apply_field_macroblock(out: bytearray, mb_row: int, mb_col: int, ref: bytes,
+                           mvs: tuple[tuple[int, int, int], tuple[int, int, int]]) -> None:
+    """Write one field-predicted macroblock's motion-compensated pixels.
+
+    mvs[d] = (field_select, vx, vy) for destination field d, where d 0 is the
+    top field and d 1 the bottom.  vx is half-pel in frame columns and vy is
+    half-pel in field lines.  Each destination field half is 16x8 luma and 8x4
+    chroma, which is what makes this different from a frame-predicted
+    macroblock rather than merely a differently addressed one.
+    """
+    for d in (0, 1):
+        sel, vx, vy = mvs[d]
+        for j in range(8):
+            for xx in range(16):
+                px = mb_col * 16 + xx
+                out[(mb_row * 16 + 2 * j + d) * WIDTH + px] = sample_field(
+                    ref, 0, WIDTH, HEIGHT, px, mb_row * 8 + j, vx, vy, sel)
+        cvx, cvy = trunc2(vx), trunc2(vy)
+        for plane_index, plane_base in ((0, Y_SIZE), (1, Y_SIZE + C_SIZE)):
+            for j in range(4):
+                for xx in range(8):
+                    px = mb_col * 8 + xx
+                    out[plane_base + (mb_row * 8 + 2 * j + d) * CW + px] = sample_field(
+                        ref, plane_base, CW, CH, px, mb_row * 4 + j, cvx, cvy, sel)
+
+
+class FieldMotionPredictor:
+    """H.262 7.6.3.1 predictor state for field vectors in a frame picture.
+
+    The vertical predictor is stored doubled and halved before use, which is
+    the rule that lets frame and field vectors share one predictor set.  Two
+    vector slots are kept because field prediction in a frame picture always
+    codes two vectors.
+    """
+
+    def __init__(self) -> None:
+        self.reset()
+
+    def reset(self) -> None:
+        self.pmv = [[0, 0], [0, 0]]
+
+    def encode(self, slot: int, vx: int, vy: int, f_code: int = 3) -> str:
+        bits = enc_comp(vx, self.pmv[slot][0], f_code)
+        bits += enc_comp(vy, self.pmv[slot][1] // 2, f_code)
+        self.pmv[slot] = [vx, vy * 2]
+        return bits
+
+
 def trunc2(v: int) -> int:
     return -(abs(v) // 2) if v < 0 else v // 2
 
