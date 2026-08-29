@@ -1,4 +1,4 @@
-## 689 COMMIT Unreleased ??? 2026-08-28T18:30:50-07:00
+## 689 COMMIT Unreleased 8423f20 2026-08-28T18:30:50-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Install the corrected helper for controlled HDMI and S/PDIF hardware playback va
 
 #### Outcome:
 
-The user explicitly authorizes installing and testing the helper-only correction from entry 688 on the MiSTer at 10.10.0.30. Use the stripped, statically linked ARM EABI5 artifact built from clean source commit 8423f20 with expected SHA-256 fefaeb18b8c9e091a9cd9e97258e86264683f374f9663cb3ea6b99bafb81977a. Preserve the currently installed helper in a timestamped backup before replacement, stage the candidate separately, verify its hash before and after the final rename, and confirm the RBF, Main executable and test media are unchanged. This authorization covers helper installation, readback verification and collection of the resulting playback evidence; it does not authorize an FPGA rebuild, RBF replacement, Main replacement, relaxed error criteria or unrelated file changes.
+The user explicitly authorizes installing and testing the helper-only correction from entry 688 on the MiSTer at 10.10.0.30. The exact stripped, statically linked ARM EABI5 artifact from clean source commit 8423f20 is retrieved from the build PC and locally reverified as 399,340 bytes with SHA-256 fefaeb18b8c9e091a9cd9e97258e86264683f374f9663cb3ea6b99bafb81977a. FTP staging and independent readback reproduce that hash before final rename, and final readback from `/media/fat/linux/MediaPlayer_Helper` reproduces it again. The replaced helper is preserved at `/media/fat/_MediaPlayer_Backups/MediaPlayer_Helper_f6206ba01459_20260828T183350` with its original 399,340-byte size and SHA-256 f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8. Before-and-after readbacks prove the MiSTer Main executable, original DVD opening and all three existing MediaPlayer RBF files unchanged. No core reload or playback is initiated, and hardware acceptance remains pending.
 
 #### Next Steps:
 
-Publish this approved scope, transfer the exact build-PC artifact to the MiSTer, verify backup and final hashes, and then have the user replay the original DVD opening over S/PDIF and HDMI without changing deinterlacer mode during either run. Prefer extending S/PDIF to the prior eighteen-minute observation window if the prepared file permits it, and collect the latest helper log plus completed 2DID telemetry after each run. Accept the correction only if the user reports clean playback and telemetry shows no audio underrun or protocol fault; otherwise preserve the evidence and stop before further production changes.
+Play `games/MediaPlayer/dvd_opening_original.mpg` first over S/PDIF with Weave held fixed, leave the completed 2DID screen and latest helper log intact, and report any audible dropout or visible stutter so the evidence can be collected before another run. If that opening is clean, repeat over HDMI and then use the longer file that previously showed minor recurring underruns for an extended S/PDIF run. Accept the correction only if the user reports clean playback and telemetry shows no audio underrun or protocol fault; otherwise preserve the evidence and stop before further production changes. The helper is launched per playback, so no FPGA reload is required.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Publish this approved scope, transfer the exact build-PC artifact to the MiSTer,
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
