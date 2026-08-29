@@ -27,6 +27,7 @@ artifacts, not committed repository inputs.
 """
 from __future__ import annotations
 
+import argparse
 import hashlib
 import tempfile
 from pathlib import Path
@@ -91,9 +92,22 @@ def clear_progressive_sequence(data: bytes) -> bytes:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path(__file__).resolve().parent / "test_interlaced_field_motion.m2v",
+    )
+    parser.add_argument(
+        "--oracle-output",
+        type=Path,
+        help="optional readmemh byte oracle for both decoded YUV420P frames",
+    )
+    args = parser.parse_args()
     ffmpeg = h.require_tool("ffmpeg")
     ffprobe = h.require_tool("ffprobe")
-    out = Path(__file__).resolve().parent / "test_interlaced_field_motion.m2v"
+    out = args.output.resolve()
+    out.parent.mkdir(parents=True, exist_ok=True)
 
     rows_bits, rows_specs = [], []
     for r in range(h.MB_HEIGHT):
@@ -134,7 +148,18 @@ def main() -> None:
     if problem:
         raise SystemExit(f"verification failed: {problem}")
 
+    # The reference model is the oracle for the P frame and is byte-identical
+    # to `pframe` by the check above; the I frame comes from the same decode.
+    raw = bytes(iframe) + bytes(expected)
+    if len(raw) != 2 * (h.Y_SIZE + 2 * h.C_SIZE):
+        raise SystemExit(f"unexpected oracle byte count: {len(raw)}")
+    if args.oracle_output:
+        oracle = args.oracle_output.resolve()
+        oracle.parent.mkdir(parents=True, exist_ok=True)
+        oracle.write_text("".join(f"{value:02x}\n" for value in raw))
+
     digest = hashlib.sha256(out.read_bytes()).hexdigest()
+    oracle_digest = hashlib.sha256(raw).hexdigest()
     print(f"generated: {out}")
     print("geometry: 45x30 macroblocks (720x480, 1350 total)")
     print(f"bytes: {out.stat().st_size}")
@@ -145,6 +170,9 @@ def main() -> None:
     print(f"row {FIELD_ROW}: field-select and half-sample coverage at columns "
           f"{sorted(FIELD_COLS)}")
     print("verification: pixel-exact against FFmpeg decode via h262common field model")
+    print(f"yuv420p_sha256: {oracle_digest}")
+    if args.oracle_output:
+        print(f"oracle: {args.oracle_output.resolve()} ({len(raw)} bytes)")
 
 
 if __name__ == "__main__":
