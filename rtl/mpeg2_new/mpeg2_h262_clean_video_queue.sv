@@ -36,8 +36,8 @@ module mpeg2_h262_clean_video_queue
     output wire        output_metadata_valid
 );
 
-localparam integer VIDEO_DEPTH = 65536;
-localparam integer VIDEO_ADDRESS_WIDTH = 16;
+localparam integer VIDEO_DEPTH = 32768;
+localparam integer VIDEO_ADDRESS_WIDTH = 15;
 localparam integer METADATA_DEPTH = 16;
 localparam integer METADATA_ADDRESS_WIDTH = 4;
 localparam integer METADATA_WIDTH = 65;

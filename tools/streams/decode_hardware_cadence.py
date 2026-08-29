@@ -130,7 +130,7 @@ def decode_words(path: Path | str) -> list[int]:
 def parse_words(words: list[int]) -> dict[str, Any]:
     format_word = words[1]
     schema_version = (format_word >> 24) & 0xFF
-    if schema_version > 19:
+    if schema_version > 20:
         raise TelemetryDecodeError(f"unsupported telemetry schema {schema_version}")
     clock_hz = (format_word & 0xFFFF) * 1000
     counts = words[17]
@@ -577,6 +577,25 @@ def parse_words(words: list[int]) -> dict[str, Any]:
             else None
         )
         result["deadline_gap_count"] = words[38] & 0xFFFF
+        if schema_version >= 20:
+            # Entry 693: the longest single stall of the shared transport byte
+            # path is what the audio FIFO depth must cover; the underrun count
+            # reports recurrence the first-error snapshot latch cannot.
+            result["transport_block_longest_cycles"] = words[55]
+            result["transport_block_longest_ms"] = (
+                words[55] * 1000.0 / clock_hz if clock_hz else None
+            )
+            result["transport_block_count"] = (words[56] >> 16) & 0xFFFF
+            result["audio_underrun_count"] = words[56] & 0xFFFF
+            result["audio_fifo_floor"] = words[57] & 0x3FFF
+            result["audio_fifo_floor_ms"] = (words[57] & 0x3FFF) / 48.0
+        else:
+            for key in (
+                "transport_block_longest_cycles", "transport_block_longest_ms",
+                "transport_block_count", "audio_underrun_count",
+                "audio_fifo_floor", "audio_fifo_floor_ms",
+            ):
+                result[key] = None
         result["deadline_scope"] = "native_30000_1001_after_first_swap"
         result["deadline_records"] = []
         flag_bits = {
@@ -591,7 +610,10 @@ def parse_words(words: list[int]) -> dict[str, Any]:
             "presentation_error": 7, "display_scratch": 6,
             "first_reference_seen": 1,
         }
-        for index in range(min(result["deadline_gap_count"], 3)):
+        # Entry 693: schema 20 spends the third deadline record on audio block
+        # telemetry, so only two remain readable.
+        deadline_slots = 2 if schema_version >= 20 else 3
+        for index in range(min(result["deadline_gap_count"], deadline_slots)):
             base = 39 + index * 8
             meta, cycle, flags, age, starvation, capacity, delay, byte = \
                 words[base:base + 8]
@@ -872,6 +894,18 @@ def main() -> int:
             )
         if result["schema_version"] == 19:
             print(f"confirmed deadline gaps: {result['deadline_gap_count']}")
+        if result.get("audio_underrun_count") is not None:
+            longest = result["transport_block_longest_ms"]
+            print(
+                "audio: underruns=%d transport_blocks=%d longest_block=%s "
+                "fifo_floor=%d frames/%.1f ms" % (
+                    result["audio_underrun_count"],
+                    result["transport_block_count"],
+                    "%.1f ms" % longest if longest is not None else "n/a",
+                    result["audio_fifo_floor"],
+                    result["audio_fifo_floor_ms"],
+                )
+            )
             for record in result["deadline_records"]:
                 print("deadline: " + json.dumps(record, sort_keys=True))
         print(

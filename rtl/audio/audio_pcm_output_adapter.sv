@@ -5,7 +5,7 @@
 // each sample event is scheduled with at most one CLK_AUDIO period of jitter.
 
 module audio_pcm_output_adapter #(
-    parameter [12:0] PREFILL_SAMPLES = 13'd2048
+    parameter [13:0] PREFILL_SAMPLES = 14'd2048
 )
 (
     input  wire        clk,
@@ -13,7 +13,7 @@ module audio_pcm_output_adapter #(
 
     input  wire [34:0] fifo_data,
     input  wire        fifo_empty,
-    input  wire [12:0] fifo_used,
+    input  wire [13:0] fifo_used,
     input  wire        source_ended,
     output reg         fifo_rd,
 

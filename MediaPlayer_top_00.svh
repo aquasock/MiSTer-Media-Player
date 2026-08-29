@@ -429,8 +429,8 @@ wire               audio_pcm_end;
 wire               audio_pcm_fifo_full;
 wire               audio_pcm_fifo_empty;
 wire [34:0]        audio_pcm_fifo_data;
-wire [12:0]        audio_pcm_fifo_used;
-wire [12:0]        audio_pcm_fifo_read_used;
+wire [13:0]        audio_pcm_fifo_used;
+wire [13:0]        audio_pcm_fifo_read_used;
 wire               audio_pcm_fifo_rd;
 wire               audio_pcm_underrun;
 wire               audio_pcm_playback_complete;
@@ -558,18 +558,66 @@ audio_pcm_output_adapter audio_pcm_output_adapter
 reg [6:0] audio_pcm_fifo_peak;
 reg [1:0] audio_pcm_underrun_sync;
 
+// Entry 693: audio starves because the shared transport byte path halts while
+// the clean video queue is full, so the quantity that sizes the audio FIFO is
+// how long a single block lasts.  Measure it here, where the stall is visible,
+// rather than inferring it from a drained FIFO.  The first-error snapshot
+// latch reports only the first underrun, so count them instead: a run that
+// still starves must say how often, not merely that it did.
+reg [31:0] transport_block_longest;
+reg [31:0] transport_block_current;
+reg [15:0] transport_block_count;
+reg [15:0] audio_pcm_underrun_count;
+reg [13:0] audio_pcm_fifo_floor;
+reg        audio_pcm_floor_armed;
+
+wire transport_blocked =
+	mpeg2_new_system_input_valid && !mpeg2_new_system_input_ready;
+
 always @(posedge clk_mpeg2) begin
 	if (reset_mpeg2) begin
 		audio_pcm_fifo_peak      <= 7'd0;
 		audio_pcm_underrun_sync <= 2'b00;
+		transport_block_longest  <= 32'd0;
+		transport_block_current  <= 32'd0;
+		transport_block_count    <= 16'd0;
+		audio_pcm_underrun_count <= 16'd0;
+		audio_pcm_fifo_floor     <= 14'h3FFF;
+		audio_pcm_floor_armed    <= 1'b0;
 	end
 	else begin
 		audio_pcm_underrun_sync <=
 			{audio_pcm_underrun_sync[0], audio_pcm_underrun};
-		if (audio_pcm_fifo_full || |audio_pcm_fifo_used[12:7])
+		if (audio_pcm_fifo_full || |audio_pcm_fifo_used[13:7])
 			audio_pcm_fifo_peak <= 7'h7F;
 		else if (audio_pcm_fifo_used[6:0] > audio_pcm_fifo_peak)
 			audio_pcm_fifo_peak <= audio_pcm_fifo_used[6:0];
+
+		// Each rising edge of the synchronised underrun is one starvation.
+		if (audio_pcm_underrun_sync[0] && !audio_pcm_underrun_sync[1] &&
+		    !(&audio_pcm_underrun_count))
+			audio_pcm_underrun_count <= audio_pcm_underrun_count + 1'b1;
+
+		// A block is one continuous run of stalled transport bytes.  Close it
+		// on the falling edge so only completed runs enter the maximum.
+		if (transport_blocked) begin
+			if (!(&transport_block_current))
+				transport_block_current <= transport_block_current + 1'b1;
+		end
+		else if (|transport_block_current) begin
+			if (transport_block_current > transport_block_longest)
+				transport_block_longest <= transport_block_current;
+			if (!(&transport_block_count))
+				transport_block_count <= transport_block_count + 1'b1;
+			transport_block_current <= 32'd0;
+		end
+
+		// Track the floor only once the FIFO has filled at least once, so the
+		// empty start of a session is not reported as the minimum.
+		if (audio_pcm_fifo_used[13:11] != 3'd0)
+			audio_pcm_floor_armed <= 1'b1;
+		if (audio_pcm_floor_armed && audio_pcm_fifo_used < audio_pcm_fifo_floor)
+			audio_pcm_fifo_floor <= audio_pcm_fifo_used;
 	end
 end
 

@@ -99,6 +99,15 @@ module mpeg2_h262_hardware_cadence_profiler #(
     // longer carried; entry 371 records its validation.
     input wire [7:0] associated_count,input wire [32:0] display_pts,
     input wire [13:0] pcm_sample_count,input wire [6:0] pcm_fifo_peak,
+    // Entry 693: the shared transport byte path halts while the clean video
+    // queue is full and audio behind the held byte halts with it, so the
+    // longest single block is what the audio FIFO depth has to cover.  The
+    // underrun count replaces inference from a snapshot that latches on the
+    // first error and therefore cannot report recurrence.
+    input wire [31:0] transport_block_longest,
+    input wire [15:0] transport_block_count,
+    input wire [15:0] audio_underrun_count,
+    input wire [13:0] audio_fifo_floor,
     input wire top_field_first,input wire repeat_first_field,
     input wire [15:0] error_flags,input wire [11:0] h_pos,
     input wire [11:0] v_pos,input wire [7:0] base_r,
@@ -115,7 +124,7 @@ localparam [26:0] NO_PROGRESS_SNAPSHOT_LIMIT=
     NO_PROGRESS_SNAPSHOT_DELAY-27'd1;
 localparam [31:0] SNAPSHOT_MAGIC=32'h4d4d5031;
 localparam [31:0] SNAPSHOT_FORMAT=
-    {DEADLINE_DIAGNOSTICS ? 8'd19 : 8'd18,8'd64,16'd60000};
+    {DEADLINE_DIAGNOSTICS ? 8'd20 : 8'd18,8'd64,16'd60000};
 // Entry 511: keep all 41 rows visible without changing their encoding. The
 // mode observation is already in clk_video and affects overlay placement only.
 localparam [11:0] OVERLAY_X=12'd8;
@@ -150,6 +159,10 @@ reg [7:0] associated_count_q;
 reg [32:0] display_pts_q;
 reg [13:0] pcm_sample_count_q;
 reg [6:0] pcm_fifo_peak_q;
+reg [31:0] transport_block_longest_q;
+reg [15:0] transport_block_count_q;
+reg [15:0] audio_underrun_count_q;
+reg [13:0] audio_fifo_floor_q;
 reg top_field_first_q,repeat_first_field_q;
 
 reg [31:0] session_cycles,accepted_bytes;
@@ -624,22 +637,25 @@ wire [31:0] snapshot_word_53=DEADLINE_DIAGNOSTICS ?
     deadline_records[14] : legacy_snapshot_word_53;
 wire [31:0] snapshot_word_54=DEADLINE_DIAGNOSTICS ?
     deadline_records[15] : legacy_snapshot_word_54;
+// Entry 693: schema 20 spends the third deadline-diagnostics record, whose
+// presentation investigation is closed, on the audio block telemetry.
 wire [31:0] snapshot_word_55=DEADLINE_DIAGNOSTICS ?
-    deadline_records[16] : legacy_snapshot_word_55;
+    transport_block_longest_q : legacy_snapshot_word_55;
 wire [31:0] snapshot_word_56=DEADLINE_DIAGNOSTICS ?
-    deadline_records[17] : legacy_snapshot_word_56;
+    {transport_block_count_q,audio_underrun_count_q} :
+    legacy_snapshot_word_56;
 wire [31:0] snapshot_word_57=DEADLINE_DIAGNOSTICS ?
-    deadline_records[18] : legacy_snapshot_word_57;
+    {18'd0,audio_fifo_floor_q} : legacy_snapshot_word_57;
 wire [31:0] snapshot_word_58=DEADLINE_DIAGNOSTICS ?
-    deadline_records[19] : legacy_snapshot_word_58;
+    32'd0 : legacy_snapshot_word_58;
 wire [31:0] snapshot_word_59=DEADLINE_DIAGNOSTICS ?
-    deadline_records[20] : legacy_snapshot_word_59;
+    32'd0 : legacy_snapshot_word_59;
 wire [31:0] snapshot_word_60=DEADLINE_DIAGNOSTICS ?
-    deadline_records[21] : legacy_snapshot_word_60;
+    32'd0 : legacy_snapshot_word_60;
 wire [31:0] snapshot_word_61=DEADLINE_DIAGNOSTICS ?
-    deadline_records[22] : legacy_snapshot_word_61;
+    32'd0 : legacy_snapshot_word_61;
 wire [31:0] snapshot_word_62=DEADLINE_DIAGNOSTICS ?
-    deadline_records[23] : legacy_snapshot_word_62;
+    32'd0 : legacy_snapshot_word_62;
 wire [31:0] snapshot_word_63=snapshot_word_00^snapshot_word_01^
     snapshot_word_02^snapshot_word_03^snapshot_word_04^snapshot_word_05^
     snapshot_word_06^snapshot_word_07^snapshot_word_08^snapshot_word_09^
@@ -704,6 +720,8 @@ always @(posedge clk_mpeg2) begin
         stc_seconds_q<=0;top_field_first_q<=0;repeat_first_field_q<=0;
         associated_count_q<=0;display_pts_q<=0;
         pcm_sample_count_q<=0;pcm_fifo_peak_q<=0;
+        transport_block_longest_q<=0;transport_block_count_q<=0;
+        audio_underrun_count_q<=0;audio_fifo_floor_q<=0;
         session_cycles<=0;accepted_bytes<=0;first_present_cycle<=0;
         last_present_cycle<=0;first_present_valid<=0;
         decoder_stall_cycles<=0;presentation_stall_cycles<=0;
@@ -830,6 +848,10 @@ always @(posedge clk_mpeg2) begin
         display_pts_q<=display_pts;
         pcm_sample_count_q<=pcm_sample_count;
         pcm_fifo_peak_q<=pcm_fifo_peak;
+        transport_block_longest_q<=transport_block_longest;
+        transport_block_count_q<=transport_block_count;
+        audio_underrun_count_q<=audio_underrun_count;
+        audio_fifo_floor_q<=audio_fifo_floor;
         top_field_first_q<=top_field_first;
         repeat_first_field_q<=repeat_first_field;
         framebuffer_generation_reset_d<=framebuffer_generation_reset;
