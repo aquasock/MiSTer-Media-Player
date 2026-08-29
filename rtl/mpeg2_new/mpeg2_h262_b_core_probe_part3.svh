@@ -51,7 +51,13 @@ wire parser_consumes_bit=(state==S_QSCALE)||(state==S_EXTRA_FLAG)||(state==S_EXT
     (state==S_BX)||(state==S_BX_RES)||(state==S_BY)||(state==S_BY_RES)||(state==S_CBP)||
     (state==S_FIRST_COEFF)||(state==S_COEFF_VLC)||(state==S_COEFF_SIGN)||(state==S_ESCAPE_RUN)||
     (state==S_ESCAPE_LEVEL)||(state==S_STUFF)||(state==S_MB_QSCALE)||
-    (state==S_DC_SIZE)||(state==S_DC_DIFF);
+    (state==S_DC_SIZE)||(state==S_DC_DIFF)||
+    // Entry 695: frame_motion_type and each vector's
+    // motion_vertical_field_select are read from the bitstream like any other
+    // syntax element and must advance the bit pointer.  Without this
+    // S_MOTION_TYPE reads one bit twice and decodes 00 or 11, and the field
+    // selects desynchronise every vector behind them.
+    (state==S_MOTION_TYPE)||(state==S_FSEL)||(state==S_BSEL);
 wire consume_bit=parse_active&&parser_consumes_bit&&!parser_at_end;
 
 reg t_start,t_we,t_end,t_intra; reg [5:0] t_widx; reg signed [12:0] t_wval; reg [4:0] t_qscale;
