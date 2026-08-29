@@ -1,3 +1,38 @@
+## 695 COMMIT Unreleased ??? 2026-08-28T22:37:13-07:00
+
+#### Coming From:
+
+Unreleased f2c10be
+
+#### Purpose:
+
+Admit interlaced NTSC P and B frame pictures by adding field motion prediction and residual field DCT.
+
+#### Outcome:
+
+This entry is the approved plan for the cycle and its commit does not exist yet. The user's target is an ordinary user playing commercial DVDs over HDMI from a USB drive, with S/PDIF and native bypass deferred as extras, and NTSC is the primary standard; PAL is a later additive axis and no format conversion is involved, since the core decodes and presents NTSC natively. Against that target the decoder's syntax coverage is the blocker rather than input or navigation, because the admission gate in mpeg2_h262_frontend.sv currently requires a 480i sequence carrying progressive film frames at exactly 720 by 480 and frame rate code 4, in frame pictures, without concealment motion vectors, and admits interlaced frames for I pictures only. Three probes establish what is missing. Field DCT exists for intra reconstruction, parsed in mpeg2_h262_luma4_probe.sv and honoured in mpeg2_h262_intra_recon.sv, but the P and B residual engines carry no dct_type handling at all. Field motion prediction is entirely absent: frame_motion_type, field_motion_type, motion_vertical_field_select and dual_prime appear nowhere in the RTL. Interlaced I pictures already decode and present, so the sequence, bank, cadence and presentation plumbing for interlaced content is proven and is not what this cycle builds. The user directed that the two proposed boundaries be bundled into one build, so this cycle admits interlaced P and B frame pictures for both values of frame_pred_frame_dct: where it is set no new prediction mathematics is required and only the admission gate changes, and where it is clear the macroblock layer must parse frame_motion_type and motion_vertical_field_select, the prediction engines must form sixteen by eight field predictions from the selected reference field with vertical vectors in field units, and the residual path must apply the dct_type line mapping the intra path already applies. Dual prime prediction is refused explicitly and recorded as an implementation limit of this decoder rather than a limit of the standard, and field pictures with picture_structure 01 or 10 remain outside this cycle because they change the reference and bank model rather than the macroblock layer. Bundling accepts that a playback failure could originate either in interlaced P and B flowing through the existing path or in the new field prediction mathematics, and the deterministic regression streams are the intended mitigation for that entangled diagnosis.
+
+#### Next Steps:
+
+Build deterministic interlaced P and B streams under tools/streams covering frame and field motion types, both dct_type values, and the vertical field select combinations, then bring the decoder up against them in simulation before any hardware step. Extend the admission gate last so that unsupported syntax stays refused rather than silently mis-decoded while the engines are incomplete. Compile once in Quartus, reseeding at most once, and report fit and timing against the 0.170 nanosecond worst setup slack and 517 RAM blocks this cycle starts from, since the design is timing sensitive and RAM blocks are the binding resource at ninety-three percent. Install only after separate user authorization with the accepted bitstream backed up, and validate on real interlaced disc content rather than only on synthetic streams. Fold in the two entry 694 instrumentation defects while the profiler is already being rebuilt: probe the transport block at the clean video queue's own full condition rather than a valid and ready pair, and move the snapshot trigger off the first error flag now that underruns are counted. Watch for video stutter, since the clean video queue is half its former depth and interlaced P and B raise decoder load. The HDMI session of the bounded opening remains outstanding from entry 690.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_frontend.sv
+- rtl/mpeg2_new/mpeg2_h262_luma4_probe.sv
+- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
+- rtl/mpeg2_new/mpeg2_h262_p_residual_pipeline_420.sv
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 694 COMMIT Unreleased f2c10be 2026-08-28T22:21:11-07:00
 
 #### Coming From:
@@ -1224,35 +1259,6 @@ Pull exact published source on GUNSMOKE, repeat paired original-opening qualific
 - tools/streams/tb_native_480i_presentation_integration.sv
 - tools/streams/tb_native_field_order.sv
 - tools/streams/tb_native_ordinary_overlap_ownership.sv
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 655 COMMIT Unreleased 4777c59 2026-08-27T22:47:56-07:00
-
-#### Coming From:
-
-Unreleased 4777c59
-
-#### Purpose:
-
-Resolve the three items carried open from the field-DCT cycle.
-
-#### Outcome:
-
-All three are investigated read-only, with no source, build, deployment or hardware change. The unexplained logic decrease is resolved and was never a correctness signal. Running Analysis and Synthesis alone on the pre-change source at `3e89189` and comparing with the field-DCT build shows 46,832 registers against 46,846, a rise of exactly fourteen, which is what the change calls for: the `dct_type` register, the three-bit capture row counter, the two per-bank field flags, the six bits gained by no longer truncating the block origin across two banks, and a little plumbing. Nothing was pruned. The decrease is entirely a fitter effect, because the fitter adds registers over synthesis through duplication for fanout and packing and added 3,441 in the baseline against 2,515 here, simply choosing less duplication for a different placement; the ALM decrease follows from the same cause. The consequence is recorded so it is not misused: the apparent saving is not real, must not be banked against future features, and will move again with a different seed or the next change. The HDMI setup margin needs no separate mechanism. Its slack of positive 0.126 nanoseconds sits an order of magnitude below the next worst domain at positive 1.382, and its Fmax of 151.38 megahertz against a 148.5 megahertz clock is about 1.9 percent of headroom, matching the roughly two percent entry 370 measured. The 0.117 nanosecond erosion is placement pressure from added logic on the one domain with no room to absorb it, which is exactly that entry's finding, and the recorded response of reseeding rather than restructuring stands. One earlier reading is corrected: the `general[1]` Fmax of 60.7 megahertz was briefly treated as alarming, but that domain's slack is positive 2.043 nanoseconds and the restricted Fmax column does not represent headroom. The capture variation is characterised far enough to act on and then deliberately left alone. Between two captures of an identical unchanged frame the differences occupy ninety columns spaced exactly eight apart from x equal to 41, across all 480 rows of the active area; since 720-wide content is centred in an 800-wide display from x equal to 40, this is x modulo eight equal to one in video coordinates, the second pixel of each eight-pixel group and one byte lane of each 64-bit word. Magnitudes run from one to 255, are content dependent and chroma dominated, with sampled pairs showing red unchanged while green swings fully. With entry 653's finding that one capture matched a released-bitstream baseline exactly while counters stayed identical, this is a readback or display-path instability on a fixed byte lane rather than decode or framebuffer content. It is recorded as costing measurement reliability rather than picture quality: there is no evidence it affects playback, the user reports both affected fixtures play perfectly and they are the most detailed fixtures where the deltas are largest, while entry 644 nearly recorded a false regression from it and entry 653 nearly repeated that. The mitigation of capturing a completed frame twice and comparing the best of the two is proven on two fixtures and costs seconds.
-
-#### Next Steps:
-
-Do not spend a development cycle on the capture variation's root cause; use the two-capture method for every raster comparison and revisit only if visible shimmer is reported on real content, at which point it becomes a quality question rather than a measurement one. Do not treat the reduced ALM and register figures as headroom when scoping the next feature, because they are a placement artifact rather than a saving; the 41 free block-memory blocks recorded in entry 609 remain the real memory budget. Keep the HDMI setup margin visible as the binding timing constraint and reseed rather than restructure if a later change pushes that category negative. With these three closed, the field-DCT cycle has no open technical items, though a release-grade regression would still want tests two, three, five and six replayed. The next decoder milestone remains unapproved and unscoped: interlaced P and B is the gate that would make commercial discs play, and the deferred field-picture gate needs either a non-ffmpeg generator or a real disc sample because ffmpeg cannot encode field pictures, which is a choice for the user. Preserve restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
