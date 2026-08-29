@@ -556,7 +556,7 @@ def parse_words(words: list[int]) -> dict[str, Any]:
         "checksum": words[-1],
     }
 
-    if schema_version == 19:
+    if schema_version >= 19:
         # Words 37-62 now belong to deadline evidence. Never expose their bits
         # as the retired framebuffer fields, even when a legacy marker matches.
         for key in result:
