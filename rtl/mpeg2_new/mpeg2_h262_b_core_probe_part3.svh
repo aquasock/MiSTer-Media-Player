@@ -118,6 +118,7 @@ always @(posedge clk) begin
         picture_capture<=0;picture_count<=0;picture_shift<=0;current_picture_is_b<=0;
         pce_capture<=0;pce_count<=0;pce_shift<=0;b_candidate<=0;b_seen<=0;b_complete_now<=0;
         b_forward_f_code_horizontal<=0;b_forward_f_code_vertical<=0;
+        b_frame_pred_frame_dct<=1'b1;b_progressive_frame<=1'b1;
         b_backward_f_code_horizontal<=0;b_backward_f_code_vertical<=0;
         parse_hold<=0;parser_error<=0;replay_error<=0;prior_error<=0;slice_capture<=0;slice_parser_started<=0;chunk_boundary_known<=0;slice_row_number<=0;row_byte_count<=0;row_base_index<=0;row_covered_count<=0;
         parse_active<=0;proof_done<=0;boundary_final<=0;row_waiting<=0;replay_row_final<=0;

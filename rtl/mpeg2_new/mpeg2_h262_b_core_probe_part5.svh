@@ -138,6 +138,8 @@
                     b_forward_f_code_vertical<=pce_next[31:28];
                     b_backward_f_code_horizontal<=pce_next[27:24];
                     b_backward_f_code_vertical<=pce_next[23:20];
+                    b_frame_pred_frame_dct<=pce_next[14];
+                    b_progressive_frame<=pce_next[7];
                     b_candidate<=geometry_supported&&current_picture_is_b&&(pce_next[39:36]==4'h8)&&
                         (pce_next[35:32]>=4'd1)&&(pce_next[35:32]<=4'd6)&&
                         (pce_next[31:28]>=4'd1)&&(pce_next[31:28]<=4'd6)&&

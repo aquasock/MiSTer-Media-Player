@@ -105,6 +105,12 @@ reg pce_capture; reg [2:0] pce_count; reg [39:0] pce_shift;
 wire [39:0] pce_next={pce_shift[31:0],stream_data};
 reg [3:0] b_forward_f_code_horizontal,b_forward_f_code_vertical;
 reg [3:0] b_backward_f_code_horizontal,b_backward_f_code_vertical;
+// Entry 695: picture_coding_extension controls the macroblock layer needs once
+// interlaced P/B is admitted.  frame_pred_frame_dct clear is what introduces
+// frame_motion_type and the macroblock dct_type bit together, so the parser
+// has to carry it rather than assume frame prediction structurally.
+reg       b_frame_pred_frame_dct;
+reg       b_progressive_frame;
 
 // Commit 420: the row window lives in block memory with a registered read.
 // Entries 0 and 1 stay in registers so the chunk rollover needs neither a
