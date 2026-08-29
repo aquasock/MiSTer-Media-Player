@@ -579,6 +579,8 @@ always @(posedge clk) begin
     if(reset) begin
         mb_width<=0;mb_height<=0;geometry_seen<=0;motion_count<=0;motion_word<=0;motion_load<=0;
         motion_first_pending<=0;pending_direction<=0;pending_fmvx<=0;pending_fmvy<=0;
+        pending_fmvx1<=0;pending_fmvy1<=0;pending_bmvx1<=0;pending_bmvy1<=0;
+        pending_field<=0;pending_fsel0<=0;pending_fsel1<=0;pending_bsel1<=0;
         exec_direction<=0;exec_fmvx<=0;exec_fmvy<=0;exec_bmvx<=0;exec_bmvy<=0;
         phase_mvx<=0;phase_mvy<=0;phase_backward<=0;
         bidir_prelaunch_addr<=0;next_prelaunch_addr<=0;
@@ -618,7 +620,22 @@ always @(posedge clk) begin
             end else if(first_direction_word) begin
                 if(bank_ready[capture_bank]||motion_first_pending||
                    (motion_count>=MAX_MB)||(capture_desc_count!=0))begin error<=1;if(!error)error_source<=5'd2;end
-                else begin pending_direction<=direction_word;pending_fmvx<=motion_vector_x;pending_fmvy<=motion_vector_y;motion_first_pending<=1;end
+                else begin
+                    pending_direction<=direction_word;pending_fmvx<=motion_vector_x;pending_fmvy<=motion_vector_y;
+                    // Entry 695: the record value carries the field flag and
+                    // this slot's field select; frame prediction sends zero and
+                    // leaves both slots equal.
+                    pending_field<=sideband_value[1];pending_fsel0<=sideband_value[0];
+                    pending_fmvx1<=motion_vector_x;pending_fmvy1<=motion_vector_y;
+                    pending_bmvx1<=0;pending_bmvy1<=0;pending_fsel1<=0;pending_bsel1<=0;
+                    motion_first_pending<=1;
+                end
+            end else if(sideband_index==6'h35) begin
+                if(bank_ready[capture_bank]||!motion_first_pending||!sideband_value[1])begin error<=1;if(!error)error_source<=5'd2;end
+                else begin pending_fmvx1<=motion_vector_x;pending_fmvy1<=motion_vector_y;pending_fsel1<=sideband_value[0];end
+            end else if(sideband_index==6'h36) begin
+                if(bank_ready[capture_bank]||!motion_first_pending||!sideband_value[1])begin error<=1;if(!error)error_source<=5'd2;end
+                else begin pending_bmvx1<=motion_vector_x;pending_bmvy1<=motion_vector_y;pending_bsel1<=sideband_value[0];end
             end else if(geometry_word) begin
                 if(bank_ready[capture_bank]||geometry_seen||!motion_first_pending||(motion_count!=0)||
                    (sideband_value[11:6]==0)||(sideband_value[11:6]>6'd45)||(sideband_value[5:0]==0)||(sideband_value[5:0]>6'd30))begin error<=1;if(!error)error_source<=5'd3;end
@@ -626,7 +643,13 @@ always @(posedge clk) begin
             end else if(sideband_index==6'h3b) begin
                 if(bank_ready[capture_bank]||!motion_first_pending||(motion_count>=MAX_MB)||!geometry_seen)begin error<=1;if(!error)error_source<=5'd4;end
                 else begin
-                    motion_mem[motion_count]<={pending_direction,pending_fmvx,pending_fmvy,motion_vector_x,motion_vector_y};
+                    motion_mem[motion_count]<={
+                        pending_field,pending_fsel0,pending_fsel1,sideband_value[0],pending_bsel1,
+                        pending_direction,
+                        pending_fmvx,pending_fmvy,pending_fmvx1,pending_fmvy1,
+                        motion_vector_x,motion_vector_y,
+                        pending_field?pending_bmvx1:motion_vector_x,
+                        pending_field?pending_bmvy1:motion_vector_y};
                     motion_count<=motion_count+1'b1;motion_first_pending<=0;
                 end
             end else if(descriptor_word) begin

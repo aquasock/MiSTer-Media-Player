@@ -192,12 +192,24 @@ endfunction
 
 // kate - Commit 166: no reset loop on this array. Synchronous read plus ordered
 // write/read phases allow Quartus to infer block RAM instead of 1350x16 flops.
-(* ramstyle = "M10K" *) reg [26:0] motion_mem [0:MAX_MB-1];
+// Entry 695: field prediction carries two vectors and their field selects,
+// so one macroblock's motion word becomes
+// {field, fsel0, fsel1, intra, slot0 x/y, slot1 x/y}.  Frame prediction
+// leaves both slots equal.
+(* ramstyle = "M10K" *) reg [55:0] motion_mem [0:MAX_MB-1];
 reg [10:0] motion_count;
-reg [26:0] motion_word;
-wire mb_intra=motion_word[26];
-wire signed [12:0] mb_mvx=$signed(motion_word[25:13]);
-wire signed [12:0] mb_mvy=$signed(motion_word[12:0]);
+reg [55:0] motion_word;
+// Entry 695: the second field vector arrives as its own sideband record.
+reg signed [12:0] p_pending_mvx1,p_pending_mvy1;
+reg p_pending_field,p_pending_fsel0,p_pending_fsel1;
+wire mb_field=motion_word[55];
+wire mb_fsel0=motion_word[54];
+wire mb_fsel1=motion_word[53];
+wire mb_intra=motion_word[52];
+wire signed [12:0] mb_mvx=$signed(motion_word[51:39]);
+wire signed [12:0] mb_mvy=$signed(motion_word[38:26]);
+wire signed [12:0] mb_mvx1=$signed(motion_word[25:13]);
+wire signed [12:0] mb_mvy1=$signed(motion_word[12:0]);
 
 (* ramstyle = "M10K" *) reg [14:0] desc_mem [0:1023];
 reg [14:0] desc_word;
@@ -548,6 +560,8 @@ always @(posedge clk) begin
     if(reset) begin
         motion_count<=0;
         motion_word<=0;
+        p_pending_mvx1<=0;p_pending_mvy1<=0;
+        p_pending_field<=0;p_pending_fsel0<=0;p_pending_fsel1<=0;
         bank_desc_count[0]<=0;
         bank_desc_count[1]<=0;
         bank_last_desc_word[0]<=0;
@@ -621,7 +635,9 @@ always @(posedge clk) begin
             persisted_seen<=0;
             progress_stage<=4'd1;
             motion_count<=11'd1;
-            motion_mem[0]<={(residual_index==6'h3b),motion_vector_x,motion_vector_y};
+            motion_mem[0]<={3'b000,(residual_index==6'h3b),
+                            motion_vector_x,motion_vector_y,
+                            motion_vector_x,motion_vector_y};
             bank_desc_count[0]<=0;
             bank_desc_count[1]<=0;
             bank_last_desc_word[0]<=0;
@@ -678,6 +694,12 @@ always @(posedge clk) begin
                         sample_expected<=sample_expected+1'b1;
                     end
                 end
+            end else if(residual_index==6'h35) begin
+                // Entry 695: the second field vector and its field select.
+                // The record value carries the field flag in bit 1 and the
+                // select in bit 0, so no channel widening is needed.
+                p_pending_mvx1<=motion_vector_x;p_pending_mvy1<=motion_vector_y;
+                p_pending_field<=1'b1;p_pending_fsel1<=residual_value[0];
             end else if((residual_index==6'h3e)||
                         (residual_index==6'h3b)) begin
                 if(bank_ready[capture_bank] ||
@@ -688,8 +710,13 @@ always @(posedge clk) begin
                     if(!error) error_source<=5'd2;
                 end else begin
                     motion_mem[motion_count]<=
-                        {(residual_index==6'h3b),motion_vector_x,motion_vector_y};
+                        {p_pending_field,p_pending_fsel0,p_pending_fsel1,
+                         (residual_index==6'h3b),
+                         motion_vector_x,motion_vector_y,
+                         p_pending_field?p_pending_mvx1:motion_vector_x,
+                         p_pending_field?p_pending_mvy1:motion_vector_y};
                     motion_count<=motion_count+1'b1;
+                    p_pending_field<=0;p_pending_fsel0<=0;p_pending_fsel1<=0;
                 end
             end else if(residual_index==6'h3c) begin
                 if(bank_ready[capture_bank] ||

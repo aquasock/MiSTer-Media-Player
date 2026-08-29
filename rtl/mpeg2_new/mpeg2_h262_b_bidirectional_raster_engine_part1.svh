@@ -27,18 +27,33 @@ endfunction
 
 // {direction[1:0], fmvx, fmvy, bmvx, bmvy}. No reset loop: capture and
 // execution are disjoint phases, allowing synchronous block-RAM inference.
-(* ramstyle = "M10K" *) reg [41:0] motion_mem [0:MAX_MB-1];
+// Entry 695: field prediction carries two vectors per direction plus each
+// vector's motion_vertical_field_select, so one macroblock's motion word is
+// {field, fsel0, fsel1, bsel0, bsel1, direction, fwd slot0/slot1,
+//  bwd slot0/slot1}.  Frame prediction leaves both slots equal.
+(* ramstyle = "M10K" *) reg [86:0] motion_mem [0:MAX_MB-1];
 reg [10:0] motion_count;
-reg [41:0] motion_word;
+reg [86:0] motion_word;
 reg motion_load;
 reg motion_first_pending;
 reg [1:0] pending_direction;
 reg signed [9:0] pending_fmvx,pending_fmvy;
-wire [1:0] mb_direction=motion_word[41:40];
-wire signed [9:0] mb_fmvx=$signed(motion_word[39:30]);
-wire signed [9:0] mb_fmvy=$signed(motion_word[29:20]);
-wire signed [9:0] mb_bmvx=$signed(motion_word[19:10]);
-wire signed [9:0] mb_bmvy=$signed(motion_word[9:0]);
+reg signed [9:0] pending_fmvx1,pending_fmvy1,pending_bmvx1,pending_bmvy1;
+reg pending_field,pending_fsel0,pending_fsel1,pending_bsel1;
+wire [1:0] mb_direction=motion_word[81:80];
+wire signed [9:0] mb_fmvx=$signed(motion_word[79:70]);
+wire mb_field=motion_word[86];
+wire mb_fsel0=motion_word[85];
+wire mb_fsel1=motion_word[84];
+wire mb_bsel0=motion_word[83];
+wire mb_bsel1=motion_word[82];
+wire signed [9:0] mb_fmvx1=$signed(motion_word[59:50]);
+wire signed [9:0] mb_fmvy1=$signed(motion_word[49:40]);
+wire signed [9:0] mb_bmvx1=$signed(motion_word[19:10]);
+wire signed [9:0] mb_bmvy1=$signed(motion_word[9:0]);
+wire signed [9:0] mb_fmvy=$signed(motion_word[69:60]);
+wire signed [9:0] mb_bmvx=$signed(motion_word[39:30]);
+wire signed [9:0] mb_bmvy=$signed(motion_word[29:20]);
 
 // Commit 232 timing repair: execution begins two cycles after motion_word is
 // loaded. Capture block-normalized motion fields in a separate preserved stage
