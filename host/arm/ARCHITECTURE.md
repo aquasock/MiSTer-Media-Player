@@ -50,7 +50,7 @@ share a compilation unit:
 3. Timeline: PTS extraction and FPGA in-band timestamp records, with future
    discontinuity events for title, cell and seek transitions.
 4. Audio codec: MPEG Layer II on stream ids 0xC0-0xDF, standalone MPEG-1
-   Layer III and RIFF WAVE files, and AC-3 on private stream 1 substreams 0x80-0x87, all
+   Layer III, RIFF WAVE and FLAC files, and AC-3 on private stream 1 substreams 0x80-0x87, all
    behind codec selection rather than output-specific decode paths. MPEG audio
    is decoded by the pinned minimp3 source compiled directly into the static
    helper binary; MP3 support adds no runtime library. A Program Stream codec
@@ -89,7 +89,14 @@ ordinary integer or floating-point mono, stereo or multichannel input to signed
 accepted rates emit at 48 kHz. This conversion deliberately serves predictable
 consumer playback rather than bit-perfect or discrete-surround output. The
 dependency is compiled into the static helper with device, engine, resource
-manager, encoder, threading, runtime linking, MP3 and FLAC code disabled.
+manager, encoder, threading, runtime linking and MP3 code disabled.
+
+Standalone `.flac` follows the WAV audio-only contract and uses miniaudio's
+FLAC decoder through the same bounded `media_source` callbacks. Sixteen- and
+24-bit mono, stereo or multichannel input is converted to signed 16-bit stereo;
+44.1 kHz-family rates emit at 44.1 kHz and other accepted rates emit at 48 kHz.
+The decoder is compiled directly into the static helper and adds no runtime
+library or FPGA dependency.
 
 Future play, pause, seek, title, chapter, angle, audio-track and subtitle-track
 commands require a versioned control channel. They are intentionally not

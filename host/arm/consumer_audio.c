@@ -7,7 +7,6 @@
 #define MA_NO_THREADING
 #define MA_NO_RUNTIME_LINKING
 #define MA_NO_MP3
-#define MA_NO_FLAC
 #define MINIAUDIO_IMPLEMENTATION
 
 #include "miniaudio.h"
@@ -22,10 +21,11 @@
 #define CONSUMER_MIN_RATE_HZ 8000u
 #define CONSUMER_MAX_RATE_HZ 192000u
 
-static void set_error(char *error, size_t error_size, const char *message)
+static void set_format_error(char *error, size_t error_size,
+                             const char *format, const char *message)
 {
     if (error && error_size)
-        snprintf(error, error_size, "%s", message);
+        snprintf(error, error_size, message, format);
 }
 
 static ma_result source_read(ma_decoder *decoder, void *data, size_t size,
@@ -62,10 +62,10 @@ static unsigned choose_output_rate(unsigned source_rate)
     return source_rate % 11025u == 0u ? 44100u : 48000u;
 }
 
-int consumer_audio_decode_wav(struct media_source *source,
-                              consumer_pcm_callback callback, void *opaque,
-                              struct consumer_audio_info *info,
-                              char *error, size_t error_size)
+static int consumer_audio_decode_miniaudio(
+    struct media_source *source, ma_encoding_format encoding_format,
+    const char *format_name, consumer_pcm_callback callback, void *opaque,
+    struct consumer_audio_info *info, char *error, size_t error_size)
 {
     ma_decoder decoder;
     ma_decoder_config config;
@@ -78,16 +78,18 @@ int consumer_audio_decode_wav(struct media_source *source,
     ma_result result;
 
     if (!source || !callback) {
-        set_error(error, error_size, "invalid WAV decoder arguments");
+        set_format_error(error, error_size, format_name,
+                         "invalid %s decoder arguments");
         return -1;
     }
     memset(&decoder, 0, sizeof(decoder));
     config = ma_decoder_config_init_default();
-    config.encodingFormat = ma_encoding_format_wav;
+    config.encodingFormat = encoding_format;
     result = ma_decoder_init(source_read, source_seek, source, &config,
                              &decoder);
     if (result != MA_SUCCESS) {
-        set_error(error, error_size, "not a supported WAV file");
+        set_format_error(error, error_size, format_name,
+                         "not a supported %s file");
         return -1;
     }
     result = ma_decoder_get_data_format(&decoder, &source_format,
@@ -98,25 +100,27 @@ int consumer_audio_decode_wav(struct media_source *source,
         source_rate < CONSUMER_MIN_RATE_HZ ||
         source_rate > CONSUMER_MAX_RATE_HZ) {
         ma_decoder_uninit(&decoder);
-        set_error(error, error_size,
-                  "unsupported WAV channel count or sample rate");
+        set_format_error(error, error_size, format_name,
+                         "unsupported %s channel count or sample rate");
         return -1;
     }
     output_rate = choose_output_rate(source_rate);
     ma_decoder_uninit(&decoder);
     if (media_source_rewind(source) != 0) {
-        set_error(error, error_size, "cannot rewind WAV source");
+        set_format_error(error, error_size, format_name,
+                         "cannot rewind %s source");
         return -1;
     }
 
     memset(&decoder, 0, sizeof(decoder));
     config = ma_decoder_config_init(ma_format_s16, 2, output_rate);
-    config.encodingFormat = ma_encoding_format_wav;
+    config.encodingFormat = encoding_format;
     config.resampling.linear.lpfOrder = 8;
     result = ma_decoder_init(source_read, source_seek, source, &config,
                              &decoder);
     if (result != MA_SUCCESS) {
-        set_error(error, error_size, "cannot initialize WAV conversion");
+        set_format_error(error, error_size, format_name,
+                         "cannot initialize %s conversion");
         return -1;
     }
     for (;;) {
@@ -129,7 +133,8 @@ int consumer_audio_decode_wav(struct media_source *source,
             if (callback(opaque, pcm, (size_t)frames_read,
                          (int)output_rate) < 0) {
                 ma_decoder_uninit(&decoder);
-                set_error(error, error_size, "cannot write WAV PCM output");
+                set_format_error(error, error_size, format_name,
+                                 "cannot write %s PCM output");
                 return -1;
             }
             total_frames += frames_read;
@@ -138,13 +143,15 @@ int consumer_audio_decode_wav(struct media_source *source,
             break;
         if (result != MA_SUCCESS) {
             ma_decoder_uninit(&decoder);
-            set_error(error, error_size, "damaged WAV audio data");
+            set_format_error(error, error_size, format_name,
+                             "damaged %s audio data");
             return -1;
         }
     }
     ma_decoder_uninit(&decoder);
     if (!total_frames) {
-        set_error(error, error_size, "WAV file contains no audio frames");
+        set_format_error(error, error_size, format_name,
+                         "%s file contains no audio frames");
         return -1;
     }
     if (info) {
@@ -154,4 +161,24 @@ int consumer_audio_decode_wav(struct media_source *source,
         info->output_frames = total_frames;
     }
     return 0;
+}
+
+int consumer_audio_decode_wav(struct media_source *source,
+                              consumer_pcm_callback callback, void *opaque,
+                              struct consumer_audio_info *info,
+                              char *error, size_t error_size)
+{
+    return consumer_audio_decode_miniaudio(
+        source, ma_encoding_format_wav, "WAV", callback, opaque, info,
+        error, error_size);
+}
+
+int consumer_audio_decode_flac(struct media_source *source,
+                               consumer_pcm_callback callback, void *opaque,
+                               struct consumer_audio_info *info,
+                               char *error, size_t error_size)
+{
+    return consumer_audio_decode_miniaudio(
+        source, ma_encoding_format_flac, "FLAC", callback, opaque, info,
+        error, error_size);
 }

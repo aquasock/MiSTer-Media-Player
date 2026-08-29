@@ -21,4 +21,9 @@ int consumer_audio_decode_wav(struct media_source *source,
                               struct consumer_audio_info *info,
                               char *error, size_t error_size);
 
+int consumer_audio_decode_flac(struct media_source *source,
+                               consumer_pcm_callback callback, void *opaque,
+                               struct consumer_audio_info *info,
+                               char *error, size_t error_size);
+
 #endif

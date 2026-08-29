@@ -1988,6 +1988,26 @@ static int process_wav_stream(struct media_source *input,
     return 0;
 }
 
+static int process_flac_stream(struct media_source *input,
+                               struct output_state *output)
+{
+    struct consumer_audio_info info = {0};
+    char error[160];
+
+    output->audio_only_mode = 1;
+    output->hold_active = 0;
+    output->scheduler_started = 1;
+    if (consumer_audio_decode_flac(input, write_consumer_pcm, output, &info,
+                                   error, sizeof(error)) < 0) {
+        fprintf(stderr, "media_player_helper: %s\n", error);
+        return -1;
+    }
+    fprintf(stderr,
+            "media_player_helper: FLAC %u channel(s) at %u Hz, output %u Hz\n",
+            info.source_channels, info.source_rate_hz, info.output_rate_hz);
+    return 0;
+}
+
 static int finish_output(struct output_state *output, int success)
 {
     if (output->video && fflush(output->video) == EOF)
@@ -2017,6 +2037,7 @@ int main(int argc, char **argv)
     int is_program_stream;
     int is_mp3;
     int is_wav;
+    int is_flac;
     int is_audio_file;
     int i;
     int success = 0;
@@ -2126,13 +2147,15 @@ int main(int argc, char **argv)
     }
     is_mp3 = has_suffix_case(source_specification, ".mp3");
     is_wav = has_suffix_case(source_specification, ".wav");
-    is_audio_file = is_mp3 || is_wav;
+    is_flac = has_suffix_case(source_specification, ".flac");
+    is_audio_file = is_mp3 || is_wav || is_flac;
     is_program_stream = !is_audio_file &&
                         !memcmp(signature, "\x00\x00\x01\xba", 4);
     if (is_mp3) {
         if (preflight_mp3(&input) < 0)
             goto done;
-    } else if (!is_wav && preflight_input(&input, is_program_stream) < 0) {
+    } else if (!is_wav && !is_flac &&
+               preflight_input(&input, is_program_stream) < 0) {
         goto done;
     }
     output.scheduler_enabled = is_program_stream && !output.pcm;
@@ -2141,6 +2164,9 @@ int main(int argc, char **argv)
             goto done;
     } else if (is_wav) {
         if (process_wav_stream(&input, &output) < 0)
+            goto done;
+    } else if (is_flac) {
+        if (process_flac_stream(&input, &output) < 0)
             goto done;
     } else if (is_program_stream) {
         if (process_program_stream(&input, &audio, &output) < 0)

@@ -45,6 +45,8 @@ TRANSPORT_PRELUDE = r'''
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <cctype>
+#include <cstring>
 static const uint32_t SSPI_STROBE = 1u << 17;
 static const uint32_t SSPI_ACK = 1u << 17;
 static const int FIO_FILE_TX_DAT = 0x54;
@@ -79,6 +81,13 @@ static unsigned writes() {
     unsigned n = 0; for (auto v : trace) n += !(v >> 40); return n;
 }
 int main() {
+    char extensions[] = "M2VMPGMP3WAVFLC";
+    char flac[] = "track.flac", upper_flac[] = "TRACK.FLAC";
+    char flc[] = "track.flc", flv[] = "track.flv";
+    assert(user_io_ext_idx(flac, extensions) == 4);
+    assert(user_io_ext_idx(upper_flac, extensions) == 4);
+    assert(user_io_ext_idx(flc, extensions) != 4);
+    assert(user_io_ext_idx(flv, extensions) != 4);
     unsigned cases = 0;
     for (int wide : {0, 1}) for (unsigned size : {0u, 1u, 2u, 3u, 17u, 16383u, 16384u}) {
         fio_size = wide;
@@ -244,10 +253,13 @@ int main() {
     assert(mediaplayer_handles_file("TRACK.MP3"));
     assert(mediaplayer_handles_file("track.wav"));
     assert(mediaplayer_handles_file("TRACK.WAV"));
+    assert(mediaplayer_handles_file("track.flac"));
+    assert(mediaplayer_handles_file("TRACK.FLAC"));
     assert(mediaplayer_handles_file("movie.m2v"));
     assert(mediaplayer_handles_file("movie.mpg"));
     assert(mediaplayer_handles_file("movie.mpeg"));
-    assert(!mediaplayer_handles_file("track.flac"));
+    assert(!mediaplayer_handles_file("track.flc"));
+    assert(!mediaplayer_handles_file("track.flv"));
     assert(!mediaplayer_handles_file("track.mp3.txt"));
     session(); pipe_reads={-EAGAIN}; mediaplayer_poll();
     assert(helper_fd==42 && releases==0 && !step_calls && would_block_events==1);
@@ -605,7 +617,7 @@ def run(main_source: Path, compiler: str, sanitize: bool, rtl: bool = False) -> 
 
     with tempfile.TemporaryDirectory(prefix="main-profile-test-") as temporary:
         work = Path(temporary)
-        for name in ("menu.cpp", "user_io.cpp", "user_io.h", "fpga_io.cpp", "fpga_io.h"):
+        for name in ("file_io.cpp", "menu.cpp", "user_io.cpp", "user_io.h", "fpga_io.cpp", "fpga_io.h"):
             (work / name).write_text(upstream(name))
         patch = ROOT / "host/main_mister/0001-mediaplayer-arm-loader.patch"
         subprocess.run(["git", "apply", "--check", str(patch)], cwd=work, check=True)
@@ -628,11 +640,15 @@ def run(main_source: Path, compiler: str, sanitize: bool, rtl: bool = False) -> 
         bulk += function(fpga, "fpga_spi_write_ack")
         transport += bulk
         transport += function(io, "user_io_file_tx_data")
-        transport += function(io, "user_io_file_tx_data_ack") + TRANSPORT_TESTS
+        transport += function(io, "user_io_file_tx_data_ack")
+        transport += function(io, "user_io_ext_idx") + TRANSPORT_TESTS
         loader = (work / "support/mediaplayer/mediaplayer.cpp").read_text()
         menu = (work / "menu.cpp").read_text()
-        if 'strcpy(ext, "M2VMPGMP3WAV")' not in menu:
-            raise RuntimeError("MediaPlayer file picker does not expose MP3 and WAV")
+        if 'strcpy(ext, "M2VMPGMP3WAVFLC")' not in menu:
+            raise RuntimeError("MediaPlayer file picker does not expose MP3, WAV and FLAC")
+        file_io = (work / "file_io.cpp").read_text()
+        if '!strcasecmp(e, "FLC")' not in file_io or '!strcasecmp(fext, "flac")' not in file_io:
+            raise RuntimeError("MediaPlayer FLC alias is not mapped exactly to .flac")
         loader = re.sub(r"^#include .*\n", "", loader, flags=re.M)
         reports = {}
         for name, source in (("transport", transport), ("loader", LOADER_PRELUDE + loader + LOADER_TESTS)):

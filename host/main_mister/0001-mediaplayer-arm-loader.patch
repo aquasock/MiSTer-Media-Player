@@ -1,4 +1,21 @@
 # Applies to Main_MiSTer commit 0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f.
+diff --git a/file_io.cpp b/file_io.cpp
+index 2c9f406..0000000 100644
+--- a/file_io.cpp
++++ b/file_io.cpp
+@@ -1791,4 +1791,12 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
+ 							e[3] = 0;
++							if (!strcasecmp(e, "FLC"))
++							{
++								found = !strcasecmp(fext, "flac");
++								if (found) break;
++								if (strlen(ext) < 3) break;
++								ext += 3;
++								continue;
++							}
+ 							found = 1;
+ 							for (int i = 0; i < 4; i++)
+ 							{
 diff --git a/fpga_io.cpp b/fpga_io.cpp
 index b64cfe5..2912a55 100644
 --- a/fpga_io.cpp
@@ -122,6 +139,25 @@ index 0c74e21..473cfb0 100644
  
  /*menu states*/
  enum MENU
+@@ -319,7 +320,7 @@ static const char *info_top = "\x80\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x82";
+ static const char *info_bottom = "\x85\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x81\x84";
+ 
+ // file selection menu variables
+-static char fs_pFileExt[13] = "xxx";
++static char fs_pFileExt[16] = "xxx";
+ static uint32_t fs_ExtLen = 0;
+ static uint32_t fs_Options;
+ static uint32_t fs_MenuSelect;
+@@ -337,7 +338,8 @@ static char* GetExt(char *ext)
+ 
+ 	while (*ext) {
+ 		strcpy(p, ",");
+-		strncat(p, ext, 3);
++		if (!strncasecmp(ext, "FLC", 3)) strcat(p, "FLAC");
++		else strncat(p, ext, 3);
+ 		while (*(p + strlen(p) - 1) == ' ') *(p + strlen(p) - 1) = 0;
+ 		if (strlen(ext) <= 3) break;
+ 		ext += 3;
 @@ -458,10 +459,11 @@ void SelectFile(const char* path, const char* pFileExt, int Options, unsigned ch
  	}
  	else
@@ -140,7 +176,7 @@ index 0c74e21..473cfb0 100644
  
  						if (p[idx] >= '0' && p[idx] <= '9') ioctl_index = p[idx] - '0';
  						substrcpy(ext, p, 1);
-+						if (mediaplayer_is_core()) strcpy(ext, "M2VMPGMP3WAV");
++						if (mediaplayer_is_core()) strcpy(ext, "M2VMPGMP3WAVFLC");
  						if (is_gba() && FileExists(user_io_make_filepath(HomeDir(), "goomba.rom"))) strcat(ext, "GB GBC");
  						while (strlen(ext) % 3) strcat(ext, " ");
  
@@ -191,7 +227,7 @@ new file mode 100644
 index 0000000..663f7b0
 --- /dev/null
 +++ b/support/mediaplayer/mediaplayer.cpp
-@@ -0,0 +1,442 @@
+@@ -0,0 +1,443 @@
 +#include "mediaplayer.h"
 +
 +#include <errno.h>
@@ -368,7 +404,8 @@ index 0000000..663f7b0
 +	                     !strcasecmp(extension, ".mpg") ||
 +	                     !strcasecmp(extension, ".mpeg") ||
 +	                     !strcasecmp(extension, ".mp3") ||
-+	                     !strcasecmp(extension, ".wav"));
++	                     !strcasecmp(extension, ".wav") ||
++	                     !strcasecmp(extension, ".flac"));
 +}
 +
 +static void finish_download(const char *reason)
@@ -857,6 +894,39 @@ index 511c7a4..661b045 100644
  
  	if ((core_type != CORE_TYPE_SHARPMZ) &&
  		(core_type != CORE_TYPE_8BIT))
+@@ -4379,7 +4560,8 @@ unsigned char user_io_ext_idx(char *name, char* ext)
+ 	char *p = strrchr(name, '.');
+ 	if (p)
+ 	{
+ 		p++;
++		char *full_ext = p;
+ 		char e[4] = "   ";
+ 		for (int i = 0; i < 3; i++)
+ 		{
+@@ -4389,11 +4571,19 @@ unsigned char user_io_ext_idx(char *name, char* ext)
+ 
+ 		while (*ext)
+ 		{
+-			int found = 1;
+-			for (int i = 0; i < 3; i++)
++			int found;
++			if (!strncasecmp(ext, "FLC", 3))
++			{
++				found = !strcasecmp(full_ext, "flac");
++			}
++			else
+ 			{
+-				if (ext[i] == '*') break;
+-				if (ext[i] != '?' && (toupper(ext[i]) != toupper(e[i]))) found = 0;
++				found = 1;
++				for (int i = 0; i < 3; i++)
++				{
++					if (ext[i] == '*') break;
++					if (ext[i] != '?' && (toupper(ext[i]) != toupper(e[i]))) found = 0;
++				}
+ 			}
+ 
+ 			if (found)
 diff --git a/user_io.h b/user_io.h
 index 648736f..f91969d 100644
 --- a/user_io.h
