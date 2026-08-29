@@ -1,3 +1,32 @@
+## 704 COMMIT Unreleased ??? 2026-08-29T03:35:47-07:00
+
+#### Coming From:
+
+Unreleased 8404035
+
+#### Purpose:
+
+Deploy and hardware-test the exact fit-qualified recovery RBF with its matching decoded-PCM S/PDIF helper.
+
+#### Outcome:
+
+The authorized hardware checkpoint will use source `736f64f`'s clean timing-positive 4,459,744-byte RBF with SHA-256 `3f66a5eb38bcff783472b977764bc34366a07570b01278822e705718edf224fa` and the matching 629,056-byte static ARM helper with SHA-256 `02d1df98c62ee00169585db990b6bd48c3769eca20c3e1d594f2318c362eb00f`.  The RBF will be installed as a separate dated candidate rather than replacing an existing core, while the installed helper will be read back and preserved before a staged, hash-verified replacement.  Main and existing media will remain unchanged.  This checkpoint can validate existing video behavior and the corrected HDMI and S/PDIF audio routing, but production interlaced P and B admission remains closed and therefore it cannot accept the NARA release profile or prove the recovered field-prediction path on hardware.
+
+#### Next Steps:
+
+Perform a read-only MiSTer inventory, retrieve and independently verify the exact build-PC artifacts, preserve the current helper, upload both candidates through staging names, verify staged and final readback hashes, and leave core loading and playback to the user.  Test the existing original DVD opening over HDMI decoded PCM first, then MP3, WAV and FLAC over S/PDIF, then AC-3 passthrough over S/PDIF and one known progressive video.  Capture the helper log and terminal telemetry before replay if any regression, dropout, protocol fault or visible error occurs.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 703 COMMIT Unreleased 8404035 2026-08-29T03:31:55-07:00
 
 #### Coming From:
@@ -1233,35 +1262,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 664 COMMIT Unreleased 6c1b621 2026-08-28T01:44:41-07:00
-
-#### Coming From:
-
-Unreleased 3e287b3
-
-#### Purpose:
-
-Reseed the unchanged decoder after weight prefetch closes MPEG timing and only the known HDMI scaler path remains negative.
-
-#### Outcome:
-
-Seed-only source 6c1b621 is published from the Pi; its sole production difference is MediaPlayer.qsf seed 17 to 18. The clean source-3e287b3 build completes in 781.6 seconds with zero errors and 205 warnings. Decoder setup improves to positive 1.486 nanoseconds and video setup to positive 2.775, but HDMI setup remains negative 0.274 with total negative slack of 6.576 on the existing ascal vertical-address path. Hold, recovery, removal and minimum pulse width are positive 0.253, 3.368, 0.529 and 0.925. Fitted resources are 32,856 ALMs, 52,359 registers, 4,054,267 memory bits, 514 of 553 RAM blocks and 67 DSP blocks. TimeQuest finds all four eight-bit prefetched weight banks, input setup at least positive 4.798 and output setup at least positive 2.853; all film CDC endpoints match and subsequent synchronizer stages have positive 15.531 setup. Both exact-source opening checks pass all 289 pictures and 149,817,600 samples, preserving the isolated one-level and measured real-reference propagation bounds, with no decoder or ownership errors. The failed RBF is not packaged or deployed. Entry 655's recorded response for marginal HDMI placement applies: change only the fitter seed from 17 to 18, leaving all RTL, clocks and timing constraints unchanged, publish that source and perform another clean build. Reports and the failed image remain under /home/vash/mister-builds/entry663.
-
-#### Next Steps:
-
-Pull published seed-only source 6c1b621 on GUNSMOKE, rerun the clean build and paired opening checks, and audit every timing category, warning difference, register boundary and synchronization endpoint again. Package only a fully timing-positive candidate with a locally verified checksum, preserve the known-good core and leave deployment and playback to the user. No decoder feature or acceptance bound is expanded.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
