@@ -127,6 +127,10 @@ always @(posedge clk) begin
         state<=S_QSCALE;field_bit_count<=0;qscale_shift<=0;current_qscale<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;skip_remaining<=0;geometry_sent<=0;
         mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;mba_symbol_escape_q<=0;mba_symbol_value_q<=0;mbtype_bits<=0;mbtype_len<=0;current_direction<=0;last_direction<=0;current_pattern<=0;current_intra<=0;current_quant<=0;
         fpx<=0;fpy<=0;bpx<=0;bpy<=0;cur_fx<=0;cur_fy<=0;cur_bx<=0;cur_by<=0;
+        fpy_frame<=0;bpy_frame<=0;fpx1<=0;fpy1_frame<=0;bpx1<=0;bpy1_frame<=0;
+        current_motion_type<=2'b10;motion_type_shift<=0;motion_type_count<=0;motion_slot<=0;
+        cur_fsel0<=0;cur_fsel1<=0;cur_bsel0<=0;cur_bsel1<=0;
+        cur_fx1<=0;cur_fy1<=0;cur_bx1<=0;cur_by1<=0;
         motion_code_pending<=0;motion_bits<=0;motion_len<=0;motion_residual_shift<=0;motion_residual_count<=0;
         cbp_bits<=0;cbp_len<=0;current_cbp<=0;current_block_index<=0;coeff_vlc_code<=0;coeff_vlc_len<=0;
         qfs_index<=0;coeff_run_pending<=0;coeff_level_pending<=0;current_block_has_coeff<=0;
@@ -242,22 +246,86 @@ always @(posedge clk) begin
                     current_quant<=mbtype_match[4];current_intra<=mbtype_match[3];current_direction<=mbtype_match[2:1];current_pattern<=mbtype_match[0];mbtype_bits<=0;mbtype_len<=0;
                     cur_fx<=0;cur_fy<=0;cur_bx<=0;cur_by<=0;motion_bits<=0;motion_len<=0;
                     if(!mbtype_match[3])begin dc_predictor_y<=dc_predictor_reset;dc_predictor_cb<=dc_predictor_reset;dc_predictor_cr<=dc_predictor_reset;end
+                    // Entry 695: per-macroblock field motion state starts from
+                    // frame prediction, which is what a set frame_pred_frame_dct
+                    // implies and what every skipped macroblock assumes.
+                    motion_type_shift<=0;motion_type_count<=0;motion_slot<=0;
+                    current_motion_type<=2'b10;
+                    cur_fsel0<=0;cur_fsel1<=0;cur_bsel0<=0;cur_bsel1<=0;
+                    cur_fx1<=0;cur_fy1<=0;cur_bx1<=0;cur_by1<=0;
                     if(mbtype_match[4])begin qscale_shift<=0;field_bit_count<=0;state<=S_MB_QSCALE;end
                     else if(mbtype_match[3])begin current_cbp<=6'h3f;current_block_index<=0;state<=S_BLOCK;end
+                    else if(!b_frame_pred_frame_dct)state<=S_MOTION_TYPE;
                     else if(mbtype_match[2:1]==2'd2)state<=S_BX;else state<=S_FX;
                 end else if(mbtype_len_next>=6)state<=S_ERROR;else begin mbtype_bits<=mbtype_bits_next;mbtype_len<=mbtype_len_next;end
             end
             S_MB_QSCALE: begin
                 if(parser_at_end)state<=S_ERROR;
-                else begin qscale_shift<=qscale_next;if(field_bit_count==4)begin field_bit_count<=0;if(qscale_next==0)state<=S_ERROR;else begin current_qscale<=qscale_next;if(current_intra)begin current_cbp<=6'h3f;current_block_index<=0;state<=S_BLOCK;end else if(current_direction==2'd2)state<=S_BX;else state<=S_FX;end end else field_bit_count<=field_bit_count+1'b1;end
+                else begin qscale_shift<=qscale_next;if(field_bit_count==4)begin field_bit_count<=0;if(qscale_next==0)state<=S_ERROR;else begin current_qscale<=qscale_next;if(current_intra)begin current_cbp<=6'h3f;current_block_index<=0;state<=S_BLOCK;end else if(!b_frame_pred_frame_dct)state<=S_MOTION_TYPE;else if(current_direction==2'd2)state<=S_BX;else state<=S_FX;end end else field_bit_count<=field_bit_count+1'b1;end
+            end
+            // Entry 695: with frame_pred_frame_dct clear, frame_motion_type
+            // follows macroblock_type for every macroblock carrying motion.
+            // 2'b01 is field prediction, 2'b10 frame prediction; 2'b11 is dual
+            // prime and 2'b00 reserved, both refused here as an implementation
+            // limit of this decoder rather than a limit of H.262.
+            S_MOTION_TYPE: begin
+                if(parser_at_end)state<=S_ERROR;
+                else begin
+                    motion_type_shift<=motion_type_next;
+                    if(motion_type_count==1'b1)begin
+                        motion_type_count<=0;current_motion_type<=motion_type_next;motion_slot<=0;
+                        case(motion_type_next)
+                            2'b01: state<=(current_direction==2'd2)?S_BSEL:S_FSEL;
+                            2'b10: state<=(current_direction==2'd2)?S_BX:S_FX;
+                            default: state<=S_ERROR;
+                        endcase
+                    end else motion_type_count<=motion_type_count+1'b1;
+                end
+            end
+            // motion_vertical_field_select immediately precedes its own vector.
+            S_FSEL: begin
+                if(parser_at_end)state<=S_ERROR;
+                else begin
+                    if(motion_slot)cur_fsel1<=parser_current_bit;else cur_fsel0<=parser_current_bit;
+                    motion_bits<=0;motion_len<=0;state<=S_FX;
+                end
+            end
+            S_BSEL: begin
+                if(parser_at_end)state<=S_ERROR;
+                else begin
+                    if(motion_slot)cur_bsel1<=parser_current_bit;else cur_bsel0<=parser_current_bit;
+                    motion_bits<=0;motion_len<=0;state<=S_BX;
+                end
+            end
+            // One vector pair is complete.  Field prediction codes a second,
+            // so retain the first slot's vector and parse the other; otherwise
+            // continue exactly as frame prediction always did.
+            S_FDONE: begin
+                if(field_motion&&!motion_slot)begin
+                    cur_fx1<=cur_fx;cur_fy1<=cur_fy;motion_slot<=1'b1;state<=S_FSEL;
+                end else begin
+                    motion_slot<=0;
+                    if(current_direction==2'd3)state<=field_motion?S_BSEL:S_BX;
+                    else if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end
+                    else state<=S_MB_DONE;
+                end
+            end
+            S_BDONE: begin
+                if(field_motion&&!motion_slot)begin
+                    cur_bx1<=cur_bx;cur_by1<=cur_by;motion_slot<=1'b1;state<=S_BSEL;
+                end else begin
+                    motion_slot<=0;
+                    if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end
+                    else state<=S_MB_DONE;
+                end
             end
             S_FX: begin
                 if(parser_at_end)state<=S_ERROR;
                 else if(motion_match[6])begin
                     motion_code_pending<=$signed(motion_match[5:0]);motion_bits<=0;motion_len<=0;
-                    if($signed(motion_match[5:0])==0)begin cur_fx<=fpx;state<=S_FY;end
+                    if($signed(motion_match[5:0])==0)begin cur_fx<=fpx_sel;state<=S_FY;end
                     else if(b_forward_f_code_horizontal==4'd1)begin
-                        cur_fx<=reconstruct_mv(fpx,motion_match[5:0],4'd0,b_forward_f_code_horizontal);state<=S_FY;
+                        cur_fx<=reconstruct_mv(fpx_sel,motion_match[5:0],4'd0,b_forward_f_code_horizontal);state<=S_FY;
                     end else begin motion_residual_shift<=0;motion_residual_count<=0;state<=S_FX_RES;end
                 end
                 else if(motion_len_next==11)state<=S_ERROR;else begin motion_bits<=motion_bits_next;motion_len<=motion_len_next;end
@@ -267,7 +335,7 @@ always @(posedge clk) begin
                 else begin
                     motion_residual_shift<=motion_residual_next;
                     if({1'b0,motion_residual_count}==(b_forward_f_code_horizontal-4'd2))begin
-                        cur_fx<=reconstruct_mv(fpx,motion_code_pending,motion_residual_next,b_forward_f_code_horizontal);
+                        cur_fx<=reconstruct_mv(fpx_sel,motion_code_pending,motion_residual_next,b_forward_f_code_horizontal);
                         motion_residual_count<=0;motion_bits<=0;motion_len<=0;state<=S_FY;
                     end else motion_residual_count<=motion_residual_count+1'b1;
                 end
@@ -277,15 +345,11 @@ always @(posedge clk) begin
                 else if(motion_match[6])begin
                     motion_code_pending<=$signed(motion_match[5:0]);motion_bits<=0;motion_len<=0;
                     if($signed(motion_match[5:0])==0)begin
-                        cur_fy<=fpy;
-                        if(current_direction==2'd3)state<=S_BX;
-                        else if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end
-                        else state<=S_MB_DONE;
+                        cur_fy<=fpy_sel;
+                        state<=S_FDONE;
                     end else if(b_forward_f_code_vertical==4'd1)begin
-                        cur_fy<=reconstruct_mv(fpy,motion_match[5:0],4'd0,b_forward_f_code_vertical);
-                        if(current_direction==2'd3)state<=S_BX;
-                        else if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end
-                        else state<=S_MB_DONE;
+                        cur_fy<=reconstruct_mv(fpy_sel,motion_match[5:0],4'd0,b_forward_f_code_vertical);
+                        state<=S_FDONE;
                     end else begin motion_residual_shift<=0;motion_residual_count<=0;state<=S_FY_RES;end
                 end
                 else if(motion_len_next==11)state<=S_ERROR;else begin motion_bits<=motion_bits_next;motion_len<=motion_len_next;end

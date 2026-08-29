@@ -144,7 +144,12 @@ localparam [5:0]
     S_COEFF_SIGN=17,S_ESCAPE_RUN=18,S_ESCAPE_LEVEL=19,
     S_MB_DONE=20,S_STUFF=21,S_SUCCESS=22,S_ERROR=23,
     S_SKIP_A=24,S_SKIP_B=25,S_GEOMETRY=26,S_MB_B=27,S_MBA_APPLY=28,
-    S_MB_QSCALE=29,S_DC_SIZE=30,S_DC_DIFF=31;
+    S_MB_QSCALE=29,S_DC_SIZE=30,S_DC_DIFF=31,
+    // Entry 695: field motion in a frame picture codes two vectors per
+    // direction, each preceded by its own motion_vertical_field_select, so the
+    // existing per-direction vector states are iterated twice through a slot
+    // rather than duplicated.
+    S_MOTION_TYPE=32,S_FSEL=33,S_FDONE=34,S_BSEL=35,S_BDONE=36;
 reg [5:0] state;
 
 reg [2:0] field_bit_count; reg [4:0] qscale_shift,current_qscale; reg [3:0] extra_info_count;
@@ -233,6 +238,37 @@ wire [7:0] mba_escape_min_target_q={2'b00,current_col}+mba_escape_accum_next_q;
 reg [5:0] mbtype_bits; reg [2:0] mbtype_len; reg [1:0] current_direction,last_direction;
 reg current_pattern,current_intra,current_quant;
 reg signed [9:0] fpx,fpy,bpx,bpy,cur_fx,cur_fy,cur_bx,cur_by;
+// Entry 695: field motion state.  frame_motion_type 2'b01 selects field
+// prediction, 2'b10 frame prediction; 2'b11 is dual prime and 2'b00 is
+// reserved, both refused as an implementation limit of this decoder rather
+// than a limit of H.262.
+reg [1:0] current_motion_type;
+reg [1:0] motion_type_shift;
+reg       motion_type_count;
+reg       motion_slot;
+reg       cur_fsel0,cur_fsel1,cur_bsel0,cur_bsel1;
+reg signed [9:0] cur_fx1,cur_fy1,cur_bx1,cur_by1;
+// Second-slot predictors.  H.262 7.6.3.1 keeps every vertical predictor in
+// frame units, so a field vertical vector is stored doubled and halved before
+// use; one extra bit carries that doubling.
+reg signed [10:0] fpy_frame,bpy_frame,fpy1_frame,bpy1_frame;
+reg signed [9:0]  fpx1,bpx1;
+wire field_motion = (current_motion_type==2'b01);
+wire signed [9:0]  fpx_sel = motion_slot ? fpx1 : fpx;
+wire signed [9:0]  bpx_sel = motion_slot ? bpx1 : bpx;
+wire signed [10:0] fpy_frame_sel = motion_slot ? fpy1_frame : fpy_frame;
+wire signed [10:0] bpy_frame_sel = motion_slot ? bpy1_frame : bpy_frame;
+// Truncation toward zero, which is what H.262 DIV specifies.
+function automatic signed [9:0] half_toward_zero;
+    input signed [10:0] value;
+    begin
+        half_toward_zero = value[10] ? -$signed((-value) >>> 1) : $signed(value >>> 1);
+    end
+endfunction
+wire signed [9:0] fpy_sel = field_motion ? half_toward_zero(fpy_frame_sel)
+                                         : $signed(fpy_frame_sel[9:0]);
+wire signed [9:0] bpy_sel = field_motion ? half_toward_zero(bpy_frame_sel)
+                                         : $signed(bpy_frame_sel[9:0]);
 reg signed [5:0] motion_code_pending; reg [10:0] motion_bits; reg [3:0] motion_len;
 reg [4:0] motion_residual_shift; reg [2:0] motion_residual_count;
 

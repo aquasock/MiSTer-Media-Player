@@ -30,6 +30,8 @@ wire [11:0] dc_coefficient_max=(12'd256 << b_intra_dc_precision)-12'd1;
 wire signed [12:0] dc_coefficient_max_signed=$signed({1'b0,dc_coefficient_max});
 
 wire [4:0] qscale_next={qscale_shift[3:0],parser_current_bit};
+// Entry 695: frame_motion_type is two bits, motion_vertical_field_select one.
+wire [1:0] motion_type_next={motion_type_shift[0],parser_current_bit};
 wire [6:0] mba_bits_next={mba_bits[5:0],parser_current_bit};
 wire [2:0] mba_len_next=mba_len+1'b1;
 wire [10:0] motion_bits_next={motion_bits[9:0],parser_current_bit};

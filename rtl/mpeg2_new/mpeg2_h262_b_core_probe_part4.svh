@@ -4,11 +4,9 @@
                 else begin
                     motion_residual_shift<=motion_residual_next;
                     if({1'b0,motion_residual_count}==(b_forward_f_code_vertical-4'd2))begin
-                        cur_fy<=reconstruct_mv(fpy,motion_code_pending,motion_residual_next,b_forward_f_code_vertical);
+                        cur_fy<=reconstruct_mv(fpy_sel,motion_code_pending,motion_residual_next,b_forward_f_code_vertical);
                         motion_residual_count<=0;motion_bits<=0;motion_len<=0;
-                        if(current_direction==2'd3)state<=S_BX;
-                        else if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end
-                        else state<=S_MB_DONE;
+                        state<=S_FDONE;
                     end else motion_residual_count<=motion_residual_count+1'b1;
                 end
             end
@@ -16,9 +14,9 @@
                 if(parser_at_end)state<=S_ERROR;
                 else if(motion_match[6])begin
                     motion_code_pending<=$signed(motion_match[5:0]);motion_bits<=0;motion_len<=0;
-                    if($signed(motion_match[5:0])==0)begin cur_bx<=bpx;state<=S_BY;end
+                    if($signed(motion_match[5:0])==0)begin cur_bx<=bpx_sel;state<=S_BY;end
                     else if(b_backward_f_code_horizontal==4'd1)begin
-                        cur_bx<=reconstruct_mv(bpx,motion_match[5:0],4'd0,b_backward_f_code_horizontal);state<=S_BY;
+                        cur_bx<=reconstruct_mv(bpx_sel,motion_match[5:0],4'd0,b_backward_f_code_horizontal);state<=S_BY;
                     end else begin motion_residual_shift<=0;motion_residual_count<=0;state<=S_BX_RES;end
                 end
                 else if(motion_len_next==11)state<=S_ERROR;else begin motion_bits<=motion_bits_next;motion_len<=motion_len_next;end
@@ -28,7 +26,7 @@
                 else begin
                     motion_residual_shift<=motion_residual_next;
                     if({1'b0,motion_residual_count}==(b_backward_f_code_horizontal-4'd2))begin
-                        cur_bx<=reconstruct_mv(bpx,motion_code_pending,motion_residual_next,b_backward_f_code_horizontal);
+                        cur_bx<=reconstruct_mv(bpx_sel,motion_code_pending,motion_residual_next,b_backward_f_code_horizontal);
                         motion_residual_count<=0;motion_bits<=0;motion_len<=0;state<=S_BY;
                     end else motion_residual_count<=motion_residual_count+1'b1;
                 end
@@ -38,11 +36,11 @@
                 else if(motion_match[6])begin
                     motion_code_pending<=$signed(motion_match[5:0]);motion_bits<=0;motion_len<=0;
                     if($signed(motion_match[5:0])==0)begin
-                        cur_by<=bpy;
-                        if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end else state<=S_MB_DONE;
+                        cur_by<=bpy_sel;
+                        state<=S_BDONE;
                     end else if(b_backward_f_code_vertical==4'd1)begin
-                        cur_by<=reconstruct_mv(bpy,motion_match[5:0],4'd0,b_backward_f_code_vertical);
-                        if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end else state<=S_MB_DONE;
+                        cur_by<=reconstruct_mv(bpy_sel,motion_match[5:0],4'd0,b_backward_f_code_vertical);
+                        state<=S_BDONE;
                     end else begin motion_residual_shift<=0;motion_residual_count<=0;state<=S_BY_RES;end
                 end
                 else if(motion_len_next==11)state<=S_ERROR;else begin motion_bits<=motion_bits_next;motion_len<=motion_len_next;end
@@ -52,9 +50,9 @@
                 else begin
                     motion_residual_shift<=motion_residual_next;
                     if({1'b0,motion_residual_count}==(b_backward_f_code_vertical-4'd2))begin
-                        cur_by<=reconstruct_mv(bpy,motion_code_pending,motion_residual_next,b_backward_f_code_vertical);
+                        cur_by<=reconstruct_mv(bpy_sel,motion_code_pending,motion_residual_next,b_backward_f_code_vertical);
                         motion_residual_count<=0;
-                        if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end else state<=S_MB_DONE;
+                        state<=S_BDONE;
                     end else motion_residual_count<=motion_residual_count+1'b1;
                 end
             end
@@ -176,10 +174,31 @@
                 // H.262 7.6.3.4: intra without concealment resets ALL PMVs.
                 // Concealment vectors remain excluded by picture admission.
                 if(current_intra)begin
-                    fpx<=0;fpy<=0;bpx<=0;bpy<=0;last_direction<=0;
+                    fpx<=0;fpy_frame<=0;bpx<=0;bpy_frame<=0;
+                    fpx1<=0;fpy1_frame<=0;bpx1<=0;bpy1_frame<=0;last_direction<=0;
                 end else begin
-                    if(current_direction[0])begin fpx<=cur_fx;fpy<=cur_fy;end
-                    if(current_direction[1])begin bpx<=cur_bx;bpy<=cur_by;end
+                    // Entry 695: H.262 7.6.3.1 keeps every vertical predictor in
+                    // frame units, so a field vertical vector is stored doubled.
+                    // Field prediction leaves slot 0 in cur_*1 and slot 1 in
+                    // cur_*, because the second slot reuses the vector states.
+                    if(current_direction[0])begin
+                        if(field_motion)begin
+                            fpx<=cur_fx1;fpy_frame<=$signed({cur_fy1,1'b0});
+                            fpx1<=cur_fx;fpy1_frame<=$signed({cur_fy,1'b0});
+                        end else begin
+                            fpx<=cur_fx;fpy_frame<=$signed({cur_fy[9],cur_fy});
+                            fpx1<=cur_fx;fpy1_frame<=$signed({cur_fy[9],cur_fy});
+                        end
+                    end
+                    if(current_direction[1])begin
+                        if(field_motion)begin
+                            bpx<=cur_bx1;bpy_frame<=$signed({cur_by1,1'b0});
+                            bpx1<=cur_bx;bpy1_frame<=$signed({cur_by,1'b0});
+                        end else begin
+                            bpx<=cur_bx;bpy_frame<=$signed({cur_by[9],cur_by});
+                            bpx1<=cur_bx;bpy1_frame<=$signed({cur_by[9],cur_by});
+                        end
+                    end
                     last_direction<=current_direction;
                 end
                 row_has_coded_mb<=1;
