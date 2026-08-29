@@ -168,29 +168,36 @@
             end
 
             R_MB_DONE: begin
-                // Entry 695: field prediction emits the slot 1 vector on its
-                // own record first, because the raster engine commits the
-                // macroblock on the slot 0 record.  This state consumes no
-                // bit, so holding it for the extra cycle costs no syntax.
+                // Entry 695: field prediction sends slot 0 on the ordinary
+                // record and slot 1 on a second record behind it.  The
+                // ordinary record must go first: it is what arms the raster
+                // engine's capture, so a second record ahead of it would be
+                // dropped on the first macroblock of every picture.  The
+                // engine therefore completes the macroblock on the second
+                // record, as the B engine already does.  This state consumes
+                // no bit, so holding it for the extra cycle costs no syntax.
                 if(field_motion&&!motion_second_sent) begin
-                    motion_event_valid<=1;
-                    motion_event_index<=current_mb_index;
-                    motion_event_x<=current_motion_x;
-                    motion_event_y<=current_motion_y;
-                    motion_event_intra<=1'b0;
-                    motion_event_second<=1'b1;
-                    motion_event_field<=1'b1;
-                    motion_event_fsel<=current_fsel1;
-                    motion_second_sent<=1'b1;
-                end else begin
                     motion_event_valid<=1;
                     motion_event_index<=current_mb_index;
                     motion_event_x<=current_motion_x1_or_x;
                     motion_event_y<=current_motion_y1_or_y;
                     motion_event_intra<=current_is_intra;
                     motion_event_second<=1'b0;
-                    motion_event_field<=field_motion;
+                    motion_event_field<=1'b1;
                     motion_event_fsel<=current_fsel0;
+                    motion_second_sent<=1'b1;
+                end else begin
+                    motion_event_valid<=1;
+                    motion_event_index<=current_mb_index;
+                    motion_event_x<=field_motion?current_motion_x
+                                                :current_motion_x1_or_x;
+                    motion_event_y<=field_motion?current_motion_y
+                                                :current_motion_y1_or_y;
+                    motion_event_intra<=field_motion?1'b0:current_is_intra;
+                    motion_event_second<=field_motion;
+                    motion_event_field<=field_motion;
+                    motion_event_fsel<=field_motion?current_fsel1
+                                                   :current_fsel0;
                     motion_second_sent<=1'b0;
                     if(current_has_motion) begin
                         // H.262 7.6.3.1: every vertical predictor is kept in frame

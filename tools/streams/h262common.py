@@ -362,11 +362,20 @@ def source_frames(count: int) -> bytes:
     return bytes(out)
 
 
-def make_skeleton(ffmpeg: str, raw: Path, out: Path, frame_count: int, gop: int, bframes: int = 1) -> None:
+def make_skeleton(ffmpeg: str, raw: Path, out: Path, frame_count: int, gop: int, bframes: int = 1,
+                  fps: str | None = None) -> None:
+    """Encode the FFmpeg skeleton the fixtures patch.
+
+    `fps` overrides the module default for fixtures that must carry a
+    particular frame_rate_code.  The decoder's 480i admission gate requires
+    30000/1001, which the module default of 25 does not satisfy; passing it
+    here leaves every other fixture on the default untouched.
+    """
     raw.write_bytes(source_frames(frame_count))
     subprocess.run(
         [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "yuv420p",
-         "-s", f"{WIDTH}x{HEIGHT}", "-r", str(FPS), "-i", str(raw), "-frames:v", str(frame_count), "-an",
+         "-s", f"{WIDTH}x{HEIGHT}", "-r", str(fps if fps is not None else FPS), "-i", str(raw),
+         "-frames:v", str(frame_count), "-an",
          "-c:v", "mpeg2video", "-pix_fmt", "yuv420p", "-bf", str(bframes), "-g", str(gop),
          "-sc_threshold", "1000000000", "-q:v", "2", "-f", "mpeg2video", str(out)],
         check=True,

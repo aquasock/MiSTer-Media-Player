@@ -118,7 +118,12 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="mister_h262_ifm_") as td:
         temp = Path(td)
         raw, sk = temp / "src.yuv", temp / "sk.m2v"
-        h.make_skeleton(ffmpeg, raw, sk, frame_count=2, gop=12, bframes=0)
+        # 30000/1001 is frame_rate_code 4, which the 480i admission gate
+        # requires; the module default of 25 is code 3 and is refused, so
+        # the I picture never becomes a reference and the P picture has
+        # nothing to predict from.
+        h.make_skeleton(ffmpeg, raw, sk, frame_count=2, gop=12, bframes=0,
+                        fps="30000/1001")
         if h.picture_types(ffprobe, sk) != ["I", "P"]:
             raise SystemExit("FFmpeg skeleton picture order changed")
         row_groups = tuple((payload,) for payload in rows_bits)
