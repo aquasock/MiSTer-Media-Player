@@ -1,0 +1,77 @@
+{
+  "captured": "2026-08-28T19:19:00-07:00",
+  "host": "10.10.0.30",
+  "files": {
+    "/tmp/MediaPlayer_ARM.log": {
+      "local": "arm_helper_after.log",
+      "bytes": 477252,
+      "sha256": "7ea39510023274614300b8de360ce9c09e223fe20f77933914e015d7cdbf7454"
+    },
+    "/media/fat/screenshots/entry690_playback_20260828T191900_1.png": {
+      "local": "screen_1.png",
+      "bytes": 316577,
+      "sha256": "8264e13456094ccb4153523c188208d7b48e810fb7df7734a19dd9c51219a2ae",
+      "complete_png_verified": true
+    },
+    "/media/fat/screenshots/entry690_playback_20260828T191900_2.png": {
+      "local": "screen_2.png",
+      "bytes": 316577,
+      "sha256": "8264e13456094ccb4153523c188208d7b48e810fb7df7734a19dd9c51219a2ae",
+      "complete_png_verified": true
+    },
+    "/media/fat/MiSTer": {
+      "local": "MiSTer",
+      "bytes": 1170340,
+      "sha256": "01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9"
+    },
+    "/media/fat/linux/MediaPlayer_Helper": {
+      "local": "MediaPlayer_Helper",
+      "bytes": 399340,
+      "sha256": "fefaeb18b8c9e091a9cd9e97258e86264683f374f9663cb3ea6b99bafb81977a"
+    },
+    "/media/fat/MediaPlayer.rbf": {
+      "local": "MediaPlayer.rbf",
+      "bytes": 4309784,
+      "sha256": "9730e0ba61adbcd5319a42b9d270f30083947487f156cc17a1ce277d96a7dc18"
+    },
+    "/media/fat/MediaPlayer_20260828.rbf": {
+      "local": "MediaPlayer_20260828.rbf",
+      "bytes": 4369004,
+      "sha256": "a403d224ee98d192994fccf8116d59eef26933351216c66a14d044748a86171c"
+    },
+    "/media/fat/MediaPlayer_OLD.rbf": {
+      "local": "MediaPlayer_OLD.rbf",
+      "bytes": 4278588,
+      "sha256": "5895917446f140bc53130fcf4b93226fa507cd9c6b9f335c00660c7428711365"
+    },
+    "/media/fat/games/MediaPlayer/dvd_opening_original.mpg": {
+      "local": "dvd_opening_original.mpg",
+      "bytes": 11145233,
+      "sha256": "218d3a8eab32efceb6263d884be1b589b75e598ae25eeb465d14e4b430dfdc21"
+    }
+  },
+  "operations": [
+    "RETR /tmp/MediaPlayer_ARM.log",
+    "STOR MiSTer_cmd: screenshot entry690_playback_20260828T191900_1.png",
+    "RETR /media/fat/screenshots/entry690_playback_20260828T191900_1.png",
+    "STOR MiSTer_cmd: screenshot entry690_playback_20260828T191900_2.png",
+    "RETR /media/fat/screenshots/entry690_playback_20260828T191900_2.png",
+    "RETR /media/fat/MiSTer",
+    "RETR /media/fat/linux/MediaPlayer_Helper",
+    "RETR /media/fat/MediaPlayer.rbf",
+    "RETR /media/fat/MediaPlayer_20260828.rbf",
+    "RETR /media/fat/MediaPlayer_OLD.rbf",
+    "RETR /media/fat/games/MediaPlayer/dvd_opening_original.mpg",
+    "RETR /tmp/MediaPlayer_ARM.log"
+  ],
+  "errors": [],
+  "helper_log_unchanged_during_capture": true,
+  "screenshots": [
+    "entry690_playback_20260828T191900_1.png",
+    "entry690_playback_20260828T191900_2.png"
+  ],
+  "reloaded": false,
+  "playback_started": false,
+  "mode_changed": false,
+  "finished": "2026-08-28T19:19:06-07:00"
+}

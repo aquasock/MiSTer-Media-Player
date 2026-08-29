@@ -1,3 +1,32 @@
+## 690 COMMIT Unreleased 8423f20 2026-08-28T19:24:00-07:00
+
+#### Coming From:
+
+Unreleased 8423f20
+
+#### Purpose:
+
+Record hardware acceptance of the entry 688 helper audio pacing correction installed in entry 689.
+
+#### Outcome:
+
+The user reports clean playback with no audible dropout or visible stutter and authorizes capture, and the captured telemetry accepts source commit `8423f20` in hardware. The helper on the MiSTer at 10.10.0.30 reads back as the installed candidate, 399,340 bytes with SHA-256 `fefaeb18b8c9e091a9cd9e97258e86264683f374f9663cb3ea6b99bafb81977a`, and the MiSTer Main executable, the original DVD opening and all three MediaPlayer RBF files reproduce their entry 689 hashes, so the run exercised the helper change alone with no FPGA reload. The helper log covers one complete S/PDIF session of `dvd_opening_original.mpg` in IEC 61937 passthrough on private substream 0x80, reaching end of file with child exit status zero after submitting all 12,818,397 transport bytes with 12,818,397 fast bytes, zero slow bytes and no would-block stall beyond the normal 286 startup events; the log contains no underrun, starvation, protocol or error record of any kind, which is the failure signature entry 687 diagnosed and entry 688 predicted would disappear. The schema 19 terminal snapshot taken while the completed opening was still displayed reports `audio_underrun` false, `pcm_protocol_error` false, `presentation_error` false, `error_flags` zero and no validation failures, with sequence end seen, presentation complete and a quiet session. Video delivered 289 pictures across 288 swaps in 12.138878 seconds for 23.725 fps against frame rate code 4, with 128 reference pictures, 161 B pictures and 10,334,169 accepted clean video bytes; the simulated full run in entry 688 predicted 10,334,168, a one-byte difference that is a counter boundary rather than a stream discrepancy. Two independent screenshots taken seconds apart are byte-identical at SHA-256 `8264e13456094ccb`-prefixed 316,577 bytes and both verify as complete PNGs, confirming the frozen completed frame. The `pcm_sample_count` field reads 16,383 and `pcm_fifo_peak` reads 127, the saturation values of their counters, so they bound rather than measure delivered audio and cannot be used as a frame total. The evidence captured here is the final S/PDIF session only, because the helper log is rewritten per playback; the HDMI repeat and the extended run over the longer file are user-reported as clean but are not represented in this telemetry, and the eighteen-minute observation window from entry 687 therefore remains unproven by captured evidence. Entry 689 is superseded on its open acceptance question, and the helper correction is accepted for the bounded original opening over S/PDIF.
+
+#### Next Steps:
+
+Capture the extended run before treating the long-duration case as closed, by starting the longer file over S/PDIF, letting it pass the prior eighteen-minute observation point, and pulling the helper log and terminal snapshot while that session is still resident so the absence of recurring underrun is evidenced rather than reported. Capture one HDMI session of the original opening the same way so both output forms have telemetry on record. If both are clean, close the audio delivery line of work and return to the entry 660 track, where whole-title playback, arbitrary interlaced P and B syntax, and ISO and IFO navigation remain outside any validated scope, and where a clean from-scratch Quartus build has still not been performed against current source. If an underrun reappears in the extended window, preserve the exact log and snapshot and reopen diagnosis without enlarging buffers, adding arbitrary delay or relaxing error criteria.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 689 COMMIT Unreleased 8423f20 2026-08-28T18:30:50-07:00
 
 #### Coming From:
@@ -1225,42 +1254,5 @@ None.
 
 - [ ] Built
 - [x] Passed
-
----
-
-## 650 COMMIT Unreleased 4777c59 2026-08-27T22:08:18-07:00
-
-#### Coming From:
-
-Unreleased 3e89189
-
-#### Purpose:
-
-Open the field-DCT gate by accepting all-I frame pictures coded with `frame_pred_frame_dct` clear.
-
-#### Outcome:
-
-This entry replaces an earlier field-picture plan that carried the same number and was corrected before work began, because the user directs that fixtures and per-step tests use standard ffmpeg commands and measurement shows that requirement selects the gate. FFmpeg's `mpeg2video` encoder never emits field pictures: an encode with `+ilme` and `+ildct` produced fifteen picture coding extensions all carrying `picture_structure` equal to `2'b11`. The same tool produces field DCT natively, so a single all-intra `+ildct` encode isolates it with no prediction and no second scan table. Committed generator `48d992b` writes `test_field_dct.m2v` from one ffmpeg command and verifies geometry, frame rate code four, 4:2:0, cleared `progressive_sequence`, and that all 360 pictures are intra and frame-structured with `frame_pred_frame_dct`, `alternate_scan`, `intra_vlc_format`, `repeat_first_field`, `chroma_420_type` and `progressive_frame` at the expected values; it decodes independently to reject a stationary fixture and encodes a frame-DCT control to show the flag changed the bitstream. Source `4777c59` relaxes the `frame_pred_frame_dct` term in `phase1_supported`, which is safe because `picture_coding_type` still admits only I pictures so field prediction cannot arise and `picture_structure` still refuses field pictures. The macroblock layer gains one state consuming the `dct_type` bit after `macroblock_type` and any `quantiser_scale_code` and before the first block; `mpeg2_h262_intra_recon` maps blocks two and three one line down rather than eight when it is set; and the writer walks luma rows by 180 instead of 90. Two writer changes affect every block rather than only field-DCT ones and are the first place to look if the existing fixtures regress: the capture row index moves from `pixel_y[2:0]` to a sequential counter because rows two apart alias in the low three bits, and the block origin is no longer truncated to an eight-row boundary, which was a no-op for frame DCT but would discard the odd base row of a field-DCT pair. The bounds check now validates the last row written rather than the first, which is stricter and rejects a frame-DCT origin at row 476 that previously passed and wrote past the plane. The clean build succeeds with zero errors. Block memory is unchanged at 512 of 553, confirming the gate costs no additional M10K against the 41 free blocks. Timing closes in every category with all total negative slack zero: setup positive 0.126, hold 0.245, recovery 3.357, removal 0.632 and minimum pulse width 0.925 nanoseconds. Setup falls 0.117 nanoseconds against the shipped baseline on the HDMI domain that entry 370 established has roughly two percent headroom, so it remains the category to watch and a reseed rather than a restructure is the recorded response if a later change pushes it negative. Logic falls to 31,092 ALMs and 49,361 registers, 372 and 912 below the baseline. That decrease while adding a feature is not explained and is recorded as unexplained rather than rationalised; attempts to attribute it from the fitter and synthesis reports were inconclusive because those reports do not enumerate internal register names, and a check that appeared to show the new logic pruned was invalid for the same reason. The RBF is `9730e0ba61adbcd5` and differs from the released `61a2fed28425a461`, so the netlist did change. Acceptance moved from a telemetry counter to a reference-decode comparison at the user's direction: no ffmpeg command reports whether a macroblock actually set `dct_type`, and all sixty-four snapshot words are occupied, so a counter would have required stealing a deadline-record slot or a sixty-fifth word and a geometry change. Comparing the completed hardware raster against ffmpeg's decode of the same fixture is stronger, because a decoder that ignored `dct_type` would scramble exactly the macroblocks that used it, and the bar content is `cb=128:cr=128` so the chroma-edge difference of the release notes cannot confound it. Built records the successful compile; hardware acceptance is unstarted.
-
-#### Next Steps:
-
-Deploy this RBF only, since no software changed, backing up the installed `MediaPlayer.rbf` first and verifying the staged copy by hash before and after rename. Have the user generate `test_field_dct.m2v` locally and play it, then compare the completed raster against ffmpeg's decode of that same file, and separately confirm the seven existing fixtures still complete with final rasters pixel-identical to their recorded baselines, because the writer changes touch frame-DCT blocks too and a reconstruction fault corrupts pixels while every counter stays clean. Treat acceptance of this fixture as evidence that field DCT decodes, not that discs play: interlaced P and B remain the gate that changes that, and every other interlaced gate only ever decodes I pictures until it exists. If the existing fixtures regress, suspect the capture counter and the untruncated origin before the field mapping. Resolve the unexplained logic decrease before the next feature rather than carrying it forward as an assumed saving. The deferred field-picture gate still needs either a non-ffmpeg generator or a real disc sample, and that choice needs the user's direction. Preserve restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_frontend.sv
-- rtl/mpeg2_new/mpeg2_h262_luma4_probe.sv
-- rtl/mpeg2_new/mpeg2_h262_intra_recon.sv
-- rtl/mpeg2_new/mpeg2_h262_ddram_store_420p.sv
-- rtl/mpeg2_new/mpeg2_h262_picture_bookkeeper.sv
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
-- MediaPlayer_top_01.svh
-- MediaPlayer_top_02.svh
-- MediaPlayer_top_03.svh
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
