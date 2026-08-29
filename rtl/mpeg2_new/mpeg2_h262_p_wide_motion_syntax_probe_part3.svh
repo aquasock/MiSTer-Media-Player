@@ -407,9 +407,6 @@
                         (pce_next[31:28]>=4'd1) &&
                         (pce_next[31:28]<=4'd9) &&
                         (pce_next[17:16]==2'b11) &&
-`ifndef H262_TEST_FIELD_MOTION
-                        pce_next[14] &&
-`endif
                         !pce_next[13];
                     // Entry 289: announce the rejection.  This is a well
                     // formed P picture coding extension that this probe will
@@ -426,9 +423,6 @@
                           (pce_next[31:28]>=4'd1) &&
                           (pce_next[31:28]<=4'd9) &&
                           (pce_next[17:16]==2'b11) &&
-`ifndef H262_TEST_FIELD_MOTION
-                          pce_next[14] &&
-`endif
                           !pce_next[13]);
                 end else pce_count<=pce_count+1'b1;
             end else if(current_picture_is_p &&

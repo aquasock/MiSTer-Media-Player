@@ -84,11 +84,13 @@
         if(residual_load_wait)begin
             residual_load_wait<=0;pred_sum<=0;tap_index<=0;pixel_setup<=1;
             phase_base_addr<=computed_phase_base_addr;
-            phase_base_byte<=exec_field?
+            phase_base_byte<=block_field_dct?
+                (field_dct_fetch_x[2:0]+ei[2:0]):exec_field?
                 (field_pair0_base_x[2:0]+ei[2:0])
                                        :src_base_x[2:0];
             phase_row_words<=(blk<4)?7'd90:7'd45;
-            phase_bounds_ok<=source_bounds_ok;
+            phase_bounds_ok<=block_field_dct?
+                block_all_bounds_ok:source_bounds_ok;
             if((exec_direction!=0)&&block_all_bounds_ok)begin
                 if(block_current_prefetched)
                     block_current_prefetched<=0;
@@ -101,12 +103,17 @@
                     field_second_fetch_launch<=0;
                     field_second_fetch_started<=0;
                     field_second_fetch_pending<=
-                        exec_field&&(exec_direction==2'd3);
+                        (exec_field||block_field_dct)&&
+                        (exec_direction==2'd3);
                 end
-                block_phase0_base_byte<=exec_field?field_pair0_base_x[2:0]
-                                                  :block_phase0_src_x[2:0];
-                block_phase1_base_byte<=exec_field?field_pair1_base_x[2:0]
-                                                  :block_backward_src_x[2:0];
+                block_phase0_base_byte<=block_field_dct?
+                    field_dct_fetch_x[2:0]:
+                    (exec_field?field_pair0_base_x[2:0]
+                               :block_phase0_src_x[2:0]);
+                block_phase1_base_byte<=block_field_dct?
+                    field_dct_fetch_x[2:0]:
+                    (exec_field?field_pair1_base_x[2:0]
+                               :block_backward_src_x[2:0]);
             end
         end
 
@@ -124,13 +131,16 @@
         // of its address, span or bounds arithmetic is evaluated.
         if(!block_fetch_start&&field_second_fetch_launch)begin
             field_second_fetch_launch<=0;
-            if(field_pair_bounds_ok)begin
+            if(block_field_dct?field_dct_fetch_bounds_ok:
+                               field_pair_bounds_ok)begin
                 block_fetch_start<=1;
                 block_fetch_start_bank<=~block_consumer_bank;
                 block_fetch_start_prefetch<=0;
                 field_second_fetch_started<=1;
-                block_phase2_base_byte<=field_pair0_base_x[2:0];
-                block_phase3_base_byte<=field_pair1_base_x[2:0];
+                block_phase2_base_byte<=block_field_dct?
+                    field_dct_fetch_x[2:0]:field_pair0_base_x[2:0];
+                block_phase3_base_byte<=block_field_dct?
+                    field_dct_fetch_x[2:0]:field_pair1_base_x[2:0];
             end else begin
                 error<=1;
                 if(!error)error_source<=5'd11;
@@ -153,7 +163,7 @@
         // successor footprint while reconstruction consumes retained words.
         if(!residual_load_wait&&!block_fetch_start&&block_current_started&&
            !block_current_prefetched&&(exec_direction!=0)&&(blk<5)&&
-           !exec_field&&
+           !exec_field&&!block_field_dct&&
            block_fetch_complete&&!block_prefetch_valid&&
            successor_all_bounds_ok)begin
             block_fetch_start<=1;
@@ -166,11 +176,15 @@
             bidir_prelaunch_addr<=precompute_bidir_addr;
             bidir_prelaunch_byte<=precompute_bidir_src_x[2:0];
             bidir_prelaunch_valid<=
-                (exec_direction==2'd3)&&precompute_bidir_bounds_ok;
+                (exec_direction==2'd3)&&
+                (block_field_dct?block_all_bounds_ok:
+                                 precompute_bidir_bounds_ok);
             next_prelaunch_addr<=precompute_next_addr;
             next_prelaunch_byte<=precompute_next_src_x[2:0];
             next_prelaunch_valid<=
-                (exec_direction!=0)&&precompute_next_bounds_ok;
+                (exec_direction!=0)&&
+                (block_field_dct?(precompute_current_ei!=6'd63):
+                                 precompute_next_bounds_ok);
         end
 
         if(pixel_setup) begin
@@ -197,9 +211,12 @@
                         phase_mvy<=exec_field?field_mv_y(1'b1,ei[3]):exec_bmvy;
                         phase_backward<=1;
                         phase_base_addr<=bidir_prelaunch_addr;
-                        phase_base_byte<=exec_field?field_backward_base_byte
-                                                   :bidir_prelaunch_byte;
-                        phase_bounds_ok<=bidir_prelaunch_valid;
+                        phase_base_byte<=block_field_dct?
+                            (block_phase2_base_byte+ei[2:0]):
+                            (exec_field?field_backward_base_byte
+                                       :bidir_prelaunch_byte);
+                        phase_bounds_ok<=block_field_dct?
+                            block_all_bounds_ok:bidir_prelaunch_valid;
                         if(exec_bmvx[0]||exec_bmvy[0])
                             half_sample_seen<=1;
                         lookup_wait<=1;
@@ -239,9 +256,11 @@
                     ((exec_direction==2'd2)?exec_bmvy:exec_fmvy);
                 phase_backward<=(exec_direction==2'd2);
                 phase_base_addr<=next_prelaunch_addr;
-                phase_base_byte<=exec_field?field_next_base_byte
-                                           :next_prelaunch_byte;
-                phase_bounds_ok<=next_prelaunch_valid;
+                phase_base_byte<=block_field_dct?
+                    (block_phase0_base_byte+field_next_ei[2:0]):
+                    (exec_field?field_next_base_byte:next_prelaunch_byte);
+                phase_bounds_ok<=block_field_dct?
+                    block_all_bounds_ok:next_prelaunch_valid;
                 pred_sum<=0;
                 tap_index<=0;
                 if(next_pixel_early_lookup) begin
@@ -281,9 +300,11 @@
                     ((exec_direction==2'd2)?exec_bmvy:exec_fmvy);
                 phase_backward<=(exec_direction==2'd2);
                 phase_base_addr<=next_prelaunch_addr;
-                phase_base_byte<=exec_field?field_next_base_byte
-                                           :next_prelaunch_byte;
-                phase_bounds_ok<=next_prelaunch_valid;
+                phase_base_byte<=block_field_dct?
+                    (block_phase0_base_byte+field_next_ei[2:0]):
+                    (exec_field?field_next_base_byte:next_prelaunch_byte);
+                phase_bounds_ok<=block_field_dct?
+                    block_all_bounds_ok:next_prelaunch_valid;
                 pred_sum<=0;
                 tap_index<=0;
                 lookup_wait<=1;

@@ -37,6 +37,22 @@ RESIDUALS = {
               4: [(0, 1)], 5: [(0, -1)]}),
 }
 
+# Half-sample frame vectors make the cache exercise field-DCT's doubled row
+# walk rather than proving only the integer, zero-vector case.  Each B entry is
+# (forward, backward), with opposite vertical parities represented.
+P_VECTORS = {
+    5: (0, 1), 12: (1, 1), 19: (0, -1),
+    26: (-1, 1), 33: (2, -1), 40: (0, 0),
+}
+B_VECTORS = {
+    5: ((0, 1), (0, -1)),
+    12: ((1, 1), (-1, -1)),
+    19: ((0, -1), (1, 1)),
+    26: ((-1, 1), (0, -1)),
+    33: ((2, -1), (-2, 1)),
+    40: ((0, 0), (0, 0)),
+}
+
 
 def clear_progressive_sequence(data: bytes) -> bytes:
     b = bytearray(data)
@@ -66,19 +82,20 @@ def build_p_row(row: int):
         bits += h.enc_mba(1)
         if row == RESIDUAL_ROW and col in RESIDUALS:
             cbp, coeffs = RESIDUALS[col]
+            mvx, mvy = P_VECTORS[col]
             bits += h.P_MC_CODED
             bits += "10"                 # frame_motion_type
             bits += "1"                  # dct_type: field DCT
-            bits += h.enc_comp(0, predictor[0]) + h.enc_comp(0, predictor[1])
-            predictor[:] = (0, 0)
+            bits += h.enc_comp(mvx, predictor[0]) + h.enc_comp(mvy, predictor[1])
+            predictor[:] = (mvx, mvy)
             bits = emit_residual(bits, cbp, coeffs)
-            specs[col] = (cbp, coeffs)
+            specs[col] = (cbp, coeffs, (mvx, mvy))
         else:
             bits += h.P_MC_NOT_CODED
             bits += "10"                 # frame_motion_type; no dct_type
             bits += h.enc_comp(0, predictor[0]) + h.enc_comp(0, predictor[1])
             predictor[:] = (0, 0)
-            specs[col] = (None, None)
+            specs[col] = (None, None, (0, 0))
     return h.bits_to_bytes(bits), specs
 
 
@@ -90,17 +107,18 @@ def build_b_row(row: int):
         bits += h.enc_mba(1)
         if row == RESIDUAL_ROW and col in RESIDUALS:
             cbp, base_coeffs = RESIDUALS[col]
+            fvec, bvec = B_VECTORS[col]
             coeffs = {block: [(run, -level) for run, level in values]
                       for block, values in base_coeffs.items()}
             bits += h.BTYPE[(3, 1)]
             bits += "10"                 # frame_motion_type
             bits += "1"                  # dct_type: field DCT
-            bits += h.enc_comp(0, fp[0]) + h.enc_comp(0, fp[1])
-            bits += h.enc_comp(0, bp[0]) + h.enc_comp(0, bp[1])
-            fp[:] = (0, 0)
-            bp[:] = (0, 0)
+            bits += h.enc_comp(fvec[0], fp[0]) + h.enc_comp(fvec[1], fp[1])
+            bits += h.enc_comp(bvec[0], bp[0]) + h.enc_comp(bvec[1], bp[1])
+            fp[:] = fvec
+            bp[:] = bvec
             bits = emit_residual(bits, cbp, coeffs)
-            specs[col] = (cbp, coeffs)
+            specs[col] = (cbp, coeffs, fvec, bvec)
         else:
             bits += h.BTYPE[(3, 0)]
             bits += "10"                 # frame_motion_type; no dct_type
@@ -108,7 +126,7 @@ def build_b_row(row: int):
             bits += h.enc_comp(0, bp[0]) + h.enc_comp(0, bp[1])
             fp[:] = (0, 0)
             bp[:] = (0, 0)
-            specs[col] = (None, None)
+            specs[col] = (None, None, (0, 0), (0, 0))
     return h.bits_to_bytes(bits), specs
 
 
@@ -164,8 +182,8 @@ def main() -> None:
     p_mask = bytearray(len(expected_p))
     for row in range(h.MB_HEIGHT):
         for col in range(h.MB_WIDTH):
-            cbp, coeffs = p_specs[row][col]
-            h.apply_macroblock(expected_p, row, col, iframe, (0, 0),
+            cbp, coeffs, fvec = p_specs[row][col]
+            h.apply_macroblock(expected_p, row, col, iframe, fvec,
                                cbp=cbp, coeffs_per_block=coeffs,
                                scale=SCALE, field_dct=bool(cbp))
             h.mark_residual(p_mask, row, col, cbp, field_dct=bool(cbp))
@@ -177,9 +195,9 @@ def main() -> None:
     b_mask = bytearray(len(expected_b))
     for row in range(h.MB_HEIGHT):
         for col in range(h.MB_WIDTH):
-            cbp, coeffs = b_specs[row][col]
-            h.apply_macroblock(expected_b, row, col, iframe, (0, 0),
-                               bwd_ref=pframe, bwd_vec=(0, 0), cbp=cbp,
+            cbp, coeffs, fvec, bvec = b_specs[row][col]
+            h.apply_macroblock(expected_b, row, col, iframe, fvec,
+                               bwd_ref=pframe, bwd_vec=bvec, cbp=cbp,
                                coeffs_per_block=coeffs, scale=SCALE,
                                field_dct=bool(cbp))
             h.mark_residual(b_mask, row, col, cbp, field_dct=bool(cbp))
@@ -199,7 +217,8 @@ def main() -> None:
     print("picture order: I B P (display), I P B (coded)")
     print("P/B: frame pictures, frame_pred_frame_dct 0, frame_motion_type 10")
     print(f"row {RESIDUAL_ROW}: dct_type 1 at columns {sorted(RESIDUALS)}")
-    print("coverage: Y0/Y1/Y2/Y3, both field pairs, all luma, luma plus chroma")
+    print("coverage: Y0/Y1/Y2/Y3, both field pairs, all luma, luma plus chroma,")
+    print("          integer and horizontal/vertical/diagonal half-sample prediction")
     print("verification: field-DCT reference model agrees with FFmpeg decode")
     print(f"yuv420p_sha256: {hashlib.sha256(oracle).hexdigest()}")
     if args.oracle_output:

@@ -4,6 +4,11 @@ An experimental media-player core for [MiSTer FPGA](https://github.com/MiSTer-de
 
 > **Development status:** active, pre-release, developer-oriented. **v0.8.0 is the current milestone**, adding a bounded 720x480 interlaced frame-DCT all-I path with native 480i presentation, AC-3 decode, and AC-3/DTS passthrough over S/PDIF, on the v0.7.0 Program Stream, PTS, and ARM-helper foundation.
 
+Current `master` extends that released baseline with simulation-qualified
+720x480 interlaced frame-picture P/B decoding, frame or field motion, and frame
+or field DCT. A clean Quartus fit and MiSTer playback qualification are still
+required before that extension becomes a released capability.
+
 ## Current status
 
 The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`. v0.8.0 provides:
@@ -28,7 +33,7 @@ The supported subset is intentionally bounded while the architecture is being pr
 | --- | --- |
 | Input | Raw MPEG-2 Video `.m2v`, bounded MPEG-2 Program Stream `.mpg` / `.mpeg`, or audio-only MPEG-1 Layer III `.mp3`, RIFF WAVE `.wav` and FLAC `.flac` through the ARM helper |
 | Video, progressive | 4:2:0 I, P and B pictures through 720x480 |
-| Video, interlaced | 720x480 at 30000/1001 only, 4:2:0, **I-pictures only**, frame-structured, frame DCT and frame prediction only, top- or bottom-field-first, no `repeat_first_field` |
+| Video, interlaced | Current `master`: 720x480 at 30000/1001, 4:2:0 frame pictures with I, P and B coding, frame or field motion, frame or field DCT, and top- or bottom-field-first presentation. `repeat_first_field` and field pictures remain unsupported; Quartus and MiSTer qualification are pending |
 | Picture types | Coded-order/display-order presentation with B reordering |
 | Presentation rates | H.262 frame-rate codes 1..5; codes 6..8 are rejected before transport |
 | Program Stream timing | Picture PTS on a 33-bit / 90 kHz FPGA timeline with cadence-floor enforcement |
@@ -123,14 +128,14 @@ it is downmixed to stereo and its LFE is discarded.
 
 ### Interlaced 480i
 
-The interlaced path is deliberately narrow: 720x480 at 30000/1001, 4:2:0,
-**I-pictures only**, frame-structured, frame DCT and frame prediction only.
+The released v0.8.0 path is deliberately narrow: 720x480 at 30000/1001,
+4:2:0, I-pictures only, frame-structured, frame DCT and frame prediction.
+Current `master` additionally admits interlaced P and B frame pictures and
+implements both field motion and field DCT, including their combined case.
+Those additions are covered by deterministic pixel-oracle simulations but are
+not yet a hardware-qualified release.
 
-FFmpeg's interlacing flags will not produce it. `-flags +ildct` selects field
-DCT and `+ilme` selects field prediction, and both are rejected before decode.
-The supported shape is ordinary frame-DCT coding of woven field pairs, with the
-interlaced signalling applied afterwards. Use the committed generator, which
-does exactly that and verifies the result:
+Use the committed generator for the released all-I hand-test shape:
 
 ```bash
 python3 tools/streams/generate_test_suite.py --output-dir /tmp/suite --duration 12
@@ -274,7 +279,7 @@ The build script pins minimp3, miniaudio, liba52, MiSTer Main, dependency hashes
 - Decoded audio is MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, ordinary PCM/float WAV and FLAC from 8 through 192 kHz converted to stereo at 44.1 or 48 kHz, and AC-3 at 48 kHz. MPEG-1 Layer III at 32 kHz and MPEG-2/2.5 Layer III remain rejected; AAC and Ogg Vorbis are not yet enabled. Only the first Program Stream audio track is played; track switching needs a control channel that protocol one does not implement.
 - AC-3 is downmixed to stereo for decoded output, which discards LFE. Discrete surround requires passthrough and an external decoder.
 - Passthrough carries the bitstream untouched, so nothing may scale it. The audio output option therefore mutes the output it is not driving, and volume control does not apply to a passthrough stream.
-- Progressive 4:2:0 video is released through 720x480 and decodes I, P and B pictures. The interlaced path is far narrower: 720x480 at 30000/1001 only, I-pictures only, frame-structured, frame DCT and frame prediction only. Field pictures, field DCT, interlaced P and B pictures, `repeat_first_field` (3:2 pulldown), and 576i are all rejected before decode. Most commercial DVDs use several of these and will not play.
+- Progressive 4:2:0 video is released through 720x480 and decodes I, P and B pictures. Current `master` also implements 720x480-at-30000/1001 interlaced frame-picture I/P/B decoding with frame or field motion and frame or field DCT, but this remains simulation-qualified until a clean fit and MiSTer playback pass. Field pictures, `repeat_first_field` (3:2 pulldown), and 576i remain rejected. DVD navigation, subpictures and broader systems-layer behavior are separate limitations.
 - Comprehensive playback pixel accuracy remains unqualified. Simulation comparisons cover decoder reconstruction, and a targeted hardware-screenshot comparison found the chroma-edge difference below; that comparison is not a full playback pixel-validation suite.
 - Sharp colour transitions show one blended pixel column that an independent software decoder does not produce, consistent with horizontal chroma upsampling in the display path. It is obvious on synthetic colour bars and subtle on ordinary material, and it is not specific to any picture type.
 - On material whose peak coded picture is large enough, one or two display slots are missed at that picture, shown as a repeated frame rather than a dropped one. This is a property of input buffer depth against peak picture size, not of the stream; the qualified full-length fixture hits it once, at a scene cut.
@@ -324,7 +329,7 @@ Record all three LEDs, the selected output/deinterlace mode, and the reboot/relo
 
 ## Development roadmap
 
-Future work can extend the qualified envelope toward 50/59.94/60 fps, interlaced P/B and field-picture structures, field DCT, `repeat_first_field` and 576i, broader Program Stream handling, additional audio codecs and multi-track selection, qualification of playback pixel accuracy against a software decoder, improved chroma presentation, playback controls, seeking, DVD navigation, optical-drive integration, and qualification of native 480i through external HDMI-to-SDI hardware.
+Future work can extend the qualified envelope toward 50/59.94/60 fps, field-picture structures, `repeat_first_field` and 576i, broader Program Stream handling, additional audio codecs and multi-track selection, qualification of playback pixel accuracy against a software decoder, improved chroma presentation, playback controls, seeking, DVD navigation, optical-drive integration, and qualification of native 480i through external HDMI-to-SDI hardware.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for completed milestones.
 

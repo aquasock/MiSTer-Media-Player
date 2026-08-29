@@ -20,7 +20,6 @@ mapfile -t sources < <(sed -n \
 
 echo "compile : ${#sources[@]} RTL files + testbench"
 (cd "$ROOT" && verilator --binary --timing -j 6 \
- -DH262_TEST_FIELD_MOTION \
  -Wno-fatal -Wno-PINMISSING -Wno-WIDTH -Wno-UNOPTFLAT \
  -Wno-CASEINCOMPLETE -Wno-BLKANDNBLK \
  +incdir+rtl/mpeg2_new \

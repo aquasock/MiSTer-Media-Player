@@ -39,6 +39,7 @@ module mpeg2_h262_frontend
     output wire        frontend_ready,
     output wire        phase1_supported,
     output wire        native_film_supported,
+    output wire        native_480i_supported,
     output reg         syntax_error,
     // Commit 188 observability: stable first assertion site, 1..22.
     output reg  [4:0]  syntax_error_source,
@@ -255,6 +256,18 @@ wire phase1_native_480i_i_frame =
     (horizontal_size == 14'd720) &&
     (vertical_size == 14'd480) &&
     (frame_rate_code == 4'h4);
+
+// Production native-480i ownership must remain asserted after the reference I
+// picture while ordinary interlaced P and B frame pictures are decoded.  The
+// dedicated P/B parsers enforce their own motion/f_code capability bounds;
+// this front-end gate retains the common sequence, picture-structure, timing,
+// chroma and concealment requirements.
+assign native_480i_supported =
+    frontend_ready && !sequence_scalable_extension_seen &&
+    (chroma_format == 2'b01) && (picture_structure == 2'b11) &&
+    (picture_coding_type >= 3'd1) && (picture_coding_type <= 3'd3) &&
+    !concealment_motion_vectors && phase1_native_480i_i_frame &&
+    !timing_unsupported && !timing_error;
 
 // Film frames in a 480i sequence retain progressive chroma; RFF controls
 // later field presentation, never transform coordinates.

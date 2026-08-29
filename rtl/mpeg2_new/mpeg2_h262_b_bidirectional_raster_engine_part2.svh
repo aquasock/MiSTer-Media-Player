@@ -34,10 +34,12 @@ wire block_phase0_half_y=block_phase0_backward?
 wire signed [13:0] block_phase0_last_x=block_phase0_src_x+14'sd7+
     (block_phase0_half_x?14'sd1:14'sd0);
 wire signed [13:0] block_phase0_last_y=block_phase0_src_y+14'sd7+
+    (block_field_dct?14'sd7:14'sd0)+
     (block_phase0_half_y?14'sd1:14'sd0);
 wire signed [13:0] block_phase1_last_x=block_backward_src_x+14'sd7+
     (exec_bmvx[0]?14'sd1:14'sd0);
 wire signed [13:0] block_phase1_last_y=block_backward_src_y+14'sd7+
+    (block_field_dct?14'sd7:14'sd0)+
     (exec_bmvy[0]?14'sd1:14'sd0);
 wire block_phase0_bounds_ok=(block_phase0_src_x>=0)&&
     (block_phase0_src_y>=0)&&
@@ -145,9 +147,61 @@ wire [2:0] field_next_base_byte=
     (field_next_ei[3]?block_phase1_base_byte:block_phase0_base_byte)+
     field_next_ei[2:0];
 wire field_pair_bounds_ok=field_pair0_bounds_ok&&field_pair1_bounds_ok;
-wire block_all_bounds_ok=exec_field?field_pair_bounds_ok:
+wire block_all_bounds_ok=block_field_dct?field_dct_fetch_bounds_ok:
+    exec_field?field_pair_bounds_ok:
     (block_phase0_bounds_ok&&
      ((exec_direction!=2'd3)||block_phase1_bounds_ok));
+
+// A frame-predicted field-DCT block walks one destination field at a time.
+// Each prediction direction therefore owns one physical fetcher; phase zero
+// holds the source parity at integer Y and phase one, when needed, holds the
+// adjacent frame line for vertical half-sample interpolation.  This reuses the
+// same two fetchers already required by bidirectional field prediction.
+wire field_dct_fetch_backward=
+    (exec_direction==2'd2)||field_fetch_backward;
+wire field_dct_slot=blk[1];
+wire signed [9:0] field_dct_fetch_mvx=exec_field?
+    field_mv_x(field_dct_fetch_backward,field_dct_slot):
+    (field_dct_fetch_backward?exec_bmvx:exec_fmvx);
+wire signed [9:0] field_dct_fetch_mvy=exec_field?
+    field_mv_y(field_dct_fetch_backward,field_dct_slot):
+    (field_dct_fetch_backward?exec_bmvy:exec_fmvy);
+wire field_dct_fetch_sel=exec_field?
+    field_select(field_dct_fetch_backward,field_dct_slot):1'b0;
+wire [11:0] field_dct_dest_y0=({6'd0,mrow}<<4)+{11'd0,blk[1]};
+wire signed [13:0] field_dct_dest_field_row=
+    $signed({2'b00,field_dct_dest_y0[11:1]});
+wire signed [13:0] field_dct_fetch_x=
+    $signed({2'b00,block_dest_x0})+
+    ($signed(field_dct_fetch_mvx)>>>1);
+wire signed [13:0] field_dct_fetch_y=
+    exec_field?
+        (((field_dct_dest_field_row+
+           ($signed(field_dct_fetch_mvy)>>>1))<<<1)+
+         $signed({13'd0,field_dct_fetch_sel})):
+        ($signed({2'b00,field_dct_dest_y0})+
+         ($signed(field_dct_fetch_mvy)>>>1));
+wire field_dct_fetch_half_x=
+    field_dct_fetch_mvx[0];
+wire field_dct_fetch_half_y=
+    field_dct_fetch_mvy[0];
+wire [28:0] field_dct_phase0_addr=pixel_addr(
+    field_dct_fetch_backward?future_off:past_off,blk,
+    field_dct_fetch_x[11:0],field_dct_fetch_y[11:0]);
+wire [28:0] field_dct_phase1_addr=pixel_addr(
+    field_dct_fetch_backward?future_off:past_off,blk,
+    field_dct_fetch_x[11:0],field_dct_fetch_y[11:0]+12'd1);
+wire [3:0] field_dct_word_span=
+    {1'b0,field_dct_fetch_x[2:0]}+4'd7+
+    {3'd0,field_dct_fetch_half_x};
+wire signed [13:0] field_dct_last_x=field_dct_fetch_x+14'sd7+
+    (field_dct_fetch_half_x?14'sd1:14'sd0);
+wire signed [13:0] field_dct_last_y=field_dct_fetch_y+14'sd14+
+    (field_dct_fetch_half_y?(exec_field?14'sd2:14'sd1):14'sd0);
+wire field_dct_fetch_bounds_ok=
+    (field_dct_fetch_x>=0)&&(field_dct_fetch_y>=0)&&
+    (field_dct_last_x<$signed({2'b00,plane_width}))&&
+    (field_dct_last_y<$signed({2'b00,plane_height}));
 
 // Entry 272: the successor footprint is derived from the already loaded
 // macroblock motion record.  Only blk 0..4 use it; the blk-5 boundary keeps
@@ -221,29 +275,40 @@ wire [28:0] successor_phase1_base_addr=pixel_addr(
     successor_phase1_src_y[11:0]);
 wire [7:0] successor_row_words=successor_luma?8'd90:8'd45;
 
-wire [28:0] launch_phase0_base_addr=exec_field?field_pair0_addr:
+wire [28:0] launch_phase0_base_addr=block_field_dct?field_dct_phase0_addr:
+    exec_field?field_pair0_addr:
     (block_fetch_start_prefetch?
         successor_phase0_base_addr:block_phase0_base_addr);
-wire [28:0] launch_phase1_base_addr=exec_field?field_pair1_addr:
+wire [28:0] launch_phase1_base_addr=block_field_dct?field_dct_phase1_addr:
+    exec_field?field_pair1_addr:
     (block_fetch_start_prefetch?
         successor_phase1_base_addr:block_phase1_base_addr);
-wire launch_phase0_two_words=exec_field?field_pair0_span[3]:
+wire launch_phase0_two_words=block_field_dct?field_dct_word_span[3]:
+    exec_field?field_pair0_span[3]:
     (block_fetch_start_prefetch?
         successor_phase0_word_span[3]:block_phase0_word_span[3]);
-wire launch_phase1_two_words=exec_field?field_pair1_span[3]:
+wire launch_phase1_two_words=block_field_dct?field_dct_word_span[3]:
+    exec_field?field_pair1_span[3]:
     (block_fetch_start_prefetch?
         successor_phase1_word_span[3]:block_phase1_word_span[3]);
-wire launch_phase0_half_y=exec_field?field_pair0_mvy[0]:
+wire launch_phase0_half_y=block_field_dct?field_dct_fetch_half_y:
+    exec_field?field_pair0_mvy[0]:
     (block_fetch_start_prefetch?
         successor_phase0_mvy[0]:block_phase0_half_y);
-wire launch_phase1_half_y=exec_field?field_pair1_mvy[0]:
+wire launch_phase1_half_y=block_field_dct?field_dct_fetch_half_y:
+    exec_field?field_pair1_mvy[0]:
     (block_fetch_start_prefetch?successor_bmvy[0]:exec_bmvy[0]);
 // A field macroblock never prefetches its successor, so these need no mux.
-wire [3:0] launch_phase0_rows=exec_field?(4'd4+{3'd0,launch_phase0_half_y})
+wire [3:0] launch_phase0_rows=block_field_dct?
+    (4'd8+(exec_field?{3'd0,field_dct_fetch_half_y}:4'd0)):
+    exec_field?(4'd4+{3'd0,launch_phase0_half_y})
                                         :(4'd8+{3'd0,launch_phase0_half_y});
-wire [3:0] launch_phase1_rows=exec_field?(4'd4+{3'd0,launch_phase1_half_y})
+wire [3:0] launch_phase1_rows=block_field_dct?4'd8:
+    exec_field?(4'd4+{3'd0,launch_phase1_half_y})
                                         :(4'd8+{3'd0,launch_phase1_half_y});
-wire [2:0] launch_phase_count=exec_field?3'd2:
+wire [2:0] launch_phase_count=block_field_dct?
+    (exec_field?3'd1:(field_dct_fetch_half_y?3'd2:3'd1)):
+    exec_field?3'd2:
     ((exec_direction==2'd3)?3'd2:3'd1);
 wire [7:0] launch_row_words=block_fetch_start_prefetch?
     successor_row_words:block_row_words;
@@ -271,7 +336,8 @@ mpeg2_h262_prediction_block_fetcher #(.PHASES(2)) block_fetcher(
     .phase2_rows(4'd0),
     .phase3_rows(4'd0),
     // A doubled stride makes each fetched row step one field line.
-    .row_words(exec_field?{launch_row_words[6:0],1'b0}:launch_row_words),
+    .row_words((exec_field||block_field_dct)?
+                   {launch_row_words[6:0],1'b0}:launch_row_words),
     .memory_busy(ddram_busy),
     .memory_dout(ddram_dout),
     .memory_dout_ready(ddram_dout_ready&&block_fetch_active0),
@@ -305,7 +371,8 @@ mpeg2_h262_prediction_block_fetcher #(.PHASES(2)) block_fetcher1(
     .phase2_rows(4'd0),
     .phase3_rows(4'd0),
     // A doubled stride makes each fetched row step one field line.
-    .row_words(exec_field?{launch_row_words[6:0],1'b0}:launch_row_words),
+    .row_words((exec_field||block_field_dct)?
+                   {launch_row_words[6:0],1'b0}:launch_row_words),
     .memory_busy(ddram_busy),
     .memory_dout(ddram_dout),
     .memory_dout_ready(ddram_dout_ready&&block_fetch_active1),
@@ -323,13 +390,15 @@ mpeg2_h262_prediction_block_fetcher #(.PHASES(2)) block_fetcher1(
     .outstanding_count(block_fetch_outstanding1));
 
 wire block_lookup_bank=block_consumer_bank^
-    (exec_field&&(exec_direction==2'd3)&&pred_direction);
+    ((exec_field||block_field_dct)&&
+     (exec_direction==2'd3)&&pred_direction);
 assign block_lookup_ready=block_lookup_bank?
     block_lookup_ready1:block_lookup_ready0;
 wire block_lookup_selected_valid=block_lookup_bank?
     block_lookup_valid1:block_lookup_valid0;
 wire field_backward_lookup_current=
-    exec_field&&(exec_direction==2'd3)&&pred_direction;
+    (exec_field||block_field_dct)&&
+    (exec_direction==2'd3)&&pred_direction;
 assign block_lookup_valid=block_lookup_selected_valid&&
     (!field_backward_lookup_current||
      (field_second_fetch_started&&!block_fetch_start));
@@ -383,7 +452,10 @@ wire signed [9:0] next_int_y=$signed(next_exec_mvy)>>>1;
 wire [11:0] precompute_current_luma_x=
     ({6'd0,col}<<4)+{8'd0,blk[0],precompute_current_el};
 wire [11:0] precompute_current_luma_y=
-    ({6'd0,mrow}<<4)+{8'd0,blk[1],precompute_current_er};
+    ({6'd0,mrow}<<4)+
+    (block_field_dct?
+        ({8'd0,precompute_current_er,1'b0}+{11'd0,blk[1]}):
+        {8'd0,blk[1],precompute_current_er});
 wire [11:0] precompute_current_chroma_x=
     ({6'd0,col}<<3)+{9'd0,precompute_current_el};
 wire [11:0] precompute_current_chroma_y=
@@ -411,7 +483,10 @@ wire [28:0] precompute_bidir_addr=pixel_addr(
 wire [11:0] precompute_next_luma_x=
     ({6'd0,col}<<4)+{8'd0,blk[0],precompute_next_el};
 wire [11:0] precompute_next_luma_y=
-    ({6'd0,mrow}<<4)+{8'd0,blk[1],precompute_next_er};
+    ({6'd0,mrow}<<4)+
+    (block_field_dct?
+        ({8'd0,precompute_next_er,1'b0}+{11'd0,blk[1]}):
+        {8'd0,blk[1],precompute_next_er});
 wire [11:0] precompute_next_chroma_x=
     ({6'd0,col}<<3)+{9'd0,precompute_next_el};
 wire [11:0] precompute_next_chroma_y=
@@ -456,6 +531,7 @@ wire [3:0] next_phase_tap_byte_sum=
 // samples stay in that column, all four registered bytes are available now.
 wire lookup_quad=lookup_wait&&block_lookup_ready&&
     block_lookup_valid&&block_lookup_next_row_valid&&
+    !block_field_dct&&
     (tap_index==2'd0)&&half_x&&half_y&&
     (phase_tap_byte_sum[3]==next_phase_tap_byte_sum[3]);
 // Entry 273: a retained word may supply the following horizontal tap without
@@ -469,6 +545,7 @@ wire lookup_horizontal_pair=lookup_wait&&block_lookup_ready&&
 // horizontal word crossings remain on the established path.
 wire lookup_vertical_pair=lookup_wait&&block_lookup_ready&&
     block_lookup_valid&&block_lookup_next_row_valid&&!tap_last&&
+    !block_field_dct&&
     !half_x&&half_y&&(next_tap_dy==(tap_dy+1'b1))&&
     (phase_tap_byte_sum[3]==next_phase_tap_byte_sum[3]);
 wire lookup_pair=lookup_horizontal_pair||lookup_vertical_pair;
@@ -641,7 +718,8 @@ wire block_lookup_idle_request=lookup_wait&&!block_fetch_start&&
 wire block_lookup_direction=bidir_lookup_candidate?1'b1:
     next_pixel_lookup_candidate?1'b0:
     ((exec_direction==2'd3)&&pred_direction);
-assign block_lookup_phase=exec_field?
+assign block_lookup_phase=block_field_dct?
+    {1'b0,(exec_field?1'b0:block_request_tap_dy)}:exec_field?
     {1'b0,block_request_ei[3]}:
     {1'b0,block_lookup_direction};
 wire [5:0] block_request_ei=next_pixel_lookup_candidate?
@@ -651,14 +729,19 @@ wire [1:0] block_request_tap=lookup_advance?
     (bidir_lookup_candidate||next_pixel_lookup_candidate)?2'd0:tap_index;
 // The vector belongs to the direction being looked up and, under field
 // prediction, to the slot matching the pixel's destination parity.
-wire block_request_backward=exec_field?
+wire block_request_backward=block_field_dct?
+    ((exec_direction==2'd2)||block_lookup_direction):exec_field?
     ((exec_direction==2'd2)||block_lookup_direction)
                                       :block_lookup_phase[0];
-wire signed [9:0] block_request_mvx=exec_field?
+wire signed [9:0] block_request_mvx=block_field_dct?
+    (exec_field?field_mv_x(block_request_backward,field_dct_slot):
+                (block_request_backward?exec_bmvx:exec_fmvx)):exec_field?
     field_mv_x(block_request_backward,block_lookup_phase[0]):
     (block_lookup_phase[0]?exec_bmvx
                           :((exec_direction==2'd2)?exec_bmvx:exec_fmvx));
-wire signed [9:0] block_request_mvy=exec_field?
+wire signed [9:0] block_request_mvy=block_field_dct?
+    (exec_field?field_mv_y(block_request_backward,field_dct_slot):
+                (block_request_backward?exec_bmvy:exec_fmvy)):exec_field?
     field_mv_y(block_request_backward,block_lookup_phase[0]):
     (block_lookup_phase[0]?exec_bmvy
                           :((exec_direction==2'd2)?exec_bmvy:exec_fmvy));
@@ -671,13 +754,18 @@ wire block_request_tap_dy=
     (block_request_half_x&&block_request_half_y)?block_request_tap[1]:
     (block_request_half_y?block_request_tap[0]:1'b0);
 wire [2:0] block_request_base_byte=
+    block_field_dct?
+        ((block_request_backward&&(exec_direction==2'd3))?
+            block_phase2_base_byte:block_phase0_base_byte):
     exec_field&&block_request_backward&&(exec_direction==2'd3)?
         (block_lookup_phase[0]?block_phase3_base_byte:block_phase2_base_byte):
     (block_lookup_phase==2'd0)?block_phase0_base_byte:block_phase1_base_byte;
 wire [4:0] block_request_byte=
     {2'd0,block_request_base_byte}+{2'd0,block_request_ei[2:0]}+
     {4'd0,block_request_tap_dx};
-assign block_lookup_row=exec_field?
+assign block_lookup_row=block_field_dct?
+    ({1'b0,block_request_ei[5:3]}+
+     (exec_field?{3'd0,block_request_tap_dy}:4'd0)):exec_field?
     ({2'd0,block_request_ei[5:4]}+{3'd0,block_request_tap_dy}):
     ({1'b0,block_request_ei[5:3]}+block_request_tap_dy);
 assign block_lookup_column=block_request_byte[3];

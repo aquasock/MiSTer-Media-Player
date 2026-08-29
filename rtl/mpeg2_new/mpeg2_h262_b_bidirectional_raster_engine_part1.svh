@@ -190,7 +190,9 @@ wire half_x=exec_mvx[0];
 wire half_y=exec_mvy[0];
 
 wire [11:0] luma_x=({6'd0,col}<<4)+{8'd0,blk[0],el};
-wire block_field_dct=mb_field_dct&&residual_hit&&(blk<4);
+// dct_type selects the layout of all four luma blocks in the macroblock, not
+// only blocks whose coded-block-pattern bit supplies a residual.
+wire block_field_dct=mb_field_dct&&(blk<4);
 wire [11:0] luma_y=({6'd0,mrow}<<4)+
     (block_field_dct ? {8'd0,er,1'b0}+{11'd0,blk[1]}
                      : {8'd0,blk[1],er});

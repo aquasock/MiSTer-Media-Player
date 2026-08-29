@@ -288,7 +288,11 @@ wire signed [12:0] slot0_mv_x=(blk<4)?mb_mvx :chroma_half_vector(mb_mvx);
 wire signed [12:0] slot0_mv_y=(blk<4)?mb_mvy :chroma_half_vector(mb_mvy);
 wire signed [12:0] slot1_mv_x=(blk<4)?mb_mvx1:chroma_half_vector(mb_mvx1);
 wire signed [12:0] slot1_mv_y=(blk<4)?mb_mvy1:chroma_half_vector(mb_mvy1);
-wire dest_slot=mb_field?er[0]:1'b0;
+// A field-DCT luma block contains one complete destination field: blocks 0/1
+// are the top field and blocks 2/3 are the bottom field.  Ordinary frame-DCT
+// blocks still alternate destination fields from one coefficient row to the
+// next under field prediction.
+wire dest_slot=mb_field?(block_field_dct?blk[1]:er[0]):1'b0;
 wire slot_fsel=dest_slot?mb_fsel1:mb_fsel0;
 
 wire signed [12:0] exec_mvx=dest_slot?slot1_mv_x:slot0_mv_x;
@@ -320,7 +324,10 @@ wire signed [13:0] phase1_base_y=
     ((block_field_row0+slot1_int_y)<<<1)+$signed({13'd0,mb_fsel1});
 
 wire [11:0] luma_x=({6'd0,col}<<4)+{8'd0,blk[0],el};
-wire block_field_dct=mb_field_dct&&residual_hit&&(blk<4);
+// dct_type is a macroblock layout choice.  Even an uncoded luma block in a
+// patterned macroblock must use the same field ordering, otherwise its frame-
+// ordered prediction overwrites rows emitted by a coded neighboring block.
+wire block_field_dct=mb_field_dct&&(blk<4);
 wire [11:0] luma_y=({6'd0,mrow}<<4)+
     (block_field_dct ? {8'd0,er,1'b0}+{11'd0,blk[1]}
                      : {8'd0,blk[1],er});
@@ -358,6 +365,8 @@ wire signed [13:0] block_src_last_x=src_base_x+14'sd7+
     (half_x?14'sd1:14'sd0);
 wire signed [13:0] block_src_last_y=src_base_y+14'sd7+
     (half_y?14'sd1:14'sd0);
+wire signed [13:0] block_field_dct_last_y=src_base_y+14'sd14+
+    (half_y?(mb_field?14'sd2:14'sd1):14'sd0);
 // Both phases are fetched, so both must be in range.  A phase spans four field
 // rows, which is six frame lines, plus two more for a vertical half sample.
 wire phase0_bounds_ok=
@@ -369,6 +378,10 @@ wire phase1_bounds_ok=
     ((phase1_base_x+14'sd7+(slot1_half_x?14'sd1:14'sd0))<plane_width_s)&&
     ((phase1_base_y+14'sd6+(slot1_half_y?14'sd2:14'sd0))<plane_height_s);
 wire block_source_bounds_ok=
+    block_field_dct?
+              ((src_base_x>=0)&&(src_base_y>=0)&&
+               (block_src_last_x<plane_width_s)&&
+               (block_field_dct_last_y<plane_height_s)):
     mb_field?(phase0_bounds_ok&&phase1_bounds_ok)
             :((src_base_x>=0)&&(src_base_y>=0)&&
               (block_src_last_x<plane_width_s)&&
@@ -385,24 +398,37 @@ wire [28:0] phase1_addr=pixel_addr(
     roff,blk,phase1_base_x[11:0],phase1_base_y[11:0]);
 wire [28:0] block_phase0_base_addr=pixel_addr(
     roff,blk,src_base_x[11:0],src_base_y[11:0]);
+wire [28:0] block_field_dct_phase1_addr=pixel_addr(
+    roff,blk,src_base_x[11:0],src_base_y[11:0]+12'd1);
 wire [7:0] block_row_words=(blk<4)?8'd90:8'd45;
 
 mpeg2_h262_prediction_block_fetcher block_fetcher(
     .clk(clk),.reset(reset),.start(block_fetch_start),
     // Entry 695: field prediction fetches one rectangle per destination field.
-    .phase_count(mb_field?3'd2:3'd1),
-    .phase0_base_addr(mb_field?phase0_addr:block_phase0_base_addr),
-    .phase1_base_addr(mb_field?phase1_addr:29'd0),
+    .phase_count(block_field_dct?(mb_field?3'd1:
+                                 (half_y?3'd2:3'd1)):
+                 (mb_field?3'd2:3'd1)),
+    .phase0_base_addr(block_field_dct?block_phase0_base_addr:
+                      (mb_field?phase0_addr:block_phase0_base_addr)),
+    .phase1_base_addr(block_field_dct?block_field_dct_phase1_addr:
+                      (mb_field?phase1_addr:29'd0)),
     .phase2_base_addr(29'd0),.phase3_base_addr(29'd0),
-    .phase0_two_words(mb_field?phase0_word_span[3]:block_word_span[3]),
-    .phase1_two_words(mb_field?phase1_word_span[3]:1'b0),
+    .phase0_two_words(block_field_dct?block_word_span[3]:
+                      (mb_field?phase0_word_span[3]:block_word_span[3])),
+    .phase1_two_words(block_field_dct?block_word_span[3]:
+                      (mb_field?phase1_word_span[3]:1'b0)),
     .phase2_two_words(1'b0),.phase3_two_words(1'b0),
-    .phase0_rows(mb_field?(4'd4+{3'd0,slot0_half_y}):(4'd8+{3'd0,half_y})),
-    .phase1_rows(mb_field?(4'd4+{3'd0,slot1_half_y}):4'd1),
+    .phase0_rows(block_field_dct?
+                     (4'd8+(mb_field?{3'd0,half_y}:4'd0)):
+                     (mb_field?(4'd4+{3'd0,slot0_half_y}):
+                               (4'd8+{3'd0,half_y}))),
+    .phase1_rows(block_field_dct?4'd8:
+                     (mb_field?(4'd4+{3'd0,slot1_half_y}):4'd1)),
     .phase2_rows(4'd1),.phase3_rows(4'd1),
     // A doubled stride makes each fetched row step one field line, which is
     // also what lets the vertical half sample interpolate between field lines.
-    .row_words(mb_field?{block_row_words[6:0],1'b0}:block_row_words),
+    .row_words((mb_field||block_field_dct)?
+                   {block_row_words[6:0],1'b0}:block_row_words),
     .memory_busy(ddram_busy),
     .memory_dout(ddram_dout),.memory_dout_ready(ddram_dout_ready),
     .memory_addr(block_fetch_addr),.memory_rd(block_fetch_rd),
@@ -428,7 +454,10 @@ wire [2:0] next_pixel_el=next_pixel_ei[2:0];
 wire [11:0] next_pixel_luma_x=
     ({6'd0,col}<<4)+{8'd0,blk[0],next_pixel_el};
 wire [11:0] next_pixel_luma_y=
-    ({6'd0,mrow}<<4)+{8'd0,blk[1],next_pixel_er};
+    ({6'd0,mrow}<<4)+
+    (block_field_dct?
+        ({8'd0,next_pixel_er,1'b0}+{11'd0,blk[1]}):
+        {8'd0,blk[1],next_pixel_er});
 wire [11:0] next_pixel_chroma_x=
     ({6'd0,col}<<3)+{9'd0,next_pixel_el};
 wire [11:0] next_pixel_chroma_y=
@@ -439,7 +468,8 @@ wire [11:0] next_pixel_dest_y=
     (blk<4)?next_pixel_luma_y:next_pixel_chroma_y;
 // The following pixel may belong to the other destination field, so it takes
 // its own slot's vector rather than the current pixel's.
-wire next_pixel_dest_slot=mb_field?next_pixel_er[0]:1'b0;
+wire next_pixel_dest_slot=mb_field?
+    (block_field_dct?blk[1]:next_pixel_er[0]):1'b0;
 wire signed [12:0] next_pixel_mv_x=
     next_pixel_dest_slot?slot1_mv_x:slot0_mv_x;
 wire signed [12:0] next_pixel_mv_y=
@@ -599,17 +629,23 @@ wire block_request_tap_dy=
     (half_x&&half_y)?block_request_tap[1]:
     (half_y?block_request_tap[0]:1'b0);
 wire [2:0] block_request_base_byte=
-    (mb_field&&block_request_ei[3])?block_base_byte1:block_base_byte;
+    (mb_field&&!block_field_dct&&block_request_ei[3])?
+        block_base_byte1:block_base_byte;
 wire [4:0] block_request_byte=
     {2'd0,block_request_base_byte}+{2'd0,block_request_ei[2:0]}+
     {4'd0,block_request_tap_dx};
 // Entry 695: a field phase holds this block's four rows of one parity, so the
 // row within the phase is the block row halved.
 assign block_lookup_row=
+    block_field_dct?
+        ({1'b0,block_request_ei[5:3]}+
+         (mb_field?{3'd0,block_request_tap_dy}:4'd0)):
     mb_field?({2'd0,block_request_ei[5:4]}+{3'd0,block_request_tap_dy})
             :({1'b0,block_request_ei[5:3]}+block_request_tap_dy);
 // The phase to read is the destination parity of the pixel being requested.
-assign block_lookup_phase=mb_field?block_request_ei[3]:1'b0;
+assign block_lookup_phase=block_field_dct?
+    ((!mb_field&&half_y)?block_request_tap_dy:1'b0):
+    (mb_field?block_request_ei[3]:1'b0);
 assign block_lookup_column=block_request_byte[3];
 assign block_lookup_request=
     (prediction_lookup&&!(pixel_setup&&(ei==0)))||
@@ -1025,8 +1061,9 @@ always @(posedge clk) begin
             end else begin
                 if(ei==0)begin
                     block_fetch_start<=1;
-                    block_base_byte<=mb_field?phase0_base_x[2:0]
-                                             :src_base_x[2:0];
+                    block_base_byte<=
+                        (mb_field&&!block_field_dct)?phase0_base_x[2:0]
+                                                    :src_base_x[2:0];
                     block_base_byte1<=phase1_base_x[2:0];
                 end
                 if(half_x||half_y) half_sample_seen<=1;

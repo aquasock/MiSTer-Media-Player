@@ -8,11 +8,13 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
+- Added simulation-qualified 720x480 interlaced frame-picture P/B decoding with frame or field motion and frame or field DCT. Deterministic P, B and combined field-motion/field-DCT fixtures cover field selection, integer and half-sample prediction, all luma block layouts, chroma residuals, and coded-order/display-order presentation against independently FFmpeg-checked pixel oracles.
 - Added helper-only RIFF WAVE playback through the existing MediaPlayer picker and PCM transport. Pinned miniaudio source is compiled into the static helper to convert ordinary PCM/float mono, stereo or multichannel WAV input to 44.1 or 48 kHz signed stereo without an FPGA change.
 - Added helper-only FLAC playback through the existing MediaPlayer picker and PCM transport. The same statically compiled miniaudio dependency converts 16- or 24-bit mono, stereo or multichannel FLAC input to 44.1 or 48 kHz signed stereo without an FPGA change.
 
 ### Changed
 
+- Opened the production P/B admission path for interlaced frame pictures and kept native 480i output ownership asserted across admitted I, P and B pictures. Quartus fit/timing and MiSTer playback qualification remain pending.
 - Reconciled current release, build, architecture and test guidance with the published v0.8.0 package; labelled older design and regression instructions as historical.
 - Corrected v0.8.0 tag provenance, compressed ZIP size, the role of patched Main, and the distinction between a targeted hardware pixel comparison and comprehensive playback qualification. Runtime code, the release tag and packaged binaries are unchanged.
 

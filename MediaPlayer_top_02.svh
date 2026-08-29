@@ -38,6 +38,7 @@ wire mpeg2_new_phase1n_frame_geometry_supported =
 mpeg2_h262_frontend mpeg2_h262_frontend
 (
     .native_film_supported(mpeg2_new_native_film_supported),
+    .native_480i_supported(mpeg2_new_native_480i_supported),
     .picture_coding_extension_repeat_first_field(mpeg2_new_pce_repeat_first_field),
     .picture_coding_extension_progressive_frame(mpeg2_new_pce_progressive_frame),
 	.clk                              (clk_mpeg2),

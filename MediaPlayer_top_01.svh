@@ -89,6 +89,7 @@ wire        mpeg2_new_chroma_420_type;
 wire        mpeg2_new_top_field_first;
 wire        mpeg2_new_native_film_mode;
 wire        mpeg2_new_native_film_supported;
+wire        mpeg2_new_native_480i_supported;
 wire        mpeg2_new_pce_repeat_first_field, mpeg2_new_pce_progressive_frame;
 wire        mpeg2_new_native_field_order_locked;
 wire        mpeg2_new_native_top_field_first;
@@ -111,6 +112,7 @@ mpeg2_h262_native_field_order mpeg2_h262_native_field_order
 wire mpeg2_new_native_480i_request =
 	!status[120] &&
     (mpeg2_new_phase1_supported ||
+     mpeg2_new_native_480i_supported ||
      (mpeg2_new_native_film_mode && mpeg2_new_native_film_supported)) &&
 	!mpeg2_new_progressive_sequence &&
 	mpeg2_new_native_field_order_locked &&
