@@ -1,4 +1,33 @@
-## 693 COMMIT Unreleased ??? 2026-08-28T21:13:29-07:00
+## 694 COMMIT Unreleased f2c10be 2026-08-28T22:21:11-07:00
+
+#### Coming From:
+
+Unreleased 100072a
+
+#### Purpose:
+
+Scale the helper PCM reserve with the doubled sink FIFO after the entry 693 build starved audio once at startup.
+
+#### Outcome:
+
+The entry 693 bitstream removed the eighty-four second starvation but underran once at approximately 1.7 seconds, with forty-two pictures already displayed, so the startup video burst had not wedged the extractor and the audio cushion was the weak point. The reserve is half the sink FIFO by construction; doubling the FIFO to 16,384 frames while leaving the reserve at 4,096 left audio with the old eighty-five millisecond cushion exactly as the halved clean video queue made transport blocks more frequent. This commit takes the reserve and the initial release to 8,192 frames, keeping reserve plus one batch below the sink FIFO, and corrects the stale documented sink depth. The first attempt aborted playback on the build PC with a video lookahead limit exceeded at 524,288 bytes and exit status one, because a deeper reserve makes the scheduler read further ahead for audio and hold more video meanwhile, so the lookahead bound moves to two mebibytes, negligible against 492 mebibytes of host memory and still a runaway guard. Equivalence is proven before installation: video, PCM and PTS payloads are byte-identical to the previous helper in both output modes, at 10,334,172 video bytes and 2,304,000 PCM bytes, with only delivery order changed, and all four helper audio profiles and the AC-3 passthrough verification pass. The helper installed as `ed13bc9357bff0a5e28bcfa703badb1614a6220cb29a51c4886316067f201a35` during playback without disturbing it, since the helper is executed per playback. A full nineteen minute hardware run then completed with all 1,126,974,123 transport bytes submitted, 867 reports, the helper never behind and its lead between 1.15 and 1.89 seconds. The startup underrun is gone, confirming the inference this commit rests on. The user reports the entire movie, including a continuous intro song, looked and sounded perfect. Hardware counted exactly one audio underrun, at STC 521 seconds, which the user did not hear and which the helper log shows no disturbance around, so it is transient and downstream of the host. Against four consecutive runs that starved at eighty-three to eighty-five seconds with audible recurring dropouts, this is accepted.
+
+#### Next Steps:
+
+Two instrumentation defects from entry 693 remain and should ride along with the next FPGA build rather than justify one alone. The transport block counters read zero blocks and zero milliseconds across the whole run while an underrun demonstrably occurred, because the probe used a conventional valid-and-ready pair on a path whose decoder advances on stream_valid itself, so the longest blocked interval was never actually measured and should instead be probed at the clean video queue's own full condition. The snapshot still latches on the first error flag, so it froze at 521 seconds and the last ten minutes of the run are unmeasured; now that underruns are counted, the trigger should move to the terminal or quiet path. Until both are fixed the remaining single underrun cannot be sized, so do not attempt to tune it further. Watch for video stutter on material heavier than this title, since the clean video queue is half its former depth, and revisit the trade rather than defend it if stutter appears. The HDMI session of the bounded opening remains outstanding from entry 690.
+
+#### Files Modified:
+
+- host/arm/media_player_helper.c
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
+## 693 COMMIT Unreleased 100072a 2026-08-28T21:13:29-07:00
 
 #### Coming From:
 
@@ -14,7 +43,7 @@ This entry is the approved plan for the cycle and its commit does not exist yet;
 
 #### Next Steps:
 
-Compile once in Quartus, reseeding at most once if timing does not close, and report fit and timing against the current build before anything is installed. After separate user authorization install the RBF with the accepted bitstream backed up and readback verified, keep helper 9956c8e in place so the two sides stay separable, and run the same file over S/PDIF past the eighty-four second failure point. Accept only on clean audio with the counted underrun record at zero and no video regression; if audio is clean but video stutters, the shortened video queue is the suspect and the trade should be revisited rather than defended. If underruns persist, read the maximum blocked interval against the new three hundred forty-one millisecond budget, and if that interval exceeds what any affordable buffer could cover, treat the cause as decoder latency rather than buffering and stop widening. The HDMI session of the bounded opening remains outstanding from entry 690.
+The build compiled once with no reseed and closed timing: worst setup slack improved to 0.170 nanoseconds against the 0.126 baseline on the HDMI PLL domain, clk_mpeg2 gave up margin to 1.035 nanoseconds and every TNS is zero, with ALMs at 32,355 of 41,910 and RAM blocks at 517 of 553 rather than the predicted 512, so the trade cost five blocks instead of being free. The RBF installed with the accepted bitstream backed up and verified, and a core reload proved necessary before the FPGA ran it, which one capture initially missed because the file on the card had been updated while the running configuration had not; the schema version in the snapshot is the reliable check and should be read first in every future capture. The eighty-four second starvation did not recur. A startup underrun at approximately 1.7 seconds appeared instead and is corrected in entry 694, where the full hardware result is recorded. The decoder gate for schema 20 is fixed separately in `55f2595`, which also restores correct picture counts for this schema.
 
 #### Files Modified:
 
@@ -26,8 +55,8 @@ Compile once in Quartus, reseeding at most once if timing does not close, and re
 
 #### Status:
 
-- [ ] Built
-- [ ] Passed
+- [x] Built
+- [x] Passed
 
 ---
 
@@ -1229,34 +1258,5 @@ None.
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 654 COMMIT Unreleased 4777c59 2026-08-27T22:39:00-07:00
-
-#### Coming From:
-
-Unreleased 4777c59
-
-#### Purpose:
-
-Confirm progressive all-I decoding is unchanged on the field-DCT bitstream and close the practical regression.
-
-#### Outcome:
-
-The user replayed test four and reports video and audio are good. Helper-first collection preserved a log distinct from the test seven capture and identifies `test_4_progressive.mpg` with 12,060,823 bytes of video, 500 audio frames and 576,000 emitted samples, exit zero, and all 888 pipe reads reconciling to 14,546,422 completed transport bytes, which is byte for byte the transport entry 644 recorded. Every schema-19 counter matches that entry exactly, including 12,057,601 accepted video bytes, 360 reference and displayed pictures, zero B pictures, 359 swaps, zero decoder and presentation errors, no audio underrun or PCM protocol fault, zero deadline gaps and gap outliers, and the distinctive six timestamp advance conflicts this fixture has always produced; the three largest recorded intervals differ by at most one clock. Raster equality is deliberately not claimed for this fixture and the reason is recorded rather than glossed. Entry 644's capture was written to the Buildroot card, which is no longer installed, so no local baseline raster exists; and these captures are 800 by 600 scaled from 720 by 480, so the reference-decode comparison used for test one cannot apply without replicating the scaler. What was measured instead is capture stability, and it reproduces the entry 653 finding on the fixture where entry 644 first saw it: two screenshots of the same completed frame, taken without replaying anything, differ at 4,144 of 382,992 compared pixels, every one at x modulo eight equal to one, against the 4,418 entry 644 recorded for the same fixture. Acceptance therefore rests on counter and transport equality with entry 644 plus the user's visual report, and on the coverage argument that test one's interlaced all-I and test seven's progressive I/P/B both produced pixel-exact matches against released-bitstream baselines and together bracket the paths this fixture exercises. Three fixtures have now passed on this bitstream. Tests two, three, five and six remain unreplayed but carry the same bar and line content that test one already matched pixel for pixel, so the practical regression for the writer's capture-counter and untruncated-origin changes is complete. Three items remain open and none is resolved by this entry: the unexplained decrease of 372 ALMs and 912 registers, the HDMI setup margin at positive 0.126 nanoseconds, and the capture-path variation whose mechanism is still unidentified.
-
-#### Next Steps:
-
-The field-DCT gate can be treated as functionally accepted for development purposes on the strength of tests one, four and seven, while remembering that this gate decodes field DCT and does not make commercial discs play. Do not prepare a release on this basis: the unexplained logic decrease should be understood first, because a release should not ship a resource change nobody can account for, and tests two, three, five and six would need replaying for a release-grade regression. Investigate the capture-path variation as its own scoped question, since it now has a specific signature of every eighth pixel column, a reproducible test of capturing an unchanged frame twice, and consistent magnitudes across two fixtures. Keep the reduced HDMI setup margin visible and reseed rather than restructure if a later change pushes that category negative. The next decoder milestone remains unapproved and unscoped; interlaced P and B is the gate that would make commercial discs play, and the deferred field-picture gate still needs either a non-ffmpeg generator or a real disc sample because ffmpeg cannot encode field pictures. Preserve restricted core.md and the forty-entry ring.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [ ] Built
-- [x] Passed
 
 ---

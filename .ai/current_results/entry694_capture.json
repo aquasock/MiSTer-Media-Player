@@ -1,52 +1,40 @@
 {
-  "captured": "2026-08-28T21:03:19-07:00",
+  "captured": "2026-08-28T22:19:35-07:00",
   "host": "10.10.0.30",
-  "source_commit": "9956c8e",
-  "user_report": "file played to completion with instrumented helper",
+  "source_commits": {
+    "helper": "f2c10be",
+    "fpga": "100072a"
+  },
+  "user_report": "movie done, looked and sounded perfect; 2DID overlay appeared roughly halfway through",
   "files": {
     "/tmp/MediaPlayer_ARM.log": {
-      "local": "arm_helper_final_after.log",
-      "bytes": 39338747,
-      "sha256": "3948e6e7c03dc0232e30b91ab706189c236bc0cf4d7590bd48f6bda394ca6258"
+      "local": "arm_helper_after.log",
+      "bytes": 29995643,
+      "sha256": "3bcd87b5de51873b62445a9abe27c9af957816eb421e3f90df00532374450c4c"
     },
-    "/media/fat/screenshots/entry694_final_20260828T210319_1.png": {
-      "local": "final_1.png",
-      "bytes": 356132,
-      "sha256": "1b697e9112a6a53801f6f945b71619af8f5f1a4e4b847b70d4da77a78fe90eb9",
+    "/media/fat/screenshots/entry696_final_20260828T221935_1.png": {
+      "local": "screen_1.png",
+      "bytes": 355951,
+      "sha256": "5deedf4557fcae2dd01b46578686adb8086deaa9ce04774cc7ffd38e3d9a4e2d",
       "complete_png_verified": true
     },
-    "/media/fat/screenshots/entry694_final_20260828T210319_2.png": {
-      "local": "final_2.png",
-      "bytes": 356132,
-      "sha256": "1b697e9112a6a53801f6f945b71619af8f5f1a4e4b847b70d4da77a78fe90eb9",
+    "/media/fat/screenshots/entry696_final_20260828T221935_2.png": {
+      "local": "screen_2.png",
+      "bytes": 355951,
+      "sha256": "5deedf4557fcae2dd01b46578686adb8086deaa9ce04774cc7ffd38e3d9a4e2d",
       "complete_png_verified": true
     },
     "/media/fat/linux/MediaPlayer_Helper": {
       "local": "MediaPlayer_Helper",
       "bytes": 399344,
-      "sha256": "c76eb4b0e41a401f64994a8ea67a08c4cf932642f7a8114706562ab64fb00a44"
+      "sha256": "ed13bc9357bff0a5e28bcfa703badb1614a6220cb29a51c4886316067f201a35"
     },
     "/media/fat/MediaPlayer.rbf": {
       "local": "MediaPlayer.rbf",
-      "bytes": 4309784,
-      "sha256": "9730e0ba61adbcd5319a42b9d270f30083947487f156cc17a1ce277d96a7dc18"
-    },
-    "/media/fat/MiSTer": {
-      "local": "MiSTer",
-      "bytes": 1170340,
-      "sha256": "01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9"
+      "bytes": 4393936,
+      "sha256": "417a92aa5a1b43c2873398ba48f8e9dd8c2210ab07848e29559449936f6a3518"
     }
   },
-  "operations": [
-    "RETR /tmp/MediaPlayer_ARM.log",
-    "RETR /media/fat/screenshots/entry694_final_20260828T210319_1.png",
-    "RETR /media/fat/screenshots/entry694_final_20260828T210319_2.png",
-    "RETR /media/fat/linux/MediaPlayer_Helper",
-    "RETR /media/fat/MediaPlayer.rbf",
-    "RETR /media/fat/MiSTer",
-    "RETR /tmp/MediaPlayer_ARM.log"
-  ],
   "errors": [],
-  "helper_log_unchanged_during_capture": true,
-  "finished": "2026-08-28T21:03:26-07:00"
+  "log_stable": true
 }

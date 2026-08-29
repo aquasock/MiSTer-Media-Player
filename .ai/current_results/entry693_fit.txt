@@ -1,0 +1,6 @@
+Fitter Status : Successful - Fri Aug 28 21:30:14 2026
+Quartus Prime Version : 17.0.2 Build 602 07/19/2017 SJ Lite Edition
+Logic utilization (in ALMs) : 32,355 / 41,910 ( 77 % )
+Total registers : 51411
+Total block memory bits : 4,078,843 / 5,662,720 ( 72 % )
+Total RAM Blocks : 517 / 553 ( 93 % )

@@ -1,0 +1,70 @@
+{
+  "source_commit": "f2c10be",
+  "device": "10.10.0.30",
+  "target": "/media/fat/linux/MediaPlayer_Helper",
+  "note": "installed during playback; helper is exec'd per playback so the running process is unaffected and this takes effect on the next start",
+  "candidate": {
+    "bytes": 399344,
+    "sha256": "ed13bc9357bff0a5e28bcfa703badb1614a6220cb29a51c4886316067f201a35"
+  },
+  "protected_before": [
+    {
+      "path": "/media/fat/MiSTer",
+      "bytes": 1170340,
+      "sha256": "01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9"
+    },
+    {
+      "path": "/media/fat/MediaPlayer.rbf",
+      "bytes": 4393936,
+      "sha256": "417a92aa5a1b43c2873398ba48f8e9dd8c2210ab07848e29559449936f6a3518"
+    },
+    {
+      "path": "/media/fat/games/MediaPlayer/dvd_opening_original.mpg",
+      "bytes": 11145233,
+      "sha256": "218d3a8eab32efceb6263d884be1b589b75e598ae25eeb465d14e4b430dfdc21"
+    }
+  ],
+  "protected_after": [
+    {
+      "path": "/media/fat/MiSTer",
+      "bytes": 1170340,
+      "sha256": "01a15750476f3616385fe98dee2d4d832f34823df5ddfc7098966a5b786efad9"
+    },
+    {
+      "path": "/media/fat/MediaPlayer.rbf",
+      "bytes": 4393936,
+      "sha256": "417a92aa5a1b43c2873398ba48f8e9dd8c2210ab07848e29559449936f6a3518"
+    },
+    {
+      "path": "/media/fat/games/MediaPlayer/dvd_opening_original.mpg",
+      "bytes": 11145233,
+      "sha256": "218d3a8eab32efceb6263d884be1b589b75e598ae25eeb465d14e4b430dfdc21"
+    }
+  ],
+  "started": "2026-08-28T21:58:48-07:00",
+  "operations": [
+    "STOR /media/fat/_MediaPlayer_Backups/MediaPlayer_Helper_c76eb4b0e41a_20260828T215848",
+    "STOR /media/fat/linux/MediaPlayer_Helper.upload-entry696-20260828T215848"
+  ],
+  "errors": [],
+  "replaced": {
+    "path": "/media/fat/linux/MediaPlayer_Helper",
+    "bytes": 399344,
+    "sha256": "c76eb4b0e41a401f64994a8ea67a08c4cf932642f7a8114706562ab64fb00a44"
+  },
+  "backup": {
+    "path": "/media/fat/_MediaPlayer_Backups/MediaPlayer_Helper_c76eb4b0e41a_20260828T215848",
+    "bytes": 399344,
+    "sha256": "c76eb4b0e41a401f64994a8ea67a08c4cf932642f7a8114706562ab64fb00a44"
+  },
+  "backup_verified": true,
+  "stage_verified": true,
+  "final_readback": {
+    "path": "/media/fat/linux/MediaPlayer_Helper",
+    "bytes": 399344,
+    "sha256": "ed13bc9357bff0a5e28bcfa703badb1614a6220cb29a51c4886316067f201a35"
+  },
+  "installation_verified": true,
+  "protected_unchanged": true,
+  "finished": "2026-08-28T21:58:50-07:00"
+}
