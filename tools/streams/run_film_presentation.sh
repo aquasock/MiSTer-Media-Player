@@ -14,6 +14,7 @@ iverilog -g2012 -s tb_h262_film_reorder_timestamp -o "$WORK/reorder" \
 vvp "$WORK/reorder"
 vvp "$WORK/reorder" +OVERLAP_REFERENCE_ADMISSION
 vvp "$WORK/reorder" +EARLY_B_REFERENCE
+vvp "$WORK/reorder" +DISPLAYED_B_REFERENCE
 vvp "$WORK/reorder" +EARLY_P_RELEASE
 vvp "$WORK/reorder" +ORDINARY_B_OVERLAP
 vvp "$WORK/reorder" +DRAIN_REFERENCE_OVERLAP

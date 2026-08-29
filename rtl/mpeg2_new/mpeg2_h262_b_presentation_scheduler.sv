@@ -652,12 +652,18 @@ always @(posedge clk) begin
                     last_bound_reference_valid<=1;
                     last_bound_reference_bank<=pending_frame_bank;
                     last_bound_reference_count<=reference_promotion_count;
-                // A promotion since the last B run may be an ordinary P
-                // already on screen. It cannot be this B's future reference.
-                // With no retained publication, only a distinct physical
-                // reference can be bound; otherwise await its completion.
+                // A newer promoted generation may already be on screen when
+                // presentation releases the compressed stream immediately
+                // before this B header.  It is the future reference only when
+                // no still-unpublished I/P header can supersede it.  The
+                // inflight guard retains the early-B protection where the
+                // displayed reference is deliberately the older generation.
                 end else if(!display_scratch&&
-                            (display_frame_bank!=reference_frame_bank))begin
+                            ((display_frame_bank!=reference_frame_bank)||
+                             (last_bound_reference_valid&&
+                              (reference_promotion_count!=
+                               last_bound_reference_count)&&
+                              (reference_headers_inflight==0))))begin
                     future_frame_bank<=reference_frame_bank;
                     future_reference_pending<=0;
                     last_bound_reference_valid<=1;

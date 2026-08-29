@@ -91,6 +91,29 @@ task field_end(input bit expected_scratch,input bit expected_sb,input [1:0] expe
  end
 endtask
 initial begin
+ if($test$plusargs("DISPLAYED_B_REFERENCE"))begin
+  // A newly promoted future reference can already be visible when its B
+  // header is released on the following clock.  Physical bank equality must
+  // not hide the newer generation when no I/P header remains unpublished.
+  ordinary_overlap=1;
+  repeat(4)@(negedge clk);reset=0;
+  @(negedge clk);
+  reference=1;promoted=8'd11;
+  scheduler.display_scratch=0;
+  scheduler.display_frame_bank=1;
+  scheduler.last_bound_reference_valid=1;
+  scheduler.last_bound_reference_bank=0;
+  scheduler.last_bound_reference_count=8'd10;
+  scheduler.reference_headers_inflight=0;
+  @(negedge clk);start=1;is_b=1;is_i=0;
+  @(negedge clk);start=0;repeat(3)@(negedge clk);
+  if(error||!scheduler.reorder_active||
+     scheduler.future_reference_pending||scheduler.future_frame_bank!=1||
+     scheduler.last_bound_reference_count!=11)
+   $fatal(1,"displayed future generation was not bound to B run");
+  $display("DISPLAYED_B_REFERENCE_PASS bank=1 generation=11 inflight=0");
+  $finish;
+ end
  if($test$plusargs("DRAIN_REFERENCE_OVERLAP"))begin
   ordinary_overlap=1;
   for(overlap_class=0;overlap_class<4;overlap_class=overlap_class+1)begin
