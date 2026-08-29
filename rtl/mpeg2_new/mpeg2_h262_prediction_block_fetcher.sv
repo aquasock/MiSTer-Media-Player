@@ -20,7 +20,8 @@
 // field prediction distributes its forward and backward parity pairs across
 // the B engine's two existing instances instead of widening both stores.
 module mpeg2_h262_prediction_block_fetcher #(
-    parameter integer PHASES=2
+    parameter integer PHASES=2,
+    parameter integer PIPELINED_LOOKUP=0
 )
 (
     input  wire        clk,
@@ -93,6 +94,10 @@ reg [7:0] row_words_reg;
 reg [6:0] descriptor_slot [0:DESCRIPTOR_DEPTH-1];
 reg [DESCRIPTOR_POINTER_WIDTH-1:0] descriptor_head,descriptor_tail;
 reg [DESCRIPTOR_COUNT_WIDTH-1:0] descriptor_count;
+reg lookup_pending;
+reg [1:0] lookup_phase_q;
+reg [3:0] lookup_row_q;
+reg lookup_column_q;
 
 wire generator_two_words=phase_two_words_reg[generator_phase];
 wire [3:0] generator_rows=phase_rows_reg[generator_phase];
@@ -131,16 +136,26 @@ wire [DESCRIPTOR_POINTER_WIDTH-1:0] descriptor_tail_next=
     (descriptor_tail==(DESCRIPTOR_DEPTH-1))?
     {DESCRIPTOR_POINTER_WIDTH{1'b0}}:descriptor_tail+1'b1;
 
-wire [6:0] lookup_slot=({5'd0,lookup_phase}*7'd18)+
-    {2'd0,lookup_row,1'b0}+{6'd0,lookup_column};
+wire lookup_do=PIPELINED_LOOKUP ? lookup_pending : lookup_request;
+wire pipelined_lookup_accept=lookup_request&&!lookup_pending;
+wire [1:0] lookup_phase_selected=
+    PIPELINED_LOOKUP ? lookup_phase_q : lookup_phase;
+wire [3:0] lookup_row_selected=
+    PIPELINED_LOOKUP ? lookup_row_q : lookup_row;
+wire lookup_column_selected=
+    PIPELINED_LOOKUP ? lookup_column_q : lookup_column;
+wire [6:0] lookup_slot=({5'd0,lookup_phase_selected}*7'd18)+
+    {2'd0,lookup_row_selected,1'b0}+{6'd0,lookup_column_selected};
 wire [6:0] lookup_next_row_slot=lookup_slot+7'd2;
-wire [3:0] selected_lookup_rows=phase_rows_reg[lookup_phase];
-wire selected_lookup_two_words=phase_two_words_reg[lookup_phase];
-wire lookup_in_range=({1'b0,lookup_phase}<phase_count_reg)&&
-    (lookup_row<selected_lookup_rows)&&
-    (!lookup_column||selected_lookup_two_words);
+wire [3:0] selected_lookup_rows=
+    phase_rows_reg[lookup_phase_selected];
+wire selected_lookup_two_words=
+    phase_two_words_reg[lookup_phase_selected];
+wire lookup_in_range=({1'b0,lookup_phase_selected}<phase_count_reg)&&
+    (lookup_row_selected<selected_lookup_rows)&&
+    (!lookup_column_selected||selected_lookup_two_words);
 wire lookup_next_row_in_range=lookup_in_range&&
-    (lookup_row+1'b1<selected_lookup_rows);
+    (lookup_row_selected+1'b1<selected_lookup_rows);
 
 integer clear_index,descriptor_index,phase_index;
 always @(posedge clk) begin
@@ -165,6 +180,10 @@ always @(posedge clk) begin
         descriptor_tail<={DESCRIPTOR_POINTER_WIDTH{1'b0}};
         descriptor_count<={DESCRIPTOR_COUNT_WIDTH{1'b0}};
         lookup_ready<=1'b0;
+        lookup_pending<=1'b0;
+        lookup_phase_q<=2'd0;
+        lookup_row_q<=4'd0;
+        lookup_column_q<=1'b0;
         lookup_valid<=1'b0;
         lookup_data<=64'd0;
         lookup_next_row_valid<=1'b0;
@@ -178,8 +197,26 @@ always @(posedge clk) begin
             word_data[clear_index]<=64'd0;
     end else begin
         lookup_ready<=1'b0;
+        if(PIPELINED_LOOKUP) begin
+            // The consumer holds lookup_request until lookup_ready.  Accept
+            // it once, then suppress the held duplicate while this one-entry
+            // stage produces its response.
+            lookup_pending<=pipelined_lookup_accept;
+            if(pipelined_lookup_accept) begin
+                lookup_phase_q<=lookup_phase;
+                lookup_row_q<=lookup_row;
+                lookup_column_q<=lookup_column;
+            end
+        end
 
         if(start) begin
+            // A queued lookup belongs to the footprint being replaced.  Do
+            // not expose its retained word on the cycle that start clears the
+            // validity map; the held consumer request will retry afterward.
+            lookup_pending<=1'b0;
+            lookup_ready<=1'b0;
+            lookup_valid<=1'b0;
+            lookup_next_row_valid<=1'b0;
             complete<=1'b0;
             issued_count<=7'd0;
             returned_count<=7'd0;
@@ -269,7 +306,7 @@ always @(posedge clk) begin
             end
         end
 
-        if(lookup_request) begin
+        if(lookup_do&&!start) begin
             lookup_ready<=1'b1;
             lookup_valid<=lookup_in_range&&word_valid[lookup_slot];
             lookup_next_row_valid<=lookup_next_row_in_range&&

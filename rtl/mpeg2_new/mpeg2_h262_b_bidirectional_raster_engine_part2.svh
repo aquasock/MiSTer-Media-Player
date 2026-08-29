@@ -315,11 +315,15 @@ wire [7:0] launch_row_words=block_fetch_start_prefetch?
 // Do not let a broadcast lookup sample a fetcher's previous retained word on
 // the same edge that start clears its validity map for a new block.
 wire block_lookup_request0=block_lookup_request&&
+    !block_lookup_target_bank&&
     !(block_fetch_start&&!block_fetch_start_bank);
 wire block_lookup_request1=block_lookup_request&&
+    block_lookup_target_bank&&
     !(block_fetch_start&&block_fetch_start_bank);
 
-mpeg2_h262_prediction_block_fetcher #(.PHASES(2)) block_fetcher(
+mpeg2_h262_prediction_block_fetcher #(
+    .PHASES(2),.PIPELINED_LOOKUP(1)
+) block_fetcher(
     .clk(clk),.reset(reset),
     .start(block_fetch_start&&!block_fetch_start_bank),
     .phase_count(launch_phase_count),
@@ -354,7 +358,9 @@ mpeg2_h262_prediction_block_fetcher #(.PHASES(2)) block_fetcher(
     .returned_count(block_fetch_returned0),
     .outstanding_count(block_fetch_outstanding0));
 
-mpeg2_h262_prediction_block_fetcher #(.PHASES(2)) block_fetcher1(
+mpeg2_h262_prediction_block_fetcher #(
+    .PHASES(2),.PIPELINED_LOOKUP(1)
+) block_fetcher1(
     .clk(clk),.reset(reset),
     .start(block_fetch_start&&block_fetch_start_bank),
     .phase_count(launch_phase_count),
@@ -691,14 +697,9 @@ wire lookup_advance_tap_dx=(half_x&&half_y)?
 wire lookup_advance_tap_dy=(half_x&&half_y)?
     lookup_advance_tap_index[1]:
     (half_y?lookup_advance_tap_index[0]:1'b0);
-// A direction or pixel boundary updates the registered phase vector, byte
-// origin and direction first; the normal idle request launches its lookup on
-// the following cycle.  Keeping those boundary look-aheads out of this path
-// avoids putting completion, direction selection, address arithmetic and the
-// fetcher's retained-word read in one 60 MHz cycle.  Tap-to-tap lookup within
-// an unchanged phase remains zero-bubble through lookup_advance.
 wire prediction_lookup=
-    (pixel_setup&&(exec_direction!=0)&&phase_bounds_ok)||lookup_advance;
+    (pixel_setup&&(exec_direction!=0)&&phase_bounds_ok)||lookup_advance||
+    bidir_lookup_candidate||next_pixel_lookup_candidate;
 wire advance_tap_address=lookup_advance;
 wire address_tap_dx=advance_tap_address?lookup_advance_tap_dx:tap_dx;
 wire address_tap_dy=advance_tap_address?lookup_advance_tap_dy:tap_dy;
@@ -723,6 +724,9 @@ wire block_lookup_idle_request=lookup_wait&&!block_fetch_start&&
 wire block_lookup_direction=bidir_lookup_candidate?1'b1:
     next_pixel_lookup_candidate?1'b0:
     ((exec_direction==2'd3)&&pred_direction);
+assign block_lookup_target_bank=block_consumer_bank^
+    ((exec_field||block_field_dct)&&
+     (exec_direction==2'd3)&&block_lookup_direction);
 assign block_lookup_phase=block_field_dct?
     {1'b0,(exec_field?1'b0:block_request_tap_dy)}:exec_field?
     {1'b0,block_request_ei[3]}:

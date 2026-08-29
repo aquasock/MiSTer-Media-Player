@@ -155,6 +155,7 @@ wire [1:0] block_lookup_phase;
 wire [3:0] block_lookup_row;
 wire block_lookup_column;
 wire block_lookup_ready,block_lookup_valid;
+wire block_lookup_target_bank;
 wire [63:0] block_lookup_data;
 wire block_lookup_next_row_valid;
 wire [63:0] block_lookup_next_row_data;

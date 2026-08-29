@@ -1830,9 +1830,9 @@ module tb_h262_live_raster_soak #(
                    b_queue_handoffs!=3600||
                    b_queue_bank0_starts!=2160||
                    b_queue_bank1_starts!=2160||
-                   b_paired_tap_lookups!=44197||
-                   b_single_tap_advances!=5017||
-                   b_vertical_tap_pairs!=22327||
+                   b_paired_tap_lookups!=44206||
+                   b_single_tap_advances!=5008||
+                   b_vertical_tap_pairs!=22336||
                    b_quad_tap_lookups!=4241||
                    profile_b_replay_twrite!=26591||
                    profile_b_replay_coeff_writes!=26591||
@@ -1841,9 +1841,9 @@ module tb_h262_live_raster_soak #(
                    // retained-word timing cone while preserving every DDR
                    // and reconstruction count.
                    ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
-                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1439997))||
+                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1449997))||
                    ((EXPECTED_DESCRIPTOR_DEPTH==4)&&
-                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1439997))||
+                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1449997))||
                    pixel_samples!=423936||pixel_mismatches!=0||
                    !writer_seen||!pred_read_observed||
                    !pred_reconstructed_observed||!presentation_complete||
