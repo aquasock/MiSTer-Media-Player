@@ -797,14 +797,7 @@ always @(posedge clk) begin
         end
 
         if (parse_active) begin
-            // The frontend classifies the following P/B header while this I
-            // parser is consuming that same picture-ending start code.  Once
-            // next_start_code() has been recognized, finish its value and
-            // publish the completed I picture; unsupported picture data still
-            // aborts immediately in every other state.
-            if (!phase1_supported &&
-                (parse_state != ST_START_CODE_PREFIX) &&
-                (parse_state != ST_START_CODE_VALUE)) begin
+            if (!phase1_supported) begin
                 parse_active <= 1'b0;
             end
             else if ((parse_state != ST_WAIT_PIPELINE) && !bit_valid) begin
