@@ -1050,7 +1050,10 @@ always @(posedge clk) begin
                             block_index              <= 3'd0;
                             macroblock_qscale_shift <= 5'd0;
                             field_bit_count         <= 4'd0;
-                            parse_state             <= ST_MB_QSCALE;
+                            // H.262 macroblock_modes() carries dct_type before
+                            // macroblock() carries quantiser_scale_code.
+                            parse_state <= frame_pred_frame_dct ?
+                                           ST_MB_QSCALE : ST_DCT_TYPE;
                         end
                         else begin
                             probe_error  <= 1'b1;
@@ -1071,8 +1074,7 @@ always @(posedge clk) begin
                                 probe_error  <= 1'b1;
                                 parse_active <= 1'b0;
                             end
-                            else if (frame_pred_frame_dct) start_luma_block();
-                            else parse_state <= ST_DCT_TYPE;
+                            else start_luma_block();
                         end
                         else field_bit_count <= field_bit_count + 4'd1;
                     end
@@ -1083,7 +1085,10 @@ always @(posedge clk) begin
                     // blocks and is consumed before the first block's DC.
                     ST_DCT_TYPE: begin
                         dct_type <= current_bit;
-                        start_luma_block();
+                        if (macroblock_quant)
+                            parse_state <= ST_MB_QSCALE;
+                        else
+                            start_luma_block();
                     end
 
                     ST_DC_LUMA: begin

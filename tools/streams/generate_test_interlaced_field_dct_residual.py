@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Generate a 720x480 interlaced P/B field-DCT residual regression.
+"""Generate a 720x480 interlaced I/P/B field-DCT residual regression.
 
-The P and B pictures are frame pictures with frame_pred_frame_dct clear.  All
-motion is ordinary frame prediction (frame_motion_type 10), while selected
-pattern-bearing macroblocks set dct_type and carry residuals in all useful
-luma block combinations.  This isolates field-DCT block ordering from the
-already-qualified field-motion arithmetic.
+All three pictures are frame pictures with frame_pred_frame_dct clear.  The I
+picture contains a quantized field-DCT macroblock.  P/B motion is ordinary
+frame prediction (frame_motion_type 10), while selected pattern-bearing
+macroblocks set dct_type and carry residuals in all useful luma block
+combinations.  This isolates field-DCT block ordering from the already-
+qualified field-motion arithmetic.
 
 Generated media are local regression artifacts, not repository inputs.  The
 reference model applies the field-DCT luma layout and is checked against
@@ -24,8 +25,10 @@ SLICE_QSCALE = 10
 RESIDUAL_ROW = 8
 QUANTIZED_P_COL = 5
 QUANTIZED_B_COL = 5
+QUANTIZED_I_COL = 11
 B_MC_CODED_QUANT = "00010"
 SCALE = h.quantiser_scale(SLICE_QSCALE)
+I_DC_ONLY_BLOCKS = ("100" + h.EOB) * 4 + ("00" + h.EOB) * 2
 
 # Exercise each luma block alone, both field pairs, all luma, and luma+chroma.
 # Every selected macroblock sets dct_type=1.
@@ -75,6 +78,21 @@ def emit_residual(bits: str, cbp: int, coeffs: dict[int, list[tuple[int, int]]])
         if cbp & (1 << (5 - block)):
             bits += h.emit_block(coeffs[block])
     return bits
+
+
+def build_i_row(row: int) -> bytes:
+    bits = format(SLICE_QSCALE, "05b") + "0"
+    for col in range(h.MB_WIDTH):
+        bits += h.enc_mba(1)
+        if row == 2 and col == QUANTIZED_I_COL:
+            bits += "01"                 # intra plus macroblock_quant
+            bits += "1"                  # dct_type: field DCT
+            bits += format(SLICE_QSCALE, "05b")
+        else:
+            bits += "1"                  # intra, no macroblock_quant
+            bits += "0"                  # dct_type: frame DCT
+        bits += I_DC_ONLY_BLOCKS
+    return h.bits_to_bytes(bits)
 
 
 def build_p_row(row: int):
@@ -156,9 +174,11 @@ def main() -> None:
     out = args.output.resolve()
     out.parent.mkdir(parents=True, exist_ok=True)
 
+    i_payloads = []
     p_payloads, p_specs = [], []
     b_payloads, b_specs = [], []
     for row in range(h.MB_HEIGHT):
+        i_payloads.append(build_i_row(row))
         payload, specs = build_p_row(row)
         p_payloads.append(payload)
         p_specs.append(specs)
@@ -166,6 +186,7 @@ def main() -> None:
         b_payloads.append(payload)
         b_specs.append(specs)
 
+    i_rows = tuple((payload,) for payload in i_payloads)
     p_rows = tuple((payload,) for payload in p_payloads)
     b_rows = tuple((payload,) for payload in b_payloads)
     with tempfile.TemporaryDirectory(prefix="mister_h262_field_dct_") as directory:
@@ -177,9 +198,10 @@ def main() -> None:
             raise SystemExit("FFmpeg skeleton coded order changed")
         data = h.patch_pictures(
             skeleton.read_bytes(), [1, 2, 3],
-            {1: (False, p_rows), 2: (True, b_rows)},
+            {0: (False, i_rows), 1: (False, p_rows), 2: (True, b_rows)},
             interlaced={
-                0: {"progressive_frame": False, "top_field_first": True},
+                0: {"frame_pred_frame_dct": False,
+                    "progressive_frame": False, "top_field_first": True},
                 1: {"frame_pred_frame_dct": False,
                     "progressive_frame": False, "top_field_first": True},
                 2: {"frame_pred_frame_dct": False,
@@ -229,7 +251,9 @@ def main() -> None:
     print(f"bytes: {out.stat().st_size}")
     print(f"sha256: {hashlib.sha256(out.read_bytes()).hexdigest()}")
     print("picture order: I B P (display), I P B (coded)")
-    print("P/B: frame pictures, frame_pred_frame_dct 0, frame_motion_type 10")
+    print("I/P/B: frame pictures, frame_pred_frame_dct 0")
+    print(f"row 2: quantized I field-DCT macroblock at column {QUANTIZED_I_COL}")
+    print("P/B: frame_motion_type 10")
     print(f"row {RESIDUAL_ROW}: dct_type 1 at columns {sorted(RESIDUALS)}")
     print(f"row {RESIDUAL_ROW}: quantized P macroblock at column {QUANTIZED_P_COL}")
     print(f"row {RESIDUAL_ROW}: quantized B macroblock at column {QUANTIZED_B_COL}")
