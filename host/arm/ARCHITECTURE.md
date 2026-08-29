@@ -89,7 +89,7 @@ ordinary integer or floating-point mono, stereo or multichannel input to signed
 accepted rates emit at 48 kHz. This conversion deliberately serves predictable
 consumer playback rather than bit-perfect or discrete-surround output. The
 dependency is compiled into the static helper with device, engine, resource
-manager, encoder, MP3 and FLAC code disabled.
+manager, encoder, threading, runtime linking, MP3 and FLAC code disabled.
 
 Future play, pause, seek, title, chapter, angle, audio-track and subtitle-track
 commands require a versioned control channel. They are intentionally not
