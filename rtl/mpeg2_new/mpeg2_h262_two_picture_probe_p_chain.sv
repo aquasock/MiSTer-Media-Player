@@ -73,13 +73,15 @@ mpeg2_h262_picture_bookkeeper bookkeeper(
 // later.  Checking publication at header time therefore rejects a legal
 // ordering.  Track the wait instead and enforce the real invariant, which is
 // that a B must not COMPLETE against an unpublished reference.
-reg b_reference_publication_pending;reg p_persistence_d;reg[7:0] p_publication_count;reg p_reconstruction_inflight;reg p_overlap_hold;reg publication_error;reg[2:0] publication_error_detail_reg;reg picture_complete_pulse;
+reg b_reference_publication_pending;reg p_persistence_d;reg[7:0] p_publication_count;reg p_reconstruction_inflight;reg p_overlap_pending,p_overlap_hold;reg publication_error;reg[2:0] publication_error_detail_reg;reg picture_complete_pulse;
 reg[1:0] active_frame_bank_reg,completed_frame_bank_reg;reg[7:0] picture_count_reg;
 reg reference_frame_valid_reg;reg[1:0] reference_frame_bank_reg,previous_reference_frame_bank_reg;
 reg[7:0] reference_promotion_count_reg;
 
 reg[31:0] picture_window;wire[31:0] picture_window_next={picture_window[23:0],stream_data};
 wire picture_start_now=(picture_window_next==32'h00000100);reg picture_header_capture,picture_header_second_byte;
+wire extension_start_now=(picture_window_next==32'h000001b5);
+reg p_overlap_extension_capture;reg[2:0] p_overlap_extension_count;
 // Entry 215: these are transaction proofs, not small diagnostic categories.
 // Preserve every P/B header and persistence event through the complete stream;
 // saturation at 3/7 made the first B of the second GOP indistinguishable from
@@ -107,14 +109,15 @@ assign second_picture_420_parsed=base_second_picture_420_parsed||(picture_count_
 
 always @(posedge clk)begin
  if(reset)begin
-  b_reference_publication_pending<=0;p_persistence_d<=0;p_publication_count<=0;p_reconstruction_inflight<=0;p_overlap_hold<=0;publication_error<=0;publication_error_detail_reg<=0;picture_complete_pulse<=0;active_frame_bank_reg<=0;completed_frame_bank_reg<=0;
+  b_reference_publication_pending<=0;p_persistence_d<=0;p_publication_count<=0;p_reconstruction_inflight<=0;p_overlap_pending<=0;p_overlap_hold<=0;publication_error<=0;publication_error_detail_reg<=0;picture_complete_pulse<=0;active_frame_bank_reg<=0;completed_frame_bank_reg<=0;
   picture_count_reg<=0;reference_frame_valid_reg<=0;reference_frame_bank_reg<=0;previous_reference_frame_bank_reg<=0;reference_promotion_count_reg<=0;
-  picture_window<=0;picture_header_capture<=0;picture_header_second_byte<=0;p_header_count<=0;consecutive_candidate_seen<=0;
+  picture_window<=0;picture_header_capture<=0;picture_header_second_byte<=0;p_overlap_extension_capture<=0;p_overlap_extension_count<=0;p_header_count<=0;consecutive_candidate_seen<=0;
   b_picture_observed<=0;b_picture_inflight<=0;b_persistence_verified<=0;b_header_count<=0;b_persist_count<=0;
  end else begin
   p_persistence_d<=p_persistence_complete;picture_complete_pulse<=0;
   if(p_persisted_now)begin
    p_reconstruction_inflight<=0;
+   p_overlap_pending<=0;
    p_overlap_hold<=0;
   end
   if(p_residual_sample_valid_raw&&
@@ -124,21 +127,39 @@ always @(posedge clk)begin
 
   if(stream_valid)begin
    picture_window<=picture_window_next;
+   if(extension_start_now)begin
+    p_overlap_extension_capture<=1;
+    p_overlap_extension_count<=0;
+   end else if(p_overlap_extension_capture)begin
+    if((p_overlap_extension_count==0)&&(stream_data[7:4]!=4'h8))begin
+     p_overlap_extension_capture<=0;
+     p_overlap_extension_count<=0;
+    end else if(p_overlap_extension_count==4)begin
+     p_overlap_extension_capture<=0;
+     p_overlap_extension_count<=0;
+     // The wide parser restores candidate ownership on this same accepted
+     // byte.  Waiting here keeps its delayed prior-row replay visible while
+     // preventing the following picture's first slice from emitting motion.
+     if(p_overlap_pending&&p_reconstruction_inflight&&!p_persisted_now)
+      p_overlap_hold<=1;
+    end else p_overlap_extension_count<=p_overlap_extension_count+1'b1;
+   end
    if(picture_start_now)begin picture_header_capture<=1;picture_header_second_byte<=0;end
    else if(picture_header_capture)begin
     if(!picture_header_second_byte)picture_header_second_byte<=1;
     else begin
      picture_header_capture<=0;picture_header_second_byte<=0;
      if(stream_data[5:3]==3'b010)begin
-      // Entry 710: the header may be consumed so coded order can still be
-      // classified, but its payload must not enter the shared P sideband
-      // while the preceding P reconstruction still owns the raster engine.
+      // Entry 710: classify the next P header, then wait until its coding
+      // extension has restored wide-parser ownership before applying the
+      // overlap hold.  Holding at the header itself hides the preceding row's
+      // delayed residual terminator and deadlocks persistence.
       // Header/publication counts cannot prove that ownership: the accepted
       // GOP bookkeeping intentionally leaves them offset on some legal coded
       // orders.  The first live P motion record starts ownership and the
       // matching persistence pulse releases it.
       if(p_reconstruction_inflight&&!p_persisted_now)
-       p_overlap_hold<=1;
+       p_overlap_pending<=1;
       if(p_header_count!=8'hff)p_header_count<=p_header_count+1'b1;
       if(p_header_count>=1)consecutive_candidate_seen<=1;
      end else if(stream_data[5:3]==3'b011)begin
