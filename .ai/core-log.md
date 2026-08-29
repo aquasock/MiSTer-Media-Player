@@ -1,3 +1,32 @@
+## 703 COMMIT Unreleased ??? 2026-08-29T03:31:55-07:00
+
+#### Coming From:
+
+Unreleased 736f64f
+
+#### Purpose:
+
+Adopt the U.S. National Archives MPD-D2 DVD-from-film profile as the project's controlled release media target.
+
+#### Outcome:
+
+The official NARA MPD-D2 web profile will be added to the active source catalog and controlled records as the project's release media baseline.  The target carries MPEG-2 Main Profile at Main Level in VOB and Program Stream form, temporary approximately eight-megabit-per-second standard-definition source, 720 by 480 constant-bit-rate video at 29.97 frames per second, interlaced top-field-first single-pass encoding, and two-channel constant-bit-rate AC-3 at 256 kilobits per second, 48 kilohertz and a listed sixteen-bit sample size.  The record will preserve the page's December 22, 2023 review date and distinguish this adopted distribution profile from the normative H.262 and H.222.0 decode rules and from the separately controlled DVD filesystem, navigation, menu and CSS boundaries.
+
+#### Next Steps:
+
+Add one tightly coupled NARA profile record, active source-catalog entry, routing reference and fast index entry to `core-reference.md`, update its verification date and official-page list, and audit every core file against `core-syntax.md`.  Do not change decoder RTL, helper behavior, the built RBF or the MiSTer during this reference-only cycle; subsequent release qualification must construct or retain a conforming target stream and verify each observable property independently.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 702 COMMIT Unreleased 736f64f 2026-08-29T03:10:56-07:00
 
 #### Coming From:
@@ -1229,37 +1258,6 @@ Pull published seed-only source 6c1b621 on GUNSMOKE, rerun the clean build and p
 #### Files Modified:
 
 - MediaPlayer.qsf
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 663 COMMIT Unreleased 3e287b3 2026-08-28T01:24:48-07:00
-
-#### Coming From:
-
-Unreleased 3828608
-
-#### Purpose:
-
-Register prefetched P/B quantization weights to close the remaining matrix-RAM timing path without changing transform cadence.
-
-#### Outcome:
-
-Correction 3e287b3 is published from the Pi after all 384 coefficient cases and 122,992 cycle-by-cycle comparisons match the previous transform, including coefficient values, output timing, busy state and errors. Independent matrix vectors pass all 36,864 coefficients, and the six-picture matrix-transition raster checks all 3,110,400 samples within one level. The protected weight registers preload during the existing commit phase without adding cycles. Source 3828608 passes the complete paired original-opening qualification and completes a clean Quartus build in 704.7 seconds with zero errors, but remains blocked from deployment by negative 1.100-nanosecond decoder setup. The byte-parser and three CDC corrections resolve their prior failures; video setup is positive 2.136 and HDMI setup positive 0.310. Hold, recovery, removal and minimum pulse width are positive 0.246, 3.813, 0.418 and 0.925. Fitted resources are 31,301 ALMs, 48,891 registers, 4,056,315 memory bits, 518 of 553 RAM blocks and 67 DSP blocks. Detailed TimeQuest paths now start at the B transform's intra-matrix RAM and pass through the shared inverse-quantization result logic. The correction preloads weight zero while idle and the next natural-index weight during each coefficient's existing commit phase, using preserved data registers protected from retiming. The default non-intra fast path and the custom/intra two-phase schedule must keep their existing cycles and values. No extra timing exception, clock reduction, feature expansion, deployment or hardware acceptance is proposed. The failed build and reports remain under /home/vash/mister-builds/entry662/results.
-
-#### Next Steps:
-
-Pull published source 3e287b3 on GUNSMOKE, build from a fresh exact-source checkout and rerun the complete paired original-opening qualification. Require all timing categories positive and retained register-stage evidence before packaging any RBF; keep all prior failures visible and preserve restricted core.md and user control of the MiSTer.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
-- tools/streams/run_quant_transform_equivalence.sh
-- docs/testing_original_dvd_opening.md
 
 #### Status:
 
