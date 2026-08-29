@@ -1,0 +1,22 @@
+{
+  "audio_frames_read": 119550,
+  "audio_frames_written": 127742,
+  "complete_required": false,
+  "events": {
+    "END": 1,
+    "SAMPLE": 16,
+    "START": 1,
+    "STOP": 1
+  },
+  "last_transport_byte": 1518340,
+  "last_video_byte": 915236,
+  "max_audio_used": 8191,
+  "max_clean_video_used": 65536,
+  "passed": true,
+  "pcm_protocol_error": false,
+  "playback_complete": false,
+  "problems": [],
+  "scope": "Behavioral FIFO capacity and production-path delivery order; not an FPGA CDC timing or physical receiver model.",
+  "starvation_intervals": 0,
+  "underrun": false
+}

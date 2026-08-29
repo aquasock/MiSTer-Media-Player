@@ -1,4 +1,4 @@
-## 688 COMMIT Unreleased ??? 2026-08-28T17:22:05-07:00
+## 688 COMMIT Unreleased 8423f20 2026-08-28T17:22:05-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Correct helper audio delivery across blocking video intervals and add the reprod
 
 #### Outcome:
 
-The user approves fixing the entry 687 mechanism and reports that approximately eighteen minutes of the same file produced visually perfect video with only minor recurring audio underruns. Treat this as valuable user-observed long-play video evidence, not a clean audio pass, full-title telemetry capture or broad DVD qualification. Change the helper scheduler only where measured evidence requires it: supply sufficient bounded audio before queued video can prevent the extractor from reaching later audio, while preserving the original compressed video and audio bytes, current physical FIFO sizes, timestamp semantics and existing startup behavior. Promote the isolated audio-delivery test into deterministic build-PC regression coverage for the exact opening and rate sensitivity, and retain the accepted HDMI baseline. Do not change FPGA production logic, timing constraints, fitter seed, Main transport behavior or error reporting in this correction. No Quartus build, device installation or playback is included until helper-only validation proves the correction safe.
+The user reports visually perfect video over approximately eighteen minutes with minor recurring audio underruns, and this correction addresses the entry 687 mechanism entirely in the helper. The scheduler now records each video timestamp at its source-byte anchor, interpolates a bounded audio-delivery horizon toward the next visible timestamp across queued video, and rounds delivery to the existing 128-frame guard quantum; FIFO sizes, the 4096-frame reserve, 2048-frame steady batch cap, startup behavior, timestamp format, video bytes and FPGA production logic remain unchanged. The checked-in regression drives the production extractor, clean-video queue, audio FIFO and output adapter: the prior helper deterministically underruns at cycle 108,142,511 and video byte 368,134 with the clean queue full, while corrected S/PDIF and paced HDMI prefixes complete without starvation, underrun or protocol faults. A full corrected S/PDIF run consumes all 12,818,397 transport bytes, 10,334,168 clean-video bytes and 576,000 audio frames, reaches normal playback completion, and reports zero decoder, presentation, chain or audio errors. HDMI preserves the original video and PCM hashes, all 375 S/PDIF bursts preserve and decode to the original AC-3 payload, and the two output forms have identical record positions and lengths. All four existing helper audio profiles pass after correcting their stale expectation that supported AC-3 private audio should be rejected. A clean 8423f20 clone produces a stripped, statically linked ARM EABI5 helper with SHA-256 fefaeb18b8c9e091a9cd9e97258e86264683f374f9663cb3ea6b99bafb81977a. No Quartus build, MiSTer installation or hardware playback is part of this result, so hardware acceptance remains open.
 
 #### Next Steps:
 
-Implement the smallest bounded helper scheduling correction and a regression that fails at video byte 368,134 on the old source. Verify unchanged video and AC-3 payloads, helper compilation, existing transport and audio checks, full-opening behavior in HDMI and S/PDIF forms, rate sensitivity, absence of simulated underruns, video stalls and protocol faults, and preserved end-of-stream completion. Publish the source only after these gates pass, then build the ARM helper for MiSTer and request separate installation and hardware-test authorization; stop for approval if evidence requires FPGA changes, buffer enlargement, arbitrary delay or relaxed error criteria.
+After separate user authorization, install only the committed ARM helper on the MiSTer with a backup and readback hash, leaving the accepted RBF and Main transport untouched. Replay the original opening over S/PDIF and HDMI, preferably extending the S/PDIF run to the prior eighteen-minute observation window, then collect the helper log and terminal 2DID evidence and require no audio underrun indication before accepting this commit in hardware. If an underrun remains, preserve the exact playback evidence and reopen diagnosis without enlarging buffers, adding arbitrary delay or relaxing error criteria.
 
 #### Files Modified:
 
@@ -24,10 +24,11 @@ Implement the smallest bounded helper scheduling correction and a regression tha
 - tools/streams/tb_h262_live_audio_transport.svh
 - tools/streams/run_original_dvd_audio_delivery.sh
 - tools/streams/analyze_original_audio_delivery.py
+- tools/streams/verify_arm_av_pipeline.py
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---

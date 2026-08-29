@@ -1,0 +1,29 @@
+{
+  "clean_video_bytes": 10334168,
+  "final_audio_deficit_frames": -34800,
+  "first_pcm_batch": 6144,
+  "first_pcm_clean_byte": 28645,
+  "max_audio_deficit_at_seconds": 0.5,
+  "max_audio_deficit_frames": 3544,
+  "max_pcm_free_video_bytes": 4052,
+  "max_pts_clean_video_gap": 518034,
+  "max_steady_pcm_batch": 2048,
+  "min_pts_clean_video_gap": 8065,
+  "pcm_end_count": 1,
+  "pcm_frames": 576000,
+  "pcm_sha256": "61b44febf8c9cdfad36313be9e650b1cb0f0929222744d374a877d21d1a3baaa",
+  "pts_count": 25,
+  "scheduler_stderr": [
+    "media_player_helper: audio output hdmi (decoded stereo PCM)",
+    "No accelerated IMDCT transform found",
+    "media_player_helper: AC-3 audio on private substream 0x80",
+    "media_player_helper: video=10334393 bytes, pts=25, audio=375 frames/576000 samples",
+    "media_player_helper: scheduler video_peak=461560 bytes, pcm_peak=15360 samples, pcm_emitted=576000 samples"
+  ],
+  "tail_pcm_free_video_bytes": 122304,
+  "terminal_pcm_batch": 0,
+  "transport_bytes": 12818397,
+  "transport_sha256": "ebdf440de71160a984ce772c851ed66385042dff2e52822dd059932ee809372b",
+  "video_bytes": 10334393,
+  "video_sha256": "4044b051d150e243d650d26ad5958a273d5ecfb1b9fdd14fd37c19e242679da6"
+}
