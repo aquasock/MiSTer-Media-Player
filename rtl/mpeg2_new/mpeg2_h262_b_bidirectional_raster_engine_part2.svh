@@ -47,8 +47,9 @@ wire block_phase1_bounds_ok=(block_backward_src_x>=0)&&
     (block_backward_src_y>=0)&&
     (block_phase1_last_x<$signed({2'b00,plane_width}))&&
     (block_phase1_last_y<$signed({2'b00,plane_height}));
-wire block_all_bounds_ok=block_phase0_bounds_ok&&
-    ((exec_direction!=2'd3)||block_phase1_bounds_ok);
+wire block_all_bounds_ok=exec_field?field_all_bounds_ok:
+    (block_phase0_bounds_ok&&
+     ((exec_direction!=2'd3)||block_phase1_bounds_ok));
 wire [3:0] block_phase0_word_span=
     {1'b0,block_phase0_src_x[2:0]}+4'd7+
     {3'd0,block_phase0_half_x};
@@ -62,6 +63,118 @@ wire [28:0] block_phase1_base_addr=pixel_addr(
     future_off,blk,block_backward_src_x[11:0],
     block_backward_src_y[11:0]);
 wire [7:0] block_row_words=(blk<4)?8'd90:8'd45;
+
+// Entry 695: a field phase is addressed from the block's first line rather
+// than from the pixel being reconstructed, because the phase holds the block's
+// four rows of one destination parity.
+wire [11:0] block_dest_x0=(blk<4)?(({6'd0,col}<<4)+{8'd0,blk[0],3'b000})
+                                 :({6'd0,col}<<3);
+wire [11:0] block_dest_y0=(blk<4)?(({6'd0,mrow}<<4)+{8'd0,blk[1],3'b000})
+                                 :({6'd0,mrow}<<3);
+wire signed [13:0] block_field_row0=$signed({2'b00,block_dest_y0[11:1]});
+// Phase p serves destination field p[0].  Phases 0 and 1 serve the forward
+// direction, or the only direction when the macroblock has just one; phases 2
+// and 3 serve the backward direction of a bidirectional macroblock.
+function automatic signed [9:0] field_mv_x;
+    input backward; input slot;
+    begin
+        field_mv_x=backward?(slot?exec_bmvx1:exec_bmvx)
+                           :(slot?exec_fmvx1:exec_fmvx);
+    end
+endfunction
+function automatic signed [9:0] field_mv_y;
+    input backward; input slot;
+    begin
+        field_mv_y=backward?(slot?exec_bmvy1:exec_bmvy)
+                           :(slot?exec_fmvy1:exec_fmvy);
+    end
+endfunction
+function automatic field_select;
+    input backward; input slot;
+    begin
+        field_select=backward?(slot?exec_bsel1:exec_bsel0)
+                             :(slot?exec_fsel1:exec_fsel0);
+    end
+endfunction
+wire field_phase01_backward=block_phase0_backward;
+wire signed [9:0] field_phase0_mvx=field_mv_x(field_phase01_backward,1'b0);
+wire signed [9:0] field_phase0_mvy=field_mv_y(field_phase01_backward,1'b0);
+wire signed [9:0] field_phase1_mvx=field_mv_x(field_phase01_backward,1'b1);
+wire signed [9:0] field_phase1_mvy=field_mv_y(field_phase01_backward,1'b1);
+wire signed [9:0] field_phase2_mvx=field_mv_x(1'b1,1'b0);
+wire signed [9:0] field_phase2_mvy=field_mv_y(1'b1,1'b0);
+wire signed [9:0] field_phase3_mvx=field_mv_x(1'b1,1'b1);
+wire signed [9:0] field_phase3_mvy=field_mv_y(1'b1,1'b1);
+wire field_phase0_sel=field_select(field_phase01_backward,1'b0);
+wire field_phase1_sel=field_select(field_phase01_backward,1'b1);
+wire field_phase2_sel=field_select(1'b1,1'b0);
+wire field_phase3_sel=field_select(1'b1,1'b1);
+// A field row maps back to a frame line through the selected field's parity.
+`define H262_B_FIELD_BASE_X(MVX) \
+    ($signed({2'b00,block_dest_x0})+($signed(MVX)>>>1))
+`define H262_B_FIELD_BASE_Y(MVY,SEL) \
+    (((block_field_row0+($signed(MVY)>>>1))<<<1)+$signed({13'd0,SEL}))
+wire signed [13:0] field_phase0_base_x=`H262_B_FIELD_BASE_X(field_phase0_mvx);
+wire signed [13:0] field_phase1_base_x=`H262_B_FIELD_BASE_X(field_phase1_mvx);
+wire signed [13:0] field_phase2_base_x=`H262_B_FIELD_BASE_X(field_phase2_mvx);
+wire signed [13:0] field_phase3_base_x=`H262_B_FIELD_BASE_X(field_phase3_mvx);
+wire signed [13:0] field_phase0_base_y=
+    `H262_B_FIELD_BASE_Y(field_phase0_mvy,field_phase0_sel);
+wire signed [13:0] field_phase1_base_y=
+    `H262_B_FIELD_BASE_Y(field_phase1_mvy,field_phase1_sel);
+wire signed [13:0] field_phase2_base_y=
+    `H262_B_FIELD_BASE_Y(field_phase2_mvy,field_phase2_sel);
+wire signed [13:0] field_phase3_base_y=
+    `H262_B_FIELD_BASE_Y(field_phase3_mvy,field_phase3_sel);
+wire [28:0] field_phase0_addr=pixel_addr(
+    field_phase01_backward?future_off:past_off,blk,
+    field_phase0_base_x[11:0],field_phase0_base_y[11:0]);
+wire [28:0] field_phase1_addr=pixel_addr(
+    field_phase01_backward?future_off:past_off,blk,
+    field_phase1_base_x[11:0],field_phase1_base_y[11:0]);
+wire [28:0] field_phase2_addr=pixel_addr(
+    future_off,blk,field_phase2_base_x[11:0],field_phase2_base_y[11:0]);
+wire [28:0] field_phase3_addr=pixel_addr(
+    future_off,blk,field_phase3_base_x[11:0],field_phase3_base_y[11:0]);
+wire [3:0] field_phase0_span=
+    {1'b0,field_phase0_base_x[2:0]}+4'd7+{3'd0,field_phase0_mvx[0]};
+wire [3:0] field_phase1_span=
+    {1'b0,field_phase1_base_x[2:0]}+4'd7+{3'd0,field_phase1_mvx[0]};
+wire [3:0] field_phase2_span=
+    {1'b0,field_phase2_base_x[2:0]}+4'd7+{3'd0,field_phase2_mvx[0]};
+wire [3:0] field_phase3_span=
+    {1'b0,field_phase3_base_x[2:0]}+4'd7+{3'd0,field_phase3_mvx[0]};
+// A phase spans four field rows, which is six frame lines, plus two more for a
+// vertical half sample.
+`define H262_B_FIELD_BOUNDS(BX,BY,MVX,MVY) \
+    ((BX>=0)&&(BY>=0)&& \
+     ((BX+14'sd7+(MVX[0]?14'sd1:14'sd0))<$signed({2'b00,plane_width}))&& \
+     ((BY+14'sd6+(MVY[0]?14'sd2:14'sd0))<$signed({2'b00,plane_height})))
+wire field_phase0_bounds_ok=`H262_B_FIELD_BOUNDS(
+    field_phase0_base_x,field_phase0_base_y,field_phase0_mvx,field_phase0_mvy);
+wire field_phase1_bounds_ok=`H262_B_FIELD_BOUNDS(
+    field_phase1_base_x,field_phase1_base_y,field_phase1_mvx,field_phase1_mvy);
+wire field_phase2_bounds_ok=`H262_B_FIELD_BOUNDS(
+    field_phase2_base_x,field_phase2_base_y,field_phase2_mvx,field_phase2_mvy);
+wire field_phase3_bounds_ok=`H262_B_FIELD_BOUNDS(
+    field_phase3_base_x,field_phase3_base_y,field_phase3_mvx,field_phase3_mvy);
+// The byte within a fetched word comes from the phase's own horizontal vector,
+// so the preserved extraction registers must follow the slot as well as the
+// direction.  ei[3] is the destination parity of the pixel being set up.
+wire [5:0] field_next_ei=ei+6'd1;
+// The extraction path does not add the element offset the way the lookup path
+// does, so these are the pixel's own source byte, not the block origin's.
+wire [2:0] field_forward_base_byte=
+    (ei[3]?field_phase1_base_x[2:0]:field_phase0_base_x[2:0])+ei[2:0];
+wire [2:0] field_backward_base_byte=
+    (ei[3]?field_phase3_base_x[2:0]:field_phase2_base_x[2:0])+ei[2:0];
+wire [2:0] field_next_base_byte=
+    (field_next_ei[3]?field_phase1_base_x[2:0]:field_phase0_base_x[2:0])+
+    field_next_ei[2:0];
+wire [2:0] field_first_base_byte=field_phase0_base_x[2:0]+ei[2:0];
+wire field_all_bounds_ok=field_phase0_bounds_ok&&field_phase1_bounds_ok&&
+    ((exec_direction!=2'd3)||
+     (field_phase2_bounds_ok&&field_phase3_bounds_ok));
 
 // Entry 272: the successor footprint is derived from the already loaded
 // macroblock motion record.  Only blk 0..4 use it; the blk-5 boundary keeps
@@ -135,40 +248,60 @@ wire [28:0] successor_phase1_base_addr=pixel_addr(
     successor_phase1_src_y[11:0]);
 wire [7:0] successor_row_words=successor_luma?8'd90:8'd45;
 
-wire [28:0] launch_phase0_base_addr=block_fetch_start_prefetch?
-    successor_phase0_base_addr:block_phase0_base_addr;
-wire [28:0] launch_phase1_base_addr=block_fetch_start_prefetch?
-    successor_phase1_base_addr:block_phase1_base_addr;
-wire launch_phase0_two_words=block_fetch_start_prefetch?
-    successor_phase0_word_span[3]:block_phase0_word_span[3];
-wire launch_phase1_two_words=block_fetch_start_prefetch?
-    successor_phase1_word_span[3]:block_phase1_word_span[3];
-wire launch_phase0_half_y=block_fetch_start_prefetch?
-    successor_phase0_mvy[0]:block_phase0_half_y;
-wire launch_phase1_half_y=block_fetch_start_prefetch?
-    successor_bmvy[0]:exec_bmvy[0];
+wire [28:0] launch_phase0_base_addr=exec_field?field_phase0_addr:
+    (block_fetch_start_prefetch?
+        successor_phase0_base_addr:block_phase0_base_addr);
+wire [28:0] launch_phase1_base_addr=exec_field?field_phase1_addr:
+    (block_fetch_start_prefetch?
+        successor_phase1_base_addr:block_phase1_base_addr);
+wire launch_phase0_two_words=exec_field?field_phase0_span[3]:
+    (block_fetch_start_prefetch?
+        successor_phase0_word_span[3]:block_phase0_word_span[3]);
+wire launch_phase1_two_words=exec_field?field_phase1_span[3]:
+    (block_fetch_start_prefetch?
+        successor_phase1_word_span[3]:block_phase1_word_span[3]);
+wire launch_phase0_half_y=exec_field?field_phase0_mvy[0]:
+    (block_fetch_start_prefetch?
+        successor_phase0_mvy[0]:block_phase0_half_y);
+wire launch_phase1_half_y=exec_field?field_phase1_mvy[0]:
+    (block_fetch_start_prefetch?successor_bmvy[0]:exec_bmvy[0]);
+// A field macroblock never prefetches its successor, so these need no mux.
+wire [3:0] launch_phase0_rows=exec_field?(4'd4+{3'd0,launch_phase0_half_y})
+                                        :(4'd8+{3'd0,launch_phase0_half_y});
+wire [3:0] launch_phase1_rows=exec_field?(4'd4+{3'd0,launch_phase1_half_y})
+                                        :(4'd8+{3'd0,launch_phase1_half_y});
+wire [3:0] launch_phase2_rows=4'd4+{3'd0,field_phase2_mvy[0]};
+wire [3:0] launch_phase3_rows=4'd4+{3'd0,field_phase3_mvy[0]};
+wire [2:0] launch_phase_count=exec_field?
+    ((exec_direction==2'd3)?3'd4:3'd2):
+    ((exec_direction==2'd3)?3'd2:3'd1);
 wire [7:0] launch_row_words=block_fetch_start_prefetch?
     successor_row_words:block_row_words;
 
-mpeg2_h262_prediction_block_fetcher block_fetcher(
+mpeg2_h262_prediction_block_fetcher #(.PHASES(4)) block_fetcher(
     .clk(clk),.reset(reset),
     .start(block_fetch_start&&!block_fetch_start_bank),
-    .phase_count((exec_direction==2'd3)?3'd2:3'd1),
+    .phase_count(launch_phase_count),
     .phase0_base_addr(launch_phase0_base_addr),
     .phase1_base_addr(launch_phase1_base_addr),
-    .phase2_base_addr(29'd0),.phase3_base_addr(29'd0),
+    .phase2_base_addr(field_phase2_addr),
+    .phase3_base_addr(field_phase3_addr),
     .phase0_two_words(launch_phase0_two_words),
     .phase1_two_words(launch_phase1_two_words),
-    .phase2_two_words(1'b0),.phase3_two_words(1'b0),
-    .phase0_rows(4'd8+{3'd0,launch_phase0_half_y}),
-    .phase1_rows(4'd8+{3'd0,launch_phase1_half_y}),
-    .phase2_rows(4'd1),.phase3_rows(4'd1),
-    .row_words(launch_row_words),.memory_busy(ddram_busy),
+    .phase2_two_words(field_phase2_span[3]),
+    .phase3_two_words(field_phase3_span[3]),
+    .phase0_rows(launch_phase0_rows),
+    .phase1_rows(launch_phase1_rows),
+    .phase2_rows(launch_phase2_rows),
+    .phase3_rows(launch_phase3_rows),
+    // A doubled stride makes each fetched row step one field line.
+    .row_words(exec_field?{launch_row_words[6:0],1'b0}:launch_row_words),
+    .memory_busy(ddram_busy),
     .memory_dout(ddram_dout),
     .memory_dout_ready(ddram_dout_ready&&block_fetch_active0),
     .memory_addr(block_fetch_addr0),.memory_rd(block_fetch_rd0),
     .lookup_request(block_lookup_request),
-    .lookup_phase({1'b0,block_lookup_phase}),.lookup_row(block_lookup_row),
+    .lookup_phase(block_lookup_phase),.lookup_row(block_lookup_row),
     .lookup_column(block_lookup_column),
     .lookup_ready(block_lookup_ready0),.lookup_valid(block_lookup_valid0),
     .lookup_data(block_lookup_data0),.active(block_fetch_active0),
@@ -179,25 +312,30 @@ mpeg2_h262_prediction_block_fetcher block_fetcher(
     .returned_count(block_fetch_returned0),
     .outstanding_count(block_fetch_outstanding0));
 
-mpeg2_h262_prediction_block_fetcher block_fetcher1(
+mpeg2_h262_prediction_block_fetcher #(.PHASES(4)) block_fetcher1(
     .clk(clk),.reset(reset),
     .start(block_fetch_start&&block_fetch_start_bank),
-    .phase_count((exec_direction==2'd3)?3'd2:3'd1),
+    .phase_count(launch_phase_count),
     .phase0_base_addr(launch_phase0_base_addr),
     .phase1_base_addr(launch_phase1_base_addr),
-    .phase2_base_addr(29'd0),.phase3_base_addr(29'd0),
+    .phase2_base_addr(field_phase2_addr),
+    .phase3_base_addr(field_phase3_addr),
     .phase0_two_words(launch_phase0_two_words),
     .phase1_two_words(launch_phase1_two_words),
-    .phase2_two_words(1'b0),.phase3_two_words(1'b0),
-    .phase0_rows(4'd8+{3'd0,launch_phase0_half_y}),
-    .phase1_rows(4'd8+{3'd0,launch_phase1_half_y}),
-    .phase2_rows(4'd1),.phase3_rows(4'd1),
-    .row_words(launch_row_words),.memory_busy(ddram_busy),
+    .phase2_two_words(field_phase2_span[3]),
+    .phase3_two_words(field_phase3_span[3]),
+    .phase0_rows(launch_phase0_rows),
+    .phase1_rows(launch_phase1_rows),
+    .phase2_rows(launch_phase2_rows),
+    .phase3_rows(launch_phase3_rows),
+    // A doubled stride makes each fetched row step one field line.
+    .row_words(exec_field?{launch_row_words[6:0],1'b0}:launch_row_words),
+    .memory_busy(ddram_busy),
     .memory_dout(ddram_dout),
     .memory_dout_ready(ddram_dout_ready&&block_fetch_active1),
     .memory_addr(block_fetch_addr1),.memory_rd(block_fetch_rd1),
     .lookup_request(block_lookup_request),
-    .lookup_phase({1'b0,block_lookup_phase}),.lookup_row(block_lookup_row),
+    .lookup_phase(block_lookup_phase),.lookup_row(block_lookup_row),
     .lookup_column(block_lookup_column),
     .lookup_ready(block_lookup_ready1),.lookup_valid(block_lookup_valid1),
     .lookup_data(block_lookup_data1),.active(block_fetch_active1),
@@ -511,18 +649,35 @@ wire block_lookup_retry=lookup_wait&&block_lookup_ready&&
     !block_lookup_valid;
 wire block_lookup_idle_request=lookup_wait&&!block_fetch_start&&
     !block_lookup_ready;
-assign block_lookup_phase=bidir_lookup_candidate?1'b1:
+// Entry 695: the direction being looked up becomes the phase's high bit and
+// the pixel's destination parity its low bit, so a bidirectional field
+// macroblock reads one of four rectangles.  A single-direction field
+// macroblock keeps its two phases at 0 and 1.
+wire block_lookup_direction=bidir_lookup_candidate?1'b1:
     next_pixel_lookup_candidate?1'b0:
     ((exec_direction==2'd3)&&pred_direction);
+assign block_lookup_phase=exec_field?
+    {block_lookup_direction&&(exec_direction==2'd3),block_request_ei[3]}:
+    {1'b0,block_lookup_direction};
 wire [5:0] block_request_ei=next_pixel_lookup_candidate?
     (ei+1'b1):ei;
 wire [1:0] block_request_tap=lookup_advance?
     lookup_advance_tap_index:
     (bidir_lookup_candidate||next_pixel_lookup_candidate)?2'd0:tap_index;
-wire signed [9:0] block_request_mvx=block_lookup_phase?
-    exec_bmvx:((exec_direction==2'd2)?exec_bmvx:exec_fmvx);
-wire signed [9:0] block_request_mvy=block_lookup_phase?
-    exec_bmvy:((exec_direction==2'd2)?exec_bmvy:exec_fmvy);
+// The vector belongs to the direction being looked up and, under field
+// prediction, to the slot matching the pixel's destination parity.
+wire block_request_backward=exec_field?block_lookup_phase[1]
+                                      :block_lookup_phase[0];
+wire signed [9:0] block_request_mvx=exec_field?
+    field_mv_x(block_request_backward||(exec_direction==2'd2),
+               block_lookup_phase[0]):
+    (block_lookup_phase[0]?exec_bmvx
+                          :((exec_direction==2'd2)?exec_bmvx:exec_fmvx));
+wire signed [9:0] block_request_mvy=exec_field?
+    field_mv_y(block_request_backward||(exec_direction==2'd2),
+               block_lookup_phase[0]):
+    (block_lookup_phase[0]?exec_bmvy
+                          :((exec_direction==2'd2)?exec_bmvy:exec_fmvy));
 wire block_request_half_x=block_request_mvx[0];
 wire block_request_half_y=block_request_mvy[0];
 wire block_request_tap_dx=
@@ -531,13 +686,17 @@ wire block_request_tap_dx=
 wire block_request_tap_dy=
     (block_request_half_x&&block_request_half_y)?block_request_tap[1]:
     (block_request_half_y?block_request_tap[0]:1'b0);
-wire [2:0] block_request_base_byte=block_lookup_phase?
-    block_phase1_base_byte:block_phase0_base_byte;
+wire [2:0] block_request_base_byte=
+    (block_lookup_phase==2'd0)?block_phase0_base_byte:
+    (block_lookup_phase==2'd1)?block_phase1_base_byte:
+    (block_lookup_phase==2'd2)?block_phase2_base_byte:
+                               block_phase3_base_byte;
 wire [4:0] block_request_byte=
     {2'd0,block_request_base_byte}+{2'd0,block_request_ei[2:0]}+
     {4'd0,block_request_tap_dx};
-assign block_lookup_row=
-    {1'b0,block_request_ei[5:3]}+block_request_tap_dy;
+assign block_lookup_row=exec_field?
+    ({2'd0,block_request_ei[5:4]}+{3'd0,block_request_tap_dy}):
+    ({1'b0,block_request_ei[5:3]}+block_request_tap_dy);
 assign block_lookup_column=block_request_byte[3];
 assign block_lookup_request=
     (prediction_lookup&&!(pixel_setup&&(ei==0)))||
@@ -588,6 +747,8 @@ always @(posedge clk) begin
         pending_fmvx1<=0;pending_fmvy1<=0;pending_bmvx1<=0;pending_bmvy1<=0;
         pending_field<=0;pending_fsel0<=0;pending_fsel1<=0;pending_bsel1<=0;
         exec_direction<=0;exec_fmvx<=0;exec_fmvy<=0;exec_bmvx<=0;exec_bmvy<=0;
+        exec_fmvx1<=0;exec_fmvy1<=0;exec_bmvx1<=0;exec_bmvy1<=0;
+        exec_field<=0;exec_fsel0<=0;exec_fsel1<=0;exec_bsel0<=0;exec_bsel1<=0;
         phase_mvx<=0;phase_mvy<=0;phase_backward<=0;
         bidir_prelaunch_addr<=0;next_prelaunch_addr<=0;
         miss_prelaunch_addr<=0;miss_prelaunch_byte<=0;
@@ -613,6 +774,8 @@ always @(posedge clk) begin
         block_current_started<=0;
         block_phase0_base_byte<=0;
         block_phase1_base_byte<=0;
+        block_phase2_base_byte<=0;
+        block_phase3_base_byte<=0;
         read_seen<=0;sample_nonzero<=0;half_sample_seen<=0;reconstructed_seen<=0;persisted_seen<=0;row_persisted<=0;error<=0;error_source<=0;
         row_final_latched<=0;
     end else begin

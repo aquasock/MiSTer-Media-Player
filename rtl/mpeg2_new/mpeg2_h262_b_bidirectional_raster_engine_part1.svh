@@ -62,6 +62,12 @@ wire signed [9:0] mb_bmvy=$signed(motion_word[29:20]);
 (* preserve *) reg [1:0] exec_direction;
 (* preserve *) reg signed [9:0] exec_fmvx,exec_fmvy;
 (* preserve *) reg signed [9:0] exec_bmvx,exec_bmvy;
+// Entry 695: field prediction carries a second vector per direction and a
+// motion_vertical_field_select for each, so the execution stage carries them
+// too rather than reaching back into the motion word.
+(* preserve *) reg signed [9:0] exec_fmvx1,exec_fmvy1;
+(* preserve *) reg signed [9:0] exec_bmvx1,exec_bmvy1;
+(* preserve *) reg exec_field,exec_fsel0,exec_fsel1,exec_bsel0,exec_bsel1;
 (* preserve *) reg signed [9:0] phase_mvx,phase_mvy;
 (* preserve *) reg phase_backward;
 (* preserve *) reg [28:0] bidir_prelaunch_addr,next_prelaunch_addr;
@@ -131,8 +137,14 @@ reg block_fetch_start_bank,block_fetch_start_prefetch;
 reg block_consumer_bank,block_prefetch_valid,block_current_prefetched;
 reg block_current_started;
 reg [2:0] block_phase0_base_byte,block_phase1_base_byte;
+// Entry 695: a field macroblock fetches four rectangles, each with its own
+// horizontal vector and therefore its own byte origin.
+reg [2:0] block_phase2_base_byte,block_phase3_base_byte;
 wire fast_pixel_advance,slow_pixel_advance,precompute_after_advance;
-wire block_lookup_request,block_lookup_phase;
+wire block_lookup_request;
+// Entry 695: two bits, so a bidirectional field macroblock can name one of
+// four rectangles: direction in the high bit, destination parity in the low.
+wire [1:0] block_lookup_phase;
 wire [3:0] block_lookup_row;
 wire block_lookup_column;
 wire block_lookup_ready,block_lookup_valid;

@@ -52,9 +52,14 @@
         if(residual_load)begin
             residual_load<=0;residual_load_wait<=1;
             exec_direction<=mb_direction;
+            exec_field<=mb_field;
+            exec_fsel0<=mb_fsel0;exec_fsel1<=mb_fsel1;
+            exec_bsel0<=mb_bsel0;exec_bsel1<=mb_bsel1;
             if(blk<4) begin
                 exec_fmvx<=mb_fmvx;exec_fmvy<=mb_fmvy;
                 exec_bmvx<=mb_bmvx;exec_bmvy<=mb_bmvy;
+                exec_fmvx1<=mb_fmvx1;exec_fmvy1<=mb_fmvy1;
+                exec_bmvx1<=mb_bmvx1;exec_bmvy1<=mb_bmvy1;
                 phase_mvx<=(mb_direction==2'd2)?mb_bmvx:mb_fmvx;
                 phase_mvy<=(mb_direction==2'd2)?mb_bmvy:mb_fmvy;
             end else begin
@@ -62,6 +67,10 @@
                 exec_fmvy<=chroma_half_vector(mb_fmvy);
                 exec_bmvx<=chroma_half_vector(mb_bmvx);
                 exec_bmvy<=chroma_half_vector(mb_bmvy);
+                exec_fmvx1<=chroma_half_vector(mb_fmvx1);
+                exec_fmvy1<=chroma_half_vector(mb_fmvy1);
+                exec_bmvx1<=chroma_half_vector(mb_bmvx1);
+                exec_bmvy1<=chroma_half_vector(mb_bmvy1);
                 phase_mvx<=chroma_half_vector(
                     (mb_direction==2'd2)?mb_bmvx:mb_fmvx);
                 phase_mvy<=chroma_half_vector(
@@ -72,7 +81,8 @@
         if(residual_load_wait)begin
             residual_load_wait<=0;pred_sum<=0;tap_index<=0;pixel_setup<=1;
             phase_base_addr<=computed_phase_base_addr;
-            phase_base_byte<=src_base_x[2:0];
+            phase_base_byte<=exec_field?field_first_base_byte
+                                       :src_base_x[2:0];
             phase_row_words<=(blk<4)?7'd90:7'd45;
             phase_bounds_ok<=source_bounds_ok;
             if((exec_direction!=0)&&block_all_bounds_ok)begin
@@ -84,8 +94,12 @@
                     block_fetch_start_prefetch<=0;
                     block_current_started<=1;
                 end
-                block_phase0_base_byte<=block_phase0_src_x[2:0];
-                block_phase1_base_byte<=block_backward_src_x[2:0];
+                block_phase0_base_byte<=exec_field?field_phase0_base_x[2:0]
+                                                  :block_phase0_src_x[2:0];
+                block_phase1_base_byte<=exec_field?field_phase1_base_x[2:0]
+                                                  :block_backward_src_x[2:0];
+                block_phase2_base_byte<=field_phase2_base_x[2:0];
+                block_phase3_base_byte<=field_phase3_base_x[2:0];
             end
         end
 
@@ -94,6 +108,7 @@
         // successor footprint while reconstruction consumes retained words.
         if(!residual_load_wait&&!block_fetch_start&&block_current_started&&
            !block_current_prefetched&&(exec_direction!=0)&&(blk<5)&&
+           !exec_field&&
            block_fetch_complete&&!block_prefetch_valid&&
            successor_all_bounds_ok)begin
             block_fetch_start<=1;
@@ -133,10 +148,12 @@
                     if((exec_direction==2'd3)&&!pred_direction) begin
                         forward_prediction<=lookup_selected_prediction;
                         pred_direction<=1;pred_sum<=0;tap_index<=0;
-                        phase_mvx<=exec_bmvx;phase_mvy<=exec_bmvy;
+                        phase_mvx<=exec_field?field_mv_x(1'b1,ei[3]):exec_bmvx;
+                        phase_mvy<=exec_field?field_mv_y(1'b1,ei[3]):exec_bmvy;
                         phase_backward<=1;
                         phase_base_addr<=bidir_prelaunch_addr;
-                        phase_base_byte<=bidir_prelaunch_byte;
+                        phase_base_byte<=exec_field?field_backward_base_byte
+                                                   :bidir_prelaunch_byte;
                         phase_bounds_ok<=bidir_prelaunch_valid;
                         if(exec_bmvx[0]||exec_bmvy[0])
                             half_sample_seen<=1;
@@ -169,11 +186,16 @@
             else if(!emit_advanced) begin
                 ei<=ei+1'b1;
                 pred_direction<=0;
-                phase_mvx<=(exec_direction==2'd2)?exec_bmvx:exec_fmvx;
-                phase_mvy<=(exec_direction==2'd2)?exec_bmvy:exec_fmvy;
+                phase_mvx<=exec_field?
+                    field_mv_x((exec_direction==2'd2),field_next_ei[3]):
+                    ((exec_direction==2'd2)?exec_bmvx:exec_fmvx);
+                phase_mvy<=exec_field?
+                    field_mv_y((exec_direction==2'd2),field_next_ei[3]):
+                    ((exec_direction==2'd2)?exec_bmvy:exec_fmvy);
                 phase_backward<=(exec_direction==2'd2);
                 phase_base_addr<=next_prelaunch_addr;
-                phase_base_byte<=next_prelaunch_byte;
+                phase_base_byte<=exec_field?field_next_base_byte
+                                           :next_prelaunch_byte;
                 phase_bounds_ok<=next_prelaunch_valid;
                 pred_sum<=0;
                 tap_index<=0;
@@ -206,11 +228,16 @@
             else begin
                 ei<=ei+1'b1;
                 pred_direction<=0;
-                phase_mvx<=(exec_direction==2'd2)?exec_bmvx:exec_fmvx;
-                phase_mvy<=(exec_direction==2'd2)?exec_bmvy:exec_fmvy;
+                phase_mvx<=exec_field?
+                    field_mv_x((exec_direction==2'd2),field_next_ei[3]):
+                    ((exec_direction==2'd2)?exec_bmvx:exec_fmvx);
+                phase_mvy<=exec_field?
+                    field_mv_y((exec_direction==2'd2),field_next_ei[3]):
+                    ((exec_direction==2'd2)?exec_bmvy:exec_fmvy);
                 phase_backward<=(exec_direction==2'd2);
                 phase_base_addr<=next_prelaunch_addr;
-                phase_base_byte<=next_prelaunch_byte;
+                phase_base_byte<=exec_field?field_next_base_byte
+                                           :next_prelaunch_byte;
                 phase_bounds_ok<=next_prelaunch_valid;
                 pred_sum<=0;
                 tap_index<=0;
