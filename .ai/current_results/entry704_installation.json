@@ -1,0 +1,59 @@
+{
+  "source_commit": "736f64f1631c6c6f20d4fb7ecf38b862699476c1",
+  "device": "10.10.0.30",
+  "started": "2026-08-29T03:35:47-07:00",
+  "finished": "2026-08-29T03:41:26-07:00",
+  "rbf": {
+    "source": "/home/vash/mister-builds/entry702/source_0313/output_files/MediaPlayer.rbf",
+    "target": "/media/fat/MediaPlayer_20260829.rbf",
+    "bytes": 4459744,
+    "sha256": "3f66a5eb38bcff783472b977764bc34366a07570b01278822e705718edf224fa",
+    "stage_verified": true,
+    "final_readback_verified": true
+  },
+  "helper": {
+    "source": "/home/vash/mister-builds/entry699/source/host/build/MediaPlayer_Helper",
+    "target": "/media/fat/linux/MediaPlayer_Helper",
+    "bytes": 629056,
+    "sha256": "02d1df98c62ee00169585db990b6bd48c3769eca20c3e1d594f2318c362eb00f",
+    "stage_verified": true,
+    "final_readback_verified": true
+  },
+  "replaced_helper": {
+    "bytes": 629056,
+    "sha256": "f5573a98dcd788228d317da906c8d017cf904e3a85f1d43aea7f13b048252758"
+  },
+  "backup": {
+    "path": "/media/fat/_MediaPlayer_Backups/MediaPlayer_Helper_f5573a98dcd7_20260829T034019",
+    "bytes": 629056,
+    "sha256": "f5573a98dcd788228d317da906c8d017cf904e3a85f1d43aea7f13b048252758",
+    "readback_verified": true
+  },
+  "protected_unchanged": [
+    {
+      "path": "/media/fat/MiSTer",
+      "bytes": 1170340,
+      "sha256": "7c84a66e5ad71e7fcb3b53ca8265952a96c3d7a0cf752147beb0d9649506f6ae"
+    },
+    {
+      "path": "/media/fat/MediaPlayer.rbf",
+      "bytes": 4393936,
+      "sha256": "417a92aa5a1b43c2873398ba48f8e9dd8c2210ab07848e29559449936f6a3518"
+    },
+    {
+      "path": "/media/fat/MediaPlayer_20260828.rbf",
+      "bytes": 4369004,
+      "sha256": "a403d224ee98d192994fccf8116d59eef26933351216c66a14d044748a86171c"
+    },
+    {
+      "path": "/media/fat/games/MediaPlayer/dvd_opening_original.mpg",
+      "bytes": 11145233,
+      "sha256": "218d3a8eab32efceb6263d884be1b589b75e598ae25eeb465d14e4b430dfdc21"
+    }
+  ],
+  "ftp_path_correction": "The initial read-only inventory used login-relative curl FTP paths. True filesystem-absolute paths were then encoded with a leading %2f before any write.",
+  "core_reloaded": false,
+  "playback_started": false,
+  "hardware_accepted": false,
+  "errors": []
+}

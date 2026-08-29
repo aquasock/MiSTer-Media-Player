@@ -1,4 +1,4 @@
-## 704 COMMIT Unreleased ??? 2026-08-29T03:35:47-07:00
+## 704 COMMIT Unreleased 736f64f 2026-08-29T03:35:47-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Deploy and hardware-test the exact fit-qualified recovery RBF with its matching 
 
 #### Outcome:
 
-The authorized hardware checkpoint will use source `736f64f`'s clean timing-positive 4,459,744-byte RBF with SHA-256 `3f66a5eb38bcff783472b977764bc34366a07570b01278822e705718edf224fa` and the matching 629,056-byte static ARM helper with SHA-256 `02d1df98c62ee00169585db990b6bd48c3769eca20c3e1d594f2318c362eb00f`.  The RBF will be installed as a separate dated candidate rather than replacing an existing core, while the installed helper will be read back and preserved before a staged, hash-verified replacement.  Main and existing media will remain unchanged.  This checkpoint can validate existing video behavior and the corrected HDMI and S/PDIF audio routing, but production interlaced P and B admission remains closed and therefore it cannot accept the NARA release profile or prove the recovered field-prediction path on hardware.
+The exact source `736f64f` artifacts were retrieved from GUNSMOKE and independently reverified before deployment.  The 4,459,744-byte RBF with SHA-256 `3f66a5eb38bcff783472b977764bc34366a07570b01278822e705718edf224fa` is installed as `/media/fat/MediaPlayer_20260829.rbf` without replacing any existing core, and final FTP readback matches.  The installed 629,056-byte helper with SHA-256 `f5573a98dcd788228d317da906c8d017cf904e3a85f1d43aea7f13b048252758` is preserved and readback-verified at `/media/fat/_MediaPlayer_Backups/MediaPlayer_Helper_f5573a98dcd7_20260829T034019`; the matching 629,056-byte helper with SHA-256 `02d1df98c62ee00169585db990b6bd48c3769eca20c3e1d594f2318c362eb00f` is staged, promoted and verified at `/media/fat/linux/MediaPlayer_Helper`.  An initial read-only inventory used curl's login-relative FTP interpretation; after the user identified the mistake, filesystem-absolute paths were encoded explicitly before any write.  Before-and-after readbacks prove MiSTer Main, the active undated core, the prior dated core and the original DVD opening unchanged.  No core was loaded and no playback was started.  This checkpoint can validate existing video behavior and corrected HDMI and S/PDIF routing, but production interlaced P and B admission remains closed and therefore it cannot accept the NARA release profile or prove the recovered field-prediction path on hardware.
 
 #### Next Steps:
 
-Perform a read-only MiSTer inventory, retrieve and independently verify the exact build-PC artifacts, preserve the current helper, upload both candidates through staging names, verify staged and final readback hashes, and leave core loading and playback to the user.  Test the existing original DVD opening over HDMI decoded PCM first, then MP3, WAV and FLAC over S/PDIF, then AC-3 passthrough over S/PDIF and one known progressive video.  Capture the helper log and terminal telemetry before replay if any regression, dropout, protocol fault or visible error occurs.
+Explicitly load `MediaPlayer_20260829.rbf`, then play the existing original DVD opening over HDMI decoded PCM first and report motion, audio and completion.  If clean, test MP3, WAV and FLAC over S/PDIF, then AC-3 passthrough over S/PDIF and one known progressive video.  Leave the completed screen and latest helper log intact before replay if any regression, dropout, protocol fault or visible error occurs so evidence can be collected.  Mark hardware acceptance only after the user reports the checkpoint results; this RBF does not yet exercise production field prediction.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ None.
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
