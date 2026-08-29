@@ -401,7 +401,7 @@ always @(posedge clk) begin
             deferred_ordinary_b_start<=0;
         active_frame_bank_q<=active_frame_bank;
         if(!reorder_active)ordinary_drain_overlap<=0;
-        if(non_b_picture_start)
+        if(i_picture_start||p_picture_start)
             reference_header_count<=reference_header_count+1'b1;
         case ({non_b_picture_start,reference_completed})
             2'b10: if(reference_headers_inflight!=2)
