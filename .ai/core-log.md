@@ -1,3 +1,32 @@
+## 706 COMMIT Unreleased 736f64f 2026-08-29T03:55:11-07:00
+
+#### Coming From:
+
+Unreleased 736f64f
+
+#### Purpose:
+
+Record hardware acceptance of standalone MP3 playback over decoded-PCM S/PDIF.
+
+#### Outcome:
+
+After identifying that the first attempted capture belonged to an accidental replay of the DVD opening, the user runs the intended `entry697_file_example_WAV_1MG_192k.mp3` test with the same loaded `MediaPlayer_20260829.rbf` and reports that everything passes and the audio sounds great.  The corrected helper log identifies the exact MP3 source and `audio output spdif (decoded PCM; IEC 61937 for AC-3/DTS)`, emits zero video bytes, zero timestamps and 229 decoded audio frames containing 263,808 stereo samples, reaches EOF and exits zero.  Main submits all 1,137,676 transport bytes across 70 pipe reads, with every byte on the fast path and none on the slow path.  The standalone-audio run leaves the preceding video telemetry image resident, so that stale decoder snapshot is not treated as MP3 evidence; the source-specific helper completion and the user's physical listening result accept MP3 decoded PCM over S/PDIF.  No source, FPGA image, helper, Main or MiSTer configuration changed during capture.
+
+#### Next Steps:
+
+Per the user's direction, stop consumer-audio hardware testing here and return to DVD video work.  Add and fixture-test inter-macroblock field DCT before opening the P, B and frontend production admission gates, preserving the fit-qualified RBF and accepted helper unchanged until the video simulation gates justify another build.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 705 COMMIT Unreleased 736f64f 2026-08-29T03:46:17-07:00
 
 #### Coming From:
