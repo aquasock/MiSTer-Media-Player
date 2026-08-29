@@ -1837,11 +1837,13 @@ module tb_h262_live_raster_soak #(
                    profile_b_replay_twrite!=26591||
                    profile_b_replay_coeff_writes!=26591||
                    profile_b_replay_coeff_wait!=0||
-                   // The connected frame_pred_frame_dct path adds one clock.
+                   // Registered B lookup boundaries remove the direction-to-
+                   // retained-word timing cone while preserving every DDR
+                   // and reconstruction count.
                    ((EXPECTED_DESCRIPTOR_DEPTH==2)&&
-                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1239997))||
+                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1439997))||
                    ((EXPECTED_DESCRIPTOR_DEPTH==4)&&
-                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1239997))||
+                    (MEMORY_READ_LATENCY==1)&&(total_cycles!=1439997))||
                    pixel_samples!=423936||pixel_mismatches!=0||
                    !writer_seen||!pred_read_observed||
                    !pred_reconstructed_observed||!presentation_complete||

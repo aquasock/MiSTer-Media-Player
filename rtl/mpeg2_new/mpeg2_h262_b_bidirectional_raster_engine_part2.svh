@@ -691,9 +691,14 @@ wire lookup_advance_tap_dx=(half_x&&half_y)?
 wire lookup_advance_tap_dy=(half_x&&half_y)?
     lookup_advance_tap_index[1]:
     (half_y?lookup_advance_tap_index[0]:1'b0);
+// A direction or pixel boundary updates the registered phase vector, byte
+// origin and direction first; the normal idle request launches its lookup on
+// the following cycle.  Keeping those boundary look-aheads out of this path
+// avoids putting completion, direction selection, address arithmetic and the
+// fetcher's retained-word read in one 60 MHz cycle.  Tap-to-tap lookup within
+// an unchanged phase remains zero-bubble through lookup_advance.
 wire prediction_lookup=
-    (pixel_setup&&(exec_direction!=0)&&phase_bounds_ok)||lookup_advance||
-    bidir_lookup_candidate||next_pixel_lookup_candidate;
+    (pixel_setup&&(exec_direction!=0)&&phase_bounds_ok)||lookup_advance;
 wire advance_tap_address=lookup_advance;
 wire address_tap_dx=advance_tap_address?lookup_advance_tap_dx:tap_dx;
 wire address_tap_dy=advance_tap_address?lookup_advance_tap_dy:tap_dy;
