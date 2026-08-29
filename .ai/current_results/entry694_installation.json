@@ -1,11 +1,11 @@
 {
-  "source_commit": "9956c8e",
+  "source_commit": "f2c10be",
   "device": "10.10.0.30",
-  "started": "2026-08-28T20:41:17-07:00",
   "target": "/media/fat/linux/MediaPlayer_Helper",
+  "note": "installed during playback; helper is exec'd per playback so the running process is unaffected and this takes effect on the next start",
   "candidate": {
     "bytes": 399344,
-    "sha256": "c76eb4b0e41a401f64994a8ea67a08c4cf932642f7a8114706562ab64fb00a44"
+    "sha256": "ed13bc9357bff0a5e28bcfa703badb1614a6220cb29a51c4886316067f201a35"
   },
   "protected_before": [
     {
@@ -15,18 +15,8 @@
     },
     {
       "path": "/media/fat/MediaPlayer.rbf",
-      "bytes": 4309784,
-      "sha256": "9730e0ba61adbcd5319a42b9d270f30083947487f156cc17a1ce277d96a7dc18"
-    },
-    {
-      "path": "/media/fat/MediaPlayer_20260828.rbf",
-      "bytes": 4369004,
-      "sha256": "a403d224ee98d192994fccf8116d59eef26933351216c66a14d044748a86171c"
-    },
-    {
-      "path": "/media/fat/MediaPlayer_OLD.rbf",
-      "bytes": 4278588,
-      "sha256": "5895917446f140bc53130fcf4b93226fa507cd9c6b9f335c00660c7428711365"
+      "bytes": 4393936,
+      "sha256": "417a92aa5a1b43c2873398ba48f8e9dd8c2210ab07848e29559449936f6a3518"
     },
     {
       "path": "/media/fat/games/MediaPlayer/dvd_opening_original.mpg",
@@ -42,18 +32,8 @@
     },
     {
       "path": "/media/fat/MediaPlayer.rbf",
-      "bytes": 4309784,
-      "sha256": "9730e0ba61adbcd5319a42b9d270f30083947487f156cc17a1ce277d96a7dc18"
-    },
-    {
-      "path": "/media/fat/MediaPlayer_20260828.rbf",
-      "bytes": 4369004,
-      "sha256": "a403d224ee98d192994fccf8116d59eef26933351216c66a14d044748a86171c"
-    },
-    {
-      "path": "/media/fat/MediaPlayer_OLD.rbf",
-      "bytes": 4278588,
-      "sha256": "5895917446f140bc53130fcf4b93226fa507cd9c6b9f335c00660c7428711365"
+      "bytes": 4393936,
+      "sha256": "417a92aa5a1b43c2873398ba48f8e9dd8c2210ab07848e29559449936f6a3518"
     },
     {
       "path": "/media/fat/games/MediaPlayer/dvd_opening_original.mpg",
@@ -61,33 +41,30 @@
       "sha256": "218d3a8eab32efceb6263d884be1b589b75e598ae25eeb465d14e4b430dfdc21"
     }
   ],
+  "started": "2026-08-28T21:58:48-07:00",
   "operations": [
-    "STOR /media/fat/_MediaPlayer_Backups/MediaPlayer_Helper_fefaeb18b8c9_20260828T204117",
-    "STOR /media/fat/linux/MediaPlayer_Helper.upload-entry694-20260828T204117",
-    "RNFR/RNTO -> MediaPlayer_Helper"
+    "STOR /media/fat/_MediaPlayer_Backups/MediaPlayer_Helper_c76eb4b0e41a_20260828T215848",
+    "STOR /media/fat/linux/MediaPlayer_Helper.upload-entry696-20260828T215848"
   ],
   "errors": [],
   "replaced": {
     "path": "/media/fat/linux/MediaPlayer_Helper",
-    "bytes": 399340,
-    "sha256": "fefaeb18b8c9e091a9cd9e97258e86264683f374f9663cb3ea6b99bafb81977a"
+    "bytes": 399344,
+    "sha256": "c76eb4b0e41a401f64994a8ea67a08c4cf932642f7a8114706562ab64fb00a44"
   },
   "backup": {
-    "path": "/media/fat/_MediaPlayer_Backups/MediaPlayer_Helper_fefaeb18b8c9_20260828T204117",
-    "bytes": 399340,
-    "sha256": "fefaeb18b8c9e091a9cd9e97258e86264683f374f9663cb3ea6b99bafb81977a"
+    "path": "/media/fat/_MediaPlayer_Backups/MediaPlayer_Helper_c76eb4b0e41a_20260828T215848",
+    "bytes": 399344,
+    "sha256": "c76eb4b0e41a401f64994a8ea67a08c4cf932642f7a8114706562ab64fb00a44"
   },
   "backup_verified": true,
   "stage_verified": true,
   "final_readback": {
     "path": "/media/fat/linux/MediaPlayer_Helper",
     "bytes": 399344,
-    "sha256": "c76eb4b0e41a401f64994a8ea67a08c4cf932642f7a8114706562ab64fb00a44"
+    "sha256": "ed13bc9357bff0a5e28bcfa703badb1614a6220cb29a51c4886316067f201a35"
   },
   "installation_verified": true,
   "protected_unchanged": true,
-  "core_reloaded": false,
-  "playback_started": false,
-  "hardware_accepted": false,
-  "finished": "2026-08-28T20:41:19-07:00"
+  "finished": "2026-08-28T21:58:50-07:00"
 }
