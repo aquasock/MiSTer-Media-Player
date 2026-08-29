@@ -385,20 +385,24 @@ wire [7:0] block_row_words=(blk<4)?8'd90:8'd45;
 mpeg2_h262_prediction_block_fetcher block_fetcher(
     .clk(clk),.reset(reset),.start(block_fetch_start),
     // Entry 695: field prediction fetches one rectangle per destination field.
-    .phase_count(mb_field?2'd2:2'd1),
+    .phase_count(mb_field?3'd2:3'd1),
     .phase0_base_addr(mb_field?phase0_addr:block_phase0_base_addr),
     .phase1_base_addr(mb_field?phase1_addr:29'd0),
+    .phase2_base_addr(29'd0),.phase3_base_addr(29'd0),
     .phase0_two_words(mb_field?phase0_word_span[3]:block_word_span[3]),
     .phase1_two_words(mb_field?phase1_word_span[3]:1'b0),
+    .phase2_two_words(1'b0),.phase3_two_words(1'b0),
     .phase0_rows(mb_field?(4'd4+{3'd0,slot0_half_y}):(4'd8+{3'd0,half_y})),
     .phase1_rows(mb_field?(4'd4+{3'd0,slot1_half_y}):4'd1),
+    .phase2_rows(4'd1),.phase3_rows(4'd1),
     // A doubled stride makes each fetched row step one field line, which is
     // also what lets the vertical half sample interpolate between field lines.
     .row_words(mb_field?{block_row_words[6:0],1'b0}:block_row_words),
     .memory_busy(ddram_busy),
     .memory_dout(ddram_dout),.memory_dout_ready(ddram_dout_ready),
     .memory_addr(block_fetch_addr),.memory_rd(block_fetch_rd),
-    .lookup_request(block_lookup_request),.lookup_phase(block_lookup_phase),
+    .lookup_request(block_lookup_request),
+    .lookup_phase({1'b0,block_lookup_phase}),
     .lookup_row(block_lookup_row),.lookup_column(block_lookup_column),
     .lookup_ready(block_lookup_ready),.lookup_valid(block_lookup_valid),
     .lookup_data(block_lookup_data),.active(block_fetch_active),
