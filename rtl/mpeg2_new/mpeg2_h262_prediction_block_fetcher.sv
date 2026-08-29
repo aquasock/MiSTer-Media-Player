@@ -28,7 +28,10 @@ module mpeg2_h262_prediction_block_fetcher
     input  wire        phase1_two_words,
     input  wire [3:0]  phase0_rows,
     input  wire [3:0]  phase1_rows,
-    input  wire [6:0]  row_words,
+    // Entry 695: a field fetch is the same rectangle read with the parity
+    // folded into the base address and the row stride doubled, so luma
+    // reaches 180 words and no longer fits seven bits.
+    input  wire [7:0]  row_words,
 
     input  wire        memory_busy,
     input  wire [63:0] memory_dout,
@@ -71,7 +74,7 @@ reg [1:0] phase_count_reg;
 reg [28:0] phase1_base_addr_reg;
 reg phase0_two_words_reg,phase1_two_words_reg;
 reg [3:0] phase0_rows_reg,phase1_rows_reg;
-reg [6:0] row_words_reg;
+reg [7:0] row_words_reg;
 
 reg [5:0] descriptor_slot [0:DESCRIPTOR_DEPTH-1];
 reg [DESCRIPTOR_POINTER_WIDTH-1:0] descriptor_head,descriptor_tail;
@@ -137,7 +140,7 @@ always @(posedge clk) begin
         phase1_two_words_reg<=1'b0;
         phase0_rows_reg<=4'd0;
         phase1_rows_reg<=4'd0;
-        row_words_reg<=7'd0;
+        row_words_reg<=8'd0;
         for(descriptor_index=0;descriptor_index<DESCRIPTOR_DEPTH;
             descriptor_index=descriptor_index+1)
             descriptor_slot[descriptor_index]<=6'd0;
@@ -214,7 +217,7 @@ always @(posedge clk) begin
                     generator_row<=generator_row+1'b1;
                     generator_column<=1'b0;
                     generator_row_addr<=generator_row_addr+
-                        {22'd0,row_words_reg};
+                        {21'd0,row_words_reg};
                 end else begin
                     generator_phase<=1'b1;
                     generator_row<=4'd0;

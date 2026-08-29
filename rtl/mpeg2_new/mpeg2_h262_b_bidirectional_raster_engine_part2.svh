@@ -61,7 +61,7 @@ wire [28:0] block_phase0_base_addr=pixel_addr(
 wire [28:0] block_phase1_base_addr=pixel_addr(
     future_off,blk,block_backward_src_x[11:0],
     block_backward_src_y[11:0]);
-wire [6:0] block_row_words=(blk<4)?7'd90:7'd45;
+wire [7:0] block_row_words=(blk<4)?8'd90:8'd45;
 
 // Entry 272: the successor footprint is derived from the already loaded
 // macroblock motion record.  Only blk 0..4 use it; the blk-5 boundary keeps
@@ -133,7 +133,7 @@ wire [28:0] successor_phase0_base_addr=pixel_addr(
 wire [28:0] successor_phase1_base_addr=pixel_addr(
     future_off,successor_blk,successor_phase1_src_x[11:0],
     successor_phase1_src_y[11:0]);
-wire [6:0] successor_row_words=successor_luma?7'd90:7'd45;
+wire [7:0] successor_row_words=successor_luma?8'd90:8'd45;
 
 wire [28:0] launch_phase0_base_addr=block_fetch_start_prefetch?
     successor_phase0_base_addr:block_phase0_base_addr;
@@ -147,7 +147,7 @@ wire launch_phase0_half_y=block_fetch_start_prefetch?
     successor_phase0_mvy[0]:block_phase0_half_y;
 wire launch_phase1_half_y=block_fetch_start_prefetch?
     successor_bmvy[0]:exec_bmvy[0];
-wire [6:0] launch_row_words=block_fetch_start_prefetch?
+wire [7:0] launch_row_words=block_fetch_start_prefetch?
     successor_row_words:block_row_words;
 
 mpeg2_h262_prediction_block_fetcher block_fetcher(

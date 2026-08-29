@@ -318,7 +318,7 @@ wire [3:0] block_word_span=
     {1'b0,src_base_x[2:0]}+4'd7+{3'd0,half_x};
 wire [28:0] block_phase0_base_addr=pixel_addr(
     roff,blk,src_base_x[11:0],src_base_y[11:0]);
-wire [6:0] block_row_words=(blk<4)?7'd90:7'd45;
+wire [7:0] block_row_words=(blk<4)?8'd90:8'd45;
 
 mpeg2_h262_prediction_block_fetcher block_fetcher(
     .clk(clk),.reset(reset),.start(block_fetch_start),
