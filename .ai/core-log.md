@@ -1,4 +1,33 @@
-## 701 COMMIT Unreleased ??? 2026-08-29T02:45:25-07:00
+## 702 COMMIT Unreleased ??? 2026-08-29T03:10:56-07:00
+
+#### Coming From:
+
+Unreleased 736f64f
+
+#### Purpose:
+
+Qualify the published interlaced prediction recovery and pending decoded-PCM S/PDIF correction with one clean exact-source Quartus build.
+
+#### Outcome:
+
+This cycle is build qualification only.  A fresh isolated checkout will be created from published source `736f64f` with no reused Quartus database, generated output or uncommitted patch.  Quartus Prime Lite 17.0.2 will run the complete configured flow followed by the focused timing report.  Acceptance requires fitter completion, positive setup, hold, recovery, removal and minimum-pulse timing, no hidden source mismatch, and resource comparison against the 32,355-ALM pre-field baseline and the 39,702-ALM failed near-final report.  The already passing P-field, B-field, progressive-control, helper-codec and S/PDIF routing regressions remain the functional evidence for this exact source.  No production admission gate, field DCT, codec expansion, MiSTer installation or hardware playback is included.
+
+#### Next Steps:
+
+Pull and verify exact commit `736f64f` on GUNSMOKE, run the clean flow without incremental databases, inspect fitter and TimeQuest reports, hash any timing-positive RBF and preserve the complete reports under the isolated entry directory.  If the design still does not fit or any timing category is negative, stop without packaging or deployment and record the exact failing paths and resources rather than reseeding or expanding scope.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
+## 701 COMMIT Unreleased 736f64f 2026-08-29T02:45:25-07:00
 
 #### Coming From:
 
@@ -10,22 +39,22 @@ Recover the near-complete interlaced P and B field-prediction work by removing r
 
 #### Outcome:
 
-The failed fitter run is useful evidence that the near-final interlaced implementation has unacceptable structural cost, but its database is not an exact qualification of `784ae0b`: mapping began before that final source commit existed, and the shared build checkout was subsequently advanced.  The arithmetic and parser repairs are retained because the focused P, B and mixed-raster evidence identifies concrete defects and pixel-exact results, but those claims will be reproduced from published source through a bounded test-only admission mechanism before production gates move.  The B engine will return both prediction fetchers to two retained phases and use the otherwise idle prefetch instance for the backward pair during a field macroblock, while active request footprint arithmetic will be selected before address, span and bounds computation instead of instantiating four complete combinational paths.  Field DCT, production admission gates and unrelated decoder expansion remain outside this recovery until a clean exact-source fit establishes usable margin.  The accepted MP3, WAV and FLAC helper paths and the `c2097e3` decoded-PCM S/PDIF routing must remain behaviorally unchanged.
+The failed fitter run remains useful evidence of unacceptable structural cost but is not treated as an exact qualification of `784ae0b`, because mapping began before that final source commit existed and the shared checkout later advanced.  Published source `736f64f` retains the parser and prediction arithmetic repairs while reversing both expensive implementation choices.  Each existing B fetcher again retains at most two rectangles; a bidirectional field block fetches its forward parity pair through the current instance, then reuses the otherwise idle prefetch instance for the backward pair after the shared DDR port is released.  Lookup selects the physical direction bank while each fetcher's phase index carries only destination parity.  The field selector is registered before one pair of base-address, span and bounds calculations, so four parallel footprint cones become one serialized pair.  Two races exposed by this reuse are corrected explicitly: a lookup broadcast is suppressed on the same edge that a fetcher clears its old validity map, and a nonzero backward byte origin is refreshed during the protected alternate-start cycle if the forward pixel completed before that pair launched.  Production admission remains closed; `H262_TEST_FIELD_MOTION` opens only the P and B parser gates in the two deterministic scripts, and their byte conversion now uses standard `od`, `tr` and `fold` instead of requiring `xxd`.  Fresh isolated simulations compare 518,400 P-field samples and 1,036,800 B-fixture samples with zero mismatches, including both destination parities and the four independently selected B reference fields, while the unchanged progressive mixed-raster control checks 423,936 samples with zero mismatches above its established two-level tolerance and maximum delta two.  The native helper rebuild, WAV and FLAC matrices, all four short and faded 44.1 and 48 kHz Program Stream and MP3 profiles, and focused PCM/non-audio S/PDIF routing simulations pass without changing their source.  No Quartus result, RBF or installation is claimed yet.
 
 #### Next Steps:
 
-Implement and measure the fetch-storage and footprint reductions separately, reproduce the P, B and mixed-raster simulations from the committed tree, and rerun the consumer-audio and S/PDIF transport regressions.  Then publish the exact source and perform one clean Quartus build in a fresh isolated checkout, requiring a successful fit, positive timing and resource comparison against both the 32,355-ALM baseline and the failed near-final report before considering field DCT or opening production admission gates.  Do not reuse the stale shared build database or install any helper or RBF during this cycle.
+Pull exact published source `736f64f` into a new isolated checkout and perform one clean Quartus 17.0.2 flow plus the focused timing report, requiring a successful fit, positive timing and resource comparison against both the 32,355-ALM baseline and the failed near-final report.  Record that build in a new entry rather than appending to this settled source entry.  Do not reuse the stale shared build database, open production admission, begin field DCT or install any helper or RBF during this cycle.
 
 #### Files Modified:
 
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
 - rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
+- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
 - rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
 - tools/streams/run_b_field_motion.sh
 - tools/streams/run_interlaced_field_motion.sh
-- tools/streams/tb_h262_b_field_motion_pixels.sv
-- tools/streams/tb_h262_interlaced_field_motion_pixels.sv
 
 #### Status:
 
@@ -784,7 +813,6 @@ Reevaluate the HDMI scaler RAM-output path and its neighboring low-margin paths 
 - [ ] Passed
 
 ---
-
 ## 677 COMMIT Unreleased e6ca129 2026-08-28T12:14:27-07:00
 
 #### Coming From:
@@ -1232,40 +1260,6 @@ Pull published source 3e287b3 on GUNSMOKE, build from a fresh exact-source check
 - rtl/mpeg2_new/mpeg2_h262_p_non_intra_transform.sv
 - tools/streams/run_quant_transform_equivalence.sh
 - docs/testing_original_dvd_opening.md
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 662 COMMIT Unreleased 3828608 2026-08-28T00:55:35-07:00
-
-#### Coming From:
-
-Unreleased 4a27f80
-
-#### Purpose:
-
-Close the matrix parser byte-path timing and constrain the three verified film synchronization inputs.
-
-#### Outcome:
-
-Timing correction 3828608 is committed and published from the Pi. Direct byte assembly replaces the eight-bit combinational state walk without adding acceptance latency. Cycle-by-cycle differential tests match every exposed output, write event and both matrix memories for 1,860 gapped-input cycles and 613 continuous-input cycles. Matrix-state tests pass 384 checks in each mode and all 36,864 inverse-quantization coefficients pass; the six-picture matrix-transition raster compares all 3,110,400 samples within one level. All endpoints of the three new CDC constraints match the old fitted netlist; applying only those constraints makes video setup positive 2.171 nanoseconds and later synchronizer stages positive 10.363 while leaving the original decoder failure at negative 6.587, demonstrating that the parser path is not hidden. The clean source-4a27f80 build completes in 807.9 seconds with zero compilation errors but fails timing, so its RBF is not a test candidate. It uses 32,741 ALMs, 49,045 registers, 4,056,315 memory bits, 518 of 553 RAM blocks and 67 DSP blocks. Hold, recovery, removal and minimum pulse width are positive at 0.246, 3.346, 0.445 and 0.925 nanoseconds; worst decoder setup is negative 6.587, video setup negative 1.494 and HDMI setup positive 0.002. Detailed TimeQuest reports locate the dominant failure on a 19-level path from the clean-video FIFO output to the matrix observer's FLAG state and matrix write address. The byte-wide interface currently expands an eight-bit state-machine walk combinationally, which must be replaced by direct byte assembly and bounded load-flag handling without adding byte-acceptance latency. Separate failing paths are the registered film-mode level to film_mode_video_sync stage zero, progressive_chroma_mem to progressive_chroma_r1, and registered native field/active levels to native_field_sync stage zero. These are the first sampling stages of the newly implemented synchronization and stable-descriptor transfers, and the correction will mirror existing narrowly scoped source-to-first-stage exceptions while preserving all later-stage and decoder timing. Both earlier synthesis-warning defects are gone. The paired numerical runner passes on exact published 4a27f80, and its isolated and real-reference CSV files are byte-identical to 0c17678: all 289 pictures and 149,817,600 samples, isolated maximum difference one, real-reference maximum five with 102 samples above the old fixed-two threshold and no measured propagation-bound violations. Delayed-DDR film generation tests pass in both field orders. Complete failed-build reports and path audits remain under /home/vash/mister-builds/entry661/results; no deployment or hardware acceptance occurs. This is timing closure of the approved matrix and film implementation, not an expanded playback feature.
-
-#### Next Steps:
-
-Pull the published timing correction on GUNSMOKE, perform a new clean build and exact-source full-opening paired regression, and require matched constraint endpoints, no hidden later-stage paths, positive timing in every category, and a clean build from newly published exact source on GUNSMOKE before packaging. Do not reseed as a substitute for repairing the 19-level parser path or use a timing-failing RBF. Preserve restricted core.md, existing evidence and user control of the MiSTer.
-
-#### Files Modified:
-
-- MediaPlayer.sdc
-- docs/testing_original_dvd_opening.md
-- rtl/mpeg2_new/mpeg2_h262_quant_matrices.sv
-- tools/streams/run_quant_matrices.sh
-- tools/streams/run_quant_matrix_equivalence.sh
-- tools/streams/tb_h262_quant_matrices.sv
 
 #### Status:
 
