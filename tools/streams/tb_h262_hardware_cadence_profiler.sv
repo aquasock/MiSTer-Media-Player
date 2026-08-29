@@ -31,6 +31,10 @@ reg [7:0] associated_count=0;
 reg [32:0] display_pts=0;
 reg [13:0] pcm_sample_count=0;
 reg [6:0] pcm_fifo_peak=0;
+reg [31:0] transport_block_longest=32'd123456;
+reg [15:0] transport_block_count=16'd77;
+reg [15:0] audio_underrun_count=16'd3;
+reg [13:0] audio_fifo_floor=14'd8192;
 reg top_field_first=0,repeat_first_field=0;
 reg native_active=0;
 reg native_decode_active=0,decoder_input_pending=1,writer_capacity_blocked=0;
@@ -193,6 +197,10 @@ mpeg2_h262_hardware_cadence_profiler #(
     .terminal_defer(terminal_defer),
     .stc_seconds(stc_seconds),.associated_count(associated_count),.display_pts(display_pts),
     .pcm_sample_count(pcm_sample_count),.pcm_fifo_peak(pcm_fifo_peak),
+    .transport_block_longest(transport_block_longest),
+    .transport_block_count(transport_block_count),
+    .audio_underrun_count(audio_underrun_count),
+    .audio_fifo_floor(audio_fifo_floor),
     .top_field_first(top_field_first),
     .repeat_first_field(repeat_first_field),
     .error_flags(error_flags),.h_pos(h_pos),.v_pos(v_pos),
@@ -304,6 +312,10 @@ mpeg2_h262_hardware_cadence_profiler #(
     .terminal_defer(terminal_defer),
     .stc_seconds(stc_seconds),.associated_count(associated_count),.display_pts(display_pts),
     .pcm_sample_count(pcm_sample_count),.pcm_fifo_peak(pcm_fifo_peak),
+    .transport_block_longest(transport_block_longest),
+    .transport_block_count(transport_block_count),
+    .audio_underrun_count(audio_underrun_count),
+    .audio_fifo_floor(audio_fifo_floor),
     .top_field_first(top_field_first),
     .repeat_first_field(repeat_first_field),
     .error_flags(error_flags),.h_pos(h_pos),.v_pos(v_pos),
@@ -1043,10 +1055,15 @@ initial begin
     if(deadlines.deadline_gap_count!=4)$fatal(1,"terminal idle counted as a picture");
     session_quiet=1;
     wait(deadline_snapshot_ready);repeat(4)@(posedge clk_video);
-    if(deadlines.snapshot_sync_2[63:32]!==32'h1340ea60 ||
+    if(deadlines.snapshot_sync_2[63:32]!==32'h1440ea60 ||
        deadlines.snapshot_sync_2[37*32+:32]!=={16'd349,16'd348} ||
        deadlines.snapshot_sync_2[38*32+:32]!=={16'd349,16'd4})
-        $fatal(1,"schema nineteen wide counts/header wrong");
+        $fatal(1,"schema twenty wide counts/header wrong");
+    if(deadlines.snapshot_sync_2[55*32+:32]!==transport_block_longest ||
+       deadlines.snapshot_sync_2[56*32+:32]!==
+           {transport_block_count,audio_underrun_count} ||
+       deadlines.snapshot_sync_2[57*32+:32]!=={18'd0,audio_fifo_floor})
+        $fatal(1,"schema twenty audio telemetry wrong");
     checksum=0;
     for(i=0;i<63;i=i+1)checksum=checksum^deadlines.snapshot_sync_2[i*32+:32];
     if(checksum!==deadlines.snapshot_sync_2[63*32+:32])$fatal(1,"deadline payload checksum wrong");

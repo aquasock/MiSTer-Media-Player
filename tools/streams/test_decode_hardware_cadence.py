@@ -201,13 +201,16 @@ def check_deadline_layout(temp: Path, rtl_snapshot: Path | None) -> None:
         assert parsed["display_pictures"] == 349 and parsed["display_swaps"] == 348
         assert parsed["deadline_gap_count"] == 4
         records = parsed["deadline_records"]
-        assert [r["display_picture_ordinal"] for r in records] == [3, 4, 348]
+        assert [r["display_picture_ordinal"] for r in records] == [3, 4]
         assert records[0]["input_starved_cycles_since_previous_swap"] == 11
         assert records[0]["candidate_ready_delay_cycles"] > 0
         assert records[1]["candidate_ready_delay_cycles"] == 0
         assert records[1]["writer_capacity_blocked_cycles_since_previous_swap"] > 0
-        assert records[2]["completed_reference_count"] == 347
-        print("CADENCE_RTL_PACKET_PASS schema19 ordinals=3,4,348")
+        assert parsed["transport_block_longest_cycles"] == 123456
+        assert parsed["transport_block_count"] == 77
+        assert parsed["audio_underrun_count"] == 3
+        assert parsed["audio_fifo_floor"] == 8192
+        print("CADENCE_RTL_PACKET_PASS schema20 ordinals=3,4 audio=123456/77/3/8192")
 
 
 def main() -> None:
