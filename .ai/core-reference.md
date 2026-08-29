@@ -1,10 +1,10 @@
 # CONTROLLED STANDARDS REFERENCE
 
 > **Project:** MiSTer-Media-Player  
-> **Purpose:** Fast, clause-level standards reference for the active MPEG-2 decoder, the released v0.7.0 ARM media pipeline, and the approved native-interlaced milestone.
+> **Purpose:** Fast, clause-level standards reference for the active MPEG-2 decoder, the released v0.7.0 ARM media pipeline, the approved native-interlaced milestone, and the adopted NARA MPD-D2 release media target.
 > **Authority:** The cited controlled document always outranks this summary.
 
-This file contains external rules, not project history or implementation advice. It is deliberately limited to sources that support the current H.262 decoder or approved work: native frame and field cadence, interlaced frame presentation, MPEG-2 Program Stream framing, PES parsing, PTS/DTS timing, and ARM-side MPEG-1 Layer II audio decoding.
+This file contains external rules and controlled external profiles, not project history or implementation advice. It is deliberately limited to sources that support the current H.262 decoder or approved work: native frame and field cadence, interlaced frame presentation, MPEG-2 Program Stream framing, PES parsing, PTS/DTS timing, ARM-side MPEG-1 Layer II audio decoding, and the NARA MPD-D2 profile adopted by the user as the release media target. Adoption makes that profile a project acceptance target; it does not turn it into the normative DVD-Video application specification.
 
 ---
 
@@ -18,6 +18,7 @@ authority_order:
   - formal_standard_or_recommendation
   - official_corrigendum_or_amendment
   - official_industry_specification
+  - official_government_production_profile
   - official_vendor_or_platform_specification
 
 never_primary_authority:
@@ -98,6 +99,19 @@ rules:
   use_for:
     - "formal coded-data and decoder conformance claims"
     - "future standardized test-sequence work"
+
+- source_id: NARA-MPD-D2
+  priority: P1
+  authority: U.S. National Archives and Records Administration
+  document: "DVD from Motion Picture Film Original [MPD-D2]"
+  profile_status: "Official NARA distribution-copy product profile"
+  page_reviewed_on: 2023-12-22
+  consulted_on: 2026-08-29
+  official_url: "https://www.archives.gov/preservation/products/products/mpd-d2"
+  use_for:
+    - "project release media target"
+    - "720x480 29.97 interlaced top-field-first MPEG-2 Program Stream qualification"
+    - "stereo 48 kHz AC-3 release-profile qualification"
 ```
 
 The 2021 H.222.0 edition is the controlled text consulted for the records below. It is newer and more useful than the previously catalogued paywalled-only systems reference, but it does not eliminate the need to check the 2025 delta before a current-edition conformance claim.
@@ -118,6 +132,7 @@ The 2021 H.222.0 edition is the controlled text consulted for the records below.
 | PES payload alignment assumptions | H.222.0 2.4.3.7 | H222-010 |
 | Existing video decode behavior | H.262 clauses and Annex B | H262-001 through H262-026 |
 | MPEG-1 Layer II audio decode | ISO/IEC 11172-3 | Re-open the controlled text for every syntax-level conclusion |
+| Adopted DVD-from-film release media profile | NARA MPD-D2 | NARA-001 |
 
 ### Explicitly deferred
 
@@ -126,7 +141,7 @@ The following are not active v0.7.0 reference scope and should be expanded only 
 ```yaml
 - boundary: DVD_VIDEO
   required_sources: "Authorized DVD Format/Logo Licensing Corporation Part 2 and Part 3 books"
-  note: "DVD navigation, menus, VOB application constraints and exact legacy profiles cannot be inferred from generic MPEG."
+  note: "NARA MPD-D2 is the adopted release media target, but DVD navigation, menus, VOB application constraints and exact legacy profiles still cannot be inferred from NARA or generic MPEG."
 
 - boundary: DVD_FILESYSTEM
   required_sources: "UDF 1.02 / ECMA-167 plus the applicable DVD profile; ECMA TR/71 and TR/112 as aids"
@@ -200,6 +215,7 @@ H222-008: "System clock and SCR representation"
 H222-009: "Program Stream Map and MPEG-2 video type"
 H222-010: "PES data-alignment indicator"
 H222-011: "Decode-order and presentation-order timing"
+NARA-001: "Adopted NARA MPD-D2 DVD-from-film release media profile"
 ```
 
 ---
@@ -511,7 +527,31 @@ These records are verified against the official free H.222.0 (06/2021) text. Rec
 
 ---
 
-## 7. Record template
+## 7. Adopted project release profile
+
+The following official external production profile is adopted as the project's release media target. It defines the required media essence and container baseline; it is not a substitute for the separately controlled DVD-Video application, filesystem, navigation, menu or CSS specifications.
+
+```yaml
+- record_id: NARA-001
+  title: "Adopted NARA MPD-D2 DVD-from-film release media profile"
+  status: VERIFIED
+  verified_date: 2026-08-29
+  confidence: HIGH
+  source_id: NARA-MPD-D2
+  source_edition: "Official web profile reviewed December 22, 2023"
+  source_reference: "Nature of Source Material; File Properties; File Specifications"
+  controlled_conclusion: "The MPD-D2 distribution-copy profile uses VOB files carrying MPEG-2 Program Stream essence at Main Profile and Main Level, made from temporary 8 Mbps SD MPEG-2 source, with 720x480 constant-bit-rate video at 29.97 frames per second, interlaced top-field-first and single-pass encoded. Audio is two-channel stereo AC-3 at 256 Kbps constant bitrate, 48 kHz, with a listed 16-bit sample size."
+  applicability: "Project release media target for U.S. DVD-from-motion-picture-film playback; controls qualifying VOB/Program Stream video and audio essence."
+  exceptions:
+    - "Does not define or qualify DVD filesystem access, IFO navigation, menus, subpictures, CSS, optical-drive behavior or every DVD-Video application constraint."
+    - "Does not constrain H.262 picture_structure, motion_type, macroblock dct_type, GOP design or quantization matrices; do not infer a frame-picture-only or ordinary-motion-only subset from this profile."
+    - "Does not establish that every commercial DVD uses this profile or expand the target to PAL/576i."
+  conformance_effect: "Release qualification shall include retained streams that match every listed media property, exercise the implemented H.262 syntax envelope and verify correct complete playback, field order, cadence, decoded HDMI stereo and AC-3 S/PDIF passthrough. Any profile-permitted syntax not qualified by those streams remains an explicit release limitation, and the deferred DVD application features shall not be claimed."
+```
+
+---
+
+## 8. Record template
 
 ```yaml
 - record_id: "<DOMAIN>-<NNN>"
@@ -530,7 +570,7 @@ These records are verified against the official free H.222.0 (06/2021) text. Rec
 
 ---
 
-## 8. Maintenance boundary
+## 9. Maintenance boundary
 
 - Keep controlled conclusions, source identity, exact references, applicability, exceptions and observable conformance effects here.
 - Keep architecture, resource tradeoffs, timing results, tests, failures, deployment policy and chronological history in the appropriate project-control files.
@@ -539,12 +579,13 @@ These records are verified against the official free H.222.0 (06/2021) text. Rec
 - Audit records changed since the prior release before each tagged release.
 
 ```yaml
-catalog_verified_on: 2026-08-22
+catalog_verified_on: 2026-08-29
 official_catalog_pages_checked:
   - "ITU-T H.262 recommendation database and official 02/2000 text"
   - "ITU-T H.222.0 current 04/2025 record and official free 06/2021 text"
   - "ISO/IEC 13818-4 catalog record"
+  - "U.S. National Archives MPD-D2 official profile, reviewed 2023-12-22"
 known_access_gaps:
   - "H.222.0 (04/2025) text is not loaded; new H222 records are verified against the official 06/2021 edition."
-  - "Authorized DVD application and CSS books are not loaded and are not represented by clause-level records."
+  - "Authorized DVD application and CSS books are not loaded and are not represented by clause-level records; NARA MPD-D2 does not replace them."
 ```
