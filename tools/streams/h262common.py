@@ -324,7 +324,10 @@ def packed_row(code: int, payloads: tuple[bytes, ...]) -> bytes:
 def patch_picture(data: bytes, pic_index: int, is_b: bool,
                   row_groups: tuple[tuple[bytes, ...], ...],
                   forward_f_code: tuple[int, int] = (3, 3),
-                  backward_f_code: tuple[int, int] = (3, 3)) -> bytes:
+                  backward_f_code: tuple[int, int] = (3, 3),
+                  frame_pred_frame_dct: bool = True,
+                  progressive_frame: bool | None = None,
+                  top_field_first: bool | None = None) -> bytes:
     """row_groups[row] is a tuple of one or more same-row slice payloads (already packed bytes)."""
     b = bytearray(data)
     pics = pictures(b)
@@ -349,7 +352,28 @@ def patch_picture(data: bytes, pic_index: int, is_b: bool,
         b[pce + 6] = (b[pce + 6] & 0x0F) | (backward_f_code_v << 4)
     else:
         b[pce + 5] = (f_code_v << 4) | (b[pce + 5] & 0x0F)
-    b[pce + 7] = (b[pce + 7] | 0x40) & ~(0x20 | 0x10 | 0x04)
+    # picture_coding_extension byte 7:
+    #   bit7 top_field_first, bit6 frame_pred_frame_dct, bit5 concealment_motion_vectors,
+    #   bit4 q_scale_type, bit3 intra_vlc_format, bit2 alternate_scan,
+    #   bit1 repeat_first_field, bit0 chroma_420_type.
+    # Byte 8 bit7 is progressive_frame.
+    #
+    # Entry 695: interlaced P/B needs frame_pred_frame_dct clear, which is what
+    # admits field motion types and the macroblock dct_type bit together, and
+    # progressive_frame clear so the sequence is a true interlaced one rather
+    # than film in a 480i sequence.  Both default to the progressive-film shape
+    # every earlier generator relies on: frame_pred_frame_dct was forced set,
+    # and progressive_frame was never written, so it stays untouched unless a
+    # caller asks for it.
+    b[pce + 7] = b[pce + 7] & ~(0x20 | 0x10 | 0x04)
+    if frame_pred_frame_dct:
+        b[pce + 7] |= 0x40
+    else:
+        b[pce + 7] &= ~0x40
+    if top_field_first is not None:
+        b[pce + 7] = (b[pce + 7] | 0x80) if top_field_first else (b[pce + 7] & ~0x80)
+    if progressive_frame is not None:
+        b[pce + 8] = (b[pce + 8] | 0x80) if progressive_frame else (b[pce + 8] & ~0x80)
 
     codes = start_codes(b)
     pics = pictures(b)
@@ -370,7 +394,8 @@ def patch_picture(data: bytes, pic_index: int, is_b: bool,
 def patch_pictures(data: bytes, coded_types: list[int],
                    specs: dict[int, tuple[bool, tuple[tuple[bytes, ...], ...]]],
                    forward_f_codes: dict[int, tuple[int, int]] | None = None,
-                   backward_f_codes: dict[int, tuple[int, int]] | None = None) -> bytes:
+                   backward_f_codes: dict[int, tuple[int, int]] | None = None,
+                   interlaced: dict[int, dict] | None = None) -> bytes:
     """specs: {pic_index: (is_b, row_groups)}. Applied in descending pic_index order (offset-safe)."""
     if [t for _, t in pictures(data)] != coded_types:
         raise SystemExit(f"expected coded types {coded_types}, found {[t for _, t in pictures(data)]}")
@@ -379,9 +404,13 @@ def patch_pictures(data: bytes, coded_types: list[int],
     backward_f_codes = backward_f_codes or {}
     for pic_index in sorted(specs, reverse=True):
         is_b, row_groups = specs[pic_index]
+        shape = (interlaced or {}).get(pic_index, {})
         b = patch_picture(b, pic_index, is_b, row_groups,
                           forward_f_codes.get(pic_index, (3, 3)),
-                          backward_f_codes.get(pic_index, (3, 3)))
+                          backward_f_codes.get(pic_index, (3, 3)),
+                          shape.get("frame_pred_frame_dct", True),
+                          shape.get("progressive_frame"),
+                          shape.get("top_field_first"))
     return b
 
 
