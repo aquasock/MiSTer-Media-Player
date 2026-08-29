@@ -12,6 +12,8 @@ struct media_source_ops {
     size_t (*read)(void *state, void *data, size_t size);
     int (*get_character)(void *state);
     int (*rewind_source)(void *state);
+    int (*seek_source)(void *state, int64_t offset,
+                       enum media_source_seek_origin origin);
     int (*has_error)(void *state);
     void (*close_source)(void *state);
 };
@@ -38,6 +40,15 @@ static int file_rewind(void *opaque)
     return fseek(state->stream, 0, SEEK_SET);
 }
 
+static int file_seek(void *opaque, int64_t offset,
+                     enum media_source_seek_origin origin)
+{
+    struct file_source_state *state = opaque;
+    int whence = origin == MEDIA_SOURCE_SEEK_START ? SEEK_SET : SEEK_CUR;
+
+    return fseeko(state->stream, (off_t)offset, whence);
+}
+
 static int file_has_error(void *opaque)
 {
     struct file_source_state *state = opaque;
@@ -58,6 +69,7 @@ static const struct media_source_ops file_ops = {
     file_read,
     file_get_character,
     file_rewind,
+    file_seek,
     file_has_error,
     file_close
 };
@@ -140,6 +152,16 @@ int media_source_getc(struct media_source *source)
 int media_source_rewind(struct media_source *source)
 {
     return source && source->ops ? source->ops->rewind_source(source->state) : -1;
+}
+
+int media_source_seek(struct media_source *source, int64_t offset,
+                      enum media_source_seek_origin origin)
+{
+    if (!source || !source->ops ||
+        (origin != MEDIA_SOURCE_SEEK_START &&
+         origin != MEDIA_SOURCE_SEEK_CURRENT))
+        return -1;
+    return source->ops->seek_source(source->state, offset, origin);
 }
 
 int media_source_error(struct media_source *source)

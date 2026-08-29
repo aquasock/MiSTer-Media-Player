@@ -29,8 +29,8 @@ can pass `dvd:` without changing process, pipe or FPGA-transfer ownership.
 
 ## Source boundary
 
-`media_source` is a pull interface with read, character-read, rewind, error and
-close operations. The current backend implements `file:`. `dvd:` is recognized
+`media_source` is a pull interface with read, character-read, rewind, seek,
+error and close operations. The current backend implements `file:`. `dvd:` is recognized
 as a reserved source and deliberately returns unsupported without opening,
 mounting or reading the device.
 
@@ -50,7 +50,7 @@ share a compilation unit:
 3. Timeline: PTS extraction and FPGA in-band timestamp records, with future
    discontinuity events for title, cell and seek transitions.
 4. Audio codec: MPEG Layer II on stream ids 0xC0-0xDF, standalone MPEG-1
-   Layer III files, and AC-3 on private stream 1 substreams 0x80-0x87, all
+   Layer III and RIFF WAVE files, and AC-3 on private stream 1 substreams 0x80-0x87, all
    behind codec selection rather than output-specific decode paths. MPEG audio
    is decoded by the pinned minimp3 source compiled directly into the static
    helper binary; MP3 support adds no runtime library. A Program Stream codec
@@ -81,6 +81,15 @@ or stereo at 44.1 or 48 kHz, and emits PCM records followed by the ordinary
 audio-end token. No H.262 bytes or picture timestamps are required. CBR and VBR
 share this path. MPEG-1 32 kHz and MPEG-2/2.5 lower-rate extensions are refused
 until a separately qualified helper-side resampler exists.
+
+Standalone `.wav` uses the same audio-only contract. The pinned miniaudio WAV
+decoder reads through `media_source` callbacks in bounded chunks and converts
+ordinary integer or floating-point mono, stereo or multichannel input to signed
+16-bit stereo. Sample rates in the 44.1 kHz family emit at 44.1 kHz; other
+accepted rates emit at 48 kHz. This conversion deliberately serves predictable
+consumer playback rather than bit-perfect or discrete-surround output. The
+dependency is compiled into the static helper with device, engine, resource
+manager, encoder, MP3 and FLAC code disabled.
 
 Future play, pause, seek, title, chapter, angle, audio-track and subtitle-track
 commands require a versioned control channel. They are intentionally not

@@ -7,6 +7,9 @@ build_dir="$root_dir/host/build"
 minimp3_commit=ea99364f61c14656440e8d77e9c233ccf3124633
 minimp3_sha=57e437c5c1f0e8b243885d3929c8973b5e6c778451e0100ab4251d19915cb3ad
 license_sha=6a1ee543e5282cd9061881edf462e6fdab181f328da71fc2c9a6950a80e94d01
+miniaudio_commit=9634bedb5b5a2ca38c1ee7108a9358a4e233f14d
+miniaudio_sha=ac7af4de748b7e26b777f37e01cee313a308a7296a3eb080e2906b320cc55c89
+miniaudio_license_sha=457f1b500e0adf6bc059edddfa78a2f62012e7c3bb43476c20e0bd23b25ba0eb
 # liba52 0.7.4 decodes AC-3.  Upstream ships only a release tarball, so the
 # tarball itself is pinned and the five translation units the helper needs are
 # extracted from it.  GPL-2, matching this project's own licence.
@@ -34,6 +37,12 @@ fetch_checked \
 fetch_checked \
     "https://raw.githubusercontent.com/lieff/minimp3/$minimp3_commit/LICENSE" \
     "$deps_dir/LICENSE.minimp3" "$license_sha"
+fetch_checked \
+    "https://raw.githubusercontent.com/mackron/miniaudio/$miniaudio_commit/miniaudio.h" \
+    "$deps_dir/miniaudio.h" "$miniaudio_sha"
+fetch_checked \
+    "https://raw.githubusercontent.com/mackron/miniaudio/$miniaudio_commit/LICENSE" \
+    "$deps_dir/LICENSE.miniaudio" "$miniaudio_license_sha"
 
 fetch_liba52() {
     local tarball="$deps_dir/a52dec-$liba52_version.tar.gz"

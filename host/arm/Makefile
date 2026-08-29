@@ -6,7 +6,11 @@ DEPS_DIR ?= .deps
 A52_DIR ?= $(DEPS_DIR)/liba52
 OUTPUT ?= media_player_helper
 SOURCES := media_player_helper.c media_source.c
-HEADERS := media_source.h media_player_protocol.h $(DEPS_DIR)/minimp3.h
+HEADERS := media_source.h media_player_protocol.h consumer_audio.h \
+	$(DEPS_DIR)/minimp3.h $(DEPS_DIR)/miniaudio.h
+CONSUMER_OBJDIR := $(DEPS_DIR)/consumer-obj-$(notdir $(CC))
+CONSUMER_OBJECT := $(CONSUMER_OBJDIR)/consumer_audio.o
+CONSUMER_CFLAGS ?= -O2 -Wall -Wextra -std=c11 -Wno-unused-function
 
 # Vendored liba52 0.7.4 is unmodified upstream and predates these warnings, so
 # it is compiled as its own objects without the helper's -Werror rather than
@@ -26,10 +30,16 @@ $(A52_OBJDIR)/%.o: $(A52_DIR)/%.c
 	@mkdir -p $(A52_OBJDIR)
 	$(CC) $(CPPFLAGS) -I$(A52_DIR) $(A52_CFLAGS) -c $< -o $@
 
-$(OUTPUT): $(SOURCES) $(HEADERS) $(A52_OBJECTS)
+$(CONSUMER_OBJECT): consumer_audio.c consumer_audio.h media_source.h \
+		$(DEPS_DIR)/miniaudio.h
+	@mkdir -p $(CONSUMER_OBJDIR)
+	$(CC) $(CPPFLAGS) -I$(DEPS_DIR) $(CONSUMER_CFLAGS) -c $< -o $@
+
+$(OUTPUT): $(SOURCES) $(HEADERS) $(A52_OBJECTS) $(CONSUMER_OBJECT)
 	$(CC) $(CPPFLAGS) -I$(DEPS_DIR) -I$(A52_DIR) $(CFLAGS) $(SOURCES) \
-		$(A52_OBJECTS) $(LDFLAGS) -lm -o $@
+		$(A52_OBJECTS) $(CONSUMER_OBJECT) $(LDFLAGS) -lm -o $@
 
 clean:
 	rm -f $(OUTPUT)
 	rm -rf $(A52_DIR)/obj-*
+	rm -rf $(DEPS_DIR)/consumer-obj-*

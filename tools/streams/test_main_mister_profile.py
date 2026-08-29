@@ -242,10 +242,12 @@ static void exact_bytes(size_t expected) {
 int main() {
     assert(mediaplayer_handles_file("track.mp3"));
     assert(mediaplayer_handles_file("TRACK.MP3"));
+    assert(mediaplayer_handles_file("track.wav"));
+    assert(mediaplayer_handles_file("TRACK.WAV"));
     assert(mediaplayer_handles_file("movie.m2v"));
     assert(mediaplayer_handles_file("movie.mpg"));
     assert(mediaplayer_handles_file("movie.mpeg"));
-    assert(!mediaplayer_handles_file("track.wav"));
+    assert(!mediaplayer_handles_file("track.flac"));
     assert(!mediaplayer_handles_file("track.mp3.txt"));
     session(); pipe_reads={-EAGAIN}; mediaplayer_poll();
     assert(helper_fd==42 && releases==0 && !step_calls && would_block_events==1);
@@ -629,8 +631,8 @@ def run(main_source: Path, compiler: str, sanitize: bool, rtl: bool = False) -> 
         transport += function(io, "user_io_file_tx_data_ack") + TRANSPORT_TESTS
         loader = (work / "support/mediaplayer/mediaplayer.cpp").read_text()
         menu = (work / "menu.cpp").read_text()
-        if 'strcpy(ext, "M2VMPGMP3")' not in menu:
-            raise RuntimeError("MediaPlayer file picker does not expose MP3")
+        if 'strcpy(ext, "M2VMPGMP3WAV")' not in menu:
+            raise RuntimeError("MediaPlayer file picker does not expose MP3 and WAV")
         loader = re.sub(r"^#include .*\n", "", loader, flags=re.M)
         reports = {}
         for name, source in (("transport", transport), ("loader", LOADER_PRELUDE + loader + LOADER_TESTS)):

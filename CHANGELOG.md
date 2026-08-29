@@ -6,6 +6,10 @@ This project is still in active pre-release development. Published milestone rel
 
 ## Unreleased
 
+### Added
+
+- Added helper-only RIFF WAVE playback through the existing MediaPlayer picker and PCM transport. Pinned miniaudio source is compiled into the static helper to convert ordinary PCM/float mono, stereo or multichannel WAV input to 44.1 or 48 kHz signed stereo without an FPGA change.
+
 ### Changed
 
 - Reconciled current release, build, architecture and test guidance with the published v0.8.0 package; labelled older design and regression instructions as historical.

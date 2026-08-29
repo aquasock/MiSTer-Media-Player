@@ -8,8 +8,8 @@ An experimental media-player core for [MiSTer FPGA](https://github.com/MiSTer-de
 
 The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`. v0.8.0 provides:
 
-- raw MPEG-2 Video elementary-stream playback, a bounded H.222.0 MPEG-2 Program Stream path for `.mpg` and `.mpeg` files, and audio-only `.mp3` playback;
-- a matching ARM helper that demultiplexes Program Streams, decodes MPEG Layers II/III or AC-3 audio to signed stereo PCM, and transports video, picture PTS, and PCM or passthrough bursts to the FPGA;
+- raw MPEG-2 Video elementary-stream playback, a bounded H.222.0 MPEG-2 Program Stream path for `.mpg` and `.mpeg` files, and audio-only `.mp3` or `.wav` playback;
+- a matching ARM helper that demultiplexes Program Streams, decodes MPEG Layers II/III, WAV or AC-3 audio to signed stereo PCM, and transports video, picture PTS, and PCM or passthrough bursts to the FPGA;
 - byte-exact raw `.m2v` pass-through with a synthetic 90 kHz fallback timeline;
 - Program Stream picture PTS driving the FPGA 90 kHz presentation timeline;
 - cadence as a mandatory floor: PTS may delay a picture but never presents it earlier than its encoded H.262 frame cadence;
@@ -26,14 +26,14 @@ The supported subset is intentionally bounded while the architecture is being pr
 
 | Area | Current implementation |
 | --- | --- |
-| Input | Raw MPEG-2 Video `.m2v`, bounded MPEG-2 Program Stream `.mpg` / `.mpeg`, or audio-only MPEG-1 Layer III `.mp3` through the ARM helper |
+| Input | Raw MPEG-2 Video `.m2v`, bounded MPEG-2 Program Stream `.mpg` / `.mpeg`, or audio-only MPEG-1 Layer III `.mp3` and RIFF WAVE `.wav` through the ARM helper |
 | Video, progressive | 4:2:0 I, P and B pictures through 720x480 |
 | Video, interlaced | 720x480 at 30000/1001 only, 4:2:0, **I-pictures only**, frame-structured, frame DCT and frame prediction only, top- or bottom-field-first, no `repeat_first_field` |
 | Picture types | Coded-order/display-order presentation with B reordering |
 | Presentation rates | H.262 frame-rate codes 1..5; codes 6..8 are rejected before transport |
 | Program Stream timing | Picture PTS on a 33-bit / 90 kHz FPGA timeline with cadence-floor enforcement |
 | Raw-stream timing | Synthetic 33-bit / 90 kHz cadence derived from H.262 frame-rate metadata |
-| Audio | MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, and AC-3 at 48 kHz, decoded by the helper to stereo. The AC-3 stereo downmix discards LFE |
+| Audio | MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, ordinary PCM/float WAV converted to stereo at 44.1 or 48 kHz, and AC-3 at 48 kHz. The AC-3 stereo downmix discards LFE |
 | Audio passthrough | AC-3 and DTS carried to S/PDIF as IEC 61937 bursts for an external decoder. DTS is passthrough only; there is no DTS decoder |
 | Audio output | A menu option selects HDMI or S/PDIF. The unused output is muted, because both are fed from one stereo stream |
 | Audio buffering | Packed signed PCM records into an 8,192-frame stereo FPGA FIFO |
@@ -242,9 +242,9 @@ cadence floor + 90 kHz PTS scheduler
 ```
 
 Raw `.m2v` files bypass Program Stream demux and audio decoding while retaining
-the same FPGA H.262 path. Standalone `.mp3` files use the existing file channel
-and PCM transport without requiring video bytes; the displayed background is
-whatever the core already presents when no pictures arrive.
+the same FPGA H.262 path. Standalone `.mp3` and `.wav` files use the existing
+file channel and PCM transport without requiring video bytes; the displayed
+background is whatever the core already presents when no pictures arrive.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`host/arm/ARCHITECTURE.md`](host/arm/ARCHITECTURE.md) for design details.
 
@@ -264,12 +264,12 @@ ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc host/build_arm_stack.sh --arm
 ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc host/build_arm_stack.sh --main
 ```
 
-The build script pins minimp3, liba52, MiSTer Main, dependency hashes, and the Main patch. Release candidates require reproducible FPGA, helper, and Main binaries plus host and MiSTer regression evidence. See [building and testing](docs/BUILDING.md) for the current workflow.
+The build script pins minimp3, miniaudio, liba52, MiSTer Main, dependency hashes, and the Main patch. Release candidates require reproducible FPGA, helper, and Main binaries plus host and MiSTer regression evidence. See [building and testing](docs/BUILDING.md) for the current workflow.
 
 ## Known limitations
 
 - Program Stream support is bounded; MPEG Transport Stream, DVD/VOB navigation, DVD LPCM, subpictures, and arbitrary systems-layer layouts are not supported. DVD private stream 1 supports AC-3 decode/passthrough and DTS passthrough.
-- Decoded audio is MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, and AC-3 at 48 kHz. MPEG-1 Layer III at 32 kHz and MPEG-2/2.5 Layer III require resampling and are rejected, as are other codecs and sample rates. Only the first Program Stream audio track is played; track switching needs a control channel that protocol one does not implement.
+- Decoded audio is MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, ordinary PCM/float WAV from 8 through 192 kHz converted to stereo at 44.1 or 48 kHz, and AC-3 at 48 kHz. MPEG-1 Layer III at 32 kHz and MPEG-2/2.5 Layer III remain rejected; compressed formats other than MP3 are not yet enabled. Only the first Program Stream audio track is played; track switching needs a control channel that protocol one does not implement.
 - AC-3 is downmixed to stereo for decoded output, which discards LFE. Discrete surround requires passthrough and an external decoder.
 - Passthrough carries the bitstream untouched, so nothing may scale it. The audio output option therefore mutes the output it is not driving, and volume control does not apply to a passthrough stream.
 - Progressive 4:2:0 video is released through 720x480 and decodes I, P and B pictures. The interlaced path is far narrower: 720x480 at 30000/1001 only, I-pictures only, frame-structured, frame DCT and frame prediction only. Field pictures, field DCT, interlaced P and B pictures, `repeat_first_field` (3:2 pulldown), and 576i are all rejected before decode. Most commercial DVDs use several of these and will not play.
@@ -328,7 +328,7 @@ See [`CHANGELOG.md`](CHANGELOG.md) for completed milestones.
 
 ## Standards and design policy
 
-Video syntax and decoding behavior are developed against **ITU-T H.262 / ISO/IEC 13818-2**. Program Stream, PES, and timing work uses **ITU-T H.222.0 / ISO/IEC 13818-1**. MPEG Layers II and III are decoded by the pinned minimp3 source compiled directly into the static helper binary.
+Video syntax and decoding behavior are developed against **ITU-T H.262 / ISO/IEC 13818-2**. Program Stream, PES, and timing work uses **ITU-T H.222.0 / ISO/IEC 13818-1**. MPEG Layers II and III are decoded by the pinned minimp3 source, and RIFF WAVE decode, channel conversion and resampling use pinned miniaudio source. Both are compiled directly into the static helper binary.
 
 AC-3 decode is performed by the pinned liba52 dependency, and IEC 61937 framing follows that standard for passthrough.
 

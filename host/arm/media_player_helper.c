@@ -5,6 +5,7 @@
 #include "minimp3.h"
 #include "a52.h"
 #include "mm_accel.h"
+#include "consumer_audio.h"
 #include "media_player_protocol.h"
 #include "media_source.h"
 
@@ -946,6 +947,16 @@ static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
     output->pcm_frames += (uint64_t)samples_per_channel;
     output->audio_frames++;
     return 0;
+}
+
+static int write_consumer_pcm(void *opaque, const int16_t *stereo,
+                              size_t frames, int rate_hz)
+{
+    struct output_state *output = opaque;
+
+    if (frames > INT32_MAX)
+        return -1;
+    return write_pcm(output, stereo, (int)frames, 2, rate_hz);
 }
 
 /*
@@ -1957,6 +1968,26 @@ static int process_mp3_stream(struct media_source *input,
     return decode_audio_buffer(audio, output, 1);
 }
 
+static int process_wav_stream(struct media_source *input,
+                              struct output_state *output)
+{
+    struct consumer_audio_info info = {0};
+    char error[160];
+
+    output->audio_only_mode = 1;
+    output->hold_active = 0;
+    output->scheduler_started = 1;
+    if (consumer_audio_decode_wav(input, write_consumer_pcm, output, &info,
+                                  error, sizeof(error)) < 0) {
+        fprintf(stderr, "media_player_helper: %s\n", error);
+        return -1;
+    }
+    fprintf(stderr,
+            "media_player_helper: WAV %u channel(s) at %u Hz, output %u Hz\n",
+            info.source_channels, info.source_rate_hz, info.output_rate_hz);
+    return 0;
+}
+
 static int finish_output(struct output_state *output, int success)
 {
     if (output->video && fflush(output->video) == EOF)
@@ -1985,6 +2016,8 @@ int main(int argc, char **argv)
     uint8_t signature[4];
     int is_program_stream;
     int is_mp3;
+    int is_wav;
+    int is_audio_file;
     int i;
     int success = 0;
 
@@ -2092,17 +2125,22 @@ int main(int argc, char **argv)
         goto done;
     }
     is_mp3 = has_suffix_case(source_specification, ".mp3");
-    is_program_stream = !is_mp3 &&
+    is_wav = has_suffix_case(source_specification, ".wav");
+    is_audio_file = is_mp3 || is_wav;
+    is_program_stream = !is_audio_file &&
                         !memcmp(signature, "\x00\x00\x01\xba", 4);
     if (is_mp3) {
         if (preflight_mp3(&input) < 0)
             goto done;
-    } else if (preflight_input(&input, is_program_stream) < 0) {
+    } else if (!is_wav && preflight_input(&input, is_program_stream) < 0) {
         goto done;
     }
     output.scheduler_enabled = is_program_stream && !output.pcm;
     if (is_mp3) {
         if (process_mp3_stream(&input, &audio, &output) < 0)
+            goto done;
+    } else if (is_wav) {
+        if (process_wav_stream(&input, &output) < 0)
             goto done;
     } else if (is_program_stream) {
         if (process_program_stream(&input, &audio, &output) < 0)
@@ -2118,12 +2156,12 @@ int main(int argc, char **argv)
     } else if (process_elementary_stream(&input, &output) < 0) {
         goto done;
     }
-    if (!is_mp3 && !output.video_bytes) {
+    if (!is_audio_file && !output.video_bytes) {
         fprintf(stderr, "media_player_helper: no H.262 video stream found\n");
         goto done;
     }
-    if (is_mp3 && !output.audio_frames) {
-        fprintf(stderr, "media_player_helper: no MPEG-1 Layer III audio found\n");
+    if (is_audio_file && !output.audio_frames) {
+        fprintf(stderr, "media_player_helper: no supported audio found\n");
         goto done;
     }
     if (is_program_stream && output.audio_pes_seen && !output.audio_frames) {
