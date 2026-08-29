@@ -16,13 +16,20 @@
 #include <time.h>
 
 #define AUDIO_BUFFER_LIMIT (256u * 1024u)
-#define VIDEO_QUEUE_LIMIT  (512u * 1024u)
-#define PCM_SCHEDULE_RESERVE_FRAMES 4096u
+/*
+ * Entry 693: the lookahead holds video while the scheduler reads far enough
+ * ahead to satisfy the PCM reserve, so this bound scales with that reserve.
+ * At 8192 frames of reserve the 512 KiB bound is reached on real DVD muxing
+ * and aborts playback; 2 MiB is still negligible against 492 MiB of host RAM
+ * and keeps the runaway protection this bound exists for.
+ */
+#define VIDEO_QUEUE_LIMIT  (2u * 1024u * 1024u)
+#define PCM_SCHEDULE_RESERVE_FRAMES 8192u
 #define PCM_SCHEDULE_BATCH_FRAMES   2048u
-#define PCM_INITIAL_RELEASE_FRAMES  4096u
+#define PCM_INITIAL_RELEASE_FRAMES  8192u
 #define PCM_MAX_FREE_VIDEO_BYTES    4096u
 #define PCM_REFILL_FRAMES           128u
-#define PCM_SINK_FIFO_FRAMES        8192u
+#define PCM_SINK_FIFO_FRAMES        16384u
 #define PTS_MAX_PICTURE_GAP         60u
 #define PCM_STARTUP_VIDEO_BYTES     28672u
 #define PCM_RECORD_FRAMES           16u
@@ -41,6 +48,14 @@
  * packet ahead of a whole video packet, or a picture-sized video run behind a
  * single guard sample, both let the sink's audio backlog swing by more than
  * PCM_SINK_FIFO_FRAMES, which is an underrun however exact the payload is.
+ *
+ * Entry 693: the sink FIFO doubled to 16384 frames, paid for by halving the
+ * clean video queue, because the shared byte path stalls while that queue is
+ * full and audio behind the held byte stalls with it.  The reserve is half the
+ * sink FIFO by construction, so it doubles with it; leaving it at 4096 while
+ * the shorter video queue made those stalls more frequent starved audio once
+ * at startup on hardware.  Reserve plus one batch, 8192 plus 2048, still sits
+ * below the sink FIFO so a batch never waits for room.
  * Video is therefore admitted in VIDEO_SLICE_BYTES slices, no video run
  * exceeds PCM_MAX_FREE_VIDEO_BYTES without a PCM_REFILL_FRAMES refill, and the
  * horizon is served whether or not video is queued, so a low-bitrate scene
