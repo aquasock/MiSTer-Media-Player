@@ -250,11 +250,11 @@
                         dc_predictor_cb<=dc_predictor_reset;
                         dc_predictor_cr<=dc_predictor_reset;
                     end
-                    if(mbtype_match[1]) begin
-                        qscale_shift<=0;
-                        field_bit_count<=0;
-                        parser_state<=R_MB_QSCALE;
-                    end else if(mbtype_match[0]) begin
+                    // H.262 macroblock_modes() precedes macroblock_quant's
+                    // quantiser_scale_code.  For interlaced frame pictures
+                    // that means motion_type and dct_type, when present, must
+                    // be consumed before the five-bit macroblock scale.
+                    if(mbtype_match[0]) begin
                         current_motion_x<=0;
                         current_motion_y<=0;
                         predictor_x<=0;
@@ -264,13 +264,23 @@
                         current_cbp<=6'h3f;
                         current_block_index<=0;
                         residual_present<=1;
-                        parser_state<=p_frame_pred_frame_dct ? R_BLOCK
-                                                             : R_DCT_TYPE;
+                        if(!p_frame_pred_frame_dct)
+                            parser_state<=R_DCT_TYPE;
+                        else if(mbtype_match[1]) begin
+                            qscale_shift<=0;
+                            field_bit_count<=0;
+                            parser_state<=R_MB_QSCALE;
+                        end else parser_state<=R_BLOCK;
                     end else if(mbtype_match[3]) begin
                         motion_vlc_bits<=0;
                         motion_vlc_len<=0;
-                        parser_state<=p_frame_pred_frame_dct ? R_MOTION_X
-                                                             : R_MOTION_TYPE;
+                        if(!p_frame_pred_frame_dct)
+                            parser_state<=R_MOTION_TYPE;
+                        else if(mbtype_match[1]) begin
+                            qscale_shift<=0;
+                            field_bit_count<=0;
+                            parser_state<=R_MB_QSCALE;
+                        end else parser_state<=R_MOTION_X;
                     end else begin
                         current_motion_x<=0;
                         current_motion_y<=0;
@@ -281,8 +291,13 @@
                         if(mbtype_match[2]) begin
                             cbp_vlc_bits<=0;
                             cbp_vlc_len<=0;
-                            parser_state<=p_frame_pred_frame_dct ? R_CBP
-                                                                 : R_DCT_TYPE;
+                            if(!p_frame_pred_frame_dct)
+                                parser_state<=R_DCT_TYPE;
+                            else if(mbtype_match[1]) begin
+                                qscale_shift<=0;
+                                field_bit_count<=0;
+                                parser_state<=R_MB_QSCALE;
+                            end else parser_state<=R_CBP;
                         end else parser_state<=R_MB_DONE;
                     end
                 end else if(mbtype_len_next==3'd6) begin
@@ -312,13 +327,11 @@
                                 current_cbp<=6'h3f;
                                 current_block_index<=0;
                                 residual_present<=1;
-                                parser_state<=p_frame_pred_frame_dct ? R_BLOCK
-                                                                     : R_DCT_TYPE;
+                                parser_state<=R_BLOCK;
                             end else if(current_has_motion) begin
                                 motion_vlc_bits<=0;
                                 motion_vlc_len<=0;
-                                parser_state<=p_frame_pred_frame_dct
-                                    ? R_MOTION_X : R_MOTION_TYPE;
+                                parser_state<=field_motion ? R_FSEL : R_MOTION_X;
                             end else begin
                                 current_motion_x<=0;
                                 current_motion_y<=0;
@@ -329,8 +342,7 @@
                                 if(current_has_pattern) begin
                                     cbp_vlc_bits<=0;
                                     cbp_vlc_len<=0;
-                                    parser_state<=p_frame_pred_frame_dct ? R_CBP
-                                                                         : R_DCT_TYPE;
+                                    parser_state<=R_CBP;
                                 end else parser_state<=R_MB_DONE;
                             end
                         end
@@ -351,13 +363,18 @@
                         motion_type_count<=0;
                         current_motion_type<=motion_type_next;
                         motion_slot<=0;
-                        case(motion_type_next)
-                            2'b01: parser_state<=current_has_pattern ?
-                                R_DCT_TYPE : R_FSEL;
-                            2'b10: parser_state<=current_has_pattern ?
-                                R_DCT_TYPE : R_MOTION_X;
-                            default: parser_state<=R_ERROR;
-                        endcase
+                        if((motion_type_next!=2'b01)&&
+                           (motion_type_next!=2'b10))
+                            parser_state<=R_ERROR;
+                        else if(current_has_pattern)
+                            parser_state<=R_DCT_TYPE;
+                        else if(current_has_quant) begin
+                            qscale_shift<=0;
+                            field_bit_count<=0;
+                            parser_state<=R_MB_QSCALE;
+                        end else
+                            parser_state<=(motion_type_next==2'b01) ?
+                                R_FSEL : R_MOTION_X;
                     end else motion_type_count<=motion_type_count+1'b1;
                 end
             end
@@ -370,7 +387,11 @@
                 if(parser_at_end) parser_state<=R_ERROR;
                 else begin
                     current_field_dct<=parser_current_bit;
-                    if(current_is_intra) begin
+                    if(current_has_quant) begin
+                        qscale_shift<=0;
+                        field_bit_count<=0;
+                        parser_state<=R_MB_QSCALE;
+                    end else if(current_is_intra) begin
                         parser_state<=R_BLOCK;
                     end else if(current_has_motion) begin
                         motion_vlc_bits<=0;

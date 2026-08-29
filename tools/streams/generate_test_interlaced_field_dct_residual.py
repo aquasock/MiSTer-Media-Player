@@ -22,6 +22,7 @@ import h262common as h
 
 SLICE_QSCALE = 10
 RESIDUAL_ROW = 8
+QUANTIZED_P_COL = 5
 SCALE = h.quantiser_scale(SLICE_QSCALE)
 
 # Exercise each luma block alone, both field pairs, all luma, and luma+chroma.
@@ -83,9 +84,15 @@ def build_p_row(row: int):
         if row == RESIDUAL_ROW and col in RESIDUALS:
             cbp, coeffs = RESIDUALS[col]
             mvx, mvy = P_VECTORS[col]
-            bits += h.P_MC_CODED
+            bits += (h.P_MC_CODED_QUANT
+                     if col == QUANTIZED_P_COL else h.P_MC_CODED)
             bits += "10"                 # frame_motion_type
             bits += "1"                  # dct_type: field DCT
+            if col == QUANTIZED_P_COL:
+                # macroblock_modes() fields precede macroblock_quant's scale.
+                # Repeating the slice scale leaves the pixel oracle unchanged
+                # while making this fixture prove the production parser order.
+                bits += format(SLICE_QSCALE, "05b")
             bits += h.enc_comp(mvx, predictor[0]) + h.enc_comp(mvy, predictor[1])
             predictor[:] = (mvx, mvy)
             bits = emit_residual(bits, cbp, coeffs)
@@ -217,6 +224,7 @@ def main() -> None:
     print("picture order: I B P (display), I P B (coded)")
     print("P/B: frame pictures, frame_pred_frame_dct 0, frame_motion_type 10")
     print(f"row {RESIDUAL_ROW}: dct_type 1 at columns {sorted(RESIDUALS)}")
+    print(f"row {RESIDUAL_ROW}: quantized P macroblock at column {QUANTIZED_P_COL}")
     print("coverage: Y0/Y1/Y2/Y3, both field pairs, all luma, luma plus chroma,")
     print("          integer and horizontal/vertical/diagonal half-sample prediction")
     print("verification: field-DCT reference model agrees with FFmpeg decode")
