@@ -73,7 +73,7 @@ mpeg2_h262_picture_bookkeeper bookkeeper(
 // later.  Checking publication at header time therefore rejects a legal
 // ordering.  Track the wait instead and enforce the real invariant, which is
 // that a B must not COMPLETE against an unpublished reference.
-reg b_reference_publication_pending;reg p_persistence_d;reg[7:0] p_publication_count;reg publication_error;reg[2:0] publication_error_detail_reg;reg picture_complete_pulse;
+reg b_reference_publication_pending;reg p_persistence_d;reg[7:0] p_publication_count;reg p_overlap_hold;reg publication_error;reg[2:0] publication_error_detail_reg;reg picture_complete_pulse;
 reg[1:0] active_frame_bank_reg,completed_frame_bank_reg;reg[7:0] picture_count_reg;
 reg reference_frame_valid_reg;reg[1:0] reference_frame_bank_reg,previous_reference_frame_bank_reg;
 reg[7:0] reference_promotion_count_reg;
@@ -107,12 +107,13 @@ assign second_picture_420_parsed=base_second_picture_420_parsed||(picture_count_
 
 always @(posedge clk)begin
  if(reset)begin
-  b_reference_publication_pending<=0;p_persistence_d<=0;p_publication_count<=0;publication_error<=0;publication_error_detail_reg<=0;picture_complete_pulse<=0;active_frame_bank_reg<=0;completed_frame_bank_reg<=0;
+  b_reference_publication_pending<=0;p_persistence_d<=0;p_publication_count<=0;p_overlap_hold<=0;publication_error<=0;publication_error_detail_reg<=0;picture_complete_pulse<=0;active_frame_bank_reg<=0;completed_frame_bank_reg<=0;
   picture_count_reg<=0;reference_frame_valid_reg<=0;reference_frame_bank_reg<=0;previous_reference_frame_bank_reg<=0;reference_promotion_count_reg<=0;
   picture_window<=0;picture_header_capture<=0;picture_header_second_byte<=0;p_header_count<=0;consecutive_candidate_seen<=0;
   b_picture_observed<=0;b_picture_inflight<=0;b_persistence_verified<=0;b_header_count<=0;b_persist_count<=0;
  end else begin
   p_persistence_d<=p_persistence_complete;picture_complete_pulse<=0;
+  if(p_persisted_now)p_overlap_hold<=0;
 
   if(stream_valid)begin
    picture_window<=picture_window_next;
@@ -122,6 +123,13 @@ always @(posedge clk)begin
     else begin
      picture_header_capture<=0;picture_header_second_byte<=0;
      if(stream_data[5:3]==3'b010)begin
+      // Entry 710: the header may be consumed so coded order can still be
+      // classified, but its payload must not enter the shared P sideband
+      // while an earlier P header remains unpublished.  Otherwise live
+      // motion records from the following picture can overtake the earlier
+      // picture's delayed residual-row replay in the single P raster engine.
+      if((p_publication_count<p_header_count)&&!p_persisted_now)
+       p_overlap_hold<=1;
       if(p_header_count!=8'hff)p_header_count<=p_header_count+1'b1;
       if(p_header_count>=1)consecutive_candidate_seen<=1;
      end else if(stream_data[5:3]==3'b011)begin
@@ -240,7 +248,7 @@ wire p_hold_effective=p_hold_raw&&!b_picture_inflight&&!b_candidate&&!b_transpor
 // b_seen until scratch persistence finishes; the following picture header body
 // then resumes with the shared P/B execution client free.
 wire b_persistence_wait=b_picture_inflight&&b_seen&&!b_persistence_verified&&!b_error;
-assign stream_ready=(b_picture_inflight?1'b1:parser_ready)&&!p_hold_effective&&!b_parse_hold&&!b_persistence_wait;
+assign stream_ready=(b_picture_inflight?1'b1:parser_ready)&&!p_hold_effective&&!b_parse_hold&&!b_persistence_wait&&!p_overlap_hold;
 wire b_accept_error=b_error||publication_error||reference_progress_error;
 assign b_user_success=b_final_success&&!b_accept_error;
 // Entry 289: p_error_raw is gated by b_picture_observed because a controlled
