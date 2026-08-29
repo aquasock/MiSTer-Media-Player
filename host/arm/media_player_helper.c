@@ -148,6 +148,7 @@ struct output_state {
     size_t video_bytes_since_pcm;
     uint64_t first_audio_pts;
     uint64_t max_video_pts;
+    uint64_t max_video_pts_byte;
     int have_audio_pts;
     int have_video_pts;
     int audio_pes_seen;
@@ -533,6 +534,73 @@ static uint64_t scheduler_pcm_target(const struct output_state *output,
     return elapsed + PCM_SCHEDULE_RESERVE_FRAMES;
 }
 
+/* Keep interpolated delivery in complete guard-sized runs, not tiny records. */
+static uint64_t scheduler_pcm_delivery_target(
+    const struct output_state *output, uint64_t video_pts)
+{
+    uint64_t target = scheduler_pcm_target(output, video_pts);
+
+    return target - target % PCM_REFILL_FRAMES;
+}
+
+/*
+ * A later timestamp can already be present in the bounded queue while an
+ * untimestamped run ahead of it is crossing the shared path.  Waiting for the
+ * timestamped chunk to become the head leaves only the fixed byte guard to
+ * feed audio through that run.  Spread the known timeline advance across the
+ * intervening bytes so its PCM crosses before those bytes can fill the clean
+ * video queue and block the extractor.  This changes delivery order and PCM
+ * record grouping only: timestamp bytes, compressed video and the ordered PCM
+ * sample payload remain exact.
+ */
+static uint64_t scheduler_video_horizon(const struct output_state *output,
+                                        size_t next_slice)
+{
+    const struct video_chunk *chunk;
+    uint64_t horizon = output->max_video_pts;
+    uint64_t future_byte = output->video_bytes;
+    uint64_t progress;
+
+    if (output->video_head->has_pts &&
+        (!output->have_video_pts || output->video_head->pts > horizon))
+        horizon = output->video_head->pts;
+    if (!output->have_video_pts)
+        return horizon;
+
+    for (chunk = output->video_head; chunk; chunk = chunk->next) {
+        if (chunk->has_pts && chunk->pts > output->max_video_pts) {
+            uint64_t span;
+            uint64_t delta;
+            uint64_t interpolated;
+
+            if (future_byte <= output->max_video_pts_byte)
+                return chunk->pts > horizon ? chunk->pts : horizon;
+            span = future_byte - output->max_video_pts_byte;
+            progress = output->video_bytes + (uint64_t)next_slice -
+                       output->max_video_pts_byte;
+            if (progress >= span)
+                return chunk->pts > horizon ? chunk->pts : horizon;
+            delta = chunk->pts - output->max_video_pts;
+            interpolated = output->max_video_pts +
+                           (delta * progress + span - 1u) / span;
+            return interpolated > horizon ? interpolated : horizon;
+        }
+        future_byte += (uint64_t)(chunk->size - chunk->offset);
+    }
+    return horizon;
+}
+
+static void scheduler_accept_video_pts(struct output_state *output,
+                                       const struct video_chunk *chunk)
+{
+    if (!chunk->has_pts ||
+        (output->have_video_pts && chunk->pts <= output->max_video_pts))
+        return;
+    output->max_video_pts = chunk->pts;
+    output->max_video_pts_byte = output->video_bytes - chunk->offset;
+    output->have_video_pts = 1;
+}
+
 static void free_video_head(struct output_state *output)
 {
     struct video_chunk *chunk = output->video_head;
@@ -566,11 +634,7 @@ static int scheduler_release_silent_video(struct output_state *output)
             return -1;
         chunk->offset += remaining;
         output->video_queued_bytes -= remaining;
-        if (chunk->has_pts &&
-            (!output->have_video_pts || chunk->pts > output->max_video_pts)) {
-            output->max_video_pts = chunk->pts;
-            output->have_video_pts = 1;
-        }
+        scheduler_accept_video_pts(output, chunk);
         free_video_head(output);
     }
     return 0;
@@ -618,17 +682,11 @@ static int scheduler_drain(struct output_state *output, int at_eof)
 {
     while (output->video_head) {
         struct video_chunk *chunk = output->video_head;
-        uint64_t prospective_pts = output->max_video_pts;
         uint64_t target;
         uint64_t due;
         uint64_t available_total;
         size_t remaining = chunk->size - chunk->offset;
         size_t slice;
-
-        if (chunk->has_pts &&
-            (!output->have_video_pts || chunk->pts > prospective_pts)) {
-            prospective_pts = chunk->pts;
-        }
 
         if (output->hold_active) {
             size_t startup_size;
@@ -642,11 +700,7 @@ static int scheduler_drain(struct output_state *output, int at_eof)
                 return -1;
             chunk->offset += startup_size;
             output->video_queued_bytes -= startup_size;
-            if (chunk->has_pts &&
-                (!output->have_video_pts || chunk->pts > output->max_video_pts)) {
-                output->max_video_pts = chunk->pts;
-                output->have_video_pts = 1;
-            }
+            scheduler_accept_video_pts(output, chunk);
             if (chunk->offset == chunk->size)
                 free_video_head(output);
             if (startup_lead_complete(output) && hold_available(output)) {
@@ -661,7 +715,8 @@ static int scheduler_drain(struct output_state *output, int at_eof)
         if (!output->scheduler_started)
             break;
         slice = remaining > VIDEO_SLICE_BYTES ? VIDEO_SLICE_BYTES : remaining;
-        target = scheduler_pcm_target(output, prospective_pts);
+        target = scheduler_pcm_delivery_target(
+            output, scheduler_video_horizon(output, slice));
         due = target > output->pcm_emitted_frames ?
               target - output->pcm_emitted_frames : 0;
         if (due > PCM_SCHEDULE_BATCH_FRAMES)
@@ -682,11 +737,7 @@ static int scheduler_drain(struct output_state *output, int at_eof)
         output->video_queued_bytes -= slice;
         if (chunk->offset < chunk->size)
             continue;
-        if (chunk->has_pts &&
-            (!output->have_video_pts || chunk->pts > output->max_video_pts)) {
-            output->max_video_pts = chunk->pts;
-            output->have_video_pts = 1;
-        }
+        scheduler_accept_video_pts(output, chunk);
         free_video_head(output);
     }
     /*
@@ -696,7 +747,8 @@ static int scheduler_drain(struct output_state *output, int at_eof)
      * quietest.  Serve the horizon once the queue is drained as well.
      */
     if (output->scheduler_started && !output->hold_active && !output->video_head) {
-        uint64_t target = scheduler_pcm_target(output, output->max_video_pts);
+        uint64_t target = scheduler_pcm_delivery_target(
+            output, output->max_video_pts);
         uint64_t due = target > output->pcm_emitted_frames ?
                        target - output->pcm_emitted_frames : 0;
 

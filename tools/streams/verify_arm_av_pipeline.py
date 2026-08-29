@@ -404,19 +404,29 @@ def main() -> int:
         if silent_pcm or silent_end:
             raise RuntimeError("video-only Program Stream emitted PCM transport")
 
-        unsupported_audio = envelope_dir / "bad_audio_codec.mpg"
-        unsupported = subprocess.run(
+        # This fixture predates AC-3 support and retained its historical
+        # filename. It is now a positive private-stream regression: the helper
+        # must decode the AC-3 track and terminate its in-band PCM cleanly.
+        ac3_audio = envelope_dir / "bad_audio_codec.mpg"
+        ac3_supported = subprocess.run(
             [str(args.helper), "--protocol", "1", "--source",
-             f"file:{unsupported_audio}"],
+             f"file:{ac3_audio}"],
             capture_output=True,
         )
-        unsupported_message = unsupported.stderr.decode(errors="replace")
-        if (unsupported.returncode == 0 or
-                "unsupported Program Stream private audio" not in
-                unsupported_message):
+        if ac3_supported.returncode:
             raise RuntimeError(
-                "unsupported private audio did not fail explicitly: "
-                + unsupported_message.strip()
+                "AC-3 private audio failed: "
+                + ac3_supported.stderr.decode(errors="replace").strip()
+            )
+        _, ac3_timestamps, ac3_pcm, ac3_end = strip_records(
+            ac3_supported.stdout, 48000
+        )
+        if (not ac3_timestamps or ac3_timestamps != sorted(ac3_timestamps)
+                or not ac3_pcm or ac3_end != 1):
+            raise RuntimeError(
+                "AC-3 private audio transport is incomplete: "
+                f"timestamps={len(ac3_timestamps)} pcm={len(ac3_pcm)} "
+                f"end={ac3_end}"
             )
 
         private_subpicture = temp / "private_subpicture.mpg"
@@ -484,8 +494,8 @@ def main() -> int:
     print("rates: H.262 codes 1-5 accepted; 6-8 rejected before transport")
     print("rates: cross-PES and compatibility-envelope rejection passed")
     print(
-        "program-stream audio: video-only silent pass; private audio rejected; "
-        "private subpicture ignored"
+        "program-stream audio: video-only silent pass; AC-3 private audio "
+        "accepted; private subpicture ignored"
     )
     print("compatibility: raw M2V copied byte-identically")
     print("protocol: capabilities stable; file URI equals legacy path")

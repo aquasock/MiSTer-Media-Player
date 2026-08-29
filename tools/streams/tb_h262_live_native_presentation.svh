@@ -70,9 +70,11 @@ generate if(NATIVE_PRESENTATION) begin: native_presentation
     integer pts_count=0,pts_index=0;
     reg [1023:0] pts_path,trace_path;
     integer trace_fd=0;
-    assign native_metadata_pending=(pts_index<pts_count)&&
-        (stream_index>=pts_records[pts_index][64:33]);
-    wire [32:0] metadata_pts=pts_records[pts_index][32:0];
+    assign native_metadata_pending=AUDIO_TRANSPORT ? audio_metadata_valid :
+        ((pts_index<pts_count)&&
+         (stream_index>=pts_records[pts_index][64:33]));
+    wire [32:0] metadata_pts=AUDIO_TRANSPORT ? audio_metadata_pts :
+        pts_records[pts_index][32:0];
     reg tick90=0;
     integer tick_phase=0;
     always @(posedge clk)begin

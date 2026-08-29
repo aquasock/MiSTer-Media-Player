@@ -25,6 +25,9 @@ module tb_h262_live_raster_soak #(
     // Entry 669: opt-in integrated native-film diagnosis. Defaults retain
     // the numerical soak's original fast synthetic presentation exactly.
     parameter integer NATIVE_PRESENTATION=0,
+    // Entry 688: opt-in real in-band extractor, clean-video queue and audio
+    // FIFO delivery. The default direct elementary-stream driver is unchanged.
+    parameter integer AUDIO_TRANSPORT=0,
     parameter integer MEMORY_BUSY_PERIOD=0,
     parameter integer MEMORY_BUSY_CYCLES=0,
     parameter integer SWAP_WINDOW_CYCLES=10000,
@@ -333,6 +336,7 @@ module tb_h262_live_raster_soak #(
 
     always #(NATIVE_PRESENTATION ? 8.333333 : 5) clk=~clk;
 
+    `include "tools/streams/tb_h262_live_audio_transport.svh"
     `include "tools/streams/tb_h262_live_native_presentation.svh"
 
 
@@ -767,6 +771,7 @@ module tb_h262_live_raster_soak #(
         end
     end
 
+    generate if(!AUDIO_TRANSPORT) begin: elementary_stream_driver
     always @(negedge clk) begin
         if(reset)begin
             stream_valid<=0;
@@ -784,6 +789,7 @@ module tb_h262_live_raster_soak #(
         end
         else stream_valid<=0;
     end
+    end endgenerate
 
     always @(posedge clk) begin
         if(reset||!prediction.reference_cache.active)begin
@@ -1676,6 +1682,7 @@ module tb_h262_live_raster_soak #(
 
         if((stream_index==stream_len)&&sequence_end_seen&&!pred_active&&
            !presentation_hold&&!destination_ownership_hold&&!writer.writing&&
+           audio_transport_complete&&
            (NATIVE_PRESENTATION || (!arbiter.read_outstanding&&!read_pending)))
             quiet_cycles<=quiet_cycles+1;
         else quiet_cycles<=0;
