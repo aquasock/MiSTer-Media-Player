@@ -149,7 +149,12 @@ localparam [5:0]
     // direction, each preceded by its own motion_vertical_field_select, so the
     // existing per-direction vector states are iterated twice through a slot
     // rather than duplicated.
-    S_MOTION_TYPE=32,S_FSEL=33,S_FDONE=34,S_BSEL=35,S_BDONE=36;
+    S_MOTION_TYPE=32,S_FSEL=33,S_FDONE=34,S_BSEL=35,S_BDONE=36,
+    // Field prediction emits a second motion record per direction.  The
+    // backward second record is emitted before the existing backward state so
+    // that state's macroblock-completion tail stays where it is; the engines
+    // assemble by sideband index, not by arrival order.
+    S_MB_F1=37,S_MB_B1=38;
 reg [5:0] state;
 
 reg [2:0] field_bit_count; reg [4:0] qscale_shift,current_qscale; reg [3:0] extra_info_count;
@@ -254,6 +259,12 @@ reg signed [9:0] cur_fx1,cur_fy1,cur_bx1,cur_by1;
 reg signed [10:0] fpy_frame,bpy_frame,fpy1_frame,bpy1_frame;
 reg signed [9:0]  fpx1,bpx1;
 wire field_motion = (current_motion_type==2'b01);
+// Field prediction parses slot 1 last, so slot 0 sits in cur_*1; frame
+// prediction has only the one vector.
+wire signed [9:0] cur_fx1_or_cur_fx = field_motion ? cur_fx1 : cur_fx;
+wire signed [9:0] cur_fy1_or_cur_fy = field_motion ? cur_fy1 : cur_fy;
+wire signed [9:0] cur_bx1_or_cur_bx = field_motion ? cur_bx1 : cur_bx;
+wire signed [9:0] cur_by1_or_cur_by = field_motion ? cur_by1 : cur_by;
 wire signed [9:0]  fpx_sel = motion_slot ? fpx1 : fpx;
 wire signed [9:0]  bpx_sel = motion_slot ? bpx1 : bpx;
 wire signed [10:0] fpy_frame_sel = motion_slot ? fpy1_frame : fpy_frame;

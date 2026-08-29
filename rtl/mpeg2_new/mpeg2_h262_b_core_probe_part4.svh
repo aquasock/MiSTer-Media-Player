@@ -163,14 +163,34 @@
                 end
             end
             S_MB_DONE: begin
-                sideband_valid<=1;sideband_index<=current_intra?6'h37:direction_index(current_direction);sideband_value<=0;motion_vector_x<=cur_fx;motion_vector_y<=cur_fy;
-                if(!geometry_sent)state<=S_GEOMETRY;else state<=S_MB_B;
+                // Entry 695: the record value carries the field-motion flag and
+                // this slot's motion_vertical_field_select; it was previously
+                // always zero for motion records, so no width changes.
+                sideband_valid<=1;sideband_index<=current_intra?6'h37:direction_index(current_direction);
+                sideband_value<=$signed({14'd0,field_motion,cur_fsel0});
+                motion_vector_x<=cur_fx1_or_cur_fx;motion_vector_y<=cur_fy1_or_cur_fy;
+                if(field_motion)state<=S_MB_F1;
+                else if(!geometry_sent)state<=S_GEOMETRY;else state<=S_MB_B;
+            end
+            S_MB_F1: begin
+                sideband_valid<=1;sideband_index<=6'h35;
+                sideband_value<=$signed({14'd0,1'b1,cur_fsel1});
+                motion_vector_x<=cur_fx;motion_vector_y<=cur_fy;
+                if(!geometry_sent)state<=S_GEOMETRY;else state<=S_MB_B1;
+            end
+            S_MB_B1: begin
+                sideband_valid<=1;sideband_index<=6'h36;
+                sideband_value<=$signed({14'd0,1'b1,cur_bsel1});
+                motion_vector_x<=cur_bx;motion_vector_y<=cur_by;
+                state<=S_MB_B;
             end
             S_GEOMETRY: begin
-                sideband_valid<=1;sideband_index<=6'h3c;sideband_value<=$signed({4'd0,picture_mb_width,picture_mb_height});geometry_sent<=1;state<=S_MB_B;
+                sideband_valid<=1;sideband_index<=6'h3c;sideband_value<=$signed({4'd0,picture_mb_width,picture_mb_height});geometry_sent<=1;state<=field_motion?S_MB_B1:S_MB_B;
             end
             S_MB_B: begin
-                sideband_valid<=1;sideband_index<=6'h3b;sideband_value<=0;motion_vector_x<=cur_bx;motion_vector_y<=cur_by;
+                sideband_valid<=1;sideband_index<=6'h3b;
+                sideband_value<=$signed({14'd0,field_motion,cur_bsel0});
+                motion_vector_x<=cur_bx1_or_cur_bx;motion_vector_y<=cur_by1_or_cur_by;
                 // H.262 7.6.3.4: intra without concealment resets ALL PMVs.
                 // Concealment vectors remain excluded by picture admission.
                 if(current_intra)begin
