@@ -1,0 +1,84 @@
+{
+  "captured": "2026-08-29T06:09:31-07:00",
+  "host": "10.10.0.30",
+  "source_commit": "b9c2657e6aefb6c9f6101efbe72c0b29e487a3dc",
+  "user_report": {
+    "video": "Everything looks perfect.",
+    "audio": "Sound was perfect too."
+  },
+  "session": {
+    "file": "/media/fat/games/MediaPlayer/dvd_opening_original.mpg",
+    "provenance": "12-second stream-copy opening from the_big_lebowski.iso",
+    "audio_output": "HDMI decoded stereo PCM",
+    "deinterlacer": "Weave",
+    "candidate": "/media/fat/MediaPlayer_20260829_b9c2657.rbf",
+    "playback_user_controlled": true
+  },
+  "telemetry": {
+    "schema_version": 20,
+    "snapshot_reason": "quiet",
+    "accepted_bytes": 10334169,
+    "associated_timestamps": 25,
+    "display_pictures": 289,
+    "display_swaps": 288,
+    "reference_pictures": 128,
+    "b_pictures": 161,
+    "sequence_end_seen": true,
+    "presentation_complete": true,
+    "session_quiet": true,
+    "error_flags": 0,
+    "audio_underrun": false,
+    "audio_underrun_count": 0,
+    "pcm_protocol_error": false,
+    "presentation_error": false,
+    "cache_bank_overlap_error": false,
+    "validation_failures": []
+  },
+  "helper": {
+    "video_bytes": 10334393,
+    "picture_timestamps": 25,
+    "audio_frames": 375,
+    "audio_samples": 576000,
+    "submitted_transport_bytes": 12818397,
+    "pipe_reads": 784,
+    "fast_bytes": 12818397,
+    "slow_bytes": 0,
+    "finish_reason": "eof",
+    "exit_code": 0
+  },
+  "files": {
+    "/media/fat/MediaPlayer_20260829_b9c2657.rbf": {
+      "bytes": 4436916,
+      "sha256": "f366c246854d177aa2ce4d359d370be840094ecdb09164b736e5d55f4ed3392e"
+    },
+    "/media/fat/games/MediaPlayer/dvd_opening_original.mpg": {
+      "bytes": 11145233,
+      "sha256": "218d3a8eab32efceb6263d884be1b589b75e598ae25eeb465d14e4b430dfdc21"
+    },
+    "/media/fat/linux/MediaPlayer_Helper": {
+      "bytes": 629056,
+      "sha256": "02d1df98c62ee00169585db990b6bd48c3769eca20c3e1d594f2318c362eb00f"
+    },
+    "/media/fat/MiSTer": {
+      "bytes": 1170340,
+      "sha256": "7c84a66e5ad71e7fcb3b53ca8265952a96c3d7a0cf752147beb0d9649506f6ae"
+    },
+    "/media/fat/screenshots/cadence_probe.png": {
+      "bytes": 316447,
+      "sha256": "7193a16464c1b5d5e666c3270112e4509e4098e494331da830f08e440aa22f18",
+      "captures_identical": true,
+      "complete_png_verified": true
+    },
+    "/tmp/MediaPlayer_ARM.log": {
+      "bytes": 392160,
+      "sha256": "253746fc62d6023f3c12428f6cdd47a206e1d526b5bd154da8d8be8fe1603086"
+    },
+    "/tmp/messages": {
+      "bytes": 65062,
+      "sha256": "1e783e05fad58025b9b4fc80fc58d303c1ff7e7fe68607174ebf274da1c214eb"
+    }
+  },
+  "local_evidence": "output_files/entry709/capture",
+  "scope": "Known Big Lebowski opening regression over HDMI/Weave; this fixture does not by itself qualify the newly admitted field-motion and field-DCT syntax.",
+  "errors": []
+}

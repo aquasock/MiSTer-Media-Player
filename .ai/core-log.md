@@ -1,3 +1,32 @@
+## 709 COMMIT Unreleased b9c2657 2026-08-29T06:09:31-07:00
+
+#### Coming From:
+
+Unreleased b9c2657
+
+#### Purpose:
+
+Install the exact timing-qualified interlaced decoder candidate and hardware-validate its known Big Lebowski opening regression over HDMI and Weave.
+
+#### Outcome:
+
+The exact 4,436,916-byte RBF from entry 708 is retrieved from the build PC, independently reproduces SHA-256 `f366c246854d177aa2ce4d359d370be840094ecdb09164b736e5d55f4ed3392e`, and is staged, read back, promoted and finally read back again as `/media/fat/MediaPlayer_20260829_b9c2657.rbf` without replacing any older core.  Following the explicit reload handoff, the user plays `games/MediaPlayer/dvd_opening_original.mpg`, the twelve-second stream-copy opening derived from `the_big_lebowski.iso`, with HDMI decoded stereo PCM and Weave, and reports that everything looks perfect and the sound is perfect too.  Two completed screenshots are byte-identical, show the final Universal frame and decode as checksum-valid schema-20 quiet snapshots.  Telemetry accepts the exact expected 10,334,169 clean video bytes, all 289 displayed pictures, 288 swaps, 128 reference plus 161 B pictures and all 25 timestamps, reaches sequence end and presentation completion, and reports zero error flags, audio underruns, PCM protocol faults, presentation faults, cache-bank overlap faults or validation failures.  The helper identifies AC-3 private substream `0x80`, emits 375 frames and 576,000 decoded stereo samples, reaches EOF and exits zero after all 12,818,397 transport bytes in 784 pipe reads, with every byte on the fast path and none on the slow path.  Readback reproduces the qualified RBF, accepted static helper and source movie hashes.  This accepts the exact `b9c2657` candidate for the known opening regression; because that fixture uses progressive frame pictures within an interlaced sequence, it does not alone qualify the newly admitted field-motion and field-DCT syntax.
+
+#### Next Steps:
+
+Keep the accepted RBF loaded and prepare one short stream-copy excerpt from the user's decrypted DVD samples that is confirmed to contain the newly admitted interlaced field-motion and field-DCT syntax.  Test that excerpt once in HDMI Weave, preserve the completed screen and helper log, and only then repeat it in Bob and native 480i if the first run is clean.  Retain 576i, field pictures, `repeat_first_field` expansion beyond the already admitted film cadence, DVD navigation, menus and direct ISO playback outside this checkpoint.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 708 COMMIT Unreleased b9c2657 2026-08-29T05:59:55-07:00
 
 #### Coming From:
@@ -1260,40 +1289,6 @@ Obtain approval for a production fix that preserves retiring picture identity, P
 #### Files Modified:
 
 - tools/streams/analyze_original_dvd_timing.py
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 669 COMMIT Unreleased 77859f9 2026-08-28T02:38:57-07:00
-
-#### Coming From:
-
-Unreleased 6c1b621
-
-#### Purpose:
-
-Trace the complete original DVD opening with native film timing and original timestamps to isolate silent playback stutter.
-
-#### Outcome:
-
-Diagnostic source 77859f9 is published after the user approves simulation and diagnosis before another FPGA build. The source extends the existing full-opening raster test with an opt-in native presentation path using the production timing generator, picture timestamp owner, presentation timeline and framebuffer publication feedback, keeping the production RTL unchanged. Preserve original elementary bytes and sparse timestamp positions through deterministic fixture preparation, add unique picture identity and readiness/publication traces, and exercise shared display/prediction memory service with explicit model parameters. Retain the default reconstruction regression and its measured error bounds. Treat any discrepancy first as either a harness fidelity issue or a production behavior to isolate, not automatic proof of the hardware root cause. The diagnostic development runs on GUNSMOKE; no MiSTer replay, configuration change, deployment, Quartus compile or seed change is approved in this boundary.
-
-#### Next Steps:
-
-Publish the diagnostic source from the Pi, pull it on the build PC, run the complete 289-picture opening with native field cadence and original PTS, and compare controlled memory-service conditions. Trace decode completion, candidate readiness, ownership holds, field eligibility and actual framebuffer publication using identities wider than the old eight-bit counters. Separate legal two/three-field holds and the terminal timestamp gap from missed presentation opportunities, verify the old numerical checks still apply, and record a reproducible explanation or remaining evidence gap before proposing a production fix.
-
-#### Files Modified:
-
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/streams/tb_h262_live_native_presentation.svh
-- tools/streams/prepare_original_dvd_timing.py
-- tools/streams/run_original_dvd_timing.sh
-- tools/streams/analyze_original_dvd_timing.py
-- docs/testing_original_dvd_opening.md
 
 #### Status:
 
