@@ -1,3 +1,37 @@
+## 708 COMMIT Unreleased b9c2657 2026-08-29T05:59:55-07:00
+
+#### Coming From:
+
+Unreleased d89c02b
+
+#### Purpose:
+
+Close timing on the completed interlaced MPEG-2 production decoder and preserve one exact fit-qualified candidate for hardware validation.
+
+#### Outcome:
+
+Published source `98a1670` first updates the cadence regression for the established schema-20 audio fields and passes its isolated deadline, hardware-cadence, RTL-packet and decoder-layout checks.  The first clean seed-20 build fits at 33,956 ALMs but its focused decoder audit fails at negative 2.006 ns, so that RBF is rejected.  Source `ad2b27f` inserts a B prediction boundary while retaining pixel-exact mixed, field-motion and field-DCT reconstruction, but its clean build fails the same focused audit at negative 3.712 ns and is also rejected.  Final published source `b9c2657` registers the B fetchers' retained-footprint lookup, targets requests only to the selected physical fetcher and flushes pending lookup state at each start.  The progressive mixed fixture compares all 423,936 samples within its established two-level tolerance, and the B field-motion, frame-motion field-DCT and combined field-motion plus field-DCT fixtures each compare 1,036,800 samples exactly with zero parser, raster, writer or presentation errors.  A fresh detached checkout of exact full SHA `b9c2657e6aefb6c9f6101efbe72c0b29e487a3dc` completes Quartus Prime 17.0.2 seed 20 with zero errors.  The fit uses 33,589 of 41,910 ALMs, 51,747 registers, 4,181,443 memory bits, 532 of 553 RAM blocks and 67 DSP blocks.  Full timing passes with setup 0.023 ns, hold 0.246 ns, recovery 2.440 ns, removal 0.481 ns and minimum pulse width 0.925 ns; the focused audit finds zero violations with decoder setup 0.023 ns and video setup 2.735 ns.  The accepted 4,436,916-byte RBF remains on the build PC at `/home/vash/mister-builds/entry710/source_b9c_clean/output_files/MediaPlayer.rbf` with SHA-256 `f366c246854d177aa2ce4d359d370be840094ecdb09164b736e5d55f4ed3392e`.  It has not been installed or hardware-tested.
+
+#### Next Steps:
+
+Preserve this exact RBF as the sole candidate and perform one user-controlled MiSTer playback validation of the 720-by-480 NTSC interlaced target, checking native 480i first and then Bob and Weave presentation without opening 576i scope.  Do not rebuild or reseed this checkpoint; if hardware exposes a defect, retain the completed screen and helper log before deciding on a separately approved correction.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
+- tools/streams/tb_h262_hardware_cadence_profiler.sv
+- tools/streams/tb_h262_live_raster_soak.sv
+- tools/streams/test_decode_hardware_cadence.py
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 707 COMMIT Unreleased d89c02b 2026-08-29T04:29:02-07:00
 
 #### Coming From:
@@ -1264,35 +1298,6 @@ Publish the diagnostic source from the Pi, pull it on the build PC, run the comp
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 668 COMMIT Unreleased 6c1b621 2026-08-28T02:36:27-07:00
-
-#### Coming From:
-
-Unreleased 6c1b621
-
-#### Purpose:
-
-Capture silent original-opening stutter and identify the remaining native-film timing coverage gap.
-
-#### Outcome:
-
-The user reports several severe stutters near the beginning of the silent comparison, improving toward the end, with the diagnostic overlay available. The helper log confirms dvd_opening_video_only.mpg, and FTP readback verifies the unchanged silent stream, dated candidate, preserved undated core and Main. Two screenshots are byte-identical and produce matching checksum-valid schema-19 telemetry. Unlike entry 667's early audio-underrun snapshot, this run reaches quiet sequence end with presentation complete, zero error flags, zero PCM samples, 128 reference pictures and 161 B pictures, accounting for all 289 coded pictures. Stutter therefore persists without audio; audio processing is not a necessary cause, although additional coupling in the original run remains possible. The profiler reports 280 display pictures and 279 swaps over 12.8823 seconds, but source inspection shows these are derived from first-reference completion and bank/scratch selection changes rather than unique picture publications, so the difference does not establish nine dropped pictures. Its three largest bank-change gaps are 116.8151, 100.1 and 83.4484 milliseconds at recorded ordinals 57, 71 and 89. Their retained threshold-crossing states show upstream data pending, decoder not ready, no presentable candidate and neither presentation nor destination hold; these samples prioritize video readiness and ownership/cadence investigation without proving one cause or the state throughout each gap. The fixed-29.97-frame deadline and outlier counts are not valid failure totals for two/three-field film pictures. Main completes all 10,334,393 video-plus-PTS bytes at log time 12.758744 seconds, with helper exit zero and no slow-path bytes. Review of the full-opening numerical runner reveals that its scheduler ties native film, field/publication feedback and timestamp inputs off and uses synthetic 10,000-cycle swap windows; that reconstruction pass does not cover integrated hardware film timing. Existing focused film tests remain valid within their narrower scope. Capture, helper log, decoded telemetry and source-grounded analysis are retained under .ai/current_results/entry668_*. No production source, device configuration, build or playback action is changed, and hardware acceptance remains open.
-
-#### Next Steps:
-
-Obtain approval to extend the existing simulation coverage for the complete original opening with native field cadence, original timestamps, publication feedback and realistic memory contention, tracing unique picture identity, decode readiness, ownership holds, cadence eligibility and actual publication. Reproduce and isolate the video stall before selecting a production fix or another FPGA build; distinguish legal three-field holds and the known terminal timestamp gap from real misses, and reconcile the bank-derived counters against actual publications. Preserve the numerical reconstruction bounds and then retest the original audio path. No new files or user replay are needed for the evidence already collected.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
