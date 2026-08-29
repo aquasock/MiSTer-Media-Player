@@ -201,7 +201,7 @@ reg [10:0] motion_count;
 reg [55:0] motion_word;
 // Entry 695: the second field vector arrives as its own sideband record.
 reg signed [12:0] p_pending_mvx1,p_pending_mvy1;
-reg p_pending_field,p_pending_fsel0,p_pending_fsel1;
+reg p_pending_field,p_pending_fsel1;
 wire mb_field=motion_word[55];
 wire mb_fsel0=motion_word[54];
 wire mb_fsel1=motion_word[53];
@@ -532,6 +532,16 @@ wire descriptor_order_error=
     ({wide_desc_mb,residual_value[2:0]} <=
      {capture_last_desc_word[14:4],capture_last_desc_word[2:0]});
 
+// Entry 695: one macroblock's committed motion word.  Slot 0 and its field
+// select arrive on the committing record itself, slot 1 and its select on the
+// 0x35 record that precedes it; frame prediction leaves both slots equal.
+wire [55:0] motion_commit_word=
+    {p_pending_field,residual_value[0],p_pending_fsel1,
+     (residual_index==6'h3b),
+     motion_vector_x,motion_vector_y,
+     p_pending_field?p_pending_mvx1:motion_vector_x,
+     p_pending_field?p_pending_mvy1:motion_vector_y};
+
 wire new_picture_metadata=
     capture_enable&&residual_valid&&!desc_active&&
     ((residual_index==6'h3e)||(residual_index==6'h3b))&&
@@ -561,7 +571,7 @@ always @(posedge clk) begin
         motion_count<=0;
         motion_word<=0;
         p_pending_mvx1<=0;p_pending_mvy1<=0;
-        p_pending_field<=0;p_pending_fsel0<=0;p_pending_fsel1<=0;
+        p_pending_field<=0;p_pending_fsel1<=0;
         bank_desc_count[0]<=0;
         bank_desc_count[1]<=0;
         bank_last_desc_word[0]<=0;
@@ -635,9 +645,8 @@ always @(posedge clk) begin
             persisted_seen<=0;
             progress_stage<=4'd1;
             motion_count<=11'd1;
-            motion_mem[0]<={3'b000,(residual_index==6'h3b),
-                            motion_vector_x,motion_vector_y,
-                            motion_vector_x,motion_vector_y};
+            motion_mem[0]<=motion_commit_word;
+            p_pending_field<=0;p_pending_fsel1<=0;
             bank_desc_count[0]<=0;
             bank_desc_count[1]<=0;
             bank_last_desc_word[0]<=0;
@@ -708,15 +717,16 @@ always @(posedge clk) begin
                    (motion_count>=MAX_MB)) begin
                     error<=1;
                     if(!error) error_source<=5'd2;
+                // Entry 695: both records carry the field flag, so a
+                // disagreement means the pair desynchronised.  Refusing is
+                // what keeps unsupported syntax from mis-decoding silently.
+                end else if(residual_value[1]!=p_pending_field) begin
+                    error<=1;
+                    if(!error) error_source<=5'd19;
                 end else begin
-                    motion_mem[motion_count]<=
-                        {p_pending_field,p_pending_fsel0,p_pending_fsel1,
-                         (residual_index==6'h3b),
-                         motion_vector_x,motion_vector_y,
-                         p_pending_field?p_pending_mvx1:motion_vector_x,
-                         p_pending_field?p_pending_mvy1:motion_vector_y};
+                    motion_mem[motion_count]<=motion_commit_word;
                     motion_count<=motion_count+1'b1;
-                    p_pending_field<=0;p_pending_fsel0<=0;p_pending_fsel1<=0;
+                    p_pending_field<=0;p_pending_fsel1<=0;
                 end
             end else if(residual_index==6'h3c) begin
                 if(bank_ready[capture_bank] ||
