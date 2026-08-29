@@ -22,6 +22,7 @@ module mpeg2_h262_reference_read_probe
  output wire[7:0] ddram_burstcnt,output wire[28:0] ddram_addr,output wire ddram_rd,
  output wire p_store_select,output wire[7:0] p_store_pixel_value,output wire[11:0] p_store_pixel_x,output wire[11:0] p_store_pixel_y,
  output wire p_store_pixel_valid,output wire p_store_block_start,output wire p_store_block_complete,
+ output wire p_store_field_dct,
  output wire read_seen,output wire[7:0] sample_value,output wire sample_nonzero,output wire half_sample_seen,
  output wire reconstructed_seen,output wire[7:0] reconstructed_value,output wire persisted_seen,output wire row_persisted,output wire[7:0] persisted_value,
  output wire[3:0] p_progress_stage,output wire probe_error,
@@ -52,7 +53,7 @@ wire general_detect_now=p_residual_sample_valid&&
  general_p_f_code_supported&&
  general_geometry_supported&&!p_implicit_reconstruct_request;
 reg general_mixed_mode;
-wire mixed_active,mixed_persisted_seen,mixed_error,mixed_half;
+wire mixed_active,mixed_persisted_seen,mixed_error,mixed_half,mix_store_field_dct;
 reg mixed_persisted_seen_d;
 always @(posedge clk)begin
  if(reset)begin general_mixed_mode<=0;mixed_persisted_seen_d<=0;end
@@ -71,7 +72,7 @@ wire b_detect_now=b_motion_transport&&p_residual_sample_valid&&b_direction_word&
  general_geometry_supported&&!p_implicit_reconstruct_request;
 reg b_mode;
 reg b_persisted_seen_d;
-wire b_active,b_persisted_seen,b_row_persisted,b_error,b_half,b_recon,b_read,b_nonzero;
+wire b_active,b_persisted_seen,b_row_persisted,b_error,b_half,b_recon,b_read,b_nonzero,b_store_field_dct;
 wire[4:0] b_error_source;
 wire [7:0] b_sample,b_recon_value,b_persist_value;
 reg b_history_error;
@@ -312,7 +313,7 @@ mpeg2_h262_p_motion_residual_raster_engine mixed_probe(
  .ddram_cacheable(mix_cacheable_raw),.ddram_lookup_request(mix_lookup_request),
  .ddram_lookup_consume(mix_lookup_consume),
  .store_select(mix_store_sel),.store_pixel_value(mix_store_val),.store_pixel_x(mix_store_x),.store_pixel_y(mix_store_y),.store_pixel_valid(mix_store_valid),
- .store_block_start(mix_store_start),.store_block_complete(mix_store_complete),.active(mixed_active),.read_seen(mix_read),.sample_value(mix_sample),.sample_nonzero(mix_nonzero),
+ .store_block_start(mix_store_start),.store_block_complete(mix_store_complete),.store_field_dct(mix_store_field_dct),.active(mixed_active),.read_seen(mix_read),.sample_value(mix_sample),.sample_nonzero(mix_nonzero),
  .half_sample_seen(mixed_half),.reconstructed_seen(mix_recon),.reconstructed_value(mix_recon_val),.persisted_seen(mixed_persisted_seen),.row_persisted(mix_row_persisted),.persisted_value(mix_persist_val),
  .progress_stage(mix_progress_stage),.error(mixed_error),.error_source(mixed_error_source));
 
@@ -335,6 +336,7 @@ mpeg2_h262_b_bidirectional_raster_engine b_probe(
  .ddram_lookup_consume(b_lookup_consume),
  .store_select(b_store_sel),.store_pixel_value(b_store_val),.store_pixel_x(b_store_x),.store_pixel_y(b_store_y),
  .store_pixel_valid(b_store_valid),.store_block_start(b_store_start),.store_block_complete(b_store_complete),
+ .store_field_dct(b_store_field_dct),
  .active(b_active),.read_seen(b_read),.sample_nonzero(b_nonzero),.half_sample_seen(b_half),
  .reconstructed_seen(b_recon),.persisted_seen(b_persisted_seen),.row_persisted(b_row_persisted),.error(b_error),.error_source(b_error_source));
 assign b_sample=8'd0;assign b_recon_value=8'd0;assign b_persist_value=8'd0;
@@ -349,6 +351,8 @@ assign p_store_pixel_y=b_select?b_store_y:mixed_select?mix_store_y:base_store_y;
 assign p_store_pixel_valid=b_select?b_store_valid:mixed_select?mix_store_valid:base_store_valid;
 assign p_store_block_start=b_select?b_store_start:mixed_select?mix_store_start:base_store_start;
 assign p_store_block_complete=b_select?b_store_complete:mixed_select?mix_store_complete:base_store_complete;
+assign p_store_field_dct=b_select?b_store_field_dct:
+                         mixed_select?mix_store_field_dct:1'b0;
 wire mixed_seen_enable=!plan_select||plan_replay_seen;
 assign read_seen=b_select?b_read:mixed_select?(mixed_seen_enable&&mix_read):base_read;
 assign sample_value=b_select?b_sample:mixed_select?mix_sample:base_sample;

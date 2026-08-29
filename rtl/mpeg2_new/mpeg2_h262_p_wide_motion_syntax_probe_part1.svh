@@ -355,6 +355,7 @@ always @(posedge clk) begin
         motion_event_second<=0;
         motion_event_fsel0<=0;
         motion_event_fsel1<=0;
+        motion_event_field_dct<=0;
         residual_block_read_word<=0;
         residual_block_count<=0;
         residual_present<=0;
@@ -420,6 +421,7 @@ always @(posedge clk) begin
         motion_second_sent<=0;
         current_fsel0<=0;
         current_fsel1<=0;
+        current_field_dct<=0;
         motion_code_pending<=0;
         motion_vlc_bits<=0;
         motion_vlc_len<=0;

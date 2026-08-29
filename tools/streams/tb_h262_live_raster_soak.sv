@@ -218,6 +218,7 @@ module tb_h262_live_raster_soak #(
     wire [7:0] pred_burstcnt,pred_store_value,pred_sample,pred_recon_value;
     wire [28:0] pred_addr;
     wire pred_rd,pred_store_select,pred_store_valid,pred_store_start;
+    wire pred_store_field_dct;
     wire pred_store_complete,pred_active,pred_read_seen,pred_sample_nonzero;
     wire pred_half_seen,pred_reconstructed_seen,pred_persisted;
     wire pred_row_persisted,pred_error;
@@ -459,7 +460,8 @@ module tb_h262_live_raster_soak #(
         .p_store_pixel_x(pred_store_x),.p_store_pixel_y(pred_store_y),
         .p_store_pixel_valid(pred_store_valid),
         .p_store_block_start(pred_store_start),
-        .p_store_block_complete(pred_store_complete),.read_seen(pred_read_seen),
+        .p_store_block_complete(pred_store_complete),
+        .p_store_field_dct(pred_store_field_dct),.read_seen(pred_read_seen),
         .sample_value(pred_sample),.sample_nonzero(pred_sample_nonzero),
         .half_sample_seen(pred_half_seen),
         .reconstructed_seen(pred_reconstructed_seen),
@@ -473,7 +475,8 @@ module tb_h262_live_raster_soak #(
     // compiled top level presents them.
     mpeg2_h262_ddram_store writer(
         .clk(clk),.reset(reset),.frame_bank(active_bank),
-        .field_dct(NATIVE_PRESENTATION && !pred_store_select && publication.dct_type),
+        .field_dct(native_use_intra ? publication.dct_type :
+                   pred_store_field_dct),
         .pixel_value(native_use_intra ? i_value : pred_store_value),
         .pixel_component(native_use_intra ? i_component : 2'd0),
         .pixel_x(native_use_intra ? i_x : pred_store_x),

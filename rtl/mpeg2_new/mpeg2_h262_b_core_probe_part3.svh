@@ -57,7 +57,8 @@ wire parser_consumes_bit=(state==S_QSCALE)||(state==S_EXTRA_FLAG)||(state==S_EXT
     // syntax element and must advance the bit pointer.  Without this
     // S_MOTION_TYPE reads one bit twice and decodes 00 or 11, and the field
     // selects desynchronise every vector behind them.
-    (state==S_MOTION_TYPE)||(state==S_FSEL)||(state==S_BSEL);
+    (state==S_MOTION_TYPE)||(state==S_FSEL)||(state==S_BSEL)||
+    (state==S_DCT_TYPE);
 wire consume_bit=parse_active&&parser_consumes_bit&&!parser_at_end;
 
 reg t_start,t_we,t_end,t_intra; reg [5:0] t_widx; reg signed [12:0] t_wval; reg [4:0] t_qscale;
@@ -130,7 +131,7 @@ always @(posedge clk) begin
         parse_active<=0;proof_done<=0;boundary_final<=0;row_waiting<=0;replay_row_final<=0;
         outstanding_rows<=0;final_row_queued<=0;producer_rearm_pending<=0;
         parse_byte_limit<=0;parse_byte_index<=0;parse_bit_index<=7;
-        state<=S_QSCALE;field_bit_count<=0;qscale_shift<=0;current_qscale<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;skip_remaining<=0;geometry_sent<=0;
+        state<=S_QSCALE;field_bit_count<=0;qscale_shift<=0;current_qscale<=0;extra_info_count<=0;current_col<=0;row_has_coded_mb<=0;skip_remaining<=0;geometry_sent<=0;current_field_dct<=0;
         mba_bits<=0;mba_len<=0;mba_wide_bits<=0;mba_wide_len<=0;mba_escape_accum<=0;mba_symbol_escape_q<=0;mba_symbol_value_q<=0;mbtype_bits<=0;mbtype_len<=0;current_direction<=0;last_direction<=0;current_pattern<=0;current_intra<=0;current_quant<=0;
         fpx<=0;bpx<=0;cur_fx<=0;cur_fy<=0;cur_bx<=0;cur_by<=0;
         fpy_frame<=0;bpy_frame<=0;fpx1<=0;fpy1_frame<=0;bpx1<=0;bpy1_frame<=0;
@@ -257,17 +258,18 @@ always @(posedge clk) begin
                     // implies and what every skipped macroblock assumes.
                     motion_type_shift<=0;motion_type_count<=0;motion_slot<=0;
                     current_motion_type<=2'b10;
+                    current_field_dct<=0;
                     cur_fsel0<=0;cur_fsel1<=0;cur_bsel0<=0;cur_bsel1<=0;
                     cur_fx1<=0;cur_fy1<=0;cur_bx1<=0;cur_by1<=0;
                     if(mbtype_match[4])begin qscale_shift<=0;field_bit_count<=0;state<=S_MB_QSCALE;end
-                    else if(mbtype_match[3])begin current_cbp<=6'h3f;current_block_index<=0;state<=S_BLOCK;end
+                    else if(mbtype_match[3])begin current_cbp<=6'h3f;current_block_index<=0;state<=b_frame_pred_frame_dct?S_BLOCK:S_DCT_TYPE;end
                     else if(!b_frame_pred_frame_dct)state<=S_MOTION_TYPE;
                     else if(mbtype_match[2:1]==2'd2)state<=S_BX;else state<=S_FX;
                 end else if(mbtype_len_next>=6)state<=S_ERROR;else begin mbtype_bits<=mbtype_bits_next;mbtype_len<=mbtype_len_next;end
             end
             S_MB_QSCALE: begin
                 if(parser_at_end)state<=S_ERROR;
-                else begin qscale_shift<=qscale_next;if(field_bit_count==4)begin field_bit_count<=0;if(qscale_next==0)state<=S_ERROR;else begin current_qscale<=qscale_next;if(current_intra)begin current_cbp<=6'h3f;current_block_index<=0;state<=S_BLOCK;end else if(!b_frame_pred_frame_dct)state<=S_MOTION_TYPE;else if(current_direction==2'd2)state<=S_BX;else state<=S_FX;end end else field_bit_count<=field_bit_count+1'b1;end
+                else begin qscale_shift<=qscale_next;if(field_bit_count==4)begin field_bit_count<=0;if(qscale_next==0)state<=S_ERROR;else begin current_qscale<=qscale_next;if(current_intra)begin current_cbp<=6'h3f;current_block_index<=0;state<=b_frame_pred_frame_dct?S_BLOCK:S_DCT_TYPE;end else if(!b_frame_pred_frame_dct)state<=S_MOTION_TYPE;else if(current_direction==2'd2)state<=S_BX;else state<=S_FX;end end else field_bit_count<=field_bit_count+1'b1;end
             end
             // Entry 695: with frame_pred_frame_dct clear, frame_motion_type
             // follows macroblock_type for every macroblock carrying motion.
@@ -281,11 +283,26 @@ always @(posedge clk) begin
                     if(motion_type_count==1'b1)begin
                         motion_type_count<=0;current_motion_type<=motion_type_next;motion_slot<=0;
                         case(motion_type_next)
-                            2'b01: state<=(current_direction==2'd2)?S_BSEL:S_FSEL;
-                            2'b10: state<=(current_direction==2'd2)?S_BX:S_FX;
+                            2'b01: state<=current_pattern?S_DCT_TYPE:
+                                ((current_direction==2'd2)?S_BSEL:S_FSEL);
+                            2'b10: state<=current_pattern?S_DCT_TYPE:
+                                ((current_direction==2'd2)?S_BX:S_FX);
                             default: state<=S_ERROR;
                         endcase
                     end else motion_type_count<=motion_type_count+1'b1;
+                end
+            end
+            S_DCT_TYPE: begin
+                if(parser_at_end)state<=S_ERROR;
+                else begin
+                    current_field_dct<=parser_current_bit;
+                    if(current_intra)state<=S_BLOCK;
+                    else if(current_direction!=0)
+                        state<=field_motion?
+                            ((current_direction==2'd2)?S_BSEL:S_FSEL):
+                            ((current_direction==2'd2)?S_BX:S_FX);
+                    else if(current_pattern)begin cbp_bits<=0;cbp_len<=0;state<=S_CBP;end
+                    else state<=S_MB_DONE;
                 end
             end
             // motion_vertical_field_select immediately precedes its own vector.

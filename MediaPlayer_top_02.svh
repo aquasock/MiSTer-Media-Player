@@ -16,6 +16,7 @@ wire [11:0] mpeg2_new_p_store_pixel_y;
 wire        mpeg2_new_p_store_pixel_valid;
 wire        mpeg2_new_p_store_block_start;
 wire        mpeg2_new_p_store_block_complete;
+wire        mpeg2_new_p_store_field_dct;
 reg         mpeg2_new_b_decode_scratch_bank;
 
 wire        mpeg2_new_ddr_cache_ready;

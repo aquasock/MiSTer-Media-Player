@@ -63,6 +63,7 @@ module mpeg2_h262_p_motion_residual_raster_engine
     output wire store_pixel_valid,
     output wire store_block_start,
     output wire store_block_complete,
+    output wire store_field_dct,
     output reg active,
     output reg read_seen,
     output reg [7:0] sample_value,
@@ -196,14 +197,15 @@ endfunction
 // so one macroblock's motion word becomes
 // {field, fsel0, fsel1, intra, slot0 x/y, slot1 x/y}.  Frame prediction
 // leaves both slots equal.
-(* ramstyle = "M10K" *) reg [55:0] motion_mem [0:MAX_MB-1];
+(* ramstyle = "M10K" *) reg [56:0] motion_mem [0:MAX_MB-1];
 reg [10:0] motion_count;
-reg [55:0] motion_word;
+reg [56:0] motion_word;
 // Entry 695: the second field vector arrives as its own sideband record.
 // Entry 695: the ordinary record's slot 0 is retained so the field record
 // behind it can amend the entry without reading block RAM back.
 reg signed [12:0] p_last_mvx,p_last_mvy;
-reg p_last_intra;
+reg p_last_intra,p_last_field_dct;
+wire mb_field_dct=motion_word[56];
 wire mb_field=motion_word[55];
 wire mb_fsel0=motion_word[54];
 wire mb_fsel1=motion_word[53];
@@ -318,7 +320,10 @@ wire signed [13:0] phase1_base_y=
     ((block_field_row0+slot1_int_y)<<<1)+$signed({13'd0,mb_fsel1});
 
 wire [11:0] luma_x=({6'd0,col}<<4)+{8'd0,blk[0],el};
-wire [11:0] luma_y=({6'd0,mrow}<<4)+{8'd0,blk[1],er};
+wire block_field_dct=mb_field_dct&&residual_hit&&(blk<4);
+wire [11:0] luma_y=({6'd0,mrow}<<4)+
+    (block_field_dct ? {8'd0,er,1'b0}+{11'd0,blk[1]}
+                     : {8'd0,blk[1],er});
 wire [11:0] chroma_x=({6'd0,col}<<3)+{9'd0,el};
 wire [11:0] chroma_y=({6'd0,mrow}<<3)+{9'd0,er};
 wire [11:0] dest_x=(blk<4)?luma_x:chroma_x;
@@ -622,6 +627,7 @@ assign store_pixel_value=out_reg;
 assign store_pixel_valid=emit;
 assign store_block_start=emit&&emit_block_start;
 assign store_block_complete=emit&&emit_block_complete;
+assign store_field_dct=block_field_dct;
 assign store_pixel_x=emit_x;
 assign store_pixel_y=emit_y;
 
@@ -633,8 +639,8 @@ wire descriptor_order_error=
 
 // One macroblock's committed motion word: both slots equal, no field.  This is
 // what every P path writes, and its meaning is unchanged from before entry 695.
-wire [55:0] motion_commit_word=
-    {3'b000,(residual_index==6'h3b),
+wire [56:0] motion_commit_word=
+    {residual_value[2],3'b000,(residual_index==6'h3b),
      motion_vector_x,motion_vector_y,
      motion_vector_x,motion_vector_y};
 // Entry 695: the field record's amendment of the entry just written.  Only the
@@ -642,8 +648,8 @@ wire [55:0] motion_commit_word=
 // payload; on every other path this value is the residual channel and its bits
 // mean something else, which is why the ordinary record must not be read for
 // field information.
-wire [55:0] motion_field_amend_word=
-    {1'b1,residual_value[0],residual_value[1],p_last_intra,
+wire [56:0] motion_field_amend_word=
+    {p_last_field_dct,1'b1,residual_value[0],residual_value[1],p_last_intra,
      p_last_mvx,p_last_mvy,
      motion_vector_x,motion_vector_y};
 
@@ -675,7 +681,7 @@ always @(posedge clk) begin
     if(reset) begin
         motion_count<=0;
         motion_word<=0;
-        p_last_mvx<=0;p_last_mvy<=0;p_last_intra<=0;
+        p_last_mvx<=0;p_last_mvy<=0;p_last_intra<=0;p_last_field_dct<=0;
         bank_desc_count[0]<=0;
         bank_desc_count[1]<=0;
         bank_last_desc_word[0]<=0;
@@ -753,6 +759,7 @@ always @(posedge clk) begin
             p_last_mvx<=motion_vector_x;
             p_last_mvy<=motion_vector_y;
             p_last_intra<=(residual_index==6'h3b);
+            p_last_field_dct<=residual_value[2];
             bank_desc_count[0]<=0;
             bank_desc_count[1]<=0;
             bank_last_desc_word[0]<=0;
@@ -835,6 +842,7 @@ always @(posedge clk) begin
                     p_last_mvx<=motion_vector_x;
                     p_last_mvy<=motion_vector_y;
                     p_last_intra<=(residual_index==6'h3b);
+                    p_last_field_dct<=residual_value[2];
                 end
             end else if(residual_index==6'h3c) begin
                 if(bank_ready[capture_bank] ||

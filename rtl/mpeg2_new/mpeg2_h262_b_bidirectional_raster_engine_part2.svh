@@ -696,6 +696,7 @@ assign store_pixel_value=out_reg;
 assign store_pixel_valid=emit;
 assign store_block_start=emit&&emit_block_start;
 assign store_block_complete=emit&&emit_block_complete;
+assign store_field_dct=block_field_dct;
 // Wide B scratch tag: X[11:10]=11 identifies scratch; Y[11:9]
 // identifies Y/Cb/Cr while preserving 10-bit X and 9-bit Y coordinates.
 assign store_pixel_x=emit_x;
@@ -728,7 +729,7 @@ always @(posedge clk) begin
         mb_width<=0;mb_height<=0;geometry_seen<=0;motion_count<=0;motion_word<=0;motion_load<=0;
         motion_first_pending<=0;pending_direction<=0;pending_fmvx<=0;pending_fmvy<=0;
         pending_fmvx1<=0;pending_fmvy1<=0;pending_bmvx1<=0;pending_bmvy1<=0;
-        pending_field<=0;pending_fsel0<=0;pending_fsel1<=0;pending_bsel1<=0;
+        pending_field<=0;pending_field_dct<=0;pending_fsel0<=0;pending_fsel1<=0;pending_bsel1<=0;
         exec_direction<=0;exec_fmvx<=0;exec_fmvy<=0;exec_bmvx<=0;exec_bmvy<=0;
         exec_fmvx1<=0;exec_fmvy1<=0;exec_bmvx1<=0;exec_bmvy1<=0;
         exec_field<=0;exec_fsel0<=0;exec_fsel1<=0;exec_bsel0<=0;exec_bsel1<=0;
@@ -780,7 +781,7 @@ always @(posedge clk) begin
                     // Entry 695: the record value carries the field flag and
                     // this slot's field select; frame prediction sends zero and
                     // leaves both slots equal.
-                    pending_field<=sideband_value[1];pending_fsel0<=sideband_value[0];
+                    pending_field<=sideband_value[1];pending_field_dct<=sideband_value[2];pending_fsel0<=sideband_value[0];
                     pending_fmvx1<=motion_vector_x;pending_fmvy1<=motion_vector_y;
                     pending_bmvx1<=0;pending_bmvy1<=0;pending_fsel1<=0;pending_bsel1<=0;
                     motion_first_pending<=1;
@@ -798,7 +799,7 @@ always @(posedge clk) begin
             end else if(sideband_index==6'h3b) begin
                 if(bank_ready[capture_bank]||!motion_first_pending||(motion_count>=MAX_MB)||!geometry_seen)begin error<=1;if(!error)error_source<=5'd4;end
                 else begin
-                    motion_mem[motion_count]<={
+                    motion_mem[motion_count]<={pending_field_dct,
                         pending_field,pending_fsel0,pending_fsel1,sideband_value[0],pending_bsel1,
                         pending_direction,
                         pending_fmvx,pending_fmvy,pending_fmvx1,pending_fmvy1,

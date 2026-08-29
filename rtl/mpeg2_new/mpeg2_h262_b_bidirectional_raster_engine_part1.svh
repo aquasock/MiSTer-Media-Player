@@ -31,15 +31,16 @@ endfunction
 // vector's motion_vertical_field_select, so one macroblock's motion word is
 // {field, fsel0, fsel1, bsel0, bsel1, direction, fwd slot0/slot1,
 //  bwd slot0/slot1}.  Frame prediction leaves both slots equal.
-(* ramstyle = "M10K" *) reg [86:0] motion_mem [0:MAX_MB-1];
+(* ramstyle = "M10K" *) reg [87:0] motion_mem [0:MAX_MB-1];
 reg [10:0] motion_count;
-reg [86:0] motion_word;
+reg [87:0] motion_word;
 reg motion_load;
 reg motion_first_pending;
 reg [1:0] pending_direction;
 reg signed [9:0] pending_fmvx,pending_fmvy;
 reg signed [9:0] pending_fmvx1,pending_fmvy1,pending_bmvx1,pending_bmvy1;
-reg pending_field,pending_fsel0,pending_fsel1,pending_bsel1;
+reg pending_field,pending_field_dct,pending_fsel0,pending_fsel1,pending_bsel1;
+wire mb_field_dct=motion_word[87];
 wire [1:0] mb_direction=motion_word[81:80];
 wire signed [9:0] mb_fmvx=$signed(motion_word[79:70]);
 wire mb_field=motion_word[86];
@@ -189,5 +190,8 @@ wire half_x=exec_mvx[0];
 wire half_y=exec_mvy[0];
 
 wire [11:0] luma_x=({6'd0,col}<<4)+{8'd0,blk[0],el};
-wire [11:0] luma_y=({6'd0,mrow}<<4)+{8'd0,blk[1],er};
+wire block_field_dct=mb_field_dct&&residual_hit&&(blk<4);
+wire [11:0] luma_y=({6'd0,mrow}<<4)+
+    (block_field_dct ? {8'd0,er,1'b0}+{11'd0,blk[1]}
+                     : {8'd0,blk[1],er});
 wire [11:0] chroma_x=({6'd0,col}<<3)+{9'd0,el};

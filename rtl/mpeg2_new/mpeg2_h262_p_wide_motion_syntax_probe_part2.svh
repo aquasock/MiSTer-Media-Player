@@ -213,6 +213,7 @@
                 motion_event_second<=0;
                 motion_event_fsel0<=0;
                 motion_event_fsel1<=0;
+                motion_event_field_dct<=0;
                 if(skip_remaining==1) begin
                     skip_remaining<=0;
                     parser_state<=R_MBTYPE;
@@ -241,6 +242,7 @@
                     current_motion_type<=2'b10;
                     current_fsel0<=0;
                     current_fsel1<=0;
+                    current_field_dct<=0;
                     current_motion_x1<=0;
                     current_motion_y1<=0;
                     if(!mbtype_match[0]) begin
@@ -262,7 +264,8 @@
                         current_cbp<=6'h3f;
                         current_block_index<=0;
                         residual_present<=1;
-                        parser_state<=R_BLOCK;
+                        parser_state<=p_frame_pred_frame_dct ? R_BLOCK
+                                                             : R_DCT_TYPE;
                     end else if(mbtype_match[3]) begin
                         motion_vlc_bits<=0;
                         motion_vlc_len<=0;
@@ -278,7 +281,8 @@
                         if(mbtype_match[2]) begin
                             cbp_vlc_bits<=0;
                             cbp_vlc_len<=0;
-                            parser_state<=R_CBP;
+                            parser_state<=p_frame_pred_frame_dct ? R_CBP
+                                                                 : R_DCT_TYPE;
                         end else parser_state<=R_MB_DONE;
                     end
                 end else if(mbtype_len_next==3'd6) begin
@@ -308,7 +312,8 @@
                                 current_cbp<=6'h3f;
                                 current_block_index<=0;
                                 residual_present<=1;
-                                parser_state<=R_BLOCK;
+                                parser_state<=p_frame_pred_frame_dct ? R_BLOCK
+                                                                     : R_DCT_TYPE;
                             end else if(current_has_motion) begin
                                 motion_vlc_bits<=0;
                                 motion_vlc_len<=0;
@@ -324,7 +329,8 @@
                                 if(current_has_pattern) begin
                                     cbp_vlc_bits<=0;
                                     cbp_vlc_len<=0;
-                                    parser_state<=R_CBP;
+                                    parser_state<=p_frame_pred_frame_dct ? R_CBP
+                                                                         : R_DCT_TYPE;
                                 end else parser_state<=R_MB_DONE;
                             end
                         end
@@ -346,11 +352,35 @@
                         current_motion_type<=motion_type_next;
                         motion_slot<=0;
                         case(motion_type_next)
-                            2'b01: parser_state<=R_FSEL;
-                            2'b10: parser_state<=R_MOTION_X;
+                            2'b01: parser_state<=current_has_pattern ?
+                                R_DCT_TYPE : R_FSEL;
+                            2'b10: parser_state<=current_has_pattern ?
+                                R_DCT_TYPE : R_MOTION_X;
                             default: parser_state<=R_ERROR;
                         endcase
                     end else motion_type_count<=motion_type_count+1'b1;
+                end
+            end
+
+            // H.262 6.3.17.1: in a frame picture with
+            // frame_pred_frame_dct clear, dct_type is present for intra or
+            // pattern-bearing macroblocks.  Motion type precedes it; vectors
+            // follow it.  The bit does not apply to chroma blocks.
+            R_DCT_TYPE: begin
+                if(parser_at_end) parser_state<=R_ERROR;
+                else begin
+                    current_field_dct<=parser_current_bit;
+                    if(current_is_intra) begin
+                        parser_state<=R_BLOCK;
+                    end else if(current_has_motion) begin
+                        motion_vlc_bits<=0;
+                        motion_vlc_len<=0;
+                        parser_state<=field_motion ? R_FSEL : R_MOTION_X;
+                    end else if(current_has_pattern) begin
+                        cbp_vlc_bits<=0;
+                        cbp_vlc_len<=0;
+                        parser_state<=R_CBP;
+                    end else parser_state<=R_MB_DONE;
                 end
             end
 

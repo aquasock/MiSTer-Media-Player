@@ -185,6 +185,7 @@
                     motion_event_second<=1'b0;
                     motion_event_fsel0<=1'b0;
                     motion_event_fsel1<=1'b0;
+                    motion_event_field_dct<=current_field_dct;
                     motion_second_sent<=1'b1;
                 end else begin
                     motion_event_valid<=1;
@@ -197,6 +198,7 @@
                     motion_event_second<=field_motion;
                     motion_event_fsel0<=current_fsel0;
                     motion_event_fsel1<=current_fsel1;
+                    motion_event_field_dct<=current_field_dct;
                     motion_second_sent<=1'b0;
                     if(current_has_motion) begin
                         // H.262 7.6.3.1: every vertical predictor is kept in frame

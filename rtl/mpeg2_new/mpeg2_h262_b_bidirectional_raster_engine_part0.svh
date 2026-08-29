@@ -64,6 +64,7 @@ module mpeg2_h262_b_bidirectional_raster_engine
     output wire store_pixel_valid,
     output wire store_block_start,
     output wire store_block_complete,
+    output wire store_field_dct,
     output reg  active,
     output reg  read_seen,
     output reg  sample_nonzero,

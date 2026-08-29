@@ -167,7 +167,7 @@
                 // this slot's motion_vertical_field_select; it was previously
                 // always zero for motion records, so no width changes.
                 sideband_valid<=1;sideband_index<=current_intra?6'h37:direction_index(current_direction);
-                sideband_value<=$signed({14'd0,field_motion,cur_fsel0});
+                sideband_value<=$signed({13'd0,current_field_dct,field_motion,cur_fsel0});
                 motion_vector_x<=cur_fx1_or_cur_fx;motion_vector_y<=cur_fy1_or_cur_fy;
                 if(field_motion)state<=S_MB_F1;
                 else if(!geometry_sent)state<=S_GEOMETRY;else state<=S_MB_B;

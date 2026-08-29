@@ -63,6 +63,7 @@ wire wide_motion_intra;
 wire wide_motion_second;
 wire wide_motion_fsel0;
 wire wide_motion_fsel1;
+wire wide_motion_field_dct;
 wire[10:0] wide_motion_index;
 wire signed[12:0] wide_motion_x,wide_motion_y;
 wire[5:0] wide_mb_width,wide_mb_height;
@@ -151,7 +152,8 @@ wire signed [15:0] wide_sideband_value =
     // residual channel and its bits mean something else entirely.
     wide_motion_valid ?
         (wide_motion_second ?
-            $signed({14'd0,wide_motion_fsel1,wide_motion_fsel0}) : 16'sd0) :
+            $signed({14'd0,wide_motion_fsel1,wide_motion_fsel0}) :
+            $signed({13'd0,wide_motion_field_dct,2'b00})) :
                         residual_value_raw;
 wire wide_row_produced=wide_mode&&residual_valid_raw&&
     (residual_index_raw==6'h3f)&&
@@ -395,6 +397,7 @@ mpeg2_h262_p_wide_motion_syntax_probe wide_general_probe
  .motion_event_second(wide_motion_second),
  .motion_event_fsel0(wide_motion_fsel0),
  .motion_event_fsel1(wide_motion_fsel1),
+ .motion_event_field_dct(wide_motion_field_dct),
  .motion_event_index(wide_motion_index),
  .motion_event_x(wide_motion_x),.motion_event_y(wide_motion_y),
  .picture_mb_width(wide_mb_width),.picture_mb_height(wide_mb_height),

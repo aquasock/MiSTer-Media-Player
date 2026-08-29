@@ -78,6 +78,7 @@ mpeg2_h262_reference_read_probe mpeg2_h262_reference_read_probe
     .p_store_pixel_valid       (mpeg2_new_p_store_pixel_valid),
     .p_store_block_start       (mpeg2_new_p_store_block_start),
     .p_store_block_complete    (mpeg2_new_p_store_block_complete),
+    .p_store_field_dct         (mpeg2_new_p_store_field_dct),
     .read_seen                 (mpeg2_new_pred_read_seen),
     .sample_value              (mpeg2_new_pred_sample_value),
     .sample_nonzero            (mpeg2_new_pred_sample_nonzero),

@@ -154,11 +154,15 @@ localparam [5:0]
     // backward second record is emitted before the existing backward state so
     // that state's macroblock-completion tail stays where it is; the engines
     // assemble by sideband index, not by arrival order.
-    S_MB_F1=37,S_MB_B1=38;
+    S_MB_F1=37,S_MB_B1=38,
+    // Entry 707: dct_type follows frame_motion_type (when present) and
+    // precedes motion vectors for pattern-bearing or intra macroblocks.
+    S_DCT_TYPE=39;
 reg [5:0] state;
 
 reg [2:0] field_bit_count; reg [4:0] qscale_shift,current_qscale; reg [3:0] extra_info_count;
 reg [5:0] current_col; reg row_has_coded_mb; reg [5:0] skip_remaining; reg geometry_sent;
+reg current_field_dct;
 // Historical 1..8 decoder state remains below for source compatibility; Commit
 // 171 drives S_MBA from the wider Table-B.1 state and Quartus prunes the old path.
 reg [6:0] mba_bits; reg [2:0] mba_len;

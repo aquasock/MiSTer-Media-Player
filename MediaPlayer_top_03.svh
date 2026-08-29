@@ -109,9 +109,9 @@ mpeg2_h262_ddram_store mpeg2_h262_ddram_store
 	.clk             (clk_mpeg2),
 	.reset           (reset_mpeg2),
 	.frame_bank      (mpeg2_new_active_frame_bank),
-	// Entry 650: only the reconstruction path carries field-DCT blocks;
-	// the P store path is frame-ordered.
-	.field_dct       (!mpeg2_new_p_store_select && mpeg2_new_dct_type),
+	.field_dct       (mpeg2_new_p_store_select ?
+	                  mpeg2_new_p_store_field_dct :
+	                  mpeg2_new_dct_type),
 	.pixel_value     (mpeg2_new_p_store_select ?
 	                  mpeg2_new_p_store_pixel_value :
 	                  mpeg2_new_recon_pixel_value),

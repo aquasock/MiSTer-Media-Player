@@ -512,7 +512,8 @@ Y_SIZE = WIDTH * HEIGHT
 C_SIZE = CW * CH
 
 
-def mark_residual(mask: bytearray, mb_row: int, mb_col: int, cbp: int | None) -> None:
+def mark_residual(mask: bytearray, mb_row: int, mb_col: int,
+                  cbp: int | None, field_dct: bool = False) -> None:
     """Flag every pixel of every CBP-selected block of one macroblock as residual-affected."""
     if not cbp:
         return
@@ -521,9 +522,10 @@ def mark_residual(mask: bytearray, mb_row: int, mb_col: int, cbp: int | None) ->
             continue
         if block < 4:
             bx0 = mb_col * 16 + (block & 1) * 8
-            by0 = mb_row * 16 + ((block >> 1) & 1) * 8
+            by0 = mb_row * 16 + (((block >> 1) & 1) if field_dct
+                                 else ((block >> 1) & 1) * 8)
             for yy in range(8):
-                base = (by0 + yy) * WIDTH + bx0
+                base = (by0 + yy * (2 if field_dct else 1)) * WIDTH + bx0
                 mask[base:base + 8] = b"\x01" * 8
         else:
             plane_base = Y_SIZE if block == 4 else Y_SIZE + C_SIZE
@@ -564,7 +566,7 @@ def apply_macroblock(out: bytearray, mb_row: int, mb_col: int,
                       fwd_ref: bytes, fwd_vec: tuple[int, int],
                       bwd_ref: bytes | None = None, bwd_vec: tuple[int, int] | None = None,
                       cbp: int | None = None, coeffs_per_block: dict[int, list[tuple[int, int]]] | None = None,
-                      scale: int = 16) -> None:
+                      scale: int = 16, field_dct: bool = False) -> None:
     """Write one macroblock's motion-compensated (+ optional residual) pixels into `out`.
 
     Luma blocks 0..3 are the 2x2 8x8 quadrants (Y0 top-left .. Y3 bottom-right);
@@ -608,10 +610,11 @@ def apply_macroblock(out: bytearray, mb_row: int, mb_col: int,
         residual = block_residual(coeffs, scale)
         if block < 4:
             bx0 = mb_col * 16 + (block & 1) * 8
-            by0 = mb_row * 16 + ((block >> 1) & 1) * 8
+            by0 = mb_row * 16 + (((block >> 1) & 1) if field_dct
+                                 else ((block >> 1) & 1) * 8)
             for yy in range(8):
                 for xx in range(8):
-                    idx = (by0 + yy) * WIDTH + bx0 + xx
+                    idx = (by0 + yy * (2 if field_dct else 1)) * WIDTH + bx0 + xx
                     out[idx] = max(0, min(255, out[idx] + residual[yy][xx]))
         else:
             plane_base = Y_SIZE if block == 4 else Y_SIZE + C_SIZE

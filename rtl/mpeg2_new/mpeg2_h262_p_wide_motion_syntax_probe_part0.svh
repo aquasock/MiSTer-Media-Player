@@ -52,6 +52,7 @@ module mpeg2_h262_p_wide_motion_syntax_probe
     output reg         motion_event_second,
     output reg         motion_event_fsel0,
     output reg         motion_event_fsel1,
+    output reg         motion_event_field_dct,
 
     output reg [5:0]   picture_mb_width,
     output reg [5:0]   picture_mb_height,
@@ -208,7 +209,11 @@ localparam [5:0]
 localparam [5:0]
     R_MOTION_TYPE    = 6'd25,
     R_FSEL           = 6'd26,
-    R_FDONE          = 6'd27;
+    R_FDONE          = 6'd27,
+    // Entry 707: frame pictures with frame_pred_frame_dct clear carry one
+    // dct_type bit after frame_motion_type (when present) and before motion
+    // vectors.  It controls only coded luma residual placement.
+    R_DCT_TYPE       = 6'd28;
 reg [5:0] parser_state;
 reg [5:0] parser_state_previous;
 
@@ -246,6 +251,7 @@ reg       motion_type_count;
 reg       motion_slot;
 reg       current_fsel0, current_fsel1;
 reg       motion_second_sent;
+reg       current_field_dct;
 wire field_motion = (current_motion_type == 2'b01);
 wire [1:0] motion_type_next = {motion_type_shift[0], parser_current_bit};
 // Field prediction parses slot 1 last, so slot 0 sits in current_motion_*1;
@@ -353,6 +359,7 @@ wire parser_state_consumes_bit =
     (parser_state == R_MBTYPE) ||
     (parser_state == R_MB_QSCALE) ||
     (parser_state == R_MOTION_TYPE) ||
+    (parser_state == R_DCT_TYPE) ||
     (parser_state == R_FSEL) ||
     (parser_state == R_MOTION_X) ||
     (parser_state == R_MOTION_X_RES) ||
