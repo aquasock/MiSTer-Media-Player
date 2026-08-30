@@ -1,3 +1,35 @@
+## 773 COMMIT Unreleased ??? 2026-08-30T07:19:22-07:00
+
+#### Coming From:
+
+Unreleased 0a9d48a
+
+#### Purpose:
+
+Add zero-M10K B-picture stall attribution to identify the exact intrinsic decoder stage that starves ordered audio during natural-content MPD-D2 playback.
+
+#### Outcome:
+
+The user approves the diagnostic cycle after the Coming to America capture proves that visible video remains at real-time cadence while the shared transport loses sustained throughput and B pictures dominate intrinsic decoder stalls.  Add observational outputs for active B parsing, residual replay, row-credit waiting and final persistence waiting, carry them only into the cadence profiler, and allocate five previously zero deadline-diagnostic snapshot words to mutually exclusive counters for those four causes plus any unclassified B stall.  Increment the diagnostic schema identifier so captures cannot be mistaken for schema 20, preserve every decoder-ready and presentation control equation unchanged, and require synthesis to show no new M10K allocation.
+
+#### Next Steps:
+
+Implement the observational boundary, add focused assertions that the five attributed counters partition B-picture intrinsic stall cycles, and run the established exact reconstruction, motion, field-DCT, cadence, reorder, timestamp and overlap regressions.  Commit the source only after those pass, then pull that exact commit onto build PC `10.10.0.42`, perform one clean Quartus 17.0.2 seed-19 build, and require zero negative timing slack with no increase above 532 M10Ks.  If accepted, install only the resulting RBF on test MiSTer `10.10.0.30` and replay Coming to America until the first underrun to capture the new attribution; do not alter Main, helper, media or the paused ISO deployment.
+
+#### Files Modified:
+
+- MediaPlayer.sv
+- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
+- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
+- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 772 COMMIT Unreleased 0a9d48a 2026-08-30T07:15:38-07:00
 
 #### Coming From:
@@ -1129,35 +1161,6 @@ The user explicitly authorizes the entry-733 jump to P80 after clean P66 and P69
 #### Next Steps:
 
 Require exact P80 termination, only 720x480 TFF interlaced I/P pictures, one terminal sequence end and a clean complete software decode.  Require independent absolute-path FTP readback equality after installation.  Then have the user play the intentionally short checkpoint once in `800x600 Diagnostic` with Weave and inspect the stable bright-passage P80 framebuffer for large block corruption.  If corrupt, search backward within P74 through P80; if clean, move later in the bright passage.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 733 COMMIT Unreleased 6196869 2026-08-29T20:13:51-07:00
-
-#### Coming From:
-
-Unreleased 6196869
-
-#### Purpose:
-
-Move the next authored P checkpoint from P71 to the brighter P80 shiny-hat passage.
-
-#### Outcome:
-
-After clean P66 and P69 terminal checkpoints, the user says the observed large distortion likely occurred later in playback and asks to skip farther forward.  The request supersedes entry 732's proposed P71 checkpoint before any P71 media is generated or installed.  Static source order identifies I73 as the next independent clean reference followed by consecutive P74 through P84; P80 is the seventh P after that reset and lies in the brighter shiny-hat passage, making it a materially better visible checkpoint than continuing through the earlier dark fade one picture at a time.  Existing source, generated fixtures, FPGA, Main, helper and configuration remain unchanged.
-
-#### Next Steps:
-
-Use unchanged source `6196869` to generate and install a byte-exact I/P checkpoint ending at zero-based coded P80.  Preserve every retained I/P unit, remove only B units, append one terminal sequence-end code, verify exact P80 termination and clean software decode, and require absolute-path FTP readback equality.  The next hardware test should inspect the stable terminal P80 framebuffer for the large block distortion.  If P80 is corrupt, search backward within the P74 through P80 chain; if it is clean, move later in the bright passage.  Test-media generation and installation require a separate explicit user instruction; do not change or rebuild the FPGA.
 
 #### Files Modified:
 
