@@ -1,3 +1,32 @@
+## 745 COMMIT Unreleased 6196869 2026-08-29T20:43:05-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Accept the P82 and P84 boundary results, preserve the held P82 evidence and authorize exact adjacent P81/P83 checkpoints.
+
+#### Outcome:
+
+The user leaves P82 displayed and describes it as almost at the corruption boundary, then reports that P84 is visibly worse in the same progressive manner as later checkpoints.  The 388,216-byte screenshot `/tmp/entry745_p82_checkpoint_boundary.png`, SHA-256 `ccdfaf191b7e0f715e047eb399d13f670c0fad860a891b76897bc783671c7304`, preserves the subtle P82 terminal frame; its small central disturbances are too close to the separate long-standing fine-line artifact for the screenshot alone to classify confidently, so the user's live boundary observation remains controlling.  Its checksum-valid schema-20 snapshot accepts all 983,588 bytes, displays all 45 retained reference pictures across 44 swaps, ends on P temporal reference 9, sees sequence end and presentation completion, reaches quiet state and drains the scheduler.  The 1.7961-second presentation reports zero error flags, presentation faults, cache overlap faults, deadline gaps, cadence outliers, transport blocks or timestamp conflicts.  Clean P80, boundary P82, worse P84 and first clear strip by P85 demonstrate progressive corruption within the consecutive authored P chain.  Choose exact adjacent retained endpoints P81 and P83 to resolve the first affected picture and document its immediate growth.  No source, FPGA, RBF, Main, helper, installed media or configuration changes during capture.
+
+#### Next Steps:
+
+Using unchanged source `6196869`, generate byte-exact I/P checkpoints ending separately at zero-based coded P81 and P83.  Preserve every retained unit, remove only complete B units, append one terminal sequence-end code, prove exact terminal-picture identity and clean full software decode, then install under distinct absolute MiSTer paths with exact FTP readback.  The user should play P81 first and P83 second in `800x600 Diagnostic` with Weave, reporting even a barely visible strip or flicker.  With clean P80, P81 determines whether onset is P81 or P82, while P83 records the first step of propagation.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 744 COMMIT Unreleased 6196869 2026-08-29T20:40:52-07:00
 
 #### Coming From:
@@ -1170,35 +1199,6 @@ After identifying that the first attempted capture belonged to an accidental rep
 #### Next Steps:
 
 Per the user's direction, stop consumer-audio hardware testing here and return to DVD video work.  Add and fixture-test inter-macroblock field DCT before opening the P, B and frontend production admission gates, preserving the fit-qualified RBF and accepted helper unchanged until the video simulation gates justify another build.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 705 COMMIT Unreleased 736f64f 2026-08-29T03:46:17-07:00
-
-#### Coming From:
-
-Unreleased 736f64f
-
-#### Purpose:
-
-Record hardware acceptance of the fit-recovered candidate's original-DVD-opening regression over HDMI decoded stereo PCM.
-
-#### Outcome:
-
-The user explicitly loads `MediaPlayer_20260829.rbf`, plays `dvd_opening_original.mpg` over HDMI decoded stereo PCM and reports that everything looks perfect.  Two fresh completed screenshots are byte-identical, show the final Universal frame, decode as checksum-valid schema 20 quiet snapshots and pass the exact expected 289-picture and 10,334,169-byte gate with no validation failure.  Telemetry reaches sequence end and presentation completion with 289 displayed pictures, 288 swaps, 128 reference plus 161 B pictures, all 25 timestamps, zero error flags, no audio underrun, no PCM protocol or presentation error and no cache-bank overlap error.  The helper identifies AC-3 private substream `0x80`, emits 375 frames and 576,000 decoded stereo samples, reaches EOF and child exit zero, and reconciles all 12,818,397 submitted bytes across 784 pipe reads with every byte on the fast path and none on the slow path.  FTP readback reproduces the qualified RBF and helper hashes.  Legacy observational counters remain visible at 287 deadline records, 144 outliers, 20 timestamp-advance conflicts and zero delay conflicts; they are not the acceptance gate and do not negate the clean functional result.  This accepts the existing original-opening HDMI regression only; production field prediction remains closed and no S/PDIF mode is exercised by this run.
-
-#### Next Steps:
-
-Continue the same loaded candidate with MP3 over S/PDIF first, followed by WAV and FLAC over S/PDIF, AC-3 passthrough over S/PDIF and one known progressive video.  Report each audible and visible result, and leave the latest helper log and terminal screen intact before replay if any dropout, receiver unlock, protocol fault or visual regression occurs.  Treat the recovered RBF as an accepted existing-video baseline while keeping the decoded-PCM S/PDIF correction and production field-prediction path open until their own hardware checks complete.
 
 #### Files Modified:
 
