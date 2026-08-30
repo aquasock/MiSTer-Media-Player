@@ -1,3 +1,32 @@
+## 738 COMMIT Unreleased 6196869 2026-08-29T20:25:19-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Record the first hardware result from the two-file P100/P115 checkpoint batch and direct the second test.
+
+#### Outcome:
+
+The user plays `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p100_checkpoint.m2v` in the requested diagnostic configuration and reports that it fails: large block distortion is visible at P100, with a smaller distortion event also visible shortly before the terminal frame.  Combined with the accepted clean P80 result, this brackets the first observed authored I/P corruption to after P80 and no later than P100.  Because P100 contains the exact retained authored I/P prefix and independently software-decodes cleanly, the result remains evidence against malformed checkpoint construction.  P115 remains installed and untested.  No telemetry is requested or collected, and no source, FPGA, RBF, Main, helper, media or configuration changes are made.
+
+#### Next Steps:
+
+Play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p115_checkpoint.m2v` next in `800x600 Diagnostic` with Weave selected and report whether its stable terminal framebuffer is clean or corrupt.  This distinguishes corruption that persists beyond P100 from a transient event before choosing finer checkpoints between P80 and P100.  Do not capture telemetry unless the user explicitly requests it, and do not change or rebuild the FPGA.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 737 COMMIT Unreleased 6196869 2026-08-29T20:23:51-07:00
 
 #### Coming From:
@@ -1209,50 +1238,6 @@ Keep FLAC accepted and preserve it through the interlaced recovery and S/PDIF bu
 - tools/streams/test_main_mister_profile.py
 - tools/streams/verify_arm_av_pipeline.py
 - tools/streams/verify_consumer_flac.py
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 698 COMMIT Unreleased 1ee2b93 2026-08-29T02:45:22-07:00
-
-#### Coming From:
-
-Unreleased 60159bd
-
-#### Purpose:
-
-Add ordinary WAV playback as a separately built and hardware-tested consumer format through the existing helper-only PCM path.
-
-#### Outcome:
-
-Sources `a335de1` and `1ee2b93` pin miniaudio 0.11.25, compile only its WAV decoder and conversion support into the static helper, and add case-insensitive `.wav` selection to Main without a runtime FFmpeg dependency or FPGA change.  Ordinary integer and float mono, stereo and multichannel WAV files are converted to signed 16-bit stereo at 44.1 or 48 kHz through the established audio-only transport.  Native format, sanitizer, Main-loader, MP2, MP3, AC-3 and DTS regressions pass, including byte-exact direct signed-16 decode.  The exact static helper and patched Main were transactionally installed with verified backups, and the user played both the selected WAV sample and its MP3 derivative on hardware and reported that they sounded perfect.
-
-#### Next Steps:
-
-Keep WAV and MP3 accepted and preserve both paths through later format and FPGA work.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- README.md
-- docs/BUILDING.md
-- host/arm/ARCHITECTURE.md
-- host/arm/Makefile
-- host/arm/consumer_audio.c
-- host/arm/consumer_audio.h
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- host/arm/media_source.c
-- host/arm/media_source.h
-- host/build_arm_stack.sh
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/streams/test_main_mister_profile.py
-- tools/streams/verify_arm_av_pipeline.py
-- tools/streams/verify_consumer_wav.py
 
 #### Status:
 
