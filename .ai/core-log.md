@@ -6,22 +6,19 @@ Unreleased 0a9d48a
 
 #### Purpose:
 
-Add zero-M10K B-picture stall attribution to identify the exact intrinsic decoder stage that starves ordered audio during natural-content MPD-D2 playback.
+Use simulation-only B-picture stall attribution to select one direct zero-M10K throughput correction and one final FPGA build.
 
 #### Outcome:
 
-The user approves the diagnostic cycle after the Coming to America capture proves that visible video remains at real-time cadence while the shared transport loses sustained throughput and B pictures dominate intrinsic decoder stalls.  Add observational outputs for active B parsing, residual replay, row-credit waiting and final persistence waiting, carry them only into the cadence profiler, and allocate five previously zero deadline-diagnostic snapshot words to mutually exclusive counters for those four causes plus any unclassified B stall.  Increment the diagnostic schema identifier so captures cannot be mistaken for schema 20, preserve every decoder-ready and presentation control equation unchanged, and require synthesis to show no new M10K allocation.
+The user rejects a diagnostic-only FPGA build because the accepted fit already consumes 532 of 553 M10Ks and timing is placement-sensitive, then approves a revised single-build cycle.  Do not add synthesized telemetry or produce a diagnostic RBF.  Instead, recover the established live-raster simulation harness only into temporary build-PC storage, compile it against the current source, and drive it with the exact failing elementary streams so hierarchical simulation-only counters can partition B stalls among bit parsing, residual replay, prediction-row retirement and final persistence without changing repository RTL.  Use that evidence to choose one direct correction that adds no M10Ks, and do not launch an automatic fitter reseed sweep.
 
 #### Next Steps:
 
-Implement the observational boundary, add focused assertions that the five attributed counters partition B-picture intrinsic stall cycles, and run the established exact reconstruction, motion, field-DCT, cadence, reorder, timestamp and overlap regressions.  Commit the source only after those pass, then pull that exact commit onto build PC `10.10.0.42`, perform one clean Quartus 17.0.2 seed-19 build, and require zero negative timing slack with no increase above 532 M10Ks.  If accepted, install only the resulting RBF on test MiSTer `10.10.0.30` and replay Coming to America until the first underrun to capture the new attribution; do not alter Main, helper, media or the paused ISO deployment.
+Run simulation-only attribution first and stop without compiling if it does not identify a defensible correction.  If it does, update this open proposal with the exact source boundary, implement the smallest correction, and run the established exact reconstruction, motion, field-DCT, cadence, reorder, timestamp and overlap regressions.  Commit only passing source, pull that exact commit onto build PC `10.10.0.42`, and perform exactly one clean Quartus 17.0.2 build at the pinned seed 19, requiring zero negative timing slack and no increase above 532 M10Ks.  If seed 19 fails timing, stop and report rather than reseeding automatically; do not alter Main, helper, media, the installed test-MiSTer artifact or the paused ISO deployment before a timing-clean result exists.
 
 #### Files Modified:
 
-- MediaPlayer.sv
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- rtl/mpeg2_new/mpeg2_h262_two_picture_probe_p_chain.sv
+None.
 
 #### Status:
 
