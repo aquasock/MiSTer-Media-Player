@@ -1,3 +1,32 @@
+## 779 COMMIT Unreleased 205bbd7 2026-08-30T14:31:18-07:00
+
+#### Coming From:
+
+Unreleased 205bbd7
+
+#### Purpose:
+
+Capture and independently verify the accepted NARA MPD-D2 qualification control on the installed source-`205bbd7` core.
+
+#### Outcome:
+
+At the user's request, one screenshot and the matching helper log are collected from the completed `/media/fat/games/MediaPlayer/nara_mpd_d2_qualification_5min.vob` run; the visible terminal frame confirms that this adopted NARA-named qualification file contains the Blazing Saddles footage referenced by the user.  The helper identifies S/PDIF decoded-PCM output and the exact VOB, submits all 362,200,545 bytes through the fast path in 299.946401 seconds at 1.207551 MB/s, emits all 9,375 AC-3 frames and 14,400,000 PCM samples, reaches EOF and exits zero.  The 639,401-byte screenshot `/tmp/entry779_nara_mpd_d2_qualification_5min_pass.png`, SHA-256 `518e59b9673258da6e1fca55af759d6ac02f6c2ff3ae5d589cd1de792f64d677`, visibly preserves a clean final western scene.  Its 64 schema-20 telemetry records have valid headers, row indices and parity, and checksum `bfb4da57` matches; the terminal no-progress snapshot accepts 300,095,133 clean-video bytes, records 2,998 reference pictures, 8,991 displayed pictures and 8,990 swaps, and reports zero hardware error flags, audio underruns, PCM protocol errors, presentation errors, cache overlaps, transport blocks, deadline gaps, cadence outliers or timestamp conflicts.  The 12,330,598-byte helper log has SHA-256 `b2e3ccb3ce427162adea35ccdceca6226a76ad19fca7e5f3d3279dcc0744ccc4`.  This replaces the user-report-only NARA evidence in entry 778 with a complete captured control result and changes no source, installed file, playback mode or configuration.
+
+#### Next Steps:
+
+Keep source `205bbd7`, fitter seed 19, the installed RBF, native 480i mode and current decoder capability boundary unchanged.  All three adopted five-minute frame-picture MPD-D2 VOBs now have accepted results, and each captured run shows real-time completion with no audio starvation; field-picture MPEG-2 remains intentionally deferred.  If the user wants to resume the previously paused roadmap, scope decrypted ISO playback as a host-side input and navigation boundary first, without an FPGA rebuild unless later evidence proves one necessary.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 778 COMMIT Unreleased 205bbd7 2026-08-30T14:27:08-07:00
 
 #### Coming From:
@@ -1144,34 +1173,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 739 COMMIT Unreleased 6196869 2026-08-29T20:28:15-07:00
-
-#### Coming From:
-
-Unreleased 6196869
-
-#### Purpose:
-
-Accept the corrupt P115 result and authorize two finer authored I/P checkpoints between clean P80 and corrupt P100.
-
-#### Outcome:
-
-The user plays `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p115_checkpoint.m2v` after the corrupt P100 test and reports greater block distortion around the shiny-hat passage.  The corruption therefore persists and worsens beyond P100 rather than belonging only to the P100 terminal frame.  The user specifically observes that the extremely bright highlight appears to corrupt the remainder of its block, as though that reconstruction path is overloaded.  Treat that as a visual clue toward coefficient, reconstruction-arithmetic or clipping behavior, not yet as a proven cause.  Together with clean P80, the hardware boundary remains after P80 and no later than P100.  Source coded ordinals 90 and 95 are B pictures and cannot terminate the byte-exact I/P fixture; choose retained P ordinals 91 and 97 as the two useful finer checkpoints.  No telemetry is requested or collected, and no source, FPGA, RBF, Main, helper, media or configuration changes occur while accepting the result.
-
-#### Next Steps:
-
-Using unchanged source `6196869`, generate byte-exact I/P checkpoints ending separately at zero-based coded P91 and P97.  For each, preserve every retained I/P unit, remove only complete B units, append one terminal sequence-end code, prove exact terminal-picture identity and clean full software decode, then install under distinct new absolute MiSTer paths with exact FTP readback.  The user should play P91 first and P97 second in `800x600 Diagnostic` with Weave and report each as clean or corrupt, noting whether a bright point poisons the rest of its block.  Do not change or rebuild the FPGA.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
