@@ -1,3 +1,32 @@
+## 754 COMMIT Unreleased 4e54e9d 2026-08-30T02:51:05-07:00
+
+#### Coming From:
+
+Unreleased 4e54e9d
+
+#### Purpose:
+
+Accept the corrected original authored I/P/B stream in Native 480i.
+
+#### Outcome:
+
+The user plays `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s.m2v` from beginning to end in Native 480i and reports that it looks and runs perfectly, with no large block corruption, freeze or stutter.  This is the original 6,751,008-byte authored elementary stream containing all 361 pictures, comprising 27 I, 115 P and 219 B pictures over its normal approximately twelve-second presentation.  It therefore extends the accepted exact P81 and B-stripped I/P results through the complete forward- and bidirectionally-predicted hardware path at normal coded duration.  At the user's explicit request, `/tmp/entry754_authored_ipb_native480i_pass.png` captures the clean terminal frame at 533,067 bytes with SHA-256 `13a9d27889ebf0ded78b4f44abcace0cbbfb205687fe29d74ea9f67de1597f15`.  No RBF, media, Main, helper or configuration change occurs.
+
+#### Next Steps:
+
+Keep the exact installed RBF and Native 480i mode unchanged.  Select HDMI audio and play `/media/fat/games/MediaPlayer/dvd_opening_original.mpg` once from beginning to end, then report whether video, cadence and audio are all clean.  This checks the known DVD program-stream transport and audio integration boundary on the corrected core without changing playback mode or requesting another elementary-video diagnostic.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 753 COMMIT Unreleased 4e54e9d 2026-08-30T02:48:43-07:00
 
 #### Coming From:
@@ -1125,35 +1154,6 @@ Have the user reload the sole installed `/media/fat/MediaPlayer_20260829_b9c2657
 
 - /media/fat/MediaPlayer_20260829_b9c2657.rbf
 - /media/fat/_MediaPlayer_Backups/MediaPlayer_20260829_b9c2657_pre_8fd16e8_f366c246.rbf
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 714 COMMIT Unreleased 8fd16e8 2026-08-29T18:00:21-07:00
-
-#### Coming From:
-
-Unreleased 53bc8e7
-
-#### Purpose:
-
-Close the single remaining HDMI scaler setup path without changing decoder RTL, latency, clocks or constraints.
-
-#### Outcome:
-
-The user approves a tightly bounded HDMI source correction after the one seed-17 reseed leaves decoder and video setup safely positive at 0.801 and 2.956 ns but misses HDMI setup by 0.047 ns on exactly one path.  A detailed same-clock TimeQuest report against the completed seed-17 fit identifies that path from `ascal:ascal|o_vpix_outer[1].g[3]` to `ascal:ascal|o_vpixq_pre[3].g[3]`: it has two logic levels and 6.084 ns of data delay, of which 5.000 ns, eighty-two percent, is routing between registers placed at X68_Y34 and X56_Y28.  Follow the established ASCAL timing technique already used for the C8 adaptive-polyphase selectors: capture an identical `type_pix` copy from the same C2 `pixq_v` source on the same enabled edge, mark it `dont_merge`, and use that copy only for the C8 queue element-three boundary selections currently driven by `o_vpix_outer(1)`.  This is a physical duplicate rather than a pipeline delay and must not alter scaler cycles, sync alignment, pixel values, seed 17, any decoder source or any timing constraint.  Published source `8fd16e8` adds exactly that twenty-four-bit same-edge duplicate, retains the original for the other queue elements, and changes only `sys/ascal.vhd`; a fresh detached build-PC checkout verifies exact full SHA `8fd16e8df61f0dca8a7373f035e663c84b49f1a9` and seed 17.  The repository's dedicated HDMI scaler simulation exits before analysis because GHDL is not installed or available privately on GUNSMOKE, so no simulation result is claimed and no new toolchain is installed.  The one clean Quartus Prime 17.0.2 build then completes in thirteen minutes nineteen seconds with zero errors and 215 warnings.  It fits at 34,252 of 41,910 ALMs and 52,819 registers, increases of 103 ALMs and 267 registers from the rejected seed-17 predecessor, while memory remains exactly 4,181,443 bits in 532 RAM blocks and DSP use remains 67.  Every timing category passes with zero TNS: full and HDMI setup are positive 0.044 ns, decoder setup is positive 0.853 ns, video setup is positive 2.905 ns, and hold, recovery, removal and minimum-pulse-width margins are positive 0.244, 3.953, 0.456 and 0.925 ns.  A post-fit same-clock HDMI audit reports fifty paths with zero violations, confirms the `dont_merge` copy exists in the fitted netlist, and no longer lists the former `o_vpix_outer[1]` to `o_vpixq_pre[3]` transfer; the new worst HDMI path is unrelated vertical polyphase bounding logic at positive 0.044 ns.  The accepted-for-hardware-test 4,471,792-byte RBF has SHA-256 `677f2e11df6104c8409abcd541df81f1b2d178e6a249038b16afdf5e0282ac7c` and remains only on GUNSMOKE under `/home/vash/mister-builds/entry714/source_8fd16e8/output_files`; it is not installed.
-
-#### Next Steps:
-
-Preserve this exact timing-passing RBF without rebuilding or reseeding.  Obtain a separate installation handoff before writing the MiSTer, then hardware-validate HDMI scaler output and the already qualified interlaced MPEG-2 playback path; because the focused scaler simulation could not run without GHDL, require clean physical video as part of acceptance.  Retain the existing focused decoder evidence and do not repeat the long simulation soaks unless hardware exposes a decoder-specific defect.
-
-#### Files Modified:
-
-- sys/ascal.vhd
 
 #### Status:
 
