@@ -1,3 +1,32 @@
+## 736 COMMIT Unreleased 6196869 2026-08-29T20:20:41-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Accept the clean P80 checkpoint and authorize a two-file jump to P100 and P115.
+
+#### Outcome:
+
+The user plays `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p80_checkpoint.m2v`, reports no large block distortion, leaves the terminal screen for capture, and requests two farther checkpoint files in the next batch.  The capture accepts all 896,496 bytes, displays all 43 pictures across 42 swaps, ends on P temporal reference 7, sees sequence end and presentation completion, reaches quiet state and fully drains the scheduler.  Its 1.6945-second presentation records zero error flags, presentation faults, cache overlap faults, deadline gaps, cadence outliers, transport blocks or timestamp conflicts.  The 401,549-byte screenshot `/tmp/entry735_p80_checkpoint_completed.png`, SHA-256 `33ba7d64a4f0e5a442cab982a8c59a70af8c3d84c43f1c2e27e47382c58ab233`, shows exact stable bright-passage P80 without the large macroblock corruption; the separate narrow vertical-line artifact remains visible.  At the user's explicit batching request, choose P100 at the end of the next authored GOP and P115 at the end of the following GOP, materially advancing beyond P80 while keeping both endpoints on retained P pictures.  No source, installed media, RBF, Main, helper or configuration changes during capture.
+
+#### Next Steps:
+
+Using unchanged source `6196869`, generate byte-exact I/P checkpoints ending separately at zero-based coded P100 and P115.  For each, preserve every retained I/P unit, remove only complete B units, append one terminal sequence-end code, prove exact terminal-picture identity and clean software decode, and install under distinct new absolute filenames with exact FTP readback.  The user should then play both in order in `800x600 Diagnostic` with Weave and report large block corruption separately for the stable P100 and P115 terminal frames.  Do not change or rebuild the FPGA.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 735 COMMIT Unreleased 6196869 2026-08-29T20:16:55-07:00
 
 #### Coming From:
@@ -1236,34 +1265,5 @@ Keep MP3 accepted and preserve its helper and Main behavior through later format
 
 - [x] Built
 - [x] Passed
-
----
-
-## 696 COMMIT Unreleased 784ae0b 2026-08-29T02:34:10-07:00
-
-#### Coming From:
-
-Unreleased 784ae0b
-
-#### Purpose:
-
-Record that the entry 695 tree does not fit the device.
-
-#### Outcome:
-
-A full Quartus compilation of `784ae0b` failed after forty-eight minutes with `Error (11802): Can't fit design in device`.  Logic utilization reached 39,702 ALMs of 41,910, ninety-five percent, against the 32,355 and seventy-seven percent this cycle started from, with registers at 55,017 against 48,619 and RAM blocks at 532 of 553.  The field prediction work therefore costs roughly 7,350 ALMs and 6,400 registers, a twenty-three percent increase in logic, and the design no longer fits.  The long fit was the symptom: placement on a device this full runs far past the thirty minutes a healthy build of this project has always taken, and that signal was correctly identified by the user and wrongly dismissed during the cycle on the strength of a synthesis RAM-segment count that grew only four and a half percent, which is not a proxy for logic.  Two costs dominate and both are structural rather than incidental.  The prediction fetcher's retained word store doubled from thirty-six to seventy-two words of sixty-four bits on each of the two B engine instances, which is roughly nine thousand bits of randomly indexed storage that cannot infer as block memory.  Each engine also now computes four complete phase footprints in parallel, every one carrying its own base address through the shift-add row multiply in `pixel_addr`, its own word span and its own bounds comparison, where frame prediction computed one or two.  Neither cost is required by the standard; both follow from choosing to widen the fetcher rather than reuse the second instance, and from computing all four footprints combinationally rather than sequencing them.  Simulation correctness is unaffected and remains proven: the P fixture, the B fixture and the mixed raster control all reconstruct exactly.
-
-#### Next Steps:
-
-Reduce logic before anything else in this cycle proceeds, because `dct_type` and the admission gates will only add more.  The first lever is the one rejected when the fetcher was widened: give the B engine its four rectangles by reusing the second fetcher instance, which exists as a prefetch double buffer, instead of doubling the retained store on both instances.  A field macroblock already forgoes prefetch, so that instance is idle exactly when the extra phases are needed, and this reclaims the larger of the two costs without changing the phase indexing the engines now use.  The second lever is to stop computing four phase footprints at once.  Only the phase being fetched and the phase being looked up are ever live, so the base address, word span and bounds can be selected from the slot and direction first and computed once, which removes three of every four `pixel_addr` multiplies and bounds comparisons in both engines.  Measure each lever with a fit rather than by synthesis estimates, since this cycle demonstrated that synthesis counts do not predict logic utilization.  Do not attempt hardware until the design fits with margin; ninety-five percent is not a place to add features.  The build configuration is a separate matter worth measuring once the design fits: the project sets maximum fitter effort, high performance optimization mode and five physical synthesis passes including register retiming, and a compile long enough to exceed the engineering it validates is not a workable iteration loop, but reducing effort must be measured against the 0.170 nanosecond slack rather than assumed safe.
-
-#### Files Modified:
-
-- None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
 
 ---
