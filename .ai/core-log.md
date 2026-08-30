@@ -1,3 +1,32 @@
+## 727 COMMIT Unreleased 23defaa 2026-08-29T19:55:00-07:00
+
+#### Coming From:
+
+Unreleased 23defaa
+
+#### Purpose:
+
+Accept the clean authored I-only hardware result and define a terminal P-chain checkpoint for the corrupt passage.
+
+#### Outcome:
+
+The user plays `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_i_only_hold.m2v`, reports no large block distortion, and confirms playback finishes.  At the user's explicit request, the completed screenshot is collected locally as `/tmp/entry726_authored_i_only_hold_completed.png`, 416,390 bytes with SHA-256 `77c3b5c2156bef1d744391ed17d92d0de65a472de1c3bb6adac80a21db5a8129`; it shows a clean held authored I frame without the prior large macroblock corruption.  Its checksum-valid schema-20 telemetry accepts all 12,658,036 bytes, displays all 270 I pictures across 269 swaps, sees the terminal sequence end, reaches presentation completion and quiet state, drains the scheduler, and records zero B pictures, prediction requests, error flags, presentation faults, cache overlap faults, deadline gaps, cadence outliers, transport blocks or timestamp conflicts.  The intentionally high-rate all-I stream takes 12.4203 seconds and delivers 21.658 pictures per second rather than its nominal nine seconds, confirming measured decoder pressure, but the complete error-free drain and repeated clean authored I pixels make that speed effect orthogonal to the block diagnosis.  Combined with entry 725's corrupted byte-exact I/P run, this isolates the large artifact to original authored P-picture prediction, P residual reconstruction or P reference evolution rather than I decoding, B decoding or shared intra handling.  No source, installed media, RBF, Main, helper or configuration changes during capture.
+
+#### Next Steps:
+
+Extend the deterministic transformer with a source-picture checkpoint mode and create one byte-exact I/P prefix ending immediately after zero-based coded picture 66, the sixth consecutive P picture after the clean authored I at picture 60 and a visible midpoint of the initial shiny-hat fade.  Remove B units from the retained prefix, preserve every required I and P unit unchanged, append exactly one sequence-end code, verify clean software decode, and install it under a new absolute filename.  Its final P66 framebuffer will remain visible after completion.  The next hardware test should report whether that held terminal P frame contains large block corruption; corruption places the first failure at or before P66, while a clean terminal frame places it after P66 and permits a bounded checkpoint search.  Tool modification and installation require a separate explicit user instruction; do not change or rebuild the FPGA.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 726 COMMIT Unreleased 23defaa 2026-08-29T19:45:40-07:00
 
 #### Coming From:
@@ -1263,35 +1292,6 @@ After separate user authorization, install only the committed ARM helper on the 
 - tools/streams/run_original_dvd_audio_delivery.sh
 - tools/streams/analyze_original_audio_delivery.py
 - tools/streams/verify_arm_av_pipeline.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 687 COMMIT Unreleased 83c138e 2026-08-28T13:58:39-07:00
-
-#### Coming From:
-
-Unreleased 83c138e
-
-#### Purpose:
-
-Record the reproduced opening audio-starvation mechanism and propose a helper scheduling correction.
-
-#### Outcome:
-
-The approved investigation runs on the build PC with production source unchanged from 83c138e and the exact original opening hash preserved. Native HDMI and S/PDIF transports have identical video, timestamp and audio-record positions; only audio payload differs. All 375 passthrough bursts contain the original AC-3 bytes, have constant 1536-sample periods and 1792-byte payloads, and independently decode identically to the source. Both transports satisfy the existing byte-schedule metric bounds, exposing their lack of FIFO-consumption timing coverage. An isolated native-decoder harness connects the production extractor, 65536-byte clean-video queue, 8192-frame audio FIFO and audio adapter, using behavioral vendor FIFO models and ideal DDR. The completed three-second ideal-source S/PDIF prefix reproduces the first underrun at video byte 368,134, exactly matching entry 684, and at 1.802375 seconds versus hardware 1.803186 seconds. Fifteen empty/refill intervals total 27.375 milliseconds of modeled missing sample slots; the first empty interval lasts 12.25 milliseconds, and every empty transition has a full clean-video queue and blocked extractor. A completed 2.1-second decoded-audio case with a 4 MB/s source cap also underruns at 1.802438 seconds, with sixteen intervals totaling 18.75 milliseconds; this changes payload and timing together and is a sensitivity case, not a replay or rejection of entry 683 HDMI acceptance. Log-only helper instrumentation preserves output byte-for-byte and shows a 76,168-sample horizon at video byte 121,392, followed largely by 128-sample guard refills until the horizon advances at byte 493,708. During this interval queued video prevents extraction of enough later audio; starvation ends as the next larger refill becomes reachable. Actual S/PDIF logs report no new pipe would-block events after first transfer, and ideal-source reproduction proves slow source supply is not necessary. The evidence supports insufficient audio delivery ahead of blocking video rather than burst corruption or musical loudness. Exact receiver behavior and physical timing remain unmeasured. Reports, hashes and small reproduction scripts are published under .ai/current_results/entry687_*; full traces, generated transports and isolated sources remain in output_files/entry686 and /home/vash/mister-builds/entry686. No production correction, Quartus compile, reseed, deployment, reload or playback occurs.
-
-#### Next Steps:
-
-Obtain approval for a helper scheduling correction that supplies sufficient audio before queued video blocks extraction, preserving original video and compressed audio bytes and existing physical FIFO sizes. Add this integrated audio/video failure as a regression and require zero underruns through the full opening in both output modes and paced-source cases, without introducing video stalls or A/V drift. Prefer a verified helper-only correction; do not mask flags, add an arbitrary startup delay or start another Quartus reseed. Keep entry 683 HDMI acceptance and the installed seed-20 build intact until a replacement is separately validated.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
 
 #### Status:
 
