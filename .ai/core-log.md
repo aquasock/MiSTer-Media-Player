@@ -10,11 +10,11 @@ Perform one user-authorized seed-17 rebuild of the focused-qualified B-engine ti
 
 #### Outcome:
 
-The user explicitly authorizes one reseed after exact source `2ca6b02` fits normally and closes the intended decoder paths at positive 0.386 ns but misses the independent HDMI PLL output-clock setup gate by 0.090 ns.  Seed 17 is selected from the directly comparable pre-cleanup evidence: on source `17336f8` it brought HDMI to negative 0.003 ns, substantially closer than seed 20's negative 0.048 ns, while the B-engine cleanup has since recovered about 0.38 ns in the decoder domain.  Change only the fitter seed assignment from 20 to 17; retain the four passing focused simulations because RTL, constraints and test inputs are unchanged, and do not repeat the long 361-picture or DVD soaks.  This authorization covers exactly one fresh Quartus Prime 17.0.2 compile, with no seed sweep, timing waiver or installation.  Published source `53bc8e7` changes only the fitter seed assignment, and a fresh detached build-PC checkout at exact full SHA `53bc8e7f16d49e18596205ca0b6e4926850f185a` confirms `MediaPlayer.qsf` is the sole non-log difference from focused-qualified source `2ca6b02` and contains seed 17.
+The user explicitly authorizes one reseed after exact source `2ca6b02` fits normally and closes the intended decoder paths at positive 0.386 ns but misses the independent HDMI PLL output-clock setup gate by 0.090 ns.  Seed 17 is selected from the directly comparable pre-cleanup evidence: on source `17336f8` it brought HDMI to negative 0.003 ns, substantially closer than seed 20's negative 0.048 ns, while the B-engine cleanup has since recovered about 0.38 ns in the decoder domain.  Change only the fitter seed assignment from 20 to 17; retain the four passing focused simulations because RTL, constraints and test inputs are unchanged, and do not repeat the long 361-picture or DVD soaks.  This authorization covers exactly one fresh Quartus Prime 17.0.2 compile, with no seed sweep, timing waiver or installation.  Published source `53bc8e7` changes only the fitter seed assignment, and a fresh detached build-PC checkout at exact full SHA `53bc8e7f16d49e18596205ca0b6e4926850f185a` confirms `MediaPlayer.qsf` is the sole non-log difference from focused-qualified source `2ca6b02` and contains seed 17.  The one clean Quartus Prime 17.0.2 compile completes in sixteen minutes twenty-one seconds with zero tool errors and 217 warnings.  Seed 17 fits normally at 34,149 of 41,910 ALMs and 52,552 registers, fifteen more ALMs but 114 fewer registers than the rejected seed-20 cleanup fit; memory remains exactly 4,181,443 bits in 532 RAM blocks and DSP use remains 67.  Decoder and video setup are safely positive at 0.801 and 2.956 ns, and hold, recovery, removal and minimum-pulse-width margins are positive at 0.235, 3.558, 0.413 and 0.925 ns.  Full timing nevertheless rejects the fit on one HDMI PLL output-clock path at negative 0.047 ns slack and negative 0.047 ns TNS.  This improves HDMI by 0.043 ns from seed 20 but does not meet the required zero-violation gate.  The rejected 4,456,812-byte RBF with SHA-256 `3ee9aa131d81374b1feada78145fcf7489a7a62ac4487bf62703b09526b40a36` remains only on GUNSMOKE under `/home/vash/mister-builds/entry713/source_53bc8e7/output_files` and is not installed.
 
 #### Next Steps:
 
-Publish the seed-only source and verify it differs from `2ca6b02` only in `MediaPlayer.qsf`, then perform one clean seed-17 compile and audit full, decoder and video timing plus packed resources.  If compilation or any timing category fails, stop without another seed or build.  If timing passes, preserve the RBF on the build PC and request a separate installation and hardware-test handoff.
+Stop at the rejected seed-17 build without another seed, build, timing waiver or installation.  Preserve the now-strong decoder timing and both completed HDMI fit reports; if work resumes, make a separately approved, tightly bounded source correction to the single remaining HDMI/scaler path rather than perturbing the decoder again.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Publish the seed-only source and verify it differs from `2ca6b02` only in `Media
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
