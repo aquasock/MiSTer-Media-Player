@@ -1,3 +1,32 @@
+## 718 COMMIT Unreleased 8fd16e8 2026-08-29T18:46:29-07:00
+
+#### Coming From:
+
+Unreleased 8fd16e8
+
+#### Purpose:
+
+Record the first hardware result for the corrected 361-picture interlaced stream and isolate its remaining visible startup corruption.
+
+#### Outcome:
+
+The user plays `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s.m2v` on the exact timing-passing `8fd16e8` RBF and reports that it now reaches the end without freezes or stutters, clearing the former 63-picture hardware stop.  Visible macroblock distortion remains near the beginning and then clears.  At the user's explicit request, preserve one screenshot of the completed screen, then arm a temporary continuous screenshot capture before a user-controlled replay so the transient corrupted frames can be inspected.  The capture may write only its uniquely named screenshot under absolute `/media/fat/screenshots/...`, must retrieve each completed PNG locally, and must delete only that temporary remote screenshot after retrieval.  Do not change playback mode, launch the media, reload the core, deploy files or alter source.
+
+#### Next Steps:
+
+Capture the current completed screen, arm the bounded continuous capture, and tell the user `Start` only after the capture loop confirms it is ready.  The user will replay the same file in unchanged HDMI and Weave mode.  Stop the capture after the replay report, identify the frames containing visible block distortion, update only `core-log.md` with the result, and then provide the next single test.  Treat full playback completion as passed but keep visual reconstruction acceptance open until the transient corruption is understood.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 717 COMMIT Unreleased 8fd16e8 2026-08-29T18:41:30-07:00
 
 #### Coming From:
@@ -1267,37 +1296,6 @@ Publish the seed-only source, pull it on the build PC, verify retained qualifica
 #### Status:
 
 - [ ] Built
-- [ ] Passed
-
----
-
-## 678 COMMIT Unreleased e6ca129 2026-08-28T12:35:54-07:00
-
-#### Coming From:
-
-Unreleased e6ca129
-
-#### Purpose:
-
-Record the single approved seed-18 build and pause on its HDMI setup timing failure.
-
-#### Outcome:
-
-Both retained full native traces qualify at e6ca129 with the explicitly approved fixture-pinned one-field terminal-cut exception, while their strict raw cadence results remain false and every interior cadence, metadata, timestamp, cache and paired numerical check remains intact. The gate verifies simulation and synthesis inputs unchanged from e876bf3, and all six exception tests pass locally and on the build PC. One clean Quartus 17.0.2 seed-18 compile from the published e6ca129 source finishes in 975.0 seconds with zero errors and 206 warnings. Quartus internally increases routing optimization after two initially unrouted signals and ultimately fits within this same invocation; no manual retry occurs. The build fails timing on one HDMI scaler RAM-output-to-o_hpixs.g[1] path at minus 0.002 ns setup and minus 0.002 ns TNS, with neighboring paths at plus 0.003 and plus 0.015 ns. MPEG setup is plus 1.374 ns and video setup is plus 2.498 ns. All other timing categories pass, with minimum hold plus 0.172 ns, recovery plus 4.000 ns, removal plus 0.548 ns and pulse width plus 0.925 ns. Resources are 32,924 ALMs, 52,170 registers, 4,054,267 RAM bits, 514 of 553 M10Ks and 67 DSPs. All four eight-bit inverse-quantization weight boundaries and expected film CDC endpoints remain present. Warning comparison adds only the assigned-but-unused last_bound_reference_count warning and the timing-failure warning; fitter warnings are unchanged. The rejected RBF is 4,383,728 bytes with SHA256 9a61f9f8becce917a0941a196e1fa2d0134d52d658c68cf221843decfc137e84 and remains on the build PC without packaging or deployment. Evidence is retained under .ai/current_results/entry678_* and output_files/entry675, with the complete build at /home/vash/mister-builds/entry675/FPGA. The earlier read-only MiSTer preflight again returned no route to host; no device writes, core loads or playback occur. Work pauses at the timing gate as requested, with no seed retry, timing waiver or further source change.
-
-#### Next Steps:
-
-Reevaluate the HDMI scaler RAM-output path and its neighboring low-margin paths before proposing a further approved timing-closure cycle. The observed failure is in unchanged scaler logic rather than the MPEG decode clock domain, but the tiny negative slack remains a failure and must not be waived. Preserve the qualified decoder source and all raw simulation evidence. Do not install this RBF or start another build without renewed approval. Hardware playback of the original opening with audio remains pending a timing-passing candidate and a reachable MiSTer.
-
-#### Files Modified:
-
-- tools/streams/analyze_original_dvd_timing.py
-- tools/streams/test_original_dvd_timing.py
-- docs/testing_original_dvd_opening.md
-
-#### Status:
-
-- [x] Built
 - [ ] Passed
 
 ---
