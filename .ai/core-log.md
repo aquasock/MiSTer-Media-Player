@@ -1,4 +1,4 @@
-## 770 COMMIT Unreleased ??? 2026-08-30T06:28:45-07:00
+## 770 COMMIT Unreleased 0a9d48a 2026-08-30T06:28:45-07:00
 
 #### Coming From:
 
@@ -10,17 +10,18 @@ Add a bounded unencrypted DVD ISO source that automatically plays the longest ti
 
 #### Outcome:
 
-The user explicitly authorizes ISO support while the final Coming to America VOB hardware run proceeds and supplies three full images on the authorized build PC at `/run/media/vash/GIT`.  The approved boundary is image-file playback only: Main will expose `.iso`, the helper will use pinned VideoLAN `libdvdread` 7.1.1 and `libdvdnav` 7.0.0 to interpret UDF, IFO and program-chain order, and the source will select the longest described title without menus, navigation controls, subtitles, track switching or direct optical-disc support.  CSS and every other decryption path remain explicitly unsupported; because upstream `libdvdread` can dynamically discover `libdvdcss`, the dependency build will carry and verify a project patch that forces its builtin unencrypted reader.  This is host software work only and does not change or rebuild the accepted seed-19 FPGA artifact.
+The user explicitly authorizes image-file playback while the final Coming to America VOB hardware run proceeds and supplies three full images on the authorized build PC.  Source `6af108f` adds `.iso` selection and `iso:` routing in Main, a rewindable helper source that uses pinned VideoLAN `libdvdread` 7.1.1 and `libdvdnav` 7.0.0 to read UDF and IFO metadata and expose the longest title in program-chain order, explicit scrambled-PES rejection, architecture documentation and a tracked patch that forces libdvdread's builtin unencrypted reader instead of linked or dynamically discovered libdvdcss.  The first native build exposed only a malformed upstream-patch hunk count, corrected by `0128efe`; debugger evidence then showed that libdvdnav 7.0.0 drops caller stream callbacks in `dvdnav_reset`, so `85ca285` safely reopens the same image and title on rewind.  Final source `0a9d48a` narrowly suppresses libdvdread's ignored x86-only `gcc_struct` attribute warning at the ARM helper boundary.  Native validation fully processes The Big Lebowski title 1, 7,036.1 seconds, 5,529,130,715 video bytes and 220,760 AC-3 frames with exit zero; bounded probes start clean decoding of Coming to America title 1 and correctly select Blazing Saddles title 2.  Exact-commit native, static ARM and pinned Main builds pass; the 817,700-byte helper hashes `b7ccc160`, has no dynamic section and no undefined `dlopen`, `dlsym` or dvdcss symbol, while the 1,170,340-byte Main hashes `01229bc5` and contains both the ISO selector vector and `iso:` route.  Menus, navigation controls, subtitles, track switching, direct optical-disc access and CSS remain unsupported, and no FPGA source, RBF or target installation changes.
 
 #### Next Steps:
 
-Pin both official source archives and hashes in the reproducible helper build, add the CSS-disable patch, implement `iso:` as a rewindable sequential Program Stream source, route `.iso` selections from Main, and update the architecture boundary.  Build native, static ARM helper and pinned Main artifacts from the eventual source commit; test longest-title selection and bounded reads against all three supplied images, prove the ARM helper contains no dynamic library or `libdvdcss` dependency, and only then prepare a separately preserved target installation for an end-to-end unencrypted ISO hardware gate.
+First capture and record the user's completed Coming to America VOB result without disturbing its target evidence.  Then preserve the installed helper and Main, install the exact `b7ccc160` helper and `01229bc5` Main with byte-identical readback, reboot to activate Main, place one supplied unencrypted ISO on MiSTer-accessible storage, and run the first hardware gate in Native 480i with HDMI before checking S/PDIF.  Do not rebuild or replace the accepted seed-19 FPGA artifact.
 
 #### Files Modified:
 
 - host/arm/ARCHITECTURE.md
 - host/arm/Makefile
 - host/arm/libdvdread-disable-css.patch
+- host/arm/media_player_helper.c
 - host/arm/media_player_protocol.h
 - host/arm/media_source.c
 - host/arm/media_source.h
@@ -29,7 +30,7 @@ Pin both official source archives and hashes in the reproducible helper build, a
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
