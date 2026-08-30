@@ -351,7 +351,7 @@ int media_source_open(struct media_source *source, const char *specification,
             iso_select_title(iso_state) < 0) {
             const char *detail = iso_state->navigation ?
                 dvdnav_err_to_string(iso_state->navigation) : location;
-            set_error(error, error_size, "cannot open unencrypted DVD ISO",
+            set_error(error, error_size, "cannot open DVD ISO",
                       detail);
             iso_close(iso_state);
             return MEDIA_SOURCE_IO_ERROR;

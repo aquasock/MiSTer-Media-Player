@@ -31,16 +31,17 @@ can pass `dvd:` without changing process, pipe or FPGA-transfer ownership.
 
 `media_source` is a pull interface with read, character-read, rewind, seek,
 error and close operations. The current backends implement `file:` and `iso:`.
-The ISO backend uses pinned libdvdread and libdvdnav sources to read UDF/IFO
-metadata, choose the longest described DVD-Video title, and expose its cells in
-program-chain playback order as one sequential Program Stream. It deliberately
-uses only libdvdread's builtin reader; a tracked upstream patch prevents linked
-or dynamically discovered libdvdcss from being used. Encrypted or scrambled
-PES is rejected. At the selected title's initial random-access boundary, the
-helper discards only open-GOP leading B pictures that require a reference from
-before that boundary; the first two available I/P references and every later
-authored picture remain unchanged. `dvd:` remains reserved and returns
-unsupported without opening, mounting or reading a device.
+The ISO backend uses pinned libdvdcss, libdvdread and libdvdnav sources to read
+and, when necessary, decrypt UDF/IFO and VOB sectors, choose the longest
+described DVD-Video title, and expose its cells in program-chain playback order
+as one sequential Program Stream. All three dependencies are linked into the
+static helper, so target-installed libraries cannot change this behavior. At
+the selected title's initial random-access boundary, the helper discards only
+open-GOP leading B pictures that require a reference from before that boundary;
+the first two available I/P references and every later authored picture remain
+unchanged. This delegates CSS access to libdvdcss and is not a claim of CSS
+conformance. `dvd:` remains reserved and returns unsupported without opening,
+mounting or reading a device.
 
 Future direct-disc and interactive DVD backends may add optical-device discovery
 and a versioned navigation control channel without changing Program Stream
@@ -51,7 +52,8 @@ parsing. Those responsibilities do not belong in Main or the FPGA.
 The current implementation contains these logical stages even where they still
 share a compilation unit:
 
-1. Source: `file:` and unencrypted `iso:` now; direct `dvd:` later.
+1. Source: `file:` and decrypted or CSS-encrypted `iso:` now; direct `dvd:`
+   later.
 2. Container: raw M2V pass-through or MPEG Program Stream/PES demultiplexing.
 3. Timeline: PTS extraction and FPGA in-band timestamp records, with future
    discontinuity events for title, cell and seek transitions.

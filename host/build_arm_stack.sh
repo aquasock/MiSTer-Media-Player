@@ -16,17 +16,19 @@ miniaudio_license_sha=457f1b500e0adf6bc059edddfa78a2f62012e7c3bb43476c20e0bd23b2
 liba52_version=0.7.4
 liba52_url=http://archive.ubuntu.com/ubuntu/pool/universe/a/a52dec/a52dec_0.7.4.orig.tar.gz
 liba52_sha=a21d724ab3b3933330194353687df82c475b5dfb997513eef4c25de6c865ec33
+# libdvdcss provides transparent encrypted-sector access below libdvdread;
 # libdvdread provides ISO9660/UDF and IFO access; libdvdnav assembles the
-# selected title's cells into playback order.  Both are GPL-2.0-or-later.
-# The tracked patch makes the unencrypted-only product boundary enforceable:
-# even a runtime-installed libdvdcss cannot be discovered or used.
+# selected title's cells into playback order.  All are built as pinned static
+# dependencies so playback never depends on a target-installed shared library.
+libdvdcss_version=1.6.0
+libdvdcss_url=https://download.videolan.org/libdvdcss/$libdvdcss_version/libdvdcss-$libdvdcss_version.tar.xz
+libdvdcss_sha=7ea556c846b7bfc32d47b41cae56d1863a6b6d5f706bb162778d6f298490977c
 libdvdread_version=7.1.1
 libdvdread_url=https://download.videolan.org/pub/videolan/libdvdread/last/libdvdread-7.1.1.tar.xz
 libdvdread_sha=a0d47876548bec806774bbf8dbf20bb19ba139464383156b32eb8e59915b90a9
 libdvdnav_version=7.0.0
 libdvdnav_url=https://download.videolan.org/pub/videolan/libdvdnav/last/libdvdnav-7.0.0.tar.xz
 libdvdnav_sha=a2a18f5ad36d133c74bf9106b6445806fa253b09141a46392550394b647b221e
-libdvdread_patch="$root_dir/host/arm/libdvdread-disable-css.patch"
 main_commit=0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f
 main_patch="$root_dir/host/main_mister/0001-mediaplayer-arm-loader.patch"
 
@@ -78,25 +80,29 @@ fetch_liba52() {
 fetch_liba52
 
 fetch_dvd_sources() {
+    local css_tarball="$deps_dir/libdvdcss-$libdvdcss_version.tar.xz"
     local read_tarball="$deps_dir/libdvdread-$libdvdread_version.tar.xz"
     local nav_tarball="$deps_dir/libdvdnav-$libdvdnav_version.tar.xz"
     local source_root="$deps_dir/dvd-source"
+    local css_source="$source_root/libdvdcss"
     local read_source="$source_root/libdvdread"
     local nav_source="$source_root/libdvdnav"
     local stamp="$source_root/.prepared"
     local expected_stamp
 
-    expected_stamp="$libdvdread_sha $libdvdnav_sha $(sha256sum "$libdvdread_patch" | cut -d' ' -f1)"
+    expected_stamp="$libdvdcss_sha $libdvdread_sha $libdvdnav_sha"
+    fetch_checked "$libdvdcss_url" "$css_tarball" "$libdvdcss_sha"
     fetch_checked "$libdvdread_url" "$read_tarball" "$libdvdread_sha"
     fetch_checked "$libdvdnav_url" "$nav_tarball" "$libdvdnav_sha"
     if [[ -f "$stamp" ]] && [[ $(<"$stamp") == "$expected_stamp" ]]; then
         return
     fi
     rm -rf "$source_root"
-    mkdir -p "$read_source" "$nav_source"
+    mkdir -p "$css_source" "$read_source" "$nav_source"
+    tar -xJf "$css_tarball" -C "$css_source" --strip-components=1
     tar -xJf "$read_tarball" -C "$read_source" --strip-components=1
     tar -xJf "$nav_tarball" -C "$nav_source" --strip-components=1
-    patch -d "$read_source" -p1 < "$libdvdread_patch"
+    cp -f "$css_source/COPYING" "$deps_dir/LICENSE.libdvdcss"
     printf '%s\n' "$expected_stamp" > "$stamp"
 }
 
@@ -127,6 +133,7 @@ build_dvd_libraries() {
     local flavour=$1
     local cross_file=${2:-}
     local source_root="$deps_dir/dvd-source"
+    local css_build="$deps_dir/dvd-build-$flavour/libdvdcss"
     local read_build="$deps_dir/dvd-build-$flavour/libdvdread"
     local nav_build="$deps_dir/dvd-build-$flavour/libdvdnav"
     local install_root="$deps_dir/dvd-install-$flavour"
@@ -136,10 +143,15 @@ build_dvd_libraries() {
     if [[ -n "$cross_file" ]]; then
         cross_args=(--cross-file "$cross_file")
     fi
-    meson setup --wipe "$read_build" "$source_root/libdvdread" \
+    meson setup --wipe "$css_build" "$source_root/libdvdcss" \
         "${cross_args[@]}" --prefix="$install_root" --libdir=lib \
-        --default-library=static -Dlibdvdcss=disabled -Denable_docs=false \
-        -Dc_args=-DMMP_DISABLE_DVDCSS=1
+        --default-library=static -Denable_docs=false -Denable_examples=false
+    meson compile -C "$css_build"
+    meson install -C "$css_build"
+    PKG_CONFIG_PATH="$install_root/lib/pkgconfig" \
+        meson setup --wipe "$read_build" "$source_root/libdvdread" \
+        "${cross_args[@]}" --prefix="$install_root" --libdir=lib \
+        --default-library=static -Dlibdvdcss=enabled -Denable_docs=false
     meson compile -C "$read_build"
     meson install -C "$read_build"
     PKG_CONFIG_PATH="$install_root/lib/pkgconfig" \

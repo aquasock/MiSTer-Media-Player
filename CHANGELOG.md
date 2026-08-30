@@ -8,6 +8,9 @@ This project is still in active pre-release development. Published milestone rel
 
 ### Added
 
+- Added longest-title playback from decrypted or CSS-encrypted DVD ISO files.
+  The static helper pins libdvdcss 1.6.0 beneath libdvdread/libdvdnav, with no
+  target-installed shared-library dependency and no Main or FPGA change.
 - Added simulation-qualified 720x480 interlaced frame-picture P/B decoding with frame or field motion and frame or field DCT. Deterministic P, B and combined field-motion/field-DCT fixtures cover field selection, integer and half-sample prediction, all luma block layouts, chroma residuals, and coded-order/display-order presentation against independently FFmpeg-checked pixel oracles.
 - Added helper-only RIFF WAVE playback through the existing MediaPlayer picker and PCM transport. Pinned miniaudio source is compiled into the static helper to convert ordinary PCM/float mono, stereo or multichannel WAV input to 44.1 or 48 kHz signed stereo without an FPGA change.
 - Added helper-only FLAC playback through the existing MediaPlayer picker and PCM transport. The same statically compiled miniaudio dependency converts 16- or 24-bit mono, stereo or multichannel FLAC input to 44.1 or 48 kHz signed stereo without an FPGA change.

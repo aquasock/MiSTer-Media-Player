@@ -14,6 +14,8 @@ required before that extension becomes a released capability.
 The active decoder is the clean H.262 implementation under `rtl/mpeg2_new/`. v0.8.0 provides:
 
 - raw MPEG-2 Video elementary-stream playback, a bounded H.222.0 MPEG-2 Program Stream path for `.mpg` and `.mpeg` files, and audio-only `.mp3`, `.wav` or `.flac` playback;
+- decrypted or CSS-encrypted DVD ISO main-feature playback, selecting the
+  longest described title without menus or navigation;
 - a matching ARM helper that demultiplexes Program Streams, decodes MPEG Layers II/III, WAV, FLAC or AC-3 audio to signed stereo PCM, and transports video, picture PTS, and PCM or passthrough bursts to the FPGA;
 - byte-exact raw `.m2v` pass-through with a synthetic 90 kHz fallback timeline;
 - Program Stream picture PTS driving the FPGA 90 kHz presentation timeline;
@@ -31,7 +33,7 @@ The supported subset is intentionally bounded while the architecture is being pr
 
 | Area | Current implementation |
 | --- | --- |
-| Input | Raw MPEG-2 Video `.m2v`, bounded MPEG-2 Program Stream `.mpg` / `.mpeg`, or audio-only MPEG-1 Layer III `.mp3`, RIFF WAVE `.wav` and FLAC `.flac` through the ARM helper |
+| Input | Raw MPEG-2 Video `.m2v`, bounded MPEG-2 Program Stream `.mpg` / `.mpeg`, decrypted or CSS-encrypted DVD `.iso` main features, or audio-only MPEG-1 Layer III `.mp3`, RIFF WAVE `.wav` and FLAC `.flac` through the ARM helper |
 | Video, progressive | 4:2:0 I, P and B pictures through 720x480 |
 | Video, interlaced | Current `master`: 720x480 at 30000/1001, 4:2:0 frame pictures with I, P and B coding, frame or field motion, frame or field DCT, and top- or bottom-field-first presentation. `repeat_first_field` and field pictures remain unsupported; Quartus and MiSTer qualification are pending |
 | Picture types | Coded-order/display-order presentation with B reordering |
@@ -229,7 +231,7 @@ The build script pins minimp3, miniaudio, liba52, MiSTer Main, dependency hashes
 
 ## Known limitations
 
-- Program Stream support is bounded; MPEG Transport Stream, DVD/VOB navigation, DVD LPCM, subpictures, and arbitrary systems-layer layouts are not supported. DVD private stream 1 supports AC-3 decode/passthrough and DTS passthrough.
+- Program Stream support is bounded; MPEG Transport Stream, DVD/VOB navigation, menus, DVD LPCM, subpictures, and arbitrary systems-layer layouts are not supported. ISO playback selects the longest title and uses statically linked libdvdcss for encrypted sectors. DVD private stream 1 supports AC-3 decode/passthrough and DTS passthrough.
 - Decoded audio is MPEG Layer II or standalone MPEG-1 Layer III at 44.1 or 48 kHz, ordinary PCM/float WAV and FLAC from 8 through 192 kHz converted to stereo at 44.1 or 48 kHz, and AC-3 at 48 kHz. MPEG-1 Layer III at 32 kHz and MPEG-2/2.5 Layer III remain rejected; AAC and Ogg Vorbis are not yet enabled. Only the first Program Stream audio track is played; track switching needs a control channel that protocol one does not implement.
 - AC-3 is downmixed to stereo for decoded output, which discards LFE. Discrete surround requires passthrough and an external decoder.
 - Passthrough carries the bitstream untouched, so nothing may scale it. The audio output option therefore mutes the output it is not driving, and volume control does not apply to a passthrough stream.
@@ -290,7 +292,7 @@ See [`CHANGELOG.md`](CHANGELOG.md) for completed milestones.
 
 ## Standards and design policy
 
-Video syntax and decoding behavior are developed against **ITU-T H.262 / ISO/IEC 13818-2**. Program Stream, PES, and timing work uses **ITU-T H.222.0 / ISO/IEC 13818-1**. MPEG Layers II and III are decoded by the pinned minimp3 source, and RIFF WAVE/FLAC decode, channel conversion and resampling use pinned miniaudio source. Both are compiled directly into the static helper binary.
+Video syntax and decoding behavior are developed against **ITU-T H.262 / ISO/IEC 13818-2**. Program Stream, PES, and timing work uses **ITU-T H.222.0 / ISO/IEC 13818-1**. MPEG Layers II and III are decoded by the pinned minimp3 source, and RIFF WAVE/FLAC decode, channel conversion and resampling use pinned miniaudio source. DVD ISO access uses pinned libdvdcss, libdvdread and libdvdnav sources. These dependencies are compiled directly into the static helper binary; libdvdcss is an implementation dependency and does not establish DVD CSS conformance.
 
 AC-3 decode is performed by the pinned liba52 dependency, and IEC 61937 framing follows that standard for passthrough.
 
