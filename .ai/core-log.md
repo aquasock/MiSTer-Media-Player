@@ -1,3 +1,32 @@
+## 717 COMMIT Unreleased 8fd16e8 2026-08-29T18:41:30-07:00
+
+#### Coming From:
+
+Unreleased 8fd16e8
+
+#### Purpose:
+
+Record the streamlined hardware-test reporting procedure and identify the next single DVD-video validation.
+
+#### Outcome:
+
+The user directs that, going forward, hardware playback results require only an update to `core-log.md` followed by the next test instruction.  Do not collect, retain or commit screenshots, helper logs, telemetry dumps or duplicate acceptance artifacts unless the user specifically asks for them or a newly observed failure requires evidence before diagnosis.  The exact timing-passing `8fd16e8` RBF remains installed and has passed the bounded Big Lebowski opening over both HDMI and S/PDIF.  The highest-value next test is the existing `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s.m2v` fixture: it is the real 361-picture interlaced-frame stream that previously froze after 63 displayed pictures and directly drove the quantized I/P/B parsing and generation-safe presentation corrections now present in this RBF.
+
+#### Next Steps:
+
+With the current core still loaded, select HDMI audio and Weave, then play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s.m2v` once from beginning to end without changing modes during playback.  Report only whether the video reaches the end cleanly, freezes, or shows visible corruption; this elementary video stream contains no audio, so silence is expected.  After the report, update only `core-log.md` and provide the next single test.  Do not capture telemetry for a clean pass.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 716 COMMIT Unreleased 8fd16e8 2026-08-29T18:37:35-07:00
 
 #### Coming From:
@@ -1269,36 +1298,6 @@ Reevaluate the HDMI scaler RAM-output path and its neighboring low-margin paths 
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-## 677 COMMIT Unreleased e6ca129 2026-08-28T12:14:27-07:00
-
-#### Coming From:
-
-Unreleased e876bf3
-
-#### Purpose:
-
-Apply the approved narrow terminal-cut qualification exception and perform one clean seed-18 FPGA build.
-
-#### Outcome:
-
-The user approves proceeding with the build after the request to accept only the verified one-field adjustment at the artificial clip ending. Source e6ca129 adds the explicit fixture-pinned exception, negative mutations and documentation; all six analyzer tests pass locally. The strict result and raw mismatch remain unchanged while the separate qualification result records the opt-in exception. Preserve the strict simulation result and all raw mismatches, add an explicit opt-in qualification result pinned to the tested fixture and final P285-to-I288 transition, and require that the final picture was already ready at the missed boundary. Missing or duplicate pictures, metadata and timestamp errors, incomplete terminal hold, cache errors, other cadence gaps, larger terminal gaps and unknown fixtures must still fail. Validate the exception against the complete retained traces and negative mutations. Production RTL, simulation inputs, clocks, physical buffers, constraints, Main, helper and seed remain identical to the fully simulated e876bf3 boundary. Reuse the verified native and paired numerical evidence only after confirming all simulation and synthesis inputs are unchanged. No FPGA build has yet started.
-
-#### Next Steps:
-
-Publish the approved qualification change and its exact final source hash, verify both existing complete traces with the explicit exception, then pull that source on the build PC and perform the single fresh seed-18 Quartus compile using the prepared entry675 build directory. Audit all setup, hold, recovery, removal and pulse-width categories, warning changes, resources and retained register/CDC boundaries. Stop without seed retries if compilation or timing fails. Package only a qualified timing-passing RBF; installation remains authorized only with backup and FTP readback verification when the MiSTer is reachable, and playback remains user controlled.
-
-#### Files Modified:
-
-- tools/streams/analyze_original_dvd_timing.py
-- tools/streams/test_original_dvd_timing.py
-- docs/testing_original_dvd_opening.md
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
