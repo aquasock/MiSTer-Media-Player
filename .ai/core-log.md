@@ -1,3 +1,32 @@
+## 719 COMMIT Unreleased 8fd16e8 2026-08-29T19:06:13-07:00
+
+#### Coming From:
+
+Unreleased 8fd16e8
+
+#### Purpose:
+
+Prepare and install one interlaced I/P-only comparison fixture to localize the remaining real-content block corruption between P and B prediction.
+
+#### Outcome:
+
+The user explicitly authorizes preparation of the next test media after entry 718 proves that the exact software source is clean, all-I hardware playback is clean, and the same transient corruption survives Native 480i Weave, Native 480i Bob and 800x600 Diagnostic.  Use exact 6,751,008-byte source `/home/vash/MiSTer-Media-Player/output_files/entry710/capture/coming_to_america_interlaced_12s.m2v`, SHA-256 `735b1cc8d542b310acf155e890954ba2751b11133c11a299d3e41fa2ae7e4795`; it contains 361 TFF interlaced frame pictures at 720x480 and 30000/1001, comprising 27 I, 115 P and 219 B pictures.  Decode and deterministically re-encode the same complete passage as MPEG-2 4:2:0 TFF interlaced frame pictures with I and P pictures only, retaining DVD-rate constraints and disabling B pictures.  Before installation require clean software decode, the exact expected 361-picture count, no progressive or B picture, at least one P picture, and a retained 30000/1001 coded frame rate.  Install it only as new `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_ip_only.m2v` through an absolute FTP path, verify independent remote readback size and SHA-256, and do not replace the original media or change the RBF, Main, helper, configuration or source code.
+
+#### Next Steps:
+
+After the fixture passes all structural and software-decode checks and its absolute-path readback matches, have the user keep `Interlaced output` at `800x600 Diagnostic` with Weave and play `coming_to_america_interlaced_12s_ip_only.m2v` once.  Report whether the shiny-hat block corruption remains and whether playback reaches the end without a freeze or stutter.  Corruption in I/P-only confines the defect to P prediction or reference use; a clean result confines it to B-picture bidirectional prediction.  Do not capture telemetry unless the user explicitly requests it.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 718 COMMIT Unreleased 8fd16e8 2026-08-29T18:46:29-07:00
 
 #### Coming From:
@@ -1267,35 +1296,6 @@ Pause after this single authorized reseed and obtain renewed approval before ano
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 679 COMMIT Unreleased c124aa5 2026-08-28T12:38:01-07:00
-
-#### Coming From:
-
-Unreleased e6ca129
-
-#### Purpose:
-
-Perform one approved seed-only rebuild after seed 18 missed HDMI setup timing.
-
-#### Outcome:
-
-The user authorizes a reseed following entry 678. Source c124aa5 changes only the seed assignment from 18 to 19; the single-line diff is verified and published, and the build has not yet started. Change only the Quartus fitter seed from 18 to 19 in MediaPlayer.qsf, preserving production RTL, clocks, timing constraints, physical buffers, Main, helper, test fixtures and the approved terminal-cut qualification boundary. Verify the complete source difference and retain the already qualified native and paired numerical evidence because no functional or simulation input changes. Use a separate clean build directory at /home/vash/mister-builds/entry679/FPGA and retain the failed seed-18 build intact. This authorization covers one new compile, not an automatic seed sweep; if compilation or any timing category fails, pause again without installation or further retries.
-
-#### Next Steps:
-
-Publish the seed-only source, pull it on the build PC, verify retained qualification and run one fresh seed-19 compile. Audit every timing category, warning changes, resources and retained weight-register and film CDC boundaries. If every gate passes, package the dated RBF and use the existing installation authorization only after preserving the old core and verifying FTP readback on the reachable MiSTer. Leave core loading, original-audio playback and hardware acceptance to the user. Record the outcome and pause on any build or timing failure.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
