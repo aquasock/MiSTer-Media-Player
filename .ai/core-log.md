@@ -1,3 +1,32 @@
+## 778 COMMIT Unreleased 205bbd7 2026-08-30T14:27:08-07:00
+
+#### Coming From:
+
+Unreleased 205bbd7
+
+#### Purpose:
+
+Resolve the adopted NARA control filename and accept the complete three-file MPD-D2 decoder-throughput gate on source `205bbd7`.
+
+#### Outcome:
+
+The user clarifies that the NARA file named in the preceding positive report is exactly `/media/fat/games/MediaPlayer/nara_mpd_d2_qualification_5min.vob`, so the earlier statement that it is good is assigned to that adopted control rather than to a separate Blazing Saddles fixture.  Together with entries 776 and 777, source `205bbd7` now passes the complete targeted native-480i MPD-D2 gate: NARA is user-reported clean, while the formerly worst-stuttering Coming to America and Big Lebowski VOBs both complete in approximately 299.93 seconds with perfect user-observed video and audio, all 362,080,761 transport bytes on the fast path, every AC-3 frame and PCM sample emitted, and checksum-valid schema-20 telemetry showing zero hardware errors, audio underruns, transport blocks, deadline gaps and cadence outliers.  This directly clears the sustained decoder-backpressure and ordered-audio-starvation failure that previously began near 56 seconds for Coming to America and 33 seconds for Big Lebowski.  The installed 4,440,192-byte seed-19 RBF remains SHA-256 `7f60ec43cfffa75108c39c7d21fff727c0f1dddccd844a318e1b7cc5795c6970`; no source, installed file, playback mode or configuration changes.
+
+#### Next Steps:
+
+Keep source `205bbd7`, fitter seed 19, the installed RBF, native 480i mode and current decoder capability boundary unchanged.  The frame-picture MPD-D2 VOB compatibility and real-time throughput gate is accepted; field-picture MPEG-2 remains intentionally deferred.  If the user wants to resume the previously paused roadmap, scope decrypted ISO playback as a host-side input and navigation boundary first, without an FPGA rebuild unless later evidence proves one necessary.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 777 COMMIT Unreleased 205bbd7 2026-08-30T14:25:12-07:00
 
 #### Coming From:
@@ -1144,34 +1173,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 738 COMMIT Unreleased 6196869 2026-08-29T20:25:19-07:00
-
-#### Coming From:
-
-Unreleased 6196869
-
-#### Purpose:
-
-Record the first hardware result from the two-file P100/P115 checkpoint batch and direct the second test.
-
-#### Outcome:
-
-The user plays `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p100_checkpoint.m2v` in the requested diagnostic configuration and reports that it fails: large block distortion is visible at P100, with a smaller distortion event also visible shortly before the terminal frame.  Combined with the accepted clean P80 result, this brackets the first observed authored I/P corruption to after P80 and no later than P100.  Because P100 contains the exact retained authored I/P prefix and independently software-decodes cleanly, the result remains evidence against malformed checkpoint construction.  P115 remains installed and untested.  No telemetry is requested or collected, and no source, FPGA, RBF, Main, helper, media or configuration changes are made.
-
-#### Next Steps:
-
-Play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p115_checkpoint.m2v` next in `800x600 Diagnostic` with Weave selected and report whether its stable terminal framebuffer is clean or corrupt.  This distinguishes corruption that persists beyond P100 from a transient event before choosing finer checkpoints between P80 and P100.  Do not capture telemetry unless the user explicitly requests it, and do not change or rebuild the FPGA.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
