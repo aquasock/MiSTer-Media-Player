@@ -1,3 +1,33 @@
+## 755 COMMIT Unreleased 4e54e9d 2026-08-30T03:02:28-07:00
+
+#### Coming From:
+
+Unreleased 4e54e9d
+
+#### Purpose:
+
+Accept the corrected DVD opening over HDMI and S/PDIF in Native 480i, then prepare the requested five-minute feature tests.
+
+#### Outcome:
+
+The user plays `/media/fat/games/MediaPlayer/dvd_opening_original.mpg` on the exact installed `bc79d56a` candidate in Native 480i and reports that video and audio are both perfect over HDMI and S/PDIF.  At the user's explicit request, `/tmp/entry755_dvd_opening_hdmi_spdif_native480i_pass.png` captures the clean completed Universal frame at 432,337 bytes with SHA-256 `29e524999c6a26dbd437b07a8a5a13e56f6a72fb47996d43ef0de4ac74ce9a8d`.  This accepts the known DVD program-stream and AC-3 boundary on the corrected core without changing the RBF, Main, helper or Native 480i mode.  The user next requests five minutes each of The Big Lebowski and Coming to America.  FFmpeg's DVD-video demuxer auto-selects the confirmed 7,036.1-second Big Lebowski feature from `/home/vash/Videos/the_big_lebowski.iso` and the confirmed 6,737.667-second Coming to America feature from `/home/vash/Videos/Coming Toamerica Ac/VIDEO_TS`; each first-five-minute excerpt is remuxed by stream copy to an MPEG-2 VOB/program stream with its original 720x480 MPEG-2 video and six-channel AC-3 audio.  The resulting Big Lebowski file is 264,787,968 bytes, 300.149833 seconds and SHA-256 `8fe852c10630d989448e3fb6afedf9e48d82a255c58c02815be06ff0ca494afe`; the Coming to America file is 222,027,776 bytes, 300.099789 seconds and SHA-256 `687bd2ebb757d4b34faf0f531e1f2ddb4c4e4747b1f33cd1da9aeb05b646d4cc`.  Complete software video/audio decode exits zero for both.  Authenticated absolute FTP installs the two previously absent filenames shown below, and independent downloads compare byte-for-byte with their staged sources.  The user reports independently backing up and deleting every other file in `/media/fat/games/MediaPlayer`; treat that cleanup as intentional and do not restore removed media.
+
+#### Next Steps:
+
+Keep the exact installed RBF and Native 480i mode unchanged.  Select HDMI audio and play `/media/fat/games/MediaPlayer/the_big_lebowski_first_5min.mpg` once from beginning to end.  Report whether video motion and cadence remain clean for the full five minutes, whether audio remains clean and synchronized, and whether playback returns normally at the end.  Test `/media/fat/games/MediaPlayer/coming_to_america_first_5min.mpg` only after recording the first result so any failure remains attributable to one title.
+
+#### Files Modified:
+
+- /media/fat/games/MediaPlayer/the_big_lebowski_first_5min.mpg
+- /media/fat/games/MediaPlayer/coming_to_america_first_5min.mpg
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 754 COMMIT Unreleased 4e54e9d 2026-08-30T02:51:05-07:00
 
 #### Coming From:
@@ -1129,35 +1159,5 @@ Do not repeat the known opening solely to reconfirm HDMI or S/PDIF audio.  Prese
 
 - [x] Built
 - [x] Passed
-
----
-
-## 715 COMMIT Unreleased 8fd16e8 2026-08-29T18:26:14-07:00
-
-#### Coming From:
-
-Unreleased 8fd16e8
-
-#### Purpose:
-
-Deploy the exact timing-passing interlaced decoder and HDMI scaler RBF to the MiSTer with verified backup and readback.
-
-#### Outcome:
-
-The user explicitly authorizes deployment of the entry-714 candidate without changing Main or the helper.  An initial FTP preflight mistakenly uses relative server paths and is discarded before any write; after the user corrects the procedure, every device access uses an absolute `/media/fat/...` path through a double-slash FTP URL.  Absolute inventory identifies the sole active core as `/media/fat/MediaPlayer_20260829_b9c2657.rbf`, not `/media/fat/MediaPlayer.rbf`.  Its downloaded 4,436,916 bytes have SHA-256 `f366c246854d177aa2ce4d359d370be840094ecdb09164b736e5d55f4ed3392e`.  That exact file is uploaded to `/media/fat/_MediaPlayer_Backups/MediaPlayer_20260829_b9c2657_pre_8fd16e8_f366c246.rbf` and its independent FTP readback matches the original size and hash.  The candidate re-verifies locally as the exact 4,471,792-byte output of source `8fd16e8`, SHA-256 `677f2e11df6104c8409abcd541df81f1b2d178e6a249038b16afdf5e0282ac7c`; it is uploaded to absolute staging path `/media/fat/MediaPlayer_entry715_stage.rbf`, downloaded, and verified with the same size and hash before promotion.  An absolute FTP rename then atomically replaces the existing active filename.  Final readback of `/media/fat/MediaPlayer_20260829_b9c2657.rbf` again matches all 4,471,792 bytes and SHA-256 `677f2e11df6104c8409abcd541df81f1b2d178e6a249038b16afdf5e0282ac7c`, and absolute root inventory confirms that it is the only root-level `MediaPlayer*.rbf`; no staging file remains.  Main, the helper, media files and all other cores are untouched, and the newly installed core is not reloaded during deployment.
-
-#### Next Steps:
-
-Have the user reload the sole installed `/media/fat/MediaPlayer_20260829_b9c2657.rbf`, then perform one user-controlled HDMI playback check of the known interlaced DVD sample with audio; collect telemetry only after the user reports the screen and sound result.  If rollback is needed, restore the verified `f366c246` backup using absolute FTP paths.  Do not rebuild, reseed or change source during hardware validation.
-
-#### Files Modified:
-
-- /media/fat/MediaPlayer_20260829_b9c2657.rbf
-- /media/fat/_MediaPlayer_Backups/MediaPlayer_20260829_b9c2657_pre_8fd16e8_f366c246.rbf
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
