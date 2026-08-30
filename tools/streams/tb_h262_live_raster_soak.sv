@@ -80,6 +80,12 @@ module tb_h262_live_raster_soak #(
     integer picture_max_delta[0:PIXEL_PICTURES-1];
     integer pixel_report_fd=0;
     reg [1023:0] pixel_report_path;
+    integer target_pixel_trace_fd=0;
+    integer target_pixel_picture=-1;
+    integer target_pixel_min_delta=0;
+    integer target_pixel_trace_limit=1024;
+    integer target_pixel_trace_count=0;
+    reg [1023:0] target_pixel_trace_path;
     integer intra_samples=0,intra_mismatches=0,intra_max_delta=0;
     integer intra_index,intra_delta;
     wire i_recon_done,i_recon_start,i_recon_valid,i_iq_error,i_idct_error,i_recon_error,i_matrix_error;
@@ -633,6 +639,18 @@ module tb_h262_live_raster_soak #(
             if($value$plusargs("PIXEL_REPORT=%s",pixel_report_path))begin
                 pixel_report_fd=$fopen(pixel_report_path,"w");
                 if(pixel_report_fd==0)$fatal(1,"cannot write pixel report");
+            end
+            if($value$plusargs("TARGET_PIXEL_TRACE=%s",target_pixel_trace_path))begin
+                if(!$value$plusargs("TARGET_PIXEL_PICTURE=%d",target_pixel_picture))
+                    $fatal(1,"target pixel trace requires +TARGET_PIXEL_PICTURE");
+                if(!$value$plusargs("TARGET_PIXEL_MIN_DELTA=%d",target_pixel_min_delta))
+                    target_pixel_min_delta=0;
+                if(!$value$plusargs("TARGET_PIXEL_TRACE_LIMIT=%d",target_pixel_trace_limit))
+                    target_pixel_trace_limit=1024;
+                target_pixel_trace_fd=$fopen(target_pixel_trace_path,"w");
+                if(target_pixel_trace_fd==0)$fatal(1,"cannot write target pixel trace");
+                $fdisplay(target_pixel_trace_fd,
+                    "cycle,coded,display,tr,component,x,y,rtl,oracle,delta,mbi,mb_col,mb_row,block,element");
             end
             if(!$value$plusargs("MAP=%s",map_path))$fatal(1,"missing +MAP");
             $readmemh(map_path,coded_to_display,0,PIXEL_PICTURES-1);
@@ -1277,6 +1295,20 @@ module tb_h262_live_raster_soak #(
             pixel_delta=$signed({1'b0,pred_store_value})-
                 $signed({1'b0,pixel_oracle[pixel_index]});
             if(pixel_delta<0)pixel_delta=-pixel_delta;
+            if(target_pixel_trace_fd!=0&&coded_picture==target_pixel_picture&&
+               pixel_delta>=target_pixel_min_delta&&
+               target_pixel_trace_count<target_pixel_trace_limit)begin
+                $fdisplay(target_pixel_trace_fd,
+                    "%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d",
+                    total_cycles,coded_picture,source_pixel_picture,
+                    temporal_reference,pixel_component,pixel_x,pixel_y,
+                    pred_store_value,pixel_oracle[pixel_index],pixel_delta,
+                    prediction.mixed_probe.mbi,prediction.mixed_probe.col,
+                    prediction.mixed_probe.mrow,prediction.mixed_probe.blk,
+                    prediction.mixed_probe.ei);
+                target_pixel_trace_count=target_pixel_trace_count+1;
+                $fflush(target_pixel_trace_fd);
+            end
             pixel_samples=pixel_samples+1;
             if(MIXED_PIXEL_MODE==2)begin
                 delta_histogram[pixel_delta]=delta_histogram[pixel_delta]+1;
@@ -1885,6 +1917,10 @@ module tb_h262_live_raster_soak #(
                         for(i=0;i<PIXEL_PICTURES;i=i+1)
                             $fdisplay(pixel_report_fd,"picture_max,%0d,%0d",i,picture_max_delta[i]);
                         $fclose(pixel_report_fd);
+                    end
+                    if(target_pixel_trace_fd!=0)begin
+                        $fclose(target_pixel_trace_fd);
+                        target_pixel_trace_fd=0;
                     end
                     $display("ORIGINAL_PIXEL_RESULT coded=%0d I=%0d P_B=%0d I_mismatch=%0d P_B_mismatch=%0d max_I=%0d max_P_B=%0d",
                         coded_picture+1,intra_samples,pixel_samples,intra_mismatches,pixel_mismatches,intra_max_delta,max_pixel_delta);
