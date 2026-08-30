@@ -1,4 +1,4 @@
-## 766 COMMIT Unreleased ??? 2026-08-30T05:41:38-07:00
+## 766 COMMIT Unreleased 8623431 2026-08-30T05:41:38-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Correct the incomplete MiSTer Main file-selector support that prevents installed
 
 #### Outcome:
 
-The exact 313,542,656-byte qualification file is installed as `/media/fat/games/MediaPlayer/nara_mpd_d2_qualification_5min.vob` with byte-identical target readback and SHA-256 `a7eb4c2fff0a4e15bc4ad9b2b2a3b4cff63ec87d79a59e8ba99fef7b6193cc0b`.  The `.vob`-capable Main from source `65e8af3` is installed at `/media/fat/MiSTer` with byte-identical readback and SHA-256 `40e15ff2c89dc1580a0bcb746deeb8186ebfcc0ef1155f6ac9ce17cba8125d41`, while the replaced Main is independently preserved under `_MediaPlayer_Backups`.  The user's hardware gate reports that the menu cannot see the new VOB.  Static inspection identifies the exact omission: `mediaplayer_handles_file()` accepts `.vob` after selection, but the MediaPlayer-specific three-character extension vector passed into `SelectFile()` remains `M2VMPGMP3WAVFLC` and therefore filters VOB files before selection.  The generated media, helper, FPGA and Native 480i configuration are not implicated.
+The exact 313,542,656-byte qualification file is installed as `/media/fat/games/MediaPlayer/nara_mpd_d2_qualification_5min.vob` with byte-identical target readback and SHA-256 `a7eb4c2fff0a4e15bc4ad9b2b2a3b4cff63ec87d79a59e8ba99fef7b6193cc0b`.  The `.vob`-capable Main from source `65e8af3` is installed at `/media/fat/MiSTer` with byte-identical readback and SHA-256 `40e15ff2c89dc1580a0bcb746deeb8186ebfcc0ef1155f6ac9ce17cba8125d41`, while the replaced Main is independently preserved under `_MediaPlayer_Backups`.  The user's hardware gate reports that the menu cannot see the new VOB.  Static inspection identifies the exact omission: `mediaplayer_handles_file()` accepts `.vob` after selection, but the MediaPlayer-specific three-character extension vector passed into `SelectFile()` remained `M2VMPGMP3WAVFLC` and therefore filtered VOB files before selection.  Source `8623431` adds only the missing `VOB` token to that vector.  A clean pinned Main rebuild from exact commit `8623431` passes on the authorized build PC and produces a stripped 1,170,340-byte ARM EABI5 hard-float executable with SHA-256 `61766c5eae1817607d6700b6403b59af1d05964c23cc2c8572afbb2ba03e19d3`.  The generated media, helper, FPGA and Native 480i configuration remain unchanged.
 
 #### Next Steps:
 
-Add only `VOB` to the existing MediaPlayer `SelectFile()` extension vector, rebuild pinned Main from the resulting exact commit on the build PC, and verify the ARM executable.  Preserve the currently installed `40e15ff2` Main before replacing it, require byte-identical target readback, reboot to activate the corrected Main, and first confirm that the exact qualification VOB is visible and launches before resuming the five-minute HDMI and S/PDIF playback gates.
+Preserve the currently installed `40e15ff2` Main before replacing it with the exact `61766c5e` candidate, require byte-identical target readback, reboot to activate the corrected Main, and first confirm that the exact qualification VOB is visible and launches before resuming the five-minute HDMI and S/PDIF playback gates.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Add only `VOB` to the existing MediaPlayer `SelectFile()` extension vector, rebu
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
