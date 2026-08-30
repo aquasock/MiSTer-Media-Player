@@ -277,7 +277,6 @@ wire signed [9:0]  fpx_sel = motion_slot ? fpx1 : fpx;
 wire signed [9:0]  bpx_sel = motion_slot ? bpx1 : bpx;
 wire signed [10:0] fpy_frame_sel = motion_slot ? fpy1_frame : fpy_frame;
 wire signed [10:0] bpy_frame_sel = motion_slot ? bpy1_frame : bpy_frame;
-// Truncation toward zero, which is what H.262 DIV specifies.
 // H.262 4.1 defines DIV as integer division toward minus infinity, so a
 // negative odd vertical PMV must use an arithmetic shift here (-3 DIV 2=-2).
 function automatic signed [9:0] half_floor;
