@@ -1,4 +1,4 @@
-## 780 COMMIT Unreleased ??? 2026-08-30T15:15:47-07:00
+## 780 COMMIT Unreleased 0711d3d 2026-08-30T15:15:47-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Make decrypted DVD ISO title starts safe when an authored open GOP begins with B
 
 #### Outcome:
 
-The approved ISO-capable 1,170,340-byte Main at SHA-256 `01229bc5` and reproducible static 817,700-byte helper at SHA-256 `73d2f507` are installed with independently verified rollbacks and readbacks while the accepted source-`205bbd7` seed-19 RBF remains unchanged.  The first hardware launch of the complete 6,501,636,096-byte Blazing Saddles image successfully opens the unencrypted ISO, selects longest title 2 at 5,567 seconds, identifies AC-3 private substream `0x80` and streams through the fast transport, but displays no video after the first I picture and raises checksum-valid schema-20 fatal telemetry with 7,997 accepted clean-video bytes, prediction error flag `0x0004`, one displayed reference picture and no presentation or audio error.  Byte-level native comparison against the exact hardware-passed five-minute MPG proves both paths are identical through the initial I picture; the ISO then retains temporal references B0 and B1 before the first forward P5 reference, whereas the correctly random-access-trimmed MPG begins I2, P5, B3 and B4.  The approved correction is confined to the helper's ISO initial random-access boundary and will discard only those leading B pictures that require the unavailable pre-title reference.
+The first hardware launch of the complete 6,501,636,096-byte Blazing Saddles image opened the unencrypted ISO, selected longest title 2 at 5,567 seconds and identified AC-3 substream `0x80`, but schema-20 telemetry stopped after the initial I picture with prediction error `0x0004`; native comparison then proved the ISO retained decode-order B0 and B1 pictures whose earlier reference lies before the selected title, while the hardware-passed remux begins I2, P5, B3 and B4.  Source `0711d3d` adds a bounded ISO-only initial random-access filter that holds the existing scheduler queue through the second I/P reference and neutralizes only those unavailable leading B pictures without changing byte positions, timestamps, ordinary files, Main or FPGA logic.  The native build reports exactly two discarded pictures and produces I2, P5, B3 and B4 at its opening, a complete-GOP FFmpeg decode has no errors, and the ordinary five-minute Blazing Saddles MPG output remains byte-identical at SHA-256 `45401ab3`.  The exact 817,700-byte static ARM helper from `0711d3d`, SHA-256 `536250b8`, is installed by verified staging and same-directory rename with matching final readback; the previous `73d2f507` helper is preserved in both the backup directory and `/media/fat/linux/MediaPlayer_Helper.pre_0711d3d_73d2f507`.  The accepted source-`205bbd7` seed-19 RBF and ISO-capable Main remain unchanged, and hardware replay of the corrected helper is pending.
 
 #### Next Steps:
 
-Implement the bounded ISO-only leading-B filter without changing ordinary file playback, timestamps, audio scheduling, Main or FPGA logic.  Prove the exact Blazing Saddles opening becomes I2, P5, B3 and B4 byte-for-byte after filtering, run native file/ISO and existing program-stream regressions, build only the static ARM helper, preserve and stage-rename the installed helper with independent readback, then retry the same ISO in Native 480i at 16:9, Bob and HDMI before checking S/PDIF.
+Relaunch the same Blazing Saddles ISO in Native 480i at 16:9, Bob and HDMI and confirm that picture and audio begin normally without fatal telemetry; if that startup gate passes, let the title run long enough to confirm sustained playback and then check S/PDIF without rebuilding the core.
 
 #### Files Modified:
 
@@ -23,7 +23,7 @@ Implement the bounded ISO-only leading-B filter without changing ordinary file p
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
