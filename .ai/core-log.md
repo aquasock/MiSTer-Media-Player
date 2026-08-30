@@ -1,3 +1,32 @@
+## 731 COMMIT Unreleased 6196869 2026-08-29T20:09:50-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Record verified construction and installation of the byte-exact authored I/P P69 checkpoint.
+
+#### Outcome:
+
+Using unchanged source `6196869` and the exact 6,751,008-byte original authored stream, checkpoint mode ends immediately after zero-based coded P69, proves its terminal picture byte-identical to the source, removes 38 complete B units from the retained prefix, and preserves 6 I plus 26 P units unchanged.  The resulting 405,108-byte stream has SHA-256 `cca9041bfc8274c29b04c286dca8de07618d24f0c13827d19c8c63d2b546672a`; independent FFprobe enumeration confirms exactly 32 720x480 TFF interlaced pictures at 30000/1001 comprising 6 I and 26 P with no B or progressive picture, its tail is the single required `00 00 01 b7` sequence end, and a complete FFmpeg software decode exits without an error.  Absolute FTP inventory proves the new filename absent, then installation as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p69_checkpoint.m2v` and independent absolute-path readback reproduce all 405,108 bytes, the exact `cca9041b` hash and terminal sequence end.  No source, existing media, FPGA, Main, helper or configuration changes.
+
+#### Next Steps:
+
+With `Interlaced output` at `800x600 Diagnostic` and Weave selected, play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p69_checkpoint.m2v` once and inspect the stable terminal framebuffer after its intentionally short live passage.  Report whether the held P69 frame contains large block corruption.  Corruption narrows onset to P67 through P69; a clean result narrows it to P70 through P72.  Do not capture telemetry unless the user explicitly requests it.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 730 COMMIT Unreleased 6196869 2026-08-29T20:08:11-07:00
 
 #### Coming From:
@@ -1262,34 +1291,5 @@ Correct the coupling in the FPGA, not in the helper, which entry 693 plans by fi
 
 - [x] Built
 - [x] Passed
-
----
-
-## 691 COMMIT Unreleased 8423f20 2026-08-28T19:48:00-07:00
-
-#### Coming From:
-
-Unreleased 8423f20
-
-#### Purpose:
-
-Record the extended S/PDIF hardware run that shows audio underrun still occurring after the entry 688 correction.
-
-#### Outcome:
-
-The user plays `games/MediaPlayer/my_test.mpg` over S/PDIF to completion and reports perfect video and perfect audio/video sync throughout with audio cutting out a few times in total, and the captured telemetry contradicts the entry 690 conclusion for long duration. The installed helper still reads back as `fefaeb18b8c9e091a9cd9e97258e86264683f374f9663cb3ea6b99bafb81977a`, with the MiSTer Main executable and `MediaPlayer.rbf` unchanged, so this is the entry 688 correction running against the accepted bitstream. The helper delivered the whole file: end of file with child exit status zero, 1,126,974,123 transport bytes submitted across 68,787 reads, 1,126,974,123 fast bytes, zero slow bytes, and only ten would-block events in a 1,140.5-second session, so host supply is not the limiting factor and the delivery path never stalled. The schema 19 snapshot nevertheless reports `audio_underrun` true with `error_flags` 0x0400, the sole set flag, which is the same bit the decoder exports as audio underrun, and `validation_failures` therefore lists only that condition; `pcm_protocol_error`, `presentation_error` and every other error remain clear. The snapshot is latched by the profiler on the first nonzero error flag rather than at end of playback, so it freezes the state at the first underrun and cannot count later ones. That first underrun is placed at approximately 83.5 seconds into playback by three independent measures that agree: 1,998 displayed pictures at 24000/1001 gives 83.33 seconds, the separate STC field reads 83 seconds, and the presentation cycle counter reconciles to 83.47 seconds once its single 32-bit wrap at 71.58 seconds is accounted for. With that wrap corrected the run delivered 1,997 intervals at 23.93 fps against frame rate code 4, consistent with correct film cadence right up to the underrun and with the user's report of perfect video and sync. The raw `cadence_seconds` of 11.884442 and `delivered_fps` of 168.03 in the snapshot are the uncorrected wrapped values and must not be quoted as measurements. As in entry 690, `pcm_sample_count` 16,383 and `pcm_fifo_peak` 127 are counter saturation values and bound nothing useful. The entry 688 correction therefore holds for the twelve-second opening but does not hold at longer duration, the failure is not the entry 687 startup horizon at 1.8 seconds, and commit `8423f20` is not accepted for general playback. Full telemetry is published under .ai/current_results/entry691_*; the 39,230,255-byte helper log with SHA-256 `92e08c7322842071cbb997a84f20b5da62bc4c50d304d70d75946db0843a8ce0` is retained on the build PC at /home/vash/mister-builds/entry691 and only an excerpt is committed.
-
-#### Next Steps:
-
-Diagnose why audio delivery falls behind at approximately 83 seconds when the host is demonstrably not starved, before proposing any correction. The immediate question is whether the interpolated delivery horizon added in entry 688 degrades once source bitrate or timestamp spacing varies over a long title, in a way the twelve-second opening cannot exercise, and the existing isolated harness should be extended with a long paced case built from a deterministic script rather than from the user's media so the failure can be reproduced off hardware. Instrumenting the helper in log-only form again, as entry 687 did, is the cheapest way to see the horizon and the guard refills at the failure point without changing output bytes. The profiler latching on the first error flag is a diagnostic limitation for recurring faults and should be considered for a counted rather than latched underrun record, but that is an FPGA change and must not be bundled with a helper correction. Do not enlarge FIFOs, add arbitrary startup delay, or relax error criteria. Entry 690 remains valid for the bounded opening over S/PDIF, and the HDMI session of the opening still has no telemetry on record.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
