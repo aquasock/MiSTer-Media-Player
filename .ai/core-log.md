@@ -1,3 +1,32 @@
+## 767 COMMIT Unreleased 8623431 2026-08-30T05:57:10-07:00
+
+#### Coming From:
+
+Unreleased 8623431
+
+#### Purpose:
+
+Accept corrected VOB selection and complete the retained frame-picture NARA MPD-D2 hardware playback gate.
+
+#### Outcome:
+
+After rebooting into the exact `61766c5e` Main built from source `8623431`, the user confirms that `/media/fat/games/MediaPlayer/nara_mpd_d2_qualification_5min.vob` is visible, launches normally, and plays its complete five minutes with perfect picture and sound; the user also checks S/PDIF and reports that it works.  The 639,643-byte scaled EOF capture `/tmp/entry766_nara_mpd_d2_hdmi_pass.png`, SHA-256 `76724924c69d3c199fd1ea0ef2d83de3a4c874460d12ef2a53e9f928f40c790f`, and 405,141-byte native 720x480 capture `/tmp/entry766_nara_mpd_d2_hdmi_raw.png`, SHA-256 `f32983f568bae9e24bdad3359ccfabe4b12939a414cdb816d9524f84c03eb128`, visibly preserve a clean final frame.  All 64 schema-20 records have valid headers, indices and parity, and checksum `c46d8e97` matches; the no-progress EOF snapshot accepts 300,095,133 clean-video bytes, records 2,998 reference pictures, 8,991 displayed pictures and 8,990 swaps, and reports zero hardware error flags, zero presentation errors, zero transport blocks and zero audio FIFO underruns.  It records one 4,004,000-cycle cadence gap near displayed picture 77: the passive deadline record attributes the missed window to the candidate becoming ready 67,134 cycles later, with no input starvation or writer-capacity block, and the user reports no visible defect.  The 7,313,085-byte HDMI helper log `/tmp/entry766_nara_mpd_d2_hdmi_pass.log`, SHA-256 `68a8af73a3182273c54bf9ce47b9e872072190614c5dd854b88600e728f9498b`, names the exact VOB, selects decoded stereo PCM, emits all 9,375 AC-3 frames and 14,400,000 samples, reaches EOF, exits zero, and submits all 362,200,545 annotated transport bytes on the fast path.  This accepts source `8623431`, native VOB selection, the adopted frame-picture MPD-D2 fixture, HDMI and S/PDIF playback; field-picture MPEG-2 remains the previously disclosed deferred limitation.
+
+#### Next Steps:
+
+Prepare the final reproducibility and release-qualification boundary by pinning fitter seed 19 in the QSF, retaining Native 480i as the sole product mode, documenting the accepted MPD-D2 frame-picture scope and deferred field-picture limitation, and then performing a clean from-scratch seed-19 Quartus release build and regression gate before any version tag or GitHub release.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 766 COMMIT Unreleased 8623431 2026-08-30T05:41:38-07:00
 
 #### Coming From:
@@ -1130,34 +1159,5 @@ With `Interlaced output` at `800x600 Diagnostic` and Weave selected, play `/medi
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 727 COMMIT Unreleased 23defaa 2026-08-29T19:55:00-07:00
-
-#### Coming From:
-
-Unreleased 23defaa
-
-#### Purpose:
-
-Accept the clean authored I-only hardware result and define a terminal P-chain checkpoint for the corrupt passage.
-
-#### Outcome:
-
-The user plays `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_i_only_hold.m2v`, reports no large block distortion, and confirms playback finishes.  At the user's explicit request, the completed screenshot is collected locally as `/tmp/entry726_authored_i_only_hold_completed.png`, 416,390 bytes with SHA-256 `77c3b5c2156bef1d744391ed17d92d0de65a472de1c3bb6adac80a21db5a8129`; it shows a clean held authored I frame without the prior large macroblock corruption.  Its checksum-valid schema-20 telemetry accepts all 12,658,036 bytes, displays all 270 I pictures across 269 swaps, sees the terminal sequence end, reaches presentation completion and quiet state, drains the scheduler, and records zero B pictures, prediction requests, error flags, presentation faults, cache overlap faults, deadline gaps, cadence outliers, transport blocks or timestamp conflicts.  The intentionally high-rate all-I stream takes 12.4203 seconds and delivers 21.658 pictures per second rather than its nominal nine seconds, confirming measured decoder pressure, but the complete error-free drain and repeated clean authored I pixels make that speed effect orthogonal to the block diagnosis.  Combined with entry 725's corrupted byte-exact I/P run, this isolates the large artifact to original authored P-picture prediction, P residual reconstruction or P reference evolution rather than I decoding, B decoding or shared intra handling.  No source, installed media, RBF, Main, helper or configuration changes during capture.
-
-#### Next Steps:
-
-Extend the deterministic transformer with a source-picture checkpoint mode and create one byte-exact I/P prefix ending immediately after zero-based coded picture 66, the sixth consecutive P picture after the clean authored I at picture 60 and a visible midpoint of the initial shiny-hat fade.  Remove B units from the retained prefix, preserve every required I and P unit unchanged, append exactly one sequence-end code, verify clean software decode, and install it under a new absolute filename.  Its final P66 framebuffer will remain visible after completion.  The next hardware test should report whether that held terminal P frame contains large block corruption; corruption places the first failure at or before P66, while a clean terminal frame places it after P66 and permits a bounded checkpoint search.  Tool modification and installation require a separate explicit user instruction; do not change or rebuild the FPGA.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
