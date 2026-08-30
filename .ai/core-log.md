@@ -1,3 +1,35 @@
+## 712 COMMIT Unreleased ??? 2026-08-29T17:11:30-07:00
+
+#### Coming From:
+
+Unreleased 578b7e0
+
+#### Purpose:
+
+Close decoder and HDMI timing without reverting the validated interlaced parser and scheduler corrections.
+
+#### Outcome:
+
+The user approves a source-level B-engine timing correction after seed 20 narrowly fails HDMI setup and seed 17 moves the failure into both decoder and HDMI domains.  Detailed reports exonerate the corrected parser and scheduler logic: seed 20's worst decoder path runs from live block classification through retained lookup data and reconstruction, while all five seed-17 decoder violations run from execution direction or backward-fetch selection into the prediction fetcher's phase-address registers.  The existing lookup selector also forms a reported fifteen-node combinational loop between phase choice, motion-vector choice and tap parity.  Preserve all functional fixes, return the fitter assignment to the established seed 20, register block field-DCT classification and the fetch-launch descriptor at block boundaries, and derive lookup direction, phase and vector selection acyclically from registered controls.  The user explicitly declines the long 361-picture and original-DVD soak regressions for this timing checkpoint because they take longer than the build; validation is limited to focused B field-motion, field-DCT and progressive controls before one clean compile.
+
+#### Next Steps:
+
+Implement the explicit B-engine timing boundaries and seed-20 restoration, then run only the focused B field-motion, combined field-motion plus field-DCT, interlaced field-DCT and progressive mixed-raster simulations.  If those pass, perform one clean Quartus Prime 17.0.2 seed-20 build and audit packed resources plus full, decoder and video timing.  Do not run the 361-picture or full DVD soaks in this cycle, weaken constraints, sweep seeds or install an RBF without a separate user handoff; stop and retain evidence if any focused regression or required timing category fails.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 711 COMMIT Unreleased 578b7e0 2026-08-29T16:48:02-07:00
 
 #### Coming From:
@@ -1265,37 +1297,6 @@ Publish this approved expansion, finish the active checks, implement and exercis
 - tools/streams/tb_native_ordinary_overlap_ownership.sv
 - tools/streams/tb_h262_film_reorder_timestamp.sv
 - tools/streams/run_film_presentation.sh
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 672 COMMIT Unreleased dd0dc52 2026-08-28T04:19:05-07:00
-
-#### Coming From:
-
-Unreleased 024158a
-
-#### Purpose:
-
-Record the refined early-reference release correction and the full native qualification gate while simulation remains in progress.
-
-#### Outcome:
-
-Initial production fix 024158a passes both entry-670 reduced failures, the metadata handoff matrix, film cache cases and the broad scheduler regression. Its native runs expose a further instance of the same classification-retirement failure: an early P header one clock before I-picture 60 completes fails to release that I, allowing its pending identity to be overwritten. Refined production source 197338a retains reference-header completion permission, and the new EARLY_P_RELEASE regression plus all existing film and scheduler controls pass. Test source dd0dc52 adds full descriptor and ordinary-bank ownership tracing, bounded retirement assertions and a strict simulation gate for complete ordered publication, metadata and authored cadence. The two superseded native runs are stopped by targeted SIGTERM after retaining their failures; no complete-run pass is claimed for them. Replacement ideal and contended runs use dd0dc52 in /home/vash/mister-builds/entry671/ideal_v2 and contended_v2 from the separate /home/vash/mister-builds/entry669/native_source checkout. Paired numerical and broader native controls continue on the unchanged 024158a source in the main build-PC checkout, which must not be pulled until their fingerprint check completes. A distinct cadence limitation is also measured in the first run: ordinary P decoding is serialized until predecessor presentation, and picture 41 completes 12,105 decoder clocks after its due window, causing two extra fields; other P and reference-plus-B readiness misses recur. Extending ordinary third-bank overlap beyond its deliberate I-only rule has been proposed to the user and is not yet approved. No Quartus build, clock, buffer, constraint, seed, Main, helper or MiSTer change occurs.
-
-#### Next Steps:
-
-Finish the refined full-opening tests and numerical controls, retain exact source versions and evidence, and correct any remaining admission or retirement failures within the approved boundary. Do not accept a run merely because all pictures decode: require unique ordered publication, full descriptors, timestamps and authored cadence. Obtain explicit approval before extending the ordinary overlap rule to P pictures with I/P/B transition ownership tests. Keep the FPGA build and installation blocked until all qualification gates pass; if an approved clean build later fails, pause without seed retries.
-
-#### Files Modified:
-
-- tools/streams/tb_h262_live_native_presentation.svh
-- tools/streams/analyze_original_dvd_timing.py
-- tools/streams/test_original_dvd_timing.py
 
 #### Status:
 
