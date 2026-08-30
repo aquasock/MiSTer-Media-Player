@@ -4,10 +4,12 @@
 The default behavior removes complete B-picture units and copies every other
 source byte verbatim.  ``--keep-types I`` can instead retain only I pictures,
 and ``--repeat-retained`` duplicates each retained picture unit without
-changing its bytes.  A picture unit begins at picture_start_code and ends at
-the next picture, GOP, sequence-header, or sequence-end start code.  The tool
-requires at least one removed picture, at least one retained picture, and
-exactly one terminal sequence_end_code.
+changing its bytes.  ``--stop-after-source-picture`` creates a terminal
+checkpoint at a zero-based source picture without repeating predictive units.
+A picture unit begins at picture_start_code and ends at the next picture, GOP,
+sequence-header, or sequence-end start code.  The tool requires at least one
+removed picture, at least one retained picture, and exactly one terminal
+sequence_end_code.
 """
 from __future__ import annotations
 
@@ -134,9 +136,22 @@ def main() -> int:
         metavar="COUNT",
         help="repeat each retained picture unit COUNT times (default: 1)",
     )
+    parser.add_argument(
+        "--stop-after-source-picture",
+        type=int,
+        metavar="ORDINAL",
+        help="end after zero-based source picture ORDINAL and append sequence end",
+    )
     args = parser.parse_args()
     if args.repeat_retained < 1:
         parser.error("--repeat-retained must be positive")
+    if (
+        args.stop_after_source_picture is not None
+        and args.stop_after_source_picture < 0
+    ):
+        parser.error("--stop-after-source-picture must be non-negative")
+    if args.stop_after_source_picture is not None and args.repeat_retained != 1:
+        parser.error("checkpoint mode requires --repeat-retained 1")
 
     source_path = args.input.resolve()
     output_path = args.output.resolve()
@@ -151,14 +166,29 @@ def main() -> int:
     if not source.endswith(START_PREFIX + bytes([SEQUENCE_END])):
         raise SystemExit("input sequence_end_code must be terminal")
 
+    source_units = picture_units(source)
     keep_types = {
         coding_type
         for coding_type, name in PICTURE_NAMES.items()
         if name in args.keep_types
     }
+    selected_unit: PictureUnit | None = None
+    working_source = source
+    if args.stop_after_source_picture is not None:
+        if args.stop_after_source_picture >= len(source_units):
+            parser.error(
+                "--stop-after-source-picture is outside the source picture range"
+            )
+        selected_unit = source_units[args.stop_after_source_picture]
+        if selected_unit.coding_type not in keep_types:
+            parser.error("checkpoint picture is not included by --keep-types")
+        working_source = (
+            source[:selected_unit.end] + START_PREFIX + bytes([SEQUENCE_END])
+        )
+
     try:
-        output, source_units = transform_pictures(
-            source, keep_types, args.repeat_retained
+        output, working_units = transform_pictures(
+            working_source, keep_types, args.repeat_retained
         )
     except ValueError as error:
         raise SystemExit(str(error)) from None
@@ -167,6 +197,9 @@ def main() -> int:
         raise AssertionError("output does not contain exactly one sequence_end_code")
     if not output.endswith(START_PREFIX + bytes([SEQUENCE_END])):
         raise AssertionError("output sequence_end_code is not terminal")
+    if selected_unit is not None:
+        if output_units[-1].bytes_from(output) != selected_unit.bytes_from(source):
+            raise AssertionError("checkpoint terminal picture differs from source")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_bytes(output)
@@ -181,13 +214,15 @@ def main() -> int:
         "output_picture_types": count_types(output_units),
         "keep_types": args.keep_types,
         "repeat_retained": args.repeat_retained,
+        "stop_after_source_picture": args.stop_after_source_picture,
+        "checkpoint_terminal_picture_byte_exact": selected_unit is not None,
         "retained_source_picture_types": count_types(
-            [unit for unit in source_units if unit.coding_type in keep_types]
+            [unit for unit in working_units if unit.coding_type in keep_types]
         ),
         "removed_picture_types": count_types(
-            [unit for unit in source_units if unit.coding_type not in keep_types]
+            [unit for unit in working_units if unit.coding_type not in keep_types]
         ),
-        "removed_b_pictures": sum(unit.coding_type == 3 for unit in source_units),
+        "removed_b_pictures": sum(unit.coding_type == 3 for unit in working_units),
         "retained_picture_units_byte_exact": True,
         "terminal_sequence_end": True,
     }
