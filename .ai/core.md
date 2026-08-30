@@ -64,7 +64,7 @@ Read this core.md file first. Treat core.md is the primary project-level source 
 
 - Accelerated development is the default cadence. Plan each development cycle around a materially useful hardware-validation boundary rather than deliberately small micro-steps.
 
-- Generated binary regression artifacts and diagnostic tools the user is intended to run such as ffmpeg generated files or other large files should normally be produced by deterministic scripts committed under tools/streams/ and generated locally by the user, rather than requiring the agent to commit the binary itself.
+- Generated binary regression artifacts and diagnostic tools the user is intended to run such as ffmpeg generated files or other large files should normally be produced by deterministic scripts committed under "tools" and generated locally by the user or agent.
 
 - Treat core-log.md as a ring buffer. Only 40 of the most recent entries are ever allowed. Roll over to "001" when "999" is reached.
 
@@ -88,7 +88,9 @@ Read this core.md file first. Treat core.md is the primary project-level source 
 
 - The test MiSTer is to be accessed through standard FPT using the default MiSTer username and password.
 
-- The build PC is to be reserved for building with Quartus, generating timing reports, soaks, simulations, anything that is resource intensive.  
+- The build PC is to be reserved for building with Quartus, generating timing reports, soaks, simulations, anything that is resource intensive. 
+
+- Use the helper scripts found in "tools" to perform basic build and diagnostic functions. 
 
 ---
 
