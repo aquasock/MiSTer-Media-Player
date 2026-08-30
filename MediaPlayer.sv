@@ -68,10 +68,10 @@ assign BUTTONS = 0;
 
 //////////////////////////////////////////////////////////////////
 
-wire [1:0] ar = status[122:121];
+wire widescreen = status[121];
 
-assign VIDEO_ARX = (!ar) ? 12'd4 : (ar - 1'd1);
-assign VIDEO_ARY = (!ar) ? 12'd3 : 12'd0;
+assign VIDEO_ARX = widescreen ? 12'd16 : 12'd4;
+assign VIDEO_ARY = widescreen ? 12'd9  : 12'd3;
 
 `include "build_id.v"
 localparam CONF_STR = {
@@ -79,13 +79,10 @@ localparam CONF_STR = {
 	"F1,M2V,Open MPEG-2 Video;",
 	"-;",
 	"-;",
-	"O[122:121],Aspect ratio,Original,Full Screen,[ARC1],[ARC2];",
-	"O[124],HDMI scaler deinterlacer,Weave,Bob;",
-	"O[123],Native timing pattern,Off,On;",
-	"O[125],Native pattern motion,Static,Moving;",
-	"O[120],Interlaced output,Native 480i,800x600 Diagnostic;",
-	"O[3:1],Audio test,Off,44.1k Mono,44.1k Stereo,48k Mono,48k Stereo;",
-	"O[126],Audio output,HDMI,S/PDIF;",
+	"O[121],Aspect Ratio,4:3,16:9;",
+	"O[124],Deinterlacer Mode,Bob,Weave;",
+	"O[3:1],Audio Test,Off,44.1k Mono,44.1k Stereo,48k Mono,48k Stereo;",
+	"O[126],Audio Output,HDMI,S/PDIF;",
 	"-;",
 	"T[0],Reset;",
 	"R[0],Reset and close OSD;",
@@ -809,8 +806,6 @@ wire        display_field_window;
 wire        display_frame_window;
 wire        display_field_swap_window;
 wire        display_native_interlaced;
-wire        display_native_timing_pattern;
-wire        display_native_timing_pattern_moving;
 wire        display_hdmi_bob_deinterlace;
 wire        mpeg2_new_native_active_mpeg2;
 
@@ -824,12 +819,6 @@ wire [7:0]  fb_video_b;
 wire        fb_video_de;
 wire        fb_video_hs;
 wire        fb_video_vs;
-wire [7:0]  native_pattern_r;
-wire [7:0]  native_pattern_g;
-wire [7:0]  native_pattern_b;
-wire        native_pattern_de;
-wire        native_pattern_hs;
-wire        native_pattern_vs;
 wire [7:0]  presentation_base_r;
 wire [7:0]  presentation_base_g;
 wire [7:0]  presentation_base_b;
@@ -929,33 +918,9 @@ mpeg2_hdmi_deinterlace_control mpeg2_hdmi_deinterlace_control
 	.clk                     (clk_video),
 	.reset                   (reset_video),
 	.native_interlaced       (display_native_interlaced),
-	.bob_selected_async      (status[124]),
+	.bob_selected_async      (!status[124]),
 	.hdmi_bob_deint          (display_hdmi_bob_deinterlace)
 );
-
-// The development timing pattern is deliberately synchronized independently
-// of the native-mode request.  It replaces only the final native pixel source;
-// decoder, DDRAM, cadence, and diagnostics continue running underneath it.
-(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
-reg [1:0] native_timing_pattern_sync;
-(* altera_attribute = "-name SYNCHRONIZER_IDENTIFICATION FORCED_IF_ASYNCHRONOUS" *)
-reg [1:0] native_timing_pattern_motion_sync;
-always @(posedge clk_video) begin
-	if (reset_video) begin
-		native_timing_pattern_sync <= 2'b00;
-		native_timing_pattern_motion_sync <= 2'b00;
-	end
-	else begin
-		native_timing_pattern_sync <=
-			{native_timing_pattern_sync[0], status[123]};
-		native_timing_pattern_motion_sync <=
-			{native_timing_pattern_motion_sync[0], status[125]};
-	end
-end
-assign display_native_timing_pattern =
-	display_native_interlaced && native_timing_pattern_sync[1];
-assign display_native_timing_pattern_moving =
-	display_native_timing_pattern && native_timing_pattern_motion_sync[1];
 
 ///////////////////////   NEW H.262 DECODER   ////////////////////
 
@@ -1017,7 +982,6 @@ mpeg2_h262_native_field_order mpeg2_h262_native_field_order
 );
 
 wire mpeg2_new_native_480i_request =
-	!status[120] &&
     (mpeg2_new_phase1_supported ||
      mpeg2_new_native_480i_supported ||
      (mpeg2_new_native_film_mode && mpeg2_new_native_film_supported)) &&
@@ -2173,42 +2137,12 @@ assign VGA_R = cadence_video_r;
 assign VGA_G = cadence_video_g;
 assign VGA_B = cadence_video_b;
 
-// Static field-invariant bars and a frame-stepped field-invariant moving bar
-// exercise the complete native sync/timing and processed-HDMI scaler path
-// without reading a framebuffer pixel or line cache. Since the MPEG pipeline
-// remains active, the moving mode distinguishes retained content after the
-// final FPGA mux from retained framebuffer/DDRAM data delivery.
-mpeg2_native_timing_pattern mpeg2_native_timing_pattern
-(
-    .clk          (clk_video),
-    .reset        (reset_video),
-    .moving       (display_native_timing_pattern_moving),
-    .frame_window (display_frame_window),
-    .h_pos        (display_h_pos),
-    .v_pos        (display_v_pos),
-    .pixel_en     (display_pixel_en),
-    .h_sync       (display_h_sync),
-    .v_sync       (display_v_sync),
-    .video_r      (native_pattern_r),
-    .video_g      (native_pattern_g),
-    .video_b      (native_pattern_b),
-    .video_de     (native_pattern_de),
-    .video_hs     (native_pattern_hs),
-    .video_vs     (native_pattern_vs)
-);
-
-assign presentation_base_r = display_native_timing_pattern ?
-                             native_pattern_r : (mpeg2_new_startup_video_blank ? 8'd0 : fb_video_r);
-assign presentation_base_g = display_native_timing_pattern ?
-                             native_pattern_g : (mpeg2_new_startup_video_blank ? 8'd0 : fb_video_g);
-assign presentation_base_b = display_native_timing_pattern ?
-                             native_pattern_b : (mpeg2_new_startup_video_blank ? 8'd0 : fb_video_b);
-assign presentation_base_de = display_native_timing_pattern ?
-                              native_pattern_de : fb_video_de;
-assign presentation_base_hs = display_native_timing_pattern ?
-                              native_pattern_hs : fb_video_hs;
-assign presentation_base_vs = display_native_timing_pattern ?
-                              native_pattern_vs : fb_video_vs;
+assign presentation_base_r = mpeg2_new_startup_video_blank ? 8'd0 : fb_video_r;
+assign presentation_base_g = mpeg2_new_startup_video_blank ? 8'd0 : fb_video_g;
+assign presentation_base_b = mpeg2_new_startup_video_blank ? 8'd0 : fb_video_b;
+assign presentation_base_de = fb_video_de;
+assign presentation_base_hs = fb_video_hs;
+assign presentation_base_vs = fb_video_vs;
 
 // Entry 245: development-only hardware cadence snapshot. Every input is an
 // already registered top-level boundary. The profiler has no control output,

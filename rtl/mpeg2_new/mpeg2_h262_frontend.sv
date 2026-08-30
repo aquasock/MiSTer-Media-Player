@@ -270,11 +270,14 @@ assign native_480i_supported =
     !timing_unsupported && !timing_error;
 
 // Film frames in a 480i sequence retain progressive chroma; RFF controls
-// later field presentation, never transform coordinates.
+// later field presentation, never transform coordinates.  A clear
+// frame_pred_frame_dct admits macroblock-level field DCT and prediction; the
+// picture remains a progressive film frame and the downstream parser handles
+// its dct_type syntax.
 wire phase1_native_film_i_frame =
     !progressive_sequence && progressive_frame && chroma_420_type &&
-    frame_pred_frame_dct && (horizontal_size == 14'd720) &&
-    (vertical_size == 14'd480) && (frame_rate_code == 4'h4);
+    (horizontal_size == 14'd720) && (vertical_size == 14'd480) &&
+    (frame_rate_code == 4'h4);
 
 // Presentation eligibility must remain asserted across admitted I/P/B film
 // pictures, while preserving the same sequence, syntax and timing guards.
