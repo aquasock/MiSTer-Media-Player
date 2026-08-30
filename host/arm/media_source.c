@@ -222,9 +222,21 @@ static int iso_get_character(void *opaque)
 static int iso_rewind(void *opaque)
 {
     struct iso_source_state *state = opaque;
+    dvdnav_stream_cb callbacks = {
+        iso_stream_seek,
+        iso_stream_read,
+        NULL
+    };
+    int32_t title = state->title;
 
-    if (dvdnav_reset(state->navigation) != DVDNAV_STATUS_OK ||
-        dvdnav_title_play(state->navigation, state->title) != DVDNAV_STATUS_OK) {
+    dvdnav_close(state->navigation);
+    state->navigation = NULL;
+    clearerr(state->stream);
+    if (fseeko(state->stream, 0, SEEK_SET) != 0 ||
+        dvdnav_open_stream(&state->navigation, state, &callbacks) !=
+            DVDNAV_STATUS_OK ||
+        dvdnav_set_readahead_flag(state->navigation, 0) != DVDNAV_STATUS_OK ||
+        dvdnav_title_play(state->navigation, title) != DVDNAV_STATUS_OK) {
         state->error = 1;
         return -1;
     }
