@@ -1,4 +1,4 @@
-## 769 COMMIT Unreleased ??? 2026-08-30T06:12:22-07:00
+## 769 COMMIT Unreleased 1e8c44f 2026-08-30T06:12:22-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Pin fitter seed 19 in the source-controlled Quartus project without changing dec
 
 #### Outcome:
 
-The user directs that decoder capability remain at the accepted boundary and explicitly requests correction of the repository QSF to the established fitter seed.  `MediaPlayer.qsf` currently contains one `SEED` assignment and still names seed 17, while the installed and hardware-accepted RBF was produced by overriding the fitter to seed 19 and passed complete timing.  The approved boundary changes only that assignment to 19 so a future clean build selects the proven seed by default.  This source-control correction does not modify or reconfigure the currently installed RBF, and no Quartus build, target installation, Main, helper, media or active two-title VOB test changes at this proposal boundary.
+The user directs that decoder capability remain at the accepted boundary and explicitly requests correction of the repository QSF to the established fitter seed.  Source `1e8c44f` changes the sole `MediaPlayer.qsf` `SEED` assignment from 17 to 19 so a future clean build selects the proven seed by default; the exact diff contains one replacement line and no decoder, timing-constraint or project-setting change.  The installed and hardware-accepted RBF was already produced by overriding the fitter to seed 19 and passed complete timing, so this source-control correction neither modifies nor reconfigures that artifact.  No Quartus build or target installation is performed, and Main, helper, media, Native 480i configuration and the active two-title VOB tests remain untouched.
 
 #### Next Steps:
 
-Change the sole `MediaPlayer.qsf` fitter-seed assignment from 17 to 19, verify the diff contains no other project or decoder change, and commit the source boundary.  Do not run Quartus or replace the accepted installed seed-19 RBF now; a clean build and regression are required only when a new release artifact is intentionally produced from the updated project.
+Continue the two installed MPD-D2 VOB hardware tests one title at a time and preserve their completed screens for capture.  Do not run Quartus or replace the accepted installed seed-19 RBF now; a clean build and regression are required only when a new release artifact is intentionally produced from this updated project.
 
 #### Files Modified:
 
