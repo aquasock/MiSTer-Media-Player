@@ -1,3 +1,32 @@
+## 739 COMMIT Unreleased 6196869 2026-08-29T20:28:15-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Accept the corrupt P115 result and authorize two finer authored I/P checkpoints between clean P80 and corrupt P100.
+
+#### Outcome:
+
+The user plays `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p115_checkpoint.m2v` after the corrupt P100 test and reports greater block distortion around the shiny-hat passage.  The corruption therefore persists and worsens beyond P100 rather than belonging only to the P100 terminal frame.  The user specifically observes that the extremely bright highlight appears to corrupt the remainder of its block, as though that reconstruction path is overloaded.  Treat that as a visual clue toward coefficient, reconstruction-arithmetic or clipping behavior, not yet as a proven cause.  Together with clean P80, the hardware boundary remains after P80 and no later than P100.  Source coded ordinals 90 and 95 are B pictures and cannot terminate the byte-exact I/P fixture; choose retained P ordinals 91 and 97 as the two useful finer checkpoints.  No telemetry is requested or collected, and no source, FPGA, RBF, Main, helper, media or configuration changes occur while accepting the result.
+
+#### Next Steps:
+
+Using unchanged source `6196869`, generate byte-exact I/P checkpoints ending separately at zero-based coded P91 and P97.  For each, preserve every retained I/P unit, remove only complete B units, append one terminal sequence-end code, prove exact terminal-picture identity and clean full software decode, then install under distinct new absolute MiSTer paths with exact FTP readback.  The user should play P91 first and P97 second in `800x600 Diagnostic` with Weave and report each as clean or corrupt, noting whether a bright point poisons the rest of its block.  Do not change or rebuild the FPGA.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 738 COMMIT Unreleased 6196869 2026-08-29T20:25:19-07:00
 
 #### Coming From:
@@ -1204,44 +1233,5 @@ Carry this correction unchanged through entry 701's clean FPGA build, then requi
 
 - [ ] Built
 - [ ] Passed
-
----
-
-## 699 COMMIT Unreleased c39ebdc 2026-08-29T02:45:23-07:00
-
-#### Coming From:
-
-Unreleased 1ee2b93
-
-#### Purpose:
-
-Add FLAC as a separately built and hardware-tested consumer format through the existing helper-only PCM path.
-
-#### Outcome:
-
-Source `c39ebdc` enables the pinned miniaudio 0.11.25 native FLAC decoder inside the single static helper and adds case-insensitive `.flac` selection to Main without a runtime FFmpeg dependency or FPGA change.  The helper accepts ordinary 16- and 24-bit mono, stereo and multichannel files, converts them to signed 16-bit stereo at 44.1 or 48 kHz through the established audio-only transport, and preserves one clean end token.  Format, sanitizer, Main-loader, MP2, MP3, WAV, AC-3 and DTS regressions pass.  The exact 629,056-byte static ARM helper and patched Main were transactionally installed with backups and hash readback, and the user played the selected FLAC sample on hardware and reported that it ran perfectly.  The later S/PDIF silence reproduced after a complete zero-error FLAC decode and belongs to the shared routing defect recorded by entry 700, not the codec.
-
-#### Next Steps:
-
-Keep FLAC accepted and preserve it through the interlaced recovery and S/PDIF build; Ogg Vorbis and M4A with AAC-LC remain later independent consumer-format cycles.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- README.md
-- host/arm/ARCHITECTURE.md
-- host/arm/consumer_audio.c
-- host/arm/consumer_audio.h
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/streams/test_main_mister_profile.py
-- tools/streams/verify_arm_av_pipeline.py
-- tools/streams/verify_consumer_flac.py
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
