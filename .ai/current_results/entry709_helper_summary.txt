@@ -1,9 +1,0 @@
-t=3 start source=file:/media/fat/games/MediaPlayer/dvd_opening_original.mpg index=65 core=MediaPlayer alternate=MediaPlayer
-media_player_helper: audio output hdmi (decoded stereo PCM)
-media_player_helper: AC-3 audio on private substream 0x80
-media_player_helper: video=10334393 bytes, pts=25, audio=375 frames/576000 samples
-media_player_helper: scheduler video_peak=536433 bytes, pcm_peak=15360 samples, pcm_emitted=576000 samples
-t=11943125 finish reason=eof fd=15 download=1 submitted=12818397 reads=784 would_block=387
-t=11943256 child wait=7126 status=0x0 wait_errno=0 exited=1 exit_code=0 signaled=0 signal=0
-t=11943277 transfer complete submitted=12818397 reads=784
-t=11943301 profile_summary polls=108610 poll_us=8144565 poll_max_us=7036 data_polls=19859 data_poll_us=6820671 intervals=108609 interval_us=11940866 interval_max_us=20848 read_calls=1172 read_us=670868 tx_calls=129871 tx_us=6740996 tx_max_us=5787 ack_chunks=2029 fast_bytes=12818397 slow_bytes=0 burst_calls=129871 status_queries=353102 transport_mode=2

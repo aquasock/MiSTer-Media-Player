@@ -1,9 +1,0 @@
-{
-  "hdmi_bytes": 12818397,
-  "passed": true,
-  "record_count": 36000,
-  "same_pcm_record_positions_and_lengths": true,
-  "same_pts_records_and_positions": true,
-  "same_stream_ignoring_pcm_payload": true,
-  "spdif_bytes": 12818397
-}

@@ -1,3 +1,0 @@
-OVERLAP_REFERENCE_STATE hold=0 pending=1/2 released=0 queued_capacity=1 run_closed=1 overlap_open=0
-FATAL: tools/streams/tb_h262_film_reorder_timestamp.sv:116: following P payload admitted with pending reference slot occupied during B drain
-       Time: 76310000  Scope: tb_h262_film_reorder_timestamp

@@ -1,9 +1,0 @@
-{
-  "pinned_main_commit": "0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f",
-  "compiler": "g++",
-  "sanitizers": true,
-  "reports": {
-    "transport": "GPI[31]==1. FPGA is uninitialized?\nGPI[31]==1. FPGA is uninitialized?\nGPI[31]==1. FPGA is uninitialized?\nGPI[31]==1. FPGA is uninitialized?\nPASS transport: 14 cases; byte/word/framing/ACK traces match upstream, including delayed ACKs and odd tails\n",
-    "loader": "MediaPlayer: stream transfer finished\nPASS loader: sampled 66-chunk session, EAGAIN, four-read budget, byte order, odd tail, EOF totals and idle no-op\nMediaPlayer: stream transfer finished\nMediaPlayer: helper pipe failed: Input/output error\nMediaPlayer: stream transfer finished\nPASS loader: warm reset, read-error errno retention, core-change and external-stop exits\nMediaPlayer: stream transfer finished\nPASS loader: unavailable diagnostic endpoint preserves ordinary transfer without sampling\n"
-  }
-}

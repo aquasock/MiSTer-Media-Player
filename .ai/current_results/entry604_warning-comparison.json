@@ -1,7 +1,0 @@
-{
-  "baseline_source": "f615ce02ba8a96ac198b26c24ff5c4b7cecfd1b4",
-  "source_commit": "d466bed3031908b5f5ffa3360cf8a594d711a1cc",
-  "normalization": "Drop source path/line suffix; replace HDL line numbers in warning body. Retain message IDs and signal names.",
-  "added": [],
-  "removed": []
-}

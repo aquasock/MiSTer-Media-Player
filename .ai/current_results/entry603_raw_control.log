@@ -1,8 +1,0 @@
-INTEGRATED_PROGRESS pictures=32 cycles=63070156
-INTEGRATED_PROGRESS pictures=64 cycles=126656380
-INTEGRATED_PROGRESS pictures=96 cycles=190476767
-INTEGRATED_PASS writer=1 phase=301711 displayed=100 gaps=0 elapsed_seconds=3.313794 words=6480000 stores=810000
-- /home/vash/mister-builds/entry603/tb_entry603_i_pts.sv:350: Verilog $finish
-- S i m u l a t i o n   R e p o r t: Verilator 5.032 2025-01-01
-- Verilator: $finish at 2s; walltime 116.343 s; speed 17.234 ms/s
-- Verilator: cpu 116.338 s on 1 threads; alloced 225 MB

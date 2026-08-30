@@ -6,18 +6,18 @@
 - MiSTer-compatible DE10-Nano target hardware
 - the repository cloned with its `sys/` framework content present
 - ARM GNU 10.2 for the helper and patched MiSTer Main, plus a native C compiler for host verification
-- Python 3, FFmpeg and Pillow for the applicable media-generation and telemetry tools
+- FFmpeg and FFprobe for media inspection and conversion
 
 The project file is `MediaPlayer.qpf` and the active source list is maintained in `files.qip`.
 
-In the standard project environment, run Quartus, simulations, media generation and other intensive checks on the build PC. Pull the published source there before official qualification; publish commits from the Raspberry Pi checkout. A documentation-only change does not require rebuilding unchanged runtime binaries.
+Run the commands below from the Raspberry Pi checkout. `tools/build.sh` syncs the source to the `mister-build` Quartus machine, runs the compile and timing gates there, then retrieves the verified RBF. A documentation-only change does not require rebuilding unchanged runtime binaries.
 
 ## Full Quartus build
 
 From the repository root:
 
 ```bash
-quartus_sh --flow compile MediaPlayer
+tools/build.sh
 ```
 
 The project is configured to generate an RBF under `output_files/`.
@@ -29,7 +29,7 @@ A full compile is required after meaningful active RTL, source-list, constraints
 After a successful compile, run:
 
 ```bash
-quartus_sta -t tools/phase1p_timing.tcl
+tools/build.sh timing
 ```
 
 This script reports the timing views used during Phase 1P closure, including the active decoder and video clock domains and focused same-clock paths.
@@ -38,18 +38,20 @@ Do not treat a successful functional compile as sufficient when a change can aff
 
 ## Hardware validation
 
-The current [v0.8.0 hand-test instructions](TEST_INSTRUCTIONS.md#v080-hand-tests) cover field order, Bob/Weave, progressive I and I/P/B, AC-3 decode, and AC-3/DTS passthrough. Generate media locally with the committed scripts under `tools/streams/`; the release ZIP does not contain the test files. Older all-I and regression-pack streams remain useful focused controls, not a substitute for current integration testing.
+The current [hardware test instructions](TEST_INSTRUCTIONS.md) use 15-minute
+segments from ordinary DVDs. This directly measures the compatibility target
+without keeping a simulation and generated-fixture framework in the repository.
 
-Install the matched RBF, helper and patched Main as described in the [README](../README.md#installation). Hardware lifecycle and playback remain user-controlled. Record installed hashes, selected modes, reboot/reload state and all three LEDs; collect the helper log before another playback overwrites it, followed by a fresh checksum-valid schema-19 terminal screenshot. Do not infer completion or cadence from a plausible still image or one LED alone.
+Install the matched RBF, helper and patched Main as described in the [README](../README.md#installation). Record installed hashes and playback observations; collect the helper log before another playback overwrites it, followed by a fresh scaled screenshot.
 
 ## Helper and Main builds
 
 From the repository root on the build PC:
 
 ```bash
-host/build_arm_stack.sh --native
-ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc host/build_arm_stack.sh --arm
-ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc host/build_arm_stack.sh --main
+tools/build.sh host native
+ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc tools/build.sh host arm
+ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc tools/build.sh host main
 ```
 
 The outputs are `host/build/media_player_helper.native`, `host/build/MediaPlayer_Helper`, and `host/build/MiSTer`. The script pins minimp3, miniaudio, liba52 and upstream Main and verifies fetched dependencies. Check each command's exit status before using an output: the presence of an older binary or the absence of the word "error" in a log does not prove a successful build. Keep the toolchain in a persistent location.

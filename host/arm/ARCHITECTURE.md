@@ -200,10 +200,3 @@ zero acknowledged payload bytes and all 360 pictures displayed. The user
 reported normal menu response. This is one measured workload, not a hard
 2,000-microsecond latency bound or a sustained-throughput guarantee for every
 source. Broader changes still require their own hardware qualification.
-
-On the build PC, run `tools/streams/test_main_mister_profile.py --main-source
-<Main_MiSTer checkout> --rtl`, then repeat with `--sanitize`. The RTL mode uses
-actual extracted Main functions, clock/ACK logic and FIO logic with modeled
-sink capacity. The separate `tb_mpeg2_stream_fifo_burst.sv` qualifies the actual
-FIFO wrapper against the installed Quartus `altera_mf.v`; compile once normally
-and once with `-DFIFO_CYCLONE_V`. The vendor model is not redistributed.

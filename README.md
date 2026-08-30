@@ -114,13 +114,11 @@ ffmpeg -hide_banner -y \
   -c:a mp2 -ar 48000 -ac 2 -b:a 192k \
   -f vob "output.mpg"
 
-python3 tools/streams/finalize_program_stream.py "output.mpg"
-python3 tools/streams/check_media_compatibility.py "output.mpg"
+tools/media.sh verify "output.mpg"
 ```
 
 Use `-an` and omit the audio codec options for a video-only Program Stream. Raw
-`.m2v` elementary streams remain supported. The finalizer supplies the required
-H.262 sequence-end and Program Stream end markers when absent.
+`.m2v` elementary streams remain supported.
 
 For AC-3 instead, replace the audio options with `-c:a ac3 -ar 48000 -ac 6 -b:a
 448k`. A 5.1 track is only heard as 5.1 through S/PDIF passthrough; in HDMI mode
@@ -135,21 +133,16 @@ implements both field motion and field DCT, including their combined case.
 Those additions are covered by deterministic pixel-oracle simulations but are
 not yet a hardware-qualified release.
 
-Use the committed generator for the released all-I hand-test shape:
+For a simple 15-minute compatibility clip, use the shared media command:
 
 ```bash
-python3 tools/streams/generate_test_suite.py --output-dir /tmp/suite --duration 12
+tools/media.sh convert input.vob output.mpg
+tools/media.sh probe output.mpg
 ```
 
-It also builds the seven hand tests described under Diagnostic streams. To
-convert your own material, follow the same sequence its `build` function uses:
-encode at 60000/1001, weave with `tinterlace=mode=interleave_top` (or
-`interleave_bottom` for bottom-field-first), encode all-I with `-g 1 -bf 0`, then
-patch the signalling with `generate_test_interlaced_i_frames.patch_interlaced_signalling`.
-
-`check_media_compatibility.py` predates the interlaced path and rejects native
-interlaced files. It remains a valid gate for progressive streams; for
-interlaced ones, use the structure check the generator performs instead.
+The conversion command produces a conservative 720x480 MPEG-2 Program Stream
+with 48 kHz stereo AC-3 audio. Direct DVD/VOB playback remains the preferred
+test when qualifying the decoder's actual compatibility envelope.
 
 ### Audio
 
@@ -171,47 +164,8 @@ receiver in HDMI mode is the option working, not a fault. Passthrough carries
 the bitstream untouched, so volume and any mixing must not be applied to it, and
 DTS has no decoder here at all.
 
-Build audio test material with the same generator the hand tests use. `--sweep`
-sounds one channel at a time for two seconds, in the order FL, FR, FC, LFE, BL,
-BR, which is what makes a channel problem audible rather than a matter of
-opinion:
-
-```bash
-python3 tools/streams/generate_test_dvd_ac3_av.py --output /tmp/ac3_sweep.mpg \
-  --duration 12 --sweep --report /tmp/ac3_sweep.json
-python3 tools/streams/generate_test_dvd_ac3_av.py --output /tmp/dts_sweep.mpg \
-  --duration 12 --sweep --codec dts --report /tmp/dts_sweep.json
-```
-
-Play the AC-3 sweep in each output mode. With **HDMI** selected you are hearing
-the stereo downmix, so expect left, right, both equally, **silence**, left,
-right: the silent fourth slot is LFE and its absence is correct, because the
-AC-3 stereo downmix discards it. With **S/PDIF** selected your receiver decodes
-the original 5.1, so each slot should come from its own speaker and the fourth
-should reach the subwoofer. Then play the DTS sweep, which requires S/PDIF.
-
-Two cautions when interpreting what you hear. A 2.1 or virtualizing soundbar
-cannot demonstrate discrete channel routing however convincing it sounds, so
-front, centre and surround placement over passthrough needs a real 5.1 decoder.
-And receivers differ between codecs: one soundbar tested here reproduces LFE
-from AC-3 but not from DTS, even though the transmitted DTS provably carries it.
-
-The audio paths can also be checked on the build PC without hardware, which is
-faster and more precise than listening:
-
-```bash
-python3 tools/streams/verify_ac3_pcm.py --helper host/build/media_player_helper.native \
-  --fixture /tmp/ac3_sweep.mpg
-python3 tools/streams/analyze_ac3_downmix.py --helper host/build/media_player_helper.native \
-  --fixture /tmp/ac3_sweep.mpg --report-in /tmp/ac3_sweep.json
-python3 tools/streams/verify_ac3_passthrough.py --helper host/build/media_player_helper.native \
-  --fixture /tmp/dts_sweep.mpg --codec dts --substream 0x88
-```
-
-The first compares the helper's decode against an independent decoder, the
-second measures where each channel lands in the downmix, and the third checks
-that passthrough bursts carry the source frames byte for byte. Pass `--report`
-to any of them to keep the numbers.
+Use real DVD material to check the audio mode that matters for playback. HDMI
+decodes AC-3 to stereo, while S/PDIF passes AC-3 or DTS to an external decoder.
 
 On the MiSTer, `/tmp/MediaPlayer_ARM.log` records the selected output mode and
 the chosen audio substream, so a log proves which path ran. It is a single fixed
@@ -260,15 +214,15 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`host/arm/ARCHITECTURE.m
 The FPGA project targets Quartus Prime 17.0.x:
 
 ```bash
-quartus_sh --flow compile MediaPlayer
-quartus_sta -t tools/phase1p_timing.tcl
+tools/build.sh
+tools/build.sh timing
 ```
 
 Build the ARM helper and matching patched Main with the ARM GNU 10.2 compiler used by MiSTer Main:
 
 ```bash
-ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc host/build_arm_stack.sh --arm
-ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc host/build_arm_stack.sh --main
+ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc tools/build.sh host arm
+ARM_CC=/path/to/arm-none-linux-gnueabihf-gcc tools/build.sh host main
 ```
 
 The build script pins minimp3, miniaudio, liba52, MiSTer Main, dependency hashes, and the Main patch. Release candidates require reproducible FPGA, helper, and Main binaries plus host and MiSTer regression evidence. See [building and testing](docs/BUILDING.md) for the current workflow.
@@ -306,24 +260,25 @@ swap intervals and deadline-gap counts to assess steady cadence. The simulation
 runner additionally reports `visible_start_cycle` and `visible_span_cycles`;
 its FIFO/host/DDR and field-window models are not a full HDMI hardware replay.
 
-## Diagnostic streams
+## Playback evidence
 
-Generated binary media remains local and is not included in the public release. Use the current [v0.8.0 hardware instructions](docs/TEST_INSTRUCTIONS.md#v080-hand-tests) and retain the generator's file hashes with each run. Older regression packs and their checksums remain historical controls, not the current release package.
+Use the first 15 minutes of real DVDs as the normal stability test. Capture the
+current helper log and scaled MiSTer screenshots before starting the next file:
 
-### Hand tests
-
-`tools/streams/generate_test_suite.py` builds seven short Program Streams meant to be watched and listened to rather than scored automatically. Each is chosen to make one failure mode obvious: a bar sweeping down the frame for interlaced top- and bottom-field-first order, scrolling bands that separate Weave from Bob, progressive all-I and progressive I/P/B, and AC-3 and DTS 5.1 channel sweeps that sound one channel at a time. AC-3 exercises stereo downmix without LFE in HDMI mode and passthrough in S/PDIF mode. DTS requires S/PDIF; HDMI selection is rejected. Discrete channel placement requires an external decoder and suitable speakers.
-
-Record all three LEDs, the selected output/deinterlace mode, and the reboot/reload lifecycle. Retrieve `/tmp/MediaPlayer_ARM.log` before another playback overwrites it, then collect a fresh checksum-valid schema-19 terminal screenshot. The current Main emits profile version two (`credit_step_v1`); older version-one log analyzers must not be used unchanged. LED appearance alone does not establish picture counts, cadence, transport integrity or audio completion.
+```bash
+tools/mister.sh log
+tools/mister.sh screenshot playback.png
+tools/mister.sh screenshot-stream 60 playback-frames
+```
 
 ## Project layout
 
-- `MediaPlayer.sv` and `MediaPlayer_top_*.svh` — MiSTer top-level integration, transport, queues, audio, and presentation scheduling.
+- `MediaPlayer.sv` — MiSTer top-level integration, transport, queues, audio, and presentation scheduling.
 - `rtl/mpeg2_new/` — active H.262 decoder pipeline.
 - `rtl/mpeg2_luma_framebuffer.sv` — DDR-backed frame readback and video-side line caching.
 - `host/arm/` — ARM helper, media source, and packed transport protocol.
 - `host/main_mister/` — pinned patch adding helper-based media loading to MiSTer Main.
-- `tools/streams/` — deterministic media generation, finalization, compatibility, and transport analysis.
+- `tools/` — compact commands for Quartus, host builds, MiSTer transfers, screenshots, and media preparation.
 - `rtl/mpeg2fpga/` — frozen legacy reference; inactive in `files.qip`.
 - `docs/` — architecture, building, testing, and release documentation.
 

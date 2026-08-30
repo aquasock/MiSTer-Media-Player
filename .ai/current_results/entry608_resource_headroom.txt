@@ -1,3 +1,0 @@
-; Logic utilization (in ALMs)     ; 31,394 / 41,910 ( 75 % )                    ;
-; Total block memory bits         ; 4,048,355 / 5,662,720 ( 71 % )              ;
-; Total RAM Blocks                ; 512 / 553 ( 93 % )                          ;

@@ -1,8 +1,0 @@
-CADENCE_RATE_PASS code=1 windows=1206 presentations=479
-CADENCE_RATE_PASS code=2 windows=603 presentations=240
-CADENCE_RATE_PASS code=3 windows=603 presentations=250
-CADENCE_RATE_PASS code=4 windows=1206 presentations=599
-CADENCE_RATE_PASS code=5 windows=1206 presentations=600
-NATIVE_FIELD_CADENCE_PASS fields=20 frame_windows=10 presentations=10
-B_PRESENTATION_RESULT handoff=before/same/after race_barrier=1 order=scratch0,scratch1,future cadence=23.976/24/25/29.97/30 timestamp_wait_due=1 timestamp_cadence_floor=1 missing_fallback=1 no_burst=1 min_present_gap=2 overlap_p=1 overlap_i=1 deferred_b=1 generations=2 bank_reuse=0,1 third_reference=1 starvation=1 ordinary=1 terminal=early/active fail_open=1
-/run/media/vash/GIT/MiSTer-Media-Player/tools/streams/tb_h262_b_presentation_scheduler.sv:706: $finish called at 188486000 (1ps)

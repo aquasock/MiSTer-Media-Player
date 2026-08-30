@@ -89,7 +89,7 @@ The hand tests used the released RBF and helper hashes. Tests one through six we
 
 ## Packaging
 
-`MiSTer_Media_Player_v0.8.0.zip` contains the three runtime files, `SHA256SUMS`, `INSTALL.txt`, `SOURCE.txt`, and licences for the project, minimp3 and liba52. Generated test media is not shipped; the seven hand tests are reproduced with `tools/streams/generate_test_suite.py`.
+`MiSTer_Media_Player_v0.8.0.zip` contains the three runtime files, `SHA256SUMS`, `INSTALL.txt`, `SOURCE.txt`, and licences for the project, minimp3 and liba52. Generated test media is not shipped.
 
 - Download size: **2,867,028 bytes**.
 - ZIP SHA-256: `5f55b49eb863f74a777b548b4f42b744a9130b4161f176b687ca297deeffcaf3`.

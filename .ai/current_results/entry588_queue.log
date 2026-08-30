@@ -1,2 +1,0 @@
-H262_CLEAN_VIDEO_QUEUE_PASS bytes=85696 pcm=3 metadata=4
-tools/streams/tb_h262_clean_video_queue.sv:217: $finish called at 2617650000 (1ps)

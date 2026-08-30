@@ -1,3 +1,0 @@
-make: Entering directory '/run/media/vash/GIT/MiSTer-Media-Player/host/arm'
-cc  -I.deps -O2 -Wall -Wextra -Werror -std=c11 media_player_helper.c media_source.c  -o /home/vash/mister-builds/entry602/media_player_helper.native
-make: Leaving directory '/run/media/vash/GIT/MiSTer-Media-Player/host/arm'
