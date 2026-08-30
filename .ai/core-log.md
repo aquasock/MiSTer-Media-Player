@@ -1,3 +1,32 @@
+## 763 COMMIT Unreleased cee1a9e 2026-08-30T05:05:10-07:00
+
+#### Coming From:
+
+Unreleased cee1a9e
+
+#### Purpose:
+
+Install and verify the approved five-minute Blazing Saddles main-feature compatibility stream for hardware testing.
+
+#### Outcome:
+
+FFmpeg's DVD-video demuxer selects title 2, the 5,567-second Blazing Saddles main feature, from `/home/vash/Videos/Blazing Saddles/VIDEO_TS` and stream-copies its first five minutes through the VOB/MPEG-2 program-stream muxer without transcoding.  The resulting `/tmp/blazing_saddles_first_5min.mpg` is 244,019,200 bytes, 300.149844 seconds and SHA-256 `e045ec4d52f5fee6bb2e57d887341697244c0886d35b734131ff171101535879`; it contains exactly 7,195 original 720x480 anamorphic 16:9 MPEG-2 pictures and 9,375 original 48 kHz six-channel English AC-3 frames.  Complete software video and audio decode exits zero; FFmpeg's null-output muxer reports repeated equal AC-3 timestamps at several DVD cell boundaries without any codec decode failure, so that authored timing remains intentionally present for the hardware compatibility test.  Absolute FTP inventory proves `/media/fat/games/MediaPlayer/blazing_saddles_first_5min.mpg` absent before upload, and independent absolute-path download reproduces all 244,019,200 bytes, the exact `e045ec4d` hash and a byte-identical comparison.  The pre-existing `blazing_saddles_main_av_15min.mpg` remains untouched, as do both earlier five-minute files, the DVD sources, repository source, FPGA, seed-19 RBF, Main, helper and Native 480i configuration.
+
+#### Next Steps:
+
+Keep the installed seed-19 RBF and Native 480i mode unchanged, select `16:9`, begin with HDMI audio, and play `/media/fat/games/MediaPlayer/blazing_saddles_first_5min.mpg` once from beginning to end.  During that same run, verify S/PDIF for a representative portion if convenient, then report whether launch, picture integrity, cadence, audio and synchronization remain perfect for the full five minutes and whether playback returns normally at EOF.  Leave the completed screen untouched for immediate screenshot, telemetry and helper-log capture.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 762 COMMIT Unreleased cee1a9e 2026-08-30T05:00:54-07:00
 
 #### Coming From:
@@ -1129,34 +1158,5 @@ With `Interlaced output` at `800x600 Diagnostic` and Weave selected, play `/medi
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 723 COMMIT Unreleased 8fd16e8 2026-08-29T19:25:05-07:00
-
-#### Coming From:
-
-Unreleased 8fd16e8
-
-#### Purpose:
-
-Accept the corrected matched I/P/B hardware run and define the next authored-stream isolation test.
-
-#### Outcome:
-
-The user reports that `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_ipb_matched_end.m2v` looks visually the same as the prior matched run: the large shiny-hat macroblock corruption remains absent, while the previously observed narrow vertical artifacts remain.  At the user's explicit request, one completed screenshot is collected locally as `/tmp/entry722_ipb_matched_end_completed.png`, 334,485 bytes with SHA-256 `a4c476c9012cd21f7ced7eaacd939455fbf22cdea97d086b8dc4eab46e398781`; it visibly retains the narrow vertical line artifacts and the long-standing tiny green crawl at the left edge but shows no large corrupted blocks.  Its checksum-valid schema-20 telemetry accepts all 4,844,184 bytes and displays all 361 encoded pictures across 360 swaps, comprising 121 reference pictures and all 240 B pictures.  Sequence end, presentation completion and quiet session are true, the scheduler is fully drained, and error flags, presentation faults, cache overlap faults, deadline gaps, cadence outliers, transport blocks and timestamp conflicts are all zero.  The measured presentation span is 12.0259 seconds at 29.935 displayed pictures per second.  This clean terminal result proves the four-byte correction resolved only the generated fixture's terminal-drain confound and confirms that ordinary B-picture presence is insufficient to reproduce the original authored stream's large corruption; no source, RBF, Main, helper, configuration or installed media changes during capture.
-
-#### Next Steps:
-
-Prepare one bit-exact B-stripped derivative of the original authored `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s.m2v`: preserve every sequence, GOP, I-picture and P-picture byte unchanged, remove only complete B-picture units, and retain exactly one terminal sequence-end code.  Verify that the resulting 142 I/P pictures are byte-for-byte the original coded units and decode cleanly in software, then install it under a new absolute filename.  The next hardware test should play that deliberately shorter and jerkier authored I/P stream once in `800x600 Diagnostic` with Weave and report whether any large shiny-hat corruption remains.  Corruption would implicate original P/reference reconstruction; a clean result would isolate the original B-picture units without conflating the result with a full re-encode.  Test-media preparation and installation require a separate explicit user instruction; do not change or rebuild the FPGA.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
