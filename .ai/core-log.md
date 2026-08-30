@@ -1,3 +1,32 @@
+## 722 COMMIT Unreleased 8fd16e8 2026-08-29T19:22:06-07:00
+
+#### Coming From:
+
+Unreleased 8fd16e8
+
+#### Purpose:
+
+Record the verified construction and installation of the sequence-end-corrected matched interlaced I/P/B fixture.
+
+#### Outcome:
+
+Following the authorized entry-721 plan, `/tmp/coming_to_america_interlaced_12s_ipb_matched_end.m2v` is created from the exact entry-720 matched file by appending only the four bytes `00 00 01 b7`.  The original is 4,844,180 bytes with SHA-256 `0739de2a5568e21f3e68031b96b340bfda0e669f0a465322486f14788bc951b0`; the corrected copy is 4,844,184 bytes with SHA-256 `0a3a2ed8612aa292bf77eb61d920a780b4063868192bc54bda91f369e3a18221`, and bytewise prefix comparison proves every original byte unchanged.  The corrected tail is the required H.262 sequence-end code, FFprobe still enumerates exactly 361 720x480 TFF interlaced pictures at 30000/1001 comprising 25 I, 96 P and 240 B, and a complete FFmpeg software decode exits without an error.  Absolute FTP inventory first proves the new filename absent, then the fixture is uploaded as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_ipb_matched_end.m2v`; independent absolute-path readback reproduces all 4,844,184 bytes, the exact `0a3a2ed8` hash and the terminal sequence-end code.  Both prior comparison fixtures, source, RBF, Main, helper and configuration remain unchanged.
+
+#### Next Steps:
+
+With `Interlaced output` at `800x600 Diagnostic` and Weave selected, play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_ipb_matched_end.m2v` once and report whether it reaches a stable end, whether the large shiny-hat block corruption remains absent, and whether the tiny vertical lines or cadence stutter differ from the prior matched run.  This is an elementary video stream, so silence is expected.  Do not capture telemetry unless the user explicitly requests it.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 721 COMMIT Unreleased 8fd16e8 2026-08-29T19:19:47-07:00
 
 #### Coming From:
@@ -1268,34 +1297,5 @@ Preserve 83c138e seed 20 as the passed original-opening hardware baseline and re
 
 - [x] Built
 - [x] Passed
-
----
-
-## 682 COMMIT Unreleased 83c138e 2026-08-28T13:15:33-07:00
-
-#### Coming From:
-
-Unreleased 83c138e
-
-#### Purpose:
-
-Record the timing-passing seed-20 build and verified installation for original-audio hardware testing.
-
-#### Outcome:
-
-Source 83c138e changes only the fitter seed from 19 to 20. The complete source comparison proves all logic, clocks, timing constraints and simulation inputs unchanged; retained native, paired and focused evidence hashes reverify, both native analyzers reproduce qualification under the approved fixture-pinned terminal-cut exception, and all six qualification tests pass. One fresh Quartus 17.0.2 seed-20 compile completes in 745.3 seconds with zero errors and 205 warnings. Every timing category passes with zero TNS: minimum setup plus 0.269 ns in HDMI, hold plus 0.250 ns, recovery plus 3.968 ns, removal plus 0.572 ns and pulse width plus 0.925 ns. MPEG setup is plus 1.401 ns and video setup is plus 3.150 ns. Resources are 32,962 ALMs, 52,275 registers, 4,054,267 RAM bits, 514 of 553 M10Ks and 67 DSPs. All four eight-bit inverse-quantization weight boundaries and expected film CDC endpoints remain present. No warning is added versus seed 19, and the timing-failure warning is removed; the previously reviewed unused last_bound_reference_count warning is the only addition relative to the older passing baseline. The 4,369,004-byte RBF has SHA256 a403d224ee98d192994fccf8116d59eef26933351216c66a14d044748a86171c and is packaged locally as output_files/entry681/MediaPlayer_20260828.rbf. Using the existing installation authorization, FTP staging and final readback verify that exact binary at /media/fat/MediaPlayer_20260828.rbf on 10.10.0.30. The prior dated core is downloaded locally and preserved with matching hash at /media/fat/_MediaPlayer_Backups/MediaPlayer_20260828_2e834957fed5_20260828T131423.rbf. Before-and-after hashes prove Main, helper, original DVD clip, undated core and other existing core unchanged. No core reload or playback occurs, and hardware acceptance remains pending. The build stays at /home/vash/mister-builds/entry681/FPGA, with full local evidence under output_files/entry681 and committed reports under .ai/current_results/entry682_*; generated binaries are not committed.
-
-#### Next Steps:
-
-Have the user explicitly reload MediaPlayer_20260828.rbf and play games/MediaPlayer/dvd_opening_original.mpg with original audio in Weave mode over HDMI stereo. Observe startup and interior video and audio stutters, and retain the 2DID screen and helper log for collection. Review those hardware results before accepting the decoder improvements; software qualification and positive FPGA timing alone do not constitute hardware acceptance. Preserve the prior core backup and both failed seed builds for comparison.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
