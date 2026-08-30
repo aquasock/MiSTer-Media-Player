@@ -1,3 +1,32 @@
+## 749 COMMIT Unreleased 6196869 2026-08-29T20:50:07-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Authorize an exact offline production-path replay and bounded correction for the first P81 mouth-level corruption.
+
+#### Outcome:
+
+The user explicitly authorizes the entry-748 next step.  Use the byte-verified P81-ending authored I/P checkpoint, its clean consecutive P80 predecessor and independently decoded FFmpeg YUV 4:2:0 pixels.  First adapt or invoke the existing full-frame production-path harness to reproduce P81 without changing decode RTL, locate the first differing component and coordinate, and correlate it with the exact owning macroblock syntax and reconstruction arithmetic.  Only after a deterministic mismatch exists may source change, and any correction must remain bounded to its proven cause, add exact P80/P81 regression coverage, preserve the existing interlaced P/B field-motion and field-DCT regressions, and avoid Quartus until simulation is pixel-exact.  No source, FPGA, RBF, Main, helper, installed media or configuration change occurs in this authorization entry.
+
+#### Next Steps:
+
+Run the exact P81 production-path replay with a software oracle and machine-readable pixel report.  Establish the first mismatch before editing RTL, then inspect the associated prediction, residual, inverse-quantization, IDCT and saturation values.  Implement only the correction justified by that trace and run the exact P80/P81 gate plus the focused and broader decoder regressions.  Record source and test outcomes in new entries; do not start Quartus or request another MiSTer test in this cycle.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 748 COMMIT Unreleased 6196869 2026-08-29T20:47:36-07:00
 
 #### Coming From:
@@ -1143,34 +1172,5 @@ Stop at the rejected seed-20 build without retrying, reseeding or installing its
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 709 COMMIT Unreleased b9c2657 2026-08-29T06:09:31-07:00
-
-#### Coming From:
-
-Unreleased b9c2657
-
-#### Purpose:
-
-Install the exact timing-qualified interlaced decoder candidate and hardware-validate its known Big Lebowski opening regression over HDMI and Weave.
-
-#### Outcome:
-
-The exact 4,436,916-byte RBF from entry 708 is retrieved from the build PC, independently reproduces SHA-256 `f366c246854d177aa2ce4d359d370be840094ecdb09164b736e5d55f4ed3392e`, and is staged, read back, promoted and finally read back again as `/media/fat/MediaPlayer_20260829_b9c2657.rbf` without replacing any older core.  Following the explicit reload handoff, the user plays `games/MediaPlayer/dvd_opening_original.mpg`, the twelve-second stream-copy opening derived from `the_big_lebowski.iso`, with HDMI decoded stereo PCM and Weave, and reports that everything looks perfect and the sound is perfect too.  Two completed screenshots are byte-identical, show the final Universal frame and decode as checksum-valid schema-20 quiet snapshots.  Telemetry accepts the exact expected 10,334,169 clean video bytes, all 289 displayed pictures, 288 swaps, 128 reference plus 161 B pictures and all 25 timestamps, reaches sequence end and presentation completion, and reports zero error flags, audio underruns, PCM protocol faults, presentation faults, cache-bank overlap faults or validation failures.  The helper identifies AC-3 private substream `0x80`, emits 375 frames and 576,000 decoded stereo samples, reaches EOF and exits zero after all 12,818,397 transport bytes in 784 pipe reads, with every byte on the fast path and none on the slow path.  Readback reproduces the qualified RBF, accepted static helper and source movie hashes.  This accepts the exact `b9c2657` candidate for the known opening regression; because that fixture uses progressive frame pictures within an interlaced sequence, it does not alone qualify the newly admitted field-motion and field-DCT syntax.
-
-#### Next Steps:
-
-Keep the accepted RBF loaded and prepare one short stream-copy excerpt from the user's decrypted DVD samples that is confirmed to contain the newly admitted interlaced field-motion and field-DCT syntax.  Test that excerpt once in HDMI Weave, preserve the completed screen and helper log, and only then repeat it in Bob and native 480i if the first run is clean.  Retain 576i, field pictures, `repeat_first_field` expansion beyond the already admitted film cadence, DVD navigation, menus and direct ISO playback outside this checkpoint.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
