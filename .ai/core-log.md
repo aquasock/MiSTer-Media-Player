@@ -1,3 +1,32 @@
+## 715 COMMIT Unreleased 8fd16e8 2026-08-29T18:26:14-07:00
+
+#### Coming From:
+
+Unreleased 8fd16e8
+
+#### Purpose:
+
+Deploy the exact timing-passing interlaced decoder and HDMI scaler RBF to the MiSTer with verified backup and readback.
+
+#### Outcome:
+
+The user explicitly authorizes deployment of the entry-714 candidate without changing Main or the helper.  Read-only FTP inventory finds exactly one core at `/media/fat/MediaPlayer.rbf`; its 4,200,652 bytes have SHA-256 `98c73c1b23499e5461fa789b3b77fbf59d798e957b9f7e9357bf6d932009a615`.  The candidate re-verifies on GUNSMOKE as the exact 4,471,792-byte output of source `8fd16e8`, SHA-256 `677f2e11df6104c8409abcd541df81f1b2d178e6a249038b16afdf5e0282ac7c`.  Preserve the current core under `/media/fat/_MediaPlayer_Backups`, verify its remote readback hash, upload the candidate under a temporary staging name, verify that readback, then promote it to the sole `/media/fat/MediaPlayer.rbf` and verify the final readback.  Do not alter, delete or rename Main, the helper, media files or any other core.
+
+#### Next Steps:
+
+Complete the staged FTP deployment with all three hashes matching their preflight values, leave only the promoted `MediaPlayer.rbf` in the active root, and report that a core reload is required.  After the user reloads, perform one user-controlled HDMI playback check of the known interlaced DVD sample with audio; collect telemetry only after the user reports the screen and sound result.  Do not rebuild, reseed or change source during hardware validation.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 714 COMMIT Unreleased 8fd16e8 2026-08-29T18:00:21-07:00
 
 #### Coming From:
@@ -1263,37 +1292,6 @@ Wait for explicit approval before changing the qualification boundary for the on
 #### Files Modified:
 
 - tools/streams/tb_h262_film_reorder_timestamp.sv
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 675 COMMIT Unreleased e9041b2 2026-08-28T04:58:36-07:00
-
-#### Coming From:
-
-Unreleased 18d9189
-
-#### Purpose:
-
-Complete the approved third-bank reference ownership work across a closed B-run drain.
-
-#### Outcome:
-
-Implementation e9041b2 adds the guarded drain transaction and I/P/B/end ownership tests; focused validation is starting. The 18d9189 full-opening comparisons remain unchanged while running. Both retain every observed picture and descriptor, and ideal memory has no cadence mismatch so far, but contended memory exposes coded B115-to-B116 taking four fields instead of two. B116 completes 4,845 decoder clocks after its required selection boundary, while the ideal case completes 18,194 clocks before it. Neither B transaction has presentation hold; the preceding P112 was held for 2,699,879 clocks while a completed B run still presented its scratch and future frames. Refine the already approved I/P/B overlap ownership without adding physical banks: once all old B prediction work is complete, allow the next ordinary reference into a bank distinct from the retained future, primary pending and actual displayed ordinary frame, while retaining its completion in the existing secondary slot. Preserve display protection until scratch presentation releases the old bank, block any further reference payload at full capacity, and retain a following B classification until the old future retires. New I/P/B/end transition checks must cover the retained three-bank identities and ordered resume. No arithmetic, clock, constraint, seed, Main, helper or device change is planned, and no FPGA build has started.
-
-#### Next Steps:
-
-Publish and exercise the drain refinement with focused timestamp, scheduler, native and mixed controls. Let the fixed-source 18d9189 runs finish as comparison evidence and preserve their numerical fingerprints before pulling the build-PC checkout. Require replacement complete ideal and contended native traces to satisfy the unchanged strict cadence gate and repeat paired numerical qualification on the final source before the single clean seed-18 FPGA build. If those gates or the build do not pass, do not install or retry seeds; retain the evidence and reevaluate any further change against the approved boundary.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
-- tools/streams/tb_h262_film_reorder_timestamp.sv
-- tools/streams/run_film_presentation.sh
 
 #### Status:
 
