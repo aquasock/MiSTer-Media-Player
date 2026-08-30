@@ -1,3 +1,32 @@
+## 746 COMMIT Unreleased 6196869 2026-08-29T20:45:04-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Complete the user's requested consecutive P80, P81, P82 and P83 terminal-frame comparison set.
+
+#### Outcome:
+
+The user explicitly requests comparison of P80, P81, P82 and P83.  P80 and P82 were already installed and independently verified.  Using unchanged source `6196869` and the exact original authored stream, generate the two missing endpoints.  P81 ends on byte-identical zero-based source P81, removes 38 complete B units and preserves 7 I plus 37 P units unchanged; its 942,600 bytes have SHA-256 `37fa9030c1d209e7c13721b6f4a1dbf28b793f8aebc3d163fc268c824cd417a0`.  P83 ends on byte-identical source P83, removes the same 38 B units and preserves 7 I plus 39 P units unchanged; its 1,024,516 bytes have SHA-256 `fe97fed338493e668e4de2553322af25f991ca08067823fd2bd9420127da7b00`.  Independent FFprobe enumeration confirms respectively 44 and 46 720x480 pictures at 30000/1001 with no B picture; both end with the required single `00 00 01 b7` sequence-end code and complete full FFmpeg software decode without error.  Absolute FTP inventory proves both new names absent; installation as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p81_checkpoint.m2v` and `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p83_checkpoint.m2v`, followed by independent absolute-path FTP readback, reproduces each exact byte count, SHA-256 and terminal sequence end.  The MiSTer now holds the complete verified consecutive P80-through-P83 comparison set.  No source, FPGA, RBF, Main, helper, existing media or configuration changes.
+
+#### Next Steps:
+
+In `800x600 Diagnostic` with Weave selected, play the four checkpoints in exact order P80, P81, P82 and P83, inspecting each stable terminal frame for the first faint strip or flicker.  Report each one as clean or affected.  This direct consecutive comparison identifies the first corrupted authored P picture and the next-frame propagation without inference from motion during a longer run.  Do not capture telemetry unless the user leaves a newly identified boundary frame displayed, and do not change or rebuild the FPGA.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 745 COMMIT Unreleased 6196869 2026-08-29T20:43:05-07:00
 
 #### Coming From:
@@ -1179,34 +1208,5 @@ Pull exact published source `d89c02b` into a fresh isolated build-PC checkout, r
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 706 COMMIT Unreleased 736f64f 2026-08-29T03:55:11-07:00
-
-#### Coming From:
-
-Unreleased 736f64f
-
-#### Purpose:
-
-Record hardware acceptance of standalone MP3 playback over decoded-PCM S/PDIF.
-
-#### Outcome:
-
-After identifying that the first attempted capture belonged to an accidental replay of the DVD opening, the user runs the intended `entry697_file_example_WAV_1MG_192k.mp3` test with the same loaded `MediaPlayer_20260829.rbf` and reports that everything passes and the audio sounds great.  The corrected helper log identifies the exact MP3 source and `audio output spdif (decoded PCM; IEC 61937 for AC-3/DTS)`, emits zero video bytes, zero timestamps and 229 decoded audio frames containing 263,808 stereo samples, reaches EOF and exits zero.  Main submits all 1,137,676 transport bytes across 70 pipe reads, with every byte on the fast path and none on the slow path.  The standalone-audio run leaves the preceding video telemetry image resident, so that stale decoder snapshot is not treated as MP3 evidence; the source-specific helper completion and the user's physical listening result accept MP3 decoded PCM over S/PDIF.  No source, FPGA image, helper, Main or MiSTer configuration changed during capture.
-
-#### Next Steps:
-
-Per the user's direction, stop consumer-audio hardware testing here and return to DVD video work.  Add and fixture-test inter-macroblock field DCT before opening the P, B and frontend production admission gates, preserving the fit-qualified RBF and accepted helper unchanged until the video simulation gates justify another build.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
