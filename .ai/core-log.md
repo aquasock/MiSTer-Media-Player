@@ -1,3 +1,34 @@
+## 716 COMMIT Unreleased 8fd16e8 2026-08-29T18:37:35-07:00
+
+#### Coming From:
+
+Unreleased 8fd16e8
+
+#### Purpose:
+
+Hardware-validate the exact timing-passing RBF's known DVD-opening regression over both HDMI and S/PDIF audio.
+
+#### Outcome:
+
+After reloading the entry-715 RBF, the user plays `/media/fat/games/MediaPlayer/dvd_opening_original.mpg` and reports working HDMI audio.  The initial report that S/PDIF does not work is withdrawn when the user finds its cable unplugged; after connecting the cable and replaying, the user reports that S/PDIF works perfectly too.  Two agent-triggered screenshots of the completed S/PDIF run use absolute `/dev/MiSTer_cmd` and `/media/fat/screenshots/cadence_probe.png` paths, are byte-identical at 316,381 bytes and SHA-256 `f9a627cc2af55b86b670dfe4fc6ca5240a81400ce7c5ca8c76075cdd3e0832ff`, show the expected final Universal frame, and decode as matching checksum-valid schema-20 quiet snapshots.  Telemetry accepts the exact expected 10,334,169 clean video bytes, all 289 displayed pictures, 288 swaps, 128 reference plus 161 B pictures and all 25 timestamps, reaches sequence end and presentation completion, and reports zero error flags, audio underruns, PCM protocol faults, presentation faults, cache-bank overlap faults, transport-block intervals or timestamp-delay conflicts.  Legacy observational counters remain visible at 287 deadline records, 145 outliers and 40 timestamp-advance conflicts; as in the prior accepted opening captures, these are not the functional acceptance gate and do not negate the complete, error-free run.  The helper independently identifies S/PDIF output with AC-3 private substream `0x80` using IEC 61937, emits 375 frames and 576,000 samples, reaches EOF and exits zero after all 12,818,397 transport bytes in 783 pipe reads, with every byte on the fast path and none on the slow path.  Absolute FTP readback reproduces the installed 4,471,792-byte entry-714 RBF hash `677f2e11df6104c8409abcd541df81f1b2d178e6a249038b16afdf5e0282ac7c`, the accepted static helper hash and the source movie hash.  This accepts the exact `8fd16e8` candidate for the bounded known opening over both HDMI and S/PDIF; because this fixture uses progressive frame pictures within an interlaced sequence, it does not independently qualify the newly admitted field-motion and field-DCT syntax.  No source, installed file, playback mode or core configuration is changed during capture.
+
+#### Next Steps:
+
+Do not repeat the known opening solely to reconfirm HDMI or S/PDIF audio.  Preserve the verified deployed RBF and rollback artifact, and resume the separate DVD-video compatibility roadmap with an excerpt that actually exercises the remaining target interlaced syntax or direct VOB path.  Keep 576i outside scope and make no rebuild, reseed or FPGA change unless a distinct video defect requires it.
+
+#### Files Modified:
+
+- .ai/current_results/entry716_hardware_acceptance.json
+- .ai/current_results/entry716_helper_summary.txt
+- .ai/current_results/entry716_spdif_terminal.png
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 715 COMMIT Unreleased 8fd16e8 2026-08-29T18:26:14-07:00
 
 #### Coming From:
@@ -1264,35 +1295,6 @@ Publish the approved qualification change and its exact final source hash, verif
 - tools/streams/analyze_original_dvd_timing.py
 - tools/streams/test_original_dvd_timing.py
 - docs/testing_original_dvd_opening.md
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 676 COMMIT Unreleased e876bf3 2026-08-28T05:22:54-07:00
-
-#### Coming From:
-
-Unreleased e9041b2
-
-#### Purpose:
-
-Record complete drain-overlap qualification and the verified terminal-cut exception requiring approval before a build.
-
-#### Outcome:
-
-Production e9041b2 and final test source e876bf3 complete both ideal and contended native opening runs with all 289 pictures once in display order, 288 swaps, all 25 associated timestamps, correct complete descriptors, clear cache/phase/overlap flags and zero interior cadence mismatches. The formerly late B116 now completes 101,729 decoder clocks before its selection boundary in the contended case. Focused I/P/B/end drain ownership, earlier completion and timestamp cases, broad scheduler, native integration and mixed-raster controls pass. The film fixture is corrected to assert reference completion when scratch is displayed, matching the production top-level wiring; the prior admission assertion now requires distinct future, primary and decode identities instead of forbidding the newly bounded transaction. Paired reconstruction passes all 149,817,600 samples per case with unchanged source fingerprint 3548c9a1f2489b0ba37c77d27367e0143c8434598667a06866126434317429e8 and pixel CSVs identical to entry 665, preserving isolated maximum one, real-reference maximum five, 102 old fixed-two exceedances and zero measured propagation-bound violations. The unchanged strict cadence gate still rejects both runs because the final P285-to-I288 transition takes four fields instead of three. An exact-prefix comparison against the source VOB proves the 12-second cut stops after open-GOP I288 with temporal reference two and omits following coded B289 and B290, which belong before that I in display order. Those omitted pictures carry five authored fields; removing them creates the only field-parity discontinuity in the fixture. I288 is already decoded well before the boundary and waits one additional physical field to preserve its bottom-first descriptor. H.262 clauses 6.3.10 and 7.12 are rechecked against the existing official controlled edition; this hold is a display recovery for the edited cut, not a general standard allowance. The user has been asked to approve only that verified one-field terminal exception while retaining every other gate, and has not yet responded. No exception is applied, no Quartus build has started and no MiSTer write occurs. Two read-only FTP attempts to 10.10.0.30 fail with no route to host. Detailed evidence and source-check scripts are retained under .ai/current_results/entry676_* and output_files/entry675; all test processes have completed on the build PC.
-
-#### Next Steps:
-
-Wait for explicit approval before changing the qualification boundary for the one-field terminal-cut adjustment. Preserve strict raw analysis as failing and keep this verified fixture exception separate from actual deadline misses; do not waive any interior gap, missing picture, metadata, timestamp, cache or numerical failure. If approved, encode and test a narrow reproducible exception, publish the exact final build source, then perform the single clean seed-18 Quartus build with timing, resource and warning audits. Prepared build scripts are under /home/vash/mister-builds/entry675 but have not run. Pause on build failure without seed retries. Install only after qualification and timing pass and the MiSTer is reachable, preserving old cores with FTP readback verification, and leave original-audio replay and hardware acceptance to the user. If the exception is declined, obtain an approved complete-GOP fixture boundary before proceeding.
-
-#### Files Modified:
-
-- tools/streams/tb_h262_film_reorder_timestamp.sv
 
 #### Status:
 

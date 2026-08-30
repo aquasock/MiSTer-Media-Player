@@ -1,0 +1,82 @@
+{
+  "captured": "2026-08-29T18:37:35-07:00",
+  "host": "10.10.0.30",
+  "source_commit": "8fd16e8df61f0dca8a7373f035e663c84b49f1a9",
+  "user_report": {
+    "hdmi": "dvd_opening_original played with working HDMI audio",
+    "spdif_initial_observation": "No output while the S/PDIF cable was unplugged",
+    "spdif_corrected_observation": "S/PDIF works perfectly after connecting the cable"
+  },
+  "session": {
+    "file": "/media/fat/games/MediaPlayer/dvd_opening_original.mpg",
+    "audio_output": "S/PDIF AC-3 IEC 61937 passthrough",
+    "playback_user_controlled": true
+  },
+  "telemetry": {
+    "schema_version": 20,
+    "checksum": 4022895368,
+    "snapshot_reason": "quiet",
+    "accepted_bytes": 10334169,
+    "associated_timestamps": 25,
+    "display_pictures": 289,
+    "display_swaps": 288,
+    "reference_pictures": 128,
+    "b_pictures": 161,
+    "sequence_end_seen": true,
+    "presentation_complete": true,
+    "session_quiet": true,
+    "error_flags": 0,
+    "audio_underrun": false,
+    "audio_underrun_count": 0,
+    "pcm_protocol_error": false,
+    "presentation_error": false,
+    "cache_bank_overlap_error": false,
+    "transport_block_count": 0,
+    "transport_block_longest_cycles": 0,
+    "deadline_gap_count": 287,
+    "gap_outlier_count": 145,
+    "timestamp_advance_conflicts": 40,
+    "timestamp_delay_conflicts": 0
+  },
+  "helper": {
+    "video_bytes": 10334393,
+    "picture_timestamps": 25,
+    "audio_frames": 375,
+    "audio_samples": 576000,
+    "submitted_transport_bytes": 12818397,
+    "pipe_reads": 783,
+    "fast_bytes": 12818397,
+    "slow_bytes": 0,
+    "finish_reason": "eof",
+    "exit_code": 0
+  },
+  "files": {
+    "/media/fat/MediaPlayer_20260829_b9c2657.rbf": {
+      "bytes": 4471792,
+      "sha256": "677f2e11df6104c8409abcd541df81f1b2d178e6a249038b16afdf5e0282ac7c"
+    },
+    "/media/fat/linux/MediaPlayer_Helper": {
+      "bytes": 629056,
+      "sha256": "02d1df98c62ee00169585db990b6bd48c3769eca20c3e1d594f2318c362eb00f"
+    },
+    "/media/fat/games/MediaPlayer/dvd_opening_original.mpg": {
+      "bytes": 11145233,
+      "sha256": "218d3a8eab32efceb6263d884be1b589b75e598ae25eeb465d14e4b430dfdc21"
+    },
+    "/media/fat/screenshots/cadence_probe.png": {
+      "bytes": 316381,
+      "sha256": "f9a627cc2af55b86b670dfe4fc6ca5240a81400ce7c5ca8c76075cdd3e0832ff",
+      "captures_identical": true,
+      "complete_png_verified": true
+    },
+    "/tmp/MediaPlayer_ARM.log": {
+      "bytes": 373886,
+      "sha256": "4a6e8292be48eee67dbfd1365600032643f04a8956ac40c5c630231dd1ec5b55"
+    }
+  },
+  "local_evidence": "output_files/entry716/capture",
+  "device_path_rule": "All FTP access used absolute remote paths.",
+  "production_changed": false,
+  "playback_or_mode_changed_by_agent": false,
+  "scope": "Known Big Lebowski opening regression on the exact timing-passing 8fd16e8 RBF; the fixture does not independently exercise the newly admitted field-motion and field-DCT syntax."
+}
