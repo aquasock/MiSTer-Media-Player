@@ -1,3 +1,32 @@
+## 741 COMMIT Unreleased 6196869 2026-08-29T20:33:13-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Accept corrupt P91 and P97 hardware results, preserve the held P91 evidence and choose the next exact GOP-boundary checkpoints.
+
+#### Outcome:
+
+The user reports that visible corruption begins in the middle of the P91 screen and that P97 develops more distortion later, then explicitly leaves P91 displayed for capture.  The 382,659-byte screenshot `/tmp/entry741_p91_checkpoint_corrupt.png`, SHA-256 `ed2834357328cbccf311af3825346e2b733c49ff8cd6d13b6767d4579ffa38df`, visibly records the central horizontal corrupted region across the otherwise recognizable shiny-hat scene.  Its checksum-valid schema-20 snapshot accepts all 1,179,288 bytes, displays all 50 retained reference pictures across 49 swaps, ends on P temporal reference 5, sees sequence end and presentation completion, reaches quiet state and drains the scheduler.  The 2.0250-second presentation reports zero error flags, presentation faults, cache overlap faults, deadline gaps, cadence outliers, transport blocks or timestamp conflicts.  Thus the corruption is reconstructed pixel content despite an internally clean lifecycle.  Exact coded order around the boundary is P80 through P85, B86 and B87, I88, B89 and B90, then corrupt P91.  P91 is therefore the first retained P after the new I88 reference; P85 and I88 are the highest-value next endpoints for separating corruption inherited before the GOP reset from corruption introduced by that I reference or its first dependent P.  No source, FPGA, RBF, Main, helper, installed media or configuration changes during capture.
+
+#### Next Steps:
+
+Using unchanged source `6196869`, generate byte-exact I/P checkpoints ending separately at zero-based coded P85 and I88.  Preserve every retained unit, remove only complete B units, append one terminal sequence-end code, prove exact terminal-picture identity and clean full software decode, then install under distinct absolute MiSTer paths with exact FTP readback.  The user should play P85 first and I88 second in `800x600 Diagnostic` with Weave.  If both are clean while P91 is corrupt, the onset is exactly the first P dependent on clean I88; if I88 is already corrupt, investigate the new intra reference.  Do not change or rebuild the FPGA.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 740 COMMIT Unreleased 6196869 2026-08-29T20:30:00-07:00
 
 #### Coming From:
@@ -1178,42 +1207,6 @@ None.
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 701 COMMIT Unreleased 736f64f 2026-08-29T02:45:25-07:00
-
-#### Coming From:
-
-Unreleased c2097e3
-
-#### Purpose:
-
-Recover the near-complete interlaced P and B field-prediction work by removing replicated fetch storage and parallel footprint logic while preserving accepted consumer audio and the pending S/PDIF correction.
-
-#### Outcome:
-
-The failed fitter run remains useful evidence of unacceptable structural cost but is not treated as an exact qualification of `784ae0b`, because mapping began before that final source commit existed and the shared checkout later advanced.  Published source `736f64f` retains the parser and prediction arithmetic repairs while reversing both expensive implementation choices.  Each existing B fetcher again retains at most two rectangles; a bidirectional field block fetches its forward parity pair through the current instance, then reuses the otherwise idle prefetch instance for the backward pair after the shared DDR port is released.  Lookup selects the physical direction bank while each fetcher's phase index carries only destination parity.  The field selector is registered before one pair of base-address, span and bounds calculations, so four parallel footprint cones become one serialized pair.  Two races exposed by this reuse are corrected explicitly: a lookup broadcast is suppressed on the same edge that a fetcher clears its old validity map, and a nonzero backward byte origin is refreshed during the protected alternate-start cycle if the forward pixel completed before that pair launched.  Production admission remains closed; `H262_TEST_FIELD_MOTION` opens only the P and B parser gates in the two deterministic scripts, and their byte conversion now uses standard `od`, `tr` and `fold` instead of requiring `xxd`.  Fresh isolated simulations compare 518,400 P-field samples and 1,036,800 B-fixture samples with zero mismatches, including both destination parities and the four independently selected B reference fields, while the unchanged progressive mixed-raster control checks 423,936 samples with zero mismatches above its established two-level tolerance and maximum delta two.  The native helper rebuild, WAV and FLAC matrices, all four short and faded 44.1 and 48 kHz Program Stream and MP3 profiles, and focused PCM/non-audio S/PDIF routing simulations pass without changing their source.  No Quartus result, RBF or installation is claimed yet.
-
-#### Next Steps:
-
-Pull exact published source `736f64f` into a new isolated checkout and perform one clean Quartus 17.0.2 flow plus the focused timing report, requiring a successful fit, positive timing and resource comparison against both the 32,355-ALM baseline and the failed near-final report.  Record that build in a new entry rather than appending to this settled source entry.  Do not reuse the stale shared build database, open production admission, begin field DCT or install any helper or RBF during this cycle.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
-- tools/streams/run_b_field_motion.sh
-- tools/streams/run_interlaced_field_motion.sh
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
