@@ -1,3 +1,32 @@
+## 766 COMMIT Unreleased ??? 2026-08-30T05:41:38-07:00
+
+#### Coming From:
+
+Unreleased 65e8af3
+
+#### Purpose:
+
+Correct the incomplete MiSTer Main file-selector support that prevents installed `.vob` media from appearing in the MediaPlayer menu.
+
+#### Outcome:
+
+The exact 313,542,656-byte qualification file is installed as `/media/fat/games/MediaPlayer/nara_mpd_d2_qualification_5min.vob` with byte-identical target readback and SHA-256 `a7eb4c2fff0a4e15bc4ad9b2b2a3b4cff63ec87d79a59e8ba99fef7b6193cc0b`.  The `.vob`-capable Main from source `65e8af3` is installed at `/media/fat/MiSTer` with byte-identical readback and SHA-256 `40e15ff2c89dc1580a0bcb746deeb8186ebfcc0ef1155f6ac9ce17cba8125d41`, while the replaced Main is independently preserved under `_MediaPlayer_Backups`.  The user's hardware gate reports that the menu cannot see the new VOB.  Static inspection identifies the exact omission: `mediaplayer_handles_file()` accepts `.vob` after selection, but the MediaPlayer-specific three-character extension vector passed into `SelectFile()` remains `M2VMPGMP3WAVFLC` and therefore filters VOB files before selection.  The generated media, helper, FPGA and Native 480i configuration are not implicated.
+
+#### Next Steps:
+
+Add only `VOB` to the existing MediaPlayer `SelectFile()` extension vector, rebuild pinned Main from the resulting exact commit on the build PC, and verify the ARM executable.  Preserve the currently installed `40e15ff2` Main before replacing it, require byte-identical target readback, reboot to activate the corrected Main, and first confirm that the exact qualification VOB is visible and launches before resuming the five-minute HDMI and S/PDIF playback gates.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 765 COMMIT Unreleased 65e8af3 2026-08-30T05:19:43-07:00
 
 #### Coming From:
@@ -1130,34 +1159,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 726 COMMIT Unreleased 23defaa 2026-08-29T19:45:40-07:00
-
-#### Coming From:
-
-Unreleased aef121f
-
-#### Purpose:
-
-Extend the deterministic picture-unit transformer and install a held byte-exact authored I-only diagnostic stream.
-
-#### Outcome:
-
-The user explicitly authorizes the entry-725 I-only isolation.  Source `23defaa` extends `tools/streams/strip_h262_b_pictures.py` without changing its default B-strip behavior: `--keep-types` selects I or I/P units, `--repeat-retained` accepts only a positive count, the original `strip_b_pictures` API remains, and output picture units are checked byte-for-byte against the selected source units in order.  Regenerating the entry-724 default produces the exact prior 4,045,136 bytes and `5f16247b` hash, proving backward compatibility; a zero repeat is rejected without creating output.  Applying `--keep-types I --repeat-retained 10` to the exact original authored stream removes all 115 P and 219 B units and repeats each of its 27 independent I-picture units ten times without altering any repeated coded-picture byte.  The resulting 12,658,036-byte stream has SHA-256 `3c28c3e9c388a929d661de5c344dc1569e6ea82c7c7efa05bd08c83d840dfdfd`; independent FFprobe enumeration finds exactly 270 720x480 TFF interlaced I pictures at 30000/1001 with no P, B or progressive picture, the tail retains exactly one `00 00 01 b7` sequence end, and a complete FFmpeg software decode exits without an error.  Its approximately nine-second all-I presentation averages 11.24 megabits per second, so cadence and error status remain observational boundaries.  Absolute FTP inventory proves the new filename absent, then installation as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_i_only_hold.m2v` and independent absolute-path readback reproduce all 12,658,036 bytes, the exact `3c28c3e9` hash and terminal sequence end.  Existing media, FPGA, Main, helper and configuration remain unchanged, and no Quartus build is needed.
-
-#### Next Steps:
-
-With `Interlaced output` at `800x600 Diagnostic` and Weave selected, play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_i_only_hold.m2v` once.  Each of the 27 distinct source I frames is held for about one third of a second; report whether any held frame shows large block corruption and whether playback reaches the end.  A clean visual result isolates P prediction or P residual reconstruction, while corruption implicates an authored I-picture or shared intra/quantization feature.  Minor cadence pressure is possible because the byte-exact all-I stream averages 11.24 megabits per second; do not conflate a stutter with block corruption, and do not capture telemetry unless the user explicitly requests it.
-
-#### Files Modified:
-
-- tools/streams/strip_h262_b_pictures.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
