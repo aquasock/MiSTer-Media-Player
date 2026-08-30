@@ -1,3 +1,32 @@
+## 721 COMMIT Unreleased 8fd16e8 2026-08-29T19:19:47-07:00
+
+#### Coming From:
+
+Unreleased 8fd16e8
+
+#### Purpose:
+
+Prepare and install a sequence-end-corrected copy of the matched interlaced I/P/B comparison fixture.
+
+#### Outcome:
+
+The user explicitly authorizes correcting the entry-720 generated fixture after its hardware capture shows no large block corruption but stalls two pictures short because FFmpeg omitted the terminal H.262 sequence-end code.  Preserve the existing matched and I/P-only fixtures unchanged; copy the exact matched I/P/B stream, append only `00 00 01 b7`, and install the result under a new absolute filename.  This test-media-only correction does not authorize source, RBF, Main, helper or configuration changes.
+
+#### Next Steps:
+
+Verify that the corrected local stream differs only by the four appended bytes, ends in the required sequence-end code, retains exactly 361 720x480 TFF interlaced pictures comprising 25 I, 96 P and 240 B, and decodes completely in software.  Upload it as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_ipb_matched_end.m2v` using an absolute FTP path, verify an independent absolute-path readback byte for byte, then have the user play that file once in `800x600 Diagnostic` with Weave and report whether it visibly reaches a stable end.  Do not capture telemetry unless the user explicitly requests it.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 720 COMMIT Unreleased 8fd16e8 2026-08-29T19:12:38-07:00
 
 #### Coming From:
@@ -1267,35 +1296,6 @@ Have the user explicitly reload MediaPlayer_20260828.rbf and play games/MediaPla
 #### Status:
 
 - [x] Built
-- [ ] Passed
-
----
-
-## 681 COMMIT Unreleased 83c138e 2026-08-28T12:58:58-07:00
-
-#### Coming From:
-
-Unreleased c124aa5
-
-#### Purpose:
-
-Perform one additional approved seed-only rebuild using seed 20.
-
-#### Outcome:
-
-The user explicitly authorizes one more reseed after seed 19 fails HDMI sync setup timing. Source 83c138e is published with the verified single seed-assignment change; the build has not yet started. Change only the seed assignment from 19 to 20 in MediaPlayer.qsf; preserve all logic, clocks, timing constraints, physical buffers, Main, helper and qualification rules. Verify the seed-only source difference and recheck the retained native, paired and focused qualification evidence, including the narrowly approved terminal-cut exception. Use a new clean build directory at /home/vash/mister-builds/entry681/FPGA, preserving both earlier failed builds. This authorization covers exactly one additional compile and no automatic retries.
-
-#### Next Steps:
-
-Publish the exact seed-20 source, pull it on the build PC, verify retained qualification and compile once from scratch. Require positive setup, hold, recovery, removal and pulse-width margins with zero TNS, and review warnings, resources and retained register and CDC boundaries. If all gates pass, use the existing installation authorization to preserve the old core and install the dated RBF with FTP readback verification, leaving loading and playback to the user. Otherwise retain the evidence and pause without installation or another seed.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [ ] Built
 - [ ] Passed
 
 ---
