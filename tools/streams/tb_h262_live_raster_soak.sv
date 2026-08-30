@@ -86,6 +86,21 @@ module tb_h262_live_raster_soak #(
     integer target_pixel_trace_limit=1024;
     integer target_pixel_trace_count=0;
     reg [1023:0] target_pixel_trace_path;
+    reg [7:0] target_trace_predicted_q=0;
+    reg signed [15:0] target_trace_residual_q=0;
+    reg [7:0] target_trace_reconstructed_q=0;
+    reg [10:0] target_trace_mbi_q=0;
+    reg [5:0] target_trace_col_q=0,target_trace_mrow_q=0;
+    reg [2:0] target_trace_blk_q=0;
+    reg [5:0] target_trace_ei_q=0;
+    reg target_trace_field_q=0,target_trace_field_dct_q=0;
+    reg target_trace_fsel0_q=0,target_trace_fsel1_q=0;
+    reg signed [12:0] target_trace_mvx0_q=0,target_trace_mvy0_q=0;
+    reg signed [12:0] target_trace_mvx1_q=0,target_trace_mvy1_q=0;
+    reg signed [13:0] target_trace_src_x_q=0,target_trace_src_y_q=0;
+    reg target_trace_residual_hit_q=0;
+    reg [8:0] target_trace_desc_slot_q=0;
+    reg [14:0] target_trace_desc_word_q=0;
     integer intra_samples=0,intra_mismatches=0,intra_max_delta=0;
     integer intra_index,intra_delta;
     wire i_recon_done,i_recon_start,i_recon_valid,i_iq_error,i_idct_error,i_recon_error,i_matrix_error;
@@ -702,6 +717,60 @@ module tb_h262_live_raster_soak #(
         end
     end
 
+    // The raster engine completes a pixel one clock before its registered
+    // writer output is visible.  Snapshot reconstruction state at completion
+    // so TARGET_PIXEL_TRACE describes the same pixel as pred_store_valid.
+    always @(posedge clk) begin
+        if(reset)begin
+            target_trace_predicted_q<=0;
+            target_trace_residual_q<=0;
+            target_trace_reconstructed_q<=0;
+            target_trace_mbi_q<=0;
+            target_trace_col_q<=0;
+            target_trace_mrow_q<=0;
+            target_trace_blk_q<=0;
+            target_trace_ei_q<=0;
+            target_trace_field_q<=0;
+            target_trace_field_dct_q<=0;
+            target_trace_fsel0_q<=0;
+            target_trace_fsel1_q<=0;
+            target_trace_mvx0_q<=0;
+            target_trace_mvy0_q<=0;
+            target_trace_mvx1_q<=0;
+            target_trace_mvy1_q<=0;
+            target_trace_src_x_q<=0;
+            target_trace_src_y_q<=0;
+            target_trace_residual_hit_q<=0;
+            target_trace_desc_slot_q<=0;
+            target_trace_desc_word_q<=0;
+        end else if(prediction.mixed_probe.pixel_completed)begin
+            target_trace_predicted_q<=prediction.mixed_probe.mb_intra ?
+                8'd0 : prediction.mixed_probe.lookup_predicted_current;
+            target_trace_residual_q<=prediction.mixed_probe.residual_pel_q;
+            target_trace_reconstructed_q<=prediction.mixed_probe.mb_intra ?
+                8'd0 :
+                prediction.mixed_probe.lookup_reconstructed_current;
+            target_trace_mbi_q<=prediction.mixed_probe.mbi;
+            target_trace_col_q<=prediction.mixed_probe.col;
+            target_trace_mrow_q<=prediction.mixed_probe.mrow;
+            target_trace_blk_q<=prediction.mixed_probe.blk;
+            target_trace_ei_q<=prediction.mixed_probe.ei;
+            target_trace_field_q<=prediction.mixed_probe.mb_field;
+            target_trace_field_dct_q<=prediction.mixed_probe.block_field_dct;
+            target_trace_fsel0_q<=prediction.mixed_probe.mb_fsel0;
+            target_trace_fsel1_q<=prediction.mixed_probe.mb_fsel1;
+            target_trace_mvx0_q<=prediction.mixed_probe.mb_mvx;
+            target_trace_mvy0_q<=prediction.mixed_probe.mb_mvy;
+            target_trace_mvx1_q<=prediction.mixed_probe.mb_mvx1;
+            target_trace_mvy1_q<=prediction.mixed_probe.mb_mvy1;
+            target_trace_src_x_q<=prediction.mixed_probe.src_base_x;
+            target_trace_src_y_q<=prediction.mixed_probe.src_base_y;
+            target_trace_residual_hit_q<=prediction.mixed_probe.residual_hit;
+            target_trace_desc_slot_q<=prediction.mixed_probe.exec_desc_slot;
+            target_trace_desc_word_q<=prediction.mixed_probe.desc_word;
+        end
+    end
+
     // Entry 272: simulation-only B block ownership boundaries. START names
     // either the current launch or its actual prefetched successor, FETCHED
     // tracks the selected consumer bank, and RETIRE is the writer persistence
@@ -1303,25 +1372,17 @@ module tb_h262_live_raster_soak #(
                     total_cycles,coded_picture,source_pixel_picture,
                     temporal_reference,pixel_component,pixel_x,pixel_y,
                     pred_store_value,pixel_oracle[pixel_index],pixel_delta,
-                    prediction.mixed_probe.mbi,prediction.mixed_probe.col,
-                    prediction.mixed_probe.mrow,prediction.mixed_probe.blk,
-                    prediction.mixed_probe.ei,
-                    prediction.mixed_probe.lookup_predicted_current,
-                    prediction.mixed_probe.residual_pel_q,
-                    prediction.mixed_probe.lookup_reconstructed_current,
-                    prediction.mixed_probe.mb_field,
-                    prediction.mixed_probe.block_field_dct,
-                    prediction.mixed_probe.mb_fsel0,
-                    prediction.mixed_probe.mb_fsel1,
-                    prediction.mixed_probe.mb_mvx,
-                    prediction.mixed_probe.mb_mvy,
-                    prediction.mixed_probe.mb_mvx1,
-                    prediction.mixed_probe.mb_mvy1,
-                    prediction.mixed_probe.src_base_x,
-                    prediction.mixed_probe.src_base_y,
-                    prediction.mixed_probe.residual_hit,
-                    prediction.mixed_probe.exec_desc_slot,
-                    prediction.mixed_probe.desc_word);
+                    target_trace_mbi_q,target_trace_col_q,
+                    target_trace_mrow_q,target_trace_blk_q,
+                    target_trace_ei_q,target_trace_predicted_q,
+                    target_trace_residual_q,target_trace_reconstructed_q,
+                    target_trace_field_q,target_trace_field_dct_q,
+                    target_trace_fsel0_q,target_trace_fsel1_q,
+                    target_trace_mvx0_q,target_trace_mvy0_q,
+                    target_trace_mvx1_q,target_trace_mvy1_q,
+                    target_trace_src_x_q,target_trace_src_y_q,
+                    target_trace_residual_hit_q,target_trace_desc_slot_q,
+                    target_trace_desc_word_q);
                 target_pixel_trace_count=target_pixel_trace_count+1;
                 $fflush(target_pixel_trace_fd);
             end
