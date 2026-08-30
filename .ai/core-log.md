@@ -1,3 +1,33 @@
+## 759 COMMIT Unreleased ??? 2026-08-30T03:36:32-07:00
+
+#### Coming From:
+
+Unreleased 4e54e9d
+
+#### Purpose:
+
+Admit legal progressive-film pictures using field DCT, simplify the product menu, remove the obsolete 800x600 diagnostic mode, and produce a timing-clean Quartus build.
+
+#### Outcome:
+
+The user approves the entry-757 production correction and requests the same build to expose only `Aspect Ratio` with `4:3` and `16:9`, `Deinterlacer Mode` with `Bob` and `Weave`, the existing audio-test choices, and `Audio Output` with `HDMI` and `S/PDIF`.  The user explicitly removes 800x600 from the product and confirms that normal playback is Native 480i only.  The planned source boundary removes the erroneous `frame_pred_frame_dct` prerequisite from progressive-film admission, maps the menu choices directly to their requested behavior, makes Native 480i independent of obsolete saved status bits, and hard-disables the removed timing-pattern controls.  The user also authorizes inspection of the full Quartus timing result and a narrowly scoped timing correction if required for closure.
+
+#### Next Steps:
+
+Implement the approved RTL changes, verify the exact Coming to America I/P prefix and focused historical video regressions in an isolated build-PC checkout, and statically verify the menu/status mappings.  Pull the resulting source commit on the build PC, perform a clean Quartus compilation and full timing analysis, inspect all reported clock domains and worst paths, and make only a functionally equivalent timing-specific correction if timing fails or lacks a usable margin.  Do not restore deleted diagnostic media or bulky regression artifacts to the production repository.  Install only a timing-passing RBF with the known-good rollback preserved, then request one five-minute Coming to America hardware run followed by the already-proven Big Lebowski control only if needed.
+
+#### Files Modified:
+
+- MediaPlayer.sv
+- rtl/mpeg2_new/mpeg2_h262_frontend.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 758 COMMIT Unreleased 4e54e9d 2026-08-30T03:31:07-07:00
 
 #### Coming From:
@@ -1123,35 +1153,6 @@ Prepare a corrected copy of the matched I/P/B fixture under a new absolute filen
 #### Files Modified:
 
 - /media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_ipb_matched.m2v
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 719 COMMIT Unreleased 8fd16e8 2026-08-29T19:06:13-07:00
-
-#### Coming From:
-
-Unreleased 8fd16e8
-
-#### Purpose:
-
-Prepare and install one interlaced I/P-only comparison fixture to localize the remaining real-content block corruption between P and B prediction.
-
-#### Outcome:
-
-The user explicitly authorizes preparation of the next test media after entry 718 proves that the exact software source is clean, all-I hardware playback is clean, and the same transient corruption survives Native 480i Weave, Native 480i Bob and 800x600 Diagnostic.  Exact 6,751,008-byte source `/home/vash/MiSTer-Media-Player/output_files/entry710/capture/coming_to_america_interlaced_12s.m2v`, SHA-256 `735b1cc8d542b310acf155e890954ba2751b11133c11a299d3e41fa2ae7e4795`, contains 361 TFF interlaced 720x480 frame pictures at 30000/1001, comprising 27 I, 115 P and 219 B pictures.  The first FFmpeg invocation rejects contradictory explicit-rate and passthrough-timing options before creating any output.  The corrected deterministic CFR invocation decodes and re-encodes the same complete passage as MPEG-2 4:2:0 TFF interlaced frame pictures with DVD-rate constraints and B pictures disabled.  The 5,955,244-byte result has SHA-256 `70fe8fd27ebecc67ee5276aa486b36cb9a40e61db06bc88cf037e34301e533a6`; independent FFprobe enumeration finds exactly 361 pictures, all interlaced and TFF, comprising 25 I and 336 P pictures with no B or progressive picture, and retains the coded 30000/1001 rate.  Project H.262 analysis confirms that the pictures keep `frame_pred_frame_dct` clear and therefore exercise the interlaced motion/DCT parsing under investigation.  A full software decode exits cleanly, and paired visual samples through the shiny-hat passage show the re-encode is clean and closely follows the source.  Absolute target inventory confirms only the original filename exists before installation.  The new fixture is uploaded as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_ip_only.m2v`; its independent absolute-path FTP readback reproduces all 5,955,244 bytes and the exact `70fe8fd2` hash, and final inventory shows the original and comparison files side by side.  The user plays the fixture in 800x600 Diagnostic with Weave and reports that it is substantially better: the large block distortion is completely absent.  A tiny cadence stutter and tiny vertically oriented miscolored lines remain, and the user notes that the narrow line artifact is visible in the prior screenshot evidence; neither is conflated with the eliminated macroblock corruption.  Removing B pictures while retaining 336 interlaced P pictures strongly localizes the large corruption away from the shared I/framebuffer path and toward B-picture prediction, but because re-encoding also changes GOP placement, vectors, residuals and quantization, a matched re-encoded I/P/B control is required before treating B presence alone as proven.  The original media, RBF, Main, helper, configuration and source code are untouched, and no new capture is collected for this user-reported comparison.
-
-#### Next Steps:
-
-Prepare a matched interlaced I/P/B re-encode of the same decoded passage using every entry-719 encoder option unchanged except restoring two B pictures between references.  Require the same 361-picture, 720x480, 30000/1001 TFF interlaced structure, both P and B pictures, clean software decode and clean shiny-hat reference frames, then install it under a separate absolute filename without replacing either existing comparison.  The next user test should replay that matched I/P/B file in 800x600 Diagnostic with Weave.  If the large blocks return against the otherwise matched encode, B-picture presence is isolated; if it remains clean, the original stream depends on a more specific motion-vector, DCT or GOP feature.  Test-media preparation and installation require a separate explicit user instruction; do not change source or build the FPGA in this entry.
-
-#### Files Modified:
-
-- /media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_ip_only.m2v
 
 #### Status:
 
