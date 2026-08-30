@@ -1,3 +1,32 @@
+## 769 COMMIT Unreleased ??? 2026-08-30T06:12:22-07:00
+
+#### Coming From:
+
+Unreleased 8623431
+
+#### Purpose:
+
+Pin fitter seed 19 in the source-controlled Quartus project without changing decoder capability or rebuilding the accepted FPGA artifact.
+
+#### Outcome:
+
+The user directs that decoder capability remain at the accepted boundary and explicitly requests correction of the repository QSF to the established fitter seed.  `MediaPlayer.qsf` currently contains one `SEED` assignment and still names seed 17, while the installed and hardware-accepted RBF was produced by overriding the fitter to seed 19 and passed complete timing.  The approved boundary changes only that assignment to 19 so a future clean build selects the proven seed by default.  This source-control correction does not modify or reconfigure the currently installed RBF, and no Quartus build, target installation, Main, helper, media or active two-title VOB test changes at this proposal boundary.
+
+#### Next Steps:
+
+Change the sole `MediaPlayer.qsf` fitter-seed assignment from 17 to 19, verify the diff contains no other project or decoder change, and commit the source boundary.  Do not run Quartus or replace the accepted installed seed-19 RBF now; a clean build and regression are required only when a new release artifact is intentionally produced from the updated project.
+
+#### Files Modified:
+
+- MediaPlayer.qsf
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 768 COMMIT Unreleased 8623431 2026-08-30T06:08:24-07:00
 
 #### Coming From:
@@ -1130,34 +1159,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 729 COMMIT Unreleased 6196869 2026-08-29T20:06:15-07:00
-
-#### Coming From:
-
-Unreleased 6196869
-
-#### Purpose:
-
-Accept the clean P66 terminal checkpoint and advance the bounded authored P-chain search to P69.
-
-#### Outcome:
-
-The user initially reports that the P66 checkpoint ends early, then confirms no visible block corruption.  The short playback is intentional rather than a failure: the fixture contains only the 29 retained I/P pictures required to reach P66, and the requested terminal capture proves all 273,704 bytes are accepted, all 29 pictures display across 28 swaps, final picture type is P with temporal reference 6, sequence end and presentation completion are true, the session is quiet and the scheduler is fully drained.  The measured presentation span is 0.9928 seconds at 28.202 pictures per second, with zero error flags, presentation faults, cache overlap faults, deadline gaps, cadence outliers, transport blocks or timestamp conflicts.  The 290,814-byte screenshot `/tmp/entry728_p66_checkpoint_completed.png`, SHA-256 `5db4847dbc17108c5ae1b0cfec86b01fabba4ebec3f6972fccd89be9e3504e96`, shows the intended dark fade-stage P66 terminal framebuffer without large macroblock corruption.  Because that final framebuffer remains onscreen after the sub-second decode, the short live passage does not limit its inspection.  The first corrupt authored P frame is therefore after P66 within the initial consecutive P chain.  No source, installed media, RBF, Main, helper or configuration changes during capture.
-
-#### Next Steps:
-
-Use the existing source `6196869` checkpoint mode to generate a second byte-exact I/P prefix ending at zero-based coded P69, midway through the remaining P67 through P72 interval.  Preserve every retained I/P unit, remove only complete B units, append one terminal sequence-end code, verify exact P69 termination and clean software decode, then install under a new absolute filename with exact readback.  The next hardware test should inspect the stable terminal P69 framebuffer rather than the intentionally short live passage.  A corrupt P69 narrows onset to P67 through P69; a clean P69 narrows it to P70 through P72.  Test-media generation and installation require a separate explicit user instruction; do not change or rebuild the FPGA.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
