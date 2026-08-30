@@ -1,3 +1,32 @@
+## 733 COMMIT Unreleased 6196869 2026-08-29T20:13:51-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Move the next authored P checkpoint from P71 to the brighter P80 shiny-hat passage.
+
+#### Outcome:
+
+After clean P66 and P69 terminal checkpoints, the user says the observed large distortion likely occurred later in playback and asks to skip farther forward.  The request supersedes entry 732's proposed P71 checkpoint before any P71 media is generated or installed.  Static source order identifies I73 as the next independent clean reference followed by consecutive P74 through P84; P80 is the seventh P after that reset and lies in the brighter shiny-hat passage, making it a materially better visible checkpoint than continuing through the earlier dark fade one picture at a time.  Existing source, generated fixtures, FPGA, Main, helper and configuration remain unchanged.
+
+#### Next Steps:
+
+Use unchanged source `6196869` to generate and install a byte-exact I/P checkpoint ending at zero-based coded P80.  Preserve every retained I/P unit, remove only B units, append one terminal sequence-end code, verify exact P80 termination and clean software decode, and require absolute-path FTP readback equality.  The next hardware test should inspect the stable terminal P80 framebuffer for the large block distortion.  If P80 is corrupt, search backward within the P74 through P80 chain; if it is clean, move later in the bright passage.  Test-media generation and installation require a separate explicit user instruction; do not change or rebuild the FPGA.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 732 COMMIT Unreleased 6196869 2026-08-29T20:12:18-07:00
 
 #### Coming From:
@@ -1253,39 +1282,6 @@ Two instrumentation defects from entry 693 remain and should ride along with the
 #### Files Modified:
 
 - host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 693 COMMIT Unreleased 100072a 2026-08-28T21:13:29-07:00
-
-#### Coming From:
-
-Unreleased 9956c8e
-
-#### Purpose:
-
-Rebalance audio and video buffering within the existing memory budget and count the blocked intervals, in one build.
-
-#### Outcome:
-
-This entry is the approved plan for the cycle and its commit does not exist yet; it replaces an earlier measurement-only plan for the same number, which the user declined because the FPGA is timing sensitive and repeated builds and reseeds are themselves a risk. Entry 692 exonerated the helper and located the fault at the single gate on the shared transport byte path, where input_ready requires stream_ready, so a full clean video queue halts the byte path and every PCM record behind the held video byte halts with it. The current fit constrains the correction: RAM blocks stand at 512 of 553, ninety-three percent, with logic at seventy-four percent and memory bits at seventy-one, so RAM blocks and not logic are the binding resource. From the configured geometry the audio FIFO of 8,192 words by thirty-five bits occupies thirty-two M10K blocks at 256 words each, and the clean video queue of 65,536 words by eight bits occupies sixty-four blocks at 1,024 words each. Doubling the audio FIFO outright would add thirty-two blocks and reach ninety-eight percent, which is rejected as reckless on a sensitive design. This cycle instead trades one for the other at zero net cost, halving the clean video queue to 32,768 bytes to free thirty-two blocks and doubling the audio FIFO to 16,384 frames to spend them, leaving the block count unchanged. The trade is justified by rate rather than preference: buffering audio costs 1.68 megabits per second against 7.12 for video, so audio is roughly four times cheaper per unit of protection time, and surrendering thirty-seven milliseconds of video slack buys one hundred seventy milliseconds of audio, raising the audio budget from one hundred seventy to three hundred forty-one milliseconds. The same build adds free-running profiler counters for the longest continuous blocked interval, the number of blocked intervals and the minimum audio FIFO level, and replaces the first-error snapshot latch with a counted underrun record so one run reports every occurrence instead of only the first, with the screenshot decoder extended to match. This reverses the standing guidance against widening buffers, which was correct while the helper was suspect and would have masked a helper defect, but the helper is now exonerated by its own measurement, the requirement is genuinely buffering, and this is a rebalance rather than a net enlargement. The known risk is that a shorter video queue makes the extractor block sooner and more often, which is harmless only if audio now survives each block, and the new counters are what will show whether it did.
-
-#### Next Steps:
-
-The build compiled once with no reseed and closed timing: worst setup slack improved to 0.170 nanoseconds against the 0.126 baseline on the HDMI PLL domain, clk_mpeg2 gave up margin to 1.035 nanoseconds and every TNS is zero, with ALMs at 32,355 of 41,910 and RAM blocks at 517 of 553 rather than the predicted 512, so the trade cost five blocks instead of being free. The RBF installed with the accepted bitstream backed up and verified, and a core reload proved necessary before the FPGA ran it, which one capture initially missed because the file on the card had been updated while the running configuration had not; the schema version in the snapshot is the reliable check and should be read first in every future capture. The eighty-four second starvation did not recur. A startup underrun at approximately 1.7 seconds appeared instead and is corrected in entry 694, where the full hardware result is recorded. The decoder gate for schema 20 is fixed separately in `55f2595`, which also restores correct picture counts for this schema.
-
-#### Files Modified:
-
-- rtl/audio/audio_pcm_fifo.sv
-- rtl/audio/audio_pcm_output_adapter.sv
-- rtl/mpeg2_new/mpeg2_h262_clean_video_queue.sv
-- rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
-- tools/streams/decode_hardware_cadence.py
 
 #### Status:
 
