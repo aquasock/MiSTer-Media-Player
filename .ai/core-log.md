@@ -1,3 +1,32 @@
+## 757 COMMIT Unreleased 4e54e9d 2026-08-30T03:26:58-07:00
+
+#### Coming From:
+
+Unreleased 4e54e9d
+
+#### Purpose:
+
+Reproduce the Coming to America first-GOP failure offline, identify its exact decoder prerequisite, and propose the narrow production correction without changing the repository RTL or installed core.
+
+#### Outcome:
+
+The preserved 202,450,560-byte elementary video is cut only at authored picture boundaries and terminated with `sequence_end_code`: the exact first-I control is 71,636 bytes with SHA-256 `cb100a65df844a372376b30e4dcf0ef5b960fb1c4200300a35b6b0b4522e4914`, and the exact first-I/P reproducer is 91,436 bytes with SHA-256 `7530a3ce8a89ea29bf93188894a07c1e3f8af6958f4c48e87627b8c7f150b4a2`.  The unchanged RTL replay of the I/P prefix fails after exactly 73,774 accepted bytes, identical to hardware.  It has parsed all 45 macroblocks of P slice row 1 but enters the P raster with `reference_valid=0`, raising raster-engine source 9 and top-level phase-one source 2 before any P row or picture publishes.  This proves that neither dense slice syntax nor the P macroblock parser is the initiating defect.  The opening reference I picture has `progressive_sequence=0`, `progressive_frame=1`, `chroma_420_type=1` and `frame_pred_frame_dct=0`.  Although the existing I parser and raster already implement the resulting macroblock `dct_type`, `mpeg2_h262_frontend.sv` admits a progressive film I picture in an interlaced sequence only when `frame_pred_frame_dct=1`; consequently this legal reference I is skipped, and the following P picture exposes the missing reference.  This is consistent with project references H262-028, H262-032 and H262-033: an interlaced sequence may contain a progressive frame picture, `frame_pred_frame_dct=1` is a restriction to frame DCT/prediction rather than a validity requirement here, and 4:2:0 requires `chroma_420_type` to equal `progressive_frame`.  In an isolated build-PC worktree only, removing `frame_pred_frame_dct` from `phase1_native_film_i_frame` changes no parser, raster, prediction or presentation logic.  The same exact I/P prefix then accepts all 91,436 bytes, applies 1,565,007 cycles of decoder backpressure while the I reference completes, retires all 30 P rows, publishes two reference pictures, presents one swap and finishes with zero decoder, raster, writer or presentation errors.  The 2,248-byte baseline log `/tmp/entry757_baseline_first_ip.log` has SHA-256 `199716d784264291cd5ba707f90691e38a8e5e2dd421f060eaf7559e1281ca0a`; the 4,190-byte diagnostic-gate log `/tmp/entry757_gate_probe_first_ip.log` has SHA-256 `80a6390b02173d61bd1645726efa13b9595217d1a8d3d1cbb7ca1ac9b5841732`.  Production source, the installed RBF, helper, target files and target mode remain unchanged.
+
+#### Next Steps:
+
+After user approval, remove only the erroneous `frame_pred_frame_dct` conjunct from `phase1_native_film_i_frame`.  Add a deterministic, source-generated progressive-film field-DCT I/P regression that proves the I reference publishes before P-row execution, then run it alongside the existing progressive-film frame-DCT control, interlaced field-DCT, P/B field-motion plus field-DCT, cadence, reference-overlap and presentation regressions.  If those pass, commit the RTL and regression change, perform one clean Quartus build plus full timing analysis on the build PC, install the timing-passing RBF with rollback preserved, and hardware-test the unchanged Coming to America five-minute file followed by a Big Lebowski control.  Do not deploy the temporary diagnostic worktree or ask the user to replay either file before a timing-clean production build exists.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 756 COMMIT Unreleased 4e54e9d 2026-08-30T03:16:42-07:00
 
 #### Coming From:
@@ -1119,35 +1148,6 @@ The user plays `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s.m2
 #### Next Steps:
 
 Prepare an interlaced I/P-only version of the same Coming to America passage, preserving its 720x480, 30000/1001, TFF frame-picture structure while disabling B pictures, then install it as a separate test file without replacing the original.  The next user test should play that I/P-only file once in 800x600 Diagnostic with Weave and report whether the shiny-hat block corruption remains.  Corruption in I/P-only confines the defect to P prediction or reference use; a clean I/P-only result confines it to B-picture bidirectional prediction.  Do not substitute the existing progressive `test_ip_only.m2v`, because it does not exercise the interlaced path under investigation.  Test-media preparation and installation require a separate explicit user instruction; do not change source, build the FPGA or deploy anything in this entry.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 717 COMMIT Unreleased 8fd16e8 2026-08-29T18:41:30-07:00
-
-#### Coming From:
-
-Unreleased 8fd16e8
-
-#### Purpose:
-
-Record the streamlined hardware-test reporting procedure and identify the next single DVD-video validation.
-
-#### Outcome:
-
-The user directs that, going forward, hardware playback results require only an update to `core-log.md` followed by the next test instruction.  Do not collect, retain or commit screenshots, helper logs, telemetry dumps or duplicate acceptance artifacts unless the user specifically asks for them or a newly observed failure requires evidence before diagnosis.  The exact timing-passing `8fd16e8` RBF remains installed and has passed the bounded Big Lebowski opening over both HDMI and S/PDIF.  The highest-value next test is the existing `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s.m2v` fixture: it is the real 361-picture interlaced-frame stream that previously froze after 63 displayed pictures and directly drove the quantized I/P/B parsing and generation-safe presentation corrections now present in this RBF.
-
-#### Next Steps:
-
-With the current core still loaded, select HDMI audio and Weave, then play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s.m2v` once from beginning to end without changing modes during playback.  Report only whether the video reaches the end cleanly, freezes, or shows visible corruption; this elementary video stream contains no audio, so silence is expected.  After the report, update only `core-log.md` and provide the next single test.  Do not capture telemetry for a clean pass.
 
 #### Files Modified:
 
