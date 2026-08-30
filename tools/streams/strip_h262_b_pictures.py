@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Remove complete B-picture units from an H.262 elementary stream.
+"""Filter and optionally repeat H.262 elementary-stream picture units.
 
-All bytes outside B-picture units are copied verbatim.  A picture unit begins
-at picture_start_code and ends at the next picture, GOP, sequence-header, or
-sequence-end start code.  The tool is deliberately narrow: it requires at
-least one B picture, at least one retained I/P picture, and exactly one terminal
-sequence_end_code.
+The default behavior removes complete B-picture units and copies every other
+source byte verbatim.  ``--keep-types I`` can instead retain only I pictures,
+and ``--repeat-retained`` duplicates each retained picture unit without
+changing its bytes.  A picture unit begins at picture_start_code and ends at
+the next picture, GOP, sequence-header, or sequence-end start code.  The tool
+requires at least one removed picture, at least one retained picture, and
+exactly one terminal sequence_end_code.
 """
 from __future__ import annotations
 
@@ -73,38 +75,68 @@ def count_types(units: list[PictureUnit]) -> dict[str, int]:
     }
 
 
-def strip_b_pictures(data: bytes) -> tuple[bytes, list[PictureUnit]]:
+def transform_pictures(
+    data: bytes, keep_types: set[int], repeat_retained: int
+) -> tuple[bytes, list[PictureUnit]]:
     units = picture_units(data)
-    removed = [unit for unit in units if unit.coding_type == 3]
-    retained = [unit for unit in units if unit.coding_type != 3]
+    removed = [unit for unit in units if unit.coding_type not in keep_types]
+    retained = [unit for unit in units if unit.coding_type in keep_types]
     if not removed:
-        raise ValueError("input contains no B pictures")
+        raise ValueError("input contains no pictures outside the keep set")
     if not retained:
-        raise ValueError("input contains no I or P pictures")
+        raise ValueError("input contains no pictures in the keep set")
+    if repeat_retained < 1:
+        raise ValueError("repeat_retained must be positive")
 
     chunks: list[bytes] = []
     cursor = 0
-    for unit in removed:
+    for unit in units:
         chunks.append(data[cursor:unit.start])
+        if unit.coding_type in keep_types:
+            chunks.extend([unit.bytes_from(data)] * repeat_retained)
         cursor = unit.end
     chunks.append(data[cursor:])
     output = b"".join(chunks)
 
     output_units = picture_units(output)
-    source_retained_bytes = [unit.bytes_from(data) for unit in retained]
+    source_retained_bytes = [
+        unit.bytes_from(data)
+        for unit in retained
+        for _repeat in range(repeat_retained)
+    ]
     output_picture_bytes = [unit.bytes_from(output) for unit in output_units]
     if output_picture_bytes != source_retained_bytes:
         raise AssertionError("retained picture units changed during transformation")
-    if any(unit.coding_type == 3 for unit in output_units):
-        raise AssertionError("output still contains a B picture")
+    if any(unit.coding_type not in keep_types for unit in output_units):
+        raise AssertionError("output contains a picture outside the keep set")
     return output, units
+
+
+def strip_b_pictures(data: bytes) -> tuple[bytes, list[PictureUnit]]:
+    """Preserve the original entry-724 default transformation API."""
+    return transform_pictures(data, {1, 2}, 1)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument(
+        "--keep-types",
+        choices=("I", "IP"),
+        default="IP",
+        help="picture types to retain (default: IP)",
+    )
+    parser.add_argument(
+        "--repeat-retained",
+        type=int,
+        default=1,
+        metavar="COUNT",
+        help="repeat each retained picture unit COUNT times (default: 1)",
+    )
     args = parser.parse_args()
+    if args.repeat_retained < 1:
+        parser.error("--repeat-retained must be positive")
 
     source_path = args.input.resolve()
     output_path = args.output.resolve()
@@ -119,7 +151,17 @@ def main() -> int:
     if not source.endswith(START_PREFIX + bytes([SEQUENCE_END])):
         raise SystemExit("input sequence_end_code must be terminal")
 
-    output, source_units = strip_b_pictures(source)
+    keep_types = {
+        coding_type
+        for coding_type, name in PICTURE_NAMES.items()
+        if name in args.keep_types
+    }
+    try:
+        output, source_units = transform_pictures(
+            source, keep_types, args.repeat_retained
+        )
+    except ValueError as error:
+        raise SystemExit(str(error)) from None
     output_units = picture_units(output)
     if output.count(START_PREFIX + bytes([SEQUENCE_END])) != 1:
         raise AssertionError("output does not contain exactly one sequence_end_code")
@@ -137,6 +179,14 @@ def main() -> int:
         "output_sha256": hashlib.sha256(output).hexdigest(),
         "input_picture_types": count_types(source_units),
         "output_picture_types": count_types(output_units),
+        "keep_types": args.keep_types,
+        "repeat_retained": args.repeat_retained,
+        "retained_source_picture_types": count_types(
+            [unit for unit in source_units if unit.coding_type in keep_types]
+        ),
+        "removed_picture_types": count_types(
+            [unit for unit in source_units if unit.coding_type not in keep_types]
+        ),
         "removed_b_pictures": sum(unit.coding_type == 3 for unit in source_units),
         "retained_picture_units_byte_exact": True,
         "terminal_sequence_end": True,
