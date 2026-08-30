@@ -1,3 +1,32 @@
+## 764 COMMIT Unreleased cee1a9e 2026-08-30T05:14:01-07:00
+
+#### Coming From:
+
+Unreleased cee1a9e
+
+#### Purpose:
+
+Capture and accept the complete five-minute Blazing Saddles hardware run and begin exact NARA MPD-D2 qualification work.
+
+#### Outcome:
+
+The user completes `/media/fat/games/MediaPlayer/blazing_saddles_first_5min.mpg` on the installed timing-clean seed-19 RBF in Native 480i at `16:9` and reports that picture and audio remain perfect through EOF, completing the requested three-title five-minute commercial-DVD compatibility set.  The 614,629-byte scaled capture `/tmp/entry764_blazing_saddles_5min_pass.png`, SHA-256 `fe6dee37ca7ae821f24e6695a2c8d86a2ca5a41e35d14dee7ab56ae33e19c04e`, and the 391,623-byte native 720x480 capture `/tmp/entry764_blazing_saddles_5min_raw.png`, SHA-256 `b225eaf2a3b6a0e7f45f1d761fa2b331cf3d0746a6a31497d652cafee6753251`, visibly preserve the clean final scene.  All 64 schema-20 telemetry records have valid headers, row indices and parity, and checksum `dd0752bc` matches; the no-progress EOF snapshot accepts 224,180,164 clean-video bytes, records 2,400 reference pictures, 7,194 displayed pictures and 7,193 swaps, and reports zero aggregate hardware errors, zero transport blocks and zero audio FIFO underruns.  The 14,514,247-byte helper log `/tmp/entry764_blazing_saddles_5min_pass.log`, SHA-256 `35be1c1d31a76a28dd94d4573cd452eda4ee7013902584234e36bc7260cce144`, names the exact file, selects HDMI decoded stereo PCM, emits all 9,375 AC-3 frames and 14,400,000 PCM samples, reaches EOF, exits zero and submits all 286,285,586 transport bytes on the fast path.  The user authorizes the remaining adopted NARA MPD-D2 qualification steps; no source, RBF, helper, media or mode change occurs during this capture.
+
+#### Next Steps:
+
+Add deterministic media tooling that creates and strictly verifies a retained NARA MPD-D2 qualification VOB/Program Stream with MPEG-2 Main Profile/Main Level 720x480 constant-bit-rate 30000/1001 interlaced top-field-first video and two-channel 48 kHz 256 Kbps constant-bit-rate AC-3 from a documented 16-bit source.  Verify complete independent software decode and every machine-checkable profile property, retain exact hashes and provenance, install the resulting fixture with independent readback, and test it completely in Native 480i over HDMI decoded stereo and S/PDIF AC-3 passthrough.  Field pictures remain an explicit limitation and are outside this cycle.  After that hardware gate, pin fitter seed 19 in the QSF, perform the clean release build and timing analysis, and update stale release documentation.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 763 COMMIT Unreleased cee1a9e 2026-08-30T05:05:10-07:00
 
 #### Coming From:
@@ -1124,35 +1153,6 @@ Extend the deterministic transformer to create a byte-exact authored I-only diag
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 724 COMMIT Unreleased aef121f 2026-08-29T19:26:37-07:00
-
-#### Coming From:
-
-Unreleased 8fd16e8
-
-#### Purpose:
-
-Add a deterministic test-media tool and install a bit-exact B-stripped derivative of the original authored interlaced stream.
-
-#### Outcome:
-
-The user explicitly authorizes the entry-723 isolation test.  Source `aef121f` adds only `tools/streams/strip_h262_b_pictures.py`, a narrowly scoped deterministic H.262 elementary-stream transformer that identifies complete picture units from picture, GOP, sequence-header and sequence-end boundaries, removes only units whose picture coding type is B, verifies retained picture-unit identity internally, and rejects B-free, malformed, non-terminal or multiply terminated inputs.  Applied to the exact 6,751,008-byte original authored source with SHA-256 `735b1cc8d542b310acf155e890954ba2751b11133c11a299d3e41fa2ae7e4795`, it creates a 4,045,136-byte derivative with SHA-256 `5f16247b130198999581b153bd53d174336476839baa7b2a3c8d59df3e8b444f`.  The tool proves all retained picture units byte-identical, preserves all 27 I and 115 P pictures, removes all 219 B pictures, and retains exactly one terminal `00 00 01 b7` sequence-end code.  Independent FFprobe enumeration confirms exactly 142 720x480 TFF interlaced pictures at 30000/1001 with no B or progressive picture, and a complete FFmpeg software decode exits without an error.  Absolute FTP inventory proves the new filename absent before upload; installation as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_only.m2v` and independent absolute-path readback reproduce all 4,045,136 bytes, the exact `5f16247b` hash and terminal sequence end.  The original and re-encoded fixtures, FPGA, Main, helper and configuration remain unchanged, and no Quartus build is needed for this test-media tool.
-
-#### Next Steps:
-
-With `Interlaced output` at `800x600 Diagnostic` and Weave selected, play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_only.m2v` once and report whether any large shiny-hat corruption appears.  The file intentionally runs for only about 4.7 seconds and motion will be jerky because all B pictures are absent; neither behavior is a defect.  Large corruption in this byte-exact retained path implicates original authored P/reference reconstruction, while a clean result isolates the original B-picture units.  Do not capture telemetry unless the user explicitly requests it.
-
-#### Files Modified:
-
-- tools/streams/strip_h262_b_pictures.py
 
 #### Status:
 
