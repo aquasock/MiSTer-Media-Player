@@ -1,3 +1,32 @@
+## 761 COMMIT Unreleased cee1a9e 2026-08-30T04:52:39-07:00
+
+#### Coming From:
+
+Unreleased cee1a9e
+
+#### Purpose:
+
+Capture and accept the complete five-minute Coming to America hardware run on the timing-clean seed-19 build.
+
+#### Outcome:
+
+The user completes `/media/fat/games/MediaPlayer/coming_to_america_first_5min.mpg` on the installed 4,461,996-byte seed-19 RBF with SHA-256 `162c788d2fa121f340ab6649ef94b25e97f31a44ee552928bb89e32b147059a6` in Native 480i, selects `16:9`, and reports that the menu, video, cadence and audio are perfect, including both HDMI and S/PDIF output.  The 760,234-byte scaled capture `/tmp/entry761_coming_to_america_5min_pass.png`, SHA-256 `3264087262cba98c011e63e6948f9e43bb6d74c88b583977feb916025b1e9b26`, and the 481,208-byte native 720x480 capture `/tmp/entry761_coming_to_america_5min_raw.png`, SHA-256 `c2811cbe6df8b1c1468724ddf1f4ac57ee401547cda8e8e278496c1cc167f312`, visibly preserve a clean final frame at the requested aspect ratio.  Every header, row index and parity bit in the raw capture's 64-record schema-20 telemetry is valid, and its XOR checksum `a5aeeea2` matches.  The end-of-run no-progress snapshot accepts 202,450,560 clean-video bytes, records 2,539 reference pictures, 7,193 displayed pictures and 7,192 swaps, and has zero aggregate hardware error flags, zero transport blocks and zero audio FIFO underruns.  The matching 8,501,618-byte helper log `/tmp/entry761_coming_to_america_5min_pass.log`, SHA-256 `d4c3693bd3392938dbd25931deefcb907c90ce0afcba36ad42a97ef2977d1ce1`, names the exact five-minute file, selects HDMI decoded stereo PCM and AC-3 private substream `0x80`, emits all 9,375 audio frames and 14,400,000 PCM samples, reaches EOF, exits zero, and submits all 264,556,180 transport bytes on the fast path.  This hardware result accepts the progressive-film field-DCT admission correction, the simplified production menu, 16:9 presentation, HDMI audio, S/PDIF audio and the timing-clean seed-19 artifact without any source, RBF, helper, media or mode change during the test or capture.
+
+#### Next Steps:
+
+Treat source `cee1a9e` and the installed seed-19 `162c788d` RBF as the accepted Coming to America compatibility boundary, preserve the verified `bc79d56a` rollback, and do not reopen the corrected progressive-film admission path based on this title.  Before a future clean build intended for release reproducibility, explicitly decide whether to pin fitter seed 19 in `MediaPlayer.qsf` and rebuild; otherwise await the user's next compatibility target or release instruction.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 760 COMMIT Unreleased cee1a9e 2026-08-30T04:40:08-07:00
 
 #### Coming From:
@@ -1120,35 +1149,6 @@ Following the authorized entry-721 plan, `/tmp/coming_to_america_interlaced_12s_
 #### Next Steps:
 
 With `Interlaced output` at `800x600 Diagnostic` and Weave selected, play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_ipb_matched_end.m2v` once and report whether it reaches a stable end, whether the large shiny-hat block corruption remains absent, and whether the tiny vertical lines or cadence stutter differ from the prior matched run.  This is an elementary video stream, so silence is expected.  Do not capture telemetry unless the user explicitly requests it.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 721 COMMIT Unreleased 8fd16e8 2026-08-29T19:19:47-07:00
-
-#### Coming From:
-
-Unreleased 8fd16e8
-
-#### Purpose:
-
-Prepare and install a sequence-end-corrected copy of the matched interlaced I/P/B comparison fixture.
-
-#### Outcome:
-
-The user explicitly authorizes correcting the entry-720 generated fixture after its hardware capture shows no large block corruption but stalls two pictures short because FFmpeg omitted the terminal H.262 sequence-end code.  Preserve the existing matched and I/P-only fixtures unchanged; copy the exact matched I/P/B stream, append only `00 00 01 b7`, and install the result under a new absolute filename.  This test-media-only correction does not authorize source, RBF, Main, helper or configuration changes.
-
-#### Next Steps:
-
-Verify that the corrected local stream differs only by the four appended bytes, ends in the required sequence-end code, retains exactly 361 720x480 TFF interlaced pictures comprising 25 I, 96 P and 240 B, and decodes completely in software.  Upload it as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_ipb_matched_end.m2v` using an absolute FTP path, verify an independent absolute-path readback byte for byte, then have the user play that file once in `800x600 Diagnostic` with Weave and report whether it visibly reaches a stable end.  Do not capture telemetry unless the user explicitly requests it.
 
 #### Files Modified:
 
