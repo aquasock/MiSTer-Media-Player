@@ -1,3 +1,32 @@
+## 735 COMMIT Unreleased 6196869 2026-08-29T20:16:55-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Record verified construction and installation of the byte-exact authored I/P P80 checkpoint.
+
+#### Outcome:
+
+Using unchanged source `6196869` and the exact original authored stream, checkpoint mode ends immediately after zero-based coded P80, proves its terminal picture byte-identical to source P80, removes 38 complete B units from the retained prefix, and preserves 7 I plus 36 P units unchanged.  The resulting 896,496-byte stream has SHA-256 `ae8e43eb20d4f1260ef6c0ba933c66e0323a4995e8872bdc3222d33685adb4aa`; independent FFprobe enumeration confirms exactly 43 720x480 TFF interlaced pictures at 30000/1001 comprising 7 I and 36 P with no B or progressive picture, its tail is the single required `00 00 01 b7` sequence end, and a complete FFmpeg software decode exits without an error.  Independent software extraction of the terminal frame confirms P80 is a clean bright shiny-hat passage suitable for visible comparison.  Absolute FTP inventory proves the new filename absent, then installation as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p80_checkpoint.m2v` and independent absolute-path readback reproduce all 896,496 bytes, the exact `ae8e43eb` hash and terminal sequence end.  No source, existing media, FPGA, Main, helper or configuration changes.
+
+#### Next Steps:
+
+With `Interlaced output` at `800x600 Diagnostic` and Weave selected, play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p80_checkpoint.m2v` once and inspect the stable terminal framebuffer after its intentionally short live passage.  Report whether the held bright-passage P80 frame contains large block corruption.  If corrupt, search backward within P74 through P80; if clean, move later in the bright passage.  Do not capture telemetry unless the user explicitly requests it.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 734 COMMIT Unreleased 6196869 2026-08-29T20:15:15-07:00
 
 #### Coming From:
@@ -1231,57 +1260,6 @@ Reduce logic before anything else in this cycle proceeds, because `dct_type` and
 #### Files Modified:
 
 - None.
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 695 COMMIT Unreleased 784ae0b 2026-08-29T02:25:48-07:00
-
-#### Coming From:
-
-Unreleased f2c10be
-
-#### Purpose:
-
-Admit interlaced NTSC P and B frame pictures by adding field motion prediction and residual field DCT.
-
-#### Outcome:
-
-This cycle admits interlaced NTSC P and B frame pictures by adding field motion prediction.  It passes analysis and synthesis and every simulation regression, but no bitstream exists yet, so it is neither built nor hardware validated.  The plan it started from understated the work in two ways that the cycle corrected.  There are two macroblock parsers, not one: B pictures parse in `mpeg2_h262_b_core_probe` and P pictures in `mpeg2_h262_p_wide_motion_syntax_probe`, selected by `b_transport` in `mpeg2_h262_two_picture_probe_p_chain.sv`, and only the B one had been touched.  The prediction fetcher held two source rectangles where a bidirectional field macroblock needs four, one forward and one backward field per destination field.  Both are now resolved: the P parser gained the field syntax, the record channel carries the field selects, the fetcher takes a PHASES parameter and the B engine raises it to four, and both engines form field predictions by indexing a phase per destination parity with the row stride doubled so a fetched row steps one field line.  A field macroblock does not prefetch its successor, which costs throughput on those blocks and avoids four more address sets.  Dual prime and the reserved motion type are refused as implementation limits of this decoder rather than limits of the standard, and field pictures remain outside the cycle.  Measurement drove all of it.  Two deterministic fixtures were built with pixel oracles the generators prove byte-identical to FFmpeg's decode of their own bitstreams, and the gates were opened locally, never in a commit, so each change was measured as it landed rather than at the end.  The P fixture went from 1,594 mismatching samples to 0 of 518,400 and the B fixture from 1,110 to 0 of 1,036,800, with the mixed raster control holding at 0 of 423,936 throughout.  That loop found four defects in the cycle's earlier work, every one of them in a commit whose message asserted behaviour was unchanged: the vertical motion predictors were renamed to a frame-unit pair while two readers and all four slice-start resets kept pointing at the dead names, so skipped B macroblocks were predicted with vertical motion zero and H.262 7.6.3.1's slice reset was silently lost; `S_MOTION_TYPE`, `S_FSEL` and `S_BSEL` never advanced the bit pointer, so `frame_motion_type` decoded as 00 or 11 and every field-predicted B macroblock failed at the first one; the P engine read slot 0's field select from a register nothing ever assigned, and its picture-start capture hardwired the field bits to zero; and emitting the second motion record ahead of the committing one raced the engine's capture arming, losing that record on the first macroblock of every picture.  The mixed raster pixel regression had been failing since `4bd6869` and nobody had run it.  A full Quartus compilation was started from this tree and had not finished after forty minutes in Fitter placement, so fit and timing are unmeasured for this cycle and no bitstream exists; the run showed no capacity errors and no critical warnings, and synthesis RAM segments grew only from 1,659 to 1,733 across the two engine walks.  Build time is itself now a project constraint: the project fits at maximum effort with high performance optimization mode and five physical synthesis passes including register retiming, on a device already at seventy-seven percent ALMs and ninety-three percent RAM blocks with 0.170 nanoseconds of slack, and a compile of that length is not a workable iteration loop.  Measure a reduced-effort build against slack before the next cycle rather than assuming either that the settings are needed or that they are free.  Analysis and synthesis pass with 0 errors.
-
-#### Next Steps:
-
-Three pieces of this cycle remain before hardware.  The macroblock `dct_type` bit is parsed only by the intra path in `mpeg2_h262_luma4_probe.sv`; neither the P wide probe nor the B parser reads it, no sideband carries it, the residual destination for luma blocks 2 and 3 still uses the frame offset of eight rather than the field offset of one, and both `MediaPlayer_top_03.svh` and the soak testbench wire the store's `field_dct` input as `!p_store_select && dct_type`, which forces it low whenever the prediction path owns the store.  The store itself already handles field DCT correctly, doubling the luma stride and applying it to luma only, so no address arithmetic needs inventing.  Neither existing fixture can test it, because both deliberately code no residual blocks to isolate prediction, so a third fixture carrying field DCT together with coded residual on inter macroblocks is a prerequisite, along with field-DCT block ordering in the reference model.  Then open the gates for real: `wide_candidate` and `wide_unsupported_now` in the P probe each carry their own copy of the `frame_pred_frame_dct` requirement and both must be relaxed together, `b_candidate` in the B parser carries a third, and the frontend admission gate still admits I pictures only.  Note that neither field fixture can exercise the frontend gate, because both are 30000/1001 sequences whose picture-level admission is what changes; validating that needs real interlaced disc content.  Finally fold in the two entry 694 instrumentation defects while the profiler is being rebuilt: probe the transport block at the clean video queue's own full condition rather than a valid and ready pair, and move the snapshot trigger off the first error flag now that underruns are counted.  Install only after separate user authorization with the accepted bitstream backed up.  Watch for video stutter, since the clean video queue is half its former depth and interlaced P and B raise decoder load.  A parallel agent is adding MP3, WAV and FLAC playback to the ARM helper under `host/arm/` on the same branch; that work does not touch `rtl/` and is integrated after this cycle is hardware validated.  The HDMI session of the bounded opening remains outstanding from entry 690.
-
-#### Files Modified:
-
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part4.svh
-- rtl/mpeg2_new/mpeg2_h262_b_core_probe_part5.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part0.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part1.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part2.svh
-- rtl/mpeg2_new/mpeg2_h262_p_wide_motion_syntax_probe_part3.svh
-- rtl/mpeg2_new/mpeg2_h262_p_diagnostic_controller_rearm.sv
-- rtl/mpeg2_new/mpeg2_h262_p_motion_residual_raster_engine.sv
-- rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
-- tools/streams/h262common.py
-- tools/streams/generate_test_interlaced_field_motion.py
-- tools/streams/generate_test_b_field_motion.py
-- tools/streams/tb_h262_interlaced_field_motion_pixels.sv
-- tools/streams/tb_h262_b_field_motion_pixels.sv
-- tools/streams/tb_h262_live_raster_soak.sv
-- tools/streams/run_interlaced_field_motion.sh
-- tools/streams/run_b_field_motion.sh
 
 #### Status:
 
