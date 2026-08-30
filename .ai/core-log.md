@@ -1,3 +1,35 @@
+## 774 COMMIT Unreleased ??? 2026-08-30T13:13:46-07:00
+
+#### Coming From:
+
+Unreleased 9f10b55
+
+#### Purpose:
+
+Repair the two seed-19 decoder setup-path families in the registered B-picture lookup implementation without changing its throughput, memory use or reconstruction behavior.
+
+#### Outcome:
+
+The user approves a simulation-first timing correction after the sole entry-773 seed-19 build rejects source `9f10b55` at negative 0.176 ns decoder setup slack while retaining exactly 532 M10Ks.  The extracted report localizes the leading path from the fetcher's multi-bit `descriptor_count[2]` occupancy decode into retained `word_data` write control and a second family from live B block parity `blk[1]` through field-DCT launch-address arithmetic into `fetch_launch_phase0_base_addr`.  Replace the response-side count-zero control cone with a registered one-bit descriptor occupancy state maintained by the existing push/pop transitions, and capture the luma field-DCT block parity with the other execution metadata before address formation.  Keep the registered lookup address and data stages, ordered streaming cursor, descriptor depth, response semantics, seed 19 and all memory structures unchanged; do not add M10Ks, alter pixel reconstruction, change clocks, add diagnostics or reseed.
+
+#### Next Steps:
+
+Implement only the two registered control cuts, then repeat the exact fetcher protocol, motion, field-DCT, pixel-oracle, cadence, reorder, timestamp, overlap, native-480i and natural Coming-to-America and Lebowski simulation gates.  Require functional equivalence and both natural windows below 49.7 cycles per input byte before committing source.  If those gates pass, inspect synthesis-relevant structure and request explicit confirmation before performing at most one clean Quartus Prime 17.0.2 seed-19 build; stop without a build if throughput or correctness regresses, and stop without reseeding if timing fails again.
+
+#### Files Modified:
+
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part1.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part2.svh
+- rtl/mpeg2_new/mpeg2_h262_b_bidirectional_raster_engine_part3.svh
+- rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 773 COMMIT Unreleased 9f10b55 2026-08-30T07:19:22-07:00
 
 #### Coming From:
@@ -1132,35 +1164,6 @@ Using unchanged source `6196869` and the exact original authored stream, checkpo
 #### Next Steps:
 
 With `Interlaced output` at `800x600 Diagnostic` and Weave selected, play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p80_checkpoint.m2v` once and inspect the stable terminal framebuffer after its intentionally short live passage.  Report whether the held bright-passage P80 frame contains large block corruption.  If corrupt, search backward within P74 through P80; if clean, move later in the bright passage.  Do not capture telemetry unless the user explicitly requests it.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 734 COMMIT Unreleased 6196869 2026-08-29T20:15:15-07:00
-
-#### Coming From:
-
-Unreleased 6196869
-
-#### Purpose:
-
-Prepare and install the byte-exact authored I/P checkpoint ending on P80.
-
-#### Outcome:
-
-The user explicitly authorizes the entry-733 jump to P80 after clean P66 and P69 prove the earlier dark fade is not where the remembered large distortion occurs.  Reuse unchanged source `6196869` and the exact original authored stream.  Generate an I/P prefix ending immediately after zero-based coded P80, remove only complete B units within the retained prefix, preserve every retained I and P unit byte-for-byte, append exactly one sequence-end code, and install it under a new absolute MiSTer filename.  Leave every existing fixture, FPGA, Main, helper and configuration unchanged.
-
-#### Next Steps:
-
-Require exact P80 termination, only 720x480 TFF interlaced I/P pictures, one terminal sequence end and a clean complete software decode.  Require independent absolute-path FTP readback equality after installation.  Then have the user play the intentionally short checkpoint once in `800x600 Diagnostic` with Weave and inspect the stable bright-passage P80 framebuffer for large block corruption.  If corrupt, search backward within P74 through P80; if clean, move later in the bright passage.
 
 #### Files Modified:
 
