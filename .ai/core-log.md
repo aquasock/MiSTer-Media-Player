@@ -1,3 +1,32 @@
+## 760 COMMIT Unreleased cee1a9e 2026-08-30T04:40:08-07:00
+
+#### Coming From:
+
+Unreleased cee1a9e
+
+#### Purpose:
+
+Install the timing-clean seed-19 RBF with an independently verified target rollback and begin the approved Coming to America hardware validation.
+
+#### Outcome:
+
+After the user instructs continuation because seed 19 passes timing, local artifact verification reconfirms the 4,461,996-byte `output_files/MediaPlayer.rbf` at SHA-256 `162c788d2fa121f340ab6649ef94b25e97f31a44ee552928bb89e32b147059a6`.  Absolute FTP inventory finds exactly one installed core, `/media/fat/MediaPlayer_20260829_b9c2657.rbf`; independent readback proves that it is the expected 4,456,984-byte `bc79d56a00c69188cd6dc3117944ccaa3a80fa5ba8cfc6dd45f451e4f1593837` timing-clean known-good build.  That exact readback is uploaded under the new rollback path `/media/fat/_MediaPlayer_Backups/MediaPlayer_cee1a9e_pre_seed19_bc79d56a.rbf`, and a second independent download reproduces the complete `bc79d56a` hash.  The single installed filename is then replaced in place with the seed-19 RBF, and the install helper's independent absolute-path readback reproduces all bytes and exact `162c788d` hash.  No Main, helper, media, configuration or source file changes, and the current FPGA remains unchanged until the user reloads the core.
+
+#### Next Steps:
+
+Reload MediaPlayer from the MiSTer menu so the newly installed RBF configures the FPGA.  Confirm the visible menu contains `Aspect Ratio` with `4:3` and `16:9`, `Deinterlacer Mode` with `Bob` and `Weave`, the existing `Audio Test` choices, and `Audio Output` with `HDMI` and `S/PDIF`, with no 800x600 or timing-pattern options.  Select `4:3`, `Bob` and `HDMI`, then play the unchanged `/media/fat/games/MediaPlayer/coming_to_america_first_5min.mpg` once for five minutes and report whether it launches immediately and whether video, cadence, HDMI audio and synchronization remain clean.  Leave the completed screen untouched for capture if any failure occurs; do not replay Big Lebowski unless this run succeeds and a control is materially needed.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 759 COMMIT Unreleased cee1a9e 2026-08-30T03:36:32-07:00
 
 #### Coming From:
@@ -1124,35 +1153,6 @@ Verify that the corrected local stream differs only by the four appended bytes, 
 #### Files Modified:
 
 None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 720 COMMIT Unreleased 8fd16e8 2026-08-29T19:12:38-07:00
-
-#### Coming From:
-
-Unreleased 8fd16e8
-
-#### Purpose:
-
-Prepare and install a matched interlaced I/P/B control that differs from the clean entry-719 I/P-only fixture only by restoring B pictures.
-
-#### Outcome:
-
-The user explicitly authorizes the matched control after entry 719 removes the large block corruption with an interlaced I/P-only re-encode but leaves a tiny cadence stutter and narrow miscolored vertical lines.  Exact source `/home/vash/MiSTer-Media-Player/output_files/entry710/capture/coming_to_america_interlaced_12s.m2v` is re-encoded with the successful entry-719 deterministic CFR command unchanged except replacing `-bf 0` with `-bf 2`.  The resulting 4,844,180-byte MPEG-2 elementary stream has SHA-256 `0739de2a5568e21f3e68031b96b340bfda0e669f0a465322486f14788bc951b0`.  Independent FFprobe enumeration finds exactly 361 pictures, all 720x480 TFF interlaced at coded rate 30000/1001, comprising 25 I, 96 P and 240 B pictures with no progressive picture.  Project H.262 analysis sees the expected I/P/B coded order and interlaced motion/DCT boundary, a full software decode exits cleanly, and paired visual samples through the shiny-hat passage are clean and closely match the source.  Absolute target inventory confirms the matched filename is unused; the file is uploaded as new `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_ipb_matched.m2v`, and its independent absolute-path FTP readback reproduces all 4,844,180 bytes and exact `0739de2a` hash.  Final inventory shows the original, I/P-only and matched I/P/B files side by side.  The user plays the matched I/P/B fixture and reports no return of the large block distortion: the tiny vertical miscolored lines are unchanged from the I/P-only run, while its tiny cadence stutter might be less.  This proves that B-picture presence by itself does not reproduce the original authored stream's large shiny-hat corruption and instead points to a more specific prediction, vector, DCT, quantization or GOP feature in that source.  At the user's permission, one completed-screen capture records all 4,844,180 bytes accepted with zero error flags, zero deadline gaps or outliers, zero transport blocks and zero timestamp conflicts, but only 359 of 361 pictures displayed across 358 swaps, comprising 121 reference pictures and 239 of the encoded 240 B pictures; sequence end, presentation completion and quiet session are false, with the final decode still inflight.  Direct tail inspection explains why this terminal observation is not a core regression: the exact original fixture correctly ends in H.262 sequence-end code `00 00 01 b7`, whereas FFmpeg omitted that marker from both generated re-encodes.  The missing marker confounds terminal drain behavior but not the completed visual comparison that eliminated B presence alone.  Neither existing fixture, the RBF, Main, helper, configuration nor source code changes.
-
-#### Next Steps:
-
-Prepare a corrected copy of the matched I/P/B fixture under a new absolute filename by appending the single missing H.262 sequence-end code without changing any picture bytes.  Verify the corrected copy still enumerates as exactly 361 TFF interlaced pictures comprising 25 I, 96 P and 240 B, ends in `00 00 01 b7`, decodes cleanly in software and survives an exact absolute-path FTP readback.  The next user test should play that corrected matched file once in `800x600 Diagnostic` with Weave and report whether it visibly reaches a stable end; do not replay the uncorrected file.  Preparing and installing the corrected test media requires a separate explicit user instruction.  Do not change source, Main, helper or FPGA for this fixture correction, and do not capture further telemetry unless the user explicitly requests it.
-
-#### Files Modified:
-
-- /media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_ipb_matched.m2v
 
 #### Status:
 
