@@ -1,3 +1,32 @@
+## 772 COMMIT Unreleased 0a9d48a 2026-08-30T07:15:38-07:00
+
+#### Coming From:
+
+Unreleased 0a9d48a
+
+#### Purpose:
+
+Capture the controlled Coming to America MPD-D2 failure and distinguish audio starvation from visible video-cadence failure and from insufficient buffering.
+
+#### Outcome:
+
+The user leaves the completed uninterrupted S/PDIF run of `/media/fat/games/MediaPlayer/coming_to_america_mpd_d2_5min.vob` untouched for collection and reiterates that only audio stutters while video remains rock solid.  The 796,193-byte screenshot `/tmp/entry772_coming_mpd_d2_telemetry.png`, SHA-256 `250135e768052a0ccc58f951c1322fa361375f02a65d5e812929fe1c0fbdb05b`, has 64 valid schema-20 headers, indices and parity bits and matching checksum `c4aeaacf`; its sticky first-underrun snapshot occurs at 56.079121 seconds after accepting 55,768,576 clean-video bytes, with 1,671 displayed pictures and 1,670 swaps, consistent with real-time video cadence at the audible failure.  The decoder input is intrinsically stalled for 94.498 percent of session cycles, divided into 6.363 percent I, 22.237 percent P and 65.899 percent B-picture stall, while presentation hold contributes only 3.777 percent, destination hold is zero and presentation hold has scratch availability for only 668 cycles.  This differs from Lebowski's 85.208-percent intrinsic and 13.042-percent presentation split but preserves the common approximately 98.3-percent total inability to accept transport bytes and dominant B-picture contribution, disproving a third presentation scratch frame as a general correction.  The matching 7,598,795-byte helper log `/tmp/entry772_coming_mpd_d2_telemetry.log`, SHA-256 `ec8bb543428ab4f4b8f920e287b65dfad64ec622b23264ec67a3caf275a02c95`, names the exact VOB and S/PDIF path, eventually emits all 14,400,000 samples and submits all 362,080,761 bytes through the fast path, but requires 308.544 seconds; its worst 10-, 20- and 30-second transport windows are only 1.112, 1.120 and 1.122 MB/s against the approximately 1.207 MB/s real-time requirement.  The 16,384-frame audio FIFO already provides approximately 341 milliseconds of reserve, so more buffering would postpone rather than remove sustained starvation; the accepted fit uses 532 of 553 M10Ks, leaving 21, and no additional M10Ks are indicated.  This corrects entry 771's overly broad wording: decoder-side shared-transport backpressure starves ordered audio ingress, but the hardware evidence does not show visible video cadence loss.
+
+#### Next Steps:
+
+Keep the accepted seed-19 RBF, host binaries, ISO deployment and all existing FIFO depths unchanged.  The smallest useful correction cycle should target B-picture intrinsic decode throughput with zero new M10Ks, preserve reconstruction arithmetic and presentation behavior, and use the unused schema-20 telemetry words to attribute B stalls among compressed-bit parsing, residual replay, prediction and row-retirement waits if static analysis cannot justify a direct scheduling overlap.  Record and obtain approval for that source boundary before implementation, then run exact simulation regressions, one clean seed-19 Quartus build with full timing and resource gates, and the NARA control plus both natural-content VOBs through five-minute HDMI and S/PDIF validation.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 771 COMMIT Unreleased 0a9d48a 2026-08-30T06:57:06-07:00
 
 #### Coming From:
@@ -1138,34 +1167,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 732 COMMIT Unreleased 6196869 2026-08-29T20:12:18-07:00
-
-#### Coming From:
-
-Unreleased 6196869
-
-#### Purpose:
-
-Accept the clean P69 terminal checkpoint and advance the authored P-chain search to P71.
-
-#### Outcome:
-
-The user plays `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p69_checkpoint.m2v` and reports no large block distortion.  The requested terminal capture proves all 405,108 bytes are accepted, all 32 pictures display across 31 swaps, final picture type is P with temporal reference 9, sequence end and presentation completion are true, the session is quiet and the scheduler is fully drained.  The 1.1509-second presentation records zero error flags, presentation faults, cache overlap faults, deadline gaps, cadence outliers, transport blocks or timestamp conflicts.  The 329,070-byte screenshot `/tmp/entry731_p69_checkpoint_completed.png`, SHA-256 `2a6e8b739feac7b60a4e7d164943234bcc1e427e2b4da2c9e92e8f26b0348e23`, shows the intended stable P69 fade-stage framebuffer without large macroblock corruption; the previously separated narrow vertical-line artifact remains visible and is not counted as the block defect.  Exact P66 and P69 are therefore clean, narrowing the first large authored P corruption to P70 through P72.  No source, installed media, RBF, Main, helper or configuration changes during capture.
-
-#### Next Steps:
-
-Use unchanged source `6196869` to generate and install a byte-exact I/P checkpoint ending at zero-based coded P71, the midpoint of the remaining P70 through P72 interval.  Preserve every retained I/P unit, remove only B units, append one terminal sequence-end code, verify exact P71 termination and clean software decode, and require absolute-path FTP readback equality.  The next hardware test should inspect the stable terminal P71 framebuffer.  Corruption narrows first onset to P70 or P71; a clean result isolates P72.  Test-media generation and installation require a separate explicit user instruction; do not change or rebuild the FPGA.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
