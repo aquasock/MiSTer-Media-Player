@@ -403,6 +403,7 @@ index 0000000..663f7b0
 +	return extension && (!strcasecmp(extension, ".m2v") ||
 +	                     !strcasecmp(extension, ".mpg") ||
 +	                     !strcasecmp(extension, ".mpeg") ||
++	                     !strcasecmp(extension, ".vob") ||
 +	                     !strcasecmp(extension, ".mp3") ||
 +	                     !strcasecmp(extension, ".wav") ||
 +	                     !strcasecmp(extension, ".flac"));
