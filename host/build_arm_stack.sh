@@ -178,7 +178,7 @@ build_arm_helper() {
         build_dvd_libraries "$flavour" "$cross_file"
         make -B -C "$root_dir/host/arm" CC="$arm_cc" DEPS_DIR="$deps_dir" \
             DVD_PREFIX="$deps_dir/dvd-install-$flavour" \
-            CFLAGS='-O2 -Wall -Wextra -Werror -std=c11' \
+            CFLAGS='-O2 -Wall -Wextra -Werror -Wno-attributes -std=c11' \
             LDFLAGS='-static -s' \
             OUTPUT="$build_dir/MediaPlayer_Helper"
 }
