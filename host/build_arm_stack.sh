@@ -151,7 +151,8 @@ build_dvd_libraries() {
     PKG_CONFIG_PATH="$install_root/lib/pkgconfig" \
         meson setup --wipe "$read_build" "$source_root/libdvdread" \
         "${cross_args[@]}" --prefix="$install_root" --libdir=lib \
-        --default-library=static -Dlibdvdcss=enabled -Denable_docs=false
+        --default-library=static -Dlibdvdcss=enabled -Denable_docs=false \
+        -Dc_args=
     meson compile -C "$read_build"
     meson install -C "$read_build"
     PKG_CONFIG_PATH="$install_root/lib/pkgconfig" \
