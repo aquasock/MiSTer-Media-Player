@@ -1,4 +1,4 @@
-## 728 COMMIT Unreleased ??? 2026-08-29T20:01:31-07:00
+## 728 COMMIT Unreleased 6196869 2026-08-29T20:01:31-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Add source-picture checkpoint generation and install a byte-exact authored I/P s
 
 #### Outcome:
 
-The user explicitly authorizes the entry-727 P-chain checkpoint.  Extend `tools/streams/strip_h262_b_pictures.py` with an optional zero-based source-picture endpoint while preserving the existing default B-strip and held-I behaviors exactly.  For checkpoint 66, retain the original source prefix through coded P66, remove only complete B units within that prefix, preserve every retained I and P unit byte-for-byte, discard all later source bytes, and append one terminal H.262 sequence-end code.  Do not repeat P pictures because repetition would change their prediction reference evolution, and do not change the FPGA, Main, helper or configuration.
+The user explicitly authorizes the entry-727 P-chain checkpoint.  Source `6196869` extends `tools/streams/strip_h262_b_pictures.py` with optional `--stop-after-source-picture`, requiring a non-negative in-range zero-based ordinal that is included by `--keep-types` and rejecting checkpoint repetition so predictive reference evolution cannot change.  Default generation still reproduces the exact 4,045,136-byte `5f16247b` I/P output, and held-I generation still reproduces the exact 12,658,036-byte `3c28c3e9` output.  Applied at source picture 66, the tool retains the original prefix through exact coded P66, removes 38 complete B units, preserves 6 I and 23 P units byte-for-byte, discards every later source byte and appends one terminal `00 00 01 b7`.  The 273,704-byte checkpoint has SHA-256 `1c1ec0b0d0f327565a19d5fe4b5008c939c51d5ab6396fae0f994f2a45dcb9dc`; independent FFprobe enumeration confirms exactly 29 720x480 TFF interlaced pictures at 30000/1001 comprising 6 I and 23 P with no B or progressive picture, the final output picture is proved identical to source P66, and a complete FFmpeg software decode exits without an error.  Absolute FTP inventory proves the new filename absent, then installation as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p66_checkpoint.m2v` and independent absolute-path readback reproduce all 273,704 bytes, the exact `1c1ec0b0` hash and terminal sequence end.  Existing media, FPGA, Main, helper and configuration remain unchanged, and no Quartus build is needed.
 
 #### Next Steps:
 
-Require the endpoint to be in range and name a retained picture, prove both established output hashes unchanged, and verify the checkpoint's final picture is exact original zero-based coded P66.  Require 720x480 TFF interlaced signalling, no B pictures, exactly one terminal sequence end and a clean complete software decode, then install under a new absolute MiSTer filename with independent byte-exact readback.  The next hardware test should play the checkpoint once in `800x600 Diagnostic` with Weave and inspect the stable terminal P66 frame for large block corruption.
+With `Interlaced output` at `800x600 Diagnostic` and Weave selected, play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p66_checkpoint.m2v` once and leave its terminal frame onscreen.  Report whether the stable final P66 frame contains large block corruption.  Corruption places the first failure at or before P66; a clean terminal frame places it after P66 and permits a bounded later checkpoint.  Do not capture telemetry unless the user explicitly requests it.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Require the endpoint to be in range and name a retained picture, prove both esta
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
