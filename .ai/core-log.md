@@ -1,3 +1,32 @@
+## 714 COMMIT Unreleased ??? 2026-08-29T18:00:21-07:00
+
+#### Coming From:
+
+Unreleased 53bc8e7
+
+#### Purpose:
+
+Close the single remaining HDMI scaler setup path without changing decoder RTL, latency, clocks or constraints.
+
+#### Outcome:
+
+The user approves a tightly bounded HDMI source correction after the one seed-17 reseed leaves decoder and video setup safely positive at 0.801 and 2.956 ns but misses HDMI setup by 0.047 ns on exactly one path.  A detailed same-clock TimeQuest report against the completed seed-17 fit identifies that path from `ascal:ascal|o_vpix_outer[1].g[3]` to `ascal:ascal|o_vpixq_pre[3].g[3]`: it has two logic levels and 6.084 ns of data delay, of which 5.000 ns, eighty-two percent, is routing between registers placed at X68_Y34 and X56_Y28.  Follow the established ASCAL timing technique already used for the C8 adaptive-polyphase selectors: capture an identical `type_pix` copy from the same C2 `pixq_v` source on the same enabled edge, mark it `dont_merge`, and use that copy only for the C8 queue element-three boundary selections currently driven by `o_vpix_outer(1)`.  This is a physical duplicate rather than a pipeline delay and must not alter scaler cycles, sync alignment, pixel values, seed 17, any decoder source or any timing constraint.
+
+#### Next Steps:
+
+Implement and publish only the local ASCAL register duplicate, verify the original and duplicate receive identical assignments and that only the failing C8 destination uses the copy, then perform one clean Quartus Prime 17.0.2 seed-17 build.  Retain the focused decoder simulations without rerunning the long 361-picture or DVD soaks because decoder RTL and test inputs are unchanged.  Audit full timing, the HDMI path, decoder and video setup plus packed resources; stop without another seed or build if any timing category fails, and do not install an RBF without a separate handoff.
+
+#### Files Modified:
+
+- sys/ascal.vhd
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 713 COMMIT Unreleased 53bc8e7 2026-08-29T17:37:40-07:00
 
 #### Coming From:
@@ -1265,35 +1294,6 @@ Publish and exercise the drain refinement with focused timestamp, scheduler, nat
 - rtl/mpeg2_new/mpeg2_h262_b_presentation_scheduler.sv
 - tools/streams/tb_h262_film_reorder_timestamp.sv
 - tools/streams/run_film_presentation.sh
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 674 COMMIT Unreleased 18d9189 2026-08-28T04:44:23-07:00
-
-#### Coming From:
-
-Unreleased 30f3c6d
-
-#### Purpose:
-
-Record complete retirement-fix evidence and qualify corrected B lookahead before the authorized FPGA build.
-
-#### Outcome:
-
-Both full retirement-only native runs at dd0dc52 finish with 289 unique ordered publications, 288 swaps, all 25 associated timestamps, no descriptor or timestamp mismatches, clear cache/phase/overlap flags and pixel reports byte-identical to entry 665. They still have nineteen cadence delays totaling forty-one extra fields and are not timing passes. The approved P-overlap source 30f3c6d removes the initial ordinary-P delays, but its later full traces expose a remaining P80-to-B82 miss because B payload waits unnecessarily for primary presentation; those runs are stopped with their partial failure evidence retained. Production refinement d70b18f allows B scratch decode after the secondary reference completes while keeping the older ordinary reference first in presentation order, and holds any following I/P payload until that older presentation frees the display bank. Focused I/P-to-B cases before, with and after completion, late completion after primary display, full-slot backpressure, following-I protection, timestamps, film cache, scheduler rates and native timing integration pass at c4aec5e. Two test-fixture corrections enable native overlap explicitly and wrap the physical reference bank over three regions; neither weakens the ownership assertions. Paired reconstruction runs on 024158a and d5274d7 both pass with unchanged source fingerprints and CSVs identical to entry 665, preserving isolated maximum error one, real-reference maximum five, 102 old fixed-two exceedances and zero measured propagation-bound violations. Final source 18d9189 changes only documentation after the latest tested RTL. Full final native runs and paired reconstruction are next, using /home/vash/mister-builds/entry673. No Quartus build or MiSTer write has occurred. A read-only FTP attempt to 10.10.0.30 returns no route to host; the user has been asked to power it on for eventual installation.
-
-#### Next Steps:
-
-Pull the final source into both build-PC checkouts, run ideal_v2 and contended_v2 with the strict full-trace gate and repeat paired reconstruction without changing its source during execution. Require all 289 pictures once in order, correct complete descriptors and timestamps, zero authored-cadence mismatches and preserved pixel bounds. Only after every gate passes perform the single clean seed-18 Quartus build and timing/resource/warning audit, then preserve existing cores and install by verified FTP readback if the MiSTer is reachable. Pause on build failure without seed retries, and leave loading and original-audio playback to the user.
-
-#### Files Modified:
-
-- docs/testing_original_dvd_opening.md
 
 #### Status:
 
