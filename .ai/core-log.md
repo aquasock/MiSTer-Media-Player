@@ -1,4 +1,4 @@
-## 714 COMMIT Unreleased ??? 2026-08-29T18:00:21-07:00
+## 714 COMMIT Unreleased 8fd16e8 2026-08-29T18:00:21-07:00
 
 #### Coming From:
 
@@ -10,7 +10,7 @@ Close the single remaining HDMI scaler setup path without changing decoder RTL, 
 
 #### Outcome:
 
-The user approves a tightly bounded HDMI source correction after the one seed-17 reseed leaves decoder and video setup safely positive at 0.801 and 2.956 ns but misses HDMI setup by 0.047 ns on exactly one path.  A detailed same-clock TimeQuest report against the completed seed-17 fit identifies that path from `ascal:ascal|o_vpix_outer[1].g[3]` to `ascal:ascal|o_vpixq_pre[3].g[3]`: it has two logic levels and 6.084 ns of data delay, of which 5.000 ns, eighty-two percent, is routing between registers placed at X68_Y34 and X56_Y28.  Follow the established ASCAL timing technique already used for the C8 adaptive-polyphase selectors: capture an identical `type_pix` copy from the same C2 `pixq_v` source on the same enabled edge, mark it `dont_merge`, and use that copy only for the C8 queue element-three boundary selections currently driven by `o_vpix_outer(1)`.  This is a physical duplicate rather than a pipeline delay and must not alter scaler cycles, sync alignment, pixel values, seed 17, any decoder source or any timing constraint.
+The user approves a tightly bounded HDMI source correction after the one seed-17 reseed leaves decoder and video setup safely positive at 0.801 and 2.956 ns but misses HDMI setup by 0.047 ns on exactly one path.  A detailed same-clock TimeQuest report against the completed seed-17 fit identifies that path from `ascal:ascal|o_vpix_outer[1].g[3]` to `ascal:ascal|o_vpixq_pre[3].g[3]`: it has two logic levels and 6.084 ns of data delay, of which 5.000 ns, eighty-two percent, is routing between registers placed at X68_Y34 and X56_Y28.  Follow the established ASCAL timing technique already used for the C8 adaptive-polyphase selectors: capture an identical `type_pix` copy from the same C2 `pixq_v` source on the same enabled edge, mark it `dont_merge`, and use that copy only for the C8 queue element-three boundary selections currently driven by `o_vpix_outer(1)`.  This is a physical duplicate rather than a pipeline delay and must not alter scaler cycles, sync alignment, pixel values, seed 17, any decoder source or any timing constraint.  Published source `8fd16e8` adds exactly that twenty-four-bit same-edge duplicate, retains the original for the other queue elements, and changes only `sys/ascal.vhd`; a fresh detached build-PC checkout verifies exact full SHA `8fd16e8df61f0dca8a7373f035e663c84b49f1a9` and seed 17.  The repository's dedicated HDMI scaler simulation exits before analysis because GHDL is not installed or available privately on GUNSMOKE, so no simulation result is claimed and no new toolchain is installed; Quartus VHDL analysis and the full timing gate remain authoritative for this checkpoint.
 
 #### Next Steps:
 
