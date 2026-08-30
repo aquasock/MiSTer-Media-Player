@@ -1,3 +1,33 @@
+## 765 COMMIT Unreleased ??? 2026-08-30T05:19:43-07:00
+
+#### Coming From:
+
+Unreleased cee1a9e
+
+#### Purpose:
+
+Add exact NARA MPD-D2 media creation and verification plus native `.vob` selection through the pinned MiSTer Main integration.
+
+#### Outcome:
+
+The user explicitly approves the exact frame-picture MPD-D2 qualification plan and defers field-picture decoding as a disclosed limitation.  Static inspection finds that the helper already accepts VOB/MPEG-2 Program Stream contents but the pinned Main patch's file dispatcher recognizes only `.m2v`, `.mpg` and `.mpeg` video extensions, so a genuinely named `.vob` qualification file cannot currently launch through the normal MiSTer menu.  The approved source boundary adds `.vob` to that existing dispatcher and extends the deterministic media tool with a profile creator and strict verifier for the adopted NARA properties, including an 8 Mbps single-pass MPEG-2 Main Profile/Main Level intermediate, 720x480 at 30000/1001, interlaced top-field-first frame pictures, documented 16-bit stereo PCM source, 48 kHz 256 Kbps constant-bit-rate AC-3 and VOB/Program Stream output.  No source, Main binary, helper, FPGA, installed media or configuration has changed at this proposal boundary.
+
+#### Next Steps:
+
+Implement only the approved Main extension and MPD-D2 tool commands, perform shell syntax and failure-path checks, generate a short exact fixture and require every verifier property plus complete software decode to pass.  Commit that source boundary before building the pinned Main on the build PC.  Preserve and independently hash the installed MiSTer Main before replacement, install only a successfully built and identified candidate, verify readback, then generate and install the retained qualification VOB for complete HDMI and S/PDIF hardware testing.
+
+#### Files Modified:
+
+- host/main_mister/0001-mediaplayer-arm-loader.patch
+- tools/media.sh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 764 COMMIT Unreleased cee1a9e 2026-08-30T05:14:01-07:00
 
 #### Coming From:
@@ -1124,35 +1154,6 @@ With `Interlaced output` at `800x600 Diagnostic` and Weave selected, play `/medi
 #### Files Modified:
 
 - tools/streams/strip_h262_b_pictures.py
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
-
----
-
-## 725 COMMIT Unreleased aef121f 2026-08-29T19:43:26-07:00
-
-#### Coming From:
-
-Unreleased aef121f
-
-#### Purpose:
-
-Record the authored I/P-only corruption result and isolate original I-picture reconstruction from P-picture prediction next.
-
-#### Outcome:
-
-The user plays `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_only.m2v` and reports visible block corruption.  Because source `aef121f` removed every complete B-picture unit while proving all 27 I and 115 P picture units byte-for-byte identical to the clean software source, the original large artifact does not require B decoding, bidirectional prediction or B presentation.  This supersedes entry 719's preliminary localization from a full re-encode and narrows the hardware defect to authored I/P content, most likely P forward prediction, its reference selection, or its residual reconstruction; stream-level signalling shared by those retained pictures remains a secondary possibility.  The intentionally shortened cadence does not alter retained coded pixels, and no screenshot or telemetry is needed to establish the user's positive visual observation.  No source, installed media, RBF, Main, helper or configuration changes.
-
-#### Next Steps:
-
-Extend the deterministic transformer to create a byte-exact authored I-only diagnostic that removes every P and B unit and repeats each retained I-picture unit enough times to hold each independent frame visibly without altering its coded bytes.  Preserve required sequence and GOP signalling, retain exactly one terminal sequence-end code, prove all 27 distinct source I units byte-identical, and require a clean complete software decode before installation under a new absolute filename.  The next hardware test should play that held I-only stream once in `800x600 Diagnostic` with Weave.  A clean result isolates P prediction or P residual reconstruction; corruption would implicate an authored I-picture or shared intra/quantization feature.  Tool modification and test-media installation require a separate explicit user instruction; do not change or rebuild the FPGA.
-
-#### Files Modified:
-
-None.
 
 #### Status:
 
