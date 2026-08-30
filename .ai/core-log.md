@@ -1,3 +1,32 @@
+## 762 COMMIT Unreleased cee1a9e 2026-08-30T05:00:54-07:00
+
+#### Coming From:
+
+Unreleased cee1a9e
+
+#### Purpose:
+
+Prepare the remaining commercial-DVD five-minute compatibility test and record fitter seed 19 as the required setting for future builds.
+
+#### Outcome:
+
+The user confirms that the accepted RBF was built with fitter seed 19 and directs that seed 19 be used going forward, resolving the reproducibility choice left by entry 761; this decision does not require rebuilding or replacing the already accepted installed artifact during the present media-only test.  Read-only inventory on the build PC identifies Blazing Saddles as the sole remaining DVD source under `/home/vash/Videos`, and FFmpeg's DVD-video demuxer identifies title 2 as the 5,567-second main feature with 720x480 anamorphic 16:9 MPEG-2 video and English six-channel AC-3 as its primary audio.  The approved plan is to stream-copy only the first five minutes of that main feature into an MPEG program stream, verify its exact streams, duration and complete software decode, install it under a new absolute filename in `/media/fat/games/MediaPlayer`, and independently verify the installed bytes before requesting one Native 480i hardware run.  The DVD sources, repository, FPGA, installed RBF, Main, helper and existing media remain unchanged at this proposal boundary.
+
+#### Next Steps:
+
+Create `blazing_saddles_first_5min.mpg` on the build PC from DVD title 2 with only the primary MPEG-2 video and English AC-3 stream, without transcoding.  Require a duration of approximately 300 seconds, correct 720x480 anamorphic 16:9 metadata, a clean complete software decode and recorded size and SHA-256; then upload it to `/media/fat/games/MediaPlayer/blazing_saddles_first_5min.mpg` and prove an independent readback byte-for-byte before asking the user to play it once in Native 480i at 16:9.  Before any later Quartus build, change the repository QSF from seed 17 to the now-required seed 19 as part of that build's source boundary.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 761 COMMIT Unreleased cee1a9e 2026-08-30T04:52:39-07:00
 
 #### Coming From:
@@ -1129,34 +1158,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 722 COMMIT Unreleased 8fd16e8 2026-08-29T19:22:06-07:00
-
-#### Coming From:
-
-Unreleased 8fd16e8
-
-#### Purpose:
-
-Record the verified construction and installation of the sequence-end-corrected matched interlaced I/P/B fixture.
-
-#### Outcome:
-
-Following the authorized entry-721 plan, `/tmp/coming_to_america_interlaced_12s_ipb_matched_end.m2v` is created from the exact entry-720 matched file by appending only the four bytes `00 00 01 b7`.  The original is 4,844,180 bytes with SHA-256 `0739de2a5568e21f3e68031b96b340bfda0e669f0a465322486f14788bc951b0`; the corrected copy is 4,844,184 bytes with SHA-256 `0a3a2ed8612aa292bf77eb61d920a780b4063868192bc54bda91f369e3a18221`, and bytewise prefix comparison proves every original byte unchanged.  The corrected tail is the required H.262 sequence-end code, FFprobe still enumerates exactly 361 720x480 TFF interlaced pictures at 30000/1001 comprising 25 I, 96 P and 240 B, and a complete FFmpeg software decode exits without an error.  Absolute FTP inventory first proves the new filename absent, then the fixture is uploaded as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_ipb_matched_end.m2v`; independent absolute-path readback reproduces all 4,844,184 bytes, the exact `0a3a2ed8` hash and the terminal sequence-end code.  Both prior comparison fixtures, source, RBF, Main, helper and configuration remain unchanged.
-
-#### Next Steps:
-
-With `Interlaced output` at `800x600 Diagnostic` and Weave selected, play `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_ipb_matched_end.m2v` once and report whether it reaches a stable end, whether the large shiny-hat block corruption remains absent, and whether the tiny vertical lines or cadence stutter differ from the prior matched run.  This is an elementary video stream, so silence is expected.  Do not capture telemetry unless the user explicitly requests it.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
