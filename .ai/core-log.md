@@ -1,3 +1,32 @@
+## 723 COMMIT Unreleased 8fd16e8 2026-08-29T19:25:05-07:00
+
+#### Coming From:
+
+Unreleased 8fd16e8
+
+#### Purpose:
+
+Accept the corrected matched I/P/B hardware run and define the next authored-stream isolation test.
+
+#### Outcome:
+
+The user reports that `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_ipb_matched_end.m2v` looks visually the same as the prior matched run: the large shiny-hat macroblock corruption remains absent, while the previously observed narrow vertical artifacts remain.  At the user's explicit request, one completed screenshot is collected locally as `/tmp/entry722_ipb_matched_end_completed.png`, 334,485 bytes with SHA-256 `a4c476c9012cd21f7ced7eaacd939455fbf22cdea97d086b8dc4eab46e398781`; it visibly retains the narrow vertical line artifacts and the long-standing tiny green crawl at the left edge but shows no large corrupted blocks.  Its checksum-valid schema-20 telemetry accepts all 4,844,184 bytes and displays all 361 encoded pictures across 360 swaps, comprising 121 reference pictures and all 240 B pictures.  Sequence end, presentation completion and quiet session are true, the scheduler is fully drained, and error flags, presentation faults, cache overlap faults, deadline gaps, cadence outliers, transport blocks and timestamp conflicts are all zero.  The measured presentation span is 12.0259 seconds at 29.935 displayed pictures per second.  This clean terminal result proves the four-byte correction resolved only the generated fixture's terminal-drain confound and confirms that ordinary B-picture presence is insufficient to reproduce the original authored stream's large corruption; no source, RBF, Main, helper, configuration or installed media changes during capture.
+
+#### Next Steps:
+
+Prepare one bit-exact B-stripped derivative of the original authored `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s.m2v`: preserve every sequence, GOP, I-picture and P-picture byte unchanged, remove only complete B-picture units, and retain exactly one terminal sequence-end code.  Verify that the resulting 142 I/P pictures are byte-for-byte the original coded units and decode cleanly in software, then install it under a new absolute filename.  The next hardware test should play that deliberately shorter and jerkier authored I/P stream once in `800x600 Diagnostic` with Weave and report whether any large shiny-hat corruption remains.  Corruption would implicate original P/reference reconstruction; a clean result would isolate the original B-picture units without conflating the result with a full re-encode.  Test-media preparation and installation require a separate explicit user instruction; do not change or rebuild the FPGA.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 722 COMMIT Unreleased 8fd16e8 2026-08-29T19:22:06-07:00
 
 #### Coming From:
@@ -1268,34 +1297,5 @@ Have the user select S/PDIF before playback, hold one deinterlacer mode fixed an
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 683 COMMIT Unreleased 83c138e 2026-08-28T13:25:50-07:00
-
-#### Coming From:
-
-Unreleased 83c138e
-
-#### Purpose:
-
-Record the accepted original-DVD-opening hardware test with original audio on the seed-20 candidate.
-
-#### Outcome:
-
-The user reports that everything looks and sounds perfect after the seed-20 installation and explicit reload handoff. Helper-first collection identifies dvd_opening_original.mpg with HDMI decoded stereo AC-3, all 375 audio frames and 576,000 samples decoded and emitted, and exit zero after 12,818,502 completed transport bytes; all 784 pipe reads reconcile to that total and no slow-path bytes are reported. Two completed screenshots are byte-identical, show the final Universal opening frame and produce matching checksum-valid schema-19 telemetry. The first download raced screenshot writing and was truncated; retrieving the same remote file after completion fixes collection without changing pixels or replaying. Telemetry reaches quiet sequence end with presentation complete, 128 reference plus 161 B pictures, 289 bank-derived display pictures, 288 swaps, all 25 associated timestamps and 10,334,168 accepted video bytes. Error flags are zero, including no recorded audio underrun, PCM protocol fault, presentation fault or cache-bank overlap error. FTP readback matches the installed 83c138e seed-20 RBF, original clip and unchanged Main, helper and undated core. Functional hardware acceptance is scoped to this original opening and audio test; Weave was requested in the handoff, while motion and audible quality rely on the user report. Legacy diagnostics remain visible: 287 deadline events, 145 outliers, largest bank-change intervals of 83.44845, 83.384883 and 66.733333 milliseconds, 26 timestamp-advance conflicts and zero delay conflicts. These counters do not account for authored film cadence or directly trace unique publications; the timestamp-advance counter records due candidates outside a cadence slot rather than early publications. They neither negate the reported functional pass nor prove perfect hardware cadence, and the raw values are retained without being waived. Saturated PCM telemetry fields are not full sample totals. Existing simulation qualification retains its narrow terminal-cut exception. Raw images, binaries, movie and full logs remain local under output_files/entry683; decoded telemetry, scoped analysis, helper summary and hashes are published under .ai/current_results/entry683_*. No production change, build, deployment, mode change, core reload or playback is initiated by the agent.
-
-#### Next Steps:
-
-Preserve 83c138e seed 20 as the passed original-opening hardware baseline and retain the old core backup. Agree on the next validation boundary before additional work, such as replay or a longer continuous segment with original audio, while keeping Bob, passthrough, full-title playback and ISO/IFO navigation outside this acceptance. Do not infer broad DVD compatibility, exact hardware cadence or release qualification from this single successful opening test.
-
-#### Files Modified:
-
-- MediaPlayer.qsf
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
