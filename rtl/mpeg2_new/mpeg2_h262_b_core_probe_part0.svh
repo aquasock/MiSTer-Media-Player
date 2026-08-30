@@ -278,15 +278,17 @@ wire signed [9:0]  bpx_sel = motion_slot ? bpx1 : bpx;
 wire signed [10:0] fpy_frame_sel = motion_slot ? fpy1_frame : fpy_frame;
 wire signed [10:0] bpy_frame_sel = motion_slot ? bpy1_frame : bpy_frame;
 // Truncation toward zero, which is what H.262 DIV specifies.
-function automatic signed [9:0] half_toward_zero;
+// H.262 4.1 defines DIV as integer division toward minus infinity, so a
+// negative odd vertical PMV must use an arithmetic shift here (-3 DIV 2=-2).
+function automatic signed [9:0] half_floor;
     input signed [10:0] value;
     begin
-        half_toward_zero = value[10] ? -$signed((-value) >>> 1) : $signed(value >>> 1);
+        half_floor=$signed(value)>>>1;
     end
 endfunction
-wire signed [9:0] fpy_sel = field_motion ? half_toward_zero(fpy_frame_sel)
+wire signed [9:0] fpy_sel = field_motion ? half_floor(fpy_frame_sel)
                                          : $signed(fpy_frame_sel[9:0]);
-wire signed [9:0] bpy_sel = field_motion ? half_toward_zero(bpy_frame_sel)
+wire signed [9:0] bpy_sel = field_motion ? half_floor(bpy_frame_sel)
                                          : $signed(bpy_frame_sel[9:0]);
 reg signed [5:0] motion_code_pending; reg [10:0] motion_bits; reg [3:0] motion_len;
 reg [4:0] motion_residual_shift; reg [2:0] motion_residual_count;

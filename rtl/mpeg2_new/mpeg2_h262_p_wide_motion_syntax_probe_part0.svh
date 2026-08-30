@@ -263,16 +263,16 @@ wire signed [12:0] current_motion_y1_or_y =
 wire signed [12:0] predictor_x_sel = motion_slot ? predictor_x1 : predictor_x;
 wire signed [13:0] predictor_y_frame_sel =
     motion_slot ? predictor_y1_frame : predictor_y_frame;
-// Truncation toward zero, which is what H.262 DIV specifies.
-function automatic signed [12:0] half_toward_zero;
+// H.262 4.1 defines DIV as integer division toward minus infinity, so a
+// negative odd vertical PMV must use an arithmetic shift here (-3 DIV 2=-2).
+function automatic signed [12:0] half_floor;
     input signed [13:0] value;
     begin
-        half_toward_zero = value[13] ? -$signed((-value) >>> 1)
-                                     : $signed(value >>> 1);
+        half_floor=$signed(value)>>>1;
     end
 endfunction
 wire signed [12:0] predictor_y_sel =
-    field_motion ? half_toward_zero(predictor_y_frame_sel)
+    field_motion ? half_floor(predictor_y_frame_sel)
                  : $signed(predictor_y_frame_sel[12:0]);
 reg signed [5:0] motion_code_pending;
 reg [10:0] motion_vlc_bits;
