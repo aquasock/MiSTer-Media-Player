@@ -1,3 +1,33 @@
+## 780 COMMIT Unreleased ??? 2026-08-30T15:15:47-07:00
+
+#### Coming From:
+
+Unreleased 205bbd7
+
+#### Purpose:
+
+Make decrypted DVD ISO title starts safe when an authored open GOP begins with B pictures whose earlier reference lies outside the selected title boundary.
+
+#### Outcome:
+
+The approved ISO-capable 1,170,340-byte Main at SHA-256 `01229bc5` and reproducible static 817,700-byte helper at SHA-256 `73d2f507` are installed with independently verified rollbacks and readbacks while the accepted source-`205bbd7` seed-19 RBF remains unchanged.  The first hardware launch of the complete 6,501,636,096-byte Blazing Saddles image successfully opens the unencrypted ISO, selects longest title 2 at 5,567 seconds, identifies AC-3 private substream `0x80` and streams through the fast transport, but displays no video after the first I picture and raises checksum-valid schema-20 fatal telemetry with 7,997 accepted clean-video bytes, prediction error flag `0x0004`, one displayed reference picture and no presentation or audio error.  Byte-level native comparison against the exact hardware-passed five-minute MPG proves both paths are identical through the initial I picture; the ISO then retains temporal references B0 and B1 before the first forward P5 reference, whereas the correctly random-access-trimmed MPG begins I2, P5, B3 and B4.  The approved correction is confined to the helper's ISO initial random-access boundary and will discard only those leading B pictures that require the unavailable pre-title reference.
+
+#### Next Steps:
+
+Implement the bounded ISO-only leading-B filter without changing ordinary file playback, timestamps, audio scheduling, Main or FPGA logic.  Prove the exact Blazing Saddles opening becomes I2, P5, B3 and B4 byte-for-byte after filtering, run native file/ISO and existing program-stream regressions, build only the static ARM helper, preserve and stage-rename the installed helper with independent readback, then retry the same ISO in Native 480i at 16:9, Bob and HDMI before checking S/PDIF.
+
+#### Files Modified:
+
+- host/arm/ARCHITECTURE.md
+- host/arm/media_player_helper.c
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 779 COMMIT Unreleased 205bbd7 2026-08-30T14:31:18-07:00
 
 #### Coming From:
@@ -1144,34 +1174,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 740 COMMIT Unreleased 6196869 2026-08-29T20:30:00-07:00
-
-#### Coming From:
-
-Unreleased 6196869
-
-#### Purpose:
-
-Record verified construction and installation of the two finer authored I/P checkpoints ending at P91 and P97.
-
-#### Outcome:
-
-Using unchanged source `6196869` and the exact original authored stream, generate the authorized two-file batch.  The P91 stream ends on byte-identical zero-based source P91, removes 42 complete B units and preserves 8 I plus 42 P units unchanged; its 1,179,288 bytes have SHA-256 `80faae0bc0ef0bf3ba0b932fb1de6e0cf35368a108fc27bb55477019515b7add`.  The P97 stream ends on byte-identical source P97, removes 46 complete B units and preserves 8 I plus 44 P units unchanged; its 1,230,916 bytes have SHA-256 `40bc0591eb7b8a1581d51bf47fea92184b5c1aea14303f477f5e73521c15ca44`.  Independent FFprobe enumeration confirms respectively 50 and 52 720x480 pictures at 30000/1001, each with no B picture; both end with the required single `00 00 01 b7` sequence-end code and complete full FFmpeg software decode without error.  Absolute FTP inventory proves both new names absent; installation as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p91_checkpoint.m2v` and `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p97_checkpoint.m2v`, followed by independent absolute-path FTP readback, reproduces each exact byte count, SHA-256 and terminal sequence end.  No source, FPGA, RBF, Main, helper, existing media or configuration changes.
-
-#### Next Steps:
-
-In `800x600 Diagnostic` with Weave selected, play P91 first and inspect both the live passage and stable terminal framebuffer for block corruption, especially whether a bright highlight poisons the rest of its block.  Then play P97 and make the same observation.  Report `P91 clean` or `P91 corrupt`, followed by `P97 clean` or `P97 corrupt`; this will narrow the onset within the clean-P80 to corrupt-P100 interval.  Do not capture telemetry unless the user explicitly requests it, and do not change or rebuild the FPGA.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
