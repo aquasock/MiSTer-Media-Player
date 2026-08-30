@@ -1,4 +1,4 @@
-## 765 COMMIT Unreleased ??? 2026-08-30T05:19:43-07:00
+## 765 COMMIT Unreleased 65e8af3 2026-08-30T05:19:43-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Add exact NARA MPD-D2 media creation and verification plus native `.vob` selecti
 
 #### Outcome:
 
-The user explicitly approves the exact frame-picture MPD-D2 qualification plan and defers field-picture decoding as a disclosed limitation.  Static inspection finds that the helper already accepts VOB/MPEG-2 Program Stream contents but the pinned Main patch's file dispatcher recognizes only `.m2v`, `.mpg` and `.mpeg` video extensions, so a genuinely named `.vob` qualification file cannot currently launch through the normal MiSTer menu.  The approved source boundary adds `.vob` to that existing dispatcher and extends the deterministic media tool with a profile creator and strict verifier for the adopted NARA properties, including an 8 Mbps single-pass MPEG-2 Main Profile/Main Level intermediate, 720x480 at 30000/1001, interlaced top-field-first frame pictures, documented 16-bit stereo PCM source, 48 kHz 256 Kbps constant-bit-rate AC-3 and VOB/Program Stream output.  No source, Main binary, helper, FPGA, installed media or configuration has changed at this proposal boundary.
+The user explicitly approved the exact frame-picture MPD-D2 qualification plan and deferred field-picture decoding as a disclosed limitation.  Commit `e6462db` added `.vob` to the pinned Main file dispatcher and added deterministic `mpd-d2-create` and strict `mpd-d2-verify` commands for the adopted NARA properties: an 8 Mbps single-pass MPEG-2 Main Profile/Main Level intermediate, 720x480 at 30000/1001, interlaced top-field-first frame pictures, documented 16-bit stereo PCM source, 48 kHz 256 Kbps constant-bit-rate AC-3 and VOB/Program Stream output.  Local syntax, rejection-path, full-decode, per-frame interlace and two-run byte-determinism checks passed with a generated two-second fixture.  The first pinned Main build exposed an incorrect new-file hunk count after the `.vob` line was added; commit `65e8af3` corrected only that patch metadata.  A fresh exact-commit build on the authorized build PC then passed and produced a stripped ARM EABI5 hard-float executable, 1,170,340 bytes, SHA-256 `40e15ff2c89dc1580a0bcb746deeb8186ebfcc0ef1155f6ac9ce17cba8125d41`.
 
 #### Next Steps:
 
-Implement only the approved Main extension and MPD-D2 tool commands, perform shell syntax and failure-path checks, generate a short exact fixture and require every verifier property plus complete software decode to pass.  Commit that source boundary before building the pinned Main on the build PC.  Preserve and independently hash the installed MiSTer Main before replacement, install only a successfully built and identified candidate, verify readback, then generate and install the retained qualification VOB for complete HDMI and S/PDIF hardware testing.
+Generate the retained five-minute MPD-D2 qualification VOB from the validated Blazing Saddles source, require the committed verifier and a complete software decode to pass, and preserve its manifest and hashes.  Preserve and independently hash the installed MiSTer Main before replacing it with the built candidate, verify both Main and VOB by target readback, then reboot to activate Main and complete HDMI and S/PDIF hardware playback gates.
 
 #### Files Modified:
 
@@ -23,7 +23,7 @@ Implement only the approved Main extension and MPD-D2 tool commands, perform she
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
