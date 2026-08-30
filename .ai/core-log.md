@@ -1,3 +1,32 @@
+## 732 COMMIT Unreleased 6196869 2026-08-29T20:12:18-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Accept the clean P69 terminal checkpoint and advance the authored P-chain search to P71.
+
+#### Outcome:
+
+The user plays `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p69_checkpoint.m2v` and reports no large block distortion.  The requested terminal capture proves all 405,108 bytes are accepted, all 32 pictures display across 31 swaps, final picture type is P with temporal reference 9, sequence end and presentation completion are true, the session is quiet and the scheduler is fully drained.  The 1.1509-second presentation records zero error flags, presentation faults, cache overlap faults, deadline gaps, cadence outliers, transport blocks or timestamp conflicts.  The 329,070-byte screenshot `/tmp/entry731_p69_checkpoint_completed.png`, SHA-256 `2a6e8b739feac7b60a4e7d164943234bcc1e427e2b4da2c9e92e8f26b0348e23`, shows the intended stable P69 fade-stage framebuffer without large macroblock corruption; the previously separated narrow vertical-line artifact remains visible and is not counted as the block defect.  Exact P66 and P69 are therefore clean, narrowing the first large authored P corruption to P70 through P72.  No source, installed media, RBF, Main, helper or configuration changes during capture.
+
+#### Next Steps:
+
+Use unchanged source `6196869` to generate and install a byte-exact I/P checkpoint ending at zero-based coded P71, the midpoint of the remaining P70 through P72 interval.  Preserve every retained I/P unit, remove only B units, append one terminal sequence-end code, verify exact P71 termination and clean software decode, and require absolute-path FTP readback equality.  The next hardware test should inspect the stable terminal P71 framebuffer.  Corruption narrows first onset to P70 or P71; a clean result isolates P72.  Test-media generation and installation require a separate explicit user instruction; do not change or rebuild the FPGA.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 731 COMMIT Unreleased 6196869 2026-08-29T20:09:50-07:00
 
 #### Coming From:
@@ -1257,35 +1286,6 @@ The build compiled once with no reseed and closed timing: worst setup slack impr
 - rtl/mpeg2_new/mpeg2_h262_clean_video_queue.sv
 - rtl/mpeg2_new/mpeg2_h262_hardware_cadence_profiler.sv
 - tools/streams/decode_hardware_cadence.py
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 692 COMMIT Unreleased 9956c8e 2026-08-28T20:39:32-07:00
-
-#### Coming From:
-
-Unreleased 8423f20
-
-#### Purpose:
-
-Instrument helper PCM delivery against the sink clock so the entry 691 audio deficit can be measured on one short hardware run.
-
-#### Outcome:
-
-The instrumentation is committed as `9956c8e`, built with MiSTer's official ARM GNU 10.2 toolchain, installed on the MiSTer at 10.10.0.30 with the replaced helper backed up and every readback hash verified, and run against the full file to completion; it exonerates the helper and relocates the fault. Equivalence was proven before installation: baseline and instrumented native helpers produce byte-identical 12,818,397 byte transports in both output modes, and a throttled run at approximately hardware transport rate reproduces that identical transport while emitting the new report. Across 870 reports over 1,137 seconds the signed difference between frames emitted and frames the sink will have consumed is never positive, meaning the helper is never behind, and it holds a lead between 1.08 and 2.11 seconds with a mean emission rate of 47,972.3 frames per second against forty-eight thousand, a residual drift of 27.7 frames per second that would need far longer than the observed failure time to exhaust the lead. The hypothesis this cycle was built to test, a systematic helper pacing deficit, is therefore disproved by its own measurement. Offline analysis of the full 1,126,974,123 byte transport, which matches the byte count hardware submitted, shows 3,420,000 PCM records carrying 54,720,000 frames, exactly 1,140.00 seconds of audio, and shows the interleave guard holding everywhere: the largest run of video between two PCM records in the entire transport is 28,672 bytes and is the startup burst at byte 28,672, while every other gap is at most 4,121 bytes, the 4,096 byte free-video guard plus record overhead. A constant transport byte rate FIFO model was built and discarded because it predicts starvation from 3.45 seconds, which hardware contradicts by playing correctly for eighty-four; delivery is bursty, which the measured lead already showed. With average rate, lead and interleave all correct, the fault is downstream, and it is structural: in mpeg2_h262_inband_metadata.sv the single gate input_ready requires stream_ready, so when the 65,536 byte clean video queue fills, the entire shared byte path halts and every PCM record behind the held video byte halts with it, exactly the condition entry 687 observed empirically and attributed to helper delivery. The audio FIFO is 8,192 frames, 170 milliseconds, which bounds how long that block can last before starvation. Three runs latched the underrun at 83.5, 85.4 and 84 seconds, twice with an identical 1,998 picture count, and the twelve second opening never reaches the sustained decode load that fills the queue. Entry 688 improved startup because that was genuinely a helper horizon problem and left this untouched because it never was one.
-
-#### Next Steps:
-
-Correct the coupling in the FPGA, not in the helper, which entry 693 plans by first measuring the maximum continuous interval the shared path stays blocked so the fix is sized from a real number rather than chosen. Prefer removing the coupling between audio extraction and video backpressure over widening either buffer, since a larger audio FIFO only fails at a longer stall instead of never. Keep this helper installed while that work proceeds so helper and FPGA behavior stay separable, and leave the accepted bitstream untouched until a replacement is validated. The HDMI session of the bounded opening remains outstanding from entry 690.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
 
 #### Status:
 
