@@ -650,7 +650,7 @@ module tb_h262_live_raster_soak #(
                 target_pixel_trace_fd=$fopen(target_pixel_trace_path,"w");
                 if(target_pixel_trace_fd==0)$fatal(1,"cannot write target pixel trace");
                 $fdisplay(target_pixel_trace_fd,
-                    "cycle,coded,display,tr,component,x,y,rtl,oracle,delta,mbi,mb_col,mb_row,block,element");
+                    "cycle,coded,display,tr,component,x,y,rtl,oracle,delta,mbi,mb_col,mb_row,block,element,predicted,residual,reconstructed,field_motion,field_dct,fsel0,fsel1,mvx0,mvy0,mvx1,mvy1,src_x,src_y,residual_hit,desc_slot,desc_word");
             end
             if(!$value$plusargs("MAP=%s",map_path))$fatal(1,"missing +MAP");
             $readmemh(map_path,coded_to_display,0,PIXEL_PICTURES-1);
@@ -1299,13 +1299,29 @@ module tb_h262_live_raster_soak #(
                pixel_delta>=target_pixel_min_delta&&
                target_pixel_trace_count<target_pixel_trace_limit)begin
                 $fdisplay(target_pixel_trace_fd,
-                    "%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d",
+                    "%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0d,%0h",
                     total_cycles,coded_picture,source_pixel_picture,
                     temporal_reference,pixel_component,pixel_x,pixel_y,
                     pred_store_value,pixel_oracle[pixel_index],pixel_delta,
                     prediction.mixed_probe.mbi,prediction.mixed_probe.col,
                     prediction.mixed_probe.mrow,prediction.mixed_probe.blk,
-                    prediction.mixed_probe.ei);
+                    prediction.mixed_probe.ei,
+                    prediction.mixed_probe.lookup_predicted_current,
+                    prediction.mixed_probe.residual_pel_q,
+                    prediction.mixed_probe.lookup_reconstructed_current,
+                    prediction.mixed_probe.mb_field,
+                    prediction.mixed_probe.block_field_dct,
+                    prediction.mixed_probe.mb_fsel0,
+                    prediction.mixed_probe.mb_fsel1,
+                    prediction.mixed_probe.mb_mvx,
+                    prediction.mixed_probe.mb_mvy,
+                    prediction.mixed_probe.mb_mvx1,
+                    prediction.mixed_probe.mb_mvy1,
+                    prediction.mixed_probe.src_base_x,
+                    prediction.mixed_probe.src_base_y,
+                    prediction.mixed_probe.residual_hit,
+                    prediction.mixed_probe.exec_desc_slot,
+                    prediction.mixed_probe.desc_word);
                 target_pixel_trace_count=target_pixel_trace_count+1;
                 $fflush(target_pixel_trace_fd);
             end
