@@ -1,3 +1,39 @@
+## 782 COMMIT Unreleased ??? 2026-08-30T15:41:39-07:00
+
+#### Coming From:
+
+Unreleased 0711d3d
+
+#### Purpose:
+
+Add encrypted DVD ISO main-feature playback through a pinned host-side libdvdcss dependency without expanding into physical discs or menus.
+
+#### Outcome:
+
+The user selects encrypted ISO files as the next target and agrees that technical decryption and licensing or distribution policy remain separate concerns.  Official VideoLAN material identifies libdvdcss 1.6.0, released in July 2026 under GPLv2, as the current library for transparent encrypted DVD block access; its 83,640-byte source archive is independently verified at SHA-256 `7ea556c8`.  The approved implementation will replace the deliberate unencrypted-only libdvdread build patch with a reproducibly pinned static libdvdcss build, link it directly beneath the existing callback-backed `iso:` source and retain longest-title selection, open-GOP startup filtering and every downstream audio/video behavior.  This is an implementation dependency rather than a substitute for the unavailable authorized DVD CCA specification, so no CSS-conformance claim will be made.
+
+#### Next Steps:
+
+Build libdvdcss 1.6.0 natively and for ARM before libdvdread, require direct static linkage with no runtime shared-library dependency, update ISO diagnostics and documentation, and prove the ordinary decrypted Blazing Saddles ISO and MPG paths remain unchanged.  Then validate sector decryption and complete native opening against an authorized genuinely CSS-scrambled ISO fixture, build only the static ARM helper, preserve and stage-rename the installed helper with independent readback, and qualify that same encrypted ISO on HDMI and S/PDIF without changing Main, the seed-19 RBF or FPGA source.
+
+#### Files Modified:
+
+- CHANGELOG.md
+- README.md
+- docs/BUILDING.md
+- host/arm/ARCHITECTURE.md
+- host/arm/Makefile
+- host/arm/libdvdread-disable-css.patch
+- host/arm/media_source.c
+- host/build_arm_stack.sh
+
+#### Status:
+
+- [ ] Built
+- [ ] Passed
+
+---
+
 ## 781 COMMIT Unreleased 0711d3d 2026-08-30T15:36:06-07:00
 
 #### Coming From:
@@ -1145,34 +1181,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 742 COMMIT Unreleased 6196869 2026-08-29T20:35:17-07:00
-
-#### Coming From:
-
-Unreleased 6196869
-
-#### Purpose:
-
-Record verified construction and installation of the GOP-boundary checkpoints ending at P85 and I88.
-
-#### Outcome:
-
-Using unchanged source `6196869` and the exact original authored stream, generate the authorized pair.  The P85 stream ends on byte-identical zero-based source P85, removes 38 complete B units and preserves 7 I plus 41 P units unchanged; its 1,105,168 bytes have SHA-256 `d31c51a5c94df9bee1025f3acf510c60f05872274f6af5815a4c3bd717bff369`.  The I88 stream ends on byte-identical source I88 after removing 40 complete B units and preserves 8 I plus 41 P units unchanged; its 1,153,180 bytes have SHA-256 `efb95578db11f2dabb6b8d174bbd7e3e02f2cc184d8045ee96f1b8eeb00eee6f`.  Independent FFprobe enumeration confirms respectively 48 and 49 720x480 pictures at 30000/1001 with no B picture; both end with the required single `00 00 01 b7` sequence-end code and complete full FFmpeg software decode without error.  Absolute FTP inventory proves both new names absent; installation as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p85_checkpoint.m2v` and `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_i88_checkpoint.m2v`, followed by independent absolute-path FTP readback, reproduces each exact byte count, SHA-256 and terminal sequence end.  No source, FPGA, RBF, Main, helper, existing media or configuration changes.
-
-#### Next Steps:
-
-In `800x600 Diagnostic` with Weave selected, play P85 first and inspect its stable terminal frame for the central corruption seen at P91; then play I88 and inspect its stable terminal frame separately.  Report `P85 clean` or `P85 corrupt`, followed by `I88 clean` or `I88 corrupt`.  If both are clean, the first corrupted retained frame is exactly P91, the first P picture dependent on I88.  Do not capture telemetry unless the user explicitly requests it, and do not change or rebuild the FPGA.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
