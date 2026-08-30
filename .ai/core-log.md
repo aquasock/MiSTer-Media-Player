@@ -1,3 +1,32 @@
+## 740 COMMIT Unreleased 6196869 2026-08-29T20:30:00-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Record verified construction and installation of the two finer authored I/P checkpoints ending at P91 and P97.
+
+#### Outcome:
+
+Using unchanged source `6196869` and the exact original authored stream, generate the authorized two-file batch.  The P91 stream ends on byte-identical zero-based source P91, removes 42 complete B units and preserves 8 I plus 42 P units unchanged; its 1,179,288 bytes have SHA-256 `80faae0bc0ef0bf3ba0b932fb1de6e0cf35368a108fc27bb55477019515b7add`.  The P97 stream ends on byte-identical source P97, removes 46 complete B units and preserves 8 I plus 44 P units unchanged; its 1,230,916 bytes have SHA-256 `40bc0591eb7b8a1581d51bf47fea92184b5c1aea14303f477f5e73521c15ca44`.  Independent FFprobe enumeration confirms respectively 50 and 52 720x480 pictures at 30000/1001, each with no B picture; both end with the required single `00 00 01 b7` sequence-end code and complete full FFmpeg software decode without error.  Absolute FTP inventory proves both new names absent; installation as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p91_checkpoint.m2v` and `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p97_checkpoint.m2v`, followed by independent absolute-path FTP readback, reproduces each exact byte count, SHA-256 and terminal sequence end.  No source, FPGA, RBF, Main, helper, existing media or configuration changes.
+
+#### Next Steps:
+
+In `800x600 Diagnostic` with Weave selected, play P91 first and inspect both the live passage and stable terminal framebuffer for block corruption, especially whether a bright highlight poisons the rest of its block.  Then play P97 and make the same observation.  Report `P91 clean` or `P91 corrupt`, followed by `P97 clean` or `P97 corrupt`; this will narrow the onset within the clean-P80 to corrupt-P100 interval.  Do not capture telemetry unless the user explicitly requests it, and do not change or rebuild the FPGA.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 739 COMMIT Unreleased 6196869 2026-08-29T20:28:15-07:00
 
 #### Coming From:
@@ -1181,53 +1210,6 @@ Pull exact published source `736f64f` into a new isolated checkout and perform o
 - rtl/mpeg2_new/mpeg2_h262_prediction_block_fetcher.sv
 - tools/streams/run_b_field_motion.sh
 - tools/streams/run_interlaced_field_motion.sh
-
-#### Status:
-
-- [ ] Built
-- [ ] Passed
-
----
-
-## 700 COMMIT Unreleased c2097e3 2026-08-29T02:45:24-07:00
-
-#### Coming From:
-
-Unreleased c39ebdc
-
-#### Purpose:
-
-Route decoded stereo PCM to the selected S/PDIF output while preserving IEC 61937 AC-3 and DTS passthrough as non-audio.
-
-#### Outcome:
-
-The accepted standalone formats were silent under the S/PDIF menu choice because the framework treated output selection and the IEC 60958 non-audio bit as the same state, sending raw words and marking every selected S/PDIF stream non-audio.  Source `c2097e3` reserves transport mode bit seven for IEC 61937 records, has only the helper's compressed-burst writer set it, preserves it through the in-band extractor, and separates `spdif_enable` from `spdif_non_audio` in the framework.  Selected decoded MP3, WAV, FLAC and Program Stream audio now use processed stereo PCM with ordinary audio channel status, while AC-3 and DTS passthrough retain raw byte-exact bursts and non-audio status; HDMI remains the alternate exclusive output and Main needs no code change.  Native and exact-checkout helper matrices pass, focused extractor and router simulations cover all four output states, decoded WAV, MP3 and FLAC carry no non-audio flag, and all 375 AC-3 plus 1,125 DTS bursts carry it and remain byte-identical.  The exact static ARM helper is 629,056 bytes with SHA-256 `02d1df98c62ee00169585db990b6bd48c3769eca20c3e1d594f2318c362eb00f`.  No Quartus build or installation occurred, so the helper is intentionally retained rather than installed without its matching FPGA image.
-
-#### Next Steps:
-
-Carry this correction unchanged through entry 701's clean FPGA build, then require a matched helper and RBF installation under separate authorization and physical MP3, WAV and FLAC listening over S/PDIF while preserving HDMI PCM and AC-3 and DTS receiver lock.
-
-#### Files Modified:
-
-- CHANGELOG.md
-- MediaPlayer_top_00.svh
-- README.md
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- rtl/mpeg2_new/mpeg2_h262_inband_metadata.sv
-- sys/audio_out.sv
-- sys/emu_ports.vh
-- sys/sys_top.v
-- tools/streams/analyze_arm_av_transport.py
-- tools/streams/run_audio_output_routing.sh
-- tools/streams/strip_inband_pcm.py
-- tools/streams/tb_audio_spdif_route.sv
-- tools/streams/tb_h262_inband_metadata.sv
-- tools/streams/verify_ac3_passthrough.py
-- tools/streams/verify_arm_av_pipeline.py
-- tools/streams/verify_consumer_flac.py
-- tools/streams/verify_consumer_wav.py
 
 #### Status:
 
