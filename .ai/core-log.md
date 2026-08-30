@@ -1,3 +1,32 @@
+## 730 COMMIT Unreleased 6196869 2026-08-29T20:08:11-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Prepare and install the byte-exact authored I/P checkpoint ending on P69.
+
+#### Outcome:
+
+The user explicitly authorizes the entry-729 P69 checkpoint after exact P66 completes cleanly.  Reuse source `6196869` and the exact original authored stream without modifying either.  Generate an I/P prefix ending immediately after zero-based coded P69, remove only complete B units within that retained prefix, preserve every retained I and P unit byte-for-byte, append exactly one sequence-end code, and install it under a new absolute MiSTer filename.  Leave every existing fixture, FPGA, Main, helper and configuration unchanged.
+
+#### Next Steps:
+
+Require the tool to prove exact P69 termination, enumerate only 720x480 TFF interlaced I/P pictures, retain one terminal sequence end and decode completely in software.  Require independent absolute-path FTP readback equality after installation.  Then have the user play the intentionally short checkpoint once in `800x600 Diagnostic` with Weave and inspect its stable terminal P69 framebuffer for large block corruption; corruption narrows onset to P67 through P69, while a clean result narrows it to P70 through P72.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 729 COMMIT Unreleased 6196869 2026-08-29T20:06:15-07:00
 
 #### Coming From:
@@ -1262,34 +1291,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 690 COMMIT Unreleased 8423f20 2026-08-28T19:24:00-07:00
-
-#### Coming From:
-
-Unreleased 8423f20
-
-#### Purpose:
-
-Record hardware acceptance of the entry 688 helper audio pacing correction installed in entry 689.
-
-#### Outcome:
-
-The user reports clean playback with no audible dropout or visible stutter and authorizes capture, and the captured telemetry accepts source commit `8423f20` in hardware. The helper on the MiSTer at 10.10.0.30 reads back as the installed candidate, 399,340 bytes with SHA-256 `fefaeb18b8c9e091a9cd9e97258e86264683f374f9663cb3ea6b99bafb81977a`, and the MiSTer Main executable, the original DVD opening and all three MediaPlayer RBF files reproduce their entry 689 hashes, so the run exercised the helper change alone with no FPGA reload. The helper log covers one complete S/PDIF session of `dvd_opening_original.mpg` in IEC 61937 passthrough on private substream 0x80, reaching end of file with child exit status zero after submitting all 12,818,397 transport bytes with 12,818,397 fast bytes, zero slow bytes and no would-block stall beyond the normal 286 startup events; the log contains no underrun, starvation, protocol or error record of any kind, which is the failure signature entry 687 diagnosed and entry 688 predicted would disappear. The schema 19 terminal snapshot taken while the completed opening was still displayed reports `audio_underrun` false, `pcm_protocol_error` false, `presentation_error` false, `error_flags` zero and no validation failures, with sequence end seen, presentation complete and a quiet session. Video delivered 289 pictures across 288 swaps in 12.138878 seconds for 23.725 fps against frame rate code 4, with 128 reference pictures, 161 B pictures and 10,334,169 accepted clean video bytes; the simulated full run in entry 688 predicted 10,334,168, a one-byte difference that is a counter boundary rather than a stream discrepancy. Two independent screenshots taken seconds apart are byte-identical at SHA-256 `8264e13456094ccb`-prefixed 316,577 bytes and both verify as complete PNGs, confirming the frozen completed frame. The `pcm_sample_count` field reads 16,383 and `pcm_fifo_peak` reads 127, the saturation values of their counters, so they bound rather than measure delivered audio and cannot be used as a frame total. The evidence captured here is the final S/PDIF session only, because the helper log is rewritten per playback; the HDMI repeat and the extended run over the longer file are user-reported as clean but are not represented in this telemetry, and the eighteen-minute observation window from entry 687 therefore remains unproven by captured evidence. Entry 689 is superseded on its open acceptance question, and the helper correction is accepted for the bounded original opening over S/PDIF.
-
-#### Next Steps:
-
-Capture the extended run before treating the long-duration case as closed, by starting the longer file over S/PDIF, letting it pass the prior eighteen-minute observation point, and pulling the helper log and terminal snapshot while that session is still resident so the absence of recurring underrun is evidenced rather than reported. Capture one HDMI session of the original opening the same way so both output forms have telemetry on record. If both are clean, close the audio delivery line of work and return to the entry 660 track, where whole-title playback, arbitrary interlaced P and B syntax, and ISO and IFO navigation remain outside any validated scope, and where a clean from-scratch Quartus build has still not been performed against current source. If an underrun reappears in the extended window, preserve the exact log and snapshot and reopen diagnosis without enlarging buffers, adding arbitrary delay or relaxing error criteria.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
