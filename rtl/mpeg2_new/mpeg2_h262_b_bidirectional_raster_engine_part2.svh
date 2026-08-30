@@ -275,43 +275,38 @@ wire [28:0] successor_phase1_base_addr=pixel_addr(
     successor_phase1_src_y[11:0]);
 wire [7:0] successor_row_words=successor_luma?8'd90:8'd45;
 
-wire [28:0] launch_phase0_base_addr=block_field_dct?field_dct_phase0_addr:
-    exec_field?field_pair0_addr:
-    (block_fetch_start_prefetch?
-        successor_phase0_base_addr:block_phase0_base_addr);
-wire [28:0] launch_phase1_base_addr=block_field_dct?field_dct_phase1_addr:
-    exec_field?field_pair1_addr:
-    (block_fetch_start_prefetch?
-        successor_phase1_base_addr:block_phase1_base_addr);
-wire launch_phase0_two_words=block_field_dct?field_dct_word_span[3]:
-    exec_field?field_pair0_span[3]:
-    (block_fetch_start_prefetch?
-        successor_phase0_word_span[3]:block_phase0_word_span[3]);
-wire launch_phase1_two_words=block_field_dct?field_dct_word_span[3]:
-    exec_field?field_pair1_span[3]:
-    (block_fetch_start_prefetch?
-        successor_phase1_word_span[3]:block_phase1_word_span[3]);
-wire launch_phase0_half_y=block_field_dct?field_dct_fetch_half_y:
-    exec_field?field_pair0_mvy[0]:
-    (block_fetch_start_prefetch?
-        successor_phase0_mvy[0]:block_phase0_half_y);
-wire launch_phase1_half_y=block_field_dct?field_dct_fetch_half_y:
-    exec_field?field_pair1_mvy[0]:
-    (block_fetch_start_prefetch?successor_bmvy[0]:exec_bmvy[0]);
+wire [28:0] current_launch_phase0_base_addr=
+    block_field_dct?field_dct_phase0_addr:
+    exec_field?field_pair0_addr:block_phase0_base_addr;
+wire [28:0] current_launch_phase1_base_addr=
+    block_field_dct?field_dct_phase1_addr:
+    exec_field?field_pair1_addr:block_phase1_base_addr;
+wire current_launch_phase0_two_words=
+    block_field_dct?field_dct_word_span[3]:
+    exec_field?field_pair0_span[3]:block_phase0_word_span[3];
+wire current_launch_phase1_two_words=
+    block_field_dct?field_dct_word_span[3]:
+    exec_field?field_pair1_span[3]:block_phase1_word_span[3];
+wire current_launch_phase0_half_y=
+    block_field_dct?field_dct_fetch_half_y:
+    exec_field?field_pair0_mvy[0]:block_phase0_half_y;
+wire current_launch_phase1_half_y=
+    block_field_dct?field_dct_fetch_half_y:
+    exec_field?field_pair1_mvy[0]:exec_bmvy[0];
 // A field macroblock never prefetches its successor, so these need no mux.
-wire [3:0] launch_phase0_rows=block_field_dct?
+wire [3:0] current_launch_phase0_rows=block_field_dct?
     (4'd8+(exec_field?{3'd0,field_dct_fetch_half_y}:4'd0)):
-    exec_field?(4'd4+{3'd0,launch_phase0_half_y})
-                                        :(4'd8+{3'd0,launch_phase0_half_y});
-wire [3:0] launch_phase1_rows=block_field_dct?4'd8:
-    exec_field?(4'd4+{3'd0,launch_phase1_half_y})
-                                        :(4'd8+{3'd0,launch_phase1_half_y});
-wire [2:0] launch_phase_count=block_field_dct?
+    exec_field?(4'd4+{3'd0,current_launch_phase0_half_y})
+                                :(4'd8+{3'd0,current_launch_phase0_half_y});
+wire [3:0] current_launch_phase1_rows=block_field_dct?4'd8:
+    exec_field?(4'd4+{3'd0,current_launch_phase1_half_y})
+                                :(4'd8+{3'd0,current_launch_phase1_half_y});
+wire [2:0] current_launch_phase_count=block_field_dct?
     (exec_field?3'd1:(field_dct_fetch_half_y?3'd2:3'd1)):
     exec_field?3'd2:
     ((exec_direction==2'd3)?3'd2:3'd1);
-wire [7:0] launch_row_words=block_fetch_start_prefetch?
-    successor_row_words:block_row_words;
+wire [7:0] current_launch_row_words=(exec_field||block_field_dct)?
+    {block_row_words[6:0],1'b0}:block_row_words;
 // Do not let a broadcast lookup sample a fetcher's previous retained word on
 // the same edge that start clears its validity map for a new block.
 wire block_lookup_request0=block_lookup_request&&
@@ -326,22 +321,21 @@ mpeg2_h262_prediction_block_fetcher #(
 ) block_fetcher(
     .clk(clk),.reset(reset),
     .start(block_fetch_start&&!block_fetch_start_bank),
-    .phase_count(launch_phase_count),
-    .phase0_base_addr(launch_phase0_base_addr),
-    .phase1_base_addr(launch_phase1_base_addr),
+    .phase_count(fetch_launch_phase_count),
+    .phase0_base_addr(fetch_launch_phase0_base_addr),
+    .phase1_base_addr(fetch_launch_phase1_base_addr),
     .phase2_base_addr(29'd0),
     .phase3_base_addr(29'd0),
-    .phase0_two_words(launch_phase0_two_words),
-    .phase1_two_words(launch_phase1_two_words),
+    .phase0_two_words(fetch_launch_phase0_two_words),
+    .phase1_two_words(fetch_launch_phase1_two_words),
     .phase2_two_words(1'b0),
     .phase3_two_words(1'b0),
-    .phase0_rows(launch_phase0_rows),
-    .phase1_rows(launch_phase1_rows),
+    .phase0_rows(fetch_launch_phase0_rows),
+    .phase1_rows(fetch_launch_phase1_rows),
     .phase2_rows(4'd0),
     .phase3_rows(4'd0),
     // A doubled stride makes each fetched row step one field line.
-    .row_words((exec_field||block_field_dct)?
-                   {launch_row_words[6:0],1'b0}:launch_row_words),
+    .row_words(fetch_launch_row_words),
     .memory_busy(ddram_busy),
     .memory_dout(ddram_dout),
     .memory_dout_ready(ddram_dout_ready&&block_fetch_active0),
@@ -363,22 +357,21 @@ mpeg2_h262_prediction_block_fetcher #(
 ) block_fetcher1(
     .clk(clk),.reset(reset),
     .start(block_fetch_start&&block_fetch_start_bank),
-    .phase_count(launch_phase_count),
-    .phase0_base_addr(launch_phase0_base_addr),
-    .phase1_base_addr(launch_phase1_base_addr),
+    .phase_count(fetch_launch_phase_count),
+    .phase0_base_addr(fetch_launch_phase0_base_addr),
+    .phase1_base_addr(fetch_launch_phase1_base_addr),
     .phase2_base_addr(29'd0),
     .phase3_base_addr(29'd0),
-    .phase0_two_words(launch_phase0_two_words),
-    .phase1_two_words(launch_phase1_two_words),
+    .phase0_two_words(fetch_launch_phase0_two_words),
+    .phase1_two_words(fetch_launch_phase1_two_words),
     .phase2_two_words(1'b0),
     .phase3_two_words(1'b0),
-    .phase0_rows(launch_phase0_rows),
-    .phase1_rows(launch_phase1_rows),
+    .phase0_rows(fetch_launch_phase0_rows),
+    .phase1_rows(fetch_launch_phase1_rows),
     .phase2_rows(4'd0),
     .phase3_rows(4'd0),
     // A doubled stride makes each fetched row step one field line.
-    .row_words((exec_field||block_field_dct)?
-                   {launch_row_words[6:0],1'b0}:launch_row_words),
+    .row_words(fetch_launch_row_words),
     .memory_busy(ddram_busy),
     .memory_dout(ddram_dout),
     .memory_dout_ready(ddram_dout_ready&&block_fetch_active1),
@@ -738,22 +731,18 @@ wire [1:0] block_request_tap=lookup_advance?
     (bidir_lookup_candidate||next_pixel_lookup_candidate)?2'd0:tap_index;
 // The vector belongs to the direction being looked up and, under field
 // prediction, to the slot matching the pixel's destination parity.
-wire block_request_backward=block_field_dct?
-    ((exec_direction==2'd2)||block_lookup_direction):exec_field?
-    ((exec_direction==2'd2)||block_lookup_direction)
-                                      :block_lookup_phase[0];
+wire block_request_backward=
+    (exec_direction==2'd2)||block_lookup_direction;
 wire signed [9:0] block_request_mvx=block_field_dct?
     (exec_field?field_mv_x(block_request_backward,field_dct_slot):
                 (block_request_backward?exec_bmvx:exec_fmvx)):exec_field?
-    field_mv_x(block_request_backward,block_lookup_phase[0]):
-    (block_lookup_phase[0]?exec_bmvx
-                          :((exec_direction==2'd2)?exec_bmvx:exec_fmvx));
+    field_mv_x(block_request_backward,block_request_ei[3]):
+    (block_request_backward?exec_bmvx:exec_fmvx);
 wire signed [9:0] block_request_mvy=block_field_dct?
     (exec_field?field_mv_y(block_request_backward,field_dct_slot):
                 (block_request_backward?exec_bmvy:exec_fmvy)):exec_field?
-    field_mv_y(block_request_backward,block_lookup_phase[0]):
-    (block_lookup_phase[0]?exec_bmvy
-                          :((exec_direction==2'd2)?exec_bmvy:exec_fmvy));
+    field_mv_y(block_request_backward,block_request_ei[3]):
+    (block_request_backward?exec_bmvy:exec_fmvy);
 wire block_request_half_x=block_request_mvx[0];
 wire block_request_half_y=block_request_mvy[0];
 wire block_request_tap_dx=
@@ -830,6 +819,7 @@ always @(posedge clk) begin
         exec_direction<=0;exec_fmvx<=0;exec_fmvy<=0;exec_bmvx<=0;exec_bmvy<=0;
         exec_fmvx1<=0;exec_fmvy1<=0;exec_bmvx1<=0;exec_bmvy1<=0;
         exec_field<=0;exec_fsel0<=0;exec_fsel1<=0;exec_bsel0<=0;exec_bsel1<=0;
+        exec_block_field_dct<=0;
         phase_mvx<=0;phase_mvy<=0;phase_backward<=0;
         bidir_prelaunch_addr<=0;next_prelaunch_addr<=0;
         miss_prelaunch_addr<=0;miss_prelaunch_byte<=0;
@@ -850,7 +840,11 @@ always @(posedge clk) begin
         pred_direction<=0;tap_index<=0;pred_sum<=0;forward_prediction<=0;out_reg<=0;tap_byte_sel<=0;
         emit_advanced<=0;emit_x<=0;emit_y<=0;emit_block_start<=0;emit_block_complete<=0;
         block_fetch_start<=0;block_fetch_start_bank<=0;
-        block_fetch_start_prefetch<=0;block_consumer_bank<=0;
+        fetch_launch_phase_count<=0;
+        fetch_launch_phase0_base_addr<=0;fetch_launch_phase1_base_addr<=0;
+        fetch_launch_phase0_two_words<=0;fetch_launch_phase1_two_words<=0;
+        fetch_launch_phase0_rows<=0;fetch_launch_phase1_rows<=0;
+        fetch_launch_row_words<=0;block_consumer_bank<=0;
         block_prefetch_valid<=0;block_current_prefetched<=0;
         block_current_started<=0;
         field_second_fetch_pending<=0;field_second_fetch_launch<=0;

@@ -56,6 +56,7 @@
             residual_load<=0;residual_load_wait<=1;
             exec_direction<=mb_direction;
             exec_field<=mb_field;
+            exec_block_field_dct<=mb_field_dct&&(blk<4);
             exec_fsel0<=mb_fsel0;exec_fsel1<=mb_fsel1;
             exec_bsel0<=mb_bsel0;exec_bsel1<=mb_bsel1;
             if(blk<4) begin
@@ -97,7 +98,18 @@
                 else begin
                     block_fetch_start<=1;
                     block_fetch_start_bank<=block_consumer_bank;
-                    block_fetch_start_prefetch<=0;
+                    fetch_launch_phase_count<=current_launch_phase_count;
+                    fetch_launch_phase0_base_addr<=
+                        current_launch_phase0_base_addr;
+                    fetch_launch_phase1_base_addr<=
+                        current_launch_phase1_base_addr;
+                    fetch_launch_phase0_two_words<=
+                        current_launch_phase0_two_words;
+                    fetch_launch_phase1_two_words<=
+                        current_launch_phase1_two_words;
+                    fetch_launch_phase0_rows<=current_launch_phase0_rows;
+                    fetch_launch_phase1_rows<=current_launch_phase1_rows;
+                    fetch_launch_row_words<=current_launch_row_words;
                     block_current_started<=1;
                     field_fetch_backward<=0;
                     field_second_fetch_launch<=0;
@@ -135,7 +147,18 @@
                                field_pair_bounds_ok)begin
                 block_fetch_start<=1;
                 block_fetch_start_bank<=~block_consumer_bank;
-                block_fetch_start_prefetch<=0;
+                fetch_launch_phase_count<=current_launch_phase_count;
+                fetch_launch_phase0_base_addr<=
+                    current_launch_phase0_base_addr;
+                fetch_launch_phase1_base_addr<=
+                    current_launch_phase1_base_addr;
+                fetch_launch_phase0_two_words<=
+                    current_launch_phase0_two_words;
+                fetch_launch_phase1_two_words<=
+                    current_launch_phase1_two_words;
+                fetch_launch_phase0_rows<=current_launch_phase0_rows;
+                fetch_launch_phase1_rows<=current_launch_phase1_rows;
+                fetch_launch_row_words<=current_launch_row_words;
                 field_second_fetch_started<=1;
                 block_phase2_base_byte<=block_field_dct?
                     field_dct_fetch_x[2:0]:field_pair0_base_x[2:0];
@@ -168,7 +191,17 @@
            successor_all_bounds_ok)begin
             block_fetch_start<=1;
             block_fetch_start_bank<=~block_consumer_bank;
-            block_fetch_start_prefetch<=1;
+            fetch_launch_phase_count<=
+                (exec_direction==2'd3)?3'd2:3'd1;
+            fetch_launch_phase0_base_addr<=successor_phase0_base_addr;
+            fetch_launch_phase1_base_addr<=successor_phase1_base_addr;
+            fetch_launch_phase0_two_words<=successor_phase0_word_span[3];
+            fetch_launch_phase1_two_words<=successor_phase1_word_span[3];
+            fetch_launch_phase0_rows<=
+                4'd8+{3'd0,successor_phase0_mvy[0]};
+            fetch_launch_phase1_rows<=
+                4'd8+{3'd0,successor_bmvy[0]};
+            fetch_launch_row_words<=successor_row_words;
             block_prefetch_valid<=1;
         end
 

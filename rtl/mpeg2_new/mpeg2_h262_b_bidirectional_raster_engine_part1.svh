@@ -69,6 +69,7 @@ wire signed [9:0] mb_bmvy=$signed(motion_word[29:20]);
 (* preserve *) reg signed [9:0] exec_fmvx1,exec_fmvy1;
 (* preserve *) reg signed [9:0] exec_bmvx1,exec_bmvy1;
 (* preserve *) reg exec_field,exec_fsel0,exec_fsel1,exec_bsel0,exec_bsel1;
+(* preserve *) reg exec_block_field_dct;
 (* preserve *) reg signed [9:0] phase_mvx,phase_mvy;
 (* preserve *) reg phase_backward;
 (* preserve *) reg [28:0] bidir_prelaunch_addr,next_prelaunch_addr;
@@ -134,7 +135,16 @@ reg emit_advanced;
 reg [11:0] emit_x,emit_y;
 reg emit_block_start,emit_block_complete;
 reg block_fetch_start;
-reg block_fetch_start_bank,block_fetch_start_prefetch;
+reg block_fetch_start_bank;
+// Capture the complete footprint descriptor when a fetch is scheduled.  The
+// registered block_fetch_start pulse reaches the fetcher on the following
+// edge, so these registers remove direction, geometry and address arithmetic
+// from the fetcher's start-to-retained-descriptor path without another cycle.
+reg [2:0] fetch_launch_phase_count;
+reg [28:0] fetch_launch_phase0_base_addr,fetch_launch_phase1_base_addr;
+reg fetch_launch_phase0_two_words,fetch_launch_phase1_two_words;
+reg [3:0] fetch_launch_phase0_rows,fetch_launch_phase1_rows;
+reg [7:0] fetch_launch_row_words;
 reg block_consumer_bank,block_prefetch_valid,block_current_prefetched;
 reg block_current_started;
 // Entry 701: field-bidirectional blocks use the otherwise idle alternate
@@ -193,7 +203,7 @@ wire half_y=exec_mvy[0];
 wire [11:0] luma_x=({6'd0,col}<<4)+{8'd0,blk[0],el};
 // dct_type selects the layout of all four luma blocks in the macroblock, not
 // only blocks whose coded-block-pattern bit supplies a residual.
-wire block_field_dct=mb_field_dct&&(blk<4);
+wire block_field_dct=exec_block_field_dct;
 wire [11:0] luma_y=({6'd0,mrow}<<4)+
     (block_field_dct ? {8'd0,er,1'b0}+{11'd0,blk[1]}
                      : {8'd0,blk[1],er});
