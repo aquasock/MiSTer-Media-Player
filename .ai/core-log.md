@@ -1,3 +1,32 @@
+## 737 COMMIT Unreleased 6196869 2026-08-29T20:23:51-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Record verified construction and installation of the two requested later authored I/P checkpoints ending at P100 and P115.
+
+#### Outcome:
+
+Using unchanged checkpoint source `6196869` and the exact original authored stream, generate the requested two-file batch.  The P100 stream ends on the byte-identical zero-based source P100, removes 48 complete B units, preserves 8 I plus 45 P units unchanged and contains exactly 53 720x480 TFF interlaced pictures at 30000/1001; its 1,255,936 bytes have SHA-256 `69d9c388a77f5afed5bbe10f8b4a9e5ba97426e1172720a5e31075c47462f9f4`.  The P115 stream ends on the byte-identical source P115, removes 58 complete B units, preserves 9 I plus 49 P units unchanged and contains exactly 58 pictures with the same format; its 1,409,104 bytes have SHA-256 `f4062400df99d5795de14197cf711b9673a60171e5a63b1756cf653302e1a3e6`.  Each contains no B picture, ends with the required single `00 00 01 b7` sequence-end code and completes an independent full FFmpeg software decode without error.  Absolute FTP inventory first proves both filenames absent; installation as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p100_checkpoint.m2v` and `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p115_checkpoint.m2v`, followed by independent absolute-path FTP readback, reproduces each exact byte count, SHA-256 and terminal sequence end.  No source, FPGA, RBF, Main, helper, existing media or configuration changes.
+
+#### Next Steps:
+
+In `800x600 Diagnostic` with Weave selected, play the P100 checkpoint first and inspect its stable terminal framebuffer for the remembered large block corruption; then play P115 and inspect its stable terminal framebuffer separately.  Report `P100 clean` or `P100 corrupt`, followed by `P115 clean` or `P115 corrupt`.  Do not capture telemetry unless the user explicitly requests it, and do not change or rebuild the FPGA.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 736 COMMIT Unreleased 6196869 2026-08-29T20:20:41-07:00
 
 #### Coming From:
@@ -1224,42 +1253,6 @@ Keep WAV and MP3 accepted and preserve both paths through later format and FPGA 
 - tools/streams/test_main_mister_profile.py
 - tools/streams/verify_arm_av_pipeline.py
 - tools/streams/verify_consumer_wav.py
-
-#### Status:
-
-- [x] Built
-- [x] Passed
-
----
-
-## 697 COMMIT Unreleased 60159bd 2026-08-29T02:45:21-07:00
-
-#### Coming From:
-
-Unreleased 784ae0b
-
-#### Purpose:
-
-Add basic standalone MP3 playback through the existing MediaPlayer picker and PCM transport without changing the FPGA.
-
-#### Outcome:
-
-Sources `c1d7da7`, `2445324` and `60159bd` compile pinned minimp3 directly into the static helper, add case-insensitive `.mp3` selection to Main and decode MPEG-1 Layer III mono or stereo at 44.1 or 48 kHz into the existing signed stereo PCM records with one clean end token and no video requirement.  The implementation bounds ID3 metadata handling, rejects unsupported rates and malformed or renamed input, preserves byte-identical video and accepted MP2, AC-3 and DTS behavior, and passes the native codec, transport and sanitized Main-loader matrices.  The exact static helper and patched Main were installed transactionally with verified backups; after the WAV cycle the user played the selected MP3 derivative on hardware and reported that it sounded perfect, and the retained session shows all 263,808 stereo frames, helper exit zero and normal completion.
-
-#### Next Steps:
-
-Keep MP3 accepted and preserve its helper and Main behavior through later format and FPGA work.
-
-#### Files Modified:
-
-- README.md
-- host/arm/ARCHITECTURE.md
-- host/arm/media_player_helper.c
-- host/arm/media_player_protocol.h
-- host/main_mister/0001-mediaplayer-arm-loader.patch
-- tools/streams/generate_arm_av_test.py
-- tools/streams/test_main_mister_profile.py
-- tools/streams/verify_arm_av_pipeline.py
 
 #### Status:
 
