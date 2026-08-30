@@ -7,6 +7,7 @@
 enum media_source_kind {
     MEDIA_SOURCE_NONE = 0,
     MEDIA_SOURCE_FILE,
+    MEDIA_SOURCE_ISO,
     MEDIA_SOURCE_DVD
 };
 

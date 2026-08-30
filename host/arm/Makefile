@@ -4,10 +4,13 @@ CPPFLAGS ?=
 LDFLAGS ?=
 DEPS_DIR ?= .deps
 A52_DIR ?= $(DEPS_DIR)/liba52
+DVD_PREFIX ?= $(DEPS_DIR)/dvd-install-native
 OUTPUT ?= media_player_helper
 SOURCES := media_player_helper.c media_source.c
 HEADERS := media_source.h media_player_protocol.h consumer_audio.h \
 	$(DEPS_DIR)/minimp3.h $(DEPS_DIR)/miniaudio.h
+DVDNAV_LIBRARY := $(DVD_PREFIX)/lib/libdvdnav.a
+DVDREAD_LIBRARY := $(DVD_PREFIX)/lib/libdvdread.a
 CONSUMER_OBJDIR := $(DEPS_DIR)/consumer-obj-$(notdir $(CC))
 CONSUMER_OBJECT := $(CONSUMER_OBJDIR)/consumer_audio.o
 CONSUMER_CFLAGS ?= -O2 -Wall -Wextra -std=c11 -Wno-unused-function
@@ -35,9 +38,11 @@ $(CONSUMER_OBJECT): consumer_audio.c consumer_audio.h media_source.h \
 	@mkdir -p $(CONSUMER_OBJDIR)
 	$(CC) $(CPPFLAGS) -I$(DEPS_DIR) $(CONSUMER_CFLAGS) -c $< -o $@
 
-$(OUTPUT): $(SOURCES) $(HEADERS) $(A52_OBJECTS) $(CONSUMER_OBJECT)
-	$(CC) $(CPPFLAGS) -I$(DEPS_DIR) -I$(A52_DIR) $(CFLAGS) $(SOURCES) \
-		$(A52_OBJECTS) $(CONSUMER_OBJECT) $(LDFLAGS) -lm -o $@
+$(OUTPUT): $(SOURCES) $(HEADERS) $(A52_OBJECTS) $(CONSUMER_OBJECT) \
+		$(DVDNAV_LIBRARY) $(DVDREAD_LIBRARY)
+	$(CC) $(CPPFLAGS) -I$(DEPS_DIR) -I$(A52_DIR) -I$(DVD_PREFIX)/include \
+		$(CFLAGS) $(SOURCES) $(A52_OBJECTS) $(CONSUMER_OBJECT) \
+		$(DVDNAV_LIBRARY) $(DVDREAD_LIBRARY) $(LDFLAGS) -lpthread -lm -o $@
 
 clean:
 	rm -f $(OUTPUT)

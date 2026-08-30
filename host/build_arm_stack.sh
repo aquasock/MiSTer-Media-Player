@@ -16,6 +16,17 @@ miniaudio_license_sha=457f1b500e0adf6bc059edddfa78a2f62012e7c3bb43476c20e0bd23b2
 liba52_version=0.7.4
 liba52_url=http://archive.ubuntu.com/ubuntu/pool/universe/a/a52dec/a52dec_0.7.4.orig.tar.gz
 liba52_sha=a21d724ab3b3933330194353687df82c475b5dfb997513eef4c25de6c865ec33
+# libdvdread provides ISO9660/UDF and IFO access; libdvdnav assembles the
+# selected title's cells into playback order.  Both are GPL-2.0-or-later.
+# The tracked patch makes the unencrypted-only product boundary enforceable:
+# even a runtime-installed libdvdcss cannot be discovered or used.
+libdvdread_version=7.1.1
+libdvdread_url=https://download.videolan.org/pub/videolan/libdvdread/last/libdvdread-7.1.1.tar.xz
+libdvdread_sha=a0d47876548bec806774bbf8dbf20bb19ba139464383156b32eb8e59915b90a9
+libdvdnav_version=7.0.0
+libdvdnav_url=https://download.videolan.org/pub/videolan/libdvdnav/last/libdvdnav-7.0.0.tar.xz
+libdvdnav_sha=a2a18f5ad36d133c74bf9106b6445806fa253b09141a46392550394b647b221e
+libdvdread_patch="$root_dir/host/arm/libdvdread-disable-css.patch"
 main_commit=0a8fb44ccec6d69c8b7f158abd5fe8065ab2bf4f
 main_patch="$root_dir/host/main_mister/0001-mediaplayer-arm-loader.patch"
 
@@ -66,8 +77,83 @@ fetch_liba52() {
 
 fetch_liba52
 
+fetch_dvd_sources() {
+    local read_tarball="$deps_dir/libdvdread-$libdvdread_version.tar.xz"
+    local nav_tarball="$deps_dir/libdvdnav-$libdvdnav_version.tar.xz"
+    local source_root="$deps_dir/dvd-source"
+    local read_source="$source_root/libdvdread"
+    local nav_source="$source_root/libdvdnav"
+    local stamp="$source_root/.prepared"
+    local expected_stamp
+
+    expected_stamp="$libdvdread_sha $libdvdnav_sha $(sha256sum "$libdvdread_patch" | cut -d' ' -f1)"
+    fetch_checked "$libdvdread_url" "$read_tarball" "$libdvdread_sha"
+    fetch_checked "$libdvdnav_url" "$nav_tarball" "$libdvdnav_sha"
+    if [[ -f "$stamp" ]] && [[ $(<"$stamp") == "$expected_stamp" ]]; then
+        return
+    fi
+    rm -rf "$source_root"
+    mkdir -p "$read_source" "$nav_source"
+    tar -xJf "$read_tarball" -C "$read_source" --strip-components=1
+    tar -xJf "$nav_tarball" -C "$nav_source" --strip-components=1
+    patch -d "$read_source" -p1 < "$libdvdread_patch"
+    printf '%s\n' "$expected_stamp" > "$stamp"
+}
+
+write_arm_cross_file() {
+    local cross_file=$1
+    local cc_path=$2
+    local tool_prefix=${cc_path%gcc}
+
+    cat > "$cross_file" <<EOF
+[binaries]
+c = '$cc_path'
+ar = '${tool_prefix}ar'
+strip = '${tool_prefix}strip'
+pkg-config = 'pkg-config'
+
+[host_machine]
+system = 'linux'
+cpu_family = 'arm'
+cpu = 'armv7'
+endian = 'little'
+
+[properties]
+needs_exe_wrapper = true
+EOF
+}
+
+build_dvd_libraries() {
+    local flavour=$1
+    local cross_file=${2:-}
+    local source_root="$deps_dir/dvd-source"
+    local read_build="$deps_dir/dvd-build-$flavour/libdvdread"
+    local nav_build="$deps_dir/dvd-build-$flavour/libdvdnav"
+    local install_root="$deps_dir/dvd-install-$flavour"
+    local cross_args=()
+
+    fetch_dvd_sources
+    if [[ -n "$cross_file" ]]; then
+        cross_args=(--cross-file "$cross_file")
+    fi
+    meson setup --wipe "$read_build" "$source_root/libdvdread" \
+        "${cross_args[@]}" --prefix="$install_root" --libdir=lib \
+        --default-library=static -Dlibdvdcss=disabled -Denable_docs=false \
+        -Dc_args=-DMMP_DISABLE_DVDCSS=1
+    meson compile -C "$read_build"
+    meson install -C "$read_build"
+    PKG_CONFIG_PATH="$install_root/lib/pkgconfig" \
+        meson setup --wipe "$nav_build" "$source_root/libdvdnav" \
+            "${cross_args[@]}" --prefix="$install_root" --libdir=lib \
+            --default-library=static -Denable_docs=false -Denable_examples=false
+    meson compile -C "$nav_build"
+    meson install -C "$nav_build"
+}
+
 build_native() {
+        build_dvd_libraries native
         make -B -C "$root_dir/host/arm" DEPS_DIR="$deps_dir" \
+            DVD_PREFIX="$deps_dir/dvd-install-native" \
             OUTPUT="$build_dir/media_player_helper.native"
 }
 
@@ -82,7 +168,16 @@ find_arm_cc() {
 
 build_arm_helper() {
         find_arm_cc
+        local arm_cc_path
+        local cross_file="$deps_dir/arm-meson-cross.txt"
+        local flavour
+
+        arm_cc_path=$(command -v "$arm_cc")
+        flavour=$(basename -- "$arm_cc")
+        write_arm_cross_file "$cross_file" "$arm_cc_path"
+        build_dvd_libraries "$flavour" "$cross_file"
         make -B -C "$root_dir/host/arm" CC="$arm_cc" DEPS_DIR="$deps_dir" \
+            DVD_PREFIX="$deps_dir/dvd-install-$flavour" \
             CFLAGS='-O2 -Wall -Wextra -Werror -std=c11' \
             LDFLAGS='-static -s' \
             OUTPUT="$build_dir/MediaPlayer_Helper"

@@ -30,22 +30,25 @@ can pass `dvd:` without changing process, pipe or FPGA-transfer ownership.
 ## Source boundary
 
 `media_source` is a pull interface with read, character-read, rewind, seek,
-error and close operations. The current backend implements `file:`. `dvd:` is recognized
-as a reserved source and deliberately returns unsupported without opening,
-mounting or reading the device.
+error and close operations. The current backends implement `file:` and `iso:`.
+The ISO backend uses pinned libdvdread and libdvdnav sources to read UDF/IFO
+metadata, choose the longest described DVD-Video title, and expose its cells in
+program-chain playback order as one sequential Program Stream. It deliberately
+uses only libdvdread's builtin reader; a tracked upstream patch prevents linked
+or dynamically discovered libdvdcss from being used. Encrypted or scrambled
+PES is rejected. `dvd:` remains reserved and returns unsupported without
+opening, mounting or reading a device.
 
-A future DVD backend may turn title and program-chain navigation into a logical
-byte stream without changing Program Stream parsing. It will own optical-device
-discovery, ISO9660/UDF access, VIDEO_TS and IFO interpretation, VOB program-chain
-assembly and any CSS policy. Those responsibilities do not belong in Main or
-the FPGA.
+Future direct-disc and interactive DVD backends may add optical-device discovery
+and a versioned navigation control channel without changing Program Stream
+parsing. Those responsibilities do not belong in Main or the FPGA.
 
 ## Pipeline boundaries
 
 The current implementation contains these logical stages even where they still
 share a compilation unit:
 
-1. Source: `file:` now; `dvd:` and `iso:` later.
+1. Source: `file:` and unencrypted `iso:` now; direct `dvd:` later.
 2. Container: raw M2V pass-through or MPEG Program Stream/PES demultiplexing.
 3. Timeline: PTS extraction and FPGA in-band timestamp records, with future
    discontinuity events for title, cell and seek transitions.
@@ -106,13 +109,13 @@ container, codec or output ownership above.
 
 ## Deferred DVD scope
 
-Recognizing `dvd:` in protocol one is an architectural reservation, not DVD
-support. v0.8.0 already supports file-based AC-3 decode and AC-3/DTS passthrough,
-plus a bounded interlaced all-I video path in the FPGA. Mounting a disc,
-navigating titles, handling encryption, DVD LPCM, subpictures, track switching
-and broader interlaced decoding remain deferred. These require separately
-approved development scopes; accepting some DVD audio payloads does not make
-the current source backend or video decoder DVD-compatible.
+Recognizing `dvd:` in protocol one remains an architectural reservation, not
+direct-disc support. The `iso:` backend is deliberately a main-feature playback
+subset: it selects the longest title and does not provide menus, user navigation,
+chapters, angles, encryption, DVD LPCM, subpictures or track switching. Broader
+DVD-Video filesystem and navigation conformance is not claimed because the
+project's retained normative references do not cover those specifications.
+Those deferred features require separately approved development scopes.
 
 ## Main to FPGA guarded fast-block transport
 

@@ -1324,6 +1324,11 @@ static int parse_pes_header(const uint8_t *packet, size_t size,
         size_t header_size;
         if (size < 3)
             return -1;
+        if ((packet[0] & 0x30) != 0) {
+            fprintf(stderr,
+                    "media_player_helper: encrypted or scrambled PES is unsupported\n");
+            return -1;
+        }
         header_size = 3u + packet[2];
         if (header_size > size)
             return -1;
