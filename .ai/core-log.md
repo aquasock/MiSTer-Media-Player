@@ -1,3 +1,32 @@
+## 756 COMMIT Unreleased 4e54e9d 2026-08-30T03:16:42-07:00
+
+#### Coming From:
+
+Unreleased 4e54e9d
+
+#### Purpose:
+
+Extend corrected-core hardware validation to two five-minute commercial-DVD feature openings in Native 480i.
+
+#### Outcome:
+
+The user plays `/media/fat/games/MediaPlayer/the_big_lebowski_first_5min.mpg` from beginning to end and reports that it works perfectly, accepting five continuous minutes of video, cadence, HDMI AC-3 decode and A/V synchronization on the exact installed `bc79d56a` candidate.  The user then plays `/media/fat/games/MediaPlayer/coming_to_america_first_5min.mpg`, reports failure at launch and leaves the exact run untouched for collection.  The valid helper log names that file, selects HDMI decoded stereo PCM and AC-3 private substream `0x80`, and shows no helper launch, container-recognition or audio-routing failure.  The 25,318-byte scaled screenshot `/tmp/entry756_coming_to_america_5min_run.png`, SHA-256 `4fc4d3fcc3b8206f7780705652446419fed7173468f13a93eeddb83ee07da0ba`, preserves the black no-picture result; its matching 601,366-byte helper log has SHA-256 `8a16db2b3f6d6a298559f309ad14e8e533e6ee641bd884197477884c429b3782`.  A separate raw 9,313-byte telemetry screenshot `/tmp/entry756_coming_to_america_5min_run_unscaled.png`, SHA-256 `db61b053496660d3bccb1f9a13a07b4ac274053690d53272cc9b3b2d7d370d68`, decodes with a valid schema-20 checksum: only 73,774 clean-video bytes are accepted, zero reference, B or display pictures complete, first and last presentation cycles remain zero, sequence end and quiet state are false, and snapshot reason is fatal/no-progress.  The sole hardware error is `0x0002`, `phase1_probe_error`; metadata shows the decoder has entered P temporal reference 2 before stopping.  There is no audio underrun, PCM protocol error, presentation error, cache overlap error, transport block or timestamp conflict.  Exact H.262 inventory explains why the earlier approximately twelve-second excerpt can pass while this feature opening fails.  The passed excerpt begins with true interlaced pictures (`progressive_frame=0`, `frame_pred_frame_dct=0`), while the passed Big Lebowski opening begins with progressive pictures that disable interlaced macroblock tools (`progressive_frame=1`, `frame_pred_frame_dct=1`).  This failing opening begins with progressive pictures that admit interlaced DCT and motion syntax (`progressive_frame=1`, `frame_pred_frame_dct=0`); its dense first I picture has 30 slices with maximum 2,400-byte payload, followed immediately by the failing P temporal reference 2 with 30 slices and maximum 2,112-byte payload.  The evidence therefore establishes a new first-GOP phase-one boundary in the progressive-frame/interlaced-tool combination or its dense first-P syntax; it does not reopen the corrected negative-odd field-motion result and does not implicate the program-stream or AC-3 launch path.  Two earlier collections made while the user was viewing other content are explicitly excluded from evidence.  No source, RBF, Main, helper, playback mode or installed media changes during this result.
+
+#### Next Steps:
+
+Preserve the exact failing program stream and installed RBF.  Before changing production source, extract a byte-exact elementary prefix through the first failing P picture and reproduce the `phase1_probe_error` offline with the existing detailed source/detail observability.  Compare an exact first-I-only control, the failing first-I/P prefix, the passed twelve-second excerpt and the passed Big Lebowski opening to separate progressive-frame plus interlaced-tool admission from slice-density or a specific macroblock mode.  Propose the narrow correction and its focused regression expansion for user approval before editing RTL or building another RBF; do not request another hardware replay of the unchanged failing file.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 755 COMMIT Unreleased 4e54e9d 2026-08-30T03:02:28-07:00
 
 #### Coming From:
@@ -1128,36 +1157,5 @@ None.
 
 - [x] Built
 - [ ] Passed
-
----
-
-## 716 COMMIT Unreleased 8fd16e8 2026-08-29T18:37:35-07:00
-
-#### Coming From:
-
-Unreleased 8fd16e8
-
-#### Purpose:
-
-Hardware-validate the exact timing-passing RBF's known DVD-opening regression over both HDMI and S/PDIF audio.
-
-#### Outcome:
-
-After reloading the entry-715 RBF, the user plays `/media/fat/games/MediaPlayer/dvd_opening_original.mpg` and reports working HDMI audio.  The initial report that S/PDIF does not work is withdrawn when the user finds its cable unplugged; after connecting the cable and replaying, the user reports that S/PDIF works perfectly too.  Two agent-triggered screenshots of the completed S/PDIF run use absolute `/dev/MiSTer_cmd` and `/media/fat/screenshots/cadence_probe.png` paths, are byte-identical at 316,381 bytes and SHA-256 `f9a627cc2af55b86b670dfe4fc6ca5240a81400ce7c5ca8c76075cdd3e0832ff`, show the expected final Universal frame, and decode as matching checksum-valid schema-20 quiet snapshots.  Telemetry accepts the exact expected 10,334,169 clean video bytes, all 289 displayed pictures, 288 swaps, 128 reference plus 161 B pictures and all 25 timestamps, reaches sequence end and presentation completion, and reports zero error flags, audio underruns, PCM protocol faults, presentation faults, cache-bank overlap faults, transport-block intervals or timestamp-delay conflicts.  Legacy observational counters remain visible at 287 deadline records, 145 outliers and 40 timestamp-advance conflicts; as in the prior accepted opening captures, these are not the functional acceptance gate and do not negate the complete, error-free run.  The helper independently identifies S/PDIF output with AC-3 private substream `0x80` using IEC 61937, emits 375 frames and 576,000 samples, reaches EOF and exits zero after all 12,818,397 transport bytes in 783 pipe reads, with every byte on the fast path and none on the slow path.  Absolute FTP readback reproduces the installed 4,471,792-byte entry-714 RBF hash `677f2e11df6104c8409abcd541df81f1b2d178e6a249038b16afdf5e0282ac7c`, the accepted static helper hash and the source movie hash.  This accepts the exact `8fd16e8` candidate for the bounded known opening over both HDMI and S/PDIF; because this fixture uses progressive frame pictures within an interlaced sequence, it does not independently qualify the newly admitted field-motion and field-DCT syntax.  No source, installed file, playback mode or core configuration is changed during capture.
-
-#### Next Steps:
-
-Do not repeat the known opening solely to reconfirm HDMI or S/PDIF audio.  Preserve the verified deployed RBF and rollback artifact, and resume the separate DVD-video compatibility roadmap with an excerpt that actually exercises the remaining target interlaced syntax or direct VOB path.  Keep 576i outside scope and make no rebuild, reseed or FPGA change unless a distinct video defect requires it.
-
-#### Files Modified:
-
-- .ai/current_results/entry716_hardware_acceptance.json
-- .ai/current_results/entry716_helper_summary.txt
-- .ai/current_results/entry716_spdif_terminal.png
-
-#### Status:
-
-- [x] Built
-- [x] Passed
 
 ---
