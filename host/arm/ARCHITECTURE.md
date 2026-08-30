@@ -36,8 +36,11 @@ metadata, choose the longest described DVD-Video title, and expose its cells in
 program-chain playback order as one sequential Program Stream. It deliberately
 uses only libdvdread's builtin reader; a tracked upstream patch prevents linked
 or dynamically discovered libdvdcss from being used. Encrypted or scrambled
-PES is rejected. `dvd:` remains reserved and returns unsupported without
-opening, mounting or reading a device.
+PES is rejected. At the selected title's initial random-access boundary, the
+helper discards only open-GOP leading B pictures that require a reference from
+before that boundary; the first two available I/P references and every later
+authored picture remain unchanged. `dvd:` remains reserved and returns
+unsupported without opening, mounting or reading a device.
 
 Future direct-disc and interactive DVD backends may add optical-device discovery
 and a versioned navigation control channel without changing Program Stream

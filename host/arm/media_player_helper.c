@@ -177,6 +177,7 @@ struct output_state {
     int pcm_non_audio;       /* IEC 61937 burst records, never decoded PCM */
     int scheduler_enabled;
     int scheduler_started;
+    int iso_start_filter_active;
     uint32_t pts_window;      /* start-code scanner across queued payloads */
     unsigned pictures_since_pts;
     int pts_boundary_seen;    /* sequence or group header since last record */
@@ -540,6 +541,117 @@ static int queue_video(struct output_state *output, const uint8_t *data,
     return 0;
 }
 
+/*
+ * A DVD title may begin at an open GOP.  Pictures between its first I picture
+ * and the following I/P reference are decode-order leading B pictures: they
+ * need the preceding title/cell reference, which an independently selected
+ * ISO title cannot provide.  Hold the already bounded scheduler queue until
+ * the next reference proves their complete extent, then turn every start code
+ * in those pictures into user data.  This preserves every byte position and
+ * timestamp while making the unavailable pictures invisible to the decoder.
+ */
+static void neutralize_start_codes(uint8_t *data, size_t begin, size_t end)
+{
+    size_t i;
+
+    for (i = begin; i + 3u < end; ++i) {
+        if (data[i] == 0 && data[i + 1u] == 0 && data[i + 2u] == 1)
+            data[i + 3u] = 0xb2;
+    }
+}
+
+static int iso_filter_initial_random_access(struct output_state *output)
+{
+    struct video_chunk *chunk;
+    uint8_t *video;
+    size_t video_size = 0;
+    size_t copied = 0;
+    size_t orphan_start = SIZE_MAX;
+    size_t i;
+    int first_reference_seen = 0;
+    int resolved = 0;
+    unsigned discarded = 0;
+
+    if (!output->iso_start_filter_active)
+        return 1;
+    for (chunk = output->video_head; chunk; chunk = chunk->next) {
+        size_t prefix = chunk->has_record ? 9u : 0u;
+
+        if (chunk->offset || chunk->size < prefix) {
+            fprintf(stderr,
+                    "media_player_helper: invalid ISO startup queue state\n");
+            return -1;
+        }
+        video_size += chunk->size - prefix;
+    }
+    video = malloc(video_size ? video_size : 1u);
+    if (!video) {
+        fprintf(stderr,
+                "media_player_helper: out of memory filtering ISO startup\n");
+        return -1;
+    }
+    for (chunk = output->video_head; chunk; chunk = chunk->next) {
+        size_t prefix = chunk->has_record ? 9u : 0u;
+        size_t count = chunk->size - prefix;
+
+        memcpy(video + copied, chunk->data + prefix, count);
+        copied += count;
+    }
+
+    for (i = 0; i + 5u < video_size; ++i) {
+        unsigned coding_type;
+
+        if (video[i] != 0 || video[i + 1u] != 0 ||
+            video[i + 2u] != 1 || video[i + 3u] != 0)
+            continue;
+        coding_type = (video[i + 5u] >> 3) & 7u;
+        if (orphan_start != SIZE_MAX) {
+            neutralize_start_codes(video, orphan_start, i);
+            orphan_start = SIZE_MAX;
+            discarded++;
+        }
+        if (!first_reference_seen) {
+            if (coding_type == 3u) {
+                orphan_start = i;
+            } else if (coding_type == 1u) {
+                first_reference_seen = 1;
+            } else if (coding_type == 2u) {
+                fprintf(stderr,
+                        "media_player_helper: ISO title starts without an "
+                        "intra picture\n");
+                free(video);
+                return -1;
+            }
+            continue;
+        }
+        if (coding_type == 3u) {
+            orphan_start = i;
+        } else if (coding_type == 1u || coding_type == 2u) {
+            resolved = 1;
+            break;
+        }
+    }
+    if (!resolved) {
+        free(video);
+        return 0;
+    }
+
+    copied = 0;
+    for (chunk = output->video_head; chunk; chunk = chunk->next) {
+        size_t prefix = chunk->has_record ? 9u : 0u;
+        size_t count = chunk->size - prefix;
+
+        memcpy(chunk->data + prefix, video + copied, count);
+        copied += count;
+    }
+    free(video);
+    output->iso_start_filter_active = 0;
+    fprintf(stderr,
+            "media_player_helper: ISO random access discarded %u leading "
+            "B picture(s)\n", discarded);
+    return 1;
+}
+
 static int hold_push(struct output_state *output,
                      const mp3d_sample_t *stereo, int frames)
 {
@@ -707,6 +819,12 @@ static void free_video_head(struct output_state *output)
  */
 static int scheduler_release_silent_video(struct output_state *output)
 {
+    if (output->iso_start_filter_active) {
+        fprintf(stderr,
+                "media_player_helper: ISO title ended before a complete "
+                "initial random-access group\n");
+        return -1;
+    }
     output->hold_active = 0;
     output->scheduler_started = 1;
     output->scheduler_enabled = 0;
@@ -825,6 +943,13 @@ static void scheduler_log_progress(struct output_state *output)
  */
 static int scheduler_drain(struct output_state *output, int at_eof)
 {
+    if (output->iso_start_filter_active) {
+        if (at_eof)
+            fprintf(stderr,
+                    "media_player_helper: ISO title ended before a complete "
+                    "initial random-access group\n");
+        return at_eof ? -1 : 0;
+    }
     while (output->video_head) {
         struct video_chunk *chunk = output->video_head;
         uint64_t target;
@@ -942,7 +1067,7 @@ static int write_pcm(struct output_state *output, const mp3d_sample_t *samples,
             output->scheduler_started = 1;
             if (hold_flush(output, 0) < 0)
                 return -1;
-        } else if (output->hold_active &&
+        } else if (!output->iso_start_filter_active && output->hold_active &&
             (startup_lead_complete(output) ||
              hold_available(output) >= output->hold_limit)) {
             output->hold_active = 0;
@@ -1658,15 +1783,20 @@ static int process_pes(struct media_source *input, uint8_t code,
         int has_record = has_pts && pts_record_wanted(output);
         size_t video_size = length - payload_offset;
 
-        if (output->scheduler_enabled && !output->audio_pes_seen &&
+        if (output->scheduler_enabled && !output->iso_start_filter_active &&
+            !output->audio_pes_seen &&
             video_queue_would_overflow(output, video_size, has_record) &&
             scheduler_release_silent_video(output) < 0)
             goto done;
 
         if (output->scheduler_enabled) {
             if (queue_video(output, packet + payload_offset,
-                            video_size, has_pts, has_record, pts) < 0 ||
-                scheduler_drain(output, 0) < 0)
+                            video_size, has_pts, has_record, pts) < 0)
+                goto done;
+            if (output->iso_start_filter_active &&
+                iso_filter_initial_random_access(output) < 0)
+                goto done;
+            if (scheduler_drain(output, 0) < 0)
                 goto done;
         } else {
             if (has_record && emit_video_pts(output, pts) < 0)
@@ -2173,6 +2303,8 @@ int main(int argc, char **argv)
         goto done;
     }
     output.scheduler_enabled = is_program_stream && !output.pcm;
+    output.iso_start_filter_active =
+        input.kind == MEDIA_SOURCE_ISO && output.scheduler_enabled;
     if (is_mp3) {
         if (process_mp3_stream(&input, &audio, &output) < 0)
             goto done;
