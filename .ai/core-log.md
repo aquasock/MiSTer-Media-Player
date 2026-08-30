@@ -1,3 +1,32 @@
+## 729 COMMIT Unreleased 6196869 2026-08-29T20:06:15-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Accept the clean P66 terminal checkpoint and advance the bounded authored P-chain search to P69.
+
+#### Outcome:
+
+The user initially reports that the P66 checkpoint ends early, then confirms no visible block corruption.  The short playback is intentional rather than a failure: the fixture contains only the 29 retained I/P pictures required to reach P66, and the requested terminal capture proves all 273,704 bytes are accepted, all 29 pictures display across 28 swaps, final picture type is P with temporal reference 6, sequence end and presentation completion are true, the session is quiet and the scheduler is fully drained.  The measured presentation span is 0.9928 seconds at 28.202 pictures per second, with zero error flags, presentation faults, cache overlap faults, deadline gaps, cadence outliers, transport blocks or timestamp conflicts.  The 290,814-byte screenshot `/tmp/entry728_p66_checkpoint_completed.png`, SHA-256 `5db4847dbc17108c5ae1b0cfec86b01fabba4ebec3f6972fccd89be9e3504e96`, shows the intended dark fade-stage P66 terminal framebuffer without large macroblock corruption.  Because that final framebuffer remains onscreen after the sub-second decode, the short live passage does not limit its inspection.  The first corrupt authored P frame is therefore after P66 within the initial consecutive P chain.  No source, installed media, RBF, Main, helper or configuration changes during capture.
+
+#### Next Steps:
+
+Use the existing source `6196869` checkpoint mode to generate a second byte-exact I/P prefix ending at zero-based coded P69, midway through the remaining P67 through P72 interval.  Preserve every retained I/P unit, remove only complete B units, append one terminal sequence-end code, verify exact P69 termination and clean software decode, then install under a new absolute filename with exact readback.  The next hardware test should inspect the stable terminal P69 framebuffer rather than the intentionally short live passage.  A corrupt P69 narrows onset to P67 through P69; a clean P69 narrows it to P70 through P72.  Test-media generation and installation require a separate explicit user instruction; do not change or rebuild the FPGA.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [x] Passed
+
+---
+
 ## 728 COMMIT Unreleased 6196869 2026-08-29T20:01:31-07:00
 
 #### Coming From:
@@ -1262,34 +1291,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 689 COMMIT Unreleased 8423f20 2026-08-28T18:30:50-07:00
-
-#### Coming From:
-
-Unreleased 8423f20
-
-#### Purpose:
-
-Install the corrected helper for controlled HDMI and S/PDIF hardware playback validation.
-
-#### Outcome:
-
-The user explicitly authorizes installing and testing the helper-only correction from entry 688 on the MiSTer at 10.10.0.30. The exact stripped, statically linked ARM EABI5 artifact from clean source commit 8423f20 is retrieved from the build PC and locally reverified as 399,340 bytes with SHA-256 fefaeb18b8c9e091a9cd9e97258e86264683f374f9663cb3ea6b99bafb81977a. FTP staging and independent readback reproduce that hash before final rename, and final readback from `/media/fat/linux/MediaPlayer_Helper` reproduces it again. The replaced helper is preserved at `/media/fat/_MediaPlayer_Backups/MediaPlayer_Helper_f6206ba01459_20260828T183350` with its original 399,340-byte size and SHA-256 f6206ba01459eefcc40b26d3d5b3b6ca4f70e496fbeadc317254f86f19f370c8. Before-and-after readbacks prove the MiSTer Main executable, original DVD opening and all three existing MediaPlayer RBF files unchanged. No core reload or playback is initiated, and hardware acceptance remains pending.
-
-#### Next Steps:
-
-Play `games/MediaPlayer/dvd_opening_original.mpg` first over S/PDIF with Weave held fixed, leave the completed 2DID screen and latest helper log intact, and report any audible dropout or visible stutter so the evidence can be collected before another run. If that opening is clean, repeat over HDMI and then use the longer file that previously showed minor recurring underruns for an extended S/PDIF run. Accept the correction only if the user reports clean playback and telemetry shows no audio underrun or protocol fault; otherwise preserve the evidence and stop before further production changes. The helper is launched per playback, so no FPGA reload is required.
-
-#### Files Modified:
-
-- host/arm/media_player_helper.c
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
