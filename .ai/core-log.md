@@ -1,4 +1,4 @@
-## 759 COMMIT Unreleased ??? 2026-08-30T03:36:32-07:00
+## 759 COMMIT Unreleased cee1a9e 2026-08-30T03:36:32-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Admit legal progressive-film pictures using field DCT, simplify the product menu
 
 #### Outcome:
 
-The user approves the entry-757 production correction and requests the same build to expose only `Aspect Ratio` with `4:3` and `16:9`, `Deinterlacer Mode` with `Bob` and `Weave`, the existing audio-test choices, and `Audio Output` with `HDMI` and `S/PDIF`.  The user explicitly removes 800x600 from the product and confirms that normal playback is Native 480i only.  The planned source boundary removes the erroneous `frame_pred_frame_dct` prerequisite from progressive-film admission, maps the menu choices directly to their requested behavior, makes Native 480i independent of obsolete saved status bits, and hard-disables the removed timing-pattern controls.  The user also authorizes inspection of the full Quartus timing result and a narrowly scoped timing correction if required for closure.
+Source `cee1a9e` removes only the erroneous `frame_pred_frame_dct` prerequisite from progressive-film admission and documents that a clear flag admits macroblock-level field DCT and prediction handled by the existing downstream parser.  The menu now exposes `Aspect Ratio` as `4:3` or `16:9`, `Deinterlacer Mode` as `Bob` or `Weave`, the unchanged `Audio Test` choices, and `Audio Output` as `HDMI` or `S/PDIF`; Bob and 4:3 are the zero/default selections.  The obsolete 800x600, native timing-pattern and pattern-motion controls and top-level pattern mux are removed, Native 480i no longer depends on their saved status bits, and no hidden stale selection can reactivate them.  The exact 91,436-byte Coming to America first-I/P prefix accepts every byte, retires all 30 P rows, publishes both references and one swap, and completes with zero decoder, raster, writer or presentation errors.  Film cadence, reorder timestamps, reference-overlap ownership, native field order, all repeated-field cache cases, combined P/B field motion plus field DCT, interlaced P/B field-DCT residuals, B field motion, progressive mixed-raster pixels, native timing, startup, cache refill, generation, presentation integration, deadline and cadence-profiler regressions all pass.  A clean GitHub worktree build with the pinned `260829` build ID compiles at 34,156 of 41,910 ALMs, 52,529 registers, 4,181,443 memory bits and 67 DSP blocks.  Default fitter seed 17 misses only thirteen generic MiSTer `ascal` HDMI paths by at most 0.084 ns while decoder and video setup remain positive 0.986 and 3.164 ns; command-line seed 18 improves the global miss to 0.042 ns but is rejected.  At the user's instruction to stop after the current reseed and build, seed 19 is the final attempt and passes the complete gate with setup, hold, recovery, removal and minimum-pulse-width margins of positive 0.124, 0.231, 3.936, 0.541 and 0.925 ns; decoder and video setup are positive 0.462 and 2.378 ns.  The 4,461,996-byte timing-clean RBF has SHA-256 `162c788d2fa121f340ab6649ef94b25e97f31a44ee552928bb89e32b147059a6`; its 253,929-byte STA report has SHA-256 `b3fe3cd5f8b8a71dac42df1cfdf63387fd7fa4120713550a5caa789bf28c4b38`.  The prior `bc79d56a` RBF is preserved locally as `output_files/MediaPlayer-bc79d56a-known-good.rbf`.  No RBF is installed on the MiSTer, no further reseed or source cleanup is attempted, and the repository QSF remains at seed 17 because the user stops work after this seed-19 artifact.
 
 #### Next Steps:
 
-Implement the approved RTL changes, verify the exact Coming to America I/P prefix and focused historical video regressions in an isolated build-PC checkout, and statically verify the menu/status mappings.  Pull the resulting source commit on the build PC, perform a clean Quartus compilation and full timing analysis, inspect all reported clock domains and worst paths, and make only a functionally equivalent timing-specific correction if timing fails or lacks a usable margin.  Do not restore deleted diagnostic media or bulky regression artifacts to the production repository.  Install only a timing-passing RBF with the known-good rollback preserved, then request one five-minute Coming to America hardware run followed by the already-proven Big Lebowski control only if needed.
+Stop after the completed seed-19 build as instructed.  Do not install the RBF, reseed again, edit shared MiSTer scaler RTL, remove stale SDC lines or change the QSF without a new user instruction.  When work resumes, decide explicitly whether to deploy the fully identified seed-19 `162c788d` artifact as built or first pin seed 19 in `MediaPlayer.qsf` and repeat a clean full build for source-controlled placement reproducibility.  The first hardware validation of this functional change should use the unchanged five-minute Coming to America program stream in Native 480i, verify the requested menu labels and both aspect/deinterlacer choices, and leave the known-good `bc79d56a` rollback intact; do not repeat Big Lebowski unless Coming succeeds and a control is materially needed.
 
 #### Files Modified:
 
@@ -23,7 +23,7 @@ Implement the approved RTL changes, verify the exact Coming to America I/P prefi
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
