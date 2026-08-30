@@ -70,6 +70,10 @@ wire signed [9:0] mb_bmvy=$signed(motion_word[29:20]);
 (* preserve *) reg signed [9:0] exec_bmvx1,exec_bmvy1;
 (* preserve *) reg exec_field,exec_fsel0,exec_fsel1,exec_bsel0,exec_bsel1;
 (* preserve *) reg exec_block_field_dct;
+// Capture field-DCT block geometry before launch-address formation.  This
+// removes the live block counter from the seed-19 failed address path.
+(* preserve *) reg exec_field_dct_slot;
+(* preserve *) reg [11:0] exec_field_dct_dest_y0;
 (* preserve *) reg signed [9:0] phase_mvx,phase_mvy;
 (* preserve *) reg phase_backward;
 (* preserve *) reg [28:0] bidir_prelaunch_addr,next_prelaunch_addr;

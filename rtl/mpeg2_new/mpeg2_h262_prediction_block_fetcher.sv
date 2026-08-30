@@ -94,6 +94,10 @@ reg [7:0] row_words_reg;
 reg [6:0] descriptor_slot [0:DESCRIPTOR_DEPTH-1];
 reg [DESCRIPTOR_POINTER_WIDTH-1:0] descriptor_head,descriptor_tail;
 reg [DESCRIPTOR_COUNT_WIDTH-1:0] descriptor_count;
+// Keep the response-side empty decision independent of the multi-bit count.
+// The count still controls request capacity, while this one-bit invariant cuts
+// that full/room cone out of every retained-word write enable.
+(* preserve *) reg descriptor_nonempty;
 reg lookup_pending;
 reg [1:0] lookup_phase_q;
 reg [3:0] lookup_row_q;
@@ -119,12 +123,16 @@ wire start_rows_ok=
     ((phase_count<3'd3)||((phase2_rows>=4'd1)&&(phase2_rows<=4'd9)))&&
     ((phase_count<3'd4)||((phase3_rows>=4'd1)&&(phase3_rows<=4'd9)));
 
-wire response_existing=memory_dout_ready&&(descriptor_count!=0);
+wire response_existing=memory_dout_ready&&descriptor_nonempty;
 wire descriptor_room=(descriptor_count<DESCRIPTOR_DEPTH)||response_existing;
 assign memory_rd=active&&!all_issued&&descriptor_room;
 wire issue_accept=memory_rd&&!memory_busy;
-wire response_direct=memory_dout_ready&&(descriptor_count==0)&&issue_accept;
-wire response_pop=memory_dout_ready&&(descriptor_count!=0);
+// When the FIFO is empty, its count is zero by construction and therefore it
+// necessarily has room.  Spell out the direct-response issue predicate here
+// so descriptor_count cannot feed the retained-word write-control path.
+wire response_direct=memory_dout_ready&&!descriptor_nonempty&&
+    active&&!all_issued&&!memory_busy;
+wire response_pop=memory_dout_ready&&descriptor_nonempty;
 wire descriptor_push=issue_accept&&!response_direct;
 wire [DESCRIPTOR_COUNT_WIDTH:0] descriptor_count_after=
     {1'b0,descriptor_count}+descriptor_push-response_pop;
@@ -185,6 +193,7 @@ always @(posedge clk) begin
         descriptor_head<={DESCRIPTOR_POINTER_WIDTH{1'b0}};
         descriptor_tail<={DESCRIPTOR_POINTER_WIDTH{1'b0}};
         descriptor_count<={DESCRIPTOR_COUNT_WIDTH{1'b0}};
+        descriptor_nonempty<=1'b0;
         lookup_ready<=1'b0;
         lookup_pending<=1'b0;
         lookup_phase_q<=2'd0;
@@ -231,6 +240,7 @@ always @(posedge clk) begin
             descriptor_head<={DESCRIPTOR_POINTER_WIDTH{1'b0}};
             descriptor_tail<={DESCRIPTOR_POINTER_WIDTH{1'b0}};
             descriptor_count<={DESCRIPTOR_COUNT_WIDTH{1'b0}};
+            descriptor_nonempty<=1'b0;
             generator_phase<=2'd0;
             generator_row<=4'd0;
             generator_column<=1'b0;
@@ -268,9 +278,18 @@ always @(posedge clk) begin
                 descriptor_head<=descriptor_head_next;
 
             case({descriptor_push,response_pop})
-                2'b10:descriptor_count<=descriptor_count+1'b1;
-                2'b01:descriptor_count<=descriptor_count-1'b1;
-                default:descriptor_count<=descriptor_count;
+                2'b10:begin
+                    descriptor_count<=descriptor_count+1'b1;
+                    descriptor_nonempty<=1'b1;
+                end
+                2'b01:begin
+                    descriptor_count<=descriptor_count-1'b1;
+                    descriptor_nonempty<=(descriptor_count!=1);
+                end
+                default:begin
+                    descriptor_count<=descriptor_count;
+                    descriptor_nonempty<=descriptor_nonempty;
+                end
             endcase
 
             if(issue_accept) begin

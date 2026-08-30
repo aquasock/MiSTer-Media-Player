@@ -60,6 +60,9 @@
             exec_direction<=mb_direction;
             exec_field<=mb_field;
             exec_block_field_dct<=mb_field_dct&&(blk<4);
+            exec_field_dct_slot<=blk[1];
+            exec_field_dct_dest_y0<=
+                ({6'd0,mrow}<<4)+{11'd0,blk[1]};
             exec_fsel0<=mb_fsel0;exec_fsel1<=mb_fsel1;
             exec_bsel0<=mb_bsel0;exec_bsel1<=mb_bsel1;
             if(blk<4) begin

@@ -159,7 +159,7 @@ wire block_all_bounds_ok=block_field_dct?field_dct_fetch_bounds_ok:
 // same two fetchers already required by bidirectional field prediction.
 wire field_dct_fetch_backward=
     (exec_direction==2'd2)||field_fetch_backward;
-wire field_dct_slot=blk[1];
+wire field_dct_slot=exec_field_dct_slot;
 wire signed [9:0] field_dct_fetch_mvx=exec_field?
     field_mv_x(field_dct_fetch_backward,field_dct_slot):
     (field_dct_fetch_backward?exec_bmvx:exec_fmvx);
@@ -168,7 +168,7 @@ wire signed [9:0] field_dct_fetch_mvy=exec_field?
     (field_dct_fetch_backward?exec_bmvy:exec_fmvy);
 wire field_dct_fetch_sel=exec_field?
     field_select(field_dct_fetch_backward,field_dct_slot):1'b0;
-wire [11:0] field_dct_dest_y0=({6'd0,mrow}<<4)+{11'd0,blk[1]};
+wire [11:0] field_dct_dest_y0=exec_field_dct_dest_y0;
 wire signed [13:0] field_dct_dest_field_row=
     $signed({2'b00,field_dct_dest_y0[11:1]});
 wire signed [13:0] field_dct_fetch_x=
@@ -186,10 +186,10 @@ wire field_dct_fetch_half_x=
 wire field_dct_fetch_half_y=
     field_dct_fetch_mvy[0];
 wire [28:0] field_dct_phase0_addr=pixel_addr(
-    field_dct_fetch_backward?future_off:past_off,blk,
+    field_dct_fetch_backward?future_off:past_off,3'd0,
     field_dct_fetch_x[11:0],field_dct_fetch_y[11:0]);
 wire [28:0] field_dct_phase1_addr=pixel_addr(
-    field_dct_fetch_backward?future_off:past_off,blk,
+    field_dct_fetch_backward?future_off:past_off,3'd0,
     field_dct_fetch_x[11:0],field_dct_fetch_y[11:0]+12'd1);
 wire [3:0] field_dct_word_span=
     {1'b0,field_dct_fetch_x[2:0]}+4'd7+
@@ -886,7 +886,8 @@ always @(posedge clk) begin
         exec_direction<=0;exec_fmvx<=0;exec_fmvy<=0;exec_bmvx<=0;exec_bmvy<=0;
         exec_fmvx1<=0;exec_fmvy1<=0;exec_bmvx1<=0;exec_bmvy1<=0;
         exec_field<=0;exec_fsel0<=0;exec_fsel1<=0;exec_bsel0<=0;exec_bsel1<=0;
-        exec_block_field_dct<=0;
+        exec_block_field_dct<=0;exec_field_dct_slot<=0;
+        exec_field_dct_dest_y0<=0;
         phase_mvx<=0;phase_mvy<=0;phase_backward<=0;
         bidir_prelaunch_addr<=0;next_prelaunch_addr<=0;
         miss_prelaunch_addr<=0;miss_prelaunch_byte<=0;
