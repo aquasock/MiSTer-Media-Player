@@ -2,7 +2,7 @@ diff --git a/src/dvd_input.c b/src/dvd_input.c
 index 8b654dc..0caef2b 100644
 --- a/src/dvd_input.c
 +++ b/src/dvd_input.c
-@@ -425,6 +425,13 @@ static int file_close(dvd_input_t dev)
+@@ -425,5 +425,12 @@ static int file_close(dvd_input_t dev)
  int dvdinput_setup(void *priv, dvd_logger_cb *logcb, dvd_type_t dvda_flag)
  {
 +#ifdef MMP_DISABLE_DVDCSS
