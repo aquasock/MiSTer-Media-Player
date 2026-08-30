@@ -1,3 +1,32 @@
+## 744 COMMIT Unreleased 6196869 2026-08-29T20:40:52-07:00
+
+#### Coming From:
+
+Unreleased 6196869
+
+#### Purpose:
+
+Record verified construction and installation of the final onset-search checkpoints ending at P82 and P84.
+
+#### Outcome:
+
+Using unchanged source `6196869` and the exact original authored stream, generate the authorized pair.  The P82 stream ends on byte-identical zero-based source P82, removes 38 complete B units and preserves 7 I plus 38 P units unchanged; its 983,588 bytes have SHA-256 `04cbfe0fef0d2aa10dcf260daf7c2ef848b2c13012e1e42be87e2757dee58927`.  The P84 stream ends on byte-identical source P84, removes the same 38 B units and preserves 7 I plus 40 P units unchanged; its 1,075,936 bytes have SHA-256 `f905bd22168353dd78300d3431e14d4c2289944284d77cedca41ae0dd2d5f24c`.  Independent FFprobe enumeration confirms respectively 45 and 47 720x480 pictures at 30000/1001 with no B picture; both end with the required single `00 00 01 b7` sequence-end code and complete full FFmpeg software decode without error.  Absolute FTP inventory proves both new names absent; installation as `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p82_checkpoint.m2v` and `/media/fat/games/MediaPlayer/coming_to_america_interlaced_12s_authored_ip_p84_checkpoint.m2v`, followed by independent absolute-path FTP readback, reproduces each exact byte count, SHA-256 and terminal sequence end.  No source, FPGA, RBF, Main, helper, existing media or configuration changes.
+
+#### Next Steps:
+
+In `800x600 Diagnostic` with Weave selected, play P82 first and watch for even one faint horizontal strip or flicker in its live passage and stable terminal frame; then play P84 and make the same observation.  Report `P82 clean` or `P82 flicker`, followed by `P84 clean` or `P84 flicker`.  Combined with clean P80 and affected P85, these results identify the first affected authored P picture.  Do not capture telemetry unless the user explicitly leaves a failure displayed for evidence, and do not change or rebuild the FPGA.
+
+#### Files Modified:
+
+None.
+
+#### Status:
+
+- [x] Built
+- [ ] Passed
+
+---
+
 ## 743 COMMIT Unreleased 6196869 2026-08-29T20:38:36-07:00
 
 #### Coming From:
@@ -1179,34 +1208,5 @@ None.
 
 - [x] Built
 - [x] Passed
-
----
-
-## 704 COMMIT Unreleased 736f64f 2026-08-29T03:35:47-07:00
-
-#### Coming From:
-
-Unreleased 8404035
-
-#### Purpose:
-
-Deploy and hardware-test the exact fit-qualified recovery RBF with its matching decoded-PCM S/PDIF helper.
-
-#### Outcome:
-
-The exact source `736f64f` artifacts were retrieved from GUNSMOKE and independently reverified before deployment.  The 4,459,744-byte RBF with SHA-256 `3f66a5eb38bcff783472b977764bc34366a07570b01278822e705718edf224fa` is installed as `/media/fat/MediaPlayer_20260829.rbf` without replacing any existing core, and final FTP readback matches.  The installed 629,056-byte helper with SHA-256 `f5573a98dcd788228d317da906c8d017cf904e3a85f1d43aea7f13b048252758` is preserved and readback-verified at `/media/fat/_MediaPlayer_Backups/MediaPlayer_Helper_f5573a98dcd7_20260829T034019`; the matching 629,056-byte helper with SHA-256 `02d1df98c62ee00169585db990b6bd48c3769eca20c3e1d594f2318c362eb00f` is staged, promoted and verified at `/media/fat/linux/MediaPlayer_Helper`.  An initial read-only inventory used curl's login-relative FTP interpretation; after the user identified the mistake, filesystem-absolute paths were encoded explicitly before any write.  Before-and-after readbacks prove MiSTer Main, the active undated core, the prior dated core and the original DVD opening unchanged.  No core was loaded and no playback was started.  This checkpoint can validate existing video behavior and corrected HDMI and S/PDIF routing, but production interlaced P and B admission remains closed and therefore it cannot accept the NARA release profile or prove the recovered field-prediction path on hardware.
-
-#### Next Steps:
-
-Explicitly load `MediaPlayer_20260829.rbf`, then play the existing original DVD opening over HDMI decoded PCM first and report motion, audio and completion.  If clean, test MP3, WAV and FLAC over S/PDIF, then AC-3 passthrough over S/PDIF and one known progressive video.  Leave the completed screen and latest helper log intact before replay if any regression, dropout, protocol fault or visible error occurs so evidence can be collected.  Mark hardware acceptance only after the user reports the checkpoint results; this RBF does not yet exercise production field prediction.
-
-#### Files Modified:
-
-None.
-
-#### Status:
-
-- [x] Built
-- [ ] Passed
 
 ---
