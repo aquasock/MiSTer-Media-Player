@@ -136,6 +136,9 @@ reg [11:0] emit_x,emit_y;
 reg emit_block_start,emit_block_complete;
 reg block_fetch_start;
 reg block_fetch_start_bank;
+// Simulation monitors use this marker to distinguish the successor-prefetch
+// launch.  It is not part of the fetch descriptor or any functional selector.
+reg block_fetch_start_prefetch;
 // Capture the complete footprint descriptor when a fetch is scheduled.  The
 // registered block_fetch_start pulse reaches the fetcher on the following
 // edge, so these registers remove direction, geometry and address arithmetic

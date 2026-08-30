@@ -840,6 +840,7 @@ always @(posedge clk) begin
         pred_direction<=0;tap_index<=0;pred_sum<=0;forward_prediction<=0;out_reg<=0;tap_byte_sel<=0;
         emit_advanced<=0;emit_x<=0;emit_y<=0;emit_block_start<=0;emit_block_complete<=0;
         block_fetch_start<=0;block_fetch_start_bank<=0;
+        block_fetch_start_prefetch<=0;
         fetch_launch_phase_count<=0;
         fetch_launch_phase0_base_addr<=0;fetch_launch_phase1_base_addr<=0;
         fetch_launch_phase0_two_words<=0;fetch_launch_phase1_two_words<=0;

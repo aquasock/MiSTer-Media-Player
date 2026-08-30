@@ -98,6 +98,7 @@
                 else begin
                     block_fetch_start<=1;
                     block_fetch_start_bank<=block_consumer_bank;
+                    block_fetch_start_prefetch<=0;
                     fetch_launch_phase_count<=current_launch_phase_count;
                     fetch_launch_phase0_base_addr<=
                         current_launch_phase0_base_addr;
@@ -147,6 +148,7 @@
                                field_pair_bounds_ok)begin
                 block_fetch_start<=1;
                 block_fetch_start_bank<=~block_consumer_bank;
+                block_fetch_start_prefetch<=0;
                 fetch_launch_phase_count<=current_launch_phase_count;
                 fetch_launch_phase0_base_addr<=
                     current_launch_phase0_base_addr;
@@ -191,6 +193,7 @@
            successor_all_bounds_ok)begin
             block_fetch_start<=1;
             block_fetch_start_bank<=~block_consumer_bank;
+            block_fetch_start_prefetch<=1;
             fetch_launch_phase_count<=
                 (exec_direction==2'd3)?3'd2:3'd1;
             fetch_launch_phase0_base_addr<=successor_phase0_base_addr;
