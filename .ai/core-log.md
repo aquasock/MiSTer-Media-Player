@@ -1,4 +1,4 @@
-## 711 COMMIT Unreleased ??? 2026-08-29T16:48:02-07:00
+## 711 COMMIT Unreleased 578b7e0 2026-08-29T16:48:02-07:00
 
 #### Coming From:
 
@@ -10,11 +10,11 @@ Perform one user-authorized seed-17 rebuild of the simulation-qualified interlac
 
 #### Outcome:
 
-The user explicitly authorizes one reseed and delegates the seed choice after exact source `17336f8` fits normally but fails the full-chip HDMI PLL output-clock setup gate by 0.048 ns.  Seed 17 is selected from project evidence: the v0.8.0 timing-sensitive HDMI/scaler build improved from a 0.070 ns seed-16 failure to positive 0.243 ns at seed 17 and used that result for release, while seed 20 has already been exercised on the current source.  Change only the fitter seed assignment from 20 to 17, preserving production RTL, clocks, timing constraints, Main, helper and all simulation-qualified behavior.  Retain the rejected seed-20 build and use a separate clean exact-source checkout for one seed-17 compile; this is not authorization for a seed sweep, constraint waiver, installation or hardware playback.
+The user explicitly authorizes one reseed and delegates the seed choice after exact source `17336f8` fits normally but fails the full-chip HDMI PLL output-clock setup gate by 0.048 ns.  Seed 17 is selected from project evidence because the v0.8.0 timing-sensitive HDMI/scaler build improved from a 0.070 ns seed-16 failure to positive 0.243 ns at seed 17, while seed 20 has already been exercised on the current source.  Published source `578b7e0` changes only the fitter seed assignment from 20 to 17; a fresh detached checkout verifies `MediaPlayer.qsf` is the sole functional difference from simulation-qualified `17336f8`.  The one authorized Quartus Prime 17.0.2 compile completes in 13 minutes 36 seconds with zero tool errors and 247 warnings.  Seed 17 fits at 34,177 of 41,910 ALMs and 52,626 registers, reductions of 53 ALMs and 82 registers from seed 20 but still increases of 588 ALMs and 879 registers over accepted `b9c2657`; memory remains exactly 4,181,443 bits in 532 RAM blocks and DSP use remains 67.  Full timing rejects the fit: the 60 MHz decoder clock fails setup by 0.293 ns and the HDMI PLL output clock also fails by 0.003 ns with 0.072 ns TNS, while the 54 MHz video clock passes at 2.778 ns and hold, recovery, removal and minimum-pulse-width margins remain positive at 0.251, 2.956, 0.577 and 0.925 ns.  Because full timing already fails, no redundant focused timing extraction is used to qualify it.  The 4,439,176-byte RBF with SHA-256 `368fe458f18cb4659173073cce64ac44626201b895d320ff6090a17c91b13e76` is rejected and is not installed.
 
 #### Next Steps:
 
-Publish the seed-only source change, verify that `MediaPlayer.qsf` is its only functional difference from `17336f8`, and perform one clean Quartus Prime 17.0.2 compile.  Audit packed resources and all full, decoder and video timing categories against both the accepted `b9c2657` seed-20 baseline and rejected `17336f8` seed-20 build.  Preserve a timing-clean RBF as the sole candidate without installing it; if seed 17 fails compilation or any required timing category, stop without another reseed.
+Stop after the rejected seed-17 build without installing its RBF or trying another seed.  Preserve both rejected seed-20 and seed-17 reports alongside the accepted `b9c2657` baseline; if work resumes, use their path differences to propose a separately approved source-level timing correction that preserves constraints and all simulation-qualified behavior.
 
 #### Files Modified:
 
@@ -22,7 +22,7 @@ Publish the seed-only source change, verify that `MediaPlayer.qsf` is its only f
 
 #### Status:
 
-- [ ] Built
+- [x] Built
 - [ ] Passed
 
 ---
